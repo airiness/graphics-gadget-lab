@@ -1,32 +1,21 @@
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "AppRuntimeLog.h"
-#include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
-#include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
+#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
+
+#include <algorithm>
+#include <array>
+#include <format>
 
 namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] const AssetSnapshot::Model* FindModelSnapshot(
-			const AssetSnapshot& snapshot, ModelID id) noexcept
-		{
-			const auto iterator =
-				std::ranges::find(snapshot.m_Models, id, &AssetSnapshot::Model::m_Id);
-			return iterator != snapshot.m_Models.end() ? &*iterator : nullptr;
-		}
-
-		[[nodiscard]] const AssetSnapshot::Mesh* FindMeshSnapshot(
-			const AssetSnapshot& snapshot, MeshID id) noexcept
-		{
-			const auto iterator =
-				std::ranges::find(snapshot.m_Meshes, id, &AssetSnapshot::Mesh::m_Id);
-			return iterator != snapshot.m_Meshes.end() ? &*iterator : nullptr;
-		}
+		constexpr const char* ResidencyModelPath = "Assets/Models/NormalTangentTest/NormalTangentTest.gltf";
 
 		[[nodiscard]] const AssetSnapshot::Texture* FindTextureSnapshot(
 			const AssetSnapshot& snapshot, TextureID id) noexcept
@@ -35,6 +24,20 @@ namespace gglab
 				std::ranges::find(snapshot.m_Textures, id, &AssetSnapshot::Texture::m_Id);
 			return iterator != snapshot.m_Textures.end() ? &*iterator : nullptr;
 		}
+
+		[[nodiscard]] TextureID FindFirstRuntimeTexture(const Material& material) noexcept
+		{
+			for (const TextureID textureId : std::array{ material.m_BaseColorBinding.m_TextureId,
+				material.m_MetallicRoughnessBinding.m_TextureId, material.m_NormalBinding.m_TextureId,
+				material.m_OcclusionBinding.m_TextureId, material.m_EmissiveBinding.m_TextureId })
+			{
+				if (textureId.IsValid() && !IsReservedTextureId(textureId))
+				{
+					return textureId;
+				}
+			}
+			return {};
+		}
 	}
 
 	struct AssetResidencyLabSession::State
@@ -42,60 +45,22 @@ namespace gglab
 		enum class Phase : uint8_t
 		{
 			Loading,
-			MarkUsage,
-			WaitForPinnedProtection,
-			ReleaseOwner,
-			WaitForEvictionStart,
-			WaitForEvictionCancellation,
 			WaitForRelease,
-			WaitForTextureArtifactCacheReload,
-			WaitForTextureArtifactCacheRelease,
-			WaitForTextureDdcBuild,
-			WaitForTextureDdcBuildRelease,
-			WaitForTextureDdcReload,
-			WaitForTextureDdcReloadRelease,
-			WaitForTextureReloadRunning,
-			WaitForTextureReloadReplacement,
-			WaitForTextureReloadCompletion,
 			WaitForReload,
-			WaitForRuntimeRetirement,
-			WaitForDirectLoadReady,
-			WaitForDirectRuntimeRetirement,
+			WaitForRetirement,
 			Completed,
 		};
 
+		AssetOwnerScope m_Owner;
 		AssetManager::ModelLoadRequest m_Request{};
 		AssetResidencyConfig m_OriginalResidencyConfig{};
 		MeshID m_MeshId{};
 		MaterialID m_MaterialId{};
 		TextureID m_TextureId{};
-		uint64_t m_ModelGeneration = 0;
 		uint64_t m_MeshGeneration = 0;
 		uint64_t m_TextureGeneration = 0;
-		TextureImportSettings m_TextureImportSettings{};
 		uint64_t m_MeshResidencyEpoch = 0;
 		uint64_t m_TextureResidencyEpoch = 0;
-		uint64_t m_EvictionCountBaseline = 0;
-		uint64_t m_EvictionCancellationCountBaseline = 0;
-		uint64_t m_ReloadRequestCountBaseline = 0;
-		uint64_t m_OperationCountBaseline = 0;
-		uint64_t m_StaleCompletionCountBaseline = 0;
-		uint64_t m_AcceptedStateEventCountBaseline = 0;
-		uint64_t m_CompletedStateEventCountBaseline = 0;
-		uint64_t m_ModelImportArtifactCacheHitCountBaseline = 0;
-		uint64_t m_TextureArtifactCacheHitCountBaseline = 0;
-		uint64_t m_TextureDdcHitCountBaseline = 0;
-		uint64_t m_TextureDdcWriteCountBaseline = 0;
-		uint64_t m_PublicationCopiedBytesBaseline = 0;
-		uint64_t m_RuntimeRetirementCountBaseline = 0;
-		uint64_t m_ModelUseCount = 0;
-		uint64_t m_MeshUseCount = 0;
-		uint64_t m_TextureUseCount = 0;
-		uint64_t m_RuntimeEntryRetentionFramesBeforePinned = 0;
-		uint32_t m_MaxRuntimeRetirementsPerFrameBeforePinned = 0;
-		uint32_t m_PinnedProtectionFrames = 0;
-		TaskHandle m_StaleTextureReloadTask{};
-		TaskHandle m_ReplacementTextureReloadTask{};
 		float m_ElapsedSeconds = 0.0f;
 		Phase m_Phase = Phase::Loading;
 		bool m_Passed = false;
@@ -108,12 +73,12 @@ namespace gglab
 	{
 	}
 
+	AssetResidencyLabSession::~AssetResidencyLabSession() = default;
+
 	void AssetResidencyLabSession::OnEnter() noexcept
 	{
 		m_State = std::make_unique<State>();
 		AssetManager& assetManager = *m_Services.m_AssetManager;
-		m_State->m_PublicationCopiedBytesBaseline =
-			BuildAssetSnapshot(assetManager).m_ResourcePublicationQueue.m_SourceBytesCopiedToUpload;
 		m_State->m_OriginalResidencyConfig = assetManager.GetResidencyConfig();
 		assetManager.SetResidencyConfig({
 			.m_EnableAutomaticEviction = false,
@@ -121,9 +86,11 @@ namespace gglab
 			.m_LowWatermarkBytes = 0,
 			.m_MinUnusedFrames = 0,
 			.m_MaxEvictionsPerFrame = 16,
+			.m_RuntimeEntryRetentionFrames = 1'000'000,
+			.m_MaxRuntimeRetirementsPerFrame = 64,
 			});
-		m_State->m_Request = GetAssetOwnerScope().LoadModelAsync(
-			"Assets/Models/NormalTangentTest/NormalTangentTest.gltf", TaskPriority::Normal);
+		m_State->m_Owner = assetManager.CreateOwnerScope();
+		m_State->m_Request = m_State->m_Owner.LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
 		if (!m_State->m_Request.IsValid())
 		{
 			Fail("AssetManager rejected the residency verification model.");
@@ -136,7 +103,6 @@ namespace gglab
 		{
 			m_Services.m_AssetManager->SetResidencyConfig(m_State->m_OriginalResidencyConfig);
 		}
-		ResetAssetInterests();
 		m_State.reset();
 	}
 
@@ -155,778 +121,79 @@ namespace gglab
 		}
 
 		AssetManager& assetManager = *m_Services.m_AssetManager;
+		const auto setAutomaticEviction = [&assetManager](bool enabled) noexcept
+			{
+				AssetResidencyConfig config = assetManager.GetResidencyConfig();
+				config.m_EnableAutomaticEviction = enabled;
+				assetManager.SetResidencyConfig(config);
+			};
+		const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 		switch (m_State->m_Phase)
 		{
 		case State::Phase::Loading:
 		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
-			if (!model || model->m_ContentGeneration != m_State->m_Request.m_Generation)
+			if (!model || model->m_ContentGeneration != m_State->m_Request.m_Generation ||
+				(model->m_State != AssetState::Ready && model->m_State != AssetState::Failed &&
+					model->m_State != AssetState::Cancelled))
 			{
 				break;
 			}
-			if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
+			if (model->m_State != AssetState::Ready || model->m_MeshInstance.empty())
 			{
 				Fail("The residency verification model did not become Ready.");
 				return;
 			}
-			if (model->m_State != AssetState::Ready)
-			{
-				break;
-			}
-			if (model->m_ContentState != AssetContentState::Ready ||
-				model->m_ResidencyState != AssetResidencyState::Resident ||
-				model->m_ResidencyEpoch == 0 || model->m_MeshInstance.empty())
-			{
-				Fail("The Ready model has invalid content or residency metadata.");
-				return;
-			}
-
 			m_State->m_MeshId = model->m_MeshInstance.front().m_MeshId;
 			m_State->m_MaterialId = model->m_MeshInstance.front().m_MaterialId;
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
 			const Material* material = assetManager.GetMaterial(m_State->m_MaterialId);
-			if (!mesh || !material || mesh->m_ResidencyState != AssetResidencyState::Resident)
+			m_State->m_TextureId = material ? FindFirstRuntimeTexture(*material) : TextureID{};
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			const TextureContentRef content = assetManager.GetTextureContentRef(m_State->m_TextureId);
+			if (!mesh || !texture || !mesh->m_IsUploaded || !texture->m_IsUploaded ||
+				!assetManager.GetResidentTextureResource(content))
 			{
-				Fail("The verification model has no resident mesh dependency.");
+				Fail("The Ready model has no resident GPU mesh and texture view.");
 				return;
 			}
-			for (TextureID textureId :
-			std::array{ material->m_BaseColorBinding.m_TextureId,
-				material->m_MetallicRoughnessBinding.m_TextureId,
-				material->m_NormalBinding.m_TextureId, material->m_OcclusionBinding.m_TextureId,
-				material->m_EmissiveBinding.m_TextureId,
-				material->m_ClearcoatBinding.m_TextureId,
-				material->m_ClearcoatRoughnessBinding.m_TextureId,
-				material->m_ClearcoatNormalBinding.m_TextureId,
-				material->m_AnisotropyBinding.m_TextureId })
-			{
-				if (textureId.IsValid() && !IsReservedTextureId(textureId))
-				{
-					m_State->m_TextureId = textureId;
-					break;
-				}
-			}
-			const AssetSnapshot dependencySnapshot = BuildAssetSnapshot(assetManager);
-			const AssetStreamingQueueStatistics& publication =
-				dependencySnapshot.m_ResourcePublicationQueue;
-			if (publication.m_PendingCount != 0 || publication.m_PendingSourceBytes != 0)
-			{
-				break;
-			}
-			if (publication.m_SourceBytesCopiedToUpload !=
-				m_State->m_PublicationCopiedBytesBaseline)
-			{
-				Fail(
-					"Model publication created an independent CPU upload payload instead of borrowing immutable artifact data.");
-				return;
-			}
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(dependencySnapshot, m_State->m_TextureId);
-			if (!texture || texture->m_ResidencyState != AssetResidencyState::Resident)
-			{
-				Fail("The verification model has no resident texture dependency.");
-				return;
-			}
-			if (!texture->m_SourceDigest.IsValid() || !texture->m_DerivedDataKey.IsValid() ||
-				!texture->m_IsDerivedDataCached)
-			{
-				Fail("The model texture did not use the shared texture derived-data path.");
-				return;
-			}
-
-			const AssetSnapshot::Model* dependencyModel =
-				FindModelSnapshot(dependencySnapshot, m_State->m_Request.m_ModelId);
-			if (!dependencyModel || !dependencyModel->m_HasDependencyState ||
-				dependencyModel->m_DependencyCount == 0 ||
-				dependencyModel->m_ReadyDependencyCount != dependencyModel->m_DependencyCount ||
-				dependencyModel->m_PendingDependencyCount != 0 ||
-				dependencyModel->m_FailedDependencyCount != 0 ||
-				dependencyModel->m_CancelledDependencyCount != 0 ||
-				dependencySnapshot.m_TrackedModelDependencyCount == 0 ||
-				dependencySnapshot.m_ReverseDependencyEdgeCount <
-				dependencyModel->m_DependencyCount ||
-				dependencySnapshot.m_DependencyValidationCount == 0 ||
-				dependencySnapshot.m_DependencyValidationMismatchCount != 0)
-			{
-				Fail("The model dependency graph did not converge with traversal-based readiness.");
-				return;
-			}
-			if (!dependencyModel->m_ImportArtifactContentDigest.IsValid() ||
-				!dependencyModel->m_IsImportArtifactCached ||
-				dependencySnapshot.m_ModelImportArtifactCachedEntryCount == 0 ||
-				dependencySnapshot.m_ModelImportArtifactAdmissionCount == 0)
-			{
-				Fail("The immutable model import artifact was not admitted to the CPU cache.");
-				return;
-			}
-
-			if (!assetManager.SetModelResidencyPolicy(
-				m_State->m_Request.m_ModelId, AssetResidencyPolicy::Pinned) ||
-				!assetManager.SetModelResidencyPolicy(
-					m_State->m_Request.m_ModelId, AssetResidencyPolicy::Cacheable) ||
-				!assetManager.SetMeshResidencyPolicy(
-					m_State->m_MeshId, AssetResidencyPolicy::Pinned) ||
-				!assetManager.SetMeshResidencyPolicy(
-					m_State->m_MeshId, AssetResidencyPolicy::Cacheable) ||
-				!assetManager.SetTextureResidencyPolicy(
-					m_State->m_TextureId, AssetResidencyPolicy::Pinned) ||
-				!assetManager.SetTextureResidencyPolicy(
-					m_State->m_TextureId, AssetResidencyPolicy::Cacheable))
-			{
-				Fail("A cacheable asset rejected a valid residency policy transition.");
-				return;
-			}
-			if (!assetManager.SetModelResidencyPolicy(
-				m_State->m_Request.m_ModelId, AssetResidencyPolicy::Pinned))
-			{
-				Fail("The verification model could not be pinned for eviction protection.");
-				return;
-			}
-			const TextureID reservedTexture = ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
-			if (assetManager.SetTextureResidencyPolicy(
-				reservedTexture, AssetResidencyPolicy::Cacheable))
-			{
-				Fail("A reserved texture accepted a cacheable residency policy.");
-				return;
-			}
-			const AssetSnapshot reservedSnapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* pinnedTexture =
-				FindTextureSnapshot(reservedSnapshot, reservedTexture);
-			if (!pinnedTexture || pinnedTexture->m_ResidencyPolicy != AssetResidencyPolicy::Pinned)
-			{
-				Fail("A reserved texture accepted a cacheable residency policy.");
-				return;
-			}
-
-			m_State->m_ModelUseCount = model->m_UseCount;
-			m_State->m_MeshUseCount = mesh->m_UseCount;
-			m_State->m_TextureUseCount = texture->m_UseCount;
-			m_State->m_ModelGeneration = model->m_ContentGeneration;
 			m_State->m_MeshGeneration = mesh->m_ContentGeneration;
 			m_State->m_TextureGeneration = texture->m_ContentGeneration;
-			m_State->m_TextureImportSettings = texture->m_ImportSettings;
 			m_State->m_MeshResidencyEpoch = mesh->m_ResidencyEpoch;
 			m_State->m_TextureResidencyEpoch = texture->m_ResidencyEpoch;
-			const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
-			m_State->m_EvictionCountBaseline = residency.m_EvictionCount;
-			m_State->m_EvictionCancellationCountBaseline = residency.m_EvictionCancellationCount;
-			m_State->m_ReloadRequestCountBaseline = residency.m_ReloadRequestCount;
-			m_State->m_OperationCountBaseline = residency.m_OperationCount;
-			m_State->m_StaleCompletionCountBaseline = residency.m_StaleCompletionCount;
-			m_State->m_AcceptedStateEventCountBaseline = residency.m_AcceptedStateEventCount;
-			m_State->m_CompletedStateEventCountBaseline = residency.m_CompletedStateEventCount;
-			m_State->m_ModelImportArtifactCacheHitCountBaseline =
-				dependencySnapshot.m_ModelImportArtifactCacheHitCount;
-			m_State->m_Phase = State::Phase::MarkUsage;
-			break;
-		}
-
-		case State::Phase::MarkUsage:
-		{
-			assetManager.MarkModelUsed(m_State->m_Request.m_ModelId);
-			assetManager.MarkModelUsed(m_State->m_Request.m_ModelId);
-			assetManager.MarkMeshUsed(m_State->m_MeshId);
-			assetManager.MarkMeshUsed(m_State->m_MeshId);
-			assetManager.MarkTextureUsed(m_State->m_TextureId);
-			assetManager.MarkTextureUsed(m_State->m_TextureId);
-
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Model* model =
-				FindModelSnapshot(snapshot, m_State->m_Request.m_ModelId);
-			const AssetSnapshot::Mesh* mesh = FindMeshSnapshot(snapshot, m_State->m_MeshId);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!model || !mesh || !texture ||
-				model->m_UseCount != m_State->m_ModelUseCount + 1 ||
-				mesh->m_UseCount != m_State->m_MeshUseCount + 1 ||
-				texture->m_UseCount != m_State->m_TextureUseCount + 1 ||
-				model->m_LastUsedFrame != snapshot.m_AssetUsageFrame ||
-				mesh->m_LastUsedFrame != snapshot.m_AssetUsageFrame ||
-				texture->m_LastUsedFrame != snapshot.m_AssetUsageFrame)
-			{
-				Fail("Per-frame asset usage tracking did not deduplicate repeated marks.");
-				return;
-			}
-			ResetAssetInterests();
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			m_State->m_RuntimeEntryRetentionFramesBeforePinned =
-				config.m_RuntimeEntryRetentionFrames;
-			m_State->m_MaxRuntimeRetirementsPerFrameBeforePinned =
-				config.m_MaxRuntimeRetirementsPerFrame;
-			config.m_EnableAutomaticEviction = true;
-			config.m_RuntimeEntryRetentionFrames = 0;
-			config.m_MaxRuntimeRetirementsPerFrame = 64;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::WaitForPinnedProtection;
-			break;
-		}
-
-		case State::Phase::WaitForPinnedProtection:
-		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
-			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!model || !mesh || !texture ||
-				model->m_ContentGeneration != m_State->m_ModelGeneration ||
-				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
-				texture->m_ContentGeneration != m_State->m_TextureGeneration)
-			{
-				Fail("Pinned residency protection replaced a stable asset entry.");
-				return;
-			}
-			if (model->m_ResidencyPolicy != AssetResidencyPolicy::Pinned ||
-				model->m_State != AssetState::Ready || mesh->m_State != AssetState::Ready ||
-				texture->m_State != AssetState::Ready ||
-				mesh->m_ResidencyState != AssetResidencyState::Resident ||
-				texture->m_ResidencyState != AssetResidencyState::Resident)
-			{
-				Fail("A pinned model did not protect its resident dependencies from eviction.");
-				return;
-			}
-			const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
-			if (residency.m_EvictionCount != m_State->m_EvictionCountBaseline ||
-				residency.m_PendingEvictionCount != 0)
-			{
-				Fail("Automatic eviction scheduled or finalized work for a pinned model.");
-				return;
-			}
-			if (++m_State->m_PinnedProtectionFrames < 8)
-			{
-				break;
-			}
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_RuntimeEntryRetentionFrames =
-				m_State->m_RuntimeEntryRetentionFramesBeforePinned;
-			config.m_MaxRuntimeRetirementsPerFrame =
-				m_State->m_MaxRuntimeRetirementsPerFrameBeforePinned;
-			assetManager.SetResidencyConfig(config);
-			if (!assetManager.SetModelResidencyPolicy(
-				m_State->m_Request.m_ModelId, AssetResidencyPolicy::Cacheable))
-			{
-				Fail("The verification model could not return to cacheable residency.");
-				return;
-			}
-			config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = false;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::ReleaseOwner;
-			break;
-		}
-
-		case State::Phase::ReleaseOwner:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Model* model =
-				FindModelSnapshot(snapshot, m_State->m_Request.m_ModelId);
-			const AssetSnapshot::Mesh* mesh = FindMeshSnapshot(snapshot, m_State->m_MeshId);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			const AssetOwnershipStatistics ownership = assetManager.GetOwnershipStatistics();
-			const auto hasDependencyInterest = [&ownership](AssetKind kind, uint64_t stableId,
-				uint64_t generation) noexcept
-				{
-					return std::ranges::any_of(ownership.m_ActiveInterests,
-						[kind, stableId, generation](const AssetInterestActivity& interest) noexcept
-						{
-							return interest.m_Kind == kind && interest.m_StableId == stableId &&
-								interest.m_Generation == generation;
-						});
-				};
-			if (!model || !mesh || !texture || !model->m_IsEvictionCandidate ||
-				!mesh->m_IsEvictionCandidate || !texture->m_IsEvictionCandidate ||
-				!model->m_HasDependencyState || snapshot.m_DependencyValidationMismatchCount != 0)
-			{
-				Fail(
-					"Unowned cacheable resident assets were not classified as eviction candidates.");
-				return;
-			}
-			if (!hasDependencyInterest(
-				AssetKind::Mesh, m_State->m_MeshId.Value(), m_State->m_MeshGeneration) ||
-				!hasDependencyInterest(AssetKind::Texture, m_State->m_TextureId.Value(),
-					m_State->m_TextureGeneration))
-			{
-				Fail("Cached model dependencies were released before model runtime retirement.");
-				return;
-			}
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = true;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::WaitForEvictionStart;
-			break;
-		}
-
-		case State::Phase::WaitForEvictionStart:
-		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
-			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!model || !mesh || !texture ||
-				model->m_ContentGeneration != m_State->m_ModelGeneration ||
-				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
-				texture->m_ContentGeneration != m_State->m_TextureGeneration)
-			{
-				Fail("Eviction start replaced a stable asset entry.");
-				return;
-			}
-			if (mesh->m_ResidencyState != AssetResidencyState::Evicting ||
-				texture->m_ResidencyState != AssetResidencyState::Evicting)
-			{
-				break;
-			}
-			const AssetManager::ModelLoadRequest revived = GetAssetOwnerScope().LoadModelAsync(
-				"Assets/Models/NormalTangentTest/NormalTangentTest.gltf", TaskPriority::Critical);
-			if (!revived.IsValid() || revived.m_ModelId != m_State->m_Request.m_ModelId ||
-				revived.m_Generation != m_State->m_ModelGeneration)
-			{
-				Fail("Reacquiring an evicting model did not preserve its content version.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::WaitForEvictionCancellation;
-			break;
-		}
-
-		case State::Phase::WaitForEvictionCancellation:
-		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
-			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!model || !mesh || !texture)
-			{
-				Fail("Eviction cancellation removed a stable asset entry.");
-				return;
-			}
-			if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled ||
-				mesh->m_State == AssetState::Failed || mesh->m_State == AssetState::Cancelled ||
-				texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled)
-			{
-				Fail("Reacquiring an evicting model produced a terminal asset state.");
-				return;
-			}
-			if (model->m_State != AssetState::Ready || mesh->m_State != AssetState::Ready ||
-				texture->m_State != AssetState::Ready)
-			{
-				break;
-			}
-			const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
-			if (residency.m_EvictionCancellationCount <
-				m_State->m_EvictionCancellationCountBaseline + 2 ||
-				residency.m_EvictionCount != m_State->m_EvictionCountBaseline ||
-				residency.m_OperationCount < m_State->m_OperationCountBaseline + 4 ||
-				residency.m_StaleCompletionCount < m_State->m_StaleCompletionCountBaseline + 2 ||
-				mesh->m_ResidencyState != AssetResidencyState::Resident ||
-				texture->m_ResidencyState != AssetResidencyState::Resident || !mesh->m_IsUploaded ||
-				!texture->m_IsUploaded)
-			{
-				Fail(
-					"Reacquiring interest did not cancel pending eviction before resource release.");
-				return;
-			}
-			if (snapshot.m_DependencyValidationMismatchCount != 0)
-			{
-				Fail("Dependency tracking diverged while eviction was cancelled.");
-				return;
-			}
-			ResetAssetInterests();
+			m_State->m_Owner.Reset();
+			setAutomaticEviction(true);
 			m_State->m_Phase = State::Phase::WaitForRelease;
 			break;
 		}
 
 		case State::Phase::WaitForRelease:
 		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
 			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!model || !mesh || !texture ||
-				model->m_ContentGeneration != m_State->m_ModelGeneration ||
-				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			if (!mesh || !texture || mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
 				texture->m_ContentGeneration != m_State->m_TextureGeneration)
 			{
 				Fail("Residency release replaced a stable asset entry.");
 				return;
 			}
-			if (mesh->m_ResidencyState == AssetResidencyState::Evicting ||
-				texture->m_ResidencyState == AssetResidencyState::Evicting)
+			if (mesh->m_ResidencyState != AssetResidencyState::NonResident ||
+				texture->m_ResidencyState != AssetResidencyState::NonResident)
 			{
 				break;
 			}
-			if (mesh->m_State != AssetState::CpuReady || texture->m_State != AssetState::CpuReady ||
-				mesh->m_ContentState != AssetContentState::Ready ||
-				texture->m_ContentState != AssetContentState::Ready ||
-				mesh->m_ResidencyState != AssetResidencyState::NonResident ||
-				texture->m_ResidencyState != AssetResidencyState::NonResident ||
-				mesh->m_IsUploaded || texture->m_IsUploaded || mesh->m_VertexBuffer ||
-				mesh->m_IndexBuffer || texture->m_Texture.IsValid() || texture->m_HasSrv)
-			{
-				Fail("Released assets did not preserve content while dropping GPU residency.");
-				return;
-			}
-			const AssetResidencyStatistics released = assetManager.GetResidencyStatistics();
-			if (released.m_EvictionCount < m_State->m_EvictionCountBaseline + 2)
-			{
-				Fail("The residency controller did not finalize mesh and texture releases.");
-				return;
-			}
-			const TextureArtifactCacheStatistics artifactCache =
-				assetManager.GetTextureArtifactCacheStatistics();
-			if (!texture->m_IsCpuArtifactCached || !texture->m_ArtifactContentDigest.IsValid() ||
-				artifactCache.m_CachedEntryCount == 0 || artifactCache.m_CachedBytes == 0)
-			{
-				Fail("The decoded texture was not retained by the CPU artifact cache.");
-				return;
-			}
-
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = false;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_TextureArtifactCacheHitCountBaseline = artifactCache.m_HitCount;
-			const AssetManager::TextureLoadRequest cacheReload =
-				GetAssetOwnerScope().LoadTextureAsync(texture->m_SourcePath,
-					texture->m_ImportSettings.m_Semantic, TaskPriority::Critical);
-			const TextureArtifactCacheStatistics cacheReloadStatistics =
-				assetManager.GetTextureArtifactCacheStatistics();
-			if (!cacheReload.IsValid() || cacheReload.m_Task.IsValid() ||
-				cacheReload.m_TextureId != m_State->m_TextureId ||
-				cacheReload.m_Generation != m_State->m_TextureGeneration ||
-				cacheReloadStatistics.m_HitCount !=
-				m_State->m_TextureArtifactCacheHitCountBaseline + 1)
-			{
-				Fail("The texture residency reload did not use its cached CPU artifact.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::WaitForTextureArtifactCacheReload;
-			break;
-		}
-
-		case State::Phase::WaitForTextureArtifactCacheReload:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture || texture->m_State == AssetState::Failed ||
-				texture->m_State == AssetState::Cancelled)
-			{
-				Fail("The CPU artifact cache texture reload failed.");
-				return;
-			}
-			if (texture->m_State != AssetState::Ready)
-			{
-				break;
-			}
-			const TextureArtifactCacheStatistics artifactCache =
-				assetManager.GetTextureArtifactCacheStatistics();
-			if (texture->m_ResidencyState != AssetResidencyState::Resident ||
-				!texture->m_IsUploaded || !texture->m_Texture.IsValid() || !texture->m_HasSrv ||
-				!texture->m_IsCpuArtifactCached ||
-				artifactCache.m_HitCount != m_State->m_TextureArtifactCacheHitCountBaseline + 1)
-			{
-				Fail("The cached CPU artifact did not restore texture GPU residency.");
-				return;
-			}
-
-			ResetAssetInterests();
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = true;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::WaitForTextureArtifactCacheRelease;
-			break;
-		}
-
-		case State::Phase::WaitForTextureArtifactCacheRelease:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture || texture->m_ContentGeneration != m_State->m_TextureGeneration)
-			{
-				Fail("The cache-hit reload replaced its stable texture entry.");
-				return;
-			}
-			if (texture->m_ResidencyState == AssetResidencyState::Evicting)
-			{
-				break;
-			}
-			if (texture->m_State != AssetState::CpuReady ||
-				texture->m_ResidencyState != AssetResidencyState::NonResident ||
+			if (mesh->m_IsUploaded || mesh->m_VertexBuffer || mesh->m_IndexBuffer ||
 				texture->m_IsUploaded || texture->m_Texture.IsValid() || texture->m_HasSrv)
 			{
-				Fail("The cache-hit texture could not return to non-resident state.");
+				Fail("Fence-completed release kept GPU buffers, textures or views alive.");
 				return;
 			}
-
-			assetManager.ClearTextureArtifactCache();
-			if (assetManager.GetTextureArtifactCacheStatistics().m_CachedEntryCount != 0)
-			{
-				Fail("Clearing the texture CPU artifact cache left cached entries behind.");
-				return;
-			}
-			if (!assetManager.ClearTextureDerivedDataCache())
-			{
-				Fail("The texture local DDC could not be cleared.");
-				return;
-			}
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = false;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_TextureDdcWriteCountBaseline =
-				assetManager.GetTextureDerivedDataStatistics().m_WriteCount;
-			const AssetManager::TextureLoadRequest sourceBuild =
-				GetAssetOwnerScope().LoadTextureAsync(texture->m_SourcePath,
-					texture->m_ImportSettings.m_Semantic, TaskPriority::Critical);
-			if (!sourceBuild.IsValid() || !sourceBuild.m_Task.IsValid() ||
-				sourceBuild.m_TextureId != m_State->m_TextureId ||
-				sourceBuild.m_Generation != m_State->m_TextureGeneration)
-			{
-				Fail("The texture DDC source build could not start.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::WaitForTextureDdcBuild;
-			break;
-		}
-
-		case State::Phase::WaitForTextureDdcBuild:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture || texture->m_State == AssetState::Failed ||
-				texture->m_State == AssetState::Cancelled)
-			{
-				Fail("The texture DDC source build failed.");
-				return;
-			}
-			if (texture->m_State != AssetState::Ready)
-				break;
-			const LocalDerivedDataStoreStatistics ddc =
-				assetManager.GetTextureDerivedDataStatistics();
-			if (!texture->m_DerivedDataKey.IsValid() || !texture->m_SourceDigest.IsValid() ||
-				!texture->m_IsDerivedDataCached ||
-				ddc.m_WriteCount < m_State->m_TextureDdcWriteCountBaseline + 1)
-			{
-				Fail("The source-built texture was not published to the local DDC.");
-				return;
-			}
-			ResetAssetInterests();
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = true;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::WaitForTextureDdcBuildRelease;
-			break;
-		}
-
-		case State::Phase::WaitForTextureDdcBuildRelease:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture)
-			{
-				Fail("The DDC source-built texture entry disappeared.");
-				return;
-			}
-			if (texture->m_ResidencyState == AssetResidencyState::Evicting)
-				break;
-			if (texture->m_State != AssetState::CpuReady ||
-				texture->m_ResidencyState != AssetResidencyState::NonResident)
-			{
-				Fail("The DDC source-built texture did not become non-resident.");
-				return;
-			}
-			assetManager.ClearTextureArtifactCache();
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = false;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_TextureDdcHitCountBaseline =
-				assetManager.GetTextureDerivedDataStatistics().m_HitCount;
-			const AssetManager::TextureLoadRequest ddcReload =
-				GetAssetOwnerScope().LoadTextureAsync(texture->m_SourcePath,
-					texture->m_ImportSettings.m_Semantic, TaskPriority::Critical);
-			if (!ddcReload.IsValid() || !ddcReload.m_Task.IsValid())
-			{
-				Fail("The texture DDC reload could not start.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::WaitForTextureDdcReload;
-			break;
-		}
-
-		case State::Phase::WaitForTextureDdcReload:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture || texture->m_State == AssetState::Failed ||
-				texture->m_State == AssetState::Cancelled)
-			{
-				Fail("The texture local DDC reload failed.");
-				return;
-			}
-			if (texture->m_State != AssetState::Ready)
-				break;
-			if (assetManager.GetTextureDerivedDataStatistics().m_HitCount <
-				m_State->m_TextureDdcHitCountBaseline + 1)
-			{
-				Fail("The texture reload did not record a local DDC hit.");
-				return;
-			}
-			ResetAssetInterests();
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = true;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::WaitForTextureDdcReloadRelease;
-			break;
-		}
-
-		case State::Phase::WaitForTextureDdcReloadRelease:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture)
-			{
-				Fail("The DDC-hit texture entry disappeared.");
-				return;
-			}
-			if (texture->m_ResidencyState == AssetResidencyState::Evicting)
-				break;
-			if (texture->m_State != AssetState::CpuReady ||
-				texture->m_ResidencyState != AssetResidencyState::NonResident)
-			{
-				Fail("The DDC-hit texture did not become non-resident.");
-				return;
-			}
-			assetManager.ClearTextureArtifactCache();
-			if (!assetManager.ClearTextureDerivedDataCache())
-			{
-				Fail("The texture local DDC could not be cleared before the stale reload test.");
-				return;
-			}
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_EnableAutomaticEviction = false;
-			assetManager.SetResidencyConfig(config);
-			const AssetManager::TextureLoadRequest staleReload =
-				GetAssetOwnerScope().LoadTextureAsync(texture->m_SourcePath,
-					texture->m_ImportSettings.m_Semantic, TaskPriority::Background);
-			if (!staleReload.IsValid() || !staleReload.m_Task.IsValid() ||
-				staleReload.m_TextureId != m_State->m_TextureId ||
-				staleReload.m_Generation != m_State->m_TextureGeneration)
-			{
-				Fail("The texture reload replacement probe could not start its first task.");
-				return;
-			}
-			m_State->m_StaleTextureReloadTask = staleReload.m_Task;
-			m_State->m_Phase = State::Phase::WaitForTextureReloadRunning;
-			break;
-		}
-
-		case State::Phase::WaitForTextureReloadRunning:
-		{
-			const TaskSystemStatistics tasks = m_Services.m_TaskSystem->GetStatistics();
-			const auto activity = std::ranges::find(
-				tasks.m_ActiveTasks, m_State->m_StaleTextureReloadTask, &TaskActivity::m_Handle);
-			if (activity == tasks.m_ActiveTasks.end() ||
-				activity->m_Status != TaskStatus::Running ||
-				activity->m_ExecutionMilliseconds < 25.0)
-			{
-				break;
-			}
-
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture || texture->m_ContentGeneration != m_State->m_TextureGeneration)
-			{
-				Fail("The texture reload replacement probe lost its stable texture entry.");
-				return;
-			}
-			ResetAssetInterests();
-			const AssetManager::TextureLoadRequest replacementReload =
-				GetAssetOwnerScope().LoadTextureAsync(texture->m_SourcePath,
-					texture->m_ImportSettings.m_Semantic, TaskPriority::Critical);
-			if (!replacementReload.IsValid() || !replacementReload.m_Task.IsValid() ||
-				replacementReload.m_TextureId != m_State->m_TextureId ||
-				replacementReload.m_Generation != m_State->m_TextureGeneration ||
-				replacementReload.m_Task == m_State->m_StaleTextureReloadTask)
-			{
-				Fail("Cancelling a running texture reload did not create a replacement task.");
-				return;
-			}
-			m_State->m_ReplacementTextureReloadTask = replacementReload.m_Task;
-			m_State->m_Phase = State::Phase::WaitForTextureReloadReplacement;
-			break;
-		}
-
-		case State::Phase::WaitForTextureReloadReplacement:
-		{
-			const TaskSystemStatistics tasks = m_Services.m_TaskSystem->GetStatistics();
-			const bool staleCompletionDelivered = std::ranges::any_of(tasks.m_RecentTasks,
-				[this](const TaskCompletionInfo& completion) noexcept
-				{ return completion.m_Handle == m_State->m_StaleTextureReloadTask; });
-			if (!staleCompletionDelivered)
-			{
-				break;
-			}
-			const auto replacementCompletion = std::ranges::find(tasks.m_RecentTasks,
-				m_State->m_ReplacementTextureReloadTask, &TaskCompletionInfo::m_Handle);
-			if (replacementCompletion != tasks.m_RecentTasks.end())
-			{
-				if (replacementCompletion->m_Status != TaskStatus::Succeeded)
-				{
-					Fail("The replacement texture decode did not complete successfully.");
-					return;
-				}
-				m_State->m_Phase = State::Phase::WaitForTextureReloadCompletion;
-				break;
-			}
-
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture)
-			{
-				Fail("The texture reload replacement probe lost its texture entry.");
-				return;
-			}
-			const AssetManager::TextureLoadRequest trackedReplacement =
-				GetAssetOwnerScope().LoadTextureAsync(texture->m_SourcePath,
-					texture->m_ImportSettings.m_Semantic, TaskPriority::Critical);
-			if (!trackedReplacement.m_Task.IsValid() ||
-				trackedReplacement.m_Task != m_State->m_ReplacementTextureReloadTask)
-			{
-				Fail("A stale texture completion removed the replacement task record.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::WaitForTextureReloadCompletion;
-			break;
-		}
-
-		case State::Phase::WaitForTextureReloadCompletion:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture || texture->m_State == AssetState::Failed ||
-				texture->m_State == AssetState::Cancelled)
-			{
-				Fail("The replacement texture residency reload failed.");
-				return;
-			}
-			if (texture->m_State != AssetState::Ready)
-			{
-				break;
-			}
-
-			const AssetManager::ModelLoadRequest reloaded = GetAssetOwnerScope().LoadModelAsync(
-				"Assets/Models/NormalTangentTest/NormalTangentTest.gltf", TaskPriority::Normal);
+			setAutomaticEviction(false);
+			const AssetManager::ModelLoadRequest reloaded =
+				m_State->m_Owner.LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
 			if (!reloaded.IsValid() || reloaded.m_ModelId != m_State->m_Request.m_ModelId ||
-				reloaded.m_Generation != m_State->m_ModelGeneration)
+				reloaded.m_Generation != m_State->m_Request.m_Generation)
 			{
 				Fail("Reload did not preserve the model ID and content generation.");
 				return;
@@ -937,213 +204,59 @@ namespace gglab
 
 		case State::Phase::WaitForReload:
 		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
 			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
 			if (!model || !mesh || !texture)
 			{
 				Fail("A stable asset entry disappeared during residency reload.");
 				return;
 			}
-			if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled ||
-				mesh->m_State == AssetState::Failed || mesh->m_State == AssetState::Cancelled ||
-				texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled)
-			{
-				Fail("A source-backed residency reload failed.");
-				return;
-			}
 			if (model->m_State != AssetState::Ready || mesh->m_State != AssetState::Ready ||
 				texture->m_State != AssetState::Ready)
 			{
+				if (model->m_State == AssetState::Failed || texture->m_State == AssetState::Failed)
+				{
+					Fail("A residency reload failed on the device.");
+				}
 				break;
 			}
-			const TextureContentRef textureContent =
-				assetManager.GetTextureContentRef(m_State->m_TextureId);
-			if (!textureContent.IsValid() ||
-				textureContent.m_Generation != m_State->m_TextureGeneration ||
-				!assetManager.GetResidentTextureResource(textureContent))
-			{
-				Fail("The resident texture render view was unavailable for current content.");
-				return;
-			}
-			TextureContentRef staleTextureContent = textureContent;
-			++staleTextureContent.m_Generation;
-			if (assetManager.GetResidentTextureResource(staleTextureContent))
-			{
-				Fail("The resident texture render view accepted a stale content generation.");
-				return;
-			}
-			const AssetResidencyStatistics reloaded = assetManager.GetResidencyStatistics();
-			if (model->m_ContentGeneration != m_State->m_ModelGeneration ||
-				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
-				texture->m_ContentGeneration != m_State->m_TextureGeneration ||
-				texture->m_ImportSettings != m_State->m_TextureImportSettings ||
+			const TextureContentRef content = assetManager.GetTextureContentRef(m_State->m_TextureId);
+			TextureContentRef staleContent = content;
+			++staleContent.m_Generation;
+			if (!mesh->m_IsUploaded || !texture->m_IsUploaded ||
 				mesh->m_ResidencyEpoch <= m_State->m_MeshResidencyEpoch ||
 				texture->m_ResidencyEpoch <= m_State->m_TextureResidencyEpoch ||
-				mesh->m_ResidencyOperationSerial != 0 || texture->m_ResidencyOperationSerial != 0 ||
-				!mesh->m_IsUploaded || !texture->m_IsUploaded ||
-				reloaded.m_ReloadRequestCount <= m_State->m_ReloadRequestCountBaseline ||
-				reloaded.m_ReloadingAssetCount != 0 ||
-				reloaded.m_AcceptedStateEventCount <= m_State->m_AcceptedStateEventCountBaseline ||
-				reloaded.m_CompletedStateEventCount <
-				m_State->m_CompletedStateEventCountBaseline + 6 ||
-				reloaded.m_AcceptedStateEventCount < reloaded.m_CompletedStateEventCount)
+				!assetManager.GetResidentTextureResource(content) ||
+				assetManager.GetResidentTextureResource(staleContent))
 			{
-				Fail("Reload did not restore residency through validated state-operation events.");
-				return;
-			}
-			if (snapshot.m_DependencyValidationMismatchCount != 0)
-			{
-				Fail("Dependency tracking diverged during residency reload.");
-				return;
-			}
-			const AssetSnapshot::Model* reloadedModel =
-				FindModelSnapshot(snapshot, m_State->m_Request.m_ModelId);
-			if (!reloadedModel || !reloadedModel->m_IsImportArtifactCached ||
-				!reloadedModel->m_ImportArtifactContentDigest.IsValid() ||
-				snapshot.m_ModelImportArtifactCacheHitCount <=
-				m_State->m_ModelImportArtifactCacheHitCountBaseline)
-			{
-				Fail("Mesh residency reload did not reuse the immutable model import artifact.");
+				Fail("Reload did not restore a generation-safe resident GPU texture view.");
 				return;
 			}
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
 			config.m_RuntimeEntryRetentionFrames = 0;
-			config.m_MaxRuntimeRetirementsPerFrame = 64;
 			assetManager.SetResidencyConfig(config);
-			m_State->m_RuntimeRetirementCountBaseline =
-				assetManager.GetOwnershipStatistics().m_RuntimeRetirementCount;
-			ResetAssetInterests();
-			m_State->m_Phase = State::Phase::WaitForRuntimeRetirement;
+			m_State->m_Owner = {};
+			m_State->m_Phase = State::Phase::WaitForRetirement;
 			break;
 		}
 
-		case State::Phase::WaitForRuntimeRetirement:
+		case State::Phase::WaitForRetirement:
 		{
 			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			if (assetManager.GetModel(m_State->m_Request.m_ModelId) ||
-				assetManager.GetMesh(m_State->m_MeshId) ||
+			if (model || assetManager.GetMesh(m_State->m_MeshId) ||
 				assetManager.GetMaterial(m_State->m_MaterialId) ||
 				FindTextureSnapshot(snapshot, m_State->m_TextureId))
 			{
 				break;
 			}
-			const TextureContentRef retiredTexture{
+			const TextureContentRef retired{
 				.m_Id = m_State->m_TextureId,
 				.m_Generation = m_State->m_TextureGeneration,
 			};
-			const AssetOwnershipStatistics ownership = assetManager.GetOwnershipStatistics();
-			if (assetManager.GetTextureState(retiredTexture) ||
-				assetManager.GetResidentTextureResource(retiredTexture) ||
-				ownership.m_RuntimeRetirementCount <
-				m_State->m_RuntimeRetirementCountBaseline + 3 ||
-				ownership.m_PendingRuntimeRetirementCount != 0)
+			if (assetManager.GetResidentTextureResource(retired))
 			{
-				Fail("Retired runtime entries remained addressable or pending.");
-				return;
-			}
-
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_RuntimeEntryRetentionFrames = 1'000'000;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Request = assetManager.LoadModelAsync(
-				"Assets/Models/NormalTangentTest/NormalTangentTest.gltf", TaskPriority::Normal);
-			if (!m_State->m_Request.IsValid())
-			{
-				Fail("AssetManager rejected the direct-load retirement probe.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::WaitForDirectLoadReady;
-			break;
-		}
-
-		case State::Phase::WaitForDirectLoadReady:
-		{
-			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
-			if (!model || model->m_ContentGeneration != m_State->m_Request.m_Generation)
-			{
-				break;
-			}
-			if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
-			{
-				Fail("The direct-load retirement probe did not become Ready.");
-				return;
-			}
-			if (model->m_State != AssetState::Ready)
-			{
-				break;
-			}
-			if (model->m_MeshInstance.empty())
-			{
-				Fail("The direct-load retirement probe has no mesh instances.");
-				return;
-			}
-
-			const ModelMesh& instance = model->m_MeshInstance.front();
-			m_State->m_ModelGeneration = model->m_ContentGeneration;
-			m_State->m_MeshId = instance.m_MeshId;
-			m_State->m_MaterialId = instance.m_MaterialId;
-			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const Material* material = assetManager.GetMaterial(m_State->m_MaterialId);
-			if (!mesh || !material)
-			{
-				Fail("The direct-load retirement probe has missing dependencies.");
-				return;
-			}
-			m_State->m_MeshGeneration = mesh->m_ContentGeneration;
-			m_State->m_TextureId.Reset();
-			for (TextureID textureId :
-			std::array{ material->m_BaseColorBinding.m_TextureId,
-				material->m_MetallicRoughnessBinding.m_TextureId,
-				material->m_NormalBinding.m_TextureId, material->m_OcclusionBinding.m_TextureId,
-				material->m_EmissiveBinding.m_TextureId,
-				material->m_ClearcoatBinding.m_TextureId,
-				material->m_ClearcoatRoughnessBinding.m_TextureId,
-				material->m_ClearcoatNormalBinding.m_TextureId,
-				material->m_AnisotropyBinding.m_TextureId })
-			{
-				if (textureId.IsValid() && !IsReservedTextureId(textureId))
-				{
-					m_State->m_TextureId = textureId;
-					break;
-				}
-			}
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			const AssetSnapshot::Texture* texture =
-				FindTextureSnapshot(snapshot, m_State->m_TextureId);
-			if (!texture)
-			{
-				Fail("The direct-load retirement probe has no runtime texture dependency.");
-				return;
-			}
-			m_State->m_TextureGeneration = texture->m_ContentGeneration;
-			m_State->m_RuntimeRetirementCountBaseline =
-				assetManager.GetOwnershipStatistics().m_RuntimeRetirementCount;
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
-			config.m_RuntimeEntryRetentionFrames = 0;
-			assetManager.SetResidencyConfig(config);
-			m_State->m_Phase = State::Phase::WaitForDirectRuntimeRetirement;
-			break;
-		}
-
-		case State::Phase::WaitForDirectRuntimeRetirement:
-		{
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
-			if (assetManager.GetModel(m_State->m_Request.m_ModelId) ||
-				assetManager.GetMesh(m_State->m_MeshId) ||
-				assetManager.GetMaterial(m_State->m_MaterialId) ||
-				FindTextureSnapshot(snapshot, m_State->m_TextureId))
-			{
-				break;
-			}
-			const AssetOwnershipStatistics ownership = assetManager.GetOwnershipStatistics();
-			if (ownership.m_RuntimeRetirementCount <
-				m_State->m_RuntimeRetirementCountBaseline + 3 ||
-				ownership.m_PendingRuntimeRetirementCount != 0)
-			{
-				Fail("Direct-loaded runtime entries remained pending after retirement.");
+				Fail("A retired texture kept an addressable GPU view.");
 				return;
 			}
 			Complete();
@@ -1158,7 +271,7 @@ namespace gglab
 	void AssetResidencyLabSession::BuildDiagnostics(
 		LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
-		diagnostics.m_Title = "Asset Residency Verification";
+		diagnostics.m_Title = "Asset Residency GPU Acceptance";
 		if (!m_State)
 		{
 			return;
@@ -1169,25 +282,16 @@ namespace gglab
 			{.m_Name = "Mesh", .m_Value = std::to_string(m_State->m_MeshId.Value())},
 			{.m_Name = "Texture", .m_Value = std::to_string(m_State->m_TextureId.Value())},
 		};
+		const bool completed = m_State->m_Phase == State::Phase::Completed;
 		diagnostics.m_Checks.push_back({
-			.m_Name = "Residency invariants",
-			.m_Status = m_State->m_Phase != State::Phase::Completed
-							? LabDiagnosticCheckStatus::Pending
-						: m_State->m_Passed ? LabDiagnosticCheckStatus::Passed
-											: LabDiagnosticCheckStatus::Failed,
-			.m_Detail = m_State->m_Phase != State::Phase::Completed ? "Verification is running."
-						: m_State->m_Passed
-							? "All residency invariants passed."
-							: std::format("{} invariant errors.", m_State->m_Errors.size()),
+			.m_Name = "GPU residency",
+			.m_Status = !completed ? LabDiagnosticCheckStatus::Pending
+				: m_State->m_Passed ? LabDiagnosticCheckStatus::Passed
+				: LabDiagnosticCheckStatus::Failed,
+			.m_Detail = !completed ? "Verification is running."
+				: m_State->m_Passed ? "Release, reload and retirement passed on the device."
+				: m_State->m_Errors.front(),
 			});
-		for (const std::string& error : m_State->m_Errors)
-		{
-			diagnostics.m_Checks.push_back({
-				.m_Name = "Invariant",
-				.m_Status = LabDiagnosticCheckStatus::Failed,
-				.m_Detail = error,
-				});
-		}
 	}
 
 	void AssetResidencyLabSession::Fail(std::string error) noexcept
@@ -1199,6 +303,7 @@ namespace gglab
 		m_State->m_Errors.push_back(std::move(error));
 		m_State->m_Passed = false;
 		m_State->m_Phase = State::Phase::Completed;
+		m_State->m_Owner = {};
 		GGLAB_LOG_ERROR("ASSET RESIDENCY ACCEPTANCE FAIL: {}", m_State->m_Errors.back());
 	}
 
@@ -1208,7 +313,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, unified model texture DDC production, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, stable-ID reload, owner-scoped retirement, and direct-load runtime retirement invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: fence-completed release, reload to a generation-safe resident view and retirement passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
@@ -1224,7 +329,7 @@ namespace gglab
 			.m_DisplayName = "Asset Residency Lab",
 			.m_Category = "Systems",
 			.m_Description =
-				"Validates logical residency, CPU artifact/DDC reload, fence-safe release, and stable-ID source reload invariants.",
+				"GPU acceptance for fence-completed residency release, reload to resident views and retirement.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

@@ -3,11 +3,14 @@
 
 namespace gglab
 {
+	// GPU acceptance for residency on the active device: fence-completed release,
+	// reload to a generation-safe resident view and retirement. Residency policy,
+	// eviction, cache and DDC contracts are covered headlessly by the asset-residency suite.
 	class AssetResidencyLabSession final : public LabSessionBase
 	{
 	public:
 		explicit AssetResidencyLabSession(const LabSessionCreateInfo& createInfo) noexcept;
-		~AssetResidencyLabSession() override = default;
+		~AssetResidencyLabSession() override;
 
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;

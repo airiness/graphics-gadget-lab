@@ -6,7 +6,6 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
-#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
@@ -17,11 +16,6 @@ namespace gglab
 	{
 		enum class Phase : uint8_t
 		{
-			WaitForInitialEnvironment,
-			WaitForRapidSelection,
-			WaitForTransactionalSwitch,
-			WaitForDecodeFailure,
-			WaitForInvalidShape,
 			ObserveFallback,
 			WaitForReselection,
 			WaitForInitialStageSet,
@@ -33,9 +27,6 @@ namespace gglab
 			Completed,
 		};
 
-		size_t m_PreviousActiveIndex = EnvironmentAssetController::InvalidEntryIndex;
-		size_t m_ExpectedActiveIndex = EnvironmentAssetController::InvalidEntryIndex;
-		size_t m_ProbeEntryIndex = EnvironmentAssetController::InvalidEntryIndex;
 		float m_ElapsedSeconds = 0.0f;
 		uint64_t m_PreviousIBLGeneration = 0;
 		uint64_t m_DerivedDataHitCountBaseline = 0;
@@ -46,7 +37,7 @@ namespace gglab
 		uint32_t m_OriginalSpecularSampleCount = 0;
 		uint32_t m_CpuPartialSpecularSampleCount = 0;
 		uint32_t m_DdcPartialSpecularSampleCount = 0;
-		Phase m_Phase = Phase::WaitForInitialEnvironment;
+		Phase m_Phase = Phase::ObserveFallback;
 		bool m_Passed = false;
 		std::vector<std::string> m_Errors;
 	};
@@ -78,6 +69,10 @@ namespace gglab
 			m_State->m_CpuPartialSpecularSampleCount < 4096
 			? m_State->m_CpuPartialSpecularSampleCount + 1
 			: 4094;
+		// Committing the fallback and reselecting forces a fresh IBL stage set after
+		// the caches were cleared. Selection transactions themselves are covered by
+		// the environment-selection suite.
+		m_Services.m_EnvironmentAssetController->Reset();
 	}
 
 	void EnvironmentAssetLabSession::OnExit() noexcept
@@ -126,187 +121,8 @@ namespace gglab
 		}
 
 		EnvironmentAssetController& controller = *m_Services.m_EnvironmentAssetController;
-		const auto entries = controller.GetEntries();
 		switch (m_State->m_Phase)
 		{
-		case State::Phase::WaitForInitialEnvironment:
-		{
-			if (controller.GetPendingEnvironmentIndex() !=
-				EnvironmentAssetController::InvalidEntryIndex)
-			{
-				break;
-			}
-			const size_t activeIndex = controller.GetActiveEnvironmentIndex();
-			if (entries.size() < 4 || activeIndex >= entries.size())
-			{
-				break;
-			}
-
-			const size_t first = (activeIndex + 1) % entries.size();
-			const size_t second = (activeIndex + 2) % entries.size();
-			const size_t third = (activeIndex + 3) % entries.size();
-			if (!controller.SelectEnvironment(first) || !controller.SelectEnvironment(second) ||
-				!controller.SelectEnvironment(third))
-			{
-				Fail("Rapid A-to-B-to-C selection was rejected.");
-				return;
-			}
-			if (controller.GetActiveEnvironmentIndex() != activeIndex ||
-				controller.GetPendingEnvironmentIndex() != third)
-			{
-				Fail("Rapid selection changed the committed source before C became ready.");
-				return;
-			}
-			m_State->m_PreviousActiveIndex = activeIndex;
-			m_State->m_ExpectedActiveIndex = third;
-			m_State->m_Phase = State::Phase::WaitForRapidSelection;
-			break;
-		}
-
-		case State::Phase::WaitForRapidSelection:
-		{
-			if (controller.GetPendingEnvironmentIndex() !=
-				EnvironmentAssetController::InvalidEntryIndex)
-			{
-				if (controller.GetActiveEnvironmentIndex() != m_State->m_PreviousActiveIndex)
-				{
-					Fail("The active environment changed while rapid-selection C was pending.");
-				}
-				break;
-			}
-			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex)
-			{
-				Fail("Rapid selection did not commit the last candidate.");
-				return;
-			}
-
-			const size_t target = (m_State->m_ExpectedActiveIndex + 1) % entries.size();
-			const uint64_t serialBeforeImmediateFailure = controller.GetSelectionSerial();
-			if (!controller.SelectEnvironment(target))
-			{
-				Fail("Immediate-failure setup candidate was rejected.");
-				return;
-			}
-			if (controller.SelectEnvironmentFile(
-				"Assets/Textures/Skybox/__gglab_missing_environment__.hdr",
-				"Immediate Failure Probe"))
-			{
-				Fail("Missing environment unexpectedly produced a valid load request.");
-				return;
-			}
-			const auto entriesAfterFailure = controller.GetEntries();
-			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex ||
-				controller.GetPendingEnvironmentIndex() !=
-				EnvironmentAssetController::InvalidEntryIndex ||
-				controller.GetSelectionSerial() <= serialBeforeImmediateFailure ||
-				entriesAfterFailure.empty() ||
-				entriesAfterFailure.back().m_State != EnvironmentAssetEntryState::Failed)
-			{
-				Fail("An immediate selection failure did not invalidate the older pending candidate.");
-				return;
-			}
-			if (!controller.SelectEnvironment(target) ||
-				controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex)
-			{
-				Fail("Transactional switch did not preserve the active environment.");
-				return;
-			}
-			m_State->m_PreviousActiveIndex = m_State->m_ExpectedActiveIndex;
-			m_State->m_ExpectedActiveIndex = target;
-			m_State->m_Phase = State::Phase::WaitForTransactionalSwitch;
-			break;
-		}
-
-		case State::Phase::WaitForTransactionalSwitch:
-		{
-			if (controller.GetPendingEnvironmentIndex() !=
-				EnvironmentAssetController::InvalidEntryIndex)
-			{
-				if (controller.GetActiveEnvironmentIndex() != m_State->m_PreviousActiveIndex)
-				{
-					Fail("The active environment changed before the replacement was ready.");
-				}
-				break;
-			}
-			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex)
-			{
-				Fail("The ready replacement was not committed transactionally.");
-				return;
-			}
-			if (!controller.SelectEnvironmentFile(
-				"Assets/Textures/Probes/InvalidDecode.hdr", "Decode Failure Probe"))
-			{
-				Fail("Decode-failure probe was rejected before asynchronous loading.");
-				return;
-			}
-			m_State->m_ProbeEntryIndex = controller.GetPendingEnvironmentIndex();
-			m_State->m_Phase = State::Phase::WaitForDecodeFailure;
-			break;
-		}
-
-		case State::Phase::WaitForDecodeFailure:
-		{
-			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex)
-			{
-				Fail("A decode failure replaced the active environment.");
-				return;
-			}
-			if (controller.GetPendingEnvironmentIndex() !=
-				EnvironmentAssetController::InvalidEntryIndex)
-			{
-				break;
-			}
-			if (m_State->m_ProbeEntryIndex >= entries.size() ||
-				entries[m_State->m_ProbeEntryIndex].m_State != EnvironmentAssetEntryState::Failed)
-			{
-				Fail("The decode-failure candidate did not end in Failed state.");
-				return;
-			}
-			if (!controller.SelectEnvironmentFile(
-				"Assets/Textures/UVTest1K.png", "Invalid Shape Probe"))
-			{
-				Fail("Invalid-shape probe was rejected before loading.");
-				return;
-			}
-			m_State->m_ProbeEntryIndex = controller.GetPendingEnvironmentIndex();
-			m_State->m_Phase = State::Phase::WaitForInvalidShape;
-			break;
-		}
-
-		case State::Phase::WaitForInvalidShape:
-		{
-			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex)
-			{
-				Fail("An invalid-shape candidate replaced the active environment.");
-				return;
-			}
-			if (controller.GetPendingEnvironmentIndex() !=
-				EnvironmentAssetController::InvalidEntryIndex)
-			{
-				break;
-			}
-			if (m_State->m_ProbeEntryIndex >= entries.size() ||
-				entries[m_State->m_ProbeEntryIndex].m_State !=
-				EnvironmentAssetEntryState::InvalidShape)
-			{
-				Fail("The non-2:1 candidate did not end in InvalidShape state.");
-				return;
-			}
-
-			controller.Reset();
-			const EnvironmentTextureSource& source =
-				m_Services.m_RenderServices.m_Environment->GetCommittedEnvironmentSource();
-			if (controller.GetActiveEnvironment() ||
-				source.m_Type != EnvironmentTextureSourceType::Cubemap ||
-				!IsReservedTextureId(source.m_Content.m_Id))
-			{
-				Fail("Reset did not synchronously commit the pinned fallback environment.");
-				return;
-			}
-			m_State->m_Phase = State::Phase::ObserveFallback;
-			break;
-		}
-
 		case State::Phase::ObserveFallback:
 			controller.Initialize("Assets/Textures/Skybox");
 			m_State->m_Phase = State::Phase::WaitForReselection;
@@ -710,7 +526,7 @@ namespace gglab
 			.m_DisplayName = "Environment Asset Lab",
 			.m_Category = "Systems",
 			.m_Description =
-				"Validates transactional HDR selection plus atomic full/partial IBL CPU cache and local DDC restoration.",
+				"Validates atomic full/partial IBL CPU cache and local DDC restoration of a reselected environment.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 3,
 		};

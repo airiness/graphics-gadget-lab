@@ -1,28 +1,22 @@
 #pragma once
 #include "Lab/LabSessionBase.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/Asset/AssetStreamingTypes.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace gglab
 {
+	// GPU acceptance for asset publication on the active device: incremental model
+	// publication through real uploads, a GPU-submitted cancellation finalized by a
+	// real fence, and upload conservation. Publication transaction, rollback and
+	// ownership contracts are covered headlessly by the asset-publication suite.
 	class AssetPublicationLabSession final : public LabSessionBase
 	{
 	public:
-		enum class Scenario : int32_t
-		{
-			AcceptanceSuite,
-			IncrementalSuccess,
-			CancelTextures,
-			CancelMaterials,
-			CancelMeshes,
-			CancelMeshInstances,
-			CancelDependencies,
-			CancelBeforeCommit,
-			FailMaterials,
-		};
-
 		explicit AssetPublicationLabSession(const LabSessionCreateInfo& createInfo) noexcept;
-		~AssetPublicationLabSession() override = default;
+		~AssetPublicationLabSession() override;
 
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
@@ -35,27 +29,18 @@ namespace gglab
 			const LabSessionCreateInfo& createInfo) noexcept;
 
 	private:
-		struct ScenarioState;
-		struct AcceptanceSuiteState;
+		struct State;
 
-		void ApplyImmediateParameters() noexcept override;
-		void StartScenario() noexcept;
-		void StartModelScenario(Scenario scenario, uint32_t faultOccurrence) noexcept;
-		void StopScenario() noexcept;
-		void UpdateModelScenario(float deltaTime) noexcept;
-		void EvaluateScenario(const AssetUploadStatistics& statistics) noexcept;
-		void StartAcceptanceSuite() noexcept;
-		void UpdateAcceptanceSuite(float deltaTime) noexcept;
-		void StartAcceptanceCase() noexcept;
-		void CompleteAcceptanceCase(std::string name, std::vector<std::string> errors) noexcept;
-		void CompleteAcceptanceSuite() noexcept;
+		void StartIncrementalPublication() noexcept;
+		void UpdateIncrementalPublication() noexcept;
+		void StartGpuCancellation() noexcept;
+		void UpdateGpuCancellation() noexcept;
+		void CompleteCase(std::string name, std::vector<std::string> errors) noexcept;
+		void CompleteSuite() noexcept;
+		void Stop() noexcept;
 
-		Scenario m_Scenario = Scenario::AcceptanceSuite;
-		uint32_t m_FaultOccurrence = 1;
-		std::unique_ptr<ScenarioState> m_State;
-		std::unique_ptr<AcceptanceSuiteState> m_Suite;
+		std::unique_ptr<State> m_State;
 		AssetStreamingFrameBudget m_OriginalBudget{};
 		bool m_HasOriginalBudget = false;
-		bool m_Entered = false;
 	};
 }

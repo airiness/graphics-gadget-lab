@@ -1,7 +1,10 @@
 #include "ArtifactCacheSelfTests.h"
 #include "AssetDataSelfTests.h"
+#include "AssetPublicationSelfTests.h"
+#include "AssetResidencySelfTests.h"
 #include "AssetUploadSchedulerSelfTests.h"
 #include "DiagnosticsContractSelfTests.h"
+#include "EnvironmentSelectionSelfTests.h"
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "PublicationAccountingSelfTests.h"
@@ -26,12 +29,24 @@ namespace
 			.m_Run = &gglab::RunAssetDataSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
+			.m_Id = "asset-publication",
+			.m_Run = &gglab::RunAssetPublicationSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "asset-residency",
+			.m_Run = &gglab::RunAssetResidencySelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
 			.m_Id = "asset-upload-scheduler",
 			.m_Run = &gglab::RunAssetUploadSchedulerSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "diagnostics-contracts",
 			.m_Run = &gglab::RunDiagnosticsContractSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "environment-selection",
+			.m_Run = &gglab::RunEnvironmentSelectionSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "publication-accounting",
