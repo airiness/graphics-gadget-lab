@@ -96,7 +96,7 @@ namespace gglab
 		struct MaterialDiagnosticPrewarmVariant
 		{
 			uint64_t m_DrawVariantBits = 0;
-			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::Legacy;
+			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::AllLights;
 			bool m_UseDepthEqual = false;
 			bool m_GTAOContribution = false;
 		};

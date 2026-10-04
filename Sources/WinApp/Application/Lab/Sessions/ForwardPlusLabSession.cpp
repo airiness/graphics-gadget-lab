@@ -747,7 +747,7 @@ namespace gglab
 					"The deterministic geometry and selected local-light fixture were created.",
 			},
 			{
-				.m_Name = "Legacy vs Forward+ HDR diff",
+				.m_Name = "All-lights vs Forward+ HDR diff",
 				.m_Status = !hdrDiffRequested ? LabDiagnosticCheckStatus::Passed
 					: !hdrDiff.m_IsValid ? LabDiagnosticCheckStatus::Pending
 					: IsForwardPlusHdrDiffWithinTolerance(hdrDiff)

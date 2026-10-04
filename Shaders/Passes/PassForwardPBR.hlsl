@@ -50,7 +50,7 @@ struct ForwardPBRPixelOutput
 {
 	float4 Color : SV_Target0;
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	float4 LegacyColor : SV_Target1;
+	float4 AllLightsReferenceColor : SV_Target1;
 #endif
 #if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
@@ -76,13 +76,13 @@ struct ForwardPBRPixelOutput
 #endif
 };
 
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 legacyColor,
+ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 allLightsReferenceColor,
 	float4 gtaoContribution, float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	ForwardPBRPixelOutput output;
 	output.Color = EncodeForwardSceneColor(color);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
+	output.AllLightsReferenceColor = EncodeForwardSceneColor(allLightsReferenceColor);
 #endif
 #if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 	output.GTAOContribution = gtaoContribution;
@@ -100,7 +100,7 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 legacyColor
 #else
 #define ForwardPBRPixelOutput float4
 
-float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution,
+float4 MakeForwardPBRPixelOutput(float4 color, float4 allLightsReferenceColor, float4 gtaoContribution,
 	float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	return EncodeForwardSceneColor(color);
@@ -382,7 +382,7 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
 	return result;
 }
 
-float3 EvaluateLegacyDirectLighting(float3 positionWS,
+float3 EvaluateAllDirectLights(float3 positionWS,
 	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
 	float3 lighting = 0.0.xxx;
@@ -499,11 +499,11 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
 		IN.PositionWS, shadowReceiver, material);
 #else
-	const float3 directLighting = EvaluateLegacyDirectLighting(IN.PositionWS, shadowReceiver, material);
+	const float3 directLighting = EvaluateAllDirectLights(IN.PositionWS, shadowReceiver, material);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	const float3 legacyDirectLighting = EvaluateLegacyDirectLighting(IN.PositionWS, shadowReceiver, material);
+	const float3 allLightsDirectLighting = EvaluateAllDirectLights(IN.PositionWS, shadowReceiver, material);
 #endif
 
 	const float3 emissive = EvaluateMaterialEmission(surface.Emissive, material.Clearcoat);
@@ -528,12 +528,12 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	const float4 outputColor = float4(
 		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	float3 legacyOutputLighting = legacyDirectLighting;
-	legacyOutputLighting += emissive;
-	legacyOutputLighting += ibl.Diffuse + ibl.Specular;
-	const float4 legacyColor = float4(
-		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS), alpha);
-	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
+	float3 allLightsOutputLighting = allLightsDirectLighting;
+	allLightsOutputLighting += emissive;
+	allLightsOutputLighting += ibl.Diffuse + ibl.Specular;
+	const float4 allLightsReferenceColor = float4(
+		ApplyShadowDiagnosticsOverlay(allLightsOutputLighting, IN.PositionWS), alpha);
+	return MakeForwardPBRPixelOutput(outputColor, allLightsReferenceColor,
 		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
 #else
 	return MakeForwardPBRPixelOutput(outputColor, outputColor,

@@ -8,10 +8,10 @@ namespace gglab
 	struct ForwardPBRShaderSet
 	{
 		ShaderID m_CoverageVertexShader{};
-		ShaderID m_LegacyShadingPixelShader{};
+		ShaderID m_AllLightsShadingPixelShader{};
 		ShaderID m_ForwardPlusShadingPixelShader{};
 		ShaderID m_ForwardPlusValidationPixelShader{};
-		ShaderID m_LegacyGTAOContributionPixelShader{};
+		ShaderID m_AllLightsGTAOContributionPixelShader{};
 		ShaderID m_ForwardPlusGTAOContributionPixelShader{};
 		ShaderID m_ForwardPlusValidationGTAOContributionPixelShader{};
 		std::array<ShaderID, 6> m_MaterialDiagnosticPixelShaders{};
@@ -30,10 +30,10 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_CoverageVertexShader.IsValid() && m_LegacyShadingPixelShader.IsValid() &&
+			return m_CoverageVertexShader.IsValid() && m_AllLightsShadingPixelShader.IsValid() &&
 				m_ForwardPlusShadingPixelShader.IsValid() &&
 				m_ForwardPlusValidationPixelShader.IsValid() &&
-				m_LegacyGTAOContributionPixelShader.IsValid() &&
+				m_AllLightsGTAOContributionPixelShader.IsValid() &&
 				m_ForwardPlusGTAOContributionPixelShader.IsValid() &&
 				m_ForwardPlusValidationGTAOContributionPixelShader.IsValid() &&
 				m_AlphaTestPixelShader.IsValid() && m_VelocityOpaquePixelShader.IsValid() &&

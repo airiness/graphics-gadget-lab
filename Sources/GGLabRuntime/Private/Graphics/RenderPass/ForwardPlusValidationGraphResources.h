@@ -6,13 +6,13 @@ namespace gglab
 {
 	struct RGForwardPlusValidationResources
 	{
-		RGTextureId m_LegacyReferenceColor{};
+		RGTextureId m_AllLightsReferenceColor{};
 		RGBufferId m_TileMetrics{};
 		RGBufferId m_FrameMetrics{};
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_LegacyReferenceColor.IsValid();
+			return m_AllLightsReferenceColor.IsValid();
 		}
 	};
 

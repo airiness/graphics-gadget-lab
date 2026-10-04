@@ -18,7 +18,7 @@ namespace gglab
 
 	enum class ForwardPBRLightingVariant : uint8_t
 	{
-		Legacy,
+		AllLights,
 		ForwardPlus,
 		ForwardPlusValidation,
 		Count,
@@ -31,7 +31,7 @@ namespace gglab
 		if (passKind == ForwardPBRPassKind::Transparent ||
 			settings.m_Mode == ForwardLightingMode::Legacy)
 		{
-			return ForwardPBRLightingVariant::Legacy;
+			return ForwardPBRLightingVariant::AllLights;
 		}
 		return settings.m_EnableHdrDiffValidation && hdrDiffValidationAvailable
 			? ForwardPBRLightingVariant::ForwardPlusValidation

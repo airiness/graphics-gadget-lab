@@ -5,22 +5,22 @@ namespace gglab::shader_programs
 {
 	inline const ShaderProgramRef ForwardCoverageVertex{
 		"gglab.shader.forward-coverage", "vertex", ShaderStage::Vertex };
-	inline const ShaderProgramRef ForwardPBRLegacyPixel{
-		"gglab.shader.forward-pbr", "pixel.legacy", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRAllLightsPixel{
+		"gglab.shader.forward-pbr", "pixel.all-lights", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-validation", ShaderStage::Pixel };
-	inline const ShaderProgramRef ForwardPBRLegacyGTAOPixel{
-		"gglab.shader.forward-pbr", "pixel.legacy-gtao", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRAllLightsGTAOPixel{
+		"gglab.shader.forward-pbr", "pixel.all-lights-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusGTAOPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationGTAOPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao", ShaderStage::Pixel };
-	inline const ShaderProgramRef ForwardPBRLegacyMaterialDiagnosticsPixel{
-		"gglab.shader.forward-pbr", "pixel.legacy.material-diagnostics", ShaderStage::Pixel };
-	inline const ShaderProgramRef ForwardPBRLegacyGTAOMaterialDiagnosticsPixel{
-		"gglab.shader.forward-pbr", "pixel.legacy-gtao.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRAllLightsMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.all-lights.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.all-lights-gtao.material-diagnostics", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusMaterialDiagnosticsPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus.material-diagnostics", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel{

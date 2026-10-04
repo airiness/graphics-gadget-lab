@@ -56,7 +56,7 @@ namespace gglab
 		constexpr ShaderProgramBuildDefine GTAOUpsampleDefine{ L"GGLAB_GTAO_UPSAMPLE" };
 		constexpr ShaderProgramBuildDefine AerialBuildDefine{ L"AERIAL_BUILD" };
 
-		constexpr std::array LegacyGTAODefines{ GTAOContributionDefine };
+		constexpr std::array AllLightsGTAODefines{ GTAOContributionDefine };
 		constexpr std::array ForwardPlusDefines{ ForwardPlusDefine };
 		constexpr std::array ForwardPlusValidationDefines{
 			ForwardPlusDefine, ForwardPlusValidationDefine };
@@ -74,8 +74,8 @@ namespace gglab
 		constexpr std::array AerialBuildDefines{ AerialBuildDefine };
 
 		constexpr ShaderProgramBuildDefine MaterialDiagnosticsDefine{ L"GGLAB_MATERIAL_DIAGNOSTICS" };
-		constexpr std::array LegacyMaterialDiagnosticsDefines{ MaterialDiagnosticsDefine };
-		constexpr std::array LegacyGTAOMaterialDiagnosticsDefines{ GTAOContributionDefine, MaterialDiagnosticsDefine };
+		constexpr std::array AllLightsMaterialDiagnosticsDefines{ MaterialDiagnosticsDefine };
+		constexpr std::array AllLightsGTAOMaterialDiagnosticsDefines{ GTAOContributionDefine, MaterialDiagnosticsDefine };
 		constexpr std::array ForwardPlusMaterialDiagnosticsDefines{ ForwardPlusDefine, MaterialDiagnosticsDefine };
 		constexpr std::array ForwardPlusGTAOMaterialDiagnosticsDefines{ GTAOContributionDefine, ForwardPlusDefine, MaterialDiagnosticsDefine };
 		constexpr std::array ForwardPlusValidationMaterialDiagnosticsDefines{ ForwardPlusDefine, ForwardPlusValidationDefine, MaterialDiagnosticsDefine };
@@ -84,14 +84,14 @@ namespace gglab
 		using namespace shader_programs;
 		const std::array BuildRecords{
 			ShaderProgramBuildRecord{ &ForwardCoverageVertex, L"Passes/PassForwardCoverage.hlsl", L"VSMain" },
-			ShaderProgramBuildRecord{ &ForwardPBRLegacyPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &ForwardPBRAllLightsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusDefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusValidationDefines },
-			ShaderProgramBuildRecord{ &ForwardPBRLegacyGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", LegacyGTAODefines },
+			ShaderProgramBuildRecord{ &ForwardPBRAllLightsGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", AllLightsGTAODefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusGTAODefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusValidationGTAODefines },
-			ShaderProgramBuildRecord{ &ForwardPBRLegacyMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", LegacyMaterialDiagnosticsDefines },
-			ShaderProgramBuildRecord{ &ForwardPBRLegacyGTAOMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", LegacyGTAOMaterialDiagnosticsDefines },
+			ShaderProgramBuildRecord{ &ForwardPBRAllLightsMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", AllLightsMaterialDiagnosticsDefines },
+			ShaderProgramBuildRecord{ &ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", AllLightsGTAOMaterialDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusMaterialDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusGTAOMaterialDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusValidationMaterialDiagnosticsDefines },

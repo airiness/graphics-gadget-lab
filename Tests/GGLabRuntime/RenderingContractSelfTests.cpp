@@ -3052,7 +3052,7 @@ namespace gglab
 			context.Check(
 				ResolveForwardPBRLightingVariant(
 					ForwardPBRPassKind::Opaque, legacySettings, false) ==
-				ForwardPBRLightingVariant::Legacy &&
+				ForwardPBRLightingVariant::AllLights &&
 				ResolveForwardPBRLightingVariant(
 					ForwardPBRPassKind::Opaque, forwardPlusSettings, false) ==
 				ForwardPBRLightingVariant::ForwardPlus &&
@@ -3064,8 +3064,8 @@ namespace gglab
 				ForwardPBRLightingVariant::ForwardPlus &&
 				ResolveForwardPBRLightingVariant(
 					ForwardPBRPassKind::Transparent, validationSettings, true) ==
-				ForwardPBRLightingVariant::Legacy,
-				"Opaque shading selects Legacy, Forward+, or HDR-diff variants while transparent shading remains Legacy");
+				ForwardPBRLightingVariant::AllLights,
+				"Opaque shading selects all-lights, Forward+, or HDR-diff variants while transparent shading remains all-lights");
 
 			const ForwardPlusHdrDiffReadback withinTolerance{
 				.m_MaxAbsoluteError = ForwardPlusHdrDiffAbsoluteTolerance,

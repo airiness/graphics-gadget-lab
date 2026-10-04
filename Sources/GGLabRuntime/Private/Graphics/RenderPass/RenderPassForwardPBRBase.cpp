@@ -71,7 +71,7 @@ namespace gglab
 			RGTextureId m_GTAOFinalAO{};
 			RGTextureId m_AtmosphereTransmittance{};
 			RGTextureId m_GTAOContribution{};
-			RGTextureId m_LegacyReferenceColor{};
+			RGTextureId m_AllLightsReferenceColor{};
 			RGBufferId m_TileHeaders{};
 			RGBufferId m_TileIndices{};
 
@@ -81,14 +81,14 @@ namespace gglab
 			RGTextureViewId m_GTAOFinalAOSrv{};
 			RGTextureViewId m_AtmosphereTransmittanceSrv{};
 			RGTextureViewId m_GTAOContributionRtv{};
-			RGTextureViewId m_LegacyReferenceRtv{};
+			RGTextureViewId m_AllLightsReferenceRtv{};
 			std::array<RGTextureViewId, 3> m_MaterialDiagnosticRtvs{};
 			bool m_MaterialDiagnostics = false;
 
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 			const RenderQueue* m_ExpectedRenderQueue = nullptr;
 			ForwardPlusTileGrid m_ForwardPlusTileGrid{};
-			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::Legacy;
+			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::AllLights;
 			bool m_UseDepthEqual = false;
 			bool m_ClearDepth = false;
 			float m_ClearDepthValue = 0.0f;
@@ -252,13 +252,13 @@ namespace gglab
 				data.m_LightingVariant = lightingVariant;
 				const auto* forwardPlus = blackboard.TryGet<RGForwardPlusResources>(
 					ForwardPlusResourcesName);
-				if (data.m_LightingVariant != ForwardPBRLightingVariant::Legacy &&
+				if (data.m_LightingVariant != ForwardPBRLightingVariant::AllLights &&
 					(!forwardPlus || !forwardPlus->IsValid()))
 				{
-					data.m_LightingVariant = ForwardPBRLightingVariant::Legacy;
+					data.m_LightingVariant = ForwardPBRLightingVariant::AllLights;
 				}
 
-				if (data.m_LightingVariant != ForwardPBRLightingVariant::Legacy)
+				if (data.m_LightingVariant != ForwardPBRLightingVariant::AllLights)
 				{
 					data.m_ForwardPlusTileGrid = forwardPlus->m_TileGrid;
 					data.m_TileHeaders = builder.Read(forwardPlus->m_TileLightHeaders,
@@ -272,14 +272,14 @@ namespace gglab
 					RHITextureDesc referenceDesc = builder.GetTextureDesc(data.m_SceneColor);
 					auto& validation = blackboard.Create<RGForwardPlusValidationResources>(
 						ForwardPlusValidationResourcesName);
-					validation.m_LegacyReferenceColor = builder.CreateTexture(
-						"ForwardPlus.LegacyReferenceColor", referenceDesc);
+					validation.m_AllLightsReferenceColor = builder.CreateTexture(
+						"ForwardPlus.AllLightsReferenceColor", referenceDesc);
 					builder.WriteInPlace(
-						validation.m_LegacyReferenceColor, RGTextureAccess::RenderTarget);
-					data.m_LegacyReferenceColor = validation.m_LegacyReferenceColor;
-					data.m_LegacyReferenceRtv =
+						validation.m_AllLightsReferenceColor, RGTextureAccess::RenderTarget);
+					data.m_AllLightsReferenceColor = validation.m_AllLightsReferenceColor;
+					data.m_AllLightsReferenceRtv =
 						builder.CreateView<RHITextureViewType::RenderTarget>(
-							data.m_LegacyReferenceColor);
+							data.m_AllLightsReferenceColor);
 				}
 
 				if (data.m_ShadowMap.IsValid())
@@ -363,11 +363,11 @@ namespace gglab
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
 					renderTargets[1] = {
-						.m_View = executeContext.GetViewHandle(data.m_LegacyReferenceRtv),
+						.m_View = executeContext.GetViewHandle(data.m_AllLightsReferenceRtv),
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					};
 					GGLAB_ASSERT_MSG(renderTargets[1].m_View.IsValid(),
-						"Forward+ HDR diff requires a legacy reference render target.");
+						"Forward+ HDR diff requires an all-lights reference render target.");
 					renderTargetCount = 2;
 				}
 				if (data.m_GTAOContributionOutputEnabled)
@@ -431,7 +431,7 @@ namespace gglab
 				}
 				const auto& globalLightIndices = contextPtr->m_RenderScene.m_GlobalLightIndices;
 				std::array<uint32_t, ForwardPlusGlobalLightCapacity> packedGlobalLightIndices{};
-				if (data.m_LightingVariant != ForwardPBRLightingVariant::Legacy)
+				if (data.m_LightingVariant != ForwardPBRLightingVariant::AllLights)
 				{
 					GGLAB_ASSERT_MSG(IsForwardPlusGlobalLightCountSupported(
 						static_cast<uint32_t>(globalLightIndices.size())),
@@ -524,7 +524,7 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 					lightSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				if (data.m_LightingVariant != ForwardPBRLightingVariant::Legacy)
+				if (data.m_LightingVariant != ForwardPBRLightingVariant::AllLights)
 				{
 					const RHIBufferHandle tileHeaders =
 						executeContext.GetBufferHandle(data.m_TileHeaders);
@@ -549,7 +549,7 @@ namespace gglab
 					.m_ForwardPlusTileCountX = data.m_ForwardPlusTileGrid.m_TileCountX,
 					.m_ForwardPlusTileCountY = data.m_ForwardPlusTileGrid.m_TileCountY,
 					.m_ForwardPlusGlobalLightCount = data.m_LightingVariant ==
-						ForwardPBRLightingVariant::Legacy
+						ForwardPBRLightingVariant::AllLights
 						? 0u
 						: static_cast<uint32_t>(globalLightIndices.size()),
 					.m_ForwardPlusGlobalLightIndices01 = {
@@ -582,25 +582,25 @@ namespace gglab
 			}
 
 			// Pipeline recipe
-			auto& legacyKey =
-				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)][0];
-			legacyKey.m_BindingLayout = services.m_Presentation->GetRHIContext()->GetPipelineSystem().CreateBindingLayout(
+			auto& allLightsKey =
+				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::AllLights)][0];
+			allLightsKey.m_BindingLayout = services.m_Presentation->GetRHIContext()->GetPipelineSystem().CreateBindingLayout(
 				BuildForwardPBRBindingLayout(services, false));
-			GGLAB_ASSERT(legacyKey.m_BindingLayout.IsValid());
-			legacyKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
-			legacyKey.m_VSId = shaderSet.m_CoverageVertexShader;
-			legacyKey.m_PSId = shaderSet.m_LegacyShadingPixelShader;
+			GGLAB_ASSERT(allLightsKey.m_BindingLayout.IsValid());
+			allLightsKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			allLightsKey.m_VSId = shaderSet.m_CoverageVertexShader;
+			allLightsKey.m_PSId = shaderSet.m_AllLightsShadingPixelShader;
 
-			legacyKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
-			legacyKey.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-			legacyKey.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
-			legacyKey.m_Formats.m_RenderTargetCount = 1;
-			legacyKey.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
-			legacyKey.m_Formats.m_SampleCount = 1;
-			legacyKey.m_Formats.m_SampleQuality = 0;
-			legacyKey.m_RasterizerPreset = RasterizerPreset::Default;
-			legacyKey.m_BlendPreset = BlendPreset::Default;
-			legacyKey.m_DepthPreset = DepthPreset::ReversedZWrite;
+			allLightsKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			allLightsKey.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			allLightsKey.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
+			allLightsKey.m_Formats.m_RenderTargetCount = 1;
+			allLightsKey.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
+			allLightsKey.m_Formats.m_SampleCount = 1;
+			allLightsKey.m_Formats.m_SampleQuality = 0;
+			allLightsKey.m_RasterizerPreset = RasterizerPreset::Default;
+			allLightsKey.m_BlendPreset = BlendPreset::Default;
+			allLightsKey.m_DepthPreset = DepthPreset::ReversedZWrite;
 
 			if (m_PassKind == ForwardPBRPassKind::Opaque)
 			{
@@ -614,7 +614,7 @@ namespace gglab
 
 				auto& forwardPlusKey = m_BasePhysicalKeys[
 					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlus)][0];
-				forwardPlusKey = legacyKey;
+				forwardPlusKey = allLightsKey;
 				forwardPlusKey.m_BindingLayout = forwardPlusBindingLayout;
 				forwardPlusKey.m_PSId = shaderSet.m_ForwardPlusShadingPixelShader;
 
@@ -627,7 +627,7 @@ namespace gglab
 				validationKey.m_Formats.m_RenderTargetCount = 2;
 
 				const ShaderID contributionShaders[] = {
-					shaderSet.m_LegacyGTAOContributionPixelShader,
+					shaderSet.m_AllLightsGTAOContributionPixelShader,
 					shaderSet.m_ForwardPlusGTAOContributionPixelShader,
 					shaderSet.m_ForwardPlusValidationGTAOContributionPixelShader,
 				};
@@ -850,7 +850,7 @@ namespace gglab
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 
 		GraphicsPhysicalPipelineKey physicalKey =
-			m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)][0];
+			m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::AllLights)][0];
 		auto [rasterizerPreset, depthPreset, blendPreset] =
 			GetPresetsFromVariantBits(variantBits, true);
 		physicalKey.m_RasterizerPreset = rasterizerPreset;

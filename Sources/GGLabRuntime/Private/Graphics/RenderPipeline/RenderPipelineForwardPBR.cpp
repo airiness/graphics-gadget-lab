@@ -637,15 +637,15 @@ namespace gglab
 		{
 			m_ForwardPBRShaderSet.m_CoverageVertexShader =
 				shaderManager->LoadProgram(shader_programs::ForwardCoverageVertex);
-			m_ForwardPBRShaderSet.m_LegacyShadingPixelShader =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyPixel);
+			m_ForwardPBRShaderSet.m_AllLightsShadingPixelShader =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusShadingPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
 				shaderManager->LoadProgram(
 					shader_programs::ForwardPBRForwardPlusValidationPixel);
-			m_ForwardPBRShaderSet.m_LegacyGTAOContributionPixelShader =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyGTAOPixel);
+			m_ForwardPBRShaderSet.m_AllLightsGTAOContributionPixelShader =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsGTAOPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusGTAOContributionPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusValidationGTAOContributionPixelShader =
@@ -668,9 +668,9 @@ namespace gglab
 		if (materialDiagnostics && !m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid())
 		{
 			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[0] =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyMaterialDiagnosticsPixel);
+				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsMaterialDiagnosticsPixel);
 			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[1] =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyGTAOMaterialDiagnosticsPixel);
+				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel);
 			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[2] =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel);
 			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[3] =

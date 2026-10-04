@@ -8,17 +8,17 @@ namespace gglab::shader_programs
 	{
 		static const std::array Programs{
 			ForwardCoverageVertex,
-			ForwardPBRLegacyPixel,
+			ForwardPBRAllLightsPixel,
 			ForwardPBRForwardPlusPixel,
 			ForwardPBRForwardPlusValidationPixel,
-			ForwardPBRLegacyGTAOPixel,
+			ForwardPBRAllLightsGTAOPixel,
 			ForwardPBRForwardPlusGTAOPixel,
 			ForwardPBRForwardPlusValidationGTAOPixel,
 			DepthPrepassAlphaTestPixel,
 			DepthPrepassVelocityOpaquePixel,
 			DepthPrepassVelocityAlphaTestPixel,
-			ForwardPBRLegacyMaterialDiagnosticsPixel,
-			ForwardPBRLegacyGTAOMaterialDiagnosticsPixel,
+			ForwardPBRAllLightsMaterialDiagnosticsPixel,
+			ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel,
 			ForwardPBRForwardPlusMaterialDiagnosticsPixel,
 			ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel,
 			ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
@@ -31,7 +31,7 @@ namespace gglab::shader_programs
 	{
 		static const std::array Programs{
 			ForwardCoverageVertex,
-			ForwardPBRLegacyPixel,
+			ForwardPBRAllLightsPixel,
 			DepthPrepassAlphaTestPixel,
 			DepthPrepassVelocityOpaquePixel,
 			DepthPrepassVelocityAlphaTestPixel,

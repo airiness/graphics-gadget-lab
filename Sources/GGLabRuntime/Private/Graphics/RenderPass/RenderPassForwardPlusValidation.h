@@ -19,7 +19,7 @@ namespace gglab
 				.m_DisplayName = "Forward+ HDR Diff",
 				.m_CategoryName = "Lighting",
 				.m_Description =
-					"Compares opaque Forward+ and legacy HDR shading with deterministic GPU reduction.",
+					"Compares opaque Forward+ and all-lights reference HDR shading with deterministic GPU reduction.",
 				.m_Category = RenderPassCategory::Lighting,
 				.m_Type = RenderPassType::Compute,
 				}),

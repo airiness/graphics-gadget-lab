@@ -8,7 +8,7 @@ static const uint INVALID_PIXEL_INDEX = 0xffffffffu;
 struct HdrDiffParameters
 {
 	uint SceneColorTextureIndex;
-	uint LegacyReferenceTextureIndex;
+	uint AllLightsReferenceTextureIndex;
 	uint DepthTextureIndex;
 	uint Width;
 	uint Height;
@@ -76,23 +76,23 @@ void CSReduceTiles(
 		if (!IsDepthBackground(rawDepth, g_Pass.DepthConvention))
 		{
 			Texture2D<float4> sceneColor = GetTexture2DFloat4(g_Pass.SceneColorTextureIndex);
-			Texture2D<float4> legacyReference =
-				GetTexture2DFloat4(g_Pass.LegacyReferenceTextureIndex);
+			Texture2D<float4> allLightsReference =
+				GetTexture2DFloat4(g_Pass.AllLightsReferenceTextureIndex);
 			// Keep absolute errors and the relative-error floor in scene-referred units.
 			const float3 forwardPlus = sceneColor.Load(int3(pixel, 0)).rgb / g_Pass.ScenePreExposure;
-			const float3 legacy = legacyReference.Load(int3(pixel, 0)).rgb / g_Pass.ScenePreExposure;
+			const float3 allLights = allLightsReference.Load(int3(pixel, 0)).rgb / g_Pass.ScenePreExposure;
 
 			float absoluteError = 3.402823466e+38;
 			float relativeLuminanceError = 3.402823466e+38;
-			if (all(isfinite(forwardPlus)) && all(isfinite(legacy)))
+			if (all(isfinite(forwardPlus)) && all(isfinite(allLights)))
 			{
-				absoluteError = max(max(abs(forwardPlus.r - legacy.r),
-					abs(forwardPlus.g - legacy.g)), abs(forwardPlus.b - legacy.b));
+				absoluteError = max(max(abs(forwardPlus.r - allLights.r),
+					abs(forwardPlus.g - allLights.g)), abs(forwardPlus.b - allLights.b));
 				const float3 luminanceWeights = float3(0.2126, 0.7152, 0.0722);
 				const float forwardPlusLuminance = dot(forwardPlus, luminanceWeights);
-				const float legacyLuminance = dot(legacy, luminanceWeights);
-				relativeLuminanceError = abs(forwardPlusLuminance - legacyLuminance) /
-					max(abs(legacyLuminance), 1.0e-4);
+				const float allLightsLuminance = dot(allLights, luminanceWeights);
+				relativeLuminanceError = abs(forwardPlusLuminance - allLightsLuminance) /
+					max(abs(allLightsLuminance), 1.0e-4);
 			}
 
 			absoluteErrorBits = asuint(max(absoluteError, 0.0));

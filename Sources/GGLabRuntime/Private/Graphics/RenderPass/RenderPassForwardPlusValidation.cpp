@@ -35,7 +35,7 @@ namespace gglab
 		struct HdrDiffParameters
 		{
 			uint32_t m_SceneColorTextureIndex = 0;
-			uint32_t m_LegacyReferenceTextureIndex = 0;
+			uint32_t m_AllLightsReferenceTextureIndex = 0;
 			uint32_t m_DepthTextureIndex = 0;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
@@ -52,10 +52,10 @@ namespace gglab
 		struct TilePassData
 		{
 			RGTextureId m_SceneColor{};
-			RGTextureId m_LegacyReference{};
+			RGTextureId m_AllLightsReference{};
 			RGTextureId m_Depth{};
 			RGTextureViewId m_SceneColorSrv{};
-			RGTextureViewId m_LegacyReferenceSrv{};
+			RGTextureViewId m_AllLightsReferenceSrv{};
 			RGTextureViewId m_DepthSrv{};
 			RGBufferId m_TileMetrics{};
 			ForwardPlusTileGrid m_TileGrid{};
@@ -183,7 +183,7 @@ namespace gglab
 				const auto& sceneDepth =
 					blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				GGLAB_ASSERT_MSG(validation.IsValid(),
-					"Forward+ HDR diff requires the opaque legacy reference target.");
+					"Forward+ HDR diff requires the opaque all-lights reference target.");
 
 				const RHITextureDesc& sceneColorDesc = builder.GetTextureDesc(targets.m_SceneColor);
 				data.m_TileGrid = MakeForwardPlusTileGrid(
@@ -194,14 +194,14 @@ namespace gglab
 
 				data.m_SceneColor = builder.Read(
 					targets.m_SceneColor, RGTextureAccess::Sample, RHIStage::ComputeShader);
-				data.m_LegacyReference = builder.Read(validation.m_LegacyReferenceColor,
+				data.m_AllLightsReference = builder.Read(validation.m_AllLightsReferenceColor,
 					RGTextureAccess::Sample, RHIStage::ComputeShader);
 				data.m_Depth = builder.Read(
 					sceneDepth.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
 				data.m_SceneColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);
-				data.m_LegacyReferenceSrv =
-					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_LegacyReference);
+				data.m_AllLightsReferenceSrv =
+					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_AllLightsReference);
 				data.m_DepthSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
 					data.m_Depth, sceneDepth.m_SrvDesc);
 
@@ -220,12 +220,12 @@ namespace gglab
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
 				const auto sceneColorSrv = executeContext.GetViewDescriptor(data.m_SceneColorSrv);
-				const auto legacyReferenceSrv =
-					executeContext.GetViewDescriptor(data.m_LegacyReferenceSrv);
+				const auto allLightsReferenceSrv =
+					executeContext.GetViewDescriptor(data.m_AllLightsReferenceSrv);
 				const auto depthSrv = executeContext.GetViewDescriptor(data.m_DepthSrv);
 				const RHIBufferHandle tileMetrics =
 					executeContext.GetBufferHandle(data.m_TileMetrics);
-				GGLAB_ASSERT_MSG(sceneColorSrv.IsValid() && legacyReferenceSrv.IsValid() &&
+				GGLAB_ASSERT_MSG(sceneColorSrv.IsValid() && allLightsReferenceSrv.IsValid() &&
 					depthSrv.IsValid() && tileMetrics.IsValid(),
 					"Forward+ HDR diff tile resources must resolve before dispatch.");
 
@@ -236,7 +236,7 @@ namespace gglab
 					static_cast<uint32_t>(TileRootParameter::PassConstants),
 					HdrDiffParameters{
 						.m_SceneColorTextureIndex = sceneColorSrv.m_Index,
-						.m_LegacyReferenceTextureIndex = legacyReferenceSrv.m_Index,
+						.m_AllLightsReferenceTextureIndex = allLightsReferenceSrv.m_Index,
 						.m_DepthTextureIndex = depthSrv.m_Index,
 						.m_Width = data.m_TileGrid.m_Width,
 						.m_Height = data.m_TileGrid.m_Height,
@@ -259,7 +259,7 @@ namespace gglab
 					validation.m_TileMetrics, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 
 				const RHITextureDesc& referenceDesc =
-					builder.GetTextureDesc(validation.m_LegacyReferenceColor);
+					builder.GetTextureDesc(validation.m_AllLightsReferenceColor);
 				data.m_TileGrid = MakeForwardPlusTileGrid(
 					referenceDesc.m_Extent.m_Width, referenceDesc.m_Extent.m_Height);
 				RHIBufferDesc frameMetricsDesc{};
@@ -312,7 +312,7 @@ namespace gglab
 				data.m_FrameMetrics = builder.Read(
 					validation.m_FrameMetrics, RGBufferAccess::CopySource, RHIStage::Copy);
 				const RHITextureDesc& referenceDesc =
-					builder.GetTextureDesc(validation.m_LegacyReferenceColor);
+					builder.GetTextureDesc(validation.m_AllLightsReferenceColor);
 				data.m_Width = referenceDesc.m_Extent.m_Width;
 				data.m_Height = referenceDesc.m_Extent.m_Height;
 
