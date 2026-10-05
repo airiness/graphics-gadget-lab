@@ -15,19 +15,22 @@ namespace gglab
 {
 	namespace
 	{
-		// WIC requires COM on the calling thread. DirectXTex caches one
-		// process-wide WIC factory, so the apartment is joined once per thread
-		// and never left: uninitializing it could release the apartment that
-		// keeps the cached factory alive. A thread that already joined another
-		// apartment keeps it; WIC encoders work in either apartment.
-		[[nodiscard]] bool EnsureComApartment() noexcept
+		// WIC requires COM. CoIncrementMTAUsage keeps the multithreaded
+		// apartment alive for the rest of the process: a thread that never
+		// initialized COM then uses it implicitly, and the WIC factory that
+		// DirectXTex caches process-wide stays valid. The calling thread's own
+		// COM state is left alone, so callers never inherit an initialization
+		// they would have to balance; a thread in its own apartment keeps it,
+		// and WIC encoders work in either apartment.
+		[[nodiscard]] bool EnsureComAvailable() noexcept
 		{
-			thread_local const bool joined = []() noexcept
+			static const bool available = []() noexcept
 				{
-					const HRESULT hr = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-					return SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE;
+					// The usage is never released: the cached factory lives until exit.
+					CO_MTA_USAGE_COOKIE cookie = nullptr;
+					return SUCCEEDED(::CoIncrementMTAUsage(&cookie));
 				}();
-			return joined;
+			return available;
 		}
 	}
 
@@ -49,7 +52,7 @@ namespace gglab
 			.pixels = rgba->data(),
 		};
 
-		if (!EnsureComApartment())
+		if (!EnsureComAvailable())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("Frame capture PNG encoding could not initialize COM.");
 			return std::nullopt;

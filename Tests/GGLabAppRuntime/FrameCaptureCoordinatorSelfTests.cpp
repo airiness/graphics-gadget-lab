@@ -2,14 +2,15 @@
 
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureMetadata.h"
-#include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureImageEncoding.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -17,6 +18,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -161,6 +163,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_WriteOnCallingThread = true,
 				});
 
 			const uint64_t id = coordinator.Submit({
@@ -229,6 +232,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t id = coordinator.Submit({
 				.m_Timing = FrameCaptureTiming::AfterReady,
@@ -299,6 +303,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t plain = coordinator.Submit({});
 			const uint64_t viewA = coordinator.Submit({
@@ -386,7 +391,10 @@ namespace gglab
 		void RunFailureTests(SelfTestContext& context) noexcept
 		{
 			FakeCaptureControl control;
-			FrameCaptureCoordinator coordinator({ .m_Capture = &control });
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_WriteOnCallingThread = true,
+				});
 
 			const uint64_t waiting = coordinator.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
 			const uint64_t failing = coordinator.Submit({});
@@ -426,6 +434,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t waiting = coordinator.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
 			const uint64_t completed = coordinator.Submit({});
@@ -465,15 +474,21 @@ namespace gglab
 				"Shutdown gives every request one explicit result and encodes final captures");
 		}
 
-		void RunTaskSystemTests(SelfTestContext& context) noexcept
+		void RunWriterThreadTests(SelfTestContext& context) noexcept
 		{
-			TemporaryDirectory directory("frame-capture-task");
+			TemporaryDirectory directory("frame-capture-writer");
 			FakeCaptureControl control;
-			TaskSystem taskSystem(TaskSystem::CreateInfo{ .m_WorkerCount = 1 });
+			const std::thread::id testThread = std::this_thread::get_id();
+			auto encoderThread = std::make_shared<std::atomic<bool>>(false);
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
-				.m_TaskSystem = &taskSystem,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				// The platform encoder runs on a thread that never initialized COM.
+				.m_ImageEncoder = [testThread, encoderThread](const FrameCaptureImage& image) noexcept
+				{
+					encoderThread->store(std::this_thread::get_id() != testThread);
+					return EncodeFrameCapturePng(image);
+				},
 				});
 			const uint64_t id = coordinator.Submit({});
 			coordinator.BeginFrame(MakeFrameState(true));
@@ -489,10 +504,105 @@ namespace gglab
 			}
 			context.Check(results.size() == 1 && results[0].m_RequestId == id &&
 				results[0].m_Status == FrameCaptureRequestStatus::Completed &&
-				HasPngSignature(results[0].m_ImagePath),
-				"Task-system encoding initializes COM on its worker and publishes asynchronously");
+				HasPngSignature(results[0].m_ImagePath) && encoderThread->load(),
+				"The writer thread encodes PNGs without COM set up by its owner and publishes asynchronously");
 			coordinator.PrepareForShutdown();
-			taskSystem.Shutdown();
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		// Holds the encoder until released, standing in for file I/O that blocks.
+		struct EncoderGate
+		{
+			std::mutex m_Mutex;
+			std::condition_variable m_Condition;
+			bool m_Released = false;
+			bool m_Entered = false;
+		};
+
+		[[nodiscard]] bool HasAnyFile(const std::filesystem::path& directory) noexcept
+		{
+			std::error_code errorCode;
+			if (!std::filesystem::exists(directory, errorCode))
+			{
+				return false;
+			}
+			for (const auto& entry : std::filesystem::directory_iterator(directory, errorCode))
+			{
+				if (entry.is_regular_file(errorCode))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		void RunAbandonedWritingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-abandon");
+			FakeCaptureControl control;
+			auto gate = std::make_shared<EncoderGate>();
+			std::vector<FrameCaptureRequestResult> results;
+			std::chrono::steady_clock::duration finalizeTime{};
+			uint64_t encodingId = 0;
+			uint64_t queuedId = 0;
+			{
+				FrameCaptureCoordinator coordinator({
+					.m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(),
+					.m_ImageEncoder = [gate](const FrameCaptureImage& image) noexcept
+					{
+						std::unique_lock lock(gate->m_Mutex);
+						gate->m_Entered = true;
+						gate->m_Condition.notify_all();
+						gate->m_Condition.wait(lock, [&gate]() { return gate->m_Released; });
+						return EncodeFrameCapturePng(image);
+					},
+					.m_ShutdownWriteTimeout = std::chrono::milliseconds(200),
+					});
+				encodingId = coordinator.Submit({});
+				queuedId = coordinator.Submit({ .m_Source = FrameCaptureSource::Composited });
+				coordinator.BeginFrame(MakeFrameState(true));
+				control.Complete(control.m_Issued[0].m_Id, 1);
+				control.Complete(control.m_Issued[1].m_Id, 1);
+				coordinator.PrepareForShutdown();
+				{
+					std::unique_lock lock(gate->m_Mutex);
+					gate->m_Condition.wait_for(lock, std::chrono::seconds(10),
+						[&gate]() { return gate->m_Entered; });
+				}
+
+				const auto finalizeStart = std::chrono::steady_clock::now();
+				coordinator.FinalizeAfterRenderHost();
+				finalizeTime = std::chrono::steady_clock::now() - finalizeStart;
+				coordinator.ConsumeResults(results);
+			}
+			context.Check(results.size() == 2 &&
+				std::ranges::all_of(results, [](const FrameCaptureRequestResult& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Failed &&
+							result.m_Failure.find("abandoned") != std::string::npos &&
+							result.m_ImagePath.empty();
+					}) &&
+				results[0].m_RequestId == encodingId && results[1].m_RequestId == queuedId &&
+				results[0].m_Failure.find("stage: encoding") != std::string::npos &&
+				results[1].m_Failure.find("stage: queued") != std::string::npos &&
+				finalizeTime < std::chrono::seconds(2),
+				"Shutdown waits for blocked writing once in total, then abandons every unfinished capture");
+
+			// The released writer finishes on its own; the encoder it owns is its
+			// last reference to the gate besides this test's.
+			{
+				std::scoped_lock lock(gate->m_Mutex);
+				gate->m_Released = true;
+			}
+			gate->m_Condition.notify_all();
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (gate.use_count() > 1 && std::chrono::steady_clock::now() < deadline)
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+			context.Check(gate.use_count() == 1 && !HasAnyFile(directory.GetPath()),
+				"An abandoned capture publishes no files, even after its writing resumes");
 		}
 
 		void RunMetadataSerializationTests(SelfTestContext& context) noexcept
@@ -521,7 +631,8 @@ namespace gglab
 		RunReferenceViewTests(context);
 		RunFailureTests(context);
 		RunShutdownTests(context);
-		RunTaskSystemTests(context);
+		RunWriterThreadTests(context);
+		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);
 	}
 }

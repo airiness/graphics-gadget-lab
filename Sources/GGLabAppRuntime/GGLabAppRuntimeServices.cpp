@@ -158,7 +158,6 @@ namespace gglab
 		m_FrameCapture = std::make_unique<FrameCaptureCoordinator>(
 			FrameCaptureCoordinator::CreateInfo{
 				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
-				.m_TaskSystem = m_TaskSystem.get(),
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
 			});
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
@@ -328,7 +327,8 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
-		// Capture encoding runs on the task system, which stops below.
+		// Captures that are not due yet are cancelled; recorded captures keep being
+		// written and are awaited after the render host finalized.
 		if (m_FrameCapture)
 		{
 			m_FrameCapture->PrepareForShutdown();

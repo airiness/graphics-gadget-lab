@@ -1,7 +1,6 @@
 #include "Capture/FrameCaptureCoordinator.h"
 
 #include "AppRuntimeLog.h"
-#include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureImageEncoding.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
@@ -10,13 +9,14 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <deque>
 #include <format>
 #include <fstream>
 #include <limits>
 #include <mutex>
 #include <span>
-#include <stop_token>
 #include <system_error>
+#include <thread>
 #include <utility>
 
 namespace gglab
@@ -26,9 +26,10 @@ namespace gglab
 		enum class EncodeStage : uint32_t
 		{
 			Queued,
-			EncodingPng,
+			Encoding,
 			WritingImage,
 			WritingMetadata,
+			Publishing,
 			Done,
 		};
 
@@ -38,17 +39,30 @@ namespace gglab
 			{
 			case EncodeStage::Queued:
 				return "queued";
-			case EncodeStage::EncodingPng:
-				return "encoding PNG";
+			case EncodeStage::Encoding:
+				return "encoding";
 			case EncodeStage::WritingImage:
 				return "writing image";
 			case EncodeStage::WritingMetadata:
 				return "writing metadata";
+			case EncodeStage::Publishing:
+				return "publishing";
 			case EncodeStage::Done:
 				return "done";
 			}
 			return "unknown";
 		}
+
+		// Decides whether a job's files may appear. The writer claims publication
+		// before it renames the written files into place; shutdown claims the job
+		// as abandoned when it stops waiting for it. The first claim wins, so a
+		// capture reported as abandoned never publishes files afterwards.
+		enum class PublicationClaim : uint8_t
+		{
+			Open,
+			Publishing,
+			Abandoned,
+		};
 	}
 
 	struct FrameCaptureCoordinator::EncodeJob
@@ -58,8 +72,9 @@ namespace gglab
 		std::filesystem::path m_MetadataPath;
 		std::string m_MetadataJson;
 
-		// Progress is published by the encode task for stall reports.
+		// Progress is published by the writer for stall and shutdown reports.
 		std::atomic<EncodeStage> m_Stage = EncodeStage::Queued;
+		std::atomic<PublicationClaim> m_Claim = PublicationClaim::Open;
 		std::chrono::steady_clock::time_point m_SubmittedAt{};
 		bool m_StallReported = false;
 
@@ -69,17 +84,32 @@ namespace gglab
 		std::string m_Failure;
 	};
 
+	// The writer thread holds its own reference, so a writer left blocked in file
+	// I/O at shutdown never touches the destroyed coordinator.
+	struct FrameCaptureCoordinator::WriterState
+	{
+		std::mutex m_Mutex;
+		std::condition_variable m_Condition;
+		std::deque<std::shared_ptr<EncodeJob>> m_Queue;
+		bool m_Stopping = false;
+	};
+
 	namespace
 	{
-		// Bounds the shutdown wait for an encode task that never ran.
-		constexpr std::chrono::seconds EncodeShutdownTimeout{ 30 };
 		// An encode normally finishes well within a second; a longer one is reported.
 		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
 		constexpr size_t MaxFileStemComponentLength = 64;
 
-		// Writes the bytes to a sibling temporary file and renames it into place,
-		// so observers never see a partially written output.
-		[[nodiscard]] std::string WriteFileAtomically(
+		[[nodiscard]] std::filesystem::path GetTemporaryPath(const std::filesystem::path& path)
+		{
+			std::filesystem::path temporaryPath = path;
+			temporaryPath += L".partial";
+			return temporaryPath;
+		}
+
+		// Writes the bytes to a sibling temporary file. PublishFile renames it into
+		// place, so observers never see a partially written output.
+		[[nodiscard]] std::string WriteTemporaryFile(
 			const std::filesystem::path& path, std::span<const uint8_t> bytes) noexcept
 		{
 			std::error_code errorCode;
@@ -90,57 +120,28 @@ namespace gglab
 					path.parent_path().string());
 			}
 
-			std::filesystem::path temporaryPath = path;
-			temporaryPath += L".partial";
-			{
-				std::ofstream file(temporaryPath, std::ios::binary | std::ios::trunc);
-				file.write(reinterpret_cast<const char*>(bytes.data()),
-					static_cast<std::streamsize>(bytes.size()));
-				file.close();
-				if (!file)
-				{
-					std::filesystem::remove(temporaryPath, errorCode);
-					return std::format("Writing '{}' failed.", temporaryPath.string());
-				}
-			}
-			std::filesystem::rename(temporaryPath, path, errorCode);
-			if (errorCode)
+			const std::filesystem::path temporaryPath = GetTemporaryPath(path);
+			std::ofstream file(temporaryPath, std::ios::binary | std::ios::trunc);
+			file.write(reinterpret_cast<const char*>(bytes.data()),
+				static_cast<std::streamsize>(bytes.size()));
+			file.close();
+			if (!file)
 			{
 				std::filesystem::remove(temporaryPath, errorCode);
-				return std::format("Publishing '{}' failed.", path.string());
+				return std::format("Writing '{}' failed.", temporaryPath.string());
 			}
 			return {};
 		}
 
-		[[nodiscard]] std::string EncodeAndWrite(
-			const std::shared_ptr<const FrameCaptureImage>& image,
-			const std::filesystem::path& imagePath, const std::filesystem::path& metadataPath,
-			const std::string& metadataJson, std::atomic<EncodeStage>& stage) noexcept
+		[[nodiscard]] std::string PublishFile(const std::filesystem::path& path) noexcept
 		{
-			stage = EncodeStage::EncodingPng;
-			const std::optional<std::vector<uint8_t>> png =
-				image ? EncodeFrameCapturePng(*image) : std::nullopt;
-			if (!png)
+			std::error_code errorCode;
+			std::filesystem::rename(GetTemporaryPath(path), path, errorCode);
+			if (errorCode)
 			{
-				return "The captured image could not be encoded as PNG.";
+				return std::format("Publishing '{}' failed.", path.string());
 			}
-			stage = EncodeStage::WritingImage;
-			std::string failure = WriteFileAtomically(imagePath, *png);
-			if (!failure.empty())
-			{
-				return failure;
-			}
-			stage = EncodeStage::WritingMetadata;
-			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(metadataJson.data());
-			failure = WriteFileAtomically(
-				metadataPath, std::span<const uint8_t>(jsonBytes, metadataJson.size()));
-			if (!failure.empty())
-			{
-				// A capture is complete only with both files.
-				std::error_code errorCode;
-				std::filesystem::remove(imagePath, errorCode);
-			}
-			return failure;
+			return {};
 		}
 
 		[[nodiscard]] std::string SanitizeFileStemComponent(std::string_view value) noexcept
@@ -164,16 +165,40 @@ namespace gglab
 
 	FrameCaptureCoordinator::FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept :
 		m_Capture(createInfo.m_Capture),
-		m_TaskSystem(createInfo.m_TaskSystem),
-		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory)
+		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
+		m_ImageEncoder(createInfo.m_ImageEncoder),
+		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
+		m_WriteOnCallingThread(createInfo.m_WriteOnCallingThread)
 	{
+		if (!m_ImageEncoder)
+		{
+			m_ImageEncoder = [](const FrameCaptureImage& image) noexcept
+				{
+					return EncodeFrameCapturePng(image);
+				};
+		}
+		if (m_WriteOnCallingThread)
+		{
+			return;
+		}
+		try
+		{
+			m_Writer = std::make_shared<WriterState>();
+			m_WriterThread = std::thread(&FrameCaptureCoordinator::RunWriter, m_Writer, m_ImageEncoder);
+		}
+		catch (...)
+		{
+			GGLAB_LOG_WARN_ALWAYS(
+				"The frame capture writer thread could not start; captures are written on the frame thread.");
+			m_Writer.reset();
+			m_WriteOnCallingThread = true;
+		}
 	}
 
 	FrameCaptureCoordinator::~FrameCaptureCoordinator()
 	{
-		// Encode tasks own their job state, so an unfinished job cannot outlive
-		// its data; the coordinator only waits to keep output publication ordered.
-		CollectEncodedJobs(true);
+		FinishWriting();
+		StopWriter();
 	}
 
 	uint64_t FrameCaptureCoordinator::Submit(FrameCaptureRequest request) noexcept
@@ -343,7 +368,7 @@ namespace gglab
 				HandleCaptureResult(std::move(result));
 			}
 		}
-		CollectEncodedJobs(false);
+		CollectWrittenJobs();
 	}
 
 	void FrameCaptureCoordinator::PrepareForShutdown() noexcept
@@ -358,16 +383,13 @@ namespace gglab
 			}
 		}
 		Update();
-		CollectEncodedJobs(true);
 	}
 
 	void FrameCaptureCoordinator::FinalizeAfterRenderHost() noexcept
 	{
 		m_IsShuttingDown = true;
-		// The task system has stopped; the final results are encoded inline.
-		m_TaskSystem = nullptr;
 		Update();
-		CollectEncodedJobs(true);
+		FinishWriting();
 		for (Entry& entry : m_Entries)
 		{
 			if (entry.m_Phase == Phase::Waiting)
@@ -531,22 +553,58 @@ namespace gglab
 		entry.m_Job = job;
 		entry.m_Phase = Phase::Encoding;
 
-		const bool submitted = m_TaskSystem && m_TaskSystem->IsAcceptingTasks() &&
-			m_TaskSystem->Submit(TaskDesc{ .m_Name = "FrameCapture.EncodePng",
-				.m_Priority = TaskPriority::Normal },
-				[job](std::stop_token) noexcept
-				{
-					RunEncodeJob(*job);
-					return TaskResult::Success();
-				}).IsValid();
-		if (!submitted)
+		if (m_WriteOnCallingThread)
 		{
-			RunEncodeJob(*job);
+			RunEncodeJob(*job, m_ImageEncoder);
+			return;
+		}
+		{
+			std::scoped_lock lock(m_Writer->m_Mutex);
+			m_Writer->m_Queue.push_back(std::move(job));
+		}
+		m_Writer->m_Condition.notify_one();
+	}
+
+	bool FrameCaptureCoordinator::TryFinishWritten(Entry& entry) noexcept
+	{
+		EncodeJob& job = *entry.m_Job;
+		std::unique_lock lock(job.m_Mutex);
+		if (!job.m_IsDone)
+		{
+			return false;
+		}
+		std::string failure = std::move(job.m_Failure);
+		lock.unlock();
+		Finish(entry,
+			failure.empty() ? FrameCaptureRequestStatus::Completed : FrameCaptureRequestStatus::Failed,
+			std::move(failure));
+		return true;
+	}
+
+	void FrameCaptureCoordinator::CollectWrittenJobs() noexcept
+	{
+		for (Entry& entry : m_Entries)
+		{
+			if (entry.m_Phase != Phase::Encoding || TryFinishWritten(entry))
+			{
+				continue;
+			}
+			EncodeJob& job = *entry.m_Job;
+			if (!job.m_StallReported &&
+				std::chrono::steady_clock::now() - job.m_SubmittedAt >= EncodeStallReportTime)
+			{
+				job.m_StallReported = true;
+				GGLAB_LOG_WARN_ALWAYS(
+					"Frame capture {} has not finished encoding after {} seconds (stage: {}).",
+					entry.m_Id, EncodeStallReportTime.count(), GetEncodeStageName(job.m_Stage));
+			}
 		}
 	}
 
-	void FrameCaptureCoordinator::CollectEncodedJobs(bool wait) noexcept
+	void FrameCaptureCoordinator::FinishWriting() noexcept
 	{
+		// One deadline bounds the whole wait, however many captures are unfinished.
+		const auto deadline = std::chrono::steady_clock::now() + m_ShutdownWriteTimeout;
 		for (Entry& entry : m_Entries)
 		{
 			if (entry.m_Phase != Phase::Encoding)
@@ -554,38 +612,57 @@ namespace gglab
 				continue;
 			}
 			EncodeJob& job = *entry.m_Job;
-			std::unique_lock lock(job.m_Mutex);
-			if (wait)
 			{
-				job.m_Condition.wait_for(
-					lock, EncodeShutdownTimeout, [&job]() { return job.m_IsDone; });
+				std::unique_lock lock(job.m_Mutex);
+				job.m_Condition.wait_until(lock, deadline, [&job]() { return job.m_IsDone; });
 			}
-			if (!job.m_IsDone)
+			if (TryFinishWritten(entry))
 			{
-				const EncodeStage stage = job.m_Stage;
-				lock.unlock();
-				if (wait)
-				{
-					Finish(entry, FrameCaptureRequestStatus::Failed,
-						std::format("Encoding did not finish before shutdown (stage: {}).",
-							GetEncodeStageName(stage)));
-				}
-				else if (!job.m_StallReported &&
-					std::chrono::steady_clock::now() - job.m_SubmittedAt >= EncodeStallReportTime)
-				{
-					job.m_StallReported = true;
-					GGLAB_LOG_WARN_ALWAYS(
-						"Frame capture {} has not finished encoding after {} seconds (stage: {}).",
-						entry.m_Id, EncodeStallReportTime.count(), GetEncodeStageName(stage));
-				}
 				continue;
 			}
-			std::string failure = std::move(job.m_Failure);
-			lock.unlock();
-			Finish(entry,
-				failure.empty() ? FrameCaptureRequestStatus::Completed
-				: FrameCaptureRequestStatus::Failed,
-				std::move(failure));
+
+			const EncodeStage stage = job.m_Stage;
+			PublicationClaim expected = PublicationClaim::Open;
+			if (job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Abandoned))
+			{
+				m_HasAbandonedJobs = true;
+				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
+					"Writing did not finish within {} ms of shutdown (stage: {}); the capture "
+					"was abandoned and its files are not published.",
+					m_ShutdownWriteTimeout.count(), GetEncodeStageName(stage)));
+			}
+			else if (!TryFinishWritten(entry))
+			{
+				// The writer claimed publication first and is still renaming files.
+				m_HasAbandonedJobs = true;
+				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
+					"Publishing did not finish within {} ms of shutdown; the capture files "
+					"may be incomplete.", m_ShutdownWriteTimeout.count()));
+			}
+		}
+	}
+
+	void FrameCaptureCoordinator::StopWriter() noexcept
+	{
+		if (!m_WriterThread.joinable())
+		{
+			return;
+		}
+		{
+			std::scoped_lock lock(m_Writer->m_Mutex);
+			m_Writer->m_Stopping = true;
+		}
+		m_Writer->m_Condition.notify_all();
+		// File I/O cannot be interrupted. Every abandoned capture already has its
+		// result, and the writer owns all state it still uses, so a writer that may
+		// be blocked is left to finish on its own instead of holding up shutdown.
+		if (m_HasAbandonedJobs)
+		{
+			m_WriterThread.detach();
+		}
+		else
+		{
+			m_WriterThread.join();
 		}
 	}
 
@@ -621,10 +698,34 @@ namespace gglab
 			[](const Entry& entry) { return entry.m_Phase == Phase::Finished; });
 	}
 
-	void FrameCaptureCoordinator::RunEncodeJob(EncodeJob& job) noexcept
+	void FrameCaptureCoordinator::RunWriter(
+		std::shared_ptr<WriterState> state, FrameCaptureImageEncoder encoder) noexcept
 	{
-		std::string failure = EncodeAndWrite(job.m_Image, job.m_ImagePath, job.m_MetadataPath,
-			job.m_MetadataJson, job.m_Stage);
+		while (true)
+		{
+			std::shared_ptr<EncodeJob> job;
+			{
+				std::unique_lock lock(state->m_Mutex);
+				state->m_Condition.wait(lock,
+					[&state]() { return state->m_Stopping || !state->m_Queue.empty(); });
+				if (state->m_Queue.empty())
+				{
+					return;
+				}
+				job = std::move(state->m_Queue.front());
+				state->m_Queue.pop_front();
+			}
+			RunEncodeJob(*job, encoder);
+		}
+	}
+
+	void FrameCaptureCoordinator::RunEncodeJob(
+		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
+	{
+		// A job abandoned while it was queued is not written at all.
+		std::string failure = job.m_Claim == PublicationClaim::Abandoned
+			? std::string("The capture was abandoned at shutdown.")
+			: WriteAndPublish(job, encoder);
 		job.m_Stage = EncodeStage::Done;
 		{
 			std::scoped_lock lock(job.m_Mutex);
@@ -632,5 +733,64 @@ namespace gglab
 			job.m_IsDone = true;
 		}
 		job.m_Condition.notify_all();
+	}
+
+	std::string FrameCaptureCoordinator::WriteAndPublish(
+		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
+	{
+		job.m_Stage = EncodeStage::Encoding;
+		const std::optional<std::vector<uint8_t>> encoded =
+			job.m_Image ? encoder(*job.m_Image) : std::nullopt;
+		if (!encoded)
+		{
+			return "The captured image could not be encoded as PNG.";
+		}
+
+		const auto removeTemporaryFiles = [&job]() noexcept
+			{
+				std::error_code errorCode;
+				std::filesystem::remove(GetTemporaryPath(job.m_ImagePath), errorCode);
+				std::filesystem::remove(GetTemporaryPath(job.m_MetadataPath), errorCode);
+			};
+		job.m_Stage = EncodeStage::WritingImage;
+		std::string failure = WriteTemporaryFile(job.m_ImagePath, *encoded);
+		if (failure.empty())
+		{
+			job.m_Stage = EncodeStage::WritingMetadata;
+			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(job.m_MetadataJson.data());
+			failure = WriteTemporaryFile(job.m_MetadataPath,
+				std::span<const uint8_t>(jsonBytes, job.m_MetadataJson.size()));
+		}
+		if (!failure.empty())
+		{
+			removeTemporaryFiles();
+			return failure;
+		}
+
+		// Shutdown may have abandoned the job while it was being written. It then
+		// reported the capture as failed, so its files must not appear.
+		PublicationClaim expected = PublicationClaim::Open;
+		if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
+		{
+			removeTemporaryFiles();
+			return "The capture was abandoned at shutdown.";
+		}
+		job.m_Stage = EncodeStage::Publishing;
+		failure = PublishFile(job.m_ImagePath);
+		if (failure.empty())
+		{
+			failure = PublishFile(job.m_MetadataPath);
+			if (!failure.empty())
+			{
+				// A capture is complete only with both files.
+				std::error_code errorCode;
+				std::filesystem::remove(job.m_ImagePath, errorCode);
+			}
+		}
+		if (!failure.empty())
+		{
+			removeTemporaryFiles();
+		}
+		return failure;
 	}
 }

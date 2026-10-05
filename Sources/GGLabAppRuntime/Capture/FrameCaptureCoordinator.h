@@ -4,17 +4,24 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace gglab
 {
 	class FrameCaptureControlBase;
-	class TaskSystem;
+
+	// Encodes a captured image as the bytes of its PNG file; nullopt when the
+	// image cannot be encoded. Called on the coordinator's writer thread.
+	using FrameCaptureImageEncoder =
+		std::function<std::optional<std::vector<uint8_t>>(const FrameCaptureImage&)>;
 
 	struct FrameCaptureRequest
 	{
@@ -96,17 +103,24 @@ namespace gglab
 	};
 
 	// Turns host capture requests into Runtime frame captures at the requested
-	// time, then encodes the PNG and writes the metadata sidecar off the frame
-	// thread. Every submitted request finishes with exactly one result.
+	// time, then encodes the PNG and writes the metadata sidecar on a dedicated
+	// writer thread, so slow or blocked file I/O never occupies the shared task
+	// system. Every submitted request finishes with exactly one result.
 	class FrameCaptureCoordinator final
 	{
 	public:
 		struct CreateInfo
 		{
 			FrameCaptureControlBase* m_Capture = nullptr;
-			// Null encodes on the calling thread.
-			TaskSystem* m_TaskSystem = nullptr;
 			std::filesystem::path m_DefaultOutputDirectory;
+			// Empty selects the platform PNG encoder.
+			FrameCaptureImageEncoder m_ImageEncoder;
+			// Total time shutdown waits for unfinished writing before it abandons
+			// the remaining captures.
+			std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
+			// Writes on the calling thread instead of the writer thread, so a
+			// result is published by the Update that collected the capture.
+			bool m_WriteOnCallingThread = false;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -141,16 +155,19 @@ namespace gglab
 		// Collects Runtime capture results, starts encoding and publishes
 		// finished requests.
 		void Update() noexcept;
-		// Called while the task system still runs: cancels requests that were not
-		// issued and waits for in-flight encoding.
+		// Called when the runtime begins shutting down: cancels requests that
+		// were not issued. Captures already recorded keep being written.
 		void PrepareForShutdown() noexcept;
 		// Called after the render host finalized and before it is destroyed:
-		// encodes the final Runtime results on the calling thread and fails
-		// anything left. Afterwards no request is unfinished.
+		// writes the final Runtime results and waits for writing up to the
+		// shutdown write timeout in total. A capture still unfinished then is
+		// abandoned: it fails and its files are not published. Afterwards no
+		// request is unfinished.
 		void FinalizeAfterRenderHost() noexcept;
 
 	private:
 		struct EncodeJob;
+		struct WriterState;
 
 		enum class Phase : uint8_t
 		{
@@ -182,14 +199,32 @@ namespace gglab
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;
-		void CollectEncodedJobs(bool wait) noexcept;
+		// Publishes the result of a written job; false while it is unfinished.
+		[[nodiscard]] bool TryFinishWritten(Entry& entry) noexcept;
+		void CollectWrittenJobs() noexcept;
+		// Waits for unfinished writing until the shutdown write timeout and
+		// abandons what remains.
+		void FinishWriting() noexcept;
+		void StopWriter() noexcept;
 		void Finish(Entry& entry, FrameCaptureRequestStatus status, std::string failure) noexcept;
 		void RemoveFinishedEntries() noexcept;
-		static void RunEncodeJob(EncodeJob& job) noexcept;
+		static void RunWriter(std::shared_ptr<WriterState> state,
+			FrameCaptureImageEncoder encoder) noexcept;
+		static void RunEncodeJob(EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
+		[[nodiscard]] static std::string WriteAndPublish(
+			EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
 
 		FrameCaptureControlBase* m_Capture = nullptr;
-		TaskSystem* m_TaskSystem = nullptr;
 		std::filesystem::path m_DefaultOutputDirectory;
+		FrameCaptureImageEncoder m_ImageEncoder;
+		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
+		bool m_WriteOnCallingThread = false;
+		// Shared with the writer thread, which keeps its own reference.
+		std::shared_ptr<WriterState> m_Writer;
+		std::thread m_WriterThread;
+		// A writer that still holds an abandoned capture may be blocked in file
+		// I/O; shutdown then leaves it to finish on its own.
+		bool m_HasAbandonedJobs = false;
 		uint64_t m_NextRequestId = 1;
 		std::vector<Entry> m_Entries;
 		std::vector<FrameCaptureRequestResult> m_Results;
