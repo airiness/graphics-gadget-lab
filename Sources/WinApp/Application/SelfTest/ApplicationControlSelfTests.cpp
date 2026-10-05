@@ -207,7 +207,7 @@ namespace gglab
 				std::chrono::steady_clock::now().time_since_epoch().count());
 			win32::NamedPipeServer server;
 			win32::NamedPipeServer duplicate;
-			const bool started = server.Start(pipeName);
+			const bool started = server.Start(pipeName, std::chrono::milliseconds(300));
 			context.Check(started && !duplicate.Start(pipeName),
 				"A control pipe name can be served by only one server");
 			if (!started)
@@ -251,10 +251,41 @@ namespace gglab
 				received = !server.Poll().empty();
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			}
+			// A client that never reads its response and keeps the pipe open holds
+			// its connection only until the client close timeout.
+			HANDLE silent = ::CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0,
+				nullptr, OPEN_EXISTING, 0, nullptr);
+			bool silentAnswered = false;
+			if (silent != INVALID_HANDLE_VALUE)
+			{
+				constexpr std::string_view silentRequest = "silent\n";
+				DWORD bytes = 0;
+				::WriteFile(silent, silentRequest.data(), static_cast<DWORD>(silentRequest.size()),
+					&bytes, nullptr);
+				const auto silentDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+				while (!silentAnswered && std::chrono::steady_clock::now() < silentDeadline)
+				{
+					for (const auto& request : server.Poll())
+					{
+						request->Respond("unread");
+						silentAnswered = true;
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+			}
+
+			const auto stopStart = std::chrono::steady_clock::now();
 			server.Stop("stopped");
+			const auto stopTime = std::chrono::steady_clock::now() - stopStart;
 			pending.join();
+			if (silent != INVALID_HANDLE_VALUE)
+			{
+				::CloseHandle(silent);
+			}
 			context.Check(received && pendingResponse == "stopped",
 				"Stopping answers outstanding requests with the fallback response");
+			context.Check(silentAnswered && stopTime < std::chrono::seconds(3),
+				"A client that never reads its response cannot hold server shutdown");
 		}
 	}
 

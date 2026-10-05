@@ -4,6 +4,7 @@
 #include <windows.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -51,8 +52,11 @@ namespace gglab::win32
 		GGLAB_DELETE_COPYABLE_MOVABLE(NamedPipeServer);
 		~NamedPipeServer();
 
-		// pipeName is the full path, for example \\.\pipe\name.
-		[[nodiscard]] bool Start(std::wstring_view pipeName) noexcept;
+		// pipeName is the full path, for example \\.\pipe\name. After a response
+		// is written, a connection waits up to clientCloseTimeout for the client to
+		// close its end, so the response is read before the connection is dropped.
+		[[nodiscard]] bool Start(std::wstring_view pipeName,
+			std::chrono::milliseconds clientCloseTimeout = std::chrono::seconds(5)) noexcept;
 		// Requests that are not answered by then receive the fallback response.
 		void Stop(std::string_view fallbackResponse) noexcept;
 		[[nodiscard]] std::vector<std::shared_ptr<NamedPipeRequest>> Poll() noexcept;
@@ -70,6 +74,7 @@ namespace gglab::win32
 		void PruneFinishedConnections() noexcept;
 
 		std::wstring m_PipeName;
+		std::chrono::milliseconds m_ClientCloseTimeout{ 5000 };
 		HANDLE m_StopEvent = nullptr;
 		HANDLE m_FirstInstance = INVALID_HANDLE_VALUE;
 		std::thread m_Listener;

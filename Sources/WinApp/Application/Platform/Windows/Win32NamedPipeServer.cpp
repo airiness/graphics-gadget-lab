@@ -51,6 +51,43 @@ namespace gglab::win32
 			}
 			return ::GetOverlappedResult(pipe, &overlapped, &outBytes, FALSE) != FALSE;
 		}
+
+		// DisconnectNamedPipe discards unread data, and a completed write only means
+		// the response reached the pipe buffer. The client closes its end once it
+		// read the response line, so waiting for that keeps the response intact.
+		// Unlike FlushFileBuffers, the wait is bounded: a client that never reads
+		// cannot hold the connection, and with it server shutdown.
+		void WaitForClientClose(
+			HANDLE pipe, HANDLE ioEvent, std::chrono::milliseconds timeout) noexcept
+		{
+			const auto deadline = std::chrono::steady_clock::now() + timeout;
+			std::array<char, 256> discarded{};
+			while (true)
+			{
+				const auto remaining = std::chrono::ceil<std::chrono::milliseconds>(
+					deadline - std::chrono::steady_clock::now());
+				if (remaining.count() <= 0)
+				{
+					return;
+				}
+				OVERLAPPED overlapped{};
+				overlapped.hEvent = ioEvent;
+				::ResetEvent(ioEvent);
+				DWORD bytes = 0;
+				if (!::ReadFile(pipe, discarded.data(), static_cast<DWORD>(discarded.size()),
+					nullptr, &overlapped) && ::GetLastError() != ERROR_IO_PENDING)
+				{
+					// ERROR_BROKEN_PIPE: the client closed its end.
+					return;
+				}
+				// Bytes the client sends after its request line are ignored.
+				if (!CompleteOverlapped(pipe, overlapped, nullptr,
+					static_cast<DWORD>(remaining.count()), bytes) || bytes == 0)
+				{
+					return;
+				}
+			}
+		}
 	}
 
 	void NamedPipeRequest::Respond(std::string response) noexcept
@@ -93,13 +130,15 @@ namespace gglab::win32
 		Stop(R"({"ok":false,"error":"The session is shutting down."})");
 	}
 
-	bool NamedPipeServer::Start(std::wstring_view pipeName) noexcept
+	bool NamedPipeServer::Start(
+		std::wstring_view pipeName, std::chrono::milliseconds clientCloseTimeout) noexcept
 	{
 		if (m_StopEvent)
 		{
 			return false;
 		}
 		m_PipeName = pipeName;
+		m_ClientCloseTimeout = clientCloseTimeout;
 		m_StopEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
 		if (!m_StopEvent)
 		{
@@ -314,12 +353,12 @@ namespace gglab::win32
 			const bool written = ::WriteFile(pipe, response->data(),
 				static_cast<DWORD>(response->size()), nullptr, &overlapped) ||
 				::GetLastError() == ERROR_IO_PENDING;
-			// The stop event is not part of this wait: a response produced during
+			// The stop event is not part of these waits: a response produced during
 			// shutdown must still reach the client.
 			if (written && CompleteOverlapped(
 				pipe, overlapped, nullptr, ResponseWriteTimeoutMilliseconds, bytes))
 			{
-				::FlushFileBuffers(pipe);
+				WaitForClientClose(pipe, ioEvent.Get(), m_ClientCloseTimeout);
 			}
 		}
 		::DisconnectNamedPipe(pipe);
