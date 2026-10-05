@@ -13,6 +13,9 @@ namespace gglab
 		std::wstring_view m_Title;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+		// Never shown or activated. The client size is exactly the requested size,
+		// even when it exceeds the desktop.
+		bool m_Hidden = false;
 	};
 
 	enum class PlatformEventType : uint8_t

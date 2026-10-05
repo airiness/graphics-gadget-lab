@@ -19,7 +19,15 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Lab/LabRuntime.h"
 
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <filesystem>
+#include <format>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <thread>
 #include <utility>
 
 namespace gglab
@@ -32,7 +40,10 @@ namespace gglab
 		m_RuntimeConfig(std::move(createInfo.m_RuntimeConfig)),
 		m_RuntimePaths(std::move(createInfo.m_RuntimePaths)),
 		m_HostServices(std::move(createInfo.m_HostServices)),
-		m_ContentRegistration(std::move(createInfo.m_ContentRegistration))
+		m_ContentRegistration(std::move(createInfo.m_ContentRegistration)),
+		m_CaptureOnReady(std::move(createInfo.m_CaptureOnReady)),
+		m_CaptureTimeout(createInfo.m_CaptureTimeoutSeconds),
+		m_Hidden(createInfo.m_Hidden)
 	{
 	}
 
@@ -117,6 +128,7 @@ namespace gglab
 			.m_Title = m_WindowName,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
+			.m_Hidden = m_Hidden,
 		};
 		m_PlatformHostInitializationAttempted = true;
 		if (!m_PlatformHost->Initialize(windowCreateInfo))
@@ -126,6 +138,15 @@ namespace gglab
 		}
 
 		auto& mainWindow = m_PlatformHost->GetMainWindow();
+		if (m_Hidden &&
+			(mainWindow.GetWidth() != m_WindowWidth || mainWindow.GetHeight() != m_WindowHeight))
+		{
+			// A capture must never silently change resolution.
+			GGLAB_LOG_ERROR_ALWAYS(
+				"The hidden window client size {}x{} differs from the requested {}x{}.",
+				mainWindow.GetWidth(), mainWindow.GetHeight(), m_WindowWidth, m_WindowHeight);
+			return FailInitialization();
+		}
 		m_WindowWidth = mainWindow.GetWidth();
 		m_WindowHeight = mainWindow.GetHeight();
 
@@ -261,6 +282,17 @@ namespace gglab
 			GGLAB_LOG_INFO("Optional application tooling omitted by host composition.");
 		}
 
+		if (m_CaptureOnReady)
+		{
+			if (!m_FrameCapture)
+			{
+				GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready requires the frame capture service.");
+				return FailInitialization();
+			}
+			m_CaptureOnReadyRequestId = m_FrameCapture->Submit(std::move(*m_CaptureOnReady));
+			m_CaptureOnReady.reset();
+		}
+
 		m_LifecycleState = LifecycleState::Running;
 		return true;
 	}
@@ -278,7 +310,16 @@ namespace gglab
 			return true;
 		}
 
-		m_InputManager->Update();
+		if (m_Hidden)
+		{
+			// Input devices report state regardless of window focus; a hidden
+			// instance must not react to keys meant for another application.
+			PaceHiddenFrame();
+		}
+		else
+		{
+			m_InputManager->Update();
+		}
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		if (m_ShaderHotReload)
 		{
@@ -299,6 +340,11 @@ namespace gglab
 		{
 			m_FrameCapture->Update();
 		}
+		if (m_CaptureOnReadyRequestId != 0 && tickResult == AppRuntimeTickResult::Continue &&
+			!UpdateCaptureOnReady())
+		{
+			return false;
+		}
 		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
 			m_PlatformHost->WaitForEvents();
@@ -317,6 +363,89 @@ namespace gglab
 			return false;
 		}
 		return tickResult == AppRuntimeTickResult::Continue;
+	}
+
+	void Application::PaceHiddenFrame() noexcept
+	{
+		// Hidden frames present to no visible surface, so presentation does not
+		// throttle them; cap them at 60 frames per second.
+		constexpr std::chrono::microseconds frameInterval{ 16667 };
+		const auto now = std::chrono::steady_clock::now();
+		if (m_NextHiddenFrameTime > now)
+		{
+			std::this_thread::sleep_until(m_NextHiddenFrameTime);
+		}
+		m_NextHiddenFrameTime = std::max(m_NextHiddenFrameTime, now) + frameInterval;
+	}
+
+	bool Application::UpdateCaptureOnReady() noexcept
+	{
+		const auto now = std::chrono::steady_clock::now();
+		if (!m_CaptureDeadline)
+		{
+			m_CaptureDeadline =
+				now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_CaptureTimeout);
+		}
+
+		// Machine-readable outcome lines on stdout for unattended callers.
+		const auto printLine = [](std::string_view key, std::string_view value) noexcept
+			{
+				std::fprintf(stdout, "%.*s: %.*s\n", static_cast<int>(key.size()), key.data(),
+					static_cast<int>(value.size()), value.data());
+			};
+		const auto toUtf8 = [](const std::filesystem::path& path)
+			{
+				const std::u8string text = path.u8string();
+				return std::string(text.begin(), text.end());
+			};
+
+		if (const FrameCaptureRequestResult* result =
+			m_FrameCapture->FindResult(m_CaptureOnReadyRequestId))
+		{
+			if (result->m_Status == FrameCaptureRequestStatus::Completed)
+			{
+				printLine("capture-status", "completed");
+				printLine("capture-image", toUtf8(result->m_ImagePath));
+				printLine("capture-metadata", toUtf8(result->m_MetadataPath));
+				m_ExitCode = 0;
+			}
+			else
+			{
+				printLine("capture-status", result->m_Status == FrameCaptureRequestStatus::Cancelled
+					? "cancelled" : "failed");
+				printLine("capture-failure", result->m_Failure);
+				m_ExitCode = 2;
+			}
+			std::fflush(stdout);
+			m_CaptureOnReadyRequestId = 0;
+			return false;
+		}
+		if (now < *m_CaptureDeadline)
+		{
+			return true;
+		}
+
+		m_FrameCapture->Cancel(m_CaptureOnReadyRequestId);
+		printLine("capture-status", "timeout");
+		if (const FrameCaptureFrameState* frameState = m_FrameCapture->GetLastFrameState())
+		{
+			for (const FrameCaptureGate& gate : frameState->m_Readiness.m_Gates)
+			{
+				if (gate.m_State != FrameCaptureGateState::Ready)
+				{
+					printLine("capture-pending-gate", std::format("{} ({}): {}", gate.m_Name,
+						GetFrameCaptureGateStateName(gate.m_State), gate.m_Detail));
+				}
+			}
+			printLine("capture-settled-frames",
+				std::to_string(m_FrameCapture->GetSettledFrameCount()));
+		}
+		std::fflush(stdout);
+		GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready timed out after {} seconds.",
+			m_CaptureTimeout.count());
+		m_ExitCode = 3;
+		m_CaptureOnReadyRequestId = 0;
+		return false;
 	}
 
 	bool Application::FailInitialization() noexcept

@@ -2,9 +2,11 @@
 #include "ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
+#include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "RuntimePaths.h"
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -46,6 +48,11 @@ namespace gglab
 			RuntimePaths m_RuntimePaths{};
 			AppRuntimeHostServices m_HostServices{};
 			ApplicationContentRegistration m_ContentRegistration{};
+			// The main window is never shown or activated and input is ignored.
+			bool m_Hidden = false;
+			// One capture submitted at startup; the application exits with its result.
+			std::optional<FrameCaptureRequest> m_CaptureOnReady;
+			double m_CaptureTimeoutSeconds = 120.0;
 		};
 
 	public:
@@ -69,6 +76,10 @@ namespace gglab
 	private:
 		[[nodiscard]] bool FailInitialization() noexcept;
 		bool Tick() noexcept;
+		// Paces hidden frames, which present to no visible surface.
+		void PaceHiddenFrame() noexcept;
+		// Returns false once the capture-on-ready request finished or timed out.
+		[[nodiscard]] bool UpdateCaptureOnReady() noexcept;
 
 		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
@@ -92,11 +103,18 @@ namespace gglab
 		std::unique_ptr<DevelopmentShaderHotReloadSystem> m_ShaderHotReload;
 #endif
 
+		std::optional<FrameCaptureRequest> m_CaptureOnReady;
+		std::chrono::duration<double> m_CaptureTimeout{ 120.0 };
+		uint64_t m_CaptureOnReadyRequestId = 0;
+		std::optional<std::chrono::steady_clock::time_point> m_CaptureDeadline;
+		std::chrono::steady_clock::time_point m_NextHiddenFrameTime{};
+
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;
 		// Input devices report state regardless of focus; host shortcuts respond
 		// only while the main window is the active application window.
 		bool m_IsWindowActive = false;
+		bool m_Hidden = false;
 		bool m_ShutdownComplete = false;
 		int m_ExitCode = 0;
 	};

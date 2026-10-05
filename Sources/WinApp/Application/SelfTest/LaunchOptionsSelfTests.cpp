@@ -3,6 +3,7 @@
 #include "Application/ApplicationLaunchOptions.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
+#include <filesystem>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -143,6 +144,61 @@ namespace gglab
 					!relativeMouseConflict.IsValid() &&
 					relativeMouseConflict.m_Error.find("cannot be combined") != std::string::npos,
 					"Self-test selection rejects interactive startup options");
+			}
+			{
+				const auto defaults = parse({});
+				const auto hidden = parse({ "--hidden", "--window-size", "3840x2160",
+					"--fixed-delta-time", "0.02" });
+				context.Check(defaults.IsValid() && !defaults.m_Options.m_Hidden &&
+					defaults.m_Options.m_WindowWidth == 1920 &&
+					defaults.m_Options.m_WindowHeight == 1080 &&
+					!defaults.m_Options.m_FixedDeltaTimeSeconds &&
+					!defaults.m_Options.m_CaptureOnReady &&
+					hidden.IsValid() && hidden.m_Options.m_Hidden &&
+					hidden.m_Options.m_WindowWidth == 3840 &&
+					hidden.m_Options.m_WindowHeight == 2160 &&
+					hidden.m_Options.m_FixedDeltaTimeSeconds == 0.02,
+					"Hidden launches select an explicit window size and fixed time step");
+				context.Check(!parse({ "--window-size", "1920" }).IsValid() &&
+					!parse({ "--window-size", "32x32" }).IsValid() &&
+					!parse({ "--window-size", "20000x1080" }).IsValid() &&
+					!parse({ "--window-size", "1920x1080px" }).IsValid() &&
+					!parse({ "--fixed-delta-time", "0" }).IsValid() &&
+					!parse({ "--fixed-delta-time", "2" }).IsValid() &&
+					!parse({ "--fixed-delta-time", "fast" }).IsValid() &&
+					!parse({ "--hidden", "--hidden" }).IsValid() &&
+					!parse({ "--hidden", "--relative-mouse" }).IsValid(),
+					"Window size, time step and hidden options reject malformed or conflicting values");
+			}
+			{
+				const auto capture = parse({ "--lab", "gglab.lab.culling", "--capture-on-ready",
+					"C:/gglab-captures", "--capture-source", "composited",
+					"--capture-settle-frames", "16", "--capture-label", "culling",
+					"--capture-timeout", "30" });
+				const bool captureValid = capture.IsValid() && capture.m_Options.m_CaptureOnReady;
+				context.Check(captureValid &&
+					capture.m_Options.m_CaptureOnReady->m_OutputDirectory ==
+					std::filesystem::path("C:/gglab-captures") &&
+					capture.m_Options.m_CaptureOnReady->m_Source ==
+					FrameCaptureSource::Composited &&
+					capture.m_Options.m_CaptureOnReady->m_SettleFrames == 16 &&
+					capture.m_Options.m_CaptureOnReady->m_Label == "culling" &&
+					capture.m_Options.m_CaptureOnReady->m_TimeoutSeconds == 30.0,
+					"Capture-on-ready collects its output directory, source, settling and timeout");
+				const auto defaults = parse({ "--capture-on-ready", "C:/gglab-captures" });
+				context.Check(defaults.IsValid() && defaults.m_Options.m_CaptureOnReady &&
+					defaults.m_Options.m_CaptureOnReady->m_Source == FrameCaptureSource::Scene &&
+					defaults.m_Options.m_CaptureOnReady->m_SettleFrames == 8,
+					"Capture-on-ready defaults to a settled scene capture");
+				context.Check(!parse({ "--capture-on-ready", "relative/captures" }).IsValid() &&
+					!parse({ "--capture-source", "scene" }).IsValid() &&
+					!parse({ "--capture-on-ready", "C:/c", "--capture-source", "hud" }).IsValid() &&
+					!parse({ "--capture-on-ready", "C:/c", "--capture-settle-frames", "-1" })
+						.IsValid() &&
+					!parse({ "--capture-on-ready", "C:/c", "--capture-timeout", "0" }).IsValid() &&
+					!parse({ "--self-test", "all", "--capture-on-ready", "C:/c" }).IsValid() &&
+					!parse({ "--self-test", "all", "--hidden" }).IsValid(),
+					"Capture options require an absolute capture-on-ready directory and valid values");
 			}
 			{
 				const auto result = parse({ "--no-devtools" });

@@ -50,6 +50,12 @@ namespace gglab
 
 		// Submits a capture with the current settings and returns its request id.
 		uint64_t Capture() noexcept;
+		// Submits an explicit request and returns its request id.
+		uint64_t Submit(FrameCaptureRequest request) noexcept;
+		// Cancels a request that has not been issued to a frame yet.
+		bool Cancel(uint64_t requestId) noexcept;
+		// Finished result of a request still held in the history, or null.
+		[[nodiscard]] const FrameCaptureRequestResult* FindResult(uint64_t requestId) const noexcept;
 		// Moves finished captures into the history; call once per host frame.
 		void Update() noexcept;
 

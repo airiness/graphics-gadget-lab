@@ -34,6 +34,10 @@ namespace gglab
 			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;
 		}
 		config.m_RequestRuntimeValidation = requestRuntimeValidation;
+		config.m_FixedDeltaTimeSeconds = options.m_FixedDeltaTimeSeconds
+			? options.m_FixedDeltaTimeSeconds
+			: options.m_Hidden ? std::optional<double>(HiddenLaunchFixedDeltaTimeSeconds)
+			: std::nullopt;
 
 		switch (options.m_StartupDemo)
 		{
@@ -52,6 +56,24 @@ namespace gglab
 			break;
 		}
 		return config;
+	}
+
+	std::optional<FrameCaptureRequest> TranslateCaptureOnReadyOptions(
+		const ApplicationLaunchOptions& options) noexcept
+	{
+		if (!options.m_CaptureOnReady)
+		{
+			return std::nullopt;
+		}
+		const ApplicationCaptureOnReadyOptions& capture = *options.m_CaptureOnReady;
+		return FrameCaptureRequest{
+			.m_Source = capture.m_Source,
+			.m_Timing = FrameCaptureTiming::AfterReady,
+			.m_SettleFrames = capture.m_SettleFrames,
+			.m_RequiredContentId = options.m_StartupLabId.value_or(std::string{}),
+			.m_OutputDirectory = capture.m_OutputDirectory,
+			.m_Label = capture.m_Label,
+		};
 	}
 
 	RuntimePaths BuildRuntimePaths(const std::filesystem::path& executableDirectory,

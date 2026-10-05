@@ -185,6 +185,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32UnattendedProcess.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.cpp" />
@@ -295,6 +296,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32MessageHandler.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32UnattendedProcess.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextGraphics.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextLab.h" />

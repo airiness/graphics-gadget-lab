@@ -16,7 +16,7 @@ namespace gglab
 	uint64_t ApplicationFrameCapture::Capture() noexcept
 	{
 		const bool afterReady = m_Settings.m_Timing == FrameCaptureTiming::AfterReady;
-		const uint64_t requestId = m_Coordinator->Submit({
+		return Submit({
 			.m_Source = m_Settings.m_Source,
 			.m_Timing = m_Settings.m_Timing,
 			.m_SettleFrames = afterReady ? m_Settings.m_SettleFrames : 0,
@@ -24,10 +24,34 @@ namespace gglab
 			.m_Label = m_Settings.m_Label,
 			.m_Note = m_Settings.m_Note,
 			});
+	}
+
+	uint64_t ApplicationFrameCapture::Submit(FrameCaptureRequest request) noexcept
+	{
+		const FrameCaptureSource source = request.m_Source;
+		const FrameCaptureTiming timing = request.m_Timing;
+		const uint64_t requestId = m_Coordinator->Submit(std::move(request));
 		GGLAB_LOG_INFO_ALWAYS("Frame capture {} requested (source={}, timing={}).", requestId,
-			GetFrameCaptureSourceName(m_Settings.m_Source),
-			GetFrameCaptureTimingName(m_Settings.m_Timing));
+			GetFrameCaptureSourceName(source), GetFrameCaptureTimingName(timing));
 		return requestId;
+	}
+
+	bool ApplicationFrameCapture::Cancel(uint64_t requestId) noexcept
+	{
+		return m_Coordinator->Cancel(requestId);
+	}
+
+	const FrameCaptureRequestResult* ApplicationFrameCapture::FindResult(
+		uint64_t requestId) const noexcept
+	{
+		for (const HistoryEntry& entry : m_History)
+		{
+			if (entry.m_Result.m_RequestId == requestId)
+			{
+				return &entry.m_Result;
+			}
+		}
+		return nullptr;
 	}
 
 	void ApplicationFrameCapture::Update() noexcept

@@ -83,5 +83,6 @@ namespace gglab
 		std::deque<PlatformEvent> m_Events;
 		bool m_IsMinimized = false;
 		bool m_InSizeMove = false;
+		bool m_Hidden = false;
 	};
 }
