@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <format>
@@ -20,12 +21,48 @@
 
 namespace gglab
 {
+	namespace
+	{
+		enum class EncodeStage : uint32_t
+		{
+			Queued,
+			EncodingPng,
+			WritingImage,
+			WritingMetadata,
+			Done,
+		};
+
+		[[nodiscard]] const char* GetEncodeStageName(EncodeStage stage) noexcept
+		{
+			switch (stage)
+			{
+			case EncodeStage::Queued:
+				return "queued";
+			case EncodeStage::EncodingPng:
+				return "encoding PNG";
+			case EncodeStage::WritingImage:
+				return "writing image";
+			case EncodeStage::WritingMetadata:
+				return "writing metadata";
+			case EncodeStage::Done:
+				return "done";
+			}
+			return "unknown";
+		}
+	}
+
 	struct FrameCaptureCoordinator::EncodeJob
 	{
+		uint64_t m_RequestId = 0;
 		std::shared_ptr<const FrameCaptureImage> m_Image;
 		std::filesystem::path m_ImagePath;
 		std::filesystem::path m_MetadataPath;
 		std::string m_MetadataJson;
+
+		// Progress is published by the encode task for stall reports.
+		std::atomic<EncodeStage> m_Stage = EncodeStage::Queued;
+		std::chrono::steady_clock::time_point m_SubmittedAt{};
+		bool m_StallReported = false;
 
 		std::mutex m_Mutex;
 		std::condition_variable m_Condition;
@@ -37,6 +74,8 @@ namespace gglab
 	{
 		// Bounds the shutdown wait for an encode task that never ran.
 		constexpr std::chrono::seconds EncodeShutdownTimeout{ 30 };
+		// An encode normally finishes well within a second; a longer one is reported.
+		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
 		constexpr size_t MaxFileStemComponentLength = 64;
 
 		// Writes the bytes to a sibling temporary file and renames it into place,
@@ -77,19 +116,22 @@ namespace gglab
 		[[nodiscard]] std::string EncodeAndWrite(
 			const std::shared_ptr<const FrameCaptureImage>& image,
 			const std::filesystem::path& imagePath, const std::filesystem::path& metadataPath,
-			const std::string& metadataJson) noexcept
+			const std::string& metadataJson, std::atomic<EncodeStage>& stage) noexcept
 		{
+			stage = EncodeStage::EncodingPng;
 			const std::optional<std::vector<uint8_t>> png =
 				image ? EncodeFrameCapturePng(*image) : std::nullopt;
 			if (!png)
 			{
 				return "The captured image could not be encoded as PNG.";
 			}
+			stage = EncodeStage::WritingImage;
 			std::string failure = WriteFileAtomically(imagePath, *png);
 			if (!failure.empty())
 			{
 				return failure;
 			}
+			stage = EncodeStage::WritingMetadata;
 			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(metadataJson.data());
 			failure = WriteFileAtomically(
 				metadataPath, std::span<const uint8_t>(jsonBytes, metadataJson.size()));
@@ -396,6 +438,8 @@ namespace gglab
 		metadata.m_ImageFile = imagePath.filename().string();
 
 		auto job = std::make_shared<EncodeJob>();
+		job->m_RequestId = entry.m_Id;
+		job->m_SubmittedAt = std::chrono::steady_clock::now();
 		job->m_Image = result.m_Image;
 		job->m_ImagePath = imagePath;
 		job->m_MetadataPath = metadataPath;
@@ -434,11 +478,21 @@ namespace gglab
 			}
 			if (!job.m_IsDone)
 			{
+				const EncodeStage stage = job.m_Stage;
+				lock.unlock();
 				if (wait)
 				{
-					lock.unlock();
 					Finish(entry, FrameCaptureRequestStatus::Failed,
-						"Encoding did not finish before shutdown.");
+						std::format("Encoding did not finish before shutdown (stage: {}).",
+							GetEncodeStageName(stage)));
+				}
+				else if (!job.m_StallReported &&
+					std::chrono::steady_clock::now() - job.m_SubmittedAt >= EncodeStallReportTime)
+				{
+					job.m_StallReported = true;
+					GGLAB_LOG_WARN_ALWAYS(
+						"Frame capture {} has not finished encoding after {} seconds (stage: {}).",
+						entry.m_Id, EncodeStallReportTime.count(), GetEncodeStageName(stage));
 				}
 				continue;
 			}
@@ -485,8 +539,17 @@ namespace gglab
 
 	void FrameCaptureCoordinator::RunEncodeJob(EncodeJob& job) noexcept
 	{
-		std::string failure = EncodeAndWrite(
-			job.m_Image, job.m_ImagePath, job.m_MetadataPath, job.m_MetadataJson);
+		const auto startedAt = std::chrono::steady_clock::now();
+		GGLAB_LOG_INFO("Frame capture {} encode started {:.1f} ms after submission.",
+			job.m_RequestId,
+			std::chrono::duration<double, std::milli>(startedAt - job.m_SubmittedAt).count());
+		std::string failure = EncodeAndWrite(job.m_Image, job.m_ImagePath, job.m_MetadataPath,
+			job.m_MetadataJson, job.m_Stage);
+		job.m_Stage = EncodeStage::Done;
+		GGLAB_LOG_INFO("Frame capture {} encode finished in {:.1f} ms{}.", job.m_RequestId,
+			std::chrono::duration<double, std::milli>(
+				std::chrono::steady_clock::now() - startedAt).count(),
+			failure.empty() ? "" : " with a failure");
 		{
 			std::scoped_lock lock(job.m_Mutex);
 			job.m_Failure = std::move(failure);
