@@ -148,7 +148,8 @@ namespace gglab
 		// A view that could not be restored fails its request.
 		void OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept;
 		// Called before the frame described by the state is built. Issues every
-		// request that is due so that this frame's capture taps record it.
+		// request that is due so that this frame's capture taps record it, and
+		// fails waiting after-ready requests for content with a failed gate.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
 		// Called after the frame passed to BeginFrame was submitted.
 		void OnFrameSubmitted() noexcept;

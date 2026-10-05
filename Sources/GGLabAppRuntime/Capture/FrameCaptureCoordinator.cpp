@@ -100,6 +100,27 @@ namespace gglab
 		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
 		constexpr size_t MaxFileStemComponentLength = 64;
 
+		// Empty when no gate failed.
+		[[nodiscard]] std::string DescribeFailedGates(const FrameCaptureReadiness& readiness)
+		{
+			std::string failure;
+			for (const FrameCaptureGate& gate : readiness.m_Gates)
+			{
+				if (gate.m_State != FrameCaptureGateState::Failed)
+				{
+					continue;
+				}
+				failure += failure.empty() ? "Readiness failed: " : "; ";
+				failure += gate.m_Detail.empty() ? gate.m_Name
+					: std::format("{} ({})", gate.m_Name, gate.m_Detail);
+			}
+			if (!failure.empty())
+			{
+				failure += '.';
+			}
+			return failure;
+		}
+
 		[[nodiscard]] std::filesystem::path GetTemporaryPath(const std::filesystem::path& path)
 		{
 			std::filesystem::path temporaryPath = path;
@@ -275,9 +296,23 @@ namespace gglab
 
 		if (!m_IsShuttingDown)
 		{
+			const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
 			for (Entry& entry : m_Entries)
 			{
-				if (entry.m_Phase == Phase::Waiting && IsDue(entry, state, ready))
+				if (entry.m_Phase != Phase::Waiting)
+				{
+					continue;
+				}
+				// A failed gate does not become ready by waiting; the request fails
+				// now instead of at the caller's timeout. Content still to come is
+				// not judged by the failure of the content it replaces.
+				if (!readinessFailure.empty() &&
+					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+					MatchesRequiredContent(entry, state))
+				{
+					Finish(entry, FrameCaptureRequestStatus::Failed, readinessFailure);
+				}
+				else if (IsDue(entry, state, ready))
 				{
 					Issue(entry, state);
 				}

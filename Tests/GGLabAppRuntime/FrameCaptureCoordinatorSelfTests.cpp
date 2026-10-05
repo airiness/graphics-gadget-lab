@@ -416,6 +416,23 @@ namespace gglab
 				results[1].m_Failure == "Device lost." && results[1].m_Metadata,
 				"Waiting requests cancel without metadata; Runtime failures keep their reason");
 
+			const uint64_t blocked = coordinator.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
+			const uint64_t otherContent = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_RequiredContentId = "gglab.lab.other",
+				});
+			FrameCaptureFrameState failedState = MakeFrameState(true);
+			failedState.m_Readiness.Add("lab", FrameCaptureGateState::Failed, "Session creation failed.");
+			coordinator.BeginFrame(failedState);
+			const std::vector<FrameCaptureRequestResult> failedGate = Consume(coordinator);
+			const bool otherContentWaiting = coordinator.Cancel(otherContent);
+			const std::vector<FrameCaptureRequestResult> cancelledOther = Consume(coordinator);
+			context.Check(failedGate.size() == 1 && failedGate[0].m_RequestId == blocked &&
+				failedGate[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				failedGate[0].m_Failure == "Readiness failed: lab (Session creation failed.)." &&
+				otherContentWaiting && cancelledOther.size() == 1,
+				"A failed gate fails waiting after-ready captures of that content at once");
+
 			const uint64_t noDirectory = coordinator.Submit({});
 			coordinator.BeginFrame(MakeFrameState(true));
 			control.Complete(control.m_Issued.back().m_Id, 3);

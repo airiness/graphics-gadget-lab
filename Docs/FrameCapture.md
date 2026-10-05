@@ -80,8 +80,10 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   settle key (temporal session, camera cut, display view, size and Demo).
   `next-frame` captures the next recorded frame, even while loading.
 - **Readiness gates.** `shaders`, `content-transition`, `content`, `lab`,
-  `environment`, `ibl` and `asset-uploads`. A gate that never becomes ready
-  keeps an after-ready capture waiting; `status` shows its detail.
+  `environment`, `ibl` and `asset-uploads`. A pending gate keeps an
+  after-ready capture waiting; `status` shows its detail. A failed gate fails
+  the waiting after-ready captures of that content at once, with the gate's
+  detail as the reason; submit them again after fixing the cause.
 - **Content.** `-RequiredContentId` additionally waits until that Lab or Demo
   id is active.
 - **Label and note.** `-Label` names the files and is stored with `-Note` in the
