@@ -1,5 +1,7 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
+#include "Application/Capture/ApplicationFrameCapture.h"
+#include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabAppRuntime.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
@@ -213,6 +215,11 @@ namespace gglab
 			m_LabRuntimeLocator =
 				std::make_unique<DemoLabRuntimeLocator>(demoManager, *labHostIndex);
 		}
+		if (FrameCaptureCoordinator* frameCapture = m_AppRuntime->GetFrameCaptureCoordinator())
+		{
+			m_FrameCapture = std::make_unique<ApplicationFrameCapture>(
+				*frameCapture, m_RuntimePaths.m_CaptureRoot);
+		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -237,6 +244,7 @@ namespace gglab
 				.m_RHIContext = renderHost->GetRHIContext(),
 				.m_DemoManager = demoManager,
 				.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
+				.m_FrameCapture = m_FrameCapture.get(),
 				.m_SettingsRoot = m_RuntimePaths.m_SettingsRoot,
 				});
 			if (!m_ApplicationTooling)
@@ -277,10 +285,20 @@ namespace gglab
 			m_ShaderHotReload->Update();
 		}
 #endif
+		const ApplicationInput* input = m_AppRuntime->GetInput();
+		if (m_FrameCapture && m_IsWindowActive && input &&
+			!input->IsKeyboardCapturedByUI() && input->IsKeyPressed(AppInputKey::F9))
+		{
+			m_FrameCapture->Capture();
+		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 			});
+		if (m_FrameCapture)
+		{
+			m_FrameCapture->Update();
+		}
 		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
 			m_PlatformHost->WaitForEvents();
@@ -335,6 +353,13 @@ namespace gglab
 			m_AppRuntime->Shutdown({
 				.m_ApplicationTooling = m_ApplicationTooling.get(),
 				});
+			// Shutdown finished every capture request; log the final results before
+			// the coordinator is destroyed with the runtime.
+			if (m_FrameCapture)
+			{
+				m_FrameCapture->Update();
+				m_FrameCapture.reset();
+			}
 			m_AppRuntime.reset();
 		}
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -367,12 +392,14 @@ namespace gglab
 		switch (event.m_Type)
 		{
 		case PlatformEventType::Activated:
+			m_IsWindowActive = true;
 			if (m_InputManager)
 			{
 				m_InputManager->OnActive();
 			}
 			break;
 		case PlatformEventType::Deactivated:
+			m_IsWindowActive = false;
 			if (m_InputManager)
 			{
 				m_InputManager->OnInactive();

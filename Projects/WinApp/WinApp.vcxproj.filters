@@ -4,6 +4,9 @@
     <Filter Include="Application">
       <UniqueIdentifier>{89E3305C-399E-2AF8-BB69-5C3D83813129}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Capture">
+      <UniqueIdentifier>{A8CF29D2-C2BA-710F-7E28-FCC5E02713E0}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Content">
       <UniqueIdentifier>{813F9E64-18DE-6239-D0D8-A28FA4EA0A1F}</UniqueIdentifier>
     </Filter>
@@ -125,6 +128,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationPch.cpp">
       <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp">
+      <Filter>Application\Capture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.cpp">
       <Filter>Application\Content</Filter>
@@ -348,6 +354,9 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\FrameCapturePanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\GTAOInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -439,6 +448,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationPch.h">
       <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h">
+      <Filter>Application\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.h">
       <Filter>Application\Content</Filter>
@@ -687,6 +699,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\FrameCapturePanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\GTAOInspectorPanel.h">

@@ -164,6 +164,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
@@ -207,6 +208,7 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\EntityPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DemoPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\FrameCapturePanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
@@ -272,6 +274,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h" />
@@ -320,6 +323,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\EntityPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DemoPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\FrameCapturePanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiPanel.h" />

@@ -47,6 +47,7 @@ namespace gglab
 			WindowsKeyMapping{ 0x20, AppInputKey::Space },
 			WindowsKeyMapping{ 0xa0, AppInputKey::LeftShift },
 			WindowsKeyMapping{ 0xa1, AppInputKey::RightShift },
+			WindowsKeyMapping{ 0x78, AppInputKey::F9 },
 		};
 	}
 

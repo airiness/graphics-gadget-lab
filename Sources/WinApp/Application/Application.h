@@ -16,6 +16,7 @@ namespace gglab
 	class GGLabAppRuntime;
 	class RHIContextFactoryBase;
 	class InputManager;
+	class ApplicationFrameCapture;
 	class ApplicationToolingIntegrationBase;
 	class PlatformHost;
 	class LabRuntimeLocatorBase;
@@ -86,12 +87,16 @@ namespace gglab
 		std::unique_ptr<GGLabAppRuntime> m_AppRuntime;
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
 		std::unique_ptr<ApplicationToolingIntegrationBase> m_ApplicationTooling;
+		std::unique_ptr<ApplicationFrameCapture> m_FrameCapture;
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		std::unique_ptr<DevelopmentShaderHotReloadSystem> m_ShaderHotReload;
 #endif
 
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;
+		// Input devices report state regardless of focus; host shortcuts respond
+		// only while the main window is the active application window.
+		bool m_IsWindowActive = false;
 		bool m_ShutdownComplete = false;
 		int m_ExitCode = 0;
 	};

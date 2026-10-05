@@ -48,6 +48,7 @@ namespace gglab
 		Space,
 		LeftShift,
 		RightShift,
+		F9,
 		Count,
 	};
 
