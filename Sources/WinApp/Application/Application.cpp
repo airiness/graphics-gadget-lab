@@ -78,6 +78,7 @@ namespace gglab
 
 			if (m_PlatformHost->IsQuitRequested())
 			{
+				GGLAB_LOG_INFO_ALWAYS("Exit requested by closing the main window.");
 				break;
 			}
 			if (!Tick())
@@ -709,6 +710,7 @@ namespace gglab
 		switch (event.m_Type)
 		{
 		case PlatformEventType::Activated:
+			GGLAB_LOG_INFO_ALWAYS("Main window activated; input is read.");
 			m_IsWindowActive = true;
 			if (m_InputManager)
 			{
@@ -716,6 +718,7 @@ namespace gglab
 			}
 			break;
 		case PlatformEventType::Deactivated:
+			GGLAB_LOG_INFO_ALWAYS("Main window deactivated; input is ignored.");
 			m_IsWindowActive = false;
 			if (m_InputManager)
 			{

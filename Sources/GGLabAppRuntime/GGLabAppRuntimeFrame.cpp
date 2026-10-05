@@ -254,6 +254,7 @@ namespace gglab
 
 		if (m_Input->IsKeyPressed(AppInputKey::Escape))
 		{
+			GGLAB_LOG_INFO_ALWAYS("Exit requested by the Escape key.");
 			m_LifecycleState = AppRuntimeLifecycleState::ExitRequested;
 			return AppRuntimeTickResult::Exit;
 		}
