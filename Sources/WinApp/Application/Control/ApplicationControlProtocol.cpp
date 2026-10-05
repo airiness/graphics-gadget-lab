@@ -113,13 +113,15 @@ namespace gglab
 					}
 					capture.m_SettleFrames = value.get<uint32_t>();
 				}
-				else if (key == "requiredContentId" || key == "label" || key == "note")
+				else if (key == "requiredContentId" || key == "view" || key == "label" ||
+					key == "note")
 				{
 					if (!value.is_string())
 					{
 						return std::format("Field '{}' must be a string.", key);
 					}
 					std::string& target = key == "requiredContentId" ? capture.m_RequiredContentId
+						: key == "view" ? capture.m_ReferenceViewId
 						: key == "label" ? capture.m_Label
 						: capture.m_Note;
 					target = value.get<std::string>();
@@ -286,6 +288,7 @@ namespace gglab
 				{ "forward", camera.m_Forward },
 				{ "verticalFovDegrees", camera.m_VerticalFovDegrees },
 			} },
+			{ "referenceViews", frame.m_ReferenceViewIds },
 			{ "fixedDeltaTime", frame.m_FixedDeltaTime ? Json(*frame.m_FixedDeltaTime) : Json() },
 		};
 		return Dump(response);

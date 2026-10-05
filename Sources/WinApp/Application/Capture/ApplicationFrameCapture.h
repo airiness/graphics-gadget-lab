@@ -23,6 +23,8 @@ namespace gglab
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 			FrameCaptureTiming m_Timing = FrameCaptureTiming::NextFrame;
 			uint32_t m_SettleFrames = 0;
+			// Empty keeps the current camera.
+			std::string m_ReferenceViewId;
 			// Empty selects the runtime's default capture directory.
 			std::filesystem::path m_OutputDirectory;
 			std::string m_Label;
@@ -51,6 +53,9 @@ namespace gglab
 
 		// Submits a capture with the current settings and returns its request id.
 		uint64_t Capture() noexcept;
+		// Submits one capture per reference view of the active content, in order,
+		// with the current settings. Returns the number of submitted requests.
+		uint32_t CaptureReferenceViews() noexcept;
 		// Submits an explicit request and returns its request id.
 		uint64_t Submit(FrameCaptureRequest request) noexcept;
 		// Cancels a request that has not been issued to a frame yet.

@@ -174,7 +174,7 @@ namespace gglab
 				const auto capture = parse({ "--lab", "gglab.lab.culling", "--capture-on-ready",
 					"C:/gglab-captures", "--capture-source", "composited",
 					"--capture-settle-frames", "16", "--capture-label", "culling",
-					"--capture-timeout", "30" });
+					"--capture-view", "CAM_Overview", "--capture-timeout", "30" });
 				const bool captureValid = capture.IsValid() && capture.m_Options.m_CaptureOnReady;
 				context.Check(captureValid &&
 					capture.m_Options.m_CaptureOnReady->m_OutputDirectory ==
@@ -183,8 +183,9 @@ namespace gglab
 					FrameCaptureSource::Composited &&
 					capture.m_Options.m_CaptureOnReady->m_SettleFrames == 16 &&
 					capture.m_Options.m_CaptureOnReady->m_Label == "culling" &&
+					capture.m_Options.m_CaptureOnReady->m_ReferenceViewId == "CAM_Overview" &&
 					capture.m_Options.m_CaptureOnReady->m_TimeoutSeconds == 30.0,
-					"Capture-on-ready collects its output directory, source, settling and timeout");
+					"Capture-on-ready collects its output directory, source, settling, view and timeout");
 				const auto defaults = parse({ "--capture-on-ready", "C:/gglab-captures" });
 				context.Check(defaults.IsValid() && defaults.m_Options.m_CaptureOnReady &&
 					defaults.m_Options.m_CaptureOnReady->m_Source == FrameCaptureSource::Scene &&

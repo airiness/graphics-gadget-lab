@@ -229,6 +229,22 @@ namespace gglab
 		{
 			m_SettledFrames = 0;
 		}
+		for (Entry& entry : m_Entries)
+		{
+			if (entry.m_Phase != Phase::Waiting || !entry.m_ViewApplied)
+			{
+				continue;
+			}
+			if (!entry.m_ViewCameraResetSerial)
+			{
+				entry.m_ViewCameraResetSerial = state.m_SettleKey.m_CameraResetSerial;
+			}
+			else if (*entry.m_ViewCameraResetSerial != state.m_SettleKey.m_CameraResetSerial)
+			{
+				entry.m_ViewApplied = false;
+				entry.m_ViewCameraResetSerial.reset();
+			}
+		}
 		m_FrameReady = ready;
 		m_HasOpenFrame = true;
 
@@ -243,6 +259,67 @@ namespace gglab
 			}
 		}
 		m_LastFrameState = std::move(state);
+	}
+
+	std::optional<FrameCaptureViewChange> FrameCaptureCoordinator::GetPendingViewChange()
+		const noexcept
+	{
+		if (m_IsShuttingDown || !m_LastFrameState)
+		{
+			return std::nullopt;
+		}
+		// Views apply in submission order, so earlier requests keep the camera
+		// they were submitted against until they are issued.
+		const auto head = std::ranges::find(m_Entries, Phase::Waiting, &Entry::m_Phase);
+		if (head == m_Entries.end() || head->m_Request.m_ReferenceViewId.empty() ||
+			head->m_ViewApplied || !MatchesRequiredContent(*head, *m_LastFrameState))
+		{
+			return std::nullopt;
+		}
+		// An after-ready view waits for loaded content, which registers its views.
+		if (head->m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+			!m_LastFrameState->m_Readiness.IsReady())
+		{
+			return std::nullopt;
+		}
+		return FrameCaptureViewChange{
+			.m_RequestId = head->m_Id,
+			.m_ReferenceViewId = head->m_Request.m_ReferenceViewId,
+		};
+	}
+
+	void FrameCaptureCoordinator::OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept
+	{
+		const auto entry = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+			{
+				return candidate.m_Id == requestId && candidate.m_Phase == Phase::Waiting;
+			});
+		if (entry == m_Entries.end())
+		{
+			return;
+		}
+		if (restored)
+		{
+			entry->m_ViewApplied = true;
+			entry->m_ViewCameraResetSerial.reset();
+			return;
+		}
+
+		std::string available;
+		std::string content;
+		if (m_LastFrameState)
+		{
+			for (const std::string& id : m_LastFrameState->m_ReferenceViewIds)
+			{
+				available += available.empty() ? id : ", " + id;
+			}
+			content = !m_LastFrameState->m_LabId.empty() ? m_LastFrameState->m_LabId
+				: m_LastFrameState->m_DemoId;
+		}
+		Finish(*entry, FrameCaptureRequestStatus::Failed,
+			std::format("Reference view '{}' is not registered by '{}' (available: {}).",
+				entry->m_Request.m_ReferenceViewId, content,
+				available.empty() ? "none" : available));
 	}
 
 	void FrameCaptureCoordinator::OnFrameSubmitted() noexcept
@@ -307,18 +384,27 @@ namespace gglab
 		m_Capture = nullptr;
 	}
 
+	bool FrameCaptureCoordinator::MatchesRequiredContent(
+		const Entry& entry, const FrameCaptureFrameState& state) noexcept
+	{
+		const std::string& required = entry.m_Request.m_RequiredContentId;
+		return required.empty() || required == state.m_DemoId || required == state.m_LabId;
+	}
+
 	bool FrameCaptureCoordinator::IsDue(
 		const Entry& entry, const FrameCaptureFrameState& state, bool ready) const noexcept
 	{
 		const FrameCaptureRequest& request = entry.m_Request;
+		if (!request.m_ReferenceViewId.empty() && !entry.m_ViewApplied)
+		{
+			return false;
+		}
 		if (request.m_Timing == FrameCaptureTiming::NextFrame)
 		{
 			return true;
 		}
-		const bool contentMatches = request.m_RequiredContentId.empty() ||
-			request.m_RequiredContentId == state.m_DemoId ||
-			request.m_RequiredContentId == state.m_LabId;
-		return ready && contentMatches && m_SettledFrames >= request.m_SettleFrames;
+		return ready && MatchesRequiredContent(entry, state) &&
+			m_SettledFrames >= request.m_SettleFrames;
 	}
 
 	void FrameCaptureCoordinator::Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept
@@ -344,6 +430,7 @@ namespace gglab
 		metadata.m_LabId = state.m_LabId;
 		metadata.m_FrameIndex = state.m_FrameIndex;
 		metadata.m_Camera = state.m_Camera;
+		metadata.m_Camera.m_ReferenceViewId = request.m_ReferenceViewId;
 		metadata.m_FixedDeltaTime = state.m_FixedDeltaTime;
 		metadata.m_TotalTime = state.m_TotalTime;
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
@@ -409,7 +496,11 @@ namespace gglab
 				metadata.m_CapturedAtUtc.substr(11, 2), metadata.m_CapturedAtUtc.substr(14, 2),
 				metadata.m_CapturedAtUtc.substr(17, 2))
 			: std::string("unknown-time");
-		const std::string baseStem = std::format("{}-{}-{}-r{}", SanitizeFileStemComponent(subject),
+		const std::string view = metadata.m_Camera.m_ReferenceViewId.empty()
+			? std::string{}
+			: "-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
+		const std::string baseStem = std::format("{}{}-{}-{}-r{}",
+			SanitizeFileStemComponent(subject), view,
 			GetFrameCaptureSourceName(metadata.m_Source), timestamp, entry.m_Id);
 
 		std::filesystem::path imagePath;

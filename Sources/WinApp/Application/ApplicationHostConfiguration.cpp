@@ -71,6 +71,7 @@ namespace gglab
 			.m_Timing = FrameCaptureTiming::AfterReady,
 			.m_SettleFrames = capture.m_SettleFrames,
 			.m_RequiredContentId = options.m_StartupLabId.value_or(std::string{}),
+			.m_ReferenceViewId = capture.m_ReferenceViewId,
 			.m_OutputDirectory = capture.m_OutputDirectory,
 			.m_Label = capture.m_Label,
 		};

@@ -195,6 +195,7 @@ namespace gglab
 
 		writer.BeginObject("camera");
 		writer.String("name", metadata.m_Camera.m_Name);
+		writer.String("referenceView", metadata.m_Camera.m_ReferenceViewId);
 		writer.Vector("position", metadata.m_Camera.m_Position);
 		writer.Vector("forward", metadata.m_Camera.m_Forward);
 		writer.Vector("up", metadata.m_Camera.m_Up);

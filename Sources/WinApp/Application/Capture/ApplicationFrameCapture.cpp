@@ -20,19 +20,46 @@ namespace gglab
 			.m_Source = m_Settings.m_Source,
 			.m_Timing = m_Settings.m_Timing,
 			.m_SettleFrames = afterReady ? m_Settings.m_SettleFrames : 0,
+			.m_ReferenceViewId = m_Settings.m_ReferenceViewId,
 			.m_OutputDirectory = m_Settings.m_OutputDirectory,
 			.m_Label = m_Settings.m_Label,
 			.m_Note = m_Settings.m_Note,
 			});
 	}
 
+	uint32_t ApplicationFrameCapture::CaptureReferenceViews() noexcept
+	{
+		const FrameCaptureFrameState* frameState = m_Coordinator->GetLastFrameState();
+		if (!frameState)
+		{
+			return 0;
+		}
+		const bool afterReady = m_Settings.m_Timing == FrameCaptureTiming::AfterReady;
+		const std::vector<std::string>& viewIds = frameState->m_ReferenceViewIds;
+		for (const std::string& viewId : viewIds)
+		{
+			Submit({
+				.m_Source = m_Settings.m_Source,
+				.m_Timing = m_Settings.m_Timing,
+				.m_SettleFrames = afterReady ? m_Settings.m_SettleFrames : 0,
+				.m_ReferenceViewId = viewId,
+				.m_OutputDirectory = m_Settings.m_OutputDirectory,
+				.m_Label = m_Settings.m_Label,
+				.m_Note = m_Settings.m_Note,
+				});
+		}
+		return static_cast<uint32_t>(viewIds.size());
+	}
+
 	uint64_t ApplicationFrameCapture::Submit(FrameCaptureRequest request) noexcept
 	{
 		const FrameCaptureSource source = request.m_Source;
 		const FrameCaptureTiming timing = request.m_Timing;
+		const std::string viewId = request.m_ReferenceViewId;
 		const uint64_t requestId = m_Coordinator->Submit(std::move(request));
-		GGLAB_LOG_INFO_ALWAYS("Frame capture {} requested (source={}, timing={}).", requestId,
-			GetFrameCaptureSourceName(source), GetFrameCaptureTimingName(timing));
+		GGLAB_LOG_INFO_ALWAYS("Frame capture {} requested (source={}, timing={}{}{}).", requestId,
+			GetFrameCaptureSourceName(source), GetFrameCaptureTimingName(timing),
+			viewId.empty() ? "" : ", view=", viewId);
 		return requestId;
 	}
 

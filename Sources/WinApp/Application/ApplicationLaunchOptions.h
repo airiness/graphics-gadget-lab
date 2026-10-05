@@ -27,6 +27,8 @@ namespace gglab
 		FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 		uint32_t m_SettleFrames = 8;
 		std::string m_Label;
+		// Camera reference view of the startup content; empty keeps its camera.
+		std::string m_ReferenceViewId;
 		// Wall-clock limit from the first rendered frame until the capture finishes.
 		double m_TimeoutSeconds = 120.0;
 	};

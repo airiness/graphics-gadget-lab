@@ -36,7 +36,8 @@ namespace gglab
 			const ApplicationControlParseResult capture = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":8,"command":"capture","source":"composited",)"
 				R"("timing":"next-frame","settleFrames":3,"requiredContentId":"gglab.lab.culling",)"
-				R"("outputDirectory":"D:/captures","label":"a","note":"b","wait":false})");
+				R"("view":"CAM_Courtyard","outputDirectory":"D:/captures","label":"a","note":"b",)"
+				R"("wait":false})");
 			const bool captureParsed = capture.m_Request.has_value();
 			context.Check(captureParsed &&
 				capture.m_Request->m_Command == ApplicationControlCommand::Capture &&
@@ -44,6 +45,7 @@ namespace gglab
 				capture.m_Request->m_Capture.m_Timing == FrameCaptureTiming::NextFrame &&
 				capture.m_Request->m_Capture.m_SettleFrames == 3 &&
 				capture.m_Request->m_Capture.m_RequiredContentId == "gglab.lab.culling" &&
+				capture.m_Request->m_Capture.m_ReferenceViewId == "CAM_Courtyard" &&
 				capture.m_Request->m_Capture.m_OutputDirectory ==
 				std::filesystem::path("D:/captures") &&
 				capture.m_Request->m_Capture.m_Label == "a" &&
@@ -107,6 +109,7 @@ namespace gglab
 				.m_DemoId = "Demo.LabHost",
 				.m_LabId = "gglab.lab.culling",
 				.m_FrameIndex = 42,
+				.m_ReferenceViewIds = { "CAM_A", "CAM_B" },
 			};
 			frame.m_Readiness.Add("lab", FrameCaptureGateState::Pending, "Warming up.");
 			const std::string status = SerializeApplicationControlStatus(4, {
@@ -123,8 +126,9 @@ namespace gglab
 				Contains(status, R"("labId":"gglab.lab.culling")") &&
 				Contains(status, R"("ready":false)") && Contains(status, R"("settledFrames":5)") &&
 				Contains(status, R"("unfinished":2)") && Contains(status, R"("state":"pending")") &&
-				Contains(status, R"("fixedDeltaTime":null)"),
-				"Status reports the session, pending captures and readiness gates");
+				Contains(status, R"("fixedDeltaTime":null)") &&
+				Contains(status, R"("referenceViews":["CAM_A","CAM_B"])"),
+				"Status reports the session, pending captures, readiness gates and reference views");
 			const std::string noFrame = SerializeApplicationControlStatus(5, { .m_SessionId = "s1" });
 			context.Check(Contains(noFrame, R"("frame":null)"),
 				"Status before the first frame reports no frame state");

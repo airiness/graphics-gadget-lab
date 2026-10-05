@@ -26,6 +26,10 @@ namespace gglab
 		// AfterReady only: when set, the capture also waits until the active Demo
 		// id or Lab id equals this id.
 		std::string m_RequiredContentId;
+		// When set, the runtime restores this camera reference view of the active
+		// content before the capture. The view is applied only after every earlier
+		// request was issued, and its camera cut restarts settling.
+		std::string m_ReferenceViewId;
 		// Empty selects the coordinator's default output directory.
 		std::filesystem::path m_OutputDirectory;
 		std::string m_Label;
@@ -77,9 +81,18 @@ namespace gglab
 		FrameCaptureSettleKey m_SettleKey{};
 		uint64_t m_FrameIndex = 0;
 		FrameCaptureCameraState m_Camera{};
+		// Reference views the active content registers for its main camera.
+		std::vector<std::string> m_ReferenceViewIds;
 		std::optional<double> m_FixedDeltaTime;
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
+	};
+
+	// A camera reference view the runtime restores for a waiting request.
+	struct FrameCaptureViewChange
+	{
+		uint64_t m_RequestId = 0;
+		std::string m_ReferenceViewId;
 	};
 
 	// Turns host capture requests into Runtime frame captures at the requested
@@ -114,6 +127,12 @@ namespace gglab
 		// settle key.
 		[[nodiscard]] uint32_t GetSettledFrameCount() const noexcept { return m_SettledFrames; }
 
+		// Called before the next frame is planned, with the state of the previous
+		// frame. Returns the reference view to restore on the active content's
+		// main camera; the runtime reports the outcome to OnReferenceViewApplied.
+		[[nodiscard]] std::optional<FrameCaptureViewChange> GetPendingViewChange() const noexcept;
+		// A view that could not be restored fails its request.
+		void OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept;
 		// Called before the frame described by the state is built. Issues every
 		// request that is due so that this frame's capture taps record it.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
@@ -147,10 +166,17 @@ namespace gglab
 			FrameCaptureRequest m_Request{};
 			Phase m_Phase = Phase::Waiting;
 			uint64_t m_CaptureRequestId = 0;
+			// The requested reference view was restored, and the camera reset
+			// serial of the first frame rendered with it. A different serial later
+			// means another camera cut replaced the view, which is then restored again.
+			bool m_ViewApplied = false;
+			std::optional<uint64_t> m_ViewCameraResetSerial;
 			FrameCaptureMetadata m_Metadata{};
 			std::shared_ptr<EncodeJob> m_Job;
 		};
 
+		[[nodiscard]] static bool MatchesRequiredContent(
+			const Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(const Entry& entry, const FrameCaptureFrameState& state,
 			bool ready) const noexcept;
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;

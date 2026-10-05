@@ -386,6 +386,16 @@ namespace gglab
 				captureDetailSpecified = true;
 				continue;
 			}
+			if (argument == "--capture-view")
+			{
+				if (!requireValue(index, argument))
+				{
+					return result;
+				}
+				capture.m_ReferenceViewId = std::string(arguments[index]);
+				captureDetailSpecified = true;
+				continue;
+			}
 			if (argument == "--capture-timeout")
 			{
 				if (!requireValue(index, argument))
@@ -567,6 +577,7 @@ namespace gglab
 			"  --capture-source <scene|composited>  Capture tap (default: scene).\n"
 			"  --capture-settle-frames <n>     Ready frames before the capture (default: 8).\n"
 			"  --capture-label <text>          Label recorded in the capture metadata.\n"
+			"  --capture-view <id>             Restore this camera reference view first.\n"
 			"  --capture-timeout <seconds>     Limit from the first frame (default: 120).\n"
 			"  --session <id>                  Serve the session control protocol on\n"
 			"                                  \\.\\pipe\\gglab-session-<id> ([A-Za-z0-9_-]).\n"

@@ -17,6 +17,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
@@ -35,6 +36,8 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
@@ -98,6 +101,7 @@ namespace gglab
 			const Time& m_Time;
 			const ShaderPreloadStatus& m_ShaderPreload;
 			const CameraRig::CameraSlot& m_DisplayCameraSlot;
+			std::span<const CameraReferenceView> m_ReferenceViews;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint64_t m_TemporalSessionIdentity = 0;
 			uint32_t m_Width = 0;
@@ -174,6 +178,12 @@ namespace gglab
 					return std::array<float, 3>{ value.m_X, value.m_Y, value.m_Z };
 				};
 			const uint32_t demoIndex = inputs.m_DemoManager.GetActiveIndex();
+			std::vector<std::string> referenceViewIds;
+			referenceViewIds.reserve(inputs.m_ReferenceViews.size());
+			for (const CameraReferenceView& view : inputs.m_ReferenceViews)
+			{
+				referenceViewIds.push_back(view.m_Id);
+			}
 			return FrameCaptureFrameState{
 				.m_Backend = std::string(GetBackendName(inputs.m_Backend)),
 				// The bootstrap loading Demo has no registered index.
@@ -200,6 +210,7 @@ namespace gglab
 					.m_NearPlane = camera.GetNear(),
 					.m_FarPlane = camera.GetFar(),
 				},
+				.m_ReferenceViewIds = std::move(referenceViewIds),
 				.m_FixedDeltaTime = inputs.m_Time.GetFixedDeltaTime(),
 				.m_TotalTime = inputs.m_Time.GetTotalTime(),
 				.m_DevelopmentTools = inputs.m_DevelopmentTools,
@@ -325,6 +336,14 @@ namespace gglab
 				effectiveViewRenderProfile);
 		}
 		CameraRig& cameraRig = demo->GetCameraRig();
+		// A capture's reference view is restored before the frame is planned, so
+		// this frame already renders it.
+		if (const std::optional<FrameCaptureViewChange> viewChange =
+			m_FrameCapture->GetPendingViewChange())
+		{
+			m_FrameCapture->OnReferenceViewApplied(viewChange->m_RequestId,
+				cameraRig.RestoreReferenceView(viewChange->m_ReferenceViewId));
+		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
 		GGLAB_ASSERT_MSG(effectiveDisplayView.IsValid(),
@@ -375,6 +394,7 @@ namespace gglab
 			.m_Time = *m_Time,
 			.m_ShaderPreload = shaderPreload,
 			.m_DisplayCameraSlot = *displayCameraSlot,
+			.m_ReferenceViews = cameraRig.GetReferenceViews(),
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_TemporalSessionIdentity = temporalSessionIdentity,
 			.m_Width = m_WindowWidth,

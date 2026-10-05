@@ -284,6 +284,105 @@ namespace gglab
 				"A required content id holds the capture until that Demo or Lab is active");
 		}
 
+		[[nodiscard]] FrameCaptureFrameState MakeViewFrameState(uint64_t cameraResetSerial)
+		{
+			FrameCaptureFrameState state = MakeFrameState(true);
+			state.m_SettleKey.m_CameraResetSerial = cameraResetSerial;
+			state.m_ReferenceViewIds = { "CAM_A", "CAM_B" };
+			return state;
+		}
+
+		void RunReferenceViewTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-view");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				});
+			const uint64_t plain = coordinator.Submit({});
+			const uint64_t viewA = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 1,
+				.m_ReferenceViewId = "CAM_A",
+				});
+			const uint64_t viewB = coordinator.Submit({ .m_ReferenceViewId = "CAM_B" });
+
+			const bool noViewBeforeFrame = !coordinator.GetPendingViewChange();
+			coordinator.BeginFrame(MakeViewFrameState(0));
+			coordinator.OnFrameSubmitted();
+			const std::optional<FrameCaptureViewChange> firstChange =
+				coordinator.GetPendingViewChange();
+			context.Check(noViewBeforeFrame && control.m_Issued.size() == 1 && firstChange &&
+				firstChange->m_RequestId == viewA && firstChange->m_ReferenceViewId == "CAM_A",
+				"Reference views apply in submission order once earlier requests were issued");
+			if (!firstChange)
+			{
+				return;
+			}
+
+			// Restoring the view is a camera cut: settling restarts under the view.
+			coordinator.OnReferenceViewApplied(viewA, true);
+			const bool appliedOnce = !coordinator.GetPendingViewChange();
+			coordinator.BeginFrame(MakeViewFrameState(1));
+			const bool waitedForSettle = control.m_Issued.size() == 1;
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(MakeViewFrameState(1));
+			coordinator.OnFrameSubmitted();
+			context.Check(appliedOnce && waitedForSettle && control.m_Issued.size() == 2,
+				"An after-ready view capture settles from the view's camera cut");
+
+			const std::optional<FrameCaptureViewChange> secondChange =
+				coordinator.GetPendingViewChange();
+			context.Check(secondChange && secondChange->m_RequestId == viewB,
+				"The next view applies only after the previous view capture was issued");
+			coordinator.OnReferenceViewApplied(viewB, false);
+			control.Complete(control.m_Issued[0].m_Id, 1);
+			control.Complete(control.m_Issued[1].m_Id, 3);
+			coordinator.Update();
+			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
+			const auto find = [&](uint64_t id) -> const FrameCaptureRequestResult*
+				{
+					const auto result = std::ranges::find(results, id,
+						&FrameCaptureRequestResult::m_RequestId);
+					return result != results.end() ? &*result : nullptr;
+				};
+			const FrameCaptureRequestResult* plainResult = find(plain);
+			const FrameCaptureRequestResult* viewAResult = find(viewA);
+			const FrameCaptureRequestResult* viewBResult = find(viewB);
+			context.Check(viewBResult && viewBResult->m_Status == FrameCaptureRequestStatus::Failed &&
+				viewBResult->m_Failure.find("'CAM_B'") != std::string::npos &&
+				viewBResult->m_Failure.find("available: CAM_A, CAM_B") != std::string::npos,
+				"A view the content cannot restore fails with the available view ids");
+			context.Check(plainResult && viewAResult && viewAResult->m_Metadata &&
+				plainResult->m_Metadata && plainResult->m_Metadata->m_Camera.m_ReferenceViewId.empty() &&
+				viewAResult->m_Metadata->m_Camera.m_ReferenceViewId == "CAM_A" &&
+				viewAResult->m_ImagePath.filename().string().find("-CAM_A-scene-") !=
+				std::string::npos &&
+				ReadText(viewAResult->m_MetadataPath).find("\"referenceView\": \"CAM_A\"") !=
+				std::string::npos,
+				"Metadata and file names record the restored reference view");
+
+			// Another camera cut before the capture replaces the view, so it is restored again.
+			const uint64_t viewAgain = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 2,
+				.m_ReferenceViewId = "CAM_B",
+				});
+			const std::optional<FrameCaptureViewChange> againChange =
+				coordinator.GetPendingViewChange();
+			coordinator.OnReferenceViewApplied(viewAgain, true);
+			coordinator.BeginFrame(MakeViewFrameState(5));
+			coordinator.OnFrameSubmitted();
+			const bool heldAfterApply = !coordinator.GetPendingViewChange();
+			coordinator.BeginFrame(MakeViewFrameState(6));
+			coordinator.OnFrameSubmitted();
+			const std::optional<FrameCaptureViewChange> reapply = coordinator.GetPendingViewChange();
+			context.Check(againChange && heldAfterApply && reapply &&
+				reapply->m_RequestId == viewAgain && coordinator.Cancel(viewAgain),
+				"A camera cut that replaces an applied view restores the view again");
+		}
+
 		void RunFailureTests(SelfTestContext& context) noexcept
 		{
 			FakeCaptureControl control;
@@ -419,6 +518,7 @@ namespace gglab
 	{
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
+		RunReferenceViewTests(context);
 		RunFailureTests(context);
 		RunShutdownTests(context);
 		RunTaskSystemTests(context);

@@ -96,6 +96,29 @@ namespace gglab
 					1.0f, &minimumSettleFrames, &maximumSettleFrames);
 			}
 
+			const FrameCaptureFrameState* frameState = frameCapture.GetLastFrameState();
+			if (ImGui::BeginCombo("Reference View", settings.m_ReferenceViewId.empty()
+				? "Current camera" : settings.m_ReferenceViewId.c_str()))
+			{
+				if (ImGui::Selectable("Current camera", settings.m_ReferenceViewId.empty()))
+				{
+					settings.m_ReferenceViewId.clear();
+				}
+				if (frameState)
+				{
+					for (const std::string& viewId : frameState->m_ReferenceViewIds)
+					{
+						if (ImGui::Selectable(viewId.c_str(), settings.m_ReferenceViewId == viewId))
+						{
+							settings.m_ReferenceViewId = viewId;
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::SetItemTooltip("A reference view moves the main camera to the content's "
+				"authored pose before the capture.");
+
 			if (ImGui::InputText(
 				"Output Directory", state.m_OutputDirectory.data(), state.m_OutputDirectory.size()))
 			{
@@ -115,6 +138,19 @@ namespace gglab
 			if (ImGui::Button("Capture (F9)"))
 			{
 				frameCapture.Capture();
+			}
+			ImGui::SameLine();
+			const size_t viewCount = frameState ? frameState->m_ReferenceViewIds.size() : 0;
+			ImGui::BeginDisabled(viewCount == 0);
+			if (ImGui::Button(std::format("Capture All Views ({})", viewCount).c_str()))
+			{
+				frameCapture.CaptureReferenceViews();
+			}
+			ImGui::EndDisabled();
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			{
+				ImGui::SetTooltip("Captures every reference view of the active content in order.\n"
+					"After-ready timing lets each view settle before its capture.");
 			}
 			ImGui::SameLine();
 			ImGui::TextDisabled("%u pending", frameCapture.GetUnfinishedRequestCount());

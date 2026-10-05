@@ -32,6 +32,8 @@ namespace gglab
 	struct FrameCaptureCameraState
 	{
 		std::string m_Name;
+		// The reference view the capture request restored; empty otherwise.
+		std::string m_ReferenceViewId;
 		std::array<float, 3> m_Position{};
 		std::array<float, 3> m_Forward{};
 		std::array<float, 3> m_Up{};

@@ -15,6 +15,9 @@ Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
   status   Report readiness gates, settled frames, camera and pending captures.
   capture  Capture a frame; waits for the PNG and metadata unless -NoWait.
+           -View restores a camera reference view of the active content first.
+  batch    Capture every reference view of the active content (or -Views) in
+           order and wait for all of them.
   result   Report a capture submitted with -NoWait.
   stop     Stop a session and wait for the process to exit.
   list     List running sessions.
@@ -22,12 +25,13 @@ Commands:
 .EXAMPLE
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 start -Session atrium -Rhi vulkan -Demo atrium
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 capture -Session atrium -SettleFrames 16 -Label overview
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 batch -Session atrium -SettleFrames 16
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 stop -Session atrium
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'result', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'batch', 'result', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -58,6 +62,9 @@ param(
     [ValidateRange(0, 10000)]
     [int]$SettleFrames = 8,
     [string]$RequiredContentId,
+    [string]$View,
+    # batch: reference view ids; empty captures every view the session reports.
+    [string[]]$Views,
     [string]$OutputDirectory,
     [string]$Label,
     [string]$Note,
@@ -164,6 +171,34 @@ function Complete-SessionResponse($Response, [string]$Id) {
     if ($Response.ok) { Write-Result $result 0 } else { Write-Result $result 1 }
 }
 
+# Property value of a parsed JSON object, or $null when the property is absent.
+function Get-Field($Object, [string]$Name) {
+    if ($null -eq $Object) { return $null }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($property) { return $property.Value }
+    return $null
+}
+
+function Get-CaptureOutputDirectory {
+    $directory = $OutputDirectory
+    if (-not $directory) {
+        $directory = Join-Path (Get-SessionDirectory $Session) 'Captures'
+    }
+    return [System.IO.Path]::GetFullPath($directory)
+}
+
+function New-CaptureRequest([string]$ViewId, [bool]$Wait) {
+    $request = @{
+        command = 'capture'; source = $Source; timing = $Timing; settleFrames = $SettleFrames
+        outputDirectory = (Get-CaptureOutputDirectory); wait = $Wait
+    }
+    if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
+    if ($ViewId) { $request['view'] = $ViewId }
+    if ($Label) { $request['label'] = $Label }
+    if ($Note) { $request['note'] = $Note }
+    return $request
+}
+
 function Require-Session {
     if (-not $Session) {
         Fail "Command '$Command' requires -Session."
@@ -240,19 +275,64 @@ switch ($Command) {
     }
     'capture' {
         Require-Session
-        if (-not $OutputDirectory) {
-            $OutputDirectory = Join-Path (Get-SessionDirectory $Session) 'Captures'
-        }
-        $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
-        $request = @{
-            command = 'capture'; source = $Source; timing = $Timing; settleFrames = $SettleFrames
-            outputDirectory = $OutputDirectory; wait = (-not $NoWait)
-        }
-        if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
-        if ($Label) { $request['label'] = $Label }
-        if ($Note) { $request['note'] = $Note }
-        $response = Invoke-SessionRequest $Session $request $TimeoutSeconds
+        $response = Invoke-SessionRequest $Session (New-CaptureRequest $View (-not $NoWait)) $TimeoutSeconds
         Complete-SessionResponse $response $Session
+    }
+    'batch' {
+        Require-Session
+        $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        # 'powershell -File' passes '-Views a,b' as one string.
+        $Views = @($Views | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+        if ($Views.Count -eq 0) {
+            # Content registers its reference views while it loads, so the view
+            # list is taken once the session reports ready content.
+            while ($true) {
+                $status = Invoke-SessionRequest $Session @{ command = 'status' } 30
+                $frame = Get-Field $status 'frame'
+                $reported = @(Get-Field $frame 'referenceViews' | Where-Object { $_ })
+                if ((Get-Field $frame 'ready') -and $reported.Count -gt 0) {
+                    $Views = $reported
+                    break
+                }
+                if ((Get-Date) -ge $deadline) {
+                    Fail "Session '$Session' reported no reference views within $TimeoutSeconds seconds." @{
+                        session = $Session; demoId = (Get-Field $frame 'demoId'); labId = (Get-Field $frame 'labId')
+                    }
+                }
+                Start-Sleep -Milliseconds 500
+            }
+        }
+
+        # Every view is queued first; the session applies them in this order.
+        $queued = @()
+        foreach ($viewId in $Views) {
+            $response = Invoke-SessionRequest $Session (New-CaptureRequest $viewId $false) 30
+            if (-not $response.ok) { Complete-SessionResponse $response $Session }
+            $queued += @{ view = $viewId; requestId = $response.requestId }
+        }
+
+        $captures = @()
+        $completed = 0
+        foreach ($entry in $queued) {
+            $response = $null
+            while ($true) {
+                $response = Invoke-SessionRequest $Session @{ command = 'result'; requestId = $entry.requestId } 30
+                if (-not $response.ok) { Complete-SessionResponse $response $Session }
+                if ($response.status -ne 'queued' -or (Get-Date) -ge $deadline) { break }
+                Start-Sleep -Milliseconds 250
+            }
+            $status = if ($response.status -eq 'queued') { 'timeout' } else { $response.status }
+            if ($status -eq 'completed') { ++$completed }
+            $captures += @{
+                view = $entry.view; requestId = $entry.requestId; status = $status
+                image = (Get-Field $response 'image'); metadata = (Get-Field $response 'metadata')
+                failure = (Get-Field $response 'failure')
+            }
+        }
+        Write-Result @{
+            ok = $true; session = $Session; outputDirectory = (Get-CaptureOutputDirectory)
+            completed = $completed; failed = ($captures.Count - $completed); captures = $captures
+        } 0
     }
     'result' {
         Require-Session
