@@ -312,11 +312,13 @@ namespace gglab
 
 		if (m_Hidden)
 		{
-			// Input devices report state regardless of window focus; a hidden
-			// instance must not react to keys meant for another application.
 			PaceHiddenFrame();
 		}
-		else
+		// GameInput reports devices regardless of window focus. Reading it only
+		// while the main window is active keeps keys meant for another
+		// application, such as Escape, from reaching the runtime; deactivation
+		// already reset the published input state.
+		if (!m_Hidden && m_IsWindowActive)
 		{
 			m_InputManager->Update();
 		}

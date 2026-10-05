@@ -111,8 +111,8 @@ namespace gglab
 
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;
-		// Input devices report state regardless of focus; host shortcuts respond
-		// only while the main window is the active application window.
+		// Input devices report state regardless of focus; input is read and host
+		// shortcuts respond only while the main window is the active window.
 		bool m_IsWindowActive = false;
 		bool m_Hidden = false;
 		bool m_ShutdownComplete = false;
