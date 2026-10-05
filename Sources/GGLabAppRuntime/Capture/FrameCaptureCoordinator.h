@@ -229,9 +229,9 @@ namespace gglab
 		uint64_t m_NextRequestId = 1;
 		std::vector<Entry> m_Entries;
 		std::vector<FrameCaptureRequestResult> m_Results;
-		// Image paths of captures still being encoded, so concurrent captures never
-		// select the same file name.
-		std::vector<std::filesystem::path> m_ReservedPaths;
+		// Names this coordinator's temporary files apart from those of other
+		// processes writing to the same directory.
+		std::string m_TemporaryTag;
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		uint32_t m_SettledFrames = 0;
 		bool m_FrameReady = false;

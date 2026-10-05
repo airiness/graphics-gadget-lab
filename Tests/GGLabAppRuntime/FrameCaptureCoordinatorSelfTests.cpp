@@ -147,6 +147,19 @@ namespace gglab
 			return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 		}
 
+		[[nodiscard]] bool HasPartialFile(const std::filesystem::path& directory) noexcept
+		{
+			std::error_code errorCode;
+			for (const auto& entry : std::filesystem::directory_iterator(directory, errorCode))
+			{
+				if (entry.path().extension() == ".partial")
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
 		[[nodiscard]] bool HasPngSignature(const std::filesystem::path& path) noexcept
 		{
 			constexpr std::array<char, 8> signature{ '\x89', 'P', 'N', 'G', '\r', '\n', '\x1A',
@@ -203,7 +216,7 @@ namespace gglab
 				std::filesystem::exists(result.m_MetadataPath) &&
 				HasPngSignature(result.m_ImagePath) &&
 				result.m_ImagePath.parent_path() == directory.GetPath() &&
-				!std::filesystem::exists(result.m_ImagePath.native() + L".partial"),
+				!HasPartialFile(directory.GetPath()),
 				"The PNG and its metadata sidecar are published without partial files");
 			context.Check(metadata.m_FrameSerial == 17 && metadata.m_Width == 2 &&
 				metadata.m_Height == 2 && metadata.m_DisplayFormat == "B8G8R8A8Unorm" &&
@@ -491,6 +504,66 @@ namespace gglab
 				"Shutdown gives every request one explicit result and encodes final captures");
 		}
 
+		void RunNameCollisionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-names");
+			std::error_code errorCode;
+			std::filesystem::create_directories(directory.GetPath(), errorCode);
+			// Another process already published the preferred names: an image for
+			// request 1 and only a sidecar for request 2, in any second the
+			// captures below may be stamped with.
+			std::vector<std::filesystem::path> occupied;
+			const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+			for (int32_t offset = -1; offset <= 2; ++offset)
+			{
+				const std::string time = std::format("{:%Y%m%d-%H%M%S}", now + std::chrono::seconds(offset));
+				occupied.push_back(directory.GetPath() / std::format("shared-scene-dx12-{}-r1.png", time));
+				occupied.push_back(directory.GetPath() / std::format("sidecar-scene-dx12-{}-r2.json", time));
+			}
+			for (const std::filesystem::path& path : occupied)
+			{
+				std::ofstream(path, std::ios::binary) << "occupied";
+			}
+
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_WriteOnCallingThread = true,
+				});
+			const uint64_t imageTaken = coordinator.Submit({ .m_Label = "shared" });
+			const uint64_t sidecarTaken = coordinator.Submit({ .m_Label = "sidecar" });
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Complete(control.m_Issued[0].m_Id, 1);
+			control.Complete(control.m_Issued[1].m_Id, 1);
+			coordinator.Update();
+			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
+
+			const auto published = [&](uint64_t id, std::string_view suffix)
+				{
+					const auto result = std::ranges::find(results, id,
+						&FrameCaptureRequestResult::m_RequestId);
+					if (result == results.end() ||
+						result->m_Status != FrameCaptureRequestStatus::Completed ||
+						!result->m_Metadata)
+					{
+						return false;
+					}
+					const std::string file = result->m_ImagePath.filename().string();
+					return file.ends_with(suffix) && result->m_Metadata->m_ImageFile == file &&
+						ReadText(result->m_MetadataPath).find(
+							std::format("\"file\": \"{}\"", file)) != std::string::npos;
+				};
+			context.Check(results.size() == 2 && published(imageTaken, "-r1-2.png") &&
+				published(sidecarTaken, "-r2-2.png") &&
+				std::ranges::all_of(occupied, [](const std::filesystem::path& path)
+					{
+						return ReadText(path) == "occupied";
+					}) &&
+				!HasPartialFile(directory.GetPath()),
+				"Captures never replace files of another writer and take the next free name");
+		}
+
 		void RunWriterThreadTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-writer");
@@ -648,6 +721,7 @@ namespace gglab
 		RunReferenceViewTests(context);
 		RunFailureTests(context);
 		RunShutdownTests(context);
+		RunNameCollisionTests(context);
 		RunWriterThreadTests(context);
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);

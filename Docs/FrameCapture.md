@@ -113,13 +113,19 @@ button for interactive use.
 
 ## Output
 
-Each capture writes `<subject>[-<view>]-<source>-<UTC time>-r<request id>.png`
-and a `.json` sidecar with the same stem. The subject is the label, else the Lab
-id, else the Demo id. Files are published atomically through a `.partial`
-rename, so an existing PNG is complete. Files are written on a dedicated
-writer thread. When the process shuts down it waits for unfinished writing up
-to 30 seconds in total; captures still unfinished then fail as abandoned and
-never publish their files.
+Each capture writes
+`<subject>[-<view>]-<source>-<backend>-<UTC time>-r<request id>.png` and a
+`.json` sidecar with the same stem. The subject is the label, else the Lab id,
+else the Demo id. A name that already exists, for example from another session
+writing to the same directory, is never replaced: the capture takes the next
+free suffix (`-2`, `-3`, ...), and its sidecar's `image.file` names the PNG it
+belongs to.
+
+Files are written completely to temporary `.partial` files on a dedicated writer
+thread and only then published, so an existing PNG or sidecar is complete. When
+the process shuts down it waits for unfinished writing up to 30 seconds in
+total; captures still unfinished then fail as abandoned and never publish their
+files.
 
 The sidecar (`schemaVersion` 1) records the request (label, note, source,
 timing, settle frames), backend, Demo and Lab ids, frame serial and index, image

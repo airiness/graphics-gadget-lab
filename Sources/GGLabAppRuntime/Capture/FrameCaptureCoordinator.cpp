@@ -14,6 +14,7 @@
 #include <fstream>
 #include <limits>
 #include <mutex>
+#include <random>
 #include <span>
 #include <system_error>
 #include <thread>
@@ -68,9 +69,17 @@ namespace gglab
 	struct FrameCaptureCoordinator::EncodeJob
 	{
 		std::shared_ptr<const FrameCaptureImage> m_Image;
+		std::filesystem::path m_Directory;
+		// Preferred file stem; the writer appends a suffix when it is taken.
+		std::string m_BaseStem;
+		// Unique across processes, so concurrent writers never share a
+		// temporary file.
+		std::string m_TemporaryStem;
+		// The writer records the published image file name before serializing.
+		FrameCaptureMetadata m_Metadata;
+		// Published paths, set by the writer before it marks the job done.
 		std::filesystem::path m_ImagePath;
 		std::filesystem::path m_MetadataPath;
-		std::string m_MetadataJson;
 
 		// Progress is published by the writer for stall and shutdown reports.
 		std::atomic<EncodeStage> m_Stage = EncodeStage::Queued;
@@ -121,16 +130,27 @@ namespace gglab
 			return failure;
 		}
 
-		[[nodiscard]] std::filesystem::path GetTemporaryPath(const std::filesystem::path& path)
+		// A capture keeps its preferred name unless another capture, possibly of
+		// another process, already published it.
+		constexpr uint32_t MaxPublishAttempts = 1000;
+
+		[[nodiscard]] std::string CreateTemporaryTag() noexcept
 		{
-			std::filesystem::path temporaryPath = path;
-			temporaryPath += L".partial";
-			return temporaryPath;
+			uint64_t value = static_cast<uint64_t>(
+				std::chrono::steady_clock::now().time_since_epoch().count());
+			try
+			{
+				std::random_device device;
+				value ^= (static_cast<uint64_t>(device()) << 32) | device();
+			}
+			catch (...)
+			{
+			}
+			return std::format("{:016x}", value);
 		}
 
-		// Writes the bytes to a sibling temporary file. PublishFile renames it into
-		// place, so observers never see a partially written output.
-		[[nodiscard]] std::string WriteTemporaryFile(
+		// Writes the whole file, which is published only once it is complete.
+		[[nodiscard]] std::string WriteFileContents(
 			const std::filesystem::path& path, std::span<const uint8_t> bytes) noexcept
 		{
 			std::error_code errorCode;
@@ -141,28 +161,49 @@ namespace gglab
 					path.parent_path().string());
 			}
 
-			const std::filesystem::path temporaryPath = GetTemporaryPath(path);
-			std::ofstream file(temporaryPath, std::ios::binary | std::ios::trunc);
+			std::ofstream file(path, std::ios::binary | std::ios::trunc);
 			file.write(reinterpret_cast<const char*>(bytes.data()),
 				static_cast<std::streamsize>(bytes.size()));
 			file.close();
 			if (!file)
 			{
-				std::filesystem::remove(temporaryPath, errorCode);
-				return std::format("Writing '{}' failed.", temporaryPath.string());
+				std::filesystem::remove(path, errorCode);
+				return std::format("Writing '{}' failed.", path.string());
 			}
 			return {};
 		}
 
-		[[nodiscard]] std::string PublishFile(const std::filesystem::path& path) noexcept
+		enum class PublishOutcome : uint8_t
+		{
+			Published,
+			NameTaken,
+			Failed,
+		};
+
+		// Publishes a complete temporary file under a name that must not exist yet.
+		// A hard link creates the name only if it is free, so a file of another
+		// writer is never replaced. File systems without hard links fall back to a
+		// rename after checking the name, which a concurrent writer can still race.
+		[[nodiscard]] PublishOutcome PublishNewFile(
+			const std::filesystem::path& temporaryPath, const std::filesystem::path& path) noexcept
 		{
 			std::error_code errorCode;
-			std::filesystem::rename(GetTemporaryPath(path), path, errorCode);
-			if (errorCode)
+			std::filesystem::create_hard_link(temporaryPath, path, errorCode);
+			if (!errorCode)
 			{
-				return std::format("Publishing '{}' failed.", path.string());
+				return PublishOutcome::Published;
 			}
-			return {};
+			if (errorCode == std::errc::file_exists)
+			{
+				return PublishOutcome::NameTaken;
+			}
+			std::error_code existsError;
+			if (std::filesystem::exists(path, existsError))
+			{
+				return PublishOutcome::NameTaken;
+			}
+			std::filesystem::rename(temporaryPath, path, errorCode);
+			return errorCode ? PublishOutcome::Failed : PublishOutcome::Published;
 		}
 
 		[[nodiscard]] std::string SanitizeFileStemComponent(std::string_view value) noexcept
@@ -189,7 +230,8 @@ namespace gglab
 		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
 		m_ImageEncoder(createInfo.m_ImageEncoder),
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
-		m_WriteOnCallingThread(createInfo.m_WriteOnCallingThread)
+		m_WriteOnCallingThread(createInfo.m_WriteOnCallingThread),
+		m_TemporaryTag(CreateTemporaryTag())
 	{
 		if (!m_ImageEncoder)
 		{
@@ -556,35 +598,18 @@ namespace gglab
 		const std::string view = metadata.m_Camera.m_ReferenceViewId.empty()
 			? std::string{}
 			: "-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
-		const std::string baseStem = std::format("{}{}-{}-{}-r{}",
+		const std::string baseStem = std::format("{}{}-{}-{}-{}-r{}",
 			SanitizeFileStemComponent(subject), view,
-			GetFrameCaptureSourceName(metadata.m_Source), timestamp, entry.m_Id);
-
-		std::filesystem::path imagePath;
-		std::filesystem::path metadataPath;
-		for (uint32_t attempt = 1;; ++attempt)
-		{
-			const std::string stem =
-				attempt == 1 ? baseStem : std::format("{}-{}", baseStem, attempt);
-			imagePath = directory / (stem + ".png");
-			metadataPath = directory / (stem + ".json");
-			std::error_code errorCode;
-			if (std::ranges::find(m_ReservedPaths, imagePath) == m_ReservedPaths.end() &&
-				!std::filesystem::exists(imagePath, errorCode) &&
-				!std::filesystem::exists(metadataPath, errorCode))
-			{
-				break;
-			}
-		}
-		m_ReservedPaths.push_back(imagePath);
-		metadata.m_ImageFile = imagePath.filename().string();
+			GetFrameCaptureSourceName(metadata.m_Source),
+			SanitizeFileStemComponent(metadata.m_Backend), timestamp, entry.m_Id);
 
 		auto job = std::make_shared<EncodeJob>();
 		job->m_SubmittedAt = std::chrono::steady_clock::now();
 		job->m_Image = result.m_Image;
-		job->m_ImagePath = imagePath;
-		job->m_MetadataPath = metadataPath;
-		job->m_MetadataJson = SerializeFrameCaptureMetadata(metadata);
+		job->m_Directory = directory;
+		job->m_BaseStem = baseStem;
+		job->m_TemporaryStem = std::format("{}.{}", baseStem, m_TemporaryTag);
+		job->m_Metadata = metadata;
 		entry.m_Job = job;
 		entry.m_Phase = Phase::Encoding;
 
@@ -609,6 +634,10 @@ namespace gglab
 			return false;
 		}
 		std::string failure = std::move(job.m_Failure);
+		if (failure.empty())
+		{
+			entry.m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
+		}
 		lock.unlock();
 		Finish(entry,
 			failure.empty() ? FrameCaptureRequestStatus::Completed : FrameCaptureRequestStatus::Failed,
@@ -711,7 +740,6 @@ namespace gglab
 		};
 		if (entry.m_Job)
 		{
-			std::erase(m_ReservedPaths, entry.m_Job->m_ImagePath);
 			if (status == FrameCaptureRequestStatus::Completed)
 			{
 				result.m_ImagePath = entry.m_Job->m_ImagePath;
@@ -781,24 +809,20 @@ namespace gglab
 			return "The captured image could not be encoded as PNG.";
 		}
 
-		const auto removeTemporaryFiles = [&job]() noexcept
+		const std::filesystem::path temporaryImage =
+			job.m_Directory / (job.m_TemporaryStem + ".png.partial");
+		const std::filesystem::path temporaryMetadata =
+			job.m_Directory / (job.m_TemporaryStem + ".json.partial");
+		const auto removeTemporaryFiles = [&]() noexcept
 			{
 				std::error_code errorCode;
-				std::filesystem::remove(GetTemporaryPath(job.m_ImagePath), errorCode);
-				std::filesystem::remove(GetTemporaryPath(job.m_MetadataPath), errorCode);
+				std::filesystem::remove(temporaryImage, errorCode);
+				std::filesystem::remove(temporaryMetadata, errorCode);
 			};
 		job.m_Stage = EncodeStage::WritingImage;
-		std::string failure = WriteTemporaryFile(job.m_ImagePath, *encoded);
-		if (failure.empty())
-		{
-			job.m_Stage = EncodeStage::WritingMetadata;
-			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(job.m_MetadataJson.data());
-			failure = WriteTemporaryFile(job.m_MetadataPath,
-				std::span<const uint8_t>(jsonBytes, job.m_MetadataJson.size()));
-		}
+		std::string failure = WriteFileContents(temporaryImage, *encoded);
 		if (!failure.empty())
 		{
-			removeTemporaryFiles();
 			return failure;
 		}
 
@@ -810,22 +834,67 @@ namespace gglab
 			removeTemporaryFiles();
 			return "The capture was abandoned at shutdown.";
 		}
+
 		job.m_Stage = EncodeStage::Publishing;
-		failure = PublishFile(job.m_ImagePath);
-		if (failure.empty())
+		for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
 		{
-			failure = PublishFile(job.m_MetadataPath);
-			if (!failure.empty())
+			const std::string stem = attempt == 1
+				? job.m_BaseStem
+				: std::format("{}-{}", job.m_BaseStem, attempt);
+			const std::filesystem::path imagePath = job.m_Directory / (stem + ".png");
+			const std::filesystem::path metadataPath = job.m_Directory / (stem + ".json");
+			const PublishOutcome image = PublishNewFile(temporaryImage, imagePath);
+			if (image == PublishOutcome::NameTaken)
 			{
-				// A capture is complete only with both files.
-				std::error_code errorCode;
-				std::filesystem::remove(job.m_ImagePath, errorCode);
+				continue;
 			}
+			if (image == PublishOutcome::Failed)
+			{
+				removeTemporaryFiles();
+				return std::format("Publishing '{}' failed.", imagePath.string());
+			}
+
+			// The sidecar names the image file, so it is written once the name is fixed.
+			job.m_Stage = EncodeStage::WritingMetadata;
+			job.m_Metadata.m_ImageFile = imagePath.filename().string();
+			const std::string json = SerializeFrameCaptureMetadata(job.m_Metadata);
+			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(json.data());
+			failure = WriteFileContents(
+				temporaryMetadata, std::span<const uint8_t>(jsonBytes, json.size()));
+			const PublishOutcome metadata = failure.empty()
+				? PublishNewFile(temporaryMetadata, metadataPath)
+				: PublishOutcome::Failed;
+			if (metadata == PublishOutcome::Published)
+			{
+				removeTemporaryFiles();
+				job.m_ImagePath = imagePath;
+				job.m_MetadataPath = metadataPath;
+				return {};
+			}
+
+			// A capture is complete only with both files. This image was created
+			// above, so withdrawing it never touches another writer's file; after a
+			// rename fallback it moves back to be published under the next name.
+			std::error_code errorCode;
+			if (std::filesystem::exists(temporaryImage, errorCode))
+			{
+				std::filesystem::remove(imagePath, errorCode);
+			}
+			else
+			{
+				std::filesystem::rename(imagePath, temporaryImage, errorCode);
+			}
+			if (metadata == PublishOutcome::Failed)
+			{
+				removeTemporaryFiles();
+				return failure.empty()
+					? std::format("Publishing '{}' failed.", metadataPath.string())
+					: failure;
+			}
+			job.m_Stage = EncodeStage::Publishing;
 		}
-		if (!failure.empty())
-		{
-			removeTemporaryFiles();
-		}
-		return failure;
+		removeTemporaryFiles();
+		return std::format("No unused file name was found for '{}' after {} attempts.",
+			job.m_BaseStem, MaxPublishAttempts);
 	}
 }
