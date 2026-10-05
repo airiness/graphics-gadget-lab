@@ -53,7 +53,6 @@ namespace gglab
 
 	struct FrameCaptureCoordinator::EncodeJob
 	{
-		uint64_t m_RequestId = 0;
 		std::shared_ptr<const FrameCaptureImage> m_Image;
 		std::filesystem::path m_ImagePath;
 		std::filesystem::path m_MetadataPath;
@@ -354,8 +353,6 @@ namespace gglab
 
 		entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
 		entry.m_Phase = Phase::Issued;
-		GGLAB_LOG_INFO("Frame capture {} issued before frame index {} (runtime request {}).",
-			entry.m_Id, state.m_FrameIndex, entry.m_CaptureRequestId);
 	}
 
 	void FrameCaptureCoordinator::HandleCaptureResult(FrameCaptureResult result) noexcept
@@ -373,9 +370,6 @@ namespace gglab
 		}
 
 		entry->m_Metadata.m_FrameSerial = result.m_FrameSerial;
-		GGLAB_LOG_INFO("Frame capture {} recorded by frame serial {} ({}).", entry->m_Id,
-			result.m_FrameSerial,
-			result.m_Status == FrameCaptureStatus::Completed ? "encoding" : "failed");
 		if (result.m_Status != FrameCaptureStatus::Completed || !result.m_Image)
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
@@ -438,7 +432,6 @@ namespace gglab
 		metadata.m_ImageFile = imagePath.filename().string();
 
 		auto job = std::make_shared<EncodeJob>();
-		job->m_RequestId = entry.m_Id;
 		job->m_SubmittedAt = std::chrono::steady_clock::now();
 		job->m_Image = result.m_Image;
 		job->m_ImagePath = imagePath;
@@ -539,17 +532,9 @@ namespace gglab
 
 	void FrameCaptureCoordinator::RunEncodeJob(EncodeJob& job) noexcept
 	{
-		const auto startedAt = std::chrono::steady_clock::now();
-		GGLAB_LOG_INFO("Frame capture {} encode started {:.1f} ms after submission.",
-			job.m_RequestId,
-			std::chrono::duration<double, std::milli>(startedAt - job.m_SubmittedAt).count());
 		std::string failure = EncodeAndWrite(job.m_Image, job.m_ImagePath, job.m_MetadataPath,
 			job.m_MetadataJson, job.m_Stage);
 		job.m_Stage = EncodeStage::Done;
-		GGLAB_LOG_INFO("Frame capture {} encode finished in {:.1f} ms{}.", job.m_RequestId,
-			std::chrono::duration<double, std::milli>(
-				std::chrono::steady_clock::now() - startedAt).count(),
-			failure.empty() ? "" : " with a failure");
 		{
 			std::scoped_lock lock(job.m_Mutex);
 			job.m_Failure = std::move(failure);

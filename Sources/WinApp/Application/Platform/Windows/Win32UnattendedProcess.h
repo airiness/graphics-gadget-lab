@@ -13,8 +13,4 @@ namespace gglab::win32
 	// process standard handles, so console logging and outcome lines reach it.
 	// A launcher can then start the process without inheriting any handle.
 	[[nodiscard]] bool RedirectStandardOutputToFile(const std::filesystem::path& path) noexcept;
-
-	// Logs console control events (Ctrl+C, console close, logoff, shutdown)
-	// before the default handling ends the process.
-	void LogConsoleControlEvents() noexcept;
 }

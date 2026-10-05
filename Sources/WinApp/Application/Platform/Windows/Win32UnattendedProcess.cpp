@@ -1,5 +1,4 @@
 #include "Application/Platform/Windows/Win32UnattendedProcess.h"
-#include "AppRuntimeLog.h"
 
 #include <Windows.h>
 #include <crtdbg.h>
@@ -62,36 +61,5 @@ namespace gglab::win32
 		const auto error = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stderr)));
 		return output != INVALID_HANDLE_VALUE && error != INVALID_HANDLE_VALUE &&
 			::SetStdHandle(STD_OUTPUT_HANDLE, output) && ::SetStdHandle(STD_ERROR_HANDLE, error);
-	}
-
-	void LogConsoleControlEvents() noexcept
-	{
-		::SetConsoleCtrlHandler([](DWORD controlType) noexcept -> BOOL
-			{
-				const char* name = "unknown";
-				switch (controlType)
-				{
-				case CTRL_C_EVENT:
-					name = "Ctrl+C";
-					break;
-				case CTRL_BREAK_EVENT:
-					name = "Ctrl+Break";
-					break;
-				case CTRL_CLOSE_EVENT:
-					name = "console close";
-					break;
-				case CTRL_LOGOFF_EVENT:
-					name = "logoff";
-					break;
-				case CTRL_SHUTDOWN_EVENT:
-					name = "shutdown";
-					break;
-				default:
-					break;
-				}
-				GGLAB_LOG_WARN_ALWAYS("Console control event received: {}.", name);
-				// The default handler still ends the process.
-				return FALSE;
-			}, TRUE);
 	}
 }

@@ -381,11 +381,6 @@ namespace gglab
 			m_LifecycleState = LifecycleState::Failed;
 			return false;
 		}
-		if (tickResult == AppRuntimeTickResult::Exit)
-		{
-			GGLAB_LOG_INFO_ALWAYS("The app runtime ended its run (lifecycle state {}).",
-				static_cast<uint32_t>(m_AppRuntime->GetLifecycleState()));
-		}
 		return tickResult == AppRuntimeTickResult::Continue;
 	}
 
@@ -715,7 +710,6 @@ namespace gglab
 		switch (event.m_Type)
 		{
 		case PlatformEventType::Activated:
-			GGLAB_LOG_INFO_ALWAYS("Main window activated; input is read.");
 			m_IsWindowActive = true;
 			if (m_InputManager)
 			{
@@ -723,7 +717,6 @@ namespace gglab
 			}
 			break;
 		case PlatformEventType::Deactivated:
-			GGLAB_LOG_INFO_ALWAYS("Main window deactivated; input is ignored.");
 			m_IsWindowActive = false;
 			if (m_InputManager)
 			{
@@ -733,7 +726,6 @@ namespace gglab
 		case PlatformEventType::Suspended:
 			if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Running)
 			{
-				GGLAB_LOG_INFO_ALWAYS("Main window minimized or moving; rendering is suspended.");
 				if (m_InputManager)
 				{
 					m_InputManager->OnSuspend();
@@ -746,7 +738,6 @@ namespace gglab
 		case PlatformEventType::Resumed:
 			if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended)
 			{
-				GGLAB_LOG_INFO_ALWAYS("Main window restored; rendering resumes.");
 				if (m_InputManager)
 				{
 					m_InputManager->OnResume();
