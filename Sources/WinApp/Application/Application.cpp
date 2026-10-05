@@ -733,6 +733,7 @@ namespace gglab
 		case PlatformEventType::Suspended:
 			if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Running)
 			{
+				GGLAB_LOG_INFO_ALWAYS("Main window minimized or moving; rendering is suspended.");
 				if (m_InputManager)
 				{
 					m_InputManager->OnSuspend();
@@ -745,6 +746,7 @@ namespace gglab
 		case PlatformEventType::Resumed:
 			if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended)
 			{
+				GGLAB_LOG_INFO_ALWAYS("Main window restored; rendering resumes.");
 				if (m_InputManager)
 				{
 					m_InputManager->OnResume();

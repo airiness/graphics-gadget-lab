@@ -312,6 +312,8 @@ namespace gglab
 
 		entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
 		entry.m_Phase = Phase::Issued;
+		GGLAB_LOG_INFO("Frame capture {} issued before frame index {} (runtime request {}).",
+			entry.m_Id, state.m_FrameIndex, entry.m_CaptureRequestId);
 	}
 
 	void FrameCaptureCoordinator::HandleCaptureResult(FrameCaptureResult result) noexcept
@@ -329,6 +331,9 @@ namespace gglab
 		}
 
 		entry->m_Metadata.m_FrameSerial = result.m_FrameSerial;
+		GGLAB_LOG_INFO("Frame capture {} recorded by frame serial {} ({}).", entry->m_Id,
+			result.m_FrameSerial,
+			result.m_Status == FrameCaptureStatus::Completed ? "encoding" : "failed");
 		if (result.m_Status != FrameCaptureStatus::Completed || !result.m_Image)
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
