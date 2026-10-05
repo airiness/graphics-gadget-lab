@@ -2,9 +2,13 @@
 
 #include <Windows.h>
 #include <crtdbg.h>
+#include <fcntl.h>
+#include <io.h>
 #include <stdlib.h>
 
 #include <array>
+#include <cstdint>
+#include <cstdio>
 
 namespace gglab::win32
 {
@@ -23,5 +27,39 @@ namespace gglab::win32
 			_CrtSetReportFile(reportType, _CRTDBG_FILE_STDERR);
 		}
 #endif
+	}
+
+	bool RedirectStandardOutputToFile(const std::filesystem::path& path) noexcept
+	{
+		// Shared read access lets a launcher follow the log while it is written.
+		const HANDLE file = ::CreateFileW(path.c_str(), GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (file == INVALID_HANDLE_VALUE)
+		{
+			return false;
+		}
+		const int descriptor = _open_osfhandle(reinterpret_cast<intptr_t>(file), _O_WRONLY);
+		if (descriptor < 0)
+		{
+			::CloseHandle(file);
+			return false;
+		}
+		std::fflush(stdout);
+		std::fflush(stderr);
+		const bool redirected = _dup2(descriptor, _fileno(stdout)) == 0 &&
+			_dup2(descriptor, _fileno(stderr)) == 0;
+		_close(descriptor);
+		if (!redirected)
+		{
+			return false;
+		}
+		// Unbuffered, so outcome lines are visible to a polling launcher at once.
+		std::setvbuf(stdout, nullptr, _IONBF, 0);
+		std::setvbuf(stderr, nullptr, _IONBF, 0);
+		const auto output = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stdout)));
+		const auto error = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stderr)));
+		return output != INVALID_HANDLE_VALUE && error != INVALID_HANDLE_VALUE &&
+			::SetStdHandle(STD_OUTPUT_HANDLE, output) && ::SetStdHandle(STD_ERROR_HANDLE, error);
 	}
 }

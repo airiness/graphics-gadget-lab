@@ -54,11 +54,11 @@ namespace gglab
 		return nullptr;
 	}
 
-	void ApplicationFrameCapture::Update() noexcept
+	std::vector<FrameCaptureRequestResult> ApplicationFrameCapture::Update() noexcept
 	{
 		std::vector<FrameCaptureRequestResult> results;
 		m_Coordinator->ConsumeResults(results);
-		for (FrameCaptureRequestResult& result : results)
+		for (const FrameCaptureRequestResult& result : results)
 		{
 			if (result.m_Status == FrameCaptureRequestStatus::Completed)
 			{
@@ -73,7 +73,7 @@ namespace gglab
 					result.m_Failure);
 			}
 			m_History.push_back({
-				.m_Result = std::move(result),
+				.m_Result = result,
 				.m_FinishedAt = std::chrono::steady_clock::now(),
 				});
 			if (m_History.size() > MaxHistoryEntries)
@@ -81,6 +81,7 @@ namespace gglab
 				m_History.pop_front();
 			}
 		}
+		return results;
 	}
 
 	uint32_t ApplicationFrameCapture::GetUnfinishedRequestCount() const noexcept

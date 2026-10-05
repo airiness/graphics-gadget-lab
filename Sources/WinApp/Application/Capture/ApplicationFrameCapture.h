@@ -8,6 +8,7 @@
 #include <deque>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace gglab
 {
@@ -56,8 +57,9 @@ namespace gglab
 		bool Cancel(uint64_t requestId) noexcept;
 		// Finished result of a request still held in the history, or null.
 		[[nodiscard]] const FrameCaptureRequestResult* FindResult(uint64_t requestId) const noexcept;
-		// Moves finished captures into the history; call once per host frame.
-		void Update() noexcept;
+		// Moves finished captures into the history and returns them; call once per
+		// host frame.
+		std::vector<FrameCaptureRequestResult> Update() noexcept;
 
 		// Newest entry last.
 		[[nodiscard]] const std::deque<HistoryEntry>& GetHistory() const noexcept

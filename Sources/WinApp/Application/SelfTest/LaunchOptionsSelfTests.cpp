@@ -201,6 +201,26 @@ namespace gglab
 					"Capture options require an absolute capture-on-ready directory and valid values");
 			}
 			{
+				const auto session = parse({ "--hidden", "--session", "agent_01-a",
+					"--idle-timeout", "60" });
+				context.Check(session.IsValid() && session.m_Options.m_SessionId == "agent_01-a" &&
+					session.m_Options.m_IdleTimeoutSeconds == 60.0 &&
+					parse({ "--session", "a" }).m_Options.m_IdleTimeoutSeconds == 900.0,
+					"Sessions take a pipe-safe id and an optional idle timeout");
+				context.Check(!parse({ "--session", "bad id" }).IsValid() &&
+					!parse({ "--session", "bad/id" }).IsValid() &&
+					!parse({ "--session", std::string(65, 'a') }).IsValid() &&
+					!parse({ "--idle-timeout", "60" }).IsValid() &&
+					!parse({ "--session", "a", "--idle-timeout", "0" }).IsValid() &&
+					!parse({ "--self-test", "all", "--session", "a" }).IsValid(),
+					"Session options reject unsafe ids, orphan or invalid idle timeouts");
+				context.Check(parse({ "--output-log", "C:/logs/out.log" }).m_Options.m_OutputLog ==
+					std::filesystem::path("C:/logs/out.log") &&
+					!parse({ "--output-log", "out.log" }).IsValid() &&
+					!parse({ "--output-log", "C:/a", "--output-log", "C:/b" }).IsValid(),
+					"The output log takes one absolute file path");
+			}
+			{
 				const auto result = parse({ "--no-devtools" });
 				context.Check(result.IsValid() &&
 					result.m_Options.m_DisableDevelopmentTools,

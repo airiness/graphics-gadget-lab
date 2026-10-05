@@ -1,6 +1,8 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
+#include "Application/Control/ApplicationControlProtocol.h"
+#include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabAppRuntime.h"
 #include "Application/Platform/PlatformHost.h"
@@ -29,6 +31,9 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <vector>
+
+#include <windows.h>
 
 namespace gglab
 {
@@ -43,6 +48,8 @@ namespace gglab
 		m_ContentRegistration(std::move(createInfo.m_ContentRegistration)),
 		m_CaptureOnReady(std::move(createInfo.m_CaptureOnReady)),
 		m_CaptureTimeout(createInfo.m_CaptureTimeoutSeconds),
+		m_SessionId(std::move(createInfo.m_SessionId)),
+		m_IdleTimeout(createInfo.m_IdleTimeoutSeconds),
 		m_Hidden(createInfo.m_Hidden)
 	{
 	}
@@ -292,6 +299,11 @@ namespace gglab
 			m_CaptureOnReadyRequestId = m_FrameCapture->Submit(std::move(*m_CaptureOnReady));
 			m_CaptureOnReady.reset();
 		}
+		m_StartTime = std::chrono::steady_clock::now();
+		if (!m_SessionId.empty() && !StartControlSession())
+		{
+			return FailInitialization();
+		}
 
 		m_LifecycleState = LifecycleState::Running;
 		return true;
@@ -340,7 +352,11 @@ namespace gglab
 			});
 		if (m_FrameCapture)
 		{
-			m_FrameCapture->Update();
+			ResolveControlCaptures(m_FrameCapture->Update());
+		}
+		if (m_ControlServer && !UpdateControlSession())
+		{
+			return false;
 		}
 		if (m_CaptureOnReadyRequestId != 0 && tickResult == AppRuntimeTickResult::Continue &&
 			!UpdateCaptureOnReady())
@@ -450,6 +466,164 @@ namespace gglab
 		return false;
 	}
 
+	bool Application::StartControlSession() noexcept
+	{
+		std::wstring pipeName = L"\\\\.\\pipe\\gglab-session-";
+		pipeName.append(m_SessionId.begin(), m_SessionId.end());
+		m_ControlServer = std::make_unique<win32::NamedPipeServer>();
+		if (!m_ControlServer->Start(pipeName))
+		{
+			GGLAB_LOG_ERROR_ALWAYS("Session '{}' could not open its control pipe; the id may "
+				"already be in use.", m_SessionId);
+			m_ControlServer.reset();
+			return false;
+		}
+		m_LastControlActivity = std::chrono::steady_clock::now();
+		GGLAB_LOG_INFO_ALWAYS("Session '{}' accepts control requests (protocol {}).",
+			m_SessionId, ApplicationControlProtocolVersion);
+		std::fprintf(stdout, "session-ready: %s\n", m_SessionId.c_str());
+		std::fflush(stdout);
+		return true;
+	}
+
+	bool Application::UpdateControlSession() noexcept
+	{
+		const auto now = std::chrono::steady_clock::now();
+		for (const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest : m_ControlServer->Poll())
+		{
+			m_LastControlActivity = now;
+			const ApplicationControlParseResult parsed =
+				ParseApplicationControlRequest(pipeRequest->GetLine());
+			if (!parsed.m_Request)
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(parsed.m_Id, parsed.m_Error));
+				continue;
+			}
+			HandleControlRequest(pipeRequest, *parsed.m_Request);
+		}
+		if (m_StopRequested)
+		{
+			GGLAB_LOG_INFO_ALWAYS("Session '{}' is stopping on request.", m_SessionId);
+			return false;
+		}
+
+		// Only requests and finished captures count as activity. A capture that can
+		// never become due, such as one waiting for content that is not loaded,
+		// must not keep an abandoned session alive; shutdown still answers it.
+		if (now - m_LastControlActivity > m_IdleTimeout)
+		{
+			GGLAB_LOG_INFO_ALWAYS("Session '{}' exits after {} idle seconds.", m_SessionId,
+				m_IdleTimeout.count());
+			return false;
+		}
+		return true;
+	}
+
+	void Application::HandleControlRequest(
+		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
+		const ApplicationControlRequest& request) noexcept
+	{
+		switch (request.m_Command)
+		{
+		case ApplicationControlCommand::Status:
+			pipeRequest->Respond(SerializeApplicationControlStatus(request.m_Id, {
+				.m_SessionId = m_SessionId,
+				.m_ProcessId = static_cast<uint32_t>(::GetCurrentProcessId()),
+				.m_UptimeSeconds =
+					std::chrono::duration<double>(std::chrono::steady_clock::now() - m_StartTime)
+					.count(),
+				.m_Hidden = m_Hidden,
+				.m_Width = m_WindowWidth,
+				.m_Height = m_WindowHeight,
+				.m_UnfinishedCaptures =
+					m_FrameCapture ? m_FrameCapture->GetUnfinishedRequestCount() : 0,
+				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
+				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
+				}));
+			return;
+		case ApplicationControlCommand::Capture:
+		{
+			if (!m_FrameCapture)
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(
+					request.m_Id, "Frame capture is unavailable in this session."));
+				return;
+			}
+			const uint64_t captureRequestId = m_FrameCapture->Submit(request.m_Capture);
+			m_ControlCaptureIds.insert(captureRequestId);
+			if (request.m_Wait)
+			{
+				m_ControlCaptureWaits.push_back({
+					.m_PipeRequest = pipeRequest,
+					.m_ControlId = request.m_Id,
+					.m_CaptureRequestId = captureRequestId,
+					});
+			}
+			else
+			{
+				pipeRequest->Respond(
+					SerializeApplicationControlCaptureQueued(request.m_Id, captureRequestId));
+			}
+			return;
+		}
+		case ApplicationControlCommand::Result:
+		{
+			const auto finished = m_ControlCaptureResults.find(request.m_CaptureRequestId);
+			if (finished != m_ControlCaptureResults.end())
+			{
+				pipeRequest->Respond(
+					SerializeApplicationControlCaptureResult(request.m_Id, finished->second));
+			}
+			else if (m_ControlCaptureIds.contains(request.m_CaptureRequestId))
+			{
+				pipeRequest->Respond(SerializeApplicationControlCaptureQueued(
+					request.m_Id, request.m_CaptureRequestId));
+			}
+			else
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
+					std::format("Capture request {} is unknown to this session.",
+						request.m_CaptureRequestId)));
+			}
+			return;
+		}
+		case ApplicationControlCommand::Stop:
+			pipeRequest->Respond(SerializeApplicationControlStopping(request.m_Id));
+			m_StopRequested = true;
+			return;
+		}
+	}
+
+	void Application::ResolveControlCaptures(
+		std::span<const FrameCaptureRequestResult> results) noexcept
+	{
+		// Finished results stay queryable for a bounded number of captures.
+		constexpr size_t maxRetainedResults = 256;
+		for (const FrameCaptureRequestResult& result : results)
+		{
+			if (m_ControlCaptureIds.erase(result.m_RequestId) == 0)
+			{
+				continue;
+			}
+			m_LastControlActivity = std::chrono::steady_clock::now();
+			m_ControlCaptureResults[result.m_RequestId] = result;
+			if (m_ControlCaptureResults.size() > maxRetainedResults)
+			{
+				m_ControlCaptureResults.erase(m_ControlCaptureResults.begin());
+			}
+			std::erase_if(m_ControlCaptureWaits, [&](const ControlCaptureWait& wait)
+				{
+					if (wait.m_CaptureRequestId != result.m_RequestId)
+					{
+						return false;
+					}
+					wait.m_PipeRequest->Respond(
+						SerializeApplicationControlCaptureResult(wait.m_ControlId, result));
+					return true;
+				});
+		}
+	}
+
 	bool Application::FailInitialization() noexcept
 	{
 		if (m_ExitCode == 0)
@@ -484,14 +658,26 @@ namespace gglab
 			m_AppRuntime->Shutdown({
 				.m_ApplicationTooling = m_ApplicationTooling.get(),
 				});
-			// Shutdown finished every capture request; log the final results before
-			// the coordinator is destroyed with the runtime.
+			// Shutdown finished every capture request; log and answer the final
+			// results before the coordinator is destroyed with the runtime.
 			if (m_FrameCapture)
 			{
-				m_FrameCapture->Update();
+				ResolveControlCaptures(m_FrameCapture->Update());
 				m_FrameCapture.reset();
 			}
 			m_AppRuntime.reset();
+		}
+		if (m_ControlServer)
+		{
+			for (const ControlCaptureWait& wait : m_ControlCaptureWaits)
+			{
+				wait.m_PipeRequest->Respond(SerializeApplicationControlError(
+					wait.m_ControlId, "The session stopped before the capture finished."));
+			}
+			m_ControlCaptureWaits.clear();
+			m_ControlServer->Stop(SerializeApplicationControlError(
+				0, "The session stopped before the request was answered."));
+			m_ControlServer.reset();
 		}
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		m_ShaderHotReload.reset();

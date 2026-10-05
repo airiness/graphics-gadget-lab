@@ -10,6 +10,9 @@
     <Filter Include="Application\Content">
       <UniqueIdentifier>{813F9E64-18DE-6239-D0D8-A28FA4EA0A1F}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Control">
+      <UniqueIdentifier>{B47E0784-75AF-661D-5FB2-3D60F1E747FD}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{D01FABD7-6ACE-5D41-9A4C-8AF724F08E10}</UniqueIdentifier>
     </Filter>
@@ -135,6 +138,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.cpp">
       <Filter>Application\Content</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp">
+      <Filter>Application\Control</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Demo\DemoLabHost.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
@@ -231,6 +237,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\WindowsInputMapping.cpp">
       <Filter>Application\Platform\Windows\Input</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
@@ -247,6 +256,9 @@
       <Filter>Application</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp">
@@ -458,6 +470,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.h">
       <Filter>Application\Content</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalAtriumReferenceViews.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
@@ -569,6 +584,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32MessageHandler.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
@@ -585,6 +603,9 @@
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h">

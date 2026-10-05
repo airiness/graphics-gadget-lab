@@ -58,6 +58,13 @@ namespace gglab
 		bool m_Hidden = false;
 		std::optional<double> m_FixedDeltaTimeSeconds;
 		std::optional<ApplicationCaptureOnReadyOptions> m_CaptureOnReady;
+		// Serves the session control protocol on \\.\pipe\gglab-session-<id>.
+		std::optional<std::string> m_SessionId;
+		// A session exits after this long without a control request.
+		double m_IdleTimeoutSeconds = 900.0;
+		bool m_IdleTimeoutSpecified = false;
+		// stdout and stderr are written to this file instead of the inherited handles.
+		std::filesystem::path m_OutputLog;
 	};
 
 	struct ApplicationLaunchParseResult

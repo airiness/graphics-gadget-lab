@@ -3,6 +3,7 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "GGLabFoundation/String/StringUtils.h"
 
+#include <algorithm>
 #include <charconv>
 #include <format>
 #include <string>
@@ -49,6 +50,18 @@ namespace gglab
 				return std::nullopt;
 			}
 			return result;
+		}
+
+		[[nodiscard]] bool IsValidSessionId(std::string_view value) noexcept
+		{
+			return !value.empty() && value.size() <= 64 &&
+				std::ranges::all_of(value, [](char character)
+					{
+						return (character >= 'a' && character <= 'z') ||
+							(character >= 'A' && character <= 'Z') ||
+							(character >= '0' && character <= '9') || character == '-' ||
+							character == '_';
+					});
 		}
 
 		// Parses "<width>x<height>".
@@ -392,6 +405,69 @@ namespace gglab
 				continue;
 			}
 
+			if (argument == "--output-log")
+			{
+				if (!result.m_Options.m_OutputLog.empty())
+				{
+					result.m_Error = "Option '--output-log' may only be specified once.";
+					return result;
+				}
+				if (!requireValue(index, argument))
+				{
+					return result;
+				}
+				result.m_Options.m_OutputLog = std::filesystem::path(arguments[index]);
+				if (!result.m_Options.m_OutputLog.is_absolute())
+				{
+					result.m_Error = "Option '--output-log' requires an absolute file path.";
+					return result;
+				}
+				continue;
+			}
+			if (argument == "--session")
+			{
+				if (result.m_Options.m_SessionId)
+				{
+					result.m_Error = "Option '--session' may only be specified once.";
+					return result;
+				}
+				if (!requireValue(index, argument))
+				{
+					return result;
+				}
+				if (!IsValidSessionId(arguments[index]))
+				{
+					result.m_Error = std::format("Option '--session' expects 1 to 64 characters "
+						"from [A-Za-z0-9_-], got '{}'.", arguments[index]);
+					return result;
+				}
+				result.m_Options.m_SessionId = std::string(arguments[index]);
+				continue;
+			}
+			if (argument == "--idle-timeout")
+			{
+				if (result.m_Options.m_IdleTimeoutSpecified)
+				{
+					result.m_Error = "Option '--idle-timeout' may only be specified once.";
+					return result;
+				}
+				if (!requireValue(index, argument))
+				{
+					return result;
+				}
+				const std::optional<double> seconds = ParseNumber<double>(arguments[index]);
+				if (!seconds || !(*seconds > 0.0 && *seconds <= 604800.0))
+				{
+					result.m_Error = std::format(
+						"Option '--idle-timeout' expects seconds in (0, 604800], got '{}'.",
+						arguments[index]);
+					return result;
+				}
+				result.m_Options.m_IdleTimeoutSeconds = *seconds;
+				result.m_Options.m_IdleTimeoutSpecified = true;
+				continue;
+			}
+
 			result.m_Error = std::format("Unknown option '{}'.", argument);
 			return result;
 		}
@@ -404,6 +480,11 @@ namespace gglab
 		else if (captureDetailSpecified)
 		{
 			result.m_Error = "Capture options require '--capture-on-ready'.";
+			return result;
+		}
+		if (result.m_Options.m_IdleTimeoutSpecified && !result.m_Options.m_SessionId)
+		{
+			result.m_Error = "Option '--idle-timeout' requires '--session'.";
 			return result;
 		}
 		if (result.m_Options.m_Hidden && result.m_Options.m_StartWithRelativeMouse)
@@ -429,7 +510,8 @@ namespace gglab
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
 				result.m_Options.m_AdapterSelector || result.m_Options.m_Hidden ||
 				result.m_Options.m_WindowSizeSpecified ||
-				result.m_Options.m_FixedDeltaTimeSeconds || result.m_Options.m_CaptureOnReady))
+				result.m_Options.m_FixedDeltaTimeSeconds || result.m_Options.m_CaptureOnReady ||
+				result.m_Options.m_SessionId))
 		{
 			result.m_Error =
 				"Option '--self-test' cannot be combined with interactive startup options.";
@@ -486,6 +568,11 @@ namespace gglab
 			"  --capture-settle-frames <n>     Ready frames before the capture (default: 8).\n"
 			"  --capture-label <text>          Label recorded in the capture metadata.\n"
 			"  --capture-timeout <seconds>     Limit from the first frame (default: 120).\n"
+			"  --session <id>                  Serve the session control protocol on\n"
+			"                                  \\.\\pipe\\gglab-session-<id> ([A-Za-z0-9_-]).\n"
+			"  --idle-timeout <seconds>        Exit a session after this long without a\n"
+			"                                  control request (default: 900).\n"
+			"  --output-log <absolute-file>    Write stdout and stderr to this file.\n"
 			"  --self-test <suite-id|all>      Run one or all headless self-test suites.\n"
 			"                                  Available: artifact-cache, asset-data,\n"
 			"                                  publication-accounting, rendering-contracts,\n"

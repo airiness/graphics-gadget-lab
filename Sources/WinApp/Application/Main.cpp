@@ -88,7 +88,15 @@ int main(int argc, char* argv[])
 		std::fputs(gglab::GetApplicationLaunchUsage().data(), stdout);
 		return EXIT_SUCCESS;
 	}
-	if (launchResult.m_Options.m_Hidden || launchResult.m_Options.m_CaptureOnReady)
+	if (!launchResult.m_Options.m_OutputLog.empty() &&
+		!gglab::win32::RedirectStandardOutputToFile(launchResult.m_Options.m_OutputLog))
+	{
+		std::fprintf(stderr, "Error: cannot write the output log '%ls'.\n",
+			launchResult.m_Options.m_OutputLog.c_str());
+		return EXIT_FAILURE;
+	}
+	if (launchResult.m_Options.m_Hidden || launchResult.m_Options.m_CaptureOnReady ||
+		launchResult.m_Options.m_SessionId)
 	{
 		gglab::win32::ConfigureUnattendedFailureReporting();
 	}
@@ -176,6 +184,8 @@ int main(int argc, char* argv[])
 	createInfo.m_HostServices.m_TaskWorkerLifecycle =
 		std::make_shared<gglab::win32::Win32TaskWorkerLifecycle>();
 	createInfo.m_Hidden = launchResult.m_Options.m_Hidden;
+	createInfo.m_SessionId = launchResult.m_Options.m_SessionId.value_or(std::string{});
+	createInfo.m_IdleTimeoutSeconds = launchResult.m_Options.m_IdleTimeoutSeconds;
 	createInfo.m_CaptureOnReady = gglab::TranslateCaptureOnReadyOptions(launchResult.m_Options);
 	if (launchResult.m_Options.m_CaptureOnReady)
 	{

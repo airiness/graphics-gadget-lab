@@ -1,6 +1,7 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ApplicationHostConfigurationSelfTests.h"
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
+#include "Application/SelfTest/ApplicationControlSelfTests.h"
 #include "Application/SelfTest/ApplicationInputSelfTests.h"
 #include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
@@ -51,6 +52,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-devtools-view-profile",
 				.m_Run = &RunDevToolsViewProfileSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-control",
+				.m_Run = &RunApplicationControlSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-launch-options",
