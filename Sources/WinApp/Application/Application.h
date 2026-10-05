@@ -29,6 +29,7 @@ namespace gglab
 	class LabRuntime;
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	class DevelopmentShaderHotReloadSystem;
+#endif
 	struct ApplicationControlRequest;
 
 	namespace win32
@@ -36,7 +37,6 @@ namespace gglab
 		class NamedPipeRequest;
 		class NamedPipeServer;
 	}
-#endif
 	struct PlatformEvent;
 	class Application
 	{
