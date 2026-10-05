@@ -8,6 +8,7 @@
 #include "Application/RenderingStartup.h"
 #endif
 #include "Application/SelfTest/SelfTestRunner.h"
+#include "AppRuntimeLog.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -174,6 +175,7 @@ int main(int argc, char* argv[])
 #endif
 	}
 
+	gglab::win32::LogConsoleControlEvents();
 	gglab::Application::CreateInfo createInfo{};
 	createInfo.m_WindowName = L"GraphicsGadgetLab";
 	createInfo.m_PlatformHost = std::make_unique<gglab::Win32PlatformHost>(hInstance);
@@ -201,5 +203,8 @@ int main(int argc, char* argv[])
 	const int exitCode = application.GetExitCode();
 	application.Shutdown();
 
+	// A log that ends without this line means the process was terminated from
+	// outside instead of returning from main.
+	GGLAB_LOG_INFO_ALWAYS("GraphicsGadgetLab exits normally with code {}.", exitCode);
 	return exitCode == 0 ? EXIT_SUCCESS : exitCode;
 }

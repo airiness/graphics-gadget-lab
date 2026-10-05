@@ -1,5 +1,6 @@
 #include "Application/Platform/Windows/Win32Window.h"
 #include "Application/Platform/Windows/Win32MessageHandler.h"
+#include "AppRuntimeLog.h"
 
 #include <algorithm>
 #include <limits>
@@ -187,7 +188,20 @@ namespace gglab
 
 		switch (message)
 		{
+		// Lifetime messages are logged: they end the process with exit code 0.
+		case WM_CLOSE:
+			GGLAB_LOG_INFO_ALWAYS("Main window received WM_CLOSE.");
+			break;
+
+		case WM_QUERYENDSESSION:
+		case WM_ENDSESSION:
+			GGLAB_LOG_INFO_ALWAYS("Main window received {} (wParam={}, lParam=0x{:X}).",
+				message == WM_ENDSESSION ? "WM_ENDSESSION" : "WM_QUERYENDSESSION",
+				static_cast<uint64_t>(wParam), static_cast<uint64_t>(lParam));
+			break;
+
 		case WM_DESTROY:
+			GGLAB_LOG_INFO_ALWAYS("Main window destroyed; the message loop will quit.");
 			PostQuitMessage(0);
 			windowMessageHandled = true;
 			break;

@@ -381,6 +381,11 @@ namespace gglab
 			m_LifecycleState = LifecycleState::Failed;
 			return false;
 		}
+		if (tickResult == AppRuntimeTickResult::Exit)
+		{
+			GGLAB_LOG_INFO_ALWAYS("The app runtime ended its run (lifecycle state {}).",
+				static_cast<uint32_t>(m_AppRuntime->GetLifecycleState()));
+		}
 		return tickResult == AppRuntimeTickResult::Continue;
 	}
 
