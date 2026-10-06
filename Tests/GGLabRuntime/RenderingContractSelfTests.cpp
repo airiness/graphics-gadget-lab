@@ -1039,6 +1039,10 @@ namespace gglab
 				GGLAB_ASSERT(!m_IsRendering);
 				++m_CopyBufferCount;
 			}
+			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override
+			{
+				GGLAB_ASSERT(!m_IsRendering);
+			}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
@@ -1108,6 +1112,7 @@ namespace gglab
 				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
 			}
+			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
@@ -1147,6 +1152,7 @@ namespace gglab
 				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
 			}
+			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
 			void Begin() noexcept override {}
 			RHIFencePoint Submit(bool) noexcept override
 			{

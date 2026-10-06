@@ -100,6 +100,8 @@ namespace gglab
 		[[nodiscard]] VkFormat GetVkFormat() const noexcept { return m_VkFormat; }
 		[[nodiscard]] VkPresentModeKHR GetPresentMode() const noexcept { return m_PresentMode; }
 		[[nodiscard]] bool GetVsync() const noexcept { return m_Vsync; }
+		// True when the images were created with transfer-source usage.
+		[[nodiscard]] bool SupportsCopySource() const noexcept { return m_SupportsCopySource; }
 		[[nodiscard]] const VulkanSwapchainImage& GetImage(uint32_t index) const noexcept;
 		[[nodiscard]] VkImageView GetImageView(uint32_t index) const noexcept
 		{
@@ -125,6 +127,7 @@ namespace gglab
 		VkFormat m_VkFormat = VK_FORMAT_UNDEFINED;
 		VkPresentModeKHR m_PresentMode = VK_PRESENT_MODE_FIFO_KHR;
 		bool m_Vsync = false;
+		bool m_SupportsCopySource = false;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		uint32_t m_MinImageCount = 0;

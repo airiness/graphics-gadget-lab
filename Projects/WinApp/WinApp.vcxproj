@@ -164,11 +164,14 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.cpp" />
@@ -184,6 +187,10 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32UnattendedProcess.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.cpp" />
@@ -207,6 +214,7 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\EntityPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DemoPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\FrameCapturePanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
@@ -272,11 +280,14 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.h" />
@@ -292,6 +303,10 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32MessageHandler.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32UnattendedProcess.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextGraphics.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextLab.h" />
@@ -320,6 +335,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\EntityPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DemoPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\FrameCapturePanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiPanel.h" />

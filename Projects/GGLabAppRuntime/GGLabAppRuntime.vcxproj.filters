@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Capture">
+      <UniqueIdentifier>{C0A28B94-942D-7B8A-9B2C-3A6A703E94DE}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Demo">
       <UniqueIdentifier>{D743B9F7-27D2-6396-D43D-2810D1C81323}</UniqueIdentifier>
     </Filter>
@@ -15,6 +18,12 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.cpp">
       <Filter>Demo</Filter>
     </ClCompile>
@@ -54,6 +63,18 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureImageEncoder.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureReadiness.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h">
       <Filter>Demo</Filter>
     </ClInclude>

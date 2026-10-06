@@ -3,6 +3,7 @@
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
+#include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "Demo/DemoBase.h"
@@ -13,6 +14,10 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/IBLBakeTypes.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
@@ -25,10 +30,14 @@
 #include "Lab/LabRuntime.h"
 #include "LoadingProgress.h"
 
+#include <array>
 #include <format>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
@@ -82,6 +91,131 @@ namespace gglab
 			}
 			return "unknown";
 		}
+
+		struct CaptureFrameInputs
+		{
+			const DemoManager& m_DemoManager;
+			const DemoBase& m_Demo;
+			const EnvironmentAssetController& m_EnvironmentAssetController;
+			const RenderServices& m_RenderServices;
+			const Time& m_Time;
+			const ShaderPreloadStatus& m_ShaderPreload;
+			const CameraRig::CameraSlot& m_DisplayCameraSlot;
+			std::span<const CameraReferenceView> m_ReferenceViews;
+			RenderViewID m_DisplayViewId = RenderViewID::Main;
+			uint64_t m_TemporalSessionIdentity = 0;
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			AppRuntimeRHIBackend m_Backend = AppRuntimeRHIBackend::Unknown;
+			bool m_DevelopmentTools = false;
+		};
+
+		// Runtime-owned readiness gates first, then the content-owned ones.
+		[[nodiscard]] FrameCaptureReadiness BuildCaptureReadiness(
+			const CaptureFrameInputs& inputs) noexcept
+		{
+			FrameCaptureReadiness readiness;
+			const ShaderPreloadStatus& shaders = inputs.m_ShaderPreload;
+			readiness.Add("shaders",
+				shaders.IsReady() ? FrameCaptureGateState::Ready
+				: shaders.HasFailed() ? FrameCaptureGateState::Failed
+				: FrameCaptureGateState::Pending,
+				shaders.HasFailed() ? shaders.m_Error
+				: shaders.IsReady() ? std::string{}
+				: std::format("{} of {} shaders preloaded.", shaders.m_CompletedCount,
+					shaders.m_TotalCount));
+
+			if (inputs.m_DemoManager.HasPendingActiveDemo())
+			{
+				const std::optional<LoadingProgress> progress =
+					inputs.m_DemoManager.GetLoadingProgress();
+				readiness.Add("content-transition", FrameCaptureGateState::Pending,
+					progress ? progress->m_Title : std::string("Switching Demos."));
+			}
+			else
+			{
+				readiness.Add("content-transition", FrameCaptureGateState::Ready);
+			}
+			inputs.m_Demo.AppendCaptureReadiness(readiness);
+
+			const bool environmentPending =
+				inputs.m_EnvironmentAssetController.GetPendingEnvironmentIndex() !=
+				EnvironmentAssetController::InvalidEntryIndex;
+			readiness.Add("environment",
+				environmentPending ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
+				environmentPending ? "Loading the selected environment." : "");
+
+			// The published IBL generation matches the latest request once the
+			// requested environment lighting is fully baked or cache-restored.
+			const IBLBakeStatus& bake = inputs.m_RenderServices.m_Environment->GetBakingStatus();
+			const bool iblPending = bake.m_RequestedGeneration != bake.m_ActiveGeneration;
+			readiness.Add("ibl",
+				iblPending ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
+				iblPending ? std::format("Baking {} ({:.0f}%).", GetIBLBakeStageName(bake.m_Stage),
+					bake.m_Progress * 100.0f)
+				: std::string{});
+
+			const AssetUploadStatistics uploads =
+				inputs.m_RenderServices.m_AssetUpload->GetStatistics();
+			const uint32_t pendingUploads = uploads.m_PendingCount +
+				uploads.m_CpuPayloadQueue.m_PendingCount +
+				uploads.m_ResourcePublicationQueue.m_PendingCount +
+				uploads.m_UploadRecordingQueue.m_PendingCount +
+				uploads.m_GpuFinalizeQueue.m_PendingCount;
+			readiness.Add("asset-uploads",
+				pendingUploads > 0 ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
+				pendingUploads > 0 ? std::format("{} uploads pending.", pendingUploads)
+				: std::string{});
+			return readiness;
+		}
+
+		[[nodiscard]] FrameCaptureFrameState BuildCaptureFrameState(
+			const CaptureFrameInputs& inputs) noexcept
+		{
+			const Camera& camera = *inputs.m_DisplayCameraSlot.m_Camera;
+			const auto toArray = [](const Vector3& value) noexcept
+				{
+					return std::array<float, 3>{ value.m_X, value.m_Y, value.m_Z };
+				};
+			const uint32_t demoIndex = inputs.m_DemoManager.GetActiveIndex();
+			std::vector<std::string> referenceViewIds;
+			referenceViewIds.reserve(inputs.m_ReferenceViews.size());
+			for (const CameraReferenceView& view : inputs.m_ReferenceViews)
+			{
+				referenceViewIds.push_back(view.m_Id);
+			}
+			return FrameCaptureFrameState{
+				.m_Backend = std::string(GetBackendName(inputs.m_Backend)),
+				// The bootstrap loading Demo has no registered index.
+				.m_DemoId = std::string(demoIndex < inputs.m_DemoManager.GetDemoCount()
+					? inputs.m_DemoManager.GetDemoName(demoIndex)
+					: inputs.m_Demo.GetName()),
+				.m_LabId = inputs.m_Demo.GetCaptureContentId(),
+				.m_Readiness = BuildCaptureReadiness(inputs),
+				.m_SettleKey = {
+					.m_TemporalSession = inputs.m_TemporalSessionIdentity,
+					.m_CameraResetSerial = camera.GetTemporalResetSerial(),
+					.m_DisplayView = static_cast<uint32_t>(inputs.m_DisplayViewId),
+					.m_Width = inputs.m_Width,
+					.m_Height = inputs.m_Height,
+					.m_DemoIndex = demoIndex,
+				},
+				.m_FrameIndex = inputs.m_Time.GetFrameCount(),
+				.m_Camera = {
+					.m_Name = inputs.m_DisplayCameraSlot.m_Name,
+					.m_Position = toArray(camera.GetPosition()),
+					.m_Forward = toArray(camera.GetForward()),
+					.m_Up = toArray(camera.GetUp()),
+					.m_VerticalFovDegrees = camera.GetFov(),
+					.m_NearPlane = camera.GetNear(),
+					.m_FarPlane = camera.GetFar(),
+				},
+				.m_ReferenceViewIds = std::move(referenceViewIds),
+				.m_FixedDeltaTime = inputs.m_Time.GetFixedDeltaTime(),
+				.m_TotalTime = inputs.m_Time.GetTotalTime(),
+				.m_DevelopmentTools = inputs.m_DevelopmentTools,
+			};
+		}
 	}
 
 	AppRuntimeTickResult GGLabAppRuntime::FailRuntime(std::string_view failure) noexcept
@@ -120,6 +254,7 @@ namespace gglab
 			.m_MaxMilliseconds = 1.0,
 			});
 		m_AssetManager->DrainLoadCompletions();
+		m_FrameCapture->Update();
 
 		if (m_Input->IsKeyPressed(AppInputKey::T))
 		{
@@ -130,6 +265,7 @@ namespace gglab
 
 		if (m_Input->IsKeyPressed(AppInputKey::Escape))
 		{
+			GGLAB_LOG_INFO_ALWAYS("Exit requested by the Escape key.");
 			m_LifecycleState = AppRuntimeLifecycleState::ExitRequested;
 			return AppRuntimeTickResult::Exit;
 		}
@@ -200,6 +336,14 @@ namespace gglab
 				effectiveViewRenderProfile);
 		}
 		CameraRig& cameraRig = demo->GetCameraRig();
+		// A capture's reference view is restored before the frame is planned, so
+		// this frame already renders it.
+		if (const std::optional<FrameCaptureViewChange> viewChange =
+			m_FrameCapture->GetPendingViewChange())
+		{
+			m_FrameCapture->OnReferenceViewApplied(viewChange->m_RequestId,
+				cameraRig.RestoreReferenceView(viewChange->m_ReferenceViewId));
+		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
 		GGLAB_ASSERT_MSG(effectiveDisplayView.IsValid(),
@@ -241,6 +385,23 @@ namespace gglab
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
+		// Captures due this frame are issued before its graph binds capture taps.
+		m_FrameCapture->BeginFrame(BuildCaptureFrameState({
+			.m_DemoManager = *m_DemoManager,
+			.m_Demo = *demo,
+			.m_EnvironmentAssetController = *m_EnvironmentAssetController,
+			.m_RenderServices = m_RenderServices,
+			.m_Time = *m_Time,
+			.m_ShaderPreload = shaderPreload,
+			.m_DisplayCameraSlot = *displayCameraSlot,
+			.m_ReferenceViews = cameraRig.GetReferenceViews(),
+			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
+			.m_TemporalSessionIdentity = temporalSessionIdentity,
+			.m_Width = m_WindowWidth,
+			.m_Height = m_WindowHeight,
+			.m_Backend = m_Config.m_RhiBackend,
+			.m_DevelopmentTools = applicationTooling != nullptr,
+			}));
 		RenderFrameBuildResult frame;
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
@@ -373,6 +534,7 @@ namespace gglab
 			toolingFrame.Abort();
 			return FailRuntime("The render host failed to complete frame submission.");
 		}
+		m_FrameCapture->OnFrameSubmitted();
 
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,

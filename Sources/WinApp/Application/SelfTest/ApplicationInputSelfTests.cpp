@@ -27,6 +27,7 @@ namespace gglab
 		}
 		context.Check(mappingTableIsUnique && MapWindowsVirtualKey('W') == AppInputKey::W &&
 			MapWindowsVirtualKey(0x1b) == AppInputKey::Escape &&
+			MapWindowsVirtualKey(0x78) == AppInputKey::F9 &&
 			MapWindowsVirtualKey(0xffff) == AppInputKey::Count,
 			"Windows virtual keys map explicitly and uniquely to the neutral key contract");
 

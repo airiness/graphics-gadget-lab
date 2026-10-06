@@ -5,6 +5,9 @@
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
+
+#include <optional>
 
 namespace gglab
 {
@@ -390,6 +393,42 @@ namespace gglab
 		vkCmdCopyBuffer2(m_CommandBuffer, &copyInfo);
 		TrackBufferUse(destination);
 		TrackBufferUse(source);
+	}
+
+	void VulkanGraphicsCommandContext::CopyTextureToBuffer(
+		const RHITextureToBufferCopy& copy) noexcept
+	{
+		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
+		{
+			Reject("CopyTextureToBuffer", m_IsRendering ? "copies are invalid inside rendering"
+				: "no command buffer is active");
+			return;
+		}
+		VulkanResourceManager& resources = m_Device->GetResourceManager();
+		VulkanTexture* sourceTexture = resources.ResolveTexture(copy.m_Source);
+		VulkanBuffer* destinationBuffer = resources.ResolveBuffer(copy.m_Destination);
+		const RHITextureDesc* sourceDesc = resources.ResolveTextureDesc(copy.m_Source);
+		const RHIBufferDesc* destinationDesc = resources.ResolveBufferDesc(copy.m_Destination);
+		const std::optional<VkBufferImageCopy2> region =
+			sourceTexture && destinationBuffer && sourceDesc && destinationDesc
+			? BuildVulkanTextureToBufferCopyRegion(*sourceDesc, *destinationDesc, copy)
+			: std::nullopt;
+		if (!region)
+		{
+			Reject("CopyTextureToBuffer", "a texture, buffer, usage or footprint is invalid");
+			return;
+		}
+		const VkCopyImageToBufferInfo2 copyInfo{
+			.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+			.srcImage = sourceTexture->Get(),
+			.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.dstBuffer = destinationBuffer->Get(),
+			.regionCount = 1,
+			.pRegions = &*region,
+		};
+		vkCmdCopyImageToBuffer2(m_CommandBuffer, &copyInfo);
+		TrackTextureUse(copy.m_Source);
+		TrackBufferUse(copy.m_Destination);
 	}
 
 	void VulkanGraphicsCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
@@ -961,6 +1000,12 @@ namespace gglab
 	{
 		m_GraphicsContext->CopyBuffer(
 			destination, destinationOffset, source, sourceOffset, sizeInBytes);
+	}
+
+	void VulkanComputeCommandContext::CopyTextureToBuffer(
+		const RHITextureToBufferCopy& copy) noexcept
+	{
+		m_GraphicsContext->CopyTextureToBuffer(copy);
 	}
 
 	void VulkanComputeCommandContext::BeginGpuProfileScope(std::string_view name) noexcept

@@ -170,7 +170,8 @@ Select checks according to the change:
   `GraphicsGadgetLab.exe --rhi <dx12|vulkan> --lab <stable-lab-id>`.
   Exercise both backends for shared rendering changes; inspect assertions,
   validation output, shader failures, lifetime/synchronization errors and the
-  visual result. Qualification's `--self-test` checks headless contracts;
+  visual result. Capture visual results with the hidden workflows in
+  `Docs/FrameCapture.md`. Qualification's `--self-test` checks headless contracts;
   `GGLabVulkanQualification.exe [--adapter <index|identity-prefix>]` performs
   hardware qualification. Headless tests do not establish GPU presentation or
   visual correctness.

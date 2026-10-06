@@ -198,8 +198,7 @@ namespace gglab
 			DX12ResourceManager::ImportedTextureDesc importDesc{};
 			importDesc.m_RHI.m_Desc.m_Dimension = RHITextureDimension::Texture2D;
 			importDesc.m_RHI.m_Desc.m_Format = ToRHIFormat(nativeDesc.Format);
-			importDesc.m_RHI.m_Desc.m_Usage =
-				RHITextureUsage::RenderTarget | RHITextureUsage::Present;
+			importDesc.m_RHI.m_Desc.m_Usage = BackBufferUsage;
 			importDesc.m_RHI.m_Desc.m_Extent = {
 				.m_Width = static_cast<uint32_t>(nativeDesc.Width),
 				.m_Height = nativeDesc.Height,

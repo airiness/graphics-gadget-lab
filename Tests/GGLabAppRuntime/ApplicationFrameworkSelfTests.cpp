@@ -85,6 +85,10 @@ namespace gglab
 			{
 				return nullptr;
 			}
+			[[nodiscard]] FrameCaptureControlBase* GetFrameCaptureControl() const noexcept override
+			{
+				return nullptr;
+			}
 
 		private:
 			void AbortFrame(uint64_t) noexcept override {}

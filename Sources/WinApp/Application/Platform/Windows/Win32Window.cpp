@@ -2,6 +2,7 @@
 #include "Application/Platform/Windows/Win32MessageHandler.h"
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace gglab
@@ -55,6 +56,7 @@ namespace gglab
 		const std::wstring windowTitle(createInfo.m_Title);
 		m_Width = createInfo.m_Width;
 		m_Height = createInfo.m_Height;
+		m_Hidden = createInfo.m_Hidden;
 
 		WNDCLASSEXW windowClass{};
 		windowClass.cbSize = sizeof(windowClass);
@@ -101,7 +103,22 @@ namespace gglab
 			return false;
 		}
 
-		ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
+		if (!m_Hidden)
+		{
+			ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
+			return true;
+		}
+
+		// The creation-time size is clamped to the desktop before this window
+		// receives messages. Resize again so WM_GETMINMAXINFO lifts the limit, then
+		// report the actual client size without ever showing or activating it.
+		SetWindowPos(m_Hwnd, nullptr, 0, 0, windowRect.right - windowRect.left,
+			windowRect.bottom - windowRect.top,
+			SWP_NOMOVE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
+		RECT clientRect{};
+		GetClientRect(m_Hwnd, &clientRect);
+		m_Width = static_cast<uint32_t>(clientRect.right - clientRect.left);
+		m_Height = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
 		return true;
 	}
 
@@ -183,6 +200,17 @@ namespace gglab
 			windowMessageHandled = true;
 			break;
 		}
+
+		case WM_GETMINMAXINFO:
+			if (m_Hidden)
+			{
+				// A hidden window renders at its requested size, not the desktop's.
+				auto* minMaxInfo = reinterpret_cast<MINMAXINFO*>(lParam);
+				minMaxInfo->ptMaxTrackSize.x = std::numeric_limits<LONG>::max();
+				minMaxInfo->ptMaxTrackSize.y = std::numeric_limits<LONG>::max();
+				windowMessageHandled = true;
+			}
+			break;
 
 		case WM_ACTIVATEAPP:
 			PushEvent(wParam ? PlatformEventType::Activated : PlatformEventType::Deactivated);

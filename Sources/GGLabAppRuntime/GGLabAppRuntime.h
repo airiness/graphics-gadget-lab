@@ -91,6 +91,7 @@ namespace gglab
 	class DiagnosticsSession;
 	class DiagnosticsView;
 	class EnvironmentAssetController;
+	class FrameCaptureCoordinator;
 	class LabRuntimeLocatorBase;
 	class RenderCompositionAccess;
 	class RenderHost;
@@ -202,6 +203,12 @@ namespace gglab
 		{
 			return m_DebugDrawService.get();
 		}
+		// Non-owning; null before runtime services are composed. It outlives
+		// Shutdown so hosts can drain the final capture results.
+		[[nodiscard]] FrameCaptureCoordinator* GetFrameCaptureCoordinator() const noexcept
+		{
+			return m_FrameCapture.get();
+		}
 		// Non-owning; null unless optional diagnostics were composed with runtime services.
 		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
 		[[nodiscard]] DiagnosticsControl* GetDiagnosticsControl() const noexcept;
@@ -236,6 +243,7 @@ namespace gglab
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<DebugDrawService> m_DebugDrawService;
 		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
+		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		uint32_t m_WindowWidth = 0;

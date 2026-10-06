@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
+#include <optional>
 
 namespace gglab
 {
@@ -349,6 +350,41 @@ namespace gglab
 		vkCmdCopyBuffer2(m_ExecutingInfo->m_CommandBuffer, &copyInfo);
 		RecordBufferUse(dst);
 		RecordBufferUse(src);
+	}
+
+	void VulkanTransferContext::CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept
+	{
+		if (!CheckRecording("VulkanTransferContext::CopyTextureToBuffer"))
+		{
+			return;
+		}
+		VulkanResourceManager& resources = m_Device->GetResourceManager();
+		VulkanTexture* sourceTexture = resources.ResolveTexture(copy.m_Source);
+		VulkanBuffer* destinationBuffer = resources.ResolveBuffer(copy.m_Destination);
+		const RHITextureDesc* sourceDesc = resources.ResolveTextureDesc(copy.m_Source);
+		const RHIBufferDesc* destinationDesc = resources.ResolveBufferDesc(copy.m_Destination);
+		const std::optional<VkBufferImageCopy2> region =
+			sourceTexture && destinationBuffer && sourceDesc && destinationDesc
+			? BuildVulkanTextureToBufferCopyRegion(*sourceDesc, *destinationDesc, copy)
+			: std::nullopt;
+		if (!region)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("VulkanTransferContext::CopyTextureToBuffer rejected invalid "
+				"resources, usage or footprint.");
+			m_RecordingFailed = true;
+			return;
+		}
+		const VkCopyImageToBufferInfo2 copyInfo{
+			.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+			.srcImage = sourceTexture->Get(),
+			.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.dstBuffer = destinationBuffer->Get(),
+			.regionCount = 1,
+			.pRegions = &*region,
+		};
+		vkCmdCopyImageToBuffer2(m_ExecutingInfo->m_CommandBuffer, &copyInfo);
+		RecordTextureUse(copy.m_Source);
+		RecordBufferUse(copy.m_Destination);
 	}
 
 	RHIBufferOwner VulkanTransferContext::CreateStagingBuffer(uint64_t sizeInBytes,

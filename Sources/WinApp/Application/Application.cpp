@@ -1,5 +1,9 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
+#include "Application/Capture/ApplicationFrameCapture.h"
+#include "Application/Control/ApplicationControlProtocol.h"
+#include "Application/Platform/Windows/Win32NamedPipeServer.h"
+#include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabAppRuntime.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
@@ -17,8 +21,19 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Lab/LabRuntime.h"
 
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <filesystem>
+#include <format>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <thread>
 #include <utility>
+#include <vector>
+
+#include <windows.h>
 
 namespace gglab
 {
@@ -30,7 +45,12 @@ namespace gglab
 		m_RuntimeConfig(std::move(createInfo.m_RuntimeConfig)),
 		m_RuntimePaths(std::move(createInfo.m_RuntimePaths)),
 		m_HostServices(std::move(createInfo.m_HostServices)),
-		m_ContentRegistration(std::move(createInfo.m_ContentRegistration))
+		m_ContentRegistration(std::move(createInfo.m_ContentRegistration)),
+		m_CaptureOnReady(std::move(createInfo.m_CaptureOnReady)),
+		m_CaptureTimeout(createInfo.m_CaptureTimeoutSeconds),
+		m_SessionId(std::move(createInfo.m_SessionId)),
+		m_IdleTimeout(createInfo.m_IdleTimeoutSeconds),
+		m_Hidden(createInfo.m_Hidden)
 	{
 	}
 
@@ -58,6 +78,7 @@ namespace gglab
 
 			if (m_PlatformHost->IsQuitRequested())
 			{
+				GGLAB_LOG_INFO_ALWAYS("Exit requested by closing the main window.");
 				break;
 			}
 			if (!Tick())
@@ -115,6 +136,7 @@ namespace gglab
 			.m_Title = m_WindowName,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
+			.m_Hidden = m_Hidden,
 		};
 		m_PlatformHostInitializationAttempted = true;
 		if (!m_PlatformHost->Initialize(windowCreateInfo))
@@ -124,6 +146,15 @@ namespace gglab
 		}
 
 		auto& mainWindow = m_PlatformHost->GetMainWindow();
+		if (m_Hidden &&
+			(mainWindow.GetWidth() != m_WindowWidth || mainWindow.GetHeight() != m_WindowHeight))
+		{
+			// A capture must never silently change resolution.
+			GGLAB_LOG_ERROR_ALWAYS(
+				"The hidden window client size {}x{} differs from the requested {}x{}.",
+				mainWindow.GetWidth(), mainWindow.GetHeight(), m_WindowWidth, m_WindowHeight);
+			return FailInitialization();
+		}
 		m_WindowWidth = mainWindow.GetWidth();
 		m_WindowHeight = mainWindow.GetHeight();
 
@@ -213,6 +244,11 @@ namespace gglab
 			m_LabRuntimeLocator =
 				std::make_unique<DemoLabRuntimeLocator>(demoManager, *labHostIndex);
 		}
+		if (FrameCaptureCoordinator* frameCapture = m_AppRuntime->GetFrameCaptureCoordinator())
+		{
+			m_FrameCapture = std::make_unique<ApplicationFrameCapture>(
+				*frameCapture, m_RuntimePaths.m_CaptureRoot);
+		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -237,6 +273,7 @@ namespace gglab
 				.m_RHIContext = renderHost->GetRHIContext(),
 				.m_DemoManager = demoManager,
 				.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
+				.m_FrameCapture = m_FrameCapture.get(),
 				.m_SettingsRoot = m_RuntimePaths.m_SettingsRoot,
 				});
 			if (!m_ApplicationTooling)
@@ -251,6 +288,22 @@ namespace gglab
 		else
 		{
 			GGLAB_LOG_INFO("Optional application tooling omitted by host composition.");
+		}
+
+		if (m_CaptureOnReady)
+		{
+			if (!m_FrameCapture)
+			{
+				GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready requires the frame capture service.");
+				return FailInitialization();
+			}
+			m_CaptureOnReadyRequestId = m_FrameCapture->Submit(std::move(*m_CaptureOnReady));
+			m_CaptureOnReady.reset();
+		}
+		m_StartTime = std::chrono::steady_clock::now();
+		if (!m_SessionId.empty() && !StartControlSession())
+		{
+			return FailInitialization();
 		}
 
 		m_LifecycleState = LifecycleState::Running;
@@ -270,17 +323,47 @@ namespace gglab
 			return true;
 		}
 
-		m_InputManager->Update();
+		if (m_Hidden)
+		{
+			PaceHiddenFrame();
+		}
+		// GameInput reports devices regardless of window focus. Reading it only
+		// while the main window is active keeps keys meant for another
+		// application, such as Escape, from reaching the runtime; deactivation
+		// already reset the published input state.
+		if (!m_Hidden && m_IsWindowActive)
+		{
+			m_InputManager->Update();
+		}
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		if (m_ShaderHotReload)
 		{
 			m_ShaderHotReload->Update();
 		}
 #endif
+		const ApplicationInput* input = m_AppRuntime->GetInput();
+		if (m_FrameCapture && m_IsWindowActive && input &&
+			!input->IsKeyboardCapturedByUI() && input->IsKeyPressed(AppInputKey::F9))
+		{
+			m_FrameCapture->Capture();
+		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 			});
+		if (m_FrameCapture)
+		{
+			ResolveControlCaptures(m_FrameCapture->Update());
+		}
+		if (m_ControlServer && !UpdateControlSession())
+		{
+			return false;
+		}
+		if (m_CaptureOnReadyRequestId != 0 && tickResult == AppRuntimeTickResult::Continue &&
+			!UpdateCaptureOnReady())
+		{
+			return false;
+		}
 		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
 			m_PlatformHost->WaitForEvents();
@@ -299,6 +382,247 @@ namespace gglab
 			return false;
 		}
 		return tickResult == AppRuntimeTickResult::Continue;
+	}
+
+	void Application::PaceHiddenFrame() noexcept
+	{
+		// Hidden frames present to no visible surface, so presentation does not
+		// throttle them; cap them at 60 frames per second.
+		constexpr std::chrono::microseconds frameInterval{ 16667 };
+		const auto now = std::chrono::steady_clock::now();
+		if (m_NextHiddenFrameTime > now)
+		{
+			std::this_thread::sleep_until(m_NextHiddenFrameTime);
+		}
+		m_NextHiddenFrameTime = std::max(m_NextHiddenFrameTime, now) + frameInterval;
+	}
+
+	bool Application::UpdateCaptureOnReady() noexcept
+	{
+		const auto now = std::chrono::steady_clock::now();
+		if (!m_CaptureDeadline)
+		{
+			m_CaptureDeadline =
+				now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_CaptureTimeout);
+		}
+
+		// Machine-readable outcome lines on stdout for unattended callers.
+		const auto printLine = [](std::string_view key, std::string_view value) noexcept
+			{
+				std::fprintf(stdout, "%.*s: %.*s\n", static_cast<int>(key.size()), key.data(),
+					static_cast<int>(value.size()), value.data());
+			};
+		const auto toUtf8 = [](const std::filesystem::path& path)
+			{
+				const std::u8string text = path.u8string();
+				return std::string(text.begin(), text.end());
+			};
+
+		if (const FrameCaptureRequestResult* result =
+			m_FrameCapture->FindResult(m_CaptureOnReadyRequestId))
+		{
+			if (result->m_Status == FrameCaptureRequestStatus::Completed)
+			{
+				printLine("capture-status", "completed");
+				printLine("capture-image", toUtf8(result->m_ImagePath));
+				printLine("capture-metadata", toUtf8(result->m_MetadataPath));
+				m_ExitCode = 0;
+			}
+			else
+			{
+				printLine("capture-status", result->m_Status == FrameCaptureRequestStatus::Cancelled
+					? "cancelled" : "failed");
+				printLine("capture-failure", result->m_Failure);
+				m_ExitCode = 2;
+			}
+			std::fflush(stdout);
+			m_CaptureOnReadyRequestId = 0;
+			return false;
+		}
+		if (now < *m_CaptureDeadline)
+		{
+			return true;
+		}
+
+		m_FrameCapture->Cancel(m_CaptureOnReadyRequestId);
+		printLine("capture-status", "timeout");
+		if (const FrameCaptureFrameState* frameState = m_FrameCapture->GetLastFrameState())
+		{
+			for (const FrameCaptureGate& gate : frameState->m_Readiness.m_Gates)
+			{
+				if (gate.m_State != FrameCaptureGateState::Ready)
+				{
+					printLine("capture-pending-gate", std::format("{} ({}): {}", gate.m_Name,
+						GetFrameCaptureGateStateName(gate.m_State), gate.m_Detail));
+				}
+			}
+			printLine("capture-settled-frames",
+				std::to_string(m_FrameCapture->GetSettledFrameCount()));
+		}
+		std::fflush(stdout);
+		GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready timed out after {} seconds.",
+			m_CaptureTimeout.count());
+		m_ExitCode = 3;
+		m_CaptureOnReadyRequestId = 0;
+		return false;
+	}
+
+	bool Application::StartControlSession() noexcept
+	{
+		std::wstring pipeName = L"\\\\.\\pipe\\gglab-session-";
+		pipeName.append(m_SessionId.begin(), m_SessionId.end());
+		m_ControlServer = std::make_unique<win32::NamedPipeServer>();
+		if (!m_ControlServer->Start(pipeName))
+		{
+			GGLAB_LOG_ERROR_ALWAYS("Session '{}' could not open its control pipe; the id may "
+				"already be in use.", m_SessionId);
+			m_ControlServer.reset();
+			return false;
+		}
+		m_LastControlActivity = std::chrono::steady_clock::now();
+		GGLAB_LOG_INFO_ALWAYS("Session '{}' accepts control requests (protocol {}).",
+			m_SessionId, ApplicationControlProtocolVersion);
+		std::fprintf(stdout, "session-ready: %s\n", m_SessionId.c_str());
+		std::fflush(stdout);
+		return true;
+	}
+
+	bool Application::UpdateControlSession() noexcept
+	{
+		const auto now = std::chrono::steady_clock::now();
+		for (const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest : m_ControlServer->Poll())
+		{
+			m_LastControlActivity = now;
+			const ApplicationControlParseResult parsed =
+				ParseApplicationControlRequest(pipeRequest->GetLine());
+			if (!parsed.m_Request)
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(parsed.m_Id, parsed.m_Error));
+				continue;
+			}
+			HandleControlRequest(pipeRequest, *parsed.m_Request);
+		}
+		if (m_StopRequested)
+		{
+			GGLAB_LOG_INFO_ALWAYS("Session '{}' is stopping on request.", m_SessionId);
+			return false;
+		}
+
+		// Only requests and finished captures count as activity. A capture that can
+		// never become due, such as one waiting for content that is not loaded,
+		// must not keep an abandoned session alive; shutdown still answers it.
+		if (now - m_LastControlActivity > m_IdleTimeout)
+		{
+			GGLAB_LOG_INFO_ALWAYS("Session '{}' exits after {} idle seconds.", m_SessionId,
+				m_IdleTimeout.count());
+			return false;
+		}
+		return true;
+	}
+
+	void Application::HandleControlRequest(
+		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
+		const ApplicationControlRequest& request) noexcept
+	{
+		switch (request.m_Command)
+		{
+		case ApplicationControlCommand::Status:
+			pipeRequest->Respond(SerializeApplicationControlStatus(request.m_Id, {
+				.m_SessionId = m_SessionId,
+				.m_ProcessId = static_cast<uint32_t>(::GetCurrentProcessId()),
+				.m_UptimeSeconds =
+					std::chrono::duration<double>(std::chrono::steady_clock::now() - m_StartTime)
+					.count(),
+				.m_Hidden = m_Hidden,
+				.m_Width = m_WindowWidth,
+				.m_Height = m_WindowHeight,
+				.m_UnfinishedCaptures =
+					m_FrameCapture ? m_FrameCapture->GetUnfinishedRequestCount() : 0,
+				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
+				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
+				}));
+			return;
+		case ApplicationControlCommand::Capture:
+		{
+			if (!m_FrameCapture)
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(
+					request.m_Id, "Frame capture is unavailable in this session."));
+				return;
+			}
+			const uint64_t captureRequestId = m_FrameCapture->Submit(request.m_Capture);
+			m_ControlCaptureIds.insert(captureRequestId);
+			if (request.m_Wait)
+			{
+				m_ControlCaptureWaits.push_back({
+					.m_PipeRequest = pipeRequest,
+					.m_ControlId = request.m_Id,
+					.m_CaptureRequestId = captureRequestId,
+					});
+			}
+			else
+			{
+				pipeRequest->Respond(
+					SerializeApplicationControlCaptureQueued(request.m_Id, captureRequestId));
+			}
+			return;
+		}
+		case ApplicationControlCommand::Result:
+		{
+			const auto finished = m_ControlCaptureResults.find(request.m_CaptureRequestId);
+			if (finished != m_ControlCaptureResults.end())
+			{
+				pipeRequest->Respond(
+					SerializeApplicationControlCaptureResult(request.m_Id, finished->second));
+			}
+			else if (m_ControlCaptureIds.contains(request.m_CaptureRequestId))
+			{
+				pipeRequest->Respond(SerializeApplicationControlCaptureQueued(
+					request.m_Id, request.m_CaptureRequestId));
+			}
+			else
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
+					std::format("Capture request {} is unknown to this session.",
+						request.m_CaptureRequestId)));
+			}
+			return;
+		}
+		case ApplicationControlCommand::Stop:
+			pipeRequest->Respond(SerializeApplicationControlStopping(request.m_Id));
+			m_StopRequested = true;
+			return;
+		}
+	}
+
+	void Application::ResolveControlCaptures(
+		std::span<const FrameCaptureRequestResult> results) noexcept
+	{
+		// Finished results stay queryable for a bounded number of captures.
+		constexpr size_t maxRetainedResults = 256;
+		for (const FrameCaptureRequestResult& result : results)
+		{
+			if (m_ControlCaptureIds.erase(result.m_RequestId) == 0)
+			{
+				continue;
+			}
+			m_LastControlActivity = std::chrono::steady_clock::now();
+			m_ControlCaptureResults[result.m_RequestId] = result;
+			if (m_ControlCaptureResults.size() > maxRetainedResults)
+			{
+				m_ControlCaptureResults.erase(m_ControlCaptureResults.begin());
+			}
+			std::erase_if(m_ControlCaptureWaits, [&](const ControlCaptureWait& wait)
+				{
+					if (wait.m_CaptureRequestId != result.m_RequestId)
+					{
+						return false;
+					}
+					wait.m_PipeRequest->Respond(
+						SerializeApplicationControlCaptureResult(wait.m_ControlId, result));
+					return true;
+				});
+		}
 	}
 
 	bool Application::FailInitialization() noexcept
@@ -335,7 +659,26 @@ namespace gglab
 			m_AppRuntime->Shutdown({
 				.m_ApplicationTooling = m_ApplicationTooling.get(),
 				});
+			// Shutdown finished every capture request; log and answer the final
+			// results before the coordinator is destroyed with the runtime.
+			if (m_FrameCapture)
+			{
+				ResolveControlCaptures(m_FrameCapture->Update());
+				m_FrameCapture.reset();
+			}
 			m_AppRuntime.reset();
+		}
+		if (m_ControlServer)
+		{
+			for (const ControlCaptureWait& wait : m_ControlCaptureWaits)
+			{
+				wait.m_PipeRequest->Respond(SerializeApplicationControlError(
+					wait.m_ControlId, "The session stopped before the capture finished."));
+			}
+			m_ControlCaptureWaits.clear();
+			m_ControlServer->Stop(SerializeApplicationControlError(
+				0, "The session stopped before the request was answered."));
+			m_ControlServer.reset();
 		}
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		m_ShaderHotReload.reset();
@@ -367,12 +710,14 @@ namespace gglab
 		switch (event.m_Type)
 		{
 		case PlatformEventType::Activated:
+			m_IsWindowActive = true;
 			if (m_InputManager)
 			{
 				m_InputManager->OnActive();
 			}
 			break;
 		case PlatformEventType::Deactivated:
+			m_IsWindowActive = false;
 			if (m_InputManager)
 			{
 				m_InputManager->OnInactive();

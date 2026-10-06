@@ -3,6 +3,7 @@
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
+#include "Capture/FrameCaptureCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
@@ -107,6 +108,7 @@ namespace gglab
 
 		m_Time = std::make_unique<Time>();
 		m_Time->Initialize();
+		m_Time->SetFixedDeltaTime(m_Config.m_FixedDeltaTimeSeconds);
 		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
 			.m_WorkerLifecycle = m_HostServices.m_TaskWorkerLifecycle,
 			});
@@ -153,6 +155,12 @@ namespace gglab
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
+		m_FrameCapture = std::make_unique<FrameCaptureCoordinator>(
+			FrameCaptureCoordinator::CreateInfo{
+				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
+				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
+				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
+			});
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
@@ -320,6 +328,12 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
+		// Captures that are not due yet are cancelled; recorded captures keep being
+		// written and are awaited after the render host finalized.
+		if (m_FrameCapture)
+		{
+			m_FrameCapture->PrepareForShutdown();
+		}
 		bool applicationToolingPrepared = false;
 		const auto prepareApplicationTooling = [&]() noexcept
 			{
@@ -380,6 +394,12 @@ namespace gglab
 		if (m_RenderHost)
 		{
 			m_RenderHost->Finalize();
+			// Finalize published every outstanding Runtime capture result; drain
+			// them while the render host still owns the capture control.
+			if (m_FrameCapture)
+			{
+				m_FrameCapture->FinalizeAfterRenderHost();
+			}
 			m_RenderHost.reset();
 		}
 		m_RenderComposition = nullptr;

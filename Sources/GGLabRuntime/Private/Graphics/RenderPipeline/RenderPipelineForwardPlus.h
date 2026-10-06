@@ -9,6 +9,7 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
 #include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
 #include "Graphics/RenderPass/RenderPassForwardTransparent.h"
+#include "Graphics/RenderPass/RenderPassFrameCapture.h"
 #include "Graphics/RenderPass/RenderPassGTAO.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
 #include "Graphics/RenderPass/RenderPassAerialPerspective.h"
@@ -135,6 +136,8 @@ namespace gglab
 		RenderPassIBL m_IBLPass;
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
+		RenderPassFrameCapture m_SceneCapturePass{ FrameCaptureSource::Scene };
+		RenderPassFrameCapture m_CompositedCapturePass{ FrameCaptureSource::Composited };
 		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
 		std::optional<FramePlan> m_FramePlan;
 

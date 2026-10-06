@@ -9,6 +9,7 @@
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/LoadingOverlay.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
+#include "DevTools/DevelopGui/Panels/FrameCapturePanel.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 
 #include <memory>
@@ -58,6 +59,12 @@ namespace gglab
 				{
 					runtime.GetRegistry().RegisterPanel(
 						std::make_unique<LabPanel>(createInfo.m_LabRuntimeLocator));
+				}
+				m_FrameCapture = createInfo.m_FrameCapture;
+				if (m_FrameCapture)
+				{
+					runtime.GetRegistry().RegisterPanel(
+						std::make_unique<FrameCapturePanel>(m_FrameCapture));
 				}
 				return true;
 			}
@@ -136,6 +143,10 @@ namespace gglab
 				{
 					DrawLoadingOverlay(*context.m_LoadingProgress);
 				}
+				if (m_FrameCapture)
+				{
+					DrawFrameCaptureNotification(*m_FrameCapture);
+				}
 			}
 
 			void EndFrame(ApplicationToolingFrameEndReason) noexcept override
@@ -151,6 +162,7 @@ namespace gglab
 		private:
 			DemoManager* m_DemoManager = nullptr;
 			LabRuntimeLocatorBase* m_LabRuntimeLocator = nullptr;
+			ApplicationFrameCapture* m_FrameCapture = nullptr;
 			std::unique_ptr<DX12ResourceLifecycleToolsBase> m_ResourceLifecycleTools;
 			DevelopGuiSystem m_System;
 		};

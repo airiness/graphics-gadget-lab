@@ -1,9 +1,11 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ApplicationHostConfigurationSelfTests.h"
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
+#include "Application/SelfTest/ApplicationControlSelfTests.h"
 #include "Application/SelfTest/ApplicationInputSelfTests.h"
 #include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
+#include "Application/SelfTest/FrameCaptureImageEncoderSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -51,6 +53,14 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-devtools-view-profile",
 				.m_Run = &RunDevToolsViewProfileSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-control",
+				.m_Run = &RunApplicationControlSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-frame-capture-encoder",
+				.m_Run = &RunFrameCaptureImageEncoderSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-launch-options",

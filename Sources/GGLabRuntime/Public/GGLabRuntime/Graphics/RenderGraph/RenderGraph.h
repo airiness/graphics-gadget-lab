@@ -47,6 +47,9 @@ namespace gglab
 		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
 		RHIDescriptorHandle GetViewDescriptor(RGTextureViewId viewId) const noexcept;
 		RHIBufferHandle GetBufferHandle(RGBufferId bufferId) const noexcept;
+		// Resolves the texture of a declared access for copy commands; shader
+		// access goes through views.
+		RHITextureHandle GetTextureHandle(RGTextureId textureId) const noexcept;
 		RHIGraphicsCommandContext* GetGraphicsCommandContext() const noexcept;
 		RHIComputeCommandContext* GetDirectComputeCommandContext() const noexcept;
 		RHIComputeCommandContext* GetAsyncComputeCommandContext() const noexcept;

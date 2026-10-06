@@ -144,6 +144,55 @@ namespace gglab
 		}
 	};
 
+	// Backend-neutral placed layout for copying one 2D color subresource into a
+	// buffer. The alignments satisfy the D3D12 placed-footprint rules; Vulkan
+	// accepts the same layout because the texel size must divide the row pitch.
+	inline constexpr uint64_t RHITextureCopyRowPitchAlignment = 256;
+	inline constexpr uint64_t RHITextureCopyPlacementAlignment = 512;
+
+	struct RHITextureCopyFootprint
+	{
+		RHIFormat m_Format = RHIFormat::Unknown;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		uint32_t m_BytesPerTexel = 0;
+		uint64_t m_RowSizeInBytes = 0;
+		uint64_t m_RowPitch = 0;
+		uint64_t m_SizeInBytes = 0;
+
+		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_SizeInBytes != 0; }
+	};
+
+	// Returns an invalid footprint for an empty extent or for formats without a
+	// single-plane, uncompressed color texel whose size divides the row pitch
+	// alignment (block-compressed, depth/stencil, typeless and 96-bit formats).
+	[[nodiscard]] constexpr RHITextureCopyFootprint ComputeRHITextureCopyFootprint(
+		RHIFormat format, uint32_t width, uint32_t height) noexcept
+	{
+		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(format);
+		const uint32_t bytesPerTexel = formatInfo.m_BytesPerBlock;
+		if (width == 0 || height == 0 || formatInfo.m_IsTypeless ||
+			formatInfo.m_Aspects != RHITextureAspect::Color || formatInfo.m_PlaneCount != 1 ||
+			formatInfo.m_BlockWidth != 1 || formatInfo.m_BlockHeight != 1 || bytesPerTexel == 0 ||
+			RHITextureCopyRowPitchAlignment % bytesPerTexel != 0)
+		{
+			return {};
+		}
+
+		const uint64_t rowSizeInBytes = static_cast<uint64_t>(width) * bytesPerTexel;
+		const uint64_t rowPitch = (rowSizeInBytes + RHITextureCopyRowPitchAlignment - 1) /
+			RHITextureCopyRowPitchAlignment * RHITextureCopyRowPitchAlignment;
+		return RHITextureCopyFootprint{
+			.m_Format = format,
+			.m_Width = width,
+			.m_Height = height,
+			.m_BytesPerTexel = bytesPerTexel,
+			.m_RowSizeInBytes = rowSizeInBytes,
+			.m_RowPitch = rowPitch,
+			.m_SizeInBytes = rowPitch * height,
+		};
+	}
+
 	struct RHITextureViewDesc
 	{
 		RHITextureViewType m_Type = RHITextureViewType::ShaderResource;

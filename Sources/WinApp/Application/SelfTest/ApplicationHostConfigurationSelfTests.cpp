@@ -4,6 +4,7 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 
 #include <filesystem>
+#include <optional>
 
 namespace gglab
 {
@@ -42,6 +43,36 @@ namespace gglab
 			defaultContentConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute,
 			"Windows host policy supplies stable default content and an absolute pointer for UI interaction");
 
+		ApplicationLaunchOptions hiddenOptions = options;
+		hiddenOptions.m_StartWithRelativeMouse = false;
+		hiddenOptions.m_Hidden = true;
+		ApplicationLaunchOptions explicitStepOptions = hiddenOptions;
+		explicitStepOptions.m_FixedDeltaTimeSeconds = 0.05;
+		context.Check(!defaultContentConfig.m_FixedDeltaTimeSeconds &&
+			TranslateApplicationLaunchOptions(hiddenOptions, { 1920, 1080 }, true)
+			.m_FixedDeltaTimeSeconds == HiddenLaunchFixedDeltaTimeSeconds &&
+			TranslateApplicationLaunchOptions(explicitStepOptions, { 1920, 1080 }, true)
+			.m_FixedDeltaTimeSeconds == 0.05,
+			"Hidden launches default to a fixed time step that an explicit step overrides");
+
+		ApplicationLaunchOptions captureOptions = options;
+		captureOptions.m_CaptureOnReady = ApplicationCaptureOnReadyOptions{
+			.m_OutputDirectory = "C:/gglab-captures",
+			.m_Source = FrameCaptureSource::Composited,
+			.m_SettleFrames = 12,
+			.m_Label = "culling",
+		};
+		const std::optional<FrameCaptureRequest> captureRequest =
+			TranslateCaptureOnReadyOptions(captureOptions);
+		context.Check(!TranslateCaptureOnReadyOptions(options) && captureRequest &&
+			captureRequest->m_Timing == FrameCaptureTiming::AfterReady &&
+			captureRequest->m_Source == FrameCaptureSource::Composited &&
+			captureRequest->m_SettleFrames == 12 &&
+			captureRequest->m_RequiredContentId == "gglab.lab.culling" &&
+			captureRequest->m_OutputDirectory == std::filesystem::path("C:/gglab-captures") &&
+			captureRequest->m_Label == "culling",
+			"Capture-on-ready waits for the requested Lab after readiness and settling");
+
 		ApplicationLaunchOptions islandOptions{};
 		islandOptions.m_StartupDemo = ApplicationStartupDemo::Island;
 		const AppRuntimeConfig islandConfig = TranslateApplicationLaunchOptions(
@@ -75,7 +106,7 @@ namespace gglab
 		context.Check(paths.IsValid() && paths.m_RuntimeRoot == runtimeRoot &&
 			paths.m_AssetRoot == runtimeRoot / "Assets" &&
 			paths.m_EnvironmentAssetRoot == runtimeRoot / "Assets" / "Textures" / "Skybox" &&
-			paths.m_SettingsRoot == runtimeRoot,
+			paths.m_SettingsRoot == runtimeRoot && paths.m_CaptureRoot == runtimeRoot / "Captures",
 			"Executable directory deterministically produces explicit content roots");
 		context.Check(paths.m_ShaderArtifactRoot == runtimeRoot / "ShaderArtifacts" &&
 			paths.m_IblDerivedDataRoot == runtimeRoot / "DerivedDataCache" / "IBL" &&
@@ -89,7 +120,8 @@ namespace gglab
 			isolatedPaths.m_AssetRoot == paths.m_AssetRoot &&
 			isolatedPaths.m_ShaderArtifactRoot == stateRoot / "ShaderArtifacts" &&
 			isolatedPaths.m_IblDerivedDataRoot == stateRoot / "DerivedDataCache" / "IBL" &&
-			isolatedPaths.m_SettingsRoot == stateRoot / "Settings",
+			isolatedPaths.m_SettingsRoot == stateRoot / "Settings" &&
+			isolatedPaths.m_CaptureRoot == stateRoot / "Captures",
 			"Explicit writable state leaves deployed input roots unchanged");
 		context.Check(!BuildRuntimePaths(executableDirectory, "relative/state").IsValid(),
 			"Host path translation rejects a relative state directory");

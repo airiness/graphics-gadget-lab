@@ -2,7 +2,9 @@
 #include "Application/ApplicationHostConfiguration.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Platform/Windows/Win32FrameCaptureImageEncoder.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
+#include "Application/Platform/Windows/Win32UnattendedProcess.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/RenderingStartup.h"
 #endif
@@ -87,6 +89,18 @@ int main(int argc, char* argv[])
 		std::fputs(gglab::GetApplicationLaunchUsage().data(), stdout);
 		return EXIT_SUCCESS;
 	}
+	if (!launchResult.m_Options.m_OutputLog.empty() &&
+		!gglab::win32::RedirectStandardOutputToFile(launchResult.m_Options.m_OutputLog))
+	{
+		std::fprintf(stderr, "Error: cannot write the output log '%ls'.\n",
+			launchResult.m_Options.m_OutputLog.c_str());
+		return EXIT_FAILURE;
+	}
+	if (launchResult.m_Options.m_Hidden || launchResult.m_Options.m_CaptureOnReady ||
+		launchResult.m_Options.m_SessionId)
+	{
+		gglab::win32::ConfigureUnattendedFailureReporting();
+	}
 	const bool isPathSensitiveSelfTest = launchResult.m_Options.m_SelfTestSelection &&
 		(*launchResult.m_Options.m_SelfTestSelection ==
 			gglab::ApplicationPathCompositionSelfTestSelection ||
@@ -139,7 +153,10 @@ int main(int argc, char* argv[])
 				runtimePaths, launchResult.m_Options.m_RhiBackend);
 		return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
-	constexpr gglab::AppRuntimeExtent InitialExtent{ 1920, 1080 };
+	const gglab::AppRuntimeExtent initialExtent{
+		launchResult.m_Options.m_WindowWidth,
+		launchResult.m_Options.m_WindowHeight,
+	};
 #if defined(BUILD_DEBUG)
 	constexpr bool RequestRuntimeValidation = true;
 #else
@@ -162,11 +179,20 @@ int main(int argc, char* argv[])
 	createInfo.m_WindowName = L"GraphicsGadgetLab";
 	createInfo.m_PlatformHost = std::make_unique<gglab::Win32PlatformHost>(hInstance);
 	createInfo.m_RuntimeConfig = gglab::TranslateApplicationLaunchOptions(
-		launchResult.m_Options, InitialExtent, RequestRuntimeValidation);
+		launchResult.m_Options, initialExtent, RequestRuntimeValidation);
 	createInfo.m_RuntimePaths = runtimePaths;
 	createInfo.m_ContentRegistration = gglab::CreateDesktopApplicationContent();
 	createInfo.m_HostServices.m_TaskWorkerLifecycle =
 		std::make_shared<gglab::win32::Win32TaskWorkerLifecycle>();
+	createInfo.m_HostServices.m_FrameCaptureImageEncoder = &gglab::win32::EncodeFrameCapturePng;
+	createInfo.m_Hidden = launchResult.m_Options.m_Hidden;
+	createInfo.m_SessionId = launchResult.m_Options.m_SessionId.value_or(std::string{});
+	createInfo.m_IdleTimeoutSeconds = launchResult.m_Options.m_IdleTimeoutSeconds;
+	createInfo.m_CaptureOnReady = gglab::TranslateCaptureOnReadyOptions(launchResult.m_Options);
+	if (launchResult.m_Options.m_CaptureOnReady)
+	{
+		createInfo.m_CaptureTimeoutSeconds = launchResult.m_Options.m_CaptureOnReady->m_TimeoutSeconds;
+	}
 
 	gglab::Application application(std::move(createInfo));
 	if (!application.Initialize())

@@ -176,6 +176,19 @@ namespace gglab
 		return true;
 	}
 
+	// Copies the footprint extent from the origin of one color subresource into a
+	// placed buffer layout. The caller owns the source CopySource state and the
+	// destination CopyDest state.
+	struct RHITextureToBufferCopy
+	{
+		RHITextureHandle m_Source{};
+		uint32_t m_SourceMipLevel = 0;
+		uint32_t m_SourceArraySlice = 0;
+		RHIBufferHandle m_Destination{};
+		uint64_t m_DestinationOffset = 0;
+		RHITextureCopyFootprint m_Footprint{};
+	};
+
 	class RHICommandContext
 	{
 	public:
@@ -192,6 +205,7 @@ namespace gglab
 		virtual void FlushBarriers() noexcept = 0;
 		virtual void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept = 0;
+		virtual void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept = 0;
 		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};

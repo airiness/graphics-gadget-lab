@@ -84,10 +84,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\GGLabAppRuntimeLifecycleSelfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabAppRuntime\GGLabAppRuntime.vcxproj">

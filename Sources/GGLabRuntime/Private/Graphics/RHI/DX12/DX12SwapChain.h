@@ -50,6 +50,10 @@ namespace gglab
 		uint32_t GetBufferWidth() const noexcept override { return m_Width; }
 		uint32_t GetBufferHeight() const noexcept override { return m_Height; }
 		RHIFormat GetFormat() const noexcept override;
+		RHITextureUsage GetBackBufferUsage() const noexcept override
+		{
+			return BackBufferUsage;
+		}
 
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override;
 		RHIResourceState GetBackBufferInitialState(uint32_t) const noexcept override
@@ -74,6 +78,10 @@ namespace gglab
 		void Reset() noexcept;
 
 	private:
+		// DXGI flip-model back buffers always permit copy reads.
+		static constexpr RHITextureUsage BackBufferUsage =
+			RHITextureUsage::RenderTarget | RHITextureUsage::Present | RHITextureUsage::CopySource;
+
 		DX12Device* m_DX12Device = nullptr;
 		DX12CommandQueue* m_PresentQueue = nullptr;
 

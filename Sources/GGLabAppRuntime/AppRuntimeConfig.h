@@ -48,6 +48,9 @@ namespace gglab
 		AppRuntimePointerMode m_InitialPointerMode = AppRuntimePointerMode::Absolute;
 		AppRuntimeCapability m_Capabilities = AppRuntimeCapability::None;
 		bool m_RequestRuntimeValidation = false;
+		// Advances simulation time by exactly this many seconds per frame for every
+		// Demo and Lab, so frame-count-based captures are reproducible.
+		std::optional<double> m_FixedDeltaTimeSeconds;
 
 		[[nodiscard]] bool IsValid() const noexcept;
 		[[nodiscard]] bool HasCapability(AppRuntimeCapability capability) const noexcept;

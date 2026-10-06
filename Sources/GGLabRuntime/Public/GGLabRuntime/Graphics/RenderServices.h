@@ -29,6 +29,7 @@ namespace gglab
 {
 	class DynamicConstantBufferAllocator;
 	class AssetUploadScheduling;
+	class RenderFrameCaptureAccess;
 	class RenderPipelineOverlayExtensionBase;
 	class RHIDevice;
 	class RenderAtmosphereAccess;
@@ -271,6 +272,8 @@ namespace gglab
 		RenderAtmosphereAccess* m_Atmosphere = nullptr;
 		RenderAtmosphereAccess* m_BakeAtmosphere = nullptr;
 		AssetUploadScheduling* m_AssetUpload = nullptr;
+		// Optional capture seam; pipelines add capture taps only when it is present.
+		RenderFrameCaptureAccess* m_FrameCapture = nullptr;
 		// Deliberate per-frame application injection; null when no developer
 		// overlay pass participates in the frame.
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;

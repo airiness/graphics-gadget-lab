@@ -5,6 +5,7 @@
 #include "AssetUploadSchedulerSelfTests.h"
 #include "DiagnosticsContractSelfTests.h"
 #include "EnvironmentSelectionSelfTests.h"
+#include "FrameCaptureSelfTests.h"
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "PublicationAccountingSelfTests.h"
@@ -47,6 +48,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "environment-selection",
 			.m_Run = &gglab::RunEnvironmentSelectionSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "frame-capture",
+			.m_Run = &gglab::RunFrameCaptureSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "publication-accounting",

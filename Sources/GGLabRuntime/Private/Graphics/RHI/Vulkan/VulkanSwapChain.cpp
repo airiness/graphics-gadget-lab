@@ -202,6 +202,13 @@ namespace gglab
 			imageCount = std::min(imageCount, capabilities.maxImageCount);
 		}
 
+		// Transfer-source usage lets frame capture read presented images. Surfaces
+		// without it remain presentable; capture then reports the missing capability.
+		swapChain->m_SupportsCopySource =
+			(capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
+		const VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+			(swapChain->m_SupportsCopySource ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0u);
+
 		VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		if ((capabilities.supportedCompositeAlpha & compositeAlpha) == 0)
 		{
@@ -216,7 +223,7 @@ namespace gglab
 		swapChainCreateInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 		swapChainCreateInfo.imageExtent = imageExtent;
 		swapChainCreateInfo.imageArrayLayers = 1;
-		swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		swapChainCreateInfo.imageUsage = imageUsage;
 		swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		swapChainCreateInfo.preTransform = capabilities.currentTransform;
 		swapChainCreateInfo.compositeAlpha = compositeAlpha;

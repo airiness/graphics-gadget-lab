@@ -33,6 +33,7 @@
 namespace gglab
 {
 	class CameraRig;
+	class FrameCaptureControlBase;
 	class ShaderManager;
 	class TaskSystem;
 	class World;
@@ -217,6 +218,7 @@ namespace gglab
 		[[nodiscard]] virtual ShadowPreviewControlBase* GetShadowPreviewControl() const noexcept = 0;
 		[[nodiscard]] virtual GpuProfilingViewBase* GetGpuProfilingView() const noexcept = 0;
 		[[nodiscard]] virtual GpuProfilingControlBase* GetGpuProfilingControl() const noexcept = 0;
+		[[nodiscard]] virtual FrameCaptureControlBase* GetFrameCaptureControl() const noexcept = 0;
 
 	protected:
 		[[nodiscard]] static RenderFrame MakeReadyFrame(RenderHost* host, uint64_t frameSerial,

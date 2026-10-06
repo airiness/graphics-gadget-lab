@@ -91,4 +91,45 @@ namespace gglab
 		}
 		return result;
 	}
+
+	std::optional<VkBufferImageCopy2> BuildVulkanTextureToBufferCopyRegion(
+		const RHITextureDesc& sourceDesc, const RHIBufferDesc& destinationDesc,
+		const RHITextureToBufferCopy& copy) noexcept
+	{
+		const RHITextureCopyFootprint& footprint = copy.m_Footprint;
+		const uint32_t mipWidth =
+			std::max(sourceDesc.m_Extent.m_Width >> copy.m_SourceMipLevel, 1u);
+		const uint32_t mipHeight =
+			std::max(sourceDesc.m_Extent.m_Height >> copy.m_SourceMipLevel, 1u);
+		if (!footprint.IsValid() || sourceDesc.m_Dimension != RHITextureDimension::Texture2D ||
+			sourceDesc.m_SampleCount != 1 || sourceDesc.m_Format != footprint.m_Format ||
+			!Test(sourceDesc.m_Usage, RHITextureUsage::CopySource) ||
+			copy.m_SourceMipLevel >= GetRHITextureMipLevelCount(sourceDesc) ||
+			copy.m_SourceArraySlice >= GetRHITextureArraySize(sourceDesc) ||
+			footprint.m_Width > mipWidth || footprint.m_Height > mipHeight ||
+			!Test(destinationDesc.m_Usage, RHIBufferUsage::CopyDest) ||
+			copy.m_DestinationOffset % RHITextureCopyPlacementAlignment != 0 ||
+			footprint.m_SizeInBytes > destinationDesc.m_SizeInBytes ||
+			copy.m_DestinationOffset > destinationDesc.m_SizeInBytes - footprint.m_SizeInBytes ||
+			footprint.m_RowPitch % footprint.m_BytesPerTexel != 0)
+		{
+			return std::nullopt;
+		}
+
+		return VkBufferImageCopy2{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+			.bufferOffset = copy.m_DestinationOffset,
+			.bufferRowLength =
+				static_cast<uint32_t>(footprint.m_RowPitch / footprint.m_BytesPerTexel),
+			.bufferImageHeight = footprint.m_Height,
+			.imageSubresource = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.mipLevel = copy.m_SourceMipLevel,
+				.baseArrayLayer = copy.m_SourceArraySlice,
+				.layerCount = 1,
+			},
+			.imageOffset = { 0, 0, 0 },
+			.imageExtent = { footprint.m_Width, footprint.m_Height, 1 },
+		};
+	}
 }

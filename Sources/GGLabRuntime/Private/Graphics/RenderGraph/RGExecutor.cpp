@@ -203,6 +203,30 @@ namespace gglab
 			: RHIBufferHandle{};
 	}
 
+	RHITextureHandle RGExecuteContext::GetTextureHandle(RGTextureId textureId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ExecutionPlan);
+		if (!m_ExecutionPlan || !textureId.IsValid())
+		{
+			return {};
+		}
+
+		const size_t resourceIndex = textureId.GetHandle().Value();
+		GGLAB_ASSERT_MSG(resourceIndex < m_ExecutionPlan->GetResources().size(),
+			"RenderGraph texture id must resolve to a compiled resource.");
+		if (resourceIndex >= m_ExecutionPlan->GetResources().size())
+		{
+			return {};
+		}
+
+		const auto& resource = m_ExecutionPlan->GetResources()[resourceIndex];
+		GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGTexture,
+			"RenderGraph texture resolution requires a texture resource.");
+		return resource.m_ResourceType == RGResourceType::RGTexture
+			? ResolveTextureHandle(resource)
+			: RHITextureHandle{};
+	}
+
 	RHIGraphicsCommandContext* RGExecuteContext::GetGraphicsCommandContext() const noexcept
 	{
 		const bool compatible =
