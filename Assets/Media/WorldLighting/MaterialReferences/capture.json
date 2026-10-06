@@ -1,0 +1,938 @@
+{
+    "schema_version":  1,
+    "source_revision":  "eca5cc1af769e315374a3faa676046a05272e34e",
+    "captured_on":  "2026-10-02",
+    "archived_on":  "2026-10-06",
+    "archive_operation":  "Copy previously captured PNG files unchanged; no application launch, build, or new capture",
+    "provenance":  "Historical source revision recorded during the original capture session; per-image records and comparisons preserved from that session",
+    "configuration":  "x64 Debug",
+    "images":  {
+                   "width":  1920,
+                   "height":  1080,
+                   "encoding":  "Lossless PNG from 8-bit BGRA WGC client pixels",
+                   "resampled":  false,
+                   "post_capture_crop":  false,
+                   "cursor":  false,
+                   "windows_chrome":  false,
+                   "optional_tooling":  false
+               },
+    "acquisition":  {
+                        "api":  "Windows Graphics Capture CreateForWindow",
+                        "z_order":  "HWND_BOTTOM",
+                        "flags":  "SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW",
+                        "corner_mask":  "DWMWCP_DONOTROUND",
+                        "foreground_check":  "Reject target process in foreground; unrelated user foreground changes permitted",
+                        "input_injection":  false,
+                        "gpu_completion":  "Blocking D3D11 staging Map; frame/source/staging/mapping retained through WIC encoding"
+                    },
+    "settings":  {
+                     "taa":  false,
+                     "gtao":  false,
+                     "bloom":  false,
+                     "scene_pre_exposure":  true,
+                     "aerial_perspective":  true,
+                     "manual_ev100":  15,
+                     "exposure_compensation_ev":  0,
+                     "sun_lux":  120000,
+                     "sun_angular_radius_degrees":  0.2666,
+                     "sun_chromaticity":  [
+                                              1,
+                                              1,
+                                              1
+                                          ],
+                     "environment":  "Physical Sky",
+                     "environment_intensity":  1,
+                     "environment_yaw_radians":  0,
+                     "ibl_quality":  "Medium",
+                     "atmosphere":  "Default AtmosphereSettings at the historical source revision",
+                     "settle_seconds_after_publication":  8,
+                     "capture_preroll_seconds":  3.96
+                 },
+    "cameras":  [
+                    {
+                        "case":  "clearcoat",
+                        "id":  "CAM_Clearcoat",
+                        "profile_version":  2,
+                        "position":  [
+                                         67,
+                                         3.2,
+                                         -10
+                                     ],
+                        "target":  [
+                                       67,
+                                       0.8,
+                                       0
+                                   ],
+                        "vertical_fov_degrees":  37.29907608,
+                        "near":  0.1,
+                        "far":  100
+                    },
+                    {
+                        "case":  "anisotropy",
+                        "id":  "CAM_Anisotropy",
+                        "profile_version":  2,
+                        "position":  [
+                                         82.2,
+                                         4.4,
+                                         -10
+                                     ],
+                        "target":  [
+                                       82.2,
+                                       0.8,
+                                       1.3
+                                   ],
+                        "vertical_fov_degrees":  37.29907608,
+                        "near":  0.1,
+                        "far":  100
+                    },
+                    {
+                        "case":  "lounge-courtyard",
+                        "id":  "CAM_Courtyard",
+                        "profile_version":  1,
+                        "position":  [
+                                         23,
+                                         19,
+                                         -28
+                                     ],
+                        "target":  [
+                                       -1,
+                                       1.8,
+                                       -2
+                                   ],
+                        "vertical_fov_degrees":  37.29907608,
+                        "near":  0.1,
+                        "far":  150
+                    },
+                    {
+                        "case":  "lounge-close",
+                        "id":  null,
+                        "profile_version":  null,
+                        "position":  [
+                                         6.35,
+                                         4.2,
+                                         -6.8
+                                     ],
+                        "target":  [
+                                       6.35,
+                                       3.15,
+                                       -1
+                                   ],
+                        "vertical_fov_degrees":  37.29907608,
+                        "near":  0.1,
+                        "far":  150
+                    }
+                ],
+    "shots":  [
+                  {
+                      "file":  "clearcoat-dx12-lit.png",
+                      "backend":  "dx12",
+                      "case":  "clearcoat",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:18:03.8558034+09:00",
+                      "sha256":  "ce4917734420f189dc9519cd468c7894f7e26dd7b75a39563dbc84d2f6d8f860",
+                      "bytes":  175173,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=clearcoat view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(67.000000,3.200000,-10.000000) forward=(0.000000,-0.233373,0.972387) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:17:49] [info] [PID 38748] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=6691.9)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "clearcoat-dx12-unfiltered.png",
+                      "backend":  "dx12",
+                      "case":  "clearcoat",
+                      "view":  "unfiltered",
+                      "captured_at":  "2026-10-02T20:18:27.8467693+09:00",
+                      "sha256":  "c70ccecf3d83284b35ea8c426e3cce39459c5f74db87662ac8cf66901525c2d5",
+                      "bytes":  174251,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=clearcoat view=23 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(67.000000,3.200000,-10.000000) forward=(0.000000,-0.233373,0.972387) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=23"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:18:13] [info] [PID 67468] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=6495.0)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "clearcoat-dx12-specular-aa.png",
+                      "backend":  "dx12",
+                      "case":  "clearcoat",
+                      "view":  "specular-aa",
+                      "captured_at":  "2026-10-02T20:18:59.0532813+09:00",
+                      "sha256":  "64f38a13d0f5503838c236cd49a967907fc21ff52d34ecba9a006f1d8b880975",
+                      "bytes":  81879,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=clearcoat view=20 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(67.000000,3.200000,-10.000000) forward=(0.000000,-0.233373,0.972387) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=20"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:18:43] [info] [PID 67844] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=13284.2)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "anisotropy-dx12-lit.png",
+                      "backend":  "dx12",
+                      "case":  "anisotropy",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:19:27.1762410+09:00",
+                      "sha256":  "d5878a202271c7b3fc8b527d324cf1497513306bc53a48437569ca0f152af60b",
+                      "bytes":  196394,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=anisotropy view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(82.199997,4.400000,-10.000000) forward=(0.000000,-0.303552,0.952815) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:19:12] [info] [PID 52804] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=10433.0)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "anisotropy-dx12-unfiltered.png",
+                      "backend":  "dx12",
+                      "case":  "anisotropy",
+                      "view":  "unfiltered",
+                      "captured_at":  "2026-10-02T20:19:55.3448705+09:00",
+                      "sha256":  "eab42ca0223969c238b8a6b018a49cb8f338d799c3cf7fed5f46833e2dd98ab7",
+                      "bytes":  194734,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=anisotropy view=23 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(82.199997,4.400000,-10.000000) forward=(0.000000,-0.303552,0.952815) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=23"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:19:41] [info] [PID 5804] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=11083.2)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "anisotropy-dx12-specular-aa.png",
+                      "backend":  "dx12",
+                      "case":  "anisotropy",
+                      "view":  "specular-aa",
+                      "captured_at":  "2026-10-02T20:20:24.5467918+09:00",
+                      "sha256":  "3e558ae5a3d4bffb8fe8bd1df77aa7af5ba99a01d78f6117d53a7d950becff4a",
+                      "bytes":  70842,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=anisotropy view=20 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(82.199997,4.400000,-10.000000) forward=(0.000000,-0.303552,0.952815) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=20"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:20:09] [info] [PID 69980] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=11400.7)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "lounge-courtyard-dx12-lit.png",
+                      "backend":  "dx12",
+                      "case":  "lounge-courtyard",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:20:51.7741821+09:00",
+                      "sha256":  "278fdc4d6c3257bad879f04bdf8015148f559049486bb6470b3c731bbd4c4909",
+                      "bytes":  1034829,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=lounge-courtyard view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(23.000000,19.000000,-28.000000) forward=(-0.610026,-0.437185,0.660861) fov=37.299076080 near=0.100000 far=150.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:20:37] [info] [PID 64152] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=10098.9)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=0; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "lounge-close-dx12-lit.png",
+                      "backend":  "dx12",
+                      "case":  "lounge-close",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:21:17.0881254+09:00",
+                      "sha256":  "20bdc2755f5cbcb04bbba5bd6f736487df5c648b9b3cbdd16fbaf1f62ea6f63f",
+                      "bytes":  1031024,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=lounge-close view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(6.350000,4.200000,-6.800000) forward=(0.000000,-0.178139,0.984005) fov=37.299076080 near=0.100000 far=150.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:21:01] [info] [PID 29804] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=7382.6)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER dx12:000010de:00002504:8e901462:000000a1:driver-00200000000f1e27"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=0; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "clearcoat-vulkan-lit.png",
+                      "backend":  "vulkan",
+                      "case":  "clearcoat",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:22:20.6551291+09:00",
+                      "sha256":  "b047e3f12528e5a7a981dfb68d20950c5552232470183726eea176f8816f18c7",
+                      "bytes":  175236,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=clearcoat view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(67.000000,3.200000,-10.000000) forward=(0.000000,-0.233373,0.972387) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:22:06] [info] [PID 12340] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=2423.0)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "clearcoat-vulkan-unfiltered.png",
+                      "backend":  "vulkan",
+                      "case":  "clearcoat",
+                      "view":  "unfiltered",
+                      "captured_at":  "2026-10-02T20:22:38.8044497+09:00",
+                      "sha256":  "21a4f19f5afa51059e0607c4cce5baea5a915bc02c9a9f98050b64b9aa5fb324",
+                      "bytes":  174320,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=clearcoat view=23 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(67.000000,3.200000,-10.000000) forward=(0.000000,-0.233373,0.972387) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=23"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:22:24] [info] [PID 65668] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=86.6)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "clearcoat-vulkan-specular-aa.png",
+                      "backend":  "vulkan",
+                      "case":  "clearcoat",
+                      "view":  "specular-aa",
+                      "captured_at":  "2026-10-02T20:22:57.9476929+09:00",
+                      "sha256":  "2fc22f6654bdebcf52499c4c1e8c95ec7c5da18b4e32548144c34e35da30c030",
+                      "bytes":  84047,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=clearcoat view=20 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(67.000000,3.200000,-10.000000) forward=(0.000000,-0.233373,0.972387) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=20"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:22:43] [info] [PID 68784] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=1676.8)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "anisotropy-vulkan-lit.png",
+                      "backend":  "vulkan",
+                      "case":  "anisotropy",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:23:15.8674863+09:00",
+                      "sha256":  "752c53653bb02958be030d54d41683575c6c27a7c991504b00dea36feb8a8c51",
+                      "bytes":  196445,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=anisotropy view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(82.199997,4.400000,-10.000000) forward=(0.000000,-0.303552,0.952815) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:23:01] [info] [PID 52116] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=81.7)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "anisotropy-vulkan-unfiltered.png",
+                      "backend":  "vulkan",
+                      "case":  "anisotropy",
+                      "view":  "unfiltered",
+                      "captured_at":  "2026-10-02T20:23:33.9634336+09:00",
+                      "sha256":  "f6b7f0b0cd8d18b8819e2dba5cd0f9534564a684d2e6e72c7431b803f578ce8f",
+                      "bytes":  194702,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=anisotropy view=23 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(82.199997,4.400000,-10.000000) forward=(0.000000,-0.303552,0.952815) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=23"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:23:19] [info] [PID 55388] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=80.1)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "anisotropy-vulkan-specular-aa.png",
+                      "backend":  "vulkan",
+                      "case":  "anisotropy",
+                      "view":  "specular-aa",
+                      "captured_at":  "2026-10-02T20:23:52.2245444+09:00",
+                      "sha256":  "4422cb63722c667d1ba3c6a5599bc8d8b212d64a78a8a436869c0581a8367b1f",
+                      "bytes":  71742,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=anisotropy view=20 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(82.199997,4.400000,-10.000000) forward=(0.000000,-0.303552,0.952815) fov=37.299076080 near=0.100000 far=100.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+                                                   "ARCHIVE_MATERIAL_VIEW models=1 meshInstances=36 authoredMaterials=36 view=20"
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:23:37] [info] [PID 55128] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=89.0)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "lounge-courtyard-vulkan-lit.png",
+                      "backend":  "vulkan",
+                      "case":  "lounge-courtyard",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:24:10.5383683+09:00",
+                      "sha256":  "a3aec010b8ff20ac4ea20a97df5527523044a693f814cb638eae667dd3375995",
+                      "bytes":  987644,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=lounge-courtyard view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(23.000000,19.000000,-28.000000) forward=(-0.610026,-0.437185,0.660861) fov=37.299076080 near=0.100000 far=150.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:23:55] [info] [PID 69128] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=125.0)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  },
+                  {
+                      "file":  "lounge-close-vulkan-lit.png",
+                      "backend":  "vulkan",
+                      "case":  "lounge-close",
+                      "view":  "lit",
+                      "captured_at":  "2026-10-02T20:24:27.7177549+09:00",
+                      "sha256":  "fb5306c55db2056d9a4ecf1d8a149e90d6c1d60165cfb0baa50e03b1b0101d84",
+                      "bytes":  1024183,
+                      "ready_record":  [
+                                           "ARCHIVE_READY case=lounge-close view=0 TAA=0 GTAO=0 bloom=0 preExposure=1 EV=15 camera=(6.350000,4.200000,-6.800000) forward=(0.000000,-0.178139,0.984005) fov=37.299076080 near=0.100000 far=150.000000 aspect=1.777777791"
+                                       ],
+                      "material_view_record":  [
+
+                                               ],
+                      "physical_sky_publication":  [
+                                                       "[20:24:13] [info] [PID 24932] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=Physical Sky, publicationMs=94.4)."
+                                                   ],
+                      "adapter_record":  [
+                                             "ARCHIVE_ADAPTER vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+                                         ],
+                      "capture_record":  [
+                                             "Window class=NVOpenGLPbuffer title=__wglDummyWindowFodder visible=0 minimized=0",
+                                             "Window class=GraphicsGadgetLab Material Archive.WindowClass title=GraphicsGadgetLab Material Archive visible=0 minimized=0",
+                                             "Client ROI x=2 y=45 width=1920 height=1080; source=1924x1127; cursor=disabled",
+                                             "Captured 1920x1080; foreground unchanged=1; target foreground detected=0"
+                                         ],
+                      "known_warnings":  [
+
+                                         ],
+                      "exit_code":  0
+                  }
+              ],
+    "comparisons":  {
+                        "value":  [
+                                      {
+                                          "first":  "clearcoat-dx12-lit.png",
+                                          "second":  "clearcoat-dx12-unfiltered.png",
+                                          "kind":  "lit-vs-unfiltered",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  14991,
+                                                              "pixels_over_one_code_value":  3110,
+                                                              "max_rgb_delta":  54,
+                                                              "mean_absolute_rgb_delta":  0.011729681069958848,
+                                                              "rms_rgb_delta":  0.403008395025346,
+                                                              "difference_bounds":  [
+                                                                                        312,
+                                                                                        415,
+                                                                                        1607,
+                                                                                        664
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "anisotropy-dx12-lit.png",
+                                          "second":  "anisotropy-dx12-unfiltered.png",
+                                          "kind":  "lit-vs-unfiltered",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  53965,
+                                                              "pixels_over_one_code_value":  4735,
+                                                              "max_rgb_delta":  53,
+                                                              "mean_absolute_rgb_delta":  0.020666152263374486,
+                                                              "rms_rgb_delta":  0.39016572795094356,
+                                                              "difference_bounds":  [
+                                                                                        503,
+                                                                                        394,
+                                                                                        1416,
+                                                                                        720
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "clearcoat-vulkan-lit.png",
+                                          "second":  "clearcoat-vulkan-unfiltered.png",
+                                          "kind":  "lit-vs-unfiltered",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  14982,
+                                                              "pixels_over_one_code_value":  3117,
+                                                              "max_rgb_delta":  55,
+                                                              "mean_absolute_rgb_delta":  0.0117041216563786,
+                                                              "rms_rgb_delta":  0.40184178441476953,
+                                                              "difference_bounds":  [
+                                                                                        312,
+                                                                                        415,
+                                                                                        1607,
+                                                                                        664
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "anisotropy-vulkan-lit.png",
+                                          "second":  "anisotropy-vulkan-unfiltered.png",
+                                          "kind":  "lit-vs-unfiltered",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  53959,
+                                                              "pixels_over_one_code_value":  4737,
+                                                              "max_rgb_delta":  54,
+                                                              "mean_absolute_rgb_delta":  0.020679816100823045,
+                                                              "rms_rgb_delta":  0.39107417590486693,
+                                                              "difference_bounds":  [
+                                                                                        503,
+                                                                                        394,
+                                                                                        1416,
+                                                                                        720
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "clearcoat-dx12-lit.png",
+                                          "second":  "clearcoat-vulkan-lit.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  2215,
+                                                              "pixels_over_one_code_value":  218,
+                                                              "max_rgb_delta":  22,
+                                                              "mean_absolute_rgb_delta":  0.00066390174897119339,
+                                                              "rms_rgb_delta":  0.04392418294899321,
+                                                              "difference_bounds":  [
+                                                                                        3,
+                                                                                        0,
+                                                                                        1915,
+                                                                                        864
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "clearcoat-dx12-unfiltered.png",
+                                          "second":  "clearcoat-vulkan-unfiltered.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  1314,
+                                                              "pixels_over_one_code_value":  16,
+                                                              "max_rgb_delta":  67,
+                                                              "mean_absolute_rgb_delta":  0.000271508487654321,
+                                                              "rms_rgb_delta":  0.047916666666666663,
+                                                              "difference_bounds":  [
+                                                                                        3,
+                                                                                        0,
+                                                                                        1915,
+                                                                                        864
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "clearcoat-dx12-specular-aa.png",
+                                          "second":  "clearcoat-vulkan-specular-aa.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  8467,
+                                                              "pixels_over_one_code_value":  1408,
+                                                              "max_rgb_delta":  72,
+                                                              "mean_absolute_rgb_delta":  0.0024779771090534981,
+                                                              "rms_rgb_delta":  0.12902284406307069,
+                                                              "difference_bounds":  [
+                                                                                        3,
+                                                                                        0,
+                                                                                        1915,
+                                                                                        664
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "anisotropy-dx12-lit.png",
+                                          "second":  "anisotropy-vulkan-lit.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  1023,
+                                                              "pixels_over_one_code_value":  49,
+                                                              "max_rgb_delta":  7,
+                                                              "mean_absolute_rgb_delta":  0.00023984053497942386,
+                                                              "rms_rgb_delta":  0.018276778651066559,
+                                                              "difference_bounds":  [
+                                                                                        8,
+                                                                                        0,
+                                                                                        1855,
+                                                                                        934
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "anisotropy-dx12-unfiltered.png",
+                                          "second":  "anisotropy-vulkan-unfiltered.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  329,
+                                                              "pixels_over_one_code_value":  5,
+                                                              "max_rgb_delta":  2,
+                                                              "mean_absolute_rgb_delta":  6.2210648148148151E-05,
+                                                              "rms_rgb_delta":  0.0079886268179339814,
+                                                              "difference_bounds":  [
+                                                                                        8,
+                                                                                        0,
+                                                                                        1855,
+                                                                                        934
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "anisotropy-dx12-specular-aa.png",
+                                          "second":  "anisotropy-vulkan-specular-aa.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  3777,
+                                                              "pixels_over_one_code_value":  456,
+                                                              "max_rgb_delta":  13,
+                                                              "mean_absolute_rgb_delta":  0.0010397376543209876,
+                                                              "rms_rgb_delta":  0.046245342330258496,
+                                                              "difference_bounds":  [
+                                                                                        8,
+                                                                                        0,
+                                                                                        1855,
+                                                                                        720
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "lounge-courtyard-dx12-lit.png",
+                                          "second":  "lounge-courtyard-vulkan-lit.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  253221,
+                                                              "pixels_over_one_code_value":  41785,
+                                                              "max_rgb_delta":  8,
+                                                              "mean_absolute_rgb_delta":  0.0959130658436214,
+                                                              "rms_rgb_delta":  0.41399141161247405,
+                                                              "difference_bounds":  [
+                                                                                        4,
+                                                                                        1,
+                                                                                        1919,
+                                                                                        1079
+                                                                                    ]
+                                                          }
+                                      },
+                                      {
+                                          "first":  "lounge-close-dx12-lit.png",
+                                          "second":  "lounge-close-vulkan-lit.png",
+                                          "kind":  "dx12-vs-vulkan",
+                                          "measurement":  {
+                                                              "region":  [
+                                                                             0,
+                                                                             0,
+                                                                             1920,
+                                                                             1080
+                                                                         ],
+                                                              "pixels":  2073600,
+                                                              "changed_pixels":  62501,
+                                                              "pixels_over_one_code_value":  7130,
+                                                              "max_rgb_delta":  22,
+                                                              "mean_absolute_rgb_delta":  0.01972093621399177,
+                                                              "rms_rgb_delta":  0.20039987032104428,
+                                                              "difference_bounds":  [
+                                                                                        0,
+                                                                                        0,
+                                                                                        1919,
+                                                                                        1079
+                                                                                    ]
+                                                          }
+                                      }
+                                  ],
+                        "Count":  12
+                    },
+    "comparison_units":  "Previously recorded absolute RGB 8-bit PNG display-code differences; not scene-linear radiance",
+    "comparison_record_sha256":  "525ae98cfa66a1fac9918ecf22e6b07310372ea9938ce322db3d9db40e5f7591",
+    "verification":  {
+                         "existing_images":  16,
+                         "original_png_hashes_match":  true,
+                         "native_client_dimensions":  true,
+                         "original_process_exit_codes":  0,
+                         "visual_review":  "Pending owner review",
+                         "merge_visual_gate":  "Pending owner review",
+                         "new_captures_during_archival":  0,
+                         "release_presentation":  "Not tested",
+                         "motion_stability":  "Not tested",
+                         "native_ui_interaction":  "Not tested"
+                     },
+    "limitations":  [
+                        "No capture-time executable hash manifest was saved; current build outputs are not substituted for historical provenance",
+                        "The temporary capture tools are local verification files, not a shipped screenshot feature"
+                    ]
+}
