@@ -25,8 +25,8 @@ factors, texture transforms and instance transforms remain as exported.
 
 | Installed file | SHA-256 |
 | --- | --- |
-| `GGLabCoastalRetreat.bin` | `be15e043f5625079112bc881dccd69cdd135df687fc7eaff709202a0efb8bb64` |
-| `GGLabCoastalRetreat.gltf` | `4aff8d929c4fd887f3b921a9f439ac0a8fa70c2b82a18abfba511fcc493ac1b4` |
+| `GGLabCoastalRetreat.bin` | `df4cd64a1afd108df14cdbe6beaae6b5e75c50009e2245d875510613791ce4bc` |
+| `GGLabCoastalRetreat.gltf` | `551fe58fd3d31a5a99594dbbf831d2978bbe0740cb0f05d194fb2df03678f5c2` |
 | `Textures/CoastalRock_BaseColor.png` | `56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9` |
 | `Textures/CoastalRock_MetallicRoughness.png` | `4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342` |
 | `Textures/CoastalRock_Normal.png` | `d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8` |
@@ -51,6 +51,16 @@ factors, texture transforms and instance transforms remain as exported.
 | `Textures/Upholstery_BaseColor.png` | `8b609f23151ddc922cd926183f7aeb1b3e099ac0b8177d7553a6de943fa54f08` |
 | `Textures/Upholstery_MetallicRoughness.png` | `15ea1ce5c4fc92f21e5588929b044b903ec137fbf15e44abcdb995a571ff1964` |
 | `Textures/Upholstery_Normal.png` | `5f433933356f2de09dcf550a2cc1e1267ce74287d5b7a89795b08a73dcf4b3d6` |
+
+The installed bundle repairs the two lounge armrests' authored corner normals.
+Some retained non-planar bevel faces had been classified as new boolean contact
+faces and assigned flat normals, producing disconnected clearcoat highlights
+around the front corners. The repair restores the retained bevel normals and
+their derived tangents. Triangle geometry and winding, UVs, material bindings,
+node transforms and all twenty-four PNGs retain their previous values.
+The Blender glTF exporter 5.2.40 reorders indices and writes the source reference
+Sun color `(1, 0.95, 0.85)` in place of the preceding export's white value. This
+reference light does not configure the Demo's Runtime Physical Sun.
 
 ## Physical daylight presentation
 
@@ -98,8 +108,9 @@ reference aspects, with the far plane extended to the same coastal range.
 | `Retreat_Overview` | Both terraces, courtyard circulation and stair approach |
 
 The production import suite checks placed triangles per material, opaque
-bindings, finite geometry, orthonormal tangent frames and all twenty-four
-textures' semantic decoding and mip chains. Build WinApp and ShaderCompiler
+bindings, finite geometry, orthonormal tangent frames, normal continuity at both
+upper front armrest bevels and all twenty-four textures' semantic decoding and
+mip chains. Build WinApp and ShaderCompiler
 from the same code revision, then run from the code repository root:
 
 ```powershell
@@ -115,32 +126,38 @@ default. See [Frame Capture](../../../Docs/FrameCapture.md) for sidecars and
 cross-backend comparisons. Import checks and shader compilation alone do not
 establish visual correctness.
 
-Local verification on 2026-10-06: Debug WinApp and ShaderCompiler built
-successfully. `app-content-registration` passed all 293
-checks using the installed assets, including exposure, pre-exposure, coastal
-range and camera restoration for all thirteen reference views.
-`app-devtools-view-profile` passed 35 checks for authoring defaults and session
-overrides. The daylight and reference-view changes also passed the WinApp
-no-PCH gate, project filter metadata and dependency boundary validation.
+Local armrest repair verification on 2026-10-06: Debug WinApp and ShaderCompiler
+built successfully. `app-content-registration` passed all 295 checks using the
+installed assets, including exposure, pre-exposure, coastal range and camera
+restoration for all thirteen reference views. A negative run against the
+preceding bundle failed exactly the two new armrest checks: maximum normal
+delta at coincident upper front bevel corners was 0.565064 on each arm. The
+installed repair reduced it to 0.000173, below the 0.0005 export-noise tolerance.
+The checks select model-space corners independently of importer mesh merging.
 
 Hidden DX12 and Vulkan sessions with isolated state each captured all thirteen
-reference views at 1280 x 800 after sixty-four settled frames. All twenty-six
-images and readiness sidecars were inspected. Both logs confirmed atomic
-Physical Sky IBL publication before the captures. Sky radiance, lit materials,
-blue skylight in shadows, furniture, foliage and the distant coast were present
-on both backends. TAA smoothed railings, building edges and vegetation with
-some detail softening; no previous-view history was visible after settling.
-The retained horizon and interior views no longer clip the
-sea at 150 m. All thirteen paired comparisons passed (`MaxMeanError=1`,
-`MaxDifferingPercent=1`, channel threshold 8). Mean absolute RGB differences
-ranged from 0.0266 to 0.1899 on the 8-bit scale; at most 0.1112% of pixels exceeded
-the channel threshold. Camera and capture settings agreed; total simulation
-time differed by 2.3833 seconds in this static scene. No assertion, validation
-error or upload failure was reported. The existing startup HDR FP16 sanitization
-warning occurred on both runs. Vulkan reported one `Shader-OutputNotConsumed`
-performance warning for vertex output location 5. All sessions exited
-successfully. Release, interactive Demo switching, temporal ghosting during
-camera motion and performance/LOD qualification were not run.
+reference views at 1280 x 800 after sixty-four settled frames. Separate hidden
+runs captured `Retreat_Lounge` at 2560 x 1600 with the same settling contract.
+All twenty-eight images and readiness sidecars were inspected. Every readiness
+gate was ready, and all four runs logged atomic Physical Sky IBL publication
+before capture. Both armrests now show continuous bevel shading; the previous
+rectangular clearcoat highlights at the front corners are gone. The remaining
+views retain their daylight, material detail, shadows, foliage and distant
+coast, with no missing content or previous-view temporal history visible.
+
+All thirteen reference-view comparisons and the high-resolution lounge pair
+passed (`MaxMeanError=1`, `MaxDifferingPercent=1`, channel threshold 8). The
+reference views' mean absolute RGB differences ranged from 0.0183 to 0.1900 on
+the 8-bit scale; at most 0.1108% of pixels exceeded the channel threshold. The
+lounge detail pair had mean error 0.0358 and 0.0094% differing pixels. Camera and
+capture settings agreed. Only total simulation time differed, by at most
+0.9 seconds for the reference views and 1 second for the detail, in this static
+scene. No assertion, validation error or upload failure was reported. The
+existing startup HDR FP16 sanitization warning occurred on both backends.
+Vulkan reported the existing `Shader-OutputNotConsumed` performance warning for
+vertex output location 5. All sessions and detail runs exited successfully.
+Release, interactive Demo switching, temporal ghosting during camera motion
+and performance/LOD qualification were not run.
 
 ## Presentation limits
 

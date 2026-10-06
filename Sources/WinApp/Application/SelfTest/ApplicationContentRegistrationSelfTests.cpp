@@ -1071,6 +1071,51 @@ namespace gglab
 				context.Check(triangles[index] == expectedTriangles[index].second,
 					std::format("Coastal retreat {} retains {} placed triangles (imported={})",
 						expectedTriangles[index].first, expectedTriangles[index].second, triangles[index]));
+
+			// Probe the upper front bevel in model space, independent of Assimp mesh
+			// merging. Nonplanar source quads once acquired flat normals here despite
+			// valid unit normals and tangent frames, producing block-shaped highlights.
+			constexpr std::array armCentersX{ 5.04f, 7.66f };
+			std::array<std::vector<std::pair<Vector3, Vector3>>, armCentersX.size()> frontCorners;
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				if (instance.m_MeshIndex >= model.m_Meshes.size() || instance.m_MaterialIndex >= model.m_Materials.size())
+					continue;
+				if (model.m_Materials[instance.m_MaterialIndex].m_Name != "MAT_LoungeCoatedShell")
+					continue;
+				for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
+				{
+					const Vector3 position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
+					if (position.m_Y < 3.1999f || position.m_Y > 3.4341f ||
+						position.m_Z < -1.6151f || position.m_Z > -1.5249f)
+						continue;
+					// The authored shells have rigid instance transforms.
+					const Vector3 normal = math::TransformDirection(vertex.m_Normal, instance.m_LocalTransform).Normalized();
+					for (size_t arm = 0; arm < armCentersX.size(); ++arm)
+						if (std::abs(position.m_X - armCentersX[arm]) < 0.056f)
+							frontCorners[arm].emplace_back(position, normal);
+				}
+			}
+			for (size_t arm = 0; arm < frontCorners.size(); ++arm)
+			{
+				const auto& corners = frontCorners[arm];
+				size_t coincidentPairs = 0;
+				float maximumNormalDelta = 0.0f;
+				for (size_t first = 0; first < corners.size(); ++first)
+					for (size_t second = first + 1; second < corners.size(); ++second)
+						if ((corners[first].first - corners[second].first).LengthSquared() < 1e-10f)
+						{
+							++coincidentPairs;
+							maximumNormalDelta = std::max(maximumNormalDelta,
+								(corners[first].second - corners[second].second).Length());
+						}
+				// Allow four-decimal export/encoding noise, while rejecting a real
+				// smooth-bevel seam across vertices split by UVs, normals or tangents.
+				context.Check(corners.size() >= 12 && coincidentPairs > 0 && maximumNormalDelta < 0.0005f,
+					std::format("Coastal retreat {} upper front bevel retains continuous imported normals "
+						"(vertices={}, coincident pairs={}, maximum normal delta={:.6f})",
+						arm == 0 ? "left" : "right", corners.size(), coincidentPairs, maximumNormalDelta));
+			}
 		}
 
 		void CheckCoastalAtriumContent(SelfTestContext& context) noexcept
