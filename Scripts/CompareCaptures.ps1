@@ -102,7 +102,8 @@ public static class CapturePixelComparer
             return result;
         }
 
-        var diff = diffPath != null ? new byte[stride * height] : null;
+        // PowerShell passes a null path as an empty string.
+        var diff = !string.IsNullOrEmpty(diffPath) ? new byte[stride * height] : null;
         long sum = 0;
         double squares = 0.0;
         long differing = 0;
