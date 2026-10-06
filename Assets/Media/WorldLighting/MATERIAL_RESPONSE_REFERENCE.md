@@ -19,3 +19,9 @@ lighting settings and camera poses. These images do not measure
 linear-light BRDF energy.
 
 Material emissive factors retain the pre-World-Lighting legacy scale.
+
+The [Material Shading captures](MaterialReferences/CAPTURE.md) archive the
+2026-10-02 DX12/Vulkan clearcoat, anisotropy and Research Lounge appearance,
+including TAA-off Lit/UnfilteredLit comparisons and Specular AA diagnostics.
+These SDR stills complement the contract tests; they do not measure BRDF energy
+or motion stability.
