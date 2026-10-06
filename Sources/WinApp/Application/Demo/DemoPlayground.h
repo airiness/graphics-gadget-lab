@@ -2,6 +2,7 @@
 #include "Demo/DemoBase.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -74,8 +75,7 @@ namespace gglab
 	private:
 		DemoServices m_Services{};
 		PlaygroundContent m_Content;
-		float m_PreviousEnvironmentIntensity = 1.0f;
-		bool m_PreviousSkyboxEnabled = true;
+		EnvironmentLightingSettings m_PreviousEnvironment{};
 		bool m_HasEnvironmentOverride = false;
 		AssetOwnerScope m_AssetOwnerScope;
 		World m_World;

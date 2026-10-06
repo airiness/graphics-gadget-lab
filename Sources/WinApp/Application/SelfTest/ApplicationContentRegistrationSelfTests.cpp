@@ -1,7 +1,7 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
-#include "Application/Demo/CoastalAtriumReferenceViews.h"
+#include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
@@ -13,6 +13,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -944,31 +945,39 @@ namespace gglab
 				"Imported UVs preserve orientation/repeat and mirrored tangents preserve normal-map +Y up" + basisFailure);
 		}
 
-		void CheckCoastalAtriumReferenceViews(SelfTestContext& context) noexcept
+		void CheckCoastalSceneReferenceViews(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
 			CameraController controller(CameraController::CreateInfo{});
 			CameraRig rig;
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
-				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
-			context.Check(registered && CoastalAtriumReferenceViews.size() == 8,
-				"Four established and four surface-detail coastal atrium views register in runtime coordinates");
+				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
+			context.Check(registered && CoastalSceneReferenceViews.size() == 13,
+				"Eight retained atrium views and five coastal retreat views register in runtime coordinates");
 			if (!registered) return;
-			for (const auto& reference : CoastalAtriumReferenceViews)
+			for (const auto& reference : CoastalSceneReferenceViews)
 			{
 				const bool restored = rig.RestoreReferenceView(reference.m_Id);
 				const Vector3 targetInView = math::TransformPoint(reference.m_Target, camera.GetViewMatrix());
 				context.Check(restored && (camera.GetPosition() - reference.m_Position).LengthSquared() == 0.0f &&
 					std::abs(targetInView.m_X) < 0.0001f && std::abs(targetInView.m_Y) < 0.0001f &&
 					targetInView.m_Z > 0.0f && camera.GetFov() == reference.m_VerticalFovDegrees &&
-					camera.GetNear() == 0.1f && camera.GetFar() == 150.0f,
+					camera.GetNear() == reference.m_NearPlane && camera.GetFar() == reference.m_FarPlane,
 					std::format("{} looks at its authored target with the intended perspective projection", reference.m_Id));
+				const auto exposure = ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
+				const float daylightScale = 1.0f / (1.2f * 32768.0f);
+				context.Check(reference.m_ProfileVersion == 2 && camera.GetFar() == 6000.0f &&
+					camera.GetManualEV100() == 15.0f &&
+					exposure.m_EffectiveEV100 == 15.0f && exposure.m_ExposureScale == daylightScale &&
+					exposure.m_PreExposure == daylightScale,
+					std::format("{} retains the coastal range, EV100 15 and consistent physical daylight pre-exposure", reference.m_Id));
 				const auto view = camera.GetViewMatrix().ToArray();
 				const auto projection = camera.GetProjMatrix().ToArray();
 				camera.SetYawPitch(0.5f, 0.2f);
 				camera.SetFov(75.0f);
 				camera.SetNearFar(0.5f, 500.0f);
+				camera.SetManualEV100(5.0f);
 				camera.SetExposureCompensationEV(2.0f);
 				controller.Update(camera, CameraInput{ .m_Front = true }, 0.1f);
 				const auto serial = camera.GetTemporalResetSerial();
@@ -976,11 +985,136 @@ namespace gglab
 				controller.Update(camera, CameraInput{}, 0.1f);
 				camera.Update();
 				context.Check(restoredAgain && camera.GetViewMatrix().ToArray() == view &&
-					camera.GetProjMatrix().ToArray() == projection && camera.GetExposureCompensationEV() == 0.0f &&
+					camera.GetProjMatrix().ToArray() == projection && camera.GetManualEV100() == 15.0f &&
+					camera.GetExposureCompensationEV() == 0.0f &&
 					camera.GetTemporalResetSerial() == serial + 1 && rig.GetLastRestoredReferenceId() == reference.m_Id,
 					std::format("{} restores identical matrices after movement and lens edits; runtime yaw/pitch {:.9g}, {:.9g}; "
 						"vertical FOV {:.9g} deg; aspect {:.9g}", reference.m_Id,
 						camera.GetYaw(), camera.GetPitch(), camera.GetFov(), camera.GetAspect()));
+			}
+		}
+
+		void CheckCoastalRetreatContent(SelfTestContext& context) noexcept
+		{
+			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf"), {});
+			context.Check(imported.Succeeded() && imported.m_Model.m_TextureSources.size() == 24,
+				std::format("Coastal retreat geometry and twenty-four surface textures import: {}", imported.m_Error));
+			if (!imported.Succeeded()) return;
+			const auto& model = imported.m_Model;
+			CheckImportedTextures(context, model);
+			constexpr std::array<std::pair<std::string_view, size_t>, 19> expectedTriangles = { {
+				{ "MAT_RetreatStone", 156 },
+				{ "MAT_RetreatLime", 3996 },
+				{ "MAT_RetreatMetal", 14968 },
+				{ "MAT_RetreatTimber", 46900 },
+				{ "MAT_CoastalRock", 5798 },
+				{ "MAT_LoungeCoatedShell", 1460 },
+				{ "MAT_LoungeUpholstery", 752 },
+				{ "MAT_LoungeJoints", 752 },
+				{ "MAT_LoungeBrushedAluminum", 1504 },
+				{ "MAT_RetreatPaint", 2832 },
+				{ "MAT_ServiceSeal", 3500 },
+				{ "MAT_RetreatCeramic", 1784 },
+				{ "MAT_RetreatPaper", 188 },
+				{ "MAT_RetreatSoil", 48 },
+				{ "MAT_RetreatLeaf", 1121968 },
+				{ "MAT_RetreatSilverLeaf", 360900 },
+				{ "MAT_RetreatDryLeaf", 297272 },
+				{ "MAT_RetreatSea", 2 },
+				{ "MAT_RetreatDistantRock", 2298 },
+			} };
+			std::array<size_t, expectedTriangles.size()> triangles{};
+			bool geometryValid = true;
+			for (const auto& mesh : model.m_Meshes)
+			{
+				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
+				for (const auto index : mesh.m_Indices)
+					geometryValid &= index < mesh.m_Vertices.size();
+				for (const auto& vertex : mesh.m_Vertices)
+				{
+					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
+					geometryValid &= std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
+						std::isfinite(vertex.m_Position.m_Z) && std::isfinite(vertex.m_TexCoord0.m_X) &&
+						std::isfinite(vertex.m_TexCoord0.m_Y) && std::abs(vertex.m_Normal.LengthSquared() - 1.0f) < 0.0002f &&
+						std::abs(tangent.LengthSquared() - 1.0f) < 0.0002f &&
+						std::abs(vertex.m_Normal.Dot(tangent)) < 0.0002f && std::abs(std::abs(vertex.m_Tangent.m_W) - 1.0f) < 0.0002f;
+				}
+			}
+			// Count placed geometry through bindings so shared foliage meshes retain every instance.
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				if (instance.m_MeshIndex >= model.m_Meshes.size() || instance.m_MaterialIndex >= model.m_Materials.size())
+				{
+					geometryValid = false;
+					continue;
+				}
+				const auto& material = model.m_Materials[instance.m_MaterialIndex];
+				geometryValid &= material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
+				const auto match = std::ranges::find(expectedTriangles, material.m_Name,
+					&std::pair<std::string_view, size_t>::first);
+				if (match == expectedTriangles.end()) { geometryValid = false; continue; }
+				triangles[static_cast<size_t>(match - expectedTriangles.begin())] +=
+					model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
+				for (const auto slot : { MaterialTextureSlot::BaseColor, MaterialTextureSlot::Normal,
+					MaterialTextureSlot::MetallicRoughness })
+				{
+					const auto& binding = material.m_TextureBindings[static_cast<size_t>(slot)];
+					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex) continue;
+					geometryValid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < model.m_TextureSources.size();
+					if (binding.m_TextureIndex < model.m_TextureSources.size())
+						geometryValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic == GetMaterialTextureSlotSemantic(slot);
+				}
+			}
+			context.Check(geometryValid, "Coastal retreat retains valid opaque geometry, tangent frames and UV0 texture semantics");
+			for (size_t index = 0; index < expectedTriangles.size(); ++index)
+				context.Check(triangles[index] == expectedTriangles[index].second,
+					std::format("Coastal retreat {} retains {} placed triangles (imported={})",
+						expectedTriangles[index].first, expectedTriangles[index].second, triangles[index]));
+
+			// Probe the upper front bevel in model space, independent of Assimp mesh
+			// merging. Nonplanar source quads once acquired flat normals here despite
+			// valid unit normals and tangent frames, producing block-shaped highlights.
+			constexpr std::array armCentersX{ 5.04f, 7.66f };
+			std::array<std::vector<std::pair<Vector3, Vector3>>, armCentersX.size()> frontCorners;
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				if (instance.m_MeshIndex >= model.m_Meshes.size() || instance.m_MaterialIndex >= model.m_Materials.size())
+					continue;
+				if (model.m_Materials[instance.m_MaterialIndex].m_Name != "MAT_LoungeCoatedShell")
+					continue;
+				for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
+				{
+					const Vector3 position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
+					if (position.m_Y < 3.1999f || position.m_Y > 3.4341f ||
+						position.m_Z < -1.6151f || position.m_Z > -1.5249f)
+						continue;
+					// The authored shells have rigid instance transforms.
+					const Vector3 normal = math::TransformDirection(vertex.m_Normal, instance.m_LocalTransform).Normalized();
+					for (size_t arm = 0; arm < armCentersX.size(); ++arm)
+						if (std::abs(position.m_X - armCentersX[arm]) < 0.056f)
+							frontCorners[arm].emplace_back(position, normal);
+				}
+			}
+			for (size_t arm = 0; arm < frontCorners.size(); ++arm)
+			{
+				const auto& corners = frontCorners[arm];
+				size_t coincidentPairs = 0;
+				float maximumNormalDelta = 0.0f;
+				for (size_t first = 0; first < corners.size(); ++first)
+					for (size_t second = first + 1; second < corners.size(); ++second)
+						if ((corners[first].first - corners[second].first).LengthSquared() < 1e-10f)
+						{
+							++coincidentPairs;
+							maximumNormalDelta = std::max(maximumNormalDelta,
+								(corners[first].second - corners[second].second).Length());
+						}
+				// Allow four-decimal export/encoding noise, while rejecting a real
+				// smooth-bevel seam across vertices split by UVs, normals or tangents.
+				context.Check(corners.size() >= 12 && coincidentPairs > 0 && maximumNormalDelta < 0.0005f,
+					std::format("Coastal retreat {} upper front bevel retains continuous imported normals "
+						"(vertices={}, coincident pairs={}, maximum normal delta={:.6f})",
+						arm == 0 ? "left" : "right", corners.size(), coincidentPairs, maximumNormalDelta));
 			}
 		}
 
@@ -1334,7 +1468,7 @@ namespace gglab
 			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
-		CheckCoastalAtriumReferenceViews(context);
+		CheckCoastalSceneReferenceViews(context);
 		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.
 		std::thread textureWorker([&]
 			{
@@ -1342,6 +1476,7 @@ namespace gglab
 				CheckMaterialReferenceImports(context);
 				CheckAnisotropyReferenceImports(context);
 				CheckCoastalAtriumContent(context);
+				CheckCoastalRetreatContent(context);
 				CheckTextureContractContent(context);
 			});
 		textureWorker.join();
