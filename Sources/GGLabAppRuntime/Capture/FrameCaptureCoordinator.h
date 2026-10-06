@@ -100,7 +100,8 @@ namespace gglab
 	// Turns host capture requests into Runtime frame captures at the requested
 	// time, then encodes the PNG and writes the metadata sidecar on a dedicated
 	// writer thread, so slow or blocked file I/O never occupies the shared task
-	// system. Every submitted request finishes with exactly one result.
+	// system. At most eight jobs wait behind the running writer job; a capture
+	// fails if the writer queue is full. Every request finishes with one result.
 	class FrameCaptureCoordinator final
 	{
 	public:
@@ -110,8 +111,8 @@ namespace gglab
 			std::filesystem::path m_DefaultOutputDirectory;
 			// Without an encoder every capture fails when it is written.
 			FrameCaptureImageEncoder m_ImageEncoder;
-			// Total time shutdown waits for unfinished writing before it abandons
-			// the remaining captures.
+			// Total time shutdown waits for unfinished writing before failing the
+			// remaining captures; only jobs before publication can be abandoned.
 			std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 			// Writes on the calling thread instead of the writer thread, so a
 			// result is published by the Update that collected the capture.
@@ -156,9 +157,10 @@ namespace gglab
 		void PrepareForShutdown() noexcept;
 		// Called after the render host finalized and before it is destroyed:
 		// writes the final Runtime results and waits for writing up to the
-		// shutdown write timeout in total. A capture still unfinished then is
-		// abandoned: it fails and its files are not published. Afterwards no
-		// request is unfinished.
+		// shutdown write timeout in total. Unfinished captures fail. Before the
+		// writer claims publication, a job is abandoned and never publishes files.
+		// Once publication is claimed, its outcome is indeterminate: files may
+		// already exist or appear later. Afterwards no request is unfinished.
 		void FinalizeAfterRenderHost() noexcept;
 
 	private:
@@ -198,8 +200,8 @@ namespace gglab
 		// Publishes the result of a written job; false while it is unfinished.
 		[[nodiscard]] bool TryFinishWritten(Entry& entry) noexcept;
 		void CollectWrittenJobs() noexcept;
-		// Waits for unfinished writing until the shutdown write timeout and
-		// abandons what remains.
+		// Waits for unfinished writing until the shutdown write timeout, then
+		// fails what remains and abandons jobs that have not claimed publication.
 		void FinishWriting() noexcept;
 		void StopWriter() noexcept;
 		void Finish(Entry& entry, FrameCaptureRequestStatus status, std::string failure) noexcept;
@@ -218,8 +220,8 @@ namespace gglab
 		// Shared with the writer thread, which keeps its own reference.
 		std::shared_ptr<WriterState> m_Writer;
 		std::thread m_WriterThread;
-		// A writer that still holds an abandoned capture may be blocked in file
-		// I/O; shutdown then leaves it to finish on its own.
+		// A writer with jobs unfinished at the shutdown timeout may be blocked in
+		// file I/O; shutdown then leaves it to finish on its own.
 		bool m_HasAbandonedJobs = false;
 		uint64_t m_NextRequestId = 1;
 		std::vector<Entry> m_Entries;

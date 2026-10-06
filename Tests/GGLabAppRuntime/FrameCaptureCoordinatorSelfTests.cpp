@@ -658,6 +658,105 @@ namespace gglab
 			return false;
 		}
 
+		void RunWriterQueueLimitTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-queue");
+			const std::filesystem::path rejectedDirectory = directory.GetPath() / "rejected";
+			FakeCaptureControl control;
+			auto gate = std::make_shared<EncoderGate>();
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = [gate](const FrameCaptureImage& image) noexcept
+				{
+					std::unique_lock lock(gate->m_Mutex);
+					gate->m_Entered = true;
+					gate->m_Condition.notify_all();
+					gate->m_Condition.wait(lock, [&gate]() { return gate->m_Released; });
+					return EncodeTestPng(image);
+				},
+				});
+
+			std::vector<uint64_t> acceptedIds{ coordinator.Submit({}) };
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Complete(control.m_Issued[0].m_Id, 1);
+			coordinator.Update();
+			{
+				std::unique_lock lock(gate->m_Mutex);
+				const bool entered = gate->m_Condition.wait_for(lock, std::chrono::seconds(10),
+					[&gate]() { return gate->m_Entered; });
+				context.Check(entered, "The running writer job is blocked before filling its queue");
+			}
+
+			for (uint32_t index = 0; index < 8; ++index)
+			{
+				acceptedIds.push_back(coordinator.Submit({}));
+			}
+			const std::array<uint64_t, 2> rejectedIds{
+				coordinator.Submit({ .m_OutputDirectory = rejectedDirectory }),
+				coordinator.Submit({ .m_OutputDirectory = rejectedDirectory }),
+			};
+			coordinator.BeginFrame(MakeFrameState(true));
+			for (size_t index = 1; index < control.m_Issued.size(); ++index)
+			{
+				control.Complete(control.m_Issued[index].m_Id, 2);
+			}
+			coordinator.Update();
+			const auto rejected = Consume(coordinator);
+			context.Check(rejected.size() == rejectedIds.size() &&
+				rejected[0].m_RequestId == rejectedIds[0] && rejected[1].m_RequestId == rejectedIds[1] &&
+				std::ranges::all_of(rejected, [](const FrameCaptureRequestResult& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Failed &&
+							result.m_Failure == "Capture writer queue is full." &&
+							result.m_ImagePath.empty() && result.m_MetadataPath.empty();
+					}),
+				"A full writer queue immediately fails each new capture with an explicit result");
+			context.Check(coordinator.GetUnfinishedRequestCount() == 9 &&
+				!HasAnyFile(directory.GetPath()),
+				"The writer accepts one running job and exactly eight pending jobs");
+
+			{
+				std::scoped_lock lock(gate->m_Mutex);
+				gate->m_Released = true;
+			}
+			gate->m_Condition.notify_all();
+			std::vector<FrameCaptureRequestResult> completed;
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (completed.size() < acceptedIds.size() &&
+				std::chrono::steady_clock::now() < deadline)
+			{
+				coordinator.Update();
+				coordinator.ConsumeResults(completed);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+			context.Check(completed.size() == acceptedIds.size() &&
+				std::ranges::all_of(acceptedIds, [&completed](uint64_t id)
+					{
+						return std::ranges::count(completed, id,
+							&FrameCaptureRequestResult::m_RequestId) == 1;
+					}) &&
+				std::ranges::all_of(completed, [](const FrameCaptureRequestResult& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Completed &&
+							HasPngSignature(result.m_ImagePath) && !ReadText(result.m_MetadataPath).empty();
+					}),
+				"All accepted writer jobs publish their files and finish exactly once after release");
+
+			const uint64_t resumedId = coordinator.Submit({});
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Complete(control.m_Issued.back().m_Id, 3);
+			coordinator.PrepareForShutdown();
+			coordinator.FinalizeAfterRenderHost();
+			const auto resumed = Consume(coordinator);
+			context.Check(resumed.size() == 1 && resumed[0].m_RequestId == resumedId &&
+				resumed[0].m_Status == FrameCaptureRequestStatus::Completed &&
+				coordinator.GetUnfinishedRequestCount() == 0,
+				"The writer accepts new captures after its pending queue drains");
+			context.Check(!HasAnyFile(rejectedDirectory) && !HasPartialFile(directory.GetPath()),
+				"Captures rejected by a full writer queue never write files after the writer resumes");
+		}
+
 		void RunAbandonedWritingTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-abandon");
@@ -755,6 +854,7 @@ namespace gglab
 		RunShutdownTests(context);
 		RunNameCollisionTests(context);
 		RunWriterThreadTests(context);
+		RunWriterQueueLimitTests(context);
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);
 	}

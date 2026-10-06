@@ -53,10 +53,10 @@ namespace gglab
 			return "unknown";
 		}
 
-		// Decides whether a job's files may appear. The writer claims publication
-		// before it renames the written files into place; shutdown claims the job
-		// as abandoned when it stops waiting for it. The first claim wins, so a
-		// capture reported as abandoned never publishes files afterwards.
+		// Decides whether a job's files may appear. Shutdown can abandon a job
+		// only before the writer claims publication; abandoned jobs never publish.
+		// If the writer claims publication first, its files may already exist or
+		// appear later even when shutdown reports the unfinished job as failed.
 		enum class PublicationClaim : uint8_t
 		{
 			Open,
@@ -106,6 +106,8 @@ namespace gglab
 	{
 		// An encode normally finishes well within a second; a longer one is reported.
 		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
+		// The writer runs one job outside the queue; only pending jobs count here.
+		constexpr size_t MaxPendingEncodeJobs = 8;
 		constexpr size_t MaxFileStemComponentLength = 64;
 
 		// Empty when no gate failed.
@@ -588,8 +590,7 @@ namespace gglab
 				metadata.m_CapturedAtUtc.substr(17, 2))
 			: std::string("unknown-time");
 		const std::string view = metadata.m_Camera.m_ReferenceViewId.empty()
-			? std::string{}
-			: "-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
+			? std::string{} : "-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
 		const std::string baseStem = std::format("{}{}-{}-{}-{}-r{}",
 			SanitizeFileStemComponent(subject), view,
 			GetFrameCaptureSourceName(metadata.m_Source),
@@ -612,6 +613,11 @@ namespace gglab
 		}
 		{
 			std::scoped_lock lock(m_Writer->m_Mutex);
+			if (m_Writer->m_Queue.size() >= MaxPendingEncodeJobs)
+			{
+				Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
+				return;
+			}
 			m_Writer->m_Queue.push_back(std::move(job));
 		}
 		m_Writer->m_Condition.notify_one();
@@ -692,11 +698,13 @@ namespace gglab
 			}
 			else if (!TryFinishWritten(entry))
 			{
-				// The writer claimed publication first and is still renaming files.
+				// Publication started before the timeout. Its outcome is indeterminate:
+				// files may already exist or appear after this failure is reported.
 				m_HasAbandonedJobs = true;
 				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
-					"Publishing did not finish within {} ms of shutdown; the capture files "
-					"may be incomplete.", m_ShutdownWriteTimeout.count()));
+					"Publishing did not finish within {} ms of shutdown; capture publication "
+					"is indeterminate and files may already exist or appear later.",
+					m_ShutdownWriteTimeout.count()));
 			}
 		}
 	}
@@ -712,9 +720,10 @@ namespace gglab
 			m_Writer->m_Stopping = true;
 		}
 		m_Writer->m_Condition.notify_all();
-		// File I/O cannot be interrupted. Every abandoned capture already has its
-		// result, and the writer owns all state it still uses, so a writer that may
-		// be blocked is left to finish on its own instead of holding up shutdown.
+		// File I/O cannot be interrupted. Every capture unfinished at the timeout
+		// already has its failed result, and the writer owns all state it still uses.
+		// A blocked writer is left to finish on its own; jobs that already claimed
+		// publication may still publish files after shutdown reports their failure.
 		if (m_HasAbandonedJobs)
 		{
 			m_WriterThread.detach();
@@ -825,8 +834,8 @@ namespace gglab
 			return failure;
 		}
 
-		// Shutdown may have abandoned the job while it was being written. It then
-		// reported the capture as failed, so its files must not appear.
+		// Shutdown may have abandoned the job before publication started. Only
+		// that claim guarantees that its files never appear after a failed result.
 		PublicationClaim expected = PublicationClaim::Open;
 		if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
 		{
