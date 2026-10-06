@@ -153,6 +153,16 @@ recent capture per key). It reports per pair the mean and maximum absolute
 given. `-MaxMeanError` and `-MaxDifferingPercent` turn it into a check: exit
 code 1 when a pair exceeds them, sizes differ or a capture has no counterpart.
 
+Sidecars with an unsupported `schemaVersion` are listed under `rejected` and
+not compared, which also makes the exit code 1. Each pair lists the frame
+settings that differ between its sidecars under `metadataDifferences`: camera,
+time step, total simulated time, size, content and the like. Backends, request
+ids and capture times are expected to differ and are not listed. Check these
+before reading pixel differences as rendering differences. Sessions on
+different backends can become ready a few frames apart, so `time.totalTime`
+often differs; for content that changes over time, part of the difference then
+comes from the scene itself.
+
 DX12 and Vulkan are not bit-identical. Small mean errors with isolated
 differing pixels are expected; look at the difference images for structured
 differences such as shifted shadows, missing passes or color shifts.

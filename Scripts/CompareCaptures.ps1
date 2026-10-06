@@ -17,8 +17,17 @@ difference, the percentage of pixels whose largest channel difference exceeds
 -Threshold, and PSNR (null for identical images). -DiffDirectory writes one
 amplified absolute-difference PNG per compared pair.
 
+Sidecars must carry a supported schemaVersion; others are listed under
+"rejected" and not compared. Every pair with sidecars lists the frame settings
+that differ between them under "metadataDifferences", such as the camera, the
+time step or the total simulated time. Backend, request id, capture time and
+file names are expected to differ and are not listed. A difference does not
+fail the comparison, but pixel differences of such a pair may come from it
+rather than from rendering.
+
 Prints one JSON object on stdout. The exit code is 0 when every pair was
-compared and stays within the optional tolerances, and 1 otherwise.
+compared and stays within the optional tolerances and no sidecar was rejected,
+and 1 otherwise.
 
 .EXAMPLE
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CompareCaptures.ps1 -Reference Build/Sessions/dx12/Captures -Candidate Build/Sessions/vulkan/Captures -MaxMeanError 1.0
@@ -167,11 +176,85 @@ function Get-Field($Object, [string]$Name) {
     return $null
 }
 
+# Capture sidecar schema versions this script understands.
+$SupportedSchemaVersions = @(1)
+
+# Frame settings that change what a capture shows. Backend, request id, frame
+# serial, capture time and file names are expected to differ between captures.
+$ComparedMetadataFields = @(
+    'source', 'timing.mode', 'timing.settleFrames', 'content.demoId', 'content.labId',
+    'image.width', 'image.height', 'image.displayFormat', 'camera.referenceView',
+    'camera.position', 'camera.forward', 'camera.up', 'camera.verticalFovDegrees',
+    'camera.nearPlane', 'camera.farPlane', 'time.fixedDeltaTime', 'time.totalTime',
+    'developmentTools'
+)
+
+function Get-MetadataValue($Metadata, [string]$Path) {
+    $value = $Metadata
+    foreach ($name in $Path.Split('.')) { $value = Get-Field $value $name }
+    return $value
+}
+
+function Test-SameValue($Left, $Right) {
+    $leftValues = @($Left)
+    $rightValues = @($Right)
+    if ($leftValues.Count -ne $rightValues.Count) { return $false }
+    for ($index = 0; $index -lt $leftValues.Count; ++$index) {
+        $a = $leftValues[$index]
+        $b = $rightValues[$index]
+        if ($a -is [ValueType] -and $b -is [ValueType] -and $a -isnot [bool] -and $b -isnot [bool]) {
+            if ([Math]::Abs([double]$a - [double]$b) -gt 1e-4) { return $false }
+        }
+        elseif ("$a" -cne "$b") {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Get-MetadataDifferences($ReferenceMetadata, $CandidateMetadata) {
+    $differences = @()
+    if ($null -eq $ReferenceMetadata -or $null -eq $CandidateMetadata) { return $differences }
+    foreach ($field in $ComparedMetadataFields) {
+        $referenceValue = Get-MetadataValue $ReferenceMetadata $field
+        $candidateValue = Get-MetadataValue $CandidateMetadata $field
+        if (-not (Test-SameValue $referenceValue $candidateValue)) {
+            $differences += @{ field = $field; reference = $referenceValue; candidate = $candidateValue }
+        }
+    }
+    return $differences
+}
+
+# Reads a capture sidecar; returns the metadata, or a rejection reason.
+function Read-CaptureMetadata([string]$Path) {
+    try {
+        $metadata = Get-Content -Raw -Path $Path | ConvertFrom-Json
+    }
+    catch {
+        return @{ rejected = 'The sidecar is not valid JSON.' }
+    }
+    $version = Get-Field $metadata 'schemaVersion'
+    if ($null -eq $version) {
+        return @{ rejected = 'The sidecar has no schemaVersion.' }
+    }
+    if ($SupportedSchemaVersions -notcontains $version) {
+        return @{ rejected = "Sidecar schemaVersion $version is not supported (supported: $($SupportedSchemaVersions -join ', '))." }
+    }
+    return @{ metadata = $metadata }
+}
+
+$rejected = @()
+
 # Most recent capture per comparison key: content|view|source|label.
 function Get-CaptureIndex([string]$Directory) {
     $index = @{}
     foreach ($file in Get-ChildItem -Path $Directory -Filter '*.json' -File) {
-        $metadata = Get-Content -Raw -Path $file.FullName | ConvertFrom-Json
+        $read = Read-CaptureMetadata $file.FullName
+        if ($read.ContainsKey('rejected')) {
+            $script:rejected += @{ file = $file.FullName; reason = $read.rejected }
+            continue
+        }
+        $metadata = $read.metadata
         $image = Get-Field (Get-Field $metadata 'image') 'file'
         if (-not $image) { continue }
         $imagePath = Join-Path $Directory $image
@@ -184,12 +267,23 @@ function Get-CaptureIndex([string]$Directory) {
         $capturedAt = [string](Get-Field $metadata 'capturedAtUtc')
         if (-not $index.ContainsKey($key) -or $index[$key].capturedAt -lt $capturedAt) {
             $index[$key] = @{
-                key = $key; image = $imagePath; capturedAt = $capturedAt
-                backend = (Get-Field $metadata 'backend')
+                key = $key; image = $imagePath; capturedAt = $capturedAt; metadata = $metadata
             }
         }
     }
     return $index
+}
+
+# Sidecar next to a single image, when there is one.
+function Get-ImageMetadata([string]$ImagePath) {
+    $sidecar = [System.IO.Path]::ChangeExtension($ImagePath, '.json')
+    if (-not (Test-Path $sidecar)) { return $null }
+    $read = Read-CaptureMetadata $sidecar
+    if ($read.ContainsKey('rejected')) {
+        $script:rejected += @{ file = $sidecar; reason = $read.rejected }
+        return $null
+    }
+    return $read.metadata
 }
 
 function Get-DiffPath([string]$Name) {
@@ -199,13 +293,15 @@ function Get-DiffPath([string]$Name) {
     return Join-Path $DiffDirectory "$safe-diff.png"
 }
 
-function Compare-Pair([string]$Key, [string]$ReferenceImage, [string]$CandidateImage) {
+function Compare-Pair([string]$Key, [string]$ReferenceImage, [string]$CandidateImage,
+    $ReferenceMetadata, $CandidateMetadata) {
     $diffPath = Get-DiffPath $Key
     $comparison = [CapturePixelComparer]::Compare($ReferenceImage, $CandidateImage, $Threshold,
         $diffPath, $DiffScale)
     $pair = @{
         key = $Key; reference = $ReferenceImage; candidate = $CandidateImage
         width = $comparison.Width; height = $comparison.Height; sizeMatches = $comparison.SizeMatches
+        metadataDifferences = @(Get-MetadataDifferences $ReferenceMetadata $CandidateMetadata)
     }
     if (-not $comparison.SizeMatches) {
         $pair['pass'] = $false
@@ -231,14 +327,20 @@ if ($DiffDirectory) {
 $pairs = @()
 $unmatched = @()
 if ((Test-Path $Reference -PathType Leaf) -and (Test-Path $Candidate -PathType Leaf)) {
-    $pairs += Compare-Pair ([System.IO.Path]::GetFileNameWithoutExtension($Candidate)) $Reference $Candidate
+    $referenceMetadata = Get-ImageMetadata $Reference
+    $candidateMetadata = Get-ImageMetadata $Candidate
+    if ($rejected.Count -eq 0) {
+        $pairs += Compare-Pair ([System.IO.Path]::GetFileNameWithoutExtension($Candidate)) `
+            $Reference $Candidate $referenceMetadata $candidateMetadata
+    }
 }
 elseif ((Test-Path $Reference -PathType Container) -and (Test-Path $Candidate -PathType Container)) {
     $referenceIndex = Get-CaptureIndex $Reference
     $candidateIndex = Get-CaptureIndex $Candidate
     foreach ($key in ($referenceIndex.Keys | Sort-Object)) {
         if ($candidateIndex.ContainsKey($key)) {
-            $pairs += Compare-Pair $key $referenceIndex[$key].image $candidateIndex[$key].image
+            $pairs += Compare-Pair $key $referenceIndex[$key].image $candidateIndex[$key].image `
+                $referenceIndex[$key].metadata $candidateIndex[$key].metadata
         }
         else {
             $unmatched += @{ key = $key; missingFrom = 'candidate' }
@@ -255,11 +357,15 @@ else {
 }
 
 if ($pairs.Count -eq 0) {
-    Write-Result @{ ok = $false; error = 'No captures could be paired.'; unmatched = $unmatched } 1
+    Write-Result @{
+        ok = $false; error = 'No captures could be paired.'; unmatched = $unmatched; rejected = $rejected
+    } 1
 }
 $failed = @($pairs | Where-Object { -not $_.pass }).Count
-$ok = $failed -eq 0 -and $unmatched.Count -eq 0
+$metadataMismatches = @($pairs | Where-Object { $_.metadataDifferences.Count -gt 0 }).Count
+$ok = $failed -eq 0 -and $unmatched.Count -eq 0 -and $rejected.Count -eq 0
 Write-Result @{
     ok = $ok; compared = $pairs.Count; failed = $failed; threshold = $Threshold
-    pairs = $pairs; unmatched = $unmatched
+    metadataMismatches = $metadataMismatches; pairs = $pairs; unmatched = $unmatched
+    rejected = $rejected
 } $(if ($ok) { 0 } else { 1 })
