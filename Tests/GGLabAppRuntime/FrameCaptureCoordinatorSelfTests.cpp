@@ -3,7 +3,6 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
-#include "GGLabRuntime/Graphics/Capture/FrameCaptureImageEncoding.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <algorithm>
@@ -147,6 +146,16 @@ namespace gglab
 			return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 		}
 
+		// Stands in for the host's PNG encoder: a PNG signature followed by the
+		// image bytes is enough for the publication contracts tested here.
+		[[nodiscard]] std::optional<std::vector<uint8_t>> EncodeTestPng(
+			const FrameCaptureImage& image) noexcept
+		{
+			std::vector<uint8_t> bytes{ 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+			bytes.insert(bytes.end(), image.m_Pixels.begin(), image.m_Pixels.end());
+			return bytes;
+		}
+
 		[[nodiscard]] bool HasPartialFile(const std::filesystem::path& directory) noexcept
 		{
 			std::error_code errorCode;
@@ -176,6 +185,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
 				.m_WriteOnCallingThread = true,
 				});
 
@@ -245,6 +255,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
 				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t id = coordinator.Submit({
@@ -316,6 +327,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
 				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t plain = coordinator.Submit({});
@@ -406,6 +418,7 @@ namespace gglab
 			FakeCaptureControl control;
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
+				.m_ImageEncoder = &EncodeTestPng,
 				.m_WriteOnCallingThread = true,
 				});
 
@@ -446,6 +459,23 @@ namespace gglab
 				otherContentWaiting && cancelledOther.size() == 1,
 				"A failed gate fails waiting after-ready captures of that content at once");
 
+			TemporaryDirectory directory("frame-capture-no-encoder");
+			FrameCaptureCoordinator withoutEncoder({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_WriteOnCallingThread = true,
+				});
+			const uint64_t notEncoded = withoutEncoder.Submit({});
+			withoutEncoder.BeginFrame(MakeFrameState(true));
+			control.Complete(control.m_Issued.back().m_Id, 2);
+			withoutEncoder.Update();
+			const std::vector<FrameCaptureRequestResult> noEncoder = Consume(withoutEncoder);
+			context.Check(noEncoder.size() == 1 && noEncoder[0].m_RequestId == notEncoded &&
+				noEncoder[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				noEncoder[0].m_Failure == "No capture image encoder is configured." &&
+				!std::filesystem::exists(directory.GetPath()),
+				"Without a host image encoder captures fail instead of writing files");
+
 			const uint64_t noDirectory = coordinator.Submit({});
 			coordinator.BeginFrame(MakeFrameState(true));
 			control.Complete(control.m_Issued.back().m_Id, 3);
@@ -464,6 +494,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
 				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t waiting = coordinator.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
@@ -529,6 +560,7 @@ namespace gglab
 			FrameCaptureCoordinator coordinator({
 				.m_Capture = &control,
 				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
 				.m_WriteOnCallingThread = true,
 				});
 			const uint64_t imageTaken = coordinator.Submit({ .m_Label = "shared" });
@@ -577,7 +609,7 @@ namespace gglab
 				.m_ImageEncoder = [testThread, encoderThread](const FrameCaptureImage& image) noexcept
 				{
 					encoderThread->store(std::this_thread::get_id() != testThread);
-					return EncodeFrameCapturePng(image);
+					return EncodeTestPng(image);
 				},
 				});
 			const uint64_t id = coordinator.Submit({});
@@ -595,7 +627,7 @@ namespace gglab
 			context.Check(results.size() == 1 && results[0].m_RequestId == id &&
 				results[0].m_Status == FrameCaptureRequestStatus::Completed &&
 				HasPngSignature(results[0].m_ImagePath) && encoderThread->load(),
-				"The writer thread encodes PNGs without COM set up by its owner and publishes asynchronously");
+				"The writer thread encodes off the frame thread and publishes asynchronously");
 			coordinator.PrepareForShutdown();
 			coordinator.FinalizeAfterRenderHost();
 		}
@@ -645,7 +677,7 @@ namespace gglab
 						gate->m_Entered = true;
 						gate->m_Condition.notify_all();
 						gate->m_Condition.wait(lock, [&gate]() { return gate->m_Released; });
-						return EncodeFrameCapturePng(image);
+						return EncodeTestPng(image);
 					},
 					.m_ShutdownWriteTimeout = std::chrono::milliseconds(200),
 					});

@@ -1,4 +1,5 @@
 #pragma once
+#include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/FrameCaptureReadiness.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -7,7 +8,6 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,11 +17,6 @@
 namespace gglab
 {
 	class FrameCaptureControlBase;
-
-	// Encodes a captured image as the bytes of its PNG file; nullopt when the
-	// image cannot be encoded. Called on the coordinator's writer thread.
-	using FrameCaptureImageEncoder =
-		std::function<std::optional<std::vector<uint8_t>>(const FrameCaptureImage&)>;
 
 	struct FrameCaptureRequest
 	{
@@ -113,7 +108,7 @@ namespace gglab
 		{
 			FrameCaptureControlBase* m_Capture = nullptr;
 			std::filesystem::path m_DefaultOutputDirectory;
-			// Empty selects the platform PNG encoder.
+			// Without an encoder every capture fails when it is written.
 			FrameCaptureImageEncoder m_ImageEncoder;
 			// Total time shutdown waits for unfinished writing before it abandons
 			// the remaining captures.

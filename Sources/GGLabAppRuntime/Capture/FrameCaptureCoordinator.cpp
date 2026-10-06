@@ -2,7 +2,6 @@
 
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
-#include "GGLabRuntime/Graphics/Capture/FrameCaptureImageEncoding.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <algorithm>
@@ -233,13 +232,6 @@ namespace gglab
 		m_WriteOnCallingThread(createInfo.m_WriteOnCallingThread),
 		m_TemporaryTag(CreateTemporaryTag())
 	{
-		if (!m_ImageEncoder)
-		{
-			m_ImageEncoder = [](const FrameCaptureImage& image) noexcept
-				{
-					return EncodeFrameCapturePng(image);
-				};
-		}
 		if (m_WriteOnCallingThread)
 		{
 			return;
@@ -634,14 +626,17 @@ namespace gglab
 			return false;
 		}
 		std::string failure = std::move(job.m_Failure);
-		if (failure.empty())
+		// Decided before the failure moves into Finish: argument evaluation order
+		// is unspecified, so testing it in the same call could see the moved-from text.
+		const FrameCaptureRequestStatus status = failure.empty()
+			? FrameCaptureRequestStatus::Completed
+			: FrameCaptureRequestStatus::Failed;
+		if (status == FrameCaptureRequestStatus::Completed)
 		{
 			entry.m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
 		}
 		lock.unlock();
-		Finish(entry,
-			failure.empty() ? FrameCaptureRequestStatus::Completed : FrameCaptureRequestStatus::Failed,
-			std::move(failure));
+		Finish(entry, status, std::move(failure));
 		return true;
 	}
 
@@ -801,6 +796,10 @@ namespace gglab
 	std::string FrameCaptureCoordinator::WriteAndPublish(
 		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
 	{
+		if (!encoder)
+		{
+			return "No capture image encoder is configured.";
+		}
 		job.m_Stage = EncodeStage::Encoding;
 		const std::optional<std::vector<uint8_t>> encoded =
 			job.m_Image ? encoder(*job.m_Image) : std::nullopt;

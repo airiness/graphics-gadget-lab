@@ -2,6 +2,7 @@
 #include "Application/ApplicationHostConfiguration.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Platform/Windows/Win32FrameCaptureImageEncoder.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
 #include "Application/Platform/Windows/Win32UnattendedProcess.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -183,6 +184,7 @@ int main(int argc, char* argv[])
 	createInfo.m_ContentRegistration = gglab::CreateDesktopApplicationContent();
 	createInfo.m_HostServices.m_TaskWorkerLifecycle =
 		std::make_shared<gglab::win32::Win32TaskWorkerLifecycle>();
+	createInfo.m_HostServices.m_FrameCaptureImageEncoder = &gglab::win32::EncodeFrameCapturePng;
 	createInfo.m_Hidden = launchResult.m_Options.m_Hidden;
 	createInfo.m_SessionId = launchResult.m_Options.m_SessionId.value_or(std::string{});
 	createInfo.m_IdleTimeoutSeconds = launchResult.m_Options.m_IdleTimeoutSeconds;

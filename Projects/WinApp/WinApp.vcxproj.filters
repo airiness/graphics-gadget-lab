@@ -237,6 +237,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\WindowsInputMapping.cpp">
       <Filter>Application\Platform\Windows\Input</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
@@ -277,6 +280,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.cpp">
@@ -581,6 +587,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\WindowsInputMapping.h">
       <Filter>Application\Platform\Windows\Input</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32MessageHandler.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
@@ -624,6 +633,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h">

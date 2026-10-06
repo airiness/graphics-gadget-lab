@@ -159,6 +159,7 @@ namespace gglab
 			FrameCaptureCoordinator::CreateInfo{
 				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
+				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
 			});
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),

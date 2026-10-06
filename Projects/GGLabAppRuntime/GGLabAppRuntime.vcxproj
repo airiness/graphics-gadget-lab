@@ -97,6 +97,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureImageEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureReadiness.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h" />

@@ -66,6 +66,9 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.h">
       <Filter>Capture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureImageEncoder.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.h">
       <Filter>Capture</Filter>
     </ClInclude>

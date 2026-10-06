@@ -111,8 +111,7 @@ $platformLeafPrefixes = @(
 $platformLeafFiles = @(
     "Private/Graphics/RHI/Vulkan/VulkanWin32Surface.h", # Win32 WSI leaf
     "Private/Graphics/RHI/Vulkan/VulkanWin32Surface.cpp", # Win32 WSI leaf
-    "Private/Graphics/Asset/TextureLoader.cpp", # DirectXTex (Windows third-party) consumer
-    "Private/Graphics/Capture/FrameCaptureImageEncoding.cpp" # DirectXTex/WIC capture PNG encoder
+    "Private/Graphics/Asset/TextureLoader.cpp" # DirectXTex (Windows third-party) consumer
 )
 
 # Transitional debt: allowed only with an explicit removal condition.
