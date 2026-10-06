@@ -93,9 +93,12 @@ requests a temporal reset through the existing camera-cut contract. It does not
 create additional render views. Current viewport dimensions and aspect remain
 in effect; the panel reports a mismatch with the intended 16:9 composition.
 
-The reference views use profile version 1. Runtime definitions live in
-[`CoastalAtriumReferenceViews.h`](../../../Sources/WinApp/Application/Demo/CoastalAtriumReferenceViews.h).
-The coordinate system is left-handed, Y-up, in meters. Each perspective camera
+The archived reference views use profile version 1. Their poses and fields of
+view are retained in
+[`CoastalSceneReferenceViews.h`](../../../Sources/WinApp/Application/Demo/CoastalSceneReferenceViews.h).
+The active [Retreat presentation](../GGLabCoastalRetreat/README.md) uses profile
+version 2 with physical daylight, EV100 15 and a 6000 m far plane. The archived
+coordinate system is left-handed, Y-up, in meters. Each perspective camera
 uses near/far distances of 0.1/150 m and derives roll-free orientation from its
 position and target. Blender's horizontal sensor/lens values are converted to
 vertical FOV at the reference aspect, independently of window size.

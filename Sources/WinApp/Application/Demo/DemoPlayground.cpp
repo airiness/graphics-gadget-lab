@@ -1,5 +1,5 @@
 #include "Application/Demo/DemoPlayground.h"
-#include "Application/Demo/CoastalAtriumReferenceViews.h"
+#include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "ApplicationCameraInput.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
@@ -8,11 +8,15 @@
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Graphics/WorldSun.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+
+#include <optional>
 
 namespace gglab
 {
@@ -38,7 +42,7 @@ namespace gglab
 		camCreateInfo.m_Far = 100.0f;
 		camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
 		camCreateInfo.m_ExposureCompensationEV = 0.0f;
-		m_ViewRenderProfile.m_TemporalAA.m_Enabled = false;
+		m_ViewRenderProfile.m_TemporalAA.m_Enabled = m_Content == PlaygroundContent::CoastalAtrium;
 		m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
 		m_ViewRenderProfile.m_PostProcess.m_Bloom.m_Enabled = false;
 		m_Camera = std::make_unique<Camera>(camCreateInfo);
@@ -53,11 +57,12 @@ namespace gglab
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
 		if (m_Content == PlaygroundContent::CoastalAtrium)
 		{
+			m_ViewRenderProfile.m_EnableScenePreExposure = true;
 			const bool registered = m_CameraRig.SetReferenceViews(
-				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
-			GGLAB_ASSERT_MSG(registered, "Coastal atrium reference views must be valid.");
+				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
+			GGLAB_ASSERT_MSG(registered, "Coastal scene reference views must be valid.");
 			const bool restored = m_CameraRig.RestoreReferenceView("Retreat_Overview");
-			GGLAB_ASSERT_MSG(restored, "Coastal atrium must start at its retreat overview reference view.");
+			GGLAB_ASSERT_MSG(restored, "Coastal scene must start at its retreat overview reference view.");
 		}
 
 		// RenderPipeline
@@ -177,16 +182,27 @@ namespace gglab
 
 	void DemoPlayground::OnEnter() noexcept
 	{
+		if (m_HasEnvironmentOverride) return;
 		auto* environmentView = m_Services.m_EnvironmentLighting;
 		auto* environmentControl = m_Services.m_EnvironmentLightingControl;
 		GGLAB_ASSERT_NOT_NULL(environmentView);
 		GGLAB_ASSERT_NOT_NULL(environmentControl);
-		const auto previous = environmentView->GetEnvironmentLightingSettings();
-		m_PreviousEnvironmentIntensity = previous.m_Intensity;
-		m_PreviousSkyboxEnabled = previous.m_EnableSkybox;
+		// Pending Demos own their World but must not override the active environment.
+		m_PreviousEnvironment = environmentView->GetEnvironmentLightingSettings();
 		m_HasEnvironmentOverride = true;
-		environmentControl->SetIntensity(0.0f);
-		environmentControl->SetSkyboxEnabled(false);
+		if (m_Content == PlaygroundContent::CoastalAtrium)
+		{
+			// The Runtime publishes this World's sun, sky and IBL as one completed generation.
+			environmentControl->SetIntensity(1.0f);
+			environmentControl->SetRotationRadians(0.0f);
+			environmentControl->SetSkyboxEnabled(true);
+			environmentControl->SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+		}
+		else
+		{
+			environmentControl->SetIntensity(0.0f);
+			environmentControl->SetSkyboxEnabled(false);
+		}
 	}
 
 	void DemoPlayground::OnResize(uint32_t width, uint32_t height) noexcept
@@ -200,8 +216,13 @@ namespace gglab
 		{
 			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
 			GGLAB_ASSERT_NOT_NULL(environmentControl);
-			environmentControl->SetIntensity(m_PreviousEnvironmentIntensity);
-			environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
+			environmentControl->SetIntensity(m_PreviousEnvironment.m_Intensity);
+			environmentControl->SetSkyboxEnabled(m_PreviousEnvironment.m_EnableSkybox);
+			if (m_Content == PlaygroundContent::CoastalAtrium)
+			{
+				environmentControl->SetRotationRadians(m_PreviousEnvironment.m_RotationRadians);
+				environmentControl->SetBackgroundMode(m_PreviousEnvironment.m_BackgroundMode);
+			}
 			m_HasEnvironmentOverride = false;
 		}
 		m_AssetOwnerScope.Reset();
@@ -223,6 +244,8 @@ namespace gglab
 
 	void DemoPlayground::CommitScene() noexcept
 	{
+		m_World.m_Atmosphere = m_Content == PlaygroundContent::CoastalAtrium
+			? std::optional<AtmosphereSettings>(AtmosphereSettings{}) : std::nullopt;
 		auto& registry = m_World.GetRegistry();
 		for (const PendingModel& pending : m_PendingModels)
 		{
@@ -245,8 +268,9 @@ namespace gglab
 			auto mainLightEntity = registry.create();
 
 			components::TransformComponent transComp{};
+			// Retreat's exported photon direction: 23 degree sun elevation, authored meters.
 			Vector3 direction = m_Content == PlaygroundContent::CoastalAtrium ?
-				Vector3(-1.0f, -0.85f, 0.35f) : Vector3(-0.6f, -1.6f, 0.4f);
+				Vector3(-0.6840816f, -0.3907311f, 0.6159450f) : Vector3(-0.6f, -1.6f, 0.4f);
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
@@ -257,6 +281,11 @@ namespace gglab
 			lightComp.m_Type = LightType::Directional;
 			lightComp.m_Range = 1000.0f;
 			lightComp.m_DirectionalShadowSettings.emplace();
+			if (m_Content == PlaygroundContent::CoastalAtrium)
+			{
+				// TOA illuminance is attenuated by the same atmosphere that lights the sky and IBL.
+				lightComp.m_WorldSun = WorldSunSettings{};
+			}
 			registry.emplace<components::LightComponent>(mainLightEntity, lightComp);
 		}
 	}

@@ -422,7 +422,7 @@ namespace gglab
 		[[nodiscard]] bool ReadGltfMaterialInputs(const Json& material,
 			MaterialProperties& properties, std::string& error) noexcept
 		{
-			// Source JSON owns Material 2.0 extension values and core texture scale/strength.
+			// Source JSON owns glTF material extension values and core texture scale/strength.
 			// Assimp owns core factors and geometry; vendor capability probes belong in tests.
 			const auto extensions = material.find("extensions");
 			if (extensions != material.end())

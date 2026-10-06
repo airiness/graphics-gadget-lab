@@ -52,6 +52,33 @@ factors, texture transforms and instance transforms remain as exported.
 | `Textures/Upholstery_MetallicRoughness.png` | `15ea1ce5c4fc92f21e5588929b044b903ec137fbf15e44abcdb995a571ff1964` |
 | `Textures/Upholstery_Normal.png` | `5f433933356f2de09dcf550a2cc1e1267ce74287d5b7a89795b08a73dcf4b3d6` |
 
+## Physical daylight presentation
+
+The Demo uses physical daylight and opaque PBR shading. Its World has
+the default Earth atmosphere and one designated Physical Sun, aligned with the
+exported reference direction at 23 degrees elevation. The Sun uses 120,000 lux
+top-of-atmosphere perpendicular illuminance and a 0.2666 degree angular radius;
+the atmosphere attenuates direct sunlight consistently with the sky radiance.
+`PhysicalSky` supplies the visible background and baked diffuse/specular IBL.
+The Runtime publishes the Sun, Sky and IBL together after the GPU bake completes.
+Environment intensity is 1, rotation is 0 and the skybox is enabled. The Demo
+retains the selected IBL quality and restores the previous environment settings
+on exit.
+
+All thirteen reference views use profile version 2 with manual EV100 15 and
+zero exposure compensation. They share a 6000 m far plane so the sea and distant
+coast remain visible, including from the retained horizon and interior views.
+Scene pre-exposure is enabled, using
+`1 / (1.2 * 2^15)` for both exposure and pre-exposure. Reference restoration also
+restores this exposure contract after camera or lens edits. Temporal
+anti-aliasing (TAA) is enabled with the Runtime's default settings; GTAO and Bloom
+remain disabled in the Demo's view profile. Reference restoration resets temporal
+history. Allow 64 settled frames per view for repeatable TAA captures.
+The internal view collection is
+`CoastalSceneReferenceViews.h`; `--demo atrium`, the persisted Demo id and all
+existing view ids remain stable. Frozen profile-version-1 captures retain their
+original settings and are not exposure-matched baselines for this presentation.
+
 ## Runtime views and verification
 
 The Demo starts at `Retreat_Overview`. Five new reference views register the
@@ -59,7 +86,8 @@ authored positions, targets and exported vertical FOV in runtime coordinates,
 mapping Blender `(X, Y, Z)` to `(X, Z, Y)` in meters. They use a 0.05 m near plane,
 6000 m far plane and reference aspect 16:10. Camera restoration
 keeps the actual viewport aspect. The eight preceding Atrium reference views
-remain available with their original poses and projections.
+remain available with their original poses, field of view, near planes and
+reference aspects, with the far plane extended to the same coastal range.
 
 | View | Purpose |
 | --- | --- |
@@ -76,8 +104,9 @@ from the same code revision, then run from the code repository root:
 
 ```powershell
 Build/Output/x64/Debug/GraphicsGadgetLab.exe --self-test app-content-registration
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 start -Session retreat-dx12 -Rhi dx12 -Demo atrium -WindowSize 1280x800
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 batch -Session retreat-dx12 -Views Retreat_Hero,Retreat_Courtyard,Retreat_Lounge,Retreat_Planting,Retreat_Overview -SettleFrames 16
+$retreatStateRoot = Join-Path (Get-Location) 'Build/Sessions/retreat-dx12/State'
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 start -Session retreat-dx12 -Rhi dx12 -Demo atrium -WindowSize 1280x800 -NoDevTools -StateRoot $retreatStateRoot
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 batch -Session retreat-dx12 -SettleFrames 64
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 stop -Session retreat-dx12
 ```
 
@@ -87,26 +116,39 @@ cross-backend comparisons. Import checks and shader compilation alone do not
 establish visual correctness.
 
 Local verification on 2026-10-06: Debug WinApp and ShaderCompiler built
-successfully; `app-content-registration` passed all 280 checks using the installed
-assets in this repository. Hidden DX12 and Vulkan sessions each captured all five
-Retreat views at 1280 x 800 after sixteen settled frames. All ten images and
-readiness sidecars were inspected. Geometry, foliage,
-furniture, texture bindings and distant coast were present on both backends.
-The five paired captures had mean absolute RGB differences of 0.0419 to 0.1270
-on the 8-bit scale; at most 0.0061% of pixels exceeded a channel difference of 8.
-Camera and capture settings agreed; total simulation time differed by four
-seconds in this static scene. No assertion, validation error or upload failure
-was reported. The existing HDR FP16 sanitization warning occurred on both runs.
-Release and performance/LOD qualification were not run.
+successfully. `app-content-registration` passed all 293
+checks using the installed assets, including exposure, pre-exposure, coastal
+range and camera restoration for all thirteen reference views.
+`app-devtools-view-profile` passed 35 checks for authoring defaults and session
+overrides. The daylight and reference-view changes also passed the WinApp
+no-PCH gate, project filter metadata and dependency boundary validation.
+
+Hidden DX12 and Vulkan sessions with isolated state each captured all thirteen
+reference views at 1280 x 800 after sixty-four settled frames. All twenty-six
+images and readiness sidecars were inspected. Both logs confirmed atomic
+Physical Sky IBL publication before the captures. Sky radiance, lit materials,
+blue skylight in shadows, furniture, foliage and the distant coast were present
+on both backends. TAA smoothed railings, building edges and vegetation with
+some detail softening; no previous-view history was visible after settling.
+The retained horizon and interior views no longer clip the
+sea at 150 m. All thirteen paired comparisons passed (`MaxMeanError=1`,
+`MaxDifferingPercent=1`, channel threshold 8). Mean absolute RGB differences
+ranged from 0.0266 to 0.1899 on the 8-bit scale; at most 0.1112% of pixels exceeded
+the channel threshold. Camera and capture settings agreed; total simulation
+time differed by 2.3833 seconds in this static scene. No assertion, validation
+error or upload failure was reported. The existing startup HDR FP16 sanitization
+warning occurred on both runs. Vulkan reported one `Shader-OutputNotConsumed`
+performance warning for vertex output location 5. All sessions exited
+successfully. Release, interactive Demo switching, temporal ghosting during
+camera motion and performance/LOD qualification were not run.
 
 ## Presentation limits
 
 GGLab uses the Demo's existing runtime lighting and post-processing. Blender
 World lighting, Cycles, AgX, depth of field and Hero's off-centre lens shift are
 not glTF rendering contracts; the runtime Hero camera uses a symmetric
-projection. The Demo's existing environment override disables IBL and the
-skybox, leaving a black background and dark unlit shadows in these captures.
+projection. Runtime Physical Sun, Sky and IBL use the daylight contract above.
 The sea is static opaque PBR geometry. Vegetation is static
 solid geometry; this import adds no plant LOD, wind animation or performance
-budget guarantee. Existing Atrium/Research Lounge bundles and their frozen
+budget guarantee. Existing Atrium/Research Lounge exports and their frozen
 capture baselines retain their bytes.

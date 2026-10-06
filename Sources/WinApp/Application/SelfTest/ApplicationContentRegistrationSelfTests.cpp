@@ -1,7 +1,7 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
-#include "Application/Demo/CoastalAtriumReferenceViews.h"
+#include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
@@ -13,6 +13,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -944,18 +945,18 @@ namespace gglab
 				"Imported UVs preserve orientation/repeat and mirrored tangents preserve normal-map +Y up" + basisFailure);
 		}
 
-		void CheckCoastalAtriumReferenceViews(SelfTestContext& context) noexcept
+		void CheckCoastalSceneReferenceViews(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
 			CameraController controller(CameraController::CreateInfo{});
 			CameraRig rig;
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
-				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
-			context.Check(registered && CoastalAtriumReferenceViews.size() == 13,
+				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
+			context.Check(registered && CoastalSceneReferenceViews.size() == 13,
 				"Eight retained atrium views and five coastal retreat views register in runtime coordinates");
 			if (!registered) return;
-			for (const auto& reference : CoastalAtriumReferenceViews)
+			for (const auto& reference : CoastalSceneReferenceViews)
 			{
 				const bool restored = rig.RestoreReferenceView(reference.m_Id);
 				const Vector3 targetInView = math::TransformPoint(reference.m_Target, camera.GetViewMatrix());
@@ -964,11 +965,19 @@ namespace gglab
 					targetInView.m_Z > 0.0f && camera.GetFov() == reference.m_VerticalFovDegrees &&
 					camera.GetNear() == reference.m_NearPlane && camera.GetFar() == reference.m_FarPlane,
 					std::format("{} looks at its authored target with the intended perspective projection", reference.m_Id));
+				const auto exposure = ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
+				const float daylightScale = 1.0f / (1.2f * 32768.0f);
+				context.Check(reference.m_ProfileVersion == 2 && camera.GetFar() == 6000.0f &&
+					camera.GetManualEV100() == 15.0f &&
+					exposure.m_EffectiveEV100 == 15.0f && exposure.m_ExposureScale == daylightScale &&
+					exposure.m_PreExposure == daylightScale,
+					std::format("{} retains the coastal range, EV100 15 and consistent physical daylight pre-exposure", reference.m_Id));
 				const auto view = camera.GetViewMatrix().ToArray();
 				const auto projection = camera.GetProjMatrix().ToArray();
 				camera.SetYawPitch(0.5f, 0.2f);
 				camera.SetFov(75.0f);
 				camera.SetNearFar(0.5f, 500.0f);
+				camera.SetManualEV100(5.0f);
 				camera.SetExposureCompensationEV(2.0f);
 				controller.Update(camera, CameraInput{ .m_Front = true }, 0.1f);
 				const auto serial = camera.GetTemporalResetSerial();
@@ -976,7 +985,8 @@ namespace gglab
 				controller.Update(camera, CameraInput{}, 0.1f);
 				camera.Update();
 				context.Check(restoredAgain && camera.GetViewMatrix().ToArray() == view &&
-					camera.GetProjMatrix().ToArray() == projection && camera.GetExposureCompensationEV() == 0.0f &&
+					camera.GetProjMatrix().ToArray() == projection && camera.GetManualEV100() == 15.0f &&
+					camera.GetExposureCompensationEV() == 0.0f &&
 					camera.GetTemporalResetSerial() == serial + 1 && rig.GetLastRestoredReferenceId() == reference.m_Id,
 					std::format("{} restores identical matrices after movement and lens edits; runtime yaw/pitch {:.9g}, {:.9g}; "
 						"vertical FOV {:.9g} deg; aspect {:.9g}", reference.m_Id,
@@ -1413,7 +1423,7 @@ namespace gglab
 			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
-		CheckCoastalAtriumReferenceViews(context);
+		CheckCoastalSceneReferenceViews(context);
 		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.
 		std::thread textureWorker([&]
 			{
