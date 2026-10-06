@@ -13,6 +13,10 @@ Installed-file hashes identify the actual Runtime inputs independently of
 authoring history. Original project fixtures contain no third-party content;
 third-party assets retain their own notices and redistribution requirements.
 
+The current `--demo atrium` uses [Coastal Retreat](GGLabCoastalRetreat/README.md).
+Earlier Atrium and Research Lounge bundles remain available for their recorded
+capture baselines and import checks.
+
 ## Verify installed content
 
 Build WinApp and ShaderCompiler from the same code revision using the setup in

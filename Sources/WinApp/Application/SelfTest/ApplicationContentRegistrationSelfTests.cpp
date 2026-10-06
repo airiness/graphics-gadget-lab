@@ -952,8 +952,8 @@ namespace gglab
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
 				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
-			context.Check(registered && CoastalAtriumReferenceViews.size() == 8,
-				"Four established and four surface-detail coastal atrium views register in runtime coordinates");
+			context.Check(registered && CoastalAtriumReferenceViews.size() == 13,
+				"Eight retained atrium views and five coastal retreat views register in runtime coordinates");
 			if (!registered) return;
 			for (const auto& reference : CoastalAtriumReferenceViews)
 			{
@@ -962,7 +962,7 @@ namespace gglab
 				context.Check(restored && (camera.GetPosition() - reference.m_Position).LengthSquared() == 0.0f &&
 					std::abs(targetInView.m_X) < 0.0001f && std::abs(targetInView.m_Y) < 0.0001f &&
 					targetInView.m_Z > 0.0f && camera.GetFov() == reference.m_VerticalFovDegrees &&
-					camera.GetNear() == 0.1f && camera.GetFar() == 150.0f,
+					camera.GetNear() == reference.m_NearPlane && camera.GetFar() == reference.m_FarPlane,
 					std::format("{} looks at its authored target with the intended perspective projection", reference.m_Id));
 				const auto view = camera.GetViewMatrix().ToArray();
 				const auto projection = camera.GetProjMatrix().ToArray();
@@ -982,6 +982,85 @@ namespace gglab
 						"vertical FOV {:.9g} deg; aspect {:.9g}", reference.m_Id,
 						camera.GetYaw(), camera.GetPitch(), camera.GetFov(), camera.GetAspect()));
 			}
+		}
+
+		void CheckCoastalRetreatContent(SelfTestContext& context) noexcept
+		{
+			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf"), {});
+			context.Check(imported.Succeeded() && imported.m_Model.m_TextureSources.size() == 24,
+				std::format("Coastal retreat geometry and twenty-four surface textures import: {}", imported.m_Error));
+			if (!imported.Succeeded()) return;
+			const auto& model = imported.m_Model;
+			CheckImportedTextures(context, model);
+			constexpr std::array<std::pair<std::string_view, size_t>, 19> expectedTriangles = { {
+				{ "MAT_RetreatStone", 156 },
+				{ "MAT_RetreatLime", 3996 },
+				{ "MAT_RetreatMetal", 14968 },
+				{ "MAT_RetreatTimber", 46900 },
+				{ "MAT_CoastalRock", 5798 },
+				{ "MAT_LoungeCoatedShell", 1460 },
+				{ "MAT_LoungeUpholstery", 752 },
+				{ "MAT_LoungeJoints", 752 },
+				{ "MAT_LoungeBrushedAluminum", 1504 },
+				{ "MAT_RetreatPaint", 2832 },
+				{ "MAT_ServiceSeal", 3500 },
+				{ "MAT_RetreatCeramic", 1784 },
+				{ "MAT_RetreatPaper", 188 },
+				{ "MAT_RetreatSoil", 48 },
+				{ "MAT_RetreatLeaf", 1121968 },
+				{ "MAT_RetreatSilverLeaf", 360900 },
+				{ "MAT_RetreatDryLeaf", 297272 },
+				{ "MAT_RetreatSea", 2 },
+				{ "MAT_RetreatDistantRock", 2298 },
+			} };
+			std::array<size_t, expectedTriangles.size()> triangles{};
+			bool geometryValid = true;
+			for (const auto& mesh : model.m_Meshes)
+			{
+				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
+				for (const auto index : mesh.m_Indices)
+					geometryValid &= index < mesh.m_Vertices.size();
+				for (const auto& vertex : mesh.m_Vertices)
+				{
+					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
+					geometryValid &= std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
+						std::isfinite(vertex.m_Position.m_Z) && std::isfinite(vertex.m_TexCoord0.m_X) &&
+						std::isfinite(vertex.m_TexCoord0.m_Y) && std::abs(vertex.m_Normal.LengthSquared() - 1.0f) < 0.0002f &&
+						std::abs(tangent.LengthSquared() - 1.0f) < 0.0002f &&
+						std::abs(vertex.m_Normal.Dot(tangent)) < 0.0002f && std::abs(std::abs(vertex.m_Tangent.m_W) - 1.0f) < 0.0002f;
+				}
+			}
+			// Count placed geometry through bindings so shared foliage meshes retain every instance.
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				if (instance.m_MeshIndex >= model.m_Meshes.size() || instance.m_MaterialIndex >= model.m_Materials.size())
+				{
+					geometryValid = false;
+					continue;
+				}
+				const auto& material = model.m_Materials[instance.m_MaterialIndex];
+				geometryValid &= material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
+				const auto match = std::ranges::find(expectedTriangles, material.m_Name,
+					&std::pair<std::string_view, size_t>::first);
+				if (match == expectedTriangles.end()) { geometryValid = false; continue; }
+				triangles[static_cast<size_t>(match - expectedTriangles.begin())] +=
+					model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
+				for (const auto slot : { MaterialTextureSlot::BaseColor, MaterialTextureSlot::Normal,
+					MaterialTextureSlot::MetallicRoughness })
+				{
+					const auto& binding = material.m_TextureBindings[static_cast<size_t>(slot)];
+					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex) continue;
+					geometryValid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < model.m_TextureSources.size();
+					if (binding.m_TextureIndex < model.m_TextureSources.size())
+						geometryValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic == GetMaterialTextureSlotSemantic(slot);
+				}
+			}
+			context.Check(geometryValid, "Coastal retreat retains valid opaque geometry, tangent frames and UV0 texture semantics");
+			for (size_t index = 0; index < expectedTriangles.size(); ++index)
+				context.Check(triangles[index] == expectedTriangles[index].second,
+					std::format("Coastal retreat {} retains {} placed triangles (imported={})",
+						expectedTriangles[index].first, expectedTriangles[index].second, triangles[index]));
 		}
 
 		void CheckCoastalAtriumContent(SelfTestContext& context) noexcept
@@ -1342,6 +1421,7 @@ namespace gglab
 				CheckMaterialReferenceImports(context);
 				CheckAnisotropyReferenceImports(context);
 				CheckCoastalAtriumContent(context);
+				CheckCoastalRetreatContent(context);
 				CheckTextureContractContent(context);
 			});
 		textureWorker.join();

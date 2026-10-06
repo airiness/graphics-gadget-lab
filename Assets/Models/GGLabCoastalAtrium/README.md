@@ -6,10 +6,11 @@ Basic concrete, stone and metal surfaces use nine original procedural PNGs.
 Load the `.gltf` with its adjacent `.bin` and `Textures/` directory.
 
 This bundle retains the earlier content reference. The current `--demo atrium`
-loads [the Research Lounge bundle](../GGLabCoastalAtriumResearchLounge/README.md).
+loads [the Coastal Retreat bundle](../GGLabCoastalRetreat/README.md).
 Existing captures below retain their original export identity. Use the recorded
-exported files for those comparisons; the current Demo bundle also includes
-the coated lounge, brushed frame and subsequent coastal/material refinements.
+exported files for those comparisons. The preceding
+[Research Lounge bundle](../GGLabCoastalAtriumResearchLounge/README.md) also remains
+available for its historical captures and import checks.
 
 ## Source
 

@@ -1,5 +1,8 @@
 # Coastal Atrium with Research Lounge
 
+This retained bundle supports historical captures and import checks. The current
+`--demo atrium` loads [Coastal Retreat](../GGLabCoastalRetreat/README.md).
+
 This original project asset combines the Coastal Atrium and coated Research
 Lounge with detailed coastal shelves, dedicated rock textures, eight shared
 boulder instances, static service equipment, refined concrete/metal edges,

@@ -56,8 +56,8 @@ namespace gglab
 			const bool registered = m_CameraRig.SetReferenceViews(
 				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
 			GGLAB_ASSERT_MSG(registered, "Coastal atrium reference views must be valid.");
-			const bool restored = m_CameraRig.RestoreReferenceView(CoastalAtriumReferenceViews.front().m_Id);
-			GGLAB_ASSERT_MSG(restored, "Coastal atrium must start at its courtyard reference view.");
+			const bool restored = m_CameraRig.RestoreReferenceView("Retreat_Overview");
+			GGLAB_ASSERT_MSG(restored, "Coastal atrium must start at its retreat overview reference view.");
 		}
 
 		// RenderPipeline
@@ -80,7 +80,7 @@ namespace gglab
 		if (m_Content == PlaygroundContent::CoastalAtrium)
 		{
 			m_PendingModels = {
-				{ .m_Path = "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf" },
+				{ .m_Path = "Assets/Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf" },
 			};
 		}
 		else

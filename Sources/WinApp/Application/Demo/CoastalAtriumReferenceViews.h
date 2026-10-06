@@ -8,8 +8,8 @@
 namespace gglab
 {
 	// Blender (X, Y, Z) -> runtime (X, Z, Y), meters. Perspective, vertical FOV.
-	// Profile 1 records the greybox composition; it is not Rendering Baseline 1.
-	inline const std::array<CameraReferenceView, 8> CoastalAtriumReferenceViews = { {
+	// Established Atrium poses remain available alongside the authored Retreat views.
+	inline const std::array<CameraReferenceView, 13> CoastalAtriumReferenceViews = { {
 		{
 			.m_Id = "CAM_Courtyard",
 			.m_Name = "Courtyard",
@@ -82,6 +82,63 @@ namespace gglab
 			.m_Target = { 5.75f, 3.065f, -1.22f },
 			.m_VerticalFovDegrees = math::ToDegrees(0.2371180160f),
 			.m_FarPlane = 150.0f,
+		},
+		// Retreat cameras use the source's 16:10 composition and include its distant coast.
+		// Hero uses a symmetric runtime projection; Blender's lens shift is not portable.
+		{
+			.m_Id = "Retreat_Hero",
+			.m_Name = "Retreat Hero",
+			.m_Purpose = "Complete coastal retreat silhouette, sea and distant landforms.",
+			.m_Position = { 25.0f, 12.5f, -35.0f },
+			.m_Target = { -1.4f, 3.65f, -1.0f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.6571063577f),
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "Retreat_Courtyard",
+			.m_Name = "Retreat Courtyard",
+			.m_Purpose = "Window planting, timber screening and the open colonnade.",
+			.m_Position = { 1.8f, 4.0f, -5.5f },
+			.m_Target = { -5.9f, 3.55f, 3.4f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.7640896469f),
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "Retreat_Lounge",
+			.m_Name = "Retreat Lounge",
+			.m_Purpose = "Lounge cushions, notched timber deck and supported table props.",
+			.m_Position = { 8.15f, 3.65f, -5.7f },
+			.m_Target = { 6.35f, 3.25f, -1.2f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.6057697296f),
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "Retreat_Planting",
+			.m_Name = "Retreat Planting",
+			.m_Purpose = "Curved coastal foliage, soil and supported planter seating.",
+			.m_Position = { -2.15f, 3.35f, -7.9f },
+			.m_Target = { -5.2f, 3.02f, -5.35f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.4426289155f),
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "Retreat_Overview",
+			.m_Name = "Retreat Overview",
+			.m_Purpose = "Courtyard circulation, both terraces, stair approach and coast.",
+			.m_Position = { 23.0f, 23.0f, -31.0f },
+			.m_Target = { -1.4f, 2.0f, -2.8f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.6057697296f),
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ReferenceAspect = 1.6f,
 		},
 	} };
 }
