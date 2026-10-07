@@ -48,6 +48,56 @@ float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryA
 		: TAA_HISTORY_INITIAL_AGE;
 }
 
+// PCG3D (Jarzynski and Olano 2020): three decorrelated 32-bit hashes.
+uint3 HashTemporalPcg3d(uint3 value)
+{
+	value = value * 1664525u + 1013904223u;
+	value.x += value.y * value.z;
+	value.y += value.z * value.x;
+	value.z += value.x * value.y;
+	value ^= value >> 16u;
+	value.x += value.y * value.z;
+	value.y += value.z * value.x;
+	value.z += value.x * value.y;
+	return value;
+}
+
+// Rounds a finite non-negative value to one of its two neighbouring half-precision
+// values with a probability proportional to its distance from the other one, so the
+// stored value is unbiased for any accumulation weight. Round-to-nearest storage
+// discards every history update smaller than half a half-precision step; with
+// asymmetric jittered samples the discarded updates do not cancel, and the
+// accumulated color drifts away from the converged mean as the feedback grows.
+// Does not depend on the rounding mode of f32tof16.
+float RoundTemporalHistoryToHalfStochastic(float value, float uniformSample)
+{
+	const uint nearestBits = f32tof16(value);
+	const float nearest = f16tof32(nearestBits);
+	if (!(value > 0.0) || nearest == value)
+	{
+		return nearest;
+	}
+	// For positive half values the adjacent larger and smaller encodings are +1/-1.
+	const bool roundedDown = nearest < value;
+	const float adjacent = f16tof32(roundedDown ? nearestBits + 1u : nearestBits - 1u);
+	const float lower = roundedDown ? nearest : adjacent;
+	const float upper = roundedDown ? adjacent : nearest;
+	const float upperProbability = (value - lower) / (upper - lower);
+	return uniformSample < upperProbability ? upper : lower;
+}
+
+// History color as stored in its half-precision target, stochastically rounded with
+// noise that varies per pixel, channel and temporal frame.
+float3 QuantizeTemporalHistoryColor(float3 color, uint2 pixel, uint temporalFrameIndex)
+{
+	const uint3 hash = HashTemporalPcg3d(uint3(pixel, temporalFrameIndex));
+	const float3 uniformSamples = float3(hash >> 8u) * (1.0 / 16777216.0);
+	return float3(
+		RoundTemporalHistoryToHalfStochastic(color.r, uniformSamples.x),
+		RoundTemporalHistoryToHalfStochastic(color.g, uniformSamples.y),
+		RoundTemporalHistoryToHalfStochastic(color.b, uniformSamples.z));
+}
+
 float2 ResolveTemporalAAOutputAlphas(float nextHistoryAge)
 {
 	return float2(1.0, IsTemporalHistoryAgeValid(nextHistoryAge)

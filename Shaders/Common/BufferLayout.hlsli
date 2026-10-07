@@ -127,5 +127,6 @@ struct ViewData
 	uint PreviousDepthConvention;
 	float ScenePreExposure;
 	float PreviousScenePreExposure;
-	uint Padding;
+	// Frames since the view's temporal history was reset; seeds temporal noise.
+	uint TemporalFrameIndex;
 };

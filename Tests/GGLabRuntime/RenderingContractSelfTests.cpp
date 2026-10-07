@@ -8493,6 +8493,15 @@ namespace gglab
 				NearlyEqual(rasterClip.m_Z, expectedRasterClip.m_Z) &&
 				NearlyEqual(rasterClip.m_W, expectedRasterClip.m_W),
 				"Temporal frame transaction advances only on committed resolve and invalidates on fatal");
+			context.Check(abortedTransaction.GetFrameIndex() == 0 &&
+				committedView.m_TemporalFrameIndex == 0 &&
+				noResolveTransaction.GetFrameIndex() == 1 &&
+				noResolveView.m_TemporalFrameIndex == 1 &&
+				changedSessionView.m_TemporalFrameIndex == 0 &&
+				temporalShadowView.m_TemporalFrameIndex == 0 &&
+				temporalViewHistory.m_NextFrameIndex == 0,
+				"The temporal frame index counts committed frames since the history reset and "
+				"restarts with it");
 
 			TemporalViewHistory submittedViewHistory{};
 			TemporalObjectHistory submittedObjectHistory{};

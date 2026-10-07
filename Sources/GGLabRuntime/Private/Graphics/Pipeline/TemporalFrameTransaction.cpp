@@ -13,6 +13,7 @@ namespace gglab
 	{
 		m_Committed = {};
 		m_NextJitterIndex = 0;
+		m_NextFrameIndex = 0;
 		m_Valid = false;
 	}
 
@@ -71,6 +72,7 @@ namespace gglab
 			(!historyManager || (m_HistoryFrame.m_PreviousValid &&
 				m_HistoryFrame.m_PreviousPreExposure == viewHistory.m_Committed.m_PreExposure));
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
+		m_FrameIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextFrameIndex : 0;
 		m_JitterPixels =
 			plan.m_Active ? temporal::GetJitterSamplePixels(m_JitterIndex) : Vector2::Zero;
 		if (m_ReferenceSample)
@@ -94,6 +96,7 @@ namespace gglab
 
 		view.m_TemporalResetIdentity = m_Plan.m_ResetIdentity;
 		view.m_TemporalSessionIdentity = m_Plan.m_SessionIdentity;
+		view.m_TemporalFrameIndex = m_FrameIndex;
 		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
 			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
 		if (m_Plan.m_Active || m_ReferenceSample)
@@ -304,6 +307,8 @@ namespace gglab
 		m_ViewHistory->m_Committed = m_PendingView;
 		m_ViewHistory->m_NextJitterIndex =
 			(m_JitterIndex + 1) % temporal::JitterSampleCount;
+		// Wraps after 2^32 frames; consumers use it only as a noise seed.
+		m_ViewHistory->m_NextFrameIndex = m_FrameIndex + 1;
 		m_ViewHistory->m_Valid = true;
 		CommitObjectHistory();
 		m_State = TemporalFrameTransactionState::Committed;

@@ -196,7 +196,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		ResolveTemporalHistoryNextAge(accepted, previousHistoryAge);
 	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextHistoryAge);
 	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor), outputAlphas.x);
-	const float4 historyOutput = float4(resolvedOutput.rgb, outputAlphas.y);
+	// The age in alpha is an integer that half precision stores exactly.
+	const float4 historyOutput = float4(QuantizeTemporalHistoryColor(
+		resolvedOutput.rgb, pixel, viewData.TemporalFrameIndex), outputAlphas.y);
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
 	nextHistoryDepth[pixel] = currentRawDepth;

@@ -43,6 +43,7 @@ namespace gglab
 	{
 		TemporalCommittedViewState m_Committed{};
 		uint32_t m_NextJitterIndex = 0;
+		uint32_t m_NextFrameIndex = 0;
 		bool m_Valid = false;
 
 		void Invalidate() noexcept;
@@ -145,6 +146,8 @@ namespace gglab
 
 		[[nodiscard]] TemporalFrameTransactionState GetState() const noexcept { return m_State; }
 		[[nodiscard]] uint32_t GetJitterIndex() const noexcept { return m_JitterIndex; }
+		// Frames since the temporal history was reset, counting this frame from zero.
+		[[nodiscard]] uint32_t GetFrameIndex() const noexcept { return m_FrameIndex; }
 		[[nodiscard]] float GetScenePreExposure() const noexcept { return m_ScenePreExposure; }
 		[[nodiscard]] TemporalColorAbi GetColorAbi() const noexcept { return m_ColorAbi; }
 		[[nodiscard]] const Vector2& GetJitterPixels() const noexcept { return m_JitterPixels; }
@@ -193,6 +196,7 @@ namespace gglab
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		uint32_t m_JitterIndex = 0;
+		uint32_t m_FrameIndex = 0;
 		float m_ScenePreExposure = SceneColorStoragePreExposureV1;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 		bool m_HasCompatiblePreviousView = false;

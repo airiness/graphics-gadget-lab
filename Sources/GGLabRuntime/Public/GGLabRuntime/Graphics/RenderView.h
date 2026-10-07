@@ -55,6 +55,9 @@ namespace gglab
 		uint32_t m_Height = 0;
 		uint64_t m_TemporalResetIdentity = 0;
 		uint64_t m_TemporalSessionIdentity = 0;
+		// Display-view frames since the temporal history was reset; zero for every other
+		// view. A replayed camera-path sequence repeats it exactly.
+		uint32_t m_TemporalFrameIndex = 0;
 
 		DepthConvention m_DepthConvention = DepthConvention::Standard;
 		DepthConvention m_PreviousDepthConvention = DepthConvention::Standard;
