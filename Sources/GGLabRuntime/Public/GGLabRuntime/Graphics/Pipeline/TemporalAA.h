@@ -98,6 +98,31 @@ namespace gglab
 		return saturationAge;
 	}
 
+	// Filter that resamples the previous history color at the reprojected position.
+	// A non-integer reprojection filters the accumulated signal again every frame, so
+	// the filter's low-pass response compounds over the history lifetime.
+	enum class TemporalAAHistoryFilter : uint8_t
+	{
+		// Kept for comparison: its blur compounds under motion.
+		Bilinear,
+		// Five-tap approximation of the 4x4 Catmull-Rom kernel, limited to the range of
+		// the 2x2 history texels around the position. The limit removes overshoot of
+		// the negative lobes beyond the bilinear footprint, such as dark halos around
+		// HDR highlights.
+		CatmullRomClamped,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAHistoryFilterName(
+		TemporalAAHistoryFilter filter) noexcept
+	{
+		switch (filter)
+		{
+		case TemporalAAHistoryFilter::Bilinear: return "bilinear";
+		case TemporalAAHistoryFilter::CatmullRomClamped: return "catmull-rom-clamped";
+		}
+		return "unknown";
+	}
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -107,6 +132,7 @@ namespace gglab
 		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
+		TemporalAAHistoryFilter m_HistoryFilter = TemporalAAHistoryFilter::CatmullRomClamped;
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;
 	};
@@ -140,6 +166,11 @@ namespace gglab
 			? std::clamp(settings.m_NeighborhoodClampExpansion, 0.0f,
 				TemporalAAMaxNeighborhoodClampExpansion)
 			: defaults.m_NeighborhoodClampExpansion;
+		if (settings.m_HistoryFilter != TemporalAAHistoryFilter::Bilinear &&
+			settings.m_HistoryFilter != TemporalAAHistoryFilter::CatmullRomClamped)
+		{
+			settings.m_HistoryFilter = defaults.m_HistoryFilter;
+		}
 		return settings;
 	}
 

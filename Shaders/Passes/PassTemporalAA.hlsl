@@ -58,6 +58,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_COLOR_PREVIEW_BIT) != 0;
 	const bool writeHistoryAgePreview =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_AGE_PREVIEW_BIT) != 0;
+	const bool catmullRomHistory =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_CATMULL_ROM_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
@@ -107,8 +109,11 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				GetSamplerState(g_Pass.LinearClampSamplerIndex);
 			SamplerState pointClampSampler =
 				GetSamplerState(g_Pass.PointClampSamplerIndex);
-			historyColor = previousColorTexture.SampleLevel(
-				linearClampSampler, previousHistoryUV, 0.0).rgb;
+			historyColor = catmullRomHistory
+				? SampleTemporalHistoryCatmullRomClamped(previousColorTexture,
+					linearClampSampler, previousHistoryUV)
+				: previousColorTexture.SampleLevel(
+					linearClampSampler, previousHistoryUV, 0.0).rgb;
 			historyColor = float3(
 				RescaleHistoryColorChannel(historyColor.r, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
 				RescaleHistoryColorChannel(historyColor.g, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),

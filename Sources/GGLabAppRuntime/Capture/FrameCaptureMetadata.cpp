@@ -260,6 +260,7 @@ namespace gglab
 		writer.Number("velocityWeightScale", temporal.m_VelocityWeightScale);
 		writer.Number("luminanceWeightScale", temporal.m_LuminanceWeightScale);
 		writer.Number("neighborhoodClampExpansion", temporal.m_NeighborhoodClampExpansion);
+		writer.String("historyFilter", temporal.m_HistoryFilter);
 		writer.EndObject();
 		writer.BeginArray("renderExtent");
 		writer.Unsigned({}, temporal.m_RenderExtent[0]);

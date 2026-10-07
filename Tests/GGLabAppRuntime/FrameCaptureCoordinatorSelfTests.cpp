@@ -1239,11 +1239,18 @@ namespace gglab
 				const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
 					.m_MaxHistoryFeedback = 0.9f,
 					.m_NeighborhoodClampExpansion = 4.0f,
+					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
 					}, content);
+				TemporalAASettings invalidFilter = content;
+				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
 				context.Check(overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
 					overridden.m_DepthAbsoluteThreshold == 0.25f &&
 					overridden.m_NeighborhoodClampExpansion ==
 					TemporalAAMaxNeighborhoodClampExpansion &&
+					overridden.m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
+					content.m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
+					ResolveTemporalAASettings(invalidFilter).m_HistoryFilter ==
+					TemporalAAHistoryFilter::CatmullRomClamped &&
 					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
 					ResolveTemporalAASettings(content),
 					"Sequence Temporal AA overrides replace only set fields and stay within the "

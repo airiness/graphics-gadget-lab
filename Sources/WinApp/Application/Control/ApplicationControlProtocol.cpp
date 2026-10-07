@@ -156,6 +156,22 @@ namespace gglab
 			} };
 			for (const auto& [key, fieldValue] : value.items())
 			{
+				if (key == "historyFilter")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array filters{ TemporalAAHistoryFilter::Bilinear,
+						TemporalAAHistoryFilter::CatmullRomClamped };
+					const auto filter = std::ranges::find(
+						filters, name, &GetTemporalAAHistoryFilterName);
+					if (filter == filters.end())
+					{
+						return "Temporal AA override 'historyFilter' must be 'bilinear' or "
+							"'catmull-rom-clamped'.";
+					}
+					outOverrides.m_HistoryFilter = *filter;
+					continue;
+				}
 				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
 				if (field == fields.end())
 				{

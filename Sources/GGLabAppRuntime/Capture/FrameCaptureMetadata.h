@@ -60,6 +60,7 @@ namespace gglab
 		float m_VelocityWeightScale = 0.0f;
 		float m_LuminanceWeightScale = 0.0f;
 		float m_NeighborhoodClampExpansion = 0.0f;
+		std::string m_HistoryFilter;
 		std::array<uint32_t, 2> m_RenderExtent{};
 		std::array<uint32_t, 2> m_DisplayExtent{};
 	};

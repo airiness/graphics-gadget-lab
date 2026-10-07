@@ -103,6 +103,11 @@ namespace gglab
 				0.05f, 0.0f, TemporalAAMaxLuminanceWeightScale, "%.2f");
 			ImGui::DragFloat("Clamp Expansion", &settings.m_NeighborhoodClampExpansion,
 				0.005f, 0.0f, TemporalAAMaxNeighborhoodClampExpansion, "%.3f");
+			int historyFilter = static_cast<int>(settings.m_HistoryFilter);
+			if (ImGui::Combo("History Filter", &historyFilter, "Bilinear\0Catmull-Rom (clamped)\0"))
+			{
+				settings.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(historyFilter);
+			}
 		}
 
 		void DrawPreview(DevelopGuiContext& context,

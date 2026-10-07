@@ -101,13 +101,15 @@ namespace gglab
 				"Diagnostic captures and sequences name their tap");
 			const ApplicationControlParseResult evaluation = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
-				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9}})");
+				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,)"
+				R"("historyFilter":"bilinear"}})");
 			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
 				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
 				: nullptr;
 			context.Check(overrides && evaluation.m_Request->m_Sequence.m_GpuTiming &&
 				overrides->m_NeighborhoodClampExpansion == 1.0f &&
-				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale,
+				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale &&
+				overrides->m_HistoryFilter == TemporalAAHistoryFilter::Bilinear,
 				"A sequence request carries its Temporal AA overrides and GPU timing request");
 
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
@@ -145,6 +147,8 @@ namespace gglab
 				{ R"({"protocol":1,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
 				{ R"({"protocol":1,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})", 21 },
 				{ R"({"protocol":1,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})", 22 },
+				{ R"({"protocol":1,"id":26,"command":"sequence","path":"A","temporalAA":{"historyFilter":"bicubic"}})", 26 },
+				{ R"({"protocol":1,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})", 27 },
 				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
 				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
 				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },

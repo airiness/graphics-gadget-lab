@@ -13,9 +13,10 @@ static const uint TAA_REJECTION_BACKGROUND_MISMATCH = 5;
 static const uint TAA_HISTORY_VALID_BIT = 0x80000000u;
 static const uint TAA_HISTORY_COLOR_PREVIEW_BIT = 0x40000000u;
 static const uint TAA_HISTORY_AGE_PREVIEW_BIT = 0x20000000u;
+static const uint TAA_HISTORY_CATMULL_ROM_BIT = 0x10000000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
-	TAA_HISTORY_AGE_PREVIEW_BIT;
+	TAA_HISTORY_AGE_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT;
 static const float TAA_HISTORY_INITIAL_AGE = 1.0;
 // Provisional until feedback tuning freezes the coupled accumulation bound.
 static const float TAA_HISTORY_MAX_AGE = 255.0;
@@ -46,6 +47,56 @@ float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryA
 	return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
 		? min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_AGE)
 		: TAA_HISTORY_INITIAL_AGE;
+}
+
+// Catmull-Rom resampling of the history color with five bilinear fetches: the 4x4
+// kernel's separable weights are folded into bilinear taps along the centre rows and
+// columns, and the four corner taps (the smallest weights) are dropped and the rest
+// renormalized. At a texel centre it returns that texel exactly. The negative lobes
+// overshoot at edges, so the result is limited to the range of the 2x2 texels a
+// bilinear fetch would blend; the caller's neighborhood rectification bounds it
+// further. Temporal 2.0 T1.1 measured the unlimited kernel at about twice the
+// overshoot increase for a few percent less reference error.
+float3 SampleTemporalHistoryCatmullRomClamped(Texture2D<float4> history,
+	SamplerState linearClamp, float2 uv)
+{
+	uint width;
+	uint height;
+	history.GetDimensions(width, height);
+	const float2 extent = float2(width, height);
+	const float2 position = uv * extent;
+	const float2 center1 = floor(position - 0.5) + 0.5;
+	const float2 f = position - center1;
+	const float2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+	const float2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+	const float2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+	const float2 w3 = f * f * (-0.5 + 0.5 * f);
+	const float2 w12 = w1 + w2;
+	const float2 uv0 = (center1 - 1.0) / extent;
+	const float2 uv12 = (center1 + w2 / w12) / extent;
+	const float2 uv3 = (center1 + 2.0) / extent;
+
+	const float weightTop = w12.x * w0.y;
+	const float weightLeft = w0.x * w12.y;
+	const float weightCenter = w12.x * w12.y;
+	const float weightRight = w3.x * w12.y;
+	const float weightBottom = w12.x * w3.y;
+	const float3 sum =
+		history.SampleLevel(linearClamp, float2(uv12.x, uv0.y), 0.0).rgb * weightTop +
+		history.SampleLevel(linearClamp, float2(uv0.x, uv12.y), 0.0).rgb * weightLeft +
+		history.SampleLevel(linearClamp, uv12, 0.0).rgb * weightCenter +
+		history.SampleLevel(linearClamp, float2(uv3.x, uv12.y), 0.0).rgb * weightRight +
+		history.SampleLevel(linearClamp, float2(uv12.x, uv3.y), 0.0).rgb * weightBottom;
+	const float weightSum =
+		weightTop + weightLeft + weightCenter + weightRight + weightBottom;
+	const int2 maxTexel = int2(width, height) - 1;
+	const int2 texel = int2(center1 - 0.5);
+	const float3 c00 = history.Load(int3(clamp(texel, 0, maxTexel), 0)).rgb;
+	const float3 c10 = history.Load(int3(clamp(texel + int2(1, 0), 0, maxTexel), 0)).rgb;
+	const float3 c01 = history.Load(int3(clamp(texel + int2(0, 1), 0, maxTexel), 0)).rgb;
+	const float3 c11 = history.Load(int3(clamp(texel + int2(1, 1), 0, maxTexel), 0)).rgb;
+	return clamp(sum / weightSum, min(min(c00, c10), min(c01, c11)),
+		max(max(c00, c10), max(c01, c11)));
 }
 
 // PCG3D (Jarzynski and Olano 2020): three decorrelated 32-bit hashes.

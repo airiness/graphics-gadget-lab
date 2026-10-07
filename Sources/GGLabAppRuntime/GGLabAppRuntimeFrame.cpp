@@ -206,6 +206,8 @@ namespace gglab
 				.m_VelocityWeightScale = settings.m_VelocityWeightScale,
 				.m_LuminanceWeightScale = settings.m_LuminanceWeightScale,
 				.m_NeighborhoodClampExpansion = settings.m_NeighborhoodClampExpansion,
+				.m_HistoryFilter =
+					std::string(GetTemporalAAHistoryFilterName(settings.m_HistoryFilter)),
 				.m_RenderExtent = extent,
 				.m_DisplayExtent = extent,
 			};

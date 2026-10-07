@@ -27,7 +27,7 @@ Commands:
            -ReferenceSamples <n> renders every frame as a supersampled reference
            of n jittered samples with Temporal AA inactive and time held.
            -TemporalAA "name=value,..." evaluates Temporal AA overrides, such as
-           neighborhoodClampExpansion=1, on every frame. -GpuTiming records
+           neighborhoodClampExpansion=1 or historyFilter=bilinear, on every frame. -GpuTiming records
            per-scope GPU times of the sequence frames.
   sequence-cancel
            Cancel the active sequence.
@@ -244,10 +244,17 @@ function ConvertTo-FrameList([string]$Text) {
 function ConvertTo-TemporalAAOverrides([string]$Text) {
     $overrides = @{}
     foreach ($part in @($Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
-        if ($part -notmatch '^([A-Za-z]+)=([-+0-9.eE]+)$') {
-            Fail "Temporal AA override '$part' is not name=number."
+        if ($part -notmatch '^([A-Za-z]+)=([-+.0-9A-Za-z]+)$') {
+            Fail "Temporal AA override '$part' is not name=value."
         }
-        $overrides[$Matches[1]] = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture)
+        $number = 0.0
+        if ([double]::TryParse($Matches[2], [Globalization.NumberStyles]::Float,
+                [Globalization.CultureInfo]::InvariantCulture, [ref]$number)) {
+            $overrides[$Matches[1]] = $number
+        }
+        else {
+            $overrides[$Matches[1]] = $Matches[2]
+        }
     }
     return $overrides
 }
