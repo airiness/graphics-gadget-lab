@@ -25,6 +25,7 @@ namespace gglab
 
 		constexpr uint32_t MaxSettleFrames = 10000;
 		constexpr size_t MaxSequenceCaptureFrames = 10000;
+		constexpr double MaxReferenceTextureLodBias = 8.0;
 
 		[[nodiscard]] std::string ToUtf8(const std::filesystem::path& path)
 		{
@@ -134,25 +135,29 @@ namespace gglab
 			{
 				std::string_view m_Name;
 				std::optional<float> FrameSequenceTemporalAAOverrides::* m_Member;
+				float m_Min;
 				float m_Max;
 			};
-			constexpr std::array<OverrideField, 6> fields{ {
+			constexpr std::array<OverrideField, 7> fields{ {
 				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback,
-					TemporalAAMaxHistoryFeedbackCeiling },
+					0.0f, TemporalAAMaxHistoryFeedbackCeiling },
 				{ "depthAbsoluteThreshold",
 					&FrameSequenceTemporalAAOverrides::m_DepthAbsoluteThreshold,
-					TemporalAAMaxDepthThreshold },
+					0.0f, TemporalAAMaxDepthThreshold },
 				{ "depthRelativeThreshold",
 					&FrameSequenceTemporalAAOverrides::m_DepthRelativeThreshold,
-					TemporalAAMaxDepthThreshold },
+					0.0f, TemporalAAMaxDepthThreshold },
 				{ "velocityWeightScale", &FrameSequenceTemporalAAOverrides::m_VelocityWeightScale,
-					TemporalAAMaxVelocityWeightScale },
+					0.0f, TemporalAAMaxVelocityWeightScale },
 				{ "luminanceWeightScale",
 					&FrameSequenceTemporalAAOverrides::m_LuminanceWeightScale,
-					TemporalAAMaxLuminanceWeightScale },
+					0.0f, TemporalAAMaxLuminanceWeightScale },
 				{ "neighborhoodClampExpansion",
 					&FrameSequenceTemporalAAOverrides::m_NeighborhoodClampExpansion,
-					TemporalAAMaxNeighborhoodClampExpansion },
+					0.0f, TemporalAAMaxNeighborhoodClampExpansion },
+				{ "textureLodBiasOffset",
+					&FrameSequenceTemporalAAOverrides::m_TextureLodBiasOffset,
+					TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
 			} };
 			for (const auto& [key, fieldValue] : value.items())
 			{
@@ -209,12 +214,13 @@ namespace gglab
 				{
 					return std::format("Unknown Temporal AA override '{}'.", key);
 				}
-				const double number = fieldValue.is_number() ? fieldValue.get<double>() : -1.0;
-				if (!fieldValue.is_number() || !std::isfinite(number) || number < 0.0 ||
+				const double number = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
+				if (!fieldValue.is_number() || !std::isfinite(number) ||
+					number < static_cast<double>(field->m_Min) ||
 					number > static_cast<double>(field->m_Max))
 				{
-					return std::format("Temporal AA override '{}' must be a number from 0 to {}.",
-						key, field->m_Max);
+					return std::format("Temporal AA override '{}' must be a number from {} to {}.",
+						key, field->m_Min, field->m_Max);
 				}
 				outOverrides.*(field->m_Member) = static_cast<float>(number);
 			}
@@ -282,6 +288,17 @@ namespace gglab
 							MaxTemporalReferenceSamples);
 					}
 					sequence.m_ReferenceSamples = value.get<uint32_t>();
+				}
+				else if (key == "referenceTextureLodBias")
+				{
+					const double bias = value.is_number() ? value.get<double>() : 0.0;
+					if (!value.is_number() || !std::isfinite(bias) ||
+						bias < -MaxReferenceTextureLodBias || bias > MaxReferenceTextureLodBias)
+					{
+						return std::format("Field 'referenceTextureLodBias' must be a number from "
+							"{} to {}.", -MaxReferenceTextureLodBias, MaxReferenceTextureLodBias);
+					}
+					sequence.m_ReferenceTextureLodBias = static_cast<float>(bias);
 				}
 				else if (key == "captureFrames")
 				{

@@ -58,6 +58,9 @@ namespace gglab
 		// Display-view frames since the temporal history was reset; zero for every other
 		// view. A replayed camera-path sequence repeats it exactly.
 		uint32_t m_TemporalFrameIndex = 0;
+		// Added to the LOD of material texture samples: the active temporal view's LOD
+		// offset, or a reference's own bias; zero for every other view.
+		float m_TextureLodBias = 0.0f;
 
 		DepthConvention m_DepthConvention = DepthConvention::Standard;
 		DepthConvention m_PreviousDepthConvention = DepthConvention::Standard;

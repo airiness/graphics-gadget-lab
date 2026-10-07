@@ -198,6 +198,11 @@ namespace gglab
 		float PreviousScenePreExposure;
 		// Frames since the view's temporal history was reset; seeds temporal noise.
 		uint32_t TemporalFrameIndex;
+		// Added to the LOD of material texture samples (Temporal 2.0 Section 5.6).
+		float TextureLodBias;
+		uint32_t Padding0;
+		uint32_t Padding1;
+		uint32_t Padding2;
 	};
 	static_assert(std::is_standard_layout_v<ObjectGPU>);
 	static_assert(offsetof(ObjectGPU, ModelMat) == 0);
@@ -230,7 +235,9 @@ namespace gglab
 	static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
 	static_assert(offsetof(ViewGPU, PreviousScenePreExposure) == 472);
 	static_assert(offsetof(ViewGPU, TemporalFrameIndex) == 476);
-	static_assert(sizeof(ViewGPU) == 480);
+	static_assert(offsetof(ViewGPU, TextureLodBias) == 480);
+	static_assert(offsetof(ViewGPU, Padding2) == 492);
+	static_assert(sizeof(ViewGPU) == 496);
 	static constexpr uint32_t MaxViewCapacity =
 		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
 }

@@ -97,6 +97,10 @@ namespace gglab
 		view.m_TemporalResetIdentity = m_Plan.m_ResetIdentity;
 		view.m_TemporalSessionIdentity = m_Plan.m_SessionIdentity;
 		view.m_TemporalFrameIndex = m_FrameIndex;
+		if (m_ReferenceSample)
+		{
+			view.m_TextureLodBias = m_ReferenceSample->m_TextureLodBias;
+		}
 		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
 			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
 		if (m_Plan.m_Active || m_ReferenceSample)

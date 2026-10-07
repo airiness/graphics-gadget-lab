@@ -24,6 +24,12 @@ namespace gglab
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
 	inline constexpr float TemporalAAMaxNeighborhoodClampExpansion = 1.0f;
+	// Temporal 2.0 T1.5: against footprint-matched references -1 recovered most of the
+	// texture detail of -1.5 with a smaller rise in static texture shimmer; it stacks
+	// with log2(render / display) once the resolution split lands.
+	inline constexpr float TemporalAADefaultTextureLodBiasOffset = -1.0f;
+	inline constexpr float TemporalAAMinTextureLodBiasOffset = -2.0f;
+	inline constexpr float TemporalAAMaxTextureLodBiasOffset = 1.0f;
 	inline constexpr uint32_t TemporalAAUnitRangePairMask = 0xffffu;
 	inline constexpr float TemporalAAUnitRangeQuantizationScale =
 		static_cast<float>(TemporalAAUnitRangePairMask);
@@ -187,6 +193,9 @@ namespace gglab
 		TemporalAAHistoryFilter m_HistoryFilter = TemporalAAHistoryFilter::CatmullRomClamped;
 		TemporalAACurrentFilter m_CurrentFilter = TemporalAACurrentFilter::Gaussian;
 		TemporalAAMotionSelection m_MotionSelection = TemporalAAMotionSelection::ClosestDepth;
+		// Material texture LOD offset while Temporal AA is active, added to
+		// log2(render / display) (Temporal 2.0 Section 5.6).
+		float m_TextureLodBiasOffset = TemporalAADefaultTextureLodBiasOffset;
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;
 	};
@@ -235,6 +244,10 @@ namespace gglab
 		{
 			settings.m_MotionSelection = defaults.m_MotionSelection;
 		}
+		settings.m_TextureLodBiasOffset = std::isfinite(settings.m_TextureLodBiasOffset)
+			? std::clamp(settings.m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset,
+				TemporalAAMaxTextureLodBiasOffset)
+			: defaults.m_TextureLodBiasOffset;
 		return settings;
 	}
 

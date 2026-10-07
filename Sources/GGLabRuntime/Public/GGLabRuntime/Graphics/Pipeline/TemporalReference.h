@@ -21,6 +21,10 @@ namespace gglab
 		// Zero starts a new sum; each later sample must follow the previous submitted one.
 		uint32_t m_Index = 0;
 		uint32_t m_Count = 0;
+		// Material texture LOD bias of every sample. Zero filters textures for the whole
+		// pixel before the samples are averaged; -0.5 * log2(m_Count) matches each
+		// sample's sub-pixel footprint instead.
+		float m_TextureLodBias = 0.0f;
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept
 		{

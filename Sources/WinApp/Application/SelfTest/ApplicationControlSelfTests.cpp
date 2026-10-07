@@ -85,7 +85,8 @@ namespace gglab
 				"A sequence request carries its path, capture frames and capture fields");
 			const ApplicationControlParseResult diagnosticSequence = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic",)"
-				R"("diagnosticTap":"temporal-rejection","referenceSamples":64})");
+				R"("diagnosticTap":"temporal-rejection","referenceSamples":64,)"
+				R"("referenceTextureLodBias":-3})");
 			const ApplicationControlParseResult diagnosticCapture = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":14,"command":"capture","source":"diagnostic",)"
 				R"("diagnosticTap":"temporal-history-weight"})");
@@ -95,6 +96,7 @@ namespace gglab
 				diagnosticSequence.m_Request->m_Sequence.m_DiagnosticTap ==
 				PostProcessDebugTap::TemporalRejection &&
 				diagnosticSequence.m_Request->m_Sequence.m_ReferenceSamples == 64 &&
+				diagnosticSequence.m_Request->m_Sequence.m_ReferenceTextureLodBias == -3.0f &&
 				diagnosticCapture.m_Request &&
 				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap ==
 				PostProcessDebugTap::TemporalHistoryWeight,
@@ -103,7 +105,7 @@ namespace gglab
 				R"({"protocol":1,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
 				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,)"
 				R"("historyFilter":"bilinear","currentFilter":"point",)"
-				R"("motionSelection":"center"}})");
+				R"("motionSelection":"center","textureLodBiasOffset":-1.5}})");
 			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
 				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
 				: nullptr;
@@ -112,7 +114,8 @@ namespace gglab
 				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale &&
 				overrides->m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
 				overrides->m_CurrentFilter == TemporalAACurrentFilter::Point &&
-				overrides->m_MotionSelection == TemporalAAMotionSelection::Center,
+				overrides->m_MotionSelection == TemporalAAMotionSelection::Center &&
+				overrides->m_TextureLodBiasOffset == -1.5f,
 				"A sequence request carries its Temporal AA overrides and GPU timing request");
 
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
@@ -156,6 +159,8 @@ namespace gglab
 				{ R"({"protocol":1,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})", 29 },
 				{ R"({"protocol":1,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})", 30 },
 				{ R"({"protocol":1,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})", 31 },
+				{ R"({"protocol":1,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})", 32 },
+				{ R"({"protocol":1,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})", 33 },
 				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
 				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
 				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },

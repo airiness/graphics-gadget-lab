@@ -121,6 +121,8 @@ namespace gglab
 				settings.m_MotionSelection =
 					static_cast<TemporalAAMotionSelection>(motionSelection);
 			}
+			ImGui::SliderFloat("Texture LOD Bias Offset", &settings.m_TextureLodBiasOffset,
+				TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset, "%.2f");
 		}
 
 		void DrawPreview(DevelopGuiContext& context,

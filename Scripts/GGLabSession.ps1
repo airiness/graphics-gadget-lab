@@ -25,7 +25,8 @@ Commands:
            -Source diagnostic -DiagnosticTap <tap> records one diagnostic tap,
            such as temporal-history-weight, instead of the scene.
            -ReferenceSamples <n> renders every frame as a supersampled reference
-           of n jittered samples with Temporal AA inactive and time held.
+           of n jittered samples with Temporal AA inactive and time held;
+           -ReferenceTextureLodBias <b> adds b to its material texture LOD.
            -TemporalAA "name=value,..." evaluates Temporal AA overrides, such as
            neighborhoodClampExpansion=1 or historyFilter=bilinear, on every frame. -GpuTiming records
            per-scope GPU times of the sequence frames.
@@ -92,6 +93,7 @@ param(
     [string]$CaptureFrames,
     [ValidateRange(0, 4096)]
     [int]$ReferenceSamples = 0,
+    [double]$ReferenceTextureLodBias = 0,
     [string]$TemporalAA,
     [switch]$GpuTiming,
 
@@ -415,6 +417,7 @@ switch ($Command) {
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
+        if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
         if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-TemporalAAOverrides $TemporalAA) }
         if ($GpuTiming) { $request['gpuTiming'] = $true }
         if ($Label) { $request['label'] = $Label }

@@ -2407,6 +2407,10 @@ namespace gglab
 				GPUAbiMember{ "ScenePreExposure", offsetof(ViewGPU, ScenePreExposure) },
 				GPUAbiMember{ "PreviousScenePreExposure", offsetof(ViewGPU, PreviousScenePreExposure) },
 				GPUAbiMember{ "TemporalFrameIndex", offsetof(ViewGPU, TemporalFrameIndex) },
+				GPUAbiMember{ "TextureLodBias", offsetof(ViewGPU, TextureLodBias) },
+				GPUAbiMember{ "Padding0", offsetof(ViewGPU, Padding0) },
+				GPUAbiMember{ "Padding1", offsetof(ViewGPU, Padding1) },
+				GPUAbiMember{ "Padding2", offsetof(ViewGPU, Padding2) },
 			};
 			for (const GPUAbiMember& member : viewGPUAbiMembers)
 			{

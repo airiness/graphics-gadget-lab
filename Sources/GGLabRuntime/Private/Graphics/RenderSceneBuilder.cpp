@@ -80,6 +80,7 @@ namespace gglab
 			viewGpu.ScenePreExposure = renderView.m_ScenePreExposure;
 			viewGpu.PreviousScenePreExposure = renderView.m_PreviousScenePreExposure;
 			viewGpu.TemporalFrameIndex = renderView.m_TemporalFrameIndex;
+			viewGpu.TextureLodBias = renderView.m_TextureLodBias;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
 			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);

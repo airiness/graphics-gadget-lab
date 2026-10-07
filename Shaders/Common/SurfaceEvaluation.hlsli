@@ -102,7 +102,7 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	// Metallic/roughness: sampled from the shared texture channel layout
 	// (B=metallic, G=roughness) and multiplied by the runtime factors.
 	const float2 metallicRoughnessUV = SelectUV(matData.MetallicRoughnessBinding, uv0, uv1);
-	const float4 metallicRoughnessSampled = SampleTextureBinding(
+	const float4 metallicRoughnessSampled = SampleMaterialTextureBinding(
 		matData.MetallicRoughnessBinding.TextureSamplerBinding, metallicRoughnessUV);
 	surface.Metallic = saturate(matData.MetallicFactor * metallicRoughnessSampled.b);
 	surface.Roughness = saturate(matData.RoughnessFactor * metallicRoughnessSampled.g);
@@ -113,7 +113,7 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 		if (matData.ClearcoatBinding.TextureEnabled != 0u)
 		{
 			const float2 factorUV = SelectUV(matData.ClearcoatBinding, uv0, uv1);
-			surface.ClearcoatFactor *= SampleTextureBinding(
+			surface.ClearcoatFactor *= SampleMaterialTextureBinding(
 				matData.ClearcoatBinding.TextureSamplerBinding, factorUV).r;
 		}
 	}
@@ -126,7 +126,7 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 		matData.ClearcoatRoughnessBinding.TextureEnabled != 0u)
 	{
 		const float2 roughnessUV = SelectUV(matData.ClearcoatRoughnessBinding, uv0, uv1);
-		surface.ClearcoatRoughness *= SampleTextureBinding(
+		surface.ClearcoatRoughness *= SampleMaterialTextureBinding(
 			matData.ClearcoatRoughnessBinding.TextureSamplerBinding, roughnessUV).g;
 	}
 	surface.AnisotropyStrength = saturate(matData.AnisotropyStrength);
@@ -138,7 +138,7 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 		if (matData.AnisotropyBinding.TextureEnabled != 0u)
 		{
 			const float2 anisotropyUV = SelectUV(matData.AnisotropyBinding, uv0, uv1);
-			const float3 anisotropySample = SampleTextureBinding(
+			const float3 anisotropySample = SampleMaterialTextureBinding(
 				matData.AnisotropyBinding.TextureSamplerBinding, anisotropyUV).rgb;
 			surface.AnisotropyStrength *= anisotropySample.b;
 			const float2 sampledDirection = anisotropySample.rg * 2.0 - 1.0;
@@ -157,7 +157,7 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	// Emissive retains the runtime factor scale.
 	// A scene-referred emissive-unit migration requires a separate contract.
 	const float2 emissiveUV = SelectUV(matData.EmissiveBinding, uv0, uv1);
-	surface.Emissive = SampleTextureBinding(
+	surface.Emissive = SampleMaterialTextureBinding(
 		matData.EmissiveBinding.TextureSamplerBinding, emissiveUV).rgb *
 		matData.EmissiveColorFactor.rgb;
 

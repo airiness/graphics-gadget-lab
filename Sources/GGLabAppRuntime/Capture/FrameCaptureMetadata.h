@@ -63,6 +63,9 @@ namespace gglab
 		std::string m_HistoryFilter;
 		std::string m_CurrentFilter;
 		std::string m_MotionSelection;
+		float m_TextureLodBiasOffset = 0.0f;
+		// LOD bias the frame's material textures used.
+		float m_TextureLodBias = 0.0f;
 		std::array<uint32_t, 2> m_RenderExtent{};
 		std::array<uint32_t, 2> m_DisplayExtent{};
 	};
@@ -77,6 +80,7 @@ namespace gglab
 		uint32_t m_FrameCount = 0;
 		// Samples of a supersampled reference frame; zero for an ordinary sequence.
 		uint32_t m_ReferenceSamples = 0;
+		float m_ReferenceTextureLodBias = 0.0f;
 	};
 
 	// Everything a capture records about the frame that produced it. Frame-state

@@ -1189,10 +1189,16 @@ namespace gglab
 			std::string error;
 			const uint64_t tooMany = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
 				.m_ReferenceSamples = MaxTemporalReferenceSamples + 1 }, error);
+			std::string biasError;
+			const uint64_t biasWithoutReference = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_ReferenceTextureLodBias = -1.0f,
+				}, biasError);
 			const uint64_t id = harness.m_Sequence.Start({
 				.m_CameraPathId = "SEQ_Test",
 				.m_CaptureFrames = { 1 },
 				.m_ReferenceSamples = 3,
+				.m_ReferenceTextureLodBias = -0.75f,
 				}, error);
 			harness.Frame();
 
@@ -1200,12 +1206,15 @@ namespace gglab
 			std::vector<uint32_t> samples;
 			std::vector<bool> heldBefore;
 			std::vector<size_t> issued;
+			bool everySampleBiased = true;
 			while (harness.m_Sequence.IsActive() && frames.size() < 30)
 			{
 				heldBefore.push_back(harness.m_Sequence.ShouldHoldTime());
 				const std::optional<uint32_t> frame = harness.Frame();
 				frames.push_back(frame.value_or(999));
 				samples.push_back(harness.m_LastSample ? harness.m_LastSample->m_Index : 999);
+				everySampleBiased &= !harness.m_LastSample ||
+					harness.m_LastSample->m_TextureLodBias == -0.75f;
 				issued.push_back(harness.m_Control.m_Issued.size());
 			}
 			const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
@@ -1227,6 +1236,11 @@ namespace gglab
 				capture->m_Metadata->m_Sequence->m_Frame == 1 &&
 				capture->m_Metadata->m_Sequence->m_ReferenceSamples == 3,
 				"A reference frame is captured once, after its last sample");
+			context.Check(biasWithoutReference == 0 && !biasError.empty() && everySampleBiased &&
+				capture != harness.m_Results.end() &&
+				capture->m_Metadata->m_Sequence->m_ReferenceTextureLodBias == -0.75f,
+				"Every reference sample carries the requested texture LOD bias, recorded in the "
+				"sidecar; it requires reference samples");
 		}
 
 		void RunFrameSequenceEvaluationTests(SelfTestContext& context) noexcept

@@ -199,6 +199,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
     -CameraPath SEQ_StaticRailings -CaptureFrames 0 -ReferenceSamples 256 -Label static-ref
 ```
 
+`-ReferenceTextureLodBias <b>` adds b to the material texture LOD of every
+reference sample. The default 0 filters textures for the whole pixel before the
+samples are averaged; `-0.5 * log2(n)` filters each sample for its own sub-pixel
+footprint instead, which keeps texture detail that a pixel-sized prefilter removes.
+
 A reference renders n frames per sequence frame for the whole path; capture
 the frames you need and cancel with `sequence-cancel` once their captures
 finished. Choose n by comparing references of n and 2n samples. Sidecars record
@@ -213,9 +218,10 @@ history reset at frame 0. The names are `maxHistoryFeedback`,
 `depthAbsoluteThreshold`, `depthRelativeThreshold`, `velocityWeightScale`,
 `luminanceWeightScale` and `neighborhoodClampExpansion`, `historyFilter`
 (`catmull-rom-clamped`, the default, or `bilinear`) and `currentFilter`
-(`gaussian`, the default, or `point`) and `motionSelection` (`closest-depth`, the
-default, or `center`); a value outside the setting's range is rejected rather than
-clamped. Unset settings keep the
+(`gaussian`, the default, or `point`), `motionSelection` (`closest-depth`, the
+default, or `center`) and `textureLodBiasOffset` (-2 to 1, default -1, the material
+texture LOD offset while Temporal AA is active); a value outside the setting's range
+is rejected rather than clamped. Unset settings keep the
 content's values, and sidecars record the effective settings in `temporal`.
 A reference takes no overrides.
 

@@ -263,7 +263,9 @@ namespace gglab
 		writer.String("historyFilter", temporal.m_HistoryFilter);
 		writer.String("currentFilter", temporal.m_CurrentFilter);
 		writer.String("motionSelection", temporal.m_MotionSelection);
+		writer.Number("textureLodBiasOffset", temporal.m_TextureLodBiasOffset);
 		writer.EndObject();
+		writer.Number("textureLodBias", temporal.m_TextureLodBias);
 		writer.BeginArray("renderExtent");
 		writer.Unsigned({}, temporal.m_RenderExtent[0]);
 		writer.Unsigned({}, temporal.m_RenderExtent[1]);
@@ -283,6 +285,8 @@ namespace gglab
 			writer.Unsigned("frame", metadata.m_Sequence->m_Frame);
 			writer.Unsigned("frameCount", metadata.m_Sequence->m_FrameCount);
 			writer.Unsigned("referenceSamples", metadata.m_Sequence->m_ReferenceSamples);
+			writer.Number("referenceTextureLodBias",
+				metadata.m_Sequence->m_ReferenceTextureLodBias);
 			writer.EndObject();
 		}
 		else

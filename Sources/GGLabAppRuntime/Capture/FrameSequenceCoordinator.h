@@ -29,6 +29,7 @@ namespace gglab
 		std::optional<TemporalAAHistoryFilter> m_HistoryFilter;
 		std::optional<TemporalAACurrentFilter> m_CurrentFilter;
 		std::optional<TemporalAAMotionSelection> m_MotionSelection;
+		std::optional<float> m_TextureLodBiasOffset;
 
 		[[nodiscard]] bool IsEmpty() const noexcept;
 	};
@@ -62,6 +63,8 @@ namespace gglab
 		// jittered samples, with Temporal AA inactive and simulation time held; a
 		// capture records the mean after the last sample.
 		uint32_t m_ReferenceSamples = 0;
+		// Material texture LOD bias of every reference sample; only valid for a reference.
+		float m_ReferenceTextureLodBias = 0.0f;
 		// Applied to every sequence frame. Frame 0 resets temporal history, so the run
 		// evaluates one configuration from its first frame. Not valid for a reference.
 		FrameSequenceTemporalAAOverrides m_TemporalAAOverrides;

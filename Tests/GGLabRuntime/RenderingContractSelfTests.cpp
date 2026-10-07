@@ -7667,7 +7667,7 @@ namespace gglab
 
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext& context) noexcept
 		{
-			static_assert(sizeof(ViewGPU) == 480);
+			static_assert(sizeof(ViewGPU) == 496);
 			static_assert(offsetof(ViewGPU, PreviousViewMat) == 256);
 			static_assert(offsetof(ViewGPU, PreviousDepthReconstructionParams) == 400);
 			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
@@ -8502,6 +8502,29 @@ namespace gglab
 				temporalViewHistory.m_NextFrameIndex == 0,
 				"The temporal frame index counts committed frames since the history reset and "
 				"restarts with it");
+
+			ResolvedViewRenderSettings biasedSettings = enabledSettings;
+			biasedSettings.m_TemporalAA.m_TextureLodBiasOffset = -0.75f;
+			ResolvedTemporalFramePlan inactivePlan = activePlan;
+			inactivePlan.m_Active = false;
+			const auto buildBiasedView = [&](const ResolvedTemporalFramePlan& plan) noexcept
+				{
+					return viewBuilder.Build<RenderViewID::Main>({
+						.m_Camera = camera,
+						.m_RenderSettings = biasedSettings,
+						.m_TemporalFramePlan = plan,
+						.m_Width = 1920,
+						.m_Height = 1080,
+					});
+				};
+			TemporalAASettings outOfRangeBias{};
+			outOfRangeBias.m_TextureLodBiasOffset = -5.0f;
+			context.Check(buildBiasedView(activePlan).m_TextureLodBias == -0.75f &&
+				buildBiasedView(inactivePlan).m_TextureLodBias == 0.0f &&
+				temporalShadowView.m_TextureLodBias == 0.0f &&
+				ResolveTemporalAASettings(outOfRangeBias).m_TextureLodBiasOffset ==
+				TemporalAAMinTextureLodBiasOffset,
+				"Only an active temporal display view carries the texture LOD offset");
 
 			TemporalViewHistory submittedViewHistory{};
 			TemporalObjectHistory submittedObjectHistory{};

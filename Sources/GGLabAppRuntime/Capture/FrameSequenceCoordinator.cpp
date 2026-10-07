@@ -15,7 +15,7 @@ namespace gglab
 		return !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
 			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
 			!m_NeighborhoodClampExpansion && !m_HistoryFilter && !m_CurrentFilter &&
-			!m_MotionSelection;
+			!m_MotionSelection && !m_TextureLodBiasOffset;
 	}
 
 	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
@@ -38,6 +38,8 @@ namespace gglab
 		settings.m_CurrentFilter = overrides.m_CurrentFilter.value_or(settings.m_CurrentFilter);
 		settings.m_MotionSelection =
 			overrides.m_MotionSelection.value_or(settings.m_MotionSelection);
+		settings.m_TextureLodBiasOffset =
+			overrides.m_TextureLodBiasOffset.value_or(settings.m_TextureLodBiasOffset);
 		return ResolveTemporalAASettings(settings);
 	}
 
@@ -148,6 +150,11 @@ namespace gglab
 		{
 			outError = std::format("A reference uses at most {} samples per frame.",
 				MaxTemporalReferenceSamples);
+			return 0;
+		}
+		if (request.m_ReferenceSamples == 0 && request.m_ReferenceTextureLodBias != 0.0f)
+		{
+			outError = "A reference texture LOD bias requires reference samples.";
 			return 0;
 		}
 		if (request.m_ReferenceSamples > 0 && !request.m_TemporalAAOverrides.IsEmpty())
@@ -306,6 +313,7 @@ namespace gglab
 				: std::optional(TemporalReferenceSample{
 					.m_Index = m_Sample,
 					.m_Count = m_Request.m_ReferenceSamples,
+					.m_TextureLodBias = m_Request.m_ReferenceTextureLodBias,
 				}),
 			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
 		};
@@ -363,6 +371,7 @@ namespace gglab
 					.m_Frame = m_Frame,
 					.m_FrameCount = m_Status->m_FrameCount,
 					.m_ReferenceSamples = m_Request.m_ReferenceSamples,
+					.m_ReferenceTextureLodBias = m_Request.m_ReferenceTextureLodBias,
 				},
 				.m_DiagnosticTap = m_Request.m_DiagnosticTap,
 				});

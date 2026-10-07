@@ -449,6 +449,7 @@ ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_I
 float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 #endif
 {
+	SetMaterialTextureLodBias(IN.MaterialTextureLodBias);
 	const ShadowReceiverPlane shadowReceiver = BuildShadowReceiverPlane(IN.PositionWS);
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 
@@ -512,7 +513,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
 	float aoSampled =
-		SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, occlusionUV).r;
+		SampleMaterialTextureBinding(matData.OcclusionBinding.TextureSamplerBinding,
+			occlusionUV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 	const float gtao = LoadGTAO(uint2(IN.PositionCS.xy));
