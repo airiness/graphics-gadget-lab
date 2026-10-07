@@ -2,6 +2,9 @@
 
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureMetadata.h"
+#include "Capture/FrameSequenceCoordinator.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabTestCore/SelfTest.h"
 
@@ -845,6 +848,204 @@ namespace gglab
 		}
 	}
 
+	namespace
+	{
+		[[nodiscard]] CameraPath MakeSequenceTestPath()
+		{
+			const auto key = [](uint32_t frame, float x, bool cut = false)
+				{
+					return CameraPathKey{ .m_Frame = frame, .m_Position = { x, 1.0f, 0.0f },
+						.m_Target = { x, 1.0f, 10.0f }, .m_Cut = cut };
+				};
+			return {
+				.m_Id = "SEQ_Test",
+				.m_Name = "Test",
+				.m_Version = 2,
+				.m_Keys = { key(0, 0.0f), key(3, 3.0f), key(4, 40.0f, true), key(5, 41.0f) },
+			};
+		}
+
+		// Stands in for the runtime frame loop: poses the frame, builds its state,
+		// issues captures, submits it and completes every issued Runtime capture.
+		struct SequenceHarness
+		{
+			explicit SequenceHarness(const std::filesystem::path& directory) noexcept :
+				m_Capture({
+					.m_Capture = &m_Control,
+					.m_DefaultOutputDirectory = directory,
+					.m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true,
+					}),
+				m_Sequence(m_Capture)
+			{
+				m_Paths.push_back(MakeSequenceTestPath());
+			}
+
+			// Renders one frame; returns the posed sequence frame, if any.
+			std::optional<uint32_t> Frame(bool submit = true, uint64_t temporalSession = 1)
+			{
+				const std::optional<FrameSequencePoseRequest> pose =
+					m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
+				if (pose)
+				{
+					const std::optional<CameraPathPose> applied =
+						EvaluateCameraPath(m_Paths.front(), pose->m_Frame);
+					if (applied && applied->m_Cut)
+					{
+						++m_CameraResetSerial;
+					}
+					m_Sequence.OnPoseApplied(applied);
+				}
+				FrameCaptureFrameState state = MakeFrameState(m_Ready, temporalSession);
+				state.m_SettleKey.m_CameraResetSerial = m_CameraResetSerial;
+				m_Sequence.BeginFrame(state);
+				m_Capture.BeginFrame(std::move(state));
+				if (submit)
+				{
+					m_Capture.OnFrameSubmitted();
+					m_Sequence.OnFrameSubmitted();
+				}
+				for (; m_Completed < m_Control.m_Issued.size(); ++m_Completed)
+				{
+					m_Control.Complete(m_Control.m_Issued[m_Completed].m_Id, 7);
+				}
+				m_Capture.Update();
+				m_Sequence.OnCaptureResults(Consume(m_Capture));
+				return pose ? std::optional<uint32_t>(pose->m_Frame) : std::nullopt;
+			}
+
+			FakeCaptureControl m_Control;
+			FrameCaptureCoordinator m_Capture;
+			FrameSequenceCoordinator m_Sequence;
+			std::vector<CameraPath> m_Paths;
+			uint64_t m_CameraResetSerial = 1;
+			size_t m_Completed = 0;
+			bool m_Ready = true;
+		};
+
+		void RunFrameSequenceTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence");
+			SequenceHarness harness(directory.GetPath());
+			std::string error;
+			const uint64_t id = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 5, 1, 1 },
+				.m_Label = "run",
+				}, error);
+			std::string busyError;
+			context.Check(id != 0 && harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" },
+				busyError) == 0 && !busyError.empty(),
+				"Only one sequence runs at a time");
+
+			harness.m_Ready = false;
+			const std::optional<uint32_t> beforeFrames = harness.Frame();
+			const std::optional<uint32_t> notReady = harness.Frame();
+			harness.m_Ready = true;
+			const std::optional<uint32_t> readyPrevious = harness.Frame();
+			context.Check(!beforeFrames && !notReady && !readyPrevious &&
+				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Waiting,
+				"A sequence waits until a rendered frame reports every readiness gate ready");
+
+			std::vector<uint32_t> posed;
+			std::vector<size_t> issuedAfterFrame;
+			for (uint32_t frame = 0; frame < 6; ++frame)
+			{
+				if (frame == 2)
+				{
+					// A frame that ends without submission is posed again.
+					const std::optional<uint32_t> skipped = harness.Frame(false);
+					context.Check(skipped == 2u, "An unsubmitted frame keeps its sequence frame");
+				}
+				const std::optional<uint32_t> pose = harness.Frame();
+				posed.push_back(pose.value_or(999));
+				issuedAfterFrame.push_back(harness.m_Control.m_Issued.size());
+			}
+			const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+			context.Check(posed == std::vector<uint32_t>{ 0, 1, 2, 3, 4, 5 } &&
+				status.m_State == FrameSequenceState::Completed && status.m_FrameCount == 6 &&
+				status.m_CameraPathVersion == 2 && status.m_SubmittedFrames == 6 &&
+				status.m_CompletedCaptures == 2,
+				"Each submitted frame advances the path by one frame until the sequence completes");
+			context.Check(issuedAfterFrame == std::vector<size_t>{ 0, 1, 1, 1, 1, 2 },
+				"Requested frames are captured on exactly that frame, once, with duplicates ignored");
+			bool labelled = false;
+			std::error_code errorCode;
+			for (const auto& entry :
+				std::filesystem::directory_iterator(directory.GetPath(), errorCode))
+			{
+				labelled |= entry.path().filename().string().starts_with("run-f0005-");
+			}
+			context.Check(labelled, "Sequence captures are labelled with their sequence frame");
+			context.Check(!harness.Frame(), "A completed sequence no longer poses frames");
+		}
+
+		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-failure");
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Missing" }, error));
+				harness.Frame();
+				harness.Frame();
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Failed &&
+					status.m_Failure.find("SEQ_Test") != std::string::npos,
+					"An unknown path fails and lists the available paths");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 6 } }, error));
+				harness.Frame();
+				harness.Frame();
+				context.Check(
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
+					"A capture frame beyond the path fails before frame 0");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error));
+				harness.Frame();
+				harness.Frame();
+				harness.Frame();
+				harness.Frame(true, 2);
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Failed &&
+					status.m_SubmittedFrames == 2 && !harness.Frame(),
+					"A temporal continuity change outside a path cut fails the sequence");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error));
+				harness.Frame();
+				harness.Frame();
+				harness.m_Ready = false;
+				harness.Frame();
+				context.Check(
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
+					"A readiness gate leaving Ready fails a running sequence");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				const uint64_t id =
+					harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error);
+				harness.Frame();
+				harness.Frame();
+				const bool cancelled = harness.m_Sequence.Cancel();
+				context.Check(id != 0 && cancelled && !harness.Frame() &&
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
+					!harness.m_Sequence.Cancel(),
+					"Cancelling stops posing frames; only an active sequence can be cancelled");
+			}
+		}
+	}
+
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
 		RunNextFrameTests(context);
@@ -857,5 +1058,7 @@ namespace gglab
 		RunWriterQueueLimitTests(context);
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);
+		RunFrameSequenceTests(context);
+		RunFrameSequenceFailureTests(context);
 	}
 }

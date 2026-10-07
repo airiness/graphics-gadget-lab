@@ -66,6 +66,29 @@ namespace gglab
 			context.Check(result.m_Request && result.m_Request->m_CaptureRequestId == 4,
 				"A result request names one capture request");
 
+			const ApplicationControlParseResult sequence = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":11,"command":"sequence","path":"SEQ_DollyDoorway",)"
+				R"("requiredContentId":"Demo.CoastalAtrium","captureFrames":[0,90,179],)"
+				R"("source":"composited","outputDirectory":"D:/captures","label":"dolly",)"
+				R"("note":"baseline"})");
+			context.Check(sequence.m_Request &&
+				sequence.m_Request->m_Command == ApplicationControlCommand::Sequence &&
+				sequence.m_Request->m_Sequence.m_CameraPathId == "SEQ_DollyDoorway" &&
+				sequence.m_Request->m_Sequence.m_RequiredContentId == "Demo.CoastalAtrium" &&
+				sequence.m_Request->m_Sequence.m_CaptureFrames ==
+				std::vector<uint32_t>{ 0, 90, 179 } &&
+				sequence.m_Request->m_Sequence.m_CaptureSource == FrameCaptureSource::Composited &&
+				sequence.m_Request->m_Sequence.m_OutputDirectory ==
+				std::filesystem::path("D:/captures") &&
+				sequence.m_Request->m_Sequence.m_Label == "dolly" &&
+				sequence.m_Request->m_Sequence.m_Note == "baseline",
+				"A sequence request carries its path, capture frames and capture fields");
+			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":12,"command":"sequence-cancel"})");
+			context.Check(cancel.m_Request &&
+				cancel.m_Request->m_Command == ApplicationControlCommand::SequenceCancel,
+				"A sequence-cancel request takes no fields");
+
 			struct Rejected
 			{
 				std::string_view m_Line;
@@ -84,6 +107,11 @@ namespace gglab
 				{ R"({"protocol":1,"id":9,"command":"capture","lable":"typo"})", 9 },
 				{ R"({"protocol":1,"id":10,"command":"result"})", 10 },
 				{ R"({"protocol":1,"id":11,"command":"result","requestId":0})", 11 },
+				{ R"({"protocol":1,"id":12,"command":"sequence"})", 12 },
+				{ R"({"protocol":1,"id":13,"command":"sequence","path":"A","captureFrames":[-1]})", 13 },
+				{ R"({"protocol":1,"id":14,"command":"sequence","path":"A","captureFrames":3})", 14 },
+				{ R"({"protocol":1,"id":15,"command":"sequence","path":"A","frames":[1]})", 15 },
+				{ R"({"protocol":1,"id":16,"command":"sequence-cancel","path":"A"})", 16 },
 			};
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)
@@ -130,8 +158,33 @@ namespace gglab
 				Contains(status, R"("referenceViews":["CAM_A","CAM_B"])"),
 				"Status reports the session, pending captures, readiness gates and reference views");
 			const std::string noFrame = SerializeApplicationControlStatus(5, { .m_SessionId = "s1" });
-			context.Check(Contains(noFrame, R"("frame":null)"),
-				"Status before the first frame reports no frame state");
+			context.Check(Contains(noFrame, R"("frame":null)") &&
+				Contains(noFrame, R"("sequence":null)"),
+				"Status before the first frame reports no frame state and no sequence");
+
+			const FrameSequenceStatus sequenceStatus{
+				.m_SequenceId = 3,
+				.m_State = FrameSequenceState::Failed,
+				.m_CameraPathId = "SEQ_DollyDoorway",
+				.m_CameraPathVersion = 1,
+				.m_FrameCount = 180,
+				.m_SubmittedFrames = 12,
+				.m_CaptureRequestIds = { 21, 22 },
+				.m_CompletedCaptures = 1,
+				.m_Failure = "Lost continuity.",
+			};
+			const std::string sequenceJson = SerializeApplicationControlSequence(10, sequenceStatus);
+			const std::string statusWithSequence = SerializeApplicationControlStatus(11, {
+				.m_SessionId = "s1",
+				.m_Sequence = &sequenceStatus,
+				});
+			context.Check(Contains(sequenceJson, R"("state":"failed")") &&
+				Contains(sequenceJson, R"("path":"SEQ_DollyDoorway")") &&
+				Contains(sequenceJson, R"("frameCount":180)") &&
+				Contains(sequenceJson, R"("captureRequestIds":[21,22])") &&
+				Contains(sequenceJson, R"("failure":"Lost continuity.")") &&
+				Contains(statusWithSequence, R"("submittedFrames":12)"),
+				"Sequence responses and status report the sequence state, progress and failure");
 
 			FrameCaptureRequestResult completed{
 				.m_RequestId = 12,

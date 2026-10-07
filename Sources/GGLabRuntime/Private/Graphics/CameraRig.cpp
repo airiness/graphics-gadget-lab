@@ -27,6 +27,7 @@ namespace gglab
 	void CameraRig::AttachMainCamera(Camera& camera, CameraController& controller) noexcept
 	{
 		m_ReferenceViews.clear();
+		m_CameraPaths.clear();
 		m_LastRestoredReferenceId.clear();
 		CameraSlot mainSlot{};
 		mainSlot.m_Id = s_NextCameraId.fetch_add(1, std::memory_order_relaxed);
@@ -110,6 +111,67 @@ namespace gglab
 		m_DisplayViewId = RenderViewID::Main;
 		m_LastRestoredReferenceId = view->m_Id;
 		return true;
+	}
+
+	bool CameraRig::SetCameraPaths(std::vector<CameraPath> paths) noexcept
+	{
+		if (!GetMainCameraSlot()) return false;
+		for (size_t index = 0; index < paths.size(); ++index)
+		{
+			if (!IsCameraPathValid(paths[index])) return false;
+			for (size_t previous = 0; previous < index; ++previous)
+			{
+				if (paths[previous].m_Id == paths[index].m_Id) return false;
+			}
+		}
+		m_CameraPaths = std::move(paths);
+		return true;
+	}
+
+	const CameraPath* CameraRig::FindCameraPath(std::string_view id) const noexcept
+	{
+		const auto path = std::ranges::find(m_CameraPaths, id, &CameraPath::m_Id);
+		return path != m_CameraPaths.end() ? &*path : nullptr;
+	}
+
+	std::optional<CameraPathPose> CameraRig::ApplyCameraPathFrame(
+		std::string_view id, uint32_t frame) noexcept
+	{
+		const CameraPath* path = FindCameraPath(id);
+		auto* main = GetMainCameraSlot();
+		if (!path || !main || !main->m_Camera || !main->m_Controller)
+		{
+			return std::nullopt;
+		}
+		const std::optional<CameraPathPose> pose = EvaluateCameraPath(*path, frame);
+		Vector3 forward;
+		if (!pose || !math::TryNormalize(pose->m_Target - pose->m_Position, forward))
+		{
+			return std::nullopt;
+		}
+
+		auto& camera = *main->m_Camera;
+		if (pose->m_Cut)
+		{
+			// LookAt marks an explicit camera cut.
+			camera.LookAt(pose->m_Position, pose->m_Target);
+		}
+		else
+		{
+			// Same yaw/pitch convention as LookAt, without requesting a temporal reset.
+			camera.SetPosition(pose->m_Position);
+			camera.SetYawPitch(std::atan2(forward.m_X, forward.m_Z),
+				std::asin(std::clamp(forward.m_Y, -1.0f, 1.0f)));
+		}
+		camera.SetFov(pose->m_VerticalFovDegrees);
+		camera.SetNearFar(path->m_NearPlane, path->m_FarPlane);
+		camera.SetManualEV100(path->m_ManualEV100);
+		camera.SetExposureCompensationEV(path->m_ExposureCompensationEV);
+		camera.Update();
+		main->m_Controller->ResetVelocity();
+		m_ActiveCameraIndex = 0;
+		m_DisplayViewId = RenderViewID::Main;
+		return pose;
 	}
 
 	void CameraRig::OnResize(uint32_t width, uint32_t height) noexcept

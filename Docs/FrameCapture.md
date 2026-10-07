@@ -20,6 +20,7 @@ $session = 'Scripts/GGLabSession.ps1'
 | Several images, views or settings from one process | A session (`GGLabSession.ps1`) |
 | Every authored camera view of the content | `GGLabSession.ps1 batch` |
 | DX12 and Vulkan agreement | Two sessions, `batch` on each, `CompareCaptures.ps1` |
+| Temporal behavior along a fixed camera motion | `GGLabSession.ps1 sequence` |
 
 Sessions and one-shot launches are hidden by default: the window is never shown
 or activated, input is ignored and simulation advances with a fixed 1/60 s step.
@@ -137,6 +138,36 @@ timing, settle frames), backend, Demo and Lab ids, frame serial and index, image
 size and display format, camera pose and `referenceView`, fixed time step and
 total time, whether DevTools were active, every readiness gate, and the UTC
 capture time.
+
+## Sequences
+
+Content may register camera paths: versioned main-camera motions whose pose is
+a function of the sequence frame only, such as `SEQ_DollyDoorway` for the coastal
+retreat (`-Demo atrium`). A sequence plays one path and captures the requested
+frames:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_DollyDoorway -CaptureFrames '0,90,179' -Label dolly-taa
+```
+
+- Frame 0 starts after a rendered frame reports every readiness gate ready.
+  Each submitted frame then advances the path by exactly one frame; a frame that
+  ends without submission is posed again.
+- Frame 0 and every cut key of the path are camera cuts that reset temporal
+  history and the jitter sequence, so a replay starts from the same temporal
+  state. Any other temporal continuity change (temporal session, display view,
+  size or content) or a readiness gate leaving Ready fails the sequence.
+- Each requested frame is captured on exactly that frame as a next-frame capture
+  labelled `<label>-f<frame>`; the label defaults to the path id. At most eight
+  captures may wait for the writer, so capture sparse frames until sequence
+  capture applies back-pressure.
+- `sequence` waits until the sequence and its captures finish unless `-NoWait`;
+  `status` reports the active or last sequence, and `sequence-cancel` stops it.
+  One sequence runs at a time; avoid submitting capture views while it runs.
+
+Replays are deterministic only for content whose state depends on the sequence
+frame alone. Check it by playing the same path twice and comparing the captures.
 
 ## Comparing captures
 

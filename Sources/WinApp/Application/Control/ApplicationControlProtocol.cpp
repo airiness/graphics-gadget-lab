@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,6 +17,7 @@ namespace gglab
 		using Json = nlohmann::json;
 
 		constexpr uint32_t MaxSettleFrames = 10000;
+		constexpr size_t MaxSequenceCaptureFrames = 10000;
 
 		[[nodiscard]] std::string ToUtf8(const std::filesystem::path& path)
 		{
@@ -57,7 +59,109 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Stop;
 			}
+			if (command == "sequence")
+			{
+				return ApplicationControlCommand::Sequence;
+			}
+			if (command == "sequence-cancel")
+			{
+				return ApplicationControlCommand::SequenceCancel;
+			}
 			return std::nullopt;
+		}
+
+		// Parses an absolute output directory; returns an error text.
+		[[nodiscard]] std::string ParseOutputDirectory(
+			const Json& value, std::filesystem::path& outDirectory)
+		{
+			if (!value.is_string())
+			{
+				return "Field 'outputDirectory' must be a string.";
+			}
+			const std::string text = value.get<std::string>();
+			outDirectory = std::filesystem::path(std::u8string(text.begin(), text.end()));
+			if (!outDirectory.is_absolute())
+			{
+				return "Field 'outputDirectory' must be an absolute directory.";
+			}
+			return {};
+		}
+
+		// Fills the sequence request; returns an error text.
+		[[nodiscard]] std::string ParseSequenceFields(
+			const Json& document, ApplicationControlRequest& request)
+		{
+			FrameSequenceRequest& sequence = request.m_Sequence;
+			for (const auto& [key, value] : document.items())
+			{
+				if (key == "protocol" || key == "id" || key == "command")
+				{
+					continue;
+				}
+				if (key == "path" || key == "requiredContentId" || key == "label" ||
+					key == "note")
+				{
+					if (!value.is_string())
+					{
+						return std::format("Field '{}' must be a string.", key);
+					}
+					std::string& target = key == "path" ? sequence.m_CameraPathId
+						: key == "requiredContentId" ? sequence.m_RequiredContentId
+						: key == "label" ? sequence.m_Label
+						: sequence.m_Note;
+					target = value.get<std::string>();
+				}
+				else if (key == "source")
+				{
+					const std::string source = value.is_string() ? value.get<std::string>() : "";
+					if (source == "scene")
+					{
+						sequence.m_CaptureSource = FrameCaptureSource::Scene;
+					}
+					else if (source == "composited")
+					{
+						sequence.m_CaptureSource = FrameCaptureSource::Composited;
+					}
+					else
+					{
+						return "Field 'source' must be 'scene' or 'composited'.";
+					}
+				}
+				else if (key == "captureFrames")
+				{
+					if (!value.is_array() || value.size() > MaxSequenceCaptureFrames)
+					{
+						return std::format("Field 'captureFrames' must be an array of at most {} "
+							"frame numbers.", MaxSequenceCaptureFrames);
+					}
+					for (const Json& frame : value)
+					{
+						if (!frame.is_number_unsigned() ||
+							frame.get<uint64_t>() > std::numeric_limits<uint32_t>::max())
+						{
+							return "Field 'captureFrames' must contain unsigned 32-bit frame numbers.";
+						}
+						sequence.m_CaptureFrames.push_back(frame.get<uint32_t>());
+					}
+				}
+				else if (key == "outputDirectory")
+				{
+					if (std::string error = ParseOutputDirectory(value, sequence.m_OutputDirectory);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else
+				{
+					return std::format("Unknown field '{}' for command 'sequence'.", key);
+				}
+			}
+			if (sequence.m_CameraPathId.empty())
+			{
+				return "Command 'sequence' requires a non-empty string 'path'.";
+			}
+			return {};
 		}
 
 		// Fills the capture request from optional fields; returns an error text.
@@ -128,16 +232,10 @@ namespace gglab
 				}
 				else if (key == "outputDirectory")
 				{
-					if (!value.is_string())
+					if (std::string error = ParseOutputDirectory(value, capture.m_OutputDirectory);
+						!error.empty())
 					{
-						return "Field 'outputDirectory' must be a string.";
-					}
-					const std::string text = value.get<std::string>();
-					capture.m_OutputDirectory = std::filesystem::path(
-						std::u8string(text.begin(), text.end()));
-					if (!capture.m_OutputDirectory.is_absolute())
-					{
-						return "Field 'outputDirectory' must be an absolute directory.";
+						return error;
 					}
 				}
 				else if (key == "wait")
@@ -168,6 +266,25 @@ namespace gglab
 					});
 			}
 			return gates;
+		}
+
+		[[nodiscard]] Json SerializeSequence(const FrameSequenceStatus& status)
+		{
+			Json sequence = {
+				{ "id", status.m_SequenceId },
+				{ "state", GetFrameSequenceStateName(status.m_State) },
+				{ "path", status.m_CameraPathId },
+				{ "pathVersion", status.m_CameraPathVersion },
+				{ "frameCount", status.m_FrameCount },
+				{ "submittedFrames", status.m_SubmittedFrames },
+				{ "captureRequestIds", status.m_CaptureRequestIds },
+				{ "completedCaptures", status.m_CompletedCaptures },
+			};
+			if (!status.m_Failure.empty())
+			{
+				sequence["failure"] = status.m_Failure;
+			}
+			return sequence;
 		}
 	}
 
@@ -205,7 +322,8 @@ namespace gglab
 			: std::nullopt;
 		if (!command)
 		{
-			result.m_Error = "Field 'command' must be 'status', 'capture', 'result' or 'stop'.";
+			result.m_Error = "Field 'command' must be 'status', 'capture', 'result', 'stop', "
+				"'sequence' or 'sequence-cancel'.";
 			return result;
 		}
 
@@ -228,8 +346,12 @@ namespace gglab
 			request.m_CaptureRequestId = requestId->get<uint64_t>();
 			break;
 		}
+		case ApplicationControlCommand::Sequence:
+			error = ParseSequenceFields(document, request);
+			break;
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
+		case ApplicationControlCommand::SequenceCancel:
 			if (document.size() != 3)
 			{
 				error = std::format("Command '{}' takes no fields.",
@@ -266,6 +388,7 @@ namespace gglab
 			{ "height", status.m_Height },
 		};
 		response["capture"] = { { "unfinished", status.m_UnfinishedCaptures } };
+		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{
 			response["frame"] = nullptr;
@@ -335,6 +458,14 @@ namespace gglab
 	{
 		Json response = MakeResponse(id, true);
 		response["status"] = "stopping";
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlSequence(
+		uint64_t id, const FrameSequenceStatus& status) noexcept
+	{
+		Json response = MakeResponse(id, true);
+		response["sequence"] = SerializeSequence(status);
 		return Dump(response);
 	}
 }

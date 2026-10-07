@@ -4,6 +4,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameSequenceCoordinator.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "Demo/DemoBase.h"
@@ -344,6 +345,15 @@ namespace gglab
 			m_FrameCapture->OnReferenceViewApplied(viewChange->m_RequestId,
 				cameraRig.RestoreReferenceView(viewChange->m_ReferenceViewId));
 		}
+		// A running sequence poses the main camera after content updates and capture
+		// views, so the path alone determines this frame's camera.
+		if (const std::optional<FrameSequencePoseRequest> sequencePose =
+			m_FrameSequence->PrepareFrame(
+				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
+		{
+			m_FrameSequence->OnPoseApplied(cameraRig.ApplyCameraPathFrame(
+				sequencePose->m_CameraPathId, sequencePose->m_Frame));
+		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
 		GGLAB_ASSERT_MSG(effectiveDisplayView.IsValid(),
@@ -385,8 +395,9 @@ namespace gglab
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
-		// Captures due this frame are issued before its graph binds capture taps.
-		m_FrameCapture->BeginFrame(BuildCaptureFrameState({
+		// Captures due this frame, including a sequence frame capture, are issued
+		// before its graph binds capture taps.
+		FrameCaptureFrameState captureFrameState = BuildCaptureFrameState({
 			.m_DemoManager = *m_DemoManager,
 			.m_Demo = *demo,
 			.m_EnvironmentAssetController = *m_EnvironmentAssetController,
@@ -401,7 +412,9 @@ namespace gglab
 			.m_Height = m_WindowHeight,
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
-			}));
+			});
+		m_FrameSequence->BeginFrame(captureFrameState);
+		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		RenderFrameBuildResult frame;
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
@@ -535,6 +548,7 @@ namespace gglab
 			return FailRuntime("The render host failed to complete frame submission.");
 		}
 		m_FrameCapture->OnFrameSubmitted();
+		m_FrameSequence->OnFrameSubmitted();
 
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,

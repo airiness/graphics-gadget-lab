@@ -1,6 +1,7 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
@@ -12,6 +13,7 @@
 #include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
@@ -27,6 +29,7 @@
 #include <initializer_list>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <string_view>
 #include <string>
 #include <system_error>
@@ -945,6 +948,67 @@ namespace gglab
 				"Imported UVs preserve orientation/repeat and mirrored tangents preserve normal-map +Y up" + basisFailure);
 		}
 
+		void CheckCoastalSceneCameraPaths(SelfTestContext& context) noexcept
+		{
+			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
+			CameraController controller(CameraController::CreateInfo{});
+			CameraRig rig;
+			rig.AttachMainCamera(camera, controller);
+			const std::vector<CameraPath> paths = MakeCoastalSceneCameraPaths();
+			const bool registered = rig.SetReferenceViews(
+				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() }) &&
+				rig.SetCameraPaths(paths);
+			context.Check(registered && paths.size() == 6,
+				"Six coastal temporal evaluation paths register on the main camera");
+			if (!registered) return;
+
+			// Each path starts at the reference view it was copied from; changing either
+			// side requires a deliberate edit and a path version change.
+			struct Expected
+			{
+				std::string_view m_PathId;
+				std::string_view m_ViewId;
+				uint32_t m_FrameCount;
+				uint32_t m_Cuts;
+			};
+			constexpr std::array<Expected, 6> expected{ {
+				{ "SEQ_StaticRailings", "CAM_ShadowStairs", 96, 1 },
+				{ "SEQ_LateralPanRailings", "CAM_ShadowStairs", 180, 1 },
+				{ "SEQ_DollyDoorway", "CAM_InteriorExterior", 180, 1 },
+				{ "SEQ_OrbitLounge", "Retreat_Lounge", 241, 1 },
+				{ "SEQ_HorizonPan", "CAM_SkyHorizon", 181, 1 },
+				{ "SEQ_CutCourtyardToStairs", "CAM_Courtyard", 120, 2 },
+			} };
+			for (const Expected& entry : expected)
+			{
+				const CameraPath* path = rig.FindCameraPath(entry.m_PathId);
+				const auto view = std::ranges::find(
+					CoastalSceneReferenceViews, entry.m_ViewId, &CameraReferenceView::m_Id);
+				const std::optional<CameraPathPose> start =
+					path ? EvaluateCameraPath(*path, 0) : std::nullopt;
+				context.Check(path && view != CoastalSceneReferenceViews.end() && start &&
+					path->m_Version == 1 && GetCameraPathFrameCount(*path) == entry.m_FrameCount &&
+					(start->m_Position - view->m_Position).LengthSquared() == 0.0f &&
+					(start->m_Target - view->m_Target).LengthSquared() == 0.0f &&
+					start->m_VerticalFovDegrees == view->m_VerticalFovDegrees &&
+					path->m_NearPlane == view->m_NearPlane && path->m_FarPlane == view->m_FarPlane &&
+					path->m_ManualEV100 == view->m_ManualEV100,
+					std::format("{} starts at {} with {} frames", entry.m_PathId, entry.m_ViewId,
+						entry.m_FrameCount));
+				if (!path) continue;
+
+				const uint64_t serial = camera.GetTemporalResetSerial();
+				bool applied = true;
+				for (uint32_t frame = 0; frame < entry.m_FrameCount; ++frame)
+				{
+					applied = applied && rig.ApplyCameraPathFrame(entry.m_PathId, frame).has_value();
+				}
+				context.Check(applied && camera.GetTemporalResetSerial() == serial + entry.m_Cuts,
+					std::format("{} applies every frame and resets temporal history only at its "
+						"{} cut(s)", entry.m_PathId, entry.m_Cuts));
+			}
+		}
+
 		void CheckCoastalSceneReferenceViews(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
@@ -1469,6 +1533,7 @@ namespace gglab
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
 		CheckCoastalSceneReferenceViews(context);
+		CheckCoastalSceneCameraPaths(context);
 		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.
 		std::thread textureWorker([&]
 			{

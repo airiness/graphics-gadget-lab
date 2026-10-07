@@ -1,4 +1,5 @@
 #include "Application/Demo/DemoPlayground.h"
+#include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "ApplicationCameraInput.h"
 #include "Application/Content/DesktopApplicationContent.h"
@@ -61,6 +62,9 @@ namespace gglab
 			const bool registered = m_CameraRig.SetReferenceViews(
 				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
 			GGLAB_ASSERT_MSG(registered, "Coastal scene reference views must be valid.");
+			const bool pathsRegistered =
+				m_CameraRig.SetCameraPaths(MakeCoastalSceneCameraPaths());
+			GGLAB_ASSERT_MSG(pathsRegistered, "Coastal scene camera paths must be valid.");
 			const bool restored = m_CameraRig.RestoreReferenceView("Retreat_Overview");
 			GGLAB_ASSERT_MSG(restored, "Coastal scene must start at its retreat overview reference view.");
 		}
