@@ -84,6 +84,12 @@ namespace gglab
 			outError = "A diagnostic tap is required for, and only valid with, diagnostic captures.";
 			return 0;
 		}
+		if (request.m_ReferenceSamples > MaxTemporalReferenceSamples)
+		{
+			outError = std::format("A reference uses at most {} samples per frame.",
+				MaxTemporalReferenceSamples);
+			return 0;
+		}
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
@@ -97,8 +103,10 @@ namespace gglab
 			.m_SequenceId = m_NextSequenceId++,
 			.m_State = FrameSequenceState::Waiting,
 			.m_CameraPathId = m_Request.m_CameraPathId,
+			.m_ReferenceSamples = m_Request.m_ReferenceSamples,
 		};
 		m_Frame = 0;
+		m_Sample = 0;
 		m_AppliedPose.reset();
 		m_FrameBegun = false;
 		m_CapturedFrame.reset();
@@ -130,11 +138,22 @@ namespace gglab
 	{
 		// Unfinished requests bound every capture that can still reach the writer, so
 		// staying below the pending-job limit keeps the writer queue from overflowing.
-		return m_Status && m_Status->m_State == FrameSequenceState::Running &&
-			m_CapturedFrame != m_Frame &&
-			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame) &&
+		return m_Status && m_Status->m_State == FrameSequenceState::Running && IsCaptureDue() &&
 			m_Capture->GetUnfinishedRequestCount() >=
 			FrameCaptureCoordinator::MaxPendingWriteJobs;
+	}
+
+	bool FrameSequenceCoordinator::ShouldHoldTime() const noexcept
+	{
+		return m_Status && m_Status->m_State == FrameSequenceState::Running && m_Sample > 0;
+	}
+
+	bool FrameSequenceCoordinator::IsCaptureDue() const noexcept
+	{
+		const bool lastSample = m_Request.m_ReferenceSamples == 0 ||
+			m_Sample + 1 == m_Request.m_ReferenceSamples;
+		return lastSample && m_CapturedFrame != m_Frame &&
+			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame);
 	}
 
 	std::optional<FrameSequencePoseRequest> FrameSequenceCoordinator::PrepareFrame(
@@ -206,6 +225,12 @@ namespace gglab
 		return FrameSequencePoseRequest{
 			.m_CameraPathId = m_Request.m_CameraPathId,
 			.m_Frame = m_Frame,
+			.m_ReferenceSample = m_Request.m_ReferenceSamples == 0
+				? std::nullopt
+				: std::optional(TemporalReferenceSample{
+					.m_Index = m_Sample,
+					.m_Count = m_Request.m_ReferenceSamples,
+				}),
 		};
 	}
 
@@ -246,8 +271,7 @@ namespace gglab
 		}
 		m_LastSettleKey = state.m_SettleKey;
 
-		if (m_CapturedFrame != m_Frame &&
-			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame))
+		if (IsCaptureDue())
 		{
 			const uint64_t requestId = m_Capture->Submit(FrameCaptureRequest{
 				.m_Source = m_Request.m_CaptureSource,
@@ -261,6 +285,7 @@ namespace gglab
 					.m_CameraPathVersion = m_Status->m_CameraPathVersion,
 					.m_Frame = m_Frame,
 					.m_FrameCount = m_Status->m_FrameCount,
+					.m_ReferenceSamples = m_Request.m_ReferenceSamples,
 				},
 				.m_DiagnosticTap = m_Request.m_DiagnosticTap,
 				});
@@ -278,6 +303,11 @@ namespace gglab
 		}
 		m_FrameBegun = false;
 		m_AppliedPose.reset();
+		if (m_Request.m_ReferenceSamples > 0 && ++m_Sample < m_Request.m_ReferenceSamples)
+		{
+			return;
+		}
+		m_Sample = 0;
 		++m_Status->m_SubmittedFrames;
 		++m_Frame;
 		if (m_Frame >= m_Status->m_FrameCount)

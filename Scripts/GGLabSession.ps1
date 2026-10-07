@@ -24,6 +24,8 @@ Commands:
            and its captures finish unless -NoWait. Poll with 'status'.
            -Source diagnostic -DiagnosticTap <tap> records one diagnostic tap,
            such as temporal-history-weight, instead of the scene.
+           -ReferenceSamples <n> renders every frame as a supersampled reference
+           of n jittered samples with Temporal AA inactive and time held.
   sequence-cancel
            Cancel the active sequence.
   stop     Stop a session and wait for the process to exit.
@@ -85,6 +87,8 @@ param(
     # sequence: camera path id and frames to capture, as numbers and ranges.
     [string]$CameraPath,
     [string]$CaptureFrames,
+    [ValidateRange(0, 4096)]
+    [int]$ReferenceSamples = 0,
 
     [int]$TimeoutSeconds = 300
 )
@@ -387,6 +391,7 @@ switch ($Command) {
         }
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
+        if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
         if ($Label) { $request['label'] = $Label }
         if ($Note) { $request['note'] = $Note }
         $response = Invoke-SessionRequest $Session $request 30

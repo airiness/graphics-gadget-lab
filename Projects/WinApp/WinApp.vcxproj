@@ -495,6 +495,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\BrdfLutWhiteFurnace.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl" />

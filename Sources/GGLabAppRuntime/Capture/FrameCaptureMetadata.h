@@ -72,6 +72,8 @@ namespace gglab
 		uint32_t m_CameraPathVersion = 0;
 		uint32_t m_Frame = 0;
 		uint32_t m_FrameCount = 0;
+		// Samples of a supersampled reference frame; zero for an ordinary sequence.
+		uint32_t m_ReferenceSamples = 0;
 	};
 
 	// Everything a capture records about the frame that produced it. Frame-state

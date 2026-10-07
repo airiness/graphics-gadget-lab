@@ -182,6 +182,29 @@ A sequence records one evidence channel per run: the scene, or one diagnostic
 tap with `-Source diagnostic -DiagnosticTap <tap>`. Replay the path once per
 channel; the frames correspond because the replay is deterministic.
 
+### Supersampled reference
+
+`-ReferenceSamples <n>` (1 to 4096) renders every sequence frame as a
+supersampled reference instead of the production temporal path. Each frame is
+rendered n times with Temporal AA inactive, the camera at the frame's pose and
+simulation time held; every sample uses one Halton(2, 3) jitter phase (the first
+eight equal the production TAA phases) and adds the HDR scene color, after
+transparent and depth-tested debug geometry, to an RGBA32F sum. Post-processing
+receives the running mean, so a capture after the last sample records the mean
+of n samples: a one-pixel box reconstruction filter. Unlike the production path,
+transparent geometry is part of the accumulated image.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_StaticRailings -CaptureFrames 0 -ReferenceSamples 256 -Label static-ref
+```
+
+A reference renders n frames per sequence frame for the whole path; capture
+the frames you need and cancel with `sequence-cancel` once their captures
+finished. Choose n by comparing references of n and 2n samples. Sidecars record
+`sequence.referenceSamples`, and `temporal` shows Temporal AA as disabled with
+the reference jitter index and sample count.
+
 Replays are deterministic only for content whose state depends on the sequence
 frame alone. Check it by playing the same path twice and comparing the captures.
 

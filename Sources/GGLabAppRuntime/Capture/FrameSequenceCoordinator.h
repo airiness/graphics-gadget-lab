@@ -2,6 +2,7 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <cstdint>
@@ -32,6 +33,10 @@ namespace gglab
 		// "-f<frame>" with four or more digits.
 		std::string m_Label;
 		std::string m_Note;
+		// Non-zero renders every sequence frame as a supersampled reference of this many
+		// jittered samples, with Temporal AA inactive and simulation time held; a
+		// capture records the mean after the last sample.
+		uint32_t m_ReferenceSamples = 0;
 	};
 
 	enum class FrameSequenceState : uint8_t
@@ -56,7 +61,9 @@ namespace gglab
 		// Known once the sequence started.
 		uint32_t m_CameraPathVersion = 0;
 		uint32_t m_FrameCount = 0;
-		// Sequence frames rendered and submitted so far.
+		// Samples per sequence frame of a reference sequence; zero otherwise.
+		uint32_t m_ReferenceSamples = 0;
+		// Sequence frames completed so far: every sample of a reference frame submitted.
 		uint32_t m_SubmittedFrames = 0;
 		std::vector<uint64_t> m_CaptureRequestIds;
 		uint32_t m_CompletedCaptures = 0;
@@ -75,6 +82,8 @@ namespace gglab
 	{
 		std::string m_CameraPathId;
 		uint32_t m_Frame = 0;
+		// Set for every sample of a reference sequence.
+		std::optional<TemporalReferenceSample> m_ReferenceSample;
 	};
 
 	// Drives one camera-path sequence at a time. Frame 0 starts once every readiness
@@ -108,6 +117,9 @@ namespace gglab
 		// render a frame, so the sequence stays deterministic; the writer drains on
 		// its own thread.
 		[[nodiscard]] bool ShouldDeferFrame() const noexcept;
+		// True for every reference sample after the first of a sequence frame: the
+		// runtime then starts the frame without advancing simulation time.
+		[[nodiscard]] bool ShouldHoldTime() const noexcept;
 
 		// Called before the frame is planned with the capture state of the previous
 		// frame (null before the first frame) and the active content's camera paths.
@@ -131,6 +143,9 @@ namespace gglab
 	private:
 		void Fail(std::string failure) noexcept;
 		void CompleteIfFinished() noexcept;
+		// The posed frame is a requested frame, at its last reference sample, and has
+		// not been captured yet.
+		[[nodiscard]] bool IsCaptureDue() const noexcept;
 
 		FrameCaptureCoordinator* m_Capture = nullptr;
 		uint64_t m_NextSequenceId = 1;
@@ -139,6 +154,8 @@ namespace gglab
 		// Frame posed for the next submission; it is posed again if a frame ends
 		// without submission.
 		uint32_t m_Frame = 0;
+		// Reference sample of the posed frame; always zero outside a reference sequence.
+		uint32_t m_Sample = 0;
 		std::optional<CameraPathPose> m_AppliedPose;
 		bool m_FrameBegun = false;
 		std::optional<uint32_t> m_CapturedFrame;

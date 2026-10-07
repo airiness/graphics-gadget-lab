@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
@@ -40,8 +41,11 @@ namespace gglab
 	void TemporalFrameTransaction::Begin(TemporalViewHistory& viewHistory,
 		TemporalObjectHistory& objectHistory, const ResolvedTemporalFramePlan& plan,
 		uint32_t width, uint32_t height, TemporalHistoryManager* historyManager,
-		float scenePreExposure) noexcept
+		float scenePreExposure, std::optional<TemporalReferenceSample> referenceSample,
+		TemporalReferenceAccumulator* referenceAccumulator) noexcept
 	{
+		GGLAB_ASSERT_MSG(!referenceSample || !plan.m_Active,
+			"A temporal reference sample requires Temporal AA to be inactive.");
 		GGLAB_ASSERT_MSG(!plan.m_Active || IsTemporalColorCompatible(
 			ActiveTemporalColorAbi,
 			PostProcessColorState::SceneLinearRec709, scenePreExposure),
@@ -52,6 +56,8 @@ namespace gglab
 		m_ViewHistory = &viewHistory;
 		m_ObjectHistory = &objectHistory;
 		m_HistoryManager = historyManager;
+		m_ReferenceSample = plan.m_Active ? std::nullopt : referenceSample;
+		m_ReferenceAccumulator = m_ReferenceSample ? referenceAccumulator : nullptr;
 		m_Plan = plan;
 		m_ColorAbi = ActiveTemporalColorAbi;
 		m_ScenePreExposure = scenePreExposure;
@@ -67,6 +73,12 @@ namespace gglab
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_JitterPixels =
 			plan.m_Active ? temporal::GetJitterSamplePixels(m_JitterIndex) : Vector2::Zero;
+		if (m_ReferenceSample)
+		{
+			// The reference owns the jitter phase and removes it by averaging.
+			m_JitterIndex = m_ReferenceSample->m_Index;
+			m_JitterPixels = GetTemporalReferenceJitterPixels(m_ReferenceSample->m_Index);
+		}
 		m_HasPendingView = false;
 		m_PendingObjects.clear();
 		m_ParticipatedInResolve = false;
@@ -84,7 +96,7 @@ namespace gglab
 		view.m_TemporalSessionIdentity = m_Plan.m_SessionIdentity;
 		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
 			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
-		if (m_Plan.m_Active)
+		if (m_Plan.m_Active || m_ReferenceSample)
 		{
 			const Vector2 jitterNDC =
 				temporal::JitterPixelsToNDC(m_JitterPixels, m_Width, m_Height);
@@ -202,6 +214,24 @@ namespace gglab
 		return true;
 	}
 
+	bool TemporalFrameTransaction::ImportReferenceResources(RenderGraph::RGBuilder& builder,
+		TemporalReferenceRenderGraphResources& outResources) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && CanAccumulateReference(),
+			"Only a pending reference frame with an accumulator can import reference sums.");
+		return CanAccumulateReference() &&
+			m_ReferenceAccumulator->ImportRenderGraphResources(builder, outResources);
+	}
+
+	bool TemporalFrameTransaction::ExportReferenceResources(RenderGraph::RGBuilder& builder,
+		const TemporalReferenceRenderGraphResources& resources) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && CanAccumulateReference(),
+			"Only a pending reference frame with an accumulator can export reference sums.");
+		return CanAccumulateReference() &&
+			m_ReferenceAccumulator->ExportRenderGraphResources(builder, resources);
+	}
+
 	void TemporalFrameTransaction::MarkResolveParticipated() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
@@ -224,6 +254,10 @@ namespace gglab
 		}
 		GGLAB_ASSERT_NOT_NULL(m_ViewHistory);
 		GGLAB_ASSERT_NOT_NULL(m_ObjectHistory);
+		if (m_ReferenceAccumulator)
+		{
+			m_ReferenceAccumulator->CommitFrame();
+		}
 		if (!m_Plan.m_Active)
 		{
 			if (m_HistoryManager)
@@ -283,6 +317,10 @@ namespace gglab
 			{
 				m_HistoryManager->AbortFrame(m_HistoryFrame, retirementFence);
 			}
+			if (m_ReferenceAccumulator)
+			{
+				m_ReferenceAccumulator->AbortFrame();
+			}
 			m_State = TemporalFrameTransactionState::Aborted;
 		}
 	}
@@ -295,6 +333,11 @@ namespace gglab
 			if (m_HistoryManager)
 			{
 				m_HistoryManager->InvalidateAfterFatal(m_HistoryFrame, submittedFence);
+			}
+			if (m_ReferenceAccumulator)
+			{
+				// The sum written by a failed submission is unknown; restart the reference.
+				m_ReferenceAccumulator->Release(submittedFence);
 			}
 			m_ViewHistory->Invalidate();
 			m_ObjectHistory->Invalidate();

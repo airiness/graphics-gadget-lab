@@ -1,5 +1,6 @@
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 
 #include <nlohmann/json.hpp>
 
@@ -166,6 +167,16 @@ namespace gglab
 						return error;
 					}
 				}
+				else if (key == "referenceSamples")
+				{
+					if (!value.is_number_unsigned() ||
+						value.get<uint64_t>() > MaxTemporalReferenceSamples)
+					{
+						return std::format("Field 'referenceSamples' must be 0 to {}.",
+							MaxTemporalReferenceSamples);
+					}
+					sequence.m_ReferenceSamples = value.get<uint32_t>();
+				}
 				else if (key == "captureFrames")
 				{
 					if (!value.is_array() || value.size() > MaxSequenceCaptureFrames)
@@ -327,6 +338,7 @@ namespace gglab
 				{ "path", status.m_CameraPathId },
 				{ "pathVersion", status.m_CameraPathVersion },
 				{ "frameCount", status.m_FrameCount },
+				{ "referenceSamples", status.m_ReferenceSamples },
 				{ "submittedFrames", status.m_SubmittedFrames },
 				{ "captureRequestIds", status.m_CaptureRequestIds },
 				{ "completedCaptures", status.m_CompletedCaptures },

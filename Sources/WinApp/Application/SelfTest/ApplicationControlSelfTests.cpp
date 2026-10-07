@@ -85,7 +85,7 @@ namespace gglab
 				"A sequence request carries its path, capture frames and capture fields");
 			const ApplicationControlParseResult diagnosticSequence = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic",)"
-				R"("diagnosticTap":"temporal-rejection"})");
+				R"("diagnosticTap":"temporal-rejection","referenceSamples":64})");
 			const ApplicationControlParseResult diagnosticCapture = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":14,"command":"capture","source":"diagnostic",)"
 				R"("diagnosticTap":"temporal-history-weight"})");
@@ -94,6 +94,7 @@ namespace gglab
 				FrameCaptureSource::Diagnostic &&
 				diagnosticSequence.m_Request->m_Sequence.m_DiagnosticTap ==
 				PostProcessDebugTap::TemporalRejection &&
+				diagnosticSequence.m_Request->m_Sequence.m_ReferenceSamples == 64 &&
 				diagnosticCapture.m_Request &&
 				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap ==
 				PostProcessDebugTap::TemporalHistoryWeight,
@@ -129,6 +130,7 @@ namespace gglab
 				{ R"({"protocol":1,"id":15,"command":"sequence","path":"A","frames":[1]})", 15 },
 				{ R"({"protocol":1,"id":16,"command":"sequence-cancel","path":"A"})", 16 },
 				{ R"({"protocol":1,"id":17,"command":"capture","source":"diagnostic"})", 17 },
+				{ R"({"protocol":1,"id":20,"command":"sequence","path":"A","referenceSamples":5000})", 20 },
 				{ R"({"protocol":1,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})", 18 },
 				{ R"({"protocol":1,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
 			};

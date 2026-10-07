@@ -279,6 +279,7 @@ namespace gglab
 			writer.Unsigned("cameraPathVersion", metadata.m_Sequence->m_CameraPathVersion);
 			writer.Unsigned("frame", metadata.m_Sequence->m_Frame);
 			writer.Unsigned("frameCount", metadata.m_Sequence->m_FrameCount);
+			writer.Unsigned("referenceSamples", metadata.m_Sequence->m_ReferenceSamples);
 			writer.EndObject();
 		}
 		else

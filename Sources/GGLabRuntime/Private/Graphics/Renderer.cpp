@@ -20,6 +20,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -116,6 +117,8 @@ namespace gglab
 		m_BakeAtmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
 		m_TemporalHistoryManager =
 			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
+		m_TemporalReferenceAccumulator =
+			std::make_unique<TemporalReferenceAccumulator>(m_PersistentTexturePool.get());
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -215,6 +218,8 @@ namespace gglab
 		m_Atmosphere.reset();
 		m_TemporalHistoryManager->Shutdown();
 		m_TemporalHistoryManager.reset();
+		m_TemporalReferenceAccumulator->Release(m_LastSubmittedFencePoint);
+		m_TemporalReferenceAccumulator.reset();
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
@@ -276,14 +281,22 @@ namespace gglab
 
 	TemporalFrameTransaction& Renderer::BeginTemporalFrame(RenderFrame& frame,
 		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-		float scenePreExposure) noexcept
+		float scenePreExposure,
+		const std::optional<TemporalReferenceSample>& referenceSample) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
 			m_ActiveFrame.m_Phase == FramePhase::Begun,
 			"Temporal frame planning requires the active begun render host frame.");
+		const std::optional<TemporalReferenceSample> sample =
+			plan.m_Active ? std::nullopt : referenceSample;
+		// A sample the accumulator cannot take leaves the frame without an accumulator,
+		// which the pipeline reports as a contract failure.
+		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(
+			sample, width, height, m_LastSubmittedFencePoint);
 		m_ActiveFrame.m_TemporalTransaction.Begin(
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
-			m_TemporalHistoryManager.get(), scenePreExposure);
+			m_TemporalHistoryManager.get(), scenePreExposure, sample,
+			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr);
 		return m_ActiveFrame.m_TemporalTransaction;
 	}
 

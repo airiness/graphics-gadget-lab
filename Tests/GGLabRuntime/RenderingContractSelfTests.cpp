@@ -30,6 +30,8 @@
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
@@ -266,6 +268,11 @@ namespace gglab
 		struct TemporalHistoryContractPassData
 		{
 			TemporalHistoryRenderGraphResources m_History;
+		};
+
+		struct TemporalReferenceContractPassData
+		{
+			TemporalReferenceRenderGraphResources m_Sums;
 		};
 
 		struct BarrierBatchingPassData
@@ -5237,6 +5244,127 @@ namespace gglab
 				"Fence retirement drains only completed generations and rejects duplicate release");
 		}
 
+		void RunTemporalReferenceContractTests(SelfTestContext& context) noexcept
+		{
+			bool productionPhasesMatch = true;
+			for (uint32_t index = 0; index < temporal::JitterSampleCount; ++index)
+			{
+				const Vector2 reference = GetTemporalReferenceJitterPixels(index);
+				const Vector2 production = temporal::GetJitterSamplePixels(index);
+				productionPhasesMatch = productionPhasesMatch &&
+					std::abs(reference.m_X - production.m_X) < 1.0e-6f &&
+					std::abs(reference.m_Y - production.m_Y) < 1.0e-6f;
+			}
+			bool phasesInsidePixel = true;
+			for (uint32_t index = 0; index < 256; ++index)
+			{
+				const Vector2 phase = GetTemporalReferenceJitterPixels(index);
+				phasesInsidePixel = phasesInsidePixel && phase.m_X >= -0.5f && phase.m_X < 0.5f &&
+					phase.m_Y >= -0.5f && phase.m_Y < 0.5f;
+			}
+			context.Check(productionPhasesMatch && phasesInsidePixel &&
+				TemporalReferenceSample{ .m_Index = 3, .m_Count = 4 }.IsValid() &&
+				!TemporalReferenceSample{ .m_Index = 4, .m_Count = 4 }.IsValid() &&
+				!TemporalReferenceSample{ .m_Index = 0, .m_Count = 0 }.IsValid() &&
+				!TemporalReferenceSample{ .m_Index = 0,
+					.m_Count = MaxTemporalReferenceSamples + 1 }.IsValid(),
+				"Reference phases extend the production Halton(2, 3) sequence inside the pixel");
+
+			RecordingDevice device;
+			device.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool pool(&device);
+			TemporalReferenceAccumulator accumulator(&pool);
+			const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 5 };
+			auto accumulate = [&](uint32_t index, uint32_t count, bool submit,
+				bool& outPreviousValid, uint32_t width = 8, uint32_t height = 4)
+			{
+				if (!accumulator.BeginFrame(TemporalReferenceSample{ .m_Index = index,
+					.m_Count = count }, width, height, fence))
+				{
+					return false;
+				}
+				RenderGraph graph({
+					.m_Device = &device,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				bool imported = false;
+				bool exported = false;
+				graph.AddPass<TemporalReferenceContractPassData>("TemporalReference.Contract",
+					[&](RenderGraph::RGBuilder& builder, TemporalReferenceContractPassData& data)
+					{
+						imported = accumulator.ImportRenderGraphResources(builder, data.m_Sums);
+						outPreviousValid = data.m_Sums.m_PreviousValid;
+						if (data.m_Sums.m_PreviousValid)
+						{
+							data.m_Sums.m_PreviousSum = builder.Read(
+								data.m_Sums.m_PreviousSum, RGTextureAccess::Sample);
+						}
+						builder.WriteInPlace(data.m_Sums.m_NextSum, RGTextureAccess::StorageWrite);
+						exported = accumulator.ExportRenderGraphResources(builder, data.m_Sums);
+					});
+				const bool compiled = graph.Compile();
+				if (submit)
+				{
+					accumulator.CommitFrame();
+				}
+				else
+				{
+					accumulator.AbortFrame();
+				}
+				return imported && exported && compiled;
+			};
+
+			bool firstPrevious = true;
+			bool secondPrevious = false;
+			bool repeatedPrevious = false;
+			const bool first = accumulate(0, 3, true, firstPrevious);
+			const bool unsubmitted = accumulate(1, 3, false, secondPrevious);
+			const uint32_t afterAbort = accumulator.GetCommittedSampleCount();
+			const bool repeated = accumulate(1, 3, true, repeatedPrevious);
+			context.Check(first && !firstPrevious && unsubmitted && secondPrevious &&
+				afterAbort == 1 && repeated && repeatedPrevious &&
+				accumulator.GetCommittedSampleCount() == 2 &&
+				pool.GetDiagnostics().m_ActiveTextureCount == 2,
+				"Each submitted sample commits the next sum; an unsubmitted sample is repeated");
+
+			bool skippedPrevious = false;
+			const bool skipped = accumulator.BeginFrame(
+				TemporalReferenceSample{ .m_Index = 3, .m_Count = 4 }, 8, 4, fence);
+			bool restartPrevious = true;
+			const bool restarted = accumulate(0, 4, true, restartPrevious);
+			context.Check(!skipped && !skippedPrevious && restarted && !restartPrevious &&
+				accumulator.GetCommittedSampleCount() == 1,
+				"A sample that does not follow the committed sum is rejected; sample 0 restarts");
+
+			bool resizedPrevious = true;
+			const bool resized = accumulate(0, 2, true, resizedPrevious, 16, 8);
+			const PersistentTexturePoolDiagnostics resizedPool = pool.GetDiagnostics();
+			const bool idle = accumulator.BeginFrame(std::nullopt, 16, 8, fence);
+			const PersistentTexturePoolDiagnostics idlePool = pool.GetDiagnostics();
+			context.Check(resized && !resizedPrevious && resizedPool.m_ActiveTextureCount == 2 &&
+				resizedPool.m_PendingRetirementTextureCount == 2 && idle &&
+				idlePool.m_ActiveTextureCount == 0 && idlePool.m_PendingRetirementTextureCount == 4 &&
+				accumulator.GetCommittedSampleCount() == 0,
+				"A new extent reallocates the sum pair and a frame without a sample retires it "
+				"through the fence");
+
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			TemporalFrameTransaction transaction;
+			transaction.Begin(viewHistory, objectHistory, ResolvedTemporalFramePlan{}, 8, 4,
+				nullptr, 1.0f, TemporalReferenceSample{ .m_Index = 5, .m_Count = 16 }, nullptr);
+			const Vector2 expected = GetTemporalReferenceJitterPixels(5);
+			context.Check(transaction.GetReferenceSample() &&
+				transaction.GetJitterIndex() == 5 && !transaction.CanAccumulateReference() &&
+				transaction.GetJitterPixels().m_X == expected.m_X &&
+				transaction.GetJitterPixels().m_Y == expected.m_Y,
+				"A reference frame jitters with its sample phase while Temporal AA is inactive");
+			transaction.Abort();
+			device.m_CompletedFenceValue = fence.m_Value;
+			pool.Tick();
+		}
+
 		void RunTemporalHistoryTransactionContractTests(SelfTestContext& context) noexcept
 		{
 			RecordingDevice writeProofDevice;
@@ -9102,6 +9230,7 @@ namespace gglab
 		RunDirectionalShadowGraphTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
+		RunTemporalReferenceContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
 		RunAtmosphereContractTests(context);
 		RunWorldSunContractTests(context);

@@ -47,6 +47,7 @@ namespace gglab
 	class ShadowPreviewViewBase;
 	class ShadowPreviewControlBase;
 	class TemporalHistoryManager;
+	class TemporalReferenceAccumulator;
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
 
@@ -90,7 +91,8 @@ namespace gglab
 			const RenderFrameBuildRequest& request) noexcept override;
 		TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-			float scenePreExposure) noexcept override;
+			float scenePreExposure,
+			const std::optional<TemporalReferenceSample>& referenceSample) noexcept override;
 		void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept override;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
 		void Render(RenderFrame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
@@ -326,6 +328,7 @@ namespace gglab
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
+		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;
 		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
 		// Outlives Finalize so the application can drain the final capture results.

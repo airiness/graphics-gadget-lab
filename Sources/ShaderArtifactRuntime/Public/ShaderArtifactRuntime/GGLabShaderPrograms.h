@@ -57,6 +57,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gtao", "compute.upsample", ShaderStage::Compute };
 	inline const ShaderProgramRef TemporalAAReprojectionCompute{
 		"gglab.shader.temporal-aa", "compute.reprojection", ShaderStage::Compute };
+	inline const ShaderProgramRef TemporalReferenceAccumulateCompute{
+		"gglab.shader.temporal-reference", "compute.accumulate", ShaderStage::Compute };
 
 	inline const ShaderProgramRef DirectionalShadowMapVertex{
 		"gglab.shader.directional-shadow-map", "vertex", ShaderStage::Vertex };

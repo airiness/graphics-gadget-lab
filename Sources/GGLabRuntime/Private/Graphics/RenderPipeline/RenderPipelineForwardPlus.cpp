@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
@@ -486,6 +487,9 @@ namespace gglab
 		// Depth-tested world-space debug geometry is part of HDR scene color.
 		m_DebugDrawScenePass.AddPass(rg, context, services);
 
+		// An evaluation reference sample accumulates the complete HDR scene, including
+		// transparent and depth-tested debug geometry, before post-processing.
+		m_TemporalReferencePass.AddPass(rg, context, services);
 		m_PostProcessPipeline.AddPasses(rg, context, services);
 
 		// The scene capture tap reads the post-processed display target before any
@@ -641,6 +645,23 @@ namespace gglab
 			.m_TemporalActive = temporalActive,
 			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
 			});
+		const TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
+		if (result.IsReady() && transaction && transaction->GetReferenceSample())
+		{
+			m_TemporalReferencePass.Prepare(services);
+			if (!transaction->CanAccumulateReference())
+			{
+				return RenderFrameValidationResult::ContractFailure(
+					"Temporal reference sample cannot be accumulated",
+					"The sum pair could not be allocated or the sample does not follow the "
+					"committed sum.");
+			}
+			if (!m_TemporalReferencePass.ValidatePipelineClosure(services))
+			{
+				return RenderFrameValidationResult::ContractFailure(
+					"Temporal reference accumulation pipeline unavailable");
+			}
+		}
 		if (result.IsReady())
 		{
 			m_FramePlan = std::move(plan);

@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
@@ -190,9 +191,12 @@ namespace gglab
 		[[nodiscard]] virtual RenderFrame BeginFrame() noexcept = 0;
 		[[nodiscard]] virtual RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept = 0;
+		// A reference sample (evaluation only) requires an inactive Temporal AA plan; the
+		// frame then renders with the sample's jitter phase and accumulates its scene color.
 		[[nodiscard]] virtual TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-			float scenePreExposure) noexcept = 0;
+			float scenePreExposure,
+			const std::optional<TemporalReferenceSample>& referenceSample) noexcept = 0;
 		virtual void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept = 0;
 		virtual void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept = 0;
 		[[nodiscard]] virtual RenderGraph::CreateInfo CreateRenderGraphCreateInfo()

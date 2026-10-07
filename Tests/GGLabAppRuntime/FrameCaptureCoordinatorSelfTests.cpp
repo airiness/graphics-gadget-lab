@@ -936,6 +936,7 @@ namespace gglab
 				}
 				const std::optional<FrameSequencePoseRequest> pose =
 					m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
+				m_LastSample = pose ? pose->m_ReferenceSample : std::nullopt;
 				if (pose)
 				{
 					const std::optional<CameraPathPose> applied =
@@ -975,6 +976,7 @@ namespace gglab
 			bool m_Ready = true;
 			bool m_AutoComplete = true;
 			bool m_Deferred = false;
+			std::optional<TemporalReferenceSample> m_LastSample;
 			std::vector<FrameCaptureRequestResult> m_Results;
 		};
 
@@ -1174,6 +1176,53 @@ namespace gglab
 				"A sequence records one diagnostic tap as its evidence channel");
 		}
 
+		void RunReferenceSequenceTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-reference");
+			SequenceHarness harness(directory.GetPath());
+			std::string error;
+			const uint64_t tooMany = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+				.m_ReferenceSamples = MaxTemporalReferenceSamples + 1 }, error);
+			const uint64_t id = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 1 },
+				.m_ReferenceSamples = 3,
+				}, error);
+			harness.Frame();
+
+			std::vector<uint32_t> frames;
+			std::vector<uint32_t> samples;
+			std::vector<bool> heldBefore;
+			std::vector<size_t> issued;
+			while (harness.m_Sequence.IsActive() && frames.size() < 30)
+			{
+				heldBefore.push_back(harness.m_Sequence.ShouldHoldTime());
+				const std::optional<uint32_t> frame = harness.Frame();
+				frames.push_back(frame.value_or(999));
+				samples.push_back(harness.m_LastSample ? harness.m_LastSample->m_Index : 999);
+				issued.push_back(harness.m_Control.m_Issued.size());
+			}
+			const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+			context.Check(tooMany == 0 && id != 0 && frames.size() == 18 &&
+				frames[0] == 0 && frames[2] == 0 && frames[3] == 1 && frames[17] == 5 &&
+				samples[0] == 0 && samples[1] == 1 && samples[2] == 2 && samples[3] == 0 &&
+				!heldBefore[0] && heldBefore[1] && heldBefore[2] && !heldBefore[3] &&
+				status.m_State == FrameSequenceState::Completed &&
+				status.m_SubmittedFrames == 6 && status.m_ReferenceSamples == 3,
+				"A reference sequence renders every frame as consecutive samples with time held "
+				"after the first");
+			const auto capture = std::ranges::find_if(harness.m_Results,
+				[](const FrameCaptureRequestResult& result)
+				{
+					return result.m_Metadata && result.m_Metadata->m_Sequence;
+				});
+			context.Check(issued[4] == 0 && issued[5] == 1 && harness.m_Results.size() == 1 &&
+				capture != harness.m_Results.end() &&
+				capture->m_Metadata->m_Sequence->m_Frame == 1 &&
+				capture->m_Metadata->m_Sequence->m_ReferenceSamples == 3,
+				"A reference frame is captured once, after its last sample");
+		}
+
 		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-sequence-failure");
@@ -1255,6 +1304,7 @@ namespace gglab
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
 		RunDiagnosticCaptureTests(context);
+		RunReferenceSequenceTests(context);
 		RunFrameSequenceFailureTests(context);
 	}
 }

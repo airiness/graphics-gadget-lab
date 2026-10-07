@@ -27,6 +27,7 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
@@ -183,6 +184,8 @@ namespace gglab
 			const ResolvedTemporalFramePlan& plan = inputs.m_TemporalFramePlan;
 			const TemporalAASettings& settings = inputs.m_TemporalSettings;
 			const Vector2& jitter = inputs.m_TemporalFrameTransaction.GetJitterPixels();
+			const std::optional<TemporalReferenceSample>& referenceSample =
+				inputs.m_TemporalFrameTransaction.GetReferenceSample();
 			// One resolution domain until the render/display split lands.
 			const std::array<uint32_t, 2> extent{ inputs.m_Width, inputs.m_Height };
 			return FrameCaptureTemporalState{
@@ -192,7 +195,8 @@ namespace gglab
 				.m_SessionIdentity = plan.m_SessionIdentity,
 				.m_ResetIdentity = plan.m_ResetIdentity,
 				.m_JitterIndex = inputs.m_TemporalFrameTransaction.GetJitterIndex(),
-				.m_JitterSequenceLength = plan.m_Active ? temporal::JitterSampleCount : 0,
+				.m_JitterSequenceLength = plan.m_Active ? temporal::JitterSampleCount
+					: referenceSample ? referenceSample->m_Count : 0,
 				.m_JitterPixels = { jitter.m_X, jitter.m_Y },
 				.m_MaxHistoryFeedback = settings.m_MaxHistoryFeedback,
 				.m_DepthAbsoluteThreshold = settings.m_DepthAbsoluteThreshold,
@@ -295,7 +299,15 @@ namespace gglab
 
 		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
 
-		m_Time->Update();
+		if (m_FrameSequence->ShouldHoldTime())
+		{
+			// Every sample of a supersampled reference frame renders the same instant.
+			m_Time->Hold();
+		}
+		else
+		{
+			m_Time->Update();
+		}
 		m_TaskSystem->PumpCompletions({
 			.m_MaxCallbacks = 64,
 			.m_MaxMilliseconds = 1.0,
@@ -393,12 +405,14 @@ namespace gglab
 		}
 		// A running sequence poses the main camera after content updates and capture
 		// views, so the path alone determines this frame's camera.
+		std::optional<TemporalReferenceSample> referenceSample;
 		if (const std::optional<FrameSequencePoseRequest> sequencePose =
 			m_FrameSequence->PrepareFrame(
 				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
 		{
 			m_FrameSequence->OnPoseApplied(cameraRig.ApplyCameraPathFrame(
 				sequencePose->m_CameraPathId, sequencePose->m_Frame));
+			referenceSample = sequencePose->m_ReferenceSample;
 		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
@@ -406,9 +420,14 @@ namespace gglab
 			"CameraRig must resolve one effective display view before "
 			"frame planning.");
 		const CameraRig::CameraSlot* displayCameraSlot = effectiveDisplayView.m_CameraSlot;
-		const ResolvedViewRenderSettings displayViewSettings =
+		ResolvedViewRenderSettings displayViewSettings =
 			ResolveViewRenderSettings(
 				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		if (referenceSample)
+		{
+			// The reference owns jitter and accumulation; Temporal AA stays inactive.
+			displayViewSettings.m_TemporalAA.m_Enabled = false;
+		}
 		const uint64_t temporalSessionIdentity =
 			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
 			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
@@ -425,7 +444,7 @@ namespace gglab
 			});
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
-			displayViewSettings.m_Exposure.m_PreExposure);
+			displayViewSettings.m_Exposure.m_PreExposure, referenceSample);
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
