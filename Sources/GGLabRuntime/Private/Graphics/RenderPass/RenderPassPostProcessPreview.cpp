@@ -8,6 +8,7 @@
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
+#include "Graphics/RenderPass/DiagnosticCaptureGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -118,6 +119,59 @@ namespace gglab
 				tap == PostProcessDebugTap::TemporalHistoryAge;
 		}
 
+		// Records the fullscreen preview draw shared by inspector previews and
+		// diagnostic captures.
+		void RecordPreviewDraw(RGExecuteContext& executeContext, const PassData& data,
+			RHIPipelineHandle pipeline, const RenderServices& services,
+			const RenderFrameContext& context, RenderViewID displayViewId) noexcept
+		{
+			auto* commandContext = executeContext.GetGraphicsCommandContext();
+			const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
+			const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
+			GGLAB_ASSERT_MSG(
+				sourceSrv.IsValid(), "Post-process preview source SRV must be shader visible.");
+
+			const RHIRenderingAttachment colorAttachment{
+				.m_View = outputRtv,
+				.m_LoadOp = RHIContentLoadOp::DontCare,
+			};
+			commandContext->BeginRendering({ .m_ColorAttachments =
+				std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+			commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
+			commandContext->SetPipeline(pipeline);
+			commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+				static_cast<float>(data.m_Height) });
+			commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+				static_cast<int32_t>(data.m_Height) });
+
+			const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
+			commandContext->SetConstantBuffer(
+				static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+				sceneBuffer->GetBufferHandle(),
+				context.m_RenderScene.m_SceneConstantBufferOffset);
+			commandContext->SetReadOnlyBuffer(
+				static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+				services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+
+			const PostProcessPreviewPassParameters parameters{
+				.SourceTextureIndex = sourceSrv.m_Index,
+				.SourceSamplerIndex = data.m_SamplerIndex,
+				.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+				.SourceMode = static_cast<uint32_t>(data.m_Selection.m_Tap),
+				.SourcePreExposure = data.m_SourcePreExposure,
+				.PreviewExposureScale = data.m_PreviewExposureScale,
+			};
+			commandContext->SetPushConstants(
+				static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+			commandContext->DrawFullscreenTriangle();
+		}
+
+		struct DiagnosticSource
+		{
+			RGTextureId m_Texture{};
+			std::optional<RHITextureViewDesc> m_ViewDesc;
+		};
+
 		RGTextureId ResolveGTAOPreviewSource(
 			const RGGTAOResources& resources, PostProcessDebugTap tap) noexcept
 		{
@@ -143,6 +197,92 @@ namespace gglab
 				return {};
 			}
 		}
+	}
+
+	bool RenderPassPostProcessPreview::AddDiagnosticCapturePass(RenderGraph& rg,
+		const RenderFrameContext& context, const RenderServices& services,
+		PostProcessDebugTap tap) noexcept
+	{
+		auto& blackboard = rg.GetBlackboard();
+		DiagnosticSource source{};
+		if (IsTemporalAAPreview(tap))
+		{
+			const auto* temporalAA =
+				blackboard.TryGet<RGTemporalAAResources>(TemporalAAResourcesName);
+			source.m_Texture =
+				temporalAA ? ResolveTemporalAAPreviewSource(*temporalAA, tap) : RGTextureId{};
+		}
+		else if (IsTemporalMotionPreview(tap))
+		{
+			const auto* temporalGeometry = blackboard.TryGet<RGTemporalGeometryResources>(
+				TemporalGeometryResourcesName);
+			if (temporalGeometry && temporalGeometry->IsValid())
+			{
+				source = { temporalGeometry->m_MotionVectors, temporalGeometry->m_MotionSrvDesc };
+			}
+		}
+		else if (IsGTAOPreview(tap))
+		{
+			const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
+			source.m_Texture = gtao ? ResolveGTAOPreviewSource(*gtao, tap) : RGTextureId{};
+		}
+		else if (IsDepthPreview(tap))
+		{
+			const auto* sceneDepth =
+				blackboard.TryGet<RGSceneDepthResources>(SceneDepthResourcesName);
+			if (sceneDepth)
+			{
+				source = { sceneDepth->m_Texture, sceneDepth->m_SrvDesc };
+			}
+		}
+		if (!source.m_Texture.IsValid())
+		{
+			return false;
+		}
+
+		EnsureInitialized(services);
+		const RenderView& displayView = context.GetDisplayRenderView();
+		// RenderGraph infers usage from accesses: the target is rendered here and
+		// copied by the Diagnostic capture pass, which receives the inferred usage.
+		const RHITextureDesc outputDesc{
+			.m_Format = RHIFormat::R8G8B8A8Unorm,
+			.m_Extent = { displayView.m_Width, displayView.m_Height, 1u },
+		};
+		RHITextureDesc captureDesc = outputDesc;
+		captureDesc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::CopySource;
+		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::PointClamp);
+		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const auto* contextPtr = &context;
+		rg.AddPass<PassData>("Capture.DiagnosticTap",
+			[source, outputDesc, captureDesc, samplerIndex, tap](
+				RenderGraph::RGBuilder& builder, PassData& data)
+			{
+				data.m_Source = builder.Read(source.m_Texture, RGTextureAccess::Sample);
+				data.m_SourceSrv = source.m_ViewDesc
+					? builder.CreateView<RHITextureViewType::ShaderResource>(
+						data.m_Source, *source.m_ViewDesc)
+					: builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+				data.m_Output = builder.CreateTexture("Capture.DiagnosticTap", outputDesc);
+				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
+				data.m_OutputRtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
+				data.m_Selection = { .m_Tap = tap };
+				data.m_Width = outputDesc.m_Extent.m_Width;
+				data.m_Height = outputDesc.m_Extent.m_Height;
+				data.m_SamplerIndex = samplerIndex;
+				builder.GetBlackboard().GetOrCreate<RGDiagnosticCaptureResources>(
+					DiagnosticCaptureResourcesName) = {
+					.m_Texture = data.m_Output,
+					.m_Desc = captureDesc,
+				};
+			},
+			[this, services, contextPtr, displayViewId](
+				RGExecuteContext& executeContext, PassData& data)
+			{
+				RecordPreviewDraw(executeContext, data, GetOrCreatePSO(services), services,
+					*contextPtr, displayViewId);
+			});
+		return true;
 	}
 
 	void RenderPassPostProcessPreview::AddPass(
@@ -383,45 +523,8 @@ namespace gglab
 			[this, services, registry, contextPtr, displayViewId, channel](
 				RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
-				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
-				GGLAB_ASSERT_MSG(
-					sourceSrv.IsValid(), "Post-process preview source SRV must be shader visible.");
-
-				const RHIRenderingAttachment colorAttachment{
-					.m_View = outputRtv,
-					.m_LoadOp = RHIContentLoadOp::DontCare,
-				};
-				commandContext->BeginRendering({ .m_ColorAttachments =
-					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
-				commandContext->SetPipeline(GetOrCreatePSO(services));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
-					static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
-					static_cast<int32_t>(data.m_Height) });
-
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
-				commandContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
-				commandContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-
-				const PostProcessPreviewPassParameters parameters{
-					.SourceTextureIndex = sourceSrv.m_Index,
-					.SourceSamplerIndex = data.m_SamplerIndex,
-					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
-					.SourceMode = static_cast<uint32_t>(data.m_Selection.m_Tap),
-					.SourcePreExposure = data.m_SourcePreExposure,
-					.PreviewExposureScale = data.m_PreviewExposureScale,
-				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
-				commandContext->DrawFullscreenTriangle();
+				RecordPreviewDraw(executeContext, data, GetOrCreatePSO(services), services,
+					*contextPtr, displayViewId);
 				registry->PublishPostProcessPreview(data.m_Selection, channel,
 					contextPtr->m_FrameSerial);
 			});

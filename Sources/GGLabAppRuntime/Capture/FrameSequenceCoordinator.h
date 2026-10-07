@@ -2,6 +2,7 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -22,6 +23,9 @@ namespace gglab
 		// path's frame count. Duplicates are ignored.
 		std::vector<uint32_t> m_CaptureFrames;
 		FrameCaptureSource m_CaptureSource = FrameCaptureSource::Scene;
+		// Required when the capture source is Diagnostic: the one evidence channel
+		// the run records.
+		std::optional<PostProcessDebugTap> m_DiagnosticTap;
 		// Empty selects the capture coordinator's default output directory.
 		std::filesystem::path m_OutputDirectory;
 		// File subject prefix; empty uses the camera path id. Each capture appends
@@ -81,7 +85,9 @@ namespace gglab
 	// (temporal session, display view, size or content) or a readiness gate leaving
 	// Ready fails the sequence, because the remaining frames would no longer be
 	// comparable. Requested frames are captured through the capture coordinator as
-	// next-frame requests issued on exactly that frame.
+	// next-frame requests issued on exactly that frame. When the capture writer
+	// cannot accept another capture, the runtime defers the next frame entirely
+	// instead of letting the capture fail or rendering an extra frame.
 	class FrameSequenceCoordinator final
 	{
 	public:
@@ -97,6 +103,11 @@ namespace gglab
 		// Status of the active or most recent sequence.
 		[[nodiscard]] const FrameSequenceStatus* GetStatus() const noexcept;
 		[[nodiscard]] bool IsActive() const noexcept;
+		// True while the next sequence frame needs a capture that the capture
+		// coordinator cannot accept yet. The runtime must then neither simulate nor
+		// render a frame, so the sequence stays deterministic; the writer drains on
+		// its own thread.
+		[[nodiscard]] bool ShouldDeferFrame() const noexcept;
 
 		// Called before the frame is planned with the capture state of the previous
 		// frame (null before the first frame) and the active content's camera paths.

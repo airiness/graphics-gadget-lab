@@ -28,12 +28,16 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(FrameCaptureService);
 
 		[[nodiscard]] uint64_t RequestCapture(FrameCaptureSource source) noexcept override;
+		[[nodiscard]] uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept override;
 
 		[[nodiscard]] bool HasPendingRequests(FrameCaptureSource source) const noexcept override;
 		[[nodiscard]] std::optional<FrameCaptureTapTarget> BindTap(uint64_t frameSerial,
 			FrameCaptureSource source, const RHITextureDesc& displayTargetDesc) noexcept override;
+		[[nodiscard]] std::optional<PostProcessDebugTap> GetPendingDiagnosticTap()
+			const noexcept override;
+		void FailPendingDiagnosticRequests(std::string_view failure) noexcept override;
 
 		// The frame's GPU work, including its tap copies, was submitted.
 		void OnFrameSubmitted(uint64_t frameSerial, const RHIFencePoint& fence) noexcept;
@@ -54,12 +58,15 @@ namespace gglab
 		{
 			uint64_t m_Id = 0;
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+			// Diagnostic requests only.
+			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 		};
 
 		struct Tap
 		{
 			uint64_t m_FrameSerial = 0;
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 			std::vector<uint64_t> m_RequestIds;
 			RHIBufferOwner m_Buffer;
 			RHITextureCopyFootprint m_Footprint{};
@@ -67,6 +74,8 @@ namespace gglab
 			bool m_Submitted = false;
 		};
 
+		[[nodiscard]] bool IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,
+			PostProcessDebugTap diagnosticTap) const noexcept;
 		void PublishFailure(uint64_t requestId, FrameCaptureSource source,
 			uint64_t frameSerial, std::string failure) noexcept;
 		void FailTap(Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept;

@@ -138,6 +138,7 @@ namespace gglab
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
 		RenderPassFrameCapture m_SceneCapturePass{ FrameCaptureSource::Scene };
 		RenderPassFrameCapture m_CompositedCapturePass{ FrameCaptureSource::Composited };
+		RenderPassFrameCapture m_DiagnosticCapturePass{ FrameCaptureSource::Diagnostic };
 		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
 		std::optional<FramePlan> m_FramePlan;
 

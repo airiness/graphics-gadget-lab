@@ -491,6 +491,9 @@ namespace gglab
 		// The scene capture tap reads the post-processed display target before any
 		// back-buffer preview or overlay composes into it.
 		m_SceneCapturePass.AddPass(rg, context, services);
+		// Diagnostic captures read a separate display-resolution tap visualization.
+		m_PostProcessPipeline.AddDiagnosticCapturePass(rg, context, services);
+		m_DiagnosticCapturePass.AddPass(rg, context, services);
 
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);

@@ -22,6 +22,8 @@ Commands:
   sequence Play a camera path registered by the active content (-CameraPath),
            capturing -CaptureFrames ("0,10,20-23"); waits until the sequence
            and its captures finish unless -NoWait. Poll with 'status'.
+           -Source diagnostic -DiagnosticTap <tap> records one diagnostic tap,
+           such as temporal-history-weight, instead of the scene.
   sequence-cancel
            Cancel the active sequence.
   stop     Stop a session and wait for the process to exit.
@@ -60,8 +62,10 @@ param(
     [int]$StartTimeoutSeconds = 300,
 
     # capture
-    [ValidateSet('scene', 'composited')]
+    [ValidateSet('scene', 'composited', 'diagnostic')]
     [string]$Source = 'scene',
+    # Required with -Source diagnostic, for example temporal-history-weight.
+    [string]$DiagnosticTap,
     [ValidateSet('after-ready', 'next-frame')]
     [string]$Timing = 'after-ready',
     [ValidateRange(0, 10000)]
@@ -202,6 +206,7 @@ function New-CaptureRequest([string]$ViewId, [bool]$Wait) {
         outputDirectory = (Get-CaptureOutputDirectory); wait = $Wait
     }
     if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
+    if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
     if ($ViewId) { $request['view'] = $ViewId }
     if ($Label) { $request['label'] = $Label }
     if ($Note) { $request['note'] = $Note }
@@ -381,6 +386,7 @@ switch ($Command) {
             outputDirectory = (Get-CaptureOutputDirectory)
         }
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
+        if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($Label) { $request['label'] = $Label }
         if ($Note) { $request['note'] = $Note }
         $response = Invoke-SessionRequest $Session $request 30

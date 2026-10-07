@@ -75,7 +75,14 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
 
 - **Source.** `scene` (default) is the post-processed image without IBL
   previews, the always-visible debug overlay or tooling UI. `composited` is the
-  final presented image, including overlays and DevTools UI.
+  final presented image, including overlays and DevTools UI. `diagnostic`
+  records one diagnostic tap named by `-DiagnosticTap`, rendered at display
+  resolution with the post-process preview encoding: `temporal-motion-direction`,
+  `temporal-motion-magnitude`, `temporal-history-color`,
+  `temporal-reprojection-uv`, `temporal-rejection`, `temporal-history-weight`,
+  `temporal-history-age`, `scene-depth-raw`, `scene-depth-linear-view-z` and the
+  `gtao-*` taps. A tap whose feature produced nothing in that frame, such as a
+  temporal tap with Temporal AA inactive, fails the capture.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
   is ready and then for `-SettleFrames` submitted frames with an unchanged
   settle key (temporal session, camera cut, display view, size and Demo).
@@ -134,10 +141,14 @@ their files. Jobs that already claimed publication have an indeterminate
 outcome; their files may already exist or appear later, despite the failed result.
 
 The sidecar (`schemaVersion` 1) records the request (label, note, source,
-timing, settle frames), backend, Demo and Lab ids, frame serial and index, image
+diagnostic tap, timing, settle frames), backend, Demo and Lab ids, frame serial and index, image
 size and display format, camera pose and `referenceView`, fixed time step and
 total time, whether DevTools were active, every readiness gate, and the UTC
-capture time.
+capture time. `temporal` records the Temporal AA frame plan (requested, status,
+disable reason), temporal session and reset identities, jitter index, sequence
+length and offset in pixels, the resolved Temporal AA settings, and the render
+and display extents. `sequence` names the camera path, its version, the
+sequence frame and frame count, or is null outside a sequence.
 
 ## Sequences
 
@@ -159,12 +170,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
   state. Any other temporal continuity change (temporal session, display view,
   size or content) or a readiness gate leaving Ready fails the sequence.
 - Each requested frame is captured on exactly that frame as a next-frame capture
-  labelled `<label>-f<frame>`; the label defaults to the path id. At most eight
-  captures may wait for the writer, so capture sparse frames until sequence
-  capture applies back-pressure.
+  labelled `<label>-f<frame>`; the label defaults to the path id. Every frame of
+  a path may be captured (`-CaptureFrames '0-179'`): when the capture writer
+  cannot accept another capture, the session defers the next frame entirely,
+  without simulating or rendering it, until the writer drains.
 - `sequence` waits until the sequence and its captures finish unless `-NoWait`;
   `status` reports the active or last sequence, and `sequence-cancel` stops it.
   One sequence runs at a time; avoid submitting capture views while it runs.
+
+A sequence records one evidence channel per run: the scene, or one diagnostic
+tap with `-Source diagnostic -DiagnosticTap <tap>`. Replay the path once per
+channel; the frames correspond because the replay is deterministic.
 
 Replays are deterministic only for content whose state depends on the sequence
 frame alone. Check it by playing the same path twice and comparing the captures.

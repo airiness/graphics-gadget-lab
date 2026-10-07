@@ -83,6 +83,22 @@ namespace gglab
 				sequence.m_Request->m_Sequence.m_Label == "dolly" &&
 				sequence.m_Request->m_Sequence.m_Note == "baseline",
 				"A sequence request carries its path, capture frames and capture fields");
+			const ApplicationControlParseResult diagnosticSequence = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic",)"
+				R"("diagnosticTap":"temporal-rejection"})");
+			const ApplicationControlParseResult diagnosticCapture = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":14,"command":"capture","source":"diagnostic",)"
+				R"("diagnosticTap":"temporal-history-weight"})");
+			context.Check(diagnosticSequence.m_Request &&
+				diagnosticSequence.m_Request->m_Sequence.m_CaptureSource ==
+				FrameCaptureSource::Diagnostic &&
+				diagnosticSequence.m_Request->m_Sequence.m_DiagnosticTap ==
+				PostProcessDebugTap::TemporalRejection &&
+				diagnosticCapture.m_Request &&
+				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap ==
+				PostProcessDebugTap::TemporalHistoryWeight,
+				"Diagnostic captures and sequences name their tap");
+
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":12,"command":"sequence-cancel"})");
 			context.Check(cancel.m_Request &&
@@ -112,6 +128,9 @@ namespace gglab
 				{ R"({"protocol":1,"id":14,"command":"sequence","path":"A","captureFrames":3})", 14 },
 				{ R"({"protocol":1,"id":15,"command":"sequence","path":"A","frames":[1]})", 15 },
 				{ R"({"protocol":1,"id":16,"command":"sequence-cancel","path":"A"})", 16 },
+				{ R"({"protocol":1,"id":17,"command":"capture","source":"diagnostic"})", 17 },
+				{ R"({"protocol":1,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})", 18 },
+				{ R"({"protocol":1,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
 			};
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)

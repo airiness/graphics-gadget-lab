@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <string_view>
 
 namespace gglab
 {
@@ -191,6 +192,34 @@ namespace gglab
 		DepthVelocityPathUnavailable,
 		SceneExtensionUnsupported,
 	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAFrameStatusName(
+		TemporalAAFrameStatus status) noexcept
+	{
+		switch (status)
+		{
+		case TemporalAAFrameStatus::Disabled: return "disabled";
+		case TemporalAAFrameStatus::Unavailable: return "unavailable";
+		case TemporalAAFrameStatus::Active: return "active";
+		}
+		return "unknown";
+	}
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAADisableReasonName(
+		TemporalAADisableReason reason) noexcept
+	{
+		switch (reason)
+		{
+		case TemporalAADisableReason::None: return "none";
+		case TemporalAADisableReason::NotRequested: return "not-requested";
+		case TemporalAADisableReason::CoreCapabilityUnavailable: return "core-capability-unavailable";
+		case TemporalAADisableReason::DisplayViewIneligible: return "display-view-ineligible";
+		case TemporalAADisableReason::DepthVelocityPathUnavailable:
+			return "depth-velocity-path-unavailable";
+		case TemporalAADisableReason::SceneExtensionUnsupported: return "scene-extension-unsupported";
+		}
+		return "unknown";
+	}
 
 	struct TemporalFramePlanResolveInfo
 	{

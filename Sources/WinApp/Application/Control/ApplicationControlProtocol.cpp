@@ -1,4 +1,5 @@
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 
 #include <nlohmann/json.hpp>
 
@@ -70,6 +71,32 @@ namespace gglab
 			return std::nullopt;
 		}
 
+		// Parses a diagnostic tap name; returns an error text.
+		[[nodiscard]] std::string ParseDiagnosticTap(
+			const Json& value, std::optional<PostProcessDebugTap>& outTap)
+		{
+			outTap = value.is_string()
+				? FindFrameCaptureDiagnosticTap(value.get<std::string>())
+				: std::nullopt;
+			if (!outTap)
+			{
+				return "Field 'diagnosticTap' must name a diagnostic tap such as "
+					"'temporal-history-weight'.";
+			}
+			return {};
+		}
+
+		[[nodiscard]] std::string ValidateDiagnosticTap(
+			FrameCaptureSource source, const std::optional<PostProcessDebugTap>& tap)
+		{
+			if ((source == FrameCaptureSource::Diagnostic) != tap.has_value())
+			{
+				return "Field 'diagnosticTap' is required for, and only valid with, source "
+					"'diagnostic'.";
+			}
+			return {};
+		}
+
 		// Parses an absolute output directory; returns an error text.
 		[[nodiscard]] std::string ParseOutputDirectory(
 			const Json& value, std::filesystem::path& outDirectory)
@@ -122,9 +149,21 @@ namespace gglab
 					{
 						sequence.m_CaptureSource = FrameCaptureSource::Composited;
 					}
+					else if (source == "diagnostic")
+					{
+						sequence.m_CaptureSource = FrameCaptureSource::Diagnostic;
+					}
 					else
 					{
-						return "Field 'source' must be 'scene' or 'composited'.";
+						return "Field 'source' must be 'scene', 'composited' or 'diagnostic'.";
+					}
+				}
+				else if (key == "diagnosticTap")
+				{
+					if (std::string error = ParseDiagnosticTap(value, sequence.m_DiagnosticTap);
+						!error.empty())
+					{
+						return error;
 					}
 				}
 				else if (key == "captureFrames")
@@ -161,7 +200,7 @@ namespace gglab
 			{
 				return "Command 'sequence' requires a non-empty string 'path'.";
 			}
-			return {};
+			return ValidateDiagnosticTap(sequence.m_CaptureSource, sequence.m_DiagnosticTap);
 		}
 
 		// Fills the capture request from optional fields; returns an error text.
@@ -188,9 +227,21 @@ namespace gglab
 					{
 						capture.m_Source = FrameCaptureSource::Composited;
 					}
+					else if (source == "diagnostic")
+					{
+						capture.m_Source = FrameCaptureSource::Diagnostic;
+					}
 					else
 					{
-						return "Field 'source' must be 'scene' or 'composited'.";
+						return "Field 'source' must be 'scene', 'composited' or 'diagnostic'.";
+					}
+				}
+				else if (key == "diagnosticTap")
+				{
+					if (std::string error = ParseDiagnosticTap(value, capture.m_DiagnosticTap);
+						!error.empty())
+					{
+						return error;
 					}
 				}
 				else if (key == "timing")
@@ -251,7 +302,7 @@ namespace gglab
 					return std::format("Unknown field '{}' for command 'capture'.", key);
 				}
 			}
-			return {};
+			return ValidateDiagnosticTap(capture.m_Source, capture.m_DiagnosticTap);
 		}
 
 		[[nodiscard]] Json SerializeGates(const FrameCaptureReadiness& readiness)

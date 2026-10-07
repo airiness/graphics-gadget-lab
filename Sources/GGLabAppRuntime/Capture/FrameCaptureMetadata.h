@@ -42,6 +42,38 @@ namespace gglab
 		float m_FarPlane = 0.0f;
 	};
 
+	// Temporal state of the frame a capture recorded. Settings are the resolved
+	// display-view settings; the resolve may still be disabled or unavailable.
+	struct FrameCaptureTemporalState
+	{
+		bool m_Requested = false;
+		std::string m_Status;
+		std::string m_DisableReason;
+		uint64_t m_SessionIdentity = 0;
+		uint64_t m_ResetIdentity = 0;
+		uint32_t m_JitterIndex = 0;
+		uint32_t m_JitterSequenceLength = 0;
+		std::array<float, 2> m_JitterPixels{};
+		float m_MaxHistoryFeedback = 0.0f;
+		float m_DepthAbsoluteThreshold = 0.0f;
+		float m_DepthRelativeThreshold = 0.0f;
+		float m_VelocityWeightScale = 0.0f;
+		float m_LuminanceWeightScale = 0.0f;
+		float m_NeighborhoodClampExpansion = 0.0f;
+		std::array<uint32_t, 2> m_RenderExtent{};
+		std::array<uint32_t, 2> m_DisplayExtent{};
+	};
+
+	// Camera-path sequence frame a capture belongs to.
+	struct FrameCaptureSequenceInfo
+	{
+		uint64_t m_SequenceId = 0;
+		std::string m_CameraPathId;
+		uint32_t m_CameraPathVersion = 0;
+		uint32_t m_Frame = 0;
+		uint32_t m_FrameCount = 0;
+	};
+
 	// Everything a capture records about the frame that produced it. Frame-state
 	// fields are sampled when the capture is issued, immediately before the
 	// frame that records it is built.
@@ -68,6 +100,10 @@ namespace gglab
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
 		FrameCaptureReadiness m_Readiness{};
+		FrameCaptureTemporalState m_Temporal{};
+		std::optional<FrameCaptureSequenceInfo> m_Sequence;
+		// Diagnostic tap name of a Diagnostic capture; empty otherwise.
+		std::string m_DiagnosticTap;
 		std::string m_CapturedAtUtc;
 	};
 

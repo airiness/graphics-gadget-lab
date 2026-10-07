@@ -341,6 +341,74 @@ namespace gglab
 				"The capture service leaves no readback buffers alive");
 		}
 
+		void RunDiagnosticTests(SelfTestContext& context) noexcept
+		{
+			context.Check(GetFrameCaptureSourceName(FrameCaptureSource::Diagnostic) == "diagnostic" &&
+				FindFrameCaptureDiagnosticTap("temporal-history-weight") ==
+				PostProcessDebugTap::TemporalHistoryWeight &&
+				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::TemporalRejection) ==
+				"temporal-rejection" &&
+				!FindFrameCaptureDiagnosticTap("bloom-result") &&
+				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::BloomResult).empty(),
+				"Diagnostic taps have stable names; non-diagnostic taps have none");
+
+			CaptureTestDevice device;
+			FrameCaptureService service(device);
+			const RHITextureDesc target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			const uint64_t unsupported = service.RequestDiagnosticCapture(PostProcessDebugTap::BloomResult);
+			const std::vector<FrameCaptureResult> rejected = Consume(service);
+			context.Check(rejected.size() == 1 && rejected[0].m_RequestId == unsupported &&
+				rejected[0].m_Status == FrameCaptureStatus::Failed &&
+				rejected[0].m_Source == FrameCaptureSource::Diagnostic,
+				"A tap without diagnostic support fails immediately");
+
+			const uint64_t weightA = service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight);
+			const uint64_t rejection = service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalRejection);
+			const uint64_t weightB = service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight);
+			context.Check(service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalHistoryWeight &&
+				service.HasPendingRequests(FrameCaptureSource::Diagnostic) &&
+				!service.HasPendingRequests(FrameCaptureSource::Scene),
+				"The pending diagnostic tap is the tap of the oldest diagnostic request");
+
+			const std::optional<FrameCaptureTapTarget> weightTap =
+				service.BindTap(3, FrameCaptureSource::Diagnostic, target);
+			context.Check(weightTap &&
+				service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalRejection &&
+				service.GetUnfinishedRequestCount() == 3,
+				"A diagnostic tap binds only the requests for the pending tap");
+
+			service.OnFrameAborted(3);
+			context.Check(service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalHistoryWeight,
+				"Requests of an aborted frame return to the queue with their diagnostic tap");
+
+			service.FailPendingDiagnosticRequests("No source.");
+			const std::vector<FrameCaptureResult> failed = Consume(service);
+			context.Check(failed.size() == 2 && failed[0].m_RequestId == weightA &&
+				failed[1].m_RequestId == weightB &&
+				failed[0].m_Status == FrameCaptureStatus::Failed &&
+				failed[0].m_Failure == "No source." &&
+				service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalRejection,
+				"Failing the pending tap finishes only its requests");
+
+			const std::optional<FrameCaptureTapTarget> rejectionTap =
+				service.BindTap(4, FrameCaptureSource::Diagnostic, target);
+			if (rejectionTap)
+			{
+				device.FillReadback(rejectionTap->m_Buffer, rejectionTap->m_Footprint);
+				service.OnFrameSubmitted(4, MakeFence(1));
+				device.m_CompletedFenceValue = 1;
+				service.CollectCompleted();
+			}
+			const std::vector<FrameCaptureResult> completed = Consume(service);
+			context.Check(rejectionTap && completed.size() == 1 &&
+				completed[0].m_RequestId == rejection &&
+				completed[0].m_Status == FrameCaptureStatus::Completed &&
+				completed[0].m_Source == FrameCaptureSource::Diagnostic &&
+				!service.GetPendingDiagnosticTap(),
+				"A bound diagnostic tap completes like any other capture");
+			service.Shutdown();
+		}
+
 		void RunFrameEndTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -437,6 +505,7 @@ namespace gglab
 		RunFootprintTests(context);
 		RunConversionTests(context);
 		RunCompletionTests(context);
+		RunDiagnosticTests(context);
 		RunFrameEndTests(context);
 	}
 }

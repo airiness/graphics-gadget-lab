@@ -106,8 +106,6 @@ namespace gglab
 	{
 		// An encode normally finishes well within a second; a longer one is reported.
 		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
-		// The writer runs one job outside the queue; only pending jobs count here.
-		constexpr size_t MaxPendingEncodeJobs = 8;
 		constexpr size_t MaxFileStemComponentLength = 64;
 
 		// Empty when no gate failed.
@@ -528,10 +526,29 @@ namespace gglab
 		metadata.m_TotalTime = state.m_TotalTime;
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
 		metadata.m_Readiness = state.m_Readiness;
+		metadata.m_Temporal = state.m_Temporal;
+		metadata.m_Sequence = request.m_Sequence;
+		metadata.m_DiagnosticTap = request.m_Source == FrameCaptureSource::Diagnostic &&
+			request.m_DiagnosticTap
+			? std::string(GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap))
+			: std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
 			std::chrono::floor<std::chrono::milliseconds>(std::chrono::system_clock::now()));
 
-		entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
+		if (request.m_Source == FrameCaptureSource::Diagnostic)
+		{
+			if (!request.m_DiagnosticTap)
+			{
+				Finish(entry, FrameCaptureRequestStatus::Failed,
+					"A diagnostic capture requires a diagnostic tap.");
+				return;
+			}
+			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(*request.m_DiagnosticTap);
+		}
+		else
+		{
+			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
+		}
 		entry.m_Phase = Phase::Issued;
 	}
 
@@ -613,7 +630,8 @@ namespace gglab
 		}
 		{
 			std::scoped_lock lock(m_Writer->m_Mutex);
-			if (m_Writer->m_Queue.size() >= MaxPendingEncodeJobs)
+			// The writer runs one job outside the queue; only pending jobs count here.
+			if (m_Writer->m_Queue.size() >= MaxPendingWriteJobs)
 			{
 				Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
 				return;

@@ -25,6 +25,8 @@
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
@@ -32,11 +34,13 @@
 #include "LoadingProgress.h"
 
 #include <array>
+#include <chrono>
 #include <format>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -105,6 +109,9 @@ namespace gglab
 			std::span<const CameraReferenceView> m_ReferenceViews;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint64_t m_TemporalSessionIdentity = 0;
+			const ResolvedTemporalFramePlan& m_TemporalFramePlan;
+			const TemporalFrameTransaction& m_TemporalFrameTransaction;
+			const TemporalAASettings& m_TemporalSettings;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			AppRuntimeRHIBackend m_Backend = AppRuntimeRHIBackend::Unknown;
@@ -170,6 +177,34 @@ namespace gglab
 			return readiness;
 		}
 
+		[[nodiscard]] FrameCaptureTemporalState BuildCaptureTemporalState(
+			const CaptureFrameInputs& inputs) noexcept
+		{
+			const ResolvedTemporalFramePlan& plan = inputs.m_TemporalFramePlan;
+			const TemporalAASettings& settings = inputs.m_TemporalSettings;
+			const Vector2& jitter = inputs.m_TemporalFrameTransaction.GetJitterPixels();
+			// One resolution domain until the render/display split lands.
+			const std::array<uint32_t, 2> extent{ inputs.m_Width, inputs.m_Height };
+			return FrameCaptureTemporalState{
+				.m_Requested = plan.m_Requested,
+				.m_Status = std::string(GetTemporalAAFrameStatusName(plan.m_Status)),
+				.m_DisableReason = std::string(GetTemporalAADisableReasonName(plan.m_DisableReason)),
+				.m_SessionIdentity = plan.m_SessionIdentity,
+				.m_ResetIdentity = plan.m_ResetIdentity,
+				.m_JitterIndex = inputs.m_TemporalFrameTransaction.GetJitterIndex(),
+				.m_JitterSequenceLength = plan.m_Active ? temporal::JitterSampleCount : 0,
+				.m_JitterPixels = { jitter.m_X, jitter.m_Y },
+				.m_MaxHistoryFeedback = settings.m_MaxHistoryFeedback,
+				.m_DepthAbsoluteThreshold = settings.m_DepthAbsoluteThreshold,
+				.m_DepthRelativeThreshold = settings.m_DepthRelativeThreshold,
+				.m_VelocityWeightScale = settings.m_VelocityWeightScale,
+				.m_LuminanceWeightScale = settings.m_LuminanceWeightScale,
+				.m_NeighborhoodClampExpansion = settings.m_NeighborhoodClampExpansion,
+				.m_RenderExtent = extent,
+				.m_DisplayExtent = extent,
+			};
+		}
+
 		[[nodiscard]] FrameCaptureFrameState BuildCaptureFrameState(
 			const CaptureFrameInputs& inputs) noexcept
 		{
@@ -215,6 +250,7 @@ namespace gglab
 				.m_FixedDeltaTime = inputs.m_Time.GetFixedDeltaTime(),
 				.m_TotalTime = inputs.m_Time.GetTotalTime(),
 				.m_DevelopmentTools = inputs.m_DevelopmentTools,
+				.m_Temporal = BuildCaptureTemporalState(inputs),
 			};
 		}
 	}
@@ -244,6 +280,16 @@ namespace gglab
 		// frame work starts only after the host has composed the runtime services.
 		if (!m_ServicesInitialized)
 		{
+			return AppRuntimeTickResult::Continue;
+		}
+
+		// A sequence capture that the capture writer cannot accept yet defers the
+		// whole frame, before time advances, so no extra frame is simulated or
+		// rendered while the writer drains.
+		if (m_FrameSequence->ShouldDeferFrame())
+		{
+			m_FrameCapture->Update();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			return AppRuntimeTickResult::Continue;
 		}
 
@@ -408,6 +454,9 @@ namespace gglab
 			.m_ReferenceViews = cameraRig.GetReferenceViews(),
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_TemporalSessionIdentity = temporalSessionIdentity,
+			.m_TemporalFramePlan = temporalFramePlan,
+			.m_TemporalFrameTransaction = temporalFrameTransaction,
+			.m_TemporalSettings = displayViewSettings.m_TemporalAA,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
 			.m_Backend = m_Config.m_RhiBackend,

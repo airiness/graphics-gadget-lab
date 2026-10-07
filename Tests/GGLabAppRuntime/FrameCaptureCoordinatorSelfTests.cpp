@@ -42,11 +42,18 @@ namespace gglab
 			{
 				uint64_t m_Id = 0;
 				FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+				std::optional<PostProcessDebugTap> m_DiagnosticTap;
 			};
 
 			uint64_t RequestCapture(FrameCaptureSource source) noexcept override
 			{
 				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source });
+				return m_NextId++;
+			}
+			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override
+			{
+				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = tap });
 				return m_NextId++;
 			}
 			void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override
@@ -845,6 +852,40 @@ namespace gglab
 				json.find("\"totalTime\": null") != std::string::npos &&
 				json.find("\"state\": \"pending\"") != std::string::npos,
 				"Metadata JSON escapes control characters and writes non-finite numbers as null");
+
+			metadata.m_Temporal = {
+				.m_Requested = true,
+				.m_Status = "active",
+				.m_DisableReason = "none",
+				.m_SessionIdentity = 5,
+				.m_ResetIdentity = 9,
+				.m_JitterIndex = 3,
+				.m_JitterSequenceLength = 8,
+				.m_JitterPixels = { -0.375f, -0.0625f },
+				.m_MaxHistoryFeedback = 0.97f,
+				.m_RenderExtent = { 1280, 720 },
+				.m_DisplayExtent = { 1280, 720 },
+			};
+			metadata.m_Sequence = FrameCaptureSequenceInfo{
+				.m_SequenceId = 2,
+				.m_CameraPathId = "SEQ_Test",
+				.m_CameraPathVersion = 4,
+				.m_Frame = 17,
+				.m_FrameCount = 96,
+			};
+			const std::string sequenceJson = SerializeFrameCaptureMetadata(metadata);
+			context.Check(
+				sequenceJson.find("\"status\": \"active\"") != std::string::npos &&
+				sequenceJson.find("\"jitterIndex\": 3") != std::string::npos &&
+				sequenceJson.find("\"jitterSequenceLength\": 8") != std::string::npos &&
+				sequenceJson.find("-0.375") != std::string::npos &&
+				sequenceJson.find("\"maxHistoryFeedback\": 0.97") != std::string::npos &&
+				sequenceJson.find("\"cameraPath\": \"SEQ_Test\"") != std::string::npos &&
+				sequenceJson.find("\"cameraPathVersion\": 4") != std::string::npos &&
+				sequenceJson.find("\"frame\": 17") != std::string::npos &&
+				json.find("\"sequence\": null") != std::string::npos,
+				"Metadata records temporal state, jitter and settings, and the sequence frame "
+				"when the capture belongs to a sequence");
 		}
 	}
 
@@ -884,6 +925,15 @@ namespace gglab
 			// Renders one frame; returns the posed sequence frame, if any.
 			std::optional<uint32_t> Frame(bool submit = true, uint64_t temporalSession = 1)
 			{
+				m_Deferred = false;
+				if (m_Sequence.ShouldDeferFrame())
+				{
+					// The runtime neither simulates nor renders a deferred frame.
+					m_Deferred = true;
+					m_Capture.Update();
+					m_Sequence.OnCaptureResults(Consume(m_Capture));
+					return std::nullopt;
+				}
 				const std::optional<FrameSequencePoseRequest> pose =
 					m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
 				if (pose)
@@ -905,12 +955,14 @@ namespace gglab
 					m_Capture.OnFrameSubmitted();
 					m_Sequence.OnFrameSubmitted();
 				}
-				for (; m_Completed < m_Control.m_Issued.size(); ++m_Completed)
+				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
 				{
 					m_Control.Complete(m_Control.m_Issued[m_Completed].m_Id, 7);
 				}
 				m_Capture.Update();
-				m_Sequence.OnCaptureResults(Consume(m_Capture));
+				std::vector<FrameCaptureRequestResult> results = Consume(m_Capture);
+				m_Sequence.OnCaptureResults(results);
+				m_Results.insert(m_Results.end(), results.begin(), results.end());
 				return pose ? std::optional<uint32_t>(pose->m_Frame) : std::nullopt;
 			}
 
@@ -921,6 +973,9 @@ namespace gglab
 			uint64_t m_CameraResetSerial = 1;
 			size_t m_Completed = 0;
 			bool m_Ready = true;
+			bool m_AutoComplete = true;
+			bool m_Deferred = false;
+			std::vector<FrameCaptureRequestResult> m_Results;
 		};
 
 		void RunFrameSequenceTests(SelfTestContext& context) noexcept
@@ -977,7 +1032,146 @@ namespace gglab
 				labelled |= entry.path().filename().string().starts_with("run-f0005-");
 			}
 			context.Check(labelled, "Sequence captures are labelled with their sequence frame");
+			const auto lastCapture = std::ranges::find_if(harness.m_Results,
+				[](const FrameCaptureRequestResult& result)
+				{
+					return result.m_Metadata && result.m_Metadata->m_Sequence &&
+						result.m_Metadata->m_Sequence->m_Frame == 5;
+				});
+			context.Check(lastCapture != harness.m_Results.end() &&
+				lastCapture->m_Metadata->m_Sequence->m_CameraPathId == "SEQ_Test" &&
+				lastCapture->m_Metadata->m_Sequence->m_CameraPathVersion == 2 &&
+				lastCapture->m_Metadata->m_Sequence->m_FrameCount == 6 &&
+				lastCapture->m_Metadata->m_Sequence->m_SequenceId == id,
+				"Sequence capture metadata names the sequence, path version and frame");
 			context.Check(!harness.Frame(), "A completed sequence no longer poses frames");
+		}
+
+		void RunFrameSequenceBackPressureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-backpressure");
+			SequenceHarness harness(directory.GetPath());
+			harness.m_AutoComplete = false;
+			std::string error;
+			GGLAB_UNUSED(harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 0, 1, 2, 3, 4, 5 },
+				}, error));
+			harness.Frame();
+			// Six frames issue six captures whose Runtime results are still pending.
+			for (uint32_t frame = 0; frame < 6; ++frame)
+			{
+				harness.Frame();
+			}
+			context.Check(harness.m_Control.m_Issued.size() == 6 && !harness.m_Deferred &&
+				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+				"Captures below the writer limit never defer a frame");
+
+			SequenceHarness limited(directory.GetPath());
+			limited.m_AutoComplete = false;
+			limited.m_Paths.front().m_Keys.back().m_Frame = 20;
+			std::vector<uint32_t> frames(21);
+			for (uint32_t frame = 0; frame < frames.size(); ++frame)
+			{
+				frames[frame] = frame;
+			}
+			GGLAB_UNUSED(limited.m_Sequence.Start(
+				{ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = frames }, error));
+			limited.Frame();
+			for (uint32_t frame = 0; frame < FrameCaptureCoordinator::MaxPendingWriteJobs; ++frame)
+			{
+				limited.Frame();
+			}
+			const size_t issuedAtLimit = limited.m_Control.m_Issued.size();
+			const std::optional<uint32_t> deferred = limited.Frame();
+			const bool deferredAgain = !limited.Frame() && limited.m_Deferred;
+			context.Check(issuedAtLimit == FrameCaptureCoordinator::MaxPendingWriteJobs &&
+				!deferred && deferredAgain &&
+				limited.m_Control.m_Issued.size() == issuedAtLimit &&
+				limited.m_Sequence.GetStatus()->m_SubmittedFrames ==
+				FrameCaptureCoordinator::MaxPendingWriteJobs,
+				"A capture beyond the writer limit defers the frame without posing or submitting it");
+
+			limited.m_AutoComplete = true;
+			limited.m_Control.Complete(limited.m_Control.m_Issued[0].m_Id, 7);
+			limited.m_Completed = 1;
+			// The next tick is still deferred; it drains the finished capture.
+			const std::optional<uint32_t> draining = limited.Frame();
+			const std::optional<uint32_t> resumed = limited.Frame();
+			context.Check(!draining && resumed == FrameCaptureCoordinator::MaxPendingWriteJobs,
+				"The sequence resumes with the deferred frame once the writer drains");
+			while (limited.m_Sequence.IsActive())
+			{
+				limited.Frame();
+			}
+			const FrameSequenceStatus& status = *limited.m_Sequence.GetStatus();
+			context.Check(status.m_State == FrameSequenceState::Completed &&
+				status.m_CompletedCaptures == 21 && status.m_SubmittedFrames == 21,
+				"Every frame of a fully captured sequence is captured without writer overflow");
+		}
+
+		void RunDiagnosticCaptureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-diagnostic");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true,
+				});
+			const uint64_t missingTap = coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic });
+			const uint64_t weight = coordinator.Submit({
+				.m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight,
+				});
+			coordinator.BeginFrame(MakeFrameState(true));
+			coordinator.OnFrameSubmitted();
+			if (!control.m_Issued.empty())
+			{
+				control.Complete(control.m_Issued.back().m_Id, 3);
+			}
+			coordinator.Update();
+			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
+			const auto find = [&](uint64_t id)
+				{
+					return std::ranges::find(results, id, &FrameCaptureRequestResult::m_RequestId);
+				};
+			const auto failed = find(missingTap);
+			const auto completed = find(weight);
+			context.Check(control.m_Issued.size() == 1 &&
+				control.m_Issued[0].m_Source == FrameCaptureSource::Diagnostic &&
+				control.m_Issued[0].m_DiagnosticTap == PostProcessDebugTap::TemporalHistoryWeight &&
+				failed != results.end() && failed->m_Status == FrameCaptureRequestStatus::Failed &&
+				completed != results.end() &&
+				completed->m_Status == FrameCaptureRequestStatus::Completed &&
+				completed->m_Metadata &&
+				completed->m_Metadata->m_DiagnosticTap == "temporal-history-weight",
+				"Diagnostic captures pass their tap to the Runtime, record its name and fail "
+				"without a tap");
+
+			SequenceHarness harness(directory.GetPath());
+			std::string mismatch;
+			std::string ok;
+			const uint64_t rejectedSequence = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureSource = FrameCaptureSource::Diagnostic,
+				}, mismatch);
+			const uint64_t sequence = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 2 },
+				.m_CaptureSource = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalRejection,
+				}, ok);
+			while (harness.m_Sequence.IsActive())
+			{
+				harness.Frame();
+			}
+			context.Check(rejectedSequence == 0 && !mismatch.empty() && sequence != 0 &&
+				harness.m_Control.m_Issued.size() == 1 &&
+				harness.m_Control.m_Issued[0].m_DiagnosticTap == PostProcessDebugTap::TemporalRejection &&
+				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed,
+				"A sequence records one diagnostic tap as its evidence channel");
 		}
 
 		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
@@ -1059,6 +1253,8 @@ namespace gglab
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);
 		RunFrameSequenceTests(context);
+		RunFrameSequenceBackPressureTests(context);
+		RunDiagnosticCaptureTests(context);
 		RunFrameSequenceFailureTests(context);
 	}
 }

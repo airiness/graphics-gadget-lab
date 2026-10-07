@@ -1,4 +1,5 @@
 #include "Graphics/Capture/FrameCaptureService.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
@@ -36,6 +37,63 @@ namespace gglab
 		return requestId;
 	}
 
+	uint64_t FrameCaptureService::RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept
+	{
+		const uint64_t requestId = m_NextRequestId++;
+		if (m_IsShutdown)
+		{
+			PublishFailure(requestId, FrameCaptureSource::Diagnostic, 0,
+				"The render host has been finalized.");
+			return requestId;
+		}
+		if (GetFrameCaptureDiagnosticTapName(tap).empty())
+		{
+			PublishFailure(requestId, FrameCaptureSource::Diagnostic, 0,
+				"The tap does not support diagnostic captures.");
+			return requestId;
+		}
+		m_Queued.push_back({
+			.m_Id = requestId,
+			.m_Source = FrameCaptureSource::Diagnostic,
+			.m_DiagnosticTap = tap,
+			});
+		return requestId;
+	}
+
+	std::optional<PostProcessDebugTap> FrameCaptureService::GetPendingDiagnosticTap()
+		const noexcept
+	{
+		const auto request = std::ranges::find(
+			m_Queued, FrameCaptureSource::Diagnostic, &QueuedRequest::m_Source);
+		return request != m_Queued.end() ? std::optional(request->m_DiagnosticTap)
+										 : std::nullopt;
+	}
+
+	void FrameCaptureService::FailPendingDiagnosticRequests(std::string_view failure) noexcept
+	{
+		const std::optional<PostProcessDebugTap> tap = GetPendingDiagnosticTap();
+		if (!tap)
+		{
+			return;
+		}
+		std::erase_if(m_Queued, [&](const QueuedRequest& request)
+			{
+				if (!IsBoundBy(request, FrameCaptureSource::Diagnostic, *tap))
+				{
+					return false;
+				}
+				PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure));
+				return true;
+			});
+	}
+
+	bool FrameCaptureService::IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,
+		PostProcessDebugTap diagnosticTap) const noexcept
+	{
+		return request.m_Source == source && (source != FrameCaptureSource::Diagnostic ||
+			request.m_DiagnosticTap == diagnosticTap);
+	}
+
 	void FrameCaptureService::ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept
 	{
 		outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
@@ -68,14 +126,20 @@ namespace gglab
 			return std::nullopt;
 		}
 
+		const PostProcessDebugTap diagnosticTap =
+			GetPendingDiagnosticTap().value_or(PostProcessDebugTap::SceneColor);
 		Tap tap{
 			.m_FrameSerial = frameSerial,
 			.m_Source = source,
+			.m_DiagnosticTap = diagnosticTap,
 			.m_Footprint = ComputeRHITextureCopyFootprint(displayTargetDesc.m_Format,
 				displayTargetDesc.m_Extent.m_Width, displayTargetDesc.m_Extent.m_Height),
 		};
 		const auto boundEnd = std::ranges::stable_partition(m_Queued,
-			[source](const QueuedRequest& request) { return request.m_Source != source; })
+			[&](const QueuedRequest& request)
+			{
+				return !IsBoundBy(request, source, diagnosticTap);
+			})
 			.begin();
 		for (auto request = boundEnd; request != m_Queued.end(); ++request)
 		{
@@ -145,7 +209,8 @@ namespace gglab
 				}
 				for (const uint64_t requestId : tap.m_RequestIds)
 				{
-					returned.push_back({ .m_Id = requestId, .m_Source = tap.m_Source });
+					returned.push_back({ .m_Id = requestId, .m_Source = tap.m_Source,
+						.m_DiagnosticTap = tap.m_DiagnosticTap });
 				}
 				return true;
 			});

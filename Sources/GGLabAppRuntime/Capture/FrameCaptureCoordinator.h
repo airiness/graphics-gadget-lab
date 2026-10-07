@@ -4,6 +4,7 @@
 #include "Capture/FrameCaptureReadiness.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <chrono>
 #include <cstdint>
@@ -36,6 +37,10 @@ namespace gglab
 		std::filesystem::path m_OutputDirectory;
 		std::string m_Label;
 		std::string m_Note;
+		// Set by a camera-path sequence for the frame it captures.
+		std::optional<FrameCaptureSequenceInfo> m_Sequence;
+		// Required for Diagnostic captures and ignored by other sources.
+		std::optional<PostProcessDebugTap> m_DiagnosticTap;
 	};
 
 	enum class FrameCaptureRequestStatus : uint8_t
@@ -88,6 +93,7 @@ namespace gglab
 		std::optional<double> m_FixedDeltaTime;
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
+		FrameCaptureTemporalState m_Temporal{};
 	};
 
 	// A camera reference view the runtime restores for a waiting request.
@@ -105,6 +111,9 @@ namespace gglab
 	class FrameCaptureCoordinator final
 	{
 	public:
+		// Encode jobs that may wait behind the running writer job.
+		static constexpr uint32_t MaxPendingWriteJobs = 8;
+
 		struct CreateInfo
 		{
 			FrameCaptureControlBase* m_Capture = nullptr;

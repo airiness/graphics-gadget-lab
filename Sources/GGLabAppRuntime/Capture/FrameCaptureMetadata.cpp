@@ -167,6 +167,14 @@ namespace gglab
 		writer.String("label", metadata.m_Label);
 		writer.String("note", metadata.m_Note);
 		writer.String("source", GetFrameCaptureSourceName(metadata.m_Source));
+		if (metadata.m_DiagnosticTap.empty())
+		{
+			writer.Null("diagnosticTap");
+		}
+		else
+		{
+			writer.String("diagnosticTap", metadata.m_DiagnosticTap);
+		}
 
 		writer.BeginObject("timing");
 		writer.String("mode", GetFrameCaptureTimingName(metadata.m_Timing));
@@ -231,6 +239,52 @@ namespace gglab
 		}
 		writer.EndArray();
 		writer.EndObject();
+
+		const FrameCaptureTemporalState& temporal = metadata.m_Temporal;
+		writer.BeginObject("temporal");
+		writer.Bool("requested", temporal.m_Requested);
+		writer.String("status", temporal.m_Status);
+		writer.String("disableReason", temporal.m_DisableReason);
+		writer.Unsigned("sessionIdentity", temporal.m_SessionIdentity);
+		writer.Unsigned("resetIdentity", temporal.m_ResetIdentity);
+		writer.Unsigned("jitterIndex", temporal.m_JitterIndex);
+		writer.Unsigned("jitterSequenceLength", temporal.m_JitterSequenceLength);
+		writer.BeginArray("jitterPixels");
+		writer.Number({}, temporal.m_JitterPixels[0]);
+		writer.Number({}, temporal.m_JitterPixels[1]);
+		writer.EndArray();
+		writer.BeginObject("settings");
+		writer.Number("maxHistoryFeedback", temporal.m_MaxHistoryFeedback);
+		writer.Number("depthAbsoluteThreshold", temporal.m_DepthAbsoluteThreshold);
+		writer.Number("depthRelativeThreshold", temporal.m_DepthRelativeThreshold);
+		writer.Number("velocityWeightScale", temporal.m_VelocityWeightScale);
+		writer.Number("luminanceWeightScale", temporal.m_LuminanceWeightScale);
+		writer.Number("neighborhoodClampExpansion", temporal.m_NeighborhoodClampExpansion);
+		writer.EndObject();
+		writer.BeginArray("renderExtent");
+		writer.Unsigned({}, temporal.m_RenderExtent[0]);
+		writer.Unsigned({}, temporal.m_RenderExtent[1]);
+		writer.EndArray();
+		writer.BeginArray("displayExtent");
+		writer.Unsigned({}, temporal.m_DisplayExtent[0]);
+		writer.Unsigned({}, temporal.m_DisplayExtent[1]);
+		writer.EndArray();
+		writer.EndObject();
+
+		if (metadata.m_Sequence)
+		{
+			writer.BeginObject("sequence");
+			writer.Unsigned("id", metadata.m_Sequence->m_SequenceId);
+			writer.String("cameraPath", metadata.m_Sequence->m_CameraPathId);
+			writer.Unsigned("cameraPathVersion", metadata.m_Sequence->m_CameraPathVersion);
+			writer.Unsigned("frame", metadata.m_Sequence->m_Frame);
+			writer.Unsigned("frameCount", metadata.m_Sequence->m_FrameCount);
+			writer.EndObject();
+		}
+		else
+		{
+			writer.Null("sequence");
+		}
 
 		writer.String("capturedAtUtc", metadata.m_CapturedAtUtc);
 		writer.EndObject();

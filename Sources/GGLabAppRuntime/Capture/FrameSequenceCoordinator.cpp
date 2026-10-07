@@ -78,6 +78,12 @@ namespace gglab
 			outError = "A sequence requires a camera path id.";
 			return 0;
 		}
+		if ((request.m_CaptureSource == FrameCaptureSource::Diagnostic) !=
+			request.m_DiagnosticTap.has_value())
+		{
+			outError = "A diagnostic tap is required for, and only valid with, diagnostic captures.";
+			return 0;
+		}
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
@@ -118,6 +124,17 @@ namespace gglab
 	bool FrameSequenceCoordinator::IsActive() const noexcept
 	{
 		return m_Status && !m_Status->IsTerminal();
+	}
+
+	bool FrameSequenceCoordinator::ShouldDeferFrame() const noexcept
+	{
+		// Unfinished requests bound every capture that can still reach the writer, so
+		// staying below the pending-job limit keeps the writer queue from overflowing.
+		return m_Status && m_Status->m_State == FrameSequenceState::Running &&
+			m_CapturedFrame != m_Frame &&
+			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame) &&
+			m_Capture->GetUnfinishedRequestCount() >=
+			FrameCaptureCoordinator::MaxPendingWriteJobs;
 	}
 
 	std::optional<FrameSequencePoseRequest> FrameSequenceCoordinator::PrepareFrame(
@@ -238,6 +255,14 @@ namespace gglab
 				.m_OutputDirectory = m_Request.m_OutputDirectory,
 				.m_Label = std::format("{}-f{:04}", m_Request.m_Label, m_Frame),
 				.m_Note = m_Request.m_Note,
+				.m_Sequence = FrameCaptureSequenceInfo{
+					.m_SequenceId = m_Status->m_SequenceId,
+					.m_CameraPathId = m_Request.m_CameraPathId,
+					.m_CameraPathVersion = m_Status->m_CameraPathVersion,
+					.m_Frame = m_Frame,
+					.m_FrameCount = m_Status->m_FrameCount,
+				},
+				.m_DiagnosticTap = m_Request.m_DiagnosticTap,
 				});
 			m_Status->m_CaptureRequestIds.push_back(requestId);
 			m_CapturedFrame = m_Frame;

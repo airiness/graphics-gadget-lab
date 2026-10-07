@@ -1,9 +1,11 @@
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace gglab
@@ -16,8 +18,60 @@ namespace gglab
 			return "scene";
 		case FrameCaptureSource::Composited:
 			return "composited";
+		case FrameCaptureSource::Diagnostic:
+			return "diagnostic";
 		}
 		GGLAB_UNREACHABLE("Unhandled FrameCaptureSource.");
+	}
+
+	namespace
+	{
+		// Persisted in capture metadata and requested by name; never rename an entry.
+		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 17>
+			DiagnosticTapNames{ {
+				{ PostProcessDebugTap::SceneDepthRaw, "scene-depth-raw" },
+				{ PostProcessDebugTap::SceneDepthLinearViewZ, "scene-depth-linear-view-z" },
+				{ PostProcessDebugTap::GTAORawAO, "gtao-raw-ao" },
+				{ PostProcessDebugTap::GTAOHalfDepthViewZ, "gtao-half-depth-view-z" },
+				{ PostProcessDebugTap::GTAOReconstructedNormal, "gtao-reconstructed-normal" },
+				{ PostProcessDebugTap::GTAOSelectedSurfaceOffset, "gtao-selected-surface-offset" },
+				{ PostProcessDebugTap::GTAODenoiseX, "gtao-denoise-x" },
+				{ PostProcessDebugTap::GTAODenoiseY, "gtao-denoise-y" },
+				{ PostProcessDebugTap::GTAOFinalAO, "gtao-final-ao" },
+				{ PostProcessDebugTap::GTAOAOOnlyLightingContribution, "gtao-ao-only-lighting" },
+				{ PostProcessDebugTap::TemporalMotionDirection, "temporal-motion-direction" },
+				{ PostProcessDebugTap::TemporalMotionMagnitude, "temporal-motion-magnitude" },
+				{ PostProcessDebugTap::TemporalHistoryColor, "temporal-history-color" },
+				{ PostProcessDebugTap::TemporalReprojectionUV, "temporal-reprojection-uv" },
+				{ PostProcessDebugTap::TemporalRejection, "temporal-rejection" },
+				{ PostProcessDebugTap::TemporalHistoryWeight, "temporal-history-weight" },
+				{ PostProcessDebugTap::TemporalHistoryAge, "temporal-history-age" },
+			} };
+	}
+
+	std::string_view GetFrameCaptureDiagnosticTapName(PostProcessDebugTap tap) noexcept
+	{
+		for (const auto& [candidate, name] : DiagnosticTapNames)
+		{
+			if (candidate == tap)
+			{
+				return name;
+			}
+		}
+		return {};
+	}
+
+	std::optional<PostProcessDebugTap> FindFrameCaptureDiagnosticTap(
+		std::string_view name) noexcept
+	{
+		for (const auto& [tap, candidate] : DiagnosticTapNames)
+		{
+			if (candidate == name)
+			{
+				return tap;
+			}
+		}
+		return std::nullopt;
 	}
 
 	std::optional<std::vector<uint8_t>> ConvertFrameCaptureToRgba8(
