@@ -6,6 +6,8 @@
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <algorithm>
@@ -937,6 +939,9 @@ namespace gglab
 				const std::optional<FrameSequencePoseRequest> pose =
 					m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
 				m_LastSample = pose ? pose->m_ReferenceSample : std::nullopt;
+				m_LastTemporalAAOverrides = pose
+					? std::optional(pose->m_TemporalAAOverrides)
+					: std::nullopt;
 				if (pose)
 				{
 					const std::optional<CameraPathPose> applied =
@@ -977,6 +982,7 @@ namespace gglab
 			bool m_AutoComplete = true;
 			bool m_Deferred = false;
 			std::optional<TemporalReferenceSample> m_LastSample;
+			std::optional<FrameSequenceTemporalAAOverrides> m_LastTemporalAAOverrides;
 			std::vector<FrameCaptureRequestResult> m_Results;
 		};
 
@@ -1223,6 +1229,101 @@ namespace gglab
 				"A reference frame is captured once, after its last sample");
 		}
 
+		void RunFrameSequenceEvaluationTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-evaluation");
+			{
+				TemporalAASettings content{};
+				content.m_Enabled = true;
+				content.m_DepthAbsoluteThreshold = 0.25f;
+				const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
+					.m_MaxHistoryFeedback = 0.9f,
+					.m_NeighborhoodClampExpansion = 4.0f,
+					}, content);
+				context.Check(overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
+					overridden.m_DepthAbsoluteThreshold == 0.25f &&
+					overridden.m_NeighborhoodClampExpansion ==
+					TemporalAAMaxNeighborhoodClampExpansion &&
+					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
+					ResolveTemporalAASettings(content),
+					"Sequence Temporal AA overrides replace only set fields and stay within the "
+					"settings ranges");
+			}
+			{
+				const std::array<double, 5> samples{ 4.0, 1.0, 3.0, 2.0, 5.0 };
+				const FrameSequenceTimingSummary summary = SummarizeFrameSequenceTiming(samples);
+				context.Check(summary.m_Count == 5 && summary.m_Mean == 3.0 &&
+					summary.m_Median == 3.0 && summary.m_P90 == 5.0 && summary.m_Min == 1.0 &&
+					summary.m_Max == 5.0 && SummarizeFrameSequenceTiming({}).m_Count == 0,
+					"Timing summaries report nearest-rank percentiles");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string referenceError;
+				const uint64_t reference = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_ReferenceSamples = 2,
+					.m_TemporalAAOverrides = { .m_MaxHistoryFeedback = 0.9f },
+					}, referenceError);
+				std::string error;
+				const uint64_t id = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_TemporalAAOverrides = { .m_NeighborhoodClampExpansion = 0.5f },
+					}, error);
+				harness.Frame();
+				bool everyFrameOverridden = true;
+				while (harness.m_Sequence.IsActive())
+				{
+					everyFrameOverridden &= harness.Frame().has_value() &&
+						harness.m_LastTemporalAAOverrides &&
+						harness.m_LastTemporalAAOverrides->m_NeighborhoodClampExpansion == 0.5f &&
+						!harness.m_LastTemporalAAOverrides->m_MaxHistoryFeedback;
+				}
+				context.Check(reference == 0 && !referenceError.empty() && id != 0 &&
+					everyFrameOverridden && !harness.m_Sequence.GetStatus()->m_GpuTiming,
+					"Every sequence frame carries the requested Temporal AA overrides; a reference "
+					"rejects them");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.back().m_Frame = 20;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				const bool wantedWhileWaiting = harness.m_Sequence.WantsGpuTiming();
+				harness.Frame();
+				// Render k of the sequence is profiler frame 100 + k; its profile completes two
+				// frames later, so the first two profiles seen while running precede the
+				// sequence. Each profile is also reported twice.
+				uint64_t profilerFrame = 100;
+				while (harness.m_Sequence.IsActive())
+				{
+					harness.Frame();
+					++profilerFrame;
+					const uint64_t completed = profilerFrame - 2;
+					const GpuProfileFrameSnapshot profile{
+						.m_FrameIndex = completed,
+						.m_FrameMilliseconds = static_cast<double>(completed),
+						.m_Samples = { { .m_Name = "PostProcess.TemporalAA",
+							.m_Milliseconds = 0.5, .m_CallCount = 1 } },
+					};
+					harness.m_Sequence.OnGpuProfile(profile);
+					harness.m_Sequence.OnGpuProfile(profile);
+				}
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				const FrameSequenceGpuTiming* timing =
+					status.m_GpuTiming ? &*status.m_GpuTiming : nullptr;
+				context.Check(wantedWhileWaiting && !harness.m_Sequence.WantsGpuTiming() &&
+					timing && timing->m_FrameMilliseconds.size() == 16 &&
+					timing->m_FrameMilliseconds.front() == 103.0 &&
+					timing->m_FrameMilliseconds.back() == 118.0 &&
+					timing->m_Scopes.size() == 1 &&
+					timing->m_Scopes[0].m_Name == "PostProcess.TemporalAA" &&
+					timing->m_Scopes[0].m_Milliseconds.size() == 16,
+					"Sequence GPU timing records each profiled sequence frame once after warm-up");
+			}
+		}
+
 		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-sequence-failure");
@@ -1305,6 +1406,7 @@ namespace gglab
 		RunFrameSequenceBackPressureTests(context);
 		RunDiagnosticCaptureTests(context);
 		RunReferenceSequenceTests(context);
+		RunFrameSequenceEvaluationTests(context);
 		RunFrameSequenceFailureTests(context);
 	}
 }

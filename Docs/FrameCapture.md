@@ -205,6 +205,33 @@ finished. Choose n by comparing references of n and 2n samples. Sidecars record
 `sequence.referenceSamples`, and `temporal` shows Temporal AA as disabled with
 the reference jitter index and sample count.
 
+### Temporal AA evaluation
+
+`-TemporalAA "name=value,..."` replaces display-view Temporal AA settings for
+every frame of the sequence, so one replay evaluates one configuration from the
+history reset at frame 0. The names are `maxHistoryFeedback`,
+`depthAbsoluteThreshold`, `depthRelativeThreshold`, `velocityWeightScale`,
+`luminanceWeightScale` and `neighborhoodClampExpansion`; a value outside the
+setting's range is rejected rather than clamped. Unset settings keep the
+content's values, and sidecars record the effective settings in `temporal`.
+A reference takes no overrides.
+
+`-GpuTiming` keeps GPU profiling enabled while the sequence runs and records
+the GPU time of every profiled scope, such as `PostProcess.TemporalAA`, for
+each sequence frame. Profiles trail submission by the frames in flight, so the
+first few frames are skipped. The sequence status reports, for the frame and
+each scope, the sample count and the mean, median, 90th percentile, minimum
+and maximum in milliseconds:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_StaticRailings -CaptureFrames 95 -GpuTiming `
+    -TemporalAA 'neighborhoodClampExpansion=1' -Label static-wide-clamp
+```
+
+Profiling adds timestamp queries but does not change the rendered image. Time
+Release builds and compare configurations within one session and backend.
+
 Replays are deterministic only for content whose state depends on the sequence
 frame alone. Check it by playing the same path twice and comparing the captures.
 

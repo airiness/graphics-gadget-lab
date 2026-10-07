@@ -1,13 +1,18 @@
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <format>
 #include <limits>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -115,6 +120,59 @@ namespace gglab
 			return {};
 		}
 
+		// Parses the Temporal AA overrides of a sequence; returns an error text. Values
+		// outside a setting's range are rejected instead of clamped, so a run records
+		// exactly the configuration it was asked to evaluate.
+		[[nodiscard]] std::string ParseTemporalAAOverrides(
+			const Json& value, FrameSequenceTemporalAAOverrides& outOverrides)
+		{
+			if (!value.is_object())
+			{
+				return "Field 'temporalAA' must be an object.";
+			}
+			struct OverrideField
+			{
+				std::string_view m_Name;
+				std::optional<float> FrameSequenceTemporalAAOverrides::* m_Member;
+				float m_Max;
+			};
+			constexpr std::array<OverrideField, 6> fields{ {
+				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback,
+					TemporalAAMaxHistoryFeedbackCeiling },
+				{ "depthAbsoluteThreshold",
+					&FrameSequenceTemporalAAOverrides::m_DepthAbsoluteThreshold,
+					TemporalAAMaxDepthThreshold },
+				{ "depthRelativeThreshold",
+					&FrameSequenceTemporalAAOverrides::m_DepthRelativeThreshold,
+					TemporalAAMaxDepthThreshold },
+				{ "velocityWeightScale", &FrameSequenceTemporalAAOverrides::m_VelocityWeightScale,
+					TemporalAAMaxVelocityWeightScale },
+				{ "luminanceWeightScale",
+					&FrameSequenceTemporalAAOverrides::m_LuminanceWeightScale,
+					TemporalAAMaxLuminanceWeightScale },
+				{ "neighborhoodClampExpansion",
+					&FrameSequenceTemporalAAOverrides::m_NeighborhoodClampExpansion,
+					TemporalAAMaxNeighborhoodClampExpansion },
+			} };
+			for (const auto& [key, fieldValue] : value.items())
+			{
+				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
+				if (field == fields.end())
+				{
+					return std::format("Unknown Temporal AA override '{}'.", key);
+				}
+				const double number = fieldValue.is_number() ? fieldValue.get<double>() : -1.0;
+				if (!fieldValue.is_number() || !std::isfinite(number) || number < 0.0 ||
+					number > static_cast<double>(field->m_Max))
+				{
+					return std::format("Temporal AA override '{}' must be a number from 0 to {}.",
+						key, field->m_Max);
+				}
+				outOverrides.*(field->m_Member) = static_cast<float>(number);
+			}
+			return {};
+		}
+
 		// Fills the sequence request; returns an error text.
 		[[nodiscard]] std::string ParseSequenceFields(
 			const Json& document, ApplicationControlRequest& request)
@@ -201,6 +259,23 @@ namespace gglab
 					{
 						return error;
 					}
+				}
+				else if (key == "temporalAA")
+				{
+					if (std::string error =
+						ParseTemporalAAOverrides(value, sequence.m_TemporalAAOverrides);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "gpuTiming")
+				{
+					if (!value.is_boolean())
+					{
+						return "Field 'gpuTiming' must be a boolean.";
+					}
+					sequence.m_GpuTiming = value.get<bool>();
 				}
 				else
 				{
@@ -330,6 +405,35 @@ namespace gglab
 			return gates;
 		}
 
+		[[nodiscard]] Json SerializeTimingSummary(std::span<const double> milliseconds)
+		{
+			const FrameSequenceTimingSummary summary = SummarizeFrameSequenceTiming(milliseconds);
+			return Json{
+				{ "count", summary.m_Count },
+				{ "meanMs", summary.m_Mean },
+				{ "medianMs", summary.m_Median },
+				{ "p90Ms", summary.m_P90 },
+				{ "minMs", summary.m_Min },
+				{ "maxMs", summary.m_Max },
+			};
+		}
+
+		[[nodiscard]] Json SerializeGpuTiming(const FrameSequenceGpuTiming& timing)
+		{
+			Json scopes = Json::array();
+			for (const FrameSequenceGpuTimingSeries& series : timing.m_Scopes)
+			{
+				Json scope = SerializeTimingSummary(series.m_Milliseconds);
+				scope["name"] = series.m_Name;
+				scopes.push_back(std::move(scope));
+			}
+			return Json{
+				{ "frames", timing.m_FrameMilliseconds.size() },
+				{ "frame", SerializeTimingSummary(timing.m_FrameMilliseconds) },
+				{ "scopes", std::move(scopes) },
+			};
+		}
+
 		[[nodiscard]] Json SerializeSequence(const FrameSequenceStatus& status)
 		{
 			Json sequence = {
@@ -343,6 +447,10 @@ namespace gglab
 				{ "captureRequestIds", status.m_CaptureRequestIds },
 				{ "completedCaptures", status.m_CompletedCaptures },
 			};
+			if (status.m_GpuTiming)
+			{
+				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
+			}
 			if (!status.m_Failure.empty())
 			{
 				sequence["failure"] = status.m_Failure;

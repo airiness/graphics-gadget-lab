@@ -99,6 +99,16 @@ namespace gglab
 				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap ==
 				PostProcessDebugTap::TemporalHistoryWeight,
 				"Diagnostic captures and sequences name their tap");
+			const ApplicationControlParseResult evaluation = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
+				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9}})");
+			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
+				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
+				: nullptr;
+			context.Check(overrides && evaluation.m_Request->m_Sequence.m_GpuTiming &&
+				overrides->m_NeighborhoodClampExpansion == 1.0f &&
+				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale,
+				"A sequence request carries its Temporal AA overrides and GPU timing request");
 
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":12,"command":"sequence-cancel"})");
@@ -133,6 +143,11 @@ namespace gglab
 				{ R"({"protocol":1,"id":20,"command":"sequence","path":"A","referenceSamples":5000})", 20 },
 				{ R"({"protocol":1,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})", 18 },
 				{ R"({"protocol":1,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
+				{ R"({"protocol":1,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})", 21 },
+				{ R"({"protocol":1,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})", 22 },
+				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
+				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
+				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },
 			};
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)
@@ -204,8 +219,21 @@ namespace gglab
 				Contains(sequenceJson, R"("frameCount":180)") &&
 				Contains(sequenceJson, R"("captureRequestIds":[21,22])") &&
 				Contains(sequenceJson, R"("failure":"Lost continuity.")") &&
-				Contains(statusWithSequence, R"("submittedFrames":12)"),
+				Contains(statusWithSequence, R"("submittedFrames":12)") &&
+				!Contains(sequenceJson, R"("gpuTiming")"),
 				"Sequence responses and status report the sequence state, progress and failure");
+
+			FrameSequenceStatus timedStatus{ .m_SequenceId = 4, .m_State = FrameSequenceState::Running };
+			timedStatus.m_GpuTiming = FrameSequenceGpuTiming{
+				.m_FrameMilliseconds = { 4.0, 2.0 },
+				.m_Scopes = { { .m_Name = "PostProcess.TemporalAA", .m_Milliseconds = { 0.25 } } },
+			};
+			const std::string timedJson = SerializeApplicationControlSequence(12, timedStatus);
+			context.Check(Contains(timedJson, R"("gpuTiming":{)") &&
+				Contains(timedJson, R"("frames":2)") && Contains(timedJson, R"("medianMs":2.0)") &&
+				Contains(timedJson, R"("name":"PostProcess.TemporalAA")") &&
+				Contains(timedJson, R"("p90Ms":0.25)"),
+				"Sequence status summarizes the GPU timing of each recorded scope");
 
 			FrameCaptureRequestResult completed{
 				.m_RequestId = 12,

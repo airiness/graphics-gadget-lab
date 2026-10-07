@@ -26,6 +26,9 @@ Commands:
            such as temporal-history-weight, instead of the scene.
            -ReferenceSamples <n> renders every frame as a supersampled reference
            of n jittered samples with Temporal AA inactive and time held.
+           -TemporalAA "name=value,..." evaluates Temporal AA overrides, such as
+           neighborhoodClampExpansion=1, on every frame. -GpuTiming records
+           per-scope GPU times of the sequence frames.
   sequence-cancel
            Cancel the active sequence.
   stop     Stop a session and wait for the process to exit.
@@ -89,6 +92,8 @@ param(
     [string]$CaptureFrames,
     [ValidateRange(0, 4096)]
     [int]$ReferenceSamples = 0,
+    [string]$TemporalAA,
+    [switch]$GpuTiming,
 
     [int]$TimeoutSeconds = 300
 )
@@ -234,6 +239,17 @@ function ConvertTo-FrameList([string]$Text) {
         }
     }
     return ,$frames
+}
+
+function ConvertTo-TemporalAAOverrides([string]$Text) {
+    $overrides = @{}
+    foreach ($part in @($Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+        if ($part -notmatch '^([A-Za-z]+)=([-+0-9.eE]+)$') {
+            Fail "Temporal AA override '$part' is not name=number."
+        }
+        $overrides[$Matches[1]] = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture)
+    }
+    return $overrides
 }
 
 function Require-Session {
@@ -392,6 +408,8 @@ switch ($Command) {
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
+        if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-TemporalAAOverrides $TemporalAA) }
+        if ($GpuTiming) { $request['gpuTiming'] = $true }
         if ($Label) { $request['label'] = $Label }
         if ($Note) { $request['note'] = $Note }
         $response = Invoke-SessionRequest $Session $request 30

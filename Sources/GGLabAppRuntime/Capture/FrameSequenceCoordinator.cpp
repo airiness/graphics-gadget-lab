@@ -1,13 +1,68 @@
 #include "Capture/FrameSequenceCoordinator.h"
 
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <iterator>
+#include <numeric>
 #include <string_view>
 #include <utility>
 
 namespace gglab
 {
+	bool FrameSequenceTemporalAAOverrides::IsEmpty() const noexcept
+	{
+		return !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
+			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
+			!m_NeighborhoodClampExpansion;
+	}
+
+	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
+		const FrameSequenceTemporalAAOverrides& overrides,
+		TemporalAASettings settings) noexcept
+	{
+		settings.m_MaxHistoryFeedback =
+			overrides.m_MaxHistoryFeedback.value_or(settings.m_MaxHistoryFeedback);
+		settings.m_DepthAbsoluteThreshold =
+			overrides.m_DepthAbsoluteThreshold.value_or(settings.m_DepthAbsoluteThreshold);
+		settings.m_DepthRelativeThreshold =
+			overrides.m_DepthRelativeThreshold.value_or(settings.m_DepthRelativeThreshold);
+		settings.m_VelocityWeightScale =
+			overrides.m_VelocityWeightScale.value_or(settings.m_VelocityWeightScale);
+		settings.m_LuminanceWeightScale =
+			overrides.m_LuminanceWeightScale.value_or(settings.m_LuminanceWeightScale);
+		settings.m_NeighborhoodClampExpansion = overrides.m_NeighborhoodClampExpansion.value_or(
+			settings.m_NeighborhoodClampExpansion);
+		return ResolveTemporalAASettings(settings);
+	}
+
+	FrameSequenceTimingSummary SummarizeFrameSequenceTiming(
+		std::span<const double> milliseconds)
+	{
+		if (milliseconds.empty())
+		{
+			return {};
+		}
+		std::vector<double> sorted(milliseconds.begin(), milliseconds.end());
+		std::ranges::sort(sorted);
+		const auto percentile = [&sorted](double fraction) noexcept
+			{
+				const size_t count = sorted.size();
+				const auto rank = static_cast<size_t>(
+					std::ceil(fraction * static_cast<double>(count)));
+				return sorted[std::clamp<size_t>(rank, 1, count) - 1];
+			};
+		return FrameSequenceTimingSummary{
+			.m_Count = static_cast<uint32_t>(sorted.size()),
+			.m_Mean = std::accumulate(sorted.begin(), sorted.end(), 0.0) /
+				static_cast<double>(sorted.size()),
+			.m_Median = percentile(0.5),
+			.m_P90 = percentile(0.9),
+			.m_Min = sorted.front(),
+			.m_Max = sorted.back(),
+		};
+	}
+
 	namespace
 	{
 		[[nodiscard]] bool MatchesRequiredContent(
@@ -90,6 +145,12 @@ namespace gglab
 				MaxTemporalReferenceSamples);
 			return 0;
 		}
+		if (request.m_ReferenceSamples > 0 && !request.m_TemporalAAOverrides.IsEmpty())
+		{
+			outError = "A reference renders without Temporal AA, so it takes no Temporal AA "
+				"overrides.";
+			return 0;
+		}
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
@@ -104,6 +165,9 @@ namespace gglab
 			.m_State = FrameSequenceState::Waiting,
 			.m_CameraPathId = m_Request.m_CameraPathId,
 			.m_ReferenceSamples = m_Request.m_ReferenceSamples,
+			.m_GpuTiming = m_Request.m_GpuTiming
+				? std::optional<FrameSequenceGpuTiming>(std::in_place)
+				: std::nullopt,
 		};
 		m_Frame = 0;
 		m_Sample = 0;
@@ -111,6 +175,8 @@ namespace gglab
 		m_FrameBegun = false;
 		m_CapturedFrame.reset();
 		m_LastSettleKey.reset();
+		m_SubmittedRenders = 0;
+		m_LastGpuProfileFrame = 0;
 		return m_Status->m_SequenceId;
 	}
 
@@ -146,6 +212,11 @@ namespace gglab
 	bool FrameSequenceCoordinator::ShouldHoldTime() const noexcept
 	{
 		return m_Status && m_Status->m_State == FrameSequenceState::Running && m_Sample > 0;
+	}
+
+	bool FrameSequenceCoordinator::WantsGpuTiming() const noexcept
+	{
+		return IsActive() && m_Request.m_GpuTiming;
 	}
 
 	bool FrameSequenceCoordinator::IsCaptureDue() const noexcept
@@ -231,6 +302,7 @@ namespace gglab
 					.m_Index = m_Sample,
 					.m_Count = m_Request.m_ReferenceSamples,
 				}),
+			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
 		};
 	}
 
@@ -303,6 +375,7 @@ namespace gglab
 		}
 		m_FrameBegun = false;
 		m_AppliedPose.reset();
+		++m_SubmittedRenders;
 		if (m_Request.m_ReferenceSamples > 0 && ++m_Sample < m_Request.m_ReferenceSamples)
 		{
 			return;
@@ -314,6 +387,37 @@ namespace gglab
 		{
 			m_Status->m_State = FrameSequenceState::Finishing;
 			CompleteIfFinished();
+		}
+	}
+
+	void FrameSequenceCoordinator::OnGpuProfile(const GpuProfileFrameSnapshot& profile) noexcept
+	{
+		if (!m_Status || m_Status->m_State != FrameSequenceState::Running ||
+			!m_Status->m_GpuTiming || !profile.IsValid() ||
+			profile.m_FrameIndex <= m_LastGpuProfileFrame)
+		{
+			return;
+		}
+		// Profiles seen during warm-up, including a stale one from before the sequence,
+		// are consumed without being recorded.
+		m_LastGpuProfileFrame = profile.m_FrameIndex;
+		if (m_SubmittedRenders <= GpuTimingWarmupFrames)
+		{
+			return;
+		}
+
+		FrameSequenceGpuTiming& timing = *m_Status->m_GpuTiming;
+		timing.m_FrameMilliseconds.push_back(profile.m_FrameMilliseconds);
+		for (const GpuProfileSample& sample : profile.m_Samples)
+		{
+			auto series = std::ranges::find(
+				timing.m_Scopes, sample.m_Name, &FrameSequenceGpuTimingSeries::m_Name);
+			if (series == timing.m_Scopes.end())
+			{
+				timing.m_Scopes.push_back({ .m_Name = sample.m_Name });
+				series = std::prev(timing.m_Scopes.end());
+			}
+			series->m_Milliseconds.push_back(sample.m_Milliseconds);
 		}
 	}
 

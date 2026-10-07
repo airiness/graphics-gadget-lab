@@ -233,6 +233,9 @@ namespace gglab
 		void Resize(uint32_t width, uint32_t height) noexcept;
 		// Records failure evidence that survives Release builds and makes Failed terminal.
 		[[nodiscard]] AppRuntimeTickResult FailRuntime(std::string_view failure) noexcept;
+		// Keeps GPU profiling enabled while a sequence records GPU timing and restores
+		// the previous request afterwards.
+		void SyncSequenceGpuProfiling() noexcept;
 
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
@@ -254,6 +257,8 @@ namespace gglab
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
+		// Profiling request in effect before a timed sequence enabled profiling.
+		std::optional<bool> m_SequenceGpuProfilingRestore;
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
 		AppRuntimeLifecycleState m_LifecycleState = AppRuntimeLifecycleState::Uninitialized;

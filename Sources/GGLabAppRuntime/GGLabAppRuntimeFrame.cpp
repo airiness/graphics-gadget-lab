@@ -28,6 +28,8 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
@@ -298,6 +300,7 @@ namespace gglab
 		}
 
 		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
+		SyncSequenceGpuProfiling();
 
 		if (m_FrameSequence->ShouldHoldTime())
 		{
@@ -406,6 +409,7 @@ namespace gglab
 		// A running sequence poses the main camera after content updates and capture
 		// views, so the path alone determines this frame's camera.
 		std::optional<TemporalReferenceSample> referenceSample;
+		std::optional<FrameSequenceTemporalAAOverrides> sequenceTemporalAAOverrides;
 		if (const std::optional<FrameSequencePoseRequest> sequencePose =
 			m_FrameSequence->PrepareFrame(
 				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
@@ -413,6 +417,7 @@ namespace gglab
 			m_FrameSequence->OnPoseApplied(cameraRig.ApplyCameraPathFrame(
 				sequencePose->m_CameraPathId, sequencePose->m_Frame));
 			referenceSample = sequencePose->m_ReferenceSample;
+			sequenceTemporalAAOverrides = sequencePose->m_TemporalAAOverrides;
 		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
@@ -427,6 +432,11 @@ namespace gglab
 		{
 			// The reference owns jitter and accumulation; Temporal AA stays inactive.
 			displayViewSettings.m_TemporalAA.m_Enabled = false;
+		}
+		else if (sequenceTemporalAAOverrides)
+		{
+			displayViewSettings.m_TemporalAA = ApplyFrameSequenceTemporalAAOverrides(
+				*sequenceTemporalAAOverrides, displayViewSettings.m_TemporalAA);
 		}
 		const uint64_t temporalSessionIdentity =
 			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
@@ -617,6 +627,13 @@ namespace gglab
 		}
 		m_FrameCapture->OnFrameSubmitted();
 		m_FrameSequence->OnFrameSubmitted();
+		if (m_FrameSequence->WantsGpuTiming())
+		{
+			if (const GpuProfilingViewBase* gpuProfiling = m_RenderHost->GetGpuProfilingView())
+			{
+				m_FrameSequence->OnGpuProfile(gpuProfiling->GetLatestFrame());
+			}
+		}
 
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
@@ -628,6 +645,27 @@ namespace gglab
 		// Pipelines without an overlay pass still complete the optional tooling frame.
 		toolingFrame.Complete();
 		return AppRuntimeTickResult::Continue;
+	}
+
+	void GGLabAppRuntime::SyncSequenceGpuProfiling() noexcept
+	{
+		GpuProfilingControlBase* control = m_RenderHost->GetGpuProfilingControl();
+		const GpuProfilingViewBase* view = m_RenderHost->GetGpuProfilingView();
+		if (!control || !view)
+		{
+			return;
+		}
+		const bool timingWanted = m_FrameSequence->WantsGpuTiming();
+		if (timingWanted && !m_SequenceGpuProfilingRestore)
+		{
+			m_SequenceGpuProfilingRestore = view->IsEnabled();
+			control->RequestEnabled(true);
+		}
+		else if (!timingWanted && m_SequenceGpuProfilingRestore)
+		{
+			control->RequestEnabled(*m_SequenceGpuProfilingRestore);
+			m_SequenceGpuProfilingRestore.reset();
+		}
 	}
 
 }
