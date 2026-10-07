@@ -1241,10 +1241,12 @@ namespace gglab
 					.m_NeighborhoodClampExpansion = 4.0f,
 					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
 					.m_CurrentFilter = TemporalAACurrentFilter::Point,
+					.m_MotionSelection = TemporalAAMotionSelection::Center,
 					}, content);
 				TemporalAASettings invalidFilter = content;
 				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
 				invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
+				invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
 				context.Check(overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
 					overridden.m_DepthAbsoluteThreshold == 0.25f &&
 					overridden.m_NeighborhoodClampExpansion ==
@@ -1257,6 +1259,10 @@ namespace gglab
 					content.m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
 					ResolveTemporalAASettings(invalidFilter).m_CurrentFilter ==
 					TemporalAACurrentFilter::Gaussian &&
+					overridden.m_MotionSelection == TemporalAAMotionSelection::Center &&
+					content.m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
+					ResolveTemporalAASettings(invalidFilter).m_MotionSelection ==
+					TemporalAAMotionSelection::ClosestDepth &&
 					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
 					ResolveTemporalAASettings(content),
 					"Sequence Temporal AA overrides replace only set fields and stay within the "

@@ -188,6 +188,22 @@ namespace gglab
 					outOverrides.m_CurrentFilter = *filter;
 					continue;
 				}
+				if (key == "motionSelection")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array selections{ TemporalAAMotionSelection::Center,
+						TemporalAAMotionSelection::ClosestDepth };
+					const auto selection = std::ranges::find(
+						selections, name, &GetTemporalAAMotionSelectionName);
+					if (selection == selections.end())
+					{
+						return "Temporal AA override 'motionSelection' must be 'center' or "
+							"'closest-depth'.";
+					}
+					outOverrides.m_MotionSelection = *selection;
+					continue;
+				}
 				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
 				if (field == fields.end())
 				{

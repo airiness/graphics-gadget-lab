@@ -102,7 +102,8 @@ namespace gglab
 			const ApplicationControlParseResult evaluation = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
 				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,)"
-				R"("historyFilter":"bilinear","currentFilter":"point"}})");
+				R"("historyFilter":"bilinear","currentFilter":"point",)"
+				R"("motionSelection":"center"}})");
 			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
 				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
 				: nullptr;
@@ -110,7 +111,8 @@ namespace gglab
 				overrides->m_NeighborhoodClampExpansion == 1.0f &&
 				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale &&
 				overrides->m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
-				overrides->m_CurrentFilter == TemporalAACurrentFilter::Point,
+				overrides->m_CurrentFilter == TemporalAACurrentFilter::Point &&
+				overrides->m_MotionSelection == TemporalAAMotionSelection::Center,
 				"A sequence request carries its Temporal AA overrides and GPU timing request");
 
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
@@ -152,6 +154,8 @@ namespace gglab
 				{ R"({"protocol":1,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})", 27 },
 				{ R"({"protocol":1,"id":28,"command":"sequence","path":"A","temporalAA":{"currentFilter":"box"}})", 28 },
 				{ R"({"protocol":1,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})", 29 },
+				{ R"({"protocol":1,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})", 30 },
+				{ R"({"protocol":1,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})", 31 },
 				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
 				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
 				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },

@@ -148,6 +148,33 @@ namespace gglab
 		return "unknown";
 	}
 
+	// Which current-frame sample supplies the motion that reprojects a pixel. At a
+	// silhouette the centre sample can belong to the background while the edge belongs
+	// to the foreground (or the reverse).
+	enum class TemporalAAMotionSelection : uint8_t
+	{
+		// Kept for comparison.
+		Center,
+		// Motion of the front-most depth sample of the 3x3 neighborhood, with depth
+		// validation of that sample at its own position, so motion and validation
+		// describe one surface. Validating the centre instead keeps the motion gain
+		// but loses the edge stability (Temporal 2.0 T1.4): background pixels beside
+		// geometry then fail background validation whenever the jitter puts geometry
+		// under them in the previous frame, resetting their history.
+		ClosestDepth,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAMotionSelectionName(
+		TemporalAAMotionSelection selection) noexcept
+	{
+		switch (selection)
+		{
+		case TemporalAAMotionSelection::Center: return "center";
+		case TemporalAAMotionSelection::ClosestDepth: return "closest-depth";
+		}
+		return "unknown";
+	}
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -159,6 +186,7 @@ namespace gglab
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
 		TemporalAAHistoryFilter m_HistoryFilter = TemporalAAHistoryFilter::CatmullRomClamped;
 		TemporalAACurrentFilter m_CurrentFilter = TemporalAACurrentFilter::Gaussian;
+		TemporalAAMotionSelection m_MotionSelection = TemporalAAMotionSelection::ClosestDepth;
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;
 	};
@@ -201,6 +229,11 @@ namespace gglab
 			settings.m_CurrentFilter != TemporalAACurrentFilter::Gaussian)
 		{
 			settings.m_CurrentFilter = defaults.m_CurrentFilter;
+		}
+		if (settings.m_MotionSelection != TemporalAAMotionSelection::Center &&
+			settings.m_MotionSelection != TemporalAAMotionSelection::ClosestDepth)
+		{
+			settings.m_MotionSelection = defaults.m_MotionSelection;
 		}
 		return settings;
 	}

@@ -210,6 +210,8 @@ namespace gglab
 					std::string(GetTemporalAAHistoryFilterName(settings.m_HistoryFilter)),
 				.m_CurrentFilter =
 					std::string(GetTemporalAACurrentFilterName(settings.m_CurrentFilter)),
+				.m_MotionSelection =
+					std::string(GetTemporalAAMotionSelectionName(settings.m_MotionSelection)),
 				.m_RenderExtent = extent,
 				.m_DisplayExtent = extent,
 			};

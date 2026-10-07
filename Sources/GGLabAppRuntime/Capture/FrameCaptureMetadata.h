@@ -62,6 +62,7 @@ namespace gglab
 		float m_NeighborhoodClampExpansion = 0.0f;
 		std::string m_HistoryFilter;
 		std::string m_CurrentFilter;
+		std::string m_MotionSelection;
 		std::array<uint32_t, 2> m_RenderExtent{};
 		std::array<uint32_t, 2> m_DisplayExtent{};
 	};

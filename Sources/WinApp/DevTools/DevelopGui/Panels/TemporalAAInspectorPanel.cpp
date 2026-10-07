@@ -114,6 +114,13 @@ namespace gglab
 			{
 				settings.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(currentFilter);
 			}
+			int motionSelection = static_cast<int>(settings.m_MotionSelection);
+			if (ImGui::Combo("Motion Selection", &motionSelection,
+				"Center\0Closest Depth\0"))
+			{
+				settings.m_MotionSelection =
+					static_cast<TemporalAAMotionSelection>(motionSelection);
+			}
 		}
 
 		void DrawPreview(DevelopGuiContext& context,

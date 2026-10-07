@@ -62,6 +62,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_CATMULL_ROM_BIT) != 0;
 	const bool gaussianCurrent =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_CURRENT_GAUSSIAN_BIT) != 0;
+	const bool closestDepthMotion =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_CLOSEST_DEPTH_MOTION_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
@@ -89,24 +91,59 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float previousHistoryAge = TAA_HISTORY_INITIAL_AGE;
 	if (previousHistoryValid)
 	{
-		if (IsDepthBackground(currentRawDepth, viewData.DepthConvention))
+		// The sample whose motion reprojects this pixel: the centre, or the front-most
+		// depth of the 3x3 neighborhood. Background is never nearer than geometry.
+		int2 correspondencePixel = int2(pixel);
+		float correspondenceDepth = currentRawDepth;
+		if (closestDepthMotion)
+		{
+			const int2 maxPixel = int2(width, height) - 1;
+			[unroll]
+			for (int y = -1; y <= 1; ++y)
+			{
+				[unroll]
+				for (int x = -1; x <= 1; ++x)
+				{
+					const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
+					const float sampleDepth = currentDepthTexture.Load(int3(samplePixel, 0));
+					if (isfinite(sampleDepth) && IsDepthNearer(
+						sampleDepth, correspondenceDepth, viewData.DepthConvention))
+					{
+						correspondencePixel = samplePixel;
+						correspondenceDepth = sampleDepth;
+					}
+				}
+			}
+		}
+		if (IsDepthBackground(correspondenceDepth, viewData.DepthConvention))
 		{
 			previousRasterUV = ReprojectTemporalSkyUV(currentUV, viewData);
 		}
 		else
 		{
-			const float2 motionUV = motionTexture.Load(int3(pixel, 0));
+			const float2 motionUV = motionTexture.Load(int3(correspondencePixel, 0));
 			previousRasterUV = ReprojectTemporalUV(currentUV, motionUV);
 		}
 		const float2 rasterMotionUV = currentUV - previousRasterUV;
 		historyMotionUV = ResolveTemporalHistoryMotionUV(rasterMotionUV,
 			viewData.CurrentJitterUV, viewData.PreviousJitterUV);
 		previousHistoryUV = ReprojectTemporalUV(currentUV, historyMotionUV);
+		// Depth validation tests the selected sample at its own position, so motion
+		// and validation describe one surface.
+		float2 validationUV = currentUV;
+		float validationDepth = currentRawDepth;
+		float2 validationPreviousRasterUV = previousRasterUV;
+		if (closestDepthMotion)
+		{
+			validationUV = (float2(correspondencePixel) + 0.5.xx) / float2(width, height);
+			validationDepth = correspondenceDepth;
+			validationPreviousRasterUV = ReprojectTemporalUV(validationUV, rasterMotionUV);
+		}
 
-		if (!AreTemporalReprojectionUVsValid(previousHistoryUV, previousRasterUV))
+		if (!AreTemporalReprojectionUVsValid(previousHistoryUV, validationPreviousRasterUV))
 		{
 			rejectionReason = all(isfinite(previousHistoryUV)) &&
-				all(isfinite(previousRasterUV))
+				all(isfinite(validationPreviousRasterUV))
 				? TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS
 				: TAA_REJECTION_NON_FINITE;
 		}
@@ -134,12 +171,12 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			{
 				rejectionReason = TAA_REJECTION_NON_FINITE;
 			}
-			else if (IsDepthBackground(currentRawDepth, viewData.DepthConvention))
+			else if (IsDepthBackground(validationDepth, viewData.DepthConvention))
 			{
 				Texture2D<float> previousDepthTexture =
 					GetTexture2DFloat(g_Pass.PreviousDepthIndex);
 				const float previousRawDepth = previousDepthTexture.SampleLevel(
-					pointClampSampler, previousRasterUV, 0.0);
+					pointClampSampler, validationPreviousRasterUV, 0.0);
 				if (!isfinite(previousRawDepth))
 				{
 					rejectionReason = TAA_REJECTION_NON_FINITE;
@@ -157,9 +194,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			{
 				Texture2D<float> previousDepthTexture =
 					GetTexture2DFloat(g_Pass.PreviousDepthIndex);
-				accepted = ValidateTemporalGeometryDepth(currentUV, currentRawDepth,
-					previousRasterUV, previousDepthTexture, pointClampSampler, viewData,
-					depthThresholds.x, depthThresholds.y);
+				accepted = ValidateTemporalGeometryDepth(validationUV, validationDepth,
+					validationPreviousRasterUV, previousDepthTexture, pointClampSampler,
+					viewData, depthThresholds.x, depthThresholds.y);
 				rejectionReason = accepted ? TAA_REJECTION_NONE : TAA_REJECTION_DEPTH_MISMATCH;
 			}
 		}

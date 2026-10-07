@@ -262,6 +262,7 @@ namespace gglab
 		writer.Number("neighborhoodClampExpansion", temporal.m_NeighborhoodClampExpansion);
 		writer.String("historyFilter", temporal.m_HistoryFilter);
 		writer.String("currentFilter", temporal.m_CurrentFilter);
+		writer.String("motionSelection", temporal.m_MotionSelection);
 		writer.EndObject();
 		writer.BeginArray("renderExtent");
 		writer.Unsigned({}, temporal.m_RenderExtent[0]);
