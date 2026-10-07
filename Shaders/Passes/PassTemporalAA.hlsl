@@ -60,15 +60,24 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_AGE_PREVIEW_BIT) != 0;
 	const bool catmullRomHistory =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_CATMULL_ROM_BIT) != 0;
+	const bool gaussianCurrent =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_CURRENT_GAUSSIAN_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
 	const float2 maxHistoryFeedbackAndClampExpansion =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedMaxHistoryFeedbackAndClampExpansion);
-	float3 currentColor = currentColorTexture.Load(int3(pixel, 0)).rgb;
-	if (!IsTemporalColorFinite(currentColor))
+	float3 centerColor = currentColorTexture.Load(int3(pixel, 0)).rgb;
+	if (!IsTemporalColorFinite(centerColor))
 	{
-		currentColor = 0.0.xxx;
+		centerColor = 0.0.xxx;
+	}
+	float3 currentColor = centerColor;
+	if (gaussianCurrent)
+	{
+		currentColor = ReconstructTemporalCurrentColor(currentColorTexture, pixel,
+			uint2(width, height), viewData.CurrentJitterUV * float2(width, height),
+			TAA_CURRENT_GAUSSIAN_KERNEL_SCALE, centerColor);
 	}
 
 	uint rejectionReason = TAA_REJECTION_HISTORY_UNAVAILABLE;
@@ -162,7 +171,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float3 neighborhoodMin;
 		float3 neighborhoodMax;
 		GetTemporalNeighborhoodRange(currentColorTexture, pixel, uint2(width, height),
-			currentColor, neighborhoodMin, neighborhoodMax);
+			centerColor, neighborhoodMin, neighborhoodMax);
 		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y;
 		const float3 neighborhoodExtent = neighborhoodMax - neighborhoodMin;
 		neighborhoodMin -= neighborhoodExtent * clampExpansion;

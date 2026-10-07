@@ -14,7 +14,7 @@ namespace gglab
 	{
 		return !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
 			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
-			!m_NeighborhoodClampExpansion && !m_HistoryFilter;
+			!m_NeighborhoodClampExpansion && !m_HistoryFilter && !m_CurrentFilter;
 	}
 
 	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
@@ -34,6 +34,7 @@ namespace gglab
 		settings.m_NeighborhoodClampExpansion = overrides.m_NeighborhoodClampExpansion.value_or(
 			settings.m_NeighborhoodClampExpansion);
 		settings.m_HistoryFilter = overrides.m_HistoryFilter.value_or(settings.m_HistoryFilter);
+		settings.m_CurrentFilter = overrides.m_CurrentFilter.value_or(settings.m_CurrentFilter);
 		return ResolveTemporalAASettings(settings);
 	}
 

@@ -108,6 +108,12 @@ namespace gglab
 			{
 				settings.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(historyFilter);
 			}
+			int currentFilter = static_cast<int>(settings.m_CurrentFilter);
+			if (ImGui::Combo("Current Filter", &currentFilter,
+				"Point\0Gaussian\0"))
+			{
+				settings.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(currentFilter);
+			}
 		}
 
 		void DrawPreview(DevelopGuiContext& context,

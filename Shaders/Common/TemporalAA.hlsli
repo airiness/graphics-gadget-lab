@@ -14,9 +14,13 @@ static const uint TAA_HISTORY_VALID_BIT = 0x80000000u;
 static const uint TAA_HISTORY_COLOR_PREVIEW_BIT = 0x40000000u;
 static const uint TAA_HISTORY_AGE_PREVIEW_BIT = 0x20000000u;
 static const uint TAA_HISTORY_CATMULL_ROM_BIT = 0x10000000u;
+static const uint TAA_CURRENT_GAUSSIAN_BIT = 0x08000000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
-	TAA_HISTORY_AGE_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT;
+	TAA_HISTORY_AGE_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT |
+	TAA_CURRENT_GAUSSIAN_BIT;
+// exp(-2.29 (d / 0.75)^2): Blackman-Harris approximated by a Gaussian of 0.75 pixels.
+static const float TAA_CURRENT_GAUSSIAN_KERNEL_SCALE = 2.29 / (0.75 * 0.75);
 static const float TAA_HISTORY_INITIAL_AGE = 1.0;
 // Provisional until feedback tuning freezes the coupled accumulation bound.
 static const float TAA_HISTORY_MAX_AGE = 255.0;
@@ -97,6 +101,37 @@ float3 SampleTemporalHistoryCatmullRomClamped(Texture2D<float4> history,
 	const float3 c11 = history.Load(int3(clamp(texel + int2(1, 1), 0, maxTexel), 0)).rgb;
 	return clamp(sum / weightSum, min(min(c00, c10), min(c01, c11)),
 		max(max(c00, c10), max(c01, c11)));
+}
+
+// Current color at the output pixel centre, reconstructed from the 3x3 neighborhood.
+// The jitter shifts rendered geometry by +jitterPixels, so the sample of the
+// neighbor at offset o lies at o - jitterPixels from the centre. Each sample is
+// weighted by exp(-kernelScale * distance^2); non-finite samples use centerColor.
+float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
+	uint2 pixel, uint2 extent, float2 jitterPixels, float kernelScale, float3 centerColor)
+{
+	const int2 maxPixel = int2(extent) - 1;
+	float3 sum = 0.0.xxx;
+	float weightSum = 0.0;
+	[unroll]
+	for (int y = -1; y <= 1; ++y)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; ++x)
+		{
+			const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
+			float3 sampleColor = currentColorTexture.Load(int3(samplePixel, 0)).rgb;
+			if (!IsTemporalColorFinite(sampleColor))
+			{
+				sampleColor = centerColor;
+			}
+			const float2 offset = float2(x, y) - jitterPixels;
+			const float weight = exp(-kernelScale * dot(offset, offset));
+			sum += sampleColor * weight;
+			weightSum += weight;
+		}
+	}
+	return sum / weightSum;
 }
 
 // PCG3D (Jarzynski and Olano 2020): three decorrelated 32-bit hashes.

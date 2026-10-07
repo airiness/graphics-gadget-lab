@@ -1240,9 +1240,11 @@ namespace gglab
 					.m_MaxHistoryFeedback = 0.9f,
 					.m_NeighborhoodClampExpansion = 4.0f,
 					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
+					.m_CurrentFilter = TemporalAACurrentFilter::Point,
 					}, content);
 				TemporalAASettings invalidFilter = content;
 				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
+				invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
 				context.Check(overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
 					overridden.m_DepthAbsoluteThreshold == 0.25f &&
 					overridden.m_NeighborhoodClampExpansion ==
@@ -1251,6 +1253,10 @@ namespace gglab
 					content.m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
 					ResolveTemporalAASettings(invalidFilter).m_HistoryFilter ==
 					TemporalAAHistoryFilter::CatmullRomClamped &&
+					overridden.m_CurrentFilter == TemporalAACurrentFilter::Point &&
+					content.m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
+					ResolveTemporalAASettings(invalidFilter).m_CurrentFilter ==
+					TemporalAACurrentFilter::Gaussian &&
 					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
 					ResolveTemporalAASettings(content),
 					"Sequence Temporal AA overrides replace only set fields and stay within the "

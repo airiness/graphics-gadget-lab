@@ -208,6 +208,8 @@ namespace gglab
 				.m_NeighborhoodClampExpansion = settings.m_NeighborhoodClampExpansion,
 				.m_HistoryFilter =
 					std::string(GetTemporalAAHistoryFilterName(settings.m_HistoryFilter)),
+				.m_CurrentFilter =
+					std::string(GetTemporalAACurrentFilterName(settings.m_CurrentFilter)),
 				.m_RenderExtent = extent,
 				.m_DisplayExtent = extent,
 			};

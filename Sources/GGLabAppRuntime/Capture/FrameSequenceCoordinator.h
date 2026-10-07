@@ -27,6 +27,7 @@ namespace gglab
 		std::optional<float> m_LuminanceWeightScale;
 		std::optional<float> m_NeighborhoodClampExpansion;
 		std::optional<TemporalAAHistoryFilter> m_HistoryFilter;
+		std::optional<TemporalAACurrentFilter> m_CurrentFilter;
 
 		[[nodiscard]] bool IsEmpty() const noexcept;
 	};

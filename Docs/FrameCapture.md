@@ -211,9 +211,10 @@ the reference jitter index and sample count.
 every frame of the sequence, so one replay evaluates one configuration from the
 history reset at frame 0. The names are `maxHistoryFeedback`,
 `depthAbsoluteThreshold`, `depthRelativeThreshold`, `velocityWeightScale`,
-`luminanceWeightScale` and `neighborhoodClampExpansion`, and `historyFilter`
-(`catmull-rom-clamped`, the default, or `bilinear`); a value outside the setting's
-range is rejected rather than clamped. Unset settings keep the
+`luminanceWeightScale` and `neighborhoodClampExpansion`, `historyFilter`
+(`catmull-rom-clamped`, the default, or `bilinear`) and `currentFilter`
+(`gaussian`, the default, or `point`); a value outside the setting's range is
+rejected rather than clamped. Unset settings keep the
 content's values, and sidecars record the effective settings in `temporal`.
 A reference takes no overrides.
 

@@ -31,9 +31,11 @@ namespace gglab
 		inline constexpr uint32_t TemporalAAHistoryColorPreviewBit = 0x40000000u;
 		inline constexpr uint32_t TemporalAAHistoryAgePreviewBit = 0x20000000u;
 		inline constexpr uint32_t TemporalAAHistoryCatmullRomBit = 0x10000000u;
+		inline constexpr uint32_t TemporalAACurrentGaussianBit = 0x08000000u;
 		inline constexpr uint32_t TemporalAAViewFlagMask =
 			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit |
-			TemporalAAHistoryAgePreviewBit | TemporalAAHistoryCatmullRomBit;
+			TemporalAAHistoryAgePreviewBit | TemporalAAHistoryCatmullRomBit |
+			TemporalAACurrentGaussianBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -319,6 +321,9 @@ namespace gglab
 						(temporalAASettings.m_HistoryFilter ==
 							TemporalAAHistoryFilter::CatmullRomClamped
 							? TemporalAAHistoryCatmullRomBit
+							: 0u) |
+						(temporalAASettings.m_CurrentFilter == TemporalAACurrentFilter::Gaussian
+							? TemporalAACurrentGaussianBit
 							: 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,

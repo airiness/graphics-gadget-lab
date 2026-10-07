@@ -172,6 +172,22 @@ namespace gglab
 					outOverrides.m_HistoryFilter = *filter;
 					continue;
 				}
+				if (key == "currentFilter")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array filters{ TemporalAACurrentFilter::Point,
+						TemporalAACurrentFilter::Gaussian };
+					const auto filter = std::ranges::find(
+						filters, name, &GetTemporalAACurrentFilterName);
+					if (filter == filters.end())
+					{
+						return "Temporal AA override 'currentFilter' must be 'point' or "
+							"'gaussian'.";
+					}
+					outOverrides.m_CurrentFilter = *filter;
+					continue;
+				}
 				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
 				if (field == fields.end())
 				{

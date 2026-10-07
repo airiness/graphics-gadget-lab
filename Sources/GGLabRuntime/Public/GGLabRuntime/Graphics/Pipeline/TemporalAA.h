@@ -123,6 +123,31 @@ namespace gglab
 		return "unknown";
 	}
 
+	// Reconstruction of the current frame's color at the output pixel centre. The scene
+	// is rendered with a sub-pixel jitter, so a point sample sits off the centre by
+	// that jitter each frame.
+	enum class TemporalAACurrentFilter : uint8_t
+	{
+		// Kept for comparison: the output follows the jitter phase of each frame.
+		Point,
+		// Gaussian approximation of Blackman-Harris, exp(-2.29 (d / 0.75)^2), over the
+		// 3x3 samples at their jittered positions. Temporal 2.0 T1.2 bracketed the size
+		// with 0.6 and 1.0 pixels: narrower lost half of the stability gain, wider
+		// blurred thin detail.
+		Gaussian,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAACurrentFilterName(
+		TemporalAACurrentFilter filter) noexcept
+	{
+		switch (filter)
+		{
+		case TemporalAACurrentFilter::Point: return "point";
+		case TemporalAACurrentFilter::Gaussian: return "gaussian";
+		}
+		return "unknown";
+	}
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -133,6 +158,7 @@ namespace gglab
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
 		TemporalAAHistoryFilter m_HistoryFilter = TemporalAAHistoryFilter::CatmullRomClamped;
+		TemporalAACurrentFilter m_CurrentFilter = TemporalAACurrentFilter::Gaussian;
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;
 	};
@@ -170,6 +196,11 @@ namespace gglab
 			settings.m_HistoryFilter != TemporalAAHistoryFilter::CatmullRomClamped)
 		{
 			settings.m_HistoryFilter = defaults.m_HistoryFilter;
+		}
+		if (settings.m_CurrentFilter != TemporalAACurrentFilter::Point &&
+			settings.m_CurrentFilter != TemporalAACurrentFilter::Gaussian)
+		{
+			settings.m_CurrentFilter = defaults.m_CurrentFilter;
 		}
 		return settings;
 	}
