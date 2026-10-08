@@ -89,7 +89,7 @@ Environment intensity is 1, rotation is 0 and the skybox is enabled. The Demo
 retains the selected IBL quality and restores the previous environment settings
 on exit.
 
-All thirteen reference views use profile version 2 with manual EV100 15 and
+All fourteen reference views use profile version 2 with manual EV100 15 and
 zero exposure compensation. They share a 6000 m far plane so the sea and distant
 coast remain visible, including from the retained horizon and interior views.
 Scene pre-exposure is enabled, using
@@ -120,6 +120,11 @@ reference aspects, with the far plane extended to the same coastal range.
 | `Retreat_Lounge` | Lounge, deck and supported table props |
 | `Retreat_Planting` | Foliage, soil and planter seating detail |
 | `Retreat_Overview` | Island layout, glazed sea terrace and arrival route |
+
+`Retreat_GlassTerrace` is a temporal evaluation view defined in code rather than an
+authored camera: it looks through the sea terrace guard glass toward the sun glint,
+the dock and the lifebuoy, with a 0.1 m near plane. The `SEQ_StaticGlassTerrace` and
+`SEQ_PanGlassTerrace` camera paths start from it.
 
 The production import suite checks placed triangles per material, explicit
 opaque and glass blend bindings, finite geometry, orthonormal tangent frames,

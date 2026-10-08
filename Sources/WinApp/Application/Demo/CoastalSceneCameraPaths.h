@@ -67,6 +67,14 @@ namespace gglab
 		const Vector3 courtyardTarget{ -1.0f, 1.8f, -2.0f };
 		const float courtyardFov = math::ToDegrees(0.6509917105f);
 
+		// Glass Terrace: from inside the sea terrace through the alpha-blended guard glass
+		// toward the sun glint, so transparent panes cover sea highlights, guard posts, the
+		// dock and the lifebuoy.
+		const Vector3 glassPosition{ 2.5f, 3.1f, -8.7f };
+		const Vector3 glassTarget{ 9.0f, 2.1f, -18.0f };
+		const float glassFov = math::ToDegrees(0.7984415392f);
+		const Vector3 glassPanOffset{ 1.5f, 0.0f, 0.0f };
+
 		// Camera right for the Shadow Stairs view (left-handed, Y up): normalize(up x forward).
 		const Vector3 stairsForward = stairsTarget - stairsPosition;
 		const float stairsRightLength = std::sqrt(
@@ -134,6 +142,24 @@ namespace gglab
 			makePath("SEQ_HorizonPan", "Horizon Pan",
 				"20 degree pan across sky, horizon and distant geometry from a fixed position.",
 				CameraPathInterpolation::CatmullRom, nearPlane, std::move(horizonKeys)),
+			makePath("SEQ_StaticGlassTerrace", "Static Glass Terrace",
+				"Static view through the terrace guard glass toward the sea: post-temporal "
+				"transparent shimmer over sea highlights and guard posts.",
+				CameraPathInterpolation::Linear, nearPlane, {
+					{ .m_Frame = 0, .m_Position = glassPosition, .m_Target = glassTarget,
+						.m_VerticalFovDegrees = glassFov },
+					{ .m_Frame = 95, .m_Position = glassPosition, .m_Target = glassTarget,
+						.m_VerticalFovDegrees = glassFov },
+				}),
+			makePath("SEQ_PanGlassTerrace", "Pan Glass Terrace",
+				"1.5 m sideways truck along the terrace guard glass: transparent panes and "
+				"frames over a moving opaque and sea background.",
+				CameraPathInterpolation::Linear, nearPlane, {
+					{ .m_Frame = 0, .m_Position = glassPosition, .m_Target = glassTarget,
+						.m_VerticalFovDegrees = glassFov },
+					{ .m_Frame = 179, .m_Position = glassPosition + glassPanOffset,
+						.m_Target = glassTarget + glassPanOffset, .m_VerticalFovDegrees = glassFov },
+				}),
 			makePath("SEQ_CutCourtyardToStairs", "Cut Courtyard To Stairs",
 				"Static courtyard shot, then a camera cut to the stairs for reset and first-frame recovery.",
 				CameraPathInterpolation::Linear, nearPlane, {
