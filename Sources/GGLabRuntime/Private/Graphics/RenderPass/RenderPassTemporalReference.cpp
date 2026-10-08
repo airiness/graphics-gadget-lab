@@ -93,8 +93,10 @@ namespace gglab
 					return;
 				}
 
+				// The reference accumulates the complete composed scene, including
+				// post-temporal geometry; Temporal AA is inactive, so this is the scene color.
 				const RGTextureId currentColor = builder.Read(
-					targets.m_SceneColor, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					targets.m_DisplayColor, RGTextureAccess::Sample, RHIStage::ComputeShader);
 				data.m_CurrentColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(currentColor);
 				if (sums.m_PreviousValid)
@@ -127,7 +129,7 @@ namespace gglab
 				data.m_Height = currentDesc.m_Extent.m_Height;
 
 				// Post-processing presents the running mean of every accumulated sample.
-				targets.m_SceneColor = mean;
+				targets.m_DisplayColor = mean;
 				const bool exported = transaction->ExportReferenceResources(builder, sums);
 				GGLAB_ASSERT_MSG(exported,
 					"Temporal reference must fully write and export its next sum.");

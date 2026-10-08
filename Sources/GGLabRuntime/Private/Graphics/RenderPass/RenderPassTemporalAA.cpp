@@ -349,7 +349,7 @@ namespace gglab
 				// radiance and coverage, not the temporally reconstructed image.
 				if (!targets.m_MaterialDiagnosticColor.IsValid())
 				{
-					targets.m_SceneColor = resources.m_ResolvedSceneColor;
+					targets.m_DisplayColor = resources.m_ResolvedSceneColor;
 				}
 				const bool exported =
 					transaction->ExportHistoryResources(builder, resources.m_History);

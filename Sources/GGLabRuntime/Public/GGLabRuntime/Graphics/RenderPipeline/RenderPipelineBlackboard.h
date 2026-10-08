@@ -6,7 +6,13 @@ namespace gglab
 {
 	struct RGViewTargets
 	{
+		// Render-domain HDR color that pre-temporal passes shade and the temporal resolve
+		// reads.
 		RGTextureId m_SceneColor{};
+		// Display-domain HDR color that post-temporal composition and post-processing read
+		// and write: the temporal resolve output while Temporal AA is active, otherwise
+		// SceneColor, whose extent equals the display extent then.
+		RGTextureId m_DisplayColor{};
 		RGTextureId m_BackBuffer{};
 		// Optional display-linear diagnostic color and alpha-blended coverage.
 		RGTextureId m_MaterialDiagnosticColor{};

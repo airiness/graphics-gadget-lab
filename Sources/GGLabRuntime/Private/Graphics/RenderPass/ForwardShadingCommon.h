@@ -89,10 +89,22 @@ namespace gglab::forward_shading
 		uint32_t m_ShadowFlags = 0;
 	};
 
-	// Declares scene color and material diagnostics as render targets, IBL,
-	// atmosphere and shadow inputs as samples, and prepass depth as read-only depth.
+	// Resolution domain a Forward shading pass composes into.
+	enum class CompositionDomain : uint8_t
+	{
+		// Render-domain scene color, scene depth and the coverage raster domain, before the
+		// temporal resolve.
+		PreTemporal,
+		// Display-domain color, display depth and the post-temporal raster domain, after
+		// the temporal resolve.
+		PostTemporal,
+	};
+
+	// Declares the domain's color and material diagnostics as render targets, IBL,
+	// atmosphere and shadow inputs as samples, and the domain's depth as read-only depth.
 	void DeclareSceneInputs(RenderGraph::RGBuilder& builder, const RenderFrameContext& context,
-		const RenderServices& services, RenderViewID viewId, SceneInputs& inputs) noexcept;
+		const RenderServices& services, RenderViewID viewId, CompositionDomain domain,
+		SceneInputs& inputs) noexcept;
 
 	[[nodiscard]] RHIRenderingAttachment GetSceneColorAttachment(
 		RGExecuteContext& executeContext, const SceneInputs& inputs) noexcept;

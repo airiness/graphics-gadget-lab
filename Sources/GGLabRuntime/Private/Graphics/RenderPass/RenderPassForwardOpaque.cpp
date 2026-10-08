@@ -134,7 +134,8 @@ namespace gglab
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
-				forward_shading::DeclareSceneInputs(builder, *contextPtr, services, displayViewId, data.m_Scene);
+				forward_shading::DeclareSceneInputs(builder, *contextPtr, services, displayViewId,
+					forward_shading::CompositionDomain::PreTemporal, data.m_Scene);
 
 				auto& blackboard = builder.GetBlackboard();
 				GGLAB_ASSERT_MSG(blackboard.Get<DepthCoverageFramePlan>(DepthCoverageFramePlanName)

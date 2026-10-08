@@ -315,6 +315,16 @@ namespace gglab
 					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
 				sceneDepth.m_Convention = displayDepthConvention;
 
+				// Display depth of post-temporal composition. At native resolution it is the
+				// scene depth itself. The display color is published at the temporal boundary,
+				// after the pre-temporal passes that may replace the scene color.
+				auto& displayDepth =
+					blackboard.GetOrCreate<RGDisplayDepthResources>(DisplayDepthResourcesName);
+				displayDepth.m_Texture = sceneDepth.m_Texture;
+				displayDepth.m_DsvDesc = sceneDepth.m_DsvDesc;
+				displayDepth.m_SrvDesc = sceneDepth.m_SrvDesc;
+				displayDepth.m_Convention = sceneDepth.m_Convention;
+
 				if (temporalActive)
 				{
 					auto& temporalGeometry = blackboard.Get<RGTemporalGeometryResources>(
@@ -482,6 +492,21 @@ namespace gglab
 		if (context.GetTemporalFramePlan().m_Active)
 		{
 			m_TemporalAAPass.AddPass(rg, context, services);
+		}
+
+		// Temporal boundary: post-temporal composition and post-processing read the
+		// display-domain color from here on. An active resolve published its output;
+		// otherwise the domains are equal and the composed scene color is the display color.
+		{
+			auto& targets = rg.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+				.GetViewTargets(displayViewId);
+			if (!targets.m_DisplayColor.IsValid())
+			{
+				GGLAB_ASSERT_MSG(targets.m_RenderWidth == targets.m_DisplayWidth &&
+					targets.m_RenderHeight == targets.m_DisplayHeight,
+					"Without a temporal resolve the render and display extents are equal.");
+				targets.m_DisplayColor = targets.m_SceneColor;
+			}
 		}
 
 		// Scene extensions are post-TAA participants in the current temporal contract.

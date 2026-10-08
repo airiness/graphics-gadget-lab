@@ -59,7 +59,9 @@ namespace gglab
 			[contextPtr, services, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
-				forward_shading::DeclareSceneInputs(builder, *contextPtr, services, displayViewId, data.m_Scene);
+				// Transparent geometry composes after the temporal resolve.
+				forward_shading::DeclareSceneInputs(builder, *contextPtr, services, displayViewId,
+					forward_shading::CompositionDomain::PostTemporal, data.m_Scene);
 				GGLAB_ASSERT_MSG(builder.GetBlackboard().Get<DepthCoverageFramePlan>(DepthCoverageFramePlanName)
 					.AddsForwardTransparentPass(),
 					"Forward transparent shading is added only for validated frame plans with transparent draws.");

@@ -322,26 +322,22 @@ namespace gglab
 				.m_Buffer = viewBuffer->GetBufferHandle(),
 				.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + viewBindingId,
 			};
-			const RenderQueueBuilder::BuildInfo queueBuildInfo{
-				.m_AssetManager = info.m_AssetManager,
-				.m_RenderScene = result.m_RenderScene,
-				.m_RenderView = renderView,
-				.m_CullingFrustums = queueCullFrustums.AsSpan(),
-				.m_CoverageRasterDomain =
-					{
+			const auto makeRasterDomain = [&](uint32_t width, uint32_t height) noexcept
+				{
+					return DepthCoverageRasterDomain{
 						.m_FrameSerial = info.m_FrameSerial,
 						.m_ViewBindingId = viewBindingId,
 						.m_CurrentViewSource = viewSource,
 						.m_CurrentJitteredProjectionSource = viewSource,
 						.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
-						.m_TargetWidth = renderView.m_Width,
-						.m_TargetHeight = renderView.m_Height,
+						.m_TargetWidth = width,
+						.m_TargetHeight = height,
 						.m_Viewport =
 							{
 								.m_X = 0.0f,
 								.m_Y = 0.0f,
-								.m_Width = static_cast<float>(renderView.m_Width),
-								.m_Height = static_cast<float>(renderView.m_Height),
+								.m_Width = static_cast<float>(width),
+								.m_Height = static_cast<float>(height),
 								.m_MinDepth = 0.0f,
 								.m_MaxDepth = 1.0f,
 							},
@@ -349,11 +345,25 @@ namespace gglab
 							{
 								.m_Left = 0,
 								.m_Top = 0,
-								.m_Right = static_cast<int32_t>(renderView.m_Width),
-								.m_Bottom = static_cast<int32_t>(renderView.m_Height),
+								.m_Right = static_cast<int32_t>(width),
+								.m_Bottom = static_cast<int32_t>(height),
 							},
 						.m_DepthConvention = renderView.m_DepthConvention,
-					},
+					};
+				};
+			const RenderQueueBuilder::BuildInfo queueBuildInfo{
+				.m_AssetManager = info.m_AssetManager,
+				.m_RenderScene = result.m_RenderScene,
+				.m_RenderView = renderView,
+				.m_CullingFrustums = queueCullFrustums.AsSpan(),
+				.m_CoverageRasterDomain = makeRasterDomain(renderView.m_Width, renderView.m_Height),
+				// The display raster view of post-temporal composition keeps the jittered
+				// view projection; only its extent is display-domain. Views that are never
+				// displayed, such as shadow views, have none.
+				.m_PostTemporalRasterDomain =
+					renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0
+						? makeRasterDomain(renderView.m_DisplayWidth, renderView.m_DisplayHeight)
+						: DepthCoverageRasterDomain{},
 				.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
 				.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
 				.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_FrameSlotIndex),

@@ -94,13 +94,14 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				if (scene)
 				{
-					auto& sceneDepth =
-						builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
-					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
-					data.m_Color = targets.m_SceneColor;
+					// Depth-tested world geometry composes after the temporal resolve.
+					auto& displayDepth = builder.GetBlackboard().Get<RGDisplayDepthResources>(
+						DisplayDepthResourcesName);
+					builder.ReadWriteInPlace(targets.m_DisplayColor, RGTextureAccess::RenderTarget);
+					data.m_Color = targets.m_DisplayColor;
 					data.m_Depth =
-						builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
-					RHITextureViewDesc dsvDesc = sceneDepth.m_DsvDesc;
+						builder.Read(displayDepth.m_Texture, RGTextureAccess::DepthStencilRead);
+					RHITextureViewDesc dsvDesc = displayDepth.m_DsvDesc;
 					dsvDesc.m_ReadOnlyDepth = true;
 					data.m_Dsv =
 						builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, dsvDesc);
