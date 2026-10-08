@@ -63,8 +63,9 @@ namespace gglab
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
-						targets.m_Width = swapChain->GetBufferWidth();
-						targets.m_Height = swapChain->GetBufferHeight();
+						// The loading shell composes only display-domain targets.
+						targets.m_DisplayWidth = swapChain->GetBufferWidth();
+						targets.m_DisplayHeight = swapChain->GetBufferHeight();
 
 						RHITextureDesc backBufferDesc{};
 						backBufferDesc.m_Extent = {

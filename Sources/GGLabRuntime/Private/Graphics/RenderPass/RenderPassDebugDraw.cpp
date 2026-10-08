@@ -116,8 +116,10 @@ namespace gglab
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Color);
 				data.m_VertexBuffer = frame.m_VertexBuffer;
 				data.m_VertexBufferOffset = frame.m_VertexBufferOffset;
-				data.m_Width = targets.m_Width;
-				data.m_Height = targets.m_Height;
+				// Scene debug geometry composes after the temporal resolve and overlays into
+				// the back buffer, so both draw at the display extent.
+				data.m_Width = targets.m_DisplayWidth;
+				data.m_Height = targets.m_DisplayHeight;
 			},
 			[this, contextPtr, &services, scene, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)

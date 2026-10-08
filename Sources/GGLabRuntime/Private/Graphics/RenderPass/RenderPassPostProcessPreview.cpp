@@ -246,7 +246,7 @@ namespace gglab
 		// copied by the Diagnostic capture pass, which receives the inferred usage.
 		const RHITextureDesc outputDesc{
 			.m_Format = RHIFormat::R8G8B8A8Unorm,
-			.m_Extent = { displayView.m_Width, displayView.m_Height, 1u },
+			.m_Extent = { displayView.m_DisplayWidth, displayView.m_DisplayHeight, 1u },
 		};
 		RHITextureDesc captureDesc = outputDesc;
 		captureDesc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::CopySource;
@@ -462,7 +462,8 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const RenderView& displayView = context.GetDisplayRenderView();
 		const RHIFencePoint retireFence = services.m_Presentation->GetLastSubmittedFencePoint();
-		registry->EnsurePostProcessPreviewResources(displayView.m_Width, displayView.m_Height,
+		registry->EnsurePostProcessPreviewResources(
+			displayView.m_DisplayWidth, displayView.m_DisplayHeight,
 			retireFence.IsValid() ? &retireFence : nullptr, channel);
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;

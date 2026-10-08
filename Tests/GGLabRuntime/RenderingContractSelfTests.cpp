@@ -1992,14 +1992,21 @@ namespace gglab
 					.m_Camera = camera,
 					.m_RenderSettings = settings,
 					.m_TemporalFramePlan = temporalFramePlan,
-					.m_Width = 1280,
-					.m_Height = 720,
+					.m_Resolution = ResolveNativeViewResolution({ 1280, 720 }),
 			});
 			const RenderView shadowView =
 				RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>(
 					RenderViewBuildInfo<RenderViewID::DirectionalShadow>{
 				.m_MainView = mainView,
 			});
+			const ViewResolution nativeResolution = ResolveNativeViewResolution({ 1280, 720 });
+			context.Check(nativeResolution.IsNative() &&
+				nativeResolution.m_Render == ViewExtent{ 1280, 720 } &&
+				mainView.GetResolution() == nativeResolution &&
+				mainView.m_Width == 1280 && mainView.m_DisplayHeight == 720 &&
+				shadowView.m_DisplayWidth == 0,
+				"A camera view carries its render and display extents, which native rendering "
+				"keeps equal; shadow views have no display extent");
 
 			const float mainNear =
 				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near),
@@ -2025,8 +2032,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = settings,
 				.m_TemporalFramePlan = plan,
-				.m_Width = 1280,
-				.m_Height = 720,
+				.m_Resolution = ResolveNativeViewResolution({ 1280, 720 }),
 			});
 			frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)] = mainView;
 			frame.m_RenderViews[utils::ToIndex(RenderViewID::DebugCamera2)] = mainView;
@@ -2165,7 +2171,7 @@ namespace gglab
 			const ResolvedTemporalFramePlan plan{};
 			RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({
 				.m_Camera = camera, .m_RenderSettings = settings, .m_TemporalFramePlan = plan,
-				.m_Width = 1280, .m_Height = 720,
+				.m_Resolution = ResolveNativeViewResolution({ 1280, 720 }),
 			});
 			mainView.m_Near = 1.0f;
 			mainView.m_Far = 100.0f;
@@ -2238,7 +2244,7 @@ namespace gglab
 			const ResolvedTemporalFramePlan temporal{};
 			const auto mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({
 				.m_Camera = camera, .m_RenderSettings = viewSettings, .m_TemporalFramePlan = temporal,
-				.m_Width = 1280, .m_Height = 720 });
+				.m_Resolution = ResolveNativeViewResolution({ 1280, 720 }) });
 			DirectionalShadowSettings settings{};
 			settings.m_Enable = false;
 			const auto disabled = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, settings);
@@ -2348,7 +2354,7 @@ namespace gglab
 				const ResolvedViewRenderSettings settings{};
 				const ResolvedTemporalFramePlan plan{};
 				return RenderViewBuilder{}.Build<RenderViewID::Main>({ .m_Camera = camera,
-					.m_RenderSettings = settings, .m_TemporalFramePlan = plan, .m_Width = 1920, .m_Height = 1080 });
+					.m_RenderSettings = settings, .m_TemporalFramePlan = plan, .m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }) });
 			};
 			const auto translateView = [](RenderView view, const Vector3& offset) noexcept
 			{
@@ -2492,7 +2498,7 @@ namespace gglab
 			const ResolvedViewRenderSettings viewSettings{};
 			const ResolvedTemporalFramePlan plan{};
 			const RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({ .m_Camera = camera,
-				.m_RenderSettings = viewSettings, .m_TemporalFramePlan = plan, .m_Width = 1920, .m_Height = 1080 });
+				.m_RenderSettings = viewSettings, .m_TemporalFramePlan = plan, .m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }) });
 			const Vector3 lightDirection = Vector3(-1.0f, -0.85f, 0.35f).Normalized();
 			DirectionalShadowSettings settings{};
 			settings.m_ReceiverSlopeBiasTexels = 1.5f;
@@ -7362,8 +7368,10 @@ namespace gglab
 				colorDesc.m_Extent = extent;
 				auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(
 					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
-				targets.m_Width = extent.m_Width;
-				targets.m_Height = extent.m_Height;
+				targets.m_RenderWidth = extent.m_Width;
+				targets.m_RenderHeight = extent.m_Height;
+				targets.m_DisplayWidth = extent.m_Width;
+				targets.m_DisplayHeight = extent.m_Height;
 				targets.m_SceneColor = builder.CreateTexture("AerialTest.SceneColor", colorDesc);
 				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 				RHITextureDesc depthDesc{};
@@ -7615,8 +7623,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = preExposedSettings,
 				.m_TemporalFramePlan = noTemporalFrame,
-				.m_Width = 64,
-				.m_Height = 64,
+				.m_Resolution = ResolveNativeViewResolution({ 64, 64 }),
 			});
 			const auto upload = RenderSceneBuilder::BuildViewData(
 				std::span<const RenderView>(&preExposedView, 1), {});
@@ -8327,8 +8334,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = defaultSettings,
 				.m_TemporalFramePlan = viewPlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			TemporalViewHistory unavailableViewHistory{};
 			TemporalObjectHistory unavailableObjectHistory{};
@@ -8403,8 +8409,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = activePlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			abortedTransaction.PrepareDisplayView(abortedView);
 			const Vector4 unjitteredClip = math::Transform(
@@ -8423,8 +8428,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = activePlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			committedTransaction.PrepareDisplayView(committedView);
 			committedTransaction.MarkResolveParticipated();
@@ -8437,8 +8441,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = activePlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			noResolveTransaction.PrepareDisplayView(noResolveView);
 			noResolveTransaction.CommitCompleted();
@@ -8452,8 +8455,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = changedSessionPlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			changedSessionTransaction.PrepareDisplayView(changedSessionView);
 			changedSessionTransaction.Abort();
@@ -8469,8 +8471,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = activePlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			fatalTransaction.PrepareDisplayView(fatalView);
 			fatalTransaction.MarkResolveParticipated();
@@ -8513,8 +8514,7 @@ namespace gglab
 						.m_Camera = camera,
 						.m_RenderSettings = biasedSettings,
 						.m_TemporalFramePlan = plan,
-						.m_Width = 1920,
-						.m_Height = 1080,
+						.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 					});
 				};
 			TemporalAASettings outOfRangeBias{};
@@ -8534,8 +8534,7 @@ namespace gglab
 					.m_Camera = camera,
 					.m_RenderSettings = enabledSettings,
 					.m_TemporalFramePlan = activePlan,
-					.m_Width = 1920,
-					.m_Height = 1080,
+					.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 				});
 			};
 			const RenderObjectHistoryKey objectHistoryKey{
@@ -8663,8 +8662,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = replacementSessionPlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			replacementSessionTransaction.PrepareDisplayView(replacementSessionView);
 			const Matrix replacementSessionPrevious =
@@ -8681,8 +8679,7 @@ namespace gglab
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
 				.m_TemporalFramePlan = resetObjectPlan,
-				.m_Width = 1920,
-				.m_Height = 1080,
+				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			resetObjectTransaction.PrepareDisplayView(resetObjectView);
 			const Matrix resetPreviousModel =

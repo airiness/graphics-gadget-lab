@@ -14,7 +14,7 @@ namespace gglab
 	{
 		RenderView BuildPerspectiveCameraView(RenderViewID viewId, const Camera& camera,
 			const ResolvedViewRenderSettings& renderSettings,
-			const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
 			StringID name) noexcept
 		{
 			RenderView view{};
@@ -62,8 +62,10 @@ namespace gglab
 			view.m_ExposureMultiplier = renderSettings.m_Exposure.m_ExposureScale;
 			view.m_ScenePreExposure = renderSettings.m_Exposure.m_PreExposure;
 
-			view.m_Width = width;
-			view.m_Height = height;
+			view.m_Width = resolution.m_Render.m_Width;
+			view.m_Height = resolution.m_Render.m_Height;
+			view.m_DisplayWidth = resolution.m_Display.m_Width;
+			view.m_DisplayHeight = resolution.m_Display.m_Height;
 
 			return view;
 		}
@@ -71,19 +73,19 @@ namespace gglab
 
 	RenderView RenderViewBuilder::BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
 		const ResolvedViewRenderSettings& renderSettings,
-		const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
+		const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
 		StringID name) const noexcept
 	{
 		GGLAB_ASSERT(IsDebugCameraRenderViewID(viewId));
 		return BuildPerspectiveCameraView(
-			viewId, camera, renderSettings, temporalFramePlan, width, height, name);
+			viewId, camera, renderSettings, temporalFramePlan, resolution, name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::Main>::Build(
 		const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept
 	{
 		return BuildPerspectiveCameraView(RenderViewID::Main, info.m_Camera, info.m_RenderSettings,
-			info.m_TemporalFramePlan, info.m_Width, info.m_Height, info.m_Name);
+			info.m_TemporalFramePlan, info.m_Resolution, info.m_Name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::DirectionalShadow>::Build(

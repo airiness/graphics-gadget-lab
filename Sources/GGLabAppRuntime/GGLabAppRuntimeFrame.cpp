@@ -31,6 +31,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
@@ -115,8 +116,10 @@ namespace gglab
 			const ResolvedTemporalFramePlan& m_TemporalFramePlan;
 			const TemporalFrameTransaction& m_TemporalFrameTransaction;
 			const TemporalAASettings& m_TemporalSettings;
+			// Display extent; it keys capture settling.
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			ViewResolution m_ViewResolution{};
 			AppRuntimeRHIBackend m_Backend = AppRuntimeRHIBackend::Unknown;
 			bool m_DevelopmentTools = false;
 		};
@@ -188,8 +191,7 @@ namespace gglab
 			const Vector2& jitter = inputs.m_TemporalFrameTransaction.GetJitterPixels();
 			const std::optional<TemporalReferenceSample>& referenceSample =
 				inputs.m_TemporalFrameTransaction.GetReferenceSample();
-			// One resolution domain until the render/display split lands.
-			const std::array<uint32_t, 2> extent{ inputs.m_Width, inputs.m_Height };
+			const ViewResolution& resolution = inputs.m_ViewResolution;
 			return FrameCaptureTemporalState{
 				.m_Requested = plan.m_Requested,
 				.m_Status = std::string(GetTemporalAAFrameStatusName(plan.m_Status)),
@@ -215,8 +217,8 @@ namespace gglab
 				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
 				.m_TextureLodBias = plan.m_Active ? settings.m_TextureLodBiasOffset
 					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,
-				.m_RenderExtent = extent,
-				.m_DisplayExtent = extent,
+				.m_RenderExtent = { resolution.m_Render.m_Width, resolution.m_Render.m_Height },
+				.m_DisplayExtent = { resolution.m_Display.m_Width, resolution.m_Display.m_Height },
 			};
 		}
 
@@ -464,6 +466,10 @@ namespace gglab
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
 			displayViewSettings.m_Exposure.m_PreExposure, referenceSample);
+		// The window client extent is the display extent. Camera views render at it until
+		// temporal upscaling defines a render scale.
+		const ViewResolution viewResolution =
+			ResolveNativeViewResolution({ m_WindowWidth, m_WindowHeight });
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
@@ -473,8 +479,7 @@ namespace gglab
 			.m_TemporalFramePlan = temporalFramePlan,
 			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
-			.m_WindowWidth = m_WindowWidth,
-			.m_WindowHeight = m_WindowHeight,
+			.m_ViewResolution = viewResolution,
 			.m_FrameSlotIndex = frameSlotIndex,
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
@@ -497,6 +502,7 @@ namespace gglab
 			.m_TemporalSettings = displayViewSettings.m_TemporalAA,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
+			.m_ViewResolution = viewResolution,
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
 			});

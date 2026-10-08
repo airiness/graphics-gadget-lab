@@ -134,8 +134,8 @@ namespace gglab
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 
 				const RenderView& displayView = contextPtr->GetDisplayRenderView();
-				data.m_Width = displayView.m_Width;
-				data.m_Height = displayView.m_Height;
+				data.m_Width = displayView.m_DisplayWidth;
+				data.m_Height = displayView.m_DisplayHeight;
 
 				data.m_SamplerIndex =
 					services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);

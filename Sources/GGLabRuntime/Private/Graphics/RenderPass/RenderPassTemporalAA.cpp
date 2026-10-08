@@ -168,9 +168,14 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				const RHITextureDesc& currentColorDesc =
 					builder.GetTextureDesc(targets.m_SceneColor);
+				// The resolve output is display-domain. It reconstructs one output pixel per
+				// render pixel until temporal upscaling separates the extents.
+				GGLAB_ASSERT_MSG(currentColorDesc.m_Extent.m_Width == targets.m_DisplayWidth &&
+					currentColorDesc.m_Extent.m_Height == targets.m_DisplayHeight,
+					"Temporal AA resolves at the display extent of its render-domain input.");
 				RHITextureDesc outputDesc{};
 				outputDesc.m_Format = TemporalAAResolvedColorFormat;
-				outputDesc.m_Extent = currentColorDesc.m_Extent;
+				outputDesc.m_Extent = { targets.m_DisplayWidth, targets.m_DisplayHeight, 1u };
 
 				auto& resources =
 					blackboard.GetOrCreate<RGTemporalAAResources>(TemporalAAResourcesName);
@@ -282,7 +287,7 @@ namespace gglab
 				}
 				RHITextureDesc outputDesc{};
 				outputDesc.m_Format = TemporalAAResolvedColorFormat;
-				outputDesc.m_Extent = currentColorDesc.m_Extent;
+				outputDesc.m_Extent = { targets.m_DisplayWidth, targets.m_DisplayHeight, 1u };
 				resources.m_ReprojectionDiagnostics =
 					builder.CreateTexture("TAA.ReprojectionDiagnostics", outputDesc);
 

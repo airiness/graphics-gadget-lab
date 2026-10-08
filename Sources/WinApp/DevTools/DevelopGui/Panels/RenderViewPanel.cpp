@@ -248,7 +248,15 @@ namespace gglab
 				ImGui::TableSetColumnIndex(4);
 				ImGui::TextUnformatted(RenderViewKindLabel(view.m_ViewId));
 				ImGui::TableSetColumnIndex(5);
-				ImGui::Text("%u x %u", view.m_Width, view.m_Height);
+				if (view.m_DisplayWidth == 0 || view.GetResolution().IsNative())
+				{
+					ImGui::Text("%u x %u", view.m_Width, view.m_Height);
+				}
+				else
+				{
+					ImGui::Text("%u x %u -> %u x %u", view.m_Width, view.m_Height,
+						view.m_DisplayWidth, view.m_DisplayHeight);
+				}
 				ImGui::TableSetColumnIndex(6);
 				ImGui::TextUnformatted("Perspective");
 				ImGui::TableSetColumnIndex(7);

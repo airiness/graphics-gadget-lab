@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
@@ -160,8 +161,9 @@ namespace gglab
 		ResolvedTemporalFramePlan m_TemporalFramePlan{};
 		TemporalFrameTransaction& m_TemporalFrameTransaction;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
-		uint32_t m_WindowWidth = 0;
-		uint32_t m_WindowHeight = 0;
+		// Render and display extents of the camera views; the display extent is the
+		// window client extent.
+		ViewResolution m_ViewResolution{};
 		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
 		uint64_t m_FrameSerial = 0;

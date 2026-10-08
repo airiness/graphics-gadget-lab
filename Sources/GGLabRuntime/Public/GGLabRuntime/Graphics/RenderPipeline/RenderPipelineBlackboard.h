@@ -14,8 +14,14 @@ namespace gglab
 		// Premultiplied scene-linear lighting to remove before diagnostic composition.
 		RGTextureId m_MaterialDiagnosticLighting{};
 
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		// Extent of the render-domain targets (scene color before the temporal resolve,
+		// scene depth, motion, material diagnostics).
+		uint32_t m_RenderWidth = 0;
+		uint32_t m_RenderHeight = 0;
+		// Extent of the display-domain targets (temporal output, post-processing, back
+		// buffer).
+		uint32_t m_DisplayWidth = 0;
+		uint32_t m_DisplayHeight = 0;
 	};
 
 	struct RGViewTargetsTable

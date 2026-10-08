@@ -218,6 +218,7 @@ namespace gglab
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
+			resolution = context.GetDisplayRenderView().GetResolution(),
 			depthCoverageFramePlan, temporalActive = context.GetTemporalFramePlan().m_Active,
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
@@ -231,11 +232,20 @@ namespace gglab
 				blackboard.GetOrCreate<DepthCoverageFramePlan>(DepthCoverageFramePlanName) =
 					depthCoverageFramePlan;
 
-				const uint32_t width = swapChain->GetBufferWidth();
-				const uint32_t height = swapChain->GetBufferHeight();
+				// Scene targets are render-domain; the back buffer is display-domain, which
+				// frame validation matched to the swap chain.
+				GGLAB_ASSERT_MSG((resolution.m_Display ==
+					ViewExtent{ swapChain->GetBufferWidth(), swapChain->GetBufferHeight() }),
+					"The display extent of a validated frame equals the swap-chain extent.");
+				GGLAB_ASSERT_MSG(resolution.IsNative(),
+					"Render scales below the display extent arrive with temporal upscaling.");
+				const uint32_t width = resolution.m_Render.m_Width;
+				const uint32_t height = resolution.m_Render.m_Height;
 
-				targets.m_Width = width;
-				targets.m_Height = height;
+				targets.m_RenderWidth = width;
+				targets.m_RenderHeight = height;
+				targets.m_DisplayWidth = resolution.m_Display.m_Width;
+				targets.m_DisplayHeight = resolution.m_Display.m_Height;
 
 				const RHITextureHandle backTexture =
 					swapChain->GetBackBufferHandle(frameBackBufferIndex);
@@ -270,7 +280,8 @@ namespace gglab
 
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
-				backBufferDesc.m_Extent = { width, height, 1u };
+				backBufferDesc.m_Extent =
+					{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
@@ -602,8 +613,8 @@ namespace gglab
 			return ClassifyForwardPlusFrame({ .m_PresentationAvailable = false });
 		}
 		const RenderView& displayView = context.GetDisplayRenderView();
-		if (displayView.m_Width != swapChain->GetBufferWidth() ||
-			displayView.m_Height != swapChain->GetBufferHeight())
+		if (displayView.m_DisplayWidth != swapChain->GetBufferWidth() ||
+			displayView.m_DisplayHeight != swapChain->GetBufferHeight())
 		{
 			return ClassifyForwardPlusFrame({ .m_PresentationAvailable = true });
 		}

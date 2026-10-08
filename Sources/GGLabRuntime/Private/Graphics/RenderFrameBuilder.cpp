@@ -194,6 +194,7 @@ namespace gglab
 			result.m_RenderViews[index].m_IsValid = false;
 		}
 
+		const ViewResolution& viewResolution = info.m_ViewResolution;
 		const Camera& mainCamera = info.m_CameraRig.GetMainCamera();
 		auto& mainViewSettings = result.m_ViewRenderSettings[utils::ToIndex(RenderViewID::Main)];
 		mainViewSettings = info.m_DisplayViewId == RenderViewID::Main
@@ -203,8 +204,7 @@ namespace gglab
 			.m_Camera = mainCamera,
 			.m_RenderSettings = mainViewSettings,
 			.m_TemporalFramePlan = info.m_TemporalFramePlan,
-			.m_Width = info.m_WindowWidth,
-			.m_Height = info.m_WindowHeight,
+			.m_Resolution = viewResolution,
 			.m_Name = StringID("MainView"),
 		};
 		result.m_RenderViews[utils::ToIndex(RenderViewID::Main)] =
@@ -225,8 +225,8 @@ namespace gglab
 				? info.m_DisplayViewSettings
 				: ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
 			result.m_RenderViews[utils::ToIndex(viewId)] = m_ViewBuilder.BuildDebugCameraView(
-				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan,
-				info.m_WindowWidth, info.m_WindowHeight, StringID(std::string_view(slot->m_Name)));
+				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan, viewResolution,
+				StringID(std::string_view(slot->m_Name)));
 		}
 
 		const auto& shadowSettings = result.m_WorldData.GetMainDirectionalShadowSettings();
