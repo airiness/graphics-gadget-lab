@@ -1067,29 +1067,41 @@ namespace gglab
 			if (!imported.Succeeded()) return;
 			const auto& model = imported.m_Model;
 			CheckImportedTextures(context, model);
-			constexpr std::array<std::pair<std::string_view, size_t>, 19> expectedTriangles = { {
-				{ "MAT_RetreatStone", 156 },
-				{ "MAT_RetreatLime", 3996 },
-				{ "MAT_RetreatMetal", 14968 },
-				{ "MAT_RetreatTimber", 46900 },
-				{ "MAT_CoastalRock", 5798 },
+			constexpr std::array<std::pair<std::string_view, size_t>, 24> expectedTriangles = { {
+				{ "MAT_RetreatStone", 596 },
+				{ "MAT_RetreatLime", 4778 },
+				{ "MAT_RetreatMetal", 10268 },
+				{ "MAT_RetreatTimber", 75472 },
+				{ "MAT_CoastalRock", 6048 },
 				{ "MAT_LoungeCoatedShell", 1460 },
 				{ "MAT_LoungeUpholstery", 752 },
 				{ "MAT_LoungeJoints", 752 },
-				{ "MAT_LoungeBrushedAluminum", 1504 },
+				{ "MAT_LoungeBrushedAluminum", 13376 },
 				{ "MAT_RetreatPaint", 2832 },
-				{ "MAT_ServiceSeal", 3500 },
+				{ "MAT_ServiceSeal", 3392 },
 				{ "MAT_RetreatCeramic", 1784 },
 				{ "MAT_RetreatPaper", 188 },
-				{ "MAT_RetreatSoil", 48 },
-				{ "MAT_RetreatLeaf", 1121968 },
-				{ "MAT_RetreatSilverLeaf", 360900 },
-				{ "MAT_RetreatDryLeaf", 297272 },
+				{ "MAT_RetreatSoil", 36 },
+				{ "MAT_RetreatLeaf", 722280 },
+				{ "MAT_RetreatSilverLeaf", 192952 },
+				{ "MAT_RetreatDryLeaf", 229448 },
 				{ "MAT_RetreatSea", 2 },
 				{ "MAT_RetreatDistantRock", 2298 },
+				{ "MAT_CoastalCanopyGlass", 1176 },
+				{ "MAT_DockFender", 8476 },
+				{ "MAT_LandingRope", 23808 },
+				{ "MAT_LifebuoyRed", 1024 },
+				{ "MAT_LifebuoyWhite", 1024 },
 			} };
 			std::array<size_t, expectedTriangles.size()> triangles{};
 			bool geometryValid = true;
+			std::string geometryFailure;
+			// Assimp appends one anonymous default material to this glTF. Require
+			// exactly one copy of every source material and keep the default unbound.
+			bool materialBindingsValid = model.m_Materials.size() == expectedTriangles.size() + 1 &&
+				std::ranges::count(model.m_Materials, std::string{}, &ImportedMaterial::m_Name) == 1 &&
+				std::ranges::all_of(expectedTriangles, [&](const auto& entry)
+					{ return std::ranges::count(model.m_Materials, entry.first, &ImportedMaterial::m_Name) == 1; });
 			for (const auto& mesh : model.m_Meshes)
 			{
 				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
@@ -1098,11 +1110,18 @@ namespace gglab
 				for (const auto& vertex : mesh.m_Vertices)
 				{
 					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
-					geometryValid &= std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
+					const bool vertexValid = std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
 						std::isfinite(vertex.m_Position.m_Z) && std::isfinite(vertex.m_TexCoord0.m_X) &&
 						std::isfinite(vertex.m_TexCoord0.m_Y) && std::abs(vertex.m_Normal.LengthSquared() - 1.0f) < 0.0002f &&
 						std::abs(tangent.LengthSquared() - 1.0f) < 0.0002f &&
 						std::abs(vertex.m_Normal.Dot(tangent)) < 0.0002f && std::abs(std::abs(vertex.m_Tangent.m_W) - 1.0f) < 0.0002f;
+					if (!vertexValid && geometryFailure.empty())
+						geometryFailure = std::format("; mesh {} at ({}, {}, {}): normal squared length {}, "
+							"tangent squared length {}, normal/tangent dot {}, handedness {}", mesh.m_Name,
+							vertex.m_Position.m_X, vertex.m_Position.m_Y, vertex.m_Position.m_Z,
+							vertex.m_Normal.LengthSquared(), tangent.LengthSquared(), vertex.m_Normal.Dot(tangent),
+							vertex.m_Tangent.m_W);
+					geometryValid &= vertexValid;
 				}
 			}
 			// Count placed geometry through bindings so shared foliage meshes retain every instance.
@@ -1114,9 +1133,24 @@ namespace gglab
 					continue;
 				}
 				const auto& material = model.m_Materials[instance.m_MaterialIndex];
-				geometryValid &= material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
+				const auto& properties = material.m_Properties;
+				if (material.m_Name == "MAT_CoastalCanopyGlass")
+				{
+					// The installed core-glTF approximation must stay transparent until
+					// the Runtime supports the source scene's physical transmission.
+					materialBindingsValid &= properties.m_AlphaMode == AlphaMode::Blend &&
+						std::abs(properties.m_BaseColor[3] - 0.18f) < 0.00001f &&
+						std::abs(properties.m_RoughnessFactor - 0.075f) < 0.00001f &&
+						properties.m_MetallicFactor == 0.0f && properties.m_Ior == 1.5f;
+				}
+				else
+				{
+					materialBindingsValid &= properties.m_AlphaMode == AlphaMode::Opaque &&
+						properties.m_BaseColor[3] == 1.0f;
+				}
 				const auto match = std::ranges::find(expectedTriangles, material.m_Name,
 					&std::pair<std::string_view, size_t>::first);
+				materialBindingsValid &= match != expectedTriangles.end();
 				if (match == expectedTriangles.end()) { geometryValid = false; continue; }
 				triangles[static_cast<size_t>(match - expectedTriangles.begin())] +=
 					model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
@@ -1130,14 +1164,26 @@ namespace gglab
 						geometryValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic == GetMaterialTextureSlotSemantic(slot);
 				}
 			}
-			context.Check(geometryValid, "Coastal retreat retains valid opaque geometry, tangent frames and UV0 texture semantics");
+			context.Check(geometryValid,
+				"Coastal retreat retains valid geometry, tangent frames and UV0 texture semantics" + geometryFailure);
+			std::string materialDetail = std::format(" (allocated materials={})", model.m_Materials.size());
+			for (const auto& material : model.m_Materials)
+			{
+				const auto& properties = material.m_Properties;
+				materialDetail += std::format("; {}: alpha mode {}, alpha {}, roughness {}, metallic {}, IOR {}", material.m_Name,
+					static_cast<uint32_t>(properties.m_AlphaMode), properties.m_BaseColor[3], properties.m_RoughnessFactor,
+					properties.m_MetallicFactor, properties.m_Ior);
+			}
+			context.Check(materialBindingsValid,
+				"Coastal retreat retains twenty-three opaque materials and the explicit glass blend approximation" + materialDetail);
 			for (size_t index = 0; index < expectedTriangles.size(); ++index)
 				context.Check(triangles[index] == expectedTriangles[index].second,
 					std::format("Coastal retreat {} retains {} placed triangles (imported={})",
 						expectedTriangles[index].first, expectedTriangles[index].second, triangles[index]));
 
 			// Probe the upper front bevel in model space, independent of Assimp mesh
-			// merging. Nonplanar source quads once acquired flat normals here despite
+			// merging. The lowered seat moves these retained bevels down by 0.16 m.
+			// Nonplanar source quads once acquired flat normals here despite
 			// valid unit normals and tangent frames, producing block-shaped highlights.
 			constexpr std::array armCentersX{ 5.04f, 7.66f };
 			std::array<std::vector<std::pair<Vector3, Vector3>>, armCentersX.size()> frontCorners;
@@ -1150,7 +1196,7 @@ namespace gglab
 				for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
 				{
 					const Vector3 position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
-					if (position.m_Y < 3.1999f || position.m_Y > 3.4341f ||
+					if (position.m_Y < 3.0399f || position.m_Y > 3.2741f ||
 						position.m_Z < -1.6151f || position.m_Z > -1.5249f)
 						continue;
 					// The authored shells have rigid instance transforms.
