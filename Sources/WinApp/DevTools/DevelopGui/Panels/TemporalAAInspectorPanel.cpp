@@ -14,37 +14,68 @@
 
 #include <algorithm>
 #include <ranges>
+#include <string>
 
 namespace gglab
 {
 	namespace
 	{
-		const char* StatusName(TemporalAAFrameStatus status) noexcept
+		const char* StatusName(TemporalConsumerStatus status) noexcept
 		{
 			switch (status)
 			{
-			case TemporalAAFrameStatus::Disabled: return "Disabled";
-			case TemporalAAFrameStatus::Unavailable: return "Unavailable";
-			case TemporalAAFrameStatus::Active: return "Active";
+			case TemporalConsumerStatus::Disabled: return "Disabled";
+			case TemporalConsumerStatus::Unavailable: return "Unavailable";
+			case TemporalConsumerStatus::Active: return "Active";
 			}
 			return "Unknown";
 		}
 
-		const char* DisableReasonName(TemporalAADisableReason reason) noexcept
+		const char* DisableReasonName(TemporalConsumerDisableReason reason) noexcept
 		{
 			switch (reason)
 			{
-			case TemporalAADisableReason::None: return "None";
-			case TemporalAADisableReason::NotRequested: return "Not requested";
-			case TemporalAADisableReason::CoreCapabilityUnavailable:
+			case TemporalConsumerDisableReason::None: return "None";
+			case TemporalConsumerDisableReason::NotRequested: return "Not requested";
+			case TemporalConsumerDisableReason::CoreCapabilityUnavailable:
 				return "Core capability unavailable";
-			case TemporalAADisableReason::DisplayViewIneligible: return "Display view ineligible";
-			case TemporalAADisableReason::DepthVelocityPathUnavailable:
+			case TemporalConsumerDisableReason::DisplayViewIneligible:
+				return "Display view ineligible";
+			case TemporalConsumerDisableReason::DepthVelocityPathUnavailable:
 				return "Depth/velocity path unavailable";
-			case TemporalAADisableReason::SceneExtensionUnsupported:
+			case TemporalConsumerDisableReason::SceneExtensionUnsupported:
 				return "Scene extension unsupported";
 			}
 			return "Unknown";
+		}
+
+		[[nodiscard]] std::string JoinServiceNames(TemporalService services)
+		{
+			std::string names;
+			for (const TemporalService service : TemporalServices)
+			{
+				if (Test(services, service))
+				{
+					names += names.empty() ? "" : ", ";
+					names += GetTemporalServiceName(service);
+				}
+			}
+			return names.empty() ? std::string("none") : names;
+		}
+
+		void DrawFramePlan(const ResolvedTemporalFramePlan& plan)
+		{
+			ImGui::Text("Services: %s", JoinServiceNames(plan.m_Services).c_str());
+			for (uint32_t index = 0; index < TemporalConsumerCount; ++index)
+			{
+				const auto consumer = static_cast<TemporalConsumer>(index);
+				const TemporalConsumerPlan& consumerPlan = plan.GetConsumer(consumer);
+				ImGui::BulletText("%.*s: %s%s%s",
+					static_cast<int>(GetTemporalConsumerName(consumer).size()),
+					GetTemporalConsumerName(consumer).data(), StatusName(consumerPlan.m_Status),
+					consumerPlan.IsActive() ? "" : " | ",
+					consumerPlan.IsActive() ? "" : DisableReasonName(consumerPlan.m_DisableReason));
+			}
 		}
 
 		const char* ResetReasonName(TemporalHistoryResetReason reason) noexcept
@@ -205,7 +236,8 @@ namespace gglab
 			}
 			else
 			{
-				ImGui::TextDisabled(snapshot.m_FramePlan.m_Active ? "Preview update pending..."
+				ImGui::TextDisabled(snapshot.m_FramePlan.IsConsumerActive(
+					TemporalConsumer::TemporalAA) ? "Preview update pending..."
 					: "The selected preview requires an active TAA frame.");
 			}
 		}
@@ -227,12 +259,17 @@ namespace gglab
 		}
 
 		const auto& plan = snapshot->m_FramePlan;
-		ImGui::Text("Status: %s%s%s", StatusName(plan.m_Status),
-			plan.m_Active ? "" : " | ",
-			plan.m_Active ? "" : DisableReasonName(plan.m_DisableReason));
+		const TemporalConsumerPlan& temporalAA = plan.GetConsumer(TemporalConsumer::TemporalAA);
+		ImGui::Text("Status: %s%s%s", StatusName(temporalAA.m_Status),
+			temporalAA.IsActive() ? "" : " | ",
+			temporalAA.IsActive() ? "" : DisableReasonName(temporalAA.m_DisableReason));
 		ImGui::Text("History: %s | last reset: %s",
 			snapshot->m_History.m_HistoryValid ? "Valid" : "Invalid",
 			ResetReasonName(snapshot->m_History.m_LastResetReason));
+		if (ImGui::CollapsingHeader("Frame Plan"))
+		{
+			DrawFramePlan(plan);
+		}
 
 		if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
 		{

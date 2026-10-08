@@ -287,8 +287,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
 			m_ActiveFrame.m_Phase == FramePhase::Begun,
 			"Temporal frame planning requires the active begun render host frame.");
+		GGLAB_ASSERT_MSG(referenceSample.has_value() ==
+			plan.GetConsumer(TemporalConsumer::Reference).m_Requested,
+			"The temporal plan must be resolved with the frame's reference request.");
 		const std::optional<TemporalReferenceSample> sample =
-			plan.m_Active ? std::nullopt : referenceSample;
+			plan.IsConsumerActive(TemporalConsumer::Reference) ? referenceSample : std::nullopt;
 		// A sample the accumulator cannot take leaves the frame without an accumulator,
 		// which the pipeline reports as a contract failure.
 		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(

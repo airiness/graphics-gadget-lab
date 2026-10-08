@@ -246,7 +246,8 @@ namespace gglab
 			"Frame planning and scene writes must share one resolved pre-exposure.");
 		info.m_TemporalFrameTransaction->PrepareDisplayView(
 			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
-		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.m_Requested ==
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::TemporalAA)
+			.m_Requested ==
 			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
 				.m_TemporalAA.m_Enabled,
 			"Temporal frame plan must be resolved from the display view settings.");

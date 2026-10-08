@@ -5358,7 +5358,9 @@ namespace gglab
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
 			TemporalFrameTransaction transaction;
-			transaction.Begin(viewHistory, objectHistory, ResolvedTemporalFramePlan{}, 8, 4,
+			const ResolvedTemporalFramePlan referencePlan =
+				ResolveTemporalFramePlan({ .m_ReferenceRequested = true });
+			transaction.Begin(viewHistory, objectHistory, referencePlan, 8, 4,
 				nullptr, 1.0f, TemporalReferenceSample{ .m_Index = 5, .m_Count = 16 }, nullptr);
 			const Vector2 expected = GetTemporalReferenceJitterPixels(5);
 			context.Check(transaction.GetReferenceSample() &&
@@ -5516,19 +5518,28 @@ namespace gglab
 				"Lightweight history summary observes an empty manager without allocating GPU history");
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
-			ResolvedTemporalFramePlan activePlan{
+			const TemporalFramePlanResolveInfo activePlanInfo{
+				.m_Settings = { .m_Enabled = true },
+				.m_Capabilities = {
+					.m_MotionRenderTarget = true,
+					.m_MotionShaderResource = true,
+					.m_ResolvedColorRenderTarget = true,
+					.m_ResolvedColorShaderResource = true,
+					.m_ResolvedColorTypedUavStore = true,
+					.m_HistoryColorShaderResource = true,
+					.m_HistoryColorTypedUavStore = true,
+					.m_HistoryDepthShaderResource = true,
+					.m_HistoryDepthTypedUavStore = true,
+				},
 				.m_DisplayViewId = RenderViewID::Main,
 				.m_SceneExtensionParticipation =
 					SceneExtensionTemporalParticipation::TemporalIntegrated,
-				.m_Status = TemporalAAFrameStatus::Active,
-				.m_DisableReason = TemporalAADisableReason::None,
 				.m_ResetIdentity = 7,
 				.m_SessionIdentity = 11,
-				.m_Requested = true,
-				.m_Active = true,
 				.m_DisplayViewEligible = true,
 				.m_DepthVelocityPathAvailable = true,
 			};
+			const ResolvedTemporalFramePlan activePlan = ResolveTemporalFramePlan(activePlanInfo);
 
 			auto prepareDisplayView = [&](TemporalFrameTransaction& transaction)
 			{
@@ -5765,11 +5776,9 @@ namespace gglab
 			context.Check(
 				reenabled.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission,
 				"Fresh history allocation preserves its explicit reset cause instead of ColdStart");
-			ResolvedTemporalFramePlan disabledPlan = activePlan;
-			disabledPlan.m_Status = TemporalAAFrameStatus::Disabled;
-			disabledPlan.m_DisableReason = TemporalAADisableReason::NotRequested;
-			disabledPlan.m_Requested = false;
-			disabledPlan.m_Active = false;
+			TemporalFramePlanResolveInfo disabledPlanInfo = activePlanInfo;
+			disabledPlanInfo.m_Settings.m_Enabled = false;
+			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledPlanInfo);
 			TemporalFrameTransaction disabledTransaction;
 			disabledTransaction.Begin(
 				viewHistory, objectHistory, disabledPlan, 64, 64, &historyManager);
@@ -5806,11 +5815,10 @@ namespace gglab
 				device.m_CreateTextureCount == 16,
 				"Extent changes retire committed history and allocate a fresh invalid generation");
 
-			ResolvedTemporalFramePlan unavailablePlan = activePlan;
-			unavailablePlan.m_CoreAvailable = false;
-			unavailablePlan.m_Active = false;
-			unavailablePlan.m_Status = TemporalAAFrameStatus::Unavailable;
-			unavailablePlan.m_DisableReason = TemporalAADisableReason::CoreCapabilityUnavailable;
+			TemporalFramePlanResolveInfo unavailablePlanInfo = activePlanInfo;
+			unavailablePlanInfo.m_Capabilities = {};
+			const ResolvedTemporalFramePlan unavailablePlan =
+				ResolveTemporalFramePlan(unavailablePlanInfo);
 			TemporalFrameTransaction unavailableTransaction;
 			unavailableTransaction.Begin(
 				viewHistory, objectHistory, unavailablePlan, 128, 72, &historyManager);
@@ -8271,21 +8279,60 @@ namespace gglab
 				SceneExtensionTemporalParticipation::TemporalUnsupported;
 			const ResolvedTemporalFramePlan unsupportedExtensionPlan =
 				ResolveTemporalFramePlan(unsupportedExtensionInfo);
-			context.Check(activePlan.m_Active && activePlan.m_CoreAvailable &&
-				activePlan.m_Status == TemporalAAFrameStatus::Active &&
-				activePlan.m_DisableReason == TemporalAADisableReason::None &&
+			const auto temporalAAOf = [](const ResolvedTemporalFramePlan& plan) noexcept
+				{
+					return plan.GetConsumer(TemporalConsumer::TemporalAA);
+				};
+			const auto unavailableBecause = [&](const ResolvedTemporalFramePlan& plan,
+				TemporalConsumerDisableReason reason) noexcept
+				{
+					return temporalAAOf(plan).m_Requested &&
+						temporalAAOf(plan).m_Status == TemporalConsumerStatus::Unavailable &&
+						temporalAAOf(plan).m_DisableReason == reason &&
+						plan.m_Services == TemporalService::None;
+				};
+			context.Check(temporalAAOf(activePlan).IsActive() && activePlan.m_CoreAvailable &&
+				temporalAAOf(activePlan).m_DisableReason == TemporalConsumerDisableReason::None &&
 				activePlan.m_ResetIdentity == 17 && activePlan.m_SessionIdentity == 23 &&
-				!disabledPlan.m_Active &&
-				disabledPlan.m_Status == TemporalAAFrameStatus::Disabled &&
-				disabledPlan.m_DisableReason == TemporalAADisableReason::NotRequested &&
-				missingCorePlan.m_DisableReason ==
-					TemporalAADisableReason::CoreCapabilityUnavailable &&
-				ineligiblePlan.m_DisableReason == TemporalAADisableReason::DisplayViewIneligible &&
-				missingDepthVelocityPlan.m_DisableReason ==
-					TemporalAADisableReason::DepthVelocityPathUnavailable &&
-				unsupportedExtensionPlan.m_DisableReason ==
-					TemporalAADisableReason::SceneExtensionUnsupported,
-				"Temporal frame plan resolves one atomic active state and preserves every disable cause");
+				!temporalAAOf(disabledPlan).IsActive() &&
+				!temporalAAOf(disabledPlan).m_Requested &&
+				temporalAAOf(disabledPlan).m_Status == TemporalConsumerStatus::Disabled &&
+				temporalAAOf(disabledPlan).m_DisableReason ==
+					TemporalConsumerDisableReason::NotRequested &&
+				unavailableBecause(missingCorePlan,
+					TemporalConsumerDisableReason::CoreCapabilityUnavailable) &&
+				unavailableBecause(ineligiblePlan,
+					TemporalConsumerDisableReason::DisplayViewIneligible) &&
+				unavailableBecause(missingDepthVelocityPlan,
+					TemporalConsumerDisableReason::DepthVelocityPathUnavailable) &&
+				unavailableBecause(unsupportedExtensionPlan,
+					TemporalConsumerDisableReason::SceneExtensionUnsupported),
+				"Temporal AA consumer resolves one atomic active state and preserves every disable cause");
+
+			constexpr TemporalService allServices = TemporalService::ProjectionJitter |
+				TemporalService::GeometryMotion | TemporalService::FrameContinuity |
+				TemporalService::ColorDepthHistory;
+			TemporalFramePlanResolveInfo referenceInfo = disabledInfo;
+			referenceInfo.m_ReferenceRequested = true;
+			const ResolvedTemporalFramePlan referencePlan = ResolveTemporalFramePlan(referenceInfo);
+			const TemporalConsumerPlan& reference =
+				referencePlan.GetConsumer(TemporalConsumer::Reference);
+			context.Check(activePlan.m_Services == allServices &&
+				temporalAAOf(activePlan).m_Services == allServices &&
+				activePlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
+				!activePlan.GetConsumer(TemporalConsumer::Reference).m_Requested &&
+				disabledPlan.m_Services == TemporalService::None &&
+				!disabledPlan.GetProjectionJitterOwner() &&
+				referencePlan.m_Services == TemporalService::ProjectionJitter &&
+				reference.m_Requested && reference.IsActive() &&
+				reference.m_Services == TemporalService::ProjectionJitter &&
+				referencePlan.GetProjectionJitterOwner() == TemporalConsumer::Reference &&
+				!temporalAAOf(referencePlan).IsActive() &&
+				!referencePlan.HasService(TemporalService::GeometryMotion) &&
+				!referencePlan.HasService(TemporalService::FrameContinuity) &&
+				!referencePlan.HasService(TemporalService::ColorDepthHistory),
+				"A frame enables exactly the union of its active consumers' services; with no "
+				"active consumer it enables none, and only a jitter-removing consumer owns jitter");
 
 			context.Check(IsTemporalAADisplayViewEligible(RenderViewID::Main, 1920, 1080) &&
 				IsTemporalAADisplayViewEligible(RenderViewID::DebugCamera0, 1, 1) &&
@@ -8307,12 +8354,13 @@ namespace gglab
 			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
 			const ResolvedTemporalFramePlan integratedExtensionPlan =
 				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
-			context.Check(forwardPlan.m_Active && forwardPlan.m_DepthVelocityPathAvailable &&
-				forwardWithoutClaimPlan.m_Active &&
+			context.Check(temporalAAOf(forwardPlan).IsActive() &&
+				forwardPlan.m_DepthVelocityPathAvailable &&
+				temporalAAOf(forwardWithoutClaimPlan).IsActive() &&
 				forwardPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::PostTAA &&
-				forwardPlan.m_DisableReason == TemporalAADisableReason::None &&
-				!integratedExtensionPlan.m_Active &&
+				temporalAAOf(forwardPlan).m_DisableReason == TemporalConsumerDisableReason::None &&
+				!temporalAAOf(integratedExtensionPlan).IsActive() &&
 				integratedExtensionPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::TemporalUnsupported,
 				"The Forward+ pipeline exposes its velocity path and rejects unsupported integrated extensions");
@@ -8347,9 +8395,12 @@ namespace gglab
 				Vector3(0.0f, 0.0f, view.m_Near), view.m_RasterProj).m_RawDepth;
 			const float farRawDepth = ProjectPosition(
 				Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
-			context.Check(viewPlan.m_Requested && !viewPlan.m_CoreAvailable &&
-				!viewPlan.m_Active && viewPlan.m_DisableReason ==
-					TemporalAADisableReason::CoreCapabilityUnavailable &&
+			context.Check(viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_Requested &&
+				!viewPlan.m_CoreAvailable &&
+				!viewPlan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
+				viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_DisableReason ==
+					TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
+				viewPlan.m_Services == TemporalService::None &&
 				unavailableTransaction.GetState() == TemporalFrameTransactionState::Committed &&
 				NearlyEqual(unavailableTransaction.GetJitterPixels(), Vector2::Zero) &&
 				!unavailableTransaction.ParticipatedInResolve() &&
@@ -8506,8 +8557,7 @@ namespace gglab
 
 			ResolvedViewRenderSettings biasedSettings = enabledSettings;
 			biasedSettings.m_TemporalAA.m_TextureLodBiasOffset = -0.75f;
-			ResolvedTemporalFramePlan inactivePlan = activePlan;
-			inactivePlan.m_Active = false;
+			const ResolvedTemporalFramePlan& inactivePlan = disabledPlan;
 			const auto buildBiasedView = [&](const ResolvedTemporalFramePlan& plan) noexcept
 				{
 					return viewBuilder.Build<RenderViewID::Main>({

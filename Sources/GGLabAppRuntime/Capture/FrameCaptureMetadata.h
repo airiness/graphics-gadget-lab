@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -42,13 +43,27 @@ namespace gglab
 		float m_FarPlane = 0.0f;
 	};
 
+	// One temporal consumer of the frame's plan and the services it contributed.
+	struct FrameCaptureTemporalConsumer
+	{
+		std::string m_Name;
+		bool m_Requested = false;
+		std::string m_Status;
+		std::string m_DisableReason;
+		std::vector<std::string> m_Services;
+	};
+
 	// Temporal state of the frame a capture recorded. Settings are the resolved
 	// display-view settings; the resolve may still be disabled or unavailable.
 	struct FrameCaptureTemporalState
 	{
+		// Temporal AA consumer state; m_Consumers records every consumer.
 		bool m_Requested = false;
 		std::string m_Status;
 		std::string m_DisableReason;
+		std::vector<FrameCaptureTemporalConsumer> m_Consumers;
+		// Services the frame enabled: the union of the active consumers' services.
+		std::vector<std::string> m_Services;
 		uint64_t m_SessionIdentity = 0;
 		uint64_t m_ResetIdentity = 0;
 		uint32_t m_JitterIndex = 0;
@@ -68,6 +83,8 @@ namespace gglab
 		float m_TextureLodBias = 0.0f;
 		std::array<uint32_t, 2> m_RenderExtent{};
 		std::array<uint32_t, 2> m_DisplayExtent{};
+		// Render width over display width.
+		float m_RenderScale = 1.0f;
 	};
 
 	// Camera-path sequence frame a capture belongs to.

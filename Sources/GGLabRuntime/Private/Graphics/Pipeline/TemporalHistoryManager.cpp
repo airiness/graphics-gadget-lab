@@ -80,9 +80,13 @@ namespace gglab
 			return {};
 		}
 
-		if (!plan.m_Active)
+		if (!plan.HasService(TemporalService::ColorDepthHistory))
 		{
-			Invalidate(plan.m_Requested && plan.m_Status == TemporalAAFrameStatus::Unavailable
+			// The color/depth history belongs to the Temporal AA consumer.
+			const TemporalConsumerPlan& temporalAA =
+				plan.GetConsumer(TemporalConsumer::TemporalAA);
+			Invalidate(temporalAA.m_Requested &&
+				temporalAA.m_Status == TemporalConsumerStatus::Unavailable
 				? TemporalHistoryResetReason::AvailabilityChanged
 				: TemporalHistoryResetReason::Disabled);
 			return {};

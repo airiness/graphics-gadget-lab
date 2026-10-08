@@ -45,19 +45,21 @@ namespace gglab
 		float scenePreExposure, std::optional<TemporalReferenceSample> referenceSample,
 		TemporalReferenceAccumulator* referenceAccumulator) noexcept
 	{
-		GGLAB_ASSERT_MSG(!referenceSample || !plan.m_Active,
-			"A temporal reference sample requires Temporal AA to be inactive.");
-		GGLAB_ASSERT_MSG(!plan.m_Active || IsTemporalColorCompatible(
+		GGLAB_ASSERT_MSG(referenceSample.has_value() ==
+			plan.IsConsumerActive(TemporalConsumer::Reference),
+			"A temporal reference sample is exactly the active reference consumer.");
+		GGLAB_ASSERT_MSG(!plan.HasService(TemporalService::ColorDepthHistory) ||
+			IsTemporalColorCompatible(
 			ActiveTemporalColorAbi,
 			PostProcessColorState::SceneLinearRec709, scenePreExposure),
-			"The active temporal path requires positive finite scene pre-exposure.");
+			"Temporal color history requires positive finite scene pre-exposure.");
 		GGLAB_ASSERT_MSG(m_State != TemporalFrameTransactionState::Pending,
 			"A pending temporal frame transaction must be ended before "
 			"it can be reused.");
 		m_ViewHistory = &viewHistory;
 		m_ObjectHistory = &objectHistory;
 		m_HistoryManager = historyManager;
-		m_ReferenceSample = plan.m_Active ? std::nullopt : referenceSample;
+		m_ReferenceSample = referenceSample;
 		m_ReferenceAccumulator = m_ReferenceSample ? referenceAccumulator : nullptr;
 		m_Plan = plan;
 		m_ColorAbi = ActiveTemporalColorAbi;
@@ -68,18 +70,28 @@ namespace gglab
 		m_Height = height;
 		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, width, height, m_ColorAbi)
 										: TemporalHistoryFrameState{};
-		m_HasCompatiblePreviousView = plan.m_Active && IsCompatible(viewHistory) &&
-			(!historyManager || (m_HistoryFrame.m_PreviousValid &&
-				m_HistoryFrame.m_PreviousPreExposure == viewHistory.m_Committed.m_PreExposure));
+		m_HasCompatiblePreviousView =
+			plan.HasService(TemporalService::FrameContinuity) && IsCompatible(viewHistory) &&
+			(!historyManager || !plan.HasService(TemporalService::ColorDepthHistory) ||
+				(m_HistoryFrame.m_PreviousValid &&
+					m_HistoryFrame.m_PreviousPreExposure == viewHistory.m_Committed.m_PreExposure));
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_FrameIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextFrameIndex : 0;
-		m_JitterPixels =
-			plan.m_Active ? temporal::GetJitterSamplePixels(m_JitterIndex) : Vector2::Zero;
-		if (m_ReferenceSample)
+		m_JitterPixels = Vector2::Zero;
+		// Only the consumer whose resolve removes the jitter selects its sequence.
+		switch (plan.GetProjectionJitterOwner().value_or(TemporalConsumer::Count))
 		{
-			// The reference owns the jitter phase and removes it by averaging.
+		case TemporalConsumer::TemporalAA:
+			m_JitterPixels = temporal::GetJitterSamplePixels(m_JitterIndex);
+			break;
+		case TemporalConsumer::Reference:
+			GGLAB_ASSERT_MSG(m_ReferenceSample.has_value(),
+				"The active reference consumer carries its sample.");
 			m_JitterIndex = m_ReferenceSample->m_Index;
 			m_JitterPixels = GetTemporalReferenceJitterPixels(m_ReferenceSample->m_Index);
+			break;
+		case TemporalConsumer::Count:
+			break;
 		}
 		m_HasPendingView = false;
 		m_PendingObjects.clear();
@@ -103,7 +115,7 @@ namespace gglab
 		}
 		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
 			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
-		if (m_Plan.m_Active || m_ReferenceSample)
+		if (m_Plan.HasService(TemporalService::ProjectionJitter))
 		{
 			const Vector2 jitterNDC =
 				temporal::JitterPixelsToNDC(m_JitterPixels, m_Width, m_Height);
@@ -176,7 +188,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending,
 			"Object history staging requires a pending temporal frame transaction.");
-		if (!m_Plan.m_Active)
+		if (!m_Plan.HasService(TemporalService::FrameContinuity))
 		{
 			return true;
 		}
@@ -201,8 +213,9 @@ namespace gglab
 	bool TemporalFrameTransaction::ImportHistoryResources(RenderGraph::RGBuilder& builder,
 		TemporalHistoryRenderGraphResources& outResources) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
-			"Only an active pending temporal frame can import history resources.");
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
+			m_Plan.HasService(TemporalService::ColorDepthHistory),
+			"Only a pending temporal frame with color/depth history can import it.");
 		return m_HistoryManager &&
 			m_HistoryManager->ImportRenderGraphResources(m_HistoryFrame, builder, outResources);
 	}
@@ -210,8 +223,9 @@ namespace gglab
 	bool TemporalFrameTransaction::ExportHistoryResources(RenderGraph::RGBuilder& builder,
 		const TemporalHistoryRenderGraphResources& resources) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
-			"Only an active pending temporal frame can export history resources.");
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
+			m_Plan.HasService(TemporalService::ColorDepthHistory),
+			"Only a pending temporal frame with color/depth history can export it.");
 		if (!m_HistoryManager ||
 			!m_HistoryManager->ExportRenderGraphResources(m_HistoryFrame, builder, resources))
 		{
@@ -241,8 +255,9 @@ namespace gglab
 
 	void TemporalFrameTransaction::MarkResolveParticipated() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
-			"Only an active pending temporal frame may participate in resolve.");
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
+			m_Plan.HasService(TemporalService::ColorDepthHistory),
+			"Only a pending temporal frame with color/depth history may participate in resolve.");
 		GGLAB_ASSERT_MSG(!m_HistoryManager || m_HistoryFrame.m_RenderGraphExported,
 			"Temporal history must be exported before resolve participation is committed.");
 		if (m_HistoryManager && !m_HistoryFrame.m_RenderGraphExported)
@@ -265,7 +280,8 @@ namespace gglab
 		{
 			m_ReferenceAccumulator->CommitFrame();
 		}
-		if (!m_Plan.m_Active)
+		const bool colorDepthHistory = m_Plan.HasService(TemporalService::ColorDepthHistory);
+		if (!m_Plan.HasService(TemporalService::FrameContinuity))
 		{
 			if (m_HistoryManager)
 			{
@@ -276,8 +292,8 @@ namespace gglab
 			m_State = TemporalFrameTransactionState::Committed;
 			return;
 		}
-		if (!m_HasPendingView || !m_ParticipatedInResolve ||
-			!IsTemporalColorCompatible(m_ColorAbi, PostProcessColorState::SceneLinearRec709, m_ScenePreExposure))
+		if (!m_HasPendingView || (colorDepthHistory && (!m_ParticipatedInResolve ||
+			!IsTemporalColorCompatible(m_ColorAbi, PostProcessColorState::SceneLinearRec709, m_ScenePreExposure))))
 		{
 			if (m_HistoryManager)
 			{
@@ -286,7 +302,7 @@ namespace gglab
 			m_State = TemporalFrameTransactionState::Aborted;
 			return;
 		}
-		if (m_HistoryManager)
+		if (m_HistoryManager && colorDepthHistory)
 		{
 			const bool historyCommitted = m_HistoryManager->CommitFrame(m_HistoryFrame, {
 				.m_Compatibility = {

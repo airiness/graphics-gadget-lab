@@ -859,14 +859,30 @@ namespace gglab
 				.m_Requested = true,
 				.m_Status = "active",
 				.m_DisableReason = "none",
+				.m_Consumers = {
+					{
+						.m_Name = "temporal-aa",
+						.m_Requested = true,
+						.m_Status = "active",
+						.m_DisableReason = "none",
+						.m_Services = { "projection-jitter", "geometry-motion" },
+					},
+					{
+						.m_Name = "reference",
+						.m_Status = "disabled",
+						.m_DisableReason = "not-requested",
+					},
+				},
+				.m_Services = { "projection-jitter", "geometry-motion" },
 				.m_SessionIdentity = 5,
 				.m_ResetIdentity = 9,
 				.m_JitterIndex = 3,
 				.m_JitterSequenceLength = 8,
 				.m_JitterPixels = { -0.375f, -0.0625f },
 				.m_MaxHistoryFeedback = 0.97f,
-				.m_RenderExtent = { 1280, 720 },
+				.m_RenderExtent = { 640, 360 },
 				.m_DisplayExtent = { 1280, 720 },
+				.m_RenderScale = 0.5f,
 			};
 			metadata.m_Sequence = FrameCaptureSequenceInfo{
 				.m_SequenceId = 2,
@@ -882,12 +898,17 @@ namespace gglab
 				sequenceJson.find("\"jitterSequenceLength\": 8") != std::string::npos &&
 				sequenceJson.find("-0.375") != std::string::npos &&
 				sequenceJson.find("\"maxHistoryFeedback\": 0.97") != std::string::npos &&
+				sequenceJson.find("\"name\": \"temporal-aa\"") != std::string::npos &&
+				sequenceJson.find("\"name\": \"reference\"") != std::string::npos &&
+				sequenceJson.find("\"disableReason\": \"not-requested\"") != std::string::npos &&
+				sequenceJson.find("\"geometry-motion\"") != std::string::npos &&
+				sequenceJson.find("\"renderScale\": 0.5") != std::string::npos &&
 				sequenceJson.find("\"cameraPath\": \"SEQ_Test\"") != std::string::npos &&
 				sequenceJson.find("\"cameraPathVersion\": 4") != std::string::npos &&
 				sequenceJson.find("\"frame\": 17") != std::string::npos &&
 				json.find("\"sequence\": null") != std::string::npos,
-				"Metadata records temporal state, jitter and settings, and the sequence frame "
-				"when the capture belongs to a sequence");
+				"Metadata records temporal consumers, services, jitter, settings and render "
+				"scale, and the sequence frame when the capture belongs to a sequence");
 		}
 	}
 

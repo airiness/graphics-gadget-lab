@@ -169,7 +169,7 @@ namespace gglab
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);
 		auto& gtaoResources =
 			rg.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion))
 		{
 			rg.GetBlackboard().Create<RGTemporalGeometryResources>(
 				TemporalGeometryResourcesName);
@@ -208,7 +208,7 @@ namespace gglab
 		{
 			m_ForwardPlusValidationPass.Prepare(services);
 		}
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA))
 		{
 			m_TemporalAAPass.Prepare(services);
 		}
@@ -219,7 +219,9 @@ namespace gglab
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
 			resolution = context.GetDisplayRenderView().GetResolution(),
-			depthCoverageFramePlan, temporalActive = context.GetTemporalFramePlan().m_Active,
+			depthCoverageFramePlan,
+			geometryMotion =
+				context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
@@ -325,7 +327,7 @@ namespace gglab
 				displayDepth.m_SrvDesc = sceneDepth.m_SrvDesc;
 				displayDepth.m_Convention = sceneDepth.m_Convention;
 
-				if (temporalActive)
+				if (geometryMotion)
 				{
 					auto& temporalGeometry = blackboard.Get<RGTemporalGeometryResources>(
 						TemporalGeometryResourcesName);
@@ -339,7 +341,7 @@ namespace gglab
 				}
 			});
 
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion))
 		{
 			rg.AddPass<ClearMotionVectorsPassData>(
 				"View.ClearMotionVectors",
@@ -489,7 +491,7 @@ namespace gglab
 			m_AerialPerspectivePass.AddPass(rg, context, services);
 		}
 
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA))
 		{
 			m_TemporalAAPass.AddPass(rg, context, services);
 		}
@@ -646,7 +648,8 @@ namespace gglab
 
 		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
 		m_GTAOPass.Prepare(services);
-		const bool temporalActive = context.GetTemporalFramePlan().m_Active;
+		const bool temporalActive =
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA);
 		bool temporalResolveClosureValid = false;
 		if (temporalActive)
 		{

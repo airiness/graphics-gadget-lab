@@ -104,11 +104,13 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized,
 			"Temporal AA must be prepared before graph construction.");
-		GGLAB_ASSERT_MSG(context.GetTemporalFramePlan().m_Active,
-			"Temporal AA resolve requires one active pre-frame temporal plan.");
+		const bool consumerActive =
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA);
+		GGLAB_ASSERT_MSG(consumerActive,
+			"Temporal AA resolve requires an active Temporal AA consumer in the frame plan.");
 		GGLAB_ASSERT_MSG(m_IsAvailable,
 			"Temporal resolve requires an available compute artifact and binding layout.");
-		if (!m_IsAvailable || !context.GetTemporalFramePlan().m_Active)
+		if (!m_IsAvailable || !consumerActive)
 		{
 			return;
 		}

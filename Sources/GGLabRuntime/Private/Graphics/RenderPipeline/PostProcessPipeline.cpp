@@ -59,7 +59,7 @@ namespace gglab
 						},
 				},
 		};
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().HasService(TemporalService::ColorDepthHistory))
 		{
 			GGLAB_ASSERT_NOT_NULL(context.m_TemporalFrameTransaction);
 			GGLAB_ASSERT_MSG(context.m_TemporalFrameTransaction->GetScenePreExposure() ==

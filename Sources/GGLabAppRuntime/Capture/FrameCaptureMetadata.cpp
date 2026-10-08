@@ -245,6 +245,29 @@ namespace gglab
 		writer.Bool("requested", temporal.m_Requested);
 		writer.String("status", temporal.m_Status);
 		writer.String("disableReason", temporal.m_DisableReason);
+		writer.BeginArray("consumers");
+		for (const FrameCaptureTemporalConsumer& consumer : temporal.m_Consumers)
+		{
+			writer.BeginObject();
+			writer.String("name", consumer.m_Name);
+			writer.Bool("requested", consumer.m_Requested);
+			writer.String("status", consumer.m_Status);
+			writer.String("disableReason", consumer.m_DisableReason);
+			writer.BeginArray("services");
+			for (const std::string& service : consumer.m_Services)
+			{
+				writer.String({}, service);
+			}
+			writer.EndArray();
+			writer.EndObject();
+		}
+		writer.EndArray();
+		writer.BeginArray("services");
+		for (const std::string& service : temporal.m_Services)
+		{
+			writer.String({}, service);
+		}
+		writer.EndArray();
 		writer.Unsigned("sessionIdentity", temporal.m_SessionIdentity);
 		writer.Unsigned("resetIdentity", temporal.m_ResetIdentity);
 		writer.Unsigned("jitterIndex", temporal.m_JitterIndex);
@@ -274,6 +297,7 @@ namespace gglab
 		writer.Unsigned({}, temporal.m_DisplayExtent[0]);
 		writer.Unsigned({}, temporal.m_DisplayExtent[1]);
 		writer.EndArray();
+		writer.Number("renderScale", temporal.m_RenderScale);
 		writer.EndObject();
 
 		if (metadata.m_Sequence)

@@ -183,23 +183,57 @@ namespace gglab
 			return readiness;
 		}
 
+		[[nodiscard]] std::vector<std::string> GetTemporalServiceNames(
+			TemporalService services) noexcept
+		{
+			std::vector<std::string> names;
+			for (const TemporalService service : TemporalServices)
+			{
+				if (Test(services, service))
+				{
+					names.emplace_back(GetTemporalServiceName(service));
+				}
+			}
+			return names;
+		}
+
 		[[nodiscard]] FrameCaptureTemporalState BuildCaptureTemporalState(
 			const CaptureFrameInputs& inputs) noexcept
 		{
 			const ResolvedTemporalFramePlan& plan = inputs.m_TemporalFramePlan;
+			const TemporalConsumerPlan& temporalAA =
+				plan.GetConsumer(TemporalConsumer::TemporalAA);
+			std::vector<FrameCaptureTemporalConsumer> consumers;
+			consumers.reserve(TemporalConsumerCount);
+			for (uint32_t index = 0; index < TemporalConsumerCount; ++index)
+			{
+				const auto consumer = static_cast<TemporalConsumer>(index);
+				const TemporalConsumerPlan& consumerPlan = plan.GetConsumer(consumer);
+				consumers.push_back({
+					.m_Name = std::string(GetTemporalConsumerName(consumer)),
+					.m_Requested = consumerPlan.m_Requested,
+					.m_Status = std::string(GetTemporalConsumerStatusName(consumerPlan.m_Status)),
+					.m_DisableReason = std::string(
+						GetTemporalConsumerDisableReasonName(consumerPlan.m_DisableReason)),
+					.m_Services = GetTemporalServiceNames(consumerPlan.m_Services),
+				});
+			}
 			const TemporalAASettings& settings = inputs.m_TemporalSettings;
 			const Vector2& jitter = inputs.m_TemporalFrameTransaction.GetJitterPixels();
 			const std::optional<TemporalReferenceSample>& referenceSample =
 				inputs.m_TemporalFrameTransaction.GetReferenceSample();
 			const ViewResolution& resolution = inputs.m_ViewResolution;
 			return FrameCaptureTemporalState{
-				.m_Requested = plan.m_Requested,
-				.m_Status = std::string(GetTemporalAAFrameStatusName(plan.m_Status)),
-				.m_DisableReason = std::string(GetTemporalAADisableReasonName(plan.m_DisableReason)),
+				.m_Requested = temporalAA.m_Requested,
+				.m_Status = std::string(GetTemporalConsumerStatusName(temporalAA.m_Status)),
+				.m_DisableReason = std::string(
+					GetTemporalConsumerDisableReasonName(temporalAA.m_DisableReason)),
+				.m_Consumers = std::move(consumers),
+				.m_Services = GetTemporalServiceNames(plan.m_Services),
 				.m_SessionIdentity = plan.m_SessionIdentity,
 				.m_ResetIdentity = plan.m_ResetIdentity,
 				.m_JitterIndex = inputs.m_TemporalFrameTransaction.GetJitterIndex(),
-				.m_JitterSequenceLength = plan.m_Active ? temporal::JitterSampleCount
+				.m_JitterSequenceLength = temporalAA.IsActive() ? temporal::JitterSampleCount
 					: referenceSample ? referenceSample->m_Count : 0,
 				.m_JitterPixels = { jitter.m_X, jitter.m_Y },
 				.m_MaxHistoryFeedback = settings.m_MaxHistoryFeedback,
@@ -215,10 +249,14 @@ namespace gglab
 				.m_MotionSelection =
 					std::string(GetTemporalAAMotionSelectionName(settings.m_MotionSelection)),
 				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
-				.m_TextureLodBias = plan.m_Active ? settings.m_TextureLodBiasOffset
+				.m_TextureLodBias = temporalAA.IsActive() ? settings.m_TextureLodBiasOffset
 					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,
 				.m_RenderExtent = { resolution.m_Render.m_Width, resolution.m_Render.m_Height },
 				.m_DisplayExtent = { resolution.m_Display.m_Width, resolution.m_Display.m_Height },
+				.m_RenderScale = resolution.m_Display.m_Width > 0
+					? static_cast<float>(resolution.m_Render.m_Width) /
+						static_cast<float>(resolution.m_Display.m_Width)
+					: 0.0f,
 			};
 		}
 
@@ -462,6 +500,7 @@ namespace gglab
 				.m_SessionIdentity = temporalSessionIdentity,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
+				.m_ReferenceRequested = referenceSample.has_value(),
 			});
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
