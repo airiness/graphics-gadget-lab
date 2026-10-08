@@ -449,9 +449,14 @@ ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_I
 float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 #endif
 {
-	SetMaterialTextureLodBias(IN.MaterialTextureLodBias);
-	const ShadowReceiverPlane shadowReceiver = BuildShadowReceiverPlane(IN.PositionWS);
 	MaterialData matData = g_Materials[IN.MaterialIndex];
+	// The temporal LOD bias only suits samples that the temporal resolve accumulates.
+	// Blended materials form the transparent bucket, which composes after the resolve,
+	// so they keep the asset-owned LOD until post-temporal passes receive their own
+	// display raster view.
+	SetMaterialTextureLodBias(
+		matData.AlphaMode == MaterialAlphaModeBlend ? 0.0 : IN.MaterialTextureLodBias);
+	const ShadowReceiverPlane shadowReceiver = BuildShadowReceiverPlane(IN.PositionWS);
 
 	// Get view data
 	ViewData viewData = g_Views[GetViewDataIndex(g_Pass.ViewIndex)];
