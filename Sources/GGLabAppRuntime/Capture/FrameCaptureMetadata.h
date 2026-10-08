@@ -78,6 +78,7 @@ namespace gglab
 		std::string m_HistoryFilter;
 		std::string m_CurrentFilter;
 		std::string m_MotionSelection;
+		std::string m_PostTemporalView;
 		float m_TextureLodBiasOffset = 0.0f;
 		// LOD bias the frame's material textures used.
 		float m_TextureLodBias = 0.0f;

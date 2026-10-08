@@ -2100,6 +2100,38 @@ namespace gglab
 			const auto noViews = RenderSceneBuilder::BuildViewData({}, empty);
 			context.Check(cameraOnly.m_Views.size() == moved.m_RenderViews.size() && noViews.m_Views.empty(),
 				"Empty cascade sets do not invent an uploaded shadow view");
+
+			RenderView jitteredView = mainView;
+			jitteredView.m_JitterPixels = Vector2(0.25f, -0.125f);
+			jitteredView.m_JitterUV = temporal::JitterPixelsToUV(jitteredView.m_JitterPixels,
+				jitteredView.m_Width, jitteredView.m_Height);
+			Matrix clipJitter = Matrix::Identity;
+			clipJitter.m_41 = 0.001f;
+			clipJitter.m_42 = -0.002f;
+			jitteredView.m_RasterProj = jitteredView.m_UnjitteredProj * clipJitter;
+			jitteredView.m_RasterViewProj = jitteredView.m_View * jitteredView.m_RasterProj;
+			const RenderView postTemporalView = BuildUnjitteredPostTemporalView(jitteredView);
+			const auto withPostTemporal = RenderSceneBuilder::BuildViewData(
+				moved.m_RenderViews, moved.m_DirectionalShadowFramePlan, &postTemporalView);
+			const auto withoutPostTemporal = RenderSceneBuilder::BuildViewData(
+				moved.m_RenderViews, moved.m_DirectionalShadowFramePlan);
+			const ViewGPU& postTemporalGpu =
+				withPostTemporal.m_Views[withPostTemporal.m_PostTemporalViewOffset];
+			context.Check(withPostTemporal.m_PostTemporalViewOffset ==
+					moved.m_RenderViews.size() + moved.m_DirectionalShadowFramePlan.m_Cascades.size() &&
+				withPostTemporal.m_Views.size() == withPostTemporal.m_PostTemporalViewOffset + 1 &&
+				withPostTemporal.m_ShadowViewBaseOffset == withoutPostTemporal.m_ShadowViewBaseOffset &&
+				withoutPostTemporal.m_PostTemporalViewOffset ==
+					RenderSceneBuilder::UnassignedViewOffset &&
+				postTemporalGpu.ProjMat.ToArray() == jitteredView.m_UnjitteredProj.ToArray() &&
+				postTemporalGpu.ProjMat.ToArray() != jitteredView.m_RasterProj.ToArray() &&
+				postTemporalGpu.ViewMat.ToArray() == jitteredView.m_View.ToArray() &&
+				postTemporalGpu.CurrentJitterUV.m_X == 0.0f &&
+				postTemporalGpu.CurrentJitterUV.m_Y == 0.0f &&
+				postTemporalGpu.Width == jitteredView.m_DisplayWidth &&
+				postTemporalGpu.Height == jitteredView.m_DisplayHeight,
+				"An unjittered post-temporal view uploads after the shadow views with the "
+				"unjittered projection, no jitter and the display extent");
 		}
 
 		void RunDirectionalShadowGraphTests(SelfTestContext& context) noexcept

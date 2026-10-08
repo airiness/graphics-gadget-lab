@@ -248,6 +248,8 @@ namespace gglab
 					std::string(GetTemporalAACurrentFilterName(settings.m_CurrentFilter)),
 				.m_MotionSelection =
 					std::string(GetTemporalAAMotionSelectionName(settings.m_MotionSelection)),
+				.m_PostTemporalView =
+					std::string(GetTemporalAAPostTemporalViewName(settings.m_PostTemporalView)),
 				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
 				.m_TextureLodBias = temporalAA.IsActive() ? settings.m_TextureLodBiasOffset
 					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,

@@ -1278,11 +1278,13 @@ namespace gglab
 					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
 					.m_CurrentFilter = TemporalAACurrentFilter::Point,
 					.m_MotionSelection = TemporalAAMotionSelection::Center,
+					.m_PostTemporalView = TemporalAAPostTemporalView::Jittered,
 					}, content);
 				TemporalAASettings invalidFilter = content;
 				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
 				invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
 				invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
+				invalidFilter.m_PostTemporalView = static_cast<TemporalAAPostTemporalView>(7);
 				context.Check(!overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
 					overridden.m_DepthAbsoluteThreshold == 0.25f &&
 					overridden.m_NeighborhoodClampExpansion ==
@@ -1299,6 +1301,10 @@ namespace gglab
 					content.m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
 					ResolveTemporalAASettings(invalidFilter).m_MotionSelection ==
 					TemporalAAMotionSelection::ClosestDepth &&
+					overridden.m_PostTemporalView == TemporalAAPostTemporalView::Jittered &&
+					content.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered &&
+					ResolveTemporalAASettings(invalidFilter).m_PostTemporalView ==
+					TemporalAAPostTemporalView::Unjittered &&
 					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
 					ResolveTemporalAASettings(content),
 					"Sequence Temporal AA overrides replace only set fields and stay within the "

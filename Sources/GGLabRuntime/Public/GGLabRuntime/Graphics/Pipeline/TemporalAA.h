@@ -184,6 +184,33 @@ namespace gglab
 		return "unknown";
 	}
 
+	// Projection of the display raster view with which post-temporal composition draws
+	// (transparent, depth-tested debug and post-TAA scene-extension geometry) while
+	// Temporal AA owns the jitter. The resolve does not integrate that geometry, so a
+	// jittered view moves it by the sub-pixel jitter every frame. A reference frame keeps
+	// it jittered: its average removes the jitter of everything it accumulates.
+	enum class TemporalAAPostTemporalView : uint8_t
+	{
+		// Kept for comparison: post-temporal geometry shimmers with the jitter.
+		Jittered,
+		// Stable post-temporal geometry; its edges can sit up to half a pixel from the
+		// jittered scene depth they test against. Against the jittered view it halved the
+		// static shimmer of glass guard edges and did not raise reference error or motion
+		// flicker in any evaluated region.
+		Unjittered,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAPostTemporalViewName(
+		TemporalAAPostTemporalView view) noexcept
+	{
+		switch (view)
+		{
+		case TemporalAAPostTemporalView::Jittered: return "jittered";
+		case TemporalAAPostTemporalView::Unjittered: return "unjittered";
+		}
+		return "unknown";
+	}
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -196,6 +223,7 @@ namespace gglab
 		TemporalAAHistoryFilter m_HistoryFilter = TemporalAAHistoryFilter::CatmullRomClamped;
 		TemporalAACurrentFilter m_CurrentFilter = TemporalAACurrentFilter::Gaussian;
 		TemporalAAMotionSelection m_MotionSelection = TemporalAAMotionSelection::ClosestDepth;
+		TemporalAAPostTemporalView m_PostTemporalView = TemporalAAPostTemporalView::Unjittered;
 		// Material texture LOD offset while Temporal AA is active, added to
 		// log2(render / display) (Temporal 2.0 Section 5.6).
 		float m_TextureLodBiasOffset = TemporalAADefaultTextureLodBiasOffset;
@@ -246,6 +274,11 @@ namespace gglab
 			settings.m_MotionSelection != TemporalAAMotionSelection::ClosestDepth)
 		{
 			settings.m_MotionSelection = defaults.m_MotionSelection;
+		}
+		if (settings.m_PostTemporalView != TemporalAAPostTemporalView::Jittered &&
+			settings.m_PostTemporalView != TemporalAAPostTemporalView::Unjittered)
+		{
+			settings.m_PostTemporalView = defaults.m_PostTemporalView;
 		}
 		settings.m_TextureLodBiasOffset = std::isfinite(settings.m_TextureLodBiasOffset)
 			? std::clamp(settings.m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset,

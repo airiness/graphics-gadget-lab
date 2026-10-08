@@ -53,11 +53,12 @@ namespace gglab
 	}
 
 	RenderSceneBuilder::ViewUploadData RenderSceneBuilder::BuildViewData(
-		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept
+		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades,
+		const RenderView* postTemporalView) noexcept
 	{
 		ViewUploadData result{};
 		auto& viewData = result.m_Views;
-		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size());
+		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size() + 1);
 		const auto appendView = [&viewData](const RenderView& renderView)
 		{
 			ViewGPU viewGpu{};
@@ -98,6 +99,11 @@ namespace gglab
 		{
 			appendView(cascade.m_View);
 		}
+		if (postTemporalView)
+		{
+			result.m_PostTemporalViewOffset = static_cast<uint32_t>(viewData.size());
+			appendView(*postTemporalView);
+		}
 		return result;
 	}
 
@@ -125,9 +131,11 @@ namespace gglab
 		info.m_MaterialTable.BeginUpdate();
 		info.m_LightTable.BeginUpdate();
 
-		const auto viewUpload = BuildViewData(info.m_RenderViews, info.m_DirectionalShadowFramePlan);
+		const auto viewUpload = BuildViewData(
+			info.m_RenderViews, info.m_DirectionalShadowFramePlan, info.m_PostTemporalView);
 		const auto& viewData = viewUpload.m_Views;
 		result.m_ShadowViewBaseOffset = viewUpload.m_ShadowViewBaseOffset;
+		result.m_PostTemporalViewOffset = viewUpload.m_PostTemporalViewOffset;
 
 		RenderMaterialFrameCache materialCache(
 			info.m_MaterialTable, assetManager, info.m_SamplerRegistry);

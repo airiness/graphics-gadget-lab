@@ -152,6 +152,12 @@ namespace gglab
 				settings.m_MotionSelection =
 					static_cast<TemporalAAMotionSelection>(motionSelection);
 			}
+			int postTemporalView = static_cast<int>(settings.m_PostTemporalView);
+			if (ImGui::Combo("Post-Temporal View", &postTemporalView, "Jittered\0Unjittered\0"))
+			{
+				settings.m_PostTemporalView =
+					static_cast<TemporalAAPostTemporalView>(postTemporalView);
+			}
 			ImGui::SliderFloat("Texture LOD Bias Offset", &settings.m_TextureLodBiasOffset,
 				TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset, "%.2f");
 		}

@@ -31,6 +31,7 @@ namespace gglab
 		std::optional<TemporalAAHistoryFilter> m_HistoryFilter;
 		std::optional<TemporalAACurrentFilter> m_CurrentFilter;
 		std::optional<TemporalAAMotionSelection> m_MotionSelection;
+		std::optional<TemporalAAPostTemporalView> m_PostTemporalView;
 		std::optional<float> m_TextureLodBiasOffset;
 
 		[[nodiscard]] bool IsEmpty() const noexcept;

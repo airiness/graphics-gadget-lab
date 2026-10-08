@@ -85,6 +85,13 @@ namespace gglab
 		EnsureInitialized(services);
 		const auto* contextPtr = &context;
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		// World debug geometry composes after the temporal resolve, in the display raster
+		// view of post-temporal composition.
+		const DepthCoverageRasterDomain& postTemporalDomain =
+			context.GetRenderQueue(displayViewId).m_PostTemporalRasterDomain;
+		const uint32_t viewIndex = postTemporalDomain.IsValid()
+			? postTemporalDomain.m_ViewBindingId
+			: static_cast<uint32_t>(utils::ToIndex(displayViewId));
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
 			[frame, scene, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
@@ -122,7 +129,7 @@ namespace gglab
 				data.m_Width = targets.m_DisplayWidth;
 				data.m_Height = targets.m_DisplayHeight;
 			},
-			[this, contextPtr, &services, scene, displayViewId](
+			[this, contextPtr, &services, scene, viewIndex](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -159,7 +166,7 @@ namespace gglab
 					0, std::span<const RHIVertexBufferBinding>(&binding, 1));
 
 				auto draw =
-					[this, contextPtr, commandContext, services, displayViewId](
+					[this, contextPtr, commandContext, services, viewIndex](
 						const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
 					{
 						if (range.IsEmpty())
@@ -178,7 +185,7 @@ namespace gglab
 							? RHIPrimitiveTopology::TriangleList
 							: RHIPrimitiveTopology::LineList);
 						const DebugDrawPassParameters parameters{
-							.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+							.ViewIndex = viewIndex,
 							.Flags = flags,
 						};
 						commandContext->SetPushConstants(

@@ -153,4 +153,9 @@ namespace gglab
 	};
 	[[nodiscard]] DirectionalShadowViewBuildResult BuildDirectionalShadowView(
 		const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
+
+	// The display raster view of post-temporal composition without projection jitter: the
+	// unjittered projection at the display extent. Previous-frame state is unchanged;
+	// post-temporal geometry writes no motion.
+	[[nodiscard]] RenderView BuildUnjitteredPostTemporalView(const RenderView& displayView) noexcept;
 }

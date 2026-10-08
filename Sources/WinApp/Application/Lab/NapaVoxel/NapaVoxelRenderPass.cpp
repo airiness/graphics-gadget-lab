@@ -194,7 +194,7 @@ namespace gglab
 					for (const NapaVoxelGpuSectionDraw& section : chunk.m_Sections)
 					{
 						const NapaVoxelPassParameters parameters{
-							.m_ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+							.m_ViewIndex = data.m_RasterDomain.m_ViewBindingId,
 							.m_Material = static_cast<uint32_t>(section.m_Material),
 							.m_ChunkTranslation = chunk.m_Translation,
 						};

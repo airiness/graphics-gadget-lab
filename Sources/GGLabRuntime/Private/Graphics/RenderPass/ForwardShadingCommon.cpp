@@ -234,8 +234,12 @@ namespace gglab::forward_shading
 				"Physical sun attenuation requires a transmittance descriptor.");
 			atmosphereTransmittanceIndex = transmittanceSrv.m_Index;
 		}
+		// The raster domain selects the view data: a post-temporal domain may bind its own
+		// unjittered display view.
+		const bool domainBound = inputs.m_RasterDomain && inputs.m_RasterDomain->IsValid();
 		return {
-			.m_ViewIndex = static_cast<uint32_t>(utils::ToIndex(viewId)),
+			.m_ViewIndex = domainBound ? inputs.m_RasterDomain->m_ViewBindingId
+				: static_cast<uint32_t>(utils::ToIndex(viewId)),
 			.m_ShadowMapTextureIndex = shadowSrv.IsValid() ? shadowSrv.m_Index : 0u,
 			.m_ShadowMapSamplerIndex = inputs.m_ShadowSamplerIndex,
 			.m_ShadowMapSize = inputs.m_ShadowMapSize,

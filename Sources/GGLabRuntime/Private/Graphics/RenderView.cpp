@@ -306,4 +306,23 @@ namespace gglab
 
 		return result;
 	}
+
+	RenderView BuildUnjitteredPostTemporalView(const RenderView& displayView) noexcept
+	{
+		GGLAB_ASSERT_MSG(displayView.m_IsValid && displayView.m_DisplayWidth != 0 &&
+			displayView.m_DisplayHeight != 0,
+			"An unjittered post-temporal view requires a valid displayed camera view.");
+		RenderView view = displayView;
+		view.m_RasterProj = displayView.m_UnjitteredProj;
+		view.m_RasterViewProj = displayView.m_UnjitteredViewProj;
+		view.m_InvRasterProj = displayView.m_InvUnjitteredProj;
+		view.m_InvRasterViewProj = displayView.m_InvUnjitteredViewProj;
+		view.m_DepthReconstructionParams =
+			screen_space::MakeDepthReconstructionParams(view.m_RasterProj);
+		view.m_JitterPixels = Vector2::Zero;
+		view.m_JitterUV = Vector2::Zero;
+		view.m_Width = displayView.m_DisplayWidth;
+		view.m_Height = displayView.m_DisplayHeight;
+		return view;
+	}
 }

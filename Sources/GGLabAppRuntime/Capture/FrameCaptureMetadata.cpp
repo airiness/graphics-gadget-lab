@@ -286,6 +286,7 @@ namespace gglab
 		writer.String("historyFilter", temporal.m_HistoryFilter);
 		writer.String("currentFilter", temporal.m_CurrentFilter);
 		writer.String("motionSelection", temporal.m_MotionSelection);
+		writer.String("postTemporalView", temporal.m_PostTemporalView);
 		writer.Number("textureLodBiasOffset", temporal.m_TextureLodBiasOffset);
 		writer.EndObject();
 		writer.Number("textureLodBias", temporal.m_TextureLodBias);

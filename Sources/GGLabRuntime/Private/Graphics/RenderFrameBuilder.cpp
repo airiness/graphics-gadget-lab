@@ -251,6 +251,16 @@ namespace gglab
 			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
 				.m_TemporalAA.m_Enabled,
 			"Temporal frame plan must be resolved from the display view settings.");
+		// Temporal AA does not integrate post-temporal composition, so the jitter it owns
+		// may be removed from that composition's raster view.
+		std::optional<RenderView> postTemporalView;
+		if (info.m_TemporalFramePlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
+			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_TemporalAA
+				.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered)
+		{
+			postTemporalView = BuildUnjitteredPostTemporalView(
+				result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
+		}
 
 		const bool hasMainFrustum = IsValidBuiltView(result.m_RenderViews, RenderViewID::Main);
 		const math::Frustum mainFrustum =
@@ -286,6 +296,7 @@ namespace gglab
 			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
+			.m_PostTemporalView = postTemporalView ? std::addressof(*postTemporalView) : nullptr,
 		};
 		RenderSceneBuilder::BuildResult sceneBuildResult;
 		{
@@ -306,7 +317,8 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(viewBuffer);
 
 		const auto buildQueue = [&](const RenderView& renderView, RenderQueue& renderQueue,
-			uint32_t viewBindingId, const FrustumList& queueCullFrustums)
+			uint32_t viewBindingId, uint32_t postTemporalViewBindingId,
+			const FrustumList& queueCullFrustums)
 		{
 			if (!renderView.m_IsValid)
 			{
@@ -319,15 +331,16 @@ namespace gglab
 				return;
 			}
 
-			const DepthCoverageBufferSource viewSource{
-				.m_Buffer = viewBuffer->GetBufferHandle(),
-				.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + viewBindingId,
-			};
-			const auto makeRasterDomain = [&](uint32_t width, uint32_t height) noexcept
+			const auto makeRasterDomain =
+				[&](uint32_t bindingId, uint32_t width, uint32_t height) noexcept
 				{
+					const DepthCoverageBufferSource viewSource{
+						.m_Buffer = viewBuffer->GetBufferHandle(),
+						.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + bindingId,
+					};
 					return DepthCoverageRasterDomain{
 						.m_FrameSerial = info.m_FrameSerial,
-						.m_ViewBindingId = viewBindingId,
+						.m_ViewBindingId = bindingId,
 						.m_CurrentViewSource = viewSource,
 						.m_CurrentJitteredProjectionSource = viewSource,
 						.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
@@ -357,13 +370,15 @@ namespace gglab
 				.m_RenderScene = result.m_RenderScene,
 				.m_RenderView = renderView,
 				.m_CullingFrustums = queueCullFrustums.AsSpan(),
-				.m_CoverageRasterDomain = makeRasterDomain(renderView.m_Width, renderView.m_Height),
-				// The display raster view of post-temporal composition keeps the jittered
-				// view projection; only its extent is display-domain. Views that are never
-				// displayed, such as shadow views, have none.
+				.m_CoverageRasterDomain =
+					makeRasterDomain(viewBindingId, renderView.m_Width, renderView.m_Height),
+				// The display raster view of post-temporal composition: the view itself, or
+				// its unjittered post-temporal view. Views that are never displayed, such as
+				// shadow views, have none.
 				.m_PostTemporalRasterDomain =
 					renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0
-						? makeRasterDomain(renderView.m_DisplayWidth, renderView.m_DisplayHeight)
+						? makeRasterDomain(postTemporalViewBindingId,
+							renderView.m_DisplayWidth, renderView.m_DisplayHeight)
 						: DepthCoverageRasterDomain{},
 				.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
 				.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
@@ -383,7 +398,11 @@ namespace gglab
 			const FrustumList frustums = BuildVisibilityFrustums(result.m_RenderViews,
 				renderView.m_ViewId, GetVisibilityModeForView(info.m_CameraRig, renderView.m_ViewId),
 				mainFrustum, hasMainFrustum);
-			buildQueue(renderView, result.m_RenderQueues[viewIndex], viewIndex, frustums);
+			const bool unjitteredPostTemporal = renderView.m_ViewId == result.m_DisplayViewId &&
+				sceneBuildResult.m_PostTemporalViewOffset != RenderSceneBuilder::UnassignedViewOffset;
+			buildQueue(renderView, result.m_RenderQueues[viewIndex], viewIndex,
+				unjitteredPostTemporal ? sceneBuildResult.m_PostTemporalViewOffset : viewIndex,
+				frustums);
 		}
 
 		auto& cascades = result.m_DirectionalShadowFramePlan;
@@ -391,7 +410,8 @@ namespace gglab
 		{
 			auto& cascade = cascades.m_Cascades[index];
 			// Preserve conservative all-caster submission until shadow caster culling is introduced.
-			buildQueue(cascade.m_View, cascade.m_RenderQueue, cascades.GetViewIndex(index), {});
+			buildQueue(cascade.m_View, cascade.m_RenderQueue, cascades.GetViewIndex(index),
+				cascades.GetViewIndex(index), {});
 		}
 
 		return result;

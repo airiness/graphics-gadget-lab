@@ -585,12 +585,13 @@ namespace gglab
 				camera.GetExposureCompensationEV())},
 			{.m_Name = "TAA settings", .m_Value = std::format(
 				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
-				"history {}, current {}, motion {}, texture LOD {:.2f}",
+				"history {}, current {}, motion {}, post-temporal {}, texture LOD {:.2f}",
 				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
 				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion,
 				GetTemporalAAHistoryFilterName(taa.m_HistoryFilter),
 				GetTemporalAACurrentFilterName(taa.m_CurrentFilter),
 				GetTemporalAAMotionSelectionName(taa.m_MotionSelection),
+				GetTemporalAAPostTemporalViewName(taa.m_PostTemporalView),
 				taa.m_TextureLodBiasOffset)},
 			{.m_Name = "Age bound", .m_Value = std::format(
 				"saturation {:.0f}, max {:.0f}", saturationAge, TemporalHistoryMaxAge)},

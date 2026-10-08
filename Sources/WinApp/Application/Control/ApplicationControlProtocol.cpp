@@ -218,6 +218,22 @@ namespace gglab
 					outOverrides.m_MotionSelection = *selection;
 					continue;
 				}
+				if (key == "postTemporalView")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array views{ TemporalAAPostTemporalView::Jittered,
+						TemporalAAPostTemporalView::Unjittered };
+					const auto view =
+						std::ranges::find(views, name, &GetTemporalAAPostTemporalViewName);
+					if (view == views.end())
+					{
+						return "Temporal AA override 'postTemporalView' must be 'jittered' or "
+							"'unjittered'.";
+					}
+					outOverrides.m_PostTemporalView = *view;
+					continue;
+				}
 				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
 				if (field == fields.end())
 				{
