@@ -20,6 +20,8 @@ namespace gglab
 	// Unset fields keep the content's resolved values.
 	struct FrameSequenceTemporalAAOverrides
 	{
+		// False evaluates the same sequence with Temporal AA not requested.
+		std::optional<bool> m_Enabled;
 		std::optional<float> m_MaxHistoryFeedback;
 		std::optional<float> m_DepthAbsoluteThreshold;
 		std::optional<float> m_DepthRelativeThreshold;

@@ -1251,6 +1251,7 @@ namespace gglab
 				content.m_Enabled = true;
 				content.m_DepthAbsoluteThreshold = 0.25f;
 				const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
+					.m_Enabled = false,
 					.m_MaxHistoryFeedback = 0.9f,
 					.m_NeighborhoodClampExpansion = 4.0f,
 					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
@@ -1261,7 +1262,7 @@ namespace gglab
 				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
 				invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
 				invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
-				context.Check(overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
+				context.Check(!overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
 					overridden.m_DepthAbsoluteThreshold == 0.25f &&
 					overridden.m_NeighborhoodClampExpansion ==
 					TemporalAAMaxNeighborhoodClampExpansion &&

@@ -250,7 +250,10 @@ function ConvertTo-TemporalAAOverrides([string]$Text) {
             Fail "Temporal AA override '$part' is not name=value."
         }
         $number = 0.0
-        if ([double]::TryParse($Matches[2], [Globalization.NumberStyles]::Float,
+        if ($Matches[2] -eq 'true' -or $Matches[2] -eq 'false') {
+            $overrides[$Matches[1]] = $Matches[2] -eq 'true'
+        }
+        elseif ([double]::TryParse($Matches[2], [Globalization.NumberStyles]::Float,
                 [Globalization.CultureInfo]::InvariantCulture, [ref]$number)) {
             $overrides[$Matches[1]] = $number
         }

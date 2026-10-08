@@ -12,7 +12,7 @@ namespace gglab
 {
 	bool FrameSequenceTemporalAAOverrides::IsEmpty() const noexcept
 	{
-		return !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
+		return !m_Enabled && !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
 			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
 			!m_NeighborhoodClampExpansion && !m_HistoryFilter && !m_CurrentFilter &&
 			!m_MotionSelection && !m_TextureLodBiasOffset;
@@ -22,6 +22,7 @@ namespace gglab
 		const FrameSequenceTemporalAAOverrides& overrides,
 		TemporalAASettings settings) noexcept
 	{
+		settings.m_Enabled = overrides.m_Enabled.value_or(settings.m_Enabled);
 		settings.m_MaxHistoryFeedback =
 			overrides.m_MaxHistoryFeedback.value_or(settings.m_MaxHistoryFeedback);
 		settings.m_DepthAbsoluteThreshold =

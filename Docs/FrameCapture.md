@@ -214,7 +214,8 @@ the reference jitter index and sample count.
 
 `-TemporalAA "name=value,..."` replaces display-view Temporal AA settings for
 every frame of the sequence, so one replay evaluates one configuration from the
-history reset at frame 0. The names are `maxHistoryFeedback`,
+history reset at frame 0. The names are `enabled` (`true` or `false`),
+`maxHistoryFeedback`,
 `depthAbsoluteThreshold`, `depthRelativeThreshold`, `velocityWeightScale`,
 `luminanceWeightScale` and `neighborhoodClampExpansion`, `historyFilter`
 (`catmull-rom-clamped`, the default, or `bilinear`) and `currentFilter`

@@ -161,6 +161,15 @@ namespace gglab
 			} };
 			for (const auto& [key, fieldValue] : value.items())
 			{
+				if (key == "enabled")
+				{
+					if (!fieldValue.is_boolean())
+					{
+						return "Temporal AA override 'enabled' must be a boolean.";
+					}
+					outOverrides.m_Enabled = fieldValue.get<bool>();
+					continue;
+				}
 				if (key == "historyFilter")
 				{
 					const std::string name =
