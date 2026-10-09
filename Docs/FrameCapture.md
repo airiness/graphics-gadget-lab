@@ -226,8 +226,9 @@ history reset at frame 0. The names are `enabled` (`true` or `false`),
 (`catmull-rom-clamped`, the default, or `bilinear`) and `currentFilter`
 (`gaussian`, the default, or `point`), `motionSelection` (`closest-depth`, the
 default, or `center`), `postTemporalView` (`unjittered`, the default, or `jittered`:
-the raster view of transparent and debug geometry drawn after the resolve) and
-`textureLodBiasOffset` (-2 to 1, default -1, the material
+the raster view of transparent and debug geometry drawn after the resolve),
+`resolutionPreset` (`native`, the default, or `quality`: render extent 2/3 of the
+display extent while the pipeline's resolve can upscale) and `textureLodBiasOffset` (-2 to 1, default -1, the material
 texture LOD offset while Temporal AA is active); a value outside the setting's range
 is rejected rather than clamped. Unset settings keep the
 content's values, and sidecars record the effective settings in `temporal`.

@@ -8366,6 +8366,72 @@ namespace gglab
 				"A frame enables exactly the union of its active consumers' services; with no "
 				"active consumer it enables none, and only a jitter-removing consumer owns jitter");
 
+			TemporalFramePlanResolveInfo qualityInfo = resolveInfo;
+			qualityInfo.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
+			TemporalFramePlanResolveInfo upscalingInfo = qualityInfo;
+			upscalingInfo.m_TemporalUpscalingAvailable = true;
+			TemporalFramePlanResolveInfo disabledUpscalingInfo = upscalingInfo;
+			disabledUpscalingInfo.m_Settings.m_Enabled = false;
+			TemporalFramePlanResolveInfo referenceUpscalingInfo = disabledUpscalingInfo;
+			referenceUpscalingInfo.m_ReferenceRequested = true;
+			const ResolvedTemporalFramePlan upscalingPlan = ResolveTemporalFramePlan(upscalingInfo);
+			context.Check(
+				ResolveTemporalFramePlan(qualityInfo).m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Native &&
+				upscalingPlan.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
+				upscalingPlan.GetJitterSequenceLength() == 18 &&
+				activePlan.GetJitterSequenceLength() == 8 &&
+				ResolveTemporalFramePlan(disabledUpscalingInfo).m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Native &&
+				ResolveTemporalFramePlan(referenceUpscalingInfo).m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Native,
+				"A render scale below native applies only to an active Temporal AA consumer "
+				"whose pipeline resolve can upscale");
+
+			const ViewResolution quality720 = ResolveTemporalAAViewResolution(
+				{ 1280, 720 }, TemporalAAResolutionPreset::Quality);
+			const ViewResolution quality1080 = ResolveTemporalAAViewResolution(
+				{ 1920, 1080 }, TemporalAAResolutionPreset::Quality);
+			context.Check(
+				ResolveTemporalAAViewResolution({ 1280, 720 }, TemporalAAResolutionPreset::Native) ==
+					ResolveNativeViewResolution({ 1280, 720 }) &&
+				quality720.m_Render == ViewExtent{ 853, 480 } &&
+				quality720.m_Display == ViewExtent{ 1280, 720 } && !quality720.IsNative() &&
+				quality1080.m_Render == ViewExtent{ 1280, 720 } &&
+				ResolveTemporalAAViewResolution({ 1, 1 }, TemporalAAResolutionPreset::Quality)
+					.m_Render == ViewExtent{ 1, 1 },
+				"Quality renders at the nearest 2/3 of each display dimension, never below a pixel");
+
+			bool qualityJitterExtendsNative = true;
+			bool qualityJitterInsidePixel = true;
+			bool qualityJitterDistinct = true;
+			constexpr uint32_t qualityLength =
+				GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Quality);
+			for (uint32_t index = 0; index < qualityLength; ++index)
+			{
+				const Vector2 sample = temporal::GetJitterSamplePixels(index, qualityLength);
+				if (index < temporal::JitterSampleCount)
+				{
+					const Vector2 native = temporal::GetJitterSamplePixels(index);
+					qualityJitterExtendsNative &=
+						sample.m_X == native.m_X && sample.m_Y == native.m_Y;
+				}
+				qualityJitterInsidePixel &= sample.m_X >= -0.5f && sample.m_X < 0.5f &&
+					sample.m_Y >= -0.5f && sample.m_Y < 0.5f;
+				for (uint32_t other = 0; other < index; ++other)
+				{
+					const Vector2 previous = temporal::GetJitterSamplePixels(other, qualityLength);
+					qualityJitterDistinct &=
+						previous.m_X != sample.m_X || previous.m_Y != sample.m_Y;
+				}
+			}
+			const Vector2 wrapped = temporal::GetJitterSamplePixels(qualityLength, qualityLength);
+			const Vector2 first = temporal::GetJitterSamplePixels(0, qualityLength);
+			context.Check(qualityJitterExtendsNative && qualityJitterInsidePixel &&
+				qualityJitterDistinct && wrapped.m_X == first.m_X && wrapped.m_Y == first.m_Y,
+				"The Quality jitter sequence extends the native Halton(2,3) phases to 18 distinct "
+				"in-pixel samples and wraps at its length");
+
 			context.Check(IsTemporalAADisplayViewEligible(RenderViewID::Main, 1920, 1080) &&
 				IsTemporalAADisplayViewEligible(RenderViewID::DebugCamera0, 1, 1) &&
 				!IsTemporalAADisplayViewEligible(RenderViewID::DirectionalShadow, 1920, 1080) &&
@@ -8601,6 +8667,16 @@ namespace gglab
 				};
 			TemporalAASettings outOfRangeBias{};
 			outOfRangeBias.m_TextureLodBiasOffset = -5.0f;
+			const RenderView qualityBiasedView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = biasedSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Resolution = ResolveTemporalAAViewResolution(
+					{ 1920, 1080 }, TemporalAAResolutionPreset::Quality),
+			});
+			context.Check(NearlyEqual(qualityBiasedView.m_TextureLodBias,
+				std::log2(1280.0f / 1920.0f) - 0.75f),
+				"The texture LOD bias adds log2(render / display) to the temporal offset");
 			context.Check(buildBiasedView(activePlan).m_TextureLodBias == -0.75f &&
 				buildBiasedView(inactivePlan).m_TextureLodBias == 0.0f &&
 				temporalShadowView.m_TextureLodBias == 0.0f &&

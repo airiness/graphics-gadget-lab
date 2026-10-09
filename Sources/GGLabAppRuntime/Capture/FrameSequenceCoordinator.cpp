@@ -15,7 +15,8 @@ namespace gglab
 		return !m_Enabled && !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
 			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
 			!m_NeighborhoodClampExpansion && !m_HistoryFilter && !m_CurrentFilter &&
-			!m_MotionSelection && !m_PostTemporalView && !m_TextureLodBiasOffset;
+			!m_MotionSelection && !m_PostTemporalView && !m_ResolutionPreset &&
+			!m_TextureLodBiasOffset;
 	}
 
 	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
@@ -41,6 +42,8 @@ namespace gglab
 			overrides.m_MotionSelection.value_or(settings.m_MotionSelection);
 		settings.m_PostTemporalView =
 			overrides.m_PostTemporalView.value_or(settings.m_PostTemporalView);
+		settings.m_ResolutionPreset =
+			overrides.m_ResolutionPreset.value_or(settings.m_ResolutionPreset);
 		settings.m_TextureLodBiasOffset =
 			overrides.m_TextureLodBiasOffset.value_or(settings.m_TextureLodBiasOffset);
 		return ResolveTemporalAASettings(settings);

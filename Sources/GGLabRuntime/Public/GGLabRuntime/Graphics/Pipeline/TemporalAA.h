@@ -210,6 +210,79 @@ namespace gglab
 		return "unknown";
 	}
 
+	// Render resolution of the display view relative to its display extent while the
+	// Temporal AA resolve upscales. The preset is fixed for a session; changing it
+	// changes the render extent, which resets history.
+	enum class TemporalAAResolutionPreset : uint8_t
+	{
+		Native,
+		// Render extent 2/3 of the display extent (scale 1 / 1.5).
+		Quality,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAResolutionPresetName(
+		TemporalAAResolutionPreset preset) noexcept
+	{
+		switch (preset)
+		{
+		case TemporalAAResolutionPreset::Native: return "native";
+		case TemporalAAResolutionPreset::Quality: return "quality";
+		}
+		return "unknown";
+	}
+
+	// Render extent over display extent as an exact ratio, so that extents and jitter
+	// sequence lengths derive without floating-point rounding.
+	struct TemporalAARenderScale
+	{
+		uint32_t m_Numerator = 1;
+		uint32_t m_Denominator = 1;
+
+		bool operator==(const TemporalAARenderScale&) const noexcept = default;
+	};
+
+	[[nodiscard]] constexpr TemporalAARenderScale GetTemporalAARenderScale(
+		TemporalAAResolutionPreset preset) noexcept
+	{
+		return preset == TemporalAAResolutionPreset::Quality
+			? TemporalAARenderScale{ .m_Numerator = 2, .m_Denominator = 3 }
+			: TemporalAARenderScale{};
+	}
+
+	// Render extent of one display dimension: rounded to the nearest pixel, at least one.
+	[[nodiscard]] constexpr uint32_t ScaleTemporalAAExtent(
+		uint32_t displayExtent, TemporalAARenderScale scale) noexcept
+	{
+		const uint64_t scaled = (static_cast<uint64_t>(displayExtent) * scale.m_Numerator +
+			scale.m_Denominator / 2u) / scale.m_Denominator;
+		return std::max(static_cast<uint32_t>(scaled), displayExtent > 0 ? 1u : 0u);
+	}
+
+	[[nodiscard]] constexpr ViewResolution ResolveTemporalAAViewResolution(
+		ViewExtent display, TemporalAAResolutionPreset preset) noexcept
+	{
+		const TemporalAARenderScale scale = GetTemporalAARenderScale(preset);
+		return ViewResolution{
+			.m_Render = { ScaleTemporalAAExtent(display.m_Width, scale),
+				ScaleTemporalAAExtent(display.m_Height, scale) },
+			.m_Display = display,
+		};
+	}
+
+	// Distinct jitter phases per display pixel grow with the inverse pixel area of the
+	// render grid: ceil(8 / r^2) render-pixel Halton(2, 3) samples, 8 at native and 18
+	// at Quality.
+	[[nodiscard]] constexpr uint32_t GetTemporalAAJitterSequenceLength(
+		TemporalAAResolutionPreset preset) noexcept
+	{
+		const TemporalAARenderScale scale = GetTemporalAARenderScale(preset);
+		const uint32_t numeratorSquared = scale.m_Numerator * scale.m_Numerator;
+		return (8u * scale.m_Denominator * scale.m_Denominator + numeratorSquared - 1u) /
+			numeratorSquared;
+	}
+	static_assert(GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Native) == 8);
+	static_assert(GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Quality) == 18);
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -223,6 +296,9 @@ namespace gglab
 		TemporalAACurrentFilter m_CurrentFilter = TemporalAACurrentFilter::Gaussian;
 		TemporalAAMotionSelection m_MotionSelection = TemporalAAMotionSelection::ClosestDepth;
 		TemporalAAPostTemporalView m_PostTemporalView = TemporalAAPostTemporalView::Unjittered;
+		// Requested render resolution; it applies only while the Temporal AA consumer is
+		// active and the pipeline's resolve can upscale.
+		TemporalAAResolutionPreset m_ResolutionPreset = TemporalAAResolutionPreset::Native;
 		// Material texture LOD offset while Temporal AA is active, added to
 		// log2(render / display).
 		float m_TextureLodBiasOffset = TemporalAADefaultTextureLodBiasOffset;
@@ -278,6 +354,11 @@ namespace gglab
 			settings.m_PostTemporalView != TemporalAAPostTemporalView::Unjittered)
 		{
 			settings.m_PostTemporalView = defaults.m_PostTemporalView;
+		}
+		if (settings.m_ResolutionPreset != TemporalAAResolutionPreset::Native &&
+			settings.m_ResolutionPreset != TemporalAAResolutionPreset::Quality)
+		{
+			settings.m_ResolutionPreset = defaults.m_ResolutionPreset;
 		}
 		settings.m_TextureLodBiasOffset = std::isfinite(settings.m_TextureLodBiasOffset)
 			? std::clamp(settings.m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset,
@@ -477,6 +558,9 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		bool m_DisplayViewEligible = false;
 		bool m_DepthVelocityPathAvailable = false;
+		// The pipeline's resolve reconstructs the display extent from a smaller render
+		// extent; without it every frame renders at native resolution.
+		bool m_TemporalUpscalingAvailable = false;
 		// A supersampled reference sample is due this frame. It excludes Temporal AA.
 		bool m_ReferenceRequested = false;
 	};
@@ -491,6 +575,9 @@ namespace gglab
 		std::array<TemporalConsumerPlan, TemporalConsumerCount> m_Consumers{};
 		// Union of the active consumers' services.
 		TemporalService m_Services = TemporalService::None;
+		// Effective render resolution of the display view: the requested preset while the
+		// Temporal AA consumer is active and the resolve can upscale, native otherwise.
+		TemporalAAResolutionPreset m_ResolutionPreset = TemporalAAResolutionPreset::Native;
 		uint64_t m_ResetIdentity = 0;
 		uint64_t m_SessionIdentity = 0;
 		bool m_CoreAvailable = false;
@@ -525,6 +612,11 @@ namespace gglab
 				}
 			}
 			return std::nullopt;
+		}
+
+		[[nodiscard]] constexpr uint32_t GetJitterSequenceLength() const noexcept
+		{
+			return GetTemporalAAJitterSequenceLength(m_ResolutionPreset);
 		}
 
 		bool operator==(const ResolvedTemporalFramePlan&) const noexcept = default;
@@ -621,25 +713,40 @@ namespace gglab
 		}
 		GGLAB_ASSERT_MSG(jitterOwnerCount <= 1,
 			"At most one active temporal consumer owns the projection jitter.");
+		if (plan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
+			info.m_TemporalUpscalingAvailable)
+		{
+			plan.m_ResolutionPreset = info.m_Settings.m_ResolutionPreset;
+		}
 		return plan;
 	}
 
 	namespace temporal
 	{
-		inline constexpr uint32_t JitterSampleCount = 8;
-		inline constexpr std::array<Vector2, JitterSampleCount> JitterSamplesPixels = {
-			Vector2(0.0f, -1.0f / 6.0f),
-			Vector2(-1.0f / 4.0f, 1.0f / 6.0f),
-			Vector2(1.0f / 4.0f, -7.0f / 18.0f),
-			Vector2(-3.0f / 8.0f, -1.0f / 18.0f),
-			Vector2(1.0f / 8.0f, 5.0f / 18.0f),
-			Vector2(-1.0f / 8.0f, -5.0f / 18.0f),
-			Vector2(3.0f / 8.0f, 1.0f / 18.0f),
-			Vector2(-7.0f / 16.0f, 7.0f / 18.0f),
-		};
-		[[nodiscard]] constexpr Vector2 GetJitterSamplePixels(uint32_t sequenceIndex) noexcept
+		// Jitter sequence length at native resolution.
+		inline constexpr uint32_t JitterSampleCount =
+			GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Native);
+
+		[[nodiscard]] constexpr double HaltonRadicalInverse(uint32_t index, uint32_t base) noexcept
 		{
-			return JitterSamplesPixels[sequenceIndex % JitterSampleCount];
+			double fraction = 1.0;
+			double result = 0.0;
+			while (index > 0)
+			{
+				fraction /= static_cast<double>(base);
+				result += fraction * static_cast<double>(index % base);
+				index /= base;
+			}
+			return result;
+		}
+
+		// Halton(2, 3) indices 1..length, centred on the pixel, in render pixels.
+		[[nodiscard]] constexpr Vector2 GetJitterSamplePixels(
+			uint32_t sequenceIndex, uint32_t sequenceLength = JitterSampleCount) noexcept
+		{
+			const uint32_t index = sequenceIndex % std::max(sequenceLength, 1u) + 1u;
+			return Vector2(static_cast<float>(HaltonRadicalInverse(index, 2) - 0.5),
+				static_cast<float>(HaltonRadicalInverse(index, 3) - 0.5));
 		}
 
 		[[nodiscard]] inline Vector2 JitterPixelsToUV(

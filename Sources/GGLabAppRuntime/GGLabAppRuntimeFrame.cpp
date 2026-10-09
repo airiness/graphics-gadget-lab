@@ -233,7 +233,7 @@ namespace gglab
 				.m_SessionIdentity = plan.m_SessionIdentity,
 				.m_ResetIdentity = plan.m_ResetIdentity,
 				.m_JitterIndex = inputs.m_TemporalFrameTransaction.GetJitterIndex(),
-				.m_JitterSequenceLength = temporalAA.IsActive() ? temporal::JitterSampleCount
+				.m_JitterSequenceLength = temporalAA.IsActive() ? plan.GetJitterSequenceLength()
 					: referenceSample ? referenceSample->m_Count : 0,
 				.m_JitterPixels = { jitter.m_X, jitter.m_Y },
 				.m_MaxHistoryFeedback = settings.m_MaxHistoryFeedback,
@@ -250,6 +250,8 @@ namespace gglab
 					std::string(GetTemporalAAMotionSelectionName(settings.m_MotionSelection)),
 				.m_PostTemporalView =
 					std::string(GetTemporalAAPostTemporalViewName(settings.m_PostTemporalView)),
+				.m_ResolutionPreset =
+					std::string(GetTemporalAAResolutionPresetName(settings.m_ResolutionPreset)),
 				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
 				.m_TextureLodBias = temporalAA.IsActive() ? settings.m_TextureLodBiasOffset
 					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,
@@ -511,13 +513,14 @@ namespace gglab
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 				.m_ReferenceRequested = referenceSample.has_value(),
 			});
+		// The window client extent is the display extent; the plan's effective preset
+		// derives the render extent from it.
+		const ViewResolution viewResolution = ResolveTemporalAAViewResolution(
+			{ m_WindowWidth, m_WindowHeight }, temporalFramePlan.m_ResolutionPreset);
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
-			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
-			displayViewSettings.m_Exposure.m_PreExposure, referenceSample);
-		// The window client extent is the display extent. Camera views render at it until
-		// temporal upscaling defines a render scale.
-		const ViewResolution viewResolution =
-			ResolveNativeViewResolution({ m_WindowWidth, m_WindowHeight });
+			rendererFrame, temporalFramePlan, viewResolution.m_Render.m_Width,
+			viewResolution.m_Render.m_Height, displayViewSettings.m_Exposure.m_PreExposure,
+			referenceSample);
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),

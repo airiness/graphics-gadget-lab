@@ -234,6 +234,22 @@ namespace gglab
 					outOverrides.m_PostTemporalView = *view;
 					continue;
 				}
+				if (key == "resolutionPreset")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array presets{ TemporalAAResolutionPreset::Native,
+						TemporalAAResolutionPreset::Quality };
+					const auto preset =
+						std::ranges::find(presets, name, &GetTemporalAAResolutionPresetName);
+					if (preset == presets.end())
+					{
+						return "Temporal AA override 'resolutionPreset' must be 'native' or "
+							"'quality'.";
+					}
+					outOverrides.m_ResolutionPreset = *preset;
+					continue;
+				}
 				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
 				if (field == fields.end())
 				{

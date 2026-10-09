@@ -158,6 +158,12 @@ namespace gglab
 				settings.m_PostTemporalView =
 					static_cast<TemporalAAPostTemporalView>(postTemporalView);
 			}
+			int resolutionPreset = static_cast<int>(settings.m_ResolutionPreset);
+			if (ImGui::Combo("Resolution", &resolutionPreset, "Native\0Quality (1/1.5)\0"))
+			{
+				settings.m_ResolutionPreset =
+					static_cast<TemporalAAResolutionPreset>(resolutionPreset);
+			}
 			ImGui::SliderFloat("Texture LOD Bias Offset", &settings.m_TextureLodBiasOffset,
 				TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset, "%.2f");
 		}

@@ -82,7 +82,8 @@ namespace gglab
 		switch (plan.GetProjectionJitterOwner().value_or(TemporalConsumer::Count))
 		{
 		case TemporalConsumer::TemporalAA:
-			m_JitterPixels = temporal::GetJitterSamplePixels(m_JitterIndex);
+			m_JitterPixels =
+				temporal::GetJitterSamplePixels(m_JitterIndex, plan.GetJitterSequenceLength());
 			break;
 		case TemporalConsumer::Reference:
 			GGLAB_ASSERT_MSG(m_ReferenceSample.has_value(),
@@ -326,7 +327,7 @@ namespace gglab
 
 		m_ViewHistory->m_Committed = m_PendingView;
 		m_ViewHistory->m_NextJitterIndex =
-			(m_JitterIndex + 1) % temporal::JitterSampleCount;
+			(m_JitterIndex + 1) % m_Plan.GetJitterSequenceLength();
 		// Wraps after 2^32 frames; consumers use it only as a noise seed.
 		m_ViewHistory->m_NextFrameIndex = m_FrameIndex + 1;
 		m_ViewHistory->m_Valid = true;
