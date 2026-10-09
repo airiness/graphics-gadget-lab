@@ -6,8 +6,10 @@ its Research Lounge presentation with a U-shaped coastal retreat, a continuous
 L-shaped mineral roof, an open rear gallery and a same-level sea terrace.
 Four pale piers support the glazed terrace roof; glass guards keep the ocean
 view open. A straight timber dock, mooring pile and red/white lifebuoy establish
-the arrival route. Roof glazing retainers and drainage, stair upstands, inset
-planters and supported seating complete the construction details.
+the arrival route. Roof glazing retainers, graded collectors and open roof
+outlets complete the weather details without external downpipes. Stair guards
+retain the stepped openings beneath their glass, with supported posts and clips.
+Inset planters and supported seating complete the construction details.
 Keep the `.gltf`, adjacent `.bin` and `Textures/` directory together.
 All geometry and textures are original project work; see the
 [asset notices](../THIRD_PARTY_NOTICES.md#original-project-assets).
@@ -20,8 +22,8 @@ verification use the installed glTF Separate bundle directly. No asset
 generation step or additional asset repository is required. The SHA-256 values
 below identify the shipped files independently of authoring history.
 
-The bundle has 554 unique glTF meshes, 742 placed mesh nodes, 769 total nodes,
-206,264 unique / 1,304,222 placed triangles, twenty-three opaque materials,
+The bundle has 546 unique glTF meshes, 734 placed mesh nodes, 761 total nodes,
+205,048 unique / 1,303,006 placed triangles, twenty-three opaque materials,
 one transparent glass material, twelve saved cameras and one reference Sun.
 The glazing includes 28 roof panes and 70 guard panes. Twenty-four original
 1024-square PNGs form eight PBR map sets: Retreat lime, stone, timber, sea and
@@ -38,8 +40,8 @@ blending does not establish physically correct glass refraction or transmission.
 
 | Installed file | SHA-256 |
 | --- | --- |
-| `GGLabCoastalRetreat.bin` | `37e5946c63b4595b65f56e139de3ca9e24f6b3c6f0e40279e64075d921a38e3f` |
-| `GGLabCoastalRetreat.gltf` | `ad85500288c58f66accc96dbb3992eae7f435fc7835ab12df8127aa38f2c7da4` |
+| `GGLabCoastalRetreat.bin` | `cd48c435a38ae2d4d894bcfe58ced5222c993e0e486de7bbfcbe98b0d30143ae` |
+| `GGLabCoastalRetreat.gltf` | `13b113fab61cc791896d146b85c27cadec194f82011b250828087de864c9bb0e` |
 | `Textures/CoastalRock_BaseColor.png` | `56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9` |
 | `Textures/CoastalRock_MetallicRoughness.png` | `4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342` |
 | `Textures/CoastalRock_Normal.png` | `d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8` |
@@ -146,27 +148,33 @@ default. See [Frame Capture](../../../Docs/FrameCapture.md) for sidecars and
 cross-backend comparisons. Import checks and shader compilation alone do not
 establish visual correctness.
 
-Installed-bundle verification on 2026-10-08: Debug WinApp and ShaderCompiler
+Installed-bundle verification on 2026-10-09: Debug WinApp and ShaderCompiler
 built with the x64-hosted MSVC toolchain, with zero build errors or warnings.
-`app-content-registration` passed all 314 checks against the installed public
+`app-content-registration` passed all 321 checks against the installed public
 assets, including all 24 named materials and their placed triangle counts,
 texture decoding/mips, orthonormal imported vertex frames, camera/exposure
 restoration and the six registered temporal camera-path contracts. Both upper
 front armrest bevels had maximum coincident normal delta 0.000173, below 0.0005.
 
-The source acceptance retained world-space sofa-leg positions/normals/UVs and
-all unrelated authored state, exercised complete construction negative fixtures,
-and verified two byte-identical 26-file exports. Both the physical and shipped
+The source acceptance removed exactly eight independent objects: two stair
+upstands, two downpipes, their stays and splash pads. All retained meshes,
+object transforms, material bindings, packed images, cameras and lighting remain
+exact. Geometry checks retain the post bases, glass clips, stepped stair
+openings, roof falls, collector seats and open scuppers. Negative fixtures reject
+a displaced stair pane, a blocked stair opening and the existing construction
+contact/void failures; the historical detail profile still passes unchanged.
+Two 26-file exports are byte-identical. Both the physical and shipped
 Runtime-profile glTF were reimported and checked for geometry, supports,
-construction joints and open routes.
+construction joints and open routes. Four focused Blender views review the
+stair edges, post base, rear canopy and roof outlet.
 
 Fresh hidden DX12 and Vulkan sessions loaded the normal Debug executable and
-this public bundle directly. Each captured all thirteen reference views at
+this public bundle directly. Each captured all fourteen reference views at
 1280 x 800 after 64 settled frames, with DevTools disabled and every readiness
-gate ready. All 26 images and sidecars were reviewed; both sessions exited 0.
-All thirteen cross-backend pairs passed `MaxMeanError=1`,
+gate ready. All 28 images and sidecars were reviewed; both sessions exited 0.
+All fourteen cross-backend pairs passed `MaxMeanError=1`,
 `MaxDifferingPercent=1` and channel threshold 8. Maximum mean absolute RGB error
-was 0.4979 / 255; at most 0.02% of pixels exceeded the threshold. Compared
+was 0.4979 / 255; at most 0.0201% of pixels exceeded the threshold. Compared
 presentation settings agreed; only `time.totalTime` differed.
 
 No assertion, validation error or upload failure was reported. Both backends
