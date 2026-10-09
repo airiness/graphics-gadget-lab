@@ -252,11 +252,15 @@ namespace gglab
 				.m_TemporalAA.m_Enabled,
 			"Temporal frame plan must be resolved from the display view settings.");
 		// Temporal AA does not integrate post-temporal composition, so the jitter it owns
-		// may be removed from that composition's raster view.
+		// may be removed from that composition's raster view. Below native resolution the
+		// jittered view does not exist at the display extent, so the view is unjittered.
 		std::optional<RenderView> postTemporalView;
+		const RenderView& builtDisplayView =
+			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)];
 		if (info.m_TemporalFramePlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
-			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_TemporalAA
-				.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered)
+			(result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_TemporalAA
+				.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered ||
+				!builtDisplayView.GetResolution().IsNative()))
 		{
 			postTemporalView = BuildUnjitteredPostTemporalView(
 				result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);

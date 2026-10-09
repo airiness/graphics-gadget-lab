@@ -916,6 +916,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

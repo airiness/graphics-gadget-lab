@@ -496,6 +496,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\BrdfLutWhiteFurnace.hlsl" />

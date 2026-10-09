@@ -105,6 +105,11 @@ namespace gglab
 				desc.m_DepthWriteEnable = false;
 				desc.m_DepthCompareOp = RHICompareOp::Equal;
 				break;
+			case DepthPreset::AlwaysZWrite:
+				desc.m_DepthTestEnable = true;
+				desc.m_DepthWriteEnable = true;
+				desc.m_DepthCompareOp = RHICompareOp::Always;
+				break;
 			case DepthPreset::StandardZWrite:
 			default:
 				desc.m_DepthTestEnable = true;

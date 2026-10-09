@@ -121,6 +121,10 @@ namespace gglab
 		// recipe always provides the depth/velocity path. A lost resolve closure is a
 		// frame contract failure in ValidateRenderFrame, not a capability.
 		info.m_DepthVelocityPathAvailable = true;
+		// The resolve reconstructs the display extent from a smaller render extent. Material
+		// diagnostics render at native resolution, so the frames after one that showed them
+		// stay native.
+		info.m_TemporalUpscalingAvailable = !m_MaterialDiagnosticsShown;
 		const SceneExtensionTemporalParticipation participation = m_SceneExtension
 			? m_SceneExtension->GetTemporalParticipation()
 			: SceneExtensionTemporalParticipation::PostTAA;
@@ -147,6 +151,7 @@ namespace gglab
 		}
 		const FramePlan framePlan = std::move(*m_FramePlan);
 		m_FramePlan.reset();
+		m_MaterialDiagnosticsShown = context.m_RenderScene.m_HasMaterialDiagnostics;
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
 			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
@@ -222,6 +227,8 @@ namespace gglab
 			depthCoverageFramePlan,
 			geometryMotion =
 				context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
+			temporalAAActive =
+				context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
@@ -239,8 +246,8 @@ namespace gglab
 				GGLAB_ASSERT_MSG((resolution.m_Display ==
 					ViewExtent{ swapChain->GetBufferWidth(), swapChain->GetBufferHeight() }),
 					"The display extent of a validated frame equals the swap-chain extent.");
-				GGLAB_ASSERT_MSG(resolution.IsNative(),
-					"Render scales below the display extent arrive with temporal upscaling.");
+				GGLAB_ASSERT_MSG(resolution.IsNative() || temporalAAActive,
+					"Render extents below the display extent require the Temporal AA resolve.");
 				const uint32_t width = resolution.m_Render.m_Width;
 				const uint32_t height = resolution.m_Render.m_Height;
 
@@ -318,11 +325,23 @@ namespace gglab
 				sceneDepth.m_Convention = displayDepthConvention;
 
 				// Display depth of post-temporal composition. At native resolution it is the
-				// scene depth itself. The display color is published at the temporal boundary,
-				// after the pre-temporal passes that may replace the scene color.
+				// scene depth itself; below it, the temporal resolve fills a display-extent
+				// depth. The display color is published at the temporal boundary, after the
+				// pre-temporal passes that may replace the scene color.
 				auto& displayDepth =
 					blackboard.GetOrCreate<RGDisplayDepthResources>(DisplayDepthResourcesName);
-				displayDepth.m_Texture = sceneDepth.m_Texture;
+				if (resolution.IsNative())
+				{
+					displayDepth.m_Texture = sceneDepth.m_Texture;
+				}
+				else
+				{
+					RHITextureDesc displayDepthDesc = depthBufferDesc;
+					displayDepthDesc.m_Extent =
+						{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
+					displayDepth.m_Texture =
+						builder.CreateTexture("DisplayView.DisplayDepth", displayDepthDesc);
+				}
 				displayDepth.m_DsvDesc = sceneDepth.m_DsvDesc;
 				displayDepth.m_SrvDesc = sceneDepth.m_SrvDesc;
 				displayDepth.m_Convention = sceneDepth.m_Convention;
@@ -660,7 +679,7 @@ namespace gglab
 		FramePlan plan{
 			.m_FrameSerial = context.m_FrameSerial,
 			.m_DepthCoverage = BuildDepthCoverageFramePlanForFrame(
-				context, swapChain->GetBufferWidth(), swapChain->GetBufferHeight()),
+				context, displayView.m_Width, displayView.m_Height),
 		};
 		const DepthCoverageFramePlan& depthCoverage = plan.m_DepthCoverage;
 		plan.m_ForwardPlusStatus = depthCoverage.m_HasDepthCoverageDraws

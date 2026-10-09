@@ -41,6 +41,8 @@ namespace gglab::forward_shading
 		uint32_t m_ForwardPlusGlobalLightCount = 0;
 		std::array<uint32_t, 2> m_ForwardPlusGlobalLightIndices01{};
 		std::array<uint32_t, 2> m_ForwardPlusGlobalLightIndices23{};
+		// The Forward+ tile grid and GTAO are render-domain and indexed by raster pixel;
+		// only pre-temporal shading binds them.
 		uint32_t m_GTAOTextureIndex = 0;
 		uint32_t m_GTAOFlags = 0;
 	};

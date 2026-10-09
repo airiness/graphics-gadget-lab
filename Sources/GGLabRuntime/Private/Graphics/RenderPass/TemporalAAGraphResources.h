@@ -18,6 +18,10 @@ namespace gglab
 		// rejection reason, previous U, previous V. TemporalHistoryColor carries
 		// current accumulated color; TemporalHistoryAge carries normalized NextAge.
 		RGTextureId m_ReprojectionDiagnostics{};
+		// Display-extent raw depth of the nearest render sample, resolved when the render
+		// extent is smaller; it becomes the post-temporal display depth.
+		RGTextureId m_DisplayDepthSource{};
+		// Display extent of the resolve output.
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 

@@ -16,10 +16,11 @@ static const uint TAA_HISTORY_AGE_PREVIEW_BIT = 0x20000000u;
 static const uint TAA_HISTORY_CATMULL_ROM_BIT = 0x10000000u;
 static const uint TAA_CURRENT_GAUSSIAN_BIT = 0x08000000u;
 static const uint TAA_CLOSEST_DEPTH_MOTION_BIT = 0x04000000u;
+static const uint TAA_DISPLAY_DEPTH_BIT = 0x02000000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
 	TAA_HISTORY_AGE_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT |
-	TAA_CURRENT_GAUSSIAN_BIT | TAA_CLOSEST_DEPTH_MOTION_BIT;
+	TAA_CURRENT_GAUSSIAN_BIT | TAA_CLOSEST_DEPTH_MOTION_BIT | TAA_DISPLAY_DEPTH_BIT;
 // exp(-2.29 (d / 0.75)^2): Blackman-Harris approximated by a Gaussian of 0.75 pixels.
 static const float TAA_CURRENT_GAUSSIAN_KERNEL_SCALE = 2.29 / (0.75 * 0.75);
 static const float TAA_HISTORY_INITIAL_AGE = 1.0;
@@ -106,10 +107,13 @@ float3 SampleTemporalHistoryCatmullRomClamped(Texture2D<float4> history,
 
 // Current color at the output pixel centre, reconstructed from the 3x3 neighborhood.
 // The jitter shifts rendered geometry by +jitterPixels, so the sample of the
-// neighbor at offset o lies at o - jitterPixels from the centre. Each sample is
-// weighted by exp(-kernelScale * distance^2); non-finite samples use centerColor.
+// neighbor at offset o lies at o - jitterPixels from the centre of the render pixel.
+// outputOffset is the output position relative to that centre, in render pixels; zero
+// when render and output pixels coincide. Each sample is weighted by
+// exp(-kernelScale * distance^2) in render pixels; non-finite samples use centerColor.
 float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
-	uint2 pixel, uint2 extent, float2 jitterPixels, float kernelScale, float3 centerColor)
+	uint2 pixel, uint2 extent, float2 jitterPixels, float2 outputOffset, float kernelScale,
+	float3 centerColor)
 {
 	const int2 maxPixel = int2(extent) - 1;
 	float3 sum = 0.0.xxx;
@@ -126,7 +130,7 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 			{
 				sampleColor = centerColor;
 			}
-			const float2 offset = float2(x, y) - jitterPixels;
+			const float2 offset = float2(x, y) - jitterPixels - outputOffset;
 			const float weight = exp(-kernelScale * dot(offset, offset));
 			sum += sampleColor * weight;
 			weightSum += weight;

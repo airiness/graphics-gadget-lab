@@ -132,6 +132,8 @@ namespace gglab
 		RenderPassAtmosphere m_AtmospherePass;
 		RenderPassAerialPerspective m_AerialPerspectivePass;
 		RenderPassTemporalAA m_TemporalAAPass;
+		// Whether the last built frame showed material diagnostics.
+		bool m_MaterialDiagnosticsShown = false;
 		RenderPassTemporalReference m_TemporalReferencePass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		PostProcessPipeline m_PostProcessPipeline;

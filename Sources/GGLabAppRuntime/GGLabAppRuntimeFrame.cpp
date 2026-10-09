@@ -39,6 +39,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <format>
 #include <optional>
 #include <span>
@@ -253,7 +254,11 @@ namespace gglab
 				.m_ResolutionPreset =
 					std::string(GetTemporalAAResolutionPresetName(settings.m_ResolutionPreset)),
 				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
-				.m_TextureLodBias = temporalAA.IsActive() ? settings.m_TextureLodBiasOffset
+				// The view applies log2(render / display) on top of the temporal offset.
+				.m_TextureLodBias = temporalAA.IsActive()
+					? std::log2(static_cast<float>(resolution.m_Render.m_Width) /
+						static_cast<float>(resolution.m_Display.m_Width)) +
+						settings.m_TextureLodBiasOffset
 					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,
 				.m_RenderExtent = { resolution.m_Render.m_Width, resolution.m_Render.m_Height },
 				.m_DisplayExtent = { resolution.m_Display.m_Width, resolution.m_Display.m_Height },

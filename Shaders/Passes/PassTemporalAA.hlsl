@@ -20,7 +20,9 @@ struct TemporalAAPassParameters
 	uint PackedMaxHistoryFeedbackAndClampExpansion;
 	float VelocityWeightScale;
 	float LuminanceWeightScale;
-	uint Padding0;
+	// Display-extent depth for post-temporal composition, written when the render
+	// extent is smaller than the display extent.
+	uint DisplayDepthUavIndex;
 };
 
 ConstantBuffer<TemporalAAPassParameters> g_Pass : register(b2);
@@ -28,27 +30,37 @@ ConstantBuffer<TemporalAAPassParameters> g_Pass : register(b2);
 [numthreads(8, 8, 1)]
 void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
-	Texture2D<float4> currentColorTexture = GetTexture2DFloat4(g_Pass.CurrentColorIndex);
+	// The resolve writes display pixels from render-domain color, depth and motion. At
+	// native resolution the two extents coincide and every render position is exact.
+	RWTexture2D<float4> resolvedColor =
+		GetRWTexture2DFloat4(g_Pass.ResolvedColorUavIndex);
 	uint width;
 	uint height;
-	currentColorTexture.GetDimensions(width, height);
+	resolvedColor.GetDimensions(width, height);
 	const uint2 pixel = dispatchThreadId.xy;
 	if (any(pixel >= uint2(width, height)))
 	{
 		return;
 	}
+	Texture2D<float4> currentColorTexture = GetTexture2DFloat4(g_Pass.CurrentColorIndex);
+	uint renderWidth;
+	uint renderHeight;
+	currentColorTexture.GetDimensions(renderWidth, renderHeight);
+	const uint2 renderExtent = uint2(renderWidth, renderHeight);
+	const float2 renderPosition =
+		(float2(pixel) + 0.5.xx) * (float2(renderExtent) / float2(width, height));
+	const uint2 renderPixel = min(uint2(renderPosition), renderExtent - 1u);
+	const float2 outputOffset = renderPosition - (float2(renderPixel) + 0.5.xx);
 
 	Texture2D<float2> motionTexture = GetTexture2DFloat2(g_Pass.MotionIndex);
 	Texture2D<float> currentDepthTexture = GetTexture2DFloat(g_Pass.CurrentDepthIndex);
-	RWTexture2D<float4> resolvedColor =
-		GetRWTexture2DFloat4(g_Pass.ResolvedColorUavIndex);
 	RWTexture2D<float4> nextHistoryColor =
 		GetRWTexture2DFloat4(g_Pass.NextHistoryColorUavIndex);
 	RWTexture2D<float4> reprojectionDiagnostics =
 		GetRWTexture2DFloat4(g_Pass.ReprojectionDiagnosticsUavIndex);
 
 	const float2 currentUV = (float2(pixel) + 0.5.xx) / float2(width, height);
-	const float currentRawDepth = currentDepthTexture.Load(int3(pixel, 0));
+	const float currentRawDepth = currentDepthTexture.Load(int3(renderPixel, 0));
 	const uint viewIndex = g_Pass.ViewIndexAndHistoryValid & ~TAA_VIEW_FLAG_MASK;
 	const bool previousHistoryValid =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_VALID_BIT) != 0;
@@ -62,12 +74,14 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_CURRENT_GAUSSIAN_BIT) != 0;
 	const bool closestDepthMotion =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_CLOSEST_DEPTH_MOTION_BIT) != 0;
+	const bool writeDisplayDepth =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_DISPLAY_DEPTH_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
 	const float2 maxHistoryFeedbackAndClampExpansion =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedMaxHistoryFeedbackAndClampExpansion);
-	float3 centerColor = currentColorTexture.Load(int3(pixel, 0)).rgb;
+	float3 centerColor = currentColorTexture.Load(int3(renderPixel, 0)).rgb;
 	if (!IsTemporalColorFinite(centerColor))
 	{
 		centerColor = 0.0.xxx;
@@ -75,8 +89,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float3 currentColor = centerColor;
 	if (gaussianCurrent)
 	{
-		currentColor = ReconstructTemporalCurrentColor(currentColorTexture, pixel,
-			uint2(width, height), viewData.CurrentJitterUV * float2(width, height),
+		currentColor = ReconstructTemporalCurrentColor(currentColorTexture, renderPixel,
+			renderExtent, viewData.CurrentJitterUV * float2(renderExtent), outputOffset,
 			TAA_CURRENT_GAUSSIAN_KERNEL_SCALE, centerColor);
 	}
 
@@ -91,18 +105,19 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	{
 		// The sample whose motion reprojects this pixel: the centre, or the front-most
 		// depth of the 3x3 neighborhood. Background is never nearer than geometry.
-		int2 correspondencePixel = int2(pixel);
+		int2 correspondencePixel = int2(renderPixel);
 		float correspondenceDepth = currentRawDepth;
 		if (closestDepthMotion)
 		{
-			const int2 maxPixel = int2(width, height) - 1;
+			const int2 maxPixel = int2(renderExtent) - 1;
 			[unroll]
 			for (int y = -1; y <= 1; ++y)
 			{
 				[unroll]
 				for (int x = -1; x <= 1; ++x)
 				{
-					const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
+					const int2 samplePixel =
+						clamp(int2(renderPixel) + int2(x, y), 0, maxPixel);
 					const float sampleDepth = currentDepthTexture.Load(int3(samplePixel, 0));
 					if (isfinite(sampleDepth) && IsDepthNearer(
 						sampleDepth, correspondenceDepth, viewData.DepthConvention))
@@ -133,7 +148,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float2 validationPreviousRasterUV = previousRasterUV;
 		if (closestDepthMotion)
 		{
-			validationUV = (float2(correspondencePixel) + 0.5.xx) / float2(width, height);
+			validationUV = (float2(correspondencePixel) + 0.5.xx) / float2(renderExtent);
 			validationDepth = correspondenceDepth;
 			validationPreviousRasterUV = ReprojectTemporalUV(validationUV, rasterMotionUV);
 		}
@@ -205,7 +220,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	{
 		float3 neighborhoodMin;
 		float3 neighborhoodMax;
-		GetTemporalNeighborhoodRange(currentColorTexture, pixel, uint2(width, height),
+		GetTemporalNeighborhoodRange(currentColorTexture, renderPixel, renderExtent,
 			centerColor, neighborhoodMin, neighborhoodMax);
 		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y;
 		const float3 neighborhoodExtent = neighborhoodMax - neighborhoodMin;
@@ -263,4 +278,14 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		diagnosticsOutput = float4(normalizedHistoryAge.xxx, 1.0);
 	}
 	reprojectionDiagnostics[pixel] = diagnosticsOutput;
+
+	if (writeDisplayDepth)
+	{
+		// The render sample whose jittered position is nearest the display pixel centre.
+		const float2 jitterPixels = viewData.CurrentJitterUV * float2(renderExtent);
+		const uint2 depthPixel = min(uint2(max(renderPosition + jitterPixels, 0.0.xx)),
+			renderExtent - 1u);
+		RWTexture2D<float> displayDepth = GetRWTexture2DFloat(g_Pass.DisplayDepthUavIndex);
+		displayDepth[pixel] = currentDepthTexture.Load(int3(depthPixel, 0));
+	}
 }

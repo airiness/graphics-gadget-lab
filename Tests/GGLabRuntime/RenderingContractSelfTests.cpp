@@ -8484,6 +8484,12 @@ namespace gglab
 				integratedExtensionPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::TemporalUnsupported,
 				"The Forward+ pipeline exposes its velocity path and rejects unsupported integrated extensions");
+			context.Check(forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Quality &&
+				ResolveTemporalFramePlan(qualityInfo).m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Native,
+				"The Forward+ resolve upscales a requested Quality preset; a pipeline without an "
+				"upscaling resolve renders native");
 
 			Renderer renderer;
 			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),

@@ -33,10 +33,12 @@ namespace gglab
 		inline constexpr uint32_t TemporalAAHistoryCatmullRomBit = 0x10000000u;
 		inline constexpr uint32_t TemporalAACurrentGaussianBit = 0x08000000u;
 		inline constexpr uint32_t TemporalAAClosestDepthMotionBit = 0x04000000u;
+		inline constexpr uint32_t TemporalAADisplayDepthBit = 0x02000000u;
 		inline constexpr uint32_t TemporalAAViewFlagMask =
 			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit |
 			TemporalAAHistoryAgePreviewBit | TemporalAAHistoryCatmullRomBit |
-			TemporalAACurrentGaussianBit | TemporalAAClosestDepthMotionBit;
+			TemporalAACurrentGaussianBit | TemporalAAClosestDepthMotionBit |
+			TemporalAADisplayDepthBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -55,7 +57,7 @@ namespace gglab
 			uint32_t m_PackedMaxHistoryFeedbackAndClampExpansion = 0;
 			float m_VelocityWeightScale = 0.0f;
 			float m_LuminanceWeightScale = 0.0f;
-			uint32_t m_Padding0 = 0;
+			uint32_t m_DisplayDepthUavIndex = 0;
 		};
 		static_assert(IsPassRootConstantStruct<TemporalAAPassParameters>);
 		static_assert(sizeof(TemporalAAPassParameters) == 64);
@@ -79,12 +81,28 @@ namespace gglab
 			RGTextureViewId m_NextHistoryColorUav{};
 			RGTextureViewId m_NextHistoryDepthUav{};
 			RGTextureViewId m_ReprojectionDiagnosticsUav{};
+			RGTextureViewId m_DisplayDepthUav{};
 			TemporalAAPassParameters m_Parameters{};
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			// Render extent of the depth that the next depth history copies.
 			uint32_t m_DepthWidth = 0;
 			uint32_t m_DepthHeight = 0;
+		};
+
+		struct TemporalAADisplayDepthPassParameters
+		{
+			uint32_t m_SourceDepthIndex = 0;
+			uint32_t m_Padding[3]{};
+		};
+		static_assert(IsPassRootConstantStruct<TemporalAADisplayDepthPassParameters>);
+
+		struct TemporalAADisplayDepthPassData
+		{
+			RGTextureViewId m_SourceSrv{};
+			RGTextureViewId m_Dsv{};
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
 		};
 
 		struct TemporalAAResolvedColorInitializePassData
@@ -109,8 +127,28 @@ namespace gglab
 		m_DepthHistoryPipelineRecipe.m_CSId = shaderManager->LoadProgram(
 			shader_programs::TemporalAADepthHistoryCompute);
 		m_DepthHistoryPipelineRecipe.m_BindingLayout = m_PipelineRecipe.m_BindingLayout;
+
+		// Converts the resolved display depth into the D32 post-temporal display depth.
+		m_DisplayDepthPipelineKey.m_BindingLayout = m_PipelineRecipe.m_BindingLayout;
+		m_DisplayDepthPipelineKey.m_InputLayoutId = InputLayoutID::None;
+		m_DisplayDepthPipelineKey.m_VSId =
+			shaderManager->LoadProgram(shader_programs::TemporalAADisplayDepthVertex);
+		m_DisplayDepthPipelineKey.m_PSId =
+			shaderManager->LoadProgram(shader_programs::TemporalAADisplayDepthPixel);
+		m_DisplayDepthPipelineKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+		m_DisplayDepthPipelineKey.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+		m_DisplayDepthPipelineKey.m_Formats.m_RenderTargetCount = 0;
+		m_DisplayDepthPipelineKey.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
+		m_DisplayDepthPipelineKey.m_Formats.m_SampleCount = 1;
+		m_DisplayDepthPipelineKey.m_Formats.m_SampleQuality = 0;
+		m_DisplayDepthPipelineKey.m_RasterizerPreset = RasterizerPreset::Default;
+		m_DisplayDepthPipelineKey.m_BlendPreset = BlendPreset::Default;
+		m_DisplayDepthPipelineKey.m_DepthPreset = DepthPreset::AlwaysZWrite;
+
 		m_IsAvailable = m_PipelineRecipe.m_CSId.IsValid() &&
 			m_DepthHistoryPipelineRecipe.m_CSId.IsValid() &&
+			m_DisplayDepthPipelineKey.m_VSId.IsValid() &&
+			m_DisplayDepthPipelineKey.m_PSId.IsValid() &&
 			m_PipelineRecipe.m_BindingLayout.IsValid();
 	}
 
@@ -185,11 +223,10 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				const RHITextureDesc& currentColorDesc =
 					builder.GetTextureDesc(targets.m_SceneColor);
-				// The resolve output is display-domain. It reconstructs one output pixel per
-				// render pixel until temporal upscaling separates the extents.
-				GGLAB_ASSERT_MSG(currentColorDesc.m_Extent.m_Width == targets.m_DisplayWidth &&
-					currentColorDesc.m_Extent.m_Height == targets.m_DisplayHeight,
-					"Temporal AA resolves at the display extent of its render-domain input.");
+				// The resolve reads render-domain inputs and writes display-domain outputs.
+				GGLAB_ASSERT_MSG(currentColorDesc.m_Extent.m_Width == targets.m_RenderWidth &&
+					currentColorDesc.m_Extent.m_Height == targets.m_RenderHeight,
+					"Temporal AA reads scene color at the render extent.");
 				RHITextureDesc outputDesc{};
 				outputDesc.m_Format = TemporalAAResolvedColorFormat;
 				outputDesc.m_Extent = { targets.m_DisplayWidth, targets.m_DisplayHeight, 1u };
@@ -294,9 +331,8 @@ namespace gglab
 					data.m_PreviousDepthSrv = data.m_CurrentDepthSrv;
 				}
 
-				const RHITextureDesc& currentColorDesc = builder.GetTextureDesc(currentColor);
-				resources.m_Width = currentColorDesc.m_Extent.m_Width;
-				resources.m_Height = currentColorDesc.m_Extent.m_Height;
+				resources.m_Width = targets.m_DisplayWidth;
+				resources.m_Height = targets.m_DisplayHeight;
 				data.m_Width = resources.m_Width;
 				data.m_Height = resources.m_Height;
 				GGLAB_ASSERT_MSG(resources.m_ResolvedSceneColor.IsValid(),
@@ -333,6 +369,24 @@ namespace gglab
 					builder.CreateView<RHITextureViewType::UnorderedAccess>(
 						resources.m_History.m_NextDepth);
 
+				// Below native resolution post-temporal composition needs a display-extent
+				// depth; at native it tests against the scene depth itself.
+				const bool resolveDisplayDepth = targets.m_RenderWidth != targets.m_DisplayWidth ||
+					targets.m_RenderHeight != targets.m_DisplayHeight;
+				if (resolveDisplayDepth)
+				{
+					RHITextureDesc displayDepthDesc{};
+					displayDepthDesc.m_Format = RHIFormat::R32Float;
+					displayDepthDesc.m_Extent = { targets.m_DisplayWidth, targets.m_DisplayHeight, 1u };
+					resources.m_DisplayDepthSource =
+						builder.CreateTexture("TAA.DisplayDepthSource", displayDepthDesc);
+					builder.WriteInPlace(resources.m_DisplayDepthSource,
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_DisplayDepthUav =
+						builder.CreateView<RHITextureViewType::UnorderedAccess>(
+							resources.m_DisplayDepthSource);
+				}
+
 				data.m_Parameters = {
 					.m_LinearClampSamplerIndex = linearClampSamplerIndex,
 					.m_PointClampSamplerIndex = pointClampSamplerIndex,
@@ -354,7 +408,8 @@ namespace gglab
 						(temporalAASettings.m_MotionSelection ==
 							TemporalAAMotionSelection::ClosestDepth
 							? TemporalAAClosestDepthMotionBit
-							: 0u),
+							: 0u) |
+						(resolveDisplayDepth ? TemporalAADisplayDepthBit : 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),
@@ -366,8 +421,10 @@ namespace gglab
 					.m_LuminanceWeightScale = temporalAASettings.m_LuminanceWeightScale,
 				};
 				// Still update history, but diagnostic MRTs describe this frame's raw
-				// radiance and coverage, not the temporally reconstructed image.
-				if (!targets.m_MaterialDiagnosticColor.IsValid())
+				// radiance and coverage, not the temporally reconstructed image. Material
+				// diagnostics render at native resolution; a frame that discovers them at a
+				// smaller render extent shows the resolved image instead.
+				if (!targets.m_MaterialDiagnosticColor.IsValid() || resolveDisplayDepth)
 				{
 					targets.m_DisplayColor = resources.m_ResolvedSceneColor;
 				}
@@ -414,6 +471,14 @@ namespace gglab
 				parameters.m_ResolvedColorUavIndex = resolvedColor.m_Index;
 				parameters.m_NextHistoryColorUavIndex = nextHistoryColor.m_Index;
 				parameters.m_ReprojectionDiagnosticsUavIndex = diagnostics.m_Index;
+				if (data.m_DisplayDepthUav.IsValid())
+				{
+					const auto displayDepth =
+						executeContext.GetViewDescriptor(data.m_DisplayDepthUav);
+					GGLAB_ASSERT_MSG(displayDepth.IsValid(),
+						"The resolved display depth must be shader visible before dispatch.");
+					parameters.m_DisplayDepthUavIndex = displayDepth.m_Index;
+				}
 
 				// The next depth history copies the render-domain scene depth; the resolve
 				// neither reads nor writes it, so the dispatches need no barrier between them.
@@ -449,12 +514,77 @@ namespace gglab
 						TemporalAAThreadGroupSize,
 					1);
 			});
+
+		AddDisplayDepthPass(rg, services, displayViewId);
+	}
+
+	void RenderPassTemporalAA::AddDisplayDepthPass(RenderGraph& rg,
+		const RenderServices& services, RenderViewID displayViewId) noexcept
+	{
+		auto& blackboard = rg.GetBlackboard();
+		const auto* resources = blackboard.TryGet<RGTemporalAAResources>(TemporalAAResourcesName);
+		if (!resources || !resources->m_DisplayDepthSource.IsValid())
+		{
+			return;
+		}
+		rg.AddPass<TemporalAADisplayDepthPassData>(
+			"PostProcess.TemporalAA.DisplayDepth",
+			[displayViewId](RenderGraph::RGBuilder& builder, TemporalAADisplayDepthPassData& data)
+			{
+				auto& blackboard = builder.GetBlackboard();
+				const auto& resources =
+					blackboard.Get<RGTemporalAAResources>(TemporalAAResourcesName);
+				const auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
+					.GetViewTargets(displayViewId);
+				auto& displayDepth =
+					blackboard.Get<RGDisplayDepthResources>(DisplayDepthResourcesName);
+				const RHITextureDesc& depthDesc = builder.GetTextureDesc(displayDepth.m_Texture);
+				GGLAB_ASSERT_MSG(depthDesc.m_Extent.m_Width == targets.m_DisplayWidth &&
+					depthDesc.m_Extent.m_Height == targets.m_DisplayHeight,
+					"The resolved display depth fills the display-extent depth target.");
+
+				const RGTextureId source = builder.Read(resources.m_DisplayDepthSource,
+					RGTextureAccess::Sample, RHIStage::PixelShader);
+				data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(source);
+				builder.WriteInPlace(displayDepth.m_Texture, RGTextureAccess::DepthStencilWrite);
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
+					displayDepth.m_Texture, displayDepth.m_DsvDesc);
+				data.m_Width = targets.m_DisplayWidth;
+				data.m_Height = targets.m_DisplayHeight;
+			},
+			[this, services](RGExecuteContext& executeContext, TemporalAADisplayDepthPassData& data)
+			{
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				GGLAB_ASSERT_NOT_NULL(commandContext);
+				const auto source = executeContext.GetViewDescriptor(data.m_SourceSrv);
+				const RHITextureViewHandle dsv = executeContext.GetViewHandle(data.m_Dsv);
+				GGLAB_ASSERT_MSG(source.IsValid() && dsv.IsValid(),
+					"The display depth conversion needs its source and depth views.");
+				commandContext->BeginRendering({
+					.m_DepthAttachment = RHIRenderingAttachment{
+						.m_View = dsv,
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					},
+				});
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPipeline(GetOrCreateDisplayDepthPipeline(services));
+				const TemporalAADisplayDepthPassParameters parameters{
+					.m_SourceDepthIndex = source.m_Index,
+				};
+				commandContext->SetPushConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				commandContext->DrawFullscreenTriangle();
+			});
 	}
 
 	bool RenderPassTemporalAA::ValidatePipelineClosure(const RenderServices& services) noexcept
 	{
 		return m_IsAvailable && GetOrCreatePipeline(services).IsValid() &&
-			GetOrCreateDepthHistoryPipeline(services).IsValid();
+			GetOrCreateDepthHistoryPipeline(services).IsValid() &&
+			GetOrCreateDisplayDepthPipeline(services).IsValid();
 	}
 
 	RHIPipelineHandle RenderPassTemporalAA::GetOrCreatePipeline(
@@ -474,5 +604,14 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(
 			m_DepthHistoryPipelineSlot, m_DepthHistoryPipelineRecipe, GetInfo());
+	}
+
+	RHIPipelineHandle RenderPassTemporalAA::GetOrCreateDisplayDepthPipeline(
+		const RenderServices& services) noexcept
+	{
+		auto* pipelineCache = services.m_PipelineResolver;
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		return pipelineCache->Resolve(
+			m_DisplayDepthPipelineSlot, m_DisplayDepthPipelineKey, GetInfo());
 	}
 }

@@ -30,14 +30,20 @@ namespace gglab
 		[[nodiscard]] bool ValidatePipelineClosure(const RenderServices& services) noexcept;
 
 	private:
+		void AddDisplayDepthPass(RenderGraph& rg, const RenderServices& services,
+			RenderViewID displayViewId) noexcept;
 		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const RenderServices& services) noexcept;
 		[[nodiscard]] RHIPipelineHandle GetOrCreateDepthHistoryPipeline(
+			const RenderServices& services) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreateDisplayDepthPipeline(
 			const RenderServices& services) noexcept;
 
 		ComputePipelineRecipe m_PipelineRecipe{};
 		ComputePipelineSlot m_PipelineSlot{};
 		ComputePipelineRecipe m_DepthHistoryPipelineRecipe{};
 		ComputePipelineSlot m_DepthHistoryPipelineSlot{};
+		GraphicsPhysicalPipelineKey m_DisplayDepthPipelineKey{};
+		GraphicsPipelineSlot m_DisplayDepthPipelineSlot{};
 		bool m_IsInitialized = false;
 		bool m_IsAvailable = false;
 	};

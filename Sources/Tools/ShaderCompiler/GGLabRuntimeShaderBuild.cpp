@@ -109,6 +109,8 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GTAOUpsampleCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOUpsampleDefines },
 			ShaderProgramBuildRecord{ &TemporalAAReprojectionCompute, L"Passes/PassTemporalAA.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &TemporalAADepthHistoryCompute, L"Passes/PassTemporalAADepthHistory.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &TemporalAADisplayDepthVertex, L"Passes/PassTemporalAADisplayDepth.hlsl", L"VSMain" },
+			ShaderProgramBuildRecord{ &TemporalAADisplayDepthPixel, L"Passes/PassTemporalAADisplayDepth.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &TemporalReferenceAccumulateCompute, L"Passes/PassTemporalReference.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapVertex, L"Passes/PassDirectionalShadowMap.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapPixel, L"Passes/PassDirectionalShadowMap.hlsl", L"PSMain" },
