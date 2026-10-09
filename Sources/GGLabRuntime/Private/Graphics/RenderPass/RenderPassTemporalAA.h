@@ -31,9 +31,13 @@ namespace gglab
 
 	private:
 		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const RenderServices& services) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreateDepthHistoryPipeline(
+			const RenderServices& services) noexcept;
 
 		ComputePipelineRecipe m_PipelineRecipe{};
 		ComputePipelineSlot m_PipelineSlot{};
+		ComputePipelineRecipe m_DepthHistoryPipelineRecipe{};
+		ComputePipelineSlot m_DepthHistoryPipelineSlot{};
 		bool m_IsInitialized = false;
 		bool m_IsAvailable = false;
 	};

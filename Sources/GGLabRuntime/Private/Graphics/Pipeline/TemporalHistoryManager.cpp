@@ -71,7 +71,7 @@ namespace gglab
 	}
 
 	TemporalHistoryFrameState TemporalHistoryManager::BeginFrame(
-		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+		const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 		TemporalColorAbi colorAbi) noexcept
 	{
 		GGLAB_ASSERT_MSG(!m_Shutdown, "Temporal history cannot begin after shutdown.");
@@ -96,12 +96,17 @@ namespace gglab
 			.m_DisplayViewId = plan.m_DisplayViewId,
 			.m_ResetIdentity = plan.m_ResetIdentity,
 			.m_SessionIdentity = plan.m_SessionIdentity,
-			.m_Width = width,
-			.m_Height = height,
+			.m_ColorExtent = resolution.m_Display,
+			.m_DepthExtent = resolution.m_Render,
 			.m_ColorAbi = colorAbi,
 		};
+		const auto isEmpty = [](ViewExtent extent) noexcept
+			{
+				return extent.m_Width == 0 || extent.m_Height == 0;
+			};
 		if (compatibility.m_DisplayViewId == RenderViewID::Unknown ||
-			compatibility.m_SessionIdentity == 0 || width == 0 || height == 0)
+			compatibility.m_SessionIdentity == 0 || isEmpty(compatibility.m_ColorExtent) ||
+			isEmpty(compatibility.m_DepthExtent))
 		{
 			RecordReset(TemporalHistoryResetReason::AllocationFailure);
 			return {};
@@ -371,7 +376,8 @@ namespace gglab
 		{
 			return TemporalHistoryResetReason::SessionIdentityChanged;
 		}
-		if (current.m_Width != compatibility.m_Width || current.m_Height != compatibility.m_Height)
+		if (current.m_ColorExtent != compatibility.m_ColorExtent ||
+			current.m_DepthExtent != compatibility.m_DepthExtent)
 		{
 			return TemporalHistoryResetReason::ExtentChanged;
 		}
@@ -399,9 +405,11 @@ namespace gglab
 		}
 
 		const RHIOwnedTextureCreateInfo colorInfo = MakeHistoryTextureCreateInfo(
-			compatibility.m_ColorFormat, compatibility.m_Width, compatibility.m_Height);
+			compatibility.m_ColorFormat, compatibility.m_ColorExtent.m_Width,
+			compatibility.m_ColorExtent.m_Height);
 		const RHIOwnedTextureCreateInfo depthInfo = MakeHistoryTextureCreateInfo(
-			compatibility.m_DepthFormat, compatibility.m_Width, compatibility.m_Height);
+			compatibility.m_DepthFormat, compatibility.m_DepthExtent.m_Width,
+			compatibility.m_DepthExtent.m_Height);
 		history.m_Color[0] = m_TexturePool->AcquireTexture(colorInfo, "TAA.HistoryColor0");
 		history.m_Color[1] = m_TexturePool->AcquireTexture(colorInfo, "TAA.HistoryColor1");
 		history.m_Depth[0] = m_TexturePool->AcquireTexture(depthInfo, "TAA.HistoryDepth0");

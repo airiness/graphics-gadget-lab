@@ -196,7 +196,7 @@ namespace gglab
 		// A reference sample (evaluation only) requires an inactive Temporal AA plan; the
 		// frame then renders with the sample's jitter phase and accumulates its scene color.
 		[[nodiscard]] virtual TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 			float scenePreExposure,
 			const std::optional<TemporalReferenceSample>& referenceSample) noexcept = 0;
 		virtual void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept = 0;

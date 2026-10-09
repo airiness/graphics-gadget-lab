@@ -90,7 +90,7 @@ namespace gglab
 		[[nodiscard]] RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept override;
 		TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 			float scenePreExposure,
 			const std::optional<TemporalReferenceSample>& referenceSample) noexcept override;
 		void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept override;

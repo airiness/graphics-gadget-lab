@@ -280,7 +280,7 @@ namespace gglab
 	}
 
 	TemporalFrameTransaction& Renderer::BeginTemporalFrame(RenderFrame& frame,
-		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+		const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 		float scenePreExposure,
 		const std::optional<TemporalReferenceSample>& referenceSample) noexcept
 	{
@@ -294,10 +294,12 @@ namespace gglab
 			plan.IsConsumerActive(TemporalConsumer::Reference) ? referenceSample : std::nullopt;
 		// A sample the accumulator cannot take leaves the frame without an accumulator,
 		// which the pipeline reports as a contract failure.
-		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(
-			sample, width, height, m_LastSubmittedFencePoint);
+		// The reference averages the display-domain scene it accumulates.
+		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(sample,
+			resolution.m_Display.m_Width, resolution.m_Display.m_Height,
+			m_LastSubmittedFencePoint);
 		m_ActiveFrame.m_TemporalTransaction.Begin(
-			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
+			m_TemporalViewHistory, m_TemporalObjectHistory, plan, resolution,
 			m_TemporalHistoryManager.get(), scenePreExposure, sample,
 			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr);
 		return m_ActiveFrame.m_TemporalTransaction;

@@ -34,6 +34,7 @@ namespace gglab::shader_programs
 			DepthPrepassVelocityOpaquePixel,
 			DepthPrepassVelocityAlphaTestPixel,
 			TemporalAAReprojectionCompute,
+			TemporalAADepthHistoryCompute,
 			AtmosphereLutCompute,
 			AerialPerspectiveBuildCompute,
 			AerialPerspectiveCompositeCompute,

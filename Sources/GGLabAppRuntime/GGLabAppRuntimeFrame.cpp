@@ -518,9 +518,8 @@ namespace gglab
 		const ViewResolution viewResolution = ResolveTemporalAAViewResolution(
 			{ m_WindowWidth, m_WindowHeight }, temporalFramePlan.m_ResolutionPreset);
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
-			rendererFrame, temporalFramePlan, viewResolution.m_Render.m_Width,
-			viewResolution.m_Render.m_Height, displayViewSettings.m_Exposure.m_PreExposure,
-			referenceSample);
+			rendererFrame, temporalFramePlan, viewResolution,
+			displayViewSettings.m_Exposure.m_PreExposure, referenceSample);
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),

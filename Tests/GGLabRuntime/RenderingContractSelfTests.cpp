@@ -5392,7 +5392,7 @@ namespace gglab
 			TemporalFrameTransaction transaction;
 			const ResolvedTemporalFramePlan referencePlan =
 				ResolveTemporalFramePlan({ .m_ReferenceRequested = true });
-			transaction.Begin(viewHistory, objectHistory, referencePlan, 8, 4,
+			transaction.Begin(viewHistory, objectHistory, referencePlan, ResolveNativeViewResolution({ 8, 4 }),
 				nullptr, 1.0f, TemporalReferenceSample{ .m_Index = 5, .m_Count = 16 }, nullptr);
 			const Vector2 expected = GetTemporalReferenceJitterPixels(5);
 			context.Check(transaction.GetReferenceSample() &&
@@ -5667,7 +5667,7 @@ namespace gglab
 
 			TemporalFrameTransaction noWriteTransaction;
 			noWriteTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(noWriteTransaction));
 			const bool noWriteGraphValid = buildNoWriteHistoryGraph(noWriteTransaction);
 			noWriteTransaction.CommitCompleted(RHIFencePoint{ RHIFenceHandle{ 1, 1 }, 5 });
@@ -5681,7 +5681,7 @@ namespace gglab
 
 			TemporalFrameTransaction firstTransaction;
 			firstTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager, 0.25f);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager, 0.25f);
 			const RenderView firstView = prepareDisplayView(firstTransaction);
 			const bool coldStartGraphValid = buildHistoryGraph(firstTransaction, false, true);
 			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
@@ -5710,7 +5710,7 @@ namespace gglab
 			TemporalObjectHistory incompatibleObjectHistory;
 			TemporalFrameTransaction incompatibleViewTransaction;
 			incompatibleViewTransaction.Begin(incompatibleViewHistory,
-				incompatibleObjectHistory, activePlan, 64, 64, &historyManager);
+				incompatibleObjectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			const RenderView incompatibleView = prepareDisplayView(incompatibleViewTransaction);
 			const bool managerHistoryStillValid =
 				buildHistoryGraph(incompatibleViewTransaction, true, false);
@@ -5723,7 +5723,7 @@ namespace gglab
 
 			TemporalFrameTransaction abortedTransaction;
 			abortedTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager, 8.0f);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager, 8.0f);
 			const RenderView abortedView = prepareDisplayView(abortedTransaction);
 			const bool abortGraphValid = buildHistoryGraph(abortedTransaction, true, false);
 			const RHIFencePoint vulkanAbortFence{ RHIFenceHandle{ 1, 1 }, 20 };
@@ -5742,7 +5742,7 @@ namespace gglab
 
 			TemporalFrameTransaction noResolveTransaction;
 			noResolveTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			const RenderView noResolveView = prepareDisplayView(noResolveTransaction);
 			const RHIFencePoint noResolveFence{ RHIFenceHandle{ 1, 1 }, 30 };
 			noResolveTransaction.CommitCompleted(noResolveFence);
@@ -5761,7 +5761,7 @@ namespace gglab
 
 			TemporalFrameTransaction invalidFenceTransaction;
 			invalidFenceTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(invalidFenceTransaction));
 			const bool invalidFenceGraphValid =
 				buildHistoryGraph(invalidFenceTransaction, true, false);
@@ -5777,7 +5777,7 @@ namespace gglab
 
 			TemporalFrameTransaction fatalTransaction;
 			fatalTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(fatalTransaction));
 			const bool fatalGraphValid = buildHistoryGraph(fatalTransaction, true, false);
 			const RHIFencePoint fatalFence{ RHIFenceHandle{ 1, 1 }, 40 };
@@ -5802,7 +5802,7 @@ namespace gglab
 
 			TemporalFrameTransaction reenabledTransaction;
 			reenabledTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			const TemporalHistoryManagerDiagnostics reenabled = historyManager.GetDiagnostics();
 			reenabledTransaction.Abort();
 			context.Check(
@@ -5813,7 +5813,7 @@ namespace gglab
 			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledPlanInfo);
 			TemporalFrameTransaction disabledTransaction;
 			disabledTransaction.Begin(
-				viewHistory, objectHistory, disabledPlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, disabledPlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			disabledTransaction.Abort();
 			const TemporalHistoryManagerDiagnostics disabled = historyManager.GetDiagnostics();
 			context.Check(reenabled.m_HasActiveHistory && !reenabled.m_HistoryValid &&
@@ -5825,7 +5825,7 @@ namespace gglab
 
 			TemporalFrameTransaction preResizeTransaction;
 			preResizeTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(preResizeTransaction));
 			const bool preResizeGraphValid =
 				buildHistoryGraph(preResizeTransaction, false, false);
@@ -5835,12 +5835,12 @@ namespace gglab
 				historyManager.GetDiagnostics().m_AllocationGeneration;
 			TemporalFrameTransaction resizedTransaction;
 			resizedTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 128, 72, &historyManager);
+				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 128, 72 }), &historyManager);
 			const TemporalHistoryManagerDiagnostics resized = historyManager.GetDiagnostics();
 			resizedTransaction.Abort();
 			context.Check(preResizeGraphValid && resized.m_HasActiveHistory &&
-				!resized.m_HistoryValid && resized.m_Compatibility.m_Width == 128 &&
-				resized.m_Compatibility.m_Height == 72 &&
+				!resized.m_HistoryValid && resized.m_Compatibility.m_ColorExtent == ViewExtent{ 128, 72 } &&
+				resized.m_Compatibility.m_DepthExtent == ViewExtent{ 128, 72 } &&
 				resized.m_AllocationGeneration > preResizeGeneration &&
 				resized.m_LastResetReason == TemporalHistoryResetReason::ExtentChanged &&
 				resized.m_PendingRetirementFences.size() == 4 &&
@@ -5853,7 +5853,7 @@ namespace gglab
 				ResolveTemporalFramePlan(unavailablePlanInfo);
 			TemporalFrameTransaction unavailableTransaction;
 			unavailableTransaction.Begin(
-				viewHistory, objectHistory, unavailablePlan, 128, 72, &historyManager);
+				viewHistory, objectHistory, unavailablePlan, ResolveNativeViewResolution({ 128, 72 }), &historyManager);
 			unavailableTransaction.Abort();
 			const TemporalHistoryManagerDiagnostics unavailable = historyManager.GetDiagnostics();
 			context.Check(!unavailable.m_HasActiveHistory &&
@@ -5877,7 +5877,7 @@ namespace gglab
 			for (const float scale : { 0.5f, 4.0f, 0.00000001f, 1024.0f, 1.0f })
 			{
 				TemporalFrameTransaction transaction;
-				transaction.Begin(viewHistory, objectHistory, activePlan, 64, 64, &exposureManager, scale);
+				transaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &exposureManager, scale);
 				const auto view = prepareDisplayView(transaction);
 				sweepValid &= view.m_HasPreviousTemporalState == expectPrevious &&
 					view.m_PreviousScenePreExposure == (expectPrevious ? previousScale : scale) &&
@@ -5905,13 +5905,13 @@ namespace gglab
 					});
 				return graph.Compile() && written;
 			};
-			auto legacyFrame = exposureManager.BeginFrame(activePlan, 64, 64,
+			auto legacyFrame = exposureManager.BeginFrame(activePlan, ResolveNativeViewResolution({ 64, 64 }),
 				TemporalColorAbi::LinearRec709SceneReferredV1);
 			const bool legacyWritten = writeManagerFrame(legacyFrame);
 			const bool legacyCommitted = exposureManager.CommitFrame(legacyFrame, {
 				.m_Compatibility = exposureManager.GetDiagnostics().m_Compatibility,
 				.m_PreExposure = 1.0f }, { RHIFenceHandle{ 1, 1 }, exposureFence++ });
-			auto migratedFrame = exposureManager.BeginFrame(activePlan, 64, 64);
+			auto migratedFrame = exposureManager.BeginFrame(activePlan, ResolveNativeViewResolution({ 64, 64 }));
 			context.Check(legacyWritten && legacyCommitted && !migratedFrame.m_PreviousValid &&
 				exposureManager.GetDiagnostics().m_LastResetReason == TemporalHistoryResetReason::ColorAbiChanged,
 				"V1 history is retired rather than sampled after migration to active V2");
@@ -5920,7 +5920,7 @@ namespace gglab
 			for (const float invalidScale : { 0.0f, -1.0f, std::numeric_limits<float>::infinity(),
 				std::numeric_limits<float>::quiet_NaN() })
 			{
-				auto frame = exposureManager.BeginFrame(activePlan, 64, 64);
+				auto frame = exposureManager.BeginFrame(activePlan, ResolveNativeViewResolution({ 64, 64 }));
 				invalidScalesRejected &= writeManagerFrame(frame);
 				invalidScalesRejected &= !exposureManager.CommitFrame(frame, {
 					.m_Compatibility = exposureManager.GetDiagnostics().m_Compatibility,
@@ -5930,6 +5930,28 @@ namespace gglab
 					diagnostics.m_LastResetReason == TemporalHistoryResetReason::InvalidExposureMetadata;
 			}
 			context.Check(invalidScalesRejected, "Zero, negative, infinite and NaN scales cannot publish history and retire submitted resources");
+			// Color history stores display pixels and depth history render-domain samples, so
+			// either extent changing invalidates the pair.
+			TemporalHistoryManager domainManager(&texturePool);
+			const ViewResolution upscaled{ .m_Render = { 64, 40 }, .m_Display = { 96, 60 } };
+			auto upscaledFrame = domainManager.BeginFrame(activePlan, upscaled);
+			const TemporalHistoryManagerDiagnostics upscaledHistory = domainManager.GetDiagnostics();
+			domainManager.AbortFrame(upscaledFrame, {});
+			ViewResolution renderChanged = upscaled;
+			renderChanged.m_Render = { 48, 30 };
+			auto renderChangedFrame = domainManager.BeginFrame(activePlan, renderChanged);
+			const TemporalHistoryManagerDiagnostics renderChangedHistory =
+				domainManager.GetDiagnostics();
+			domainManager.AbortFrame(renderChangedFrame, {});
+			context.Check(upscaledHistory.m_HasActiveHistory &&
+				upscaledHistory.m_Compatibility.m_ColorExtent == ViewExtent{ 96, 60 } &&
+				upscaledHistory.m_Compatibility.m_DepthExtent == ViewExtent{ 64, 40 } &&
+				renderChangedHistory.m_LastResetReason == TemporalHistoryResetReason::ExtentChanged &&
+				renderChangedHistory.m_Compatibility.m_ColorExtent == ViewExtent{ 96, 60 } &&
+				renderChangedHistory.m_Compatibility.m_DepthExtent == ViewExtent{ 48, 30 },
+				"Temporal color history follows the display extent and depth history the render "
+				"extent; a render extent change alone resets the pair");
+			domainManager.Shutdown();
 			exposureManager.Shutdown();
 			device.m_CompletedFenceValue = exposureFence;
 			texturePool.Tick();
@@ -7703,7 +7725,7 @@ namespace gglab
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
 			TemporalFrameTransaction disabledTransaction;
-			disabledTransaction.Begin(viewHistory, objectHistory, {}, 64, 64, nullptr, 0.5f);
+			disabledTransaction.Begin(viewHistory, objectHistory, {}, ResolveNativeViewResolution({ 64, 64 }), nullptr, 0.5f);
 			const bool retainedDisabledScale =
 				disabledTransaction.GetScenePreExposure() == 0.5f;
 			disabledTransaction.Abort();
@@ -8486,7 +8508,7 @@ namespace gglab
 			TemporalObjectHistory unavailableObjectHistory{};
 			TemporalFrameTransaction unavailableTransaction;
 			unavailableTransaction.Begin(unavailableViewHistory, unavailableObjectHistory,
-				viewPlan, 1920, 1080);
+				viewPlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			unavailableTransaction.PrepareDisplayView(view);
 			unavailableTransaction.CommitCompleted();
 			const float nearRawDepth = ProjectPosition(
@@ -8553,7 +8575,7 @@ namespace gglab
 			TemporalObjectHistory temporalObjectHistory{};
 			TemporalFrameTransaction abortedTransaction;
 			abortedTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView abortedView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8572,7 +8594,7 @@ namespace gglab
 
 			TemporalFrameTransaction committedTransaction;
 			committedTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView committedView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8585,7 +8607,7 @@ namespace gglab
 
 			TemporalFrameTransaction noResolveTransaction;
 			noResolveTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView noResolveView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8599,7 +8621,7 @@ namespace gglab
 			++changedSessionPlan.m_SessionIdentity;
 			TemporalFrameTransaction changedSessionTransaction;
 			changedSessionTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, changedSessionPlan, 1920, 1080);
+				temporalViewHistory, temporalObjectHistory, changedSessionPlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView changedSessionView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8615,7 +8637,7 @@ namespace gglab
 
 			TemporalFrameTransaction fatalTransaction;
 			fatalTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView fatalView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8711,7 +8733,7 @@ namespace gglab
 
 			TemporalFrameTransaction initialObjectTransaction;
 			initialObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, 1920, 1080);
+				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView initialObjectView = buildSubmittedHistoryView();
 			initialObjectTransaction.PrepareDisplayView(initialObjectView);
 			const Matrix initialPreviousModel =
@@ -8730,7 +8752,7 @@ namespace gglab
 
 			TemporalFrameTransaction abortedObjectTransaction;
 			abortedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, 1920, 1080);
+				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView abortedObjectView = buildSubmittedHistoryView();
 			abortedObjectTransaction.PrepareDisplayView(abortedObjectView);
 			const Matrix abortedPreviousModel =
@@ -8748,7 +8770,7 @@ namespace gglab
 
 			TemporalFrameTransaction movedObjectTransaction;
 			movedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, 1920, 1080);
+				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView movedObjectView = buildSubmittedHistoryView();
 			movedObjectTransaction.PrepareDisplayView(movedObjectView);
 			const Matrix movedPreviousModel =
@@ -8762,7 +8784,7 @@ namespace gglab
 
 			TemporalFrameTransaction abortedDisappearanceTransaction;
 			abortedDisappearanceTransaction.Begin(submittedViewHistory,
-				submittedObjectHistory, activePlan, 1920, 1080);
+				submittedObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView abortedDisappearanceView = buildSubmittedHistoryView();
 			abortedDisappearanceTransaction.PrepareDisplayView(abortedDisappearanceView);
 			abortedDisappearanceTransaction.Abort();
@@ -8785,7 +8807,7 @@ namespace gglab
 			++reusedEntityKey.m_EntityIdentity;
 			TemporalFrameTransaction replacementTransaction;
 			replacementTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, 1920, 1080);
+				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView replacementView = buildSubmittedHistoryView();
 			replacementTransaction.PrepareDisplayView(replacementView);
 			const Matrix replacementPreviousModel =
@@ -8815,7 +8837,7 @@ namespace gglab
 			replacementSessionKey.m_SessionIdentity = replacementSessionPlan.m_SessionIdentity;
 			TemporalFrameTransaction replacementSessionTransaction;
 			replacementSessionTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				replacementSessionPlan, 1920, 1080);
+				replacementSessionPlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView replacementSessionView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8832,7 +8854,7 @@ namespace gglab
 			++resetObjectPlan.m_ResetIdentity;
 			TemporalFrameTransaction resetObjectTransaction;
 			resetObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				resetObjectPlan, 1920, 1080);
+				resetObjectPlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView resetObjectView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -8847,7 +8869,7 @@ namespace gglab
 
 			TemporalFrameTransaction fatalObjectTransaction;
 			fatalObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, 1920, 1080);
+				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView fatalObjectView = buildSubmittedHistoryView();
 			fatalObjectTransaction.PrepareDisplayView(fatalObjectView);
 			fatalObjectTransaction.InvalidateAfterFatal();

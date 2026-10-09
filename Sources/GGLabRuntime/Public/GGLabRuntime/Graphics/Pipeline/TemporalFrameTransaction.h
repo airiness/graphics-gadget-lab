@@ -33,8 +33,7 @@ namespace gglab
 		RenderViewID m_DisplayViewId = RenderViewID::Unknown;
 		uint64_t m_ResetIdentity = 0;
 		uint64_t m_SessionIdentity = 0;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		ViewResolution m_Resolution{};
 		float m_PreExposure = 1.0f;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 	};
@@ -120,7 +119,7 @@ namespace gglab
 	{
 	public:
 		void Begin(TemporalViewHistory& viewHistory, TemporalObjectHistory& objectHistory,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 			TemporalHistoryManager* historyManager = nullptr,
 			float scenePreExposure = SceneColorStoragePreExposureV1,
 			std::optional<TemporalReferenceSample> referenceSample = std::nullopt,
@@ -193,8 +192,8 @@ namespace gglab
 			m_PendingObjects;
 		TemporalFrameTransactionState m_State = TemporalFrameTransactionState::Idle;
 		Vector2 m_JitterPixels = Vector2::Zero;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		// Jitter is expressed in render pixels; histories follow their own domains.
+		ViewResolution m_Resolution{};
 		uint32_t m_JitterIndex = 0;
 		uint32_t m_FrameIndex = 0;
 		float m_ScenePreExposure = SceneColorStoragePreExposureV1;

@@ -12,7 +12,6 @@ struct TemporalAAPassParameters
 	uint PreviousDepthIndex;
 	uint ResolvedColorUavIndex;
 	uint NextHistoryColorUavIndex;
-	uint NextHistoryDepthUavIndex;
 	uint ReprojectionDiagnosticsUavIndex;
 	uint LinearClampSamplerIndex;
 	uint PointClampSamplerIndex;
@@ -21,6 +20,7 @@ struct TemporalAAPassParameters
 	uint PackedMaxHistoryFeedbackAndClampExpansion;
 	float VelocityWeightScale;
 	float LuminanceWeightScale;
+	uint Padding0;
 };
 
 ConstantBuffer<TemporalAAPassParameters> g_Pass : register(b2);
@@ -44,8 +44,6 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		GetRWTexture2DFloat4(g_Pass.ResolvedColorUavIndex);
 	RWTexture2D<float4> nextHistoryColor =
 		GetRWTexture2DFloat4(g_Pass.NextHistoryColorUavIndex);
-	RWTexture2D<float> nextHistoryDepth =
-		GetRWTexture2DFloat(g_Pass.NextHistoryDepthUavIndex);
 	RWTexture2D<float4> reprojectionDiagnostics =
 		GetRWTexture2DFloat4(g_Pass.ReprojectionDiagnosticsUavIndex);
 
@@ -252,7 +250,6 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		resolvedOutput.rgb, pixel, viewData.TemporalFrameIndex), outputAlphas.y);
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
-	nextHistoryDepth[pixel] = currentRawDepth;
 	float4 diagnosticsOutput =
 		float4(historyWeight, float(rejectionReason), previousHistoryUV);
 	if (writeHistoryColorPreview)

@@ -41,8 +41,10 @@ namespace gglab
 		RenderViewID m_DisplayViewId = RenderViewID::Unknown;
 		uint64_t m_ResetIdentity = 0;
 		uint64_t m_SessionIdentity = 0;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		// The resolved color history stores display pixels; the depth history that
+		// validates reprojection stores the render-domain samples it was rasterized at.
+		ViewExtent m_ColorExtent{};
+		ViewExtent m_DepthExtent{};
 		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
 		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;

@@ -41,7 +41,7 @@ namespace gglab
 
 	void TemporalFrameTransaction::Begin(TemporalViewHistory& viewHistory,
 		TemporalObjectHistory& objectHistory, const ResolvedTemporalFramePlan& plan,
-		uint32_t width, uint32_t height, TemporalHistoryManager* historyManager,
+		const ViewResolution& resolution, TemporalHistoryManager* historyManager,
 		float scenePreExposure, std::optional<TemporalReferenceSample> referenceSample,
 		TemporalReferenceAccumulator* referenceAccumulator) noexcept
 	{
@@ -66,9 +66,8 @@ namespace gglab
 		m_ScenePreExposure = scenePreExposure;
 		m_PendingView = {};
 		m_State = TemporalFrameTransactionState::Pending;
-		m_Width = width;
-		m_Height = height;
-		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, width, height, m_ColorAbi)
+		m_Resolution = resolution;
+		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, resolution, m_ColorAbi)
 										: TemporalHistoryFrameState{};
 		m_HasCompatiblePreviousView =
 			plan.HasService(TemporalService::FrameContinuity) && IsCompatible(viewHistory) &&
@@ -119,7 +118,8 @@ namespace gglab
 		if (m_Plan.HasService(TemporalService::ProjectionJitter))
 		{
 			const Vector2 jitterNDC =
-				temporal::JitterPixelsToNDC(m_JitterPixels, m_Width, m_Height);
+				temporal::JitterPixelsToNDC(m_JitterPixels, m_Resolution.m_Render.m_Width,
+					m_Resolution.m_Render.m_Height);
 			Matrix clipJitter = Matrix::Identity;
 			clipJitter.m_41 = jitterNDC.m_X;
 			clipJitter.m_42 = jitterNDC.m_Y;
@@ -130,7 +130,8 @@ namespace gglab
 			view.m_DepthReconstructionParams =
 				screen_space::MakeDepthReconstructionParams(view.m_RasterProj);
 			view.m_JitterPixels = m_JitterPixels;
-			view.m_JitterUV = temporal::JitterPixelsToUV(m_JitterPixels, m_Width, m_Height);
+			view.m_JitterUV = temporal::JitterPixelsToUV(m_JitterPixels,
+				m_Resolution.m_Render.m_Width, m_Resolution.m_Render.m_Height);
 		}
 
 		if (m_HasCompatiblePreviousView)
@@ -162,8 +163,7 @@ namespace gglab
 			.m_DisplayViewId = view.m_ViewId,
 			.m_ResetIdentity = m_Plan.m_ResetIdentity,
 			.m_SessionIdentity = m_Plan.m_SessionIdentity,
-			.m_Width = m_Width,
-			.m_Height = m_Height,
+			.m_Resolution = m_Resolution,
 			.m_PreExposure = m_ScenePreExposure,
 			.m_ColorAbi = m_ColorAbi,
 		};
@@ -310,8 +310,8 @@ namespace gglab
 					.m_DisplayViewId = m_PendingView.m_DisplayViewId,
 					.m_ResetIdentity = m_PendingView.m_ResetIdentity,
 					.m_SessionIdentity = m_PendingView.m_SessionIdentity,
-					.m_Width = m_PendingView.m_Width,
-					.m_Height = m_PendingView.m_Height,
+					.m_ColorExtent = m_PendingView.m_Resolution.m_Display,
+					.m_DepthExtent = m_PendingView.m_Resolution.m_Render,
 					.m_ColorAbi = m_ColorAbi,
 				},
 				.m_JitterUV = m_PendingView.m_JitterUV,
@@ -379,7 +379,7 @@ namespace gglab
 				PostProcessColorState::SceneLinearRec709, committed.m_PreExposure) && committed.m_DisplayViewId == m_Plan.m_DisplayViewId &&
 			   committed.m_ResetIdentity == m_Plan.m_ResetIdentity &&
 			   committed.m_SessionIdentity == m_Plan.m_SessionIdentity &&
-			   committed.m_Width == m_Width && committed.m_Height == m_Height;
+			   committed.m_Resolution == m_Resolution;
 	}
 
 	void TemporalFrameTransaction::CommitObjectHistory() noexcept

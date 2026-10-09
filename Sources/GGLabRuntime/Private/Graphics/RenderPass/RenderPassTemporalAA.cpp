@@ -47,7 +47,6 @@ namespace gglab
 			uint32_t m_PreviousDepthIndex = 0;
 			uint32_t m_ResolvedColorUavIndex = 0;
 			uint32_t m_NextHistoryColorUavIndex = 0;
-			uint32_t m_NextHistoryDepthUavIndex = 0;
 			uint32_t m_ReprojectionDiagnosticsUavIndex = 0;
 			uint32_t m_LinearClampSamplerIndex = 0;
 			uint32_t m_PointClampSamplerIndex = 0;
@@ -56,9 +55,18 @@ namespace gglab
 			uint32_t m_PackedMaxHistoryFeedbackAndClampExpansion = 0;
 			float m_VelocityWeightScale = 0.0f;
 			float m_LuminanceWeightScale = 0.0f;
+			uint32_t m_Padding0 = 0;
 		};
 		static_assert(IsPassRootConstantStruct<TemporalAAPassParameters>);
 		static_assert(sizeof(TemporalAAPassParameters) == 64);
+
+		struct TemporalAADepthHistoryPassParameters
+		{
+			uint32_t m_CurrentDepthIndex = 0;
+			uint32_t m_NextHistoryDepthUavIndex = 0;
+			uint32_t m_Padding[2]{};
+		};
+		static_assert(IsPassRootConstantStruct<TemporalAADepthHistoryPassParameters>);
 
 		struct TemporalAAPassData
 		{
@@ -74,6 +82,9 @@ namespace gglab
 			TemporalAAPassParameters m_Parameters{};
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			// Render extent of the depth that the next depth history copies.
+			uint32_t m_DepthWidth = 0;
+			uint32_t m_DepthHeight = 0;
 		};
 
 		struct TemporalAAResolvedColorInitializePassData
@@ -95,7 +106,11 @@ namespace gglab
 		m_PipelineRecipe.m_CSId = shaderManager->LoadProgram(
 			shader_programs::TemporalAAReprojectionCompute);
 		m_PipelineRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
+		m_DepthHistoryPipelineRecipe.m_CSId = shaderManager->LoadProgram(
+			shader_programs::TemporalAADepthHistoryCompute);
+		m_DepthHistoryPipelineRecipe.m_BindingLayout = m_PipelineRecipe.m_BindingLayout;
 		m_IsAvailable = m_PipelineRecipe.m_CSId.IsValid() &&
+			m_DepthHistoryPipelineRecipe.m_CSId.IsValid() &&
 			m_PipelineRecipe.m_BindingLayout.IsValid();
 	}
 
@@ -249,6 +264,9 @@ namespace gglab
 					motion, temporalGeometry.m_MotionSrvDesc);
 				data.m_CurrentDepthSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
 					currentDepth, sceneDepth.m_SrvDesc);
+				const RHITextureDesc& currentDepthDesc = builder.GetTextureDesc(currentDepth);
+				data.m_DepthWidth = currentDepthDesc.m_Extent.m_Width;
+				data.m_DepthHeight = currentDepthDesc.m_Extent.m_Height;
 
 				GGLAB_ASSERT_MSG(!previousHistoryCompatible ||
 					resources.m_History.m_PreviousValid,
@@ -395,10 +413,15 @@ namespace gglab
 				parameters.m_PreviousDepthIndex = previousDepth.m_Index;
 				parameters.m_ResolvedColorUavIndex = resolvedColor.m_Index;
 				parameters.m_NextHistoryColorUavIndex = nextHistoryColor.m_Index;
-				parameters.m_NextHistoryDepthUavIndex = nextHistoryDepth.m_Index;
 				parameters.m_ReprojectionDiagnosticsUavIndex = diagnostics.m_Index;
 
-				commandContext->SetPipeline(GetOrCreatePipeline(services));
+				// The next depth history copies the render-domain scene depth; the resolve
+				// neither reads nor writes it, so the dispatches need no barrier between them.
+				const TemporalAADepthHistoryPassParameters depthHistoryParameters{
+					.m_CurrentDepthIndex = currentDepth.m_Index,
+					.m_NextHistoryDepthUavIndex = nextHistoryDepth.m_Index,
+				};
+				commandContext->SetPipeline(GetOrCreateDepthHistoryPipeline(services));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
@@ -406,6 +429,17 @@ namespace gglab
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+				commandContext->SetPushConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+					depthHistoryParameters);
+				commandContext->Dispatch(
+					(data.m_DepthWidth + TemporalAAThreadGroupSize - 1) /
+						TemporalAAThreadGroupSize,
+					(data.m_DepthHeight + TemporalAAThreadGroupSize - 1) /
+						TemporalAAThreadGroupSize,
+					1);
+
+				commandContext->SetPipeline(GetOrCreatePipeline(services));
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
@@ -419,7 +453,8 @@ namespace gglab
 
 	bool RenderPassTemporalAA::ValidatePipelineClosure(const RenderServices& services) noexcept
 	{
-		return m_IsAvailable && GetOrCreatePipeline(services).IsValid();
+		return m_IsAvailable && GetOrCreatePipeline(services).IsValid() &&
+			GetOrCreateDepthHistoryPipeline(services).IsValid();
 	}
 
 	RHIPipelineHandle RenderPassTemporalAA::GetOrCreatePipeline(
@@ -430,5 +465,14 @@ namespace gglab
 		const RHIPipelineHandle pipeline =
 			pipelineCache->Resolve(m_PipelineSlot, m_PipelineRecipe, GetInfo());
 		return pipeline;
+	}
+
+	RHIPipelineHandle RenderPassTemporalAA::GetOrCreateDepthHistoryPipeline(
+		const RenderServices& services) noexcept
+	{
+		auto* pipelineCache = services.m_PipelineResolver;
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		return pipelineCache->Resolve(
+			m_DepthHistoryPipelineSlot, m_DepthHistoryPipelineRecipe, GetInfo());
 	}
 }

@@ -45,7 +45,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(TemporalHistoryManager);
 
 		[[nodiscard]] TemporalHistoryFrameState BeginFrame(
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 			TemporalColorAbi colorAbi = ActiveTemporalColorAbi) noexcept;
 		[[nodiscard]] bool ImportRenderGraphResources(TemporalHistoryFrameState& frame,
 			RenderGraph::RGBuilder& builder,

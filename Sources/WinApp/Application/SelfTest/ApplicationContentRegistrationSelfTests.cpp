@@ -1545,15 +1545,17 @@ namespace gglab
 			"Texture contract is not registered as a standalone Demo");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
 		context.Check(std::ranges::find(
-			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
-			"Renderer artifact demand includes the production Temporal AA compute program");
+			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end() &&
+			std::ranges::find(rendererDemands, shader_programs::TemporalAADepthHistoryCompute) !=
+				rendererDemands.end(),
+			"Renderer artifact demand includes the production Temporal AA compute programs");
 		context.Check(std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveBuildCompute) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveCompositeCompute) != rendererDemands.end(),
 			"Renderer startup artifacts include both aerial transport programs before any Lab enables atmosphere");
-		context.Check(rendererDemands.size() == 46 &&
+		context.Check(rendererDemands.size() == 47 &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportanceVertex) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportancePixel) != rendererDemands.end(),
-			"Renderer startup demand includes both IBL importance programs in its 46-program contract");
+			"Renderer startup demand includes both IBL importance programs in its 47-program contract");
 
 		const auto checkSelectedDemand = [&context, &desktop](
 			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
@@ -1566,18 +1568,18 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 50,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 51,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 50,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 51,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 48,
+		checkSelectedDemand("gglab.lab.napa_voxel", 49,
 			"Napa voxel selection contributes two stable shader demands");
-		checkSelectedDemand("gglab.lab.texture_contract", 46,
+		checkSelectedDemand("gglab.lab.texture_contract", 47,
 			"Texture contract uses the production renderer's shader demands");
-		checkSelectedDemand("gglab.lab.lighting_contract", 46,
+		checkSelectedDemand("gglab.lab.lighting_contract", 47,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		checkSelectedDemand("gglab.lab.atmosphere_range", 46,
+		checkSelectedDemand("gglab.lab.atmosphere_range", 47,
 			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);

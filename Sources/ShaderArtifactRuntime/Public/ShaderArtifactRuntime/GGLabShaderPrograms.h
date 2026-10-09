@@ -57,6 +57,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gtao", "compute.upsample", ShaderStage::Compute };
 	inline const ShaderProgramRef TemporalAAReprojectionCompute{
 		"gglab.shader.temporal-aa", "compute.reprojection", ShaderStage::Compute };
+	inline const ShaderProgramRef TemporalAADepthHistoryCompute{
+		"gglab.shader.temporal-aa-depth-history", "compute.copy", ShaderStage::Compute };
 	inline const ShaderProgramRef TemporalReferenceAccumulateCompute{
 		"gglab.shader.temporal-reference", "compute.accumulate", ShaderStage::Compute };
 
