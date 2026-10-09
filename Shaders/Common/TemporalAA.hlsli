@@ -60,7 +60,7 @@ float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryA
 // renormalized. At a texel centre it returns that texel exactly. The negative lobes
 // overshoot at edges, so the result is limited to the range of the 2x2 texels a
 // bilinear fetch would blend; the caller's neighborhood rectification bounds it
-// further. Temporal 2.0 T1.1 measured the unlimited kernel at about twice the
+// further. Measured against supersampled references, the unlimited kernel doubled the
 // overshoot increase for a few percent less reference error.
 float3 SampleTemporalHistoryCatmullRomClamped(Texture2D<float4> history,
 	SamplerState linearClamp, float2 uv)

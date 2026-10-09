@@ -45,9 +45,9 @@ namespace gglab
 			{
 				view.m_TemporalResetIdentity = temporalFramePlan.m_ResetIdentity;
 				view.m_TemporalSessionIdentity = temporalFramePlan.m_SessionIdentity;
-				// log2(render / display) + offset; render and display extents are equal
-				// until the resolution split lands, so only the offset remains. Temporal
-				// accumulation is what recovers the detail a negative bias exposes.
+				// log2(render / display) + offset; camera views render at the display
+				// extent, so only the offset remains. Temporal accumulation is what
+				// recovers the detail a negative bias exposes.
 				view.m_TextureLodBias =
 					temporalFramePlan.IsConsumerActive(TemporalConsumer::TemporalAA)
 					? renderSettings.m_TemporalAA.m_TextureLodBiasOffset

@@ -27,9 +27,9 @@ namespace gglab
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
 	inline constexpr float TemporalAAMaxNeighborhoodClampExpansion = 1.0f;
-	// Temporal 2.0 T1.5: against footprint-matched references -1 recovered most of the
-	// texture detail of -1.5 with a smaller rise in static texture shimmer; it stacks
-	// with log2(render / display) once the resolution split lands.
+	// Against footprint-matched references -1 recovered most of the texture detail of
+	// -1.5 with a smaller rise in static texture shimmer. It stacks with
+	// log2(render / display).
 	inline constexpr float TemporalAADefaultTextureLodBiasOffset = -1.0f;
 	inline constexpr float TemporalAAMinTextureLodBiasOffset = -2.0f;
 	inline constexpr float TemporalAAMaxTextureLodBiasOffset = 1.0f;
@@ -140,9 +140,8 @@ namespace gglab
 		// Kept for comparison: the output follows the jitter phase of each frame.
 		Point,
 		// Gaussian approximation of Blackman-Harris, exp(-2.29 (d / 0.75)^2), over the
-		// 3x3 samples at their jittered positions. Temporal 2.0 T1.2 bracketed the size
-		// with 0.6 and 1.0 pixels: narrower lost half of the stability gain, wider
-		// blurred thin detail.
+		// 3x3 samples at their jittered positions. Sizes of 0.6 and 1.0 pixels bracket
+		// it: narrower lost half of the stability gain, wider blurred thin detail.
 		Gaussian,
 	};
 
@@ -167,7 +166,7 @@ namespace gglab
 		// Motion of the front-most depth sample of the 3x3 neighborhood, with depth
 		// validation of that sample at its own position, so motion and validation
 		// describe one surface. Validating the centre instead keeps the motion gain
-		// but loses the edge stability (Temporal 2.0 T1.4): background pixels beside
+		// but loses the edge stability: background pixels beside
 		// geometry then fail background validation whenever the jitter puts geometry
 		// under them in the previous frame, resetting their history.
 		ClosestDepth,
@@ -225,7 +224,7 @@ namespace gglab
 		TemporalAAMotionSelection m_MotionSelection = TemporalAAMotionSelection::ClosestDepth;
 		TemporalAAPostTemporalView m_PostTemporalView = TemporalAAPostTemporalView::Unjittered;
 		// Material texture LOD offset while Temporal AA is active, added to
-		// log2(render / display) (Temporal 2.0 Section 5.6).
+		// log2(render / display).
 		float m_TextureLodBiasOffset = TemporalAADefaultTextureLodBiasOffset;
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;

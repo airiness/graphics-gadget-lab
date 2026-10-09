@@ -198,7 +198,8 @@ namespace gglab
 		float PreviousScenePreExposure;
 		// Frames since the view's temporal history was reset; seeds temporal noise.
 		uint32_t TemporalFrameIndex;
-		// Added to the LOD of material texture samples (Temporal 2.0 Section 5.6).
+		// Added to the LOD of material texture samples: log2(render / display) plus the
+		// temporal offset while Temporal AA is active, or a reference's own bias.
 		float TextureLodBias;
 		uint32_t Padding0;
 		uint32_t Padding1;

@@ -31,7 +31,7 @@ namespace gglab
 		bool operator==(const ViewExtent&) const noexcept = default;
 	};
 
-	// Resolution domains of a camera view (Temporal 2.0 plan Section 5.1). Geometry is
+	// Resolution domains of a camera view. Geometry is
 	// rasterized and shaded at the render extent; the temporal output, post-temporal
 	// composition and the back buffer use the display extent.
 	struct ViewResolution
