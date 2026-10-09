@@ -275,8 +275,6 @@ namespace gglab
 				.m_SettleFrames = 2,
 				});
 
-			coordinator.BeginFrame(MakeFrameState(false));
-			coordinator.OnFrameSubmitted();
 			coordinator.BeginFrame(MakeFrameState(true));
 			coordinator.OnFrameSubmitted();
 			const bool waitingAfterOne = control.m_Issued.empty() &&
@@ -322,6 +320,84 @@ namespace gglab
 			context.Check(matching != 0 && waitedForContent &&
 				control.m_Issued.size() == issuedBefore + 1,
 				"A required content id holds the capture until that Demo or Lab is active");
+		}
+
+		[[nodiscard]] FrameCaptureFrameState MakeCutFrameState(
+			bool ready, uint64_t cameraResetSerial)
+		{
+			FrameCaptureFrameState state = MakeFrameState(ready);
+			state.m_SettleKey.m_CameraResetSerial = cameraResetSerial;
+			return state;
+		}
+
+		// Temporal history keeps accumulating while content loads. An after-ready
+		// capture that settled over such history would depend on how many frames
+		// loading took, so settling and time start at a camera cut on a ready frame.
+		void RunLoadingHistoryTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-loading-history");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true,
+				});
+			const bool idleKeepsTime = !coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory();
+			const uint64_t id = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 1,
+				});
+			const bool holdsBeforeFirstFrame = coordinator.ShouldHoldTime();
+
+			coordinator.BeginFrame(MakeCutFrameState(false, 1));
+			coordinator.OnFrameSubmitted();
+			const bool waitsWhileLoading = coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory();
+			coordinator.BeginFrame(MakeCutFrameState(true, 1));
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(MakeCutFrameState(true, 1));
+			coordinator.OnFrameSubmitted();
+			context.Check(idleKeepsTime && holdsBeforeFirstFrame && waitsWhileLoading &&
+				control.m_Issued.empty() && coordinator.GetSettledFrameCount() == 0 &&
+				coordinator.ShouldRestartTemporalHistory() && coordinator.ShouldHoldTime(),
+				"Ready frames over history that began while loading do not settle; the "
+				"coordinator holds time and asks for a temporal restart");
+
+			// The runtime's camera cut on a ready frame starts settling and time.
+			coordinator.BeginFrame(MakeCutFrameState(true, 2));
+			coordinator.OnFrameSubmitted();
+			const bool settlingFromCut = control.m_Issued.empty() &&
+				coordinator.GetSettledFrameCount() == 1 &&
+				!coordinator.ShouldRestartTemporalHistory() && !coordinator.ShouldHoldTime();
+			coordinator.BeginFrame(MakeCutFrameState(true, 2));
+			coordinator.OnFrameSubmitted();
+			context.Check(id != 0 && settlingFromCut && control.m_Issued.size() == 1,
+				"Settling and time start at the cut, and the capture follows the settled frames");
+
+			// A gate leaving Ready puts loading frames into the history again.
+			const uint64_t again = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 1,
+				});
+			const bool settledHistoryKeepsTime = !coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory();
+			coordinator.BeginFrame(MakeCutFrameState(false, 2));
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(MakeCutFrameState(true, 2));
+			coordinator.OnFrameSubmitted();
+			context.Check(settledHistoryKeepsTime && control.m_Issued.size() == 1 &&
+				coordinator.ShouldRestartTemporalHistory() && coordinator.ShouldHoldTime(),
+				"Readiness lost under one settle key restarts temporal history once ready");
+
+			// A next-frame capture never waits for history, so it neither holds time
+			// nor cuts the view.
+			const bool cancelled = coordinator.Cancel(again);
+			const uint64_t next = coordinator.Submit({});
+			context.Check(cancelled && next != 0 && !coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory(),
+				"Only waiting after-ready captures hold time or restart temporal history");
 		}
 
 		[[nodiscard]] FrameCaptureFrameState MakeViewFrameState(uint64_t cameraResetSerial)
@@ -1455,6 +1531,7 @@ namespace gglab
 	{
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
+		RunLoadingHistoryTests(context);
 		RunReferenceViewTests(context);
 		RunFailureTests(context);
 		RunShutdownTests(context);

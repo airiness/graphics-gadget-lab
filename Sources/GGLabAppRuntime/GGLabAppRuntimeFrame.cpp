@@ -353,9 +353,10 @@ namespace gglab
 		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
 		SyncSequenceGpuProfiling();
 
-		if (m_FrameSequence->ShouldHoldTime())
+		if (m_FrameSequence->ShouldHoldTime() || m_FrameCapture->ShouldHoldTime())
 		{
-			// Every sample of a supersampled reference frame renders the same instant.
+			// Every sample of a supersampled reference frame renders the same instant,
+			// and an after-ready capture does not advance time before it settles.
 			m_Time->Hold();
 		}
 		else
@@ -476,6 +477,12 @@ namespace gglab
 			"CameraRig must resolve one effective display view before "
 			"frame planning.");
 		const CameraRig::CameraSlot* displayCameraSlot = effectiveDisplayView.m_CameraSlot;
+		// An after-ready capture settles over temporal history of ready frames
+		// only. A cut drops history that still holds frames of loading content.
+		if (m_FrameCapture->ShouldRestartTemporalHistory())
+		{
+			displayCameraSlot->m_Camera->RequestTemporalReset();
+		}
 		ResolvedViewRenderSettings displayViewSettings =
 			ResolveViewRenderSettings(
 				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);

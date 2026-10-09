@@ -86,6 +86,11 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
   is ready and then for `-SettleFrames` submitted frames with an unchanged
   settle key (temporal session, camera cut, display view, size and Demo).
+  Settling counts only over temporal history that began on a ready frame: when
+  history still holds frames rendered while a gate was pending, the runtime
+  cuts the display camera first. Simulation time holds until settling begins,
+  so animated content reaches the capture after exactly the settle frames and
+  repeated runs capture the same image however long loading took.
   `next-frame` captures the next recorded frame, even while loading.
 - **Readiness gates.** `shaders`, `content-transition`, `content`, `lab`,
   `environment`, `ibl` and `asset-uploads`. A pending gate keeps an

@@ -305,7 +305,12 @@ namespace gglab
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
 		const bool ready = state.m_Readiness.IsReady();
-		if (!ready || !m_LastFrameState || m_LastFrameState->m_SettleKey != state.m_SettleKey)
+		const bool historyRestarted =
+			!m_LastFrameState || m_LastFrameState->m_SettleKey != state.m_SettleKey;
+		// Temporal history keeps accumulating while gates are pending, so frames of
+		// content still loading stay in it until the settle key changes.
+		m_HistoryReady = historyRestarted ? ready : m_HistoryReady && ready;
+		if (!m_HistoryReady || historyRestarted)
 		{
 			m_SettledFrames = 0;
 		}
@@ -325,7 +330,6 @@ namespace gglab
 				entry.m_ViewCameraResetSerial.reset();
 			}
 		}
-		m_FrameReady = ready;
 		m_HasOpenFrame = true;
 
 		if (!m_IsShuttingDown)
@@ -346,7 +350,7 @@ namespace gglab
 				{
 					Finish(entry, FrameCaptureRequestStatus::Failed, readinessFailure);
 				}
-				else if (IsDue(entry, state, ready))
+				else if (IsDue(entry, state))
 				{
 					Issue(entry, state);
 				}
@@ -380,6 +384,37 @@ namespace gglab
 			.m_RequestId = head->m_Id,
 			.m_ReferenceViewId = head->m_Request.m_ReferenceViewId,
 		};
+	}
+
+	bool FrameCaptureCoordinator::ShouldRestartTemporalHistory() const noexcept
+	{
+		if (m_IsShuttingDown || !m_LastFrameState || m_HistoryReady ||
+			!m_LastFrameState->m_Readiness.IsReady())
+		{
+			return false;
+		}
+		return std::ranges::any_of(m_Entries, [this](const Entry& entry)
+			{
+				// A view restored for this frame is already a camera cut.
+				const bool viewSettling = entry.m_Request.m_ReferenceViewId.empty() ||
+					entry.m_ViewCameraResetSerial.has_value();
+				return entry.m_Phase == Phase::Waiting &&
+					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+					viewSettling && MatchesRequiredContent(entry, *m_LastFrameState);
+			});
+	}
+
+	bool FrameCaptureCoordinator::ShouldHoldTime() const noexcept
+	{
+		if (m_IsShuttingDown || m_HistoryReady)
+		{
+			return false;
+		}
+		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+			{
+				return entry.m_Phase == Phase::Waiting &&
+					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady;
+			});
 	}
 
 	void FrameCaptureCoordinator::OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept
@@ -418,7 +453,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::OnFrameSubmitted() noexcept
 	{
-		if (m_HasOpenFrame && m_FrameReady &&
+		if (m_HasOpenFrame && m_HistoryReady &&
 			m_SettledFrames < std::numeric_limits<uint32_t>::max())
 		{
 			++m_SettledFrames;
@@ -483,7 +518,7 @@ namespace gglab
 	}
 
 	bool FrameCaptureCoordinator::IsDue(
-		const Entry& entry, const FrameCaptureFrameState& state, bool ready) const noexcept
+		const Entry& entry, const FrameCaptureFrameState& state) const noexcept
 	{
 		const FrameCaptureRequest& request = entry.m_Request;
 		if (!request.m_ReferenceViewId.empty() && !entry.m_ViewApplied)
@@ -494,7 +529,7 @@ namespace gglab
 		{
 			return true;
 		}
-		return ready && MatchesRequiredContent(entry, state) &&
+		return m_HistoryReady && MatchesRequiredContent(entry, state) &&
 			m_SettledFrames >= request.m_SettleFrames;
 	}
 
