@@ -7955,7 +7955,7 @@ namespace gglab
 			const float staticHistoryWeight = ResolveTemporalAAHistoryWeight(
 				63.0f, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
 			const float movingHistoryWeight =
-				ResolveTemporalAAHistoryWeight(63.0f, 10.0f, 1.0f, 1.0f, defaultTemporalAA);
+				ResolveTemporalAAHistoryWeight(63.0f, 5.0f, 1.0f, 1.0f, defaultTemporalAA);
 			const float defaultChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
 				63.0f, 0.0f, 1.0f, 0.9f, defaultTemporalAA);
 			TemporalAASettings luminanceResearchSettings = defaultTemporalAA;

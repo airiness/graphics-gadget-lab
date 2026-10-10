@@ -290,7 +290,7 @@ namespace gglab
 		temporalSettings.m_DepthAbsoluteThreshold = 0.1f;
 		temporalSettings.m_DepthRelativeThreshold = 0.04f;
 		temporalSettings.m_MaxHistoryFeedback = 0.75f;
-		temporalSettings.m_VelocityWeightScale = 0.1f;
+		temporalSettings.m_VelocityWeightScale = 0.2f;
 		temporalSettings.m_LuminanceWeightScale = 0.25f;
 		temporalSettings.m_NeighborhoodClampExpansion = 0.5f;
 		overrides.m_TemporalAA.Activate(temporalSettings);

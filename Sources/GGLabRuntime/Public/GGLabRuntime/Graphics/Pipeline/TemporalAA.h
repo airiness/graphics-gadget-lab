@@ -16,7 +16,11 @@ namespace gglab
 {
 	inline constexpr float TemporalAADepthAbsoluteThreshold = 0.05f;
 	inline constexpr float TemporalAADepthRelativeThreshold = 0.02f;
-	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.05f;
+	// History weight falls linearly to zero at 10 display pixels of motion per frame.
+	// Against supersampled references, a weaker scale (0.05) leaves moving content with
+	// more resampling blur and more frame-to-frame flicker. A pixel without motion keeps
+	// its full history weight.
+	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.1f;
 	inline constexpr float TemporalAADefaultLuminanceWeightScale = 0.0f;
 	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
 	inline constexpr float TemporalHistoryInitialAge = 1.0f;
