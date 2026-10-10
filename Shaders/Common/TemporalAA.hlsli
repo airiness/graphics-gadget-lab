@@ -12,7 +12,7 @@ static const uint TAA_REJECTION_DEPTH_MISMATCH = 4;
 static const uint TAA_REJECTION_BACKGROUND_MISMATCH = 5;
 static const uint TAA_HISTORY_VALID_BIT = 0x80000000u;
 static const uint TAA_HISTORY_COLOR_PREVIEW_BIT = 0x40000000u;
-static const uint TAA_HISTORY_AGE_PREVIEW_BIT = 0x20000000u;
+static const uint TAA_HISTORY_SAMPLES_PREVIEW_BIT = 0x20000000u;
 static const uint TAA_HISTORY_CATMULL_ROM_BIT = 0x10000000u;
 static const uint TAA_CURRENT_GAUSSIAN_BIT = 0x08000000u;
 static const uint TAA_CLOSEST_DEPTH_MOTION_BIT = 0x04000000u;
@@ -20,16 +20,19 @@ static const uint TAA_DISPLAY_DEPTH_BIT = 0x02000000u;
 static const uint TAA_VARIANCE_CLIP_BIT = 0x01000000u;
 static const uint TAA_VARIANCE_CLIP_BOUNDED_BIT = 0x00800000u;
 static const uint TAA_CLIP_DISTANCE_PREVIEW_BIT = 0x00400000u;
+static const uint TAA_EFFECTIVE_SAMPLES_BIT = 0x00200000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
-	TAA_HISTORY_AGE_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT |
+	TAA_HISTORY_SAMPLES_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT |
 	TAA_CURRENT_GAUSSIAN_BIT | TAA_CLOSEST_DEPTH_MOTION_BIT | TAA_DISPLAY_DEPTH_BIT |
-	TAA_VARIANCE_CLIP_BIT | TAA_VARIANCE_CLIP_BOUNDED_BIT | TAA_CLIP_DISTANCE_PREVIEW_BIT;
+	TAA_VARIANCE_CLIP_BIT | TAA_VARIANCE_CLIP_BOUNDED_BIT | TAA_CLIP_DISTANCE_PREVIEW_BIT |
+	TAA_EFFECTIVE_SAMPLES_BIT;
 // exp(-2.29 (d / 0.75)^2): Blackman-Harris approximated by a Gaussian of 0.75 pixels.
 static const float TAA_CURRENT_GAUSSIAN_KERNEL_SCALE = 2.29 / (0.75 * 0.75);
-static const float TAA_HISTORY_INITIAL_AGE = 1.0;
-// Provisional until feedback tuning freezes the coupled accumulation bound.
-static const float TAA_HISTORY_MAX_AGE = 255.0;
+// History alpha holds a compatibility age or an effective sample count, by the history's
+// accumulation model. Both start at one and stay within these bounds.
+static const float TAA_HISTORY_INITIAL_ACCUMULATION = 1.0;
+static const float TAA_HISTORY_MAX_ACCUMULATION = 255.0;
 
 float2 UnpackTemporalAAUnitRangePair(uint packedValues)
 {
@@ -46,17 +49,42 @@ bool IsTemporalColorFinite(float3 color)
 	return all(isfinite(color));
 }
 
-bool IsTemporalHistoryAgeValid(float historyAge)
+bool IsTemporalHistoryAccumulationValid(float accumulation)
 {
-	return isfinite(historyAge) && historyAge >= TAA_HISTORY_INITIAL_AGE &&
-		historyAge <= TAA_HISTORY_MAX_AGE;
+	return isfinite(accumulation) && accumulation >= TAA_HISTORY_INITIAL_ACCUMULATION &&
+		accumulation <= TAA_HISTORY_MAX_ACCUMULATION;
 }
 
+// Compatibility age: consecutive accepted frames, whatever their confidence.
 float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryAge)
 {
-	return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
-		? min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_AGE)
-		: TAA_HISTORY_INITIAL_AGE;
+	return historyAccepted && IsTemporalHistoryAccumulationValid(previousHistoryAge)
+		? min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_ACCUMULATION)
+		: TAA_HISTORY_INITIAL_ACCUMULATION;
+}
+
+// Sample bound of effective-sample accumulation: the count whose weight N / (N + 1)
+// equals the feedback ceiling.
+float ResolveTemporalAAMaxHistorySamples(float maxHistoryFeedback)
+{
+	const float feedback = clamp(maxHistoryFeedback, 0.0, 65534.0 / 65535.0);
+	return clamp(feedback / (1.0 - feedback), TAA_HISTORY_INITIAL_ACCUMULATION,
+		TAA_HISTORY_MAX_ACCUMULATION);
+}
+
+// Effective sample count: the history confidence discounts the carried samples and the
+// current frame adds one, so a low-confidence frame also lowers the weight of the frames
+// after it until evidence accumulates again.
+float ResolveTemporalHistoryNextSamples(bool historyAccepted, float previousSamples,
+	float historyConfidence, float maxSamples)
+{
+	if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) ||
+		!isfinite(historyConfidence))
+	{
+		return TAA_HISTORY_INITIAL_ACCUMULATION;
+	}
+	return clamp(saturate(historyConfidence) * min(previousSamples, maxSamples) + 1.0,
+		TAA_HISTORY_INITIAL_ACCUMULATION, maxSamples);
 }
 
 // Catmull-Rom resampling of the history color with five bilinear fetches: the 4x4
@@ -193,30 +221,30 @@ float3 QuantizeTemporalHistoryColor(float3 color, uint2 pixel, uint temporalFram
 		RoundTemporalHistoryToHalfStochastic(color.b, uniformSamples.z));
 }
 
-float2 ResolveTemporalAAOutputAlphas(float nextHistoryAge)
+float2 ResolveTemporalAAOutputAlphas(float nextAccumulation)
 {
-	return float2(1.0, IsTemporalHistoryAgeValid(nextHistoryAge)
-		? nextHistoryAge
-		: TAA_HISTORY_INITIAL_AGE);
+	return float2(1.0, IsTemporalHistoryAccumulationValid(nextAccumulation)
+		? nextAccumulation
+		: TAA_HISTORY_INITIAL_ACCUMULATION);
 }
 
 float ResolveTemporalAAFeedbackSaturationAge(float maxHistoryFeedback)
 {
 	if (!isfinite(maxHistoryFeedback))
 	{
-		return TAA_HISTORY_INITIAL_AGE;
+		return TAA_HISTORY_INITIAL_ACCUMULATION;
 	}
 
 	const float maxPackedFeedback = 65534.0 / 65535.0;
 	const float feedback = clamp(maxHistoryFeedback, 0.0, maxPackedFeedback);
 	return max(ceil(feedback / max(1.0 - feedback, 1.0 / 65535.0)),
-		TAA_HISTORY_INITIAL_AGE);
+		TAA_HISTORY_INITIAL_ACCUMULATION);
 }
 
 float ResolveTemporalAAHistoryAgePreview(float nextHistoryAge,
 	float maxHistoryFeedback)
 {
-	if (!IsTemporalHistoryAgeValid(nextHistoryAge))
+	if (!IsTemporalHistoryAccumulationValid(nextHistoryAge))
 	{
 		return 0.0;
 	}
@@ -225,8 +253,19 @@ float ResolveTemporalAAHistoryAgePreview(float nextHistoryAge,
 		ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
 	// Feedback uses PreviousAge while this preview displays stored NextAge.
 	// Keep the saturation-age denominator intact; there is intentionally no -1.
-	return saturate((nextHistoryAge - TAA_HISTORY_INITIAL_AGE) /
-		max(feedbackSaturationAge, TAA_HISTORY_INITIAL_AGE));
+	return saturate((nextHistoryAge - TAA_HISTORY_INITIAL_ACCUMULATION) /
+		max(feedbackSaturationAge, TAA_HISTORY_INITIAL_ACCUMULATION));
+}
+
+// Stored effective samples from a reset (black) to the sample bound (white).
+float ResolveTemporalAAHistorySamplesPreview(float nextSamples, float maxSamples)
+{
+	if (!IsTemporalHistoryAccumulationValid(nextSamples))
+	{
+		return 0.0;
+	}
+	return saturate((nextSamples - TAA_HISTORY_INITIAL_ACCUMULATION) /
+		max(maxSamples - TAA_HISTORY_INITIAL_ACCUMULATION, 1.0e-6));
 }
 
 float2 ResolveTemporalHistoryMotionUV(float2 rasterMotionUV,
@@ -303,19 +342,17 @@ float3 ClipTemporalHistoryTowardMean(float3 history, float3 mean, float3 boxMin,
 	return mean + direction * scale;
 }
 
-float ComputeTemporalHistoryWeight(float previousHistoryAge, float motionMagnitudePixels,
+// Confidence in accepted history, in [0, 1], from its motion and luminance change.
+float ComputeTemporalHistoryConfidence(float motionMagnitudePixels,
 	float currentLuminance, float historyLuminance,
-	float maxHistoryFeedback, float velocityWeightScale, float luminanceWeightScale)
+	float velocityWeightScale, float luminanceWeightScale)
 {
-	if (!IsTemporalHistoryAgeValid(previousHistoryAge) ||
-		!isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0 ||
+	if (!isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0 ||
 		!isfinite(currentLuminance) || !isfinite(historyLuminance))
 	{
 		return 0.0;
 	}
 
-	const float ageWeight = previousHistoryAge / (previousHistoryAge + 1.0);
-	const float baseHistoryWeight = min(ageWeight, saturate(maxHistoryFeedback));
 	const float velocityConfidence =
 		1.0 - saturate(motionMagnitudePixels * max(velocityWeightScale, 0.0));
 	const float luminanceDenominator = max(
@@ -324,7 +361,23 @@ float ComputeTemporalHistoryWeight(float previousHistoryAge, float motionMagnitu
 		abs(currentLuminance - historyLuminance) / luminanceDenominator;
 	const float luminanceConfidence =
 		1.0 - saturate(relativeLuminanceDifference * max(luminanceWeightScale, 0.0));
-	return baseHistoryWeight * velocityConfidence * luminanceConfidence;
+	return velocityConfidence * luminanceConfidence;
+}
+
+// Weight of accepted history, min(N / (N + 1), feedback) * confidence, for the stored
+// accumulation N of either model.
+float ComputeTemporalHistoryWeight(float previousAccumulation, float historyConfidence,
+	float maxHistoryFeedback)
+{
+	if (!IsTemporalHistoryAccumulationValid(previousAccumulation) ||
+		!isfinite(historyConfidence))
+	{
+		return 0.0;
+	}
+
+	const float accumulationWeight = previousAccumulation / (previousAccumulation + 1.0);
+	return min(accumulationWeight, saturate(maxHistoryFeedback)) *
+		saturate(historyConfidence);
 }
 
 bool IsTemporalDepthCompatible(float expectedPreviousViewZ, float storedPreviousViewZ,

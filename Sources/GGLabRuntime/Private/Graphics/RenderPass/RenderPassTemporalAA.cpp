@@ -31,7 +31,7 @@ namespace gglab
 		inline constexpr uint32_t TemporalAAThreadGroupSize = 8;
 		inline constexpr uint32_t TemporalAAHistoryValidBit = 0x80000000u;
 		inline constexpr uint32_t TemporalAAHistoryColorPreviewBit = 0x40000000u;
-		inline constexpr uint32_t TemporalAAHistoryAgePreviewBit = 0x20000000u;
+		inline constexpr uint32_t TemporalAAHistorySamplesPreviewBit = 0x20000000u;
 		inline constexpr uint32_t TemporalAAHistoryCatmullRomBit = 0x10000000u;
 		inline constexpr uint32_t TemporalAACurrentGaussianBit = 0x08000000u;
 		inline constexpr uint32_t TemporalAAClosestDepthMotionBit = 0x04000000u;
@@ -39,12 +39,14 @@ namespace gglab
 		inline constexpr uint32_t TemporalAAVarianceClipBit = 0x01000000u;
 		inline constexpr uint32_t TemporalAAVarianceClipBoundedBit = 0x00800000u;
 		inline constexpr uint32_t TemporalAAClipDistancePreviewBit = 0x00400000u;
+		inline constexpr uint32_t TemporalAAEffectiveSamplesBit = 0x00200000u;
 		inline constexpr uint32_t TemporalAAViewFlagMask =
 			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit |
-			TemporalAAHistoryAgePreviewBit | TemporalAAHistoryCatmullRomBit |
+			TemporalAAHistorySamplesPreviewBit | TemporalAAHistoryCatmullRomBit |
 			TemporalAACurrentGaussianBit | TemporalAAClosestDepthMotionBit |
 			TemporalAADisplayDepthBit | TemporalAAVarianceClipBit |
-			TemporalAAVarianceClipBoundedBit | TemporalAAClipDistancePreviewBit;
+			TemporalAAVarianceClipBoundedBit | TemporalAAClipDistancePreviewBit |
+			TemporalAAEffectiveSamplesBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -196,6 +198,12 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const TemporalAASettings temporalAASettings =
 			context.GetDisplayViewRenderSettings().m_TemporalAA;
+		// The history's compatibility identity names what its alpha accumulates; the
+		// resolve follows it rather than the settings so the two cannot disagree.
+		const TemporalAAHistoryAccumulation historyAccumulation =
+			transaction->GetHistoryAccumulation();
+		GGLAB_ASSERT_MSG(historyAccumulation == temporalAASettings.m_HistoryAccumulation,
+			"Temporal AA resolves with the accumulation model its frame plan resolved.");
 		const bool previousHistoryCompatible =
 			transaction->HasCompatiblePreviousHistory();
 		const auto* resourceRegistry = services.m_Resources;
@@ -223,8 +231,8 @@ namespace gglab
 		}
 		const bool historyColorPreviewRequested =
 			payloadTap && UsesTemporalAAHistoryColorPreviewPayload(*payloadTap);
-		const bool historyAgePreviewRequested =
-			payloadTap && UsesTemporalAAHistoryAgePreviewPayload(*payloadTap);
+		const bool historySamplesPreviewRequested =
+			payloadTap && UsesTemporalAAHistorySamplesPreviewPayload(*payloadTap);
 		const bool clipDistancePreviewRequested =
 			payloadTap && UsesTemporalAAClipDistancePreviewPayload(*payloadTap);
 
@@ -281,9 +289,9 @@ namespace gglab
 
 		rg.AddPass<TemporalAAPassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
-			[transaction, displayViewId, viewIndex, temporalAASettings,
+			[transaction, displayViewId, viewIndex, temporalAASettings, historyAccumulation,
 			previousHistoryCompatible, historyColorPreviewRequested,
-			historyAgePreviewRequested, clipDistancePreviewRequested,
+			historySamplesPreviewRequested, clipDistancePreviewRequested,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -418,8 +426,8 @@ namespace gglab
 						(historyColorPreviewRequested
 							? TemporalAAHistoryColorPreviewBit
 							: 0u) |
-						(historyAgePreviewRequested
-							? TemporalAAHistoryAgePreviewBit
+						(historySamplesPreviewRequested
+							? TemporalAAHistorySamplesPreviewBit
 							: 0u) |
 						(clipDistancePreviewRequested
 							? TemporalAAClipDistancePreviewBit
@@ -443,6 +451,9 @@ namespace gglab
 						(temporalAASettings.m_HistoryRectification ==
 							TemporalAAHistoryRectification::BoundedVarianceClip
 							? TemporalAAVarianceClipBoundedBit
+							: 0u) |
+						(historyAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples
+							? TemporalAAEffectiveSamplesBit
 							: 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,

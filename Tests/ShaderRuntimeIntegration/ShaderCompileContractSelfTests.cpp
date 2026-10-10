@@ -3253,7 +3253,7 @@ namespace gglab
 				temporalAASpirVArtifact.IsSuccess() &&
 				postProcessPreviewDxilArtifact.IsSuccess() &&
 				postProcessPreviewSpirVArtifact.IsSuccess(),
-				"Production DXC compiles TAA reprojection and post-process age preview with point-sampled history age, split resolved/history alpha, transient diagnostics, depth rejection, YCoCg neighborhood clamp, and age-capped temporal blend for DX12 and Vulkan 1.3");
+				"Production DXC compiles TAA reprojection and post-process accumulation preview with point-sampled history accumulation, split resolved/history alpha, transient diagnostics, depth rejection, YCoCg neighborhood clamp, and accumulation-capped temporal blend for DX12 and Vulkan 1.3");
 
 			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

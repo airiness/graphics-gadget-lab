@@ -236,6 +236,23 @@ namespace gglab
 					outOverrides.m_PostTemporalView = *view;
 					continue;
 				}
+				if (key == "historyAccumulation")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array accumulations{
+						TemporalAAHistoryAccumulation::CompatibilityAge,
+						TemporalAAHistoryAccumulation::EffectiveSamples };
+					const auto accumulation = std::ranges::find(
+						accumulations, name, &GetTemporalAAHistoryAccumulationName);
+					if (accumulation == accumulations.end())
+					{
+						return "Temporal AA override 'historyAccumulation' must be "
+							"'compatibility-age' or 'effective-samples'.";
+					}
+					outOverrides.m_HistoryAccumulation = *accumulation;
+					continue;
+				}
 				if (key == "historyRectification")
 				{
 					const std::string name =

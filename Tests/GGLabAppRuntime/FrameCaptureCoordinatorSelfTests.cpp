@@ -1351,6 +1351,7 @@ namespace gglab
 					.m_Enabled = false,
 					.m_MaxHistoryFeedback = 0.9f,
 					.m_NeighborhoodClampExpansion = 4.0f,
+					.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge,
 					.m_HistoryRectification = TemporalAAHistoryRectification::BoundedVarianceClip,
 					.m_VarianceClipGamma = 9.0f,
 					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
@@ -1391,6 +1392,8 @@ namespace gglab
 					content.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
 					ResolveTemporalAASettings(invalidFilter).m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Native &&
+					overridden.m_HistoryAccumulation == TemporalAAHistoryAccumulation::CompatibilityAge &&
+					content.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
 					overridden.m_HistoryRectification ==
 					TemporalAAHistoryRectification::BoundedVarianceClip &&
 					overridden.m_VarianceClipGamma == TemporalAAMaxVarianceClipGamma &&

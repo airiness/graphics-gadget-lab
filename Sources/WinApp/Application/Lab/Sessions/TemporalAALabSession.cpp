@@ -85,7 +85,7 @@ namespace gglab
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalReprojectionUV), .m_Name = "Reprojection UV"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalRejection), .m_Name = "Rejection"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryAge), .m_Name = "History Age"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistorySamples), .m_Name = "History Samples"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalClipDistance), .m_Name = "Clip Distance"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude"},
@@ -562,8 +562,10 @@ namespace gglab
 				TemporalAAMaxHistoryFeedbackCeiling, 0.0f))[0];
 		const float packedCeilingSaturationAge =
 			ResolveTemporalAAFeedbackSaturationAge(packedCeiling);
-		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAge &&
-			packedCeilingSaturationAge <= TemporalHistoryMaxAge && packedCeiling < 1.0f;
+		const float maxHistorySamples = ResolveTemporalAAMaxHistorySamples(taa.m_MaxHistoryFeedback);
+		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAccumulation &&
+			packedCeilingSaturationAge <= TemporalHistoryMaxAccumulation && packedCeiling < 1.0f &&
+			ResolveTemporalAAMaxHistorySamples(packedCeiling) < TemporalHistoryMaxAccumulation;
 		const std::string gpuTiming = m_GpuTimingSampleCount > 0
 			? std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
 				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
@@ -586,10 +588,11 @@ namespace gglab
 				camera.GetExposureCompensationEV())},
 			{.m_Name = "TAA settings", .m_Value = std::format(
 				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
-				"rectification {} (gamma {:.2f}), history {}, current {}, motion {}, "
-				"post-temporal {}, resolution {}, texture LOD {:.2f}",
+				"accumulation {}, rectification {} (gamma {:.2f}), history {}, current {}, "
+				"motion {}, post-temporal {}, resolution {}, texture LOD {:.2f}",
 				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
 				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion,
+				GetTemporalAAHistoryAccumulationName(taa.m_HistoryAccumulation),
 				GetTemporalAAHistoryRectificationName(taa.m_HistoryRectification),
 				taa.m_VarianceClipGamma,
 				GetTemporalAAHistoryFilterName(taa.m_HistoryFilter),
@@ -598,8 +601,9 @@ namespace gglab
 				GetTemporalAAPostTemporalViewName(taa.m_PostTemporalView),
 				GetTemporalAAResolutionPresetName(taa.m_ResolutionPreset),
 				taa.m_TextureLodBiasOffset)},
-			{.m_Name = "Age bound", .m_Value = std::format(
-				"saturation {:.0f}, max {:.0f}", saturationAge, TemporalHistoryMaxAge)},
+			{.m_Name = "Accumulation bound", .m_Value = std::format(
+				"age saturation {:.0f}, samples {:.2f}, stored max {:.0f}", saturationAge,
+				maxHistorySamples, TemporalHistoryMaxAccumulation)},
 			{.m_Name = "Frozen ceiling", .m_Value = std::format(
 				"{:.6f} -> age {:.0f}; packed {:.6f} -> age {:.0f}",
 				TemporalAAMaxHistoryFeedbackCeiling, ceilingSaturationAge,
@@ -629,14 +633,14 @@ namespace gglab
 			{.m_Name = "Coupled accumulation bound",
 				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Failed,
-				.m_Detail = "The selected feedback ceiling must saturate no later than MaxHistoryAge and its UNORM16 representation must remain below one."},
+				.m_Detail = "The selected feedback ceiling must saturate both accumulation models below the stored accumulation bound and its UNORM16 representation must remain below one."},
 			{.m_Name = "GPU timing capture",
 				.m_Status = m_GpuTimingSampleCount >= TemporalAAGpuTimingSampleTarget
 					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "The fixed 120-frame window starts after two complete 8-sample jitter cycles and resets when the evidence domain changes."},
 			{.m_Name = "Sampling-footprint review",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Inspect named edge/disocclusion ROIs: RGB is bilinear (4 texels), age is point sampled (1 texel), and depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
+				.m_Detail = "Inspect named edge/disocclusion ROIs: RGB is bilinear (4 texels), the accumulation state is point sampled (1 texel), and depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
 		};
 	}
 

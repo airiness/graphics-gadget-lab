@@ -5451,7 +5451,7 @@ namespace gglab
 			historyColorPreviewPayloadDesc.m_Usage = RHITextureUsage::None;
 			RGTemporalAAResources historyColorPreviewResources{};
 			bool historyColorPreviewUsesTransientPayload = false;
-			bool historyAgePreviewUsesTransientPayload = false;
+			bool historySamplesPreviewUsesTransientPayload = false;
 			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
 				"TemporalHistory.ExportPrevious",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
@@ -5500,13 +5500,13 @@ namespace gglab
 					builder.SideEffect();
 				});
 			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
-				"PostProcess.Preview.HistoryAge",
+				"PostProcess.Preview.HistorySamples",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
 					const RGTextureId previewSource = ResolveTemporalAAPreviewSource(
 						historyColorPreviewResources,
-						PostProcessDebugTap::TemporalHistoryAge);
-					historyAgePreviewUsesTransientPayload =
+						PostProcessDebugTap::TemporalHistorySamples);
+					historySamplesPreviewUsesTransientPayload =
 						previewSource ==
 							historyColorPreviewResources.m_ReprojectionDiagnostics &&
 						previewSource !=
@@ -5517,19 +5517,19 @@ namespace gglab
 					builder.SideEffect();
 				});
 			context.Check(historyColorPreviewUsesTransientPayload &&
-				historyAgePreviewUsesTransientPayload &&
+				historySamplesPreviewUsesTransientPayload &&
 				UsesTemporalAAHistoryColorPreviewPayload(
 					PostProcessDebugTap::TemporalHistoryColor) &&
 				!UsesTemporalAAHistoryColorPreviewPayload(
-					PostProcessDebugTap::TemporalHistoryAge) &&
-				UsesTemporalAAHistoryAgePreviewPayload(
-					PostProcessDebugTap::TemporalHistoryAge) &&
-				!UsesTemporalAAHistoryAgePreviewPayload(
+					PostProcessDebugTap::TemporalHistorySamples) &&
+				UsesTemporalAAHistorySamplesPreviewPayload(
+					PostProcessDebugTap::TemporalHistorySamples) &&
+				!UsesTemporalAAHistorySamplesPreviewPayload(
 					PostProcessDebugTap::TemporalHistoryColor) &&
 				UsesTemporalAAClipDistancePreviewPayload(
 					PostProcessDebugTap::TemporalClipDistance) &&
 				!UsesTemporalAAClipDistancePreviewPayload(
-					PostProcessDebugTap::TemporalHistoryAge) &&
+					PostProcessDebugTap::TemporalHistorySamples) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalClipDistance) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalHistoryWeight) &&
 				!IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalMotionMagnitude) &&
@@ -5958,6 +5958,19 @@ namespace gglab
 				renderChangedHistory.m_Compatibility.m_DepthExtent == ViewExtent{ 48, 30 },
 				"Temporal color history follows the display extent and depth history the render "
 				"extent; a render extent change alone resets the pair");
+			// The stored alpha of one accumulation model is not the other's.
+			ResolvedTemporalFramePlan agePlan = activePlan;
+			agePlan.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+			auto ageFrame = domainManager.BeginFrame(agePlan, renderChanged);
+			const TemporalHistoryManagerDiagnostics ageHistory = domainManager.GetDiagnostics();
+			domainManager.AbortFrame(ageFrame, {});
+			context.Check(renderChangedHistory.m_Compatibility.m_Accumulation ==
+					TemporalAAHistoryAccumulation::EffectiveSamples &&
+				!ageFrame.m_PreviousValid &&
+				ageHistory.m_LastResetReason == TemporalHistoryResetReason::AccumulationChanged &&
+				ageHistory.m_Compatibility.m_Accumulation ==
+					TemporalAAHistoryAccumulation::CompatibilityAge,
+				"Switching the history accumulation model resets the color and depth history");
 			domainManager.Shutdown();
 			exposureManager.Shutdown();
 			device.m_CompletedFenceValue = exposureFence;
@@ -6927,24 +6940,49 @@ namespace gglab
 			};
 		}
 
-		[[nodiscard]] inline bool IsTemporalHistoryAgeValid(float historyAge) noexcept
+		[[nodiscard]] inline bool IsTemporalHistoryAccumulationValid(float accumulation) noexcept
 		{
-			return std::isfinite(historyAge) && historyAge >= TemporalHistoryInitialAge &&
-				historyAge <= TemporalHistoryMaxAge;
+			return std::isfinite(accumulation) &&
+				accumulation >= TemporalHistoryInitialAccumulation &&
+				accumulation <= TemporalHistoryMaxAccumulation;
 		}
 
 		[[nodiscard]] inline float ResolveTemporalHistoryNextAge(
 			bool historyAccepted, float previousHistoryAge) noexcept
 		{
-			return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
-				? std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAge)
-				: TemporalHistoryInitialAge;
+			return historyAccepted && IsTemporalHistoryAccumulationValid(previousHistoryAge)
+				? std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAccumulation)
+				: TemporalHistoryInitialAccumulation;
+		}
+
+		[[nodiscard]] inline float ResolveTemporalHistoryNextSamples(bool historyAccepted,
+			float previousSamples, float historyConfidence, float maxSamples) noexcept
+		{
+			if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) ||
+				!std::isfinite(historyConfidence))
+			{
+				return TemporalHistoryInitialAccumulation;
+			}
+			return std::clamp(std::clamp(historyConfidence, 0.0f, 1.0f) *
+				std::min(previousSamples, maxSamples) + 1.0f,
+				TemporalHistoryInitialAccumulation, maxSamples);
+		}
+
+		[[nodiscard]] inline float ResolveTemporalAAHistorySamplesPreview(
+			float nextSamples, float maxSamples) noexcept
+		{
+			if (!IsTemporalHistoryAccumulationValid(nextSamples))
+			{
+				return 0.0f;
+			}
+			return std::clamp((nextSamples - TemporalHistoryInitialAccumulation) /
+				std::max(maxSamples - TemporalHistoryInitialAccumulation, 1.0e-6f), 0.0f, 1.0f);
 		}
 
 		struct TemporalAAOutputAlphaContract final
 		{
 			float m_ResolvedAlpha = 1.0f;
-			float m_HistoryAlpha = TemporalHistoryInitialAge;
+			float m_HistoryAlpha = TemporalHistoryInitialAccumulation;
 		};
 
 		[[nodiscard]] inline TemporalAAOutputAlphaContract ResolveTemporalAAOutputAlphas(
@@ -6952,9 +6990,9 @@ namespace gglab
 		{
 			return {
 				.m_ResolvedAlpha = 1.0f,
-				.m_HistoryAlpha = IsTemporalHistoryAgeValid(nextHistoryAge)
+				.m_HistoryAlpha = IsTemporalHistoryAccumulationValid(nextHistoryAge)
 					? nextHistoryAge
-					: TemporalHistoryInitialAge,
+					: TemporalHistoryInitialAccumulation,
 			};
 		}
 
@@ -6982,7 +7020,7 @@ namespace gglab
 		[[nodiscard]] inline float ResolveTemporalAAHistoryAgePreview(
 			float nextHistoryAge, float maxHistoryFeedback) noexcept
 		{
-			if (!IsTemporalHistoryAgeValid(nextHistoryAge))
+			if (!IsTemporalHistoryAccumulationValid(nextHistoryAge))
 			{
 				return 0.0f;
 			}
@@ -6991,15 +7029,15 @@ namespace gglab
 				ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
 			// Feedback uses PreviousAge while this preview displays stored NextAge.
 			// Keep the saturation-age denominator intact; there is intentionally no -1.
-			return std::clamp((nextHistoryAge - TemporalHistoryInitialAge) /
-				std::max(feedbackSaturationAge, TemporalHistoryInitialAge), 0.0f, 1.0f);
+			return std::clamp((nextHistoryAge - TemporalHistoryInitialAccumulation) /
+				std::max(feedbackSaturationAge, TemporalHistoryInitialAccumulation), 0.0f, 1.0f);
 		}
 
 		[[nodiscard]] inline float ResolveTemporalAAHistoryWeight(float previousHistoryAge,
 			float motionMagnitudePixels, float currentLuminance, float historyLuminance,
 			const TemporalAASettings& settings) noexcept
 		{
-			if (!IsTemporalHistoryAgeValid(previousHistoryAge) ||
+			if (!IsTemporalHistoryAccumulationValid(previousHistoryAge) ||
 				!std::isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0f ||
 				!std::isfinite(currentLuminance) || !std::isfinite(historyLuminance))
 			{
@@ -7863,18 +7901,18 @@ namespace gglab
 					std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
 				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
 
-			context.Check(TemporalHistoryInitialAge == 1.0f &&
-				TemporalHistoryMaxAge == 255.0f &&
-				IsTemporalHistoryAgeValid(TemporalHistoryInitialAge) &&
-				IsTemporalHistoryAgeValid(TemporalHistoryMaxAge) &&
-				!IsTemporalHistoryAgeValid(0.0f) &&
-				!IsTemporalHistoryAgeValid(TemporalHistoryMaxAge + 1.0f) &&
-				!IsTemporalHistoryAgeValid(std::numeric_limits<float>::quiet_NaN()) &&
-				ResolveTemporalHistoryNextAge(false, 37.0f) == TemporalHistoryInitialAge &&
-				ResolveTemporalHistoryNextAge(true, 0.0f) == TemporalHistoryInitialAge &&
-				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAge) == 2.0f &&
-				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAge) ==
-					TemporalHistoryMaxAge,
+			context.Check(TemporalHistoryInitialAccumulation == 1.0f &&
+				TemporalHistoryMaxAccumulation == 255.0f &&
+				IsTemporalHistoryAccumulationValid(TemporalHistoryInitialAccumulation) &&
+				IsTemporalHistoryAccumulationValid(TemporalHistoryMaxAccumulation) &&
+				!IsTemporalHistoryAccumulationValid(0.0f) &&
+				!IsTemporalHistoryAccumulationValid(TemporalHistoryMaxAccumulation + 1.0f) &&
+				!IsTemporalHistoryAccumulationValid(std::numeric_limits<float>::quiet_NaN()) &&
+				ResolveTemporalHistoryNextAge(false, 37.0f) == TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextAge(true, 0.0f) == TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAccumulation) == 2.0f &&
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAccumulation) ==
+					TemporalHistoryMaxAccumulation,
 				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at the frozen R16Float-exact bound");
 
 			const TemporalAAOutputAlphaContract accumulatedOutputAlphas =
@@ -7885,7 +7923,7 @@ namespace gglab
 			context.Check(accumulatedOutputAlphas.m_ResolvedAlpha == 1.0f &&
 				accumulatedOutputAlphas.m_HistoryAlpha == 37.0f &&
 				resetOutputAlphas.m_ResolvedAlpha == 1.0f &&
-				resetOutputAlphas.m_HistoryAlpha == TemporalHistoryInitialAge,
+				resetOutputAlphas.m_HistoryAlpha == TemporalHistoryInitialAccumulation,
 				"TAA output alpha contract keeps resolved color opaque while history carries a finite bounded age");
 
 			const float previewFeedbackSaturationAge =
@@ -7936,7 +7974,7 @@ namespace gglab
 				ResolveTemporalAAFeedbackSaturationAge(
 					feedbackCeilingPackingGolden[0]) == 100.0f &&
 				std::ceil(feedbackCeilingPackingGolden[0] /
-					(1.0f - feedbackCeilingPackingGolden[0])) <= TemporalHistoryMaxAge,
+					(1.0f - feedbackCeilingPackingGolden[0])) <= TemporalHistoryMaxAccumulation,
 				"Temporal AA CPU packing matches the HLSL low/high UNORM16 ABI, feedback can never encode one, and the frozen cap remains reachable before age saturation");
 
 			constexpr std::array<float, 7> historyAges{ 1.0f, 2.0f, 3.0f, 7.0f, 15.0f,
@@ -7965,7 +8003,7 @@ namespace gglab
 			TemporalAASettings packedCeilingSettings = defaultTemporalAA;
 			packedCeilingSettings.m_MaxHistoryFeedback = feedbackCeilingPackingGolden[0];
 			const float saturatedCeilingWeight = ResolveTemporalAAHistoryWeight(
-				TemporalHistoryMaxAge, 0.0f, 1.0f, 1.0f, packedCeilingSettings);
+				TemporalHistoryMaxAccumulation, 0.0f, 1.0f, 1.0f, packedCeilingSettings);
 			context.Check(ageWeightGoldenMatches &&
 				TemporalAADefaultLuminanceWeightScale == 0.0f &&
 				NearlyEqual(staticHistoryWeight,
@@ -7981,6 +8019,62 @@ namespace gglab
 					std::numeric_limits<float>::quiet_NaN(),
 					1.0f, 1.0f, defaultTemporalAA) == 0.0f,
 				"Temporal blend follows the age golden sequence, caps at the frozen maximum, retains velocity attenuation, and keeps luminance attenuation research-only by default");
+
+			const float maxHistorySamples =
+				ResolveTemporalAAMaxHistorySamples(TemporalAADefaultMaxHistoryFeedback);
+			context.Check(NearlyEqual(maxHistorySamples, TemporalAADefaultMaxHistoryFeedback /
+					(1.0f - TemporalAADefaultMaxHistoryFeedback)) &&
+				NearlyEqual(maxHistorySamples / (maxHistorySamples + 1.0f),
+					TemporalAADefaultMaxHistoryFeedback) &&
+				ResolveTemporalAAMaxHistorySamples(0.0f) == TemporalHistoryInitialAccumulation &&
+				ResolveTemporalAAMaxHistorySamples(std::numeric_limits<float>::quiet_NaN()) ==
+					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalAAMaxHistorySamples(feedbackCeilingPackingGolden[0]) <
+					TemporalHistoryMaxAccumulation &&
+				ResolveTemporalAAMaxHistorySamples(1.0f) == TemporalHistoryMaxAccumulation &&
+				ResolveTemporalHistoryNextSamples(false, 20.0f, 1.0f, maxHistorySamples) ==
+					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 0.0f, 1.0f, maxHistorySamples) ==
+					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f,
+					std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) ==
+					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 1.0f, 1.0f, maxHistorySamples) == 2.0f &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 0.0f, maxHistorySamples) ==
+					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 0.5f, maxHistorySamples) == 11.0f &&
+				ResolveTemporalHistoryNextSamples(true, maxHistorySamples, 1.0f,
+					maxHistorySamples) == maxHistorySamples &&
+				ResolveTemporalHistoryNextSamples(true, TemporalHistoryMaxAccumulation, 1.0f,
+					maxHistorySamples) == maxHistorySamples &&
+				ResolveTemporalAAHistorySamplesPreview(1.0f, maxHistorySamples) == 0.0f &&
+				ResolveTemporalAAHistorySamplesPreview(maxHistorySamples, maxHistorySamples) == 1.0f &&
+				ResolveTemporalAAHistorySamplesPreview(
+					std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) == 0.0f &&
+				ResolveTemporalAAHistorySamplesPreview(1.0f, 1.0f) == 0.0f,
+				"Effective samples start or reset at one, discount the carried samples by the history confidence, add one per accepted frame and saturate where their weight meets the feedback ceiling");
+
+			// After a stretch of half-confidence frames the age keeps counting, so the next
+			// confident frame returns to the ceiling weight; the effective samples have
+			// settled near 1 / (1 - 0.5) and the weight rises again only as evidence returns.
+			float compatibilityAge = TemporalHistoryInitialAccumulation;
+			float effectiveSamples = TemporalHistoryInitialAccumulation;
+			for (uint32_t frame = 0; frame < 80; ++frame)
+			{
+				const float confidence = frame < 60 ? 1.0f : 0.5f;
+				compatibilityAge = ResolveTemporalHistoryNextAge(true, compatibilityAge);
+				effectiveSamples = ResolveTemporalHistoryNextSamples(
+					true, effectiveSamples, confidence, maxHistorySamples);
+			}
+			const float ageWeightAfterMotion = ResolveTemporalAAHistoryWeight(
+				compatibilityAge, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float samplesWeightAfterMotion = ResolveTemporalAAHistoryWeight(
+				effectiveSamples, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			context.Check(compatibilityAge == 81.0f &&
+				NearlyEqual(ageWeightAfterMotion, TemporalAADefaultMaxHistoryFeedback) &&
+				effectiveSamples > 1.9f && effectiveSamples <= 2.0f + 1.0e-4f &&
+				samplesWeightAfterMotion < 0.7f,
+				"Effective samples keep a low-confidence stretch from returning to the ceiling weight on the next confident frame");
 
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;
@@ -8416,6 +8510,27 @@ namespace gglab
 					TemporalAAResolutionPreset::Native,
 				"A render scale below native applies only to an active Temporal AA consumer "
 				"whose pipeline resolve can upscale");
+
+			TemporalFramePlanResolveInfo ageInfo = resolveInfo;
+			ageInfo.m_Settings.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+			TemporalFramePlanResolveInfo disabledAgeInfo = ageInfo;
+			disabledAgeInfo.m_Settings.m_Enabled = false;
+			TemporalAASettings invalidAccumulation{};
+			invalidAccumulation.m_HistoryAccumulation = static_cast<TemporalAAHistoryAccumulation>(7);
+			context.Check(TemporalAASettings{}.m_HistoryAccumulation ==
+					TemporalAAHistoryAccumulation::EffectiveSamples &&
+				activePlan.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
+				ResolveTemporalFramePlan(ageInfo).m_HistoryAccumulation ==
+					TemporalAAHistoryAccumulation::CompatibilityAge &&
+				ResolveTemporalFramePlan(disabledAgeInfo).m_HistoryAccumulation ==
+					TemporalAAHistoryAccumulation::EffectiveSamples &&
+				ResolveTemporalAASettings(invalidAccumulation).m_HistoryAccumulation ==
+					TemporalAAHistoryAccumulation::EffectiveSamples &&
+				GetTemporalAAHistoryAccumulationName(
+					TemporalAAHistoryAccumulation::CompatibilityAge) == "compatibility-age" &&
+				GetTemporalAAHistoryAccumulationName(
+					TemporalAAHistoryAccumulation::EffectiveSamples) == "effective-samples",
+				"The frame plan carries the requested accumulation model of an active Temporal AA consumer");
 
 			const ViewResolution quality720 = ResolveTemporalAAViewResolution(
 				{ 1280, 720 }, TemporalAAResolutionPreset::Quality);

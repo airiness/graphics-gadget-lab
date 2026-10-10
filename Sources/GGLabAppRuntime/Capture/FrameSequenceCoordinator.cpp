@@ -14,7 +14,7 @@ namespace gglab
 	{
 		return !m_Enabled && !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
 			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
-			!m_NeighborhoodClampExpansion && !m_HistoryRectification &&
+			!m_NeighborhoodClampExpansion && !m_HistoryAccumulation && !m_HistoryRectification &&
 			!m_VarianceClipGamma && !m_HistoryFilter && !m_CurrentFilter &&
 			!m_MotionSelection && !m_PostTemporalView && !m_ResolutionPreset &&
 			!m_TextureLodBiasOffset;
@@ -37,6 +37,8 @@ namespace gglab
 			overrides.m_LuminanceWeightScale.value_or(settings.m_LuminanceWeightScale);
 		settings.m_NeighborhoodClampExpansion = overrides.m_NeighborhoodClampExpansion.value_or(
 			settings.m_NeighborhoodClampExpansion);
+		settings.m_HistoryAccumulation =
+			overrides.m_HistoryAccumulation.value_or(settings.m_HistoryAccumulation);
 		settings.m_HistoryRectification =
 			overrides.m_HistoryRectification.value_or(settings.m_HistoryRectification);
 		settings.m_VarianceClipGamma =

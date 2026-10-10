@@ -149,6 +149,11 @@ namespace gglab
 		[[nodiscard]] uint32_t GetFrameIndex() const noexcept { return m_FrameIndex; }
 		[[nodiscard]] float GetScenePreExposure() const noexcept { return m_ScenePreExposure; }
 		[[nodiscard]] TemporalColorAbi GetColorAbi() const noexcept { return m_ColorAbi; }
+		// Accumulation model of the color history this frame reads and writes.
+		[[nodiscard]] TemporalAAHistoryAccumulation GetHistoryAccumulation() const noexcept
+		{
+			return m_Plan.m_HistoryAccumulation;
+		}
 		[[nodiscard]] const Vector2& GetJitterPixels() const noexcept { return m_JitterPixels; }
 		[[nodiscard]] const std::optional<TemporalReferenceSample>& GetReferenceSample()
 			const noexcept

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
@@ -12,7 +13,8 @@
 
 namespace gglab
 {
-	// Persistent history RGB stores accumulated color; alpha stores HistoryAge.
+	// Persistent history RGB stores accumulated color; alpha stores the accumulation
+	// state of the history's accumulation model.
 	inline constexpr RHIFormat TemporalHistoryColorFormat = RHIFormat::R16G16B16A16Float;
 	inline constexpr RHIFormat TemporalHistoryDepthFormat = RHIFormat::R32Float;
 
@@ -27,6 +29,7 @@ namespace gglab
 		ExtentChanged,
 		FormatChanged,
 		ColorAbiChanged,
+		AccumulationChanged,
 		AllocationFailure,
 		AvailabilityChanged,
 		ResolveProgramChanged,
@@ -48,6 +51,9 @@ namespace gglab
 		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
 		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
+		// Meaning of the stored alpha.
+		TemporalAAHistoryAccumulation m_Accumulation =
+			TemporalAAHistoryAccumulation::EffectiveSamples;
 
 		bool operator==(const TemporalHistoryCompatibilityIdentity&) const noexcept = default;
 	};

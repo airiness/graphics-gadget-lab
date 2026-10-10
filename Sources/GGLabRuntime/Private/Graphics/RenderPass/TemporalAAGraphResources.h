@@ -16,7 +16,8 @@ namespace gglab
 		RGTextureId m_ResolvedSceneColor{};
 		// The selected TAA preview payload. Normally RGBA = history weight,
 		// rejection reason, previous U, previous V. TemporalHistoryColor carries
-		// current accumulated color; TemporalHistoryAge carries normalized NextAge.
+		// current accumulated color; TemporalHistorySamples carries the normalized next
+		// accumulation state.
 		RGTextureId m_ReprojectionDiagnostics{};
 		// Display-extent raw depth of the nearest render sample, resolved when the render
 		// extent is smaller; it becomes the post-temporal display depth.
@@ -38,10 +39,10 @@ namespace gglab
 		return tap == PostProcessDebugTap::TemporalHistoryColor;
 	}
 
-	[[nodiscard]] constexpr bool UsesTemporalAAHistoryAgePreviewPayload(
+	[[nodiscard]] constexpr bool UsesTemporalAAHistorySamplesPreviewPayload(
 		PostProcessDebugTap tap) noexcept
 	{
-		return tap == PostProcessDebugTap::TemporalHistoryAge;
+		return tap == PostProcessDebugTap::TemporalHistorySamples;
 	}
 
 	[[nodiscard]] constexpr bool UsesTemporalAAClipDistancePreviewPayload(
@@ -59,7 +60,7 @@ namespace gglab
 		case PostProcessDebugTap::TemporalReprojectionUV:
 		case PostProcessDebugTap::TemporalRejection:
 		case PostProcessDebugTap::TemporalHistoryWeight:
-		case PostProcessDebugTap::TemporalHistoryAge:
+		case PostProcessDebugTap::TemporalHistorySamples:
 		case PostProcessDebugTap::TemporalClipDistance:
 			return true;
 		default:
@@ -76,7 +77,7 @@ namespace gglab
 		case PostProcessDebugTap::TemporalReprojectionUV:
 		case PostProcessDebugTap::TemporalRejection:
 		case PostProcessDebugTap::TemporalHistoryWeight:
-		case PostProcessDebugTap::TemporalHistoryAge:
+		case PostProcessDebugTap::TemporalHistorySamples:
 		case PostProcessDebugTap::TemporalClipDistance:
 			return resources.m_ReprojectionDiagnostics;
 		default:

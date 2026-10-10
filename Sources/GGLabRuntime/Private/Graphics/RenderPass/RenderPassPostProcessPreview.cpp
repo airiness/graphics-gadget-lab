@@ -56,7 +56,7 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalRejection) == 18);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
-		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistorySamples) == 20);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
 
 		struct PassData
@@ -117,7 +117,7 @@ namespace gglab
 				tap == PostProcessDebugTap::TemporalReprojectionUV ||
 				tap == PostProcessDebugTap::TemporalRejection ||
 				tap == PostProcessDebugTap::TemporalHistoryWeight ||
-				tap == PostProcessDebugTap::TemporalHistoryAge ||
+				tap == PostProcessDebugTap::TemporalHistorySamples ||
 				tap == PostProcessDebugTap::TemporalClipDistance;
 		}
 

@@ -45,7 +45,7 @@ namespace gglab
 				{ PostProcessDebugTap::TemporalReprojectionUV, "temporal-reprojection-uv" },
 				{ PostProcessDebugTap::TemporalRejection, "temporal-rejection" },
 				{ PostProcessDebugTap::TemporalHistoryWeight, "temporal-history-weight" },
-				{ PostProcessDebugTap::TemporalHistoryAge, "temporal-history-age" },
+				{ PostProcessDebugTap::TemporalHistorySamples, "temporal-history-samples" },
 				{ PostProcessDebugTap::TemporalClipDistance, "temporal-clip-distance" },
 			} };
 	}

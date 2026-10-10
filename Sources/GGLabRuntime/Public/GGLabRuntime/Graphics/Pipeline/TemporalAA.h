@@ -16,15 +16,18 @@ namespace gglab
 {
 	inline constexpr float TemporalAADepthAbsoluteThreshold = 0.05f;
 	inline constexpr float TemporalAADepthRelativeThreshold = 0.02f;
-	// History weight falls linearly to zero at 10 display pixels of motion per frame.
-	// Against supersampled references, a weaker scale (0.05) leaves moving content with
-	// more resampling blur and more frame-to-frame flicker. A pixel without motion keeps
-	// its full history weight.
-	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.1f;
+	// History confidence falls linearly to zero at 1 / scale display pixels of motion per
+	// frame. A pixel without motion keeps its full history weight. Effective-sample
+	// accumulation also discounts the carried samples by the confidence, so its scale is
+	// lower than the 0.1 that suited compatibility age. At 0.075 no evaluated region was
+	// worse than compatibility age at 0.1, and moving content recovered faster after a stop.
+	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.075f;
 	inline constexpr float TemporalAADefaultLuminanceWeightScale = 0.0f;
 	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
-	inline constexpr float TemporalHistoryInitialAge = 1.0f;
-	inline constexpr float TemporalHistoryMaxAge = 255.0f;
+	// History alpha stores the accumulation state of its accumulation model; both start
+	// at one and stay within [initial, max].
+	inline constexpr float TemporalHistoryInitialAccumulation = 1.0f;
+	inline constexpr float TemporalHistoryMaxAccumulation = 255.0f;
 	inline constexpr float TemporalAADefaultMaxHistoryFeedback = 0.97f;
 	inline constexpr float TemporalAAMaxHistoryFeedbackCeiling = 0.99f;
 	inline constexpr float TemporalAAMaxDepthThreshold = 1.0f;
@@ -43,12 +46,12 @@ namespace gglab
 	inline constexpr uint32_t TemporalAAUnitRangePairMask = 0xffffu;
 	inline constexpr float TemporalAAUnitRangeQuantizationScale =
 		static_cast<float>(TemporalAAUnitRangePairMask);
-	static_assert(TemporalHistoryMaxAge <= 2048.0f);
+	static_assert(TemporalHistoryMaxAccumulation <= 2048.0f);
 	static_assert(TemporalAADefaultMaxHistoryFeedback >= 0.0f &&
 		TemporalAADefaultMaxHistoryFeedback < TemporalAAMaxHistoryFeedbackCeiling);
 	static_assert(TemporalAAMaxHistoryFeedbackCeiling < 1.0f);
 	static_assert(TemporalAAMaxHistoryFeedbackCeiling <=
-		TemporalHistoryMaxAge / (TemporalHistoryMaxAge + 1.0f));
+		TemporalHistoryMaxAccumulation / (TemporalHistoryMaxAccumulation + 1.0f));
 
 	[[nodiscard]] constexpr uint32_t QuantizeTemporalAAUnitRange(float value) noexcept
 	{
@@ -88,7 +91,7 @@ namespace gglab
 	{
 		if (!std::isfinite(maxHistoryFeedback))
 		{
-			return TemporalHistoryInitialAge;
+			return TemporalHistoryInitialAccumulation;
 		}
 
 		const float maxPackedFeedback =
@@ -97,12 +100,12 @@ namespace gglab
 		const float feedback = std::clamp(maxHistoryFeedback, 0.0f, maxPackedFeedback);
 		float saturationAge = std::max(std::ceil(feedback / std::max(
 			1.0f - feedback, 1.0f / TemporalAAUnitRangeQuantizationScale)),
-			TemporalHistoryInitialAge);
+			TemporalHistoryInitialAccumulation);
 		// Correct ceil() at exactly representable discrete weights such as 99 / 100.
 		// The diagnostic must report the first integer age whose actual float weight
 		// reaches the cap, rather than inheriting division-rounding error from the
 		// closed-form estimate.
-		while (saturationAge > TemporalHistoryInitialAge &&
+		while (saturationAge > TemporalHistoryInitialAccumulation &&
 			(saturationAge - 1.0f) / saturationAge >= feedback)
 		{
 			saturationAge -= 1.0f;
@@ -112,6 +115,50 @@ namespace gglab
 			saturationAge += 1.0f;
 		}
 		return saturationAge;
+	}
+
+	// Sample bound of effective-sample accumulation: the count whose weight N / (N + 1)
+	// equals the feedback ceiling, so the ceiling and the carried samples share one bound.
+	[[nodiscard]] inline float ResolveTemporalAAMaxHistorySamples(
+		float maxHistoryFeedback) noexcept
+	{
+		if (!std::isfinite(maxHistoryFeedback))
+		{
+			return TemporalHistoryInitialAccumulation;
+		}
+		const float maxPackedFeedback =
+			static_cast<float>(TemporalAAUnitRangePairMask - 1u) /
+			TemporalAAUnitRangeQuantizationScale;
+		const float feedback = std::clamp(maxHistoryFeedback, 0.0f, maxPackedFeedback);
+		return std::clamp(feedback / (1.0f - feedback), TemporalHistoryInitialAccumulation,
+			TemporalHistoryMaxAccumulation);
+	}
+
+	// What the history alpha accumulates. Both models weight accepted history by
+	// min(N / (N + 1), feedback) times its confidence; they differ in the N they carry.
+	// Switching the model resets history: the stored state of one is not the other's.
+	enum class TemporalAAHistoryAccumulation : uint8_t
+	{
+		// Kept for comparison: consecutive accepted frames. Low-confidence frames lower
+		// their own weight but not the age, so the weight returns to the ceiling as soon
+		// as the confidence does, over history accumulated while it was low.
+		CompatibilityAge,
+		// Effective sample count: the confidence discounts the carried samples and the
+		// current frame adds one, N' = min(confidence * N + 1, feedback / (1 - feedback)).
+		// After a camera stop its reference error came within 2% of the converged error 28
+		// frames later at native resolution and 8 at Quality, against 52 and 44.
+		EffectiveSamples,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAHistoryAccumulationName(
+		TemporalAAHistoryAccumulation accumulation) noexcept
+	{
+		switch (accumulation)
+		{
+		case TemporalAAHistoryAccumulation::CompatibilityAge: return "compatibility-age";
+		case TemporalAAHistoryAccumulation::EffectiveSamples: return "effective-samples";
+		}
+		return "unknown";
 	}
 
 	// Filter that resamples the previous history color at the reprojected position.
@@ -325,6 +372,8 @@ namespace gglab
 		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
+		TemporalAAHistoryAccumulation m_HistoryAccumulation =
+			TemporalAAHistoryAccumulation::EffectiveSamples;
 		TemporalAAHistoryRectification m_HistoryRectification =
 			TemporalAAHistoryRectification::MinMaxClamp;
 		float m_VarianceClipGamma = TemporalAADefaultVarianceClipGamma;
@@ -395,6 +444,11 @@ namespace gglab
 			settings.m_ResolutionPreset != TemporalAAResolutionPreset::Quality)
 		{
 			settings.m_ResolutionPreset = defaults.m_ResolutionPreset;
+		}
+		if (settings.m_HistoryAccumulation != TemporalAAHistoryAccumulation::CompatibilityAge &&
+			settings.m_HistoryAccumulation != TemporalAAHistoryAccumulation::EffectiveSamples)
+		{
+			settings.m_HistoryAccumulation = defaults.m_HistoryAccumulation;
 		}
 		if (settings.m_HistoryRectification != TemporalAAHistoryRectification::MinMaxClamp &&
 			settings.m_HistoryRectification != TemporalAAHistoryRectification::VarianceClip &&
@@ -624,6 +678,9 @@ namespace gglab
 		// Effective render resolution of the display view: the requested preset while the
 		// Temporal AA consumer is active and the resolve can upscale, native otherwise.
 		TemporalAAResolutionPreset m_ResolutionPreset = TemporalAAResolutionPreset::Native;
+		// Accumulation model of the Temporal AA color history while that consumer is active.
+		TemporalAAHistoryAccumulation m_HistoryAccumulation =
+			TemporalAAHistoryAccumulation::EffectiveSamples;
 		uint64_t m_ResetIdentity = 0;
 		uint64_t m_SessionIdentity = 0;
 		bool m_CoreAvailable = false;
@@ -759,10 +816,13 @@ namespace gglab
 		}
 		GGLAB_ASSERT_MSG(jitterOwnerCount <= 1,
 			"At most one active temporal consumer owns the projection jitter.");
-		if (plan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
-			info.m_TemporalUpscalingAvailable)
+		if (plan.IsConsumerActive(TemporalConsumer::TemporalAA))
 		{
-			plan.m_ResolutionPreset = info.m_Settings.m_ResolutionPreset;
+			plan.m_HistoryAccumulation = info.m_Settings.m_HistoryAccumulation;
+			if (info.m_TemporalUpscalingAvailable)
+			{
+				plan.m_ResolutionPreset = info.m_Settings.m_ResolutionPreset;
+			}
 		}
 		return plan;
 	}

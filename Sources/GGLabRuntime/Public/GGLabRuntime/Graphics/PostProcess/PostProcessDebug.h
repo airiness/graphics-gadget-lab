@@ -40,7 +40,7 @@ namespace gglab
 		TemporalReprojectionUV = 17,
 		TemporalRejection = 18,
 		TemporalHistoryWeight = 19,
-		TemporalHistoryAge = 20,
+		TemporalHistorySamples = 20,
 
 		AtmosphereTransmittance = 21,
 		AtmosphereMultipleScattering = 22,
@@ -73,7 +73,7 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalRejection) == 18);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistorySamples) == 20);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 27);
 

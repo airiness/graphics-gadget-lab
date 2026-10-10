@@ -67,8 +67,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_VALID_BIT) != 0;
 	const bool writeHistoryColorPreview =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_COLOR_PREVIEW_BIT) != 0;
-	const bool writeHistoryAgePreview =
-		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_AGE_PREVIEW_BIT) != 0;
+	const bool writeHistorySamplesPreview =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_SAMPLES_PREVIEW_BIT) != 0;
 	const bool writeClipDistancePreview =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_CLIP_DISTANCE_PREVIEW_BIT) != 0;
 	const bool catmullRomHistory =
@@ -79,6 +79,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_CLOSEST_DEPTH_MOTION_BIT) != 0;
 	const bool writeDisplayDepth =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_DISPLAY_DEPTH_BIT) != 0;
+	const bool effectiveSamples =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_EFFECTIVE_SAMPLES_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
@@ -103,7 +105,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float2 historyMotionUV = 0.0.xx;
 	bool accepted = false;
 	float3 historyColor = currentColor;
-	float previousHistoryAge = TAA_HISTORY_INITIAL_AGE;
+	float previousAccumulation = TAA_HISTORY_INITIAL_ACCUMULATION;
 	if (previousHistoryValid)
 	{
 		// The sample whose motion reprojects this pixel: the centre, or the front-most
@@ -180,10 +182,13 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				RescaleHistoryColorChannel(historyColor.r, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
 				RescaleHistoryColorChannel(historyColor.g, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
 				RescaleHistoryColorChannel(historyColor.b, viewData.ScenePreExposure, viewData.PreviousScenePreExposure));
-			previousHistoryAge = previousColorTexture.SampleLevel(
+			// The accumulation state of the nearest texel. Its minimum over the bilinear
+			// footprint spread intermittent alpha-test rejections to the neighboring
+			// pixels and raised static shimmer.
+			previousAccumulation = previousColorTexture.SampleLevel(
 				pointClampSampler, previousHistoryUV, 0.0).a;
 			if (!IsTemporalColorFinite(historyColor) ||
-				!IsTemporalHistoryAgeValid(previousHistoryAge))
+				!IsTemporalHistoryAccumulationValid(previousAccumulation))
 			{
 				rejectionReason = TAA_REJECTION_NON_FINITE;
 			}
@@ -219,6 +224,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 
 	float historyWeight = 0.0;
+	float historyConfidence = 0.0;
 	// How far rectification moved accepted history, relative to the size of the
 	// neighborhood box; history that is not accepted counts as fully discarded.
 	float clipDistance = 1.0;
@@ -239,12 +245,12 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		const float3 historyYCoCg = TemporalRGBToYCoCg(historyColor);
 		const float motionMagnitudePixels =
 			length(historyMotionUV * float2(width, height));
-		historyWeight = ComputeTemporalHistoryWeight(previousHistoryAge,
-			motionMagnitudePixels,
+		historyConfidence = ComputeTemporalHistoryConfidence(motionMagnitudePixels,
 			currentYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
 			historyYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
-			maxHistoryFeedbackAndClampExpansion.x,
 			g_Pass.VelocityWeightScale, g_Pass.LuminanceWeightScale);
+		historyWeight = ComputeTemporalHistoryWeight(previousAccumulation, historyConfidence,
+			maxHistoryFeedbackAndClampExpansion.x);
 		const bool varianceClip =
 			(g_Pass.ViewIndexAndHistoryValid & TAA_VARIANCE_CLIP_BIT) != 0;
 		float3 rectifiedYCoCg;
@@ -285,11 +291,16 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		rejectionReason = TAA_REJECTION_NON_FINITE;
 	}
 
-	const float nextHistoryAge =
-		ResolveTemporalHistoryNextAge(accepted, previousHistoryAge);
-	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextHistoryAge);
+	const float maxHistorySamples =
+		ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x);
+	const float nextAccumulation = effectiveSamples
+		? ResolveTemporalHistoryNextSamples(accepted, previousAccumulation,
+			historyConfidence, maxHistorySamples)
+		: ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
+	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextAccumulation);
 	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor), outputAlphas.x);
-	// The age in alpha is an integer that half precision stores exactly.
+	// Half precision stores a compatibility age exactly and an effective sample count
+	// within a relative 2^-11.
 	const float4 historyOutput = float4(QuantizeTemporalHistoryColor(
 		resolvedOutput.rgb, pixel, viewData.TemporalFrameIndex), outputAlphas.y);
 	resolvedColor[pixel] = resolvedOutput;
@@ -300,11 +311,13 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	{
 		diagnosticsOutput = resolvedOutput;
 	}
-	else if (writeHistoryAgePreview)
+	else if (writeHistorySamplesPreview)
 	{
-		const float normalizedHistoryAge = ResolveTemporalAAHistoryAgePreview(
-			nextHistoryAge, maxHistoryFeedbackAndClampExpansion.x);
-		diagnosticsOutput = float4(normalizedHistoryAge.xxx, 1.0);
+		const float normalizedAccumulation = effectiveSamples
+			? ResolveTemporalAAHistorySamplesPreview(nextAccumulation, maxHistorySamples)
+			: ResolveTemporalAAHistoryAgePreview(
+				nextAccumulation, maxHistoryFeedbackAndClampExpansion.x);
+		diagnosticsOutput = float4(normalizedAccumulation.xxx, 1.0);
 	}
 	else if (writeClipDistancePreview)
 	{

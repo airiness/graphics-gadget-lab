@@ -91,6 +91,7 @@ namespace gglab
 			case TemporalHistoryResetReason::ExtentChanged: return "Extent changed";
 			case TemporalHistoryResetReason::FormatChanged: return "Format changed";
 			case TemporalHistoryResetReason::ColorAbiChanged: return "Color ABI changed";
+			case TemporalHistoryResetReason::AccumulationChanged: return "Accumulation changed";
 			case TemporalHistoryResetReason::InvalidExposureMetadata: return "Invalid exposure metadata";
 			case TemporalHistoryResetReason::AllocationFailure: return "Allocation failure";
 			case TemporalHistoryResetReason::AvailabilityChanged: return "Availability changed";
@@ -111,7 +112,7 @@ namespace gglab
 			case PostProcessDebugTap::TemporalReprojectionUV: return "Reprojection UV";
 			case PostProcessDebugTap::TemporalRejection: return "Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";
-			case PostProcessDebugTap::TemporalHistoryAge: return "History Age";
+			case PostProcessDebugTap::TemporalHistorySamples: return "History Samples";
 			case PostProcessDebugTap::TemporalClipDistance: return "Clip Distance";
 			case PostProcessDebugTap::TemporalMotionDirection: return "Motion Direction";
 			case PostProcessDebugTap::TemporalMotionMagnitude: return "Motion Magnitude";
@@ -135,6 +136,13 @@ namespace gglab
 				0.05f, 0.0f, TemporalAAMaxLuminanceWeightScale, "%.2f");
 			ImGui::DragFloat("Clamp Expansion", &settings.m_NeighborhoodClampExpansion,
 				0.005f, 0.0f, TemporalAAMaxNeighborhoodClampExpansion, "%.3f");
+			int historyAccumulation = static_cast<int>(settings.m_HistoryAccumulation);
+			if (ImGui::Combo("History Accumulation", &historyAccumulation,
+				"Compatibility Age\0Effective Samples\0"))
+			{
+				settings.m_HistoryAccumulation =
+					static_cast<TemporalAAHistoryAccumulation>(historyAccumulation);
+			}
 			int historyRectification = static_cast<int>(settings.m_HistoryRectification);
 			if (ImGui::Combo("History Rectification", &historyRectification,
 				"Min/Max Clamp\0Variance Clip\0Bounded Variance Clip\0"))
@@ -196,7 +204,7 @@ namespace gglab
 				PostProcessDebugTap::TemporalReprojectionUV,
 				PostProcessDebugTap::TemporalRejection,
 				PostProcessDebugTap::TemporalHistoryWeight,
-				PostProcessDebugTap::TemporalHistoryAge,
+				PostProcessDebugTap::TemporalHistorySamples,
 				PostProcessDebugTap::TemporalClipDistance,
 				PostProcessDebugTap::TemporalMotionDirection,
 				PostProcessDebugTap::TemporalMotionMagnitude,
@@ -360,6 +368,8 @@ namespace gglab
 				history.m_Compatibility.m_ColorAbi == TemporalColorAbi::LinearRec709PreExposedV2
 					? "Pre-exposed scene linear" : "Scene linear",
 				history.m_LastCommitted.m_PreExposure);
+			ImGui::Text("History accumulation: %s",
+				GetTemporalAAHistoryAccumulationName(history.m_Compatibility.m_Accumulation).data());
 			if (!history.m_PendingRetirementFences.empty())
 			{
 				ImGui::Text("Latest pending fence: %llu",

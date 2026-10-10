@@ -243,6 +243,8 @@ namespace gglab
 				.m_VelocityWeightScale = settings.m_VelocityWeightScale,
 				.m_LuminanceWeightScale = settings.m_LuminanceWeightScale,
 				.m_NeighborhoodClampExpansion = settings.m_NeighborhoodClampExpansion,
+				.m_HistoryAccumulation = std::string(
+					GetTemporalAAHistoryAccumulationName(settings.m_HistoryAccumulation)),
 				.m_HistoryRectification = std::string(
 					GetTemporalAAHistoryRectificationName(settings.m_HistoryRectification)),
 				.m_VarianceClipGamma = settings.m_VarianceClipGamma,

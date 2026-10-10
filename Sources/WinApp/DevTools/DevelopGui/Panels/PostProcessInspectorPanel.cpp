@@ -67,8 +67,8 @@ namespace gglab
 				return "Temporal / Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight:
 				return "Temporal / History Weight";
-			case PostProcessDebugTap::TemporalHistoryAge:
-				return "Temporal / History Age";
+			case PostProcessDebugTap::TemporalHistorySamples:
+				return "Temporal / History Samples";
 			case PostProcessDebugTap::TemporalClipDistance:
 				return "Temporal / Clip Distance";
 			default:
