@@ -145,11 +145,11 @@ namespace gglab
 		}
 		return {
 			.m_AllocationGeneration = history.m_AllocationGeneration,
-			.m_ReadIndex = history.m_ReadIndex,
-			.m_WriteIndex = 1u - history.m_ReadIndex,
+			.m_ReadIndex = history.m_Textures.GetReadIndex(),
+			.m_WriteIndex = history.m_Textures.GetWriteIndex(),
 			.m_PreviousPreExposure = history.m_Valid ? history.m_LastCommitted.m_PreExposure : 1.0f,
 			.m_Active = true,
-			.m_PreviousValid = history.m_Valid && history.m_Initialized[history.m_ReadIndex],
+			.m_PreviousValid = history.m_Valid && history.m_Textures.IsReadInitialized(),
 		};
 	}
 
@@ -162,48 +162,28 @@ namespace gglab
 			return false;
 		}
 
-		HistorySet& history = *m_ActiveHistory;
-		const uint32_t readIndex = frame.m_ReadIndex;
-		const uint32_t writeIndex = frame.m_WriteIndex;
-		const bool previousValid =
-			frame.m_PreviousValid && history.m_Initialized[readIndex];
-		const RHIResourceState previousInitialState = history.m_Initialized[readIndex]
-			? CommonRHIResourceState()
-			: UndefinedRHITextureState();
-		const RHIResourceState nextInitialState = history.m_Initialized[writeIndex]
-			? CommonRHIResourceState()
-			: UndefinedRHITextureState();
+		const auto& textures = m_ActiveHistory->m_Textures;
+		const bool previousValid = frame.m_PreviousValid && textures.IsReadInitialized();
+		// The resolve's writers keep the last committed content of the next textures defined.
+		const auto import = [&](HistorySurface surface, const char* previousName,
+			const char* nextName) noexcept
+			{
+				return textures.Import(builder, surface, previousName, nextName, previousValid, true);
+			};
+		const auto color = import(ColorSurface, "TAA.History.PreviousColor", "TAA.History.NextColor");
+		const auto depth = import(DepthSurface, "TAA.History.PreviousDepth", "TAA.History.NextDepth");
+		const auto reliability = import(ReliabilitySurface, "TAA.History.PreviousReliability",
+			"TAA.History.NextReliability");
 
 		outResources = {
-			.m_PreviousColor = builder.ImportTexture("TAA.History.PreviousColor",
-				history.m_Color[readIndex].GetTexture(),
-				history.m_Color[readIndex].GetCreateInfo().m_Desc, previousInitialState,
-				previousValid ? RGContentValidity::Defined : RGContentValidity::Undefined),
-			.m_PreviousDepth = builder.ImportTexture("TAA.History.PreviousDepth",
-				history.m_Depth[readIndex].GetTexture(),
-				history.m_Depth[readIndex].GetCreateInfo().m_Desc, previousInitialState,
-				previousValid ? RGContentValidity::Defined : RGContentValidity::Undefined),
-			.m_NextColor = builder.ImportTexture("TAA.History.NextColor",
-				history.m_Color[writeIndex].GetTexture(),
-				history.m_Color[writeIndex].GetCreateInfo().m_Desc, nextInitialState,
-				history.m_Initialized[writeIndex] ? RGContentValidity::Defined
-												  : RGContentValidity::Undefined),
-			.m_NextDepth = builder.ImportTexture("TAA.History.NextDepth",
-				history.m_Depth[writeIndex].GetTexture(),
-				history.m_Depth[writeIndex].GetCreateInfo().m_Desc, nextInitialState,
-				history.m_Initialized[writeIndex] ? RGContentValidity::Defined
-												  : RGContentValidity::Undefined),
-			.m_PreviousReliability = builder.ImportTexture("TAA.History.PreviousReliability",
-				history.m_Reliability[readIndex].GetTexture(),
-				history.m_Reliability[readIndex].GetCreateInfo().m_Desc, previousInitialState,
-				previousValid ? RGContentValidity::Defined : RGContentValidity::Undefined),
-			.m_NextReliability = builder.ImportTexture("TAA.History.NextReliability",
-				history.m_Reliability[writeIndex].GetTexture(),
-				history.m_Reliability[writeIndex].GetCreateInfo().m_Desc, nextInitialState,
-				history.m_Initialized[writeIndex] ? RGContentValidity::Defined
-												  : RGContentValidity::Undefined),
-			.m_ReadIndex = readIndex,
-			.m_WriteIndex = writeIndex,
+			.m_PreviousColor = color.m_Previous,
+			.m_PreviousDepth = depth.m_Previous,
+			.m_NextColor = color.m_Next,
+			.m_NextDepth = depth.m_Next,
+			.m_PreviousReliability = reliability.m_Previous,
+			.m_NextReliability = reliability.m_Next,
+			.m_ReadIndex = frame.m_ReadIndex,
+			.m_WriteIndex = frame.m_WriteIndex,
 			.m_PreviousValid = previousValid,
 		};
 		frame.m_RenderGraphImported = outResources.IsValid();
@@ -221,22 +201,23 @@ namespace gglab
 		{
 			return false;
 		}
-		if (!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextColor) ||
-			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextDepth) ||
-			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextReliability))
+		using Textures = TemporalHistoryTextures<HistorySurfaceCount>;
+		const std::array<Textures::RenderGraphSurface, HistorySurfaceCount> surfaces{ {
+			{ resources.m_PreviousColor, resources.m_NextColor },
+			{ resources.m_PreviousDepth, resources.m_NextDepth },
+			{ resources.m_PreviousReliability, resources.m_NextReliability },
+		} };
+		if (!std::ranges::all_of(surfaces, [&builder](const Textures::RenderGraphSurface& surface)
+			{
+				return Textures::IsFullyWritten(builder, surface);
+			}))
 		{
 			return false;
 		}
-
-		if (resources.m_PreviousValid)
+		for (const Textures::RenderGraphSurface& surface : surfaces)
 		{
-			builder.Export(resources.m_PreviousColor, RGTextureAccess::None);
-			builder.Export(resources.m_PreviousDepth, RGTextureAccess::None);
-			builder.Export(resources.m_PreviousReliability, RGTextureAccess::None);
+			Textures::Export(builder, surface, resources.m_PreviousValid);
 		}
-		builder.Export(resources.m_NextColor, RGTextureAccess::None);
-		builder.Export(resources.m_NextDepth, RGTextureAccess::None);
-		builder.Export(resources.m_NextReliability, RGTextureAccess::None);
 		frame.m_RenderGraphExported = true;
 		return true;
 	}
@@ -262,8 +243,8 @@ namespace gglab
 		}
 
 		HistorySet& history = *m_ActiveHistory;
-		history.m_ReadIndex = frame.m_WriteIndex;
-		history.m_Initialized[frame.m_WriteIndex] = true;
+		// IsCurrentFrame guarantees that the frame wrote the textures this commit promotes.
+		history.m_Textures.Commit();
 		history.m_Valid = true;
 		history.m_LastCommitted = metadata;
 		history.m_LastCommitted.m_Compatibility = history.m_Compatibility;
@@ -346,15 +327,10 @@ namespace gglab
 			diagnostics.m_Compatibility = history.m_Compatibility;
 			diagnostics.m_LastCommitted = history.m_LastCommitted;
 			diagnostics.m_AllocationGeneration = history.m_AllocationGeneration;
-			diagnostics.m_ReadIndex = history.m_ReadIndex;
+			diagnostics.m_ReadIndex = history.m_Textures.GetReadIndex();
 			diagnostics.m_HasActiveHistory = true;
 			diagnostics.m_HistoryValid = history.m_Valid;
-			for (uint32_t index = 0; index < 2; ++index)
-			{
-				diagnostics.m_ActiveBytes += history.m_Color[index].GetEstimatedBytes();
-				diagnostics.m_ActiveBytes += history.m_Depth[index].GetEstimatedBytes();
-				diagnostics.m_ActiveBytes += history.m_Reliability[index].GetEstimatedBytes();
-			}
+			diagnostics.m_ActiveBytes = history.m_Textures.GetEstimatedBytes();
 		}
 
 		const PersistentTexturePoolDiagnostics poolDiagnostics = m_TexturePool->GetDiagnostics();
@@ -424,40 +400,19 @@ namespace gglab
 			return false;
 		}
 
-		const RHIOwnedTextureCreateInfo colorInfo = MakeHistoryTextureCreateInfo(
-			compatibility.m_ColorFormat, compatibility.m_ColorExtent.m_Width,
-			compatibility.m_ColorExtent.m_Height);
-		const RHIOwnedTextureCreateInfo depthInfo = MakeHistoryTextureCreateInfo(
-			compatibility.m_DepthFormat, compatibility.m_DepthExtent.m_Width,
-			compatibility.m_DepthExtent.m_Height);
-		history.m_Color[0] = m_TexturePool->AcquireTexture(colorInfo, "TAA.HistoryColor0");
-		history.m_Color[1] = m_TexturePool->AcquireTexture(colorInfo, "TAA.HistoryColor1");
-		history.m_Depth[0] = m_TexturePool->AcquireTexture(depthInfo, "TAA.HistoryDepth0");
-		history.m_Depth[1] = m_TexturePool->AcquireTexture(depthInfo, "TAA.HistoryDepth1");
-		const RHIOwnedTextureCreateInfo reliabilityInfo = MakeHistoryTextureCreateInfo(
-			compatibility.m_ReliabilityFormat, compatibility.m_ColorExtent.m_Width,
-			compatibility.m_ColorExtent.m_Height);
-		history.m_Reliability[0] =
-			m_TexturePool->AcquireTexture(reliabilityInfo, "TAA.HistoryReliability0");
-		history.m_Reliability[1] =
-			m_TexturePool->AcquireTexture(reliabilityInfo, "TAA.HistoryReliability1");
-		const bool complete = std::ranges::all_of(history.m_Color,
-			&PersistentTextureAllocation::IsValid) &&
-			std::ranges::all_of(history.m_Depth, &PersistentTextureAllocation::IsValid) &&
-			std::ranges::all_of(history.m_Reliability, &PersistentTextureAllocation::IsValid);
-		if (!complete)
+		// Color and reliability follow the display extent, depth the render extent.
+		if (!history.m_Textures.Acquire(*m_TexturePool, { {
+			{ .m_CreateInfo = MakeHistoryTextureCreateInfo(compatibility.m_ColorFormat,
+					compatibility.m_ColorExtent.m_Width, compatibility.m_ColorExtent.m_Height),
+				.m_AllocationNames = { "TAA.HistoryColor0", "TAA.HistoryColor1" } },
+			{ .m_CreateInfo = MakeHistoryTextureCreateInfo(compatibility.m_DepthFormat,
+					compatibility.m_DepthExtent.m_Width, compatibility.m_DepthExtent.m_Height),
+				.m_AllocationNames = { "TAA.HistoryDepth0", "TAA.HistoryDepth1" } },
+			{ .m_CreateInfo = MakeHistoryTextureCreateInfo(compatibility.m_ReliabilityFormat,
+					compatibility.m_ColorExtent.m_Width, compatibility.m_ColorExtent.m_Height),
+				.m_AllocationNames = { "TAA.HistoryReliability0", "TAA.HistoryReliability1" } },
+			} }))
 		{
-			for (auto* allocations : { &history.m_Color, &history.m_Depth, &history.m_Reliability })
-			{
-				for (PersistentTextureAllocation& allocation : *allocations)
-				{
-					if (allocation.IsValid())
-					{
-						GGLAB_UNUSED(
-							m_TexturePool->ReleaseTextureWithoutSubmission(std::move(allocation)));
-					}
-				}
-			}
 			return false;
 		}
 
@@ -470,8 +425,8 @@ namespace gglab
 	{
 		return frame.m_Active && m_ActiveHistory &&
 			frame.m_AllocationGeneration == m_ActiveHistory->m_AllocationGeneration &&
-			frame.m_ReadIndex == m_ActiveHistory->m_ReadIndex &&
-			frame.m_WriteIndex == 1u - m_ActiveHistory->m_ReadIndex;
+			frame.m_ReadIndex == m_ActiveHistory->m_Textures.GetReadIndex() &&
+			frame.m_WriteIndex == m_ActiveHistory->m_Textures.GetWriteIndex();
 	}
 
 	void TemporalHistoryManager::RetireActiveHistory(TemporalHistoryResetReason reason,
@@ -481,26 +436,7 @@ namespace gglab
 		HistorySet history = std::move(*m_ActiveHistory);
 		m_ActiveHistory.reset();
 		UpdateFence(history.m_LastPossibleUseFence, retirementFence);
-		const RHIFencePoint gate = history.m_LastPossibleUseFence;
-		auto release = [&](PersistentTextureAllocation& allocation)
-		{
-			const bool released = gate.IsValid()
-				? m_TexturePool->ReleaseTexture(std::move(allocation), gate)
-				: m_TexturePool->ReleaseTextureWithoutSubmission(std::move(allocation));
-			GGLAB_ASSERT_MSG(released, "Temporal history texture retirement failed.");
-		};
-		for (PersistentTextureAllocation& allocation : history.m_Color)
-		{
-			release(allocation);
-		}
-		for (PersistentTextureAllocation& allocation : history.m_Depth)
-		{
-			release(allocation);
-		}
-		for (PersistentTextureAllocation& allocation : history.m_Reliability)
-		{
-			release(allocation);
-		}
+		history.m_Textures.Release(*m_TexturePool, history.m_LastPossibleUseFence);
 		RecordReset(reason);
 	}
 

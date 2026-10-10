@@ -1,8 +1,6 @@
 #include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 
-#include <utility>
-
 namespace gglab
 {
 	namespace
@@ -19,16 +17,6 @@ namespace gglab
 				.m_InitialState = UndefinedRHITextureState(),
 			};
 		}
-
-		[[nodiscard]] RGTextureId ImportHistoryTexture(RenderGraph::RGBuilder& builder,
-			const char* name, const PersistentTextureAllocation& allocation, bool initialized,
-			bool defined) noexcept
-		{
-			return builder.ImportTexture(name, allocation.GetTexture(),
-				allocation.GetCreateInfo().m_Desc,
-				initialized ? CommonRHIResourceState() : UndefinedRHITextureState(),
-				defined ? RGContentValidity::Defined : RGContentValidity::Undefined);
-		}
 	}
 
 	GTAOTemporalHistory::GTAOTemporalHistory(PersistentTexturePool* texturePool) noexcept :
@@ -38,8 +26,7 @@ namespace gglab
 
 	GTAOTemporalHistory::~GTAOTemporalHistory() noexcept
 	{
-		GGLAB_ASSERT_MSG(!m_Visibility[0].IsValid() && !m_Visibility[1].IsValid() &&
-			!m_ViewZ[0].IsValid() && !m_ViewZ[1].IsValid(),
+		GGLAB_ASSERT_MSG(!m_Textures.IsAllocated(),
 			"Temporal GTAO history must be released before destruction.");
 	}
 
@@ -58,25 +45,19 @@ namespace gglab
 			return false;
 		}
 
-		if (m_Extent != halfExtent || !m_Visibility[0].IsValid())
+		if (m_Extent != halfExtent || !m_Textures.IsAllocated())
 		{
 			Release(retirementFence);
-			const RHIOwnedTextureCreateInfo visibilityInfo =
-				MakeHistoryTextureCreateInfo(GTAOHistoryVisibilityFormat, halfExtent);
-			const RHIOwnedTextureCreateInfo viewZInfo =
-				MakeHistoryTextureCreateInfo(GTAOHistoryViewZFormat, halfExtent);
-			m_Visibility[0] =
-				m_TexturePool->AcquireTexture(visibilityInfo, "GTAO.HistoryVisibility0");
-			m_Visibility[1] =
-				m_TexturePool->AcquireTexture(visibilityInfo, "GTAO.HistoryVisibility1");
-			m_ViewZ[0] = m_TexturePool->AcquireTexture(viewZInfo, "GTAO.HistoryViewZ0");
-			m_ViewZ[1] = m_TexturePool->AcquireTexture(viewZInfo, "GTAO.HistoryViewZ1");
-			if (!m_Visibility[0].IsValid() || !m_Visibility[1].IsValid() ||
-				!m_ViewZ[0].IsValid() || !m_ViewZ[1].IsValid())
+			if (!m_Textures.Acquire(*m_TexturePool, { {
+				{ .m_CreateInfo =
+						MakeHistoryTextureCreateInfo(GTAOHistoryVisibilityFormat, halfExtent),
+					.m_AllocationNames = { "GTAO.HistoryVisibility0", "GTAO.HistoryVisibility1" } },
+				{ .m_CreateInfo = MakeHistoryTextureCreateInfo(GTAOHistoryViewZFormat, halfExtent),
+					.m_AllocationNames = { "GTAO.HistoryViewZ0", "GTAO.HistoryViewZ1" } },
+				} }))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR("Temporal GTAO failed to allocate its {}x{} history.",
 					halfExtent.m_Width, halfExtent.m_Height);
-				Release(retirementFence);
 				return false;
 			}
 			m_Extent = halfExtent;
@@ -92,19 +73,18 @@ namespace gglab
 		{
 			return false;
 		}
-		const uint32_t readIndex = m_ReadIndex;
-		const uint32_t writeIndex = 1u - m_ReadIndex;
 		const bool previousValid =
-			continuesPreviousView && m_CommittedValid && m_Initialized[readIndex];
+			continuesPreviousView && m_CommittedValid && m_Textures.IsReadInitialized();
+		// The temporal pass overwrites every texel of the next textures.
+		const auto visibility = m_Textures.Import(builder, VisibilitySurface,
+			"GTAO.PreviousVisibility", "GTAO.NextVisibility", previousValid, false);
+		const auto viewZ = m_Textures.Import(builder, ViewZSurface, "GTAO.PreviousViewZ",
+			"GTAO.NextViewZ", previousValid, false);
 		outResources = {
-			.m_PreviousVisibility = ImportHistoryTexture(builder, "GTAO.PreviousVisibility",
-				m_Visibility[readIndex], m_Initialized[readIndex], previousValid),
-			.m_PreviousViewZ = ImportHistoryTexture(builder, "GTAO.PreviousViewZ",
-				m_ViewZ[readIndex], m_Initialized[readIndex], previousValid),
-			.m_NextVisibility = ImportHistoryTexture(builder, "GTAO.NextVisibility",
-				m_Visibility[writeIndex], m_Initialized[writeIndex], false),
-			.m_NextViewZ = ImportHistoryTexture(builder, "GTAO.NextViewZ",
-				m_ViewZ[writeIndex], m_Initialized[writeIndex], false),
+			.m_PreviousVisibility = visibility.m_Previous,
+			.m_PreviousViewZ = viewZ.m_Previous,
+			.m_NextVisibility = visibility.m_Next,
+			.m_NextViewZ = viewZ.m_Next,
 			.m_PreviousValid = previousValid,
 		};
 		m_Imported = true;
@@ -114,19 +94,18 @@ namespace gglab
 	bool GTAOTemporalHistory::ExportRenderGraphResources(RenderGraph::RGBuilder& builder,
 		const GTAOTemporalHistoryRenderGraphResources& resources) noexcept
 	{
+		using Textures = TemporalHistoryTextures<HistorySurfaceCount>;
+		const Textures::RenderGraphSurface visibility{
+			resources.m_PreviousVisibility, resources.m_NextVisibility };
+		const Textures::RenderGraphSurface viewZ{ resources.m_PreviousViewZ, resources.m_NextViewZ };
 		if (!m_Imported || m_Exported || !resources.IsValid() ||
-			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextVisibility) ||
-			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextViewZ))
+			!Textures::IsFullyWritten(builder, visibility) ||
+			!Textures::IsFullyWritten(builder, viewZ))
 		{
 			return false;
 		}
-		if (resources.m_PreviousValid)
-		{
-			builder.Export(resources.m_PreviousVisibility, RGTextureAccess::None);
-			builder.Export(resources.m_PreviousViewZ, RGTextureAccess::None);
-		}
-		builder.Export(resources.m_NextVisibility, RGTextureAccess::None);
-		builder.Export(resources.m_NextViewZ, RGTextureAccess::None);
+		Textures::Export(builder, visibility, resources.m_PreviousValid);
+		Textures::Export(builder, viewZ, resources.m_PreviousValid);
 		m_Exported = true;
 		return true;
 	}
@@ -137,8 +116,7 @@ namespace gglab
 		{
 			if (m_Exported)
 			{
-				m_ReadIndex = 1u - m_ReadIndex;
-				m_Initialized[m_ReadIndex] = true;
+				m_Textures.Commit();
 			}
 			m_CommittedValid = m_Exported;
 		}
@@ -154,29 +132,12 @@ namespace gglab
 
 	void GTAOTemporalHistory::Release(const RHIFencePoint& retirementFence) noexcept
 	{
-		const auto release = [this, &retirementFence](PersistentTextureAllocation& allocation)
-			{
-				if (!allocation.IsValid())
-				{
-					return;
-				}
-				// The renderer's last submitted fence covers every frame that used the pair.
-				const bool released = retirementFence.IsValid()
-					? m_TexturePool->ReleaseTexture(std::move(allocation), retirementFence)
-					: m_TexturePool->ReleaseTextureWithoutSubmission(std::move(allocation));
-				GGLAB_ASSERT_MSG(released, "Temporal GTAO history must retire through its pool.");
-			};
-		for (PersistentTextureAllocation& allocation : m_Visibility)
+		// The renderer's last submitted fence covers every frame that used the pairs.
+		if (m_TexturePool)
 		{
-			release(allocation);
+			m_Textures.Release(*m_TexturePool, retirementFence);
 		}
-		for (PersistentTextureAllocation& allocation : m_ViewZ)
-		{
-			release(allocation);
-		}
-		m_Initialized = {};
 		m_Extent = {};
-		m_ReadIndex = 0;
 		m_CommittedValid = false;
 		AbortFrame();
 	}

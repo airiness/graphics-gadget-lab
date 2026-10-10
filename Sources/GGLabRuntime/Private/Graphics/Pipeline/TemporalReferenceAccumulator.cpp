@@ -1,9 +1,6 @@
 #include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 
-#include <algorithm>
-#include <utility>
-
 namespace gglab
 {
 	namespace
@@ -30,7 +27,7 @@ namespace gglab
 
 	TemporalReferenceAccumulator::~TemporalReferenceAccumulator() noexcept
 	{
-		GGLAB_ASSERT_MSG(!m_Sums[0].IsValid() && !m_Sums[1].IsValid(),
+		GGLAB_ASSERT_MSG(!m_Sums.IsAllocated(),
 			"The temporal reference sum pair must be released before destruction.");
 	}
 
@@ -52,17 +49,16 @@ namespace gglab
 			return false;
 		}
 
-		if (m_Width != width || m_Height != height || !m_Sums[0].IsValid())
+		if (m_Width != width || m_Height != height || !m_Sums.IsAllocated())
 		{
 			Release(retirementFence);
-			const RHIOwnedTextureCreateInfo createInfo = MakeSumTextureCreateInfo(width, height);
-			m_Sums[0] = m_TexturePool->AcquireTexture(createInfo, "TemporalReference.Sum0");
-			m_Sums[1] = m_TexturePool->AcquireTexture(createInfo, "TemporalReference.Sum1");
-			if (!m_Sums[0].IsValid() || !m_Sums[1].IsValid())
+			if (!m_Sums.Acquire(*m_TexturePool, { {
+				{ .m_CreateInfo = MakeSumTextureCreateInfo(width, height),
+					.m_AllocationNames = { "TemporalReference.Sum0", "TemporalReference.Sum1" } },
+				} }))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
 					"Temporal reference failed to allocate its {}x{} sum pair.", width, height);
-				Release(retirementFence);
 				return false;
 			}
 			m_Width = width;
@@ -89,18 +85,13 @@ namespace gglab
 		{
 			return false;
 		}
-		const uint32_t readIndex = m_ReadIndex;
-		const uint32_t writeIndex = 1u - m_ReadIndex;
-		const bool previousValid = m_PendingSample->m_Index > 0 && m_Initialized[readIndex];
+		const bool previousValid = m_PendingSample->m_Index > 0 && m_Sums.IsReadInitialized();
+		// The accumulation pass overwrites every texel of the next sum.
+		const auto sums = m_Sums.Import(builder, 0, "TemporalReference.PreviousSum",
+			"TemporalReference.NextSum", previousValid, false);
 		outResources = {
-			.m_PreviousSum = builder.ImportTexture("TemporalReference.PreviousSum",
-				m_Sums[readIndex].GetTexture(), m_Sums[readIndex].GetCreateInfo().m_Desc,
-				m_Initialized[readIndex] ? CommonRHIResourceState() : UndefinedRHITextureState(),
-				previousValid ? RGContentValidity::Defined : RGContentValidity::Undefined),
-			.m_NextSum = builder.ImportTexture("TemporalReference.NextSum",
-				m_Sums[writeIndex].GetTexture(), m_Sums[writeIndex].GetCreateInfo().m_Desc,
-				m_Initialized[writeIndex] ? CommonRHIResourceState() : UndefinedRHITextureState(),
-				RGContentValidity::Undefined),
+			.m_PreviousSum = sums.m_Previous,
+			.m_NextSum = sums.m_Next,
 			.m_PreviousValid = previousValid,
 		};
 		m_Imported = true;
@@ -110,16 +101,14 @@ namespace gglab
 	bool TemporalReferenceAccumulator::ExportRenderGraphResources(
 		RenderGraph::RGBuilder& builder, const TemporalReferenceRenderGraphResources& resources) noexcept
 	{
+		const TemporalHistoryTextures<1>::RenderGraphSurface sums{
+			resources.m_PreviousSum, resources.m_NextSum };
 		if (!m_Imported || m_Exported || !resources.IsValid() ||
-			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextSum))
+			!TemporalHistoryTextures<1>::IsFullyWritten(builder, sums))
 		{
 			return false;
 		}
-		if (resources.m_PreviousValid)
-		{
-			builder.Export(resources.m_PreviousSum, RGTextureAccess::None);
-		}
-		builder.Export(resources.m_NextSum, RGTextureAccess::None);
+		TemporalHistoryTextures<1>::Export(builder, sums, resources.m_PreviousValid);
 		m_Exported = true;
 		return true;
 	}
@@ -128,8 +117,7 @@ namespace gglab
 	{
 		if (m_PendingSample && m_Exported)
 		{
-			m_ReadIndex = 1u - m_ReadIndex;
-			m_Initialized[m_ReadIndex] = true;
+			m_Sums.Commit();
 			m_CommittedSamples = m_PendingSample->m_Index + 1;
 		}
 		AbortFrame();
@@ -144,20 +132,11 @@ namespace gglab
 
 	void TemporalReferenceAccumulator::Release(const RHIFencePoint& retirementFence) noexcept
 	{
-		for (PersistentTextureAllocation& sum : m_Sums)
+		// The renderer's last submitted fence covers every frame that used the pair.
+		if (m_TexturePool)
 		{
-			if (!sum.IsValid())
-			{
-				continue;
-			}
-			// The renderer's last submitted fence covers every frame that used the pair.
-			const bool released = retirementFence.IsValid()
-				? m_TexturePool->ReleaseTexture(std::move(sum), retirementFence)
-				: m_TexturePool->ReleaseTextureWithoutSubmission(std::move(sum));
-			GGLAB_ASSERT_MSG(released, "Temporal reference sums must retire through their pool.");
+			m_Sums.Release(*m_TexturePool, retirementFence);
 		}
-		m_Initialized = {};
-		m_ReadIndex = 0;
 		m_CommittedSamples = 0;
 		m_Width = 0;
 		m_Height = 0;

@@ -42,11 +42,6 @@ float2 UnpackTemporalAAUnitRangePair(uint packedValues)
 	return float2(packedValues & 0xffffu, packedValues >> 16u) / 65535.0;
 }
 
-bool IsTemporalUVInBounds(float2 uv)
-{
-	return all(isfinite(uv)) && all(uv >= 0.0.xx) && all(uv <= 1.0.xx);
-}
-
 bool IsTemporalColorFinite(float3 color)
 {
 	return all(isfinite(color));
@@ -419,22 +414,6 @@ float ComputeTemporalHistoryWeight(float previousAccumulation, float historyConf
 		saturate(historyConfidence);
 }
 
-bool IsTemporalDepthCompatible(float expectedPreviousViewZ, float storedPreviousViewZ,
-	float absoluteThreshold, float relativeThreshold)
-{
-	if (!isfinite(expectedPreviousViewZ) || !isfinite(storedPreviousViewZ) ||
-		expectedPreviousViewZ <= 0.0 || storedPreviousViewZ <= 0.0 ||
-		!isfinite(absoluteThreshold) || !isfinite(relativeThreshold) ||
-		absoluteThreshold < 0.0 || relativeThreshold < 0.0)
-	{
-		return false;
-	}
-
-	const float tolerance = max(absoluteThreshold,
-		relativeThreshold * expectedPreviousViewZ);
-	return abs(expectedPreviousViewZ - storedPreviousViewZ) <= tolerance;
-}
-
 float2 ReprojectTemporalSkyUV(float2 currentUV, ViewData viewData)
 {
 	const float currentFarDepth = GetDepthFarValue(viewData.DepthConvention);
@@ -458,10 +437,8 @@ bool ValidateTemporalGeometryDepth(float2 currentUV, float currentRawDepth,
 {
 	const float3 currentPositionVS = ReconstructViewPosition(
 		currentUV, currentRawDepth, viewData.InvProjMat);
-	const float3 currentPositionWS =
-		mul(float4(currentPositionVS, 1.0), viewData.InvViewMat).xyz;
-	const float expectedPreviousViewZ =
-		mul(float4(currentPositionWS, 1.0), viewData.PreviousViewMat).z;
+	const float expectedPreviousViewZ = ResolveExpectedPreviousViewZ(
+		currentPositionVS, viewData.InvViewMat, viewData.PreviousViewMat);
 
 	uint previousDepthWidth;
 	uint previousDepthHeight;

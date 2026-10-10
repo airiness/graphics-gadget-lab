@@ -3,9 +3,9 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "Graphics/Pipeline/TemporalHistoryTextures.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 
-#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -47,9 +47,7 @@ namespace gglab
 
 	private:
 		PersistentTexturePool* m_TexturePool = nullptr;
-		std::array<PersistentTextureAllocation, 2> m_Sums;
-		std::array<bool, 2> m_Initialized{};
-		uint32_t m_ReadIndex = 0;
+		TemporalHistoryTextures<1> m_Sums;
 		uint32_t m_CommittedSamples = 0;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

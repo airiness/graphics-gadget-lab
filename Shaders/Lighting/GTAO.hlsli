@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Common/DepthReconstruction.hlsli>
+#include <Common/Temporal.hlsli>
 
 static const uint GTAO_MAX_DIRECTION_COUNT = 8;
 static const uint GTAO_MAX_STEP_COUNT = 8;
@@ -302,13 +303,8 @@ static const float GTAO_TEMPORAL_DEPTH_RELATIVE_THRESHOLD = 0.05;
 
 bool IsGTAOHistoryDepthCompatible(float expectedViewZ, float storedViewZ)
 {
-	if (!isfinite(expectedViewZ) || !isfinite(storedViewZ) ||
-		expectedViewZ <= 0.0 || storedViewZ <= 0.0)
-	{
-		return false;
-	}
-	return abs(expectedViewZ - storedViewZ) <= max(GTAO_TEMPORAL_DEPTH_ABSOLUTE_THRESHOLD,
-		GTAO_TEMPORAL_DEPTH_RELATIVE_THRESHOLD * expectedViewZ);
+	return IsTemporalDepthCompatible(expectedViewZ, storedViewZ,
+		GTAO_TEMPORAL_DEPTH_ABSOLUTE_THRESHOLD, GTAO_TEMPORAL_DEPTH_RELATIVE_THRESHOLD);
 }
 
 struct GTAOTemporalResult
@@ -359,13 +355,14 @@ GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface su
 	result.Visibility = currentVisibility;
 	result.Samples = 1.0;
 
-	const float2 previousUV = PixelCenterToUV(surface.FullPixel, fullExtent) - motionUV;
-	if (!all(isfinite(previousUV)) || any(previousUV < 0.0) || any(previousUV > 1.0))
+	const float2 previousUV =
+		ReprojectTemporalUV(PixelCenterToUV(surface.FullPixel, fullExtent), motionUV);
+	if (!IsTemporalUVInBounds(previousUV))
 	{
 		return result;
 	}
-	const float3 positionWS = mul(float4(surface.PositionVS, 1.0), viewData.InvViewMat).xyz;
-	const float expectedViewZ = mul(float4(positionWS, 1.0), viewData.PreviousViewMat).z;
+	const float expectedViewZ = ResolveExpectedPreviousViewZ(
+		surface.PositionVS, viewData.InvViewMat, viewData.PreviousViewMat);
 
 	const int2 footprintPixel = clamp(int2(floor(previousUV * float2(fullExtent) * 0.5)),
 		int2(0, 0), int2(halfExtent) - 1);

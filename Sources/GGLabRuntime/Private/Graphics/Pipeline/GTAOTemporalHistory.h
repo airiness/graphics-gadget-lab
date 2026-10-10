@@ -3,10 +3,10 @@
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "Graphics/Pipeline/TemporalHistoryTextures.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 
-#include <array>
-#include <cstdint>
+#include <cstddef>
 
 namespace gglab
 {
@@ -44,12 +44,16 @@ namespace gglab
 		[[nodiscard]] bool HasCommittedHistory() const noexcept { return m_CommittedValid; }
 
 	private:
+		enum HistorySurface : size_t
+		{
+			VisibilitySurface,
+			ViewZSurface,
+			HistorySurfaceCount,
+		};
+
 		PersistentTexturePool* m_TexturePool = nullptr;
-		std::array<PersistentTextureAllocation, 2> m_Visibility;
-		std::array<PersistentTextureAllocation, 2> m_ViewZ;
-		std::array<bool, 2> m_Initialized{};
+		TemporalHistoryTextures<HistorySurfaceCount> m_Textures;
 		GTAOExtent m_Extent{};
-		uint32_t m_ReadIndex = 0;
 		bool m_CommittedValid = false;
 		bool m_Active = false;
 		bool m_Imported = false;

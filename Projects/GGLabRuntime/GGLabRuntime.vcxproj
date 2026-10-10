@@ -330,6 +330,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraPath.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryTextures.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraTooling.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\CameraTooling.h" />

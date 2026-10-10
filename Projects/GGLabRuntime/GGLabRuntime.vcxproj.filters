@@ -1190,6 +1190,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryManager.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryTextures.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalMotion.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
