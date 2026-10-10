@@ -16,6 +16,16 @@ namespace gglab
 	inline constexpr uint32_t MaxTemporalReferenceSamples = 4096;
 	inline constexpr RHIFormat TemporalReferenceSumFormat = RHIFormat::R32G32B32A32Float;
 
+	// Signal a reference averages over its samples.
+	enum class TemporalReferenceSignal : uint8_t
+	{
+		// The HDR scene color that post-processing receives.
+		SceneColor,
+		// The full-resolution GTAO visibility, averaged over the rotated GTAO sampling
+		// sequence: the converged estimate of the runtime GTAO for that frame.
+		AmbientOcclusion,
+	};
+
 	struct TemporalReferenceSample
 	{
 		// Zero starts a new sum; each later sample must follow the previous submitted one.
@@ -25,6 +35,7 @@ namespace gglab
 		// pixel before the samples are averaged; -0.5 * log2(m_Count) matches each
 		// sample's sub-pixel footprint instead.
 		float m_TextureLodBias = 0.0f;
+		TemporalReferenceSignal m_Signal = TemporalReferenceSignal::SceneColor;
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept
 		{

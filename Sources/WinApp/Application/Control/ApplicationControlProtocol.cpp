@@ -142,16 +142,30 @@ namespace gglab
 					outOverrides.m_TemporalAccumulation = fieldValue.get<bool>();
 					continue;
 				}
-				if (key == "temporalMaxSamples")
+				struct CountField
 				{
-					const double samples = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
-					if (!fieldValue.is_number() || samples != std::floor(samples) ||
-						samples < 1.0 || samples > static_cast<double>(GTAOMaxTemporalSamples))
+					std::string_view m_Name;
+					std::optional<uint32_t> FrameSequenceGTAOOverrides::* m_Member;
+					uint32_t m_Max;
+				};
+				constexpr std::array<CountField, 3> countFields{ {
+					{ "temporalMaxSamples", &FrameSequenceGTAOOverrides::m_TemporalMaxSamples,
+						GTAOMaxTemporalSamples },
+					{ "directionCount", &FrameSequenceGTAOOverrides::m_DirectionCount,
+						GTAOMaxDirectionCount },
+					{ "stepCount", &FrameSequenceGTAOOverrides::m_StepCount, GTAOMaxStepCount },
+				} };
+				const auto countField = std::ranges::find(countFields, key, &CountField::m_Name);
+				if (countField != countFields.end())
+				{
+					const double count = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
+					if (!fieldValue.is_number() || count != std::floor(count) || count < 1.0 ||
+						count > static_cast<double>(countField->m_Max))
 					{
-						return std::format("GTAO override 'temporalMaxSamples' must be an "
-							"integer in [1, {}].", GTAOMaxTemporalSamples);
+						return std::format("GTAO override '{}' must be an integer in [1, {}].",
+							countField->m_Name, countField->m_Max);
 					}
-					outOverrides.m_TemporalMaxSamples = static_cast<uint32_t>(samples);
+					outOverrides.*(countField->m_Member) = static_cast<uint32_t>(count);
 					continue;
 				}
 				return std::format("Unknown GTAO override '{}'.", key);

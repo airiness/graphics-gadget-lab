@@ -54,10 +54,13 @@ namespace gglab
 		// True evaluates the same sequence with GTAO accumulated over submitted frames.
 		std::optional<bool> m_TemporalAccumulation;
 		std::optional<uint32_t> m_TemporalMaxSamples;
+		std::optional<uint32_t> m_DirectionCount;
+		std::optional<uint32_t> m_StepCount;
 
 		[[nodiscard]] bool IsEmpty() const noexcept
 		{
-			return !m_TemporalAccumulation && !m_TemporalMaxSamples;
+			return !m_TemporalAccumulation && !m_TemporalMaxSamples && !m_DirectionCount &&
+				!m_StepCount;
 		}
 	};
 

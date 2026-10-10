@@ -10,6 +10,7 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <cstdint>
@@ -76,9 +77,10 @@ namespace gglab
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const uint32_t sampleIndex = transaction->GetReferenceSample()->m_Index;
+		const TemporalReferenceSignal signal = transaction->GetReferenceSample()->m_Signal;
 		rg.AddPass<TemporalReferencePassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
-			[transaction, displayViewId, sampleIndex](
+			[transaction, displayViewId, sampleIndex, signal](
 				RenderGraph::RGBuilder& builder, TemporalReferencePassData& data)
 			{
 				auto& targets = builder.GetBlackboard()
@@ -95,8 +97,21 @@ namespace gglab
 
 				// The reference accumulates the complete composed scene, including
 				// post-temporal geometry; Temporal AA is inactive, so this is the scene color.
+				// An ambient-occlusion reference accumulates the final GTAO visibility instead.
+				RGGTAOResources* gtao = nullptr;
+				if (signal == TemporalReferenceSignal::AmbientOcclusion)
+				{
+					gtao = &builder.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
+					GGLAB_ASSERT_MSG(gtao->IsComplete(),
+						"An ambient-occlusion reference requires active GTAO.");
+					if (!gtao->IsComplete())
+					{
+						return;
+					}
+				}
 				const RGTextureId currentColor = builder.Read(
-					targets.m_DisplayColor, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					gtao ? gtao->m_FinalAO : targets.m_DisplayColor, RGTextureAccess::Sample,
+					RHIStage::ComputeShader);
 				data.m_CurrentColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(currentColor);
 				if (sums.m_PreviousValid)
@@ -115,7 +130,9 @@ namespace gglab
 
 				const RHITextureDesc& currentDesc = builder.GetTextureDesc(currentColor);
 				RHITextureDesc meanDesc{};
-				meanDesc.m_Format = currentDesc.m_Format;
+				// The mean visibility keeps full precision in a four-channel format that the
+				// shader's typed float4 store supports on every backend.
+				meanDesc.m_Format = gtao ? RHIFormat::R16G16B16A16Float : currentDesc.m_Format;
 				meanDesc.m_Extent = currentDesc.m_Extent;
 				RGTextureId mean = builder.CreateTexture("TemporalReference.MeanSceneColor", meanDesc);
 				builder.WriteInPlace(mean, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
@@ -128,8 +145,16 @@ namespace gglab
 				data.m_Width = currentDesc.m_Extent.m_Width;
 				data.m_Height = currentDesc.m_Extent.m_Height;
 
-				// Post-processing presents the running mean of every accumulated sample.
-				targets.m_DisplayColor = mean;
+				// Post-processing presents the running mean of every accumulated sample; an
+				// ambient-occlusion reference presents it through the GTAO preview.
+				if (gtao)
+				{
+					gtao->m_FinalAO = mean;
+				}
+				else
+				{
+					targets.m_DisplayColor = mean;
+				}
 				const bool exported = transaction->ExportReferenceResources(builder, sums);
 				GGLAB_ASSERT_MSG(exported,
 					"Temporal reference must fully write and export its next sum.");

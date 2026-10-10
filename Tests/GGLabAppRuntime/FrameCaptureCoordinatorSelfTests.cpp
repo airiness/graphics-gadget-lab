@@ -6,7 +6,11 @@
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabTestCore/SelfTest.h"
 
@@ -1039,6 +1043,7 @@ namespace gglab
 				m_LastTemporalAAOverrides = pose
 					? std::optional(pose->m_TemporalAAOverrides)
 					: std::nullopt;
+				m_LastGTAOOverrides = pose ? std::optional(pose->m_GTAOOverrides) : std::nullopt;
 				if (pose)
 				{
 					const std::optional<CameraPathPose> applied =
@@ -1080,6 +1085,7 @@ namespace gglab
 			bool m_Deferred = false;
 			std::optional<TemporalReferenceSample> m_LastSample;
 			std::optional<FrameSequenceTemporalAAOverrides> m_LastTemporalAAOverrides;
+			std::optional<FrameSequenceGTAOOverrides> m_LastGTAOOverrides;
 			std::vector<FrameCaptureRequestResult> m_Results;
 		};
 
@@ -1444,6 +1450,65 @@ namespace gglab
 					everyFrameOverridden && !harness.m_Sequence.GetStatus()->m_GpuTiming,
 					"Every sequence frame carries the requested Temporal AA overrides; a reference "
 					"rejects them");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string overrideError;
+				const uint64_t referenceWithOverrides = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_ReferenceSamples = 2,
+					.m_GTAOOverrides = { .m_TemporalAccumulation = true },
+					}, overrideError);
+				std::string tapError;
+				const uint64_t referenceWithOtherTap = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_CaptureSource = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight,
+					.m_ReferenceSamples = 2,
+					}, tapError);
+				std::string error;
+				const uint64_t visibilityReference = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_CaptureSource = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = PostProcessDebugTap::GTAOFinalAO,
+					.m_ReferenceSamples = 2,
+					}, error);
+				for (uint32_t frame = 0; frame < 4 && !harness.m_LastSample; ++frame)
+				{
+					harness.Frame();
+				}
+				context.Check(referenceWithOverrides == 0 && !overrideError.empty() &&
+					referenceWithOtherTap == 0 && !tapError.empty() && visibilityReference != 0 &&
+					harness.m_LastSample &&
+					harness.m_LastSample->m_Signal == TemporalReferenceSignal::AmbientOcclusion &&
+					harness.m_LastGTAOOverrides && harness.m_LastGTAOOverrides->IsEmpty(),
+					"A reference averages GTAO visibility for the gtao-final-ao tap, rejects other "
+					"taps and takes no GTAO overrides");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				const uint64_t id = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_GTAOOverrides = { .m_TemporalAccumulation = true, .m_TemporalMaxSamples = 8u },
+					}, error);
+				harness.Frame();
+				bool everyFrameOverridden = true;
+				while (harness.m_Sequence.IsActive())
+				{
+					everyFrameOverridden &= harness.Frame().has_value() &&
+						harness.m_LastGTAOOverrides &&
+						harness.m_LastGTAOOverrides->m_TemporalAccumulation == true &&
+						harness.m_LastGTAOOverrides->m_TemporalMaxSamples == 8u;
+				}
+				const GTAOSettings overridden = ApplyFrameSequenceGTAOOverrides(
+					{ .m_TemporalAccumulation = true, .m_TemporalMaxSamples = 999u }, GTAOSettings{});
+				context.Check(id != 0 && everyFrameOverridden && overridden.m_TemporalAccumulation &&
+					overridden.m_TemporalMaxSamples == GTAOMaxTemporalSamples &&
+					ApplyFrameSequenceGTAOOverrides({}, GTAOSettings{}).m_TemporalMaxSamples ==
+						GTAOSettings{}.m_TemporalMaxSamples,
+					"Every sequence frame carries the requested GTAO overrides, resolved to the "
+					"settings' ranges");
 			}
 			{
 				SequenceHarness harness(directory.GetPath());

@@ -34,6 +34,15 @@ namespace gglab
 			settings.m_TemporalMaxSamples =
 				std::clamp(*overrides.m_TemporalMaxSamples, 1u, GTAOMaxTemporalSamples);
 		}
+		if (overrides.m_DirectionCount)
+		{
+			settings.m_DirectionCount =
+				std::clamp(*overrides.m_DirectionCount, 1u, GTAOMaxDirectionCount);
+		}
+		if (overrides.m_StepCount)
+		{
+			settings.m_StepCount = std::clamp(*overrides.m_StepCount, 1u, GTAOMaxStepCount);
+		}
 		return settings;
 	}
 
@@ -176,6 +185,13 @@ namespace gglab
 			request.m_DiagnosticTap.has_value())
 		{
 			outError = "A diagnostic tap is required for, and only valid with, diagnostic captures.";
+			return 0;
+		}
+		if (request.m_ReferenceSamples > 0 && request.m_DiagnosticTap &&
+			*request.m_DiagnosticTap != PostProcessDebugTap::GTAOFinalAO)
+		{
+			outError = "A reference averages the scene color, or GTAO visibility with the "
+				"gtao-final-ao tap; it records no other diagnostic tap.";
 			return 0;
 		}
 		if (request.m_ReferenceSamples > MaxTemporalReferenceSamples)
@@ -352,6 +368,9 @@ namespace gglab
 					.m_Index = m_Sample,
 					.m_Count = m_Request.m_ReferenceSamples,
 					.m_TextureLodBias = m_Request.m_ReferenceTextureLodBias,
+					.m_Signal = m_Request.m_DiagnosticTap
+						? TemporalReferenceSignal::AmbientOcclusion
+						: TemporalReferenceSignal::SceneColor,
 				}),
 			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
 			.m_GTAOOverrides = m_Request.m_GTAOOverrides,
