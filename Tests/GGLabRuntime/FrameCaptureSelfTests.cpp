@@ -350,6 +350,8 @@ namespace gglab
 				"temporal-rejection" &&
 				FindFrameCaptureDiagnosticTap("temporal-clip-distance") ==
 				PostProcessDebugTap::TemporalClipDistance &&
+				FindFrameCaptureDiagnosticTap("temporal-history-relaxation") ==
+				PostProcessDebugTap::TemporalHistoryRelaxation &&
 				!FindFrameCaptureDiagnosticTap("bloom-result") &&
 				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::BloomResult).empty(),
 				"Diagnostic taps have stable names; non-diagnostic taps have none");

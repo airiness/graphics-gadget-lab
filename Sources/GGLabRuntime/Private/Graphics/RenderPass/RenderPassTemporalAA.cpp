@@ -15,6 +15,7 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
@@ -40,13 +41,14 @@ namespace gglab
 		inline constexpr uint32_t TemporalAAVarianceClipBoundedBit = 0x00800000u;
 		inline constexpr uint32_t TemporalAAClipDistancePreviewBit = 0x00400000u;
 		inline constexpr uint32_t TemporalAAEffectiveSamplesBit = 0x00200000u;
+		inline constexpr uint32_t TemporalAAHistoryRelaxationPreviewBit = 0x00100000u;
 		inline constexpr uint32_t TemporalAAViewFlagMask =
 			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit |
 			TemporalAAHistorySamplesPreviewBit | TemporalAAHistoryCatmullRomBit |
 			TemporalAACurrentGaussianBit | TemporalAAClosestDepthMotionBit |
 			TemporalAADisplayDepthBit | TemporalAAVarianceClipBit |
 			TemporalAAVarianceClipBoundedBit | TemporalAAClipDistancePreviewBit |
-			TemporalAAEffectiveSamplesBit;
+			TemporalAAEffectiveSamplesBit | TemporalAAHistoryRelaxationPreviewBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -55,8 +57,10 @@ namespace gglab
 			uint32_t m_CurrentDepthIndex = 0;
 			uint32_t m_PreviousColorIndex = 0;
 			uint32_t m_PreviousDepthIndex = 0;
-			uint32_t m_ResolvedColorUavIndex = 0;
-			uint32_t m_NextHistoryColorUavIndex = 0;
+			// Resolved color UAV in the low 16 bits, next history color UAV in the high 16 bits.
+			uint32_t m_PackedOutputColorUavIndices = 0;
+			// Previous reliability SRV in the low 16 bits, next reliability UAV in the high 16 bits.
+			uint32_t m_PackedReliabilityIndices = 0;
 			uint32_t m_ReprojectionDiagnosticsUavIndex = 0;
 			// Linear clamp sampler in the low 16 bits, point clamp in the high 16 bits.
 			uint32_t m_PackedClampSamplerIndices = 0;
@@ -65,11 +69,21 @@ namespace gglab
 			uint32_t m_PackedDepthThresholds = 0;
 			uint32_t m_PackedMaxHistoryFeedbackAndClampExpansion = 0;
 			float m_VelocityWeightScale = 0.0f;
-			float m_LuminanceWeightScale = 0.0f;
+			// Luminance weight scale / 16 in the low 16 bits, history relaxation / 4 in the high.
+			uint32_t m_PackedLuminanceWeightAndHistoryRelaxation = 0;
 			uint32_t m_DisplayDepthUavIndex = 0;
 		};
 		static_assert(IsPassRootConstantStruct<TemporalAAPassParameters>);
 		static_assert(sizeof(TemporalAAPassParameters) == 64);
+		// Resource descriptor indices fit the 16-bit halves of the packed index pairs.
+		static_assert(GGLabDescriptorCapacityContract.m_ResourceDescriptorCount <= 0x10000u);
+
+		[[nodiscard]] uint32_t PackTemporalAADescriptorIndexPair(uint32_t low, uint32_t high) noexcept
+		{
+			GGLAB_ASSERT_MSG(low <= 0xffffu && high <= 0xffffu,
+				"Temporal AA packs descriptor indices into 16 bits each.");
+			return (low & 0xffffu) | (high << 16u);
+		}
 
 		struct TemporalAADepthHistoryPassParameters
 		{
@@ -86,6 +100,8 @@ namespace gglab
 			RGTextureViewId m_CurrentDepthSrv{};
 			RGTextureViewId m_PreviousColorSrv{};
 			RGTextureViewId m_PreviousDepthSrv{};
+			RGTextureViewId m_PreviousReliabilitySrv{};
+			RGTextureViewId m_NextReliabilityUav{};
 			RGTextureViewId m_ResolvedColorUav{};
 			RGTextureViewId m_NextHistoryColorUav{};
 			RGTextureViewId m_NextHistoryDepthUav{};
@@ -235,6 +251,8 @@ namespace gglab
 			payloadTap && UsesTemporalAAHistorySamplesPreviewPayload(*payloadTap);
 		const bool clipDistancePreviewRequested =
 			payloadTap && UsesTemporalAAClipDistancePreviewPayload(*payloadTap);
+		const bool historyRelaxationPreviewRequested =
+			payloadTap && UsesTemporalAAHistoryRelaxationPreviewPayload(*payloadTap);
 
 		rg.AddPass<TemporalAAResolvedColorInitializePassData>(
 			"PostProcess.TemporalAA.InitializeResolvedSceneColor",
@@ -292,6 +310,7 @@ namespace gglab
 			[transaction, displayViewId, viewIndex, temporalAASettings, historyAccumulation,
 			previousHistoryCompatible, historyColorPreviewRequested,
 			historySamplesPreviewRequested, clipDistancePreviewRequested,
+			historyRelaxationPreviewRequested,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -352,6 +371,12 @@ namespace gglab
 					data.m_PreviousDepthSrv =
 						builder.CreateView<RHITextureViewType::ShaderResource>(
 							resources.m_History.m_PreviousDepth);
+					resources.m_History.m_PreviousReliability = builder.Read(
+						resources.m_History.m_PreviousReliability, RGTextureAccess::Sample,
+						RHIStage::ComputeShader);
+					data.m_PreviousReliabilitySrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(
+							resources.m_History.m_PreviousReliability);
 				}
 				else
 				{
@@ -359,6 +384,7 @@ namespace gglab
 					// previous-history-valid is false, and the undefined previous imports stay unread.
 					data.m_PreviousColorSrv = data.m_CurrentColorSrv;
 					data.m_PreviousDepthSrv = data.m_CurrentDepthSrv;
+					data.m_PreviousReliabilitySrv = data.m_CurrentColorSrv;
 				}
 
 				resources.m_Width = targets.m_DisplayWidth;
@@ -385,6 +411,11 @@ namespace gglab
 					RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 				builder.WriteInPlace(resources.m_History.m_NextDepth,
 					RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				builder.WriteInPlace(resources.m_History.m_NextReliability,
+					RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_NextReliabilityUav =
+					builder.CreateView<RHITextureViewType::UnorderedAccess>(
+						resources.m_History.m_NextReliability);
 
 				data.m_ResolvedColorUav =
 					builder.CreateView<RHITextureViewType::UnorderedAccess>(
@@ -432,6 +463,9 @@ namespace gglab
 						(clipDistancePreviewRequested
 							? TemporalAAClipDistancePreviewBit
 							: 0u) |
+						(historyRelaxationPreviewRequested
+							? TemporalAAHistoryRelaxationPreviewBit
+							: 0u) |
 						(temporalAASettings.m_HistoryFilter ==
 							TemporalAAHistoryFilter::CatmullRomClamped
 							? TemporalAAHistoryCatmullRomBit
@@ -463,7 +497,10 @@ namespace gglab
 						temporalAASettings.m_MaxHistoryFeedback,
 						temporalAASettings.m_NeighborhoodClampExpansion),
 					.m_VelocityWeightScale = temporalAASettings.m_VelocityWeightScale,
-					.m_LuminanceWeightScale = temporalAASettings.m_LuminanceWeightScale,
+					.m_PackedLuminanceWeightAndHistoryRelaxation =
+						PackTemporalAALuminanceWeightAndHistoryRelaxation(
+							temporalAASettings.m_LuminanceWeightScale,
+							temporalAASettings.m_HistoryRelaxation),
 				};
 				// Still update history, but diagnostic MRTs describe this frame's raw
 				// radiance and coverage, not the temporally reconstructed image. Material
@@ -501,11 +538,16 @@ namespace gglab
 					executeContext.GetViewDescriptor(data.m_NextHistoryDepthUav);
 				const auto diagnostics =
 					executeContext.GetViewDescriptor(data.m_ReprojectionDiagnosticsUav);
+				const auto previousReliability =
+					executeContext.GetViewDescriptor(data.m_PreviousReliabilitySrv);
+				const auto nextReliability =
+					executeContext.GetViewDescriptor(data.m_NextReliabilityUav);
 				GGLAB_ASSERT_MSG(currentColor.IsValid() && motion.IsValid() &&
 					currentDepth.IsValid() && previousColor.IsValid() &&
 					previousDepth.IsValid() && resolvedColor.IsValid() &&
 					nextHistoryColor.IsValid() && nextHistoryDepth.IsValid() &&
-					diagnostics.IsValid(),
+					diagnostics.IsValid() && previousReliability.IsValid() &&
+					nextReliability.IsValid(),
 					"Temporal AA views must be shader visible before dispatch.");
 
 				parameters.m_CurrentColorIndex = currentColor.m_Index;
@@ -513,8 +555,10 @@ namespace gglab
 				parameters.m_CurrentDepthIndex = currentDepth.m_Index;
 				parameters.m_PreviousColorIndex = previousColor.m_Index;
 				parameters.m_PreviousDepthIndex = previousDepth.m_Index;
-				parameters.m_ResolvedColorUavIndex = resolvedColor.m_Index;
-				parameters.m_NextHistoryColorUavIndex = nextHistoryColor.m_Index;
+				parameters.m_PackedOutputColorUavIndices = PackTemporalAADescriptorIndexPair(
+					resolvedColor.m_Index, nextHistoryColor.m_Index);
+				parameters.m_PackedReliabilityIndices = PackTemporalAADescriptorIndexPair(
+					previousReliability.m_Index, nextReliability.m_Index);
 				parameters.m_ReprojectionDiagnosticsUavIndex = diagnostics.m_Index;
 				if (data.m_DisplayDepthUav.IsValid())
 				{

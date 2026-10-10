@@ -21,18 +21,21 @@ static const uint TAA_VARIANCE_CLIP_BIT = 0x01000000u;
 static const uint TAA_VARIANCE_CLIP_BOUNDED_BIT = 0x00800000u;
 static const uint TAA_CLIP_DISTANCE_PREVIEW_BIT = 0x00400000u;
 static const uint TAA_EFFECTIVE_SAMPLES_BIT = 0x00200000u;
+static const uint TAA_HISTORY_RELAXATION_PREVIEW_BIT = 0x00100000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
 	TAA_HISTORY_SAMPLES_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT |
 	TAA_CURRENT_GAUSSIAN_BIT | TAA_CLOSEST_DEPTH_MOTION_BIT | TAA_DISPLAY_DEPTH_BIT |
 	TAA_VARIANCE_CLIP_BIT | TAA_VARIANCE_CLIP_BOUNDED_BIT | TAA_CLIP_DISTANCE_PREVIEW_BIT |
-	TAA_EFFECTIVE_SAMPLES_BIT;
+	TAA_EFFECTIVE_SAMPLES_BIT | TAA_HISTORY_RELAXATION_PREVIEW_BIT;
 // exp(-2.29 (d / 0.75)^2): Blackman-Harris approximated by a Gaussian of 0.75 pixels.
 static const float TAA_CURRENT_GAUSSIAN_KERNEL_SCALE = 2.29 / (0.75 * 0.75);
 // History alpha holds a compatibility age or an effective sample count, by the history's
 // accumulation model. Both start at one and stay within these bounds.
 static const float TAA_HISTORY_INITIAL_ACCUMULATION = 1.0;
 static const float TAA_HISTORY_MAX_ACCUMULATION = 255.0;
+// Smoothing of the reliability evidence: one native jitter cycle; 1/16 measured the same.
+static const float TAA_RELIABILITY_SMOOTHING = 0.125;
 
 float2 UnpackTemporalAAUnitRangePair(uint packedValues)
 {
@@ -53,6 +56,42 @@ bool IsTemporalHistoryAccumulationValid(float accumulation)
 {
 	return isfinite(accumulation) && accumulation >= TAA_HISTORY_INITIAL_ACCUMULATION &&
 		accumulation <= TAA_HISTORY_MAX_ACCUMULATION;
+}
+
+// Relative luminance difference of the current frame from history, in [-1, 1].
+float ComputeTemporalRelativeLuminanceDifference(float currentLuminance, float historyLuminance)
+{
+	const float current = max(currentLuminance, 0.0);
+	const float history = max(historyLuminance, 0.0);
+	return (current - history) / max(max(current, history), 1.0e-4);
+}
+
+// Reliability evidence of accepted history: the signed and the absolute relative
+// luminance difference, exponentially smoothed. Rejected history starts again from zero.
+float2 ResolveTemporalReliability(float2 previousReliability, float difference)
+{
+	const float2 carried = all(isfinite(previousReliability)) ? previousReliability : 0.0.xx;
+	return lerp(carried, float2(difference, abs(difference)), TAA_RELIABILITY_SMOOTHING);
+}
+
+// How consistently the current frame departs from history in one direction, in [0, 1]:
+// near zero while jitter aliasing alternates the sign of the difference, near one while a
+// shading or lighting change keeps it.
+float ResolveTemporalDisagreementConsistency(float2 reliability)
+{
+	return saturate(abs(reliability.x) / max(reliability.y, 1.0e-4));
+}
+
+// Expansion of the min/max box, in box extents per side, for history whose disagreement
+// alternates in sign: all of it below a consistency of 0.2 and none above 0.5, scaled by how
+// close the accumulated samples are to their bound. A single frame's clip distance cannot
+// separate jitter aliasing from stale history; the sign of the disagreement over frames can.
+float ResolveTemporalHistoryRelaxation(float historyRelaxation, float accumulation,
+	float maxSamples, float consistency)
+{
+	const float accumulated = saturate((accumulation - TAA_HISTORY_INITIAL_ACCUMULATION) /
+		max(maxSamples - TAA_HISTORY_INITIAL_ACCUMULATION, 1.0));
+	return max(historyRelaxation, 0.0) * accumulated * saturate((0.5 - consistency) / 0.3);
 }
 
 // Compatibility age: consecutive accepted frames, whatever their confidence.

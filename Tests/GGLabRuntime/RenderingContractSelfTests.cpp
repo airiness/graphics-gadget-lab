@@ -5531,6 +5531,11 @@ namespace gglab
 				!UsesTemporalAAClipDistancePreviewPayload(
 					PostProcessDebugTap::TemporalHistorySamples) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalClipDistance) &&
+				UsesTemporalAAHistoryRelaxationPreviewPayload(
+					PostProcessDebugTap::TemporalHistoryRelaxation) &&
+				!UsesTemporalAAHistoryRelaxationPreviewPayload(
+					PostProcessDebugTap::TemporalClipDistance) &&
+				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalHistoryRelaxation) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalHistoryWeight) &&
 				!IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalMotionMagnitude) &&
 				historyColorPreviewGraph.Compile(),
@@ -5541,13 +5546,14 @@ namespace gglab
 			const TemporalHistoryFormatSupport formatSupport =
 				QueryTemporalHistoryFormatSupport(device);
 			context.Check(formatSupport.IsSupported() &&
-				device.m_TextureViewQueryCount == 4 &&
-				device.m_LastTextureViewQueryTextureDesc.m_Format == TemporalHistoryDepthFormat &&
+				device.m_TextureViewQueryCount == 6 &&
+				device.m_LastTextureViewQueryTextureDesc.m_Format ==
+					TemporalHistoryReliabilityFormat &&
 				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::Sampled) &&
 				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage,
 					RHITextureUsage::UnorderedAccess) &&
 				device.m_LastTextureViewQueryDesc.m_Type == RHITextureViewType::UnorderedAccess,
-				"Temporal history capability requires SRV and typed-UAV support for both fixed formats");
+				"Temporal history capability requires SRV and typed-UAV support for the color, depth and reliability formats");
 			device.m_UseControlledFenceCompletion = true;
 			PersistentTexturePool texturePool(&device);
 			TemporalHistoryManager historyManager(&texturePool);
@@ -5569,6 +5575,8 @@ namespace gglab
 					.m_HistoryColorTypedUavStore = true,
 					.m_HistoryDepthShaderResource = true,
 					.m_HistoryDepthTypedUavStore = true,
+					.m_HistoryReliabilityShaderResource = true,
+					.m_HistoryReliabilityTypedUavStore = true,
 				},
 				.m_DisplayViewId = RenderViewID::Main,
 				.m_SceneExtensionParticipation =
@@ -5613,11 +5621,15 @@ namespace gglab
 								data.m_History.m_PreviousColor, RGTextureAccess::Sample);
 							data.m_History.m_PreviousDepth = builder.Read(
 								data.m_History.m_PreviousDepth, RGTextureAccess::Sample);
+							data.m_History.m_PreviousReliability = builder.Read(
+								data.m_History.m_PreviousReliability, RGTextureAccess::Sample);
 						}
 						builder.WriteInPlace(
 							data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
 						builder.WriteInPlace(
 							data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(
+							data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
 						exported =
 							transaction.ExportHistoryResources(builder, data.m_History);
 					});
@@ -5631,14 +5643,14 @@ namespace gglab
 							return resource.m_Name.starts_with("TAA.History.Previous") &&
 								resource.m_HasFinalBarrierState &&
 								resource.m_FinalBarrierState == CommonRHIResourceState();
-						}) == 2;
+						}) == 3;
 				if (!inspectColdStartContract)
 				{
 					return imported && exported && previousMatched && compiled &&
 						previousExportsCommon;
 				}
 
-				const bool importedFour = snapshot.m_Resources.size() == 4 &&
+				const bool importedSix = snapshot.m_Resources.size() == 6 &&
 					std::ranges::all_of(snapshot.m_Resources,
 						[](const RGSnapshotResourceInfo& resource) noexcept
 						{ return resource.m_Imported; });
@@ -5649,9 +5661,9 @@ namespace gglab
 							resource.m_InitialBarrierState == UndefinedRHITextureState() &&
 							resource.m_HasFinalBarrierState &&
 							resource.m_FinalBarrierState == CommonRHIResourceState();
-					}) == 2;
+					}) == 3;
 				return imported && exported && previousMatched && compiled &&
-					previousExportsCommon && importedFour && nextExportsCommon;
+					previousExportsCommon && importedSix && nextExportsCommon;
 			};
 			auto buildNoWriteHistoryGraph = [&](TemporalFrameTransaction& transaction)
 			{
@@ -5699,7 +5711,7 @@ namespace gglab
 			const auto committedHistorySummary = historyManager.GetSummary();
 			context.Check(committedHistorySummary.m_HasActiveHistory && committedHistorySummary.m_HistoryValid &&
 				committedHistorySummary.m_DisplayViewId == activePlan.m_DisplayViewId &&
-				committedHistorySummary.m_SessionIdentity == activePlan.m_SessionIdentity && device.m_CreateTextureCount == 4,
+				committedHistorySummary.m_SessionIdentity == activePlan.m_SessionIdentity && device.m_CreateTextureCount == 6,
 				"Lightweight history summary identifies valid committed history without allocating or reading back");
 			context.Check(coldStartGraphValid && !firstView.m_HasPreviousTemporalState &&
 				firstTransaction.GetState() == TemporalFrameTransactionState::Committed &&
@@ -5709,8 +5721,8 @@ namespace gglab
 				firstCommitted.m_Compatibility.m_ColorAbi == ActiveTemporalColorAbi &&
 				firstCommitted.m_LastCommitted.m_PreExposure == 0.25f &&
 				firstCommitted.m_LastCommitted.m_GraphicsFence == firstFence &&
-				device.m_CreateTextureCount == 4,
-				"Temporal history cold start imports four persistent textures and commits one write pair");
+				device.m_CreateTextureCount == 6,
+				"Temporal history cold start imports six persistent textures and commits one write set");
 
 			TemporalViewHistory incompatibleViewHistory = viewHistory;
 			incompatibleViewHistory.Invalidate();
@@ -5804,7 +5816,7 @@ namespace gglab
 				!viewHistory.m_Valid && !afterFatal.m_HasActiveHistory &&
 				afterFatal.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission &&
 				afterFatal.m_PendingRetirementBytes > 0 && fatalFencesAreRetirementOnly &&
-				destroyedBeforeFatalFence == 0 && device.m_DestroyTextureCount == 4,
+				destroyedBeforeFatalFence == 0 && device.m_DestroyTextureCount == 6,
 				"Fatal-after-submit invalidates history and uses its fence only for retirement");
 
 			TemporalFrameTransaction reenabledTransaction;
@@ -5825,9 +5837,9 @@ namespace gglab
 			const TemporalHistoryManagerDiagnostics disabled = historyManager.GetDiagnostics();
 			context.Check(reenabled.m_HasActiveHistory && !reenabled.m_HistoryValid &&
 				reenabled.m_AllocationGeneration > firstGeneration &&
-				device.m_CreateTextureCount == 8 && !disabled.m_HasActiveHistory &&
+				device.m_CreateTextureCount == 12 && !disabled.m_HasActiveHistory &&
 				disabled.m_LastResetReason == TemporalHistoryResetReason::Disabled &&
-				device.m_DestroyTextureCount == 8,
+				device.m_DestroyTextureCount == 12,
 				"Disabled history releases immediately and re-enable never revives retired allocations");
 
 			TemporalFrameTransaction preResizeTransaction;
@@ -5850,8 +5862,8 @@ namespace gglab
 				resized.m_Compatibility.m_DepthExtent == ViewExtent{ 128, 72 } &&
 				resized.m_AllocationGeneration > preResizeGeneration &&
 				resized.m_LastResetReason == TemporalHistoryResetReason::ExtentChanged &&
-				resized.m_PendingRetirementFences.size() == 4 &&
-				device.m_CreateTextureCount == 16,
+				resized.m_PendingRetirementFences.size() == 6 &&
+				device.m_CreateTextureCount == 24,
 				"Extent changes retire committed history and allocate a fresh invalid generation");
 
 			TemporalFramePlanResolveInfo unavailablePlanInfo = activePlanInfo;
@@ -5870,7 +5882,7 @@ namespace gglab
 			historyManager.Shutdown();
 			device.m_CompletedFenceValue = 50;
 			texturePool.Tick();
-			context.Check(device.m_DestroyTextureCount == 16 &&
+			context.Check(device.m_DestroyTextureCount == 24 &&
 				texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
 				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
 				"Temporal history shutdown leaves no active or pending persistent allocation");
@@ -5908,6 +5920,7 @@ namespace gglab
 						if (!exposureManager.ImportRenderGraphResources(frame, builder, data.m_History)) return;
 						builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
 						builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
 						written = exposureManager.ExportRenderGraphResources(frame, builder, data.m_History);
 					});
 				return graph.Compile() && written;
@@ -6966,6 +6979,23 @@ namespace gglab
 			return std::clamp(std::clamp(historyConfidence, 0.0f, 1.0f) *
 				std::min(previousSamples, maxSamples) + 1.0f,
 				TemporalHistoryInitialAccumulation, maxSamples);
+		}
+
+		[[nodiscard]] inline float ResolveTemporalDisagreementConsistency(
+			float signedDifference, float absoluteDifference) noexcept
+		{
+			return std::clamp(std::abs(signedDifference) / std::max(absoluteDifference, 1.0e-4f),
+				0.0f, 1.0f);
+		}
+
+		[[nodiscard]] inline float ResolveTemporalHistoryRelaxation(float historyRelaxation,
+			float accumulation, float maxSamples, float consistency) noexcept
+		{
+			const float accumulated = std::clamp(
+				(accumulation - TemporalHistoryInitialAccumulation) /
+				std::max(maxSamples - TemporalHistoryInitialAccumulation, 1.0f), 0.0f, 1.0f);
+			return std::max(historyRelaxation, 0.0f) * accumulated *
+				std::clamp((0.5f - consistency) / 0.3f, 0.0f, 1.0f);
 		}
 
 		[[nodiscard]] inline float ResolveTemporalAAHistorySamplesPreview(
@@ -8076,6 +8106,37 @@ namespace gglab
 				samplesWeightAfterMotion < 0.7f,
 				"Effective samples keep a low-confidence stretch from returning to the ceiling weight on the next confident frame");
 
+			// A disagreement that alternates in sign relaxes rectification of fully
+			// accumulated history; one that keeps its sign, or fresh history, does not.
+			const float alternatingConsistency = ResolveTemporalDisagreementConsistency(0.01f, 0.1f);
+			const float persistentConsistency = ResolveTemporalDisagreementConsistency(-0.2f, 0.2f);
+			TemporalAASettings relaxationOutOfRange{};
+			relaxationOutOfRange.m_HistoryRelaxation = 9.0f;
+			TemporalAASettings relaxationInvalid{};
+			relaxationInvalid.m_HistoryRelaxation = std::numeric_limits<float>::quiet_NaN();
+			constexpr std::array<float, 2> relaxationPackingGolden = UnpackTemporalAAUnitRangePair(
+				PackTemporalAALuminanceWeightAndHistoryRelaxation(0.0f, 2.0f));
+			context.Check(NearlyEqual(alternatingConsistency, 0.1f) &&
+				persistentConsistency == 1.0f &&
+				ResolveTemporalDisagreementConsistency(0.0f, 0.0f) == 0.0f &&
+				ResolveTemporalHistoryRelaxation(1.0f, maxHistorySamples, maxHistorySamples,
+					alternatingConsistency) == 1.0f &&
+				ResolveTemporalHistoryRelaxation(1.0f, maxHistorySamples, maxHistorySamples,
+					persistentConsistency) == 0.0f &&
+				ResolveTemporalHistoryRelaxation(1.0f, TemporalHistoryInitialAccumulation,
+					maxHistorySamples, alternatingConsistency) == 0.0f &&
+				ResolveTemporalHistoryRelaxation(0.0f, maxHistorySamples, maxHistorySamples,
+					alternatingConsistency) == 0.0f &&
+				TemporalAASettings{}.m_HistoryRelaxation == TemporalAADefaultHistoryRelaxation &&
+				ResolveTemporalAASettings(relaxationOutOfRange).m_HistoryRelaxation ==
+					TemporalAAMaxHistoryRelaxation &&
+				ResolveTemporalAASettings(relaxationInvalid).m_HistoryRelaxation ==
+					TemporalAADefaultHistoryRelaxation &&
+				relaxationPackingGolden[0] == 0.0f &&
+				NearlyEqual(relaxationPackingGolden[1] * TemporalAAMaxHistoryRelaxation, 2.0f, 1.0e-3f) &&
+				TemporalHistoryReliabilityFormat == RHIFormat::R16G16Float,
+				"History relaxation widens rectification only for fully accumulated history whose disagreement alternates in sign, within its packed settings range");
+
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;
 			const TemporalMotionFormatSupport motionSupport =
@@ -8397,6 +8458,8 @@ namespace gglab
 				.m_HistoryColorTypedUavStore = true,
 				.m_HistoryDepthShaderResource = true,
 				.m_HistoryDepthTypedUavStore = true,
+				.m_HistoryReliabilityShaderResource = true,
+				.m_HistoryReliabilityTypedUavStore = true,
 			};
 			context.Check(fullCapabilities.IsCoreAvailable() &&
 				!TemporalAACapabilityStatus{}.IsCoreAvailable(),

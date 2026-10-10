@@ -113,6 +113,7 @@ namespace gglab
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistorySamples), .m_Name = "History Samples"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalClipDistance), .m_Name = "Clip Distance"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryRelaxation), .m_Name = "History Relaxation"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude"},
 			},
@@ -663,10 +664,12 @@ namespace gglab
 				camera.GetExposureCompensationEV())},
 			{.m_Name = "TAA settings", .m_Value = std::format(
 				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
-				"accumulation {}, rectification {} (gamma {:.2f}), history {}, current {}, "
-				"motion {}, post-temporal {}, resolution {}, texture LOD {:.2f}",
+				"relaxation {:.2f}, accumulation {}, rectification {} (gamma {:.2f}), "
+				"history {}, current {}, motion {}, post-temporal {}, resolution {}, "
+				"texture LOD {:.2f}",
 				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
 				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion,
+				taa.m_HistoryRelaxation,
 				GetTemporalAAHistoryAccumulationName(taa.m_HistoryAccumulation),
 				GetTemporalAAHistoryRectificationName(taa.m_HistoryRectification),
 				taa.m_VarianceClipGamma,

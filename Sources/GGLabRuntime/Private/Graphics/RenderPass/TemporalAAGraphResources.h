@@ -51,6 +51,12 @@ namespace gglab
 		return tap == PostProcessDebugTap::TemporalClipDistance;
 	}
 
+	[[nodiscard]] constexpr bool UsesTemporalAAHistoryRelaxationPreviewPayload(
+		PostProcessDebugTap tap) noexcept
+	{
+		return tap == PostProcessDebugTap::TemporalHistoryRelaxation;
+	}
+
 	// Taps read from the Temporal AA diagnostics texture.
 	[[nodiscard]] constexpr bool IsTemporalAADiagnosticsTap(PostProcessDebugTap tap) noexcept
 	{
@@ -62,6 +68,7 @@ namespace gglab
 		case PostProcessDebugTap::TemporalHistoryWeight:
 		case PostProcessDebugTap::TemporalHistorySamples:
 		case PostProcessDebugTap::TemporalClipDistance:
+		case PostProcessDebugTap::TemporalHistoryRelaxation:
 			return true;
 		default:
 			return false;
@@ -79,6 +86,7 @@ namespace gglab
 		case PostProcessDebugTap::TemporalHistoryWeight:
 		case PostProcessDebugTap::TemporalHistorySamples:
 		case PostProcessDebugTap::TemporalClipDistance:
+		case PostProcessDebugTap::TemporalHistoryRelaxation:
 			return resources.m_ReprojectionDiagnostics;
 		default:
 			return {};

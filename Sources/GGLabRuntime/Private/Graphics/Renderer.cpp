@@ -183,6 +183,10 @@ namespace gglab
 			historySupport.m_Depth.m_ShaderResource.IsSupported();
 		m_TemporalAACapabilityStatus.m_HistoryDepthTypedUavStore =
 			historySupport.m_Depth.m_TypedUavStore.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryReliabilityShaderResource =
+			historySupport.m_Reliability.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryReliabilityTypedUavStore =
+			historySupport.m_Reliability.m_TypedUavStore.IsSupported();
 
 		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
 		m_FrameCapture = std::make_unique<FrameCaptureService>(m_RHIContext->GetDevice());

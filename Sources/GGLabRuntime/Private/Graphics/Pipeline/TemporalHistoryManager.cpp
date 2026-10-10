@@ -52,6 +52,7 @@ namespace gglab
 		return {
 			.m_Color = querySurface(TemporalHistoryColorFormat),
 			.m_Depth = querySurface(TemporalHistoryDepthFormat),
+			.m_Reliability = querySurface(TemporalHistoryReliabilityFormat),
 		};
 	}
 
@@ -192,6 +193,15 @@ namespace gglab
 				history.m_Depth[writeIndex].GetCreateInfo().m_Desc, nextInitialState,
 				history.m_Initialized[writeIndex] ? RGContentValidity::Defined
 												  : RGContentValidity::Undefined),
+			.m_PreviousReliability = builder.ImportTexture("TAA.History.PreviousReliability",
+				history.m_Reliability[readIndex].GetTexture(),
+				history.m_Reliability[readIndex].GetCreateInfo().m_Desc, previousInitialState,
+				previousValid ? RGContentValidity::Defined : RGContentValidity::Undefined),
+			.m_NextReliability = builder.ImportTexture("TAA.History.NextReliability",
+				history.m_Reliability[writeIndex].GetTexture(),
+				history.m_Reliability[writeIndex].GetCreateInfo().m_Desc, nextInitialState,
+				history.m_Initialized[writeIndex] ? RGContentValidity::Defined
+												  : RGContentValidity::Undefined),
 			.m_ReadIndex = readIndex,
 			.m_WriteIndex = writeIndex,
 			.m_PreviousValid = previousValid,
@@ -212,7 +222,8 @@ namespace gglab
 			return false;
 		}
 		if (!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextColor) ||
-			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextDepth))
+			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextDepth) ||
+			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextReliability))
 		{
 			return false;
 		}
@@ -221,9 +232,11 @@ namespace gglab
 		{
 			builder.Export(resources.m_PreviousColor, RGTextureAccess::None);
 			builder.Export(resources.m_PreviousDepth, RGTextureAccess::None);
+			builder.Export(resources.m_PreviousReliability, RGTextureAccess::None);
 		}
 		builder.Export(resources.m_NextColor, RGTextureAccess::None);
 		builder.Export(resources.m_NextDepth, RGTextureAccess::None);
+		builder.Export(resources.m_NextReliability, RGTextureAccess::None);
 		frame.m_RenderGraphExported = true;
 		return true;
 	}
@@ -340,6 +353,7 @@ namespace gglab
 			{
 				diagnostics.m_ActiveBytes += history.m_Color[index].GetEstimatedBytes();
 				diagnostics.m_ActiveBytes += history.m_Depth[index].GetEstimatedBytes();
+				diagnostics.m_ActiveBytes += history.m_Reliability[index].GetEstimatedBytes();
 			}
 		}
 
@@ -391,7 +405,8 @@ namespace gglab
 			return TemporalHistoryResetReason::AccumulationChanged;
 		}
 		return current.m_ColorFormat != compatibility.m_ColorFormat ||
-			current.m_DepthFormat != compatibility.m_DepthFormat
+			current.m_DepthFormat != compatibility.m_DepthFormat ||
+			current.m_ReliabilityFormat != compatibility.m_ReliabilityFormat
 			? TemporalHistoryResetReason::FormatChanged
 			: TemporalHistoryResetReason::None;
 	}
@@ -419,25 +434,28 @@ namespace gglab
 		history.m_Color[1] = m_TexturePool->AcquireTexture(colorInfo, "TAA.HistoryColor1");
 		history.m_Depth[0] = m_TexturePool->AcquireTexture(depthInfo, "TAA.HistoryDepth0");
 		history.m_Depth[1] = m_TexturePool->AcquireTexture(depthInfo, "TAA.HistoryDepth1");
+		const RHIOwnedTextureCreateInfo reliabilityInfo = MakeHistoryTextureCreateInfo(
+			compatibility.m_ReliabilityFormat, compatibility.m_ColorExtent.m_Width,
+			compatibility.m_ColorExtent.m_Height);
+		history.m_Reliability[0] =
+			m_TexturePool->AcquireTexture(reliabilityInfo, "TAA.HistoryReliability0");
+		history.m_Reliability[1] =
+			m_TexturePool->AcquireTexture(reliabilityInfo, "TAA.HistoryReliability1");
 		const bool complete = std::ranges::all_of(history.m_Color,
 			&PersistentTextureAllocation::IsValid) &&
-			std::ranges::all_of(history.m_Depth, &PersistentTextureAllocation::IsValid);
+			std::ranges::all_of(history.m_Depth, &PersistentTextureAllocation::IsValid) &&
+			std::ranges::all_of(history.m_Reliability, &PersistentTextureAllocation::IsValid);
 		if (!complete)
 		{
-			for (PersistentTextureAllocation& allocation : history.m_Color)
+			for (auto* allocations : { &history.m_Color, &history.m_Depth, &history.m_Reliability })
 			{
-				if (allocation.IsValid())
+				for (PersistentTextureAllocation& allocation : *allocations)
 				{
-					GGLAB_UNUSED(
-						m_TexturePool->ReleaseTextureWithoutSubmission(std::move(allocation)));
-				}
-			}
-			for (PersistentTextureAllocation& allocation : history.m_Depth)
-			{
-				if (allocation.IsValid())
-				{
-					GGLAB_UNUSED(
-						m_TexturePool->ReleaseTextureWithoutSubmission(std::move(allocation)));
+					if (allocation.IsValid())
+					{
+						GGLAB_UNUSED(
+							m_TexturePool->ReleaseTextureWithoutSubmission(std::move(allocation)));
+					}
 				}
 			}
 			return false;
@@ -476,6 +494,10 @@ namespace gglab
 			release(allocation);
 		}
 		for (PersistentTextureAllocation& allocation : history.m_Depth)
+		{
+			release(allocation);
+		}
+		for (PersistentTextureAllocation& allocation : history.m_Reliability)
 		{
 			release(allocation);
 		}

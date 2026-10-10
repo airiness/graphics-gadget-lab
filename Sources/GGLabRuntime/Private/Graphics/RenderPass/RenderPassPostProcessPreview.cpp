@@ -58,6 +58,7 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistorySamples) == 20);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
 
 		struct PassData
 		{
@@ -118,7 +119,8 @@ namespace gglab
 				tap == PostProcessDebugTap::TemporalRejection ||
 				tap == PostProcessDebugTap::TemporalHistoryWeight ||
 				tap == PostProcessDebugTap::TemporalHistorySamples ||
-				tap == PostProcessDebugTap::TemporalClipDistance;
+				tap == PostProcessDebugTap::TemporalClipDistance ||
+				tap == PostProcessDebugTap::TemporalHistoryRelaxation;
 		}
 
 		// Records the fullscreen preview draw shared by inspector previews and

@@ -138,7 +138,7 @@ namespace gglab
 				float m_Min;
 				float m_Max;
 			};
-			constexpr std::array<OverrideField, 8> fields{ {
+			constexpr std::array<OverrideField, 9> fields{ {
 				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback,
 					0.0f, TemporalAAMaxHistoryFeedbackCeiling },
 				{ "depthAbsoluteThreshold",
@@ -160,6 +160,8 @@ namespace gglab
 					TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
 				{ "varianceClipGamma", &FrameSequenceTemporalAAOverrides::m_VarianceClipGamma,
 					TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
+				{ "historyRelaxation", &FrameSequenceTemporalAAOverrides::m_HistoryRelaxation,
+					0.0f, TemporalAAMaxHistoryRelaxation },
 			} };
 			for (const auto& [key, fieldValue] : value.items())
 			{

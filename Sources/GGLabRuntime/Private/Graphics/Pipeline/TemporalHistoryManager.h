@@ -27,10 +27,12 @@ namespace gglab
 	{
 		TemporalHistorySurfaceFormatSupport m_Color{};
 		TemporalHistorySurfaceFormatSupport m_Depth{};
+		TemporalHistorySurfaceFormatSupport m_Reliability{};
 
 		[[nodiscard]] constexpr bool IsSupported() const noexcept
 		{
-			return m_Color.IsSupported() && m_Depth.IsSupported();
+			return m_Color.IsSupported() && m_Depth.IsSupported() &&
+				m_Reliability.IsSupported();
 		}
 	};
 
@@ -73,6 +75,7 @@ namespace gglab
 		{
 			std::array<PersistentTextureAllocation, 2> m_Color;
 			std::array<PersistentTextureAllocation, 2> m_Depth;
+			std::array<PersistentTextureAllocation, 2> m_Reliability;
 			std::array<bool, 2> m_Initialized{};
 			TemporalHistoryCompatibilityIdentity m_Compatibility{};
 			TemporalHistoryCommittedMetadata m_LastCommitted{};

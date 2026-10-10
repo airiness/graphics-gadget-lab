@@ -114,6 +114,7 @@ namespace gglab
 			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";
 			case PostProcessDebugTap::TemporalHistorySamples: return "History Samples";
 			case PostProcessDebugTap::TemporalClipDistance: return "Clip Distance";
+			case PostProcessDebugTap::TemporalHistoryRelaxation: return "History Relaxation";
 			case PostProcessDebugTap::TemporalMotionDirection: return "Motion Direction";
 			case PostProcessDebugTap::TemporalMotionMagnitude: return "Motion Magnitude";
 			default: return "Temporal Preview";
@@ -136,6 +137,8 @@ namespace gglab
 				0.05f, 0.0f, TemporalAAMaxLuminanceWeightScale, "%.2f");
 			ImGui::DragFloat("Clamp Expansion", &settings.m_NeighborhoodClampExpansion,
 				0.005f, 0.0f, TemporalAAMaxNeighborhoodClampExpansion, "%.3f");
+			ImGui::SliderFloat("History Relaxation", &settings.m_HistoryRelaxation,
+				0.0f, TemporalAAMaxHistoryRelaxation, "%.2f");
 			int historyAccumulation = static_cast<int>(settings.m_HistoryAccumulation);
 			if (ImGui::Combo("History Accumulation", &historyAccumulation,
 				"Compatibility Age\0Effective Samples\0"))
@@ -206,6 +209,7 @@ namespace gglab
 				PostProcessDebugTap::TemporalHistoryWeight,
 				PostProcessDebugTap::TemporalHistorySamples,
 				PostProcessDebugTap::TemporalClipDistance,
+				PostProcessDebugTap::TemporalHistoryRelaxation,
 				PostProcessDebugTap::TemporalMotionDirection,
 				PostProcessDebugTap::TemporalMotionMagnitude,
 			};

@@ -283,6 +283,7 @@ namespace gglab
 		writer.Number("velocityWeightScale", temporal.m_VelocityWeightScale);
 		writer.Number("luminanceWeightScale", temporal.m_LuminanceWeightScale);
 		writer.Number("neighborhoodClampExpansion", temporal.m_NeighborhoodClampExpansion);
+		writer.Number("historyRelaxation", temporal.m_HistoryRelaxation);
 		writer.String("historyAccumulation", temporal.m_HistoryAccumulation);
 		writer.String("historyRectification", temporal.m_HistoryRectification);
 		writer.Number("varianceClipGamma", temporal.m_VarianceClipGamma);

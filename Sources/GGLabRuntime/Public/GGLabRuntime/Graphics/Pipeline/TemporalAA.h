@@ -34,6 +34,8 @@ namespace gglab
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
 	inline constexpr float TemporalAAMaxNeighborhoodClampExpansion = 1.0f;
+	inline constexpr float TemporalAADefaultHistoryRelaxation = 1.0f;
+	inline constexpr float TemporalAAMaxHistoryRelaxation = 4.0f;
 	inline constexpr float TemporalAADefaultVarianceClipGamma = 1.0f;
 	inline constexpr float TemporalAAMinVarianceClipGamma = 0.25f;
 	inline constexpr float TemporalAAMaxVarianceClipGamma = 4.0f;
@@ -73,6 +75,14 @@ namespace gglab
 			QuantizeTemporalAAUnitRange(maxHistoryFeedback),
 			TemporalAAUnitRangePairMask - 1u);
 		return feedback | (QuantizeTemporalAAUnitRange(clampExpansion) << 16u);
+	}
+
+	[[nodiscard]] constexpr uint32_t PackTemporalAALuminanceWeightAndHistoryRelaxation(
+		float luminanceWeightScale, float historyRelaxation) noexcept
+	{
+		return PackTemporalAAUnitRangePair(
+			luminanceWeightScale / TemporalAAMaxLuminanceWeightScale,
+			historyRelaxation / TemporalAAMaxHistoryRelaxation);
 	}
 
 	[[nodiscard]] constexpr std::array<float, 2> UnpackTemporalAAUnitRangePair(
@@ -372,6 +382,11 @@ namespace gglab
 		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
+		// Further min/max box expansion, in box extents per side, for history whose
+		// disagreement with the current frame keeps changing sign, as jitter aliasing does,
+		// in proportion to how close its samples are to their bound. A disagreement that
+		// keeps one sign, such as a lighting change, withdraws it; sky never relaxes.
+		float m_HistoryRelaxation = TemporalAADefaultHistoryRelaxation;
 		TemporalAAHistoryAccumulation m_HistoryAccumulation =
 			TemporalAAHistoryAccumulation::EffectiveSamples;
 		TemporalAAHistoryRectification m_HistoryRectification =
@@ -420,6 +435,9 @@ namespace gglab
 			? std::clamp(settings.m_NeighborhoodClampExpansion, 0.0f,
 				TemporalAAMaxNeighborhoodClampExpansion)
 			: defaults.m_NeighborhoodClampExpansion;
+		settings.m_HistoryRelaxation = std::isfinite(settings.m_HistoryRelaxation)
+			? std::clamp(settings.m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation)
+			: defaults.m_HistoryRelaxation;
 		if (settings.m_HistoryFilter != TemporalAAHistoryFilter::Bilinear &&
 			settings.m_HistoryFilter != TemporalAAHistoryFilter::CatmullRomClamped)
 		{
@@ -485,6 +503,8 @@ namespace gglab
 		bool m_HistoryColorTypedUavStore = false;
 		bool m_HistoryDepthShaderResource = false;
 		bool m_HistoryDepthTypedUavStore = false;
+		bool m_HistoryReliabilityShaderResource = false;
+		bool m_HistoryReliabilityTypedUavStore = false;
 
 		// Device format support only. Required programs and pipeline closures are frame
 		// contracts of the selected pipeline, never a reason to disable a requested TAA.
@@ -494,7 +514,8 @@ namespace gglab
 				m_ResolvedColorRenderTarget && m_ResolvedColorShaderResource &&
 				m_ResolvedColorTypedUavStore && m_HistoryColorShaderResource &&
 				m_HistoryColorTypedUavStore && m_HistoryDepthShaderResource &&
-				m_HistoryDepthTypedUavStore;
+				m_HistoryDepthTypedUavStore && m_HistoryReliabilityShaderResource &&
+				m_HistoryReliabilityTypedUavStore;
 		}
 
 		bool operator==(const TemporalAACapabilityStatus&) const noexcept = default;

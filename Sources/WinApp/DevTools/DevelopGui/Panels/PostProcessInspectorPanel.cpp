@@ -71,6 +71,8 @@ namespace gglab
 				return "Temporal / History Samples";
 			case PostProcessDebugTap::TemporalClipDistance:
 				return "Temporal / Clip Distance";
+			case PostProcessDebugTap::TemporalHistoryRelaxation:
+				return "Temporal / History Relaxation";
 			default:
 				return "Unknown";
 			}

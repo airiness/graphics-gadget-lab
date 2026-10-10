@@ -17,6 +17,10 @@ namespace gglab
 	// state of the history's accumulation model.
 	inline constexpr RHIFormat TemporalHistoryColorFormat = RHIFormat::R16G16B16A16Float;
 	inline constexpr RHIFormat TemporalHistoryDepthFormat = RHIFormat::R32Float;
+	// Per-pixel reliability evidence that travels with the color history across frames:
+	// the smoothed signed (R) and absolute (G) relative luminance difference of the current
+	// frame from accepted history.
+	inline constexpr RHIFormat TemporalHistoryReliabilityFormat = RHIFormat::R16G16Float;
 
 	enum class TemporalHistoryResetReason : uint8_t
 	{
@@ -50,6 +54,7 @@ namespace gglab
 		ViewExtent m_DepthExtent{};
 		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
 		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
+		RHIFormat m_ReliabilityFormat = TemporalHistoryReliabilityFormat;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 		// Meaning of the stored alpha.
 		TemporalAAHistoryAccumulation m_Accumulation =
@@ -87,6 +92,9 @@ namespace gglab
 		RGTextureId m_PreviousDepth;
 		RGTextureId m_NextColor;
 		RGTextureId m_NextDepth;
+		// Display extent, like the color history.
+		RGTextureId m_PreviousReliability;
+		RGTextureId m_NextReliability;
 		uint32_t m_ReadIndex = 0;
 		uint32_t m_WriteIndex = 1;
 		bool m_PreviousValid = false;
@@ -94,7 +102,8 @@ namespace gglab
 		[[nodiscard]] bool IsValid() const noexcept
 		{
 			return m_PreviousColor.IsValid() && m_PreviousDepth.IsValid() &&
-				m_NextColor.IsValid() && m_NextDepth.IsValid();
+				m_NextColor.IsValid() && m_NextDepth.IsValid() &&
+				m_PreviousReliability.IsValid() && m_NextReliability.IsValid();
 		}
 	};
 

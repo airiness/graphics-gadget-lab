@@ -10,8 +10,10 @@ struct TemporalAAPassParameters
 	uint CurrentDepthIndex;
 	uint PreviousColorIndex;
 	uint PreviousDepthIndex;
-	uint ResolvedColorUavIndex;
-	uint NextHistoryColorUavIndex;
+	// Resolved color UAV in the low 16 bits, next history color UAV in the high 16 bits.
+	uint PackedOutputColorUavIndices;
+	// Previous reliability SRV in the low 16 bits, next reliability UAV in the high 16 bits.
+	uint PackedReliabilityIndices;
 	uint ReprojectionDiagnosticsUavIndex;
 	// Linear clamp sampler in the low 16 bits, point clamp in the high 16 bits.
 	uint PackedClampSamplerIndices;
@@ -20,7 +22,8 @@ struct TemporalAAPassParameters
 	uint PackedDepthThresholds;
 	uint PackedMaxHistoryFeedbackAndClampExpansion;
 	float VelocityWeightScale;
-	float LuminanceWeightScale;
+	// Luminance weight scale / 16 in the low 16 bits, history relaxation / 4 in the high.
+	uint PackedLuminanceWeightAndHistoryRelaxation;
 	// Display-extent depth for post-temporal composition, written when the render
 	// extent is smaller than the display extent.
 	uint DisplayDepthUavIndex;
@@ -34,7 +37,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	// The resolve writes display pixels from render-domain color, depth and motion. At
 	// native resolution the two extents coincide and every render position is exact.
 	RWTexture2D<float4> resolvedColor =
-		GetRWTexture2DFloat4(g_Pass.ResolvedColorUavIndex);
+		GetRWTexture2DFloat4(g_Pass.PackedOutputColorUavIndices & 0xffffu);
 	uint width;
 	uint height;
 	resolvedColor.GetDimensions(width, height);
@@ -56,7 +59,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	Texture2D<float2> motionTexture = GetTexture2DFloat2(g_Pass.MotionIndex);
 	Texture2D<float> currentDepthTexture = GetTexture2DFloat(g_Pass.CurrentDepthIndex);
 	RWTexture2D<float4> nextHistoryColor =
-		GetRWTexture2DFloat4(g_Pass.NextHistoryColorUavIndex);
+		GetRWTexture2DFloat4(g_Pass.PackedOutputColorUavIndices >> 16);
 	RWTexture2D<float4> reprojectionDiagnostics =
 		GetRWTexture2DFloat4(g_Pass.ReprojectionDiagnosticsUavIndex);
 
@@ -71,6 +74,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_SAMPLES_PREVIEW_BIT) != 0;
 	const bool writeClipDistancePreview =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_CLIP_DISTANCE_PREVIEW_BIT) != 0;
+	const bool writeHistoryRelaxationPreview =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_RELAXATION_PREVIEW_BIT) != 0;
 	const bool catmullRomHistory =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_CATMULL_ROM_BIT) != 0;
 	const bool gaussianCurrent =
@@ -86,6 +91,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
 	const float2 maxHistoryFeedbackAndClampExpansion =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedMaxHistoryFeedbackAndClampExpansion);
+	const float2 luminanceWeightAndHistoryRelaxation =
+		UnpackTemporalAAUnitRangePair(g_Pass.PackedLuminanceWeightAndHistoryRelaxation) *
+		float2(16.0, 4.0);
 	float3 centerColor = currentColorTexture.Load(int3(renderPixel, 0)).rgb;
 	if (!IsTemporalColorFinite(centerColor))
 	{
@@ -106,6 +114,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	bool accepted = false;
 	float3 historyColor = currentColor;
 	float previousAccumulation = TAA_HISTORY_INITIAL_ACCUMULATION;
+	float2 previousReliability = 0.0.xx;
 	if (previousHistoryValid)
 	{
 		// The sample whose motion reprojects this pixel: the centre, or the front-most
@@ -187,6 +196,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			// pixels and raised static shimmer.
 			previousAccumulation = previousColorTexture.SampleLevel(
 				pointClampSampler, previousHistoryUV, 0.0).a;
+			previousReliability = GetTexture2DFloat2(g_Pass.PackedReliabilityIndices & 0xffffu)
+				.SampleLevel(pointClampSampler, previousHistoryUV, 0.0);
 			if (!IsTemporalColorFinite(historyColor) ||
 				!IsTemporalHistoryAccumulationValid(previousAccumulation))
 			{
@@ -225,6 +236,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	float historyWeight = 0.0;
 	float historyConfidence = 0.0;
+	float2 nextReliability = 0.0.xx;
+	float historyRelaxation = 0.0;
 	// How far rectification moved accepted history, relative to the size of the
 	// neighborhood box; history that is not accepted counts as fully discarded.
 	float clipDistance = 1.0;
@@ -236,19 +249,30 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float3 neighborhoodStdDev;
 		GetTemporalNeighborhoodRange(currentColorTexture, renderPixel, renderExtent,
 			centerColor, neighborhoodMin, neighborhoodMax, neighborhoodMean, neighborhoodStdDev);
-		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y;
+		const float3 currentYCoCg = TemporalRGBToYCoCg(currentColor);
+		const float3 historyYCoCg = TemporalRGBToYCoCg(historyColor);
+		nextReliability = ResolveTemporalReliability(previousReliability,
+			ComputeTemporalRelativeLuminanceDifference(currentYCoCg.x, historyYCoCg.x));
+		// Sky beside moving silhouettes keeps edge color in history that only the
+		// unrelaxed box removes.
+		if (!IsDepthBackground(currentRawDepth, viewData.DepthConvention))
+		{
+			historyRelaxation = ResolveTemporalHistoryRelaxation(
+				luminanceWeightAndHistoryRelaxation.y, previousAccumulation,
+				ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x),
+				ResolveTemporalDisagreementConsistency(nextReliability));
+		}
+		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y + historyRelaxation;
 		const float3 neighborhoodExtent = neighborhoodMax - neighborhoodMin;
 		neighborhoodMin -= neighborhoodExtent * clampExpansion;
 		neighborhoodMax += neighborhoodExtent * clampExpansion;
 
-		const float3 currentYCoCg = TemporalRGBToYCoCg(currentColor);
-		const float3 historyYCoCg = TemporalRGBToYCoCg(historyColor);
 		const float motionMagnitudePixels =
 			length(historyMotionUV * float2(width, height));
 		historyConfidence = ComputeTemporalHistoryConfidence(motionMagnitudePixels,
 			currentYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
 			historyYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
-			g_Pass.VelocityWeightScale, g_Pass.LuminanceWeightScale);
+			g_Pass.VelocityWeightScale, luminanceWeightAndHistoryRelaxation.x);
 		historyWeight = ComputeTemporalHistoryWeight(previousAccumulation, historyConfidence,
 			maxHistoryFeedbackAndClampExpansion.x);
 		const bool varianceClip =
@@ -305,6 +329,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		resolvedOutput.rgb, pixel, viewData.TemporalFrameIndex), outputAlphas.y);
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
+	GetRWTexture2DFloat2(g_Pass.PackedReliabilityIndices >> 16)[pixel] =
+		accepted && all(isfinite(nextReliability)) ? nextReliability : 0.0.xx;
 	float4 diagnosticsOutput =
 		float4(historyWeight, float(rejectionReason), previousHistoryUV);
 	if (writeHistoryColorPreview)
@@ -322,6 +348,13 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	else if (writeClipDistancePreview)
 	{
 		diagnosticsOutput = float4((accepted ? clipDistance : 1.0).xxx, 1.0);
+	}
+	else if (writeHistoryRelaxationPreview)
+	{
+		const float relaxationFraction = accepted && luminanceWeightAndHistoryRelaxation.y > 0.0
+			? saturate(historyRelaxation / luminanceWeightAndHistoryRelaxation.y)
+			: 0.0;
+		diagnosticsOutput = float4(relaxationFraction.xxx, 1.0);
 	}
 	reprojectionDiagnostics[pixel] = diagnosticsOutput;
 

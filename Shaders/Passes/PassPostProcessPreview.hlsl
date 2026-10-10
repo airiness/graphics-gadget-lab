@@ -37,6 +37,7 @@ static const uint PREVIEW_SOURCE_TEMPORAL_REJECTION = 18;
 static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT = 19;
 static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_SAMPLES = 20;
 static const uint PREVIEW_SOURCE_TEMPORAL_CLIP_DISTANCE = 26;
+static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_RELAXATION = 27;
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
@@ -83,7 +84,8 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_REJECTION ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_SAMPLES ||
-		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_CLIP_DISTANCE)
+		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_CLIP_DISTANCE ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_RELAXATION)
 	{
 		Texture2D<float4> diagnosticsTexture = GetTexture2DFloat4(g_Pass.SourceTextureIndex);
 		const float4 diagnostics = diagnosticsTexture.SampleLevel(pointSampler, input.UV, 0.0);
@@ -93,7 +95,8 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 		}
 		if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT ||
 			g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_SAMPLES ||
-			g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_CLIP_DISTANCE)
+			g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_CLIP_DISTANCE ||
+			g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_RELAXATION)
 		{
 			return float4(saturate(diagnostics.x).xxx, 1.0);
 		}

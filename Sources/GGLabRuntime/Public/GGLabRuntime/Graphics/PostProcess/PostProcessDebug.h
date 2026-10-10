@@ -50,8 +50,10 @@ namespace gglab
 
 		// How far rectification moved accepted history, relative to the neighborhood box.
 		TemporalClipDistance = 26,
+		// Fraction of the configured history relaxation that widened the neighborhood box.
+		TemporalHistoryRelaxation = 27,
 
-		Count = 27
+		Count = 28
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -75,7 +77,8 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistorySamples) == 20);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 27);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 28);
 
 	struct PostProcessDebugSelection
 	{
