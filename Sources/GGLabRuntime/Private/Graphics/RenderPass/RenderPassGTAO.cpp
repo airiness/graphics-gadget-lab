@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
@@ -41,7 +42,7 @@ namespace gglab
 			float m_Radius = 0.0f;
 			float m_FalloffStart = 0.0f;
 			float m_FalloffEnd = 0.0f;
-			float m_Padding0 = 0.0f;
+			uint32_t m_SampleIndex = 0;
 		};
 		static_assert(IsPassRootConstantStruct<GTAOEvaluatePassParameters>);
 		static_assert(sizeof(GTAOEvaluatePassParameters) == 64);
@@ -280,10 +281,17 @@ namespace gglab
 			? RHIFormat::R16Float
 			: m_Capabilities.m_FinalAO.m_Format;
 
+		// A supersampled reference averages its samples, so each one advances the sampling
+		// sequence; every other frame keeps the fixed spatial pattern.
+		const TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
+		const uint32_t sampleIndex = transaction && transaction->GetReferenceSample()
+			? transaction->GetReferenceSample()->m_Index
+			: 0u;
+
 		rg.AddPass<EvaluatePassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
 			[viewIndex, settings, diagnosticOutputsEnabled, capabilities = m_Capabilities,
-			finalAOFormat](
+			finalAOFormat, sampleIndex](
 				RenderGraph::RGBuilder& builder, EvaluatePassData& data)
 			{
 				auto& blackboard = builder.GetBlackboard();
@@ -357,6 +365,7 @@ namespace gglab
 					.m_Radius = settings.m_Radius,
 					.m_FalloffStart = settings.m_FalloffStart,
 					.m_FalloffEnd = settings.m_FalloffEnd,
+					.m_SampleIndex = sampleIndex,
 				};
 			},
 			[this, services, &context](RGExecuteContext& executeContext, EvaluatePassData& data)

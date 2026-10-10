@@ -27,6 +27,14 @@ float GTAOInterleavedGradientNoise(uint2 pixel)
 	return frac(52.9829189 * frac(0.06711056 * float(pixel.x) + 0.00583715 * float(pixel.y)));
 }
 
+// Per-pixel sampling offset of one sample of a sequence. Sample 0 is the spatial pattern
+// itself; later samples advance it by the golden ratio, which keeps any prefix of the
+// sequence stratified over the direction and step offsets.
+float GTAOSampleNoise(uint2 pixel, uint sampleIndex)
+{
+	return frac(GTAOInterleavedGradientNoise(pixel) + 0.61803399 * float(sampleIndex));
+}
+
 bool LoadGTAOPosition(Texture2D<float> depthTexture, uint2 fullPixel, uint2 fullExtent,
 	ViewData viewData, out float rawDepth, out float viewZ, out float3 positionVS)
 {
@@ -185,11 +193,11 @@ GTAOSurface LoadHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfP
 // the spatial or temporal filters would bias the mean visibility down.
 float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 halfPixel,
 	uint2 fullExtent, ViewData viewData, float radius, float falloffStart, float falloffEnd,
-	uint directionCount, uint stepCount)
+	uint directionCount, uint stepCount, uint sampleIndex)
 {
 	static const float pi = 3.14159265;
 	static const float halfPi = 1.57079633;
-	const float noise = GTAOInterleavedGradientNoise(halfPixel);
+	const float noise = GTAOSampleNoise(halfPixel, sampleIndex);
 	const float projectedRadius = max(
 		radius * abs(viewData.ProjMat._22) * float(fullExtent.y) * 0.5 / surface.ViewZ, 1.0);
 	directionCount = clamp(directionCount, 1u, GTAO_MAX_DIRECTION_COUNT);

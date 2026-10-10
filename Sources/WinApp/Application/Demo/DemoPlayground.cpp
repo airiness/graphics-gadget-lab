@@ -44,7 +44,7 @@ namespace gglab
 		camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
 		camCreateInfo.m_ExposureCompensationEV = 0.0f;
 		m_ViewRenderProfile.m_TemporalAA.m_Enabled = m_Content == PlaygroundContent::CoastalAtrium;
-		m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
+		m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = m_Content == PlaygroundContent::CoastalAtrium;
 		m_ViewRenderProfile.m_PostProcess.m_Bloom.m_Enabled = false;
 		m_Camera = std::make_unique<Camera>(camCreateInfo);
 
