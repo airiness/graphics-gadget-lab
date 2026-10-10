@@ -57,6 +57,8 @@ namespace gglab
 				return "Final AO Visibility";
 			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
 				return "AO-only Lighting Contribution";
+			case PostProcessDebugTap::GTAOHistorySamples:
+				return "History Samples";
 			default:
 				return "GTAO Preview";
 			}
@@ -73,6 +75,7 @@ namespace gglab
 				PostProcessDebugTap::GTAODenoiseY,
 				PostProcessDebugTap::GTAOFinalAO,
 				PostProcessDebugTap::GTAOAOOnlyLightingContribution,
+				PostProcessDebugTap::GTAOHistorySamples,
 			};
 			bool changed = false;
 			if (ImGui::BeginCombo("Preview Tap##GTAO", GetTapName(tap)))
@@ -288,8 +291,10 @@ namespace gglab
 			const auto preview = view->GetPostProcessPreviewDiagnostics(Channel);
 			ImGui::BeginDisabled(!control);
 			PostProcessDebugSelection selection = preview.m_Selected;
-			if (selection.m_Tap < PostProcessDebugTap::GTAORawAO ||
-				selection.m_Tap > PostProcessDebugTap::GTAOAOOnlyLightingContribution)
+			const bool gtaoTap = (selection.m_Tap >= PostProcessDebugTap::GTAORawAO &&
+				selection.m_Tap <= PostProcessDebugTap::GTAOAOOnlyLightingContribution) ||
+				selection.m_Tap == PostProcessDebugTap::GTAOHistorySamples;
+			if (!gtaoTap)
 			{
 				selection.m_Tap = PostProcessDebugTap::GTAOFinalAO;
 			}
@@ -304,6 +309,12 @@ namespace gglab
 			if (selection.m_Tap == PostProcessDebugTap::GTAOFinalAO)
 			{
 				ImGui::TextDisabled("FinalAO is visibility: white is unoccluded, black is occluded.");
+			}
+			else if (selection.m_Tap == PostProcessDebugTap::GTAOHistorySamples)
+			{
+				ImGui::TextDisabled(
+					"Effective history samples over the maximum; GTAO keeps its own history only "
+					"without Temporal AA.");
 			}
 			else if (selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution)
 			{

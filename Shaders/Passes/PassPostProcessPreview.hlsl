@@ -38,6 +38,7 @@ static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT = 19;
 static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_SAMPLES = 20;
 static const uint PREVIEW_SOURCE_TEMPORAL_CLIP_DISTANCE = 26;
 static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_RELAXATION = 27;
+static const uint PREVIEW_SOURCE_GTAO_HISTORY_SAMPLES = 28;
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
@@ -110,7 +111,8 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_RAW_AO ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_DENOISE_X ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_DENOISE_Y ||
-		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_FINAL_AO)
+		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_FINAL_AO ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_HISTORY_SAMPLES)
 	{
 		Texture2D<float> aoTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
 		const float ao = aoTexture.SampleLevel(pointSampler, input.UV, 0.0);

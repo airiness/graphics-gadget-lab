@@ -3240,6 +3240,7 @@ namespace gglab
 				shader_programs::ForwardPlusValidationTilesCompute,
 				shader_programs::ForwardPlusValidationFrameCompute,
 				shader_programs::GTAOEvaluateDiagnosticsCompute,
+				shader_programs::GTAOTemporalDiagnosticsCompute,
 			};
 			context.Check(std::ranges::all_of(productionPrograms, inInitialDemand) &&
 				std::ranges::none_of(labOwnedPrograms, inInitialDemand),

@@ -59,6 +59,7 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistorySamples) == 20);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOHistorySamples) == 28);
 
 		struct PassData
 		{
@@ -103,7 +104,8 @@ namespace gglab
 				tap == PostProcessDebugTap::GTAODenoiseX ||
 				tap == PostProcessDebugTap::GTAODenoiseY ||
 				tap == PostProcessDebugTap::GTAOFinalAO ||
-				tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
+				tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution ||
+				tap == PostProcessDebugTap::GTAOHistorySamples;
 		}
 
 		bool IsTemporalMotionPreview(PostProcessDebugTap tap) noexcept
@@ -197,6 +199,8 @@ namespace gglab
 				return resources.m_FinalAO;
 			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
 				return resources.m_AOOnlyLightingContribution;
+			case PostProcessDebugTap::GTAOHistorySamples:
+				return resources.m_TemporalSamples;
 			default:
 				return {};
 			}

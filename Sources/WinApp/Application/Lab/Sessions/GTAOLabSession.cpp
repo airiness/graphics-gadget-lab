@@ -114,6 +114,8 @@ namespace gglab
 						.m_Name = "Final AO"},
 					{.m_Value = int32_t(PostProcessDebugTap::GTAOAOOnlyLightingContribution),
 						.m_Name = "AO-only Lighting Contribution"},
+					{.m_Value = int32_t(PostProcessDebugTap::GTAOHistorySamples),
+						.m_Name = "History Samples"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({

@@ -73,6 +73,8 @@ namespace gglab
 				return "Temporal / Clip Distance";
 			case PostProcessDebugTap::TemporalHistoryRelaxation:
 				return "Temporal / History Relaxation";
+			case PostProcessDebugTap::GTAOHistorySamples:
+				return "GTAO / History Samples";
 			default:
 				return "Unknown";
 			}

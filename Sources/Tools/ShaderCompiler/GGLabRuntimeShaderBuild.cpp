@@ -52,6 +52,8 @@ namespace gglab
 		constexpr ShaderProgramBuildDefine GTAODiagnosticsDefine{
 			L"GGLAB_GTAO_DIAGNOSTICS" };
 		constexpr ShaderProgramBuildDefine GTAOTemporalDefine{ L"GGLAB_GTAO_TEMPORAL" };
+		constexpr ShaderProgramBuildDefine GTAOTemporalDiagnosticsDefine{
+			L"GGLAB_GTAO_TEMPORAL_DIAGNOSTICS" };
 		constexpr ShaderProgramBuildDefine GTAODenoiseXDefine{ L"GGLAB_GTAO_DENOISE_X" };
 		constexpr ShaderProgramBuildDefine GTAODenoiseYDefine{ L"GGLAB_GTAO_DENOISE_Y" };
 		constexpr ShaderProgramBuildDefine GTAOUpsampleDefine{ L"GGLAB_GTAO_UPSAMPLE" };
@@ -69,6 +71,8 @@ namespace gglab
 		constexpr std::array ValidationReduceFrameDefines{ ValidationReduceFrameDefine };
 		constexpr std::array GTAODiagnosticsDefines{ GTAODiagnosticsDefine };
 		constexpr std::array GTAOTemporalDefines{ GTAOTemporalDefine };
+		constexpr std::array GTAOTemporalDiagnosticsDefines{
+			GTAOTemporalDefine, GTAOTemporalDiagnosticsDefine };
 		constexpr std::array GTAODenoiseXDefines{ GTAODenoiseXDefine };
 		constexpr std::array GTAODenoiseYDefines{ GTAODenoiseYDefine };
 		constexpr std::array GTAOUpsampleDefines{ GTAOUpsampleDefine };
@@ -107,6 +111,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GTAOEvaluateCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODiagnosticsDefines },
 			ShaderProgramBuildRecord{ &GTAOTemporalCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOTemporalDefines },
+			ShaderProgramBuildRecord{ &GTAOTemporalDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOTemporalDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseYCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseYDefines },
 			ShaderProgramBuildRecord{ &GTAOUpsampleCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOUpsampleDefines },

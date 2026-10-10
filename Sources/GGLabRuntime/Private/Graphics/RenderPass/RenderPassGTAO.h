@@ -42,6 +42,7 @@ namespace gglab
 			Evaluate,
 			EvaluateDiagnostics,
 			Temporal,
+			TemporalDiagnostics,
 			DenoiseX,
 			DenoiseY,
 			Upsample,
@@ -53,7 +54,7 @@ namespace gglab
 		// Accumulates the spatially denoised visibility with the frame's GTAO history.
 		void AddTemporalPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services, TemporalFrameTransaction& transaction,
-			uint32_t viewIndex, const GTAOSettings& settings) noexcept;
+			uint32_t viewIndex, const GTAOSettings& settings, bool diagnostics) noexcept;
 
 		std::array<ComputePipelineRecipe, static_cast<size_t>(PipelineVariant::Count)>
 			m_PipelineRecipes{};
@@ -64,5 +65,6 @@ namespace gglab
 		bool m_IsAvailable = false;
 		bool m_DiagnosticPipelineAvailable = false;
 		bool m_TemporalPipelineAvailable = false;
+		bool m_TemporalDiagnosticPipelineAvailable = false;
 	};
 }

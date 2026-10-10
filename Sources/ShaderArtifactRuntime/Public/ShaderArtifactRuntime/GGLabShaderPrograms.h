@@ -51,6 +51,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gtao", "compute.evaluate-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOTemporalCompute{
 		"gglab.shader.gtao", "compute.temporal", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAOTemporalDiagnosticsCompute{
+		"gglab.shader.gtao", "compute.temporal-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAODenoiseXCompute{
 		"gglab.shader.gtao", "compute.denoise-x", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAODenoiseYCompute{

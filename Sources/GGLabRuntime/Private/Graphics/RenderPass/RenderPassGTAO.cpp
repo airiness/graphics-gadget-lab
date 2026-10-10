@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -19,6 +20,7 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -60,14 +62,22 @@ namespace gglab
 			uint32_t m_NextVisibilityUavIndex = 0;
 			uint32_t m_NextViewZUavIndex = 0;
 			uint32_t m_AccumulatedAOUavIndex = 0;
+			uint32_t m_SamplesUavIndex = 0;
 			uint32_t m_ViewIndex = 0;
 			uint32_t m_FullWidth = 0;
 			uint32_t m_FullHeight = 0;
 			uint32_t m_HalfWidth = 0;
 			uint32_t m_HalfHeight = 0;
-			uint32_t m_PreviousValid = 0;
-			float m_MaxSamples = 1.0f;
+			uint32_t m_MaxSamplesAndPreviousValid = 0;
 		};
+		static_assert(GTAOMaxTemporalSamples <= 0xffffu,
+			"The maximum effective sample count is packed into 16 bits.");
+
+		[[nodiscard]] constexpr uint32_t PackTemporalSampling(
+			uint32_t maxSamples, bool previousValid) noexcept
+		{
+			return (maxSamples & 0xffffu) | (previousValid ? 1u << 16u : 0u);
+		}
 		static_assert(IsPassRootConstantStruct<GTAOTemporalPassParameters>);
 		static_assert(sizeof(GTAOTemporalPassParameters) == 64);
 
@@ -125,7 +135,10 @@ namespace gglab
 			RGTextureViewId m_NextVisibilityUav{};
 			RGTextureViewId m_NextViewZUav{};
 			RGTextureViewId m_AccumulatedAOUav{};
+			RGTextureViewId m_SamplesUav{};
 			GTAOTemporalPassParameters m_Parameters{};
+			bool m_PreviousValid = false;
+			bool m_Diagnostics = false;
 		};
 
 		struct DenoisePassData
@@ -173,6 +186,11 @@ namespace gglab
 		{
 			return tap == PostProcessDebugTap::GTAOReconstructedNormal ||
 				tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset;
+		}
+
+		bool RequiresGTAOTemporalDiagnostics(PostProcessDebugTap tap) noexcept
+		{
+			return tap == PostProcessDebugTap::GTAOHistorySamples;
 		}
 	}
 
@@ -237,6 +255,9 @@ namespace gglab
 				shader_programs::GTAOEvaluateDiagnosticsCompute);
 		m_TemporalPipelineAvailable = m_Capabilities.IsTemporalAvailable() &&
 			loadVariant(PipelineVariant::Temporal, shader_programs::GTAOTemporalCompute);
+		m_TemporalDiagnosticPipelineAvailable = m_TemporalPipelineAvailable &&
+			loadVariant(PipelineVariant::TemporalDiagnostics,
+				shader_programs::GTAOTemporalDiagnosticsCompute);
 		if (m_Capabilities.IsTemporalAvailable() && !m_TemporalPipelineAvailable)
 		{
 			// Frames that request temporal GTAO fall back to spatial-only visibility.
@@ -286,11 +307,19 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const uint32_t viewIndex =
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
-		const bool diagnosticOutputsEnabled =
-			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion) &&
-			m_DiagnosticPipelineAvailable &&
-			RequiresGTAODiagnosticOutputs(registry->GetPostProcessPreviewSelection(
-				PostProcessPreviewChannel::AmbientOcclusion).m_Tap);
+		// A pending diagnostic capture of a GTAO tap selects the diagnostic outputs; otherwise
+		// the interactive preview does.
+		std::optional<PostProcessDebugTap> diagnosticTap = services.m_FrameCapture
+			? services.m_FrameCapture->GetPendingDiagnosticTap()
+			: std::nullopt;
+		if (!diagnosticTap &&
+			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion))
+		{
+			diagnosticTap = registry->GetPostProcessPreviewSelection(
+				PostProcessPreviewChannel::AmbientOcclusion).m_Tap;
+		}
+		const bool diagnosticOutputsEnabled = m_DiagnosticPipelineAvailable && diagnosticTap &&
+			RequiresGTAODiagnosticOutputs(*diagnosticTap);
 		const RHIFormat finalAOFormat =
 			settings.m_FinalAOFormatPreference == GTAOFinalAOFormatPreference::ForceR16Float
 			? RHIFormat::R16Float
@@ -493,7 +522,10 @@ namespace gglab
 		addDenoisePass("Lighting.GTAO.DenoiseY", PipelineVariant::DenoiseY, false);
 		if (temporal)
 		{
-			AddTemporalPass(rg, context, services, *transaction, viewIndex, settings);
+			const bool temporalDiagnostics = m_TemporalDiagnosticPipelineAvailable &&
+				diagnosticTap && RequiresGTAOTemporalDiagnostics(*diagnosticTap);
+			AddTemporalPass(rg, context, services, *transaction, viewIndex, settings,
+				temporalDiagnostics);
 		}
 
 		rg.AddPass<UpsamplePassData>(
@@ -570,11 +602,11 @@ namespace gglab
 
 	void RenderPassGTAO::AddTemporalPass(RenderGraph& rg, const RenderFrameContext& context,
 		const RenderServices& services, TemporalFrameTransaction& transaction, uint32_t viewIndex,
-		const GTAOSettings& settings) noexcept
+		const GTAOSettings& settings, bool diagnostics) noexcept
 	{
 		rg.AddPass<TemporalPassData>(
 			"Lighting.GTAO.Temporal", RGPassEncoderType::Compute,
-			[&transaction, viewIndex, settings](
+			[&transaction, viewIndex, settings, diagnostics](
 				RenderGraph::RGBuilder& builder, TemporalPassData& data)
 			{
 				auto& blackboard = builder.GetBlackboard();
@@ -625,6 +657,17 @@ namespace gglab
 					RHIStage::ComputeShader);
 				builder.WriteInPlace(resources.m_TemporalAO, RGTextureAccess::StorageWrite,
 					RHIStage::ComputeShader);
+				if (diagnostics)
+				{
+					resources.m_TemporalSamples =
+						builder.CreateTexture("GTAO.TemporalSamples", accumulatedDesc);
+					builder.WriteInPlace(resources.m_TemporalSamples,
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_SamplesUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
+						resources.m_TemporalSamples);
+				}
+				data.m_Diagnostics = diagnostics;
+				data.m_PreviousValid = history.m_PreviousValid;
 				data.m_NextVisibilityUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 					history.m_NextVisibility);
 				data.m_NextViewZUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
@@ -643,8 +686,8 @@ namespace gglab
 					.m_FullHeight = resources.m_FullHeight,
 					.m_HalfWidth = resources.m_HalfWidth,
 					.m_HalfHeight = resources.m_HalfHeight,
-					.m_PreviousValid = history.m_PreviousValid ? 1u : 0u,
-					.m_MaxSamples = static_cast<float>(settings.m_TemporalMaxSamples),
+					.m_MaxSamplesAndPreviousValid = PackTemporalSampling(
+						settings.m_TemporalMaxSamples, history.m_PreviousValid),
 				};
 			},
 			[this, services, &context](RGExecuteContext& executeContext, TemporalPassData& data)
@@ -663,7 +706,7 @@ namespace gglab
 				parameters.m_HalfDepthIndex = descriptorIndex(data.m_HalfDepthSrv);
 				parameters.m_FullDepthIndex = descriptorIndex(data.m_FullDepthSrv);
 				parameters.m_MotionIndex = descriptorIndex(data.m_MotionSrv);
-				if (parameters.m_PreviousValid != 0u)
+				if (data.m_PreviousValid)
 				{
 					parameters.m_PreviousVisibilityIndex =
 						descriptorIndex(data.m_PreviousVisibilitySrv);
@@ -672,7 +715,12 @@ namespace gglab
 				parameters.m_NextVisibilityUavIndex = descriptorIndex(data.m_NextVisibilityUav);
 				parameters.m_NextViewZUavIndex = descriptorIndex(data.m_NextViewZUav);
 				parameters.m_AccumulatedAOUavIndex = descriptorIndex(data.m_AccumulatedAOUav);
-				commandContext->SetPipeline(GetOrCreatePipeline(services, PipelineVariant::Temporal));
+				if (data.m_Diagnostics)
+				{
+					parameters.m_SamplesUavIndex = descriptorIndex(data.m_SamplesUav);
+				}
+				commandContext->SetPipeline(GetOrCreatePipeline(services, data.m_Diagnostics
+					? PipelineVariant::TemporalDiagnostics : PipelineVariant::Temporal));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
