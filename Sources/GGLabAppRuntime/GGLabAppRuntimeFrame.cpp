@@ -478,8 +478,14 @@ namespace gglab
 			m_FrameSequence->PrepareFrame(
 				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
 		{
-			m_FrameSequence->OnPoseApplied(cameraRig.ApplyCameraPathFrame(
-				sequencePose->m_CameraPathId, sequencePose->m_Frame));
+			const std::optional<CameraPathPose> pose = cameraRig.ApplyCameraPathFrame(
+				sequencePose->m_CameraPathId, sequencePose->m_Frame);
+			m_FrameSequence->OnPoseApplied(pose);
+			if (const CameraPath* path = pose
+				? cameraRig.FindCameraPath(sequencePose->m_CameraPathId) : nullptr)
+			{
+				demo->OnCameraPathFrameApplied(*path, sequencePose->m_Frame);
+			}
 			referenceSample = sequencePose->m_ReferenceSample;
 			sequenceTemporalAAOverrides = sequencePose->m_TemporalAAOverrides;
 		}

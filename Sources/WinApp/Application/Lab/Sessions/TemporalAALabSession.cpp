@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
@@ -18,6 +19,8 @@
 #include <filesystem>
 #include <format>
 #include <ranges>
+#include <string>
+#include <string_view>
 
 namespace gglab
 {
@@ -38,6 +41,29 @@ namespace gglab
 		const LabParameterId CameraCutSerialId("temporal_aa.camera.cut_serial");
 		const LabParameterId AnimateObjectId("temporal_aa.object.animate");
 		const LabParameterId MaxHistoryFeedbackId("temporal_aa.max_history_feedback");
+
+		const Vector3 FixtureViewPosition(0.0f, 2.2f, -10.0f);
+		const Vector3 FixtureViewTarget(0.0f, 0.0f, 6.5f);
+		constexpr float FixtureViewFov = 52.0f;
+		constexpr float LightIntensity = 3.5f;
+		constexpr std::string_view LightChangePathId = "SEQ_TemporalAALab_LightChange";
+
+		// Directional light of the light-change sequence: converged for 60 frames, a step
+		// to 60% at frame 60, then a linear return over frames 120-179.
+		[[nodiscard]] constexpr float ResolveLightChangeIntensity(uint32_t frame) noexcept
+		{
+			constexpr float dimmed = LightIntensity * 0.6f;
+			if (frame < 60)
+			{
+				return LightIntensity;
+			}
+			if (frame < 120)
+			{
+				return dimmed;
+			}
+			const float fade = std::min(static_cast<float>(frame - 120) / 59.0f, 1.0f);
+			return dimmed + (LightIntensity - dimmed) * fade;
+		}
 
 		components::MaterialInstanceComponent MakeMaterial(std::string_view key,
 			const Color& color, float roughness, float metallic = 0.0f,
@@ -187,6 +213,11 @@ namespace gglab
 	{
 		m_ElapsedSeconds += deltaTime;
 		auto& registry = m_World.GetRegistry();
+		// A light-change sequence frame sets the intensity after this update.
+		if (registry.valid(m_LightEntity))
+		{
+			registry.get<components::LightComponent>(m_LightEntity).m_Intensity = LightIntensity;
+		}
 		if (m_AnimateObject && registry.valid(m_MovingEntity))
 		{
 			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
@@ -220,6 +251,28 @@ namespace gglab
 		}
 		RequestPreviewRefresh();
 		CaptureGpuTiming();
+	}
+
+	void TemporalAALabSession::OnCameraPathFrameApplied(
+		const CameraPath& path, uint32_t frame) noexcept
+	{
+		if (path.m_Id != LightChangePathId)
+		{
+			return;
+		}
+		auto& registry = m_World.GetRegistry();
+		if (registry.valid(m_LightEntity))
+		{
+			registry.get<components::LightComponent>(m_LightEntity).m_Intensity =
+				ResolveLightChangeIntensity(frame);
+		}
+		// The rigid object rests at its start pose, so only the shading changes.
+		if (registry.valid(m_MovingEntity))
+		{
+			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
+			transform.m_Position.m_X = 0.0f;
+			transform.m_Position.m_Y = -0.15f;
+		}
 	}
 
 	void TemporalAALabSession::OnFrameSubmitted(
@@ -311,9 +364,30 @@ namespace gglab
 		m_AssetPreparation.TrackModel(alphaModel, AlphaBlendModeTestPath, 0.4f);
 		m_AssetPreparation.TrackModel(ProceduralCubeModelID, "ProceduralCube", 0.35f);
 		m_AssetPreparation.TrackModel(ProceduralSphereModelID, "ProceduralSphere", 0.25f);
-		GetCamera().LookAt(Vector3(0.0f, 2.2f, -10.0f), Vector3(0.0f, 0.0f, 6.5f));
-		GetCamera().SetFov(52.0f);
+		GetCamera().LookAt(FixtureViewPosition, FixtureViewTarget);
+		GetCamera().SetFov(FixtureViewFov);
 		GetCamera().Update();
+		// The fixture view with a scripted lighting change: geometry correspondence stays
+		// exact while the shading of every surface steps and fades.
+		const bool pathsRegistered = GetCameraRig().SetCameraPaths({ CameraPath{
+			.m_Id = std::string(LightChangePathId),
+			.m_Name = "Light Change",
+			.m_Purpose = "Static fixture view; the directional light steps to 60% at frame 60 "
+				"and fades back over frames 120-179.",
+			.m_Version = 1,
+			.m_Interpolation = CameraPathInterpolation::Linear,
+			.m_NearPlane = GetCamera().GetNear(),
+			.m_FarPlane = GetCamera().GetFar(),
+			.m_ManualEV100 = GetCamera().GetManualEV100(),
+			.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+			.m_Keys = {
+				{ .m_Frame = 0, .m_Position = FixtureViewPosition, .m_Target = FixtureViewTarget,
+					.m_VerticalFovDegrees = FixtureViewFov },
+				{ .m_Frame = 179, .m_Position = FixtureViewPosition,
+					.m_Target = FixtureViewTarget, .m_VerticalFovDegrees = FixtureViewFov },
+			},
+			} });
+		GGLAB_ASSERT_MSG(pathsRegistered, "The Temporal AA Lab camera paths must be valid.");
 
 		const auto createCube = [this](std::string_view key, const Vector3& position,
 			const Vector3& scale, const Color& color, float roughness, float metallic = 0.0f,
@@ -432,9 +506,10 @@ namespace gglab
 		components::LightComponent light{};
 		light.m_Type = LightType::Directional;
 		light.m_Color = Color::White;
-		light.m_Intensity = 3.5f;
+		light.m_Intensity = LightIntensity;
 		light.m_Range = 1000.0f;
 		registry.emplace<components::LightComponent>(entity, light);
+		m_LightEntity = entity;
 	}
 
 	void TemporalAALabSession::ApplySelectedPreviewSelection() noexcept

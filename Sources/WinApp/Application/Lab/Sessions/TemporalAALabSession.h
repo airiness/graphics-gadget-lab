@@ -23,6 +23,7 @@ namespace gglab
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override;
+		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 
@@ -48,6 +49,7 @@ namespace gglab
 		PostProcessDebugSelection m_PreviousPreviewSelection{};
 		PostProcessDebugTap m_SelectedTap = PostProcessDebugTap::TemporalHistoryWeight;
 		entt::entity m_MovingEntity = entt::null;
+		entt::entity m_LightEntity = entt::null;
 		uint32_t m_ViewportWidth = 0;
 		uint32_t m_ViewportHeight = 0;
 		uint64_t m_LastGpuProfileFrame = 0;
