@@ -117,6 +117,7 @@ namespace gglab
 			const ResolvedTemporalFramePlan& m_TemporalFramePlan;
 			const TemporalFrameTransaction& m_TemporalFrameTransaction;
 			const TemporalAASettings& m_TemporalSettings;
+			const GTAOSettings& m_GTAOSettings;
 			// Display extent; it keys capture settling.
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
@@ -260,6 +261,17 @@ namespace gglab
 				.m_ResolutionPreset =
 					std::string(GetTemporalAAResolutionPresetName(settings.m_ResolutionPreset)),
 				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
+				.m_GTAO = {
+					.m_Enabled = inputs.m_GTAOSettings.m_Enabled,
+					.m_Radius = inputs.m_GTAOSettings.m_Radius,
+					.m_FalloffStart = inputs.m_GTAOSettings.m_FalloffStart,
+					.m_FalloffEnd = inputs.m_GTAOSettings.m_FalloffEnd,
+					.m_DirectionCount = inputs.m_GTAOSettings.m_DirectionCount,
+					.m_StepCount = inputs.m_GTAOSettings.m_StepCount,
+					.m_DenoiseRadius = inputs.m_GTAOSettings.m_DenoiseRadius,
+					.m_TemporalAccumulation = inputs.m_GTAOSettings.m_TemporalAccumulation,
+					.m_TemporalMaxSamples = inputs.m_GTAOSettings.m_TemporalMaxSamples,
+				},
 				// The view applies log2(render / display) on top of the temporal offset.
 				.m_TextureLodBias = temporalAA.IsActive()
 					? std::log2(static_cast<float>(resolution.m_Render.m_Width) /
@@ -475,6 +487,7 @@ namespace gglab
 		// views, so the path alone determines this frame's camera.
 		std::optional<TemporalReferenceSample> referenceSample;
 		std::optional<FrameSequenceTemporalAAOverrides> sequenceTemporalAAOverrides;
+		std::optional<FrameSequenceGTAOOverrides> sequenceGTAOOverrides;
 		if (const std::optional<FrameSequencePoseRequest> sequencePose =
 			m_FrameSequence->PrepareFrame(
 				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
@@ -489,6 +502,7 @@ namespace gglab
 			}
 			referenceSample = sequencePose->m_ReferenceSample;
 			sequenceTemporalAAOverrides = sequencePose->m_TemporalAAOverrides;
+			sequenceGTAOOverrides = sequencePose->m_GTAOOverrides;
 		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
@@ -512,10 +526,18 @@ namespace gglab
 			displayViewSettings.m_TemporalAA.m_Enabled = false;
 			displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
 		}
-		else if (sequenceTemporalAAOverrides)
+		else
 		{
-			displayViewSettings.m_TemporalAA = ApplyFrameSequenceTemporalAAOverrides(
-				*sequenceTemporalAAOverrides, displayViewSettings.m_TemporalAA);
+			if (sequenceTemporalAAOverrides)
+			{
+				displayViewSettings.m_TemporalAA = ApplyFrameSequenceTemporalAAOverrides(
+					*sequenceTemporalAAOverrides, displayViewSettings.m_TemporalAA);
+			}
+			if (sequenceGTAOOverrides)
+			{
+				displayViewSettings.m_Lighting.m_GTAO = ApplyFrameSequenceGTAOOverrides(
+					*sequenceGTAOOverrides, displayViewSettings.m_Lighting.m_GTAO);
+			}
 		}
 		const uint64_t temporalSessionIdentity =
 			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
@@ -574,6 +596,7 @@ namespace gglab
 			.m_TemporalFramePlan = temporalFramePlan,
 			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_TemporalSettings = displayViewSettings.m_TemporalAA,
+			.m_GTAOSettings = displayViewSettings.m_Lighting.m_GTAO,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
 			.m_ViewResolution = viewResolution,

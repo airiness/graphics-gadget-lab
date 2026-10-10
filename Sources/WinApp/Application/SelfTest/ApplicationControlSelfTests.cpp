@@ -127,6 +127,15 @@ namespace gglab
 				overrides->m_HistoryRelaxation == 2.0f &&
 				overrides->m_TextureLodBiasOffset == -1.5f && overrides->m_Enabled == false,
 				"A sequence request carries its Temporal AA overrides and GPU timing request");
+			const ApplicationControlParseResult gtaoEvaluation = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":16,"command":"sequence","path":"SEQ_A",)"
+				R"("gtao":{"temporal":true,"temporalMaxSamples":24}})");
+			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request
+				? &gtaoEvaluation.m_Request->m_Sequence.m_GTAOOverrides
+				: nullptr;
+			context.Check(gtaoOverrides && gtaoOverrides->m_TemporalAccumulation == true &&
+				gtaoOverrides->m_TemporalMaxSamples == 24u,
+				"A sequence request carries its GTAO overrides");
 
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
 				R"({"protocol":1,"id":12,"command":"sequence-cancel"})");
@@ -181,6 +190,10 @@ namespace gglab
 				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
 				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
 				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },
+				{ R"({"protocol":1,"id":41,"command":"sequence","path":"A","gtao":{"temporal":1}})", 41 },
+				{ R"({"protocol":1,"id":42,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":0}})", 42 },
+				{ R"({"protocol":1,"id":43,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":2.5}})", 43 },
+				{ R"({"protocol":1,"id":44,"command":"sequence","path":"A","gtao":{"radius":2}})", 44 },
 			};
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)

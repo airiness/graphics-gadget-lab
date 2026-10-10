@@ -53,6 +53,21 @@ namespace gglab
 		std::vector<std::string> m_Services;
 	};
 
+	// Resolved GTAO settings of the display view; temporal accumulation may still be
+	// inactive (see the temporal-gtao consumer).
+	struct FrameCaptureGTAOSettings
+	{
+		bool m_Enabled = false;
+		float m_Radius = 0.0f;
+		float m_FalloffStart = 0.0f;
+		float m_FalloffEnd = 0.0f;
+		uint32_t m_DirectionCount = 0;
+		uint32_t m_StepCount = 0;
+		uint32_t m_DenoiseRadius = 0;
+		bool m_TemporalAccumulation = false;
+		uint32_t m_TemporalMaxSamples = 0;
+	};
+
 	// Temporal state of the frame a capture recorded. Settings are the resolved
 	// display-view settings; the resolve may still be disabled or unavailable.
 	struct FrameCaptureTemporalState
@@ -85,6 +100,7 @@ namespace gglab
 		std::string m_PostTemporalView;
 		std::string m_ResolutionPreset;
 		float m_TextureLodBiasOffset = 0.0f;
+		FrameCaptureGTAOSettings m_GTAO{};
 		// LOD bias the frame's material textures used.
 		float m_TextureLodBias = 0.0f;
 		std::array<uint32_t, 2> m_RenderExtent{};

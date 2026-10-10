@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 
@@ -48,6 +49,23 @@ namespace gglab
 		const FrameSequenceTemporalAAOverrides& overrides,
 		TemporalAASettings settings) noexcept;
 
+	struct FrameSequenceGTAOOverrides
+	{
+		// True evaluates the same sequence with GTAO accumulated over submitted frames.
+		std::optional<bool> m_TemporalAccumulation;
+		std::optional<uint32_t> m_TemporalMaxSamples;
+
+		[[nodiscard]] bool IsEmpty() const noexcept
+		{
+			return !m_TemporalAccumulation && !m_TemporalMaxSamples;
+		}
+	};
+
+	// Returns the GTAO settings with every set override applied and resolved to the
+	// settings' valid ranges.
+	[[nodiscard]] GTAOSettings ApplyFrameSequenceGTAOOverrides(
+		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept;
+
 	struct FrameSequenceRequest
 	{
 		// Camera path registered by the active content.
@@ -76,6 +94,9 @@ namespace gglab
 		// Applied to every sequence frame. Frame 0 resets temporal history, so the run
 		// evaluates one configuration from its first frame. Not valid for a reference.
 		FrameSequenceTemporalAAOverrides m_TemporalAAOverrides;
+		// Applied to every sequence frame like the Temporal AA overrides; not valid for a
+		// reference.
+		FrameSequenceGTAOOverrides m_GTAOOverrides;
 		// Records the GPU timing of sequence frames while the sequence runs.
 		bool m_GpuTiming = false;
 	};
@@ -157,6 +178,7 @@ namespace gglab
 		// Set for every sample of a reference sequence.
 		std::optional<TemporalReferenceSample> m_ReferenceSample;
 		FrameSequenceTemporalAAOverrides m_TemporalAAOverrides;
+		FrameSequenceGTAOOverrides m_GTAOOverrides;
 	};
 
 	// Drives one camera-path sequence at a time. Frame 0 starts once every readiness

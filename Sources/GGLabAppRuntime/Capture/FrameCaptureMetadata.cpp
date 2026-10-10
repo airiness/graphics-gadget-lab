@@ -294,6 +294,17 @@ namespace gglab
 		writer.String("resolutionPreset", temporal.m_ResolutionPreset);
 		writer.Number("textureLodBiasOffset", temporal.m_TextureLodBiasOffset);
 		writer.EndObject();
+		writer.BeginObject("gtao");
+		writer.Bool("enabled", temporal.m_GTAO.m_Enabled);
+		writer.Number("radius", temporal.m_GTAO.m_Radius);
+		writer.Number("falloffStart", temporal.m_GTAO.m_FalloffStart);
+		writer.Number("falloffEnd", temporal.m_GTAO.m_FalloffEnd);
+		writer.Unsigned("directionCount", temporal.m_GTAO.m_DirectionCount);
+		writer.Unsigned("stepCount", temporal.m_GTAO.m_StepCount);
+		writer.Unsigned("denoiseRadius", temporal.m_GTAO.m_DenoiseRadius);
+		writer.Bool("temporalAccumulation", temporal.m_GTAO.m_TemporalAccumulation);
+		writer.Unsigned("temporalMaxSamples", temporal.m_GTAO.m_TemporalMaxSamples);
+		writer.EndObject();
 		writer.Number("textureLodBias", temporal.m_TextureLodBias);
 		writer.BeginArray("renderExtent");
 		writer.Unsigned({}, temporal.m_RenderExtent[0]);

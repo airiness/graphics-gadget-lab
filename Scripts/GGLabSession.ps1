@@ -28,7 +28,9 @@ Commands:
            of n jittered samples with Temporal AA inactive and time held;
            -ReferenceTextureLodBias <b> adds b to its material texture LOD.
            -TemporalAA "name=value,..." evaluates Temporal AA overrides, such as
-           neighborhoodClampExpansion=1 or historyFilter=bilinear, on every frame. -GpuTiming records
+           neighborhoodClampExpansion=1 or historyFilter=bilinear, on every frame.
+           -GTAO "name=value,..." evaluates GTAO overrides, such as temporal=true or
+           temporalMaxSamples=16, on every frame. -GpuTiming records
            per-scope GPU times of the sequence frames.
   sequence-cancel
            Cancel the active sequence.
@@ -95,6 +97,7 @@ param(
     [int]$ReferenceSamples = 0,
     [double]$ReferenceTextureLodBias = 0,
     [string]$TemporalAA,
+    [string]$GTAO,
     [switch]$GpuTiming,
 
     [int]$TimeoutSeconds = 300
@@ -243,11 +246,11 @@ function ConvertTo-FrameList([string]$Text) {
     return ,$frames
 }
 
-function ConvertTo-TemporalAAOverrides([string]$Text) {
+function ConvertTo-SettingOverrides([string]$Text, [string]$Owner) {
     $overrides = @{}
     foreach ($part in @($Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
         if ($part -notmatch '^([A-Za-z]+)=([-+.0-9A-Za-z]+)$') {
-            Fail "Temporal AA override '$part' is not name=value."
+            Fail "$Owner override '$part' is not name=value."
         }
         $number = 0.0
         if ($Matches[2] -eq 'true' -or $Matches[2] -eq 'false') {
@@ -421,7 +424,8 @@ switch ($Command) {
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
         if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
-        if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-TemporalAAOverrides $TemporalAA) }
+        if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-SettingOverrides $TemporalAA 'Temporal AA') }
+        if ($GTAO) { $request['gtao'] = (ConvertTo-SettingOverrides $GTAO 'GTAO') }
         if ($GpuTiming) { $request['gpuTiming'] = $true }
         if ($Label) { $request['label'] = $Label }
         if ($Note) { $request['note'] = $Note }

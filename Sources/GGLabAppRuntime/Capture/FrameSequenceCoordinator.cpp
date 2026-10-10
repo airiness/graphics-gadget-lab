@@ -1,4 +1,5 @@
 #include "Capture/FrameSequenceCoordinator.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 
 #include <algorithm>
 #include <cmath>
@@ -19,6 +20,21 @@ namespace gglab
 			!m_VarianceClipGamma && !m_HistoryFilter && !m_CurrentFilter &&
 			!m_MotionSelection && !m_PostTemporalView && !m_ResolutionPreset &&
 			!m_TextureLodBiasOffset;
+	}
+
+	GTAOSettings ApplyFrameSequenceGTAOOverrides(
+		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept
+	{
+		if (overrides.m_TemporalAccumulation)
+		{
+			settings.m_TemporalAccumulation = *overrides.m_TemporalAccumulation;
+		}
+		if (overrides.m_TemporalMaxSamples)
+		{
+			settings.m_TemporalMaxSamples =
+				std::clamp(*overrides.m_TemporalMaxSamples, 1u, GTAOMaxTemporalSamples);
+		}
+		return settings;
 	}
 
 	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
@@ -179,6 +195,12 @@ namespace gglab
 				"overrides.";
 			return 0;
 		}
+		if (request.m_ReferenceSamples > 0 && !request.m_GTAOOverrides.IsEmpty())
+		{
+			outError = "A reference averages GTAO over its own samples, so it takes no GTAO "
+				"overrides.";
+			return 0;
+		}
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
@@ -332,6 +354,7 @@ namespace gglab
 					.m_TextureLodBias = m_Request.m_ReferenceTextureLodBias,
 				}),
 			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
+			.m_GTAOOverrides = m_Request.m_GTAOOverrides,
 		};
 	}
 

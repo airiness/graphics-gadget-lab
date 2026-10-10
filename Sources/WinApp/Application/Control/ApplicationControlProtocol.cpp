@@ -1,5 +1,6 @@
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 
@@ -117,6 +118,43 @@ namespace gglab
 			if (!outDirectory.is_absolute())
 			{
 				return "Field 'outputDirectory' must be an absolute directory.";
+			}
+			return {};
+		}
+
+		// Parses the GTAO overrides of a sequence; returns an error text. Values outside a
+		// setting's range are rejected instead of clamped.
+		[[nodiscard]] std::string ParseGTAOOverrides(
+			const Json& value, FrameSequenceGTAOOverrides& outOverrides)
+		{
+			if (!value.is_object())
+			{
+				return "Field 'gtao' must be an object.";
+			}
+			for (const auto& [key, fieldValue] : value.items())
+			{
+				if (key == "temporal")
+				{
+					if (!fieldValue.is_boolean())
+					{
+						return "GTAO override 'temporal' must be a boolean.";
+					}
+					outOverrides.m_TemporalAccumulation = fieldValue.get<bool>();
+					continue;
+				}
+				if (key == "temporalMaxSamples")
+				{
+					const double samples = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
+					if (!fieldValue.is_number() || samples != std::floor(samples) ||
+						samples < 1.0 || samples > static_cast<double>(GTAOMaxTemporalSamples))
+					{
+						return std::format("GTAO override 'temporalMaxSamples' must be an "
+							"integer in [1, {}].", GTAOMaxTemporalSamples);
+					}
+					outOverrides.m_TemporalMaxSamples = static_cast<uint32_t>(samples);
+					continue;
+				}
+				return std::format("Unknown GTAO override '{}'.", key);
 			}
 			return {};
 		}
@@ -409,6 +447,14 @@ namespace gglab
 				{
 					if (std::string error =
 						ParseTemporalAAOverrides(value, sequence.m_TemporalAAOverrides);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "gtao")
+				{
+					if (std::string error = ParseGTAOOverrides(value, sequence.m_GTAOOverrides);
 						!error.empty())
 					{
 						return error;
