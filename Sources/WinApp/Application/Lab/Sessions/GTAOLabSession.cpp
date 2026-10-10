@@ -3,11 +3,16 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
+
+#include <cmath>
+#include <string>
+#include <string_view>
 
 namespace gglab
 {
@@ -29,6 +34,30 @@ namespace gglab
 		const LabParameterId FovId("gtao.camera.fov");
 		const LabParameterId NearPlaneId("gtao.camera.near");
 		const LabParameterId FarPlaneId("gtao.camera.far");
+
+		const Vector3 PresetViewPosition(0.0f, 2.3f, -9.0f);
+		const Vector3 PresetViewTarget(0.0f, 0.0f, 6.5f);
+		constexpr std::string_view StaticPathId = "SEQ_GTAOLab_Static";
+		constexpr std::string_view PanPathId = "SEQ_GTAOLab_Pan";
+		constexpr std::string_view MovingOccluderPathId = "SEQ_GTAOLab_MovingOccluder";
+		constexpr std::string_view OccluderStepPathId = "SEQ_GTAOLab_OccluderStep";
+		constexpr uint32_t PathLastFrame = 179;
+		// Sequence frames advance the moving occluder at this rate.
+		constexpr float MovingOccluderFramesPerSecond = 60.0f;
+		// The step occluder stands in the wall corner for frames [60, 120).
+		constexpr uint32_t OccluderStepFirstFrame = 60;
+		constexpr uint32_t OccluderStepEndFrame = 120;
+		const Vector3 SilhouetteSpherePosition(1.4f, -0.1f, 8.0f);
+		const Vector3 StepOccluderPosition(-4.3f, -0.7f, 7.0f);
+		// Far below the floor, outside every view of the fixture.
+		const Vector3 StepOccluderParkedPosition(-4.3f, -100.0f, 7.0f);
+
+		// The sphere slides between x = 0.2 and 1.8, clear of the neighboring fixtures.
+		[[nodiscard]] Vector3 ResolveMovingOccluderPosition(float seconds) noexcept
+		{
+			return Vector3(1.0f + 0.8f * std::cos(seconds * 2.4f),
+				SilhouetteSpherePosition.m_Y, SilhouetteSpherePosition.m_Z);
+		}
 
 		components::MaterialInstanceComponent MakeMaterial(
 			std::string_view key, const Color& color, float roughness = 0.7f,
@@ -260,6 +289,8 @@ namespace gglab
 		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		m_World.GetRegistry().clear();
+		m_SilhouetteSphere = entt::null;
+		m_StepOccluder = entt::null;
 		m_LoadingProgress = LoadingProgress::Ready();
 	}
 
@@ -424,7 +455,7 @@ namespace gglab
 			Color(0.18f, 0.2f, 0.24f, 1.0f));
 
 		components::TransformComponent sphereTransform{};
-		sphereTransform.m_Position = Vector3(1.4f, -0.1f, 8.0f);
+		sphereTransform.m_Position = SilhouetteSpherePosition;
 		sphereTransform.m_Scale = Vector3::One * 1.5f;
 		const entt::entity sphere = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
@@ -435,9 +466,13 @@ namespace gglab
 				"gglab.lab.gtao.silhouette", Color(0.72f, 0.18f, 0.22f, 1.0f), 0.35f),
 			});
 
+		m_StepOccluder = createCube("gglab.lab.gtao.step_occluder", StepOccluderParkedPosition,
+			Vector3(0.5f, 0.6f, 0.5f), Color(0.56f, 0.5f, 0.42f, 1.0f));
+		m_SilhouetteSphere = sphere;
+
 		const entt::entity fixtures[] = { floor, cornerWall, thinSlab, edgeSlab, tieLeft,
 			tieRight, emissiveControl, specularControl, radiusNearGap, radiusFarGap,
-			haloBackground, haloOccluder, sphere };
+			haloBackground, haloOccluder, sphere, m_StepOccluder };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
 			{
 				return registry.valid(entity) &&
@@ -466,10 +501,73 @@ namespace gglab
 
 	void GTAOLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(Vector3(0.0f, 2.3f, -9.0f), Vector3(0.0f, 0.0f, 6.5f));
+		GetCamera().LookAt(PresetViewPosition, PresetViewTarget);
 		GetCamera().SetFov(m_FovDegrees);
 		GetCamera().SetNearFar(m_NearPlane, m_FarPlane);
 		GetCamera().Update();
+
+		const auto makePath = [this](std::string_view id, const char* name, const char* purpose,
+			const Vector3& lastOffset)
+			{
+				return CameraPath{
+					.m_Id = std::string(id),
+					.m_Name = name,
+					.m_Purpose = purpose,
+					.m_Version = 1,
+					.m_Interpolation = CameraPathInterpolation::Linear,
+					.m_NearPlane = GetCamera().GetNear(),
+					.m_FarPlane = GetCamera().GetFar(),
+					.m_ManualEV100 = GetCamera().GetManualEV100(),
+					.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+					.m_Keys = {
+						{ .m_Frame = 0, .m_Position = PresetViewPosition,
+							.m_Target = PresetViewTarget, .m_VerticalFovDegrees = m_FovDegrees },
+						{ .m_Frame = PathLastFrame, .m_Position = PresetViewPosition + lastOffset,
+							.m_Target = PresetViewTarget + lastOffset,
+							.m_VerticalFovDegrees = m_FovDegrees },
+					},
+				};
+			};
+		const bool pathsRegistered = GetCameraRig().SetCameraPaths({
+			// Convergence and stability of visibility in a held view.
+			makePath(StaticPathId, "Static", "Preset view held for 180 frames.", Vector3::Zero),
+			// Reprojection and disocclusion under camera motion.
+			makePath(PanPathId, "Pan",
+				"Preset view translated 4 m to the right over 180 frames.",
+				Vector3(4.0f, 0.0f, 0.0f)),
+			// Contact occlusion that follows a moving rigid occluder.
+			makePath(MovingOccluderPathId, "Moving Occluder",
+				"Preset view; the silhouette sphere slides along the floor with the path frame.",
+				Vector3::Zero),
+			// Appearance and disappearance time of occlusion.
+			makePath(OccluderStepPathId, "Occluder Step",
+				"Preset view; a box stands in the wall corner for frames 60-119.",
+				Vector3::Zero),
+			});
+		GGLAB_ASSERT_MSG(pathsRegistered, "The GTAO Lab camera paths must be valid.");
+		GGLAB_UNUSED(pathsRegistered);
+	}
+
+	void GTAOLabSession::OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+	{
+		auto& registry = m_World.GetRegistry();
+		// Every path frame starts from the resting fixture, so one path never leaves the
+		// scene of another.
+		if (registry.valid(m_SilhouetteSphere))
+		{
+			registry.get<components::TransformComponent>(m_SilhouetteSphere).m_Position =
+				path.m_Id == MovingOccluderPathId
+				? ResolveMovingOccluderPosition(static_cast<float>(frame) /
+					MovingOccluderFramesPerSecond)
+				: SilhouetteSpherePosition;
+		}
+		if (registry.valid(m_StepOccluder))
+		{
+			const bool standing = path.m_Id == OccluderStepPathId &&
+				frame >= OccluderStepFirstFrame && frame < OccluderStepEndFrame;
+			registry.get<components::TransformComponent>(m_StepOccluder).m_Position =
+				standing ? StepOccluderPosition : StepOccluderParkedPosition;
+		}
 	}
 
 	void GTAOLabSession::RequestSelectedPreview() noexcept
