@@ -245,10 +245,14 @@ namespace gglab
 					}
 					if (info.m_TemporalFrameTransaction)
 					{
-						GGLAB_ASSERT_MSG(
+						// Staging supplies the next frame's previous model, so it must run in
+						// every build configuration rather than inside the assertion.
+						const bool objectStaged =
 							info.m_TemporalFrameTransaction->StageSubmittedObject(
-								objectHistoryKey, world),
+								objectHistoryKey, world);
+						GGLAB_ASSERT_MSG(objectStaged,
 							"Submitted object history must fit the bounded GPU object capacity.");
+						GGLAB_UNUSED(objectStaged);
 					}
 
 					Vector3 worldCenter = transformComp.m_Position;
