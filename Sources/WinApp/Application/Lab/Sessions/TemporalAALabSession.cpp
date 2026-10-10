@@ -4,6 +4,7 @@
 
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
@@ -47,6 +48,16 @@ namespace gglab
 		constexpr float FixtureViewFov = 52.0f;
 		constexpr float LightIntensity = 3.5f;
 		constexpr std::string_view LightChangePathId = "SEQ_TemporalAALab_LightChange";
+		constexpr std::string_view MovingObjectPathId = "SEQ_TemporalAALab_MovingObject";
+		// Sequence frames advance the moving-object animation at this rate.
+		constexpr float MovingObjectPathFramesPerSecond = 60.0f;
+
+		// Position of the animated rigid object after the given animation time.
+		[[nodiscard]] Vector2 ResolveMovingObjectPosition(float seconds) noexcept
+		{
+			return Vector2(std::sin(seconds * 1.35f) * 3.2f,
+				-0.15f + std::sin(seconds * 0.7f) * 0.35f);
+		}
 
 		// Directional light of the light-change sequence: converged for 60 frames, a step
 		// to 60% at frame 60, then a linear return over frames 120-179.
@@ -222,8 +233,9 @@ namespace gglab
 		if (m_AnimateObject && registry.valid(m_MovingEntity))
 		{
 			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
-			transform.m_Position.m_X = std::sin(m_ElapsedSeconds * 1.35f) * 3.2f;
-			transform.m_Position.m_Y = -0.15f + std::sin(m_ElapsedSeconds * 0.7f) * 0.35f;
+			const Vector2 position = ResolveMovingObjectPosition(m_ElapsedSeconds);
+			transform.m_Position.m_X = position.m_X;
+			transform.m_Position.m_Y = position.m_Y;
 		}
 		if (m_EnableCameraInput)
 		{
@@ -257,22 +269,26 @@ namespace gglab
 	void TemporalAALabSession::OnCameraPathFrameApplied(
 		const CameraPath& path, uint32_t frame) noexcept
 	{
-		if (path.m_Id != LightChangePathId)
+		const bool lightChange = path.m_Id == LightChangePathId;
+		if (!lightChange && path.m_Id != MovingObjectPathId)
 		{
 			return;
 		}
 		auto& registry = m_World.GetRegistry();
-		if (registry.valid(m_LightEntity))
+		if (lightChange && registry.valid(m_LightEntity))
 		{
 			registry.get<components::LightComponent>(m_LightEntity).m_Intensity =
 				ResolveLightChangeIntensity(frame);
 		}
-		// The rigid object rests at its start pose, so only the shading changes.
+		// The rigid object rests at its start pose while the light changes, and follows
+		// the path frame on the moving-object path.
 		if (registry.valid(m_MovingEntity))
 		{
+			const Vector2 position = ResolveMovingObjectPosition(lightChange ? 0.0f
+				: static_cast<float>(frame) / MovingObjectPathFramesPerSecond);
 			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
-			transform.m_Position.m_X = 0.0f;
-			transform.m_Position.m_Y = -0.15f;
+			transform.m_Position.m_X = position.m_X;
+			transform.m_Position.m_Y = position.m_Y;
 		}
 	}
 
@@ -368,26 +384,38 @@ namespace gglab
 		GetCamera().LookAt(FixtureViewPosition, FixtureViewTarget);
 		GetCamera().SetFov(FixtureViewFov);
 		GetCamera().Update();
-		// The fixture view with a scripted lighting change: geometry correspondence stays
-		// exact while the shading of every surface steps and fades.
-		const bool pathsRegistered = GetCameraRig().SetCameraPaths({ CameraPath{
-			.m_Id = std::string(LightChangePathId),
-			.m_Name = "Light Change",
-			.m_Purpose = "Static fixture view; the directional light steps to 60% at frame 60 "
-				"and fades back over frames 120-179.",
-			.m_Version = 1,
-			.m_Interpolation = CameraPathInterpolation::Linear,
-			.m_NearPlane = GetCamera().GetNear(),
-			.m_FarPlane = GetCamera().GetFar(),
-			.m_ManualEV100 = GetCamera().GetManualEV100(),
-			.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
-			.m_Keys = {
-				{ .m_Frame = 0, .m_Position = FixtureViewPosition, .m_Target = FixtureViewTarget,
-					.m_VerticalFovDegrees = FixtureViewFov },
-				{ .m_Frame = 179, .m_Position = FixtureViewPosition,
-					.m_Target = FixtureViewTarget, .m_VerticalFovDegrees = FixtureViewFov },
-			},
-			} });
+		// Static fixture views whose scene changes with the path frame.
+		const auto makeFixturePath = [this](std::string_view id, const char* name,
+			const char* purpose)
+			{
+				return CameraPath{
+					.m_Id = std::string(id),
+					.m_Name = name,
+					.m_Purpose = purpose,
+					.m_Version = 1,
+					.m_Interpolation = CameraPathInterpolation::Linear,
+					.m_NearPlane = GetCamera().GetNear(),
+					.m_FarPlane = GetCamera().GetFar(),
+					.m_ManualEV100 = GetCamera().GetManualEV100(),
+					.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+					.m_Keys = {
+						{ .m_Frame = 0, .m_Position = FixtureViewPosition,
+							.m_Target = FixtureViewTarget, .m_VerticalFovDegrees = FixtureViewFov },
+						{ .m_Frame = 179, .m_Position = FixtureViewPosition,
+							.m_Target = FixtureViewTarget, .m_VerticalFovDegrees = FixtureViewFov },
+					},
+				};
+			};
+		const bool pathsRegistered = GetCameraRig().SetCameraPaths({
+			// Geometry correspondence stays exact while every surface's shading changes.
+			makeFixturePath(LightChangePathId, "Light Change",
+				"Static fixture view; the directional light steps to 60% at frame 60 and fades "
+				"back over frames 120-179."),
+			// Correspondence of a moving rigid object over a static background.
+			makeFixturePath(MovingObjectPathId, "Moving Object",
+				"Static fixture view; the rigid sphere moves with the path frame, revealing and "
+				"covering the background behind it."),
+			});
 		GGLAB_ASSERT_MSG(pathsRegistered, "The Temporal AA Lab camera paths must be valid.");
 
 		const auto createCube = [this](std::string_view key, const Vector3& position,
