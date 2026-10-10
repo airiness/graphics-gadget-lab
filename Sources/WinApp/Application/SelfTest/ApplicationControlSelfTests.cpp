@@ -107,6 +107,7 @@ namespace gglab
 				R"("historyFilter":"bilinear","currentFilter":"point",)"
 				R"("motionSelection":"center","postTemporalView":"jittered",)"
 				R"("resolutionPreset":"quality",)"
+				R"("historyRectification":"variance-clip","varianceClipGamma":1.25,)"
 				R"("textureLodBiasOffset":-1.5,"enabled":false}})");
 			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
 				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
@@ -119,6 +120,8 @@ namespace gglab
 				overrides->m_MotionSelection == TemporalAAMotionSelection::Center &&
 				overrides->m_PostTemporalView == TemporalAAPostTemporalView::Jittered &&
 				overrides->m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
+				overrides->m_HistoryRectification == TemporalAAHistoryRectification::VarianceClip &&
+				overrides->m_VarianceClipGamma == 1.25f &&
 				overrides->m_TextureLodBiasOffset == -1.5f && overrides->m_Enabled == false,
 				"A sequence request carries its Temporal AA overrides and GPU timing request");
 
@@ -166,6 +169,8 @@ namespace gglab
 				{ R"({"protocol":1,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})", 32 },
 				{ R"({"protocol":1,"id":35,"command":"sequence","path":"A","temporalAA":{"postTemporalView":"none"}})", 35 },
 				{ R"({"protocol":1,"id":36,"command":"sequence","path":"A","temporalAA":{"resolutionPreset":"balanced"}})", 36 },
+				{ R"({"protocol":1,"id":37,"command":"sequence","path":"A","temporalAA":{"historyRectification":"variance"}})", 37 },
+				{ R"({"protocol":1,"id":38,"command":"sequence","path":"A","temporalAA":{"varianceClipGamma":8}})", 38 },
 				{ R"({"protocol":1,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})", 33 },
 				{ R"({"protocol":1,"id":34,"command":"sequence","path":"A","temporalAA":{"enabled":0}})", 34 },
 				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },

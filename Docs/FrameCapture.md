@@ -80,7 +80,8 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   resolution with the post-process preview encoding: `temporal-motion-direction`,
   `temporal-motion-magnitude`, `temporal-history-color`,
   `temporal-reprojection-uv`, `temporal-rejection`, `temporal-history-weight`,
-  `temporal-history-age`, `scene-depth-raw`, `scene-depth-linear-view-z` and the
+  `temporal-history-age`, `temporal-clip-distance`, `scene-depth-raw`,
+  `scene-depth-linear-view-z` and the
   `gtao-*` taps. A tap whose feature produced nothing in that frame, such as a
   temporal tap with Temporal AA inactive, fails the capture.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
@@ -222,7 +223,9 @@ every frame of the sequence, so one replay evaluates one configuration from the
 history reset at frame 0. The names are `enabled` (`true` or `false`),
 `maxHistoryFeedback`,
 `depthAbsoluteThreshold`, `depthRelativeThreshold`, `velocityWeightScale`,
-`luminanceWeightScale` and `neighborhoodClampExpansion`, `historyFilter`
+`luminanceWeightScale` and `neighborhoodClampExpansion`, `historyRectification`
+(`minmax-clamp`, the default, `variance-clip` or `bounded-variance-clip`) with
+`varianceClipGamma` (0.25 to 4, default 1), `historyFilter`
 (`catmull-rom-clamped`, the default, or `bilinear`) and `currentFilter`
 (`gaussian`, the default, or `point`), `motionSelection` (`closest-depth`, the
 default, or `center`), `postTemporalView` (`unjittered`, the default, or `jittered`:

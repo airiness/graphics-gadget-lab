@@ -112,6 +112,7 @@ namespace gglab
 			case PostProcessDebugTap::TemporalRejection: return "Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";
 			case PostProcessDebugTap::TemporalHistoryAge: return "History Age";
+			case PostProcessDebugTap::TemporalClipDistance: return "Clip Distance";
 			case PostProcessDebugTap::TemporalMotionDirection: return "Motion Direction";
 			case PostProcessDebugTap::TemporalMotionMagnitude: return "Motion Magnitude";
 			default: return "Temporal Preview";
@@ -134,6 +135,15 @@ namespace gglab
 				0.05f, 0.0f, TemporalAAMaxLuminanceWeightScale, "%.2f");
 			ImGui::DragFloat("Clamp Expansion", &settings.m_NeighborhoodClampExpansion,
 				0.005f, 0.0f, TemporalAAMaxNeighborhoodClampExpansion, "%.3f");
+			int historyRectification = static_cast<int>(settings.m_HistoryRectification);
+			if (ImGui::Combo("History Rectification", &historyRectification,
+				"Min/Max Clamp\0Variance Clip\0Bounded Variance Clip\0"))
+			{
+				settings.m_HistoryRectification =
+					static_cast<TemporalAAHistoryRectification>(historyRectification);
+			}
+			ImGui::SliderFloat("Variance Clip Gamma", &settings.m_VarianceClipGamma,
+				TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma, "%.2f");
 			int historyFilter = static_cast<int>(settings.m_HistoryFilter);
 			if (ImGui::Combo("History Filter", &historyFilter, "Bilinear\0Catmull-Rom (clamped)\0"))
 			{
@@ -187,6 +197,7 @@ namespace gglab
 				PostProcessDebugTap::TemporalRejection,
 				PostProcessDebugTap::TemporalHistoryWeight,
 				PostProcessDebugTap::TemporalHistoryAge,
+				PostProcessDebugTap::TemporalClipDistance,
 				PostProcessDebugTap::TemporalMotionDirection,
 				PostProcessDebugTap::TemporalMotionMagnitude,
 			};

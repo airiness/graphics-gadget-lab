@@ -69,6 +69,8 @@ namespace gglab
 				return "Temporal / History Weight";
 			case PostProcessDebugTap::TemporalHistoryAge:
 				return "Temporal / History Age";
+			case PostProcessDebugTap::TemporalClipDistance:
+				return "Temporal / Clip Distance";
 			default:
 				return "Unknown";
 			}

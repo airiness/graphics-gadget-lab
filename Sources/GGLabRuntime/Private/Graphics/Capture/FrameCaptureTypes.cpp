@@ -27,7 +27,7 @@ namespace gglab
 	namespace
 	{
 		// Persisted in capture metadata and requested by name; never rename an entry.
-		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 17>
+		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 18>
 			DiagnosticTapNames{ {
 				{ PostProcessDebugTap::SceneDepthRaw, "scene-depth-raw" },
 				{ PostProcessDebugTap::SceneDepthLinearViewZ, "scene-depth-linear-view-z" },
@@ -46,6 +46,7 @@ namespace gglab
 				{ PostProcessDebugTap::TemporalRejection, "temporal-rejection" },
 				{ PostProcessDebugTap::TemporalHistoryWeight, "temporal-history-weight" },
 				{ PostProcessDebugTap::TemporalHistoryAge, "temporal-history-age" },
+				{ PostProcessDebugTap::TemporalClipDistance, "temporal-clip-distance" },
 			} };
 	}
 

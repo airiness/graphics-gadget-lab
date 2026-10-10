@@ -27,6 +27,9 @@ namespace gglab
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
 	inline constexpr float TemporalAAMaxNeighborhoodClampExpansion = 1.0f;
+	inline constexpr float TemporalAADefaultVarianceClipGamma = 1.0f;
+	inline constexpr float TemporalAAMinVarianceClipGamma = 0.25f;
+	inline constexpr float TemporalAAMaxVarianceClipGamma = 4.0f;
 	// Against footprint-matched references -1 recovered most of the texture detail of
 	// -1.5 with a smaller rise in static texture shimmer. It stacks with
 	// log2(render / display).
@@ -283,6 +286,32 @@ namespace gglab
 	static_assert(GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Native) == 8);
 	static_assert(GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Quality) == 18);
 
+	// How accepted history is made compatible with the current local signal, from the
+	// YCoCg statistics of the current samples around the output position.
+	enum class TemporalAAHistoryRectification : uint8_t
+	{
+		// Per-channel clamp to the neighborhood minimum and maximum, expanded by the
+		// clamp expansion.
+		MinMaxClamp,
+		// Moves history along the line toward the neighborhood mean until it lies within
+		// mean +- gamma * standard deviation.
+		VarianceClip,
+		// Variance clipping against that box intersected with the expanded min/max box.
+		BoundedVarianceClip,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetTemporalAAHistoryRectificationName(
+		TemporalAAHistoryRectification rectification) noexcept
+	{
+		switch (rectification)
+		{
+		case TemporalAAHistoryRectification::MinMaxClamp: return "minmax-clamp";
+		case TemporalAAHistoryRectification::VarianceClip: return "variance-clip";
+		case TemporalAAHistoryRectification::BoundedVarianceClip: return "bounded-variance-clip";
+		}
+		return "unknown";
+	}
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -292,6 +321,9 @@ namespace gglab
 		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
+		TemporalAAHistoryRectification m_HistoryRectification =
+			TemporalAAHistoryRectification::MinMaxClamp;
+		float m_VarianceClipGamma = TemporalAADefaultVarianceClipGamma;
 		TemporalAAHistoryFilter m_HistoryFilter = TemporalAAHistoryFilter::CatmullRomClamped;
 		TemporalAACurrentFilter m_CurrentFilter = TemporalAACurrentFilter::Gaussian;
 		TemporalAAMotionSelection m_MotionSelection = TemporalAAMotionSelection::ClosestDepth;
@@ -360,6 +392,16 @@ namespace gglab
 		{
 			settings.m_ResolutionPreset = defaults.m_ResolutionPreset;
 		}
+		if (settings.m_HistoryRectification != TemporalAAHistoryRectification::MinMaxClamp &&
+			settings.m_HistoryRectification != TemporalAAHistoryRectification::VarianceClip &&
+			settings.m_HistoryRectification != TemporalAAHistoryRectification::BoundedVarianceClip)
+		{
+			settings.m_HistoryRectification = defaults.m_HistoryRectification;
+		}
+		settings.m_VarianceClipGamma = std::isfinite(settings.m_VarianceClipGamma)
+			? std::clamp(settings.m_VarianceClipGamma, TemporalAAMinVarianceClipGamma,
+				TemporalAAMaxVarianceClipGamma)
+			: defaults.m_VarianceClipGamma;
 		settings.m_TextureLodBiasOffset = std::isfinite(settings.m_TextureLodBiasOffset)
 			? std::clamp(settings.m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset,
 				TemporalAAMaxTextureLodBiasOffset)

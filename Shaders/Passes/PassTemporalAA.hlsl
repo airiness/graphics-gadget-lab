@@ -13,8 +13,9 @@ struct TemporalAAPassParameters
 	uint ResolvedColorUavIndex;
 	uint NextHistoryColorUavIndex;
 	uint ReprojectionDiagnosticsUavIndex;
-	uint LinearClampSamplerIndex;
-	uint PointClampSamplerIndex;
+	// Linear clamp sampler in the low 16 bits, point clamp in the high 16 bits.
+	uint PackedClampSamplerIndices;
+	float VarianceClipGamma;
 	uint ViewIndexAndHistoryValid;
 	uint PackedDepthThresholds;
 	uint PackedMaxHistoryFeedbackAndClampExpansion;
@@ -68,6 +69,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_COLOR_PREVIEW_BIT) != 0;
 	const bool writeHistoryAgePreview =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_AGE_PREVIEW_BIT) != 0;
+	const bool writeClipDistancePreview =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_CLIP_DISTANCE_PREVIEW_BIT) != 0;
 	const bool catmullRomHistory =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_CATMULL_ROM_BIT) != 0;
 	const bool gaussianCurrent =
@@ -165,9 +168,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			Texture2D<float4> previousColorTexture =
 				GetTexture2DFloat4(g_Pass.PreviousColorIndex);
 			SamplerState linearClampSampler =
-				GetSamplerState(g_Pass.LinearClampSamplerIndex);
+				GetSamplerState(g_Pass.PackedClampSamplerIndices & 0xffffu);
 			SamplerState pointClampSampler =
-				GetSamplerState(g_Pass.PointClampSamplerIndex);
+				GetSamplerState(g_Pass.PackedClampSamplerIndices >> 16);
 			historyColor = catmullRomHistory
 				? SampleTemporalHistoryCatmullRomClamped(previousColorTexture,
 					linearClampSampler, previousHistoryUV)
@@ -216,12 +219,17 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 
 	float historyWeight = 0.0;
+	// How far rectification moved accepted history, relative to the size of the
+	// neighborhood box; history that is not accepted counts as fully discarded.
+	float clipDistance = 1.0;
 	if (accepted)
 	{
 		float3 neighborhoodMin;
 		float3 neighborhoodMax;
+		float3 neighborhoodMean;
+		float3 neighborhoodStdDev;
 		GetTemporalNeighborhoodRange(currentColorTexture, renderPixel, renderExtent,
-			centerColor, neighborhoodMin, neighborhoodMax);
+			centerColor, neighborhoodMin, neighborhoodMax, neighborhoodMean, neighborhoodStdDev);
 		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y;
 		const float3 neighborhoodExtent = neighborhoodMax - neighborhoodMin;
 		neighborhoodMin -= neighborhoodExtent * clampExpansion;
@@ -237,8 +245,29 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			historyYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
 			maxHistoryFeedbackAndClampExpansion.x,
 			g_Pass.VelocityWeightScale, g_Pass.LuminanceWeightScale);
-		historyColor = TemporalYCoCgToRGB(
-			clamp(historyYCoCg, neighborhoodMin, neighborhoodMax));
+		const bool varianceClip =
+			(g_Pass.ViewIndexAndHistoryValid & TAA_VARIANCE_CLIP_BIT) != 0;
+		float3 rectifiedYCoCg;
+		if (varianceClip)
+		{
+			const float3 varianceExtent = g_Pass.VarianceClipGamma * neighborhoodStdDev;
+			float3 boxMin = neighborhoodMean - varianceExtent;
+			float3 boxMax = neighborhoodMean + varianceExtent;
+			if ((g_Pass.ViewIndexAndHistoryValid & TAA_VARIANCE_CLIP_BOUNDED_BIT) != 0)
+			{
+				boxMin = max(boxMin, neighborhoodMin);
+				boxMax = min(boxMax, neighborhoodMax);
+			}
+			rectifiedYCoCg =
+				ClipTemporalHistoryTowardMean(historyYCoCg, neighborhoodMean, boxMin, boxMax);
+		}
+		else
+		{
+			rectifiedYCoCg = clamp(historyYCoCg, neighborhoodMin, neighborhoodMax);
+		}
+		historyColor = TemporalYCoCgToRGB(rectifiedYCoCg);
+		clipDistance = saturate(length(rectifiedYCoCg - historyYCoCg) /
+			max(length(neighborhoodMax - neighborhoodMin), 1.0e-6));
 		if (!IsTemporalColorFinite(historyColor) || !isfinite(historyWeight))
 		{
 			historyColor = currentColor;
@@ -276,6 +305,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		const float normalizedHistoryAge = ResolveTemporalAAHistoryAgePreview(
 			nextHistoryAge, maxHistoryFeedbackAndClampExpansion.x);
 		diagnosticsOutput = float4(normalizedHistoryAge.xxx, 1.0);
+	}
+	else if (writeClipDistancePreview)
+	{
+		diagnosticsOutput = float4((accepted ? clipDistance : 1.0).xxx, 1.0);
 	}
 	reprojectionDiagnostics[pixel] = diagnosticsOutput;
 

@@ -5526,6 +5526,13 @@ namespace gglab
 					PostProcessDebugTap::TemporalHistoryAge) &&
 				!UsesTemporalAAHistoryAgePreviewPayload(
 					PostProcessDebugTap::TemporalHistoryColor) &&
+				UsesTemporalAAClipDistancePreviewPayload(
+					PostProcessDebugTap::TemporalClipDistance) &&
+				!UsesTemporalAAClipDistancePreviewPayload(
+					PostProcessDebugTap::TemporalHistoryAge) &&
+				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalClipDistance) &&
+				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalHistoryWeight) &&
+				!IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalMotionMagnitude) &&
 				historyColorPreviewGraph.Compile(),
 				"TAA history-color and history-age previews read selected transient payloads instead of exported previous or next history color");
 

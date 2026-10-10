@@ -28,6 +28,8 @@ namespace gglab
 		std::optional<float> m_VelocityWeightScale;
 		std::optional<float> m_LuminanceWeightScale;
 		std::optional<float> m_NeighborhoodClampExpansion;
+		std::optional<TemporalAAHistoryRectification> m_HistoryRectification;
+		std::optional<float> m_VarianceClipGamma;
 		std::optional<TemporalAAHistoryFilter> m_HistoryFilter;
 		std::optional<TemporalAACurrentFilter> m_CurrentFilter;
 		std::optional<TemporalAAMotionSelection> m_MotionSelection;

@@ -18,8 +18,10 @@
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 
 #include <cstdint>
+#include <optional>
 #include <span>
 
 namespace gglab
@@ -34,11 +36,15 @@ namespace gglab
 		inline constexpr uint32_t TemporalAACurrentGaussianBit = 0x08000000u;
 		inline constexpr uint32_t TemporalAAClosestDepthMotionBit = 0x04000000u;
 		inline constexpr uint32_t TemporalAADisplayDepthBit = 0x02000000u;
+		inline constexpr uint32_t TemporalAAVarianceClipBit = 0x01000000u;
+		inline constexpr uint32_t TemporalAAVarianceClipBoundedBit = 0x00800000u;
+		inline constexpr uint32_t TemporalAAClipDistancePreviewBit = 0x00400000u;
 		inline constexpr uint32_t TemporalAAViewFlagMask =
 			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit |
 			TemporalAAHistoryAgePreviewBit | TemporalAAHistoryCatmullRomBit |
 			TemporalAACurrentGaussianBit | TemporalAAClosestDepthMotionBit |
-			TemporalAADisplayDepthBit;
+			TemporalAADisplayDepthBit | TemporalAAVarianceClipBit |
+			TemporalAAVarianceClipBoundedBit | TemporalAAClipDistancePreviewBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -50,8 +56,9 @@ namespace gglab
 			uint32_t m_ResolvedColorUavIndex = 0;
 			uint32_t m_NextHistoryColorUavIndex = 0;
 			uint32_t m_ReprojectionDiagnosticsUavIndex = 0;
-			uint32_t m_LinearClampSamplerIndex = 0;
-			uint32_t m_PointClampSamplerIndex = 0;
+			// Linear clamp sampler in the low 16 bits, point clamp in the high 16 bits.
+			uint32_t m_PackedClampSamplerIndices = 0;
+			float m_VarianceClipGamma = 0.0f;
 			uint32_t m_ViewIndexAndHistoryValid = 0;
 			uint32_t m_PackedDepthThresholds = 0;
 			uint32_t m_PackedMaxHistoryFeedbackAndClampExpansion = 0;
@@ -199,14 +206,27 @@ namespace gglab
 		{
 			return;
 		}
-		const PostProcessDebugSelection previewSelection =
-			resourceRegistry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::TemporalAA);
+		// The diagnostics texture carries one payload per frame. A pending diagnostic capture
+		// of a Temporal AA tap selects it; otherwise the interactive preview does.
+		std::optional<PostProcessDebugTap> payloadTap;
+		const std::optional<PostProcessDebugTap> captureTap = services.m_FrameCapture
+			? services.m_FrameCapture->GetPendingDiagnosticTap()
+			: std::nullopt;
+		if (captureTap && IsTemporalAADiagnosticsTap(*captureTap))
+		{
+			payloadTap = captureTap;
+		}
+		else if (resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA))
+		{
+			payloadTap = resourceRegistry->GetPostProcessPreviewSelection(
+				PostProcessPreviewChannel::TemporalAA).m_Tap;
+		}
 		const bool historyColorPreviewRequested =
-			resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA) &&
-			UsesTemporalAAHistoryColorPreviewPayload(previewSelection.m_Tap);
+			payloadTap && UsesTemporalAAHistoryColorPreviewPayload(*payloadTap);
 		const bool historyAgePreviewRequested =
-			resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA) &&
-			UsesTemporalAAHistoryAgePreviewPayload(previewSelection.m_Tap);
+			payloadTap && UsesTemporalAAHistoryAgePreviewPayload(*payloadTap);
+		const bool clipDistancePreviewRequested =
+			payloadTap && UsesTemporalAAClipDistancePreviewPayload(*payloadTap);
 
 		rg.AddPass<TemporalAAResolvedColorInitializePassData>(
 			"PostProcess.TemporalAA.InitializeResolvedSceneColor",
@@ -263,7 +283,7 @@ namespace gglab
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
 			[transaction, displayViewId, viewIndex, temporalAASettings,
 			previousHistoryCompatible, historyColorPreviewRequested,
-			historyAgePreviewRequested,
+			historyAgePreviewRequested, clipDistancePreviewRequested,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -289,6 +309,8 @@ namespace gglab
 					return;
 				}
 
+				GGLAB_ASSERT_MSG(linearClampSamplerIndex <= 0xffffu && pointClampSamplerIndex <= 0xffffu,
+					"Temporal AA packs its clamp sampler indices into 16 bits each.");
 				const RGTextureId currentColor = builder.Read(
 					targets.m_SceneColor, RGTextureAccess::Sample, RHIStage::ComputeShader);
 				const RGTextureId motion = builder.Read(temporalGeometry.m_MotionVectors,
@@ -388,8 +410,9 @@ namespace gglab
 				}
 
 				data.m_Parameters = {
-					.m_LinearClampSamplerIndex = linearClampSamplerIndex,
-					.m_PointClampSamplerIndex = pointClampSamplerIndex,
+					.m_PackedClampSamplerIndices =
+						linearClampSamplerIndex | (pointClampSamplerIndex << 16u),
+					.m_VarianceClipGamma = temporalAASettings.m_VarianceClipGamma,
 					.m_ViewIndexAndHistoryValid = viewIndex |
 						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u) |
 						(historyColorPreviewRequested
@@ -397,6 +420,9 @@ namespace gglab
 							: 0u) |
 						(historyAgePreviewRequested
 							? TemporalAAHistoryAgePreviewBit
+							: 0u) |
+						(clipDistancePreviewRequested
+							? TemporalAAClipDistancePreviewBit
 							: 0u) |
 						(temporalAASettings.m_HistoryFilter ==
 							TemporalAAHistoryFilter::CatmullRomClamped
@@ -409,7 +435,15 @@ namespace gglab
 							TemporalAAMotionSelection::ClosestDepth
 							? TemporalAAClosestDepthMotionBit
 							: 0u) |
-						(resolveDisplayDepth ? TemporalAADisplayDepthBit : 0u),
+						(resolveDisplayDepth ? TemporalAADisplayDepthBit : 0u) |
+						(temporalAASettings.m_HistoryRectification !=
+							TemporalAAHistoryRectification::MinMaxClamp
+							? TemporalAAVarianceClipBit
+							: 0u) |
+						(temporalAASettings.m_HistoryRectification ==
+							TemporalAAHistoryRectification::BoundedVarianceClip
+							? TemporalAAVarianceClipBoundedBit
+							: 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),

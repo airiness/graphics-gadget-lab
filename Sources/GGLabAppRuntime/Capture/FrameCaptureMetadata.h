@@ -75,6 +75,8 @@ namespace gglab
 		float m_VelocityWeightScale = 0.0f;
 		float m_LuminanceWeightScale = 0.0f;
 		float m_NeighborhoodClampExpansion = 0.0f;
+		std::string m_HistoryRectification;
+		float m_VarianceClipGamma = 0.0f;
 		std::string m_HistoryFilter;
 		std::string m_CurrentFilter;
 		std::string m_MotionSelection;

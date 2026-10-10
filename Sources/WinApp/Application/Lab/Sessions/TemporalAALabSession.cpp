@@ -86,6 +86,7 @@ namespace gglab
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalRejection), .m_Name = "Rejection"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryAge), .m_Name = "History Age"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalClipDistance), .m_Name = "Clip Distance"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude"},
 			},
@@ -585,10 +586,12 @@ namespace gglab
 				camera.GetExposureCompensationEV())},
 			{.m_Name = "TAA settings", .m_Value = std::format(
 				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
-				"history {}, current {}, motion {}, post-temporal {}, resolution {}, "
-				"texture LOD {:.2f}",
+				"rectification {} (gamma {:.2f}), history {}, current {}, motion {}, "
+				"post-temporal {}, resolution {}, texture LOD {:.2f}",
 				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
 				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion,
+				GetTemporalAAHistoryRectificationName(taa.m_HistoryRectification),
+				taa.m_VarianceClipGamma,
 				GetTemporalAAHistoryFilterName(taa.m_HistoryFilter),
 				GetTemporalAACurrentFilterName(taa.m_CurrentFilter),
 				GetTemporalAAMotionSelectionName(taa.m_MotionSelection),

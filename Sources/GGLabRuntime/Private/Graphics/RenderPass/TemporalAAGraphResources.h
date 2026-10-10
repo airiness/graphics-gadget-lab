@@ -44,6 +44,29 @@ namespace gglab
 		return tap == PostProcessDebugTap::TemporalHistoryAge;
 	}
 
+	[[nodiscard]] constexpr bool UsesTemporalAAClipDistancePreviewPayload(
+		PostProcessDebugTap tap) noexcept
+	{
+		return tap == PostProcessDebugTap::TemporalClipDistance;
+	}
+
+	// Taps read from the Temporal AA diagnostics texture.
+	[[nodiscard]] constexpr bool IsTemporalAADiagnosticsTap(PostProcessDebugTap tap) noexcept
+	{
+		switch (tap)
+		{
+		case PostProcessDebugTap::TemporalHistoryColor:
+		case PostProcessDebugTap::TemporalReprojectionUV:
+		case PostProcessDebugTap::TemporalRejection:
+		case PostProcessDebugTap::TemporalHistoryWeight:
+		case PostProcessDebugTap::TemporalHistoryAge:
+		case PostProcessDebugTap::TemporalClipDistance:
+			return true;
+		default:
+			return false;
+		}
+	}
+
 	[[nodiscard]] inline RGTextureId ResolveTemporalAAPreviewSource(
 		const RGTemporalAAResources& resources, PostProcessDebugTap tap) noexcept
 	{
@@ -54,6 +77,7 @@ namespace gglab
 		case PostProcessDebugTap::TemporalRejection:
 		case PostProcessDebugTap::TemporalHistoryWeight:
 		case PostProcessDebugTap::TemporalHistoryAge:
+		case PostProcessDebugTap::TemporalClipDistance:
 			return resources.m_ReprojectionDiagnostics;
 		default:
 			return {};

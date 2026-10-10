@@ -138,7 +138,7 @@ namespace gglab
 				float m_Min;
 				float m_Max;
 			};
-			constexpr std::array<OverrideField, 7> fields{ {
+			constexpr std::array<OverrideField, 8> fields{ {
 				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback,
 					0.0f, TemporalAAMaxHistoryFeedbackCeiling },
 				{ "depthAbsoluteThreshold",
@@ -158,6 +158,8 @@ namespace gglab
 				{ "textureLodBiasOffset",
 					&FrameSequenceTemporalAAOverrides::m_TextureLodBiasOffset,
 					TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
+				{ "varianceClipGamma", &FrameSequenceTemporalAAOverrides::m_VarianceClipGamma,
+					TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
 			} };
 			for (const auto& [key, fieldValue] : value.items())
 			{
@@ -232,6 +234,24 @@ namespace gglab
 							"'unjittered'.";
 					}
 					outOverrides.m_PostTemporalView = *view;
+					continue;
+				}
+				if (key == "historyRectification")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array rectifications{
+						TemporalAAHistoryRectification::MinMaxClamp,
+						TemporalAAHistoryRectification::VarianceClip,
+						TemporalAAHistoryRectification::BoundedVarianceClip };
+					const auto rectification = std::ranges::find(
+						rectifications, name, &GetTemporalAAHistoryRectificationName);
+					if (rectification == rectifications.end())
+					{
+						return "Temporal AA override 'historyRectification' must be "
+							"'minmax-clamp', 'variance-clip' or 'bounded-variance-clip'.";
+					}
+					outOverrides.m_HistoryRectification = *rectification;
 					continue;
 				}
 				if (key == "resolutionPreset")

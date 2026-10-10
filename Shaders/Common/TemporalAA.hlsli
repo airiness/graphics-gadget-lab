@@ -17,10 +17,14 @@ static const uint TAA_HISTORY_CATMULL_ROM_BIT = 0x10000000u;
 static const uint TAA_CURRENT_GAUSSIAN_BIT = 0x08000000u;
 static const uint TAA_CLOSEST_DEPTH_MOTION_BIT = 0x04000000u;
 static const uint TAA_DISPLAY_DEPTH_BIT = 0x02000000u;
+static const uint TAA_VARIANCE_CLIP_BIT = 0x01000000u;
+static const uint TAA_VARIANCE_CLIP_BOUNDED_BIT = 0x00800000u;
+static const uint TAA_CLIP_DISTANCE_PREVIEW_BIT = 0x00400000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
 	TAA_HISTORY_AGE_PREVIEW_BIT | TAA_HISTORY_CATMULL_ROM_BIT |
-	TAA_CURRENT_GAUSSIAN_BIT | TAA_CLOSEST_DEPTH_MOTION_BIT | TAA_DISPLAY_DEPTH_BIT;
+	TAA_CURRENT_GAUSSIAN_BIT | TAA_CLOSEST_DEPTH_MOTION_BIT | TAA_DISPLAY_DEPTH_BIT |
+	TAA_VARIANCE_CLIP_BIT | TAA_VARIANCE_CLIP_BOUNDED_BIT | TAA_CLIP_DISTANCE_PREVIEW_BIT;
 // exp(-2.29 (d / 0.75)^2): Blackman-Harris approximated by a Gaussian of 0.75 pixels.
 static const float TAA_CURRENT_GAUSSIAN_KERNEL_SCALE = 2.29 / (0.75 * 0.75);
 static const float TAA_HISTORY_INITIAL_AGE = 1.0;
@@ -253,12 +257,16 @@ float3 TemporalYCoCgToRGB(float3 color)
 		color.x - color.y - color.z);
 }
 
+// Minimum, maximum, mean and standard deviation of the 3x3 YCoCg neighborhood.
 void GetTemporalNeighborhoodRange(Texture2D<float4> currentColorTexture,
 	uint2 pixel, uint2 extent, float3 fallbackColor,
-	out float3 neighborhoodMin, out float3 neighborhoodMax)
+	out float3 neighborhoodMin, out float3 neighborhoodMax,
+	out float3 neighborhoodMean, out float3 neighborhoodStdDev)
 {
 	neighborhoodMin = float3(3.402823466e+38, 3.402823466e+38, 3.402823466e+38);
 	neighborhoodMax = -neighborhoodMin;
+	float3 sum = 0.0.xxx;
+	float3 sumOfSquares = 0.0.xxx;
 	const int2 maxPixel = int2(extent) - 1;
 	[unroll]
 	for (int y = -1; y <= 1; ++y)
@@ -275,8 +283,24 @@ void GetTemporalNeighborhoodRange(Texture2D<float4> currentColorTexture,
 			const float3 sampleYCoCg = TemporalRGBToYCoCg(sampleColor);
 			neighborhoodMin = min(neighborhoodMin, sampleYCoCg);
 			neighborhoodMax = max(neighborhoodMax, sampleYCoCg);
+			sum += sampleYCoCg;
+			sumOfSquares += sampleYCoCg * sampleYCoCg;
 		}
 	}
+	neighborhoodMean = sum / 9.0;
+	neighborhoodStdDev =
+		sqrt(max(sumOfSquares / 9.0 - neighborhoodMean * neighborhoodMean, 0.0.xxx));
+}
+
+// Moves history along the line toward the neighborhood mean until it lies inside
+// [boxMin, boxMax], which contains the mean. Returns the clipped history.
+float3 ClipTemporalHistoryTowardMean(float3 history, float3 mean, float3 boxMin, float3 boxMax)
+{
+	const float3 direction = history - mean;
+	const float3 limit = lerp(mean - boxMin, boxMax - mean, step(0.0, direction));
+	const float3 axisScale = max(limit, 0.0.xxx) / max(abs(direction), 1.0e-7.xxx);
+	const float scale = saturate(min(axisScale.x, min(axisScale.y, axisScale.z)));
+	return mean + direction * scale;
 }
 
 float ComputeTemporalHistoryWeight(float previousHistoryAge, float motionMagnitudePixels,

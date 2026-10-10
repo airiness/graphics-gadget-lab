@@ -1351,6 +1351,8 @@ namespace gglab
 					.m_Enabled = false,
 					.m_MaxHistoryFeedback = 0.9f,
 					.m_NeighborhoodClampExpansion = 4.0f,
+					.m_HistoryRectification = TemporalAAHistoryRectification::BoundedVarianceClip,
+					.m_VarianceClipGamma = 9.0f,
 					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
 					.m_CurrentFilter = TemporalAACurrentFilter::Point,
 					.m_MotionSelection = TemporalAAMotionSelection::Center,
@@ -1363,6 +1365,8 @@ namespace gglab
 				invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
 				invalidFilter.m_PostTemporalView = static_cast<TemporalAAPostTemporalView>(7);
 				invalidFilter.m_ResolutionPreset = static_cast<TemporalAAResolutionPreset>(7);
+				invalidFilter.m_HistoryRectification = static_cast<TemporalAAHistoryRectification>(7);
+				invalidFilter.m_VarianceClipGamma = std::numeric_limits<float>::quiet_NaN();
 				context.Check(!overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
 					overridden.m_DepthAbsoluteThreshold == 0.25f &&
 					overridden.m_NeighborhoodClampExpansion ==
@@ -1387,6 +1391,14 @@ namespace gglab
 					content.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
 					ResolveTemporalAASettings(invalidFilter).m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Native &&
+					overridden.m_HistoryRectification ==
+					TemporalAAHistoryRectification::BoundedVarianceClip &&
+					overridden.m_VarianceClipGamma == TemporalAAMaxVarianceClipGamma &&
+					content.m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
+					ResolveTemporalAASettings(invalidFilter).m_HistoryRectification ==
+					TemporalAAHistoryRectification::MinMaxClamp &&
+					ResolveTemporalAASettings(invalidFilter).m_VarianceClipGamma ==
+					TemporalAADefaultVarianceClipGamma &&
 					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
 					ResolveTemporalAASettings(content),
 					"Sequence Temporal AA overrides replace only set fields and stay within the "
