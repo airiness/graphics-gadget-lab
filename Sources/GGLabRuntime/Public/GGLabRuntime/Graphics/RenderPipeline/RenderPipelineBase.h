@@ -75,6 +75,8 @@ namespace gglab
 			info.m_DepthVelocityPathAvailable = false;
 			info.m_SceneExtensionParticipation =
 				SceneExtensionTemporalParticipation::TemporalUnsupported;
+			// A pipeline without GTAO has no visibility to accumulate.
+			info.m_AmbientOcclusionAvailable = false;
 			return gglab::ResolveTemporalFramePlan(info);
 		}
 

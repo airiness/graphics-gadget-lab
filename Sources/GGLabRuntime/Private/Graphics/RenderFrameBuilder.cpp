@@ -251,6 +251,13 @@ namespace gglab
 			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
 				.m_TemporalAA.m_Enabled,
 			"Temporal frame plan must be resolved from the display view settings.");
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::AmbientOcclusion)
+			.m_Requested ==
+			(result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
+				.m_Lighting.m_GTAO.m_Enabled &&
+				result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
+				.m_Lighting.m_GTAO.m_TemporalAccumulation),
+			"Temporal GTAO planning must be resolved from the display view settings.");
 		// Temporal AA does not integrate post-temporal composition, so the jitter it owns
 		// may be removed from that composition's raster view. Below native resolution the
 		// jittered view does not exist at the display extent, so the view is unjittered.

@@ -35,6 +35,8 @@ namespace gglab
 				leftGTAO.m_DirectionCount == rightGTAO.m_DirectionCount &&
 				leftGTAO.m_StepCount == rightGTAO.m_StepCount &&
 				leftGTAO.m_DenoiseRadius == rightGTAO.m_DenoiseRadius &&
+				leftGTAO.m_TemporalAccumulation == rightGTAO.m_TemporalAccumulation &&
+				leftGTAO.m_TemporalMaxSamples == rightGTAO.m_TemporalMaxSamples &&
 				leftGTAO.m_FinalAOFormatPreference == rightGTAO.m_FinalAOFormatPreference &&
 				leftBloom.m_Enabled == rightBloom.m_Enabled &&
 				leftBloom.m_Threshold == rightBloom.m_Threshold &&
@@ -274,6 +276,8 @@ namespace gglab
 		gtaoSettings.m_DirectionCount = 4;
 		gtaoSettings.m_StepCount = 8;
 		gtaoSettings.m_DenoiseRadius = 5;
+		gtaoSettings.m_TemporalAccumulation = true;
+		gtaoSettings.m_TemporalMaxSamples = 8;
 		gtaoSettings.m_FinalAOFormatPreference = GTAOFinalAOFormatPreference::ForceR16Float;
 		overrides.m_GTAO.Activate(gtaoSettings);
 		ViewRenderProfile expectedProfile = originalAuthoringProfile;

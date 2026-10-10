@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
@@ -20,6 +21,7 @@
 namespace gglab
 {
 	struct RenderView;
+	class GTAOTemporalHistory;
 	class TemporalHistoryManager;
 	class TemporalReferenceAccumulator;
 
@@ -123,7 +125,8 @@ namespace gglab
 			TemporalHistoryManager* historyManager = nullptr,
 			float scenePreExposure = SceneColorStoragePreExposureV1,
 			std::optional<TemporalReferenceSample> referenceSample = std::nullopt,
-			TemporalReferenceAccumulator* referenceAccumulator = nullptr) noexcept;
+			TemporalReferenceAccumulator* referenceAccumulator = nullptr,
+			GTAOTemporalHistory* ambientOcclusionHistory = nullptr) noexcept;
 		void PrepareDisplayView(RenderView& view) noexcept;
 		[[nodiscard]] Matrix ResolvePreviousObjectModel(
 			const RenderObjectHistoryKey& key, const Matrix& currentModel) const noexcept;
@@ -139,6 +142,16 @@ namespace gglab
 			TemporalReferenceRenderGraphResources& outResources) noexcept;
 		[[nodiscard]] bool ExportReferenceResources(RenderGraph::RGBuilder& builder,
 			const TemporalReferenceRenderGraphResources& resources) noexcept;
+		// Temporal GTAO frames only; the history is null when the consumer is inactive or
+		// its history could not be allocated.
+		[[nodiscard]] bool ImportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
+			GTAOTemporalHistoryRenderGraphResources& outResources) noexcept;
+		[[nodiscard]] bool ExportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
+			const GTAOTemporalHistoryRenderGraphResources& resources) noexcept;
+		[[nodiscard]] bool CanAccumulateAmbientOcclusion() const noexcept
+		{
+			return m_AmbientOcclusionHistory != nullptr;
+		}
 		void CommitCompleted(const RHIFencePoint& submittedFence = {}) noexcept;
 		void Abort(const RHIFencePoint& retirementFence = {}) noexcept;
 		void InvalidateAfterFatal(const RHIFencePoint& submittedFence = {}) noexcept;
@@ -189,6 +202,7 @@ namespace gglab
 		TemporalObjectHistory* m_ObjectHistory = nullptr;
 		TemporalHistoryManager* m_HistoryManager = nullptr;
 		TemporalReferenceAccumulator* m_ReferenceAccumulator = nullptr;
+		GTAOTemporalHistory* m_AmbientOcclusionHistory = nullptr;
 		std::optional<TemporalReferenceSample> m_ReferenceSample;
 		TemporalHistoryFrameState m_HistoryFrame{};
 		ResolvedTemporalFramePlan m_Plan{};

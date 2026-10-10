@@ -145,8 +145,10 @@ bool ReconstructGTAONormal(Texture2D<float> depthTexture, uint2 centerPixel, uin
 	return all(isfinite(normalVS));
 }
 
-GTAOSurface LoadHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfPixel,
-	uint2 fullExtent, ViewData viewData, float radius)
+// Each half-resolution texel represents the nearest valid surface of its 2x2 footprint.
+// Evaluation and temporal reprojection both follow this selected full-resolution pixel.
+GTAOSurface SelectHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfPixel,
+	uint2 fullExtent, ViewData viewData)
 {
 	GTAOSurface surface = (GTAOSurface) 0;
 	const uint2 basePixel = halfPixel * 2;
@@ -177,7 +179,13 @@ GTAOSurface LoadHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfP
 			surface.IsValid = true;
 		}
 	}
+	return surface;
+}
 
+GTAOSurface LoadHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfPixel,
+	uint2 fullExtent, ViewData viewData, float radius)
+{
+	GTAOSurface surface = SelectHalfResolutionSurface(depthTexture, halfPixel, fullExtent, viewData);
 	if (surface.IsValid)
 	{
 		surface.HasValidNormal = ReconstructGTAONormal(depthTexture, surface.FullPixel, fullExtent,
@@ -287,6 +295,83 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 	}
 
 	return visibility / float(directionCount);
+}
+
+static const float GTAO_TEMPORAL_DEPTH_ABSOLUTE_THRESHOLD = 0.05;
+static const float GTAO_TEMPORAL_DEPTH_RELATIVE_THRESHOLD = 0.05;
+
+bool IsGTAOHistoryDepthCompatible(float expectedViewZ, float storedViewZ)
+{
+	if (!isfinite(expectedViewZ) || !isfinite(storedViewZ) ||
+		expectedViewZ <= 0.0 || storedViewZ <= 0.0)
+	{
+		return false;
+	}
+	return abs(expectedViewZ - storedViewZ) <= max(GTAO_TEMPORAL_DEPTH_ABSOLUTE_THRESHOLD,
+		GTAO_TEMPORAL_DEPTH_RELATIVE_THRESHOLD * expectedViewZ);
+}
+
+struct GTAOTemporalResult
+{
+	float Visibility;
+	float Samples;
+};
+
+// Accumulates the current visibility of a half-resolution texel with its reprojected
+// history. The history is a jittered render-domain signal, so it follows the raster motion
+// of the selected full-resolution surface. Each bilinear history tap must hold the view Z
+// that the current surface had in the previous view; the accepted tap weight scales the
+// effective sample count carried forward.
+GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface surface,
+	float2 motionUV, uint2 fullExtent, uint2 halfExtent, ViewData viewData,
+	Texture2D<float2> previousVisibility, Texture2D<float> previousViewZ, float maxSamples)
+{
+	GTAOTemporalResult result;
+	result.Visibility = currentVisibility;
+	result.Samples = 1.0;
+
+	const float2 previousUV = PixelCenterToUV(surface.FullPixel, fullExtent) - motionUV;
+	if (!all(isfinite(previousUV)) || any(previousUV < 0.0) || any(previousUV > 1.0))
+	{
+		return result;
+	}
+	const float3 positionWS = mul(float4(surface.PositionVS, 1.0), viewData.InvViewMat).xyz;
+	const float expectedViewZ = mul(float4(positionWS, 1.0), viewData.PreviousViewMat).z;
+
+	const float2 historyPosition = previousUV * float2(halfExtent) - 0.5;
+	const int2 basePixel = int2(floor(historyPosition));
+	const float2 fraction = historyPosition - float2(basePixel);
+	float2 weightedHistory = 0.0.xx;
+	float acceptedWeight = 0.0;
+	[unroll]
+	for (uint tapIndex = 0; tapIndex < 4; ++tapIndex)
+	{
+		const int2 tapOffset = int2(tapIndex & 1, tapIndex >> 1);
+		const int2 tapPixel = clamp(basePixel + tapOffset, int2(0, 0), int2(halfExtent) - 1);
+		const float2 tapWeights = lerp(1.0 - fraction, fraction, float2(tapOffset));
+		const float weight = tapWeights.x * tapWeights.y;
+		if (weight <= 0.0 ||
+			!IsGTAOHistoryDepthCompatible(expectedViewZ, previousViewZ.Load(int3(tapPixel, 0))))
+		{
+			continue;
+		}
+		const float2 history = previousVisibility.Load(int3(tapPixel, 0));
+		if (!all(isfinite(history)))
+		{
+			continue;
+		}
+		weightedHistory += history * weight;
+		acceptedWeight += weight;
+	}
+	if (acceptedWeight <= 1.0e-3)
+	{
+		return result;
+	}
+
+	const float2 history = weightedHistory / acceptedWeight;
+	result.Samples = min(max(history.y, 0.0) * saturate(acceptedWeight) + 1.0, maxSamples);
+	result.Visibility = lerp(currentVisibility, history.x, 1.0 - rcp(result.Samples));
+	return result;
 }
 
 float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,

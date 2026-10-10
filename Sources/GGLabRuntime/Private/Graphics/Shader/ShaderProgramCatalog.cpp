@@ -42,6 +42,7 @@ namespace gglab::shader_programs
 			AerialPerspectiveCompositeCompute,
 			ForwardPlusCullCompute,
 			GTAOEvaluateCompute,
+			GTAOTemporalCompute,
 			GTAODenoiseXCompute,
 			GTAODenoiseYCompute,
 			GTAOUpsampleCompute,

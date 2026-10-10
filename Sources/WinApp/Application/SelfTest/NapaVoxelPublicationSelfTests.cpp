@@ -71,6 +71,11 @@ namespace gglab
 			{
 				return m_Capabilities;
 			}
+			[[nodiscard]] const GTAOCapabilityStatus& GetGTAOCapabilityStatus()
+				const noexcept override
+			{
+				return m_GTAOCapabilities;
+			}
 			void Render(RenderFrame&, RenderGraph&, const RenderFrameContext&) noexcept override {}
 			[[nodiscard]] RHIFrameEndResult EndFrame(RenderFrame&) noexcept override
 			{
@@ -121,6 +126,7 @@ namespace gglab
 			void AbortFrame(uint64_t) noexcept override {}
 			TemporalFrameTransaction m_Transaction{};
 			TemporalAACapabilityStatus m_Capabilities{};
+			GTAOCapabilityStatus m_GTAOCapabilities{};
 		};
 
 		class NapaVoxelPublicationTestSamplerAccess final : public RenderSamplerAccess

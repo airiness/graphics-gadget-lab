@@ -48,6 +48,8 @@ namespace gglab
 		gtao.m_DirectionCount = std::clamp(gtao.m_DirectionCount, 1u, GTAOMaxDirectionCount);
 		gtao.m_StepCount = std::clamp(gtao.m_StepCount, 1u, GTAOMaxStepCount);
 		gtao.m_DenoiseRadius = std::clamp(gtao.m_DenoiseRadius, 1u, GTAOMaxDenoiseRadius);
+		gtao.m_TemporalMaxSamples =
+			std::clamp(gtao.m_TemporalMaxSamples, 1u, GTAOMaxTemporalSamples);
 
 		return {
 			.m_TemporalAA = temporalAA,

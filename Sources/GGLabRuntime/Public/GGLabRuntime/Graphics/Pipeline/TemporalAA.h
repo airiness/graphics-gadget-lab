@@ -529,6 +529,8 @@ namespace gglab
 		TemporalAA,
 		// Supersampled reference accumulation of an evaluation sequence frame.
 		Reference,
+		// Temporal accumulation of the display view's GTAO visibility.
+		AmbientOcclusion,
 		Count,
 	};
 	inline constexpr uint32_t TemporalConsumerCount =
@@ -541,6 +543,7 @@ namespace gglab
 		{
 		case TemporalConsumer::TemporalAA: return "temporal-aa";
 		case TemporalConsumer::Reference: return "reference";
+		case TemporalConsumer::AmbientOcclusion: return "temporal-gtao";
 		case TemporalConsumer::Count: break;
 		}
 		return "unknown";
@@ -596,6 +599,10 @@ namespace gglab
 			// The reference owns a separate jitter sequence and removes it by averaging;
 			// time is held, so it needs no motion, continuity or history.
 			return TemporalService::ProjectionJitter;
+		case TemporalConsumer::AmbientOcclusion:
+			// GTAO history follows the raster samples, jittered or not, and varies its
+			// sampling with the submitted frame index; it removes no jitter itself.
+			return TemporalService::GeometryMotion | TemporalService::FrameContinuity;
 		case TemporalConsumer::Count: break;
 		}
 		return TemporalService::None;
@@ -682,8 +689,13 @@ namespace gglab
 		// The pipeline's resolve reconstructs the display extent from a smaller render
 		// extent; without it every frame renders at native resolution.
 		bool m_TemporalUpscalingAvailable = false;
-		// A supersampled reference sample is due this frame. It excludes Temporal AA.
+		// A supersampled reference sample is due this frame. It excludes Temporal AA and
+		// temporal GTAO.
 		bool m_ReferenceRequested = false;
+		// Temporal GTAO accumulation is requested for the display view.
+		bool m_AmbientOcclusionRequested = false;
+		// The pipeline evaluates GTAO and the device supports its persistent history.
+		bool m_AmbientOcclusionAvailable = false;
 	};
 
 	// The display view's temporal plan, resolved once per frame from its consumers.
@@ -791,6 +803,39 @@ namespace gglab
 		return consumer;
 	}
 
+	[[nodiscard]] constexpr TemporalConsumerPlan ResolveTemporalAmbientOcclusionConsumerPlan(
+		const TemporalFramePlanResolveInfo& info) noexcept
+	{
+		TemporalConsumerPlan consumer{ .m_Requested = info.m_AmbientOcclusionRequested };
+		if (!consumer.m_Requested)
+		{
+			return consumer;
+		}
+
+		consumer.m_Status = TemporalConsumerStatus::Unavailable;
+		if (!info.m_AmbientOcclusionAvailable)
+		{
+			consumer.m_DisableReason = TemporalConsumerDisableReason::CoreCapabilityUnavailable;
+			return consumer;
+		}
+		if (!info.m_DisplayViewEligible)
+		{
+			consumer.m_DisableReason = TemporalConsumerDisableReason::DisplayViewIneligible;
+			return consumer;
+		}
+		if (!info.m_DepthVelocityPathAvailable)
+		{
+			consumer.m_DisableReason = TemporalConsumerDisableReason::DepthVelocityPathUnavailable;
+			return consumer;
+		}
+
+		consumer.m_Status = TemporalConsumerStatus::Active;
+		consumer.m_DisableReason = TemporalConsumerDisableReason::None;
+		consumer.m_Services =
+			GetTemporalConsumerRequiredServices(TemporalConsumer::AmbientOcclusion);
+		return consumer;
+	}
+
 	// The reference has no eligibility gate: a requested sample that cannot be
 	// accumulated is a frame contract failure of the pipeline.
 	[[nodiscard]] constexpr TemporalConsumerPlan ResolveTemporalReferenceConsumerPlan(
@@ -814,6 +859,9 @@ namespace gglab
 		// Both consumers own a jitter sequence; a reference frame holds Temporal AA off.
 		GGLAB_ASSERT_MSG(!info.m_ReferenceRequested || !info.m_Settings.m_Enabled,
 			"A temporal reference sample requires Temporal AA to be unrequested.");
+		// The reference holds time and averages GTAO over its own sample sequence.
+		GGLAB_ASSERT_MSG(!info.m_ReferenceRequested || !info.m_AmbientOcclusionRequested,
+			"A temporal reference sample requires temporal GTAO to be unrequested.");
 		ResolvedTemporalFramePlan plan{
 			.m_Capabilities = info.m_Capabilities,
 			.m_DisplayViewId = info.m_DisplayViewId,
@@ -828,6 +876,8 @@ namespace gglab
 			ResolveTemporalAAConsumerPlan(info);
 		plan.m_Consumers[static_cast<uint32_t>(TemporalConsumer::Reference)] =
 			ResolveTemporalReferenceConsumerPlan(info);
+		plan.m_Consumers[static_cast<uint32_t>(TemporalConsumer::AmbientOcclusion)] =
+			ResolveTemporalAmbientOcclusionConsumerPlan(info);
 		uint32_t jitterOwnerCount = 0;
 		for (const TemporalConsumerPlan& consumer : plan.m_Consumers)
 		{

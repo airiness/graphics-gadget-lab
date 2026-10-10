@@ -39,6 +39,72 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 #endif
 }
 
+#elif defined(GGLAB_GTAO_TEMPORAL)
+
+struct GTAOTemporalPassParameters
+{
+	uint RawAOIndex;
+	uint HalfDepthIndex;
+	uint FullDepthIndex;
+	uint MotionIndex;
+	uint PreviousVisibilityIndex;
+	uint PreviousViewZIndex;
+	uint NextVisibilityUavIndex;
+	uint NextViewZUavIndex;
+	uint AccumulatedAOUavIndex;
+	uint ViewIndex;
+	uint FullWidth;
+	uint FullHeight;
+	uint HalfWidth;
+	uint HalfHeight;
+	uint PreviousValid;
+	float MaxSamples;
+};
+
+ConstantBuffer<GTAOTemporalPassParameters> g_Pass : register(b2);
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+	const uint2 halfPixel = dispatchThreadId.xy;
+	const uint2 halfExtent = uint2(g_Pass.HalfWidth, g_Pass.HalfHeight);
+	if (any(halfPixel >= halfExtent))
+	{
+		return;
+	}
+
+	Texture2D<float> rawAO = GetTexture2DFloat(g_Pass.RawAOIndex);
+	Texture2D<float> halfDepth = GetTexture2DFloat(g_Pass.HalfDepthIndex);
+	RWTexture2D<float2> nextVisibility = GetRWTexture2DFloat2(g_Pass.NextVisibilityUavIndex);
+	RWTexture2D<float> nextViewZ = GetRWTexture2DFloat(g_Pass.NextViewZUavIndex);
+	RWTexture2D<float> accumulatedAO = GetRWTexture2DFloat(g_Pass.AccumulatedAOUavIndex);
+
+	const float currentVisibility = rawAO.Load(int3(halfPixel, 0));
+	const float viewZ = halfDepth.Load(int3(halfPixel, 0));
+	GTAOTemporalResult result;
+	result.Visibility = currentVisibility;
+	result.Samples = viewZ > 0.0 ? 1.0 : 0.0;
+	if (g_Pass.PreviousValid != 0u && viewZ > 0.0)
+	{
+		Texture2D<float> fullDepth = GetTexture2DFloat(g_Pass.FullDepthIndex);
+		Texture2D<float2> motion = GetTexture2DFloat2(g_Pass.MotionIndex);
+		const uint2 fullExtent = uint2(g_Pass.FullWidth, g_Pass.FullHeight);
+		const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + g_Pass.ViewIndex];
+		const GTAOSurface surface =
+			SelectHalfResolutionSurface(fullDepth, halfPixel, fullExtent, viewData);
+		if (surface.IsValid)
+		{
+			result = AccumulateGTAOHistory(currentVisibility, surface,
+				motion.Load(int3(surface.FullPixel, 0)), fullExtent, halfExtent, viewData,
+				GetTexture2DFloat2(g_Pass.PreviousVisibilityIndex),
+				GetTexture2DFloat(g_Pass.PreviousViewZIndex), g_Pass.MaxSamples);
+		}
+	}
+	nextVisibility[halfPixel] = float2(result.Visibility, result.Samples);
+	nextViewZ[halfPixel] = viewZ;
+	accumulatedAO[halfPixel] = result.Visibility;
+}
+
 #elif defined(GGLAB_GTAO_UPSAMPLE)
 
 struct GTAOUpsamplePassParameters

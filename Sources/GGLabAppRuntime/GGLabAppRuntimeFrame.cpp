@@ -507,8 +507,10 @@ namespace gglab
 				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
 		if (referenceSample)
 		{
-			// The reference owns jitter and accumulation; Temporal AA stays inactive.
+			// The reference owns jitter and accumulation; Temporal AA and temporal GTAO
+			// stay inactive while it averages its own sample sequence.
 			displayViewSettings.m_TemporalAA.m_Enabled = false;
+			displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
 		}
 		else if (sequenceTemporalAAOverrides)
 		{
@@ -529,6 +531,11 @@ namespace gglab
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 				.m_ReferenceRequested = referenceSample.has_value(),
+				.m_AmbientOcclusionRequested =
+					displayViewSettings.m_Lighting.m_GTAO.m_Enabled &&
+					displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation,
+				.m_AmbientOcclusionAvailable =
+					m_RenderHost->GetGTAOCapabilityStatus().IsTemporalAvailable(),
 			});
 		// The window client extent is the display extent; the plan's effective preset
 		// derives the render extent from it.

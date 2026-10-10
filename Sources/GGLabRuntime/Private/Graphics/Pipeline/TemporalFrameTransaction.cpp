@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -43,7 +44,8 @@ namespace gglab
 		TemporalObjectHistory& objectHistory, const ResolvedTemporalFramePlan& plan,
 		const ViewResolution& resolution, TemporalHistoryManager* historyManager,
 		float scenePreExposure, std::optional<TemporalReferenceSample> referenceSample,
-		TemporalReferenceAccumulator* referenceAccumulator) noexcept
+		TemporalReferenceAccumulator* referenceAccumulator,
+		GTAOTemporalHistory* ambientOcclusionHistory) noexcept
 	{
 		GGLAB_ASSERT_MSG(referenceSample.has_value() ==
 			plan.IsConsumerActive(TemporalConsumer::Reference),
@@ -61,6 +63,8 @@ namespace gglab
 		m_HistoryManager = historyManager;
 		m_ReferenceSample = referenceSample;
 		m_ReferenceAccumulator = m_ReferenceSample ? referenceAccumulator : nullptr;
+		m_AmbientOcclusionHistory = plan.IsConsumerActive(TemporalConsumer::AmbientOcclusion)
+			? ambientOcclusionHistory : nullptr;
 		m_Plan = plan;
 		m_ColorAbi = ActiveTemporalColorAbi;
 		m_ScenePreExposure = scenePreExposure;
@@ -254,6 +258,29 @@ namespace gglab
 			m_ReferenceAccumulator->ExportRenderGraphResources(builder, resources);
 	}
 
+	bool TemporalFrameTransaction::ImportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
+		GTAOTemporalHistoryRenderGraphResources& outResources) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
+			CanAccumulateAmbientOcclusion(),
+			"Only a pending temporal GTAO frame with a history can import it.");
+		// The history continues exactly when the view does: same session, reset identity,
+		// extents and a committed previous frame.
+		return CanAccumulateAmbientOcclusion() &&
+			m_AmbientOcclusionHistory->ImportRenderGraphResources(
+				builder, m_HasCompatiblePreviousView, outResources);
+	}
+
+	bool TemporalFrameTransaction::ExportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
+		const GTAOTemporalHistoryRenderGraphResources& resources) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
+			CanAccumulateAmbientOcclusion(),
+			"Only a pending temporal GTAO frame with a history can export it.");
+		return CanAccumulateAmbientOcclusion() &&
+			m_AmbientOcclusionHistory->ExportRenderGraphResources(builder, resources);
+	}
+
 	void TemporalFrameTransaction::MarkResolveParticipated() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
@@ -300,6 +327,10 @@ namespace gglab
 			{
 				m_HistoryManager->AbortFrame(m_HistoryFrame, submittedFence);
 			}
+			if (m_AmbientOcclusionHistory)
+			{
+				m_AmbientOcclusionHistory->AbortFrame();
+			}
 			m_State = TemporalFrameTransactionState::Aborted;
 			return;
 		}
@@ -320,6 +351,10 @@ namespace gglab
 				}, submittedFence);
 			if (!historyCommitted)
 			{
+				if (m_AmbientOcclusionHistory)
+				{
+					m_AmbientOcclusionHistory->AbortFrame();
+				}
 				m_State = TemporalFrameTransactionState::Aborted;
 				return;
 			}
@@ -332,6 +367,10 @@ namespace gglab
 		m_ViewHistory->m_NextFrameIndex = m_FrameIndex + 1;
 		m_ViewHistory->m_Valid = true;
 		CommitObjectHistory();
+		if (m_AmbientOcclusionHistory)
+		{
+			m_AmbientOcclusionHistory->CommitFrame();
+		}
 		m_State = TemporalFrameTransactionState::Committed;
 	}
 
@@ -346,6 +385,10 @@ namespace gglab
 			if (m_ReferenceAccumulator)
 			{
 				m_ReferenceAccumulator->AbortFrame();
+			}
+			if (m_AmbientOcclusionHistory)
+			{
+				m_AmbientOcclusionHistory->AbortFrame();
 			}
 			m_State = TemporalFrameTransactionState::Aborted;
 		}
@@ -364,6 +407,10 @@ namespace gglab
 			{
 				// The sum written by a failed submission is unknown; restart the reference.
 				m_ReferenceAccumulator->Release(submittedFence);
+			}
+			if (m_AmbientOcclusionHistory)
+			{
+				m_AmbientOcclusionHistory->Release(submittedFence);
 			}
 			m_ViewHistory->Invalidate();
 			m_ObjectHistory->Invalidate();

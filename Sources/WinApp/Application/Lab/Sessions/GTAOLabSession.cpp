@@ -23,6 +23,8 @@ namespace gglab
 		const LabParameterId DirectionCountId("gtao.direction_count");
 		const LabParameterId StepCountId("gtao.step_count");
 		const LabParameterId DenoiseRadiusId("gtao.denoise_radius");
+		const LabParameterId TemporalAccumulationId("gtao.temporal_accumulation");
+		const LabParameterId TemporalMaxSamplesId("gtao.temporal_max_samples");
 		const LabParameterId EnableCameraInputId("gtao.camera.enable_input");
 		const LabParameterId FovId("gtao.camera.fov");
 		const LabParameterId NearPlaneId("gtao.camera.near");
@@ -171,6 +173,24 @@ namespace gglab
 			.m_MaxValue = LabValue(GTAOMaxDenoiseRadius),
 			}));
 		GGLAB_UNUSED(parameters.Add({
+			.m_Id = TemporalAccumulationId,
+			.m_Name = "Temporal Accumulation",
+			.m_Group = "GTAO Temporal",
+			.m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = false,
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = TemporalMaxSamplesId,
+			.m_Name = "Temporal Max Samples",
+			.m_Group = "GTAO Temporal",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = uint32_t(16),
+			.m_MinValue = LabValue(uint32_t(1)),
+			.m_MaxValue = LabValue(GTAOMaxTemporalSamples),
+			}));
+		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,
 			.m_Name = "Enable Camera Input",
 			.m_Group = "Camera",
@@ -302,6 +322,8 @@ namespace gglab
 		gtao.m_DirectionCount = parameters.Get(DirectionCountId, uint32_t(2));
 		gtao.m_StepCount = parameters.Get(StepCountId, uint32_t(6));
 		gtao.m_DenoiseRadius = parameters.Get(DenoiseRadiusId, uint32_t(3));
+		gtao.m_TemporalAccumulation = parameters.Get(TemporalAccumulationId, false);
+		gtao.m_TemporalMaxSamples = parameters.Get(TemporalMaxSamplesId, uint32_t(16));
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, false);
 		m_FovDegrees = parameters.Get(FovId, 50.0f);
 		m_NearPlane = parameters.Get(NearPlaneId, 0.05f);

@@ -3227,6 +3227,7 @@ namespace gglab
 				shader_programs::ForwardPBRForwardPlusGTAOPixel,
 				shader_programs::ForwardPlusCullCompute,
 				shader_programs::GTAOEvaluateCompute,
+				shader_programs::GTAOTemporalCompute,
 				shader_programs::GTAODenoiseXCompute,
 				shader_programs::GTAODenoiseYCompute,
 				shader_programs::GTAOUpsampleCompute,
@@ -8550,6 +8551,50 @@ namespace gglab
 				"A frame enables exactly the union of its active consumers' services; with no "
 				"active consumer it enables none, and only a jitter-removing consumer owns jitter");
 
+			TemporalFramePlanResolveInfo ambientOcclusionInfo = disabledInfo;
+			ambientOcclusionInfo.m_AmbientOcclusionRequested = true;
+			ambientOcclusionInfo.m_AmbientOcclusionAvailable = true;
+			const ResolvedTemporalFramePlan ambientOcclusionPlan =
+				ResolveTemporalFramePlan(ambientOcclusionInfo);
+			TemporalFramePlanResolveInfo combinedInfo = resolveInfo;
+			combinedInfo.m_AmbientOcclusionRequested = true;
+			combinedInfo.m_AmbientOcclusionAvailable = true;
+			const ResolvedTemporalFramePlan combinedPlan = ResolveTemporalFramePlan(combinedInfo);
+			TemporalFramePlanResolveInfo unsupportedAmbientOcclusionInfo = ambientOcclusionInfo;
+			unsupportedAmbientOcclusionInfo.m_AmbientOcclusionAvailable = false;
+			const ResolvedTemporalFramePlan unsupportedAmbientOcclusionPlan =
+				ResolveTemporalFramePlan(unsupportedAmbientOcclusionInfo);
+			TemporalFramePlanResolveInfo ineligibleAmbientOcclusionInfo = ambientOcclusionInfo;
+			ineligibleAmbientOcclusionInfo.m_DisplayViewEligible = false;
+			const ResolvedTemporalFramePlan ineligibleAmbientOcclusionPlan =
+				ResolveTemporalFramePlan(ineligibleAmbientOcclusionInfo);
+			const auto ambientOcclusionOf = [](const ResolvedTemporalFramePlan& plan) noexcept
+				{
+					return plan.GetConsumer(TemporalConsumer::AmbientOcclusion);
+				};
+			constexpr TemporalService ambientOcclusionServices =
+				TemporalService::GeometryMotion | TemporalService::FrameContinuity;
+			context.Check(ambientOcclusionOf(ambientOcclusionPlan).IsActive() &&
+				ambientOcclusionPlan.m_Services == ambientOcclusionServices &&
+				!ambientOcclusionPlan.GetProjectionJitterOwner() &&
+				ambientOcclusionPlan.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+				combinedPlan.m_Services == allServices &&
+				combinedPlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
+				ambientOcclusionOf(combinedPlan).IsActive() &&
+				temporalAAOf(combinedPlan).IsActive() &&
+				ambientOcclusionOf(unsupportedAmbientOcclusionPlan).m_Status ==
+					TemporalConsumerStatus::Unavailable &&
+				ambientOcclusionOf(unsupportedAmbientOcclusionPlan).m_DisableReason ==
+					TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
+				unsupportedAmbientOcclusionPlan.m_Services == TemporalService::None &&
+				ambientOcclusionOf(ineligibleAmbientOcclusionPlan).m_DisableReason ==
+					TemporalConsumerDisableReason::DisplayViewIneligible &&
+				!ambientOcclusionOf(disabledPlan).m_Requested &&
+				ambientOcclusionOf(disabledPlan).m_DisableReason ==
+					TemporalConsumerDisableReason::NotRequested,
+				"Temporal GTAO consumes motion and continuity without jitter, joins Temporal AA "
+				"as a service union and reports every disable cause");
+
 			TemporalFramePlanResolveInfo qualityInfo = resolveInfo;
 			qualityInfo.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
 			TemporalFramePlanResolveInfo upscalingInfo = qualityInfo;
@@ -8863,6 +8908,47 @@ namespace gglab
 				temporalViewHistory.m_NextFrameIndex == 0,
 				"The temporal frame index counts committed frames since the history reset and "
 				"restarts with it");
+
+			// Temporal GTAO advances its sampling sequence with the committed frame index.
+			ResolvedViewRenderSettings ambientOcclusionSettings = enabledSettings;
+			ambientOcclusionSettings.m_TemporalAA.m_Enabled = false;
+			ambientOcclusionSettings.m_Lighting.m_GTAO.m_TemporalAccumulation = true;
+			TemporalViewHistory ambientOcclusionViewHistory{};
+			TemporalObjectHistory ambientOcclusionObjectHistory{};
+			const auto runAmbientOcclusionFrame = [&](bool submitted) noexcept
+				{
+					TemporalFrameTransaction transaction;
+					transaction.Begin(ambientOcclusionViewHistory, ambientOcclusionObjectHistory,
+						ambientOcclusionPlan, ResolveNativeViewResolution({ 1920, 1080 }));
+					RenderView view = viewBuilder.Build<RenderViewID::Main>({
+						.m_Camera = camera,
+						.m_RenderSettings = ambientOcclusionSettings,
+						.m_TemporalFramePlan = ambientOcclusionPlan,
+						.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
+					});
+					transaction.PrepareDisplayView(view);
+					const bool unjittered =
+						view.m_RasterProj.ToArray() == view.m_UnjitteredProj.ToArray();
+					if (submitted)
+					{
+						transaction.CommitCompleted();
+					}
+					else
+					{
+						transaction.Abort();
+					}
+					return std::pair{ view.m_TemporalFrameIndex, unjittered };
+				};
+			const auto firstAmbientOcclusionFrame = runAmbientOcclusionFrame(true);
+			const auto abortedAmbientOcclusionFrame = runAmbientOcclusionFrame(false);
+			const auto repeatedAmbientOcclusionFrame = runAmbientOcclusionFrame(true);
+			const auto nextAmbientOcclusionFrame = runAmbientOcclusionFrame(true);
+			context.Check(firstAmbientOcclusionFrame == std::pair{ 0u, true } &&
+				abortedAmbientOcclusionFrame == std::pair{ 1u, true } &&
+				repeatedAmbientOcclusionFrame == std::pair{ 1u, true } &&
+				nextAmbientOcclusionFrame == std::pair{ 2u, true },
+				"Temporal GTAO frames advance the sampling index only after submission and "
+				"leave the raster projection unjittered");
 
 			ResolvedViewRenderSettings biasedSettings = enabledSettings;
 			biasedSettings.m_TemporalAA.m_TextureLodBiasOffset = -0.75f;

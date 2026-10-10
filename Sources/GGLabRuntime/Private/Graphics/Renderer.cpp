@@ -17,6 +17,8 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/Pipeline/GTAOCapability.h"
+#include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
@@ -119,6 +121,8 @@ namespace gglab
 			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
 		m_TemporalReferenceAccumulator =
 			std::make_unique<TemporalReferenceAccumulator>(m_PersistentTexturePool.get());
+		m_GTAOTemporalHistory =
+			std::make_unique<GTAOTemporalHistory>(m_PersistentTexturePool.get());
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -187,6 +191,7 @@ namespace gglab
 			historySupport.m_Reliability.m_ShaderResource.IsSupported();
 		m_TemporalAACapabilityStatus.m_HistoryReliabilityTypedUavStore =
 			historySupport.m_Reliability.m_TypedUavStore.IsSupported();
+		m_GTAOCapabilityStatus = QueryGTAOCapabilityStatus(*device);
 
 		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
 		m_FrameCapture = std::make_unique<FrameCaptureService>(m_RHIContext->GetDevice());
@@ -224,6 +229,8 @@ namespace gglab
 		m_TemporalHistoryManager.reset();
 		m_TemporalReferenceAccumulator->Release(m_LastSubmittedFencePoint);
 		m_TemporalReferenceAccumulator.reset();
+		m_GTAOTemporalHistory->Release(m_LastSubmittedFencePoint);
+		m_GTAOTemporalHistory.reset();
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
@@ -240,6 +247,7 @@ namespace gglab
 		m_TemporalViewHistory.Invalidate();
 		m_TemporalObjectHistory.Invalidate();
 		m_TemporalAACapabilityStatus = {};
+		m_GTAOCapabilityStatus = {};
 
 		m_RHIContext.reset();
 
@@ -302,10 +310,19 @@ namespace gglab
 		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(sample,
 			resolution.m_Display.m_Width, resolution.m_Display.m_Height,
 			m_LastSubmittedFencePoint);
+		// Temporal GTAO history follows the half extent of the render domain.
+		const bool ambientOcclusionActive =
+			plan.IsConsumerActive(TemporalConsumer::AmbientOcclusion);
+		const bool canAccumulateAmbientOcclusion = m_GTAOTemporalHistory->BeginFrame(
+			ambientOcclusionActive,
+			MakeGTAOHalfResolutionExtent(resolution.m_Render.m_Width, resolution.m_Render.m_Height),
+			m_LastSubmittedFencePoint);
 		m_ActiveFrame.m_TemporalTransaction.Begin(
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, resolution,
 			m_TemporalHistoryManager.get(), scenePreExposure, sample,
-			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr);
+			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr,
+			ambientOcclusionActive && canAccumulateAmbientOcclusion
+				? m_GTAOTemporalHistory.get() : nullptr);
 		return m_ActiveFrame.m_TemporalTransaction;
 	}
 

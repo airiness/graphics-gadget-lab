@@ -48,6 +48,7 @@ namespace gglab
 	class ShadowPreviewControlBase;
 	class TemporalHistoryManager;
 	class TemporalReferenceAccumulator;
+	class GTAOTemporalHistory;
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
 
@@ -179,6 +180,10 @@ namespace gglab
 		const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus() const noexcept override
 		{
 			return m_TemporalAACapabilityStatus;
+		}
+		const GTAOCapabilityStatus& GetGTAOCapabilityStatus() const noexcept override
+		{
+			return m_GTAOCapabilityStatus;
 		}
 		// Explicit environment access for pass services. The concrete
 		// environment and bake services remain Runtime-internal.
@@ -329,6 +334,7 @@ namespace gglab
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;
+		std::unique_ptr<GTAOTemporalHistory> m_GTAOTemporalHistory;
 		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
 		// Outlives Finalize so the application can drain the final capture results.
@@ -343,6 +349,7 @@ namespace gglab
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
+		GTAOCapabilityStatus m_GTAOCapabilityStatus{};
 		TemporalViewHistory m_TemporalViewHistory{};
 		TemporalObjectHistory m_TemporalObjectHistory{};
 

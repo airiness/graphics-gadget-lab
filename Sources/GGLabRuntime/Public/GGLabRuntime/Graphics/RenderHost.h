@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
@@ -204,6 +205,8 @@ namespace gglab
 		[[nodiscard]] virtual RenderGraph::CreateInfo CreateRenderGraphCreateInfo()
 			const noexcept = 0;
 		[[nodiscard]] virtual const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus()
+			const noexcept = 0;
+		[[nodiscard]] virtual const GTAOCapabilityStatus& GetGTAOCapabilityStatus()
 			const noexcept = 0;
 		virtual void Render(RenderFrame& frame, RenderGraph& rg,
 			const RenderFrameContext& renderContext) noexcept = 0;
