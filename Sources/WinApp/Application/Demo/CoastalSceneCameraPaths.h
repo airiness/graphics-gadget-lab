@@ -128,6 +128,17 @@ namespace gglab
 					{ .m_Frame = 179, .m_Position = stairsPosition + panOffset,
 						.m_Target = stairsTarget + panOffset, .m_VerticalFovDegrees = stairsFov },
 				}),
+			makePath("SEQ_PanStopRailings", "Pan Stop Railings",
+				"Fast 1.2 m sideways truck across the railings that stops at frame 60 and holds: "
+				"accumulation recovery after low-confidence motion.",
+				CameraPathInterpolation::Linear, nearPlane, {
+					{ .m_Frame = 0, .m_Position = stairsPosition, .m_Target = stairsTarget,
+						.m_VerticalFovDegrees = stairsFov },
+					{ .m_Frame = 60, .m_Position = stairsPosition + panOffset,
+						.m_Target = stairsTarget + panOffset, .m_VerticalFovDegrees = stairsFov },
+					{ .m_Frame = 179, .m_Position = stairsPosition + panOffset,
+						.m_Target = stairsTarget + panOffset, .m_VerticalFovDegrees = stairsFov },
+				}),
 			makePath("SEQ_DollyDoorway", "Dolly Doorway",
 				"4 m forward dolly from the corridor toward the courtyard, revealing disoccluded surfaces.",
 				CameraPathInterpolation::Linear, nearPlane, {

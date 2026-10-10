@@ -958,8 +958,8 @@ namespace gglab
 			const bool registered = rig.SetReferenceViews(
 				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() }) &&
 				rig.SetCameraPaths(paths);
-			context.Check(registered && paths.size() == 8,
-				"Eight coastal temporal evaluation paths register on the main camera");
+			context.Check(registered && paths.size() == 9,
+				"Nine coastal temporal evaluation paths register on the main camera");
 			if (!registered) return;
 
 			// Each path starts at the reference view it was copied from; changing either
@@ -971,9 +971,10 @@ namespace gglab
 				uint32_t m_FrameCount;
 				uint32_t m_Cuts;
 			};
-			constexpr std::array<Expected, 8> expected{ {
+			constexpr std::array<Expected, 9> expected{ {
 				{ "SEQ_StaticRailings", "CAM_ShadowStairs", 96, 1 },
 				{ "SEQ_LateralPanRailings", "CAM_ShadowStairs", 180, 1 },
+				{ "SEQ_PanStopRailings", "CAM_ShadowStairs", 180, 1 },
 				{ "SEQ_DollyDoorway", "CAM_InteriorExterior", 180, 1 },
 				{ "SEQ_OrbitLounge", "Retreat_Lounge", 241, 1 },
 				{ "SEQ_HorizonPan", "CAM_SkyHorizon", 181, 1 },
