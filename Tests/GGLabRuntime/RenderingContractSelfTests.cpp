@@ -8591,9 +8591,13 @@ namespace gglab
 					TemporalConsumerDisableReason::DisplayViewIneligible &&
 				!ambientOcclusionOf(disabledPlan).m_Requested &&
 				ambientOcclusionOf(disabledPlan).m_DisableReason ==
-					TemporalConsumerDisableReason::NotRequested,
+					TemporalConsumerDisableReason::NotRequested &&
+				ambientOcclusionPlan.UsesAmbientOcclusionHistory() &&
+				!combinedPlan.UsesAmbientOcclusionHistory() &&
+				!unsupportedAmbientOcclusionPlan.UsesAmbientOcclusionHistory(),
 				"Temporal GTAO consumes motion and continuity without jitter, joins Temporal AA "
-				"as a service union and reports every disable cause");
+				"as a service union, keeps its own history only without the resolve and reports "
+				"every disable cause");
 
 			TemporalFramePlanResolveInfo qualityInfo = resolveInfo;
 			qualityInfo.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;

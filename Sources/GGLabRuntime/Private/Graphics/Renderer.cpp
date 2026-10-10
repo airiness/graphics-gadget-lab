@@ -311,17 +311,16 @@ namespace gglab
 			resolution.m_Display.m_Width, resolution.m_Display.m_Height,
 			m_LastSubmittedFencePoint);
 		// Temporal GTAO history follows the half extent of the render domain.
-		const bool ambientOcclusionActive =
-			plan.IsConsumerActive(TemporalConsumer::AmbientOcclusion);
+		const bool ambientOcclusionHistory = plan.UsesAmbientOcclusionHistory();
 		const bool canAccumulateAmbientOcclusion = m_GTAOTemporalHistory->BeginFrame(
-			ambientOcclusionActive,
+			ambientOcclusionHistory,
 			MakeGTAOHalfResolutionExtent(resolution.m_Render.m_Width, resolution.m_Render.m_Height),
 			m_LastSubmittedFencePoint);
 		m_ActiveFrame.m_TemporalTransaction.Begin(
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, resolution,
 			m_TemporalHistoryManager.get(), scenePreExposure, sample,
 			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr,
-			ambientOcclusionActive && canAccumulateAmbientOcclusion
+			ambientOcclusionHistory && canAccumulateAmbientOcclusion
 				? m_GTAOTemporalHistory.get() : nullptr);
 		return m_ActiveFrame.m_TemporalTransaction;
 	}

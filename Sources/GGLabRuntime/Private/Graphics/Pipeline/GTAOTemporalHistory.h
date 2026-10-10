@@ -13,8 +13,9 @@ namespace gglab
 	// Owns the persistent visibility and view-Z pairs of temporal GTAO at half render
 	// extent. A frame reads the committed pair and writes the other one, which becomes
 	// the committed history only when its frame is submitted; a frame that ends without
-	// submission leaves the committed history unchanged. The pairs exist only while the
-	// temporal GTAO consumer is active and retire through the pool's fences.
+	// submission leaves the committed history unchanged. The pairs exist only while temporal
+	// GTAO keeps its own history (see UsesAmbientOcclusionHistory) and retire through the
+	// pool's fences.
 	class GTAOTemporalHistory
 	{
 	public:

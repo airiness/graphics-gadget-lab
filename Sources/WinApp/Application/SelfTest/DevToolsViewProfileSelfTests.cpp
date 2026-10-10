@@ -276,8 +276,8 @@ namespace gglab
 		gtaoSettings.m_DirectionCount = 4;
 		gtaoSettings.m_StepCount = 8;
 		gtaoSettings.m_DenoiseRadius = 5;
-		gtaoSettings.m_TemporalAccumulation = true;
-		gtaoSettings.m_TemporalMaxSamples = 8;
+		gtaoSettings.m_TemporalAccumulation = false;
+		gtaoSettings.m_TemporalMaxSamples = 4;
 		gtaoSettings.m_FinalAOFormatPreference = GTAOFinalAOFormatPreference::ForceR16Float;
 		overrides.m_GTAO.Activate(gtaoSettings);
 		ViewRenderProfile expectedProfile = originalAuthoringProfile;

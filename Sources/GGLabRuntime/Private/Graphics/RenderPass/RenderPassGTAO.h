@@ -50,7 +50,7 @@ namespace gglab
 
 		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(
 			const RenderServices& services, PipelineVariant variant) noexcept;
-		// Accumulates evaluated visibility with the frame's GTAO history before the denoise.
+		// Accumulates the spatially denoised visibility with the frame's GTAO history.
 		void AddTemporalPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services, TemporalFrameTransaction& transaction,
 			uint32_t viewIndex, const GTAOSettings& settings) noexcept;

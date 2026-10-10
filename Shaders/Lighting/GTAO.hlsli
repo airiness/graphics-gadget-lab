@@ -317,14 +317,43 @@ struct GTAOTemporalResult
 	float Samples;
 };
 
-// Accumulates the current visibility of a half-resolution texel with its reprojected
+// Range of the current denoised visibility over the 3x3 half-resolution neighborhood of
+// valid surfaces. History outside it is stale: occlusion that appeared or disappeared.
+float2 ResolveGTAOVisibilityRange(Texture2D<float> currentVisibility,
+	Texture2D<float> halfDepth, uint2 pixel, uint2 extent)
+{
+	const float center = currentVisibility.Load(int3(pixel, 0));
+	float2 range = float2(center, center);
+	[unroll]
+	for (int y = -1; y <= 1; ++y)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; ++x)
+		{
+			const int2 neighbor = clamp(int2(pixel) + int2(x, y), int2(0, 0), int2(extent) - 1);
+			if (halfDepth.Load(int3(neighbor, 0)) > 0.0)
+			{
+				const float value = currentVisibility.Load(int3(neighbor, 0));
+				range = float2(min(range.x, value), max(range.y, value));
+			}
+		}
+	}
+	return range;
+}
+
+// Accumulates the denoised visibility of a half-resolution texel with its reprojected
 // history. The history is a jittered render-domain signal, so it follows the raster motion
-// of the selected full-resolution surface. Each bilinear history tap must hold the view Z
-// that the current surface had in the previous view; the accepted tap weight scales the
-// effective sample count carried forward.
+// of the selected full-resolution surface into the half-resolution texel whose 2x2
+// footprint holds that surface in the previous frame. A texel's value belongs to the one
+// surface it selected, not to the texel center, so filtering between texels would blur the
+// history by a fraction of a texel every frame; the texel is read as a point instead, or
+// the depth-compatible neighbor closest in view Z when the footprint selected another
+// surface. The history is clamped to the current neighborhood range before blending, so
+// occlusion that appears or disappears replaces it at once.
 GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface surface,
 	float2 motionUV, uint2 fullExtent, uint2 halfExtent, ViewData viewData,
-	Texture2D<float2> previousVisibility, Texture2D<float> previousViewZ, float maxSamples)
+	Texture2D<float2> previousVisibility, Texture2D<float> previousViewZ, float maxSamples,
+	float2 currentRange)
 {
 	GTAOTemporalResult result;
 	result.Visibility = currentVisibility;
@@ -338,38 +367,44 @@ GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface su
 	const float3 positionWS = mul(float4(surface.PositionVS, 1.0), viewData.InvViewMat).xyz;
 	const float expectedViewZ = mul(float4(positionWS, 1.0), viewData.PreviousViewMat).z;
 
-	const float2 historyPosition = previousUV * float2(halfExtent) - 0.5;
-	const int2 basePixel = int2(floor(historyPosition));
-	const float2 fraction = historyPosition - float2(basePixel);
-	float2 weightedHistory = 0.0.xx;
-	float acceptedWeight = 0.0;
+	const int2 footprintPixel = clamp(int2(floor(previousUV * float2(fullExtent) * 0.5)),
+		int2(0, 0), int2(halfExtent) - 1);
+	int2 historyPixel = int2(-1, -1);
+	float closestDelta = 1.0e30;
 	[unroll]
-	for (uint tapIndex = 0; tapIndex < 4; ++tapIndex)
+	for (int y = -1; y <= 1; ++y)
 	{
-		const int2 tapOffset = int2(tapIndex & 1, tapIndex >> 1);
-		const int2 tapPixel = clamp(basePixel + tapOffset, int2(0, 0), int2(halfExtent) - 1);
-		const float2 tapWeights = lerp(1.0 - fraction, fraction, float2(tapOffset));
-		const float weight = tapWeights.x * tapWeights.y;
-		if (weight <= 0.0 ||
-			!IsGTAOHistoryDepthCompatible(expectedViewZ, previousViewZ.Load(int3(tapPixel, 0))))
+		[unroll]
+		for (int x = -1; x <= 1; ++x)
 		{
-			continue;
+			const int2 candidate = clamp(footprintPixel + int2(x, y), int2(0, 0),
+				int2(halfExtent) - 1);
+			const float storedViewZ = previousViewZ.Load(int3(candidate, 0));
+			if (!IsGTAOHistoryDepthCompatible(expectedViewZ, storedViewZ))
+			{
+				continue;
+			}
+			// The footprint texel wins whenever it is compatible.
+			const float delta = (x == 0 && y == 0) ? -1.0 : abs(storedViewZ - expectedViewZ);
+			if (delta < closestDelta)
+			{
+				closestDelta = delta;
+				historyPixel = candidate;
+			}
 		}
-		const float2 history = previousVisibility.Load(int3(tapPixel, 0));
-		if (!all(isfinite(history)))
-		{
-			continue;
-		}
-		weightedHistory += history * weight;
-		acceptedWeight += weight;
 	}
-	if (acceptedWeight <= 1.0e-3)
+	if (historyPixel.x < 0)
 	{
 		return result;
 	}
+	float2 history = previousVisibility.Load(int3(historyPixel, 0));
+	if (!all(isfinite(history)))
+	{
+		return result;
+	}
+	history.x = clamp(history.x, currentRange.x, currentRange.y);
 
-	const float2 history = weightedHistory / acceptedWeight;
-	result.Samples = min(max(history.y, 0.0) * saturate(acceptedWeight) + 1.0, maxSamples);
+	result.Samples = min(max(history.y, 0.0) + 1.0, maxSamples);
 	result.Visibility = lerp(currentVisibility, history.x, 1.0 - rcp(result.Samples));
 	return result;
 }

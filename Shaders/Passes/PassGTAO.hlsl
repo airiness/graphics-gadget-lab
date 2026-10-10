@@ -43,7 +43,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 struct GTAOTemporalPassParameters
 {
-	uint RawAOIndex;
+	uint CurrentAOIndex;
 	uint HalfDepthIndex;
 	uint FullDepthIndex;
 	uint MotionIndex;
@@ -73,13 +73,13 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		return;
 	}
 
-	Texture2D<float> rawAO = GetTexture2DFloat(g_Pass.RawAOIndex);
+	Texture2D<float> currentAO = GetTexture2DFloat(g_Pass.CurrentAOIndex);
 	Texture2D<float> halfDepth = GetTexture2DFloat(g_Pass.HalfDepthIndex);
 	RWTexture2D<float2> nextVisibility = GetRWTexture2DFloat2(g_Pass.NextVisibilityUavIndex);
 	RWTexture2D<float> nextViewZ = GetRWTexture2DFloat(g_Pass.NextViewZUavIndex);
 	RWTexture2D<float> accumulatedAO = GetRWTexture2DFloat(g_Pass.AccumulatedAOUavIndex);
 
-	const float currentVisibility = rawAO.Load(int3(halfPixel, 0));
+	const float currentVisibility = currentAO.Load(int3(halfPixel, 0));
 	const float viewZ = halfDepth.Load(int3(halfPixel, 0));
 	GTAOTemporalResult result;
 	result.Visibility = currentVisibility;
@@ -94,10 +94,12 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			SelectHalfResolutionSurface(fullDepth, halfPixel, fullExtent, viewData);
 		if (surface.IsValid)
 		{
+			const float2 currentRange =
+				ResolveGTAOVisibilityRange(currentAO, halfDepth, halfPixel, halfExtent);
 			result = AccumulateGTAOHistory(currentVisibility, surface,
 				motion.Load(int3(surface.FullPixel, 0)), fullExtent, halfExtent, viewData,
 				GetTexture2DFloat2(g_Pass.PreviousVisibilityIndex),
-				GetTexture2DFloat(g_Pass.PreviousViewZIndex), g_Pass.MaxSamples);
+				GetTexture2DFloat(g_Pass.PreviousViewZIndex), g_Pass.MaxSamples, currentRange);
 		}
 	}
 	nextVisibility[halfPixel] = float2(result.Visibility, result.Samples);

@@ -63,8 +63,8 @@ namespace gglab
 		m_HistoryManager = historyManager;
 		m_ReferenceSample = referenceSample;
 		m_ReferenceAccumulator = m_ReferenceSample ? referenceAccumulator : nullptr;
-		m_AmbientOcclusionHistory = plan.IsConsumerActive(TemporalConsumer::AmbientOcclusion)
-			? ambientOcclusionHistory : nullptr;
+		m_AmbientOcclusionHistory =
+			plan.UsesAmbientOcclusionHistory() ? ambientOcclusionHistory : nullptr;
 		m_Plan = plan;
 		m_ColorAbi = ActiveTemporalColorAbi;
 		m_ScenePreExposure = scenePreExposure;

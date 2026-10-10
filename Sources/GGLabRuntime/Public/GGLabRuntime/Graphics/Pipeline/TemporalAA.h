@@ -529,7 +529,8 @@ namespace gglab
 		TemporalAA,
 		// Supersampled reference accumulation of an evaluation sequence frame.
 		Reference,
-		// Temporal accumulation of the display view's GTAO visibility.
+		// Temporal GTAO: a sampling sequence advanced per submitted frame, accumulated in
+		// its own visibility history when no resolve integrates the display color.
 		AmbientOcclusion,
 		Count,
 	};
@@ -734,6 +735,16 @@ namespace gglab
 		[[nodiscard]] constexpr bool HasService(TemporalService service) const noexcept
 		{
 			return Test(m_Services, service);
+		}
+
+		// Temporal GTAO keeps its own visibility history only while Temporal AA is inactive.
+		// The resolve integrates the display color that the visibility shades, so a second
+		// history would filter the same samples twice and drift with each jittered
+		// reprojection; under the resolve, temporal GTAO only advances its sampling sequence.
+		[[nodiscard]] constexpr bool UsesAmbientOcclusionHistory() const noexcept
+		{
+			return IsConsumerActive(TemporalConsumer::AmbientOcclusion) &&
+				!IsConsumerActive(TemporalConsumer::TemporalAA);
 		}
 
 		// The active consumer whose resolve removes the projection jitter, if any.

@@ -51,7 +51,7 @@ namespace gglab
 
 		struct GTAOTemporalPassParameters
 		{
-			uint32_t m_RawAOIndex = 0;
+			uint32_t m_CurrentAOIndex = 0;
 			uint32_t m_HalfDepthIndex = 0;
 			uint32_t m_FullDepthIndex = 0;
 			uint32_t m_MotionIndex = 0;
@@ -116,7 +116,7 @@ namespace gglab
 
 		struct TemporalPassData
 		{
-			RGTextureViewId m_RawAOSrv{};
+			RGTextureViewId m_CurrentAOSrv{};
 			RGTextureViewId m_HalfDepthSrv{};
 			RGTextureViewId m_FullDepthSrv{};
 			RGTextureViewId m_MotionSrv{};
@@ -298,7 +298,8 @@ namespace gglab
 
 		// Accumulating consumers advance the sampling sequence with every sample they
 		// average: a supersampled reference with its sample index, temporal GTAO with the
-		// submitted frame index. Every other frame keeps the fixed spatial pattern.
+		// submitted frame index, whether its own history or the Temporal AA resolve
+		// integrates the samples. Every other frame keeps the fixed spatial pattern.
 		TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
 		const bool temporal = m_TemporalPipelineAvailable && transaction &&
 			transaction->CanAccumulateAmbientOcclusion();
@@ -307,7 +308,8 @@ namespace gglab
 		{
 			sampleIndex = transaction->GetReferenceSample()->m_Index;
 		}
-		else if (temporal)
+		else if (transaction &&
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::AmbientOcclusion))
 		{
 			sampleIndex = transaction->GetFrameIndex();
 		}
@@ -433,11 +435,6 @@ namespace gglab
 					(parameters.m_HalfHeight + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize, 1);
 			});
 
-		if (temporal)
-		{
-			AddTemporalPass(rg, context, services, *transaction, viewIndex, settings);
-		}
-
 		const auto addDenoisePass = [this, &rg, settings, services](const char* passName,
 			PipelineVariant variant, bool horizontal) noexcept
 			{
@@ -447,9 +444,7 @@ namespace gglab
 					{
 						auto& resources =
 							builder.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
-						const RGTextureId horizontalSource = resources.m_TemporalAO.IsValid()
-							? resources.m_TemporalAO : resources.m_RawAO;
-						const RGTextureId sourceAO = builder.Read(horizontal ? horizontalSource
+						const RGTextureId sourceAO = builder.Read(horizontal ? resources.m_RawAO
 							: resources.m_DenoiseX, RGTextureAccess::Sample, RHIStage::ComputeShader);
 						const RGTextureId halfDepth = builder.Read(resources.m_HalfDepthViewZ,
 							RGTextureAccess::Sample, RHIStage::ComputeShader);
@@ -496,6 +491,10 @@ namespace gglab
 			};
 		addDenoisePass("Lighting.GTAO.DenoiseX", PipelineVariant::DenoiseX, true);
 		addDenoisePass("Lighting.GTAO.DenoiseY", PipelineVariant::DenoiseY, false);
+		if (temporal)
+		{
+			AddTemporalPass(rg, context, services, *transaction, viewIndex, settings);
+		}
 
 		rg.AddPass<UpsamplePassData>(
 			"Lighting.GTAO.Upsample", RGPassEncoderType::Compute,
@@ -507,7 +506,8 @@ namespace gglab
 				const auto& sceneDepth =
 					blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				const RGTextureId denoisedAO = builder.Read(
-					resources.m_DenoiseY, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					resources.m_TemporalAO.IsValid() ? resources.m_TemporalAO : resources.m_DenoiseY,
+					RGTextureAccess::Sample, RHIStage::ComputeShader);
 				const RGTextureId halfDepth = builder.Read(resources.m_HalfDepthViewZ,
 					RGTextureAccess::Sample, RHIStage::ComputeShader);
 				const RGTextureId fullDepth = builder.Read(
@@ -583,8 +583,9 @@ namespace gglab
 					blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				const auto& geometry = blackboard.Get<RGTemporalGeometryResources>(
 					TemporalGeometryResourcesName);
-				GGLAB_ASSERT_MSG(resources.IsEvaluateValid() && geometry.IsValid(),
-					"Temporal GTAO requires evaluated visibility and raster motion.");
+				GGLAB_ASSERT_MSG(resources.IsEvaluateValid() && resources.m_DenoiseY.IsValid() &&
+					geometry.IsValid(),
+					"Temporal GTAO requires denoised visibility and raster motion.");
 
 				GTAOTemporalHistoryRenderGraphResources history{};
 				const bool imported = transaction.ImportAmbientOcclusionHistory(builder, history);
@@ -596,8 +597,8 @@ namespace gglab
 						return builder.Read(
 							texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					};
-				data.m_RawAOSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
-					readSampled(resources.m_RawAO));
+				data.m_CurrentAOSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+					readSampled(resources.m_DenoiseY));
 				data.m_HalfDepthSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
 					readSampled(resources.m_HalfDepthViewZ));
 				data.m_FullDepthSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
@@ -658,7 +659,7 @@ namespace gglab
 							"Temporal GTAO views must be shader visible before dispatch.");
 						return descriptor.m_Index;
 					};
-				parameters.m_RawAOIndex = descriptorIndex(data.m_RawAOSrv);
+				parameters.m_CurrentAOIndex = descriptorIndex(data.m_CurrentAOSrv);
 				parameters.m_HalfDepthIndex = descriptorIndex(data.m_HalfDepthSrv);
 				parameters.m_FullDepthIndex = descriptorIndex(data.m_FullDepthSrv);
 				parameters.m_MotionIndex = descriptorIndex(data.m_MotionSrv);

@@ -142,8 +142,9 @@ namespace gglab
 			TemporalReferenceRenderGraphResources& outResources) noexcept;
 		[[nodiscard]] bool ExportReferenceResources(RenderGraph::RGBuilder& builder,
 			const TemporalReferenceRenderGraphResources& resources) noexcept;
-		// Temporal GTAO frames only; the history is null when the consumer is inactive or
-		// its history could not be allocated.
+		// Temporal GTAO frames without Temporal AA only; the history is null when the
+		// consumer is inactive, the resolve integrates its samples, or the history could not
+		// be allocated.
 		[[nodiscard]] bool ImportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
 			GTAOTemporalHistoryRenderGraphResources& outResources) noexcept;
 		[[nodiscard]] bool ExportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,

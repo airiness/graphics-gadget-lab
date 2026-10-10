@@ -50,11 +50,12 @@ namespace gglab
 		uint32_t m_DirectionCount = 2;
 		uint32_t m_StepCount = 6;
 		uint32_t m_DenoiseRadius = 3;
-		// Accumulates visibility over submitted frames as a temporal consumer of the
-		// display view, with the sampling pattern advancing every frame.
-		bool m_TemporalAccumulation = false;
-		// Effective sample count beyond which accumulated history gains no more weight.
-		uint32_t m_TemporalMaxSamples = 16;
+		// Advances the sampling pattern every submitted frame as a temporal consumer of the
+		// display view: the Temporal AA resolve integrates it when active, and GTAO's own
+		// visibility history otherwise.
+		bool m_TemporalAccumulation = true;
+		// Effective sample count beyond which GTAO's own history gains no more weight.
+		uint32_t m_TemporalMaxSamples = 8;
 		GTAOFinalAOFormatPreference m_FinalAOFormatPreference =
 			GTAOFinalAOFormatPreference::PreferR8Unorm;
 	};
