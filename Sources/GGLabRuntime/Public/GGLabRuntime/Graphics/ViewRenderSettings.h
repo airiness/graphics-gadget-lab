@@ -43,12 +43,12 @@ namespace gglab
 	{
 		bool m_Enabled = true;
 		float m_Radius = 1.0f;
-		float m_FalloffStart = 0.1f;
+		// Samples fade toward the unoccluded horizon between these distances.
+		float m_FalloffStart = 0.9f;
 		float m_FalloffEnd = 1.0f;
-		float m_Thickness = 0.25f;
 		float m_Power = 1.0f;
 		uint32_t m_DirectionCount = 2;
-		uint32_t m_StepCount = 4;
+		uint32_t m_StepCount = 6;
 		uint32_t m_DenoiseRadius = 3;
 		GTAOFinalAOFormatPreference m_FinalAOFormatPreference =
 			GTAOFinalAOFormatPreference::PreferR8Unorm;

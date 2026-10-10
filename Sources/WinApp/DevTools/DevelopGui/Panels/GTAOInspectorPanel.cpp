@@ -103,14 +103,6 @@ namespace gglab
 				"Falloff Start", &settings.m_FalloffStart, 0.01f, 0.0f, 10.0f, "%.3f m");
 			ImGui::DragFloat(
 				"Falloff End", &settings.m_FalloffEnd, 0.01f, 0.0f, 10.0f, "%.3f m");
-			ImGui::DragFloat(
-				"Thickness Bias", &settings.m_Thickness, 0.005f, 0.0f, 10.0f, "%.3f m");
-			if (ImGui::IsItemHovered())
-			{
-				ImGui::SetTooltip(
-					"Rejects near self-occlusion in the current horizon approximation. Lower values "
-					"produce stronger contact occlusion.");
-			}
 			ImGui::DragFloat("Power", &settings.m_Power, 0.02f, 0.1f, 8.0f, "%.2f");
 			if (ImGui::IsItemHovered())
 			{
@@ -251,8 +243,6 @@ namespace gglab
 				resolved.m_FalloffStart);
 			drawFloat("Falloff End", authoring.m_FalloffEnd, requested.m_FalloffEnd,
 				resolved.m_FalloffEnd);
-			drawFloat("Thickness Bias", authoring.m_Thickness, requested.m_Thickness,
-				resolved.m_Thickness);
 			drawFloat("Power", authoring.m_Power, requested.m_Power, resolved.m_Power);
 			drawUInt("Directions", authoring.m_DirectionCount, requested.m_DirectionCount,
 				resolved.m_DirectionCount);

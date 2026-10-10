@@ -19,7 +19,6 @@ namespace gglab
 		const LabParameterId RadiusId("gtao.radius");
 		const LabParameterId FalloffStartId("gtao.falloff_start");
 		const LabParameterId FalloffEndId("gtao.falloff_end");
-		const LabParameterId ThicknessId("gtao.thickness");
 		const LabParameterId PowerId("gtao.power");
 		const LabParameterId DirectionCountId("gtao.direction_count");
 		const LabParameterId StepCountId("gtao.step_count");
@@ -117,7 +116,7 @@ namespace gglab
 			.m_Group = "GTAO Spatial",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = 0.1f,
+			.m_DefaultValue = 0.9f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(10.0f),
 			}));
@@ -128,16 +127,6 @@ namespace gglab
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 1.0f,
-			.m_MinValue = LabValue(0.0f),
-			.m_MaxValue = LabValue(10.0f),
-			}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = ThicknessId,
-			.m_Name = "Thickness Bias",
-			.m_Group = "GTAO Spatial",
-			.m_Type = LabParameterType::Float,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = 0.25f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(10.0f),
 			}));
@@ -167,7 +156,7 @@ namespace gglab
 			.m_Group = "GTAO Quality",
 			.m_Type = LabParameterType::UInt,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = uint32_t(4),
+			.m_DefaultValue = uint32_t(6),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(GTAOMaxStepCount),
 			}));
@@ -307,12 +296,11 @@ namespace gglab
 				int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm)));
 		auto& gtao = GetMutableViewRenderProfile().m_Lighting.m_GTAO;
 		gtao.m_Radius = parameters.Get(RadiusId, 1.0f);
-		gtao.m_FalloffStart = parameters.Get(FalloffStartId, 0.1f);
+		gtao.m_FalloffStart = parameters.Get(FalloffStartId, 0.9f);
 		gtao.m_FalloffEnd = parameters.Get(FalloffEndId, 1.0f);
-		gtao.m_Thickness = parameters.Get(ThicknessId, 0.25f);
 		gtao.m_Power = parameters.Get(PowerId, 1.0f);
 		gtao.m_DirectionCount = parameters.Get(DirectionCountId, uint32_t(2));
-		gtao.m_StepCount = parameters.Get(StepCountId, uint32_t(4));
+		gtao.m_StepCount = parameters.Get(StepCountId, uint32_t(6));
 		gtao.m_DenoiseRadius = parameters.Get(DenoiseRadiusId, uint32_t(3));
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, false);
 		m_FovDegrees = parameters.Get(FovId, 50.0f);
@@ -500,8 +488,9 @@ namespace gglab
 				.m_Value = std::format("{} directions x {} steps", settings.m_DirectionCount,
 					settings.m_StepCount)},
 			{.m_Name = "Spatial settings",
-				.m_Value = std::format("radius {:.2f} m, thickness {:.2f} m, power {:.2f}",
-					settings.m_Radius, settings.m_Thickness, settings.m_Power)},
+				.m_Value = std::format("radius {:.2f} m, falloff {:.2f}-{:.2f} m, power {:.2f}",
+					settings.m_Radius, settings.m_FalloffStart, settings.m_FalloffEnd,
+					settings.m_Power)},
 			{.m_Name = "Denoise kernel",
 				.m_Value = std::format("separable bilateral, radius {}", settings.m_DenoiseRadius)},
 			{.m_Name = "Performance target", .m_Value = "~1.5 ms at default 1440p (informational)"},

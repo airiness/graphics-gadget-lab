@@ -178,24 +178,53 @@ GTAOSurface LoadHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfP
 	return surface;
 }
 
+// Horizon-based slice integration (Jimenez et al. 2016): each slice through the view vector
+// finds the highest horizon on both sides of the surface and integrates cosine-weighted
+// visibility of the arc between them analytically, weighted by the projected normal length.
+// The result is unclamped: estimates scatter around 1 on open surfaces, so clamping before
+// the spatial or temporal filters would bias the mean visibility down.
 float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 halfPixel,
 	uint2 fullExtent, ViewData viewData, float radius, float falloffStart, float falloffEnd,
-	float thickness, uint directionCount, uint stepCount)
+	uint directionCount, uint stepCount)
 {
+	static const float pi = 3.14159265;
+	static const float halfPi = 1.57079633;
 	const float noise = GTAOInterleavedGradientNoise(halfPixel);
 	const float projectedRadius = max(
 		radius * abs(viewData.ProjMat._22) * float(fullExtent.y) * 0.5 / surface.ViewZ, 1.0);
-	float occlusion = 0.0;
 	directionCount = clamp(directionCount, 1u, GTAO_MAX_DIRECTION_COUNT);
 	stepCount = clamp(stepCount, 1u, GTAO_MAX_STEP_COUNT);
+	const float3 viewVector = normalize(-surface.PositionVS);
+	const float falloffEndDistance = clamp(falloffEnd, 1.0e-4, radius);
+	const float falloffStartDistance = min(falloffStart, falloffEndDistance - 1.0e-4);
 
+	float visibility = 0.0;
 	[loop]
 	for (uint directionIndex = 0; directionIndex < directionCount; ++directionIndex)
 	{
-		const float angle = 3.14159265 *
-			(float(directionIndex) + noise) / float(directionCount);
+		const float angle = pi * (float(directionIndex) + noise) / float(directionCount);
+		// Screen rows grow downward while view-space Y grows upward.
 		const float2 direction = float2(cos(angle), sin(angle));
-		float directionOcclusion = 0.0;
+		const float3 directionVS = float3(direction.x, -direction.y, 0.0);
+		const float3 orthoDirection = directionVS - dot(directionVS, viewVector) * viewVector;
+		const float3 axis = normalize(cross(orthoDirection, viewVector));
+		const float3 projectedNormal = surface.NormalVS - axis * dot(surface.NormalVS, axis);
+		const float projectedNormalLength = length(projectedNormal);
+		if (projectedNormalLength <= 1.0e-5)
+		{
+			visibility += 1.0;
+			continue;
+		}
+		const float cosNormal =
+			saturate(dot(projectedNormal, viewVector) / projectedNormalLength);
+		const float normalAngle =
+			sign(dot(orthoDirection, projectedNormal)) * acos(cosNormal);
+		// Without occluders the horizons lie in the tangent plane of the projected normal;
+		// side 0 follows the screen direction and side 1 opposes it.
+		const float lowHorizonCos0 = cos(normalAngle + halfPi);
+		const float lowHorizonCos1 = cos(normalAngle - halfPi);
+		float horizonCos0 = lowHorizonCos0;
+		float horizonCos1 = lowHorizonCos1;
 		[loop]
 		for (uint stepIndex = 1; stepIndex <= stepCount; ++stepIndex)
 		{
@@ -204,7 +233,7 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 			[unroll]
 			for (uint side = 0; side < 2; ++side)
 			{
-				const float sideSign = side == 0 ? -1.0 : 1.0;
+				const float sideSign = side == 0 ? 1.0 : -1.0;
 				const int2 candidatePixel = clamp(int2(round(float2(surface.FullPixel) +
 					pixelOffset * sideSign)), int2(0, 0), int2(fullExtent) - 1);
 				float rawDepth;
@@ -215,25 +244,41 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 				{
 					continue;
 				}
-
 				const float3 delta = positionVS - surface.PositionVS;
 				const float distanceToCandidate = length(delta);
-				if (distanceToCandidate <= 1.0e-5 || distanceToCandidate > radius)
+				if (distanceToCandidate <= 1.0e-5)
 				{
 					continue;
 				}
-				const float falloff = 1.0 - smoothstep(
-					falloffStart, max(falloffEnd, falloffStart + 1.0e-4), distanceToCandidate);
-				const float horizon = dot(surface.NormalVS, delta / distanceToCandidate);
-				const float thicknessBias = thickness / max(distanceToCandidate, 1.0e-4);
-				directionOcclusion = max(
-					directionOcclusion, saturate(horizon - thicknessBias) * falloff);
+				// Distant samples fade toward the unoccluded horizon instead of being cut off.
+				const float weight = 1.0 - smoothstep(
+					falloffStartDistance, falloffEndDistance, distanceToCandidate);
+				const float sampleHorizonCos = dot(delta / distanceToCandidate, viewVector);
+				if (side == 0)
+				{
+					horizonCos0 = max(horizonCos0,
+						lerp(lowHorizonCos0, sampleHorizonCos, weight));
+				}
+				else
+				{
+					horizonCos1 = max(horizonCos1,
+						lerp(lowHorizonCos1, sampleHorizonCos, weight));
+				}
 			}
 		}
-		occlusion += directionOcclusion;
+		float horizon0 = -acos(clamp(horizonCos1, -1.0, 1.0));
+		float horizon1 = acos(clamp(horizonCos0, -1.0, 1.0));
+		horizon0 = normalAngle + clamp(horizon0 - normalAngle, -halfPi, halfPi);
+		horizon1 = normalAngle + clamp(horizon1 - normalAngle, -halfPi, halfPi);
+		const float sinNormal = sin(normalAngle);
+		const float arc0 =
+			(cosNormal + 2.0 * horizon0 * sinNormal - cos(2.0 * horizon0 - normalAngle)) * 0.25;
+		const float arc1 =
+			(cosNormal + 2.0 * horizon1 * sinNormal - cos(2.0 * horizon1 - normalAngle)) * 0.25;
+		visibility += projectedNormalLength * (arc0 + arc1);
 	}
 
-	return saturate(1.0 - occlusion / float(directionCount));
+	return visibility / float(directionCount);
 }
 
 float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,
@@ -245,7 +290,8 @@ float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,
 		return 1.0;
 	}
 
-	const float centerAO = saturate(sourceAO.Load(int3(pixel, 0)));
+	// Visibility stays unclamped until the full-resolution output.
+	const float centerAO = sourceAO.Load(int3(pixel, 0));
 	float weightedAO = centerAO;
 	float weightSum = 1.0;
 	const float spatialSigma = max(float(radius) * 0.5, 1.0);
@@ -276,10 +322,10 @@ float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,
 			(spatialSigma * spatialSigma));
 		const float depthWeight = exp2(-32.0 * depthDelta / max(centerDepth, 1.0e-4));
 		const float weight = spatialWeight * depthWeight;
-		weightedAO += saturate(sourceAO.Load(int3(neighborPixel, 0))) * weight;
+		weightedAO += sourceAO.Load(int3(neighborPixel, 0)) * weight;
 		weightSum += weight;
 	}
-	return saturate(weightedAO / max(weightSum, 1.0e-5));
+	return weightedAO / max(weightSum, 1.0e-5);
 }
 
 float UpsampleGTAO(Texture2D<float> denoisedAO, Texture2D<float> halfDepth,
@@ -318,7 +364,7 @@ float UpsampleGTAO(Texture2D<float> denoisedAO, Texture2D<float> halfDepth,
 		const float depthWeight = exp2(
 			-32.0 * abs(candidateDepth - fullViewZ) / max(fullViewZ, 1.0e-4));
 		const float weight = spatialWeight * depthWeight;
-		weightedAO += saturate(denoisedAO.Load(int3(candidatePixel, 0))) * weight;
+		weightedAO += denoisedAO.Load(int3(candidatePixel, 0)) * weight;
 		weightSum += weight;
 	}
 	return weightSum > 1.0e-5 ? saturate(weightedAO / weightSum) : 1.0;

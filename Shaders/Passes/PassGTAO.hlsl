@@ -98,7 +98,7 @@ struct GTAOEvaluatePassParameters
 	float Radius;
 	float FalloffStart;
 	float FalloffEnd;
-	float Thickness;
+	float Padding0;
 };
 
 ConstantBuffer<GTAOEvaluatePassParameters> g_Pass : register(b2);
@@ -138,7 +138,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	rawAO[halfPixel] = surface.HasValidNormal
 		? EvaluateGTAO(depthTexture, surface, halfPixel,
 			uint2(g_Pass.FullWidth, g_Pass.FullHeight), viewData, g_Pass.Radius,
-			g_Pass.FalloffStart, g_Pass.FalloffEnd, g_Pass.Thickness,
+			g_Pass.FalloffStart, g_Pass.FalloffEnd,
 			g_Pass.DirectionCount, g_Pass.StepCount)
 		: 1.0;
 	halfDepth[halfPixel] = surface.ViewZ;

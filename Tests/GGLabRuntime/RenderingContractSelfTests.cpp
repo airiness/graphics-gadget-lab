@@ -4039,7 +4039,6 @@ namespace gglab
 			gtaoProfile.m_Lighting.m_GTAO.m_Radius = -1.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_FalloffStart = 99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_FalloffEnd = -99.0f;
-			gtaoProfile.m_Lighting.m_GTAO.m_Thickness = 99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_Power = 99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_DirectionCount = 0;
 			gtaoProfile.m_Lighting.m_GTAO.m_StepCount = 99;
@@ -4050,7 +4049,6 @@ namespace gglab
 			context.Check(resolvedGTAO.m_Radius == 0.01f &&
 				resolvedGTAO.m_FalloffStart == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_FalloffEnd == resolvedGTAO.m_Radius &&
-				resolvedGTAO.m_Thickness == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_Power == 8.0f &&
 				resolvedGTAO.m_DirectionCount == 1 &&
 				resolvedGTAO.m_StepCount == GTAOMaxStepCount &&

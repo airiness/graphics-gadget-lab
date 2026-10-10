@@ -31,7 +31,6 @@ namespace gglab
 				leftGTAO.m_Radius == rightGTAO.m_Radius &&
 				leftGTAO.m_FalloffStart == rightGTAO.m_FalloffStart &&
 				leftGTAO.m_FalloffEnd == rightGTAO.m_FalloffEnd &&
-				leftGTAO.m_Thickness == rightGTAO.m_Thickness &&
 				leftGTAO.m_Power == rightGTAO.m_Power &&
 				leftGTAO.m_DirectionCount == rightGTAO.m_DirectionCount &&
 				leftGTAO.m_StepCount == rightGTAO.m_StepCount &&
@@ -271,7 +270,6 @@ namespace gglab
 		gtaoSettings.m_Radius = 2.5f;
 		gtaoSettings.m_FalloffStart = 0.25f;
 		gtaoSettings.m_FalloffEnd = 2.0f;
-		gtaoSettings.m_Thickness = 0.5f;
 		gtaoSettings.m_Power = 2.0f;
 		gtaoSettings.m_DirectionCount = 4;
 		gtaoSettings.m_StepCount = 8;

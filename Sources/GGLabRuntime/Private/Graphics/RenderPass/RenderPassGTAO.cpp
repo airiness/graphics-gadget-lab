@@ -41,7 +41,7 @@ namespace gglab
 			float m_Radius = 0.0f;
 			float m_FalloffStart = 0.0f;
 			float m_FalloffEnd = 0.0f;
-			float m_Thickness = 0.0f;
+			float m_Padding0 = 0.0f;
 		};
 		static_assert(IsPassRootConstantStruct<GTAOEvaluatePassParameters>);
 		static_assert(sizeof(GTAOEvaluatePassParameters) == 64);
@@ -357,7 +357,6 @@ namespace gglab
 					.m_Radius = settings.m_Radius,
 					.m_FalloffStart = settings.m_FalloffStart,
 					.m_FalloffEnd = settings.m_FalloffEnd,
-					.m_Thickness = settings.m_Thickness,
 				};
 			},
 			[this, services, &context](RGExecuteContext& executeContext, EvaluatePassData& data)
