@@ -197,8 +197,9 @@ namespace gglab
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
-						targets.m_Width = displayWidth;
-						targets.m_Height = displayHeight;
+						// The Lab composes only display-domain targets.
+						targets.m_DisplayWidth = displayWidth;
+						targets.m_DisplayHeight = displayHeight;
 						targets.m_BackBuffer = resources.m_BackBuffer;
 					});
 

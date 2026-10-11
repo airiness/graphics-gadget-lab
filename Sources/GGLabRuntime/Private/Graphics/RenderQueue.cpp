@@ -13,8 +13,13 @@ namespace gglab
 		RenderQueue renderQueue{};
 		renderQueue.m_ViewId = info.m_RenderView.m_ViewId;
 		renderQueue.m_CoverageRasterDomain = info.m_CoverageRasterDomain;
+		renderQueue.m_PostTemporalRasterDomain = info.m_PostTemporalRasterDomain;
 		GGLAB_ASSERT_MSG(renderQueue.m_CoverageRasterDomain.IsValid(),
 			"RenderQueue coverage raster domain must identify its frame, view, and viewport.");
+		const bool hasDisplayExtent =
+			info.m_RenderView.m_DisplayWidth != 0 && info.m_RenderView.m_DisplayHeight != 0;
+		GGLAB_ASSERT_MSG(renderQueue.m_PostTemporalRasterDomain.IsValid() == hasDisplayExtent,
+			"RenderQueue post-temporal raster domain must exist exactly for displayed views.");
 		GGLAB_ASSERT(info.m_ObjectBuffer.IsValid());
 		GGLAB_ASSERT(info.m_MaterialBuffer.IsValid());
 

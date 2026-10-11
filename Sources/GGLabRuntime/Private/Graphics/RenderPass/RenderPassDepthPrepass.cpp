@@ -67,7 +67,8 @@ namespace gglab
 				data.m_ClearDepth = screen_space::GetDepthBackgroundValue(sceneDepth.m_Convention);
 				data.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
 				data.m_ExpectedRenderQueue = framePlan.m_SourceRenderQueue;
-				data.m_OutputMotion = contextPtr->GetTemporalFramePlan().m_Active;
+				data.m_OutputMotion = contextPtr->GetTemporalFramePlan().HasService(
+					TemporalService::GeometryMotion);
 				if (data.m_OutputMotion)
 				{
 					auto& temporalGeometry = blackboard.Get<RGTemporalGeometryResources>(

@@ -15,6 +15,7 @@ namespace gglab
 	class CameraController;
 	class CameraRig;
 	class RenderPipelineBase;
+	struct CameraPath;
 	struct ViewRenderProfile;
 
 	class DemoBase
@@ -63,6 +64,15 @@ namespace gglab
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);
+		}
+		// A frame sequence posed the main camera from one of the content's camera paths,
+		// before the frame's scene is built. Content keys path-scoped scene state, such as
+		// a scripted lighting change, to the path frame here; every reference sample of a
+		// frame repeats the call with the same frame.
+		virtual void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+		{
+			GGLAB_UNUSED(path);
+			GGLAB_UNUSED(frame);
 		}
 
 		virtual World& GetWorld() noexcept = 0;

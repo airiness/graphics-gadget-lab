@@ -4,6 +4,8 @@
 #include "Lab/LabSessionBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
+#include <entt/entity/entity.hpp>
+
 namespace gglab
 {
 	class GTAOLabSession final : public LabSessionBase
@@ -22,6 +24,7 @@ namespace gglab
 		void Update(float deltaTime) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -47,6 +50,8 @@ namespace gglab
 		float m_FovDegrees = 50.0f;
 		float m_NearPlane = 0.05f;
 		float m_FarPlane = 1000.0f;
+		entt::entity m_SilhouetteSphere = entt::null;
+		entt::entity m_StepOccluder = entt::null;
 		bool m_EnableCameraInput = false;
 		bool m_FixtureConfigured = false;
 	};

@@ -29,5 +29,7 @@ namespace gglab
 		ReversedZWrite,
 		ReversedZReadOnly,
 		ReversedZEqualReadOnly,
+		// Writes every covered sample regardless of the stored depth.
+		AlwaysZWrite,
 	};
 }

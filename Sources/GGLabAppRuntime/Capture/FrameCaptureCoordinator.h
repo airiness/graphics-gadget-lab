@@ -4,6 +4,7 @@
 #include "Capture/FrameCaptureReadiness.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <chrono>
 #include <cstdint>
@@ -23,7 +24,9 @@ namespace gglab
 		FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 		FrameCaptureTiming m_Timing = FrameCaptureTiming::NextFrame;
 		// AfterReady only: frames rendered with every gate ready and an unchanged
-		// settle key before the captured frame.
+		// settle key before the captured frame. The settle key's temporal history
+		// must begin on a ready frame, so the capture never accumulates frames of
+		// content that was still loading.
 		uint32_t m_SettleFrames = 0;
 		// AfterReady only: when set, the capture also waits until the active Demo
 		// id or Lab id equals this id.
@@ -36,6 +39,10 @@ namespace gglab
 		std::filesystem::path m_OutputDirectory;
 		std::string m_Label;
 		std::string m_Note;
+		// Set by a camera-path sequence for the frame it captures.
+		std::optional<FrameCaptureSequenceInfo> m_Sequence;
+		// Required for Diagnostic captures and ignored by other sources.
+		std::optional<PostProcessDebugTap> m_DiagnosticTap;
 	};
 
 	enum class FrameCaptureRequestStatus : uint8_t
@@ -88,6 +95,7 @@ namespace gglab
 		std::optional<double> m_FixedDeltaTime;
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
+		FrameCaptureTemporalState m_Temporal{};
 	};
 
 	// A camera reference view the runtime restores for a waiting request.
@@ -105,6 +113,9 @@ namespace gglab
 	class FrameCaptureCoordinator final
 	{
 	public:
+		// Encode jobs that may wait behind the running writer job.
+		static constexpr uint32_t MaxPendingWriteJobs = 8;
+
 		struct CreateInfo
 		{
 			FrameCaptureControlBase* m_Capture = nullptr;
@@ -134,7 +145,7 @@ namespace gglab
 		// first rendered frame.
 		[[nodiscard]] const FrameCaptureFrameState* GetLastFrameState() const noexcept;
 		// Consecutive submitted frames with every gate ready and an unchanged
-		// settle key.
+		// settle key whose temporal history began on a ready frame.
 		[[nodiscard]] uint32_t GetSettledFrameCount() const noexcept { return m_SettledFrames; }
 
 		// Called before the next frame is planned, with the state of the previous
@@ -143,6 +154,17 @@ namespace gglab
 		[[nodiscard]] std::optional<FrameCaptureViewChange> GetPendingViewChange() const noexcept;
 		// A view that could not be restored fails its request.
 		void OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept;
+		// Called before the next frame is planned, after any reference view was
+		// restored. True when a waiting after-ready request cannot settle because
+		// the temporal history of the ready previous frame includes frames rendered
+		// before every gate was ready. The runtime then requests a temporal reset
+		// of the display camera, and settling starts at that camera cut. Without
+		// the cut, the captured image would depend on how many frames loading took.
+		[[nodiscard]] bool ShouldRestartTemporalHistory() const noexcept;
+		// Called before simulation time advances for the next frame. True while a
+		// waiting after-ready request has not begun settling, so time-driven
+		// content advances only over the settled frames, however long loading took.
+		[[nodiscard]] bool ShouldHoldTime() const noexcept;
 		// Called before the frame described by the state is built. Issues every
 		// request that is due so that this frame's capture taps record it, and
 		// fails waiting after-ready requests for content with a failed gate.
@@ -192,8 +214,8 @@ namespace gglab
 
 		[[nodiscard]] static bool MatchesRequiredContent(
 			const Entry& entry, const FrameCaptureFrameState& state) noexcept;
-		[[nodiscard]] bool IsDue(const Entry& entry, const FrameCaptureFrameState& state,
-			bool ready) const noexcept;
+		[[nodiscard]] bool IsDue(
+			const Entry& entry, const FrameCaptureFrameState& state) const noexcept;
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;
@@ -231,7 +253,8 @@ namespace gglab
 		std::string m_TemporaryTag;
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		uint32_t m_SettledFrames = 0;
-		bool m_FrameReady = false;
+		// Every frame of the current settle key so far had every gate ready.
+		bool m_HistoryReady = false;
 		bool m_HasOpenFrame = false;
 		bool m_IsShuttingDown = false;
 	};

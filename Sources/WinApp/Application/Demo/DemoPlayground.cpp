@@ -1,4 +1,5 @@
 #include "Application/Demo/DemoPlayground.h"
+#include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "ApplicationCameraInput.h"
 #include "Application/Content/DesktopApplicationContent.h"
@@ -43,7 +44,7 @@ namespace gglab
 		camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
 		camCreateInfo.m_ExposureCompensationEV = 0.0f;
 		m_ViewRenderProfile.m_TemporalAA.m_Enabled = m_Content == PlaygroundContent::CoastalAtrium;
-		m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
+		m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = m_Content == PlaygroundContent::CoastalAtrium;
 		m_ViewRenderProfile.m_PostProcess.m_Bloom.m_Enabled = false;
 		m_Camera = std::make_unique<Camera>(camCreateInfo);
 
@@ -61,6 +62,9 @@ namespace gglab
 			const bool registered = m_CameraRig.SetReferenceViews(
 				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
 			GGLAB_ASSERT_MSG(registered, "Coastal scene reference views must be valid.");
+			const bool pathsRegistered =
+				m_CameraRig.SetCameraPaths(MakeCoastalSceneCameraPaths());
+			GGLAB_ASSERT_MSG(pathsRegistered, "Coastal scene camera paths must be valid.");
 			const bool restored = m_CameraRig.RestoreReferenceView("Retreat_Overview");
 			GGLAB_ASSERT_MSG(restored, "Coastal scene must start at its retreat overview reference view.");
 		}

@@ -174,9 +174,10 @@ namespace gglab
 			GGLAB_ASSERT_NOT_NULL(swapChain);
 			m_DebugReadback->Initialize(*device, rhiContext->GetFrameSlotCount());
 			m_DebugReadback->ConsumeCompletedSlot(context.m_FrameSlotIndex);
+			// The tile grid covers the render extent of the display view.
 			m_DebugReadback->PrepareGridBuffer(*device, context.m_FrameSlotIndex,
-				MakeForwardPlusTileGrid(
-					swapChain->GetBufferWidth(), swapChain->GetBufferHeight()));
+				MakeForwardPlusTileGrid(context.GetDisplayRenderView().m_Width,
+					context.GetDisplayRenderView().m_Height));
 		}
 
 		rg.AddPass<PassData>(

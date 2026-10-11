@@ -4,6 +4,7 @@
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameSequenceCoordinator.h"
 #include "GGLabAppRuntime.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
@@ -524,6 +525,8 @@ namespace gglab
 		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
 		const ApplicationControlRequest& request) noexcept
 	{
+		FrameSequenceCoordinator* frameSequence =
+			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
 		switch (request.m_Command)
 		{
 		case ApplicationControlCommand::Status:
@@ -540,6 +543,7 @@ namespace gglab
 					m_FrameCapture ? m_FrameCapture->GetUnfinishedRequestCount() : 0,
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
+				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
 				}));
 			return;
 		case ApplicationControlCommand::Capture:
@@ -592,12 +596,45 @@ namespace gglab
 			pipeRequest->Respond(SerializeApplicationControlStopping(request.m_Id));
 			m_StopRequested = true;
 			return;
+		case ApplicationControlCommand::Sequence:
+		{
+			if (!frameSequence)
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(
+					request.m_Id, "Frame sequences are unavailable in this session."));
+				return;
+			}
+			std::string error;
+			if (frameSequence->Start(request.m_Sequence, error) == 0)
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id, error));
+				return;
+			}
+			pipeRequest->Respond(
+				SerializeApplicationControlSequence(request.m_Id, *frameSequence->GetStatus()));
+			return;
+		}
+		case ApplicationControlCommand::SequenceCancel:
+			if (!frameSequence || !frameSequence->Cancel())
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(
+					request.m_Id, "No sequence is active."));
+				return;
+			}
+			pipeRequest->Respond(
+				SerializeApplicationControlSequence(request.m_Id, *frameSequence->GetStatus()));
+			return;
 		}
 	}
 
 	void Application::ResolveControlCaptures(
 		std::span<const FrameCaptureRequestResult> results) noexcept
 	{
+		if (FrameSequenceCoordinator* frameSequence =
+			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr)
+		{
+			frameSequence->OnCaptureResults(results);
+		}
 		// Finished results stay queryable for a bounded number of captures.
 		constexpr size_t maxRetainedResults = 256;
 		for (const FrameCaptureRequestResult& result : results)

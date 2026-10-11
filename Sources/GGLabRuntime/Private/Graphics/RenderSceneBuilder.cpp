@@ -53,11 +53,12 @@ namespace gglab
 	}
 
 	RenderSceneBuilder::ViewUploadData RenderSceneBuilder::BuildViewData(
-		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept
+		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades,
+		const RenderView* postTemporalView) noexcept
 	{
 		ViewUploadData result{};
 		auto& viewData = result.m_Views;
-		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size());
+		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size() + 1);
 		const auto appendView = [&viewData](const RenderView& renderView)
 		{
 			ViewGPU viewGpu{};
@@ -79,6 +80,8 @@ namespace gglab
 			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
 			viewGpu.ScenePreExposure = renderView.m_ScenePreExposure;
 			viewGpu.PreviousScenePreExposure = renderView.m_PreviousScenePreExposure;
+			viewGpu.TemporalFrameIndex = renderView.m_TemporalFrameIndex;
+			viewGpu.TextureLodBias = renderView.m_TextureLodBias;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
 			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
@@ -95,6 +98,11 @@ namespace gglab
 		for (const DirectionalShadowCascade& cascade : cascades.m_Cascades)
 		{
 			appendView(cascade.m_View);
+		}
+		if (postTemporalView)
+		{
+			result.m_PostTemporalViewOffset = static_cast<uint32_t>(viewData.size());
+			appendView(*postTemporalView);
 		}
 		return result;
 	}
@@ -123,9 +131,11 @@ namespace gglab
 		info.m_MaterialTable.BeginUpdate();
 		info.m_LightTable.BeginUpdate();
 
-		const auto viewUpload = BuildViewData(info.m_RenderViews, info.m_DirectionalShadowFramePlan);
+		const auto viewUpload = BuildViewData(
+			info.m_RenderViews, info.m_DirectionalShadowFramePlan, info.m_PostTemporalView);
 		const auto& viewData = viewUpload.m_Views;
 		result.m_ShadowViewBaseOffset = viewUpload.m_ShadowViewBaseOffset;
+		result.m_PostTemporalViewOffset = viewUpload.m_PostTemporalViewOffset;
 
 		RenderMaterialFrameCache materialCache(
 			info.m_MaterialTable, assetManager, info.m_SamplerRegistry);
@@ -235,10 +245,14 @@ namespace gglab
 					}
 					if (info.m_TemporalFrameTransaction)
 					{
-						GGLAB_ASSERT_MSG(
+						// Staging supplies the next frame's previous model, so it must run in
+						// every build configuration rather than inside the assertion.
+						const bool objectStaged =
 							info.m_TemporalFrameTransaction->StageSubmittedObject(
-								objectHistoryKey, world),
+								objectHistoryKey, world);
+						GGLAB_ASSERT_MSG(objectStaged,
 							"Submitted object history must fit the bounded GPU object capacity.");
+						GGLAB_UNUSED(objectStaged);
 					}
 
 					Vector3 worldCenter = transformComp.m_Position;

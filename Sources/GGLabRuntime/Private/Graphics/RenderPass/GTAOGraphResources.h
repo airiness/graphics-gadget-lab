@@ -14,6 +14,10 @@ namespace gglab
 	{
 		RGTextureId m_RawAO{};
 		RGTextureId m_HalfDepthViewZ{};
+		// Visibility accumulated over submitted frames; invalid without temporal GTAO.
+		RGTextureId m_TemporalAO{};
+		// Effective history samples over their maximum; written only for the samples tap.
+		RGTextureId m_TemporalSamples{};
 		RGTextureId m_DenoiseX{};
 		RGTextureId m_DenoiseY{};
 		RGTextureId m_FinalAO{};

@@ -12,4 +12,5 @@ struct ForwardCoverageVSOutput
 	nointerpolation uint MaterialIndex : TEXCOORD5;
 	float4 CurrentPositionCS : TEXCOORD6;
 	float4 PreviousPositionCS : TEXCOORD7;
+	nointerpolation float MaterialTextureLodBias : TEXCOORD8;
 };

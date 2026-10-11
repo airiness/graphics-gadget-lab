@@ -18,6 +18,10 @@ namespace gglab
 		// leaves the request queued; every request finishes with exactly one
 		// result, at the latest when the render host finalizes.
 		[[nodiscard]] virtual uint64_t RequestCapture(FrameCaptureSource source) noexcept = 0;
+		// Queues a Diagnostic capture of the tap, with the same lifecycle as
+		// RequestCapture. A tap without a diagnostic name fails immediately.
+		[[nodiscard]] virtual uint64_t RequestDiagnosticCapture(
+			PostProcessDebugTap tap) noexcept = 0;
 		// Appends finished results in completion order and clears them from the
 		// control.
 		virtual void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept = 0;

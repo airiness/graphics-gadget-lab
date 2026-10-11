@@ -31,11 +31,12 @@ namespace gglab
 				leftGTAO.m_Radius == rightGTAO.m_Radius &&
 				leftGTAO.m_FalloffStart == rightGTAO.m_FalloffStart &&
 				leftGTAO.m_FalloffEnd == rightGTAO.m_FalloffEnd &&
-				leftGTAO.m_Thickness == rightGTAO.m_Thickness &&
 				leftGTAO.m_Power == rightGTAO.m_Power &&
 				leftGTAO.m_DirectionCount == rightGTAO.m_DirectionCount &&
 				leftGTAO.m_StepCount == rightGTAO.m_StepCount &&
 				leftGTAO.m_DenoiseRadius == rightGTAO.m_DenoiseRadius &&
+				leftGTAO.m_TemporalAccumulation == rightGTAO.m_TemporalAccumulation &&
+				leftGTAO.m_TemporalMaxSamples == rightGTAO.m_TemporalMaxSamples &&
 				leftGTAO.m_FinalAOFormatPreference == rightGTAO.m_FinalAOFormatPreference &&
 				leftBloom.m_Enabled == rightBloom.m_Enabled &&
 				leftBloom.m_Threshold == rightBloom.m_Threshold &&
@@ -271,11 +272,12 @@ namespace gglab
 		gtaoSettings.m_Radius = 2.5f;
 		gtaoSettings.m_FalloffStart = 0.25f;
 		gtaoSettings.m_FalloffEnd = 2.0f;
-		gtaoSettings.m_Thickness = 0.5f;
 		gtaoSettings.m_Power = 2.0f;
 		gtaoSettings.m_DirectionCount = 4;
 		gtaoSettings.m_StepCount = 8;
 		gtaoSettings.m_DenoiseRadius = 5;
+		gtaoSettings.m_TemporalAccumulation = false;
+		gtaoSettings.m_TemporalMaxSamples = 4;
 		gtaoSettings.m_FinalAOFormatPreference = GTAOFinalAOFormatPreference::ForceR16Float;
 		overrides.m_GTAO.Activate(gtaoSettings);
 		ViewRenderProfile expectedProfile = originalAuthoringProfile;
@@ -290,7 +292,7 @@ namespace gglab
 		temporalSettings.m_DepthAbsoluteThreshold = 0.1f;
 		temporalSettings.m_DepthRelativeThreshold = 0.04f;
 		temporalSettings.m_MaxHistoryFeedback = 0.75f;
-		temporalSettings.m_VelocityWeightScale = 0.1f;
+		temporalSettings.m_VelocityWeightScale = 0.2f;
 		temporalSettings.m_LuminanceWeightScale = 0.25f;
 		temporalSettings.m_NeighborhoodClampExpansion = 0.5f;
 		overrides.m_TemporalAA.Activate(temporalSettings);

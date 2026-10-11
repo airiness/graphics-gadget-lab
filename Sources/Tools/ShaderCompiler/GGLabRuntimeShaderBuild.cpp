@@ -51,6 +51,9 @@ namespace gglab
 			L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_FRAME" };
 		constexpr ShaderProgramBuildDefine GTAODiagnosticsDefine{
 			L"GGLAB_GTAO_DIAGNOSTICS" };
+		constexpr ShaderProgramBuildDefine GTAOTemporalDefine{ L"GGLAB_GTAO_TEMPORAL" };
+		constexpr ShaderProgramBuildDefine GTAOTemporalDiagnosticsDefine{
+			L"GGLAB_GTAO_TEMPORAL_DIAGNOSTICS" };
 		constexpr ShaderProgramBuildDefine GTAODenoiseXDefine{ L"GGLAB_GTAO_DENOISE_X" };
 		constexpr ShaderProgramBuildDefine GTAODenoiseYDefine{ L"GGLAB_GTAO_DENOISE_Y" };
 		constexpr ShaderProgramBuildDefine GTAOUpsampleDefine{ L"GGLAB_GTAO_UPSAMPLE" };
@@ -67,6 +70,9 @@ namespace gglab
 		constexpr std::array ValidationReduceTilesDefines{ ValidationReduceTilesDefine };
 		constexpr std::array ValidationReduceFrameDefines{ ValidationReduceFrameDefine };
 		constexpr std::array GTAODiagnosticsDefines{ GTAODiagnosticsDefine };
+		constexpr std::array GTAOTemporalDefines{ GTAOTemporalDefine };
+		constexpr std::array GTAOTemporalDiagnosticsDefines{
+			GTAOTemporalDefine, GTAOTemporalDiagnosticsDefine };
 		constexpr std::array GTAODenoiseXDefines{ GTAODenoiseXDefine };
 		constexpr std::array GTAODenoiseYDefines{ GTAODenoiseYDefine };
 		constexpr std::array GTAOUpsampleDefines{ GTAOUpsampleDefine };
@@ -104,10 +110,16 @@ namespace gglab
 			ShaderProgramBuildRecord{ &AerialPerspectiveCompositeCompute, L"Passes/PassAerialPerspective.hlsl", L"CSComposite" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODiagnosticsDefines },
+			ShaderProgramBuildRecord{ &GTAOTemporalCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOTemporalDefines },
+			ShaderProgramBuildRecord{ &GTAOTemporalDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOTemporalDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseYCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseYDefines },
 			ShaderProgramBuildRecord{ &GTAOUpsampleCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOUpsampleDefines },
 			ShaderProgramBuildRecord{ &TemporalAAReprojectionCompute, L"Passes/PassTemporalAA.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &TemporalAADepthHistoryCompute, L"Passes/PassTemporalAADepthHistory.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &TemporalAADisplayDepthVertex, L"Passes/PassTemporalAADisplayDepth.hlsl", L"VSMain" },
+			ShaderProgramBuildRecord{ &TemporalAADisplayDepthPixel, L"Passes/PassTemporalAADisplayDepth.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &TemporalReferenceAccumulateCompute, L"Passes/PassTemporalReference.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapVertex, L"Passes/PassDirectionalShadowMap.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapPixel, L"Passes/PassDirectionalShadowMap.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &ShadowMapPreviewVertex, L"Passes/PassShadowMapPreview.hlsl", L"VSMain" },

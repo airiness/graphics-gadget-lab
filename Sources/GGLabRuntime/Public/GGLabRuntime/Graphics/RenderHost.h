@@ -6,8 +6,11 @@
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
@@ -159,8 +162,9 @@ namespace gglab
 		ResolvedTemporalFramePlan m_TemporalFramePlan{};
 		TemporalFrameTransaction& m_TemporalFrameTransaction;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
-		uint32_t m_WindowWidth = 0;
-		uint32_t m_WindowHeight = 0;
+		// Render and display extents of the camera views; the display extent is the
+		// window client extent.
+		ViewResolution m_ViewResolution{};
 		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
 		uint64_t m_FrameSerial = 0;
@@ -190,14 +194,19 @@ namespace gglab
 		[[nodiscard]] virtual RenderFrame BeginFrame() noexcept = 0;
 		[[nodiscard]] virtual RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept = 0;
+		// A reference sample (evaluation only) requires an inactive Temporal AA plan; the
+		// frame then renders with the sample's jitter phase and accumulates its scene color.
 		[[nodiscard]] virtual TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-			float scenePreExposure) noexcept = 0;
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
+			float scenePreExposure,
+			const std::optional<TemporalReferenceSample>& referenceSample) noexcept = 0;
 		virtual void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept = 0;
 		virtual void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept = 0;
 		[[nodiscard]] virtual RenderGraph::CreateInfo CreateRenderGraphCreateInfo()
 			const noexcept = 0;
 		[[nodiscard]] virtual const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus()
+			const noexcept = 0;
+		[[nodiscard]] virtual const GTAOCapabilityStatus& GetGTAOCapabilityStatus()
 			const noexcept = 0;
 		virtual void Render(RenderFrame& frame, RenderGraph& rg,
 			const RenderFrameContext& renderContext) noexcept = 0;

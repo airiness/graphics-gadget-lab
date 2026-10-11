@@ -3,11 +3,16 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
+
+#include <cmath>
+#include <string>
+#include <string_view>
 
 namespace gglab
 {
@@ -19,15 +24,40 @@ namespace gglab
 		const LabParameterId RadiusId("gtao.radius");
 		const LabParameterId FalloffStartId("gtao.falloff_start");
 		const LabParameterId FalloffEndId("gtao.falloff_end");
-		const LabParameterId ThicknessId("gtao.thickness");
 		const LabParameterId PowerId("gtao.power");
 		const LabParameterId DirectionCountId("gtao.direction_count");
 		const LabParameterId StepCountId("gtao.step_count");
 		const LabParameterId DenoiseRadiusId("gtao.denoise_radius");
+		const LabParameterId TemporalAccumulationId("gtao.temporal_accumulation");
+		const LabParameterId TemporalMaxSamplesId("gtao.temporal_max_samples");
 		const LabParameterId EnableCameraInputId("gtao.camera.enable_input");
 		const LabParameterId FovId("gtao.camera.fov");
 		const LabParameterId NearPlaneId("gtao.camera.near");
 		const LabParameterId FarPlaneId("gtao.camera.far");
+
+		const Vector3 PresetViewPosition(0.0f, 2.3f, -9.0f);
+		const Vector3 PresetViewTarget(0.0f, 0.0f, 6.5f);
+		constexpr std::string_view StaticPathId = "SEQ_GTAOLab_Static";
+		constexpr std::string_view PanPathId = "SEQ_GTAOLab_Pan";
+		constexpr std::string_view MovingOccluderPathId = "SEQ_GTAOLab_MovingOccluder";
+		constexpr std::string_view OccluderStepPathId = "SEQ_GTAOLab_OccluderStep";
+		constexpr uint32_t PathLastFrame = 179;
+		// Sequence frames advance the moving occluder at this rate.
+		constexpr float MovingOccluderFramesPerSecond = 60.0f;
+		// The step occluder stands in the wall corner for frames [60, 120).
+		constexpr uint32_t OccluderStepFirstFrame = 60;
+		constexpr uint32_t OccluderStepEndFrame = 120;
+		const Vector3 SilhouetteSpherePosition(1.4f, -0.1f, 8.0f);
+		const Vector3 StepOccluderPosition(-4.3f, -0.7f, 7.0f);
+		// Far below the floor, outside every view of the fixture.
+		const Vector3 StepOccluderParkedPosition(-4.3f, -100.0f, 7.0f);
+
+		// The sphere slides between x = 0.2 and 1.8, clear of the neighboring fixtures.
+		[[nodiscard]] Vector3 ResolveMovingOccluderPosition(float seconds) noexcept
+		{
+			return Vector3(1.0f + 0.8f * std::cos(seconds * 2.4f),
+				SilhouetteSpherePosition.m_Y, SilhouetteSpherePosition.m_Z);
+		}
 
 		components::MaterialInstanceComponent MakeMaterial(
 			std::string_view key, const Color& color, float roughness = 0.7f,
@@ -84,6 +114,8 @@ namespace gglab
 						.m_Name = "Final AO"},
 					{.m_Value = int32_t(PostProcessDebugTap::GTAOAOOnlyLightingContribution),
 						.m_Name = "AO-only Lighting Contribution"},
+					{.m_Value = int32_t(PostProcessDebugTap::GTAOHistorySamples),
+						.m_Name = "History Samples"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -117,7 +149,7 @@ namespace gglab
 			.m_Group = "GTAO Spatial",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = 0.1f,
+			.m_DefaultValue = 0.9f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(10.0f),
 			}));
@@ -128,16 +160,6 @@ namespace gglab
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 1.0f,
-			.m_MinValue = LabValue(0.0f),
-			.m_MaxValue = LabValue(10.0f),
-			}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = ThicknessId,
-			.m_Name = "Thickness Bias",
-			.m_Group = "GTAO Spatial",
-			.m_Type = LabParameterType::Float,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = 0.25f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(10.0f),
 			}));
@@ -167,7 +189,7 @@ namespace gglab
 			.m_Group = "GTAO Quality",
 			.m_Type = LabParameterType::UInt,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = uint32_t(4),
+			.m_DefaultValue = uint32_t(6),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(GTAOMaxStepCount),
 			}));
@@ -180,6 +202,24 @@ namespace gglab
 			.m_DefaultValue = uint32_t(3),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(GTAOMaxDenoiseRadius),
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = TemporalAccumulationId,
+			.m_Name = "Temporal Accumulation",
+			.m_Group = "GTAO Temporal",
+			.m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = true,
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = TemporalMaxSamplesId,
+			.m_Name = "Temporal Max Samples",
+			.m_Group = "GTAO Temporal",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = uint32_t(8),
+			.m_MinValue = LabValue(uint32_t(1)),
+			.m_MaxValue = LabValue(GTAOMaxTemporalSamples),
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,
@@ -251,6 +291,8 @@ namespace gglab
 		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		m_World.GetRegistry().clear();
+		m_SilhouetteSphere = entt::null;
+		m_StepOccluder = entt::null;
 		m_LoadingProgress = LoadingProgress::Ready();
 	}
 
@@ -307,13 +349,14 @@ namespace gglab
 				int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm)));
 		auto& gtao = GetMutableViewRenderProfile().m_Lighting.m_GTAO;
 		gtao.m_Radius = parameters.Get(RadiusId, 1.0f);
-		gtao.m_FalloffStart = parameters.Get(FalloffStartId, 0.1f);
+		gtao.m_FalloffStart = parameters.Get(FalloffStartId, 0.9f);
 		gtao.m_FalloffEnd = parameters.Get(FalloffEndId, 1.0f);
-		gtao.m_Thickness = parameters.Get(ThicknessId, 0.25f);
 		gtao.m_Power = parameters.Get(PowerId, 1.0f);
 		gtao.m_DirectionCount = parameters.Get(DirectionCountId, uint32_t(2));
-		gtao.m_StepCount = parameters.Get(StepCountId, uint32_t(4));
+		gtao.m_StepCount = parameters.Get(StepCountId, uint32_t(6));
 		gtao.m_DenoiseRadius = parameters.Get(DenoiseRadiusId, uint32_t(3));
+		gtao.m_TemporalAccumulation = parameters.Get(TemporalAccumulationId, true);
+		gtao.m_TemporalMaxSamples = parameters.Get(TemporalMaxSamplesId, uint32_t(8));
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, false);
 		m_FovDegrees = parameters.Get(FovId, 50.0f);
 		m_NearPlane = parameters.Get(NearPlaneId, 0.05f);
@@ -414,7 +457,7 @@ namespace gglab
 			Color(0.18f, 0.2f, 0.24f, 1.0f));
 
 		components::TransformComponent sphereTransform{};
-		sphereTransform.m_Position = Vector3(1.4f, -0.1f, 8.0f);
+		sphereTransform.m_Position = SilhouetteSpherePosition;
 		sphereTransform.m_Scale = Vector3::One * 1.5f;
 		const entt::entity sphere = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
@@ -425,9 +468,13 @@ namespace gglab
 				"gglab.lab.gtao.silhouette", Color(0.72f, 0.18f, 0.22f, 1.0f), 0.35f),
 			});
 
+		m_StepOccluder = createCube("gglab.lab.gtao.step_occluder", StepOccluderParkedPosition,
+			Vector3(0.5f, 0.6f, 0.5f), Color(0.56f, 0.5f, 0.42f, 1.0f));
+		m_SilhouetteSphere = sphere;
+
 		const entt::entity fixtures[] = { floor, cornerWall, thinSlab, edgeSlab, tieLeft,
 			tieRight, emissiveControl, specularControl, radiusNearGap, radiusFarGap,
-			haloBackground, haloOccluder, sphere };
+			haloBackground, haloOccluder, sphere, m_StepOccluder };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
 			{
 				return registry.valid(entity) &&
@@ -456,10 +503,73 @@ namespace gglab
 
 	void GTAOLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(Vector3(0.0f, 2.3f, -9.0f), Vector3(0.0f, 0.0f, 6.5f));
+		GetCamera().LookAt(PresetViewPosition, PresetViewTarget);
 		GetCamera().SetFov(m_FovDegrees);
 		GetCamera().SetNearFar(m_NearPlane, m_FarPlane);
 		GetCamera().Update();
+
+		const auto makePath = [this](std::string_view id, const char* name, const char* purpose,
+			const Vector3& lastOffset)
+			{
+				return CameraPath{
+					.m_Id = std::string(id),
+					.m_Name = name,
+					.m_Purpose = purpose,
+					.m_Version = 1,
+					.m_Interpolation = CameraPathInterpolation::Linear,
+					.m_NearPlane = GetCamera().GetNear(),
+					.m_FarPlane = GetCamera().GetFar(),
+					.m_ManualEV100 = GetCamera().GetManualEV100(),
+					.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+					.m_Keys = {
+						{ .m_Frame = 0, .m_Position = PresetViewPosition,
+							.m_Target = PresetViewTarget, .m_VerticalFovDegrees = m_FovDegrees },
+						{ .m_Frame = PathLastFrame, .m_Position = PresetViewPosition + lastOffset,
+							.m_Target = PresetViewTarget + lastOffset,
+							.m_VerticalFovDegrees = m_FovDegrees },
+					},
+				};
+			};
+		const bool pathsRegistered = GetCameraRig().SetCameraPaths({
+			// Convergence and stability of visibility in a held view.
+			makePath(StaticPathId, "Static", "Preset view held for 180 frames.", Vector3::Zero),
+			// Reprojection and disocclusion under camera motion.
+			makePath(PanPathId, "Pan",
+				"Preset view translated 4 m to the right over 180 frames.",
+				Vector3(4.0f, 0.0f, 0.0f)),
+			// Contact occlusion that follows a moving rigid occluder.
+			makePath(MovingOccluderPathId, "Moving Occluder",
+				"Preset view; the silhouette sphere slides along the floor with the path frame.",
+				Vector3::Zero),
+			// Appearance and disappearance time of occlusion.
+			makePath(OccluderStepPathId, "Occluder Step",
+				"Preset view; a box stands in the wall corner for frames 60-119.",
+				Vector3::Zero),
+			});
+		GGLAB_ASSERT_MSG(pathsRegistered, "The GTAO Lab camera paths must be valid.");
+		GGLAB_UNUSED(pathsRegistered);
+	}
+
+	void GTAOLabSession::OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+	{
+		auto& registry = m_World.GetRegistry();
+		// Every path frame starts from the resting fixture, so one path never leaves the
+		// scene of another.
+		if (registry.valid(m_SilhouetteSphere))
+		{
+			registry.get<components::TransformComponent>(m_SilhouetteSphere).m_Position =
+				path.m_Id == MovingOccluderPathId
+				? ResolveMovingOccluderPosition(static_cast<float>(frame) /
+					MovingOccluderFramesPerSecond)
+				: SilhouetteSpherePosition;
+		}
+		if (registry.valid(m_StepOccluder))
+		{
+			const bool standing = path.m_Id == OccluderStepPathId &&
+				frame >= OccluderStepFirstFrame && frame < OccluderStepEndFrame;
+			registry.get<components::TransformComponent>(m_StepOccluder).m_Position =
+				standing ? StepOccluderPosition : StepOccluderParkedPosition;
+		}
 	}
 
 	void GTAOLabSession::RequestSelectedPreview() noexcept
@@ -500,8 +610,9 @@ namespace gglab
 				.m_Value = std::format("{} directions x {} steps", settings.m_DirectionCount,
 					settings.m_StepCount)},
 			{.m_Name = "Spatial settings",
-				.m_Value = std::format("radius {:.2f} m, thickness {:.2f} m, power {:.2f}",
-					settings.m_Radius, settings.m_Thickness, settings.m_Power)},
+				.m_Value = std::format("radius {:.2f} m, falloff {:.2f}-{:.2f} m, power {:.2f}",
+					settings.m_Radius, settings.m_FalloffStart, settings.m_FalloffEnd,
+					settings.m_Power)},
 			{.m_Name = "Denoise kernel",
 				.m_Value = std::format("separable bilateral, radius {}", settings.m_DenoiseRadius)},
 			{.m_Name = "Performance target", .m_Value = "~1.5 ms at default 1440p (informational)"},

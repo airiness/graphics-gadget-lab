@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
@@ -120,6 +121,10 @@ namespace gglab
 		// recipe always provides the depth/velocity path. A lost resolve closure is a
 		// frame contract failure in ValidateRenderFrame, not a capability.
 		info.m_DepthVelocityPathAvailable = true;
+		// The resolve reconstructs the display extent from a smaller render extent. Material
+		// diagnostics render at native resolution, so the frames after one that showed them
+		// stay native.
+		info.m_TemporalUpscalingAvailable = !m_MaterialDiagnosticsShown;
 		const SceneExtensionTemporalParticipation participation = m_SceneExtension
 			? m_SceneExtension->GetTemporalParticipation()
 			: SceneExtensionTemporalParticipation::PostTAA;
@@ -146,6 +151,7 @@ namespace gglab
 		}
 		const FramePlan framePlan = std::move(*m_FramePlan);
 		m_FramePlan.reset();
+		m_MaterialDiagnosticsShown = context.m_RenderScene.m_HasMaterialDiagnostics;
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
 			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
@@ -168,7 +174,7 @@ namespace gglab
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);
 		auto& gtaoResources =
 			rg.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion))
 		{
 			rg.GetBlackboard().Create<RGTemporalGeometryResources>(
 				TemporalGeometryResourcesName);
@@ -207,7 +213,7 @@ namespace gglab
 		{
 			m_ForwardPlusValidationPass.Prepare(services);
 		}
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA))
 		{
 			m_TemporalAAPass.Prepare(services);
 		}
@@ -217,7 +223,12 @@ namespace gglab
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
-			depthCoverageFramePlan, temporalActive = context.GetTemporalFramePlan().m_Active,
+			resolution = context.GetDisplayRenderView().GetResolution(),
+			depthCoverageFramePlan,
+			geometryMotion =
+				context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
+			temporalAAActive =
+				context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
@@ -230,11 +241,20 @@ namespace gglab
 				blackboard.GetOrCreate<DepthCoverageFramePlan>(DepthCoverageFramePlanName) =
 					depthCoverageFramePlan;
 
-				const uint32_t width = swapChain->GetBufferWidth();
-				const uint32_t height = swapChain->GetBufferHeight();
+				// Scene targets are render-domain; the back buffer is display-domain, which
+				// frame validation matched to the swap chain.
+				GGLAB_ASSERT_MSG((resolution.m_Display ==
+					ViewExtent{ swapChain->GetBufferWidth(), swapChain->GetBufferHeight() }),
+					"The display extent of a validated frame equals the swap-chain extent.");
+				GGLAB_ASSERT_MSG(resolution.IsNative() || temporalAAActive,
+					"Render extents below the display extent require the Temporal AA resolve.");
+				const uint32_t width = resolution.m_Render.m_Width;
+				const uint32_t height = resolution.m_Render.m_Height;
 
-				targets.m_Width = width;
-				targets.m_Height = height;
+				targets.m_RenderWidth = width;
+				targets.m_RenderHeight = height;
+				targets.m_DisplayWidth = resolution.m_Display.m_Width;
+				targets.m_DisplayHeight = resolution.m_Display.m_Height;
 
 				const RHITextureHandle backTexture =
 					swapChain->GetBackBufferHandle(frameBackBufferIndex);
@@ -269,7 +289,8 @@ namespace gglab
 
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
-				backBufferDesc.m_Extent = { width, height, 1u };
+				backBufferDesc.m_Extent =
+					{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
@@ -303,7 +324,29 @@ namespace gglab
 					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
 				sceneDepth.m_Convention = displayDepthConvention;
 
-				if (temporalActive)
+				// Display depth of post-temporal composition. At native resolution it is the
+				// scene depth itself; below it, the temporal resolve fills a display-extent
+				// depth. The display color is published at the temporal boundary, after the
+				// pre-temporal passes that may replace the scene color.
+				auto& displayDepth =
+					blackboard.GetOrCreate<RGDisplayDepthResources>(DisplayDepthResourcesName);
+				if (resolution.IsNative())
+				{
+					displayDepth.m_Texture = sceneDepth.m_Texture;
+				}
+				else
+				{
+					RHITextureDesc displayDepthDesc = depthBufferDesc;
+					displayDepthDesc.m_Extent =
+						{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
+					displayDepth.m_Texture =
+						builder.CreateTexture("DisplayView.DisplayDepth", displayDepthDesc);
+				}
+				displayDepth.m_DsvDesc = sceneDepth.m_DsvDesc;
+				displayDepth.m_SrvDesc = sceneDepth.m_SrvDesc;
+				displayDepth.m_Convention = sceneDepth.m_Convention;
+
+				if (geometryMotion)
 				{
 					auto& temporalGeometry = blackboard.Get<RGTemporalGeometryResources>(
 						TemporalGeometryResourcesName);
@@ -317,7 +360,7 @@ namespace gglab
 				}
 			});
 
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion))
 		{
 			rg.AddPass<ClearMotionVectorsPassData>(
 				"View.ClearMotionVectors",
@@ -467,9 +510,24 @@ namespace gglab
 			m_AerialPerspectivePass.AddPass(rg, context, services);
 		}
 
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA))
 		{
 			m_TemporalAAPass.AddPass(rg, context, services);
+		}
+
+		// Temporal boundary: post-temporal composition and post-processing read the
+		// display-domain color from here on. An active resolve published its output;
+		// otherwise the domains are equal and the composed scene color is the display color.
+		{
+			auto& targets = rg.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+				.GetViewTargets(displayViewId);
+			if (!targets.m_DisplayColor.IsValid())
+			{
+				GGLAB_ASSERT_MSG(targets.m_RenderWidth == targets.m_DisplayWidth &&
+					targets.m_RenderHeight == targets.m_DisplayHeight,
+					"Without a temporal resolve the render and display extents are equal.");
+				targets.m_DisplayColor = targets.m_SceneColor;
+			}
 		}
 
 		// Scene extensions are post-TAA participants in the current temporal contract.
@@ -486,11 +544,17 @@ namespace gglab
 		// Depth-tested world-space debug geometry is part of HDR scene color.
 		m_DebugDrawScenePass.AddPass(rg, context, services);
 
+		// An evaluation reference sample accumulates the complete HDR scene, including
+		// transparent and depth-tested debug geometry, before post-processing.
+		m_TemporalReferencePass.AddPass(rg, context, services);
 		m_PostProcessPipeline.AddPasses(rg, context, services);
 
 		// The scene capture tap reads the post-processed display target before any
 		// back-buffer preview or overlay composes into it.
 		m_SceneCapturePass.AddPass(rg, context, services);
+		// Diagnostic captures read a separate display-resolution tap visualization.
+		m_PostProcessPipeline.AddDiagnosticCapturePass(rg, context, services);
+		m_DiagnosticCapturePass.AddPass(rg, context, services);
 
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);
@@ -595,15 +659,16 @@ namespace gglab
 			return ClassifyForwardPlusFrame({ .m_PresentationAvailable = false });
 		}
 		const RenderView& displayView = context.GetDisplayRenderView();
-		if (displayView.m_Width != swapChain->GetBufferWidth() ||
-			displayView.m_Height != swapChain->GetBufferHeight())
+		if (displayView.m_DisplayWidth != swapChain->GetBufferWidth() ||
+			displayView.m_DisplayHeight != swapChain->GetBufferHeight())
 		{
 			return ClassifyForwardPlusFrame({ .m_PresentationAvailable = true });
 		}
 
 		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
 		m_GTAOPass.Prepare(services);
-		const bool temporalActive = context.GetTemporalFramePlan().m_Active;
+		const bool temporalActive =
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA);
 		bool temporalResolveClosureValid = false;
 		if (temporalActive)
 		{
@@ -614,7 +679,7 @@ namespace gglab
 		FramePlan plan{
 			.m_FrameSerial = context.m_FrameSerial,
 			.m_DepthCoverage = BuildDepthCoverageFramePlanForFrame(
-				context, swapChain->GetBufferWidth(), swapChain->GetBufferHeight()),
+				context, displayView.m_Width, displayView.m_Height),
 		};
 		const DepthCoverageFramePlan& depthCoverage = plan.m_DepthCoverage;
 		plan.m_ForwardPlusStatus = depthCoverage.m_HasDepthCoverageDraws
@@ -638,6 +703,23 @@ namespace gglab
 			.m_TemporalActive = temporalActive,
 			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
 			});
+		const TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
+		if (result.IsReady() && transaction && transaction->GetReferenceSample())
+		{
+			m_TemporalReferencePass.Prepare(services);
+			if (!transaction->CanAccumulateReference())
+			{
+				return RenderFrameValidationResult::ContractFailure(
+					"Temporal reference sample cannot be accumulated",
+					"The sum pair could not be allocated or the sample does not follow the "
+					"committed sum.");
+			}
+			if (!m_TemporalReferencePass.ValidatePipelineClosure(services))
+			{
+				return RenderFrameValidationResult::ContractFailure(
+					"Temporal reference accumulation pipeline unavailable");
+			}
+		}
 		if (result.IsReady())
 		{
 			m_FramePlan = std::move(plan);

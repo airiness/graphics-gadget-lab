@@ -66,6 +66,85 @@ namespace gglab
 			context.Check(result.m_Request && result.m_Request->m_CaptureRequestId == 4,
 				"A result request names one capture request");
 
+			const ApplicationControlParseResult sequence = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":11,"command":"sequence","path":"SEQ_DollyDoorway",)"
+				R"("requiredContentId":"Demo.CoastalAtrium","captureFrames":[0,90,179],)"
+				R"("source":"composited","outputDirectory":"D:/captures","label":"dolly",)"
+				R"("note":"baseline"})");
+			context.Check(sequence.m_Request &&
+				sequence.m_Request->m_Command == ApplicationControlCommand::Sequence &&
+				sequence.m_Request->m_Sequence.m_CameraPathId == "SEQ_DollyDoorway" &&
+				sequence.m_Request->m_Sequence.m_RequiredContentId == "Demo.CoastalAtrium" &&
+				sequence.m_Request->m_Sequence.m_CaptureFrames ==
+				std::vector<uint32_t>{ 0, 90, 179 } &&
+				sequence.m_Request->m_Sequence.m_CaptureSource == FrameCaptureSource::Composited &&
+				sequence.m_Request->m_Sequence.m_OutputDirectory ==
+				std::filesystem::path("D:/captures") &&
+				sequence.m_Request->m_Sequence.m_Label == "dolly" &&
+				sequence.m_Request->m_Sequence.m_Note == "baseline",
+				"A sequence request carries its path, capture frames and capture fields");
+			const ApplicationControlParseResult diagnosticSequence = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic",)"
+				R"("diagnosticTap":"temporal-rejection","referenceSamples":64,)"
+				R"("referenceTextureLodBias":-3})");
+			const ApplicationControlParseResult diagnosticCapture = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":14,"command":"capture","source":"diagnostic",)"
+				R"("diagnosticTap":"temporal-history-weight"})");
+			context.Check(diagnosticSequence.m_Request &&
+				diagnosticSequence.m_Request->m_Sequence.m_CaptureSource ==
+				FrameCaptureSource::Diagnostic &&
+				diagnosticSequence.m_Request->m_Sequence.m_DiagnosticTap ==
+				PostProcessDebugTap::TemporalRejection &&
+				diagnosticSequence.m_Request->m_Sequence.m_ReferenceSamples == 64 &&
+				diagnosticSequence.m_Request->m_Sequence.m_ReferenceTextureLodBias == -3.0f &&
+				diagnosticCapture.m_Request &&
+				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap ==
+				PostProcessDebugTap::TemporalHistoryWeight,
+				"Diagnostic captures and sequences name their tap");
+			const ApplicationControlParseResult evaluation = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
+				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,)"
+				R"("historyFilter":"bilinear","currentFilter":"point",)"
+				R"("motionSelection":"center","postTemporalView":"jittered",)"
+				R"("resolutionPreset":"quality",)"
+				R"("historyRectification":"variance-clip","varianceClipGamma":1.25,)"
+				R"("historyAccumulation":"compatibility-age","historyRelaxation":2,)"
+				R"("textureLodBiasOffset":-1.5,"enabled":false}})");
+			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
+				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
+				: nullptr;
+			context.Check(overrides && evaluation.m_Request->m_Sequence.m_GpuTiming &&
+				overrides->m_NeighborhoodClampExpansion == 1.0f &&
+				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale &&
+				overrides->m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
+				overrides->m_CurrentFilter == TemporalAACurrentFilter::Point &&
+				overrides->m_MotionSelection == TemporalAAMotionSelection::Center &&
+				overrides->m_PostTemporalView == TemporalAAPostTemporalView::Jittered &&
+				overrides->m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
+				overrides->m_HistoryRectification == TemporalAAHistoryRectification::VarianceClip &&
+				overrides->m_VarianceClipGamma == 1.25f &&
+				overrides->m_HistoryAccumulation == TemporalAAHistoryAccumulation::CompatibilityAge &&
+				overrides->m_HistoryRelaxation == 2.0f &&
+				overrides->m_TextureLodBiasOffset == -1.5f && overrides->m_Enabled == false,
+				"A sequence request carries its Temporal AA overrides and GPU timing request");
+			const ApplicationControlParseResult gtaoEvaluation = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":16,"command":"sequence","path":"SEQ_A",)"
+				R"("gtao":{"temporal":true,"temporalMaxSamples":24,"directionCount":1,)"
+				R"("stepCount":8}})");
+			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request
+				? &gtaoEvaluation.m_Request->m_Sequence.m_GTAOOverrides
+				: nullptr;
+			context.Check(gtaoOverrides && gtaoOverrides->m_TemporalAccumulation == true &&
+				gtaoOverrides->m_TemporalMaxSamples == 24u && gtaoOverrides->m_DirectionCount == 1u &&
+				gtaoOverrides->m_StepCount == 8u,
+				"A sequence request carries its GTAO overrides");
+
+			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
+				R"({"protocol":1,"id":12,"command":"sequence-cancel"})");
+			context.Check(cancel.m_Request &&
+				cancel.m_Request->m_Command == ApplicationControlCommand::SequenceCancel,
+				"A sequence-cancel request takes no fields");
+
 			struct Rejected
 			{
 				std::string_view m_Line;
@@ -84,6 +163,40 @@ namespace gglab
 				{ R"({"protocol":1,"id":9,"command":"capture","lable":"typo"})", 9 },
 				{ R"({"protocol":1,"id":10,"command":"result"})", 10 },
 				{ R"({"protocol":1,"id":11,"command":"result","requestId":0})", 11 },
+				{ R"({"protocol":1,"id":12,"command":"sequence"})", 12 },
+				{ R"({"protocol":1,"id":13,"command":"sequence","path":"A","captureFrames":[-1]})", 13 },
+				{ R"({"protocol":1,"id":14,"command":"sequence","path":"A","captureFrames":3})", 14 },
+				{ R"({"protocol":1,"id":15,"command":"sequence","path":"A","frames":[1]})", 15 },
+				{ R"({"protocol":1,"id":16,"command":"sequence-cancel","path":"A"})", 16 },
+				{ R"({"protocol":1,"id":17,"command":"capture","source":"diagnostic"})", 17 },
+				{ R"({"protocol":1,"id":20,"command":"sequence","path":"A","referenceSamples":5000})", 20 },
+				{ R"({"protocol":1,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})", 18 },
+				{ R"({"protocol":1,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
+				{ R"({"protocol":1,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})", 21 },
+				{ R"({"protocol":1,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})", 22 },
+				{ R"({"protocol":1,"id":26,"command":"sequence","path":"A","temporalAA":{"historyFilter":"bicubic"}})", 26 },
+				{ R"({"protocol":1,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})", 27 },
+				{ R"({"protocol":1,"id":28,"command":"sequence","path":"A","temporalAA":{"currentFilter":"box"}})", 28 },
+				{ R"({"protocol":1,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})", 29 },
+				{ R"({"protocol":1,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})", 30 },
+				{ R"({"protocol":1,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})", 31 },
+				{ R"({"protocol":1,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})", 32 },
+				{ R"({"protocol":1,"id":35,"command":"sequence","path":"A","temporalAA":{"postTemporalView":"none"}})", 35 },
+				{ R"({"protocol":1,"id":36,"command":"sequence","path":"A","temporalAA":{"resolutionPreset":"balanced"}})", 36 },
+				{ R"({"protocol":1,"id":37,"command":"sequence","path":"A","temporalAA":{"historyRectification":"variance"}})", 37 },
+				{ R"({"protocol":1,"id":38,"command":"sequence","path":"A","temporalAA":{"varianceClipGamma":8}})", 38 },
+				{ R"({"protocol":1,"id":39,"command":"sequence","path":"A","temporalAA":{"historyAccumulation":"age"}})", 39 },
+				{ R"({"protocol":1,"id":40,"command":"sequence","path":"A","temporalAA":{"historyRelaxation":5}})", 40 },
+				{ R"({"protocol":1,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})", 33 },
+				{ R"({"protocol":1,"id":34,"command":"sequence","path":"A","temporalAA":{"enabled":0}})", 34 },
+				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
+				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
+				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },
+				{ R"({"protocol":1,"id":41,"command":"sequence","path":"A","gtao":{"temporal":1}})", 41 },
+				{ R"({"protocol":1,"id":42,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":0}})", 42 },
+				{ R"({"protocol":1,"id":43,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":2.5}})", 43 },
+				{ R"({"protocol":1,"id":44,"command":"sequence","path":"A","gtao":{"radius":2}})", 44 },
+				{ R"({"protocol":1,"id":45,"command":"sequence","path":"A","gtao":{"directionCount":9}})", 45 },
 			};
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)
@@ -130,8 +243,46 @@ namespace gglab
 				Contains(status, R"("referenceViews":["CAM_A","CAM_B"])"),
 				"Status reports the session, pending captures, readiness gates and reference views");
 			const std::string noFrame = SerializeApplicationControlStatus(5, { .m_SessionId = "s1" });
-			context.Check(Contains(noFrame, R"("frame":null)"),
-				"Status before the first frame reports no frame state");
+			context.Check(Contains(noFrame, R"("frame":null)") &&
+				Contains(noFrame, R"("sequence":null)"),
+				"Status before the first frame reports no frame state and no sequence");
+
+			const FrameSequenceStatus sequenceStatus{
+				.m_SequenceId = 3,
+				.m_State = FrameSequenceState::Failed,
+				.m_CameraPathId = "SEQ_DollyDoorway",
+				.m_CameraPathVersion = 1,
+				.m_FrameCount = 180,
+				.m_SubmittedFrames = 12,
+				.m_CaptureRequestIds = { 21, 22 },
+				.m_CompletedCaptures = 1,
+				.m_Failure = "Lost continuity.",
+			};
+			const std::string sequenceJson = SerializeApplicationControlSequence(10, sequenceStatus);
+			const std::string statusWithSequence = SerializeApplicationControlStatus(11, {
+				.m_SessionId = "s1",
+				.m_Sequence = &sequenceStatus,
+				});
+			context.Check(Contains(sequenceJson, R"("state":"failed")") &&
+				Contains(sequenceJson, R"("path":"SEQ_DollyDoorway")") &&
+				Contains(sequenceJson, R"("frameCount":180)") &&
+				Contains(sequenceJson, R"("captureRequestIds":[21,22])") &&
+				Contains(sequenceJson, R"("failure":"Lost continuity.")") &&
+				Contains(statusWithSequence, R"("submittedFrames":12)") &&
+				!Contains(sequenceJson, R"("gpuTiming")"),
+				"Sequence responses and status report the sequence state, progress and failure");
+
+			FrameSequenceStatus timedStatus{ .m_SequenceId = 4, .m_State = FrameSequenceState::Running };
+			timedStatus.m_GpuTiming = FrameSequenceGpuTiming{
+				.m_FrameMilliseconds = { 4.0, 2.0 },
+				.m_Scopes = { { .m_Name = "PostProcess.TemporalAA", .m_Milliseconds = { 0.25 } } },
+			};
+			const std::string timedJson = SerializeApplicationControlSequence(12, timedStatus);
+			context.Check(Contains(timedJson, R"("gpuTiming":{)") &&
+				Contains(timedJson, R"("frames":2)") && Contains(timedJson, R"("medianMs":2.0)") &&
+				Contains(timedJson, R"("name":"PostProcess.TemporalAA")") &&
+				Contains(timedJson, R"("p90Ms":0.25)"),
+				"Sequence status summarizes the GPU timing of each recorded scope");
 
 			FrameCaptureRequestResult completed{
 				.m_RequestId = 12,

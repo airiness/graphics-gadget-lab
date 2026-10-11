@@ -3,6 +3,7 @@
 #include "AssetPublicationSelfTests.h"
 #include "AssetResidencySelfTests.h"
 #include "AssetUploadSchedulerSelfTests.h"
+#include "CameraPathSelfTests.h"
 #include "DiagnosticsContractSelfTests.h"
 #include "EnvironmentSelectionSelfTests.h"
 #include "FrameCaptureSelfTests.h"
@@ -40,6 +41,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "asset-upload-scheduler",
 			.m_Run = &gglab::RunAssetUploadSchedulerSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "camera-paths",
+			.m_Run = &gglab::RunCameraPathSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "diagnostics-contracts",

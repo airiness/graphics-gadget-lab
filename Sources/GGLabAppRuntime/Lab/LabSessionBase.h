@@ -61,6 +61,12 @@ namespace gglab
 		{
 			GGLAB_UNUSED(feedback);
 		}
+		// See DemoBase::OnCameraPathFrameApplied; the path belongs to this session's rig.
+		virtual void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+		{
+			GGLAB_UNUSED(path);
+			GGLAB_UNUSED(frame);
+		}
 		virtual void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 		{
 			GGLAB_UNUSED(diagnostics);

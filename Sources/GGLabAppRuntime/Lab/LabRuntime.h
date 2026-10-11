@@ -24,6 +24,7 @@ namespace gglab
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 		void Update() noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
+		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept;
 
 		void RequestSwitchLab(const LabId& id) noexcept override
 		{

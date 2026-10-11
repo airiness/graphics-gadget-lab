@@ -4,9 +4,11 @@
 
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
@@ -18,6 +20,8 @@
 #include <filesystem>
 #include <format>
 #include <ranges>
+#include <string>
+#include <string_view>
 
 namespace gglab
 {
@@ -38,6 +42,39 @@ namespace gglab
 		const LabParameterId CameraCutSerialId("temporal_aa.camera.cut_serial");
 		const LabParameterId AnimateObjectId("temporal_aa.object.animate");
 		const LabParameterId MaxHistoryFeedbackId("temporal_aa.max_history_feedback");
+
+		const Vector3 FixtureViewPosition(0.0f, 2.2f, -10.0f);
+		const Vector3 FixtureViewTarget(0.0f, 0.0f, 6.5f);
+		constexpr float FixtureViewFov = 52.0f;
+		constexpr float LightIntensity = 3.5f;
+		constexpr std::string_view LightChangePathId = "SEQ_TemporalAALab_LightChange";
+		constexpr std::string_view MovingObjectPathId = "SEQ_TemporalAALab_MovingObject";
+		// Sequence frames advance the moving-object animation at this rate.
+		constexpr float MovingObjectPathFramesPerSecond = 60.0f;
+
+		// Position of the animated rigid object after the given animation time.
+		[[nodiscard]] Vector2 ResolveMovingObjectPosition(float seconds) noexcept
+		{
+			return Vector2(std::sin(seconds * 1.35f) * 3.2f,
+				-0.15f + std::sin(seconds * 0.7f) * 0.35f);
+		}
+
+		// Directional light of the light-change sequence: converged for 60 frames, a step
+		// to 60% at frame 60, then a linear return over frames 120-179.
+		[[nodiscard]] constexpr float ResolveLightChangeIntensity(uint32_t frame) noexcept
+		{
+			constexpr float dimmed = LightIntensity * 0.6f;
+			if (frame < 60)
+			{
+				return LightIntensity;
+			}
+			if (frame < 120)
+			{
+				return dimmed;
+			}
+			const float fade = std::min(static_cast<float>(frame - 120) / 59.0f, 1.0f);
+			return dimmed + (LightIntensity - dimmed) * fade;
+		}
 
 		components::MaterialInstanceComponent MakeMaterial(std::string_view key,
 			const Color& color, float roughness, float metallic = 0.0f,
@@ -85,7 +122,9 @@ namespace gglab
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalReprojectionUV), .m_Name = "Reprojection UV"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalRejection), .m_Name = "Rejection"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryAge), .m_Name = "History Age"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistorySamples), .m_Name = "History Samples"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalClipDistance), .m_Name = "Clip Distance"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryRelaxation), .m_Name = "History Relaxation"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude"},
 			},
@@ -186,11 +225,17 @@ namespace gglab
 	{
 		m_ElapsedSeconds += deltaTime;
 		auto& registry = m_World.GetRegistry();
+		// A light-change sequence frame sets the intensity after this update.
+		if (registry.valid(m_LightEntity))
+		{
+			registry.get<components::LightComponent>(m_LightEntity).m_Intensity = LightIntensity;
+		}
 		if (m_AnimateObject && registry.valid(m_MovingEntity))
 		{
 			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
-			transform.m_Position.m_X = std::sin(m_ElapsedSeconds * 1.35f) * 3.2f;
-			transform.m_Position.m_Y = -0.15f + std::sin(m_ElapsedSeconds * 0.7f) * 0.35f;
+			const Vector2 position = ResolveMovingObjectPosition(m_ElapsedSeconds);
+			transform.m_Position.m_X = position.m_X;
+			transform.m_Position.m_Y = position.m_Y;
 		}
 		if (m_EnableCameraInput)
 		{
@@ -219,6 +264,32 @@ namespace gglab
 		}
 		RequestPreviewRefresh();
 		CaptureGpuTiming();
+	}
+
+	void TemporalAALabSession::OnCameraPathFrameApplied(
+		const CameraPath& path, uint32_t frame) noexcept
+	{
+		const bool lightChange = path.m_Id == LightChangePathId;
+		if (!lightChange && path.m_Id != MovingObjectPathId)
+		{
+			return;
+		}
+		auto& registry = m_World.GetRegistry();
+		if (lightChange && registry.valid(m_LightEntity))
+		{
+			registry.get<components::LightComponent>(m_LightEntity).m_Intensity =
+				ResolveLightChangeIntensity(frame);
+		}
+		// The rigid object rests at its start pose while the light changes, and follows
+		// the path frame on the moving-object path.
+		if (registry.valid(m_MovingEntity))
+		{
+			const Vector2 position = ResolveMovingObjectPosition(lightChange ? 0.0f
+				: static_cast<float>(frame) / MovingObjectPathFramesPerSecond);
+			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
+			transform.m_Position.m_X = position.m_X;
+			transform.m_Position.m_Y = position.m_Y;
+		}
 	}
 
 	void TemporalAALabSession::OnFrameSubmitted(
@@ -310,9 +381,42 @@ namespace gglab
 		m_AssetPreparation.TrackModel(alphaModel, AlphaBlendModeTestPath, 0.4f);
 		m_AssetPreparation.TrackModel(ProceduralCubeModelID, "ProceduralCube", 0.35f);
 		m_AssetPreparation.TrackModel(ProceduralSphereModelID, "ProceduralSphere", 0.25f);
-		GetCamera().LookAt(Vector3(0.0f, 2.2f, -10.0f), Vector3(0.0f, 0.0f, 6.5f));
-		GetCamera().SetFov(52.0f);
+		GetCamera().LookAt(FixtureViewPosition, FixtureViewTarget);
+		GetCamera().SetFov(FixtureViewFov);
 		GetCamera().Update();
+		// Static fixture views whose scene changes with the path frame.
+		const auto makeFixturePath = [this](std::string_view id, const char* name,
+			const char* purpose)
+			{
+				return CameraPath{
+					.m_Id = std::string(id),
+					.m_Name = name,
+					.m_Purpose = purpose,
+					.m_Version = 1,
+					.m_Interpolation = CameraPathInterpolation::Linear,
+					.m_NearPlane = GetCamera().GetNear(),
+					.m_FarPlane = GetCamera().GetFar(),
+					.m_ManualEV100 = GetCamera().GetManualEV100(),
+					.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+					.m_Keys = {
+						{ .m_Frame = 0, .m_Position = FixtureViewPosition,
+							.m_Target = FixtureViewTarget, .m_VerticalFovDegrees = FixtureViewFov },
+						{ .m_Frame = 179, .m_Position = FixtureViewPosition,
+							.m_Target = FixtureViewTarget, .m_VerticalFovDegrees = FixtureViewFov },
+					},
+				};
+			};
+		const bool pathsRegistered = GetCameraRig().SetCameraPaths({
+			// Geometry correspondence stays exact while every surface's shading changes.
+			makeFixturePath(LightChangePathId, "Light Change",
+				"Static fixture view; the directional light steps to 60% at frame 60 and fades "
+				"back over frames 120-179."),
+			// Correspondence of a moving rigid object over a static background.
+			makeFixturePath(MovingObjectPathId, "Moving Object",
+				"Static fixture view; the rigid sphere moves with the path frame, revealing and "
+				"covering the background behind it."),
+			});
+		GGLAB_ASSERT_MSG(pathsRegistered, "The Temporal AA Lab camera paths must be valid.");
 
 		const auto createCube = [this](std::string_view key, const Vector3& position,
 			const Vector3& scale, const Color& color, float roughness, float metallic = 0.0f,
@@ -431,9 +535,10 @@ namespace gglab
 		components::LightComponent light{};
 		light.m_Type = LightType::Directional;
 		light.m_Color = Color::White;
-		light.m_Intensity = 3.5f;
+		light.m_Intensity = LightIntensity;
 		light.m_Range = 1000.0f;
 		registry.emplace<components::LightComponent>(entity, light);
+		m_LightEntity = entity;
 	}
 
 	void TemporalAALabSession::ApplySelectedPreviewSelection() noexcept
@@ -561,8 +666,10 @@ namespace gglab
 				TemporalAAMaxHistoryFeedbackCeiling, 0.0f))[0];
 		const float packedCeilingSaturationAge =
 			ResolveTemporalAAFeedbackSaturationAge(packedCeiling);
-		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAge &&
-			packedCeilingSaturationAge <= TemporalHistoryMaxAge && packedCeiling < 1.0f;
+		const float maxHistorySamples = ResolveTemporalAAMaxHistorySamples(taa.m_MaxHistoryFeedback);
+		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAccumulation &&
+			packedCeilingSaturationAge <= TemporalHistoryMaxAccumulation && packedCeiling < 1.0f &&
+			ResolveTemporalAAMaxHistorySamples(packedCeiling) < TemporalHistoryMaxAccumulation;
 		const std::string gpuTiming = m_GpuTimingSampleCount > 0
 			? std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
 				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
@@ -584,11 +691,25 @@ namespace gglab
 				"FOV {:.3f} deg, exposure {:.3f} EV", camera.GetFov(),
 				camera.GetExposureCompensationEV())},
 			{.m_Name = "TAA settings", .m_Value = std::format(
-				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}",
+				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
+				"relaxation {:.2f}, accumulation {}, rectification {} (gamma {:.2f}), "
+				"history {}, current {}, motion {}, post-temporal {}, resolution {}, "
+				"texture LOD {:.2f}",
 				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
-				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion)},
-			{.m_Name = "Age bound", .m_Value = std::format(
-				"saturation {:.0f}, max {:.0f}", saturationAge, TemporalHistoryMaxAge)},
+				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion,
+				taa.m_HistoryRelaxation,
+				GetTemporalAAHistoryAccumulationName(taa.m_HistoryAccumulation),
+				GetTemporalAAHistoryRectificationName(taa.m_HistoryRectification),
+				taa.m_VarianceClipGamma,
+				GetTemporalAAHistoryFilterName(taa.m_HistoryFilter),
+				GetTemporalAACurrentFilterName(taa.m_CurrentFilter),
+				GetTemporalAAMotionSelectionName(taa.m_MotionSelection),
+				GetTemporalAAPostTemporalViewName(taa.m_PostTemporalView),
+				GetTemporalAAResolutionPresetName(taa.m_ResolutionPreset),
+				taa.m_TextureLodBiasOffset)},
+			{.m_Name = "Accumulation bound", .m_Value = std::format(
+				"age saturation {:.0f}, samples {:.2f}, stored max {:.0f}", saturationAge,
+				maxHistorySamples, TemporalHistoryMaxAccumulation)},
 			{.m_Name = "Frozen ceiling", .m_Value = std::format(
 				"{:.6f} -> age {:.0f}; packed {:.6f} -> age {:.0f}",
 				TemporalAAMaxHistoryFeedbackCeiling, ceilingSaturationAge,
@@ -618,14 +739,14 @@ namespace gglab
 			{.m_Name = "Coupled accumulation bound",
 				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Failed,
-				.m_Detail = "The selected feedback ceiling must saturate no later than MaxHistoryAge and its UNORM16 representation must remain below one."},
+				.m_Detail = "The selected feedback ceiling must saturate both accumulation models below the stored accumulation bound and its UNORM16 representation must remain below one."},
 			{.m_Name = "GPU timing capture",
 				.m_Status = m_GpuTimingSampleCount >= TemporalAAGpuTimingSampleTarget
 					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "The fixed 120-frame window starts after two complete 8-sample jitter cycles and resets when the evidence domain changes."},
 			{.m_Name = "Sampling-footprint review",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Inspect named edge/disocclusion ROIs: RGB is bilinear (4 texels), age is point sampled (1 texel), and depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
+				.m_Detail = "Inspect named edge/disocclusion ROIs: RGB is bilinear (4 texels), the accumulation state is point sampled (1 texel), and depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
 		};
 	}
 

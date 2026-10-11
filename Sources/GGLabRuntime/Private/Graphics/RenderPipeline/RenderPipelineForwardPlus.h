@@ -18,6 +18,7 @@
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
+#include "Graphics/RenderPass/RenderPassTemporalReference.h"
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
@@ -131,6 +132,9 @@ namespace gglab
 		RenderPassAtmosphere m_AtmospherePass;
 		RenderPassAerialPerspective m_AerialPerspectivePass;
 		RenderPassTemporalAA m_TemporalAAPass;
+		// Whether the last built frame showed material diagnostics.
+		bool m_MaterialDiagnosticsShown = false;
+		RenderPassTemporalReference m_TemporalReferencePass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		PostProcessPipeline m_PostProcessPipeline;
 		RenderPassIBL m_IBLPass;
@@ -138,6 +142,7 @@ namespace gglab
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
 		RenderPassFrameCapture m_SceneCapturePass{ FrameCaptureSource::Scene };
 		RenderPassFrameCapture m_CompositedCapturePass{ FrameCaptureSource::Composited };
+		RenderPassFrameCapture m_DiagnosticCapturePass{ FrameCaptureSource::Diagnostic };
 		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
 		std::optional<FramePlan> m_FramePlan;
 

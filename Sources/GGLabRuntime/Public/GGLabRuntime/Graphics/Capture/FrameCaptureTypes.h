@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <cstdint>
@@ -19,6 +20,10 @@ namespace gglab
 		Scene,
 		// Final display-target contents immediately before presentation.
 		Composited,
+		// Display-resolution visualization of one diagnostic tap of the frame, in the
+		// encoding of the post-process preview, recorded after post-processing. Each
+		// request names its tap; a tap without a source in that frame fails.
+		Diagnostic,
 	};
 
 	enum class FrameCaptureStatus : uint8_t
@@ -52,6 +57,13 @@ namespace gglab
 	};
 
 	[[nodiscard]] std::string_view GetFrameCaptureSourceName(FrameCaptureSource source) noexcept;
+
+	// Stable name of a tap that supports diagnostic captures, or empty for any other
+	// tap. Diagnostic captures cover temporal, scene-depth and GTAO taps.
+	[[nodiscard]] std::string_view GetFrameCaptureDiagnosticTapName(
+		PostProcessDebugTap tap) noexcept;
+	[[nodiscard]] std::optional<PostProcessDebugTap> FindFrameCaptureDiagnosticTap(
+		std::string_view name) noexcept;
 
 	// Converts a captured image to 8-bit RGBA rows with opaque alpha. Display
 	// targets store display-encoded values for both Unorm and UnormSrgb formats,

@@ -84,8 +84,10 @@ namespace gglab
 				context.m_TemporalFramePlan->m_DisplayViewId == context.m_DisplayViewId)
 			{
 				const auto& plan = *context.m_TemporalFramePlan;
-				snapshot.m_TemporalAA = ResolveTemporalStatus(plan);
-				if (plan.m_Active)
+				const TemporalConsumerPlan& temporalAA =
+					plan.GetConsumer(TemporalConsumer::TemporalAA);
+				snapshot.m_TemporalAA = ResolveTemporalStatus(temporalAA);
+				if (temporalAA.IsActive())
 				{
 					const auto* temporal = blackboard.TryGet<RGTemporalAAResources>(TemporalAAResourcesName);
 					snapshot.m_TemporalAA = temporal
@@ -193,24 +195,25 @@ namespace gglab
 			GGLAB_UNREACHABLE("Unhandled GTAO frame status.");
 		}
 
-		static ViewRenderFeatureStatus ResolveTemporalStatus(const ResolvedTemporalFramePlan& plan) noexcept
+		static ViewRenderFeatureStatus ResolveTemporalStatus(
+			const TemporalConsumerPlan& consumer) noexcept
 		{
-			if (plan.m_Active)
+			if (consumer.IsActive())
 			{
 				return { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			}
-			switch (plan.m_DisableReason)
+			switch (consumer.m_DisableReason)
 			{
-			case TemporalAADisableReason::NotRequested: return DisabledStatus();
-			case TemporalAADisableReason::CoreCapabilityUnavailable:
+			case TemporalConsumerDisableReason::NotRequested: return DisabledStatus();
+			case TemporalConsumerDisableReason::CoreCapabilityUnavailable:
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::CoreCapabilityUnavailable };
-			case TemporalAADisableReason::DisplayViewIneligible:
+			case TemporalConsumerDisableReason::DisplayViewIneligible:
 				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::DisplayViewIneligible };
-			case TemporalAADisableReason::DepthVelocityPathUnavailable:
+			case TemporalConsumerDisableReason::DepthVelocityPathUnavailable:
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::DepthVelocityPathUnavailable };
-			case TemporalAADisableReason::SceneExtensionUnsupported:
+			case TemporalConsumerDisableReason::SceneExtensionUnsupported:
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::SceneExtensionUnsupported };
-			case TemporalAADisableReason::None:
+			case TemporalConsumerDisableReason::None:
 				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
 			}
 			GGLAB_UNREACHABLE("Unhandled temporal disable reason.");

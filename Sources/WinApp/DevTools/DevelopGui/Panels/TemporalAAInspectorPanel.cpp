@@ -14,37 +14,68 @@
 
 #include <algorithm>
 #include <ranges>
+#include <string>
 
 namespace gglab
 {
 	namespace
 	{
-		const char* StatusName(TemporalAAFrameStatus status) noexcept
+		const char* StatusName(TemporalConsumerStatus status) noexcept
 		{
 			switch (status)
 			{
-			case TemporalAAFrameStatus::Disabled: return "Disabled";
-			case TemporalAAFrameStatus::Unavailable: return "Unavailable";
-			case TemporalAAFrameStatus::Active: return "Active";
+			case TemporalConsumerStatus::Disabled: return "Disabled";
+			case TemporalConsumerStatus::Unavailable: return "Unavailable";
+			case TemporalConsumerStatus::Active: return "Active";
 			}
 			return "Unknown";
 		}
 
-		const char* DisableReasonName(TemporalAADisableReason reason) noexcept
+		const char* DisableReasonName(TemporalConsumerDisableReason reason) noexcept
 		{
 			switch (reason)
 			{
-			case TemporalAADisableReason::None: return "None";
-			case TemporalAADisableReason::NotRequested: return "Not requested";
-			case TemporalAADisableReason::CoreCapabilityUnavailable:
+			case TemporalConsumerDisableReason::None: return "None";
+			case TemporalConsumerDisableReason::NotRequested: return "Not requested";
+			case TemporalConsumerDisableReason::CoreCapabilityUnavailable:
 				return "Core capability unavailable";
-			case TemporalAADisableReason::DisplayViewIneligible: return "Display view ineligible";
-			case TemporalAADisableReason::DepthVelocityPathUnavailable:
+			case TemporalConsumerDisableReason::DisplayViewIneligible:
+				return "Display view ineligible";
+			case TemporalConsumerDisableReason::DepthVelocityPathUnavailable:
 				return "Depth/velocity path unavailable";
-			case TemporalAADisableReason::SceneExtensionUnsupported:
+			case TemporalConsumerDisableReason::SceneExtensionUnsupported:
 				return "Scene extension unsupported";
 			}
 			return "Unknown";
+		}
+
+		[[nodiscard]] std::string JoinServiceNames(TemporalService services)
+		{
+			std::string names;
+			for (const TemporalService service : TemporalServices)
+			{
+				if (Test(services, service))
+				{
+					names += names.empty() ? "" : ", ";
+					names += GetTemporalServiceName(service);
+				}
+			}
+			return names.empty() ? std::string("none") : names;
+		}
+
+		void DrawFramePlan(const ResolvedTemporalFramePlan& plan)
+		{
+			ImGui::Text("Services: %s", JoinServiceNames(plan.m_Services).c_str());
+			for (uint32_t index = 0; index < TemporalConsumerCount; ++index)
+			{
+				const auto consumer = static_cast<TemporalConsumer>(index);
+				const TemporalConsumerPlan& consumerPlan = plan.GetConsumer(consumer);
+				ImGui::BulletText("%.*s: %s%s%s",
+					static_cast<int>(GetTemporalConsumerName(consumer).size()),
+					GetTemporalConsumerName(consumer).data(), StatusName(consumerPlan.m_Status),
+					consumerPlan.IsActive() ? "" : " | ",
+					consumerPlan.IsActive() ? "" : DisableReasonName(consumerPlan.m_DisableReason));
+			}
 		}
 
 		const char* ResetReasonName(TemporalHistoryResetReason reason) noexcept
@@ -60,6 +91,7 @@ namespace gglab
 			case TemporalHistoryResetReason::ExtentChanged: return "Extent changed";
 			case TemporalHistoryResetReason::FormatChanged: return "Format changed";
 			case TemporalHistoryResetReason::ColorAbiChanged: return "Color ABI changed";
+			case TemporalHistoryResetReason::AccumulationChanged: return "Accumulation changed";
 			case TemporalHistoryResetReason::InvalidExposureMetadata: return "Invalid exposure metadata";
 			case TemporalHistoryResetReason::AllocationFailure: return "Allocation failure";
 			case TemporalHistoryResetReason::AvailabilityChanged: return "Availability changed";
@@ -80,7 +112,9 @@ namespace gglab
 			case PostProcessDebugTap::TemporalReprojectionUV: return "Reprojection UV";
 			case PostProcessDebugTap::TemporalRejection: return "Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";
-			case PostProcessDebugTap::TemporalHistoryAge: return "History Age";
+			case PostProcessDebugTap::TemporalHistorySamples: return "History Samples";
+			case PostProcessDebugTap::TemporalClipDistance: return "Clip Distance";
+			case PostProcessDebugTap::TemporalHistoryRelaxation: return "History Relaxation";
 			case PostProcessDebugTap::TemporalMotionDirection: return "Motion Direction";
 			case PostProcessDebugTap::TemporalMotionMagnitude: return "Motion Magnitude";
 			default: return "Temporal Preview";
@@ -103,6 +137,56 @@ namespace gglab
 				0.05f, 0.0f, TemporalAAMaxLuminanceWeightScale, "%.2f");
 			ImGui::DragFloat("Clamp Expansion", &settings.m_NeighborhoodClampExpansion,
 				0.005f, 0.0f, TemporalAAMaxNeighborhoodClampExpansion, "%.3f");
+			ImGui::SliderFloat("History Relaxation", &settings.m_HistoryRelaxation,
+				0.0f, TemporalAAMaxHistoryRelaxation, "%.2f");
+			int historyAccumulation = static_cast<int>(settings.m_HistoryAccumulation);
+			if (ImGui::Combo("History Accumulation", &historyAccumulation,
+				"Compatibility Age\0Effective Samples\0"))
+			{
+				settings.m_HistoryAccumulation =
+					static_cast<TemporalAAHistoryAccumulation>(historyAccumulation);
+			}
+			int historyRectification = static_cast<int>(settings.m_HistoryRectification);
+			if (ImGui::Combo("History Rectification", &historyRectification,
+				"Min/Max Clamp\0Variance Clip\0Bounded Variance Clip\0"))
+			{
+				settings.m_HistoryRectification =
+					static_cast<TemporalAAHistoryRectification>(historyRectification);
+			}
+			ImGui::SliderFloat("Variance Clip Gamma", &settings.m_VarianceClipGamma,
+				TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma, "%.2f");
+			int historyFilter = static_cast<int>(settings.m_HistoryFilter);
+			if (ImGui::Combo("History Filter", &historyFilter, "Bilinear\0Catmull-Rom (clamped)\0"))
+			{
+				settings.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(historyFilter);
+			}
+			int currentFilter = static_cast<int>(settings.m_CurrentFilter);
+			if (ImGui::Combo("Current Filter", &currentFilter,
+				"Point\0Gaussian\0"))
+			{
+				settings.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(currentFilter);
+			}
+			int motionSelection = static_cast<int>(settings.m_MotionSelection);
+			if (ImGui::Combo("Motion Selection", &motionSelection,
+				"Center\0Closest Depth\0"))
+			{
+				settings.m_MotionSelection =
+					static_cast<TemporalAAMotionSelection>(motionSelection);
+			}
+			int postTemporalView = static_cast<int>(settings.m_PostTemporalView);
+			if (ImGui::Combo("Post-Temporal View", &postTemporalView, "Jittered\0Unjittered\0"))
+			{
+				settings.m_PostTemporalView =
+					static_cast<TemporalAAPostTemporalView>(postTemporalView);
+			}
+			int resolutionPreset = static_cast<int>(settings.m_ResolutionPreset);
+			if (ImGui::Combo("Resolution", &resolutionPreset, "Native\0Quality (1/1.5)\0"))
+			{
+				settings.m_ResolutionPreset =
+					static_cast<TemporalAAResolutionPreset>(resolutionPreset);
+			}
+			ImGui::SliderFloat("Texture LOD Bias Offset", &settings.m_TextureLodBiasOffset,
+				TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset, "%.2f");
 		}
 
 		void DrawPreview(DevelopGuiContext& context,
@@ -123,7 +207,9 @@ namespace gglab
 				PostProcessDebugTap::TemporalReprojectionUV,
 				PostProcessDebugTap::TemporalRejection,
 				PostProcessDebugTap::TemporalHistoryWeight,
-				PostProcessDebugTap::TemporalHistoryAge,
+				PostProcessDebugTap::TemporalHistorySamples,
+				PostProcessDebugTap::TemporalClipDistance,
+				PostProcessDebugTap::TemporalHistoryRelaxation,
 				PostProcessDebugTap::TemporalMotionDirection,
 				PostProcessDebugTap::TemporalMotionMagnitude,
 			};
@@ -185,7 +271,8 @@ namespace gglab
 			}
 			else
 			{
-				ImGui::TextDisabled(snapshot.m_FramePlan.m_Active ? "Preview update pending..."
+				ImGui::TextDisabled(snapshot.m_FramePlan.IsConsumerActive(
+					TemporalConsumer::TemporalAA) ? "Preview update pending..."
 					: "The selected preview requires an active TAA frame.");
 			}
 		}
@@ -207,12 +294,17 @@ namespace gglab
 		}
 
 		const auto& plan = snapshot->m_FramePlan;
-		ImGui::Text("Status: %s%s%s", StatusName(plan.m_Status),
-			plan.m_Active ? "" : " | ",
-			plan.m_Active ? "" : DisableReasonName(plan.m_DisableReason));
+		const TemporalConsumerPlan& temporalAA = plan.GetConsumer(TemporalConsumer::TemporalAA);
+		ImGui::Text("Status: %s%s%s", StatusName(temporalAA.m_Status),
+			temporalAA.IsActive() ? "" : " | ",
+			temporalAA.IsActive() ? "" : DisableReasonName(temporalAA.m_DisableReason));
 		ImGui::Text("History: %s | last reset: %s",
 			snapshot->m_History.m_HistoryValid ? "Valid" : "Invalid",
 			ResetReasonName(snapshot->m_History.m_LastResetReason));
+		if (ImGui::CollapsingHeader("Frame Plan"))
+		{
+			DrawFramePlan(plan);
+		}
 
 		if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -280,6 +372,8 @@ namespace gglab
 				history.m_Compatibility.m_ColorAbi == TemporalColorAbi::LinearRec709PreExposedV2
 					? "Pre-exposed scene linear" : "Scene linear",
 				history.m_LastCommitted.m_PreExposure);
+			ImGui::Text("History accumulation: %s",
+				GetTemporalAAHistoryAccumulationName(history.m_Compatibility.m_Accumulation).data());
 			if (!history.m_PendingRetirementFences.empty())
 			{
 				ImGui::Text("Latest pending fence: %llu",

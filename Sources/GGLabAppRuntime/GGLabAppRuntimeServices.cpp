@@ -4,6 +4,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameSequenceCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
@@ -161,6 +162,7 @@ namespace gglab
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
 				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
 			});
+		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
@@ -330,6 +332,10 @@ namespace gglab
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
 		// Captures that are not due yet are cancelled; recorded captures keep being
 		// written and are awaited after the render host finalized.
+		if (m_FrameSequence)
+		{
+			m_FrameSequence->Cancel();
+		}
 		if (m_FrameCapture)
 		{
 			m_FrameCapture->PrepareForShutdown();

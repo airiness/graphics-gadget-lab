@@ -32,7 +32,8 @@ namespace gglab
 				return {};
 			}
 			[[nodiscard]] TemporalFrameTransaction& BeginTemporalFrame(RenderFrame&,
-				const ResolvedTemporalFramePlan&, uint32_t, uint32_t, float) noexcept override
+				const ResolvedTemporalFramePlan&, const ViewResolution&, float,
+				const std::optional<TemporalReferenceSample>&) noexcept override
 			{
 				return m_Transaction;
 			}
@@ -47,6 +48,11 @@ namespace gglab
 				const noexcept override
 			{
 				return m_Capabilities;
+			}
+			[[nodiscard]] const GTAOCapabilityStatus& GetGTAOCapabilityStatus()
+				const noexcept override
+			{
+				return m_GTAOCapabilities;
 			}
 			void Render(RenderFrame&, RenderGraph&, const RenderFrameContext&) noexcept override {}
 			[[nodiscard]] RHIFrameEndResult EndFrame(RenderFrame&) noexcept override
@@ -94,6 +100,7 @@ namespace gglab
 			void AbortFrame(uint64_t) noexcept override {}
 			TemporalFrameTransaction m_Transaction{};
 			TemporalAACapabilityStatus m_Capabilities{};
+			GTAOCapabilityStatus m_GTAOCapabilities{};
 		};
 
 		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabId&,

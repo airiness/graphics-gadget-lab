@@ -17,9 +17,12 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/Pipeline/GTAOCapability.h"
+#include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -116,6 +119,10 @@ namespace gglab
 		m_BakeAtmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
 		m_TemporalHistoryManager =
 			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
+		m_TemporalReferenceAccumulator =
+			std::make_unique<TemporalReferenceAccumulator>(m_PersistentTexturePool.get());
+		m_GTAOTemporalHistory =
+			std::make_unique<GTAOTemporalHistory>(m_PersistentTexturePool.get());
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -180,6 +187,11 @@ namespace gglab
 			historySupport.m_Depth.m_ShaderResource.IsSupported();
 		m_TemporalAACapabilityStatus.m_HistoryDepthTypedUavStore =
 			historySupport.m_Depth.m_TypedUavStore.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryReliabilityShaderResource =
+			historySupport.m_Reliability.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryReliabilityTypedUavStore =
+			historySupport.m_Reliability.m_TypedUavStore.IsSupported();
+		m_GTAOCapabilityStatus = QueryGTAOCapabilityStatus(*device);
 
 		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
 		m_FrameCapture = std::make_unique<FrameCaptureService>(m_RHIContext->GetDevice());
@@ -215,6 +227,10 @@ namespace gglab
 		m_Atmosphere.reset();
 		m_TemporalHistoryManager->Shutdown();
 		m_TemporalHistoryManager.reset();
+		m_TemporalReferenceAccumulator->Release(m_LastSubmittedFencePoint);
+		m_TemporalReferenceAccumulator.reset();
+		m_GTAOTemporalHistory->Release(m_LastSubmittedFencePoint);
+		m_GTAOTemporalHistory.reset();
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
@@ -231,6 +247,7 @@ namespace gglab
 		m_TemporalViewHistory.Invalidate();
 		m_TemporalObjectHistory.Invalidate();
 		m_TemporalAACapabilityStatus = {};
+		m_GTAOCapabilityStatus = {};
 
 		m_RHIContext.reset();
 
@@ -275,15 +292,36 @@ namespace gglab
 	}
 
 	TemporalFrameTransaction& Renderer::BeginTemporalFrame(RenderFrame& frame,
-		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-		float scenePreExposure) noexcept
+		const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
+		float scenePreExposure,
+		const std::optional<TemporalReferenceSample>& referenceSample) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
 			m_ActiveFrame.m_Phase == FramePhase::Begun,
 			"Temporal frame planning requires the active begun render host frame.");
+		GGLAB_ASSERT_MSG(referenceSample.has_value() ==
+			plan.GetConsumer(TemporalConsumer::Reference).m_Requested,
+			"The temporal plan must be resolved with the frame's reference request.");
+		const std::optional<TemporalReferenceSample> sample =
+			plan.IsConsumerActive(TemporalConsumer::Reference) ? referenceSample : std::nullopt;
+		// A sample the accumulator cannot take leaves the frame without an accumulator,
+		// which the pipeline reports as a contract failure.
+		// The reference averages the display-domain scene it accumulates.
+		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(sample,
+			resolution.m_Display.m_Width, resolution.m_Display.m_Height,
+			m_LastSubmittedFencePoint);
+		// Temporal GTAO history follows the half extent of the render domain.
+		const bool ambientOcclusionHistory = plan.UsesAmbientOcclusionHistory();
+		const bool canAccumulateAmbientOcclusion = m_GTAOTemporalHistory->BeginFrame(
+			ambientOcclusionHistory,
+			MakeGTAOHalfResolutionExtent(resolution.m_Render.m_Width, resolution.m_Render.m_Height),
+			m_LastSubmittedFencePoint);
 		m_ActiveFrame.m_TemporalTransaction.Begin(
-			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
-			m_TemporalHistoryManager.get(), scenePreExposure);
+			m_TemporalViewHistory, m_TemporalObjectHistory, plan, resolution,
+			m_TemporalHistoryManager.get(), scenePreExposure, sample,
+			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr,
+			ambientOcclusionHistory && canAccumulateAmbientOcclusion
+				? m_GTAOTemporalHistory.get() : nullptr);
 		return m_ActiveFrame.m_TemporalTransaction;
 	}
 
@@ -307,8 +345,7 @@ namespace gglab
 			.m_TemporalFramePlan = request.m_TemporalFramePlan,
 			.m_TemporalFrameTransaction = &request.m_TemporalFrameTransaction,
 			.m_DisplayViewId = request.m_DisplayViewId,
-			.m_WindowWidth = request.m_WindowWidth,
-			.m_WindowHeight = request.m_WindowHeight,
+			.m_ViewResolution = request.m_ViewResolution,
 			.m_FrameSlotIndex = request.m_FrameSlotIndex,
 			.m_BackBufferIndex = request.m_BackBufferIndex,
 			.m_FrameSerial = request.m_FrameSerial,

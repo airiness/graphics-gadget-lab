@@ -4,6 +4,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameSequenceCoordinator.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "Demo/DemoBase.h"
@@ -24,18 +25,27 @@
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
 #include "LoadingProgress.h"
 
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <format>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -104,8 +114,14 @@ namespace gglab
 			std::span<const CameraReferenceView> m_ReferenceViews;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint64_t m_TemporalSessionIdentity = 0;
+			const ResolvedTemporalFramePlan& m_TemporalFramePlan;
+			const TemporalFrameTransaction& m_TemporalFrameTransaction;
+			const TemporalAASettings& m_TemporalSettings;
+			const GTAOSettings& m_GTAOSettings;
+			// Display extent; it keys capture settling.
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			ViewResolution m_ViewResolution{};
 			AppRuntimeRHIBackend m_Backend = AppRuntimeRHIBackend::Unknown;
 			bool m_DevelopmentTools = false;
 		};
@@ -169,6 +185,108 @@ namespace gglab
 			return readiness;
 		}
 
+		[[nodiscard]] std::vector<std::string> GetTemporalServiceNames(
+			TemporalService services) noexcept
+		{
+			std::vector<std::string> names;
+			for (const TemporalService service : TemporalServices)
+			{
+				if (Test(services, service))
+				{
+					names.emplace_back(GetTemporalServiceName(service));
+				}
+			}
+			return names;
+		}
+
+		[[nodiscard]] FrameCaptureTemporalState BuildCaptureTemporalState(
+			const CaptureFrameInputs& inputs) noexcept
+		{
+			const ResolvedTemporalFramePlan& plan = inputs.m_TemporalFramePlan;
+			const TemporalConsumerPlan& temporalAA =
+				plan.GetConsumer(TemporalConsumer::TemporalAA);
+			std::vector<FrameCaptureTemporalConsumer> consumers;
+			consumers.reserve(TemporalConsumerCount);
+			for (uint32_t index = 0; index < TemporalConsumerCount; ++index)
+			{
+				const auto consumer = static_cast<TemporalConsumer>(index);
+				const TemporalConsumerPlan& consumerPlan = plan.GetConsumer(consumer);
+				consumers.push_back({
+					.m_Name = std::string(GetTemporalConsumerName(consumer)),
+					.m_Requested = consumerPlan.m_Requested,
+					.m_Status = std::string(GetTemporalConsumerStatusName(consumerPlan.m_Status)),
+					.m_DisableReason = std::string(
+						GetTemporalConsumerDisableReasonName(consumerPlan.m_DisableReason)),
+					.m_Services = GetTemporalServiceNames(consumerPlan.m_Services),
+				});
+			}
+			const TemporalAASettings& settings = inputs.m_TemporalSettings;
+			const Vector2& jitter = inputs.m_TemporalFrameTransaction.GetJitterPixels();
+			const std::optional<TemporalReferenceSample>& referenceSample =
+				inputs.m_TemporalFrameTransaction.GetReferenceSample();
+			const ViewResolution& resolution = inputs.m_ViewResolution;
+			return FrameCaptureTemporalState{
+				.m_Requested = temporalAA.m_Requested,
+				.m_Status = std::string(GetTemporalConsumerStatusName(temporalAA.m_Status)),
+				.m_DisableReason = std::string(
+					GetTemporalConsumerDisableReasonName(temporalAA.m_DisableReason)),
+				.m_Consumers = std::move(consumers),
+				.m_Services = GetTemporalServiceNames(plan.m_Services),
+				.m_SessionIdentity = plan.m_SessionIdentity,
+				.m_ResetIdentity = plan.m_ResetIdentity,
+				.m_JitterIndex = inputs.m_TemporalFrameTransaction.GetJitterIndex(),
+				.m_JitterSequenceLength = temporalAA.IsActive() ? plan.GetJitterSequenceLength()
+					: referenceSample ? referenceSample->m_Count : 0,
+				.m_JitterPixels = { jitter.m_X, jitter.m_Y },
+				.m_MaxHistoryFeedback = settings.m_MaxHistoryFeedback,
+				.m_DepthAbsoluteThreshold = settings.m_DepthAbsoluteThreshold,
+				.m_DepthRelativeThreshold = settings.m_DepthRelativeThreshold,
+				.m_VelocityWeightScale = settings.m_VelocityWeightScale,
+				.m_LuminanceWeightScale = settings.m_LuminanceWeightScale,
+				.m_NeighborhoodClampExpansion = settings.m_NeighborhoodClampExpansion,
+				.m_HistoryRelaxation = settings.m_HistoryRelaxation,
+				.m_HistoryAccumulation = std::string(
+					GetTemporalAAHistoryAccumulationName(settings.m_HistoryAccumulation)),
+				.m_HistoryRectification = std::string(
+					GetTemporalAAHistoryRectificationName(settings.m_HistoryRectification)),
+				.m_VarianceClipGamma = settings.m_VarianceClipGamma,
+				.m_HistoryFilter =
+					std::string(GetTemporalAAHistoryFilterName(settings.m_HistoryFilter)),
+				.m_CurrentFilter =
+					std::string(GetTemporalAACurrentFilterName(settings.m_CurrentFilter)),
+				.m_MotionSelection =
+					std::string(GetTemporalAAMotionSelectionName(settings.m_MotionSelection)),
+				.m_PostTemporalView =
+					std::string(GetTemporalAAPostTemporalViewName(settings.m_PostTemporalView)),
+				.m_ResolutionPreset =
+					std::string(GetTemporalAAResolutionPresetName(settings.m_ResolutionPreset)),
+				.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset,
+				.m_GTAO = {
+					.m_Enabled = inputs.m_GTAOSettings.m_Enabled,
+					.m_Radius = inputs.m_GTAOSettings.m_Radius,
+					.m_FalloffStart = inputs.m_GTAOSettings.m_FalloffStart,
+					.m_FalloffEnd = inputs.m_GTAOSettings.m_FalloffEnd,
+					.m_DirectionCount = inputs.m_GTAOSettings.m_DirectionCount,
+					.m_StepCount = inputs.m_GTAOSettings.m_StepCount,
+					.m_DenoiseRadius = inputs.m_GTAOSettings.m_DenoiseRadius,
+					.m_TemporalAccumulation = inputs.m_GTAOSettings.m_TemporalAccumulation,
+					.m_TemporalMaxSamples = inputs.m_GTAOSettings.m_TemporalMaxSamples,
+				},
+				// The view applies log2(render / display) on top of the temporal offset.
+				.m_TextureLodBias = temporalAA.IsActive()
+					? std::log2(static_cast<float>(resolution.m_Render.m_Width) /
+						static_cast<float>(resolution.m_Display.m_Width)) +
+						settings.m_TextureLodBiasOffset
+					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,
+				.m_RenderExtent = { resolution.m_Render.m_Width, resolution.m_Render.m_Height },
+				.m_DisplayExtent = { resolution.m_Display.m_Width, resolution.m_Display.m_Height },
+				.m_RenderScale = resolution.m_Display.m_Width > 0
+					? static_cast<float>(resolution.m_Render.m_Width) /
+						static_cast<float>(resolution.m_Display.m_Width)
+					: 0.0f,
+			};
+		}
+
 		[[nodiscard]] FrameCaptureFrameState BuildCaptureFrameState(
 			const CaptureFrameInputs& inputs) noexcept
 		{
@@ -214,6 +332,7 @@ namespace gglab
 				.m_FixedDeltaTime = inputs.m_Time.GetFixedDeltaTime(),
 				.m_TotalTime = inputs.m_Time.GetTotalTime(),
 				.m_DevelopmentTools = inputs.m_DevelopmentTools,
+				.m_Temporal = BuildCaptureTemporalState(inputs),
 			};
 		}
 	}
@@ -246,9 +365,29 @@ namespace gglab
 			return AppRuntimeTickResult::Continue;
 		}
 
-		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
+		// A sequence capture that the capture writer cannot accept yet defers the
+		// whole frame, before time advances, so no extra frame is simulated or
+		// rendered while the writer drains.
+		if (m_FrameSequence->ShouldDeferFrame())
+		{
+			m_FrameCapture->Update();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			return AppRuntimeTickResult::Continue;
+		}
 
-		m_Time->Update();
+		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
+		SyncSequenceGpuProfiling();
+
+		if (m_FrameSequence->ShouldHoldTime() || m_FrameCapture->ShouldHoldTime())
+		{
+			// Every sample of a supersampled reference frame renders the same instant,
+			// and an after-ready capture does not advance time before it settles.
+			m_Time->Hold();
+		}
+		else
+		{
+			m_Time->Update();
+		}
 		m_TaskSystem->PumpCompletions({
 			.m_MaxCallbacks = 64,
 			.m_MaxMilliseconds = 1.0,
@@ -344,15 +483,62 @@ namespace gglab
 			m_FrameCapture->OnReferenceViewApplied(viewChange->m_RequestId,
 				cameraRig.RestoreReferenceView(viewChange->m_ReferenceViewId));
 		}
+		// A running sequence poses the main camera after content updates and capture
+		// views, so the path alone determines this frame's camera.
+		std::optional<TemporalReferenceSample> referenceSample;
+		std::optional<FrameSequenceTemporalAAOverrides> sequenceTemporalAAOverrides;
+		std::optional<FrameSequenceGTAOOverrides> sequenceGTAOOverrides;
+		if (const std::optional<FrameSequencePoseRequest> sequencePose =
+			m_FrameSequence->PrepareFrame(
+				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
+		{
+			const std::optional<CameraPathPose> pose = cameraRig.ApplyCameraPathFrame(
+				sequencePose->m_CameraPathId, sequencePose->m_Frame);
+			m_FrameSequence->OnPoseApplied(pose);
+			if (const CameraPath* path = pose
+				? cameraRig.FindCameraPath(sequencePose->m_CameraPathId) : nullptr)
+			{
+				demo->OnCameraPathFrameApplied(*path, sequencePose->m_Frame);
+			}
+			referenceSample = sequencePose->m_ReferenceSample;
+			sequenceTemporalAAOverrides = sequencePose->m_TemporalAAOverrides;
+			sequenceGTAOOverrides = sequencePose->m_GTAOOverrides;
+		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
 		GGLAB_ASSERT_MSG(effectiveDisplayView.IsValid(),
 			"CameraRig must resolve one effective display view before "
 			"frame planning.");
 		const CameraRig::CameraSlot* displayCameraSlot = effectiveDisplayView.m_CameraSlot;
-		const ResolvedViewRenderSettings displayViewSettings =
+		// An after-ready capture settles over temporal history of ready frames
+		// only. A cut drops history that still holds frames of loading content.
+		if (m_FrameCapture->ShouldRestartTemporalHistory())
+		{
+			displayCameraSlot->m_Camera->RequestTemporalReset();
+		}
+		ResolvedViewRenderSettings displayViewSettings =
 			ResolveViewRenderSettings(
 				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		if (referenceSample)
+		{
+			// The reference owns jitter and accumulation; Temporal AA and temporal GTAO
+			// stay inactive while it averages its own sample sequence.
+			displayViewSettings.m_TemporalAA.m_Enabled = false;
+			displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
+		}
+		else
+		{
+			if (sequenceTemporalAAOverrides)
+			{
+				displayViewSettings.m_TemporalAA = ApplyFrameSequenceTemporalAAOverrides(
+					*sequenceTemporalAAOverrides, displayViewSettings.m_TemporalAA);
+			}
+			if (sequenceGTAOOverrides)
+			{
+				displayViewSettings.m_Lighting.m_GTAO = ApplyFrameSequenceGTAOOverrides(
+					*sequenceGTAOOverrides, displayViewSettings.m_Lighting.m_GTAO);
+			}
+		}
 		const uint64_t temporalSessionIdentity =
 			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
 			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
@@ -366,10 +552,20 @@ namespace gglab
 				.m_SessionIdentity = temporalSessionIdentity,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
+				.m_ReferenceRequested = referenceSample.has_value(),
+				.m_AmbientOcclusionRequested =
+					displayViewSettings.m_Lighting.m_GTAO.m_Enabled &&
+					displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation,
+				.m_AmbientOcclusionAvailable =
+					m_RenderHost->GetGTAOCapabilityStatus().IsTemporalAvailable(),
 			});
+		// The window client extent is the display extent; the plan's effective preset
+		// derives the render extent from it.
+		const ViewResolution viewResolution = ResolveTemporalAAViewResolution(
+			{ m_WindowWidth, m_WindowHeight }, temporalFramePlan.m_ResolutionPreset);
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
-			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
-			displayViewSettings.m_Exposure.m_PreExposure);
+			rendererFrame, temporalFramePlan, viewResolution,
+			displayViewSettings.m_Exposure.m_PreExposure, referenceSample);
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
@@ -379,14 +575,14 @@ namespace gglab
 			.m_TemporalFramePlan = temporalFramePlan,
 			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
-			.m_WindowWidth = m_WindowWidth,
-			.m_WindowHeight = m_WindowHeight,
+			.m_ViewResolution = viewResolution,
 			.m_FrameSlotIndex = frameSlotIndex,
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
-		// Captures due this frame are issued before its graph binds capture taps.
-		m_FrameCapture->BeginFrame(BuildCaptureFrameState({
+		// Captures due this frame, including a sequence frame capture, are issued
+		// before its graph binds capture taps.
+		FrameCaptureFrameState captureFrameState = BuildCaptureFrameState({
 			.m_DemoManager = *m_DemoManager,
 			.m_Demo = *demo,
 			.m_EnvironmentAssetController = *m_EnvironmentAssetController,
@@ -397,11 +593,18 @@ namespace gglab
 			.m_ReferenceViews = cameraRig.GetReferenceViews(),
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_TemporalSessionIdentity = temporalSessionIdentity,
+			.m_TemporalFramePlan = temporalFramePlan,
+			.m_TemporalFrameTransaction = temporalFrameTransaction,
+			.m_TemporalSettings = displayViewSettings.m_TemporalAA,
+			.m_GTAOSettings = displayViewSettings.m_Lighting.m_GTAO,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
+			.m_ViewResolution = viewResolution,
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
-			}));
+			});
+		m_FrameSequence->BeginFrame(captureFrameState);
+		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		RenderFrameBuildResult frame;
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
@@ -535,6 +738,14 @@ namespace gglab
 			return FailRuntime("The render host failed to complete frame submission.");
 		}
 		m_FrameCapture->OnFrameSubmitted();
+		m_FrameSequence->OnFrameSubmitted();
+		if (m_FrameSequence->WantsGpuTiming())
+		{
+			if (const GpuProfilingViewBase* gpuProfiling = m_RenderHost->GetGpuProfilingView())
+			{
+				m_FrameSequence->OnGpuProfile(gpuProfiling->GetLatestFrame());
+			}
+		}
 
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
@@ -546,6 +757,27 @@ namespace gglab
 		// Pipelines without an overlay pass still complete the optional tooling frame.
 		toolingFrame.Complete();
 		return AppRuntimeTickResult::Continue;
+	}
+
+	void GGLabAppRuntime::SyncSequenceGpuProfiling() noexcept
+	{
+		GpuProfilingControlBase* control = m_RenderHost->GetGpuProfilingControl();
+		const GpuProfilingViewBase* view = m_RenderHost->GetGpuProfilingView();
+		if (!control || !view)
+		{
+			return;
+		}
+		const bool timingWanted = m_FrameSequence->WantsGpuTiming();
+		if (timingWanted && !m_SequenceGpuProfilingRestore)
+		{
+			m_SequenceGpuProfilingRestore = view->IsEnabled();
+			control->RequestEnabled(true);
+		}
+		else if (!timingWanted && m_SequenceGpuProfilingRestore)
+		{
+			control->RequestEnabled(*m_SequenceGpuProfilingRestore);
+			m_SequenceGpuProfilingRestore.reset();
+		}
 	}
 
 }

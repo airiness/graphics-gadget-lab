@@ -19,6 +19,21 @@ Commands:
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
   result   Report a capture submitted with -NoWait.
+  sequence Play a camera path registered by the active content (-CameraPath),
+           capturing -CaptureFrames ("0,10,20-23"); waits until the sequence
+           and its captures finish unless -NoWait. Poll with 'status'.
+           -Source diagnostic -DiagnosticTap <tap> records one diagnostic tap,
+           such as temporal-history-weight, instead of the scene.
+           -ReferenceSamples <n> renders every frame as a supersampled reference
+           of n jittered samples with Temporal AA inactive and time held;
+           -ReferenceTextureLodBias <b> adds b to its material texture LOD.
+           -TemporalAA "name=value,..." evaluates Temporal AA overrides, such as
+           neighborhoodClampExpansion=1 or historyFilter=bilinear, on every frame.
+           -GTAO "name=value,..." evaluates GTAO overrides, such as temporal=true or
+           temporalMaxSamples=16, on every frame. -GpuTiming records
+           per-scope GPU times of the sequence frames.
+  sequence-cancel
+           Cancel the active sequence.
   stop     Stop a session and wait for the process to exit.
   list     List running sessions.
 
@@ -31,7 +46,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 sto
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'batch', 'result', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -55,8 +70,10 @@ param(
     [int]$StartTimeoutSeconds = 300,
 
     # capture
-    [ValidateSet('scene', 'composited')]
+    [ValidateSet('scene', 'composited', 'diagnostic')]
     [string]$Source = 'scene',
+    # Required with -Source diagnostic, for example temporal-history-weight.
+    [string]$DiagnosticTap,
     [ValidateSet('after-ready', 'next-frame')]
     [string]$Timing = 'after-ready',
     [ValidateRange(0, 10000)]
@@ -72,6 +89,16 @@ param(
 
     # result
     [long]$RequestId,
+
+    # sequence: camera path id and frames to capture, as numbers and ranges.
+    [string]$CameraPath,
+    [string]$CaptureFrames,
+    [ValidateRange(0, 4096)]
+    [int]$ReferenceSamples = 0,
+    [double]$ReferenceTextureLodBias = 0,
+    [string]$TemporalAA,
+    [string]$GTAO,
+    [switch]$GpuTiming,
 
     [int]$TimeoutSeconds = 300
 )
@@ -193,10 +220,51 @@ function New-CaptureRequest([string]$ViewId, [bool]$Wait) {
         outputDirectory = (Get-CaptureOutputDirectory); wait = $Wait
     }
     if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
+    if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
     if ($ViewId) { $request['view'] = $ViewId }
     if ($Label) { $request['label'] = $Label }
     if ($Note) { $request['note'] = $Note }
     return $request
+}
+
+# Expands "0,10,20-23" into frame numbers.
+function ConvertTo-FrameList([string]$Text) {
+    $frames = @()
+    foreach ($part in @($Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+        if ($part -match '^(\d+)-(\d+)$') {
+            $first = [long]$Matches[1]; $last = [long]$Matches[2]
+            if ($last -lt $first) { Fail "Capture frame range '$part' is descending." }
+            for ($frame = $first; $frame -le $last; ++$frame) { $frames += $frame }
+        }
+        elseif ($part -match '^\d+$') {
+            $frames += [long]$part
+        }
+        else {
+            Fail "Capture frame '$part' is not a frame number or range."
+        }
+    }
+    return ,$frames
+}
+
+function ConvertTo-SettingOverrides([string]$Text, [string]$Owner) {
+    $overrides = @{}
+    foreach ($part in @($Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+        if ($part -notmatch '^([A-Za-z]+)=([-+.0-9A-Za-z]+)$') {
+            Fail "$Owner override '$part' is not name=value."
+        }
+        $number = 0.0
+        if ($Matches[2] -eq 'true' -or $Matches[2] -eq 'false') {
+            $overrides[$Matches[1]] = $Matches[2] -eq 'true'
+        }
+        elseif ([double]::TryParse($Matches[2], [Globalization.NumberStyles]::Float,
+                [Globalization.CultureInfo]::InvariantCulture, [ref]$number)) {
+            $overrides[$Matches[1]] = $number
+        }
+        else {
+            $overrides[$Matches[1]] = $Matches[2]
+        }
+    }
+    return $overrides
 }
 
 function Require-Session {
@@ -340,6 +408,55 @@ switch ($Command) {
             Fail "Command 'result' requires a positive -RequestId."
         }
         $response = Invoke-SessionRequest $Session @{ command = 'result'; requestId = $RequestId } 30
+        Complete-SessionResponse $response $Session
+    }
+    'sequence' {
+        Require-Session
+        if (-not $CameraPath) {
+            Fail "Command 'sequence' requires -CameraPath."
+        }
+        $request = @{
+            command = 'sequence'; path = $CameraPath; source = $Source
+            captureFrames = (ConvertTo-FrameList $CaptureFrames)
+            outputDirectory = (Get-CaptureOutputDirectory)
+        }
+        if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
+        if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
+        if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
+        if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
+        if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-SettingOverrides $TemporalAA 'Temporal AA') }
+        if ($GTAO) { $request['gtao'] = (ConvertTo-SettingOverrides $GTAO 'GTAO') }
+        if ($GpuTiming) { $request['gpuTiming'] = $true }
+        if ($Label) { $request['label'] = $Label }
+        if ($Note) { $request['note'] = $Note }
+        $response = Invoke-SessionRequest $Session $request 30
+        if ($NoWait -or -not $response.ok) { Complete-SessionResponse $response $Session }
+
+        $sequenceId = $response.sequence.id
+        $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        while ($true) {
+            $status = Invoke-SessionRequest $Session @{ command = 'status' } 30
+            $sequence = Get-Field $status 'sequence'
+            if ($null -eq $sequence -or $sequence.id -ne $sequenceId) {
+                Fail "Session '$Session' no longer reports sequence $sequenceId." @{ session = $Session }
+            }
+            if (@('completed', 'failed', 'cancelled') -contains $sequence.state) {
+                Write-Result @{
+                    ok = $true; session = $Session; outputDirectory = (Get-CaptureOutputDirectory)
+                    sequence = $sequence
+                } 0
+            }
+            if ((Get-Date) -ge $deadline) {
+                Fail "Sequence $sequenceId did not finish within $TimeoutSeconds seconds." @{
+                    session = $Session; sequence = $sequence
+                }
+            }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    'sequence-cancel' {
+        Require-Session
+        $response = Invoke-SessionRequest $Session @{ command = 'sequence-cancel' } 30
         Complete-SessionResponse $response $Session
     }
     'stop' {

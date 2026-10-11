@@ -1,10 +1,19 @@
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <format>
+#include <limits>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,6 +25,8 @@ namespace gglab
 		using Json = nlohmann::json;
 
 		constexpr uint32_t MaxSettleFrames = 10000;
+		constexpr size_t MaxSequenceCaptureFrames = 10000;
+		constexpr double MaxReferenceTextureLodBias = 8.0;
 
 		[[nodiscard]] std::string ToUtf8(const std::filesystem::path& path)
 		{
@@ -57,7 +68,430 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Stop;
 			}
+			if (command == "sequence")
+			{
+				return ApplicationControlCommand::Sequence;
+			}
+			if (command == "sequence-cancel")
+			{
+				return ApplicationControlCommand::SequenceCancel;
+			}
 			return std::nullopt;
+		}
+
+		// Parses a diagnostic tap name; returns an error text.
+		[[nodiscard]] std::string ParseDiagnosticTap(
+			const Json& value, std::optional<PostProcessDebugTap>& outTap)
+		{
+			outTap = value.is_string()
+				? FindFrameCaptureDiagnosticTap(value.get<std::string>())
+				: std::nullopt;
+			if (!outTap)
+			{
+				return "Field 'diagnosticTap' must name a diagnostic tap such as "
+					"'temporal-history-weight'.";
+			}
+			return {};
+		}
+
+		[[nodiscard]] std::string ValidateDiagnosticTap(
+			FrameCaptureSource source, const std::optional<PostProcessDebugTap>& tap)
+		{
+			if ((source == FrameCaptureSource::Diagnostic) != tap.has_value())
+			{
+				return "Field 'diagnosticTap' is required for, and only valid with, source "
+					"'diagnostic'.";
+			}
+			return {};
+		}
+
+		// Parses an absolute output directory; returns an error text.
+		[[nodiscard]] std::string ParseOutputDirectory(
+			const Json& value, std::filesystem::path& outDirectory)
+		{
+			if (!value.is_string())
+			{
+				return "Field 'outputDirectory' must be a string.";
+			}
+			const std::string text = value.get<std::string>();
+			outDirectory = std::filesystem::path(std::u8string(text.begin(), text.end()));
+			if (!outDirectory.is_absolute())
+			{
+				return "Field 'outputDirectory' must be an absolute directory.";
+			}
+			return {};
+		}
+
+		// Parses the GTAO overrides of a sequence; returns an error text. Values outside a
+		// setting's range are rejected instead of clamped.
+		[[nodiscard]] std::string ParseGTAOOverrides(
+			const Json& value, FrameSequenceGTAOOverrides& outOverrides)
+		{
+			if (!value.is_object())
+			{
+				return "Field 'gtao' must be an object.";
+			}
+			for (const auto& [key, fieldValue] : value.items())
+			{
+				if (key == "temporal")
+				{
+					if (!fieldValue.is_boolean())
+					{
+						return "GTAO override 'temporal' must be a boolean.";
+					}
+					outOverrides.m_TemporalAccumulation = fieldValue.get<bool>();
+					continue;
+				}
+				struct CountField
+				{
+					std::string_view m_Name;
+					std::optional<uint32_t> FrameSequenceGTAOOverrides::* m_Member;
+					uint32_t m_Max;
+				};
+				constexpr std::array<CountField, 3> countFields{ {
+					{ "temporalMaxSamples", &FrameSequenceGTAOOverrides::m_TemporalMaxSamples,
+						GTAOMaxTemporalSamples },
+					{ "directionCount", &FrameSequenceGTAOOverrides::m_DirectionCount,
+						GTAOMaxDirectionCount },
+					{ "stepCount", &FrameSequenceGTAOOverrides::m_StepCount, GTAOMaxStepCount },
+				} };
+				const auto countField = std::ranges::find(countFields, key, &CountField::m_Name);
+				if (countField != countFields.end())
+				{
+					const double count = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
+					if (!fieldValue.is_number() || count != std::floor(count) || count < 1.0 ||
+						count > static_cast<double>(countField->m_Max))
+					{
+						return std::format("GTAO override '{}' must be an integer in [1, {}].",
+							countField->m_Name, countField->m_Max);
+					}
+					outOverrides.*(countField->m_Member) = static_cast<uint32_t>(count);
+					continue;
+				}
+				return std::format("Unknown GTAO override '{}'.", key);
+			}
+			return {};
+		}
+
+		// Parses the Temporal AA overrides of a sequence; returns an error text. Values
+		// outside a setting's range are rejected instead of clamped, so a run records
+		// exactly the configuration it was asked to evaluate.
+		[[nodiscard]] std::string ParseTemporalAAOverrides(
+			const Json& value, FrameSequenceTemporalAAOverrides& outOverrides)
+		{
+			if (!value.is_object())
+			{
+				return "Field 'temporalAA' must be an object.";
+			}
+			struct OverrideField
+			{
+				std::string_view m_Name;
+				std::optional<float> FrameSequenceTemporalAAOverrides::* m_Member;
+				float m_Min;
+				float m_Max;
+			};
+			constexpr std::array<OverrideField, 9> fields{ {
+				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback,
+					0.0f, TemporalAAMaxHistoryFeedbackCeiling },
+				{ "depthAbsoluteThreshold",
+					&FrameSequenceTemporalAAOverrides::m_DepthAbsoluteThreshold,
+					0.0f, TemporalAAMaxDepthThreshold },
+				{ "depthRelativeThreshold",
+					&FrameSequenceTemporalAAOverrides::m_DepthRelativeThreshold,
+					0.0f, TemporalAAMaxDepthThreshold },
+				{ "velocityWeightScale", &FrameSequenceTemporalAAOverrides::m_VelocityWeightScale,
+					0.0f, TemporalAAMaxVelocityWeightScale },
+				{ "luminanceWeightScale",
+					&FrameSequenceTemporalAAOverrides::m_LuminanceWeightScale,
+					0.0f, TemporalAAMaxLuminanceWeightScale },
+				{ "neighborhoodClampExpansion",
+					&FrameSequenceTemporalAAOverrides::m_NeighborhoodClampExpansion,
+					0.0f, TemporalAAMaxNeighborhoodClampExpansion },
+				{ "textureLodBiasOffset",
+					&FrameSequenceTemporalAAOverrides::m_TextureLodBiasOffset,
+					TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
+				{ "varianceClipGamma", &FrameSequenceTemporalAAOverrides::m_VarianceClipGamma,
+					TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
+				{ "historyRelaxation", &FrameSequenceTemporalAAOverrides::m_HistoryRelaxation,
+					0.0f, TemporalAAMaxHistoryRelaxation },
+			} };
+			for (const auto& [key, fieldValue] : value.items())
+			{
+				if (key == "enabled")
+				{
+					if (!fieldValue.is_boolean())
+					{
+						return "Temporal AA override 'enabled' must be a boolean.";
+					}
+					outOverrides.m_Enabled = fieldValue.get<bool>();
+					continue;
+				}
+				if (key == "historyFilter")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array filters{ TemporalAAHistoryFilter::Bilinear,
+						TemporalAAHistoryFilter::CatmullRomClamped };
+					const auto filter = std::ranges::find(
+						filters, name, &GetTemporalAAHistoryFilterName);
+					if (filter == filters.end())
+					{
+						return "Temporal AA override 'historyFilter' must be 'bilinear' or "
+							"'catmull-rom-clamped'.";
+					}
+					outOverrides.m_HistoryFilter = *filter;
+					continue;
+				}
+				if (key == "currentFilter")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array filters{ TemporalAACurrentFilter::Point,
+						TemporalAACurrentFilter::Gaussian };
+					const auto filter = std::ranges::find(
+						filters, name, &GetTemporalAACurrentFilterName);
+					if (filter == filters.end())
+					{
+						return "Temporal AA override 'currentFilter' must be 'point' or "
+							"'gaussian'.";
+					}
+					outOverrides.m_CurrentFilter = *filter;
+					continue;
+				}
+				if (key == "motionSelection")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array selections{ TemporalAAMotionSelection::Center,
+						TemporalAAMotionSelection::ClosestDepth };
+					const auto selection = std::ranges::find(
+						selections, name, &GetTemporalAAMotionSelectionName);
+					if (selection == selections.end())
+					{
+						return "Temporal AA override 'motionSelection' must be 'center' or "
+							"'closest-depth'.";
+					}
+					outOverrides.m_MotionSelection = *selection;
+					continue;
+				}
+				if (key == "postTemporalView")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array views{ TemporalAAPostTemporalView::Jittered,
+						TemporalAAPostTemporalView::Unjittered };
+					const auto view =
+						std::ranges::find(views, name, &GetTemporalAAPostTemporalViewName);
+					if (view == views.end())
+					{
+						return "Temporal AA override 'postTemporalView' must be 'jittered' or "
+							"'unjittered'.";
+					}
+					outOverrides.m_PostTemporalView = *view;
+					continue;
+				}
+				if (key == "historyAccumulation")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array accumulations{
+						TemporalAAHistoryAccumulation::CompatibilityAge,
+						TemporalAAHistoryAccumulation::EffectiveSamples };
+					const auto accumulation = std::ranges::find(
+						accumulations, name, &GetTemporalAAHistoryAccumulationName);
+					if (accumulation == accumulations.end())
+					{
+						return "Temporal AA override 'historyAccumulation' must be "
+							"'compatibility-age' or 'effective-samples'.";
+					}
+					outOverrides.m_HistoryAccumulation = *accumulation;
+					continue;
+				}
+				if (key == "historyRectification")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array rectifications{
+						TemporalAAHistoryRectification::MinMaxClamp,
+						TemporalAAHistoryRectification::VarianceClip,
+						TemporalAAHistoryRectification::BoundedVarianceClip };
+					const auto rectification = std::ranges::find(
+						rectifications, name, &GetTemporalAAHistoryRectificationName);
+					if (rectification == rectifications.end())
+					{
+						return "Temporal AA override 'historyRectification' must be "
+							"'minmax-clamp', 'variance-clip' or 'bounded-variance-clip'.";
+					}
+					outOverrides.m_HistoryRectification = *rectification;
+					continue;
+				}
+				if (key == "resolutionPreset")
+				{
+					const std::string name =
+						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
+					constexpr std::array presets{ TemporalAAResolutionPreset::Native,
+						TemporalAAResolutionPreset::Quality };
+					const auto preset =
+						std::ranges::find(presets, name, &GetTemporalAAResolutionPresetName);
+					if (preset == presets.end())
+					{
+						return "Temporal AA override 'resolutionPreset' must be 'native' or "
+							"'quality'.";
+					}
+					outOverrides.m_ResolutionPreset = *preset;
+					continue;
+				}
+				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
+				if (field == fields.end())
+				{
+					return std::format("Unknown Temporal AA override '{}'.", key);
+				}
+				const double number = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
+				if (!fieldValue.is_number() || !std::isfinite(number) ||
+					number < static_cast<double>(field->m_Min) ||
+					number > static_cast<double>(field->m_Max))
+				{
+					return std::format("Temporal AA override '{}' must be a number from {} to {}.",
+						key, field->m_Min, field->m_Max);
+				}
+				outOverrides.*(field->m_Member) = static_cast<float>(number);
+			}
+			return {};
+		}
+
+		// Fills the sequence request; returns an error text.
+		[[nodiscard]] std::string ParseSequenceFields(
+			const Json& document, ApplicationControlRequest& request)
+		{
+			FrameSequenceRequest& sequence = request.m_Sequence;
+			for (const auto& [key, value] : document.items())
+			{
+				if (key == "protocol" || key == "id" || key == "command")
+				{
+					continue;
+				}
+				if (key == "path" || key == "requiredContentId" || key == "label" ||
+					key == "note")
+				{
+					if (!value.is_string())
+					{
+						return std::format("Field '{}' must be a string.", key);
+					}
+					std::string& target = key == "path" ? sequence.m_CameraPathId
+						: key == "requiredContentId" ? sequence.m_RequiredContentId
+						: key == "label" ? sequence.m_Label
+						: sequence.m_Note;
+					target = value.get<std::string>();
+				}
+				else if (key == "source")
+				{
+					const std::string source = value.is_string() ? value.get<std::string>() : "";
+					if (source == "scene")
+					{
+						sequence.m_CaptureSource = FrameCaptureSource::Scene;
+					}
+					else if (source == "composited")
+					{
+						sequence.m_CaptureSource = FrameCaptureSource::Composited;
+					}
+					else if (source == "diagnostic")
+					{
+						sequence.m_CaptureSource = FrameCaptureSource::Diagnostic;
+					}
+					else
+					{
+						return "Field 'source' must be 'scene', 'composited' or 'diagnostic'.";
+					}
+				}
+				else if (key == "diagnosticTap")
+				{
+					if (std::string error = ParseDiagnosticTap(value, sequence.m_DiagnosticTap);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "referenceSamples")
+				{
+					if (!value.is_number_unsigned() ||
+						value.get<uint64_t>() > MaxTemporalReferenceSamples)
+					{
+						return std::format("Field 'referenceSamples' must be 0 to {}.",
+							MaxTemporalReferenceSamples);
+					}
+					sequence.m_ReferenceSamples = value.get<uint32_t>();
+				}
+				else if (key == "referenceTextureLodBias")
+				{
+					const double bias = value.is_number() ? value.get<double>() : 0.0;
+					if (!value.is_number() || !std::isfinite(bias) ||
+						bias < -MaxReferenceTextureLodBias || bias > MaxReferenceTextureLodBias)
+					{
+						return std::format("Field 'referenceTextureLodBias' must be a number from "
+							"{} to {}.", -MaxReferenceTextureLodBias, MaxReferenceTextureLodBias);
+					}
+					sequence.m_ReferenceTextureLodBias = static_cast<float>(bias);
+				}
+				else if (key == "captureFrames")
+				{
+					if (!value.is_array() || value.size() > MaxSequenceCaptureFrames)
+					{
+						return std::format("Field 'captureFrames' must be an array of at most {} "
+							"frame numbers.", MaxSequenceCaptureFrames);
+					}
+					for (const Json& frame : value)
+					{
+						if (!frame.is_number_unsigned() ||
+							frame.get<uint64_t>() > std::numeric_limits<uint32_t>::max())
+						{
+							return "Field 'captureFrames' must contain unsigned 32-bit frame numbers.";
+						}
+						sequence.m_CaptureFrames.push_back(frame.get<uint32_t>());
+					}
+				}
+				else if (key == "outputDirectory")
+				{
+					if (std::string error = ParseOutputDirectory(value, sequence.m_OutputDirectory);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "temporalAA")
+				{
+					if (std::string error =
+						ParseTemporalAAOverrides(value, sequence.m_TemporalAAOverrides);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "gtao")
+				{
+					if (std::string error = ParseGTAOOverrides(value, sequence.m_GTAOOverrides);
+						!error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "gpuTiming")
+				{
+					if (!value.is_boolean())
+					{
+						return "Field 'gpuTiming' must be a boolean.";
+					}
+					sequence.m_GpuTiming = value.get<bool>();
+				}
+				else
+				{
+					return std::format("Unknown field '{}' for command 'sequence'.", key);
+				}
+			}
+			if (sequence.m_CameraPathId.empty())
+			{
+				return "Command 'sequence' requires a non-empty string 'path'.";
+			}
+			return ValidateDiagnosticTap(sequence.m_CaptureSource, sequence.m_DiagnosticTap);
 		}
 
 		// Fills the capture request from optional fields; returns an error text.
@@ -84,9 +518,21 @@ namespace gglab
 					{
 						capture.m_Source = FrameCaptureSource::Composited;
 					}
+					else if (source == "diagnostic")
+					{
+						capture.m_Source = FrameCaptureSource::Diagnostic;
+					}
 					else
 					{
-						return "Field 'source' must be 'scene' or 'composited'.";
+						return "Field 'source' must be 'scene', 'composited' or 'diagnostic'.";
+					}
+				}
+				else if (key == "diagnosticTap")
+				{
+					if (std::string error = ParseDiagnosticTap(value, capture.m_DiagnosticTap);
+						!error.empty())
+					{
+						return error;
 					}
 				}
 				else if (key == "timing")
@@ -128,16 +574,10 @@ namespace gglab
 				}
 				else if (key == "outputDirectory")
 				{
-					if (!value.is_string())
+					if (std::string error = ParseOutputDirectory(value, capture.m_OutputDirectory);
+						!error.empty())
 					{
-						return "Field 'outputDirectory' must be a string.";
-					}
-					const std::string text = value.get<std::string>();
-					capture.m_OutputDirectory = std::filesystem::path(
-						std::u8string(text.begin(), text.end()));
-					if (!capture.m_OutputDirectory.is_absolute())
-					{
-						return "Field 'outputDirectory' must be an absolute directory.";
+						return error;
 					}
 				}
 				else if (key == "wait")
@@ -153,7 +593,7 @@ namespace gglab
 					return std::format("Unknown field '{}' for command 'capture'.", key);
 				}
 			}
-			return {};
+			return ValidateDiagnosticTap(capture.m_Source, capture.m_DiagnosticTap);
 		}
 
 		[[nodiscard]] Json SerializeGates(const FrameCaptureReadiness& readiness)
@@ -168,6 +608,59 @@ namespace gglab
 					});
 			}
 			return gates;
+		}
+
+		[[nodiscard]] Json SerializeTimingSummary(std::span<const double> milliseconds)
+		{
+			const FrameSequenceTimingSummary summary = SummarizeFrameSequenceTiming(milliseconds);
+			return Json{
+				{ "count", summary.m_Count },
+				{ "meanMs", summary.m_Mean },
+				{ "medianMs", summary.m_Median },
+				{ "p90Ms", summary.m_P90 },
+				{ "minMs", summary.m_Min },
+				{ "maxMs", summary.m_Max },
+			};
+		}
+
+		[[nodiscard]] Json SerializeGpuTiming(const FrameSequenceGpuTiming& timing)
+		{
+			Json scopes = Json::array();
+			for (const FrameSequenceGpuTimingSeries& series : timing.m_Scopes)
+			{
+				Json scope = SerializeTimingSummary(series.m_Milliseconds);
+				scope["name"] = series.m_Name;
+				scopes.push_back(std::move(scope));
+			}
+			return Json{
+				{ "frames", timing.m_FrameMilliseconds.size() },
+				{ "frame", SerializeTimingSummary(timing.m_FrameMilliseconds) },
+				{ "scopes", std::move(scopes) },
+			};
+		}
+
+		[[nodiscard]] Json SerializeSequence(const FrameSequenceStatus& status)
+		{
+			Json sequence = {
+				{ "id", status.m_SequenceId },
+				{ "state", GetFrameSequenceStateName(status.m_State) },
+				{ "path", status.m_CameraPathId },
+				{ "pathVersion", status.m_CameraPathVersion },
+				{ "frameCount", status.m_FrameCount },
+				{ "referenceSamples", status.m_ReferenceSamples },
+				{ "submittedFrames", status.m_SubmittedFrames },
+				{ "captureRequestIds", status.m_CaptureRequestIds },
+				{ "completedCaptures", status.m_CompletedCaptures },
+			};
+			if (status.m_GpuTiming)
+			{
+				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
+			}
+			if (!status.m_Failure.empty())
+			{
+				sequence["failure"] = status.m_Failure;
+			}
+			return sequence;
 		}
 	}
 
@@ -205,7 +698,8 @@ namespace gglab
 			: std::nullopt;
 		if (!command)
 		{
-			result.m_Error = "Field 'command' must be 'status', 'capture', 'result' or 'stop'.";
+			result.m_Error = "Field 'command' must be 'status', 'capture', 'result', 'stop', "
+				"'sequence' or 'sequence-cancel'.";
 			return result;
 		}
 
@@ -228,8 +722,12 @@ namespace gglab
 			request.m_CaptureRequestId = requestId->get<uint64_t>();
 			break;
 		}
+		case ApplicationControlCommand::Sequence:
+			error = ParseSequenceFields(document, request);
+			break;
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
+		case ApplicationControlCommand::SequenceCancel:
 			if (document.size() != 3)
 			{
 				error = std::format("Command '{}' takes no fields.",
@@ -266,6 +764,7 @@ namespace gglab
 			{ "height", status.m_Height },
 		};
 		response["capture"] = { { "unfinished", status.m_UnfinishedCaptures } };
+		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{
 			response["frame"] = nullptr;
@@ -335,6 +834,14 @@ namespace gglab
 	{
 		Json response = MakeResponse(id, true);
 		response["status"] = "stopping";
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlSequence(
+		uint64_t id, const FrameSequenceStatus& status) noexcept
+	{
+		Json response = MakeResponse(id, true);
+		response["sequence"] = SerializeSequence(status);
 		return Dump(response);
 	}
 }

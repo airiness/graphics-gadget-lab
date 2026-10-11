@@ -14,7 +14,7 @@ namespace gglab
 	{
 		RenderView BuildPerspectiveCameraView(RenderViewID viewId, const Camera& camera,
 			const ResolvedViewRenderSettings& renderSettings,
-			const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
 			StringID name) noexcept
 		{
 			RenderView view{};
@@ -45,6 +45,14 @@ namespace gglab
 			{
 				view.m_TemporalResetIdentity = temporalFramePlan.m_ResetIdentity;
 				view.m_TemporalSessionIdentity = temporalFramePlan.m_SessionIdentity;
+				// log2(render / display) + offset: temporal accumulation recovers the
+				// detail that the negative bias exposes.
+				view.m_TextureLodBias =
+					temporalFramePlan.IsConsumerActive(TemporalConsumer::TemporalAA)
+					? std::log2(static_cast<float>(resolution.m_Render.m_Width) /
+						static_cast<float>(resolution.m_Display.m_Width)) +
+						renderSettings.m_TemporalAA.m_TextureLodBiasOffset
+					: 0.0f;
 			}
 
 			view.m_CameraPosition = camera.GetPosition();
@@ -56,8 +64,10 @@ namespace gglab
 			view.m_ExposureMultiplier = renderSettings.m_Exposure.m_ExposureScale;
 			view.m_ScenePreExposure = renderSettings.m_Exposure.m_PreExposure;
 
-			view.m_Width = width;
-			view.m_Height = height;
+			view.m_Width = resolution.m_Render.m_Width;
+			view.m_Height = resolution.m_Render.m_Height;
+			view.m_DisplayWidth = resolution.m_Display.m_Width;
+			view.m_DisplayHeight = resolution.m_Display.m_Height;
 
 			return view;
 		}
@@ -65,19 +75,19 @@ namespace gglab
 
 	RenderView RenderViewBuilder::BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
 		const ResolvedViewRenderSettings& renderSettings,
-		const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
+		const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
 		StringID name) const noexcept
 	{
 		GGLAB_ASSERT(IsDebugCameraRenderViewID(viewId));
 		return BuildPerspectiveCameraView(
-			viewId, camera, renderSettings, temporalFramePlan, width, height, name);
+			viewId, camera, renderSettings, temporalFramePlan, resolution, name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::Main>::Build(
 		const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept
 	{
 		return BuildPerspectiveCameraView(RenderViewID::Main, info.m_Camera, info.m_RenderSettings,
-			info.m_TemporalFramePlan, info.m_Width, info.m_Height, info.m_Name);
+			info.m_TemporalFramePlan, info.m_Resolution, info.m_Name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::DirectionalShadow>::Build(
@@ -296,5 +306,24 @@ namespace gglab
 		view.m_Height = resolution;
 
 		return result;
+	}
+
+	RenderView BuildUnjitteredPostTemporalView(const RenderView& displayView) noexcept
+	{
+		GGLAB_ASSERT_MSG(displayView.m_IsValid && displayView.m_DisplayWidth != 0 &&
+			displayView.m_DisplayHeight != 0,
+			"An unjittered post-temporal view requires a valid displayed camera view.");
+		RenderView view = displayView;
+		view.m_RasterProj = displayView.m_UnjitteredProj;
+		view.m_RasterViewProj = displayView.m_UnjitteredViewProj;
+		view.m_InvRasterProj = displayView.m_InvUnjitteredProj;
+		view.m_InvRasterViewProj = displayView.m_InvUnjitteredViewProj;
+		view.m_DepthReconstructionParams =
+			screen_space::MakeDepthReconstructionParams(view.m_RasterProj);
+		view.m_JitterPixels = Vector2::Zero;
+		view.m_JitterUV = Vector2::Zero;
+		view.m_Width = displayView.m_DisplayWidth;
+		view.m_Height = displayView.m_DisplayHeight;
+		return view;
 	}
 }

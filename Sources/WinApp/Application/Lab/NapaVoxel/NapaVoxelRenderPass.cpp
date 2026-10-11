@@ -84,28 +84,30 @@ namespace gglab
 				auto& blackboard = builder.GetBlackboard();
 				auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
 					.GetViewTargets(displayViewId);
-				auto& sceneDepth =
-					blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
+				// A post-TAA scene extension composes into the display domain: display
+				// color, display depth and the post-temporal raster domain.
+				auto& displayDepth =
+					blackboard.Get<RGDisplayDepthResources>(DisplayDepthResourcesName);
 				const auto& rasterDomain =
-					frameContextPtr->GetRenderQueue(displayViewId).m_CoverageRasterDomain;
+					frameContextPtr->GetRenderQueue(displayViewId).m_PostTemporalRasterDomain;
 				GGLAB_ASSERT_MSG(rasterDomain.IsValid() &&
 					rasterDomain.m_DepthConvention == DepthConvention::Reversed &&
-					sceneDepth.m_Convention == DepthConvention::Reversed,
+					displayDepth.m_Convention == DepthConvention::Reversed,
 					"Napa voxel rendering requires the display Reversed-Z raster domain.");
 				GGLAB_ASSERT_MSG(AreDepthCoverageTargetExtentsCompatible(rasterDomain,
-					builder.GetTextureDesc(targets.m_SceneColor),
-					builder.GetTextureDesc(sceneDepth.m_Texture)),
+					builder.GetTextureDesc(targets.m_DisplayColor),
+					builder.GetTextureDesc(displayDepth.m_Texture)),
 					"Napa voxel color and depth targets must match the display raster domain.");
 
-				builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+				builder.ReadWriteInPlace(targets.m_DisplayColor, RGTextureAccess::RenderTarget);
 				builder.ReadWriteInPlace(
-					sceneDepth.m_Texture, RGTextureAccess::DepthStencilWrite);
-				data.m_SceneColor = targets.m_SceneColor;
-				data.m_Depth = sceneDepth.m_Texture;
+					displayDepth.m_Texture, RGTextureAccess::DepthStencilWrite);
+				data.m_SceneColor = targets.m_DisplayColor;
+				data.m_Depth = displayDepth.m_Texture;
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
 				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
-					data.m_Depth, sceneDepth.m_DsvDesc);
+					data.m_Depth, displayDepth.m_DsvDesc);
 				data.m_RasterDomain = rasterDomain;
 
 				data.m_Chunks.reserve(frameView->GetChunks().size());
@@ -192,7 +194,7 @@ namespace gglab
 					for (const NapaVoxelGpuSectionDraw& section : chunk.m_Sections)
 					{
 						const NapaVoxelPassParameters parameters{
-							.m_ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+							.m_ViewIndex = data.m_RasterDomain.m_ViewBindingId,
 							.m_Material = static_cast<uint32_t>(section.m_Material),
 							.m_ChunkTranslation = chunk.m_Translation,
 						};

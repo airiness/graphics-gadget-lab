@@ -92,6 +92,7 @@ namespace gglab
 	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class FrameCaptureCoordinator;
+	class FrameSequenceCoordinator;
 	class LabRuntimeLocatorBase;
 	class RenderCompositionAccess;
 	class RenderHost;
@@ -209,6 +210,11 @@ namespace gglab
 		{
 			return m_FrameCapture.get();
 		}
+		// Non-owning; null before runtime services are composed.
+		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
+		{
+			return m_FrameSequence.get();
+		}
 		// Non-owning; null unless optional diagnostics were composed with runtime services.
 		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
 		[[nodiscard]] DiagnosticsControl* GetDiagnosticsControl() const noexcept;
@@ -227,6 +233,9 @@ namespace gglab
 		void Resize(uint32_t width, uint32_t height) noexcept;
 		// Records failure evidence that survives Release builds and makes Failed terminal.
 		[[nodiscard]] AppRuntimeTickResult FailRuntime(std::string_view failure) noexcept;
+		// Keeps GPU profiling enabled while a sequence records GPU timing and restores
+		// the previous request afterwards.
+		void SyncSequenceGpuProfiling() noexcept;
 
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
@@ -244,8 +253,12 @@ namespace gglab
 		std::unique_ptr<DebugDrawService> m_DebugDrawService;
 		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
+		// Declared after the capture coordinator it submits to, so it is destroyed first.
+		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
+		// Profiling request in effect before a timed sequence enabled profiling.
+		std::optional<bool> m_SequenceGpuProfilingRestore;
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
 		AppRuntimeLifecycleState m_LifecycleState = AppRuntimeLifecycleState::Uninitialized;

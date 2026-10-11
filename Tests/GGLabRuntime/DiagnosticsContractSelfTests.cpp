@@ -271,12 +271,23 @@ namespace gglab
 			displayView.m_Height = 64;
 			ResolvedTemporalFramePlan temporalPlan{
 				.m_DisplayViewId = RenderViewID::DebugCamera0,
-				.m_Status = TemporalAAFrameStatus::Active,
-				.m_DisableReason = TemporalAADisableReason::None,
 				.m_SessionIdentity = 41,
-				.m_Requested = true,
-				.m_Active = true,
 				};
+			const auto setTemporalAAConsumer = [&temporalPlan](TemporalConsumerStatus status,
+				TemporalConsumerDisableReason reason) noexcept
+				{
+					const TemporalService services = status == TemporalConsumerStatus::Active
+						? GetTemporalConsumerRequiredServices(TemporalConsumer::TemporalAA)
+						: TemporalService::None;
+					temporalPlan.m_Consumers[static_cast<uint32_t>(TemporalConsumer::TemporalAA)] = {
+						.m_Status = status,
+						.m_DisableReason = reason,
+						.m_Services = services,
+						.m_Requested = true,
+					};
+					temporalPlan.m_Services = services;
+				};
+			setTemporalAAConsumer(TemporalConsumerStatus::Active, TemporalConsumerDisableReason::None);
 			DirectionalShadowFramePlan shadows{};
 			shadows.m_Settings = DirectionalShadowSettings{};
 			shadows.m_ShadingEnabled = true;
@@ -389,9 +400,8 @@ namespace gglab
 			auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
 			forward.m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
-			temporalPlan.m_Active = false;
-			temporalPlan.m_Status = TemporalAAFrameStatus::Unavailable;
-			temporalPlan.m_DisableReason = TemporalAADisableReason::DepthVelocityPathUnavailable;
+			setTemporalAAConsumer(TemporalConsumerStatus::Unavailable,
+				TemporalConsumerDisableReason::DepthVelocityPathUnavailable);
 			const auto unavailable = BuildRenderingSettingsDiagnosticsSnapshot(frame);
 			context.Check(unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Inactive &&
 				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::NoOpaqueDraws &&
@@ -421,9 +431,7 @@ namespace gglab
 
 			requested.m_EnableScenePreExposure = true;
 			resolved.m_PostProcess.m_Bloom = requested.m_PostProcess.m_Bloom;
-			temporalPlan.m_Active = true;
-			temporalPlan.m_Status = TemporalAAFrameStatus::Active;
-			temporalPlan.m_DisableReason = TemporalAADisableReason::None;
+			setTemporalAAConsumer(TemporalConsumerStatus::Active, TemporalConsumerDisableReason::None);
 			RenderGraph culledGraph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),

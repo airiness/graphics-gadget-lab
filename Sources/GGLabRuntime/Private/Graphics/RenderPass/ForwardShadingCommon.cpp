@@ -96,19 +96,29 @@ namespace gglab::forward_shading
 	}
 
 	void DeclareSceneInputs(RenderGraph::RGBuilder& builder, const RenderFrameContext& context,
-		const RenderServices& services, RenderViewID viewId, SceneInputs& inputs) noexcept
+		const RenderServices& services, RenderViewID viewId, CompositionDomain domain,
+		SceneInputs& inputs) noexcept
 	{
+		const bool postTemporal = domain == CompositionDomain::PostTemporal;
 		auto& blackboard = builder.GetBlackboard();
 		auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 		auto& displayTargets = targetsTable.GetViewTargets(viewId);
 		auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 		auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
-		auto& sceneDepth = blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
+		const auto& sceneDepth = blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
+		const auto& displayDepth =
+			blackboard.Get<RGDisplayDepthResources>(DisplayDepthResourcesName);
 		const auto& framePlan = blackboard.Get<DepthCoverageFramePlan>(DepthCoverageFramePlanName);
 		const auto& renderQueue = context.GetRenderQueue(viewId);
+		// The in-place write versions the blackboard entry itself.
+		RGTextureId& color =
+			postTemporal ? displayTargets.m_DisplayColor : displayTargets.m_SceneColor;
+		const RGTextureId depth = postTemporal ? displayDepth.m_Texture : sceneDepth.m_Texture;
+		const DepthConvention depthConvention =
+			postTemporal ? displayDepth.m_Convention : sceneDepth.m_Convention;
 
-		builder.ReadWriteInPlace(displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
-		inputs.m_SceneColor = displayTargets.m_SceneColor;
+		builder.ReadWriteInPlace(color, RGTextureAccess::RenderTarget);
+		inputs.m_SceneColor = color;
 		inputs.m_MaterialDiagnostics = displayTargets.m_MaterialDiagnosticColor.IsValid();
 		if (inputs.m_MaterialDiagnostics)
 		{
@@ -145,28 +155,30 @@ namespace gglab::forward_shading
 		}
 		inputs.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(inputs.m_SceneColor);
 
-		inputs.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
+		inputs.m_RasterDomain = postTemporal
+			? std::addressof(renderQueue.m_PostTemporalRasterDomain)
+			: std::addressof(renderQueue.m_CoverageRasterDomain);
 		inputs.m_ExpectedRenderQueue = framePlan.m_SourceRenderQueue;
 		inputs.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 		if (!renderQueue.m_DrawItems.empty())
 		{
 			GGLAB_ASSERT_MSG(inputs.m_RasterDomain->IsValid(),
-				"Forward rendering requires a valid coverage raster domain.");
-			GGLAB_ASSERT_MSG(inputs.m_RasterDomain->m_DepthConvention == sceneDepth.m_Convention,
+				"Forward rendering requires a valid raster domain.");
+			GGLAB_ASSERT_MSG(inputs.m_RasterDomain->m_DepthConvention == depthConvention,
 				"Forward raster and resource depth conventions must match.");
 			GGLAB_ASSERT_MSG(AreDepthCoverageTargetExtentsCompatible(*inputs.m_RasterDomain,
-				builder.GetTextureDesc(displayTargets.m_SceneColor),
-				builder.GetTextureDesc(sceneDepth.m_Texture)),
-				"Forward color and depth extents must match the coverage raster domain.");
-			GGLAB_ASSERT_MSG(framePlan.m_RasterDomain == inputs.m_RasterDomain,
-				"Forward must consume the frame-plan raster domain.");
+				builder.GetTextureDesc(color), builder.GetTextureDesc(depth)),
+				"Forward color and depth extents must match the raster domain.");
+			GGLAB_ASSERT_MSG(postTemporal || framePlan.m_RasterDomain == inputs.m_RasterDomain,
+				"Pre-temporal Forward must consume the frame-plan raster domain.");
 			GGLAB_ASSERT_MSG(inputs.m_ExpectedRenderQueue == std::addressof(renderQueue),
 				"Forward must consume the frame-plan RenderQueue and its shared draw packets.");
 		}
 
 		// The depth prepass owns depth writes; Forward shading only reads them.
-		inputs.m_Depth = builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
-		RHITextureViewDesc readOnlyDsvDesc = sceneDepth.m_DsvDesc;
+		inputs.m_Depth = builder.Read(depth, RGTextureAccess::DepthStencilRead);
+		RHITextureViewDesc readOnlyDsvDesc =
+			postTemporal ? displayDepth.m_DsvDesc : sceneDepth.m_DsvDesc;
 		readOnlyDsvDesc.m_ReadOnlyDepth = true;
 		inputs.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(inputs.m_Depth, readOnlyDsvDesc);
 
@@ -222,8 +234,12 @@ namespace gglab::forward_shading
 				"Physical sun attenuation requires a transmittance descriptor.");
 			atmosphereTransmittanceIndex = transmittanceSrv.m_Index;
 		}
+		// The raster domain selects the view data: a post-temporal domain may bind its own
+		// unjittered display view.
+		const bool domainBound = inputs.m_RasterDomain && inputs.m_RasterDomain->IsValid();
 		return {
-			.m_ViewIndex = static_cast<uint32_t>(utils::ToIndex(viewId)),
+			.m_ViewIndex = domainBound ? inputs.m_RasterDomain->m_ViewBindingId
+				: static_cast<uint32_t>(utils::ToIndex(viewId)),
 			.m_ShadowMapTextureIndex = shadowSrv.IsValid() ? shadowSrv.m_Index : 0u,
 			.m_ShadowMapSamplerIndex = inputs.m_ShadowSamplerIndex,
 			.m_ShadowMapSize = inputs.m_ShadowMapSize,
@@ -254,8 +270,9 @@ namespace gglab::forward_shading
 		const SceneInputs& inputs, const RenderQueue& renderQueue) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(inputs.m_RasterDomain);
-		GGLAB_ASSERT_MSG(inputs.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain),
-			"Forward must consume the RenderQueue raster domain directly.");
+		GGLAB_ASSERT_MSG(inputs.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain) ||
+			inputs.m_RasterDomain == std::addressof(renderQueue.m_PostTemporalRasterDomain),
+			"Forward must consume a RenderQueue raster domain directly.");
 		graphicsContext.SetViewport(inputs.m_RasterDomain->m_Viewport);
 		graphicsContext.SetScissorRect(inputs.m_RasterDomain->m_Scissor);
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);

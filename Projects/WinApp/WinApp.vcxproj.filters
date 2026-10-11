@@ -479,6 +479,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneCameraPaths.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneReferenceViews.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
@@ -908,6 +911,15 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl">

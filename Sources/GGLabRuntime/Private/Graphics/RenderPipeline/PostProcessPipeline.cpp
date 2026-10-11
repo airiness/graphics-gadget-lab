@@ -5,9 +5,30 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+
+#include <format>
+#include <optional>
 
 namespace gglab
 {
+	void PostProcessPipeline::AddDiagnosticCapturePass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
+	{
+		RenderFrameCaptureAccess* capture = services.m_FrameCapture;
+		const std::optional<PostProcessDebugTap> tap =
+			capture ? capture->GetPendingDiagnosticTap() : std::nullopt;
+		if (!tap || m_PreviewPass.AddDiagnosticCapturePass(rg, context, services, *tap))
+		{
+			return;
+		}
+		capture->FailPendingDiagnosticRequests(std::format(
+			"Diagnostic tap '{}' has no source in this frame; its feature may be disabled.",
+			GetFrameCaptureDiagnosticTapName(*tap)));
+	}
+
 	void PostProcessPipeline::AddPasses(
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
@@ -24,7 +45,7 @@ namespace gglab
 				{
 					.m_SceneColor =
 						{
-							.m_Texture = targets.m_SceneColor,
+							.m_Texture = targets.m_DisplayColor,
 							.m_State = PostProcessColorState::SceneLinearRec709,
 							.m_PreExposure = context.GetDisplayRenderView().m_ScenePreExposure,
 						},
@@ -38,7 +59,7 @@ namespace gglab
 						},
 				},
 		};
-		if (context.GetTemporalFramePlan().m_Active)
+		if (context.GetTemporalFramePlan().HasService(TemporalService::ColorDepthHistory))
 		{
 			GGLAB_ASSERT_NOT_NULL(context.m_TemporalFrameTransaction);
 			GGLAB_ASSERT_MSG(context.m_TemporalFrameTransaction->GetScenePreExposure() ==

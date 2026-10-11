@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/Pipeline/TemporalHistoryTextures.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 
 #include <array>
@@ -27,10 +28,12 @@ namespace gglab
 	{
 		TemporalHistorySurfaceFormatSupport m_Color{};
 		TemporalHistorySurfaceFormatSupport m_Depth{};
+		TemporalHistorySurfaceFormatSupport m_Reliability{};
 
 		[[nodiscard]] constexpr bool IsSupported() const noexcept
 		{
-			return m_Color.IsSupported() && m_Depth.IsSupported();
+			return m_Color.IsSupported() && m_Depth.IsSupported() &&
+				m_Reliability.IsSupported();
 		}
 	};
 
@@ -45,7 +48,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(TemporalHistoryManager);
 
 		[[nodiscard]] TemporalHistoryFrameState BeginFrame(
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 			TemporalColorAbi colorAbi = ActiveTemporalColorAbi) noexcept;
 		[[nodiscard]] bool ImportRenderGraphResources(TemporalHistoryFrameState& frame,
 			RenderGraph::RGBuilder& builder,
@@ -69,16 +72,22 @@ namespace gglab
 		[[nodiscard]] TemporalHistoryManagerDiagnostics GetDiagnostics() const;
 
 	private:
+		// Surfaces of the history texture set.
+		enum HistorySurface : size_t
+		{
+			ColorSurface,
+			DepthSurface,
+			ReliabilitySurface,
+			HistorySurfaceCount,
+		};
+
 		struct HistorySet
 		{
-			std::array<PersistentTextureAllocation, 2> m_Color;
-			std::array<PersistentTextureAllocation, 2> m_Depth;
-			std::array<bool, 2> m_Initialized{};
+			TemporalHistoryTextures<HistorySurfaceCount> m_Textures;
 			TemporalHistoryCompatibilityIdentity m_Compatibility{};
 			TemporalHistoryCommittedMetadata m_LastCommitted{};
 			RHIFencePoint m_LastPossibleUseFence{};
 			uint64_t m_AllocationGeneration = 0;
-			uint32_t m_ReadIndex = 0;
 			bool m_Valid = false;
 		};
 

@@ -51,10 +51,22 @@ namespace gglab
 		float m_ScenePreExposure = 1.0f;
 		float m_PreviousScenePreExposure = 1.0f;
 
+		// Render (raster) extent: the view's geometry is rasterized and shaded at it.
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+		// Display extent of a camera view: its temporal output and post-temporal
+		// composition use it. Zero for views that are never displayed, such as shadow
+		// views.
+		uint32_t m_DisplayWidth = 0;
+		uint32_t m_DisplayHeight = 0;
 		uint64_t m_TemporalResetIdentity = 0;
 		uint64_t m_TemporalSessionIdentity = 0;
+		// Display-view frames since the temporal history was reset; zero for every other
+		// view. A replayed camera-path sequence repeats it exactly.
+		uint32_t m_TemporalFrameIndex = 0;
+		// Added to the LOD of material texture samples: the active temporal view's LOD
+		// offset, or a reference's own bias; zero for every other view.
+		float m_TextureLodBias = 0.0f;
 
 		DepthConvention m_DepthConvention = DepthConvention::Standard;
 		DepthConvention m_PreviousDepthConvention = DepthConvention::Standard;
@@ -62,6 +74,14 @@ namespace gglab
 		StringID m_Name{};
 		bool m_HasPreviousTemporalState = false;
 		bool m_IsValid = false;
+
+		[[nodiscard]] ViewResolution GetResolution() const noexcept
+		{
+			return ViewResolution{
+				.m_Render = { m_Width, m_Height },
+				.m_Display = { m_DisplayWidth, m_DisplayHeight },
+			};
+		}
 	};
 
 	struct DirectionalShadowProjectionInfo
@@ -87,7 +107,7 @@ namespace gglab
 	public:
 		RenderView BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
 			const ResolvedViewRenderSettings& renderSettings,
-			const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
+				const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
 			StringID name) const noexcept;
 
 		template <RenderViewID ViewId>
@@ -102,8 +122,7 @@ namespace gglab
 		const Camera& m_Camera;
 		const ResolvedViewRenderSettings& m_RenderSettings;
 		const ResolvedTemporalFramePlan& m_TemporalFramePlan;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		ViewResolution m_Resolution{};
 		StringID m_Name = StringID("MainView");
 	};
 
@@ -134,4 +153,9 @@ namespace gglab
 	};
 	[[nodiscard]] DirectionalShadowViewBuildResult BuildDirectionalShadowView(
 		const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
+
+	// The display raster view of post-temporal composition without projection jitter: the
+	// unjittered projection at the display extent. Previous-frame state is unchanged;
+	// post-temporal geometry writes no motion.
+	[[nodiscard]] RenderView BuildUnjitteredPostTemporalView(const RenderView& displayView) noexcept;
 }

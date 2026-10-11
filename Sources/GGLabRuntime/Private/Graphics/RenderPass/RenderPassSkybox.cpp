@@ -180,8 +180,8 @@ namespace gglab
 				readOnlyDsvDesc.m_ReadOnlyDepth = true;
 				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
 					data.m_Depth, readOnlyDsvDesc);
-				data.m_Width = targets.m_Width;
-				data.m_Height = targets.m_Height;
+				data.m_Width = targets.m_RenderWidth;
+				data.m_Height = targets.m_RenderHeight;
 				const RHITextureDesc& colorDesc = builder.GetTextureDesc(data.m_SceneColor);
 				const RHITextureDesc& depthDesc = builder.GetTextureDesc(data.m_Depth);
 				GGLAB_ASSERT_MSG(colorDesc.m_Extent.m_Width == depthDesc.m_Extent.m_Width &&

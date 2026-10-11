@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <cstdint>
@@ -9,6 +10,10 @@ namespace gglab
 {
 	inline constexpr uint32_t GTAOResolutionDivisor = 2;
 	inline constexpr uint32_t GTAOThreadGroupSize = 8;
+	// Temporal history at half render extent: accumulated visibility with its effective
+	// sample count, and the view Z of the surface each texel selected.
+	inline constexpr RHIFormat GTAOHistoryVisibilityFormat = RHIFormat::R16G16Float;
+	inline constexpr RHIFormat GTAOHistoryViewZFormat = RHIFormat::R32Float;
 
 	struct GTAOExtent
 	{
@@ -31,6 +36,22 @@ namespace gglab
 			.m_Height = (fullHeight + GTAOResolutionDivisor - 1) / GTAOResolutionDivisor,
 		};
 	}
+
+	struct GTAOTemporalHistoryRenderGraphResources
+	{
+		RGTextureId m_PreviousVisibility{};
+		RGTextureId m_PreviousViewZ{};
+		RGTextureId m_NextVisibility{};
+		RGTextureId m_NextViewZ{};
+		// False when no compatible history exists; the previous textures are not read.
+		bool m_PreviousValid = false;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_PreviousVisibility.IsValid() && m_PreviousViewZ.IsValid() &&
+				m_NextVisibility.IsValid() && m_NextViewZ.IsValid();
+		}
+	};
 
 	[[nodiscard]] constexpr GTAOFinalAOFormatResolution ResolveGTAOFinalAOFormat(
 		GTAOSurfaceFormatSupport preferredR8Unorm,

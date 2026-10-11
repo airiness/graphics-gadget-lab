@@ -196,6 +196,14 @@ namespace gglab
 		}
 	}
 
+	void LabRuntime::OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+	{
+		if (m_ActiveSession)
+		{
+			m_ActiveSession->OnCameraPathFrameApplied(path, frame);
+		}
+	}
+
 	void LabRuntime::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
 		m_LastFrameFeedback = feedback;

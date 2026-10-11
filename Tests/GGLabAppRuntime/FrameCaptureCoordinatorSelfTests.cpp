@@ -2,7 +2,16 @@
 
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureMetadata.h"
+#include "Capture/FrameSequenceCoordinator.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <algorithm>
@@ -39,11 +48,18 @@ namespace gglab
 			{
 				uint64_t m_Id = 0;
 				FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+				std::optional<PostProcessDebugTap> m_DiagnosticTap;
 			};
 
 			uint64_t RequestCapture(FrameCaptureSource source) noexcept override
 			{
 				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source });
+				return m_NextId++;
+			}
+			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override
+			{
+				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = tap });
 				return m_NextId++;
 			}
 			void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override
@@ -263,8 +279,6 @@ namespace gglab
 				.m_SettleFrames = 2,
 				});
 
-			coordinator.BeginFrame(MakeFrameState(false));
-			coordinator.OnFrameSubmitted();
 			coordinator.BeginFrame(MakeFrameState(true));
 			coordinator.OnFrameSubmitted();
 			const bool waitingAfterOne = control.m_Issued.empty() &&
@@ -310,6 +324,84 @@ namespace gglab
 			context.Check(matching != 0 && waitedForContent &&
 				control.m_Issued.size() == issuedBefore + 1,
 				"A required content id holds the capture until that Demo or Lab is active");
+		}
+
+		[[nodiscard]] FrameCaptureFrameState MakeCutFrameState(
+			bool ready, uint64_t cameraResetSerial)
+		{
+			FrameCaptureFrameState state = MakeFrameState(ready);
+			state.m_SettleKey.m_CameraResetSerial = cameraResetSerial;
+			return state;
+		}
+
+		// Temporal history keeps accumulating while content loads. An after-ready
+		// capture that settled over such history would depend on how many frames
+		// loading took, so settling and time start at a camera cut on a ready frame.
+		void RunLoadingHistoryTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-loading-history");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true,
+				});
+			const bool idleKeepsTime = !coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory();
+			const uint64_t id = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 1,
+				});
+			const bool holdsBeforeFirstFrame = coordinator.ShouldHoldTime();
+
+			coordinator.BeginFrame(MakeCutFrameState(false, 1));
+			coordinator.OnFrameSubmitted();
+			const bool waitsWhileLoading = coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory();
+			coordinator.BeginFrame(MakeCutFrameState(true, 1));
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(MakeCutFrameState(true, 1));
+			coordinator.OnFrameSubmitted();
+			context.Check(idleKeepsTime && holdsBeforeFirstFrame && waitsWhileLoading &&
+				control.m_Issued.empty() && coordinator.GetSettledFrameCount() == 0 &&
+				coordinator.ShouldRestartTemporalHistory() && coordinator.ShouldHoldTime(),
+				"Ready frames over history that began while loading do not settle; the "
+				"coordinator holds time and asks for a temporal restart");
+
+			// The runtime's camera cut on a ready frame starts settling and time.
+			coordinator.BeginFrame(MakeCutFrameState(true, 2));
+			coordinator.OnFrameSubmitted();
+			const bool settlingFromCut = control.m_Issued.empty() &&
+				coordinator.GetSettledFrameCount() == 1 &&
+				!coordinator.ShouldRestartTemporalHistory() && !coordinator.ShouldHoldTime();
+			coordinator.BeginFrame(MakeCutFrameState(true, 2));
+			coordinator.OnFrameSubmitted();
+			context.Check(id != 0 && settlingFromCut && control.m_Issued.size() == 1,
+				"Settling and time start at the cut, and the capture follows the settled frames");
+
+			// A gate leaving Ready puts loading frames into the history again.
+			const uint64_t again = coordinator.Submit({
+				.m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 1,
+				});
+			const bool settledHistoryKeepsTime = !coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory();
+			coordinator.BeginFrame(MakeCutFrameState(false, 2));
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(MakeCutFrameState(true, 2));
+			coordinator.OnFrameSubmitted();
+			context.Check(settledHistoryKeepsTime && control.m_Issued.size() == 1 &&
+				coordinator.ShouldRestartTemporalHistory() && coordinator.ShouldHoldTime(),
+				"Readiness lost under one settle key restarts temporal history once ready");
+
+			// A next-frame capture never waits for history, so it neither holds time
+			// nor cuts the view.
+			const bool cancelled = coordinator.Cancel(again);
+			const uint64_t next = coordinator.Submit({});
+			context.Check(cancelled && next != 0 && !coordinator.ShouldHoldTime() &&
+				!coordinator.ShouldRestartTemporalHistory(),
+				"Only waiting after-ready captures hold time or restart temporal history");
 		}
 
 		[[nodiscard]] FrameCaptureFrameState MakeViewFrameState(uint64_t cameraResetSerial)
@@ -842,6 +934,685 @@ namespace gglab
 				json.find("\"totalTime\": null") != std::string::npos &&
 				json.find("\"state\": \"pending\"") != std::string::npos,
 				"Metadata JSON escapes control characters and writes non-finite numbers as null");
+
+			metadata.m_Temporal = {
+				.m_Requested = true,
+				.m_Status = "active",
+				.m_DisableReason = "none",
+				.m_Consumers = {
+					{
+						.m_Name = "temporal-aa",
+						.m_Requested = true,
+						.m_Status = "active",
+						.m_DisableReason = "none",
+						.m_Services = { "projection-jitter", "geometry-motion" },
+					},
+					{
+						.m_Name = "reference",
+						.m_Status = "disabled",
+						.m_DisableReason = "not-requested",
+					},
+				},
+				.m_Services = { "projection-jitter", "geometry-motion" },
+				.m_SessionIdentity = 5,
+				.m_ResetIdentity = 9,
+				.m_JitterIndex = 3,
+				.m_JitterSequenceLength = 8,
+				.m_JitterPixels = { -0.375f, -0.0625f },
+				.m_MaxHistoryFeedback = 0.97f,
+				.m_RenderExtent = { 640, 360 },
+				.m_DisplayExtent = { 1280, 720 },
+				.m_RenderScale = 0.5f,
+			};
+			metadata.m_Sequence = FrameCaptureSequenceInfo{
+				.m_SequenceId = 2,
+				.m_CameraPathId = "SEQ_Test",
+				.m_CameraPathVersion = 4,
+				.m_Frame = 17,
+				.m_FrameCount = 96,
+			};
+			const std::string sequenceJson = SerializeFrameCaptureMetadata(metadata);
+			context.Check(
+				sequenceJson.find("\"status\": \"active\"") != std::string::npos &&
+				sequenceJson.find("\"jitterIndex\": 3") != std::string::npos &&
+				sequenceJson.find("\"jitterSequenceLength\": 8") != std::string::npos &&
+				sequenceJson.find("-0.375") != std::string::npos &&
+				sequenceJson.find("\"maxHistoryFeedback\": 0.97") != std::string::npos &&
+				sequenceJson.find("\"name\": \"temporal-aa\"") != std::string::npos &&
+				sequenceJson.find("\"name\": \"reference\"") != std::string::npos &&
+				sequenceJson.find("\"disableReason\": \"not-requested\"") != std::string::npos &&
+				sequenceJson.find("\"geometry-motion\"") != std::string::npos &&
+				sequenceJson.find("\"renderScale\": 0.5") != std::string::npos &&
+				sequenceJson.find("\"cameraPath\": \"SEQ_Test\"") != std::string::npos &&
+				sequenceJson.find("\"cameraPathVersion\": 4") != std::string::npos &&
+				sequenceJson.find("\"frame\": 17") != std::string::npos &&
+				json.find("\"sequence\": null") != std::string::npos,
+				"Metadata records temporal consumers, services, jitter, settings and render "
+				"scale, and the sequence frame when the capture belongs to a sequence");
+		}
+	}
+
+	namespace
+	{
+		[[nodiscard]] CameraPath MakeSequenceTestPath()
+		{
+			const auto key = [](uint32_t frame, float x, bool cut = false)
+				{
+					return CameraPathKey{ .m_Frame = frame, .m_Position = { x, 1.0f, 0.0f },
+						.m_Target = { x, 1.0f, 10.0f }, .m_Cut = cut };
+				};
+			return {
+				.m_Id = "SEQ_Test",
+				.m_Name = "Test",
+				.m_Version = 2,
+				.m_Keys = { key(0, 0.0f), key(3, 3.0f), key(4, 40.0f, true), key(5, 41.0f) },
+			};
+		}
+
+		// Stands in for the runtime frame loop: poses the frame, builds its state,
+		// issues captures, submits it and completes every issued Runtime capture.
+		struct SequenceHarness
+		{
+			explicit SequenceHarness(const std::filesystem::path& directory) noexcept :
+				m_Capture({
+					.m_Capture = &m_Control,
+					.m_DefaultOutputDirectory = directory,
+					.m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true,
+					}),
+				m_Sequence(m_Capture)
+			{
+				m_Paths.push_back(MakeSequenceTestPath());
+			}
+
+			// Renders one frame; returns the posed sequence frame, if any.
+			std::optional<uint32_t> Frame(bool submit = true, uint64_t temporalSession = 1)
+			{
+				m_Deferred = false;
+				if (m_Sequence.ShouldDeferFrame())
+				{
+					// The runtime neither simulates nor renders a deferred frame.
+					m_Deferred = true;
+					m_Capture.Update();
+					m_Sequence.OnCaptureResults(Consume(m_Capture));
+					return std::nullopt;
+				}
+				const std::optional<FrameSequencePoseRequest> pose =
+					m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
+				m_LastSample = pose ? pose->m_ReferenceSample : std::nullopt;
+				m_LastTemporalAAOverrides = pose
+					? std::optional(pose->m_TemporalAAOverrides)
+					: std::nullopt;
+				m_LastGTAOOverrides = pose ? std::optional(pose->m_GTAOOverrides) : std::nullopt;
+				if (pose)
+				{
+					const std::optional<CameraPathPose> applied =
+						EvaluateCameraPath(m_Paths.front(), pose->m_Frame);
+					if (applied && applied->m_Cut)
+					{
+						++m_CameraResetSerial;
+					}
+					m_Sequence.OnPoseApplied(applied);
+				}
+				FrameCaptureFrameState state = MakeFrameState(m_Ready, temporalSession);
+				state.m_SettleKey.m_CameraResetSerial = m_CameraResetSerial;
+				m_Sequence.BeginFrame(state);
+				m_Capture.BeginFrame(std::move(state));
+				if (submit)
+				{
+					m_Capture.OnFrameSubmitted();
+					m_Sequence.OnFrameSubmitted();
+				}
+				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
+				{
+					m_Control.Complete(m_Control.m_Issued[m_Completed].m_Id, 7);
+				}
+				m_Capture.Update();
+				std::vector<FrameCaptureRequestResult> results = Consume(m_Capture);
+				m_Sequence.OnCaptureResults(results);
+				m_Results.insert(m_Results.end(), results.begin(), results.end());
+				return pose ? std::optional<uint32_t>(pose->m_Frame) : std::nullopt;
+			}
+
+			FakeCaptureControl m_Control;
+			FrameCaptureCoordinator m_Capture;
+			FrameSequenceCoordinator m_Sequence;
+			std::vector<CameraPath> m_Paths;
+			uint64_t m_CameraResetSerial = 1;
+			size_t m_Completed = 0;
+			bool m_Ready = true;
+			bool m_AutoComplete = true;
+			bool m_Deferred = false;
+			std::optional<TemporalReferenceSample> m_LastSample;
+			std::optional<FrameSequenceTemporalAAOverrides> m_LastTemporalAAOverrides;
+			std::optional<FrameSequenceGTAOOverrides> m_LastGTAOOverrides;
+			std::vector<FrameCaptureRequestResult> m_Results;
+		};
+
+		void RunFrameSequenceTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence");
+			SequenceHarness harness(directory.GetPath());
+			std::string error;
+			const uint64_t id = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 5, 1, 1 },
+				.m_Label = "run",
+				}, error);
+			std::string busyError;
+			context.Check(id != 0 && harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" },
+				busyError) == 0 && !busyError.empty(),
+				"Only one sequence runs at a time");
+
+			harness.m_Ready = false;
+			const std::optional<uint32_t> beforeFrames = harness.Frame();
+			const std::optional<uint32_t> notReady = harness.Frame();
+			harness.m_Ready = true;
+			const std::optional<uint32_t> readyPrevious = harness.Frame();
+			context.Check(!beforeFrames && !notReady && !readyPrevious &&
+				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Waiting,
+				"A sequence waits until a rendered frame reports every readiness gate ready");
+
+			std::vector<uint32_t> posed;
+			std::vector<size_t> issuedAfterFrame;
+			for (uint32_t frame = 0; frame < 6; ++frame)
+			{
+				if (frame == 2)
+				{
+					// A frame that ends without submission is posed again.
+					const std::optional<uint32_t> skipped = harness.Frame(false);
+					context.Check(skipped == 2u, "An unsubmitted frame keeps its sequence frame");
+				}
+				const std::optional<uint32_t> pose = harness.Frame();
+				posed.push_back(pose.value_or(999));
+				issuedAfterFrame.push_back(harness.m_Control.m_Issued.size());
+			}
+			const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+			context.Check(posed == std::vector<uint32_t>{ 0, 1, 2, 3, 4, 5 } &&
+				status.m_State == FrameSequenceState::Completed && status.m_FrameCount == 6 &&
+				status.m_CameraPathVersion == 2 && status.m_SubmittedFrames == 6 &&
+				status.m_CompletedCaptures == 2,
+				"Each submitted frame advances the path by one frame until the sequence completes");
+			context.Check(issuedAfterFrame == std::vector<size_t>{ 0, 1, 1, 1, 1, 2 },
+				"Requested frames are captured on exactly that frame, once, with duplicates ignored");
+			bool labelled = false;
+			std::error_code errorCode;
+			for (const auto& entry :
+				std::filesystem::directory_iterator(directory.GetPath(), errorCode))
+			{
+				labelled |= entry.path().filename().string().starts_with("run-f0005-");
+			}
+			context.Check(labelled, "Sequence captures are labelled with their sequence frame");
+			const auto lastCapture = std::ranges::find_if(harness.m_Results,
+				[](const FrameCaptureRequestResult& result)
+				{
+					return result.m_Metadata && result.m_Metadata->m_Sequence &&
+						result.m_Metadata->m_Sequence->m_Frame == 5;
+				});
+			context.Check(lastCapture != harness.m_Results.end() &&
+				lastCapture->m_Metadata->m_Sequence->m_CameraPathId == "SEQ_Test" &&
+				lastCapture->m_Metadata->m_Sequence->m_CameraPathVersion == 2 &&
+				lastCapture->m_Metadata->m_Sequence->m_FrameCount == 6 &&
+				lastCapture->m_Metadata->m_Sequence->m_SequenceId == id,
+				"Sequence capture metadata names the sequence, path version and frame");
+			context.Check(!harness.Frame(), "A completed sequence no longer poses frames");
+		}
+
+		void RunFrameSequenceBackPressureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-backpressure");
+			SequenceHarness harness(directory.GetPath());
+			harness.m_AutoComplete = false;
+			std::string error;
+			GGLAB_UNUSED(harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 0, 1, 2, 3, 4, 5 },
+				}, error));
+			harness.Frame();
+			// Six frames issue six captures whose Runtime results are still pending.
+			for (uint32_t frame = 0; frame < 6; ++frame)
+			{
+				harness.Frame();
+			}
+			context.Check(harness.m_Control.m_Issued.size() == 6 && !harness.m_Deferred &&
+				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+				"Captures below the writer limit never defer a frame");
+
+			SequenceHarness limited(directory.GetPath());
+			limited.m_AutoComplete = false;
+			limited.m_Paths.front().m_Keys.back().m_Frame = 20;
+			std::vector<uint32_t> frames(21);
+			for (uint32_t frame = 0; frame < frames.size(); ++frame)
+			{
+				frames[frame] = frame;
+			}
+			GGLAB_UNUSED(limited.m_Sequence.Start(
+				{ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = frames }, error));
+			limited.Frame();
+			for (uint32_t frame = 0; frame < FrameCaptureCoordinator::MaxPendingWriteJobs; ++frame)
+			{
+				limited.Frame();
+			}
+			const size_t issuedAtLimit = limited.m_Control.m_Issued.size();
+			const std::optional<uint32_t> deferred = limited.Frame();
+			const bool deferredAgain = !limited.Frame() && limited.m_Deferred;
+			context.Check(issuedAtLimit == FrameCaptureCoordinator::MaxPendingWriteJobs &&
+				!deferred && deferredAgain &&
+				limited.m_Control.m_Issued.size() == issuedAtLimit &&
+				limited.m_Sequence.GetStatus()->m_SubmittedFrames ==
+				FrameCaptureCoordinator::MaxPendingWriteJobs,
+				"A capture beyond the writer limit defers the frame without posing or submitting it");
+
+			limited.m_AutoComplete = true;
+			limited.m_Control.Complete(limited.m_Control.m_Issued[0].m_Id, 7);
+			limited.m_Completed = 1;
+			// The next tick is still deferred; it drains the finished capture.
+			const std::optional<uint32_t> draining = limited.Frame();
+			const std::optional<uint32_t> resumed = limited.Frame();
+			context.Check(!draining && resumed == FrameCaptureCoordinator::MaxPendingWriteJobs,
+				"The sequence resumes with the deferred frame once the writer drains");
+			while (limited.m_Sequence.IsActive())
+			{
+				limited.Frame();
+			}
+			const FrameSequenceStatus& status = *limited.m_Sequence.GetStatus();
+			context.Check(status.m_State == FrameSequenceState::Completed &&
+				status.m_CompletedCaptures == 21 && status.m_SubmittedFrames == 21,
+				"Every frame of a fully captured sequence is captured without writer overflow");
+		}
+
+		void RunDiagnosticCaptureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-diagnostic");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true,
+				});
+			const uint64_t missingTap = coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic });
+			const uint64_t weight = coordinator.Submit({
+				.m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight,
+				});
+			coordinator.BeginFrame(MakeFrameState(true));
+			coordinator.OnFrameSubmitted();
+			if (!control.m_Issued.empty())
+			{
+				control.Complete(control.m_Issued.back().m_Id, 3);
+			}
+			coordinator.Update();
+			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
+			const auto find = [&](uint64_t id)
+				{
+					return std::ranges::find(results, id, &FrameCaptureRequestResult::m_RequestId);
+				};
+			const auto failed = find(missingTap);
+			const auto completed = find(weight);
+			context.Check(control.m_Issued.size() == 1 &&
+				control.m_Issued[0].m_Source == FrameCaptureSource::Diagnostic &&
+				control.m_Issued[0].m_DiagnosticTap == PostProcessDebugTap::TemporalHistoryWeight &&
+				failed != results.end() && failed->m_Status == FrameCaptureRequestStatus::Failed &&
+				completed != results.end() &&
+				completed->m_Status == FrameCaptureRequestStatus::Completed &&
+				completed->m_Metadata &&
+				completed->m_Metadata->m_DiagnosticTap == "temporal-history-weight",
+				"Diagnostic captures pass their tap to the Runtime, record its name and fail "
+				"without a tap");
+
+			SequenceHarness harness(directory.GetPath());
+			std::string mismatch;
+			std::string ok;
+			const uint64_t rejectedSequence = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureSource = FrameCaptureSource::Diagnostic,
+				}, mismatch);
+			const uint64_t sequence = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 2 },
+				.m_CaptureSource = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalRejection,
+				}, ok);
+			while (harness.m_Sequence.IsActive())
+			{
+				harness.Frame();
+			}
+			context.Check(rejectedSequence == 0 && !mismatch.empty() && sequence != 0 &&
+				harness.m_Control.m_Issued.size() == 1 &&
+				harness.m_Control.m_Issued[0].m_DiagnosticTap == PostProcessDebugTap::TemporalRejection &&
+				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed,
+				"A sequence records one diagnostic tap as its evidence channel");
+		}
+
+		void RunReferenceSequenceTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-reference");
+			SequenceHarness harness(directory.GetPath());
+			std::string error;
+			const uint64_t tooMany = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+				.m_ReferenceSamples = MaxTemporalReferenceSamples + 1 }, error);
+			std::string biasError;
+			const uint64_t biasWithoutReference = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_ReferenceTextureLodBias = -1.0f,
+				}, biasError);
+			const uint64_t id = harness.m_Sequence.Start({
+				.m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 1 },
+				.m_ReferenceSamples = 3,
+				.m_ReferenceTextureLodBias = -0.75f,
+				}, error);
+			harness.Frame();
+
+			std::vector<uint32_t> frames;
+			std::vector<uint32_t> samples;
+			std::vector<bool> heldBefore;
+			std::vector<size_t> issued;
+			bool everySampleBiased = true;
+			while (harness.m_Sequence.IsActive() && frames.size() < 30)
+			{
+				heldBefore.push_back(harness.m_Sequence.ShouldHoldTime());
+				const std::optional<uint32_t> frame = harness.Frame();
+				frames.push_back(frame.value_or(999));
+				samples.push_back(harness.m_LastSample ? harness.m_LastSample->m_Index : 999);
+				everySampleBiased &= !harness.m_LastSample ||
+					harness.m_LastSample->m_TextureLodBias == -0.75f;
+				issued.push_back(harness.m_Control.m_Issued.size());
+			}
+			const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+			context.Check(tooMany == 0 && id != 0 && frames.size() == 18 &&
+				frames[0] == 0 && frames[2] == 0 && frames[3] == 1 && frames[17] == 5 &&
+				samples[0] == 0 && samples[1] == 1 && samples[2] == 2 && samples[3] == 0 &&
+				!heldBefore[0] && heldBefore[1] && heldBefore[2] && !heldBefore[3] &&
+				status.m_State == FrameSequenceState::Completed &&
+				status.m_SubmittedFrames == 6 && status.m_ReferenceSamples == 3,
+				"A reference sequence renders every frame as consecutive samples with time held "
+				"after the first");
+			const auto capture = std::ranges::find_if(harness.m_Results,
+				[](const FrameCaptureRequestResult& result)
+				{
+					return result.m_Metadata && result.m_Metadata->m_Sequence;
+				});
+			context.Check(issued[4] == 0 && issued[5] == 1 && harness.m_Results.size() == 1 &&
+				capture != harness.m_Results.end() &&
+				capture->m_Metadata->m_Sequence->m_Frame == 1 &&
+				capture->m_Metadata->m_Sequence->m_ReferenceSamples == 3,
+				"A reference frame is captured once, after its last sample");
+			context.Check(biasWithoutReference == 0 && !biasError.empty() && everySampleBiased &&
+				capture != harness.m_Results.end() &&
+				capture->m_Metadata->m_Sequence->m_ReferenceTextureLodBias == -0.75f,
+				"Every reference sample carries the requested texture LOD bias, recorded in the "
+				"sidecar; it requires reference samples");
+		}
+
+		void RunFrameSequenceEvaluationTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-evaluation");
+			{
+				TemporalAASettings content{};
+				content.m_Enabled = true;
+				content.m_DepthAbsoluteThreshold = 0.25f;
+				const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
+					.m_Enabled = false,
+					.m_MaxHistoryFeedback = 0.9f,
+					.m_NeighborhoodClampExpansion = 4.0f,
+					.m_HistoryRelaxation = 0.0f,
+					.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge,
+					.m_HistoryRectification = TemporalAAHistoryRectification::BoundedVarianceClip,
+					.m_VarianceClipGamma = 9.0f,
+					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
+					.m_CurrentFilter = TemporalAACurrentFilter::Point,
+					.m_MotionSelection = TemporalAAMotionSelection::Center,
+					.m_PostTemporalView = TemporalAAPostTemporalView::Jittered,
+					.m_ResolutionPreset = TemporalAAResolutionPreset::Quality,
+					}, content);
+				TemporalAASettings invalidFilter = content;
+				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
+				invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
+				invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
+				invalidFilter.m_PostTemporalView = static_cast<TemporalAAPostTemporalView>(7);
+				invalidFilter.m_ResolutionPreset = static_cast<TemporalAAResolutionPreset>(7);
+				invalidFilter.m_HistoryRectification = static_cast<TemporalAAHistoryRectification>(7);
+				invalidFilter.m_VarianceClipGamma = std::numeric_limits<float>::quiet_NaN();
+				context.Check(!overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
+					overridden.m_DepthAbsoluteThreshold == 0.25f &&
+					overridden.m_NeighborhoodClampExpansion ==
+					TemporalAAMaxNeighborhoodClampExpansion &&
+					overridden.m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
+					content.m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
+					ResolveTemporalAASettings(invalidFilter).m_HistoryFilter ==
+					TemporalAAHistoryFilter::CatmullRomClamped &&
+					overridden.m_CurrentFilter == TemporalAACurrentFilter::Point &&
+					content.m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
+					ResolveTemporalAASettings(invalidFilter).m_CurrentFilter ==
+					TemporalAACurrentFilter::Gaussian &&
+					overridden.m_MotionSelection == TemporalAAMotionSelection::Center &&
+					content.m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
+					ResolveTemporalAASettings(invalidFilter).m_MotionSelection ==
+					TemporalAAMotionSelection::ClosestDepth &&
+					overridden.m_PostTemporalView == TemporalAAPostTemporalView::Jittered &&
+					content.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered &&
+					ResolveTemporalAASettings(invalidFilter).m_PostTemporalView ==
+					TemporalAAPostTemporalView::Unjittered &&
+					overridden.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
+					content.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+					ResolveTemporalAASettings(invalidFilter).m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Native &&
+					overridden.m_HistoryAccumulation == TemporalAAHistoryAccumulation::CompatibilityAge &&
+					overridden.m_HistoryRelaxation == 0.0f &&
+					content.m_HistoryRelaxation == TemporalAADefaultHistoryRelaxation &&
+					content.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
+					overridden.m_HistoryRectification ==
+					TemporalAAHistoryRectification::BoundedVarianceClip &&
+					overridden.m_VarianceClipGamma == TemporalAAMaxVarianceClipGamma &&
+					content.m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
+					ResolveTemporalAASettings(invalidFilter).m_HistoryRectification ==
+					TemporalAAHistoryRectification::MinMaxClamp &&
+					ResolveTemporalAASettings(invalidFilter).m_VarianceClipGamma ==
+					TemporalAADefaultVarianceClipGamma &&
+					ApplyFrameSequenceTemporalAAOverrides({}, content) ==
+					ResolveTemporalAASettings(content),
+					"Sequence Temporal AA overrides replace only set fields and stay within the "
+					"settings ranges");
+			}
+			{
+				const std::array<double, 5> samples{ 4.0, 1.0, 3.0, 2.0, 5.0 };
+				const FrameSequenceTimingSummary summary = SummarizeFrameSequenceTiming(samples);
+				context.Check(summary.m_Count == 5 && summary.m_Mean == 3.0 &&
+					summary.m_Median == 3.0 && summary.m_P90 == 5.0 && summary.m_Min == 1.0 &&
+					summary.m_Max == 5.0 && SummarizeFrameSequenceTiming({}).m_Count == 0,
+					"Timing summaries report nearest-rank percentiles");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string referenceError;
+				const uint64_t reference = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_ReferenceSamples = 2,
+					.m_TemporalAAOverrides = { .m_MaxHistoryFeedback = 0.9f },
+					}, referenceError);
+				std::string error;
+				const uint64_t id = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_TemporalAAOverrides = { .m_NeighborhoodClampExpansion = 0.5f },
+					}, error);
+				harness.Frame();
+				bool everyFrameOverridden = true;
+				while (harness.m_Sequence.IsActive())
+				{
+					everyFrameOverridden &= harness.Frame().has_value() &&
+						harness.m_LastTemporalAAOverrides &&
+						harness.m_LastTemporalAAOverrides->m_NeighborhoodClampExpansion == 0.5f &&
+						!harness.m_LastTemporalAAOverrides->m_MaxHistoryFeedback;
+				}
+				context.Check(reference == 0 && !referenceError.empty() && id != 0 &&
+					everyFrameOverridden && !harness.m_Sequence.GetStatus()->m_GpuTiming,
+					"Every sequence frame carries the requested Temporal AA overrides; a reference "
+					"rejects them");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string overrideError;
+				const uint64_t referenceWithOverrides = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_ReferenceSamples = 2,
+					.m_GTAOOverrides = { .m_TemporalAccumulation = true },
+					}, overrideError);
+				std::string tapError;
+				const uint64_t referenceWithOtherTap = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_CaptureSource = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight,
+					.m_ReferenceSamples = 2,
+					}, tapError);
+				std::string error;
+				const uint64_t visibilityReference = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_CaptureSource = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = PostProcessDebugTap::GTAOFinalAO,
+					.m_ReferenceSamples = 2,
+					}, error);
+				for (uint32_t frame = 0; frame < 4 && !harness.m_LastSample; ++frame)
+				{
+					harness.Frame();
+				}
+				context.Check(referenceWithOverrides == 0 && !overrideError.empty() &&
+					referenceWithOtherTap == 0 && !tapError.empty() && visibilityReference != 0 &&
+					harness.m_LastSample &&
+					harness.m_LastSample->m_Signal == TemporalReferenceSignal::AmbientOcclusion &&
+					harness.m_LastGTAOOverrides && harness.m_LastGTAOOverrides->IsEmpty(),
+					"A reference averages GTAO visibility for the gtao-final-ao tap, rejects other "
+					"taps and takes no GTAO overrides");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				const uint64_t id = harness.m_Sequence.Start({
+					.m_CameraPathId = "SEQ_Test",
+					.m_GTAOOverrides = { .m_TemporalAccumulation = true, .m_TemporalMaxSamples = 8u },
+					}, error);
+				harness.Frame();
+				bool everyFrameOverridden = true;
+				while (harness.m_Sequence.IsActive())
+				{
+					everyFrameOverridden &= harness.Frame().has_value() &&
+						harness.m_LastGTAOOverrides &&
+						harness.m_LastGTAOOverrides->m_TemporalAccumulation == true &&
+						harness.m_LastGTAOOverrides->m_TemporalMaxSamples == 8u;
+				}
+				const GTAOSettings overridden = ApplyFrameSequenceGTAOOverrides(
+					{ .m_TemporalAccumulation = true, .m_TemporalMaxSamples = 999u }, GTAOSettings{});
+				context.Check(id != 0 && everyFrameOverridden && overridden.m_TemporalAccumulation &&
+					overridden.m_TemporalMaxSamples == GTAOMaxTemporalSamples &&
+					ApplyFrameSequenceGTAOOverrides({}, GTAOSettings{}).m_TemporalMaxSamples ==
+						GTAOSettings{}.m_TemporalMaxSamples,
+					"Every sequence frame carries the requested GTAO overrides, resolved to the "
+					"settings' ranges");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.back().m_Frame = 20;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				const bool wantedWhileWaiting = harness.m_Sequence.WantsGpuTiming();
+				harness.Frame();
+				// Render k of the sequence is profiler frame 100 + k; its profile completes two
+				// frames later, so the first two profiles seen while running precede the
+				// sequence. Each profile is also reported twice.
+				uint64_t profilerFrame = 100;
+				while (harness.m_Sequence.IsActive())
+				{
+					harness.Frame();
+					++profilerFrame;
+					const uint64_t completed = profilerFrame - 2;
+					const GpuProfileFrameSnapshot profile{
+						.m_FrameIndex = completed,
+						.m_FrameMilliseconds = static_cast<double>(completed),
+						.m_Samples = { { .m_Name = "PostProcess.TemporalAA",
+							.m_Milliseconds = 0.5, .m_CallCount = 1 } },
+					};
+					harness.m_Sequence.OnGpuProfile(profile);
+					harness.m_Sequence.OnGpuProfile(profile);
+				}
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				const FrameSequenceGpuTiming* timing =
+					status.m_GpuTiming ? &*status.m_GpuTiming : nullptr;
+				context.Check(wantedWhileWaiting && !harness.m_Sequence.WantsGpuTiming() &&
+					timing && timing->m_FrameMilliseconds.size() == 16 &&
+					timing->m_FrameMilliseconds.front() == 103.0 &&
+					timing->m_FrameMilliseconds.back() == 118.0 &&
+					timing->m_Scopes.size() == 1 &&
+					timing->m_Scopes[0].m_Name == "PostProcess.TemporalAA" &&
+					timing->m_Scopes[0].m_Milliseconds.size() == 16,
+					"Sequence GPU timing records each profiled sequence frame once after warm-up");
+			}
+		}
+
+		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-failure");
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Missing" }, error));
+				harness.Frame();
+				harness.Frame();
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Failed &&
+					status.m_Failure.find("SEQ_Test") != std::string::npos,
+					"An unknown path fails and lists the available paths");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 6 } }, error));
+				harness.Frame();
+				harness.Frame();
+				context.Check(
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
+					"A capture frame beyond the path fails before frame 0");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error));
+				harness.Frame();
+				harness.Frame();
+				harness.Frame();
+				harness.Frame(true, 2);
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Failed &&
+					status.m_SubmittedFrames == 2 && !harness.Frame(),
+					"A temporal continuity change outside a path cut fails the sequence");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error));
+				harness.Frame();
+				harness.Frame();
+				harness.m_Ready = false;
+				harness.Frame();
+				context.Check(
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
+					"A readiness gate leaving Ready fails a running sequence");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				const uint64_t id =
+					harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error);
+				harness.Frame();
+				harness.Frame();
+				const bool cancelled = harness.m_Sequence.Cancel();
+				context.Check(id != 0 && cancelled && !harness.Frame() &&
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
+					!harness.m_Sequence.Cancel(),
+					"Cancelling stops posing frames; only an active sequence can be cancelled");
+			}
 		}
 	}
 
@@ -849,6 +1620,7 @@ namespace gglab
 	{
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
+		RunLoadingHistoryTests(context);
 		RunReferenceViewTests(context);
 		RunFailureTests(context);
 		RunShutdownTests(context);
@@ -857,5 +1629,11 @@ namespace gglab
 		RunWriterQueueLimitTests(context);
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);
+		RunFrameSequenceTests(context);
+		RunFrameSequenceBackPressureTests(context);
+		RunDiagnosticCaptureTests(context);
+		RunReferenceSequenceTests(context);
+		RunFrameSequenceEvaluationTests(context);
+		RunFrameSequenceFailureTests(context);
 	}
 }
