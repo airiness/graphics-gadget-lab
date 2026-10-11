@@ -55,6 +55,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(float2(pixel) + 0.5.xx) * (float2(renderExtent) / float2(width, height));
 	const uint2 renderPixel = min(uint2(renderPosition), renderExtent - 1u);
 	const float2 outputOffset = renderPosition - (float2(renderPixel) + 0.5.xx);
+	const bool upscaled = any(renderExtent != uint2(width, height));
+	const float2 displayPerRender = float2(width, height) / float2(renderExtent);
 
 	Texture2D<float2> motionTexture = GetTexture2DFloat2(g_Pass.MotionIndex);
 	Texture2D<float> currentDepthTexture = GetTexture2DFloat(g_Pass.CurrentDepthIndex);
@@ -104,7 +106,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	{
 		currentColor = ReconstructTemporalCurrentColor(currentColorTexture, renderPixel,
 			renderExtent, viewData.CurrentJitterUV * float2(renderExtent), outputOffset,
-			TAA_CURRENT_GAUSSIAN_KERNEL_SCALE, centerColor);
+			displayPerRender, TAA_CURRENT_GAUSSIAN_KERNEL_SCALE, centerColor);
 	}
 
 	uint rejectionReason = TAA_REJECTION_HISTORY_UNAVAILABLE;
@@ -236,6 +238,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	float historyWeight = 0.0;
 	float historyConfidence = 0.0;
+	// Samples the current frame counts as in the effective sample count.
+	float currentSampleWeight = 1.0;
 	float2 nextReliability = 0.0.xx;
 	float historyRelaxation = 0.0;
 	// How far rectification moved accepted history, relative to the size of the
@@ -262,19 +266,35 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x),
 				ResolveTemporalDisagreementConsistency(nextReliability));
 		}
-		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y + historyRelaxation;
+		const float motionMagnitudePixels =
+			length(historyMotionUV * float2(width, height));
+		float clampExpansion = maxHistoryFeedbackAndClampExpansion.y + historyRelaxation;
+		if (upscaled)
+		{
+			clampExpansion += ResolveTemporalUpscaledStaticClampExpansion(motionMagnitudePixels,
+				ResolveTemporalDisagreementConsistency(nextReliability));
+		}
 		const float3 neighborhoodExtent = neighborhoodMax - neighborhoodMin;
 		neighborhoodMin -= neighborhoodExtent * clampExpansion;
 		neighborhoodMax += neighborhoodExtent * clampExpansion;
 
-		const float motionMagnitudePixels =
-			length(historyMotionUV * float2(width, height));
 		historyConfidence = ComputeTemporalHistoryConfidence(motionMagnitudePixels,
 			currentYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
 			historyYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
 			g_Pass.VelocityWeightScale, luminanceWeightAndHistoryRelaxation.x);
 		historyWeight = ComputeTemporalHistoryWeight(previousAccumulation, historyConfidence,
 			maxHistoryFeedbackAndClampExpansion.x);
+		if (upscaled && effectiveSamples)
+		{
+			currentSampleWeight = ResolveTemporalUpscaledSampleWeight(
+				ResolveTemporalNearestSampleWeight(
+					outputOffset + viewData.CurrentJitterUV * float2(renderExtent),
+					displayPerRender, TAA_CURRENT_GAUSSIAN_KERNEL_SCALE));
+			historyWeight = ComputeTemporalWeightedHistoryWeight(previousAccumulation,
+				historyConfidence,
+				ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x),
+				currentSampleWeight);
+		}
 		const bool varianceClip =
 			(g_Pass.ViewIndexAndHistoryValid & TAA_VARIANCE_CLIP_BIT) != 0;
 		float3 rectifiedYCoCg;
@@ -319,7 +339,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x);
 	const float nextAccumulation = effectiveSamples
 		? ResolveTemporalHistoryNextSamples(accepted, previousAccumulation,
-			historyConfidence, maxHistorySamples)
+			historyConfidence, maxHistorySamples, currentSampleWeight)
 		: ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
 	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextAccumulation);
 	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor), outputAlphas.x);

@@ -6969,7 +6969,8 @@ namespace gglab
 		}
 
 		[[nodiscard]] inline float ResolveTemporalHistoryNextSamples(bool historyAccepted,
-			float previousSamples, float historyConfidence, float maxSamples) noexcept
+			float previousSamples, float historyConfidence, float maxSamples,
+			float currentSampleWeight = 1.0f) noexcept
 		{
 			if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) ||
 				!std::isfinite(historyConfidence))
@@ -6977,8 +6978,55 @@ namespace gglab
 				return TemporalHistoryInitialAccumulation;
 			}
 			return std::clamp(std::clamp(historyConfidence, 0.0f, 1.0f) *
-				std::min(previousSamples, maxSamples) + 1.0f,
+				std::min(previousSamples, maxSamples) + currentSampleWeight,
 				TemporalHistoryInitialAccumulation, maxSamples);
+		}
+
+		inline constexpr float TemporalUpscaledStaticMotionPixels = 0.5f;
+		inline constexpr float TemporalUpscaledMinSampleWeight = 1.0e-3f;
+
+		[[nodiscard]] inline float ResolveTemporalUpscaledStaticFraction(
+			float motionMagnitudePixels) noexcept
+		{
+			return std::isfinite(motionMagnitudePixels)
+				? 1.0f - std::clamp(motionMagnitudePixels / TemporalUpscaledStaticMotionPixels,
+					0.0f, 1.0f)
+				: 0.0f;
+		}
+
+		[[nodiscard]] inline float ResolveTemporalUpscaledStaticClampExpansion(
+			float motionMagnitudePixels, float consistency) noexcept
+		{
+			return ResolveTemporalUpscaledStaticFraction(motionMagnitudePixels) *
+				std::clamp((0.95f - consistency) / 0.15f, 0.0f, 1.0f);
+		}
+
+		[[nodiscard]] inline float ResolveTemporalNearestSampleWeight(
+			Vector2 offsetPixels, Vector2 displayPerRender, float kernelScale) noexcept
+		{
+			const float x = (std::round(offsetPixels.m_X) - offsetPixels.m_X) * displayPerRender.m_X;
+			const float y = (std::round(offsetPixels.m_Y) - offsetPixels.m_Y) * displayPerRender.m_Y;
+			return std::exp(-kernelScale * (x * x + y * y));
+		}
+
+		[[nodiscard]] inline float ResolveTemporalUpscaledSampleWeight(
+			float nearestSampleWeight) noexcept
+		{
+			return std::max(std::clamp(nearestSampleWeight, 0.0f, 1.0f),
+				TemporalUpscaledMinSampleWeight);
+		}
+
+		[[nodiscard]] inline float ComputeTemporalWeightedHistoryWeight(float previousSamples,
+			float historyConfidence, float maxSamples, float currentSampleWeight) noexcept
+		{
+			if (!IsTemporalHistoryAccumulationValid(previousSamples) ||
+				!std::isfinite(historyConfidence))
+			{
+				return 0.0f;
+			}
+			const float samples = std::min(previousSamples, maxSamples);
+			return std::clamp(historyConfidence, 0.0f, 1.0f) * samples /
+				(samples + std::max(currentSampleWeight, TemporalUpscaledMinSampleWeight));
 		}
 
 		[[nodiscard]] inline float ResolveTemporalDisagreementConsistency(
@@ -8105,6 +8153,45 @@ namespace gglab
 				effectiveSamples > 1.9f && effectiveSamples <= 2.0f + 1.0e-4f &&
 				samplesWeightAfterMotion < 0.7f,
 				"Effective samples keep a low-confidence stretch from returning to the ceiling weight on the next confident frame");
+
+			// Below the display extent a frame counts by the kernel weight of its nearest
+			// render sample; a weight of one reduces the weighted terms to the native ones.
+			// The static clamp expansion falls to zero with motion and as the disagreement
+			// keeps its sign, as through a gradual lighting change.
+			constexpr float gaussianKernelScale = 2.29f / (0.75f * 0.75f);
+			const Vector2 qualityDisplayPerRender(1.5f, 1.5f);
+			const float centredWeight = ResolveTemporalNearestSampleWeight(
+				Vector2(0.0f, 0.0f), qualityDisplayPerRender, gaussianKernelScale);
+			const float farWeight = ResolveTemporalNearestSampleWeight(
+				Vector2(0.5f, 0.5f), qualityDisplayPerRender, gaussianKernelScale);
+			const float wrappedWeight = ResolveTemporalNearestSampleWeight(
+				Vector2(0.9f, -0.1f), qualityDisplayPerRender, gaussianKernelScale);
+			const float farSamples = ResolveTemporalUpscaledSampleWeight(farWeight);
+			context.Check(centredWeight == 1.0f && farWeight < 0.02f &&
+				NearlyEqual(wrappedWeight, std::exp(-gaussianKernelScale * 0.045f)) &&
+				ResolveTemporalUpscaledStaticFraction(0.0f) == 1.0f &&
+				ResolveTemporalUpscaledStaticFraction(0.25f) == 0.5f &&
+				ResolveTemporalUpscaledStaticFraction(2.0f) == 0.0f &&
+				ResolveTemporalUpscaledStaticFraction(
+					std::numeric_limits<float>::quiet_NaN()) == 0.0f &&
+				ResolveTemporalUpscaledStaticClampExpansion(0.0f, 0.5f) == 1.0f &&
+				ResolveTemporalUpscaledStaticClampExpansion(0.25f, 0.5f) == 0.5f &&
+				ResolveTemporalUpscaledStaticClampExpansion(1.0f, 0.5f) == 0.0f &&
+				NearlyEqual(ResolveTemporalUpscaledStaticClampExpansion(0.0f, 0.875f), 0.5f) &&
+				ResolveTemporalUpscaledStaticClampExpansion(0.0f, 1.0f) == 0.0f &&
+				farSamples == farWeight && ResolveTemporalUpscaledSampleWeight(1.0f) == 1.0f &&
+				ResolveTemporalUpscaledSampleWeight(0.0f) == TemporalUpscaledMinSampleWeight &&
+				NearlyEqual(ComputeTemporalWeightedHistoryWeight(maxHistorySamples, 1.0f,
+					maxHistorySamples, 1.0f), ResolveTemporalAAHistoryWeight(maxHistorySamples,
+						0.0f, 1.0f, 1.0f, defaultTemporalAA)) &&
+				ComputeTemporalWeightedHistoryWeight(maxHistorySamples, 1.0f, maxHistorySamples,
+					farSamples) > 0.999f &&
+				ComputeTemporalWeightedHistoryWeight(0.0f, 1.0f, maxHistorySamples, 1.0f) == 0.0f &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples,
+					0.25f) == 20.25f &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples, 1.0f) ==
+					ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples),
+				"Upscaled frames count by their nearest render sample's display-pixel kernel weight, the static clamp expansion withdraws with motion and with a consistent disagreement, and a full sample matches the native weights");
 
 			// A disagreement that alternates in sign relaxes rectification of fully
 			// accumulated history; one that keeps its sign, or fresh history, does not.

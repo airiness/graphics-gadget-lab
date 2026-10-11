@@ -36,6 +36,14 @@ static const float TAA_HISTORY_INITIAL_ACCUMULATION = 1.0;
 static const float TAA_HISTORY_MAX_ACCUMULATION = 255.0;
 // Smoothing of the reliability evidence: one native jitter cycle; 1/16 measured the same.
 static const float TAA_RELIABILITY_SMOOTHING = 0.125;
+// Below the display extent, history motion in display pixels per frame over which the
+// static clamp expansion falls to zero.
+static const float TAA_UPSCALED_STATIC_MOTION_PIXELS = 0.5;
+// Min/max box expansion, in box extents per side, added for static history below the
+// display extent.
+static const float TAA_UPSCALED_STATIC_CLAMP_EXPANSION = 1.0;
+// Lower bound of the samples a current frame counts as, so history weights stay below one.
+static const float TAA_UPSCALED_MIN_SAMPLE_WEIGHT = 1.0e-3;
 
 float2 UnpackTemporalAAUnitRangePair(uint packedValues)
 {
@@ -107,18 +115,59 @@ float ResolveTemporalAAMaxHistorySamples(float maxHistoryFeedback)
 }
 
 // Effective sample count: the history confidence discounts the carried samples and the
-// current frame adds one, so a low-confidence frame also lowers the weight of the frames
-// after it until evidence accumulates again.
+// current frame adds the samples it counts as (one at native resolution), so a
+// low-confidence frame also lowers the weight of the frames after it until evidence
+// accumulates again.
 float ResolveTemporalHistoryNextSamples(bool historyAccepted, float previousSamples,
-	float historyConfidence, float maxSamples)
+	float historyConfidence, float maxSamples, float currentSampleWeight)
 {
 	if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) ||
 		!isfinite(historyConfidence))
 	{
 		return TAA_HISTORY_INITIAL_ACCUMULATION;
 	}
-	return clamp(saturate(historyConfidence) * min(previousSamples, maxSamples) + 1.0,
-		TAA_HISTORY_INITIAL_ACCUMULATION, maxSamples);
+	return clamp(saturate(historyConfidence) * min(previousSamples, maxSamples) +
+		currentSampleWeight, TAA_HISTORY_INITIAL_ACCUMULATION, maxSamples);
+}
+
+// How static history is below the display extent: one at rest, zero from
+// TAA_UPSCALED_STATIC_MOTION_PIXELS of motion.
+float ResolveTemporalUpscaledStaticFraction(float motionMagnitudePixels)
+{
+	return isfinite(motionMagnitudePixels)
+		? 1.0 - saturate(motionMagnitudePixels / TAA_UPSCALED_STATIC_MOTION_PIXELS)
+		: 0.0;
+}
+
+// Min/max box expansion, in box extents per side, for static history below the display
+// extent. Detail finer than the render grid can miss all nine render samples of a frame, and
+// a box without it pulls accumulated detail toward that frame's aliasing. Missed detail can
+// keep the sign of the disagreement for several frames, so the expansion withdraws only as
+// the disagreement consistency approaches one, as it does through a gradual lighting change.
+float ResolveTemporalUpscaledStaticClampExpansion(float motionMagnitudePixels,
+	float consistency)
+{
+	return TAA_UPSCALED_STATIC_CLAMP_EXPANSION *
+		ResolveTemporalUpscaledStaticFraction(motionMagnitudePixels) *
+		saturate((0.95 - consistency) / 0.15);
+}
+
+// Kernel weight, in display pixels, of the jittered render sample nearest the output
+// pixel centre. offsetPixels is the output position relative to the centre of its render
+// pixel plus the jitter, in render pixels; the nearest sample is the integer offset nearest it.
+float ResolveTemporalNearestSampleWeight(float2 offsetPixels, float2 displayPerRender,
+	float kernelScale)
+{
+	const float2 distance = (round(offsetPixels) - offsetPixels) * displayPerRender;
+	return exp(-kernelScale * dot(distance, distance));
+}
+
+// Samples the current frame counts as below the display extent. The jitter cycle places a
+// render sample near each display pixel only in some frames, so each frame counts by the
+// kernel weight of its nearest sample instead of as one sample, as at native resolution.
+float ResolveTemporalUpscaledSampleWeight(float nearestSampleWeight)
+{
+	return max(saturate(nearestSampleWeight), TAA_UPSCALED_MIN_SAMPLE_WEIGHT);
 }
 
 // Catmull-Rom resampling of the history color with five bilinear fetches: the 4x4
@@ -176,10 +225,12 @@ float3 SampleTemporalHistoryCatmullRomClamped(Texture2D<float4> history,
 // neighbor at offset o lies at o - jitterPixels from the centre of the render pixel.
 // outputOffset is the output position relative to that centre, in render pixels; zero
 // when render and output pixels coincide. Each sample is weighted by
-// exp(-kernelScale * distance^2) in render pixels; non-finite samples use centerColor.
+// exp(-kernelScale * distance^2) with the distance in output pixels, displayPerRender
+// output pixels per render pixel, so the kernel keeps its width below the display extent;
+// non-finite samples use centerColor.
 float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
-	uint2 pixel, uint2 extent, float2 jitterPixels, float2 outputOffset, float kernelScale,
-	float3 centerColor)
+	uint2 pixel, uint2 extent, float2 jitterPixels, float2 outputOffset,
+	float2 displayPerRender, float kernelScale, float3 centerColor)
 {
 	const int2 maxPixel = int2(extent) - 1;
 	float3 sum = 0.0.xxx;
@@ -196,7 +247,7 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 			{
 				sampleColor = centerColor;
 			}
-			const float2 offset = float2(x, y) - jitterPixels - outputOffset;
+			const float2 offset = (float2(x, y) - jitterPixels - outputOffset) * displayPerRender;
 			const float weight = exp(-kernelScale * dot(offset, offset));
 			sum += sampleColor * weight;
 			weightSum += weight;
@@ -396,6 +447,22 @@ float ComputeTemporalHistoryConfidence(float motionMagnitudePixels,
 	const float luminanceConfidence =
 		1.0 - saturate(relativeLuminanceDifference * max(luminanceWeightScale, 0.0));
 	return velocityConfidence * luminanceConfidence;
+}
+
+// Weight of accepted effective-sample history against a current frame that counts as
+// currentSampleWeight samples: confidence * N / (N + w). With w = 1 it equals the weight of
+// ComputeTemporalHistoryWeight, since the sample bound keeps N / (N + 1) at the feedback
+// ceiling.
+float ComputeTemporalWeightedHistoryWeight(float previousSamples, float historyConfidence,
+	float maxSamples, float currentSampleWeight)
+{
+	if (!IsTemporalHistoryAccumulationValid(previousSamples) || !isfinite(historyConfidence))
+	{
+		return 0.0;
+	}
+	const float samples = min(previousSamples, maxSamples);
+	return saturate(historyConfidence) * samples /
+		(samples + max(currentSampleWeight, TAA_UPSCALED_MIN_SAMPLE_WEIGHT));
 }
 
 // Weight of accepted history, min(N / (N + 1), feedback) * confidence, for the stored
