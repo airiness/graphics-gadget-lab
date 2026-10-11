@@ -3,6 +3,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"

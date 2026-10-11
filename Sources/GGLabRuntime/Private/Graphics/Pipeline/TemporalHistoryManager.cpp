@@ -100,7 +100,7 @@ namespace gglab
 			.m_ColorExtent = resolution.m_Display,
 			.m_DepthExtent = resolution.m_Render,
 			.m_ColorAbi = colorAbi,
-			.m_Accumulation = plan.m_HistoryAccumulation,
+			.m_Accumulation = plan.m_TemporalAA.m_HistoryAccumulation,
 		};
 		const auto isEmpty = [](ViewExtent extent) noexcept
 			{

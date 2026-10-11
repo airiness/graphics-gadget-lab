@@ -124,7 +124,7 @@ namespace gglab
 		// The resolve reconstructs the display extent from a smaller render extent. Material
 		// diagnostics render at native resolution, so the frames after one that showed them
 		// stay native.
-		info.m_TemporalUpscalingAvailable = !m_MaterialDiagnosticsShown;
+		info.m_TemporalAA.m_UpscalingAvailable = !m_MaterialDiagnosticsShown;
 		const SceneExtensionTemporalParticipation participation = m_SceneExtension
 			? m_SceneExtension->GetTemporalParticipation()
 			: SceneExtensionTemporalParticipation::PostTAA;

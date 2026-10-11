@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -174,7 +175,7 @@ namespace gglab
 		// Accumulation model of the color history this frame reads and writes.
 		[[nodiscard]] TemporalAAHistoryAccumulation GetHistoryAccumulation() const noexcept
 		{
-			return m_Plan.m_HistoryAccumulation;
+			return m_Plan.m_TemporalAA.m_HistoryAccumulation;
 		}
 		[[nodiscard]] const Vector2& GetJitterPixels() const noexcept { return m_JitterPixels; }
 		[[nodiscard]] const std::optional<TemporalReferenceSample>& GetReferenceSample()

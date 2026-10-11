@@ -17,6 +17,7 @@
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderingSettingsDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"

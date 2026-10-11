@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"

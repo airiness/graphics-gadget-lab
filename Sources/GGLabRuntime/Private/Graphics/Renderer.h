@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"

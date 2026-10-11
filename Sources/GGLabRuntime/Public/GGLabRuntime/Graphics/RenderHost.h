@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"

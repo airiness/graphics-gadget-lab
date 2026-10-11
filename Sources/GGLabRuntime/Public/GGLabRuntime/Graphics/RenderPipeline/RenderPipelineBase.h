@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 
 #include <cstdint>
 #include <span>

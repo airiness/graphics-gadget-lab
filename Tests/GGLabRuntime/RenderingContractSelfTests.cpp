@@ -27,6 +27,7 @@
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -5742,19 +5743,21 @@ namespace gglab
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
 			const TemporalFramePlanResolveInfo activePlanInfo{
-				.m_Settings = { .m_Enabled = true },
-				.m_Capabilities = {
-					.m_MotionRenderTarget = true,
-					.m_MotionShaderResource = true,
-					.m_ResolvedColorRenderTarget = true,
-					.m_ResolvedColorShaderResource = true,
-					.m_ResolvedColorTypedUavStore = true,
-					.m_HistoryColorShaderResource = true,
-					.m_HistoryColorTypedUavStore = true,
-					.m_HistoryDepthShaderResource = true,
-					.m_HistoryDepthTypedUavStore = true,
-					.m_HistoryReliabilityShaderResource = true,
-					.m_HistoryReliabilityTypedUavStore = true,
+				.m_TemporalAA = {
+					.m_Settings = { .m_Enabled = true },
+					.m_Capabilities = {
+						.m_MotionRenderTarget = true,
+						.m_MotionShaderResource = true,
+						.m_ResolvedColorRenderTarget = true,
+						.m_ResolvedColorShaderResource = true,
+						.m_ResolvedColorTypedUavStore = true,
+						.m_HistoryColorShaderResource = true,
+						.m_HistoryColorTypedUavStore = true,
+						.m_HistoryDepthShaderResource = true,
+						.m_HistoryDepthTypedUavStore = true,
+						.m_HistoryReliabilityShaderResource = true,
+						.m_HistoryReliabilityTypedUavStore = true,
+					},
 				},
 				.m_DisplayViewId = RenderViewID::Main,
 				.m_SceneExtensionParticipation =
@@ -6006,7 +6009,7 @@ namespace gglab
 				reenabled.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission,
 				"Fresh history allocation preserves its explicit reset cause instead of ColdStart");
 			TemporalFramePlanResolveInfo disabledPlanInfo = activePlanInfo;
-			disabledPlanInfo.m_Settings.m_Enabled = false;
+			disabledPlanInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledPlanInfo);
 			TemporalFrameTransaction disabledTransaction;
 			disabledTransaction.Begin(
@@ -6045,7 +6048,7 @@ namespace gglab
 				"Extent changes retire committed history and allocate a fresh invalid generation");
 
 			TemporalFramePlanResolveInfo unavailablePlanInfo = activePlanInfo;
-			unavailablePlanInfo.m_Capabilities = {};
+			unavailablePlanInfo.m_TemporalAA.m_Capabilities = {};
 			const ResolvedTemporalFramePlan unavailablePlan =
 				ResolveTemporalFramePlan(unavailablePlanInfo);
 			TemporalFrameTransaction unavailableTransaction;
@@ -6151,7 +6154,7 @@ namespace gglab
 				"extent; a render extent change alone resets the pair");
 			// The stored alpha of one accumulation model is not the other's.
 			ResolvedTemporalFramePlan agePlan = activePlan;
-			agePlan.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+			agePlan.m_TemporalAA.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
 			auto ageFrame = domainManager.BeginFrame(agePlan, renderChanged);
 			const TemporalHistoryManagerDiagnostics ageHistory = domainManager.GetDiagnostics();
 			domainManager.AbortFrame(ageFrame, {});
@@ -8731,8 +8734,10 @@ namespace gglab
 				"Temporal AA core capability requires the complete device texture support");
 
 			TemporalFramePlanResolveInfo resolveInfo{
-				.m_Settings = {.m_Enabled = true},
-				.m_Capabilities = fullCapabilities,
+				.m_TemporalAA = {
+					.m_Settings = {.m_Enabled = true},
+					.m_Capabilities = fullCapabilities,
+				},
 				.m_DisplayViewId = RenderViewID::Main,
 				.m_SceneExtensionParticipation =
 					SceneExtensionTemporalParticipation::PostTAA,
@@ -8743,10 +8748,10 @@ namespace gglab
 			};
 			const ResolvedTemporalFramePlan activePlan = ResolveTemporalFramePlan(resolveInfo);
 			TemporalFramePlanResolveInfo disabledInfo = resolveInfo;
-			disabledInfo.m_Settings.m_Enabled = false;
+			disabledInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledInfo);
 			TemporalFramePlanResolveInfo missingCoreInfo = resolveInfo;
-			missingCoreInfo.m_Capabilities = {};
+			missingCoreInfo.m_TemporalAA.m_Capabilities = {};
 			const ResolvedTemporalFramePlan missingCorePlan =
 				ResolveTemporalFramePlan(missingCoreInfo);
 			TemporalFramePlanResolveInfo ineligibleInfo = resolveInfo;
@@ -8774,7 +8779,7 @@ namespace gglab
 						temporalAAOf(plan).m_DisableReason == reason &&
 						plan.m_Services == TemporalService::None;
 				};
-			context.Check(temporalAAOf(activePlan).IsActive() && activePlan.m_CoreAvailable &&
+			context.Check(temporalAAOf(activePlan).IsActive() && activePlan.m_TemporalAA.m_CoreAvailable &&
 				temporalAAOf(activePlan).m_DisableReason == TemporalConsumerDisableReason::None &&
 				activePlan.m_ResetIdentity == 17 && activePlan.m_SessionIdentity == 23 &&
 				!temporalAAOf(disabledPlan).IsActive() &&
@@ -8843,7 +8848,7 @@ namespace gglab
 			context.Check(ambientOcclusionOf(ambientOcclusionPlan).IsActive() &&
 				ambientOcclusionPlan.m_Services == ambientOcclusionServices &&
 				!ambientOcclusionPlan.GetProjectionJitterOwner() &&
-				ambientOcclusionPlan.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+				ambientOcclusionPlan.m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
 				combinedPlan.m_Services == allServices &&
 				combinedPlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
 				ambientOcclusionOf(combinedPlan).IsActive() &&
@@ -8866,39 +8871,39 @@ namespace gglab
 				"every disable cause");
 
 			TemporalFramePlanResolveInfo qualityInfo = resolveInfo;
-			qualityInfo.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
+			qualityInfo.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
 			TemporalFramePlanResolveInfo upscalingInfo = qualityInfo;
-			upscalingInfo.m_TemporalUpscalingAvailable = true;
+			upscalingInfo.m_TemporalAA.m_UpscalingAvailable = true;
 			TemporalFramePlanResolveInfo disabledUpscalingInfo = upscalingInfo;
-			disabledUpscalingInfo.m_Settings.m_Enabled = false;
+			disabledUpscalingInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			TemporalFramePlanResolveInfo referenceUpscalingInfo = disabledUpscalingInfo;
 			referenceUpscalingInfo.m_ReferenceRequested = true;
 			const ResolvedTemporalFramePlan upscalingPlan = ResolveTemporalFramePlan(upscalingInfo);
 			context.Check(
-				ResolveTemporalFramePlan(qualityInfo).m_ResolutionPreset ==
+				ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Native &&
-				upscalingPlan.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
-				upscalingPlan.GetJitterSequenceLength() == 18 &&
-				activePlan.GetJitterSequenceLength() == 8 &&
-				ResolveTemporalFramePlan(disabledUpscalingInfo).m_ResolutionPreset ==
+				upscalingPlan.m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
+				upscalingPlan.m_TemporalAA.GetJitterSequenceLength() == 18 &&
+				activePlan.m_TemporalAA.GetJitterSequenceLength() == 8 &&
+				ResolveTemporalFramePlan(disabledUpscalingInfo).m_TemporalAA.m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Native &&
-				ResolveTemporalFramePlan(referenceUpscalingInfo).m_ResolutionPreset ==
+				ResolveTemporalFramePlan(referenceUpscalingInfo).m_TemporalAA.m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Native,
 				"A render scale below native applies only to an active Temporal AA consumer "
 				"whose pipeline resolve can upscale");
 
 			TemporalFramePlanResolveInfo ageInfo = resolveInfo;
-			ageInfo.m_Settings.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+			ageInfo.m_TemporalAA.m_Settings.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
 			TemporalFramePlanResolveInfo disabledAgeInfo = ageInfo;
-			disabledAgeInfo.m_Settings.m_Enabled = false;
+			disabledAgeInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			TemporalAASettings invalidAccumulation{};
 			invalidAccumulation.m_HistoryAccumulation = static_cast<TemporalAAHistoryAccumulation>(7);
 			context.Check(TemporalAASettings{}.m_HistoryAccumulation ==
 					TemporalAAHistoryAccumulation::EffectiveSamples &&
-				activePlan.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
-				ResolveTemporalFramePlan(ageInfo).m_HistoryAccumulation ==
+				activePlan.m_TemporalAA.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
+				ResolveTemporalFramePlan(ageInfo).m_TemporalAA.m_HistoryAccumulation ==
 					TemporalAAHistoryAccumulation::CompatibilityAge &&
-				ResolveTemporalFramePlan(disabledAgeInfo).m_HistoryAccumulation ==
+				ResolveTemporalFramePlan(disabledAgeInfo).m_TemporalAA.m_HistoryAccumulation ==
 					TemporalAAHistoryAccumulation::EffectiveSamples &&
 				ResolveTemporalAASettings(invalidAccumulation).m_HistoryAccumulation ==
 					TemporalAAHistoryAccumulation::EffectiveSamples &&
@@ -8982,9 +8987,9 @@ namespace gglab
 				integratedExtensionPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::TemporalUnsupported,
 				"The Forward+ pipeline exposes its velocity path and rejects unsupported integrated extensions");
-			context.Check(forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_ResolutionPreset ==
+			context.Check(forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Quality &&
-				ResolveTemporalFramePlan(qualityInfo).m_ResolutionPreset ==
+				ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
 					TemporalAAResolutionPreset::Native,
 				"The Forward+ resolve upscales a requested Quality preset; a pipeline without an "
 				"upscaling resolve renders native");
@@ -8994,8 +8999,10 @@ namespace gglab
 				"Renderer publishes temporal core capability as unavailable before initialization");
 
 			const ResolvedTemporalFramePlan viewPlan = ResolveTemporalFramePlan({
-				.m_Settings = enabledSettings.m_TemporalAA,
-				.m_Capabilities = {},
+				.m_TemporalAA = {
+					.m_Settings = enabledSettings.m_TemporalAA,
+					.m_Capabilities = {},
+				},
 				.m_DisplayViewId = RenderViewID::Main,
 				.m_SceneExtensionParticipation =
 					SceneExtensionTemporalParticipation::PostTAA,
@@ -9020,7 +9027,7 @@ namespace gglab
 			const float farRawDepth = ProjectPosition(
 				Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
 			context.Check(viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_Requested &&
-				!viewPlan.m_CoreAvailable &&
+				!viewPlan.m_TemporalAA.m_CoreAvailable &&
 				!viewPlan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
 				viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_DisableReason ==
 					TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
@@ -9221,15 +9228,15 @@ namespace gglab
 				"leave the raster projection unjittered");
 
 			TemporalFramePlanResolveInfo biasedInfo = resolveInfo;
-			biasedInfo.m_Settings.m_TextureLodBiasOffset = -0.75f;
+			biasedInfo.m_TemporalAA.m_Settings.m_TextureLodBiasOffset = -0.75f;
 			const ResolvedTemporalFramePlan biasedPlan = ResolveTemporalFramePlan(biasedInfo);
 			TemporalFramePlanResolveInfo biasedQualityInfo = biasedInfo;
-			biasedQualityInfo.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
-			biasedQualityInfo.m_TemporalUpscalingAvailable = true;
+			biasedQualityInfo.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
+			biasedQualityInfo.m_TemporalAA.m_UpscalingAvailable = true;
 			const ResolvedTemporalFramePlan biasedQualityPlan =
 				ResolveTemporalFramePlan(biasedQualityInfo);
 			TemporalFramePlanResolveInfo biasedInactiveInfo = biasedInfo;
-			biasedInactiveInfo.m_Settings.m_Enabled = false;
+			biasedInactiveInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			const ResolvedTemporalFramePlan biasedInactivePlan =
 				ResolveTemporalFramePlan(biasedInactiveInfo);
 			struct DisplayViewSampling
@@ -9243,7 +9250,7 @@ namespace gglab
 				std::optional<TemporalReferenceSample> referenceSample = std::nullopt) noexcept
 				{
 					const ViewResolution resolution =
-						ResolveTemporalAAViewResolution({ 1920, 1080 }, plan.m_ResolutionPreset);
+						ResolveTemporalAAViewResolution({ 1920, 1080 }, plan.m_TemporalAA.m_ResolutionPreset);
 					TemporalViewHistory viewHistory{};
 					TemporalObjectHistory objectHistory{};
 					TemporalFrameTransaction transaction;
@@ -9274,8 +9281,8 @@ namespace gglab
 				TemporalReferenceSample{ .m_Index = 2, .m_Count = 16, .m_TextureLodBias = -2.0f });
 			TemporalAASettings outOfRangeBias{};
 			outOfRangeBias.m_TextureLodBiasOffset = -5.0f;
-			context.Check(biasedPlan.m_TextureLodBiasOffset == -0.75f &&
-				biasedInactivePlan.m_TextureLodBiasOffset == 0.0f &&
+			context.Check(biasedPlan.m_TemporalAA.m_TextureLodBiasOffset == -0.75f &&
+				biasedInactivePlan.m_TemporalAA.m_TextureLodBiasOffset == 0.0f &&
 				NearlyEqual(qualitySampling.m_TransactionBias,
 					std::log2(1280.0f / 1920.0f) - 0.75f) &&
 				qualitySampling.m_PreparedViewBias == qualitySampling.m_TransactionBias &&

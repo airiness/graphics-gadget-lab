@@ -3,7 +3,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
-#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"

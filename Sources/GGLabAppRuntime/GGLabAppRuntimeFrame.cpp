@@ -26,6 +26,7 @@
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
@@ -537,8 +538,10 @@ namespace gglab
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
-				.m_Settings = displayViewSettings.m_TemporalAA,
-				.m_Capabilities = m_RenderHost->GetTemporalAACapabilityStatus(),
+				.m_TemporalAA = {
+					.m_Settings = displayViewSettings.m_TemporalAA,
+					.m_Capabilities = m_RenderHost->GetTemporalAACapabilityStatus(),
+				},
 				.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 				.m_ResetIdentity = displayCameraSlot->m_Camera->GetTemporalResetSerial(),
 				.m_SessionIdentity = temporalSessionIdentity,
@@ -554,7 +557,7 @@ namespace gglab
 		// The window client extent is the display extent; the plan's effective preset
 		// derives the render extent from it.
 		const ViewResolution viewResolution = ResolveTemporalAAViewResolution(
-			{ m_WindowWidth, m_WindowHeight }, temporalFramePlan.m_ResolutionPreset);
+			{ m_WindowWidth, m_WindowHeight }, temporalFramePlan.m_TemporalAA.m_ResolutionPreset);
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, viewResolution,
 			displayViewSettings.m_Exposure.m_PreExposure, referenceSample);

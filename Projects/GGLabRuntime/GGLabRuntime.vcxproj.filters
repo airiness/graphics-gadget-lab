@@ -1994,6 +1994,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalAA.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalFramePlan.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalFrameTransaction.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>

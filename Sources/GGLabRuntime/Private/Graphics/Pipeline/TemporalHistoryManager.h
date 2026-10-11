@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Pipeline/TemporalHistoryTextures.h"

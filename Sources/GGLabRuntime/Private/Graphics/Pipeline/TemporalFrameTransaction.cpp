@@ -90,12 +90,13 @@ namespace gglab
 		switch (plan.GetProjectionJitterOwner().value_or(TemporalConsumer::Count))
 		{
 		case TemporalConsumer::TemporalAA:
-			m_JitterSequenceLength = plan.GetJitterSequenceLength();
+			m_JitterSequenceLength = plan.m_TemporalAA.GetJitterSequenceLength();
 			m_JitterPixels = temporal::GetJitterSamplePixels(m_JitterIndex, m_JitterSequenceLength);
 			// log2(render / display) + offset: temporal accumulation recovers the detail that
 			// the negative bias exposes.
 			m_TextureLodBias = std::log2(static_cast<float>(resolution.m_Render.m_Width) /
-				static_cast<float>(resolution.m_Display.m_Width)) + plan.m_TextureLodBiasOffset;
+				static_cast<float>(resolution.m_Display.m_Width)) +
+				plan.m_TemporalAA.m_TextureLodBiasOffset;
 			break;
 		case TemporalConsumer::Reference:
 			GGLAB_ASSERT_MSG(m_ReferenceSample.has_value(),
@@ -370,7 +371,7 @@ namespace gglab
 
 		m_ViewHistory->m_Committed = m_PendingView;
 		m_ViewHistory->m_NextJitterIndex =
-			(m_JitterIndex + 1) % m_Plan.GetJitterSequenceLength();
+			(m_JitterIndex + 1) % m_Plan.m_TemporalAA.GetJitterSequenceLength();
 		// Wraps after 2^32 frames; consumers use it only as a noise seed.
 		m_ViewHistory->m_NextFrameIndex = m_FrameIndex + 1;
 		m_ViewHistory->m_Valid = true;

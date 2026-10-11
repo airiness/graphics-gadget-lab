@@ -5,6 +5,7 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
