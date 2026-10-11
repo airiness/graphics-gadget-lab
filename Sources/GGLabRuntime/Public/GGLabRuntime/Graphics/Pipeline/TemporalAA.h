@@ -715,6 +715,9 @@ namespace gglab
 		// Accumulation model of the Temporal AA color history while that consumer is active.
 		TemporalAAHistoryAccumulation m_HistoryAccumulation =
 			TemporalAAHistoryAccumulation::EffectiveSamples;
+		// Material texture LOD offset of the Temporal AA consumer while it is active, added
+		// to log2(render / display); zero otherwise.
+		float m_TextureLodBiasOffset = 0.0f;
 		uint64_t m_ResetIdentity = 0;
 		uint64_t m_SessionIdentity = 0;
 		bool m_CoreAvailable = false;
@@ -901,6 +904,7 @@ namespace gglab
 		if (plan.IsConsumerActive(TemporalConsumer::TemporalAA))
 		{
 			plan.m_HistoryAccumulation = info.m_Settings.m_HistoryAccumulation;
+			plan.m_TextureLodBiasOffset = info.m_Settings.m_TextureLodBiasOffset;
 			if (info.m_TemporalUpscalingAvailable)
 			{
 				plan.m_ResolutionPreset = info.m_Settings.m_ResolutionPreset;

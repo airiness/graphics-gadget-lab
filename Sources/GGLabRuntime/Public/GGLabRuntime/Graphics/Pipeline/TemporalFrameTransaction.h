@@ -159,6 +159,14 @@ namespace gglab
 
 		[[nodiscard]] TemporalFrameTransactionState GetState() const noexcept { return m_State; }
 		[[nodiscard]] uint32_t GetJitterIndex() const noexcept { return m_JitterIndex; }
+		// Phases of the jitter owner's sequence: the Temporal AA sequence length, the
+		// reference sample count, or zero without a jitter owner.
+		[[nodiscard]] uint32_t GetJitterSequenceLength() const noexcept
+		{
+			return m_JitterSequenceLength;
+		}
+		// Material texture LOD bias that the display view applies, set by the jitter owner.
+		[[nodiscard]] float GetTextureLodBias() const noexcept { return m_TextureLodBias; }
 		// Frames since the temporal history was reset, counting this frame from zero.
 		[[nodiscard]] uint32_t GetFrameIndex() const noexcept { return m_FrameIndex; }
 		[[nodiscard]] float GetScenePreExposure() const noexcept { return m_ScenePreExposure; }
@@ -215,7 +223,9 @@ namespace gglab
 		// Jitter is expressed in render pixels; histories follow their own domains.
 		ViewResolution m_Resolution{};
 		uint32_t m_JitterIndex = 0;
+		uint32_t m_JitterSequenceLength = 0;
 		uint32_t m_FrameIndex = 0;
+		float m_TextureLodBias = 0.0f;
 		float m_ScenePreExposure = SceneColorStoragePreExposureV1;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 		bool m_HasCompatiblePreviousView = false;

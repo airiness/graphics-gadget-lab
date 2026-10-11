@@ -45,14 +45,6 @@ namespace gglab
 			{
 				view.m_TemporalResetIdentity = temporalFramePlan.m_ResetIdentity;
 				view.m_TemporalSessionIdentity = temporalFramePlan.m_SessionIdentity;
-				// log2(render / display) + offset: temporal accumulation recovers the
-				// detail that the negative bias exposes.
-				view.m_TextureLodBias =
-					temporalFramePlan.IsConsumerActive(TemporalConsumer::TemporalAA)
-					? std::log2(static_cast<float>(resolution.m_Render.m_Width) /
-						static_cast<float>(resolution.m_Display.m_Width)) +
-						renderSettings.m_TemporalAA.m_TextureLodBiasOffset
-					: 0.0f;
 			}
 
 			view.m_CameraPosition = camera.GetPosition();

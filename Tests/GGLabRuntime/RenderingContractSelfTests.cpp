@@ -9068,36 +9068,83 @@ namespace gglab
 				"Temporal GTAO frames advance the sampling index only after submission and "
 				"leave the raster projection unjittered");
 
-			ResolvedViewRenderSettings biasedSettings = enabledSettings;
-			biasedSettings.m_TemporalAA.m_TextureLodBiasOffset = -0.75f;
-			const ResolvedTemporalFramePlan& inactivePlan = disabledPlan;
-			const auto buildBiasedView = [&](const ResolvedTemporalFramePlan& plan) noexcept
+			TemporalFramePlanResolveInfo biasedInfo = resolveInfo;
+			biasedInfo.m_Settings.m_TextureLodBiasOffset = -0.75f;
+			const ResolvedTemporalFramePlan biasedPlan = ResolveTemporalFramePlan(biasedInfo);
+			TemporalFramePlanResolveInfo biasedQualityInfo = biasedInfo;
+			biasedQualityInfo.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
+			biasedQualityInfo.m_TemporalUpscalingAvailable = true;
+			const ResolvedTemporalFramePlan biasedQualityPlan =
+				ResolveTemporalFramePlan(biasedQualityInfo);
+			TemporalFramePlanResolveInfo biasedInactiveInfo = biasedInfo;
+			biasedInactiveInfo.m_Settings.m_Enabled = false;
+			const ResolvedTemporalFramePlan biasedInactivePlan =
+				ResolveTemporalFramePlan(biasedInactiveInfo);
+			struct DisplayViewSampling
+			{
+				float m_BuiltViewBias = 0.0f;
+				float m_PreparedViewBias = 0.0f;
+				float m_TransactionBias = 0.0f;
+				uint32_t m_JitterSequenceLength = 0;
+			};
+			const auto resolveDisplayViewSampling = [&](const ResolvedTemporalFramePlan& plan,
+				std::optional<TemporalReferenceSample> referenceSample = std::nullopt) noexcept
 				{
-					return viewBuilder.Build<RenderViewID::Main>({
+					const ViewResolution resolution =
+						ResolveTemporalAAViewResolution({ 1920, 1080 }, plan.m_ResolutionPreset);
+					TemporalViewHistory viewHistory{};
+					TemporalObjectHistory objectHistory{};
+					TemporalFrameTransaction transaction;
+					transaction.Begin(viewHistory, objectHistory, plan, resolution, nullptr,
+						SceneColorStoragePreExposureV1, referenceSample);
+					RenderView view = viewBuilder.Build<RenderViewID::Main>({
 						.m_Camera = camera,
-						.m_RenderSettings = biasedSettings,
+						.m_RenderSettings = enabledSettings,
 						.m_TemporalFramePlan = plan,
-						.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
+						.m_Resolution = resolution,
 					});
+					DisplayViewSampling sampling{ .m_BuiltViewBias = view.m_TextureLodBias };
+					transaction.PrepareDisplayView(view);
+					sampling.m_PreparedViewBias = view.m_TextureLodBias;
+					sampling.m_TransactionBias = transaction.GetTextureLodBias();
+					sampling.m_JitterSequenceLength = transaction.GetJitterSequenceLength();
+					transaction.Abort();
+					return sampling;
 				};
+			const DisplayViewSampling nativeSampling = resolveDisplayViewSampling(biasedPlan);
+			const DisplayViewSampling qualitySampling =
+				resolveDisplayViewSampling(biasedQualityPlan);
+			const DisplayViewSampling inactiveSampling =
+				resolveDisplayViewSampling(biasedInactivePlan);
+			const DisplayViewSampling ambientOcclusionSampling =
+				resolveDisplayViewSampling(ambientOcclusionPlan);
+			const DisplayViewSampling referenceSampling = resolveDisplayViewSampling(referencePlan,
+				TemporalReferenceSample{ .m_Index = 2, .m_Count = 16, .m_TextureLodBias = -2.0f });
 			TemporalAASettings outOfRangeBias{};
 			outOfRangeBias.m_TextureLodBiasOffset = -5.0f;
-			const RenderView qualityBiasedView = viewBuilder.Build<RenderViewID::Main>({
-				.m_Camera = camera,
-				.m_RenderSettings = biasedSettings,
-				.m_TemporalFramePlan = activePlan,
-				.m_Resolution = ResolveTemporalAAViewResolution(
-					{ 1920, 1080 }, TemporalAAResolutionPreset::Quality),
-			});
-			context.Check(NearlyEqual(qualityBiasedView.m_TextureLodBias,
-				std::log2(1280.0f / 1920.0f) - 0.75f),
+			context.Check(biasedPlan.m_TextureLodBiasOffset == -0.75f &&
+				biasedInactivePlan.m_TextureLodBiasOffset == 0.0f &&
+				NearlyEqual(qualitySampling.m_TransactionBias,
+					std::log2(1280.0f / 1920.0f) - 0.75f) &&
+				qualitySampling.m_PreparedViewBias == qualitySampling.m_TransactionBias &&
+				qualitySampling.m_JitterSequenceLength == 18,
 				"The texture LOD bias adds log2(render / display) to the temporal offset");
-			context.Check(buildBiasedView(activePlan).m_TextureLodBias == -0.75f &&
-				buildBiasedView(inactivePlan).m_TextureLodBias == 0.0f &&
+			context.Check(nativeSampling.m_TransactionBias == -0.75f &&
+				nativeSampling.m_PreparedViewBias == -0.75f &&
+				nativeSampling.m_JitterSequenceLength == 8 &&
+				referenceSampling.m_TransactionBias == -2.0f &&
+				referenceSampling.m_PreparedViewBias == -2.0f &&
+				referenceSampling.m_JitterSequenceLength == 16 &&
+				inactiveSampling.m_PreparedViewBias == 0.0f &&
+				inactiveSampling.m_JitterSequenceLength == 0 &&
+				ambientOcclusionSampling.m_PreparedViewBias == 0.0f &&
+				ambientOcclusionSampling.m_JitterSequenceLength == 0 &&
+				nativeSampling.m_BuiltViewBias == 0.0f && referenceSampling.m_BuiltViewBias == 0.0f &&
 				temporalShadowView.m_TextureLodBias == 0.0f &&
 				ResolveTemporalAASettings(outOfRangeBias).m_TextureLodBiasOffset ==
 				TemporalAAMinTextureLodBiasOffset,
-				"Only an active temporal display view carries the texture LOD offset");
+				"The jitter owner selects the display view's texture LOD bias and jitter sequence "
+				"length once in the temporal frame transaction; other frames and views carry none");
 
 			TemporalViewHistory submittedViewHistory{};
 			TemporalObjectHistory submittedObjectHistory{};

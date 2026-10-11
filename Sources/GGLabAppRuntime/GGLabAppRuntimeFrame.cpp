@@ -39,7 +39,6 @@
 
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <format>
 #include <optional>
 #include <span>
@@ -221,9 +220,8 @@ namespace gglab
 				});
 			}
 			const TemporalAASettings& settings = inputs.m_TemporalSettings;
-			const Vector2& jitter = inputs.m_TemporalFrameTransaction.GetJitterPixels();
-			const std::optional<TemporalReferenceSample>& referenceSample =
-				inputs.m_TemporalFrameTransaction.GetReferenceSample();
+			const TemporalFrameTransaction& transaction = inputs.m_TemporalFrameTransaction;
+			const Vector2& jitter = transaction.GetJitterPixels();
 			const ViewResolution& resolution = inputs.m_ViewResolution;
 			return FrameCaptureTemporalState{
 				.m_Requested = temporalAA.m_Requested,
@@ -234,9 +232,8 @@ namespace gglab
 				.m_Services = GetTemporalServiceNames(plan.m_Services),
 				.m_SessionIdentity = plan.m_SessionIdentity,
 				.m_ResetIdentity = plan.m_ResetIdentity,
-				.m_JitterIndex = inputs.m_TemporalFrameTransaction.GetJitterIndex(),
-				.m_JitterSequenceLength = temporalAA.IsActive() ? plan.GetJitterSequenceLength()
-					: referenceSample ? referenceSample->m_Count : 0,
+				.m_JitterIndex = transaction.GetJitterIndex(),
+				.m_JitterSequenceLength = transaction.GetJitterSequenceLength(),
 				.m_JitterPixels = { jitter.m_X, jitter.m_Y },
 				.m_MaxHistoryFeedback = settings.m_MaxHistoryFeedback,
 				.m_DepthAbsoluteThreshold = settings.m_DepthAbsoluteThreshold,
@@ -272,12 +269,7 @@ namespace gglab
 					.m_TemporalAccumulation = inputs.m_GTAOSettings.m_TemporalAccumulation,
 					.m_TemporalMaxSamples = inputs.m_GTAOSettings.m_TemporalMaxSamples,
 				},
-				// The view applies log2(render / display) on top of the temporal offset.
-				.m_TextureLodBias = temporalAA.IsActive()
-					? std::log2(static_cast<float>(resolution.m_Render.m_Width) /
-						static_cast<float>(resolution.m_Display.m_Width)) +
-						settings.m_TextureLodBiasOffset
-					: referenceSample ? referenceSample->m_TextureLodBias : 0.0f,
+				.m_TextureLodBias = transaction.GetTextureLodBias(),
 				.m_RenderExtent = { resolution.m_Render.m_Width, resolution.m_Render.m_Height },
 				.m_DisplayExtent = { resolution.m_Display.m_Width, resolution.m_Display.m_Height },
 				.m_RenderScale = resolution.m_Display.m_Width > 0

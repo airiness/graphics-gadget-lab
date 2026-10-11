@@ -8,6 +8,8 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
+#include <cmath>
+
 namespace gglab
 {
 	void TemporalViewHistory::Invalidate() noexcept
@@ -81,18 +83,27 @@ namespace gglab
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_FrameIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextFrameIndex : 0;
 		m_JitterPixels = Vector2::Zero;
-		// Only the consumer whose resolve removes the jitter selects its sequence.
+		m_JitterSequenceLength = 0;
+		m_TextureLodBias = 0.0f;
+		// Only the consumer whose resolve removes the jitter selects its sequence and the
+		// material texture LOD bias of the display view.
 		switch (plan.GetProjectionJitterOwner().value_or(TemporalConsumer::Count))
 		{
 		case TemporalConsumer::TemporalAA:
-			m_JitterPixels =
-				temporal::GetJitterSamplePixels(m_JitterIndex, plan.GetJitterSequenceLength());
+			m_JitterSequenceLength = plan.GetJitterSequenceLength();
+			m_JitterPixels = temporal::GetJitterSamplePixels(m_JitterIndex, m_JitterSequenceLength);
+			// log2(render / display) + offset: temporal accumulation recovers the detail that
+			// the negative bias exposes.
+			m_TextureLodBias = std::log2(static_cast<float>(resolution.m_Render.m_Width) /
+				static_cast<float>(resolution.m_Display.m_Width)) + plan.m_TextureLodBiasOffset;
 			break;
 		case TemporalConsumer::Reference:
 			GGLAB_ASSERT_MSG(m_ReferenceSample.has_value(),
 				"The active reference consumer carries its sample.");
 			m_JitterIndex = m_ReferenceSample->m_Index;
+			m_JitterSequenceLength = m_ReferenceSample->m_Count;
 			m_JitterPixels = GetTemporalReferenceJitterPixels(m_ReferenceSample->m_Index);
+			m_TextureLodBias = m_ReferenceSample->m_TextureLodBias;
 			break;
 		case TemporalConsumer::Count:
 			break;
@@ -113,10 +124,7 @@ namespace gglab
 		view.m_TemporalResetIdentity = m_Plan.m_ResetIdentity;
 		view.m_TemporalSessionIdentity = m_Plan.m_SessionIdentity;
 		view.m_TemporalFrameIndex = m_FrameIndex;
-		if (m_ReferenceSample)
-		{
-			view.m_TextureLodBias = m_ReferenceSample->m_TextureLodBias;
-		}
+		view.m_TextureLodBias = m_TextureLodBias;
 		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
 			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
 		if (m_Plan.HasService(TemporalService::ProjectionJitter))
