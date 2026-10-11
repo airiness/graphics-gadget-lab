@@ -1474,7 +1474,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 71;
+			constexpr size_t ExpectedRuntimeProgramCount = 73;
 			const std::string expectedProgramCountField =
 				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({
@@ -1573,6 +1573,8 @@ namespace gglab
 				shader_programs::TemporalAADepthHistoryCompute,
 				shader_programs::TemporalAADisplayDepthVertex,
 				shader_programs::TemporalAADisplayDepthPixel,
+				shader_programs::GTAOTemporalCompute,
+				shader_programs::GTAOTemporalDiagnosticsCompute,
 			};
 			for (const ShaderProgramRef& programRef : requiredPrograms)
 			{
