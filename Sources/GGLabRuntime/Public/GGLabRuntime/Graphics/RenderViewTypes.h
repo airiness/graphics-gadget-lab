@@ -47,8 +47,8 @@ namespace gglab
 		bool operator==(const ViewResolution&) const noexcept = default;
 	};
 
-	// Renders at the display extent. Until temporal upscaling defines a render scale this
-	// is the only resolution a view receives, so both domains are equal.
+	// Resolution of a view that renders at its display extent without temporal upscaling:
+	// both domains are equal.
 	[[nodiscard]] constexpr ViewResolution ResolveNativeViewResolution(
 		ViewExtent display) noexcept
 	{
