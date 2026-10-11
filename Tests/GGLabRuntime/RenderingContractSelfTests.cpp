@@ -23,6 +23,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
+#include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
@@ -273,6 +274,11 @@ namespace gglab
 		struct TemporalReferenceContractPassData
 		{
 			TemporalReferenceRenderGraphResources m_Sums;
+		};
+
+		struct GTAOTemporalHistoryContractPassData
+		{
+			GTAOTemporalHistoryRenderGraphResources m_History;
 		};
 
 		struct BarrierBatchingPassData
@@ -5431,6 +5437,152 @@ namespace gglab
 			pool.Tick();
 		}
 
+		void RunGTAOTemporalHistoryContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool pool(&device);
+			GTAOTemporalHistory history(&pool);
+			const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const GTAOExtent halfExtent = MakeGTAOHalfResolutionExtent(16, 8);
+			struct HistoryFrame
+			{
+				bool m_Begun = false;
+				bool m_Imported = false;
+				bool m_Exported = false;
+				bool m_PreviousValid = false;
+				bool m_Compiled = false;
+			};
+			// Records one active temporal GTAO frame. A frame that does not fully write the
+			// next pair cannot export it.
+			const auto recordFrame = [&](bool continuesPreviousView, bool writesNext) noexcept
+				{
+					HistoryFrame frame{ .m_Begun = history.BeginFrame(true, halfExtent, fence) };
+					RenderGraph graph({
+						.m_Device = &device,
+						.m_TransientResourcePool =
+							reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+						});
+					graph.AddPass<GTAOTemporalHistoryContractPassData>("GTAO.TemporalHistory.Contract",
+						[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+						{
+							frame.m_Imported = history.ImportRenderGraphResources(
+								builder, continuesPreviousView, data.m_History);
+							frame.m_PreviousValid = data.m_History.m_PreviousValid;
+							if (data.m_History.m_PreviousValid)
+							{
+								data.m_History.m_PreviousVisibility = builder.Read(
+									data.m_History.m_PreviousVisibility, RGTextureAccess::Sample);
+								data.m_History.m_PreviousViewZ = builder.Read(
+									data.m_History.m_PreviousViewZ, RGTextureAccess::Sample);
+							}
+							if (writesNext)
+							{
+								builder.WriteInPlace(
+									data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
+								builder.WriteInPlace(
+									data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
+							}
+							frame.m_Exported =
+								history.ExportRenderGraphResources(builder, data.m_History);
+						});
+					frame.m_Compiled = graph.Compile();
+					return frame;
+				};
+			const auto recorded = [](const HistoryFrame& frame, bool exported) noexcept
+				{
+					return frame.m_Begun && frame.m_Imported && frame.m_Exported == exported &&
+						frame.m_Compiled;
+				};
+
+			const HistoryFrame unsubmitted = recordFrame(true, true);
+			history.AbortFrame();
+			const bool committedAfterAbort = history.HasCommittedHistory();
+			const HistoryFrame first = recordFrame(true, true);
+			history.CommitFrame();
+			const bool committedAfterSubmit = history.HasCommittedHistory();
+			const HistoryFrame continued = recordFrame(true, true);
+			history.CommitFrame();
+			context.Check(recorded(unsubmitted, true) && !unsubmitted.m_PreviousValid &&
+				!committedAfterAbort && recorded(first, true) && !first.m_PreviousValid &&
+				committedAfterSubmit && recorded(continued, true) && continued.m_PreviousValid &&
+				pool.GetDiagnostics().m_ActiveTextureCount == 4,
+				"Temporal GTAO commits an exported history only when its frame is submitted, and "
+				"the next frame that continues the view reads it");
+
+			const HistoryFrame cut = recordFrame(false, true);
+			history.CommitFrame();
+			const HistoryFrame unexported = recordFrame(true, false);
+			history.CommitFrame();
+			const bool committedAfterUnexported = history.HasCommittedHistory();
+			const HistoryFrame afterUnexported = recordFrame(true, true);
+			history.CommitFrame();
+			context.Check(recorded(cut, true) && !cut.m_PreviousValid &&
+				recorded(unexported, false) && unexported.m_PreviousValid &&
+				!committedAfterUnexported && recorded(afterUnexported, true) &&
+				!afterUnexported.m_PreviousValid && history.HasCommittedHistory(),
+				"Temporal GTAO reads no previous history when the view does not continue or the "
+				"last submitted frame exported none");
+
+			const PersistentTexturePoolDiagnostics activePool = pool.GetDiagnostics();
+			const bool inactiveBegun = history.BeginFrame(false, halfExtent, fence);
+			const PersistentTexturePoolDiagnostics inactivePool = pool.GetDiagnostics();
+			bool inactiveImported = true;
+			RenderGraph inactiveGraph({
+				.m_Device = &device,
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			inactiveGraph.AddPass<GTAOTemporalHistoryContractPassData>(
+				"GTAO.TemporalHistory.Inactive",
+				[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+				{
+					inactiveImported = history.ImportRenderGraphResources(builder, true, data.m_History);
+					builder.SideEffect();
+				});
+			const bool inactiveCompiled = inactiveGraph.Compile();
+			const HistoryFrame reacquired = recordFrame(true, true);
+			history.CommitFrame();
+			context.Check(inactiveBegun && activePool.m_ActiveTextureCount == 4 &&
+				inactivePool.m_ActiveTextureCount == 0 &&
+				inactivePool.m_PendingRetirementTextureCount ==
+					activePool.m_PendingRetirementTextureCount + 4 &&
+				!inactiveImported && inactiveCompiled && recorded(reacquired, true) &&
+				!reacquired.m_PreviousValid && pool.GetDiagnostics().m_ActiveTextureCount == 4,
+				"An inactive frame retires the temporal GTAO pairs through the fence, and a later "
+				"active frame reallocates them without previous history");
+
+			const ResolvedTemporalFramePlan ambientOcclusionPlan = ResolveTemporalFramePlan({
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_DisplayViewEligible = true,
+				.m_DepthVelocityPathAvailable = true,
+				.m_AmbientOcclusionRequested = true,
+				.m_AmbientOcclusionAvailable = true,
+			});
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			const bool committedBeforeFatal = history.HasCommittedHistory();
+			const bool fatalBegun = history.BeginFrame(true, halfExtent, fence);
+			TemporalFrameTransaction transaction;
+			transaction.Begin(viewHistory, objectHistory, ambientOcclusionPlan,
+				ResolveNativeViewResolution({ 16, 8 }), nullptr, SceneColorStoragePreExposureV1,
+				std::nullopt, nullptr, &history);
+			const bool fatalCanAccumulate = transaction.CanAccumulateAmbientOcclusion();
+			const PersistentTexturePoolDiagnostics beforeFatal = pool.GetDiagnostics();
+			transaction.InvalidateAfterFatal(fence);
+			const PersistentTexturePoolDiagnostics afterFatal = pool.GetDiagnostics();
+			context.Check(ambientOcclusionPlan.UsesAmbientOcclusionHistory() &&
+				committedBeforeFatal && fatalBegun && fatalCanAccumulate &&
+				transaction.GetState() == TemporalFrameTransactionState::Invalidated &&
+				!history.HasCommittedHistory() && beforeFatal.m_ActiveTextureCount == 4 &&
+				afterFatal.m_ActiveTextureCount == 0 &&
+				afterFatal.m_PendingRetirementTextureCount ==
+					beforeFatal.m_PendingRetirementTextureCount + 4,
+				"A fatal submission releases the temporal GTAO history through the fence instead "
+				"of committing or keeping it");
+			device.m_CompletedFenceValue = fence.m_Value;
+			pool.Tick();
+		}
+
 		void RunTemporalHistoryTransactionContractTests(SelfTestContext& context) noexcept
 		{
 			RecordingDevice writeProofDevice;
@@ -9880,6 +10032,7 @@ namespace gglab
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalReferenceContractTests(context);
+		RunGTAOTemporalHistoryContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
 		RunAtmosphereContractTests(context);
 		RunWorldSunContractTests(context);
