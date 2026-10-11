@@ -641,6 +641,18 @@ namespace gglab
 			return RenderFrameValidationResult::ContractFailure(
 				"GTAO is enabled but its compute pipeline recipes failed to prepare.");
 		}
+		if (inputs.m_HasOpaqueDraws && inputs.m_GTAOEnabledAndSupported &&
+			inputs.m_GTAOHistoryRequired && !inputs.m_GTAOTemporalPipelineAvailable)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"Temporal GTAO keeps its own history but its recipe failed to prepare.");
+		}
+		if (inputs.m_HasOpaqueDraws && inputs.m_GTAOEnabledAndSupported &&
+			inputs.m_GTAOHistoryRequired && !inputs.m_GTAOHistoryAvailable)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"Temporal GTAO keeps its own history but could not allocate it.");
+		}
 		if (inputs.m_TemporalActive && !inputs.m_TemporalResolveClosureValid)
 		{
 			return RenderFrameValidationResult::ContractFailure(
@@ -689,6 +701,7 @@ namespace gglab
 		plan.m_GTAOStatus = ResolveGTAOFrameStatus(
 			gtaoEnabled, gtaoCoreAvailable, depthCoverage.m_HasDepthCoverageDraws);
 
+		const TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
 		RenderFrameValidationResult result = ClassifyForwardPlusFrame({
 			.m_PresentationAvailable = true,
 			.m_DisplayExtentMatchesPresentation = true,
@@ -700,10 +713,12 @@ namespace gglab
 			.m_DepthCoverageDiagnostic = depthCoverage.m_Diagnostic,
 			.m_GTAOEnabledAndSupported = gtaoEnabled && gtaoCoreAvailable,
 			.m_GTAOPipelineAvailable = m_GTAOPass.IsAvailable(),
+			.m_GTAOHistoryRequired = context.GetTemporalFramePlan().UsesAmbientOcclusionHistory(),
+			.m_GTAOTemporalPipelineAvailable = m_GTAOPass.IsTemporalPipelineAvailable(),
+			.m_GTAOHistoryAvailable = transaction && transaction->CanAccumulateAmbientOcclusion(),
 			.m_TemporalActive = temporalActive,
 			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
 			});
-		const TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
 		if (result.IsReady() && transaction && transaction->GetReferenceSample())
 		{
 			m_TemporalReferencePass.Prepare(services);

@@ -260,7 +260,6 @@ namespace gglab
 				shader_programs::GTAOTemporalDiagnosticsCompute);
 		if (m_Capabilities.IsTemporalAvailable() && !m_TemporalPipelineAvailable)
 		{
-			// Frames that request temporal GTAO fall back to spatial-only visibility.
 			GGLAB_LOG_GRAPHICS_ERROR("GTAO failed to prepare its temporal accumulation recipe.");
 		}
 		const bool denoiseXReady = loadVariant(PipelineVariant::DenoiseX,
@@ -330,8 +329,11 @@ namespace gglab
 		// submitted frame index, whether its own history or the Temporal AA resolve
 		// integrates the samples. Every other frame keeps the fixed spatial pattern.
 		TemporalFrameTransaction* transaction = context.m_TemporalFrameTransaction;
-		const bool temporal = m_TemporalPipelineAvailable && transaction &&
-			transaction->CanAccumulateAmbientOcclusion();
+		const bool temporal = context.GetTemporalFramePlan().UsesAmbientOcclusionHistory();
+		// Frame validation fails a frame whose GTAO history lacks its recipe or allocation.
+		GGLAB_ASSERT_MSG(!temporal || (m_TemporalPipelineAvailable && transaction &&
+			transaction->CanAccumulateAmbientOcclusion()),
+			"Temporal GTAO reached graph construction without its recipe or history.");
 		uint32_t sampleIndex = 0;
 		if (transaction && transaction->GetReferenceSample())
 		{

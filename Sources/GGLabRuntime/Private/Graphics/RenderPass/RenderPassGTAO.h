@@ -31,6 +31,11 @@ namespace gglab
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 		[[nodiscard]] bool IsAvailable() const noexcept { return m_IsAvailable; }
+		// Temporal accumulation recipe; frames that keep GTAO history require it.
+		[[nodiscard]] bool IsTemporalPipelineAvailable() const noexcept
+		{
+			return m_TemporalPipelineAvailable;
+		}
 		[[nodiscard]] const GTAOCapabilityStatus& GetCapabilityStatus() const noexcept
 		{
 			return m_Capabilities;

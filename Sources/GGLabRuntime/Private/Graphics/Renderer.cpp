@@ -310,7 +310,9 @@ namespace gglab
 		const bool canAccumulate = m_TemporalReferenceAccumulator->BeginFrame(sample,
 			resolution.m_Display.m_Width, resolution.m_Display.m_Height,
 			m_LastSubmittedFencePoint);
-		// Temporal GTAO history follows the half extent of the render domain.
+		// Temporal GTAO history follows the half extent of the render domain. A history that
+		// cannot be allocated leaves the frame without one, which the pipeline reports as a
+		// contract failure.
 		const bool ambientOcclusionHistory = plan.UsesAmbientOcclusionHistory();
 		const bool canAccumulateAmbientOcclusion = m_GTAOTemporalHistory->BeginFrame(
 			ambientOcclusionHistory,

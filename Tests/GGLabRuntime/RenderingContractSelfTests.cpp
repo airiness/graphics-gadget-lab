@@ -3199,6 +3199,32 @@ namespace gglab
 				!coverageFailure.m_Reason.empty(),
 				"Frame validation skips only resize mismatches, limits only opaque work by Forward+ capacity and GTAO readiness, and fails with evidence instead of selecting another lighting path, topology or silently dropping enabled GTAO");
 
+			ForwardPlusFrameValidationInputs gtaoHistoryReady = gtaoReady;
+			gtaoHistoryReady.m_GTAOHistoryRequired = true;
+			gtaoHistoryReady.m_GTAOTemporalPipelineAvailable = true;
+			gtaoHistoryReady.m_GTAOHistoryAvailable = true;
+			ForwardPlusFrameValidationInputs gtaoHistoryRecipeMissing = gtaoHistoryReady;
+			gtaoHistoryRecipeMissing.m_GTAOTemporalPipelineAvailable = false;
+			ForwardPlusFrameValidationInputs gtaoHistoryUnallocated = gtaoHistoryReady;
+			gtaoHistoryUnallocated.m_GTAOHistoryAvailable = false;
+			// Under the Temporal AA resolve, temporal GTAO keeps no history of its own.
+			ForwardPlusFrameValidationInputs gtaoHistoryNotRequired = gtaoHistoryRecipeMissing;
+			gtaoHistoryNotRequired.m_GTAOHistoryAvailable = false;
+			gtaoHistoryNotRequired.m_GTAOHistoryRequired = false;
+			ForwardPlusFrameValidationInputs gtaoHistoryWithoutOpaqueDraws = gtaoHistoryUnallocated;
+			gtaoHistoryWithoutOpaqueDraws.m_HasOpaqueDraws = false;
+			const RenderFrameValidationResult gtaoRecipeFailure =
+				ClassifyForwardPlusFrame(gtaoHistoryRecipeMissing);
+			const RenderFrameValidationResult gtaoAllocationFailure =
+				ClassifyForwardPlusFrame(gtaoHistoryUnallocated);
+			context.Check(classify(gtaoHistoryReady) == RenderFrameValidationStatus::Ready &&
+				gtaoRecipeFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				gtaoAllocationFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				gtaoRecipeFailure.m_Reason != gtaoAllocationFailure.m_Reason &&
+				classify(gtaoHistoryNotRequired) == RenderFrameValidationStatus::Ready &&
+				classify(gtaoHistoryWithoutOpaqueDraws) == RenderFrameValidationStatus::Ready,
+				"A recorded GTAO whose temporal plan keeps its own history fails without the accumulation recipe or an allocated history instead of falling back to spatial-only visibility");
+
 			// Production composition must not depend on Lab-owned validation programs.
 			const auto productionDemand =
 				shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();

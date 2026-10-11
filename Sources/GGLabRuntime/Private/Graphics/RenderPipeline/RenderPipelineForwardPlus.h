@@ -46,6 +46,10 @@ namespace gglab
 		std::string_view m_DepthCoverageDiagnostic;
 		bool m_GTAOEnabledAndSupported = false;
 		bool m_GTAOPipelineAvailable = false;
+		// The temporal plan accumulates GTAO in its own history this frame.
+		bool m_GTAOHistoryRequired = false;
+		bool m_GTAOTemporalPipelineAvailable = false;
+		bool m_GTAOHistoryAvailable = false;
 		bool m_TemporalActive = false;
 		bool m_TemporalResolveClosureValid = false;
 	};
@@ -54,8 +58,9 @@ namespace gglab
 	// A display view built for another swap-chain extent is an expected resize state and
 	// skips the frame. Missing scene data, invalid depth coverage and a lost temporal resolve
 	// closure are contract failures. Frames that record opaque work additionally fail when
-	// global lights exceed the Forward+ capacity or an enabled, supported GTAO has unprepared
-	// recipes; transparent-only frames record neither and are not limited by them. No failure
+	// global lights exceed the Forward+ capacity, or when an enabled, supported GTAO has
+	// unprepared recipes or lacks the accumulation recipe or history that its temporal plan
+	// requires; transparent-only frames record neither and are not limited by them. No failure
 	// selects another lighting path or frame topology or silently drops a requested feature.
 	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPlusFrame(
 		const ForwardPlusFrameValidationInputs& inputs) noexcept;
