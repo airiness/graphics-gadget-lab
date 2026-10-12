@@ -2217,6 +2217,12 @@ namespace gglab
 		return m_State->m_AssetLoadCoordinator.GetTextureDerivedDataCoordinatorStatistics();
 	}
 
+	uint32_t AssetManager::GetInFlightLoadCount() const noexcept
+	{
+		return m_State->m_AssetLoadCoordinator.GetActiveOperationCount() +
+			static_cast<uint32_t>(m_State->m_ModelAssets.GetPendingModelCount());
+	}
+
 	bool AssetManager::ClearTextureDerivedDataCache() noexcept
 	{
 		return m_State->m_AssetLoadCoordinator.ClearTextureDerivedDataCache();

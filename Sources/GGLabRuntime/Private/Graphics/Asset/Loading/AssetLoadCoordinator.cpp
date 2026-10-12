@@ -734,6 +734,12 @@ namespace gglab
 		return !m_ModelImports.empty() || !m_MeshReloads.empty() || !m_TextureDecodes.empty();
 	}
 
+	uint32_t AssetLoadCoordinator::GetActiveOperationCount() const noexcept
+	{
+		return static_cast<uint32_t>(
+			m_ModelImports.size() + m_MeshReloads.size() + m_TextureDecodes.size());
+	}
+
 	AssetOperationToken AssetLoadCoordinator::AllocateOperation(
 		AssetContentVersion contentVersion) noexcept
 	{

@@ -107,6 +107,7 @@ namespace gglab
 			const DemoManager& m_DemoManager;
 			const DemoBase& m_Demo;
 			const EnvironmentAssetController& m_EnvironmentAssetController;
+			const AssetManager& m_AssetManager;
 			const RenderServices& m_RenderServices;
 			const Time& m_Time;
 			const ShaderPreloadStatus& m_ShaderPreload;
@@ -162,13 +163,24 @@ namespace gglab
 				environmentPending ? "Loading the selected environment." : "");
 
 			// The published IBL generation matches the latest request once the
-			// requested environment lighting is fully baked or cache-restored.
-			const IBLBakeStatus& bake = inputs.m_RenderServices.m_Environment->GetBakingStatus();
-			const bool iblPending = bake.m_RequestedGeneration != bake.m_ActiveGeneration;
+			// requested environment lighting is fully baked or cache-restored. The
+			// request is read live: an environment committed this frame requests its
+			// bake before the bake status observes it.
+			const RenderEnvironmentAccess& environment = *inputs.m_RenderServices.m_Environment;
+			const IBLBakeStatus& bake = environment.GetBakingStatus();
+			const bool iblPending = environment.GetBakeRequestGeneration() != bake.m_ActiveGeneration;
 			readiness.Add("ibl",
 				iblPending ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
 				iblPending ? std::format("Baking {} ({:.0f}%).", GetIBLBakeStageName(bake.m_Stage),
 					bake.m_Progress * 100.0f)
+				: std::string{});
+
+			// A load reaches the upload queues only once its CPU work completes, so
+			// asset uploads alone would report Ready while a decode is in flight.
+			const uint32_t pendingLoads = inputs.m_AssetManager.GetInFlightLoadCount();
+			readiness.Add("asset-loads",
+				pendingLoads > 0 ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
+				pendingLoads > 0 ? std::format("{} asset loads in flight.", pendingLoads)
 				: std::string{});
 
 			const AssetUploadStatistics uploads =
@@ -581,6 +593,7 @@ namespace gglab
 			.m_DemoManager = *m_DemoManager,
 			.m_Demo = *demo,
 			.m_EnvironmentAssetController = *m_EnvironmentAssetController,
+			.m_AssetManager = *m_AssetManager,
 			.m_RenderServices = m_RenderServices,
 			.m_Time = *m_Time,
 			.m_ShaderPreload = shaderPreload,

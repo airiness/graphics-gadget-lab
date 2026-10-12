@@ -7615,6 +7615,7 @@ namespace gglab
 				uint64_t GetBakingGeneration() const noexcept override { return 1; }
 				const IBLBakeConfig& GetBakingConfig() const noexcept override { return m_Settings.m_BakeConfig; }
 				const IBLBakeStatus& GetBakingStatus() const noexcept override { return m_Status; }
+				uint64_t GetBakeRequestGeneration() const noexcept override { return m_Status.m_RequestedGeneration; }
 				IBLBakeStage GetStageForRecording() const noexcept override { return IBLBakeStage::Environment; }
 				void NotifyStageExecuted(IBLBakeStage, uint64_t) noexcept override {}
 				void NotifyBakeResourcesInitialized(uint64_t) noexcept override {}

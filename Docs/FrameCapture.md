@@ -95,10 +95,16 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   repeated runs capture the same image however long loading took.
   `next-frame` captures the next recorded frame, even while loading.
 - **Readiness gates.** `shaders`, `content-transition`, `content`, `lab`,
-  `environment`, `ibl` and `asset-uploads`. A pending gate keeps an
-  after-ready capture waiting; `status` shows its detail. A failed gate fails
-  the waiting after-ready captures of that content at once, with the gate's
-  detail as the reason; submit them again after fixing the cause.
+  `environment`, `ibl`, `asset-loads` and `asset-uploads`. A pending gate keeps
+  an after-ready capture waiting; `status` shows its detail. Each gate stays
+  pending while work it covers is still in flight: `asset-loads` counts
+  imports and decodes before they reach the upload queues, and `ibl` counts a
+  bake requested by an environment committed in the same frame. A gate that
+  leaves Ready after settling began restarts settling, but the simulation time
+  already advanced cannot be taken back, so a gate must not report Ready early.
+  A failed gate fails the waiting after-ready captures of that content at once,
+  with the gate's detail as the reason; submit them again after fixing the
+  cause.
 - **Content.** `-RequiredContentId` additionally waits until that Lab or Demo
   id is active.
 - **Label and note.** `-Label` names the files and is stored with `-Note` in the

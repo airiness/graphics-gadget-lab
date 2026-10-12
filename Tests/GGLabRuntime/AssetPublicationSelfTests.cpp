@@ -403,11 +403,95 @@ namespace gglab
 			}
 			CheckQuiescent(context, harness, "Harness load");
 		}
+
+		// Readiness consumers see an asset as pending from load submission until it is
+		// usable. A decode in flight has not reached the upload queues yet, and a model
+		// becomes Ready on the Tick after its last upload, so only the in-flight load
+		// count reports those frames.
+		void RunInFlightLoadVisibilityTest(SelfTestContext& context) noexcept
+		{
+			AssetManagerHarness harness("asset-in-flight-load");
+			const auto& root = harness.GetAssetRoot();
+			const std::array<std::string, 1> images{ "Noise.png" };
+			const bool ready = harness.IsValid() &&
+				asset_test::WriteNoisePng(root / "Texture.png", 256) &&
+				asset_test::WriteNoisePng(root / images[0], 256) &&
+				asset_test::WriteTexturedModel(root / "Noise.gltf", images);
+			context.Check(ready, "In-flight load visibility composes the harness and its fixtures");
+			if (!ready)
+			{
+				return;
+			}
+			const auto hasPendingUploads = [&]() noexcept
+				{
+					const AssetUploadStatistics statistics = harness.GetScheduling().GetStatistics();
+					return statistics.m_PendingCount + statistics.m_CpuPayloadQueue.m_PendingCount +
+						statistics.m_ResourcePublicationQueue.m_PendingCount +
+						statistics.m_UploadRecordingQueue.m_PendingCount +
+						statistics.m_GpuFinalizeQueue.m_PendingCount > 0;
+				};
+			const auto drain = [&]() noexcept
+				{
+					return harness.PumpUntil([&]()
+						{ return harness.GetAssets().GetInFlightLoadCount() == 0 && !hasPendingUploads(); });
+				};
+			struct Observation
+			{
+				bool m_LoadOnly = false;
+				bool m_Gap = false;
+			};
+			// Pumps until the asset is ready, recording frames where only the load count
+			// reports pending work and frames where neither reports it before the asset
+			// is ready.
+			const auto observeUntil = [&](Observation& observation, auto&& isReady) noexcept
+				{
+					return harness.PumpUntil([&]()
+						{
+							const bool assetReady = isReady();
+							const bool loading = harness.GetAssets().GetInFlightLoadCount() > 0;
+							const bool uploading = hasPendingUploads();
+							observation.m_LoadOnly = observation.m_LoadOnly || (loading && !uploading);
+							observation.m_Gap = observation.m_Gap || (!assetReady && !loading && !uploading);
+							return assetReady;
+						});
+				};
+			{
+				AssetOwnerScope owner = harness.GetAssets().CreateOwnerScope();
+				const AssetManager::TextureLoadRequest texture =
+					owner.LoadTextureAsync("Texture.png", TextureSemantic::BaseColor, TaskPriority::Normal);
+				Observation textureObservation;
+				const bool textureReady = texture.IsValid() && observeUntil(textureObservation, [&]()
+					{
+						const AssetSnapshot snapshot = BuildAssetSnapshot(harness.GetAssets());
+						const AssetSnapshot::Texture* entry = FindTexture(snapshot, texture.m_TextureId);
+						return entry && entry->m_State == AssetState::Ready && entry->m_IsUploaded;
+					});
+				context.Check(textureReady && textureObservation.m_LoadOnly &&
+					!textureObservation.m_Gap,
+					"A texture decode counts as an in-flight load until its upload is queued");
+				context.Check(drain(), "A completed texture load leaves no in-flight load or upload");
+
+				const AssetManager::ModelLoadRequest model =
+					owner.LoadModelAsync("Noise.gltf", TaskPriority::Normal);
+				Observation modelObservation;
+				const bool modelReady = model.IsValid() && observeUntil(modelObservation, [&]()
+					{
+						const Model* entry = harness.GetAssets().GetModel(model.m_ModelId);
+						return entry && entry->m_State == AssetState::Ready;
+					});
+				context.Check(modelReady && modelObservation.m_LoadOnly && !modelObservation.m_Gap,
+					"A model import, its texture decodes and its dependency wait count as in-flight "
+					"loads until uploads take over and the model is ready");
+				context.Check(drain(), "A completed model load leaves no in-flight load or upload");
+			}
+			CheckQuiescent(context, harness, "In-flight load visibility");
+		}
 	}
 
 	void RunAssetPublicationSelfTests(SelfTestContext& context) noexcept
 	{
 		RunHarnessLoadTests(context);
+		RunInFlightLoadVisibilityTest(context);
 		RunIncrementalPublicationTest(context);
 		RunPublicationFaultTests(context);
 		RunSharedTextureRollbackTest(context);

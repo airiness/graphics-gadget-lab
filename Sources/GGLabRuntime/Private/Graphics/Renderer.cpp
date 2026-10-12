@@ -604,6 +604,12 @@ namespace gglab
 		return m_IBLBakeScheduler->GetStatus();
 	}
 
+	uint64_t Renderer::GetBakeRequestGeneration() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem.get());
+		return m_EnvironmentLightingSystem->GetBakeRequestGeneration();
+	}
+
 	IBLBakeStage Renderer::GetStageForRecording() const noexcept
 	{
 		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetStageForRecording()
