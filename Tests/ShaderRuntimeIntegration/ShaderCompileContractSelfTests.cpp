@@ -2985,6 +2985,21 @@ namespace gglab
 			};
 			checkShaderNumericContracts(L"Tests/SpecularIntegrationContractCompile.hlsl", specularCases);
 
+			const std::array temporalHistoryClipCases{
+				ShaderNumericContractCase{ L"TestClipPreservesGrayHistory", "collapsed chroma axes retain in-box luminance history" },
+				ShaderNumericContractCase{ L"TestClipGrayHistoryAtBoundary", "gray history clips at the luminance boundary" },
+				ShaderNumericContractCase{ L"TestClipRejectsOutsideCollapsedAxis", "nonzero direction on a collapsed axis still rejects history" },
+				ShaderNumericContractCase{ L"TestClipMeanIsFinite", "the mean remains finite in a point box" },
+				ShaderNumericContractCase{ L"TestClipPointBox", "a point box clips outside history to its mean" },
+				ShaderNumericContractCase{ L"TestClipAsymmetricPositiveBoundary", "positive clipping preserves the mean-to-history segment" },
+				ShaderNumericContractCase{ L"TestClipAsymmetricNegativeBoundary", "negative clipping preserves the mean-to-history segment" },
+				ShaderNumericContractCase{ L"TestClipPreservesTinyInsideDirection", "small in-box directions do not lose history to an epsilon" },
+				ShaderNumericContractCase{ L"TestClipTinyOutsideDirection", "small out-of-box directions reach the boundary" },
+				ShaderNumericContractCase{ L"TestClipPlanarAxisPermutations", "planar boxes clip consistently across all axis permutations" },
+				ShaderNumericContractCase{ L"TestClipSegmentProperties", "clipping is finite, contained, maximal on the segment and idempotent" },
+			};
+			checkShaderNumericContracts(L"Tests/TemporalHistoryClipContractCompile.hlsl", temporalHistoryClipCases);
+
 			const std::array materialShadingCases{
 				ShaderNumericContractCase{ L"TestMaterialDirectionalEnergy", "prepared base retains GGX energy and diffuse partition" },
 				ShaderNumericContractCase{ L"TestMetalSuppressesDiffuseIBL", "metal endpoint suppresses diffuse IBL" },

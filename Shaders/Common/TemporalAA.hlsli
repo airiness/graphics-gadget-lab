@@ -421,8 +421,16 @@ void GetTemporalNeighborhoodRange(Texture2D<float4> currentColorTexture,
 float3 ClipTemporalHistoryTowardMean(float3 history, float3 mean, float3 boxMin, float3 boxMax)
 {
 	const float3 direction = history - mean;
-	const float3 limit = lerp(mean - boxMin, boxMax - mean, step(0.0, direction));
-	const float3 axisScale = max(limit, 0.0.xxx) / max(abs(direction), 1.0e-7.xxx);
+	const float3 limit = max(lerp(mean - boxMin, boxMax - mean, step(0.0, direction)), 0.0.xxx);
+	const float3 axisDistance = abs(direction);
+	// An axis already inside its interval must not shorten the segment. This also
+	// covers zero direction in a zero-width interval (constant chroma, for example).
+	// Only outside axes divide, so their denominators are positive without an
+	// epsilon that would incorrectly shorten small, otherwise valid directions.
+	const float3 axisScale = float3(
+		axisDistance.x > limit.x ? limit.x / axisDistance.x : 1.0,
+		axisDistance.y > limit.y ? limit.y / axisDistance.y : 1.0,
+		axisDistance.z > limit.z ? limit.z / axisDistance.z : 1.0);
 	const float scale = saturate(min(axisScale.x, min(axisScale.y, axisScale.z)));
 	return mean + direction * scale;
 }
