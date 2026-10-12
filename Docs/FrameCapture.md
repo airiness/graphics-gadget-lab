@@ -89,28 +89,18 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   tap may share that frame; a different tap waits before being issued, so its
   camera, time and temporal metadata come from the frame that records it.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
-  is ready and then for `-SettleFrames` submitted frames of one continuous
-  Runtime history and Demo. The transaction supplies the effective session,
-  camera reset, display view, render/display extents, color ABI, accumulation
-  model and active temporal consumers, plus whether the owners can actually
-  read compatible committed history. A configuration change or lost history
-  restarts settling even when the window size is unchanged. Frames without a
-  temporal consumer still settle normally.
-  Settling counts only over temporal history that began on a ready frame: when
-  history still holds frames rendered while a gate was pending, the runtime
-  cuts the display camera first. Simulation time holds until settling begins,
-  so animated content reaches the capture after exactly the settle frames and
-  repeated runs capture the same image however long loading took.
+  is ready, then counts `-SettleFrames` successfully submitted frames. A content
+  switch, camera cut, lost history or configuration change that resets temporal
+  history restarts settling, even when the window size stays the same.
+  History rendered while loading is reset before settling begins. Simulation
+  time holds until then. Captures without active temporal effects still settle
+  normally.
   `next-frame` captures the next eligible frame, even while loading. A conflicting
   diagnostic tap can delay an ordinary request before issuance.
 - **Readiness gates.** `shaders`, `content-transition`, `content`, `lab`,
   `environment`, `ibl`, `asset-loads` and `asset-uploads`. A pending gate keeps
-  an after-ready capture waiting; `status` shows its detail. Each gate stays
-  pending while work it covers is still in flight: `asset-loads` counts
-  imports and decodes before they reach the upload queues, and `ibl` counts a
-  bake requested by an environment committed in the same frame. A gate that
-  leaves Ready after settling began restarts settling, but the simulation time
-  already advanced cannot be taken back, so a gate must not report Ready early.
+  an after-ready capture waiting; `status` shows its detail. A gate that leaves
+  Ready restarts settling, but does not rewind simulation time already advanced.
   A failed gate fails the waiting after-ready captures of that content at once,
   with the gate's detail as the reason; submit them again after fixing the
   cause.
@@ -151,42 +141,36 @@ writing to the same directory, is never replaced: the capture takes the next
 free suffix (`-2`, `-3`, ...), and its sidecar's `image.file` names the PNG it
 belongs to.
 
-Capture admission reserves a write slot before issuing GPU work. Nine slots
-cover captures awaiting GPU completion, queued encoding and the running writer.
-Once the writer claims one job, at most eight other jobs can wait. An ordinary
-capture without available capacity fails explicitly before GPU submission.
+Capture capacity is bounded:
 
-Runtime separately bounds request slots to 64 (including unconsumed results)
-and capture payloads to eight with a 256 MiB byte budget. A payload slot spans
-the pitched GPU readback through the last consumer of its immutable CPU image;
-the byte budget reserves both the readback and tight CPU rows before allocation.
-Requests sharing one frame and tap share one payload. The byte budget covers
-these raw payloads, excluding the encoder's output and working memory. A target
-too large to fit fails explicitly rather than waiting for impossible capacity.
+| Limit | Capacity |
+| --- | --- |
+| Captures awaiting GPU completion or file writing | 9 total; at most 8 wait behind the running writer |
+| Runtime requests, including unconsumed results | 64 |
+| Distinct captured images in flight | 8, sharing a 256 MiB raw-image budget |
 
-Once issued, a coordinated request is restricted to that render frame's serial.
-If the frame aborts, fails submission or does not record the requested source,
-the request fails explicitly; submit it again to retry with new frame metadata.
-A successful Runtime result must match the issued serial, source and diagnostic
-tap before encoding. Metadata is never repaired by changing only its serial to
-that of a later image. The lower-level Runtime control still supports flexible
-requests with serial zero, which can retry after abort; coordinated captures use
-non-zero serials to preserve their image/metadata identity.
+The byte budget covers GPU readback and CPU image storage, excluding PNG output
+and encoder working memory. An ordinary capture without capacity fails before
+GPU submission. Sequences wait for temporary capacity pressure to clear; an
+unsupported or oversized image fails explicitly.
+
+Each issued capture stays bound to its recorded frame and metadata. If that
+frame aborts, fails submission or does not record the requested source, the
+capture fails; submit a new request to retry.
 
 The PNG and JSON sidecar are each written completely to temporary `.partial`
 files before publication. They are published separately, so either file may
 appear before the pair is complete. When the process shuts down it waits for
 unfinished writing up to 30 seconds in total. Captures still unfinished then
-fail: jobs that have not claimed publication are abandoned and never publish
-their files. Jobs that already claimed publication have an indeterminate
-outcome; their files may already exist or appear later, despite the failed result.
+fail. Files already being published may still appear after that failure; use
+the command result to determine whether the capture completed.
 
 The sidecar (`schemaVersion` 1) records the request (label, note, source,
-diagnostic tap, timing, settle frames), backend, Demo and Lab ids, frame serial and index, image
-size and display format, camera pose and `referenceView`, fixed time step and
-total time, whether DevTools were active, every readiness gate, and the UTC
-capture time. `temporal` records the Temporal AA frame plan (requested, status,
-disable reason), temporal session and reset identities, jitter index, sequence
+diagnostic tap, timing, settle frames), backend, Demo and Lab ids, frame serial
+and index, image size and display format, camera pose and `referenceView`, fixed
+time step and total time, whether DevTools were active, every readiness gate,
+and the UTC capture time. `temporal` records the Temporal AA frame plan
+(requested, status, disable reason), temporal session and reset identities, jitter index, sequence
 length and offset in pixels, the resolved Temporal AA settings, and the render
 and display extents. `sequence` names the camera path, its version, the
 sequence frame and frame count, or is null outside a sequence.
@@ -208,20 +192,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
   ends without submission is posed again.
 - Frame 0 and every cut key of the path are camera cuts that reset temporal
   history and the jitter sequence, so a replay starts from the same temporal
-  state. Any other effective temporal identity change, loss of compatible
-  history or content change, or a readiness gate leaving Ready, fails the
-  sequence. A path cut permits its camera reset and cold history, but does not
-  permit a simultaneous resolution, accumulation model or consumer change.
-  Reference samples use their reference consumer identity; the first sample of
-  each reference frame is not treated as a production-history failure.
+  state. An unexpected history reset, loss of compatible history, content change
+  or readiness gate leaving Ready fails the sequence. A path cut permits
+  its camera reset and cold history, but does not permit simultaneous changes
+  to resolution, accumulation model or active temporal effects.
 - Each requested frame is captured on exactly that frame as a next-frame capture
   labelled `<label>-f<frame>`; the label defaults to the path id. Every frame of
-  a path may be captured (`-CaptureFrames '0-179'`): when Runtime payload capacity
-  or reserved write slots are temporarily full, the session defers the next
-  capture frame entirely, without advancing simulation time, the path or its
-  reference sample. Result polling retires completed GPU work while the writer
-  drains, so progress does not depend on rendering another frame. An unsupported
-  or oversized target fails the sequence instead of deferring forever.
+  a path may be captured (`-CaptureFrames '0-179'`): when capture capacity is
+  temporarily full, the session waits before the next requested capture frame,
+  without advancing simulation time, the path or its reference sample. An
+  unsupported or oversized target fails the sequence instead of deferring forever.
   If another diagnostic tap occupies an exact requested sequence frame, that
   capture fails rather than silently substituting a later path frame. An issued
   capture on an aborted frame also fails; a frame aborted before any capture was
@@ -240,11 +220,10 @@ channel; the frames correspond because the replay is deterministic.
 supersampled reference instead of the production temporal path. Each frame is
 rendered n times with Temporal AA inactive, the camera at the frame's pose and
 simulation time held; every sample uses one Halton(2, 3) jitter phase (the first
-eight equal the production TAA phases) and adds the HDR scene color, after
-transparent and depth-tested debug geometry, to an RGBA32F sum. Post-processing
-receives the running mean, so a capture after the last sample records the mean
-of n samples: a one-pixel box reconstruction filter. Unlike the production path,
-transparent geometry is part of the accumulated image.
+eight equal the production TAA phases). Each sample contributes HDR scene color,
+including transparent and depth-tested debug geometry. The mean of n samples is
+post-processed for the captured image: a one-pixel box reconstruction filter.
+Unlike the production path, transparent geometry is part of the accumulated image.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
@@ -266,50 +245,56 @@ the reference jitter index and sample count.
 
 `-TemporalAA "name=value,..."` replaces display-view Temporal AA settings for
 every frame of the sequence, so one replay evaluates one configuration from the
-history reset at frame 0. The names are `enabled` (`true` or `false`),
-`maxHistoryFeedback`,
-`depthAbsoluteThreshold`, `depthRelativeThreshold`, `velocityWeightScale`,
-`luminanceWeightScale` and `neighborhoodClampExpansion`, `historyRelaxation` (0 to 4,
-default 1: the further box expansion for history whose disagreement alternates in sign),
-`historyAccumulation`
-(`effective-samples`, the default, or `compatibility-age`: what the history alpha
-accumulates; switching it resets history), `historyRectification`
-(`minmax-clamp`, the default, `variance-clip` or `bounded-variance-clip`) with
-`varianceClipGamma` (0.25 to 4, default 1), `historyFilter`
-(`catmull-rom-clamped`, the default, or `bilinear`) and `currentFilter`
-(`gaussian`, the default, or `point`), `motionSelection` (`closest-depth`, the
-default, or `center`), `postTemporalView` (`unjittered`, the default, or `jittered`:
-the raster view of transparent and debug geometry drawn after the resolve),
-`resolutionPreset` (`native`, the default, or `quality`: render extent 2/3 of the
-display extent while the pipeline's resolve can upscale) and `textureLodBiasOffset` (-2 to 1, default -1, the material
-texture LOD offset while Temporal AA is active); a value outside the setting's range
-is rejected rather than clamped. Unset settings keep the
-content's values, and sidecars record the effective settings in `temporal`.
-A reference takes no overrides.
+history reset at frame 0. Omitted settings keep the active content's values.
+Built-in defaults are listed for reference; a Lab or Demo may supply different
+values. Numeric ranges include both endpoints; out-of-range values are rejected
+rather than clamped.
 
-`-GpuTiming` binds completed profiles to the RenderFrame serial of each
-successfully submitted sequence render. It includes frame zero, camera cuts
-and every reference sample; there is no latency-based warmup skip. Ordinary
-frames before or after the sequence, aborted renders, unbound profiles and
-duplicate publications do not contribute. The sequence status reports, for
-the whole frame and each scope such as `PostProcess.TemporalAA`, the sample
-count and the mean, median, 90th percentile, minimum and maximum in milliseconds:
+| Setting | Accepted values | Built-in default | Meaning |
+| --- | --- | --- | --- |
+| `enabled` | `true`, `false` | `false` | Request Temporal AA. |
+| `maxHistoryFeedback` | 0 to 0.99 | 0.97 | Maximum history feedback. |
+| `depthAbsoluteThreshold` | 0 to 1 | 0.05 | Absolute depth rejection threshold. |
+| `depthRelativeThreshold` | 0 to 1 | 0.02 | Relative depth rejection threshold. |
+| `velocityWeightScale` | 0 to 1 | 0.075 | History confidence reduction with motion. |
+| `luminanceWeightScale` | 0 to 16 | 0 | History confidence reduction with luminance changes. |
+| `neighborhoodClampExpansion` | 0 to 1 | 0 | Neighborhood clamp expansion. |
+| `historyRelaxation` | 0 to 4 | 1 | Further box expansion for history disagreement that alternates in sign. |
+| `historyAccumulation` | `effective-samples`, `compatibility-age` | `effective-samples` | History accumulation model; changing it resets history. |
+| `historyRectification` | `minmax-clamp`, `variance-clip`, `bounded-variance-clip` | `minmax-clamp` | History rectification method. |
+| `varianceClipGamma` | 0.25 to 4 | 1 | Variance clipping bound scale. |
+| `historyFilter` | `catmull-rom-clamped`, `bilinear` | `catmull-rom-clamped` | History color reconstruction filter. |
+| `currentFilter` | `gaussian`, `point` | `gaussian` | Current-frame reconstruction filter. |
+| `motionSelection` | `closest-depth`, `center` | `closest-depth` | Motion-vector selection. |
+| `postTemporalView` | `unjittered`, `jittered` | `unjittered` | Raster view for transparent and debug geometry drawn after the resolve. |
+| `resolutionPreset` | `native`, `quality` | `native` | Quality renders at 2/3 of the display extent while an active Temporal AA resolve can upscale. |
+| `textureLodBiasOffset` | -2 to 1 | -1 | Additional material texture LOD bias while Temporal AA is active. |
+
+Sidecars record the effective settings in `temporal`. Temporal AA overrides
+cannot be combined with `-ReferenceSamples`.
+
+### GPU timing
+
+`-GpuTiming` measures every successfully submitted sequence render, including
+frame zero, camera cuts and each reference sample. There is no warmup skip.
+The sequence status reports, for the whole frame and each scope such as
+`PostProcess.TemporalAA`, the sample count and the mean, median, 90th percentile,
+minimum and maximum in milliseconds.
 
 After the last sequence render, `finishing` waits for both capture writes and
-all pending profiles. Ordinary runtime frames continue to publish delayed GPU
-results, and profiling is restored to its previous state once timing collection
+all pending profiles. Profiling returns to its prior state when timing collection
 ends. A missing profile fails the sequence after 64 later successful runtime
 submissions; polling, deferred frames and aborted renders do not consume this
 budget. Unavailable/disabled profiling or a bound profile with invalid durations
 also fails explicitly. Failed or cancelled sequences retain their collected
 partial statistics, which must not be treated as a complete run.
 
-The JSON response shape is unchanged. For a completed timed sequence,
+For a completed timed sequence,
 `gpuTiming.frames` equals `frameCount` multiplied by `max(1, referenceSamples)`;
-an individual scope counts only renders that recorded it. Earlier timing results
-skipped initial profiles and could omit the tail, so account for the different
-sample population when comparing them. This sequence policy is separate from
-the Temporal AA Lab's jitter-cycle warmup and 120-sample timing window.
+an individual scope counts only renders that recorded it. Ordinary frames before
+or after the sequence, unsubmitted renders and duplicate profiles do not
+contribute. These statistics cover the full sequence, independently of the
+Temporal AA Lab's interactive timing window.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
