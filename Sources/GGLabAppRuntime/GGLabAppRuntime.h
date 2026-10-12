@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -101,6 +102,7 @@ namespace gglab
 	class TaskSystem;
 	class Time;
 	struct LoadingProgress;
+	struct FrameCaptureRequestResult;
 
 	struct AppRuntimeServiceCreateInfo
 	{
@@ -205,11 +207,15 @@ namespace gglab
 			return m_DebugDrawService.get();
 		}
 		// Non-owning; null before runtime services are composed. It outlives
-		// Shutdown so hosts can drain the final capture results.
+		// Shutdown so hosts can inspect the final capture state. AppRuntime owns
+		// its result stream; hosts drain ConsumeFrameCaptureResults instead.
 		[[nodiscard]] FrameCaptureCoordinator* GetFrameCaptureCoordinator() const noexcept
 		{
 			return m_FrameCapture.get();
 		}
+		// Appends published results in completion order, once per result. Tick and
+		// Shutdown notify the sequence before publication, independently of host polling.
+		void ConsumeFrameCaptureResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
 		// Non-owning; null before runtime services are composed.
 		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
 		{
@@ -226,6 +232,8 @@ namespace gglab
 		[[nodiscard]] LoadingProgress GetStartupLoadingProgress() const noexcept;
 
 	private:
+		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
+		void CollectFrameCaptureResults() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
 		[[nodiscard]] bool BeginInitialShaderPreload(
@@ -255,6 +263,8 @@ namespace gglab
 		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
+		// Results already routed to the sequence, awaiting host publication.
+		std::vector<FrameCaptureRequestResult> m_FrameCaptureResults;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		// Profiling request in effect before a timed sequence enabled profiling.

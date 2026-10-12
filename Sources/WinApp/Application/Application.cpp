@@ -245,10 +245,10 @@ namespace gglab
 			m_LabRuntimeLocator =
 				std::make_unique<DemoLabRuntimeLocator>(demoManager, *labHostIndex);
 		}
-		if (FrameCaptureCoordinator* frameCapture = m_AppRuntime->GetFrameCaptureCoordinator())
+		if (m_AppRuntime->GetFrameCaptureCoordinator())
 		{
 			m_FrameCapture = std::make_unique<ApplicationFrameCapture>(
-				*frameCapture, m_RuntimePaths.m_CaptureRoot);
+				*m_AppRuntime, m_RuntimePaths.m_CaptureRoot);
 		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
@@ -630,11 +630,6 @@ namespace gglab
 	void Application::ResolveControlCaptures(
 		std::span<const FrameCaptureRequestResult> results) noexcept
 	{
-		if (FrameSequenceCoordinator* frameSequence =
-			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr)
-		{
-			frameSequence->OnCaptureResults(results);
-		}
 		// Finished results stay queryable for a bounded number of captures.
 		constexpr size_t maxRetainedResults = 256;
 		for (const FrameCaptureRequestResult& result : results)

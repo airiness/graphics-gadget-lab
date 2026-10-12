@@ -367,12 +367,21 @@ namespace gglab
 			return AppRuntimeTickResult::Continue;
 		}
 
+		m_FrameCapture->Update();
+		CollectFrameCaptureResults();
+		const AppRuntimeTickResult result = TickFrame(tickInfo);
+		// Also route synchronous failures from planning, including early exits.
+		CollectFrameCaptureResults();
+		return result;
+	}
+
+	AppRuntimeTickResult GGLabAppRuntime::TickFrame(AppRuntimeTickInfo tickInfo) noexcept
+	{
 		// A sequence capture without payload or write capacity defers the
 		// whole frame, before time advances, so no extra frame is simulated or
 		// rendered while the writer drains.
 		if (m_FrameSequence->ShouldDeferFrame())
 		{
-			m_FrameCapture->Update();
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			return AppRuntimeTickResult::Continue;
 		}
@@ -395,7 +404,6 @@ namespace gglab
 			.m_MaxMilliseconds = 1.0,
 			});
 		m_AssetManager->DrainLoadCompletions();
-		m_FrameCapture->Update();
 
 		if (m_Input->IsKeyPressed(AppInputKey::T))
 		{

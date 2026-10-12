@@ -21,6 +21,7 @@
 #include "LoadingProgress.h"
 #include "GGLabRuntime/Core/Time.h"
 
+#include <iterator>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -34,6 +35,29 @@ namespace gglab
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
 		Shutdown();
+	}
+
+	void GGLabAppRuntime::CollectFrameCaptureResults() noexcept
+	{
+		if (!m_FrameCapture)
+		{
+			return;
+		}
+		const size_t firstResult = m_FrameCaptureResults.size();
+		m_FrameCapture->ConsumeResults(m_FrameCaptureResults);
+		if (m_FrameSequence)
+		{
+			m_FrameSequence->OnCaptureResults(
+				std::span<const FrameCaptureRequestResult>(m_FrameCaptureResults).subspan(firstResult));
+		}
+	}
+
+	void GGLabAppRuntime::ConsumeFrameCaptureResults(
+		std::vector<FrameCaptureRequestResult>& outResults) noexcept
+	{
+		outResults.insert(outResults.end(), std::make_move_iterator(m_FrameCaptureResults.begin()),
+			std::make_move_iterator(m_FrameCaptureResults.end()));
+		m_FrameCaptureResults.clear();
 	}
 
 	DiagnosticsView* GGLabAppRuntime::GetDiagnosticsView() const noexcept
@@ -330,6 +354,11 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
+		if (m_FrameCapture)
+		{
+			m_FrameCapture->Update();
+			CollectFrameCaptureResults();
+		}
 		// Captures that are not due yet are cancelled; recorded captures keep being
 		// written and are awaited after the render host finalized.
 		if (m_FrameSequence)
@@ -339,6 +368,7 @@ namespace gglab
 		if (m_FrameCapture)
 		{
 			m_FrameCapture->PrepareForShutdown();
+			CollectFrameCaptureResults();
 		}
 		bool applicationToolingPrepared = false;
 		const auto prepareApplicationTooling = [&]() noexcept
@@ -405,6 +435,7 @@ namespace gglab
 			if (m_FrameCapture)
 			{
 				m_FrameCapture->FinalizeAfterRenderHost();
+				CollectFrameCaptureResults();
 			}
 			m_RenderHost.reset();
 		}

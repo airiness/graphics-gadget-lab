@@ -746,7 +746,7 @@ namespace gglab
 				.m_Detail = "The fixed 120-frame window starts after two complete 8-sample jitter cycles and resets when the evidence domain changes."},
 			{.m_Name = "Sampling-footprint review",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Inspect named edge/disocclusion ROIs: RGB is bilinear (4 texels), the accumulation state is point sampled (1 texel), and depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
+				.m_Detail = "Inspect named edge/disocclusion ROIs for the selected history filter: Bilinear blends 2x2 RGB texels; CatmullRomClamped (default) uses five bilinear fetches over a 4x4 kernel with the corners omitted, then clamps to the central 2x2 texel range. Accumulation is point sampled (1 texel); depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
 		};
 	}
 

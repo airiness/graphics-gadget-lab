@@ -143,7 +143,9 @@ namespace gglab
 		[[nodiscard]] uint64_t Submit(FrameCaptureRequest request) noexcept;
 		// Cancels a request that has not been issued to a frame yet.
 		bool Cancel(uint64_t requestId) noexcept;
-		// Appends finished results in completion order.
+		// Appends finished results in completion order. When composed by
+		// GGLabAppRuntime, only that owner drains this stream; hosts consume the
+		// runtime's published results after it has notified the sequence.
 		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept;
 		// Checks Runtime payload capacity and the write slots reserved by issued
