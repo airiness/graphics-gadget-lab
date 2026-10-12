@@ -142,8 +142,18 @@ writing to the same directory, is never replaced: the capture takes the next
 free suffix (`-2`, `-3`, ...), and its sidecar's `image.file` names the PNG it
 belongs to.
 
-The dedicated writer thread runs one job with at most eight pending jobs. A new
-capture fails with `Capture writer queue is full.` when the pending queue is full.
+Capture admission reserves a write slot before issuing GPU work. Nine slots
+cover captures awaiting GPU completion, queued encoding and the running writer.
+Once the writer claims one job, at most eight other jobs can wait. An ordinary
+capture without available capacity fails explicitly before GPU submission.
+
+Runtime separately bounds request slots to 64 (including unconsumed results)
+and capture payloads to eight with a 256 MiB byte budget. A payload slot spans
+the pitched GPU readback through the last consumer of its immutable CPU image;
+the byte budget reserves both the readback and tight CPU rows before allocation.
+Requests sharing one frame and tap share one payload. The byte budget covers
+these raw payloads, excluding the encoder's output and working memory. A target
+too large to fit fails explicitly rather than waiting for impossible capacity.
 
 The PNG and JSON sidecar are each written completely to temporary `.partial`
 files before publication. They are published separately, so either file may
@@ -184,9 +194,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
   size or content) or a readiness gate leaving Ready fails the sequence.
 - Each requested frame is captured on exactly that frame as a next-frame capture
   labelled `<label>-f<frame>`; the label defaults to the path id. Every frame of
-  a path may be captured (`-CaptureFrames '0-179'`): when the capture writer
-  cannot accept another capture, the session defers the next frame entirely,
-  without simulating or rendering it, until the writer drains.
+  a path may be captured (`-CaptureFrames '0-179'`): when Runtime payload capacity
+  or reserved write slots are temporarily full, the session defers the next
+  capture frame entirely, without advancing simulation time, the path or its
+  reference sample. Result polling retires completed GPU work while the writer
+  drains, so progress does not depend on rendering another frame. An unsupported
+  or oversized target fails the sequence instead of deferring forever.
 - `sequence` waits until the sequence and its captures finish unless `-NoWait`;
   `status` reports the active or last sequence, and `sequence-cancel` stops it.
   One sequence runs at a time; avoid submitting capture views while it runs.

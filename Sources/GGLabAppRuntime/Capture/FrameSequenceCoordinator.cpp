@@ -268,11 +268,10 @@ namespace gglab
 
 	bool FrameSequenceCoordinator::ShouldDeferFrame() const noexcept
 	{
-		// Unfinished requests bound every capture that can still reach the writer, so
-		// staying below the pending-job limit keeps the writer queue from overflowing.
+		// Capacity covers GPU payloads, retained images and reserved write slots.
+		// Only temporary pressure defers: an impossible target must fail explicitly.
 		return m_Status && m_Status->m_State == FrameSequenceState::Running && IsCaptureDue() &&
-			m_Capture->GetUnfinishedRequestCount() >=
-			FrameCaptureCoordinator::MaxPendingWriteJobs;
+			m_Capture->GetCaptureAvailability(m_Request.m_CaptureSource) == FrameCaptureAvailability::Busy;
 	}
 
 	bool FrameSequenceCoordinator::ShouldHoldTime() const noexcept

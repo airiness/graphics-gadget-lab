@@ -53,11 +53,19 @@ namespace gglab
 
 			uint64_t RequestCapture(FrameCaptureSource source) noexcept override
 			{
+				if (m_RejectRequest)
+				{
+					return 0;
+				}
 				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source });
 				return m_NextId++;
 			}
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override
 			{
+				if (m_RejectRequest)
+				{
+					return 0;
+				}
 				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = FrameCaptureSource::Diagnostic,
 					.m_DiagnosticTap = tap });
 				return m_NextId++;
@@ -69,6 +77,13 @@ namespace gglab
 				m_Results.clear();
 			}
 			uint32_t GetUnfinishedRequestCount() const noexcept override { return 0; }
+			FrameCaptureAvailability GetAvailability(RHIFormat format, uint32_t width,
+				uint32_t height) const noexcept override
+			{
+				m_QueriedFormat = format;
+				m_QueriedExtent = { width, height };
+				return m_Availability;
+			}
 
 			void Complete(uint64_t id, uint64_t frameSerial) noexcept
 			{
@@ -94,6 +109,10 @@ namespace gglab
 			}
 
 			std::vector<Issued> m_Issued;
+			FrameCaptureAvailability m_Availability = FrameCaptureAvailability::Available;
+			bool m_RejectRequest = false;
+			mutable RHIFormat m_QueriedFormat = RHIFormat::Unknown;
+			mutable std::array<uint32_t, 2> m_QueriedExtent{};
 
 		private:
 			std::vector<FrameCaptureResult> m_Results;
@@ -135,6 +154,7 @@ namespace gglab
 				.m_LabId = std::move(labId),
 				.m_SettleKey = { .m_TemporalSession = temporalSession, .m_Width = 64,
 					.m_Height = 32 },
+				.m_DisplayFormat = RHIFormat::B8G8R8A8Unorm,
 				.m_FrameIndex = 42,
 				.m_Camera = { .m_Name = "Main", .m_Position = { 1.0f, 2.0f, 3.0f },
 					.m_VerticalFovDegrees = 60.0f },
@@ -750,6 +770,73 @@ namespace gglab
 			return false;
 		}
 
+		void RunCapacityAdmissionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-admission");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true,
+				});
+			for (const auto availability : { FrameCaptureAvailability::Busy,
+				FrameCaptureAvailability::TooLarge, FrameCaptureAvailability::Unsupported })
+			{
+				control.m_Availability = availability;
+				const uint64_t id = coordinator.Submit({});
+				coordinator.BeginFrame(MakeFrameState(true));
+				const auto failed = Consume(coordinator);
+				context.Check(failed.size() == 1 && failed[0].m_RequestId == id &&
+					failed[0].m_Status == FrameCaptureRequestStatus::Failed &&
+					!failed[0].m_Failure.empty() && control.m_Issued.empty(),
+					"Unavailable payload capacity fails an ordinary capture before GPU work");
+			}
+			control.m_Availability = FrameCaptureAvailability::Available;
+			control.m_RejectRequest = true;
+			const uint64_t rejected = coordinator.Submit({});
+			coordinator.BeginFrame(MakeFrameState(true));
+			const auto noSlot = Consume(coordinator);
+			context.Check(noSlot.size() == 1 && noSlot[0].m_RequestId == rejected &&
+				noSlot[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				coordinator.GetUnfinishedRequestCount() == 0 && control.m_Issued.empty(),
+				"A zero Runtime request id fails exactly once without reserving a write slot");
+			control.m_RejectRequest = false;
+			for (uint32_t index = 0; index < FrameCaptureCoordinator::MaxInFlightCaptures; ++index)
+			{
+				GGLAB_UNUSED(coordinator.Submit({}));
+			}
+			coordinator.BeginFrame(MakeFrameState(true));
+			const uint64_t excess = coordinator.Submit({});
+			coordinator.BeginFrame(MakeFrameState(true));
+			const auto overflow = Consume(coordinator);
+			context.Check(control.m_Issued.size() == FrameCaptureCoordinator::MaxInFlightCaptures &&
+				overflow.size() == 1 && overflow[0].m_RequestId == excess &&
+				coordinator.GetCaptureAvailability(FrameCaptureSource::Scene) == FrameCaptureAvailability::Busy,
+				"GPU captures still awaiting results reserve every write slot before any encoding begins");
+			control.Fail(control.m_Issued.front().m_Id, "Submission failed.");
+			coordinator.Update();
+			GGLAB_UNUSED(Consume(coordinator));
+			const uint64_t cancelled = coordinator.Submit({});
+			context.Check(coordinator.Cancel(cancelled) &&
+				coordinator.GetCaptureAvailability(FrameCaptureSource::Scene) == FrameCaptureAvailability::Available,
+				"Submission failure restores write capacity and cancelling a waiting request consumes no slot");
+			GGLAB_UNUSED(Consume(coordinator));
+			GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight }));
+			coordinator.BeginFrame(MakeFrameState(true));
+			context.Check(control.m_QueriedFormat == RHIFormat::R8G8B8A8Unorm &&
+				control.m_QueriedExtent == std::array<uint32_t, 2>{ 64, 32 } &&
+				control.m_Issued.back().m_Source == FrameCaptureSource::Diagnostic,
+				"Diagnostic admission queries the display-sized RGBA8 target independently of presentation format");
+			coordinator.PrepareForShutdown();
+			coordinator.FinalizeAfterRenderHost();
+			const auto shutdown = Consume(coordinator);
+			context.Check(shutdown.size() == FrameCaptureCoordinator::MaxInFlightCaptures &&
+				coordinator.GetUnfinishedRequestCount() == 0 && !HasAnyFile(directory.GetPath()),
+				"Shutdown finishes every reserved or cancelled request without allocating or writing an image");
+		}
+
 		void RunWriterQueueLimitTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-queue");
@@ -800,13 +887,13 @@ namespace gglab
 				std::ranges::all_of(rejected, [](const FrameCaptureRequestResult& result)
 					{
 						return result.m_Status == FrameCaptureRequestStatus::Failed &&
-							result.m_Failure == "Capture writer queue is full." &&
+							result.m_Failure == "Capture capacity is unavailable before GPU submission." &&
 							result.m_ImagePath.empty() && result.m_MetadataPath.empty();
 					}),
-				"A full writer queue immediately fails each new capture with an explicit result");
+				"Reserved write slots reject excess requests before GPU capture with an explicit result");
 			context.Check(coordinator.GetUnfinishedRequestCount() == 9 &&
-				!HasAnyFile(directory.GetPath()),
-				"The writer accepts one running job and exactly eight pending jobs");
+				control.m_Issued.size() == 9 && !HasAnyFile(directory.GetPath()),
+				"Only nine GPU captures are issued for one running writer and eight pending jobs");
 
 			{
 				std::scoped_lock lock(gate->m_Mutex);
@@ -1189,18 +1276,18 @@ namespace gglab
 			GGLAB_UNUSED(limited.m_Sequence.Start(
 				{ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = frames }, error));
 			limited.Frame();
-			for (uint32_t frame = 0; frame < FrameCaptureCoordinator::MaxPendingWriteJobs; ++frame)
+			for (uint32_t frame = 0; frame < FrameCaptureCoordinator::MaxInFlightCaptures; ++frame)
 			{
 				limited.Frame();
 			}
 			const size_t issuedAtLimit = limited.m_Control.m_Issued.size();
 			const std::optional<uint32_t> deferred = limited.Frame();
 			const bool deferredAgain = !limited.Frame() && limited.m_Deferred;
-			context.Check(issuedAtLimit == FrameCaptureCoordinator::MaxPendingWriteJobs &&
+			context.Check(issuedAtLimit == FrameCaptureCoordinator::MaxInFlightCaptures &&
 				!deferred && deferredAgain &&
 				limited.m_Control.m_Issued.size() == issuedAtLimit &&
 				limited.m_Sequence.GetStatus()->m_SubmittedFrames ==
-				FrameCaptureCoordinator::MaxPendingWriteJobs,
+				FrameCaptureCoordinator::MaxInFlightCaptures,
 				"A capture beyond the writer limit defers the frame without posing or submitting it");
 
 			limited.m_AutoComplete = true;
@@ -1209,7 +1296,7 @@ namespace gglab
 			// The next tick is still deferred; it drains the finished capture.
 			const std::optional<uint32_t> draining = limited.Frame();
 			const std::optional<uint32_t> resumed = limited.Frame();
-			context.Check(!draining && resumed == FrameCaptureCoordinator::MaxPendingWriteJobs,
+			context.Check(!draining && resumed == FrameCaptureCoordinator::MaxInFlightCaptures,
 				"The sequence resumes with the deferred frame once the writer drains");
 			while (limited.m_Sequence.IsActive())
 			{
@@ -1219,6 +1306,40 @@ namespace gglab
 			context.Check(status.m_State == FrameSequenceState::Completed &&
 				status.m_CompletedCaptures == 21 && status.m_SubmittedFrames == 21,
 				"Every frame of a fully captured sequence is captured without writer overflow");
+
+			SequenceHarness payloadLimited(directory.GetPath());
+			GGLAB_UNUSED(payloadLimited.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 0 }, .m_ReferenceSamples = 3 }, error));
+			payloadLimited.Frame();
+			payloadLimited.Frame(); // Reference sample zero.
+			payloadLimited.m_Control.m_Availability = FrameCaptureAvailability::Busy;
+			payloadLimited.Frame(); // Sample one does not need capture capacity yet.
+			const bool held = !payloadLimited.Frame() && payloadLimited.m_Deferred &&
+				!payloadLimited.Frame() && payloadLimited.m_Deferred;
+			context.Check(held && payloadLimited.m_Control.m_Issued.empty() &&
+				payloadLimited.m_LastSample && payloadLimited.m_LastSample->m_Index == 1 &&
+				payloadLimited.m_Sequence.GetStatus()->m_SubmittedFrames == 0,
+				"Payload pressure holds the final reference sample without posing or advancing the captured frame");
+			payloadLimited.m_Control.m_Availability = FrameCaptureAvailability::Available;
+			const auto finalSample = payloadLimited.Frame();
+			context.Check(finalSample == 0u && payloadLimited.m_LastSample &&
+				payloadLimited.m_LastSample->m_Index == 2 && payloadLimited.m_Results.size() == 1 &&
+				payloadLimited.m_Results[0].m_Metadata &&
+				payloadLimited.m_Results[0].m_Metadata->m_Sequence &&
+				payloadLimited.m_Results[0].m_Metadata->m_Sequence->m_Frame == 0 &&
+				payloadLimited.m_Sequence.GetStatus()->m_SubmittedFrames == 1,
+				"Released payload capacity resumes the same frame and reference sample with one capture");
+			GGLAB_UNUSED(payloadLimited.m_Sequence.Cancel());
+
+			SequenceHarness impossible(directory.GetPath());
+			GGLAB_UNUSED(impossible.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 0 } }, error));
+			impossible.Frame();
+			impossible.m_Control.m_Availability = FrameCaptureAvailability::TooLarge;
+			impossible.Frame();
+			context.Check(!impossible.m_Deferred && impossible.m_Control.m_Issued.empty() &&
+				impossible.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
+				"An oversized target fails its sequence instead of waiting forever for impossible capacity");
 		}
 
 		void RunDiagnosticCaptureTests(SelfTestContext& context) noexcept
@@ -1626,6 +1747,7 @@ namespace gglab
 		RunShutdownTests(context);
 		RunNameCollisionTests(context);
 		RunWriterThreadTests(context);
+		RunCapacityAdmissionTests(context);
 		RunWriterQueueLimitTests(context);
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);

@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -15,6 +16,15 @@ namespace gglab
 {
 	class RHIDevice;
 
+	struct FrameCaptureLimits
+	{
+		uint32_t m_MaxRequests = 64;
+		// A payload slot spans GPU readback through the last CPU image consumer.
+		uint32_t m_MaxPayloads = 8;
+		// Includes pitched readback and reserved tight CPU rows during the copy.
+		uint64_t m_MaxPayloadBytes = 256ull * 1024 * 1024;
+	};
+
 	// Owns capture requests, per-frame readback buffers and finished results. The
 	// render host drives the frame lifecycle: a tap is bound while the frame graph
 	// is built, adopts the frame's submission fence, and keeps its readback buffer
@@ -23,7 +33,7 @@ namespace gglab
 		public RenderFrameCaptureAccess
 	{
 	public:
-		explicit FrameCaptureService(RHIDevice& device) noexcept;
+		explicit FrameCaptureService(RHIDevice& device, FrameCaptureLimits limits = {}) noexcept;
 		~FrameCaptureService() override;
 		GGLAB_DELETE_COPYABLE_MOVABLE(FrameCaptureService);
 
@@ -31,6 +41,8 @@ namespace gglab
 		[[nodiscard]] uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept override;
+		[[nodiscard]] FrameCaptureAvailability GetAvailability(
+			RHIFormat format, uint32_t width, uint32_t height) const noexcept override;
 
 		[[nodiscard]] bool HasPendingRequests(FrameCaptureSource source) const noexcept override;
 		[[nodiscard]] std::optional<FrameCaptureTapTarget> BindTap(uint64_t frameSerial,
@@ -74,6 +86,12 @@ namespace gglab
 			bool m_Submitted = false;
 		};
 
+		struct RetainedImage
+		{
+			std::weak_ptr<const FrameCaptureImage> m_Image;
+			uint64_t m_Bytes = 0;
+		};
+
 		[[nodiscard]] bool IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,
 			PostProcessDebugTap diagnosticTap) const noexcept;
 		void PublishFailure(uint64_t requestId, FrameCaptureSource source,
@@ -82,10 +100,12 @@ namespace gglab
 		void PublishTap(Tap& tap) noexcept;
 
 		RHIDevice* m_Device = nullptr;
+		FrameCaptureLimits m_Limits{};
 		uint64_t m_NextRequestId = 1;
 		std::vector<QueuedRequest> m_Queued;
 		std::vector<Tap> m_Taps;
 		std::vector<FrameCaptureResult> m_Results;
+		std::vector<RetainedImage> m_RetainedImages;
 		bool m_IsShutdown = false;
 	};
 }

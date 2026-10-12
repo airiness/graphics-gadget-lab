@@ -88,6 +88,8 @@ namespace gglab
 		std::string m_LabId;
 		FrameCaptureReadiness m_Readiness{};
 		FrameCaptureSettleKey m_SettleKey{};
+		// Actual presentation format; Diagnostic captures use RGBA8 instead.
+		RHIFormat m_DisplayFormat = RHIFormat::Unknown;
 		uint64_t m_FrameIndex = 0;
 		FrameCaptureCameraState m_Camera{};
 		// Reference views the active content registers for its main camera.
@@ -108,13 +110,14 @@ namespace gglab
 	// Turns host capture requests into Runtime frame captures at the requested
 	// time, then encodes the PNG and writes the metadata sidecar on a dedicated
 	// writer thread, so slow or blocked file I/O never occupies the shared task
-	// system. At most eight jobs wait behind the running writer job; a capture
-	// fails if the writer queue is full. Every request finishes with one result.
+	// system. Nine write slots cover issued GPU captures through writing: one
+	// running writer and eight pending jobs. Every request finishes with one result.
 	class FrameCaptureCoordinator final
 	{
 	public:
 		// Encode jobs that may wait behind the running writer job.
 		static constexpr uint32_t MaxPendingWriteJobs = 8;
+		static constexpr uint32_t MaxInFlightCaptures = MaxPendingWriteJobs + 1;
 
 		struct CreateInfo
 		{
@@ -141,6 +144,11 @@ namespace gglab
 		// Appends finished results in completion order.
 		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept;
+		// Checks Runtime payload capacity and the write slots reserved by issued
+		// captures, using the last frame's display target. Busy sequences defer before
+		// simulation; permanent errors proceed to an explicit failed capture result.
+		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source)
+			const noexcept;
 		// State of the most recent frame passed to BeginFrame; null before the
 		// first rendered frame.
 		[[nodiscard]] const FrameCaptureFrameState* GetLastFrameState() const noexcept;
@@ -216,6 +224,8 @@ namespace gglab
 			const Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(
 			const Entry& entry, const FrameCaptureFrameState& state) const noexcept;
+		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
+			const FrameCaptureFrameState& state) const noexcept;
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;

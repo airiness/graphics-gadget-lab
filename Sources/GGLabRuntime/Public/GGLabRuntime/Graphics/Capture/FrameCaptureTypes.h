@@ -32,6 +32,17 @@ namespace gglab
 		Failed,
 	};
 
+	// Admission for one new capture. Busy is temporary; unsupported or oversized
+	// targets cannot become capturable by waiting for existing work to finish.
+	enum class FrameCaptureAvailability : uint8_t
+	{
+		Available,
+		Busy,
+		Unsupported,
+		TooLarge,
+		Finalized,
+	};
+
 	// CPU copy of one captured display target: tightly packed, top-down rows
 	// holding the bytes exactly as stored in the display-target format.
 	struct FrameCaptureImage

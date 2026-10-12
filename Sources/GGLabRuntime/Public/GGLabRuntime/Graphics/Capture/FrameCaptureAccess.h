@@ -28,7 +28,7 @@ namespace gglab
 		[[nodiscard]] virtual bool HasPendingRequests(FrameCaptureSource source) const noexcept = 0;
 		// Binds every queued request for the source to the frame and returns the
 		// readback target that the frame's tap pass must fill. Returns nullopt when
-		// nothing is queued; requests that the display target cannot satisfy
+		// nothing is queued; requests that the display target or payload budget cannot satisfy
 		// finish as Failed instead of being bound. A Diagnostic tap binds only the
 		// requests for the pending diagnostic tap.
 		[[nodiscard]] virtual std::optional<FrameCaptureTapTarget> BindTap(uint64_t frameSerial,

@@ -14,8 +14,8 @@
 
 namespace gglab
 {
-	FrameCaptureService::FrameCaptureService(RHIDevice& device) noexcept :
-		m_Device(std::addressof(device))
+	FrameCaptureService::FrameCaptureService(RHIDevice& device, FrameCaptureLimits limits) noexcept :
+		m_Device(std::addressof(device)), m_Limits(limits)
 	{
 	}
 
@@ -27,6 +27,10 @@ namespace gglab
 
 	uint64_t FrameCaptureService::RequestCapture(FrameCaptureSource source) noexcept
 	{
+		if (GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests)
+		{
+			return 0;
+		}
 		const uint64_t requestId = m_NextRequestId++;
 		if (m_IsShutdown)
 		{
@@ -39,6 +43,10 @@ namespace gglab
 
 	uint64_t FrameCaptureService::RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept
 	{
+		if (GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests)
+		{
+			return 0;
+		}
 		const uint64_t requestId = m_NextRequestId++;
 		if (m_IsShutdown)
 		{
@@ -96,6 +104,12 @@ namespace gglab
 
 	void FrameCaptureService::ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept
 	{
+		// A backpressured sequence may stop calling BeginFrame. Keep fence retirement
+		// progressing on the same frame-driving thread while it polls for capacity.
+		if (!m_IsShutdown)
+		{
+			CollectCompleted();
+		}
 		outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
 			std::make_move_iterator(m_Results.end()));
 		m_Results.clear();
@@ -109,6 +123,51 @@ namespace gglab
 			count += tap.m_RequestIds.size();
 		}
 		return static_cast<uint32_t>(count);
+	}
+
+	FrameCaptureAvailability FrameCaptureService::GetAvailability(
+		RHIFormat format, uint32_t width, uint32_t height) const noexcept
+	{
+		if (m_IsShutdown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		const RHITextureCopyFootprint footprint = ComputeRHITextureCopyFootprint(format, width, height);
+		if (!footprint.IsValid())
+		{
+			return FrameCaptureAvailability::Unsupported;
+		}
+		// Check multiplication and addition against the budget before using their
+		// results, including extreme extents whose footprint byte count could wrap.
+		if (footprint.m_RowPitch > m_Limits.m_MaxPayloadBytes / height)
+		{
+			return FrameCaptureAvailability::TooLarge;
+		}
+		const uint64_t imageBytes = footprint.m_RowSizeInBytes * height;
+		if (imageBytes > m_Limits.m_MaxPayloadBytes - footprint.m_SizeInBytes)
+		{
+			return FrameCaptureAvailability::TooLarge;
+		}
+		const uint64_t requiredBytes = footprint.m_SizeInBytes + imageBytes;
+		uint64_t usedBytes = 0;
+		size_t payloads = m_Taps.size();
+		for (const Tap& tap : m_Taps)
+		{
+			usedBytes += tap.m_Footprint.m_SizeInBytes +
+				tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height;
+		}
+		for (const RetainedImage& image : m_RetainedImages)
+		{
+			if (!image.m_Image.expired())
+			{
+				++payloads;
+				usedBytes += image.m_Bytes;
+			}
+		}
+		return payloads >= m_Limits.m_MaxPayloads ||
+			GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests ||
+			requiredBytes > m_Limits.m_MaxPayloadBytes - usedBytes
+			? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
 	}
 
 	bool FrameCaptureService::HasPendingRequests(FrameCaptureSource source) const noexcept
@@ -159,6 +218,17 @@ namespace gglab
 				displayTargetDesc.m_Extent.m_Width, displayTargetDesc.m_Extent.m_Height));
 			return std::nullopt;
 		}
+		const FrameCaptureAvailability availability = GetAvailability(displayTargetDesc.m_Format,
+			displayTargetDesc.m_Extent.m_Width, displayTargetDesc.m_Extent.m_Height);
+		if (availability != FrameCaptureAvailability::Available)
+		{
+			FailTap(tap, 0, availability == FrameCaptureAvailability::TooLarge
+				? "The capture target exceeds the payload byte budget."
+				: "Frame capture payload capacity is exhausted.");
+			return std::nullopt;
+		}
+		std::erase_if(m_RetainedImages,
+			[](const RetainedImage& image) { return image.m_Image.expired(); });
 
 		const RHIBufferDesc bufferDesc{
 			.m_SizeInBytes = tap.m_Footprint.m_SizeInBytes,
@@ -324,6 +394,8 @@ namespace gglab
 		m_Device->UnmapBuffer(buffer, {});
 
 		std::shared_ptr<const FrameCaptureImage> sharedImage = std::move(image);
+		m_RetainedImages.push_back({ .m_Image = sharedImage,
+			.m_Bytes = footprint.m_RowSizeInBytes * footprint.m_Height });
 		for (const uint64_t requestId : tap.m_RequestIds)
 		{
 			m_Results.push_back({

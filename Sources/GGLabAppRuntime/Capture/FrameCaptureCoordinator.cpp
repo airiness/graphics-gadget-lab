@@ -302,6 +302,39 @@ namespace gglab
 		return m_LastFrameState ? &*m_LastFrameState : nullptr;
 	}
 
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source)
+		const noexcept
+	{
+		if (!m_Capture || m_IsShuttingDown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		return m_LastFrameState ? GetCaptureAvailability(source, *m_LastFrameState)
+			: FrameCaptureAvailability::Available;
+	}
+
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source,
+		const FrameCaptureFrameState& state) const noexcept
+	{
+		if (!m_Capture || m_IsShuttingDown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		// A write slot is reserved before GPU work and stays reserved through encoding.
+		// Counting only queued writer jobs misses issued captures still on the GPU.
+		const auto reserved = std::ranges::count_if(m_Entries, [](const Entry& entry)
+			{
+				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::Encoding;
+			});
+		if (reserved >= MaxInFlightCaptures)
+		{
+			return FrameCaptureAvailability::Busy;
+		}
+		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic
+			? RHIFormat::R8G8B8A8Unorm : state.m_DisplayFormat,
+			state.m_SettleKey.m_Width, state.m_SettleKey.m_Height);
+	}
+
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
 		const bool ready = state.m_Readiness.IsReady();
@@ -540,6 +573,21 @@ namespace gglab
 			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture is unavailable.");
 			return;
 		}
+		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Request.m_Source, state);
+		if (availability != FrameCaptureAvailability::Available)
+		{
+			const char* failure = "Capture capacity is unavailable before GPU submission.";
+			if (availability == FrameCaptureAvailability::TooLarge)
+			{
+				failure = "The capture target exceeds the payload byte budget.";
+			}
+			else if (availability == FrameCaptureAvailability::Unsupported)
+			{
+				failure = "The display target has no capture footprint.";
+			}
+			Finish(entry, FrameCaptureRequestStatus::Failed, failure);
+			return;
+		}
 
 		const FrameCaptureRequest& request = entry.m_Request;
 		FrameCaptureMetadata& metadata = entry.m_Metadata;
@@ -583,6 +631,11 @@ namespace gglab
 		else
 		{
 			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
+		}
+		if (entry.m_CaptureRequestId == 0)
+		{
+			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture request capacity is exhausted.");
+			return;
 		}
 		entry.m_Phase = Phase::Issued;
 	}
@@ -665,8 +718,9 @@ namespace gglab
 		}
 		{
 			std::scoped_lock lock(m_Writer->m_Mutex);
-			// The writer runs one job outside the queue; only pending jobs count here.
-			if (m_Writer->m_Queue.size() >= MaxPendingWriteJobs)
+			// Slots were reserved before capture. All nine may enter the queue before
+			// the writer starts; once it claims one, at most eight remain pending.
+			if (m_Writer->m_Queue.size() >= MaxInFlightCaptures)
 			{
 				Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
 				return;
@@ -846,6 +900,9 @@ namespace gglab
 		std::string failure = job.m_Claim == PublicationClaim::Abandoned
 			? std::string("The capture was abandoned at shutdown.")
 			: WriteAndPublish(job, encoder);
+		// Release Runtime payload capacity on the writer thread before reporting
+		// completion. No frame-thread state or RHI resource is touched here.
+		job.m_Image.reset();
 		job.m_Stage = EncodeStage::Done;
 		{
 			std::scoped_lock lock(job.m_Mutex);

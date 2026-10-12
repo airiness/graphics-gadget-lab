@@ -212,8 +212,8 @@ namespace gglab
 		[[nodiscard]] bool IsActive() const noexcept;
 		// True while the next sequence frame needs a capture that the capture
 		// coordinator cannot accept yet. The runtime must then neither simulate nor
-		// render a frame, so the sequence stays deterministic; the writer drains on
-		// its own thread.
+		// render a frame, so the sequence stays deterministic. Poll capture results
+		// to retire GPU work while the writer drains on its own thread.
 		[[nodiscard]] bool ShouldDeferFrame() const noexcept;
 		// True for every reference sample after the first of a sequence frame: the
 		// runtime then starts the frame without advancing simulation time.

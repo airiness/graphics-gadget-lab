@@ -26,6 +26,8 @@
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -324,6 +326,7 @@ namespace gglab
 					.m_Height = inputs.m_Height,
 					.m_DemoIndex = demoIndex,
 				},
+				.m_DisplayFormat = inputs.m_RenderServices.m_Presentation->GetSwapChain()->GetFormat(),
 				.m_FrameIndex = inputs.m_Time.GetFrameCount(),
 				.m_Camera = {
 					.m_Name = inputs.m_DisplayCameraSlot.m_Name,
@@ -371,7 +374,7 @@ namespace gglab
 			return AppRuntimeTickResult::Continue;
 		}
 
-		// A sequence capture that the capture writer cannot accept yet defers the
+		// A sequence capture without payload or write capacity defers the
 		// whole frame, before time advances, so no extra frame is simulated or
 		// rendered while the writer drains.
 		if (m_FrameSequence->ShouldDeferFrame())
