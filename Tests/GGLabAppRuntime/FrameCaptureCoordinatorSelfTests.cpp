@@ -152,8 +152,12 @@ namespace gglab
 				.m_Backend = "dx12",
 				.m_DemoId = "Demo.LabHost",
 				.m_LabId = std::move(labId),
-				.m_SettleKey = { .m_TemporalSession = temporalSession, .m_Width = 64,
-					.m_Height = 32 },
+				.m_SettleKey = { .m_Temporal = {
+					.m_Identity = { .m_DisplayViewId = RenderViewID::Main,
+						.m_SessionIdentity = temporalSession,
+						.m_ColorExtent = { 64, 32 }, .m_DepthExtent = { 64, 32 } },
+					.m_Services = TemporalService::FrameContinuity | TemporalService::ColorDepthHistory,
+					.m_HasCompatiblePreviousHistory = true } },
 				.m_DisplayFormat = RHIFormat::B8G8R8A8Unorm,
 				.m_FrameIndex = 42,
 				.m_Camera = { .m_Name = "Main", .m_Position = { 1.0f, 2.0f, 3.0f },
@@ -346,11 +350,65 @@ namespace gglab
 				"A required content id holds the capture until that Demo or Lab is active");
 		}
 
+		void RunHistoryContinuitySettlingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-continuity");
+			for (uint32_t change = 0; change < 4; ++change)
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(),
+					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
+				FrameCaptureFrameState state = MakeFrameState(true);
+				coordinator.BeginFrame(state);
+				coordinator.OnFrameSubmitted();
+				coordinator.BeginFrame(state);
+				coordinator.OnFrameSubmitted();
+				GGLAB_UNUSED(coordinator.Submit({ .m_Timing = FrameCaptureTiming::AfterReady,
+					.m_SettleFrames = 2 }));
+				TemporalFrameContinuity& continuity = state.m_SettleKey.m_Temporal;
+				switch (change)
+				{
+				case 0: continuity.m_Identity.m_DepthExtent = { 43, 22 }; break;
+				case 1: continuity.m_Identity.m_Accumulation = TemporalAAHistoryAccumulation::CompatibilityAge; break;
+				case 2: break; // Same identity, but the Runtime owner lost its history.
+				case 3: continuity.m_Services = TemporalService::None; break;
+				}
+				continuity.m_HasCompatiblePreviousHistory = false;
+				coordinator.BeginFrame(state);
+				const bool restarted = control.m_Issued.empty() &&
+					coordinator.GetSettledFrameCount() == 0;
+				// Beginning another frame without a submission cannot advance settling.
+				coordinator.BeginFrame(state);
+				const bool notSubmitted = coordinator.GetSettledFrameCount() == 0;
+				coordinator.OnFrameSubmitted();
+				continuity.m_HasCompatiblePreviousHistory = true;
+				coordinator.BeginFrame(state);
+				const bool waited = control.m_Issued.empty() &&
+					coordinator.GetSettledFrameCount() == 1;
+				coordinator.OnFrameSubmitted();
+				coordinator.BeginFrame(state);
+				context.Check(restarted && notSubmitted && waited && control.m_Issued.size() == 1,
+					std::format("Capture settling restarts for continuity change {} and counts "
+						"only newly submitted frames", change));
+				if (control.m_Issued.empty())
+				{
+					continue;
+				}
+				control.Complete(control.m_Issued.front().m_Id, 9);
+				coordinator.Update();
+				const auto results = Consume(coordinator);
+				context.Check(results.size() == 1 && results.front().m_Metadata &&
+					results.front().m_Metadata->m_SettledFrames == 2,
+					"Continuity recovery metadata counts only the new settled history");
+			}
+		}
+
 		[[nodiscard]] FrameCaptureFrameState MakeCutFrameState(
 			bool ready, uint64_t cameraResetSerial)
 		{
 			FrameCaptureFrameState state = MakeFrameState(ready);
-			state.m_SettleKey.m_CameraResetSerial = cameraResetSerial;
+			state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity = cameraResetSerial;
 			return state;
 		}
 
@@ -427,7 +485,7 @@ namespace gglab
 		[[nodiscard]] FrameCaptureFrameState MakeViewFrameState(uint64_t cameraResetSerial)
 		{
 			FrameCaptureFrameState state = MakeFrameState(true);
-			state.m_SettleKey.m_CameraResetSerial = cameraResetSerial;
+			state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity = cameraResetSerial;
 			state.m_ReferenceViewIds = { "CAM_A", "CAM_B" };
 			return state;
 		}
@@ -1142,7 +1200,15 @@ namespace gglab
 					m_Sequence.OnPoseApplied(applied);
 				}
 				FrameCaptureFrameState state = MakeFrameState(m_Ready, temporalSession);
-				state.m_SettleKey.m_CameraResetSerial = m_CameraResetSerial;
+				state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity = m_CameraResetSerial;
+				state.m_SettleKey.m_Temporal.m_Identity.m_DepthExtent = m_RenderExtent;
+				state.m_SettleKey.m_Temporal.m_Identity.m_Accumulation = m_Accumulation;
+				state.m_SettleKey.m_Temporal.m_HasCompatiblePreviousHistory = m_HistoryCompatible;
+				if (m_LastSample)
+				{
+					state.m_SettleKey.m_Temporal.m_Services = TemporalService::ProjectionJitter;
+					state.m_SettleKey.m_Temporal.m_ReferenceActive = true;
+				}
 				m_Sequence.BeginFrame(state);
 				m_Capture.BeginFrame(std::move(state));
 				if (submit)
@@ -1166,6 +1232,9 @@ namespace gglab
 			FrameSequenceCoordinator m_Sequence;
 			std::vector<CameraPath> m_Paths;
 			uint64_t m_CameraResetSerial = 1;
+			ViewExtent m_RenderExtent{ 64, 32 };
+			TemporalAAHistoryAccumulation m_Accumulation = TemporalAAHistoryAccumulation::EffectiveSamples;
+			bool m_HistoryCompatible = true;
 			size_t m_Completed = 0;
 			bool m_Ready = true;
 			bool m_AutoComplete = true;
@@ -1671,6 +1740,38 @@ namespace gglab
 			}
 		}
 
+		void RunFrameSequenceContinuityTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-continuity");
+			for (uint32_t change = 0; change < 3; ++change)
+			{
+				for (const bool atCut : { false, true })
+				{
+					SequenceHarness harness(directory.GetPath());
+					std::string error;
+					GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error));
+					harness.Frame(); // Readiness frame before sequence frame zero.
+					const uint32_t framesBeforeChange = atCut ? 4u : 1u;
+					for (uint32_t frame = 0; frame < framesBeforeChange; ++frame)
+					{
+						harness.Frame();
+					}
+					if (change == 0) harness.m_RenderExtent = { 43, 22 };
+					if (change == 1) harness.m_Accumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+					if (change == 2) harness.m_HistoryCompatible = false;
+					harness.Frame();
+					const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+					// A path cut permits history loss; a simultaneous effective-identity
+					// change is still an unexpected change to the experiment.
+					const bool permitted = atCut && change == 2;
+					context.Check((status.m_State == FrameSequenceState::Failed) != permitted &&
+						status.m_SubmittedFrames == framesBeforeChange + (permitted ? 1u : 0u),
+						std::format("Sequence continuity change {} at cut {} obeys the Runtime "
+							"identity and history contract", change, atCut));
+				}
+			}
+		}
+
 		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-sequence-failure");
@@ -1741,6 +1842,7 @@ namespace gglab
 	{
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
+		RunHistoryContinuitySettlingTests(context);
 		RunLoadingHistoryTests(context);
 		RunReferenceViewTests(context);
 		RunFailureTests(context);
@@ -1756,6 +1858,7 @@ namespace gglab
 		RunDiagnosticCaptureTests(context);
 		RunReferenceSequenceTests(context);
 		RunFrameSequenceEvaluationTests(context);
+		RunFrameSequenceContinuityTests(context);
 		RunFrameSequenceFailureTests(context);
 	}
 }

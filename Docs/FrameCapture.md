@@ -86,8 +86,13 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   `gtao-*` taps. A tap whose feature produced nothing in that frame, such as a
   temporal tap with Temporal AA inactive, fails the capture.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
-  is ready and then for `-SettleFrames` submitted frames with an unchanged
-  settle key (temporal session, camera cut, display view, size and Demo).
+  is ready and then for `-SettleFrames` submitted frames of one continuous
+  Runtime history and Demo. The transaction supplies the effective session,
+  camera reset, display view, render/display extents, color ABI, accumulation
+  model and active temporal consumers, plus whether the owners can actually
+  read compatible committed history. A configuration change or lost history
+  restarts settling even when the window size is unchanged. Frames without a
+  temporal consumer still settle normally.
   Settling counts only over temporal history that began on a ready frame: when
   history still holds frames rendered while a gate was pending, the runtime
   cuts the display camera first. Simulation time holds until settling begins,
@@ -190,8 +195,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
   ends without submission is posed again.
 - Frame 0 and every cut key of the path are camera cuts that reset temporal
   history and the jitter sequence, so a replay starts from the same temporal
-  state. Any other temporal continuity change (temporal session, display view,
-  size or content) or a readiness gate leaving Ready fails the sequence.
+  state. Any other effective temporal identity change, loss of compatible
+  history or content change, or a readiness gate leaving Ready, fails the
+  sequence. A path cut permits its camera reset and cold history, but does not
+  permit a simultaneous resolution, accumulation model or consumer change.
+  Reference samples use their reference consumer identity; the first sample of
+  each reference frame is not treated as a production-history failure.
 - Each requested frame is captured on exactly that frame as a next-frame capture
   labelled `<label>-f<frame>`; the label defaults to the path id. Every frame of
   a path may be captured (`-CaptureFrames '0-179'`): when Runtime payload capacity

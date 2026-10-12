@@ -5617,6 +5617,131 @@ namespace gglab
 			pool.Tick();
 		}
 
+		void RunTemporalCaptureContinuityContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			PersistentTexturePool pool(&device);
+			TemporalHistoryManager colorHistory(&pool);
+			GTAOTemporalHistory ambientOcclusionHistory(&pool);
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			TemporalFramePlanResolveInfo info{
+				.m_TemporalAA = {
+					.m_Settings = { .m_Enabled = true },
+					.m_Capabilities = {
+						.m_MotionRenderTarget = true, .m_MotionShaderResource = true,
+						.m_ResolvedColorRenderTarget = true, .m_ResolvedColorShaderResource = true,
+						.m_ResolvedColorTypedUavStore = true, .m_HistoryColorShaderResource = true,
+						.m_HistoryColorTypedUavStore = true, .m_HistoryDepthShaderResource = true,
+						.m_HistoryDepthTypedUavStore = true, .m_HistoryReliabilityShaderResource = true,
+						.m_HistoryReliabilityTypedUavStore = true },
+					.m_UpscalingAvailable = true },
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation = SceneExtensionTemporalParticipation::TemporalIntegrated,
+				.m_ResetIdentity = 7, .m_SessionIdentity = 11,
+				.m_DisplayViewEligible = true, .m_DepthVelocityPathAvailable = true,
+				.m_AmbientOcclusionAvailable = true,
+			};
+			uint64_t fenceValue = 1;
+			const auto record = [&](bool submit = true, float preExposure = 1.0f)
+				{
+					const ResolvedTemporalFramePlan plan = ResolveTemporalFramePlan(info);
+					const ViewResolution resolution = ResolveTemporalAAViewResolution(
+						{ 64, 32 }, plan.m_TemporalAA.m_ResolutionPreset);
+					const bool aoReady = ambientOcclusionHistory.BeginFrame(plan.UsesAmbientOcclusionHistory(),
+						MakeGTAOHalfResolutionExtent(resolution.m_Render.m_Width, resolution.m_Render.m_Height), {});
+					TemporalFrameTransaction transaction;
+					transaction.Begin(viewHistory, objectHistory, plan, resolution, &colorHistory,
+						preExposure, std::nullopt, nullptr, aoReady ? &ambientOcclusionHistory : nullptr);
+					const TemporalFrameContinuity continuity = transaction.GetContinuity();
+					RenderView view{ .m_ViewId = RenderViewID::Main };
+					view.m_Width = resolution.m_Render.m_Width;
+					view.m_Height = resolution.m_Render.m_Height;
+					view.m_IsValid = true;
+					transaction.PrepareDisplayView(view);
+					RenderGraph graph({ .m_Device = &device,
+						.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+					bool exported = !plan.HasService(TemporalService::FrameContinuity);
+					if (plan.HasService(TemporalService::ColorDepthHistory))
+					{
+						graph.AddPass<TemporalHistoryContractPassData>("Continuity.Color",
+							[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+							{
+								if (!transaction.ImportHistoryResources(builder, data.m_History)) return;
+								builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+								builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+								builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
+								exported = transaction.ExportHistoryResources(builder, data.m_History);
+							});
+					}
+					else if (plan.UsesAmbientOcclusionHistory())
+					{
+						graph.AddPass<GTAOTemporalHistoryContractPassData>("Continuity.AmbientOcclusion",
+							[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+							{
+								if (!transaction.ImportAmbientOcclusionHistory(builder, data.m_History)) return;
+								builder.WriteInPlace(data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
+								builder.WriteInPlace(data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
+								exported = transaction.ExportAmbientOcclusionHistory(builder, data.m_History);
+							});
+					}
+					context.Check(exported && graph.Compile(), "Continuity fixture exports its active history");
+					if (submit) transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, fenceValue++ });
+					else transaction.Abort();
+					context.Check(transaction.GetContinuity().m_HasCompatiblePreviousHistory ==
+						continuity.m_HasCompatiblePreviousHistory,
+						"Continuity remains the Begin-time observation after commit or abort");
+					return continuity;
+				};
+
+			const auto cold = record();
+			const auto native = record();
+			context.Check(!cold.m_HasCompatiblePreviousHistory && native.Continues(cold),
+				"Continuity starts on the first committed frame, not on an uncommitted allocation");
+			const auto aborted = record(false);
+			context.Check(record().Continues(aborted), "Aborting a compatible frame preserves committed continuity");
+			info.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
+			const auto qualityAborted = record(false);
+			const auto qualityCold = record();
+			context.Check(!qualityAborted.Continues(native) && !qualityCold.Continues(qualityAborted) &&
+				!qualityCold.m_HasCompatiblePreviousHistory && record().Continues(qualityCold),
+				"A render-extent change cold-starts history and an aborted cold frame cannot warm it");
+			info.m_TemporalAA.m_Settings.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+			const auto age = record();
+			context.Check(!age.Continues(qualityCold) && !age.m_HasCompatiblePreviousHistory && record().Continues(age),
+				"Changing accumulation resets the owner history at a fixed display extent");
+			++info.m_ResetIdentity;
+			const auto cut = record();
+			context.Check(!cut.Continues(age) && cut.Continues(age, true),
+				"Only an expected camera cut permits its reset identity and cold history");
+			++info.m_ResetIdentity;
+			info.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Native;
+			const auto cutAndResize = record();
+			context.Check(!cutAndResize.Continues(cut, true), "A camera cut cannot hide a simultaneous resolution change");
+			const auto beforeInvalidation = record();
+			colorHistory.Invalidate(TemporalHistoryResetReason::ResolveProgramChanged);
+			const auto invalidated = record();
+			context.Check(!invalidated.Continues(beforeInvalidation) &&
+				invalidated.m_Identity == beforeInvalidation.m_Identity,
+				"Owner invalidation breaks capture continuity even when its effective identity is unchanged");
+			context.Check(record(true, 4.0f).Continues(invalidated), "A valid exposure-scale change preserves continuity");
+			info.m_TemporalAA.m_Settings.m_Enabled = false;
+			const auto inactive = record();
+			context.Check(record().Continues(inactive), "Frames without a temporal consumer still settle");
+			info.m_AmbientOcclusionRequested = true;
+			const auto aoCold = record();
+			const auto aoContinued = record();
+			context.Check(!aoCold.Continues(inactive) && !aoCold.m_HasCompatiblePreviousHistory &&
+				aoContinued.Continues(aoCold), "Standalone temporal GTAO reports its actual committed read history");
+			ambientOcclusionHistory.Release({});
+			const auto aoLost = record();
+			context.Check(!aoLost.Continues(aoContinued) && aoLost.m_Identity == aoContinued.m_Identity,
+				"A lost GTAO allocation breaks continuity even while geometric view history survives");
+			ambientOcclusionHistory.Release({});
+			colorHistory.Shutdown();
+			pool.Tick();
+		}
+
 		void RunTemporalHistoryTransactionContractTests(SelfTestContext& context) noexcept
 		{
 			RecordingDevice writeProofDevice;
@@ -10196,6 +10321,7 @@ namespace gglab
 		RunTemporalReferenceContractTests(context);
 		RunGTAOTemporalHistoryContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
+		RunTemporalCaptureContinuityContractTests(context);
 		RunAtmosphereContractTests(context);
 		RunWorldSunContractTests(context);
 		RunExposureContractTests(context);

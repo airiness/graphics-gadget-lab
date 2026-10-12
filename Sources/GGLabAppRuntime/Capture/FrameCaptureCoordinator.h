@@ -4,6 +4,7 @@
 #include "Capture/FrameCaptureReadiness.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <chrono>
@@ -64,19 +65,19 @@ namespace gglab
 		std::optional<FrameCaptureMetadata> m_Metadata;
 	};
 
-	// Identity of the temporal state a settled-frame count accumulates over. Any
-	// change restarts settling, because temporal history no longer describes the
-	// view being captured.
+	// Runtime owns temporal compatibility; AppRuntime adds the active content.
+	// A changed identity or unreadable previous history restarts settling.
 	struct FrameCaptureSettleKey
 	{
-		uint64_t m_TemporalSession = 0;
-		uint64_t m_CameraResetSerial = 0;
-		uint32_t m_DisplayView = 0;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		TemporalFrameContinuity m_Temporal{};
 		uint32_t m_DemoIndex = 0;
 
-		bool operator==(const FrameCaptureSettleKey&) const noexcept = default;
+		[[nodiscard]] bool Continues(const FrameCaptureSettleKey& previous,
+			bool allowCameraCut = false) const noexcept
+		{
+			return m_DemoIndex == previous.m_DemoIndex &&
+				m_Temporal.Continues(previous.m_Temporal, allowCameraCut);
+		}
 	};
 
 	// Runtime state of the frame about to be built, supplied by the application

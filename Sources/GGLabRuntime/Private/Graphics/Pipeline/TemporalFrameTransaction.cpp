@@ -80,6 +80,15 @@ namespace gglab
 			(!historyManager || !plan.HasService(TemporalService::ColorDepthHistory) ||
 				(m_HistoryFrame.m_PreviousValid &&
 					m_HistoryFrame.m_PreviousPreExposure == viewHistory.m_Committed.m_PreExposure));
+		m_Continuity = {
+			.m_Identity = MakeTemporalHistoryCompatibilityIdentity(plan, resolution, m_ColorAbi),
+			.m_Services = plan.m_Services,
+			.m_AmbientOcclusionActive = plan.IsConsumerActive(TemporalConsumer::AmbientOcclusion),
+			.m_ReferenceActive = plan.IsConsumerActive(TemporalConsumer::Reference),
+			.m_HasCompatiblePreviousHistory = m_HasCompatiblePreviousView &&
+				(!plan.UsesAmbientOcclusionHistory() || (m_AmbientOcclusionHistory &&
+					m_AmbientOcclusionHistory->HasCompatiblePreviousHistory(m_HasCompatiblePreviousView))),
+		};
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_FrameIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextFrameIndex : 0;
 		m_JitterPixels = Vector2::Zero;

@@ -93,15 +93,8 @@ namespace gglab
 			return {};
 		}
 
-		const TemporalHistoryCompatibilityIdentity compatibility{
-			.m_DisplayViewId = plan.m_DisplayViewId,
-			.m_ResetIdentity = plan.m_ResetIdentity,
-			.m_SessionIdentity = plan.m_SessionIdentity,
-			.m_ColorExtent = resolution.m_Display,
-			.m_DepthExtent = resolution.m_Render,
-			.m_ColorAbi = colorAbi,
-			.m_Accumulation = plan.m_TemporalAA.m_HistoryAccumulation,
-		};
+		const TemporalHistoryCompatibilityIdentity compatibility =
+			MakeTemporalHistoryCompatibilityIdentity(plan, resolution, colorAbi);
 		const auto isEmpty = [](ViewExtent extent) noexcept
 			{
 				return extent.m_Width == 0 || extent.m_Height == 0;

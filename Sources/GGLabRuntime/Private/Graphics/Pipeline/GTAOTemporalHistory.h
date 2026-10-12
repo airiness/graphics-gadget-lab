@@ -42,6 +42,11 @@ namespace gglab
 		void Release(const RHIFencePoint& retirementFence) noexcept;
 
 		[[nodiscard]] bool HasCommittedHistory() const noexcept { return m_CommittedValid; }
+		[[nodiscard]] bool HasCompatiblePreviousHistory(bool continuesPreviousView) const noexcept
+		{
+			return m_Active && continuesPreviousView && m_CommittedValid &&
+				m_Textures.IsReadInitialized();
+		}
 
 	private:
 		enum HistorySurface : size_t

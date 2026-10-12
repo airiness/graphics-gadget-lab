@@ -330,16 +330,17 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::Busy;
 		}
+		const ViewExtent extent = state.m_SettleKey.m_Temporal.m_Identity.m_ColorExtent;
 		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic
 			? RHIFormat::R8G8B8A8Unorm : state.m_DisplayFormat,
-			state.m_SettleKey.m_Width, state.m_SettleKey.m_Height);
+			extent.m_Width, extent.m_Height);
 	}
 
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
 		const bool ready = state.m_Readiness.IsReady();
 		const bool historyRestarted =
-			!m_LastFrameState || m_LastFrameState->m_SettleKey != state.m_SettleKey;
+			!m_LastFrameState || !state.m_SettleKey.Continues(m_LastFrameState->m_SettleKey);
 		// Temporal history keeps accumulating while gates are pending, so frames of
 		// content still loading stay in it until the settle key changes.
 		m_HistoryReady = historyRestarted ? ready : m_HistoryReady && ready;
@@ -355,9 +356,9 @@ namespace gglab
 			}
 			if (!entry.m_ViewCameraResetSerial)
 			{
-				entry.m_ViewCameraResetSerial = state.m_SettleKey.m_CameraResetSerial;
+				entry.m_ViewCameraResetSerial = state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
 			}
-			else if (*entry.m_ViewCameraResetSerial != state.m_SettleKey.m_CameraResetSerial)
+			else if (*entry.m_ViewCameraResetSerial != state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity)
 			{
 				entry.m_ViewApplied = false;
 				entry.m_ViewCameraResetSerial.reset();

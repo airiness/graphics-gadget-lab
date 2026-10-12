@@ -135,17 +135,6 @@ namespace gglab
 			return text;
 		}
 
-		// A cut legitimately changes only the camera reset serial.
-		[[nodiscard]] bool IsContinuous(const FrameCaptureSettleKey& previous,
-			const FrameCaptureSettleKey& current, bool cut) noexcept
-		{
-			FrameCaptureSettleKey expected = previous;
-			if (cut)
-			{
-				expected.m_CameraResetSerial = current.m_CameraResetSerial;
-			}
-			return expected == current;
-		}
 	}
 
 	const char* GetFrameSequenceStateName(FrameSequenceState state) noexcept
@@ -405,10 +394,10 @@ namespace gglab
 			return;
 		}
 		if (m_LastSettleKey &&
-			!IsContinuous(*m_LastSettleKey, state.m_SettleKey, m_AppliedPose->m_Cut))
+			!state.m_SettleKey.Continues(*m_LastSettleKey, m_AppliedPose->m_Cut))
 		{
 			Fail(std::format("Temporal continuity changed at sequence frame {} outside a camera "
-				"path cut (temporal session, display view, size or content).", m_Frame));
+				"path cut (effective temporal identity, history availability or content).", m_Frame));
 			return;
 		}
 		m_LastSettleKey = state.m_SettleKey;

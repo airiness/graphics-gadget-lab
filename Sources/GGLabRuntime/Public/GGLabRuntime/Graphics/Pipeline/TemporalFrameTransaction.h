@@ -203,6 +203,11 @@ namespace gglab
 		{
 			return m_Plan.m_SessionIdentity;
 		}
+		// Latched at Begin, before graph recording or commit mutates any history owner.
+		[[nodiscard]] const TemporalFrameContinuity& GetContinuity() const noexcept
+		{
+			return m_Continuity;
+		}
 
 	private:
 		[[nodiscard]] bool IsCompatible(const TemporalViewHistory& history) const noexcept;
@@ -215,6 +220,7 @@ namespace gglab
 		GTAOTemporalHistory* m_AmbientOcclusionHistory = nullptr;
 		std::optional<TemporalReferenceSample> m_ReferenceSample;
 		TemporalHistoryFrameState m_HistoryFrame{};
+		TemporalFrameContinuity m_Continuity{};
 		ResolvedTemporalFramePlan m_Plan{};
 		TemporalCommittedViewState m_PendingView{};
 		std::unordered_map<RenderObjectHistoryKey, Matrix, RenderObjectHistoryKeyHash>

@@ -116,15 +116,10 @@ namespace gglab
 			const ShaderPreloadStatus& m_ShaderPreload;
 			const CameraRig::CameraSlot& m_DisplayCameraSlot;
 			std::span<const CameraReferenceView> m_ReferenceViews;
-			RenderViewID m_DisplayViewId = RenderViewID::Main;
-			uint64_t m_TemporalSessionIdentity = 0;
 			const ResolvedTemporalFramePlan& m_TemporalFramePlan;
 			const TemporalFrameTransaction& m_TemporalFrameTransaction;
 			const TemporalAASettings& m_TemporalSettings;
 			const GTAOSettings& m_GTAOSettings;
-			// Display extent; it keys capture settling.
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
 			ViewResolution m_ViewResolution{};
 			AppRuntimeRHIBackend m_Backend = AppRuntimeRHIBackend::Unknown;
 			bool m_DevelopmentTools = false;
@@ -319,11 +314,7 @@ namespace gglab
 				.m_LabId = inputs.m_Demo.GetCaptureContentId(),
 				.m_Readiness = BuildCaptureReadiness(inputs),
 				.m_SettleKey = {
-					.m_TemporalSession = inputs.m_TemporalSessionIdentity,
-					.m_CameraResetSerial = camera.GetTemporalResetSerial(),
-					.m_DisplayView = static_cast<uint32_t>(inputs.m_DisplayViewId),
-					.m_Width = inputs.m_Width,
-					.m_Height = inputs.m_Height,
+					.m_Temporal = inputs.m_TemporalFrameTransaction.GetContinuity(),
 					.m_DemoIndex = demoIndex,
 				},
 				.m_DisplayFormat = inputs.m_RenderServices.m_Presentation->GetSwapChain()->GetFormat(),
@@ -604,14 +595,10 @@ namespace gglab
 			.m_ShaderPreload = shaderPreload,
 			.m_DisplayCameraSlot = *displayCameraSlot,
 			.m_ReferenceViews = cameraRig.GetReferenceViews(),
-			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
-			.m_TemporalSessionIdentity = temporalSessionIdentity,
 			.m_TemporalFramePlan = temporalFramePlan,
 			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_TemporalSettings = displayViewSettings.m_TemporalAA,
 			.m_GTAOSettings = displayViewSettings.m_Lighting.m_GTAO,
-			.m_Width = m_WindowWidth,
-			.m_Height = m_WindowHeight,
 			.m_ViewResolution = viewResolution,
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,

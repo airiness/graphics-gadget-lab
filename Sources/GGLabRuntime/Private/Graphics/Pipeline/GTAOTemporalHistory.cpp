@@ -73,8 +73,7 @@ namespace gglab
 		{
 			return false;
 		}
-		const bool previousValid =
-			continuesPreviousView && m_CommittedValid && m_Textures.IsReadInitialized();
+		const bool previousValid = HasCompatiblePreviousHistory(continuesPreviousView);
 		// The temporal pass overwrites every texel of the next textures.
 		const auto visibility = m_Textures.Import(builder, VisibilitySurface,
 			"GTAO.PreviousVisibility", "GTAO.NextVisibility", previousValid, false);
