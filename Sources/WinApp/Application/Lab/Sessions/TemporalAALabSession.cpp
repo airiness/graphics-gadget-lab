@@ -30,10 +30,6 @@ namespace gglab
 	{
 		constexpr std::string_view AlphaBlendModeTestPath =
 			"Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf";
-		constexpr uint32_t TemporalAAEvidenceJitterCycleCount = 2;
-		constexpr uint32_t TemporalAAEvidenceWarmupFrameCount =
-			temporal::JitterSampleCount * TemporalAAEvidenceJitterCycleCount;
-		constexpr uint32_t TemporalAAGpuTimingSampleTarget = 120;
 
 		const LabParameterId EnabledId("temporal_aa.enabled");
 		const LabParameterId PreviewTapId("temporal_aa.preview_tap");
@@ -264,7 +260,6 @@ namespace gglab
 			GetCamera().Update();
 		}
 		RequestPreviewRefresh();
-		CaptureGpuTiming();
 	}
 
 	void TemporalAALabSession::OnCameraPathFrameApplied(
@@ -301,6 +296,7 @@ namespace gglab
 		{
 			++m_CommittedFrameCount;
 		}
+		CaptureGpuTiming(feedback);
 	}
 
 	void TemporalAALabSession::OnResize(uint32_t width, uint32_t height) noexcept
@@ -322,8 +318,7 @@ namespace gglab
 		const bool animateObject = parameters.Get(AnimateObjectId, true);
 		const bool orbitCamera = parameters.Get(OrbitCameraId, false);
 		const bool continuousFovZoom = parameters.Get(ContinuousFovZoomId, false);
-		const bool evidenceDomainChanged = taa.m_Enabled != enabled ||
-			taa.m_MaxHistoryFeedback != maxHistoryFeedback ||
+		const bool evidenceDomainChanged =
 			m_EnableCameraInput != enableCameraInput || m_AnimateObject != animateObject ||
 			m_OrbitCamera != orbitCamera || m_ContinuousFovZoom != continuousFovZoom;
 		taa.m_Enabled = enabled;
@@ -560,95 +555,43 @@ namespace gglab
 		}
 	}
 
-	void TemporalAALabSession::CaptureGpuTiming() noexcept
+	void TemporalAALabSession::CaptureGpuTiming(const DemoFrameFeedback& feedback) noexcept
 	{
-		if (m_GpuTimingSampleCount >= TemporalAAGpuTimingSampleTarget)
+		const auto* profilingView = m_Services.m_GpuProfiling;
+		const bool enabled = profilingView && profilingView->IsEnabled();
+		m_GpuTiming.OnFrameSubmitted(feedback, m_Services.m_RHIContext->GetFrameSlotCount(), enabled);
+		if (!enabled || m_GpuTiming.GetSnapshot().m_SampleCount >= TemporalAALabGpuTimingSampleTarget ||
+			!m_GpuTiming.Capture(profilingView->GetLatestFrame()))
 		{
 			return;
 		}
-		auto* profilingView = m_Services.m_GpuProfiling;
-		if (!profilingView || !profilingView->IsEnabled())
-		{
-			return;
-		}
-		const GpuProfileFrameSnapshot frame = profilingView->GetLatestFrame();
-		if (!frame.IsValid() || frame.m_FrameIndex == m_LastGpuProfileFrame)
-		{
-			return;
-		}
-		m_LastGpuProfileFrame = frame.m_FrameIndex;
-		if (m_GpuTimingWarmupFrames > 0)
-		{
-			--m_GpuTimingWarmupFrames;
-			return;
-		}
-
-		double temporalAAMilliseconds = 0.0;
-		bool hasTemporalAASample = false;
-		for (const auto& sample : frame.m_Samples)
-		{
-			if (sample.m_Name == "PostProcess.TemporalAA")
-			{
-				temporalAAMilliseconds += sample.m_Milliseconds;
-				hasTemporalAASample = true;
-			}
-		}
-		if (!hasTemporalAASample)
-		{
-			return;
-		}
-
-		if (m_GpuTimingSampleCount == 0)
-		{
-			m_GpuTimingMinMilliseconds = temporalAAMilliseconds;
-			m_GpuTimingMaxMilliseconds = temporalAAMilliseconds;
-		}
-		else
-		{
-			m_GpuTimingMinMilliseconds =
-				std::min(m_GpuTimingMinMilliseconds, temporalAAMilliseconds);
-			m_GpuTimingMaxMilliseconds =
-				std::max(m_GpuTimingMaxMilliseconds, temporalAAMilliseconds);
-		}
-		m_GpuTimingSumMilliseconds += temporalAAMilliseconds;
-		++m_GpuTimingSampleCount;
-		if (m_GpuTimingSampleCount == TemporalAAGpuTimingSampleTarget)
-		{
-			const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
-			const std::string_view adapterIdentity = device
-				? device->GetAdapterCompatibilityIdentity() : "unavailable";
-			const auto& taa = GetViewRenderProfile().m_TemporalAA;
-			const std::string_view cameraMode = m_OrbitCamera ? "pan/rotation"
-				: (m_ContinuousFovZoom ? "continuous-fov" : "static");
-			GGLAB_LOG_INFO(
-				"Temporal AA A4 timing window complete: adapter='{}', extent={}x{}, "
-				"feedback={:.6f}, animate_object={}, camera_mode='{}', samples={}, "
-				"average_ms={:.6f}, min_ms={:.6f}, max_ms={:.6f}.",
-				adapterIdentity, m_ViewportWidth, m_ViewportHeight,
-				taa.m_MaxHistoryFeedback, m_AnimateObject, cameraMode,
-				m_GpuTimingSampleCount,
-				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
-				m_GpuTimingMinMilliseconds, m_GpuTimingMaxMilliseconds);
-		}
+		const auto& timing = m_GpuTiming.GetSnapshot();
+		const auto& domain = *timing.m_Domain;
+		const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
+		const std::string_view cameraMode = m_EnableCameraInput ? "input"
+			: (m_OrbitCamera ? "pan/rotation" : (m_ContinuousFovZoom ? "continuous-fov" : "static"));
+		GGLAB_LOG_INFO(
+			"Temporal AA timing window complete: adapter='{}', render={}x{}, display={}x{}, "
+			"settings='{}', lab_animate_object={}, lab_camera_mode='{}', jitter_phases={}, "
+			"warmup_frames={}, domain_first_frame={}, eligible_first_frame={}, "
+			"sample_first_frame={}, sample_last_frame={}, gpu_frame={}, samples={}, "
+			"average_ms={:.6f}, min_ms={:.6f}, max_ms={:.6f}.",
+			device ? device->GetAdapterCompatibilityIdentity() : "unavailable",
+			domain.m_Resolution.m_Render.m_Width, domain.m_Resolution.m_Render.m_Height,
+			domain.m_Resolution.m_Display.m_Width, domain.m_Resolution.m_Display.m_Height,
+			FormatTemporalAALabSettings(domain.m_Settings), m_AnimateObject, cameraMode,
+			GetTemporalAAJitterSequenceLength(domain.m_Settings.m_ResolutionPreset),
+			timing.m_WarmupFrameCount, timing.m_FirstDomainFrameSerial,
+			timing.m_FirstEligibleFrameSerial, timing.m_FirstSampleFrameSerial,
+			timing.m_LastSampleFrameSerial, timing.m_LastGpuFrameIndex, timing.m_SampleCount,
+			timing.m_SumMilliseconds / static_cast<double>(timing.m_SampleCount),
+			timing.m_MinMilliseconds, timing.m_MaxMilliseconds);
 	}
 
 	void TemporalAALabSession::ResetEvidenceCapture() noexcept
 	{
-		m_LastGpuProfileFrame = 0;
 		m_CommittedFrameCount = 0;
-		m_GpuTimingSampleCount = 0;
-		m_GpuTimingSumMilliseconds = 0.0;
-		m_GpuTimingMinMilliseconds = 0.0;
-		m_GpuTimingMaxMilliseconds = 0.0;
-		ArmGpuTimingCaptureWarmup();
-	}
-
-	void TemporalAALabSession::ArmGpuTimingCaptureWarmup() noexcept
-	{
-		const auto* rhiContext = m_Services.m_RHIContext;
-		GGLAB_ASSERT_NOT_NULL(rhiContext);
-		m_GpuTimingWarmupFrames = std::max(TemporalAAEvidenceWarmupFrameCount,
-			rhiContext->GetFrameSlotCount());
+		m_GpuTiming.Reset();
 	}
 
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
@@ -674,12 +617,15 @@ namespace gglab
 		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAccumulation &&
 			packedCeilingSaturationAge <= TemporalHistoryMaxAccumulation && packedCeiling < 1.0f &&
 			ResolveTemporalAAMaxHistorySamples(packedCeiling) < TemporalHistoryMaxAccumulation;
-		const std::string gpuTiming = m_GpuTimingSampleCount > 0
+		const auto& timing = m_GpuTiming.GetSnapshot();
+		const std::string gpuTiming = timing.m_SampleCount > 0
 			? std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
-				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
-				m_GpuTimingMinMilliseconds, m_GpuTimingMaxMilliseconds,
-				m_GpuTimingSampleCount, TemporalAAGpuTimingSampleTarget)
-			: std::format("warming up, 0/{} samples", TemporalAAGpuTimingSampleTarget);
+				timing.m_SumMilliseconds / static_cast<double>(timing.m_SampleCount),
+				timing.m_MinMilliseconds, timing.m_MaxMilliseconds,
+				timing.m_SampleCount, TemporalAALabGpuTimingSampleTarget)
+			: timing.m_Domain ? std::format("warmup remaining {}/{} submitted frames; 0/{} samples",
+				timing.m_WarmupFramesRemaining, timing.m_WarmupFrameCount, TemporalAALabGpuTimingSampleTarget)
+			: "waiting for an active submitted TAA frame with profiling";
 		diagnostics.m_Title = "Temporal AA Evidence Domain";
 		diagnostics.m_Metrics = {
 			{.m_Name = "Adapter/driver domain",
@@ -701,7 +647,13 @@ namespace gglab
 			{.m_Name = "Evidence frames", .m_Value = std::format(
 				"{} committed after reset; last jitter {}", m_CommittedFrameCount,
 				history.m_LastCommitted.m_JitterIndex)},
-			{.m_Name = "PostProcess.TemporalAA", .m_Value = gpuTiming},
+			{.m_Name = "PostProcess.TemporalAA (submitted domain)", .m_Value = gpuTiming},
+			{.m_Name = "GPU timing settings", .m_Value = timing.m_Domain
+				? FormatTemporalAALabSettings(timing.m_Domain->m_Settings) : "unavailable"},
+			{.m_Name = "GPU timing frame range", .m_Value = std::format(
+				"domain from {}; first eligible {}; samples {}-{}",
+				timing.m_FirstDomainFrameSerial, timing.m_FirstEligibleFrameSerial,
+				timing.m_FirstSampleFrameSerial, timing.m_LastSampleFrameSerial)},
 			{.m_Name = "History", .m_Value = history.m_HistoryValid ? "valid" : "invalid"},
 			{.m_Name = "Compatibility generation",
 				.m_Value = std::format("{}", history.m_AllocationGeneration)},
@@ -720,10 +672,10 @@ namespace gglab
 				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "The selected feedback ceiling must saturate both accumulation models below the stored accumulation bound and its UNORM16 representation must remain below one."},
-			{.m_Name = "GPU timing capture",
-				.m_Status = m_GpuTimingSampleCount >= TemporalAAGpuTimingSampleTarget
+			{.m_Name = "Submitted-domain GPU timing capture",
+				.m_Status = timing.m_SampleCount >= TemporalAALabGpuTimingSampleTarget
 					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "The fixed 120-frame window starts after two complete 8-sample jitter cycles and resets when the evidence domain changes."},
+				.m_Detail = "The shown submitted domain needs 120 distinct completed profiles after two effective jitter cycles (16 Native or 36 Quality frames), at least the RHI frame-slot count. Effective settings, extents, view/session/cut identity and submission gaps reset it; older or unbound profiles are excluded."},
 			{.m_Name = "Sampling-footprint review",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Inspect named edge/disocclusion ROIs for the selected history filter: Bilinear blends 2x2 RGB texels; CatmullRomClamped (default) uses five bilinear fetches over a 4x4 kernel with the corners omitted, then clamps to the central 2x2 texel range. Accumulation is point sampled (1 texel); depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},

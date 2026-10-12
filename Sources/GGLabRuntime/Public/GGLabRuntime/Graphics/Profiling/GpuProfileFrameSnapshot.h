@@ -18,6 +18,9 @@ namespace gglab
 	struct GpuProfileFrameSnapshot
 	{
 		uint64_t m_FrameIndex = 0;
+		// RenderHost correlation, independent of the profiler's own frame counter.
+		// Zero for recordings that were not bound to a RenderHost frame.
+		uint64_t m_RenderFrameSerial = 0;
 		double m_FrameMilliseconds = 0.0;
 		std::vector<GpuProfileSample> m_Samples;
 

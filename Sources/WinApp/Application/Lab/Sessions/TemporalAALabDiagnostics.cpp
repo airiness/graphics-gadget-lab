@@ -11,29 +11,27 @@
 
 namespace gglab
 {
-	namespace
+	std::string FormatTemporalAALabSettings(const TemporalAASettings& settings) noexcept
 	{
-		std::string FormatSettings(const TemporalAASettings& settings) noexcept
-		{
-			return std::format(
-				"{}; feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
-				"relaxation {:.2f}, accumulation {}, rectification {} (gamma {:.2f}), "
-				"history {}, current {}, motion {}, post-temporal {}, resolution {}, "
-				"texture LOD {:.2f}",
-				settings.m_Enabled ? "enabled" : "disabled",
-				settings.m_MaxHistoryFeedback, settings.m_VelocityWeightScale,
-				settings.m_LuminanceWeightScale, settings.m_NeighborhoodClampExpansion,
-				settings.m_HistoryRelaxation,
-				GetTemporalAAHistoryAccumulationName(settings.m_HistoryAccumulation),
-				GetTemporalAAHistoryRectificationName(settings.m_HistoryRectification),
-				settings.m_VarianceClipGamma,
-				GetTemporalAAHistoryFilterName(settings.m_HistoryFilter),
-				GetTemporalAACurrentFilterName(settings.m_CurrentFilter),
-				GetTemporalAAMotionSelectionName(settings.m_MotionSelection),
-				GetTemporalAAPostTemporalViewName(settings.m_PostTemporalView),
-				GetTemporalAAResolutionPresetName(settings.m_ResolutionPreset),
-				settings.m_TextureLodBiasOffset);
-		}
+		return std::format(
+			"{}; feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
+			"relaxation {:.2f}, accumulation {}, rectification {} (gamma {:.2f}), "
+			"history {}, current {}, motion {}, post-temporal {}, resolution {}, "
+			"texture LOD {:.2f}, depth absolute {:.6f}, relative {:.6f}",
+			settings.m_Enabled ? "enabled" : "disabled",
+			settings.m_MaxHistoryFeedback, settings.m_VelocityWeightScale,
+			settings.m_LuminanceWeightScale, settings.m_NeighborhoodClampExpansion,
+			settings.m_HistoryRelaxation,
+			GetTemporalAAHistoryAccumulationName(settings.m_HistoryAccumulation),
+			GetTemporalAAHistoryRectificationName(settings.m_HistoryRectification),
+			settings.m_VarianceClipGamma,
+			GetTemporalAAHistoryFilterName(settings.m_HistoryFilter),
+			GetTemporalAACurrentFilterName(settings.m_CurrentFilter),
+			GetTemporalAAMotionSelectionName(settings.m_MotionSelection),
+			GetTemporalAAPostTemporalViewName(settings.m_PostTemporalView),
+			GetTemporalAAResolutionPresetName(settings.m_ResolutionPreset),
+			settings.m_TextureLodBiasOffset, settings.m_DepthAbsoluteThreshold,
+			settings.m_DepthRelativeThreshold);
 	}
 
 	void AppendTemporalAALabSettingsDiagnostics(LabDiagnosticsSnapshot& diagnostics,
@@ -41,7 +39,7 @@ namespace gglab
 		const TemporalHistoryManagerDiagnostics& history) noexcept
 	{
 		diagnostics.m_Metrics.push_back({ .m_Name = "TAA authoring settings",
-			.m_Value = FormatSettings(authoring) });
+			.m_Value = FormatTemporalAALabSettings(authoring) });
 		// Require both inputs from the same capture. Never infer runtime activity
 		// from enabled authoring settings or a retained history allocation.
 		const bool available = context.m_RequestedTemporalAASettings && context.m_TemporalFramePlan;
@@ -61,7 +59,7 @@ namespace gglab
 			const auto& plan = *context.m_TemporalFramePlan;
 			const auto& consumer = plan.GetConsumer(TemporalConsumer::TemporalAA);
 			diagnostics.m_Metrics.push_back({ .m_Name = "TAA requested settings",
-				.m_Value = FormatSettings(requested) });
+				.m_Value = FormatTemporalAALabSettings(requested) });
 			diagnostics.m_Metrics.push_back({ .m_Name = "TAA runtime state", .m_Value = std::format(
 				"frame {}; {} ({}); effective resolution {}",
 				context.m_FrameSerial, GetTemporalConsumerStatusName(consumer.m_Status),

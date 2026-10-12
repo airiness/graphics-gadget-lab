@@ -66,6 +66,15 @@ namespace gglab
 		return m_LatestFrame;
 	}
 
+	void DX12GpuProfiler::SetRenderFrameSerial(uint64_t frameSerial) noexcept
+	{
+		if (m_ActiveFrame)
+		{
+			GGLAB_ASSERT(frameSerial != 0 && m_ActiveFrame->m_RenderFrameSerial == 0);
+			m_ActiveFrame->m_RenderFrameSerial = frameSerial;
+		}
+	}
+
 	void DX12GpuProfiler::BeginFrame(uint32_t frameSlot, DX12CommandList& commandList) noexcept
 	{
 		GGLAB_ASSERT_MSG(
@@ -79,6 +88,7 @@ namespace gglab
 		auto& frame = m_Frames[frameSlot];
 		ResolveCompletedFrame(frame);
 		++m_NextFrameIndex;
+		frame.m_RenderFrameSerial = 0;
 		if (!IsEnabled() || m_TimestampFrequency == 0)
 		{
 			return;
@@ -263,6 +273,7 @@ namespace gglab
 
 		GpuProfileFrameSnapshot snapshot{};
 		snapshot.m_FrameIndex = frame.m_FrameIndex;
+		snapshot.m_RenderFrameSerial = frame.m_RenderFrameSerial;
 		if (frame.m_FrameBeginQuery != InvalidQueryIndex &&
 			frame.m_FrameEndQuery != InvalidQueryIndex)
 		{

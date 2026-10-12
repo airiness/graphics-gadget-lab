@@ -3,6 +3,8 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	// Runtime composition may bind both capabilities to one backend owner.
@@ -11,5 +13,7 @@ namespace gglab
 	{
 	public:
 		~GpuProfiler() override = default;
+		// Bind the active recording, if any, before it is ended or submitted.
+		virtual void SetRenderFrameSerial(uint64_t frameSerial) noexcept = 0;
 	};
 }

@@ -41,6 +41,7 @@ namespace gglab
 		void RequestEnabled(bool enabled) noexcept override;
 		[[nodiscard]] bool IsEnabled() const noexcept override;
 		[[nodiscard]] GpuProfileFrameSnapshot GetLatestFrame() const override;
+		void SetRenderFrameSerial(uint64_t frameSerial) noexcept override;
 
 		void BeginFrame(uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept;
 		void EndFrame(uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept;
@@ -70,6 +71,7 @@ namespace gglab
 		{
 			VkQueryPool m_QueryPool = VK_NULL_HANDLE;
 			uint64_t m_FrameIndex = 0;
+			uint64_t m_RenderFrameSerial = 0;
 			uint32_t m_TimestampCount = 0;
 			uint32_t m_FrameBeginQuery = InvalidQueryIndex;
 			uint32_t m_FrameEndQuery = InvalidQueryIndex;

@@ -164,6 +164,10 @@ namespace gglab
 			void RequestEnabled(bool enabled) noexcept override { m_Enabled = enabled; }
 			bool IsEnabled() const noexcept override { return m_Enabled; }
 			GpuProfileFrameSnapshot GetLatestFrame() const override { return m_LatestFrame; }
+			void SetRenderFrameSerial(uint64_t serial) noexcept override
+			{
+				m_LatestFrame.m_RenderFrameSerial = serial;
+			}
 
 			bool m_Enabled = true;
 			GpuProfileFrameSnapshot m_LatestFrame;
@@ -181,6 +185,7 @@ namespace gglab
 
 				profiler.m_LatestFrame = {
 					.m_FrameIndex = 17,
+					.m_RenderFrameSerial = 81,
 					.m_FrameMilliseconds = 2.5,
 					.m_Samples = { { "Opaque", 1.5, 2 } },
 				};
@@ -193,13 +198,17 @@ namespace gglab
 					"GPU profiling queries observe the latest accepted enable request");
 
 				profiler.m_LatestFrame.m_FrameIndex = 18;
+				profiler.SetRenderFrameSerial(82);
 				profiler.m_LatestFrame.m_Samples.front().m_Name = "Transparent";
 				context.Check(view.GetLatestFrame().m_FrameIndex == 18 &&
+					view.GetLatestFrame().m_RenderFrameSerial == 82 &&
 					retainedFrame.m_FrameIndex == 17 &&
+					retainedFrame.m_RenderFrameSerial == 81 &&
 					retainedFrame.m_Samples.front().m_Name == "Opaque",
 					"GPU timing value copies remain independent of later backend publication");
 			}
 			context.Check(retainedFrame.IsValid() && retainedFrame.m_FrameMilliseconds == 2.5 &&
+				retainedFrame.m_RenderFrameSerial == 81 &&
 				retainedFrame.m_Samples.size() == 1 &&
 				retainedFrame.m_Samples.front().m_Milliseconds == 1.5 &&
 				retainedFrame.m_Samples.front().m_CallCount == 2,

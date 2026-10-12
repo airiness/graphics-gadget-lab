@@ -763,6 +763,11 @@ namespace gglab
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
 			.m_FrameIndex = m_Time->GetFrameCount(),
 			.m_BackBufferIndex = backBufferIndex,
+			.m_RenderFrameSerial = frame.m_FrameSerial,
+			.m_TemporalAASettings = frame.m_ViewRenderSettings[
+				utils::ToIndex(frame.m_DisplayViewId)].m_TemporalAA,
+			.m_TemporalFramePlan = frame.m_TemporalFramePlan,
+			.m_ViewResolution = viewResolution,
 			});
 
 		// Pipelines without an overlay pass still complete the optional tooling frame.

@@ -282,6 +282,10 @@ namespace gglab
 		m_FrameGpuResources = std::make_unique<RenderFrameGpuResources>();
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
+		if (GpuProfiler* profiler = m_RHIContext->GetGpuProfiler())
+		{
+			profiler->SetRenderFrameSerial(frameSerial);
+		}
 		m_ActiveFrame = {};
 		m_ActiveFrame.m_RHIFrame = rhiFrame;
 		m_ActiveFrame.m_Serial = frameSerial;

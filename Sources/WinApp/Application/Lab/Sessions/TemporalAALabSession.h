@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssetPreparationTracker.h"
+#include "Application/Lab/Sessions/TemporalAALabGpuTiming.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
@@ -42,9 +43,8 @@ namespace gglab
 		void BuildLighting() noexcept;
 		void ApplySelectedPreviewSelection() noexcept;
 		void RequestPreviewRefresh() noexcept;
-		void CaptureGpuTiming() noexcept;
+		void CaptureGpuTiming(const DemoFrameFeedback& feedback) noexcept;
 		void ResetEvidenceCapture() noexcept;
-		void ArmGpuTimingCaptureWarmup() noexcept;
 
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};
@@ -54,13 +54,8 @@ namespace gglab
 		entt::entity m_LightEntity = entt::null;
 		uint32_t m_ViewportWidth = 0;
 		uint32_t m_ViewportHeight = 0;
-		uint64_t m_LastGpuProfileFrame = 0;
 		uint64_t m_CommittedFrameCount = 0;
-		uint32_t m_GpuTimingWarmupFrames = 0;
-		uint32_t m_GpuTimingSampleCount = 0;
-		double m_GpuTimingSumMilliseconds = 0.0;
-		double m_GpuTimingMinMilliseconds = 0.0;
-		double m_GpuTimingMaxMilliseconds = 0.0;
+		TemporalAALabGpuTimingWindow m_GpuTiming;
 		float m_ElapsedSeconds = 0.0f;
 		uint32_t m_LastCameraCutSerial = 0;
 		bool m_EnableCameraInput = false;
