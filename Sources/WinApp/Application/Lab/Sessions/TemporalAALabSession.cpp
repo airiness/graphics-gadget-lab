@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
+#include "Application/Lab/Sessions/TemporalAALabDiagnostics.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "AppRuntimeLog.h"
 
@@ -652,13 +653,17 @@ namespace gglab
 
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
+		BuildFrameDiagnostics(diagnostics, {});
+	}
+
+	void TemporalAALabSession::BuildFrameDiagnostics(LabDiagnosticsSnapshot& diagnostics,
+		const LabDiagnosticsFrameContext& context) const noexcept
+	{
 		const auto history =
 			m_Services.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 		const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
 		const auto& camera = GetCamera();
 		const auto& taa = GetViewRenderProfile().m_TemporalAA;
-		const float saturationAge =
-			ResolveTemporalAAFeedbackSaturationAge(taa.m_MaxHistoryFeedback);
 		const float ceilingSaturationAge = ResolveTemporalAAFeedbackSaturationAge(
 			TemporalAAMaxHistoryFeedbackCeiling);
 		const float packedCeiling = UnpackTemporalAAUnitRangePair(
@@ -666,7 +671,6 @@ namespace gglab
 				TemporalAAMaxHistoryFeedbackCeiling, 0.0f))[0];
 		const float packedCeilingSaturationAge =
 			ResolveTemporalAAFeedbackSaturationAge(packedCeiling);
-		const float maxHistorySamples = ResolveTemporalAAMaxHistorySamples(taa.m_MaxHistoryFeedback);
 		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAccumulation &&
 			packedCeilingSaturationAge <= TemporalHistoryMaxAccumulation && packedCeiling < 1.0f &&
 			ResolveTemporalAAMaxHistorySamples(packedCeiling) < TemporalHistoryMaxAccumulation;
@@ -676,7 +680,7 @@ namespace gglab
 				m_GpuTimingMinMilliseconds, m_GpuTimingMaxMilliseconds,
 				m_GpuTimingSampleCount, TemporalAAGpuTimingSampleTarget)
 			: std::format("warming up, 0/{} samples", TemporalAAGpuTimingSampleTarget);
-		diagnostics.m_Title = "Temporal AA A4 Evidence Domain";
+		diagnostics.m_Title = "Temporal AA Evidence Domain";
 		diagnostics.m_Metrics = {
 			{.m_Name = "Adapter/driver domain",
 				.m_Value = device ? std::string(device->GetAdapterCompatibilityIdentity())
@@ -690,26 +694,6 @@ namespace gglab
 			{.m_Name = "Camera optics", .m_Value = std::format(
 				"FOV {:.3f} deg, exposure {:.3f} EV", camera.GetFov(),
 				camera.GetExposureCompensationEV())},
-			{.m_Name = "TAA settings", .m_Value = std::format(
-				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}, "
-				"relaxation {:.2f}, accumulation {}, rectification {} (gamma {:.2f}), "
-				"history {}, current {}, motion {}, post-temporal {}, resolution {}, "
-				"texture LOD {:.2f}",
-				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
-				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion,
-				taa.m_HistoryRelaxation,
-				GetTemporalAAHistoryAccumulationName(taa.m_HistoryAccumulation),
-				GetTemporalAAHistoryRectificationName(taa.m_HistoryRectification),
-				taa.m_VarianceClipGamma,
-				GetTemporalAAHistoryFilterName(taa.m_HistoryFilter),
-				GetTemporalAACurrentFilterName(taa.m_CurrentFilter),
-				GetTemporalAAMotionSelectionName(taa.m_MotionSelection),
-				GetTemporalAAPostTemporalViewName(taa.m_PostTemporalView),
-				GetTemporalAAResolutionPresetName(taa.m_ResolutionPreset),
-				taa.m_TextureLodBiasOffset)},
-			{.m_Name = "Accumulation bound", .m_Value = std::format(
-				"age saturation {:.0f}, samples {:.2f}, stored max {:.0f}", saturationAge,
-				maxHistorySamples, TemporalHistoryMaxAccumulation)},
 			{.m_Name = "Frozen ceiling", .m_Value = std::format(
 				"{:.6f} -> age {:.0f}; packed {:.6f} -> age {:.0f}",
 				TemporalAAMaxHistoryFeedbackCeiling, ceilingSaturationAge,
@@ -732,10 +716,6 @@ namespace gglab
 				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, curved/straight references, and controlled matched-world-size and matched-projected-footprint pairs are present."},
-			{.m_Name = "Temporal history allocation",
-				.m_Status = GetViewRenderProfile().m_TemporalAA.m_Enabled && history.m_HasActiveHistory
-					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Enable TAA and allow one submitted frame to allocate fresh history."},
 			{.m_Name = "Coupled accumulation bound",
 				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Failed,
@@ -748,6 +728,7 @@ namespace gglab
 				.m_Status = LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Inspect named edge/disocclusion ROIs for the selected history filter: Bilinear blends 2x2 RGB texels; CatmullRomClamped (default) uses five bilinear fetches over a 4x4 kernel with the corners omitted, then clamps to the central 2x2 texel range. Accumulation is point sampled (1 texel); depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
 		};
+		AppendTemporalAALabSettingsDiagnostics(diagnostics, taa, context, history);
 	}
 
 	LabId TemporalAALabSession::GetId() noexcept { return LabId("gglab.lab.temporal_aa"); }

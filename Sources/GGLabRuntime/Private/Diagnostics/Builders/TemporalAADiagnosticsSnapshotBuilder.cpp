@@ -18,7 +18,7 @@ namespace gglab
 		const TemporalAASettings* requestedSettings) noexcept
 	{
 		TemporalAADiagnosticsSnapshot snapshot{};
-		snapshot.m_Available = framePlan != nullptr;
+		snapshot.m_Available = framePlan && requestedSettings;
 		if (framePlan)
 		{
 			snapshot.m_FramePlan = *framePlan;

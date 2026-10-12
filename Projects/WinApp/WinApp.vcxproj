@@ -177,6 +177,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp" />
@@ -253,6 +254,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabDiagnostics.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.cpp" />
@@ -293,6 +295,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h" />
@@ -387,6 +390,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabDiagnostics.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\AtmosphereRangeReferenceViews.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.h" />

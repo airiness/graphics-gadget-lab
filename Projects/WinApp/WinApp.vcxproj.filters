@@ -213,6 +213,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabDiagnostics.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -304,6 +307,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
@@ -563,6 +569,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabDiagnostics.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -651,6 +660,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">

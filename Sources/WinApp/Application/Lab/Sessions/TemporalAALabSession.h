@@ -26,6 +26,8 @@ namespace gglab
 		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void BuildFrameDiagnostics(LabDiagnosticsSnapshot& diagnostics,
+			const LabDiagnosticsFrameContext& context) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;

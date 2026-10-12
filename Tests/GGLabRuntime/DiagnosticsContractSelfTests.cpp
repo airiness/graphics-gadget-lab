@@ -21,6 +21,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/ShadowTemporalDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/SnapshotStore.h"
@@ -512,14 +513,16 @@ namespace gglab
 		class DiagnosticsLabSnapshotSource final : public LabSnapshotSourceBase
 		{
 		public:
-			LabSnapshot GetLabSnapshot() const noexcept override
+			LabSnapshot GetLabSnapshot(const LabDiagnosticsFrameContext& frame = {}) const noexcept override
 			{
+				m_LastContext = frame;
 				LabSnapshot snapshot{};
 				snapshot.m_ActiveLabName = m_ActiveLabName;
 				return snapshot;
 			}
 
 			std::string m_ActiveLabName;
+			mutable LabDiagnosticsFrameContext m_LastContext{};
 		};
 	}
 
@@ -1056,10 +1059,18 @@ namespace gglab
 			std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		DiagnosticsLabSnapshotSource firstLabSource;
 		firstLabSource.m_ActiveLabName = "First Lab";
-		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &firstLabSource });
+		ResolvedViewRenderSettings labFrameSettings{};
+		ResolvedTemporalFramePlan labFramePlan{};
+		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &firstLabSource,
+			.m_FrameSerial = 71, .m_DisplayViewSettings = &labFrameSettings,
+			.m_TemporalFramePlan = &labFramePlan });
 		const LabSnapshot* firstLabSnapshot = labDiagnostics.GetSnapshot<LabSnapshot>();
 		context.Check(firstLabSnapshot && firstLabSnapshot->m_ActiveLabName == "First Lab",
 			"Lab diagnostics capture uses the Runtime-owned frame context source");
+		context.Check(firstLabSource.m_LastContext.m_RequestedTemporalAASettings ==
+				&labFrameSettings.m_TemporalAA && firstLabSource.m_LastContext.m_TemporalFramePlan ==
+				&labFramePlan && firstLabSource.m_LastContext.m_FrameSerial == 71,
+			"Lab diagnostics borrow final display settings and the plan from the same capture frame");
 
 		labDiagnostics.EndFrame();
 		DiagnosticsLabSnapshotSource secondLabSource;
@@ -1069,6 +1080,10 @@ namespace gglab
 		context.Check(secondLabSnapshot && secondLabSnapshot == firstLabSnapshot &&
 				secondLabSnapshot->m_ActiveLabName == "Second Lab",
 			"Lab diagnostics recaptures from the current AppRuntime-supplied source");
+		context.Check(!secondLabSource.m_LastContext.m_RequestedTemporalAASettings &&
+				!secondLabSource.m_LastContext.m_TemporalFramePlan &&
+				secondLabSource.m_LastContext.m_FrameSerial == 0,
+			"A new Lab source without a display frame receives no retained frame inputs");
 		labDiagnostics.EndFrame();
 
 		Renderer resourceSource;
@@ -1094,6 +1109,40 @@ namespace gglab
 				transientSnapshot && !transientSnapshot->m_SourceAvailable &&
 				retainedPersistentSnapshot.m_SourceAvailable,
 			"Missing-source recapture clears availability without changing a retained value copy");
+		resourceDiagnostics.EndFrame();
+
+		RenderGraph temporalGraph({
+			.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+			.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
+		ViewRenderProfile temporalAuthoring{};
+		temporalAuthoring.m_TemporalAA.m_Enabled = false;
+		ViewRenderProfile temporalOverride = temporalAuthoring;
+		temporalOverride.m_TemporalAA.m_Enabled = true;
+		ResolvedViewRenderSettings temporalDisplay{};
+		temporalDisplay.m_TemporalAA = temporalOverride.m_TemporalAA;
+		temporalDisplay.m_TemporalAA.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear;
+		temporalDisplay.m_TemporalAA.m_MaxHistoryFeedback = 0.5f;
+		resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource,
+			.m_RenderGraph = &temporalGraph,
+			.m_AuthoringViewRenderProfile = &temporalAuthoring,
+			.m_EffectiveViewRenderProfile = &temporalOverride,
+			.m_DisplayViewSettings = &temporalDisplay, .m_TemporalFramePlan = &labFramePlan });
+		const auto* temporalSnapshot = resourceDiagnostics.GetSnapshot<TemporalAADiagnosticsSnapshot>();
+		context.Check(temporalSnapshot && temporalSnapshot->m_Available &&
+				temporalSnapshot->m_AuthoringSettings == temporalAuthoring.m_TemporalAA &&
+				temporalSnapshot->m_RequestedSettings == temporalDisplay.m_TemporalAA &&
+				temporalSnapshot->m_RequestedSettings != temporalOverride.m_TemporalAA,
+			"TAA snapshot preserves authoring but publishes final display overrides, not the intermediate profile");
+		const auto retainedTemporal = temporalSnapshot ? *temporalSnapshot : TemporalAADiagnosticsSnapshot{};
+		resourceDiagnostics.EndFrame();
+		temporalDisplay.m_TemporalAA.m_MaxHistoryFeedback = 0.9f;
+		resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource,
+			.m_RenderGraph = &temporalGraph, .m_TemporalFramePlan = &labFramePlan });
+		temporalSnapshot = resourceDiagnostics.GetSnapshot<TemporalAADiagnosticsSnapshot>();
+		context.Check(temporalSnapshot && !temporalSnapshot->m_Available &&
+				retainedTemporal.m_RequestedSettings.m_MaxHistoryFeedback == 0.5f,
+			"Missing final settings clear TAA snapshot availability and retained snapshots own their values");
 		resourceDiagnostics.EndFrame();
 
 		RenderGraph shadowGraph({

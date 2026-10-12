@@ -43,7 +43,8 @@ namespace gglab
 		}
 		void ProcessPendingCommands() noexcept;
 		void TickTransitions() noexcept;
-		LabSnapshot GetLabSnapshot() const noexcept override;
+		LabSnapshot GetLabSnapshot(
+			const LabDiagnosticsFrameContext& context = {}) const noexcept override;
 		[[nodiscard]] std::optional<LoadingProgress> GetLoadingProgress() const noexcept;
 
 		LabRunState GetState() const noexcept { return m_State; }

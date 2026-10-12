@@ -12,6 +12,18 @@
 
 namespace gglab
 {
+	struct ResolvedTemporalFramePlan;
+	struct TemporalAASettings;
+
+	// Borrowed immutable inputs for this capture only. A missing frame is unknown,
+	// never an instruction to substitute the Lab's authoring settings.
+	struct LabDiagnosticsFrameContext
+	{
+		const TemporalAASettings* m_RequestedTemporalAASettings = nullptr;
+		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
+		uint64_t m_FrameSerial = 0;
+	};
+
 	struct LabIdSnapshot
 	{
 		bool IsValid() const noexcept { return !m_Name.empty(); }
@@ -168,7 +180,8 @@ namespace gglab
 	{
 	public:
 		virtual ~LabSnapshotSourceBase() = default;
-		virtual LabSnapshot GetLabSnapshot() const noexcept = 0;
+		virtual LabSnapshot GetLabSnapshot(
+			const LabDiagnosticsFrameContext& context = {}) const noexcept = 0;
 	};
 
 	template <> struct SnapshotTraits<LabSnapshot>

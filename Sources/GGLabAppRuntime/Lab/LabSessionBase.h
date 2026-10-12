@@ -16,6 +16,7 @@ namespace gglab
 	class AssetOwnerScope;
 	class RenderPipelineBase;
 	struct LabDiagnosticsSnapshot;
+	struct LabDiagnosticsFrameContext;
 
 	struct LabSessionCreateInfo
 	{
@@ -70,6 +71,12 @@ namespace gglab
 		virtual void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 		{
 			GGLAB_UNUSED(diagnostics);
+		}
+		virtual void BuildFrameDiagnostics(LabDiagnosticsSnapshot& diagnostics,
+			const LabDiagnosticsFrameContext& context) const noexcept
+		{
+			GGLAB_UNUSED(context);
+			BuildDiagnostics(diagnostics);
 		}
 
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept;

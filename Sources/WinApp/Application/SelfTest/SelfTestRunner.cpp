@@ -5,6 +5,7 @@
 #include "Application/SelfTest/ApplicationInputSelfTests.h"
 #include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
+#include "Application/SelfTest/TemporalAALabDiagnosticsSelfTests.h"
 #include "Application/SelfTest/FrameCaptureImageEncoderSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelSelfTests.h"
@@ -57,6 +58,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-control",
 				.m_Run = &RunApplicationControlSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-temporal-aa-lab-diagnostics",
+				.m_Run = &RunTemporalAALabDiagnosticsSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-frame-capture-encoder",
