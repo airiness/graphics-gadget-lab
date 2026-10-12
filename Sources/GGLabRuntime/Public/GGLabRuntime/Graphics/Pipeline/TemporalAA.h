@@ -124,25 +124,27 @@ namespace gglab
 		return saturationAge;
 	}
 
-	// Sample bound of effective-sample accumulation: the count whose weight N / (N + 1)
-	// equals the feedback ceiling, so the ceiling and the carried samples share one bound.
+	// Usable history capacity whose unit-current-sample weight N / (N + 1) equals
+	// feedback. Capacity can be below the history alpha's validity floor of one;
+	// zero feedback has zero usable capacity, while storage remains valid from one.
 	[[nodiscard]] inline float ResolveTemporalAAMaxHistorySamples(
 		float maxHistoryFeedback) noexcept
 	{
 		if (!std::isfinite(maxHistoryFeedback))
 		{
-			return TemporalHistoryInitialAccumulation;
+			return 0.0f;
 		}
 		const float maxPackedFeedback =
 			static_cast<float>(TemporalAAUnitRangePairMask - 1u) /
 			TemporalAAUnitRangeQuantizationScale;
 		const float feedback = std::clamp(maxHistoryFeedback, 0.0f, maxPackedFeedback);
-		return std::clamp(feedback / (1.0f - feedback), TemporalHistoryInitialAccumulation,
+		return std::clamp(feedback / (1.0f - feedback), 0.0f,
 			TemporalHistoryMaxAccumulation);
 	}
 
-	// What the history alpha accumulates. Both models weight accepted history by
-	// min(N / (N + 1), feedback) times its confidence; they differ in the N they carry.
+	// What the history alpha accumulates. At Native both models weight accepted history
+	// by min(N / (N + 1), feedback) times its confidence. Quality effective samples use
+	// the current sample's kernel weight and the feedback-derived usable capacity.
 	// Switching the model resets history: the stored state of one is not the other's.
 	enum class TemporalAAHistoryAccumulation : uint8_t
 	{
@@ -151,7 +153,8 @@ namespace gglab
 		// as the confidence does, over history accumulated while it was low.
 		CompatibilityAge,
 		// Effective sample count: the confidence discounts the carried samples and the
-		// current frame adds one, N' = min(confidence * N + 1, feedback / (1 - feedback)).
+		// current frame adds its sample weight. Stored N stays at least one; the usable
+		// carried samples are capped by feedback / (1 - feedback), which may be below one.
 		// After a camera stop its reference error came within 2% of the converged error 28
 		// frames later at native resolution and 8 at Quality, against 52 and 44.
 		EffectiveSamples,

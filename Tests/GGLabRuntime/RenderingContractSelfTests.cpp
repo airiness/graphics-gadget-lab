@@ -7193,7 +7193,7 @@ namespace gglab
 			}
 			return std::clamp(std::clamp(historyConfidence, 0.0f, 1.0f) *
 				std::min(previousSamples, maxSamples) + currentSampleWeight,
-				TemporalHistoryInitialAccumulation, maxSamples);
+				TemporalHistoryInitialAccumulation, std::max(maxSamples, TemporalHistoryInitialAccumulation));
 		}
 
 		inline constexpr float TemporalUpscaledStaticMotionPixels = 0.5f;
@@ -8319,9 +8319,9 @@ namespace gglab
 					(1.0f - TemporalAADefaultMaxHistoryFeedback)) &&
 				NearlyEqual(maxHistorySamples / (maxHistorySamples + 1.0f),
 					TemporalAADefaultMaxHistoryFeedback) &&
-				ResolveTemporalAAMaxHistorySamples(0.0f) == TemporalHistoryInitialAccumulation &&
+				ResolveTemporalAAMaxHistorySamples(0.0f) == 0.0f &&
 				ResolveTemporalAAMaxHistorySamples(std::numeric_limits<float>::quiet_NaN()) ==
-					TemporalHistoryInitialAccumulation &&
+					0.0f &&
 				ResolveTemporalAAMaxHistorySamples(feedbackCeilingPackingGolden[0]) <
 					TemporalHistoryMaxAccumulation &&
 				ResolveTemporalAAMaxHistorySamples(1.0f) == TemporalHistoryMaxAccumulation &&
@@ -8346,6 +8346,18 @@ namespace gglab
 					std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) == 0.0f &&
 				ResolveTemporalAAHistorySamplesPreview(1.0f, 1.0f) == 0.0f,
 				"Effective samples start or reset at one, discount the carried samples by the history confidence, add one per accepted frame and saturate where their weight meets the feedback ceiling");
+
+			constexpr auto packedLowFeedback = UnpackTemporalAAUnitRangePair(
+				PackTemporalAAMaxHistoryFeedbackAndClampExpansion(0.25f, 0.0f));
+			const float lowCapacity = ResolveTemporalAAMaxHistorySamples(packedLowFeedback[0]);
+			context.Check(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(0.0f, 0.0f) == 0u &&
+				lowCapacity > 0.0f && lowCapacity < TemporalHistoryInitialAccumulation &&
+				NearlyEqual(lowCapacity / (lowCapacity + 1.0f), packedLowFeedback[0]) &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, lowCapacity, 0.25f) ==
+					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, 0.0f, 0.25f) ==
+					TemporalHistoryInitialAccumulation,
+				"Packed zero and low feedback retain zero or fractional usable capacity without invalidating stored history alpha");
 
 			// After a stretch of half-confidence frames the age keeps counting, so the next
 			// confident frame returns to the ceiling weight; the effective samples have

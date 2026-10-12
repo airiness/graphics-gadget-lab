@@ -949,6 +949,9 @@
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryAccumulationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryClipContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>

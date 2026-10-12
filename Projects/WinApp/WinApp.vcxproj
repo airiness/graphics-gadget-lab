@@ -507,6 +507,7 @@
     <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryAccumulationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryClipContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalViewLayoutContractCompile.hlsl" />

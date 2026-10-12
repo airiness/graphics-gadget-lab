@@ -3000,6 +3000,20 @@ namespace gglab
 			};
 			checkShaderNumericContracts(L"Tests/TemporalHistoryClipContractCompile.hlsl", temporalHistoryClipCases);
 
+			// Accumulation helpers retain isfinite guards in optimized DXIL. Compile
+			// both stages here; temporal-accumulation-gpu executes their numeric probes.
+			desc.m_SourcePath = L"Tests/TemporalHistoryAccumulationContractCompile.hlsl";
+			for (const ShaderStage stage : { ShaderStage::Vertex, ShaderStage::Pixel })
+			{
+				desc.m_Stage = stage;
+				desc.m_Entry = stage == ShaderStage::Vertex ? L"VSMain" : L"PSMain";
+				desc.m_Target = MakeDX12CompileTarget(stage);
+				context.Check(compiler.Compile(desc).IsSuccess(), "Temporal accumulation GPU probe compiles to DXIL");
+				desc.m_Target = MakeVulkan13CompileTarget(stage);
+				context.Check(compiler.Compile(desc).IsSuccess(), "Temporal accumulation GPU probe compiles to SPIR-V");
+			}
+			desc.m_Stage = ShaderStage::Pixel;
+
 			const std::array materialShadingCases{
 				ShaderNumericContractCase{ L"TestMaterialDirectionalEnergy", "prepared base retains GGX energy and diffuse partition" },
 				ShaderNumericContractCase{ L"TestMetalSuppressesDiffuseIBL", "metal endpoint suppresses diffuse IBL" },

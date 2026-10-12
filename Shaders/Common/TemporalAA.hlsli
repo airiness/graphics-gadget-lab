@@ -105,12 +105,17 @@ float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryA
 		: TAA_HISTORY_INITIAL_ACCUMULATION;
 }
 
-// Sample bound of effective-sample accumulation: the count whose weight N / (N + 1)
-// equals the feedback ceiling.
+// Usable history capacity whose unit-current-sample weight N / (N + 1) equals
+// feedback. It can be below one or zero, independently of the history alpha's
+// validity floor. Applying that storage floor here would retain history at zero feedback.
 float ResolveTemporalAAMaxHistorySamples(float maxHistoryFeedback)
 {
+	if (!isfinite(maxHistoryFeedback))
+	{
+		return 0.0;
+	}
 	const float feedback = clamp(maxHistoryFeedback, 0.0, 65534.0 / 65535.0);
-	return clamp(feedback / (1.0 - feedback), TAA_HISTORY_INITIAL_ACCUMULATION,
+	return clamp(feedback / (1.0 - feedback), 0.0,
 		TAA_HISTORY_MAX_ACCUMULATION);
 }
 
@@ -126,8 +131,11 @@ float ResolveTemporalHistoryNextSamples(bool historyAccepted, float previousSamp
 	{
 		return TAA_HISTORY_INITIAL_ACCUMULATION;
 	}
+	// Storage remains valid from one; mixing separately caps usable samples by
+	// maxSamples, including fractional/zero capacity. Keep clamp's bounds ordered.
 	return clamp(saturate(historyConfidence) * min(previousSamples, maxSamples) +
-		currentSampleWeight, TAA_HISTORY_INITIAL_ACCUMULATION, maxSamples);
+		currentSampleWeight, TAA_HISTORY_INITIAL_ACCUMULATION,
+		max(maxSamples, TAA_HISTORY_INITIAL_ACCUMULATION));
 }
 
 // How static history is below the display extent: one at rest, zero from

@@ -128,6 +128,12 @@ namespace gglab
 			ImGui::SliderFloat("Max History Feedback",
 				&settings.m_MaxHistoryFeedback, 0.0f,
 				TemporalAAMaxHistoryFeedbackCeiling, "%.3f");
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Zero disables history mixing. At Native this caps the history weight.\n"
+					"Quality effective samples use it to bound usable history capacity;\n"
+					"a current sample with less kernel weight can give history a larger blend weight.");
+			}
 			ImGui::DragFloat("Depth Absolute Threshold", &settings.m_DepthAbsoluteThreshold,
 				0.001f, 0.0f, TemporalAAMaxDepthThreshold, "%.4f");
 			ImGui::DragFloat("Depth Relative Threshold", &settings.m_DepthRelativeThreshold,

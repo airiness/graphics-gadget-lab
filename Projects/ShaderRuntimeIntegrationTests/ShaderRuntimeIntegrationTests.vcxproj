@@ -91,11 +91,13 @@
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\ShaderRuntimeIntegrationTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\TemporalAccumulationNumericSelfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\BrdfLutNumericSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.h" />
+    <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\TemporalAccumulationNumericSelfTests.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
