@@ -287,12 +287,29 @@ is rejected rather than clamped. Unset settings keep the
 content's values, and sidecars record the effective settings in `temporal`.
 A reference takes no overrides.
 
-`-GpuTiming` keeps GPU profiling enabled while the sequence runs and records
-the GPU time of every profiled scope, such as `PostProcess.TemporalAA`, for
-each sequence frame. Profiles trail submission by the frames in flight, so the
-first few frames are skipped. The sequence status reports, for the frame and
-each scope, the sample count and the mean, median, 90th percentile, minimum
-and maximum in milliseconds:
+`-GpuTiming` binds completed profiles to the RenderFrame serial of each
+successfully submitted sequence render. It includes frame zero, camera cuts
+and every reference sample; there is no latency-based warmup skip. Ordinary
+frames before or after the sequence, aborted renders, unbound profiles and
+duplicate publications do not contribute. The sequence status reports, for
+the whole frame and each scope such as `PostProcess.TemporalAA`, the sample
+count and the mean, median, 90th percentile, minimum and maximum in milliseconds:
+
+After the last sequence render, `finishing` waits for both capture writes and
+all pending profiles. Ordinary runtime frames continue to publish delayed GPU
+results, and profiling is restored to its previous state once timing collection
+ends. A missing profile fails the sequence after 64 later successful runtime
+submissions; polling, deferred frames and aborted renders do not consume this
+budget. Unavailable/disabled profiling or a bound profile with invalid durations
+also fails explicitly. Failed or cancelled sequences retain their collected
+partial statistics, which must not be treated as a complete run.
+
+The JSON response shape is unchanged. For a completed timed sequence,
+`gpuTiming.frames` equals `frameCount` multiplied by `max(1, referenceSamples)`;
+an individual scope counts only renders that recorded it. Earlier timing results
+skipped initial profiles and could omit the tail, so account for the different
+sample population when comparing them. This sequence policy is separate from
+the Temporal AA Lab's jitter-cycle warmup and 120-sample timing window.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `

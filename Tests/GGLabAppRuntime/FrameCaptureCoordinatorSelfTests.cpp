@@ -1227,7 +1227,7 @@ namespace gglab
 				if (submit)
 				{
 					m_Capture.OnFrameSubmitted();
-					m_Sequence.OnFrameSubmitted();
+					m_Sequence.OnFrameSubmitted(m_RenderSerial);
 				}
 				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
 				{
@@ -1826,43 +1826,234 @@ namespace gglab
 					"Every sequence frame carries the requested GTAO overrides, resolved to the "
 					"settings' ranges");
 			}
+		}
+
+		GpuProfileFrameSnapshot MakeSequenceGpuProfile(uint64_t renderSerial) noexcept
+		{
+			return { .m_FrameIndex = renderSerial + 1000, .m_RenderFrameSerial = renderSerial,
+				.m_FrameMilliseconds = static_cast<double>(renderSerial),
+				.m_Samples = { { "PostProcess.TemporalAA", 0.5, 1 } } };
+		}
+
+		void RunFrameSequenceGpuTimingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-sequence-gpu-timing");
+			for (uint32_t delay : { 0u, 1u, 3u, 7u })
 			{
 				SequenceHarness harness(directory.GetPath());
-				harness.m_Paths.front().m_Keys.back().m_Frame = 20;
+				harness.m_Paths.front().m_Keys.back().m_Frame = 8;
 				std::string error;
 				GGLAB_UNUSED(harness.m_Sequence.Start(
 					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
-				const bool wantedWhileWaiting = harness.m_Sequence.WantsGpuTiming();
-				harness.Frame();
-				// Render k of the sequence is profiler frame 100 + k; its profile completes two
-				// frames later, so the first two profiles seen while running precede the
-				// sequence. Each profile is also reported twice.
-				uint64_t profilerFrame = 100;
-				while (harness.m_Sequence.IsActive())
+				harness.Frame(); // A ready ordinary frame before sequence frame zero.
+				const uint64_t firstSerial = harness.m_RenderSerial + 1;
+				bool sawFinishing = false;
+				for (uint32_t step = 0; harness.m_Sequence.IsActive() && step < 32; ++step)
 				{
 					harness.Frame();
-					++profilerFrame;
-					const uint64_t completed = profilerFrame - 2;
-					const GpuProfileFrameSnapshot profile{
-						.m_FrameIndex = completed,
-						.m_FrameMilliseconds = static_cast<double>(completed),
-						.m_Samples = { { .m_Name = "PostProcess.TemporalAA",
-							.m_Milliseconds = 0.5, .m_CallCount = 1 } },
-					};
-					harness.m_Sequence.OnGpuProfile(profile);
-					harness.m_Sequence.OnGpuProfile(profile);
+					sawFinishing |= harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing;
+					const auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial > delay
+						? harness.m_RenderSerial - delay : 0);
+					harness.m_Sequence.UpdateGpuTiming(profile, true);
+					harness.m_Sequence.UpdateGpuTiming(profile, true);
 				}
-				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
-				const FrameSequenceGpuTiming* timing =
-					status.m_GpuTiming ? &*status.m_GpuTiming : nullptr;
-				context.Check(wantedWhileWaiting && !harness.m_Sequence.WantsGpuTiming() &&
-					timing && timing->m_FrameMilliseconds.size() == 16 &&
-					timing->m_FrameMilliseconds.front() == 103.0 &&
-					timing->m_FrameMilliseconds.back() == 118.0 &&
-					timing->m_Scopes.size() == 1 &&
-					timing->m_Scopes[0].m_Name == "PostProcess.TemporalAA" &&
-					timing->m_Scopes[0].m_Milliseconds.size() == 16,
-					"Sequence GPU timing records each profiled sequence frame once after warm-up");
+				const auto& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Completed && sawFinishing &&
+					status.m_SubmittedFrames == 9 && status.m_GpuTiming->m_FrameMilliseconds.size() == 9 &&
+					status.m_GpuTiming->m_FrameMilliseconds.front() == static_cast<double>(firstSerial) &&
+					status.m_GpuTiming->m_FrameMilliseconds.back() == static_cast<double>(firstSerial + 8) &&
+					status.m_GpuTiming->m_Scopes.front().m_Milliseconds.size() == 9,
+					std::format("Serial membership includes every sequence frame and its delayed tail (delay {})", delay));
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.Frame();
+				const uint64_t first = harness.m_RenderSerial;
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first + 1), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first - 1), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(0), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"Future, stale and unbound profiles are excluded even with valid profiler counters");
+				harness.Frame(false);
+				const uint64_t aborted = harness.m_RenderSerial;
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(aborted), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"A begun but unsubmitted render never becomes eligible for sequence GPU timing");
+				harness.Frame();
+				const uint64_t last = harness.m_RenderSerial;
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
+					harness.m_Sequence.WantsGpuTiming(),
+					"A short sequence keeps profiling enabled while its tail is pending");
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 2,
+					"Distinct bound profiles can complete out of publication order without counting duplicates");
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"A consecutive sequence rejects a retained profile from the preceding sequence");
+				context.Check(harness.m_Sequence.Cancel() && !harness.m_Sequence.WantsGpuTiming(),
+					"Cancellation releases pending timing work and profiling ownership");
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"A cancelled sequence cannot be revived by a late GPU profile");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_ReferenceSamples = 3, .m_GpuTiming = true }, error));
+				harness.Frame();
+				for (uint32_t sample = 0; sample < 6; ++sample)
+				{
+					harness.Frame();
+					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial - 1), true);
+				}
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
+					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 2 &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 5,
+					"Reference timing counts submitted samples independently of sequence frames");
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 6,
+					"The last reference sample is drained before sequence completion");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_CaptureFrames = { 1 }, .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.Frame();
+				const uint64_t first = harness.m_RenderSerial;
+				harness.m_Control.m_Availability = FrameCaptureAvailability::Busy;
+				for (uint32_t poll = 0; poll < 100; ++poll)
+				{
+					harness.Frame();
+					harness.m_Sequence.UpdateGpuTiming({}, true);
+				}
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
+				context.Check(harness.m_Deferred && harness.m_RenderSerial == first &&
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Running &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 1,
+					"Deferred frames can collect published profiles without consuming the submission budget");
+				harness.m_Control.m_Availability = FrameCaptureAvailability::Available;
+				harness.Frame();
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 2,
+					"Resuming a deferred capture preserves both sequence timing samples");
+			}
+			for (bool completeCaptureFirst : { false, true })
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				harness.m_AutoComplete = false;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_CaptureFrames = { 1 }, .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.Frame();
+				const uint64_t first = harness.m_RenderSerial;
+				harness.Frame();
+				const uint64_t last = harness.m_RenderSerial;
+				const auto completeCapture = [&]()
+					{
+						harness.m_Control.Complete(harness.m_Control.m_Issued.front().m_Id);
+						harness.m_Capture.Update();
+						harness.m_Sequence.OnCaptureResults(Consume(harness.m_Capture));
+					};
+				if (completeCaptureFirst) completeCapture();
+				else
+				{
+					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
+					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+					context.Check(!harness.m_Sequence.WantsGpuTiming(),
+						"Finished GPU collection releases profiling while capture writing is still pending");
+				}
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+					"Sequence completion waits for both capture writing and all bound GPU profiles");
+				if (completeCaptureFirst)
+				{
+					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
+					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				}
+				else completeCapture();
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed,
+					"Capture/profile completion is independent of which owner finishes first");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.m_Sequence.UpdateGpuTiming({}, false);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					harness.m_Sequence.GetStatus()->m_Failure.find("unavailable or disabled") != std::string::npos,
+					"Unavailable profiling fails a timing request explicitly instead of completing with zero samples");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.Frame();
+				const uint64_t missing = harness.m_RenderSerial;
+				harness.Frame();
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
+				for (uint32_t poll = 0; poll < 100; ++poll) harness.m_Sequence.UpdateGpuTiming({}, true);
+				for (uint32_t abort = 0; abort < 10; ++abort) harness.Frame(false);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+					"Polling and aborted work do not consume the successful-submission drain budget");
+				for (uint32_t drain = 1; drain + 1 < FrameSequenceCoordinator::MaxPendingGpuTimingSubmissions; ++drain)
+				{
+					harness.Frame();
+					harness.m_Sequence.UpdateGpuTiming({}, true);
+				}
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+					"The drain budget allows the last submission before its explicit failure boundary");
+				harness.Frame();
+				harness.m_Sequence.UpdateGpuTiming({}, true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					harness.m_Sequence.GetStatus()->m_Failure.find(std::format("RenderFrame {}", missing)) != std::string::npos &&
+					harness.m_Sequence.GetStatus()->m_Failure.find("sequence frame 0, reference sample 0") != std::string::npos &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 1,
+					"Missing tail profiles fail within a bounded number of successful submissions with their exact identity");
+			}
+			for (bool invalidScope : { false, true })
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.Frame();
+				auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial);
+				if (invalidScope) profile.m_Samples.front().m_Milliseconds = -1.0;
+				else profile.m_FrameMilliseconds = std::numeric_limits<double>::quiet_NaN();
+				harness.m_Sequence.UpdateGpuTiming(profile, true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"Invalid frame/scope timings fail atomically without contaminating the summary");
 			}
 		}
 
@@ -1986,6 +2177,7 @@ namespace gglab
 		RunFrameResultIdentityTests(context);
 		RunReferenceSequenceTests(context);
 		RunFrameSequenceEvaluationTests(context);
+		RunFrameSequenceGpuTimingTests(context);
 		RunFrameSequenceContinuityTests(context);
 		RunFrameSequenceFailureTests(context);
 	}

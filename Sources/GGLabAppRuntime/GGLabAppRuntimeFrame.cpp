@@ -369,9 +369,13 @@ namespace gglab
 
 		m_FrameCapture->Update();
 		CollectFrameCaptureResults();
+		SyncSequenceGpuProfiling();
+		CollectSequenceGpuTiming();
 		const AppRuntimeTickResult result = TickFrame(tickInfo);
 		// Also route synchronous failures from planning, including early exits.
 		CollectFrameCaptureResults();
+		CollectSequenceGpuTiming();
+		SyncSequenceGpuProfiling();
 		return result;
 	}
 
@@ -387,7 +391,6 @@ namespace gglab
 		}
 
 		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
-		SyncSequenceGpuProfiling();
 
 		if (m_FrameSequence->ShouldHoldTime() || m_FrameCapture->ShouldHoldTime())
 		{
@@ -749,14 +752,7 @@ namespace gglab
 			return FailRuntime("The render host failed to complete frame submission.");
 		}
 		m_FrameCapture->OnFrameSubmitted();
-		m_FrameSequence->OnFrameSubmitted();
-		if (m_FrameSequence->WantsGpuTiming())
-		{
-			if (const GpuProfilingViewBase* gpuProfiling = m_RenderHost->GetGpuProfilingView())
-			{
-				m_FrameSequence->OnGpuProfile(gpuProfiling->GetLatestFrame());
-			}
-		}
+		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial);
 
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
@@ -773,6 +769,17 @@ namespace gglab
 		// Pipelines without an overlay pass still complete the optional tooling frame.
 		toolingFrame.Complete();
 		return AppRuntimeTickResult::Continue;
+	}
+
+	void GGLabAppRuntime::CollectSequenceGpuTiming() noexcept
+	{
+		if (m_FrameSequence->WantsGpuTiming())
+		{
+			const GpuProfilingViewBase* view = m_RenderHost->GetGpuProfilingView();
+			const bool enabled = view && view->IsEnabled();
+			m_FrameSequence->UpdateGpuTiming(
+				enabled ? view->GetLatestFrame() : GpuProfileFrameSnapshot{}, enabled);
+		}
 	}
 
 	void GGLabAppRuntime::SyncSequenceGpuProfiling() noexcept

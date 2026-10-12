@@ -113,7 +113,8 @@ namespace gglab
 
 	struct FrameSequenceGpuTiming
 	{
-		// Whole-frame GPU time of each timed frame.
+		// Whole-frame GPU time of every submitted sequence render, including each
+		// reference sample. Includes cold/cut frames; no latency-based warmup skip.
 		std::vector<double> m_FrameMilliseconds;
 		// Scopes in first-recorded order.
 		std::vector<FrameSequenceGpuTimingSeries> m_Scopes;
@@ -138,7 +139,7 @@ namespace gglab
 		// Waiting for ready content before frame 0.
 		Waiting,
 		Running,
-		// Every frame was submitted; captures are still being written.
+		// Every frame was submitted; captures and/or GPU profiles are still pending.
 		Finishing,
 		Completed,
 		Failed,
@@ -236,21 +237,28 @@ namespace gglab
 		// BeginFrame: checks readiness and temporal continuity, then submits this
 		// frame's capture when requested.
 		void BeginFrame(const FrameCaptureFrameState& state) noexcept;
-		// Called after the frame passed to BeginFrame was submitted.
-		void OnFrameSubmitted() noexcept;
-		// Called after each submitted frame with the latest completed GPU profile.
-		// Completed profiles trail submission by the frames in flight, so a running
-		// sequence consumes the profiles reported through its first
-		// GpuTimingWarmupFrames submitted frames without recording them; every newer
-		// profile then belongs to a sequence frame. Each profiler frame is recorded once.
-		void OnGpuProfile(const GpuProfileFrameSnapshot& profile) noexcept;
+		// Called for every successful runtime submission, including ordinary frames
+		// that publish remaining profiles while the sequence is Finishing.
+		void OnFrameSubmitted(uint64_t renderFrameSerial) noexcept;
+		// Polled independently of sequence posing and host status queries. Only a
+		// profile bound to a pending successful sequence submission is accepted.
+		void UpdateGpuTiming(const GpuProfileFrameSnapshot& profile, bool profilingEnabled) noexcept;
 
-		// Exceeds the frames in flight of every backend.
-		static constexpr uint32_t GpuTimingWarmupFrames = 4;
+		// Liveness budget, not a frames-in-flight assumption or warmup policy.
+		// Deferred/aborted frames consume no budget. Missing results fail explicitly.
+		static constexpr uint32_t MaxPendingGpuTimingSubmissions = 64;
 		// Counts finished captures of the sequence; a failed capture fails it.
 		void OnCaptureResults(std::span<const FrameCaptureRequestResult> results) noexcept;
 
 	private:
+		struct PendingGpuTimingFrame
+		{
+			uint64_t m_RenderFrameSerial = 0;
+			uint64_t m_SubmissionOrdinal = 0;
+			uint32_t m_SequenceFrame = 0;
+			uint32_t m_ReferenceSample = 0;
+		};
+
 		void Fail(std::string failure) noexcept;
 		void CompleteIfFinished() noexcept;
 		// The posed frame is a requested frame, at its last reference sample, and has
@@ -268,10 +276,11 @@ namespace gglab
 		uint32_t m_Sample = 0;
 		std::optional<CameraPathPose> m_AppliedPose;
 		bool m_FrameBegun = false;
+		uint64_t m_BegunRenderFrameSerial = 0;
 		std::optional<uint32_t> m_CapturedFrame;
 		std::optional<FrameCaptureSettleKey> m_LastSettleKey;
-		// Submitted frames, counting every reference sample.
-		uint32_t m_SubmittedRenders = 0;
-		uint64_t m_LastGpuProfileFrame = 0;
+		std::vector<PendingGpuTimingFrame> m_PendingGpuTimingFrames;
+		uint64_t m_GpuTimingSubmissionCount = 0;
+		uint64_t m_LastTimingSubmissionSerial = 0;
 	};
 }

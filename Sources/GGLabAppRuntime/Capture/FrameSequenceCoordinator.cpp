@@ -230,8 +230,10 @@ namespace gglab
 		m_FrameBegun = false;
 		m_CapturedFrame.reset();
 		m_LastSettleKey.reset();
-		m_SubmittedRenders = 0;
-		m_LastGpuProfileFrame = 0;
+		m_BegunRenderFrameSerial = 0;
+		m_PendingGpuTimingFrames.clear();
+		m_GpuTimingSubmissionCount = 0;
+		m_LastTimingSubmissionSerial = 0;
 		return m_Status->m_SequenceId;
 	}
 
@@ -242,6 +244,8 @@ namespace gglab
 			return false;
 		}
 		m_Status->m_State = FrameSequenceState::Cancelled;
+		m_PendingGpuTimingFrames.clear();
+		m_FrameBegun = false;
 		return true;
 	}
 
@@ -270,7 +274,8 @@ namespace gglab
 
 	bool FrameSequenceCoordinator::WantsGpuTiming() const noexcept
 	{
-		return IsActive() && m_Request.m_GpuTiming;
+		return IsActive() && m_Request.m_GpuTiming &&
+			(m_Status->m_State != FrameSequenceState::Finishing || !m_PendingGpuTimingFrames.empty());
 	}
 
 	bool FrameSequenceCoordinator::IsCaptureDue() const noexcept
@@ -287,6 +292,7 @@ namespace gglab
 	{
 		m_AppliedPose.reset();
 		m_FrameBegun = false;
+		m_BegunRenderFrameSerial = 0;
 		if (!m_Status)
 		{
 			return std::nullopt;
@@ -401,6 +407,11 @@ namespace gglab
 			return;
 		}
 		m_LastSettleKey = state.m_SettleKey;
+		if (WantsGpuTiming() && state.m_FrameSerial == 0)
+		{
+			Fail("GPU timing requires a non-zero RenderFrame serial.");
+			return;
+		}
 
 		if (IsCaptureDue())
 		{
@@ -424,18 +435,39 @@ namespace gglab
 			m_Status->m_CaptureRequestIds.push_back(requestId);
 			m_CapturedFrame = m_Frame;
 		}
+		m_BegunRenderFrameSerial = state.m_FrameSerial;
 		m_FrameBegun = true;
 	}
 
-	void FrameSequenceCoordinator::OnFrameSubmitted() noexcept
+	void FrameSequenceCoordinator::OnFrameSubmitted(uint64_t renderFrameSerial) noexcept
 	{
+		if (WantsGpuTiming())
+		{
+			if (renderFrameSerial == 0 || renderFrameSerial <= m_LastTimingSubmissionSerial)
+			{
+				Fail("GPU timing received an invalid or repeated submitted RenderFrame serial.");
+				return;
+			}
+			m_LastTimingSubmissionSerial = renderFrameSerial;
+			++m_GpuTimingSubmissionCount;
+		}
 		if (!m_FrameBegun || !m_Status || m_Status->m_State != FrameSequenceState::Running)
 		{
 			return;
 		}
 		m_FrameBegun = false;
+		if (renderFrameSerial != m_BegunRenderFrameSerial)
+		{
+			Fail("Sequence submission did not match its begun RenderFrame serial.");
+			return;
+		}
+		if (WantsGpuTiming())
+		{
+			m_PendingGpuTimingFrames.push_back({ .m_RenderFrameSerial = renderFrameSerial,
+				.m_SubmissionOrdinal = m_GpuTimingSubmissionCount,
+				.m_SequenceFrame = m_Frame, .m_ReferenceSample = m_Sample });
+		}
 		m_AppliedPose.reset();
-		++m_SubmittedRenders;
 		if (m_Request.m_ReferenceSamples > 0 && ++m_Sample < m_Request.m_ReferenceSamples)
 		{
 			return;
@@ -450,34 +482,62 @@ namespace gglab
 		}
 	}
 
-	void FrameSequenceCoordinator::OnGpuProfile(const GpuProfileFrameSnapshot& profile) noexcept
+	void FrameSequenceCoordinator::UpdateGpuTiming(
+		const GpuProfileFrameSnapshot& profile, bool profilingEnabled) noexcept
 	{
-		if (!m_Status || m_Status->m_State != FrameSequenceState::Running ||
-			!m_Status->m_GpuTiming || !profile.IsValid() ||
-			profile.m_FrameIndex <= m_LastGpuProfileFrame)
+		if (!WantsGpuTiming())
 		{
 			return;
 		}
-		// Profiles seen during warm-up, including a stale one from before the sequence,
-		// are consumed without being recorded.
-		m_LastGpuProfileFrame = profile.m_FrameIndex;
-		if (m_SubmittedRenders <= GpuTimingWarmupFrames)
+		if (!profilingEnabled)
 		{
+			Fail("GPU profiling is unavailable or disabled while sequence timing is requested.");
 			return;
 		}
 
-		FrameSequenceGpuTiming& timing = *m_Status->m_GpuTiming;
-		timing.m_FrameMilliseconds.push_back(profile.m_FrameMilliseconds);
-		for (const GpuProfileSample& sample : profile.m_Samples)
+		const auto pending = std::ranges::find(m_PendingGpuTimingFrames,
+			profile.m_RenderFrameSerial, &PendingGpuTimingFrame::m_RenderFrameSerial);
+		if (profile.IsValid() && pending != m_PendingGpuTimingFrames.end())
 		{
-			auto series = std::ranges::find(
-				timing.m_Scopes, sample.m_Name, &FrameSequenceGpuTimingSeries::m_Name);
-			if (series == timing.m_Scopes.end())
+			const auto validDuration = [](double milliseconds) noexcept
+				{
+					return std::isfinite(milliseconds) && milliseconds >= 0.0;
+				};
+			if (!validDuration(profile.m_FrameMilliseconds) ||
+				!std::ranges::all_of(profile.m_Samples, [&validDuration](const GpuProfileSample& sample)
+					{ return validDuration(sample.m_Milliseconds); }))
 			{
-				timing.m_Scopes.push_back({ .m_Name = sample.m_Name });
-				series = std::prev(timing.m_Scopes.end());
+				Fail(std::format("Invalid GPU timing for RenderFrame {} (sequence frame {}, reference sample {}).",
+					pending->m_RenderFrameSerial, pending->m_SequenceFrame, pending->m_ReferenceSample));
+				return;
 			}
-			series->m_Milliseconds.push_back(sample.m_Milliseconds);
+			FrameSequenceGpuTiming& timing = *m_Status->m_GpuTiming;
+			timing.m_FrameMilliseconds.push_back(profile.m_FrameMilliseconds);
+			for (const GpuProfileSample& sample : profile.m_Samples)
+			{
+				auto series = std::ranges::find(
+					timing.m_Scopes, sample.m_Name, &FrameSequenceGpuTimingSeries::m_Name);
+				if (series == timing.m_Scopes.end())
+				{
+					timing.m_Scopes.push_back({ .m_Name = sample.m_Name });
+					series = std::prev(timing.m_Scopes.end());
+				}
+				series->m_Milliseconds.push_back(sample.m_Milliseconds);
+			}
+			// Membership, not the unrelated profiler counter or readback delay,
+			// identifies a sample and rejects its subsequent publications.
+			m_PendingGpuTimingFrames.erase(pending);
+			CompleteIfFinished();
+		}
+		if (!m_PendingGpuTimingFrames.empty())
+		{
+			const PendingGpuTimingFrame& oldest = m_PendingGpuTimingFrames.front();
+			if (m_GpuTimingSubmissionCount - oldest.m_SubmissionOrdinal >= MaxPendingGpuTimingSubmissions)
+			{
+				Fail(std::format("Missing GPU timing for RenderFrame {} (sequence frame {}, reference sample {}) "
+					"after {} later successful submissions.", oldest.m_RenderFrameSerial,
+					oldest.m_SequenceFrame, oldest.m_ReferenceSample, MaxPendingGpuTimingSubmissions));
+			}
 		}
 	}
 
@@ -519,12 +579,15 @@ namespace gglab
 		}
 		m_Status->m_State = FrameSequenceState::Failed;
 		m_Status->m_Failure = std::move(failure);
+		m_PendingGpuTimingFrames.clear();
+		m_FrameBegun = false;
 	}
 
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
-			m_Status->m_CompletedCaptures == m_Status->m_CaptureRequestIds.size())
+			m_Status->m_CompletedCaptures == m_Status->m_CaptureRequestIds.size() &&
+			m_PendingGpuTimingFrames.empty())
 		{
 			m_Status->m_State = FrameSequenceState::Completed;
 		}

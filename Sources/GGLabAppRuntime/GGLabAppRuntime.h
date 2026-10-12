@@ -244,6 +244,7 @@ namespace gglab
 		// Keeps GPU profiling enabled while a sequence records GPU timing and restores
 		// the previous request afterwards.
 		void SyncSequenceGpuProfiling() noexcept;
+		void CollectSequenceGpuTiming() noexcept;
 
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
