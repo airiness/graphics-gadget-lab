@@ -85,6 +85,9 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   `scene-depth-linear-view-z` and the
   `gtao-*` taps. A tap whose feature produced nothing in that frame, such as a
   temporal tap with Temporal AA inactive, fails the capture.
+  A frame records one diagnostic tap. Concurrent ordinary requests for the same
+  tap may share that frame; a different tap waits before being issued, so its
+  camera, time and temporal metadata come from the frame that records it.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
   is ready and then for `-SettleFrames` submitted frames of one continuous
   Runtime history and Demo. The transaction supplies the effective session,
@@ -98,7 +101,8 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
   cuts the display camera first. Simulation time holds until settling begins,
   so animated content reaches the capture after exactly the settle frames and
   repeated runs capture the same image however long loading took.
-  `next-frame` captures the next recorded frame, even while loading.
+  `next-frame` captures the next eligible frame, even while loading. A conflicting
+  diagnostic tap can delay an ordinary request before issuance.
 - **Readiness gates.** `shaders`, `content-transition`, `content`, `lab`,
   `environment`, `ibl`, `asset-loads` and `asset-uploads`. A pending gate keeps
   an after-ready capture waiting; `status` shows its detail. Each gate stays
@@ -160,6 +164,15 @@ Requests sharing one frame and tap share one payload. The byte budget covers
 these raw payloads, excluding the encoder's output and working memory. A target
 too large to fit fails explicitly rather than waiting for impossible capacity.
 
+Once issued, a coordinated request is restricted to that render frame's serial.
+If the frame aborts, fails submission or does not record the requested source,
+the request fails explicitly; submit it again to retry with new frame metadata.
+A successful Runtime result must match the issued serial, source and diagnostic
+tap before encoding. Metadata is never repaired by changing only its serial to
+that of a later image. The lower-level Runtime control still supports flexible
+requests with serial zero, which can retry after abort; coordinated captures use
+non-zero serials to preserve their image/metadata identity.
+
 The PNG and JSON sidecar are each written completely to temporary `.partial`
 files before publication. They are published separately, so either file may
 appear before the pair is complete. When the process shuts down it waits for
@@ -209,6 +222,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
   reference sample. Result polling retires completed GPU work while the writer
   drains, so progress does not depend on rendering another frame. An unsupported
   or oversized target fails the sequence instead of deferring forever.
+  If another diagnostic tap occupies an exact requested sequence frame, that
+  capture fails rather than silently substituting a later path frame. An issued
+  capture on an aborted frame also fails; a frame aborted before any capture was
+  issued remains eligible for the normal pose replay.
 - `sequence` waits until the sequence and its captures finish unless `-NoWait`;
   `status` reports the active or last sequence, and `sequence-cancel` stops it.
   One sequence runs at a time; avoid submitting capture views while it runs.

@@ -368,6 +368,8 @@ namespace gglab
 
 		if (!m_IsShuttingDown)
 		{
+			std::optional<PostProcessDebugTap> diagnosticTap =
+				m_Capture ? m_Capture->GetPendingDiagnosticTap() : std::nullopt;
 			const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
 			for (Entry& entry : m_Entries)
 			{
@@ -386,7 +388,23 @@ namespace gglab
 				}
 				else if (IsDue(entry, state))
 				{
+					const FrameCaptureRequest& request = entry.m_Request;
+					if (request.m_Source == FrameCaptureSource::Diagnostic && request.m_DiagnosticTap &&
+						!GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty() &&
+						diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+					{
+						if (request.m_Sequence)
+						{
+							Finish(entry, FrameCaptureRequestStatus::Failed,
+								"A different diagnostic tap occupies the requested sequence frame.");
+						}
+						continue;
+					}
 					Issue(entry, state);
+					if (entry.m_Phase == Phase::Issued && request.m_Source == FrameCaptureSource::Diagnostic)
+					{
+						diagnosticTap = request.m_DiagnosticTap;
+					}
 				}
 			}
 		}
@@ -574,6 +592,18 @@ namespace gglab
 			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture is unavailable.");
 			return;
 		}
+		if (state.m_FrameSerial == 0)
+		{
+			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture requires a live render frame serial.");
+			return;
+		}
+		const FrameCaptureRequest& request = entry.m_Request;
+		if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
+			GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+		{
+			Finish(entry, FrameCaptureRequestStatus::Failed, "A diagnostic capture requires a supported diagnostic tap.");
+			return;
+		}
 		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Request.m_Source, state);
 		if (availability != FrameCaptureAvailability::Available)
 		{
@@ -590,7 +620,6 @@ namespace gglab
 			return;
 		}
 
-		const FrameCaptureRequest& request = entry.m_Request;
 		FrameCaptureMetadata& metadata = entry.m_Metadata;
 		metadata.m_RequestId = entry.m_Id;
 		metadata.m_Label = request.m_Label;
@@ -603,6 +632,7 @@ namespace gglab
 		metadata.m_Backend = state.m_Backend;
 		metadata.m_DemoId = state.m_DemoId;
 		metadata.m_LabId = state.m_LabId;
+		metadata.m_FrameSerial = state.m_FrameSerial;
 		metadata.m_FrameIndex = state.m_FrameIndex;
 		metadata.m_Camera = state.m_Camera;
 		metadata.m_Camera.m_ReferenceViewId = request.m_ReferenceViewId;
@@ -621,17 +651,12 @@ namespace gglab
 
 		if (request.m_Source == FrameCaptureSource::Diagnostic)
 		{
-			if (!request.m_DiagnosticTap)
-			{
-				Finish(entry, FrameCaptureRequestStatus::Failed,
-					"A diagnostic capture requires a diagnostic tap.");
-				return;
-			}
-			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(*request.m_DiagnosticTap);
+			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
+				*request.m_DiagnosticTap, state.m_FrameSerial);
 		}
 		else
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
+			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source, state.m_FrameSerial);
 		}
 		if (entry.m_CaptureRequestId == 0)
 		{
@@ -655,12 +680,21 @@ namespace gglab
 			return;
 		}
 
-		entry->m_Metadata.m_FrameSerial = result.m_FrameSerial;
 		if (result.m_Status != FrameCaptureStatus::Completed || !result.m_Image)
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
 				result.m_Failure.empty() ? std::string("The frame capture failed.")
 				: std::move(result.m_Failure));
+			return;
+		}
+		const std::optional<PostProcessDebugTap> expectedTap =
+			entry->m_Request.m_Source == FrameCaptureSource::Diagnostic
+				? entry->m_Request.m_DiagnosticTap : std::nullopt;
+		if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial ||
+			result.m_Source != entry->m_Request.m_Source || result.m_DiagnosticTap != expectedTap)
+		{
+			Finish(*entry, FrameCaptureRequestStatus::Failed,
+				"The capture result does not match its requested render frame, source or diagnostic tap.");
 			return;
 		}
 		StartEncoding(*entry, result);

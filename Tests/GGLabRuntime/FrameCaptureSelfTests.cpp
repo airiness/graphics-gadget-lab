@@ -416,6 +416,89 @@ namespace gglab
 			service.Shutdown();
 		}
 
+		void RunFrameBindingTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			FrameCaptureService service(device);
+			const RHITextureDesc target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			const auto weight = PostProcessDebugTap::TemporalHistoryWeight;
+			const auto rejection = PostProcessDebugTap::TemporalRejection;
+			const uint64_t sceneA = service.RequestCapture(FrameCaptureSource::Scene, 100);
+			const uint64_t sceneB = service.RequestCapture(FrameCaptureSource::Scene, 100);
+			const uint64_t weightA = service.RequestDiagnosticCapture(weight, 100);
+			const uint64_t rejected = service.RequestDiagnosticCapture(rejection, 100);
+			const uint64_t weightB = service.RequestDiagnosticCapture(weight, 100);
+			context.Check(!service.BindTap(99, FrameCaptureSource::Scene, target) &&
+				device.GetLiveBufferCount() == 0,
+				"A frame-restricted request cannot allocate or bind in another frame");
+			const auto sceneTap = service.BindTap(100, FrameCaptureSource::Scene, target);
+			const auto diagnosticTap = service.BindTap(100, FrameCaptureSource::Diagnostic, target);
+			if (sceneTap) device.FillReadback(sceneTap->m_Buffer, sceneTap->m_Footprint);
+			if (diagnosticTap) device.FillReadback(diagnosticTap->m_Buffer, diagnosticTap->m_Footprint);
+			service.OnFrameSubmitted(100, MakeFence(1));
+			const auto missed = Consume(service);
+			context.Check(sceneTap && diagnosticTap && missed.size() == 1 &&
+				missed[0].m_RequestId == rejected && missed[0].m_Status == FrameCaptureStatus::Failed &&
+				missed[0].m_DiagnosticTap == rejection && !service.GetPendingDiagnosticTap() &&
+				service.GetUnfinishedRequestCount() == 4,
+				"A conflicting frame-restricted tap fails at submission rather than moving to another frame");
+			context.Check(device.GetLiveBufferCount() == 2 && Consume(service).empty(),
+				"Frame identity does not bypass the GPU completion fence");
+			device.m_CompletedFenceValue = 1;
+			const auto completed = Consume(service);
+			const auto find = [&](uint64_t id)
+				{
+					return std::ranges::find(completed, id, &FrameCaptureResult::m_RequestId);
+				};
+			const auto a = find(sceneA), b = find(sceneB), c = find(weightA), d = find(weightB);
+			context.Check(completed.size() == 4 && a != completed.end() && b != completed.end() &&
+				c != completed.end() && d != completed.end() && a->m_Image == b->m_Image &&
+				c->m_Image == d->m_Image && a->m_Image != c->m_Image && !a->m_DiagnosticTap &&
+				c->m_DiagnosticTap == weight && a->m_FrameSerial == 100 && c->m_FrameSerial == 100,
+				"Scene and diagnostic taps share images only within their actual frame and source");
+
+			const uint64_t boundAbort = service.RequestDiagnosticCapture(weight, 101);
+			const uint64_t flexible = service.RequestDiagnosticCapture(weight);
+			const uint64_t queuedAbort = service.RequestCapture(FrameCaptureSource::Scene, 101);
+			const auto abortedTap = service.BindTap(101, FrameCaptureSource::Diagnostic, target);
+			service.OnFrameAborted(101);
+			const auto aborted = Consume(service);
+			context.Check(abortedTap && aborted.size() == 2 &&
+				std::ranges::any_of(aborted, [&](const auto& r) { return r.m_RequestId == boundAbort; }) &&
+				std::ranges::any_of(aborted, [&](const auto& r) { return r.m_RequestId == queuedAbort; }) &&
+				service.GetUnfinishedRequestCount() == 1 &&
+				!device.IsAlive(abortedTap->m_Buffer),
+				"Abort fails both bound and unbound frame-restricted requests and requeues only flexible requests");
+			const uint64_t retry = service.RequestDiagnosticCapture(weight, 102);
+			const auto retryTap = service.BindTap(102, FrameCaptureSource::Diagnostic, target);
+			if (retryTap) device.FillReadback(retryTap->m_Buffer, retryTap->m_Footprint);
+			service.OnFrameSubmitted(102, MakeFence(2));
+			device.m_CompletedFenceValue = 2;
+			const auto retried = Consume(service);
+			context.Check(retried.size() == 2 && retried[0].m_RequestId == flexible &&
+				retried[1].m_RequestId == retry && retried[0].m_FrameSerial == 102 &&
+				retried[1].m_FrameSerial == 102 && retried[0].m_DiagnosticTap == weight,
+				"An explicit retry has a new frame identity; flexible requests keep their original queue order");
+
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene, 103));
+			GGLAB_UNUSED(service.RequestDiagnosticCapture(weight, 103));
+			GGLAB_UNUSED(service.BindTap(103, FrameCaptureSource::Scene, target));
+			service.OnFrameSubmissionFailed(103);
+			const auto submissionFailed = Consume(service);
+			context.Check(submissionFailed.size() == 2 && device.GetLiveBufferCount() == 0 &&
+				service.GetUnfinishedRequestCount() == 0 &&
+				std::ranges::all_of(submissionFailed, [](const auto& r) {
+					return r.m_Status == FrameCaptureStatus::Failed && !r.m_Image;
+				}), "Submission failure closes bound and unbound frame-restricted requests");
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Composited, 104));
+			service.OnFrameSubmitted(104, MakeFence(3));
+			context.Check(Consume(service).size() == 1 &&
+				!service.BindTap(105, FrameCaptureSource::Composited, target),
+				"A frame without its source cannot leave a restricted capture pending for a later frame");
+			service.Shutdown();
+			context.Check(Consume(service).empty(), "Frame-restricted results are published exactly once");
+		}
+
 		void RunFrameEndTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -618,6 +701,7 @@ namespace gglab
 		RunConversionTests(context);
 		RunCompletionTests(context);
 		RunDiagnosticTests(context);
+		RunFrameBindingTests(context);
 		RunFrameEndTests(context);
 		RunCapacityTests(context);
 	}

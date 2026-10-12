@@ -30,7 +30,8 @@ namespace gglab
 		// readback target that the frame's tap pass must fill. Returns nullopt when
 		// nothing is queued; requests that the display target or payload budget cannot satisfy
 		// finish as Failed instead of being bound. A Diagnostic tap binds only the
-		// requests for the pending diagnostic tap.
+		// requests for the pending diagnostic tap. Frame-restricted requests bind
+		// only to their named frame.
 		[[nodiscard]] virtual std::optional<FrameCaptureTapTarget> BindTap(uint64_t frameSerial,
 			FrameCaptureSource source, const RHITextureDesc& displayTargetDesc) noexcept = 0;
 		// Tap of the oldest queued Diagnostic request; a frame records one tap.

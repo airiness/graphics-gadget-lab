@@ -48,25 +48,27 @@ namespace gglab
 			{
 				uint64_t m_Id = 0;
 				FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+				uint64_t m_FrameSerial = 0;
 				std::optional<PostProcessDebugTap> m_DiagnosticTap;
 			};
 
-			uint64_t RequestCapture(FrameCaptureSource source) noexcept override
+			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial = 0) noexcept override
 			{
 				if (m_RejectRequest)
 				{
 					return 0;
 				}
-				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source });
+				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source, .m_FrameSerial = frameSerial });
 				return m_NextId++;
 			}
-			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override
+			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap, uint64_t frameSerial = 0) noexcept override
 			{
 				if (m_RejectRequest)
 				{
 					return 0;
 				}
 				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = FrameCaptureSource::Diagnostic,
+					.m_FrameSerial = frameSerial,
 					.m_DiagnosticTap = tap });
 				return m_NextId++;
 			}
@@ -77,6 +79,10 @@ namespace gglab
 				m_Results.clear();
 			}
 			uint32_t GetUnfinishedRequestCount() const noexcept override { return 0; }
+			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override
+			{
+				return m_PendingDiagnosticTap;
+			}
 			FrameCaptureAvailability GetAvailability(RHIFormat format, uint32_t width,
 				uint32_t height) const noexcept override
 			{
@@ -85,8 +91,10 @@ namespace gglab
 				return m_Availability;
 			}
 
-			void Complete(uint64_t id, uint64_t frameSerial) noexcept
+			void Complete(uint64_t id, std::optional<uint64_t> frameSerial = std::nullopt) noexcept
 			{
+				const auto issued = std::ranges::find(m_Issued, id, &Issued::m_Id);
+				if (issued == m_Issued.end()) return;
 				auto image = std::make_shared<FrameCaptureImage>();
 				image->m_Format = RHIFormat::B8G8R8A8Unorm;
 				image->m_Width = 2;
@@ -94,8 +102,10 @@ namespace gglab
 				image->m_Pixels = { 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 10, 20, 30, 0 };
 				m_Results.push_back({
 					.m_RequestId = id,
+					.m_Source = issued->m_Source,
 					.m_Status = FrameCaptureStatus::Completed,
-					.m_FrameSerial = frameSerial,
+					.m_FrameSerial = frameSerial.value_or(issued->m_FrameSerial),
+					.m_DiagnosticTap = issued->m_DiagnosticTap,
 					.m_Image = std::move(image),
 					});
 			}
@@ -109,6 +119,7 @@ namespace gglab
 			}
 
 			std::vector<Issued> m_Issued;
+			std::optional<PostProcessDebugTap> m_PendingDiagnosticTap;
 			FrameCaptureAvailability m_Availability = FrameCaptureAvailability::Available;
 			bool m_RejectRequest = false;
 			mutable RHIFormat m_QueriedFormat = RHIFormat::Unknown;
@@ -159,6 +170,7 @@ namespace gglab
 					.m_Services = TemporalService::FrameContinuity | TemporalService::ColorDepthHistory,
 					.m_HasCompatiblePreviousHistory = true } },
 				.m_DisplayFormat = RHIFormat::B8G8R8A8Unorm,
+				.m_FrameSerial = 17,
 				.m_FrameIndex = 42,
 				.m_Camera = { .m_Name = "Main", .m_Position = { 1.0f, 2.0f, 3.0f },
 					.m_VerticalFovDegrees = 60.0f },
@@ -247,7 +259,7 @@ namespace gglab
 				return;
 			}
 
-			control.Complete(control.m_Issued[0].m_Id, 17);
+			control.Complete(control.m_Issued[0].m_Id);
 			coordinator.Update();
 			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
 			const bool completed = results.size() == 1 && results[0].m_RequestId == id &&
@@ -328,7 +340,7 @@ namespace gglab
 			{
 				return;
 			}
-			control.Complete(control.m_Issued[0].m_Id, 9);
+			control.Complete(control.m_Issued[0].m_Id);
 			coordinator.Update();
 			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
 			context.Check(results.size() == 1 && results[0].m_RequestId == id &&
@@ -395,7 +407,7 @@ namespace gglab
 				{
 					continue;
 				}
-				control.Complete(control.m_Issued.front().m_Id, 9);
+				control.Complete(control.m_Issued.front().m_Id);
 				coordinator.Update();
 				const auto results = Consume(coordinator);
 				context.Check(results.size() == 1 && results.front().m_Metadata &&
@@ -537,8 +549,8 @@ namespace gglab
 			context.Check(secondChange && secondChange->m_RequestId == viewB,
 				"The next view applies only after the previous view capture was issued");
 			coordinator.OnReferenceViewApplied(viewB, false);
-			control.Complete(control.m_Issued[0].m_Id, 1);
-			control.Complete(control.m_Issued[1].m_Id, 3);
+			control.Complete(control.m_Issued[0].m_Id);
+			control.Complete(control.m_Issued[1].m_Id);
 			coordinator.Update();
 			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
 			const auto find = [&](uint64_t id) -> const FrameCaptureRequestResult*
@@ -637,7 +649,7 @@ namespace gglab
 				});
 			const uint64_t notEncoded = withoutEncoder.Submit({});
 			withoutEncoder.BeginFrame(MakeFrameState(true));
-			control.Complete(control.m_Issued.back().m_Id, 2);
+			control.Complete(control.m_Issued.back().m_Id);
 			withoutEncoder.Update();
 			const std::vector<FrameCaptureRequestResult> noEncoder = Consume(withoutEncoder);
 			context.Check(noEncoder.size() == 1 && noEncoder[0].m_RequestId == notEncoded &&
@@ -648,7 +660,7 @@ namespace gglab
 
 			const uint64_t noDirectory = coordinator.Submit({});
 			coordinator.BeginFrame(MakeFrameState(true));
-			control.Complete(control.m_Issued.back().m_Id, 3);
+			control.Complete(control.m_Issued.back().m_Id);
 			coordinator.Update();
 			const std::vector<FrameCaptureRequestResult> unwritable = Consume(coordinator);
 			context.Check(unwritable.size() == 1 && unwritable[0].m_RequestId == noDirectory &&
@@ -675,7 +687,7 @@ namespace gglab
 			coordinator.PrepareForShutdown();
 			const uint64_t late = coordinator.Submit({});
 			// The render host finalizes: one capture completed, the other lost.
-			control.Complete(control.m_Issued[0].m_Id, 5);
+			control.Complete(control.m_Issued[0].m_Id);
 			coordinator.FinalizeAfterRenderHost();
 			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
 
@@ -736,8 +748,8 @@ namespace gglab
 			const uint64_t imageTaken = coordinator.Submit({ .m_Label = "shared" });
 			const uint64_t sidecarTaken = coordinator.Submit({ .m_Label = "sidecar" });
 			coordinator.BeginFrame(MakeFrameState(true));
-			control.Complete(control.m_Issued[0].m_Id, 1);
-			control.Complete(control.m_Issued[1].m_Id, 1);
+			control.Complete(control.m_Issued[0].m_Id);
+			control.Complete(control.m_Issued[1].m_Id);
 			coordinator.Update();
 			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
 
@@ -784,7 +796,7 @@ namespace gglab
 				});
 			const uint64_t id = coordinator.Submit({});
 			coordinator.BeginFrame(MakeFrameState(true));
-			control.Complete(control.m_Issued[0].m_Id, 11);
+			control.Complete(control.m_Issued[0].m_Id);
 
 			std::vector<FrameCaptureRequestResult> results;
 			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
@@ -916,7 +928,7 @@ namespace gglab
 
 			std::vector<uint64_t> acceptedIds{ coordinator.Submit({}) };
 			coordinator.BeginFrame(MakeFrameState(true));
-			control.Complete(control.m_Issued[0].m_Id, 1);
+			control.Complete(control.m_Issued[0].m_Id);
 			coordinator.Update();
 			{
 				std::unique_lock lock(gate->m_Mutex);
@@ -936,7 +948,7 @@ namespace gglab
 			coordinator.BeginFrame(MakeFrameState(true));
 			for (size_t index = 1; index < control.m_Issued.size(); ++index)
 			{
-				control.Complete(control.m_Issued[index].m_Id, 2);
+				control.Complete(control.m_Issued[index].m_Id);
 			}
 			coordinator.Update();
 			const auto rejected = Consume(coordinator);
@@ -982,7 +994,7 @@ namespace gglab
 
 			const uint64_t resumedId = coordinator.Submit({});
 			coordinator.BeginFrame(MakeFrameState(true));
-			control.Complete(control.m_Issued.back().m_Id, 3);
+			control.Complete(control.m_Issued.back().m_Id);
 			coordinator.PrepareForShutdown();
 			coordinator.FinalizeAfterRenderHost();
 			const auto resumed = Consume(coordinator);
@@ -1020,8 +1032,8 @@ namespace gglab
 				encodingId = coordinator.Submit({});
 				queuedId = coordinator.Submit({ .m_Source = FrameCaptureSource::Composited });
 				coordinator.BeginFrame(MakeFrameState(true));
-				control.Complete(control.m_Issued[0].m_Id, 1);
-				control.Complete(control.m_Issued[1].m_Id, 1);
+				control.Complete(control.m_Issued[0].m_Id);
+				control.Complete(control.m_Issued[1].m_Id);
 				coordinator.PrepareForShutdown();
 				{
 					std::unique_lock lock(gate->m_Mutex);
@@ -1200,6 +1212,7 @@ namespace gglab
 					m_Sequence.OnPoseApplied(applied);
 				}
 				FrameCaptureFrameState state = MakeFrameState(m_Ready, temporalSession);
+				state.m_FrameSerial = ++m_RenderSerial;
 				state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity = m_CameraResetSerial;
 				state.m_SettleKey.m_Temporal.m_Identity.m_DepthExtent = m_RenderExtent;
 				state.m_SettleKey.m_Temporal.m_Identity.m_Accumulation = m_Accumulation;
@@ -1218,7 +1231,7 @@ namespace gglab
 				}
 				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
 				{
-					m_Control.Complete(m_Control.m_Issued[m_Completed].m_Id, 7);
+					m_Control.Complete(m_Control.m_Issued[m_Completed].m_Id);
 				}
 				m_Capture.Update();
 				std::vector<FrameCaptureRequestResult> results = Consume(m_Capture);
@@ -1232,6 +1245,7 @@ namespace gglab
 			FrameSequenceCoordinator m_Sequence;
 			std::vector<CameraPath> m_Paths;
 			uint64_t m_CameraResetSerial = 1;
+			uint64_t m_RenderSerial = 0;
 			ViewExtent m_RenderExtent{ 64, 32 };
 			TemporalAAHistoryAccumulation m_Accumulation = TemporalAAHistoryAccumulation::EffectiveSamples;
 			bool m_HistoryCompatible = true;
@@ -1360,7 +1374,7 @@ namespace gglab
 				"A capture beyond the writer limit defers the frame without posing or submitting it");
 
 			limited.m_AutoComplete = true;
-			limited.m_Control.Complete(limited.m_Control.m_Issued[0].m_Id, 7);
+			limited.m_Control.Complete(limited.m_Control.m_Issued[0].m_Id);
 			limited.m_Completed = 1;
 			// The next tick is still deferred; it drains the finished capture.
 			const std::optional<uint32_t> draining = limited.Frame();
@@ -1430,7 +1444,7 @@ namespace gglab
 			coordinator.OnFrameSubmitted();
 			if (!control.m_Issued.empty())
 			{
-				control.Complete(control.m_Issued.back().m_Id, 3);
+				control.Complete(control.m_Issued.back().m_Id);
 			}
 			coordinator.Update();
 			const std::vector<FrameCaptureRequestResult> results = Consume(coordinator);
@@ -1473,6 +1487,118 @@ namespace gglab
 				harness.m_Control.m_Issued[0].m_DiagnosticTap == PostProcessDebugTap::TemporalRejection &&
 				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed,
 				"A sequence records one diagnostic tap as its evidence channel");
+		}
+
+		void RunDiagnosticSchedulingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-binding");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true,
+				});
+			const auto weight = PostProcessDebugTap::TemporalHistoryWeight;
+			const auto rejection = PostProcessDebugTap::TemporalRejection;
+			const uint64_t first = coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = weight });
+			const uint64_t second = coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = rejection });
+			GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = weight }));
+			GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::Scene }));
+			GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::Composited }));
+			const uint64_t cancel = coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalClipDistance });
+			FrameCaptureFrameState state = MakeFrameState(true);
+			state.m_FrameSerial = 100;
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			context.Check(control.m_Issued.size() == 4 &&
+				std::ranges::all_of(control.m_Issued, [&](const auto& issued) {
+					return issued.m_FrameSerial == 100 &&
+						(!issued.m_DiagnosticTap || issued.m_DiagnosticTap == weight);
+				}), "One frame coalesces matching diagnostics alongside scene and composited captures");
+			context.Check(coordinator.Cancel(cancel), "A conflicting tap stays cancellable before issue");
+			state.m_FrameSerial = 101;
+			state.m_FrameIndex = 43;
+			state.m_TotalTime = 0.75;
+			state.m_Camera.m_Position[0] = 9.0f;
+			state.m_Temporal.m_JitterIndex = 5;
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			context.Check(control.m_Issued.size() == 5 &&
+				control.m_Issued.back().m_DiagnosticTap == rejection &&
+				control.m_Issued.back().m_FrameSerial == 101,
+				"A different diagnostic tap is issued with the next frame's identity");
+			for (const auto& issued : control.m_Issued) control.Complete(issued.m_Id);
+			coordinator.Update();
+			const auto results = Consume(coordinator);
+			const auto a = std::ranges::find(results, first, &FrameCaptureRequestResult::m_RequestId);
+			const auto b = std::ranges::find(results, second, &FrameCaptureRequestResult::m_RequestId);
+			context.Check(a != results.end() && b != results.end() && a->m_Metadata && b->m_Metadata &&
+				a->m_Status == FrameCaptureRequestStatus::Completed &&
+				b->m_Status == FrameCaptureRequestStatus::Completed &&
+				a->m_Metadata->m_FrameSerial == 100 && a->m_Metadata->m_FrameIndex == 42 &&
+				a->m_Metadata->m_TotalTime == 0.5 && a->m_Metadata->m_Camera.m_Position[0] == 1.0f &&
+				b->m_Metadata->m_FrameSerial == 101 && b->m_Metadata->m_FrameIndex == 43 &&
+				b->m_Metadata->m_TotalTime == 0.75 && b->m_Metadata->m_Camera.m_Position[0] == 9.0f &&
+				b->m_Metadata->m_Temporal.m_JitterIndex == 5,
+				"Delayed GPU completions keep frame metadata immutable; a deferred tap uses its actual issue frame");
+
+			SequenceHarness harness(directory.GetPath());
+			std::string failure;
+			GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+				.m_CaptureFrames = { 0 }, .m_CaptureSource = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = rejection }, failure));
+			harness.Frame();
+			GGLAB_UNUSED(harness.m_Capture.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = weight }));
+			harness.Frame();
+			context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				harness.m_Control.m_Issued.size() == 1 &&
+				harness.m_Control.m_Issued.front().m_DiagnosticTap == weight,
+				"A conflicting sequence capture fails on its required frame and never issues a later substitute");
+		}
+
+		void RunFrameResultIdentityTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-result-identity");
+			for (uint32_t mismatch = 0; mismatch < 3; ++mismatch)
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({
+					.m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
+					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true,
+					});
+				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+					.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight }));
+				coordinator.BeginFrame(MakeFrameState(true));
+				if (mismatch == 1) control.m_Issued.front().m_Source = FrameCaptureSource::Scene;
+				if (mismatch == 2) control.m_Issued.front().m_DiagnosticTap = PostProcessDebugTap::TemporalRejection;
+				control.Complete(control.m_Issued.front().m_Id, mismatch == 0 ? 18u : 17u);
+				coordinator.Update();
+				const auto results = Consume(coordinator);
+				context.Check(results.size() == 1 && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+					results[0].m_Metadata && results[0].m_Metadata->m_FrameSerial == 17 &&
+					results[0].m_ImagePath.empty() && !std::filesystem::exists(directory.GetPath()),
+					std::format("A result with mismatched identity component {} never publishes a PNG", mismatch));
+			}
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control });
+			control.m_PendingDiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight;
+			const uint64_t waiting = coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
+				.m_DiagnosticTap = PostProcessDebugTap::TemporalRejection });
+			coordinator.BeginFrame(MakeFrameState(true));
+			context.Check(control.m_Issued.empty() && coordinator.Cancel(waiting),
+				"Scheduling respects a diagnostic tap already queued by another control client");
+			GGLAB_UNUSED(coordinator.Submit({}));
+			auto noFrame = MakeFrameState(true);
+			noFrame.m_FrameSerial = 0;
+			coordinator.BeginFrame(noFrame);
+			const auto failed = Consume(coordinator);
+			context.Check(control.m_Issued.empty() && std::ranges::any_of(failed, [](const auto& result) {
+				return result.m_Status == FrameCaptureRequestStatus::Failed;
+			}), "The coordinator cannot accidentally issue a flexible request without a render serial");
 		}
 
 		void RunReferenceSequenceTests(SelfTestContext& context) noexcept
@@ -1856,6 +1982,8 @@ namespace gglab
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
 		RunDiagnosticCaptureTests(context);
+		RunDiagnosticSchedulingTests(context);
+		RunFrameResultIdentityTests(context);
 		RunReferenceSequenceTests(context);
 		RunFrameSequenceEvaluationTests(context);
 		RunFrameSequenceContinuityTests(context);

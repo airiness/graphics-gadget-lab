@@ -91,6 +91,7 @@ namespace gglab
 		FrameCaptureSettleKey m_SettleKey{};
 		// Actual presentation format; Diagnostic captures use RGBA8 instead.
 		RHIFormat m_DisplayFormat = RHIFormat::Unknown;
+		uint64_t m_FrameSerial = 0;
 		uint64_t m_FrameIndex = 0;
 		FrameCaptureCameraState m_Camera{};
 		// Reference views the active content registers for its main camera.
@@ -174,9 +175,10 @@ namespace gglab
 		// waiting after-ready request has not begun settling, so time-driven
 		// content advances only over the settled frames, however long loading took.
 		[[nodiscard]] bool ShouldHoldTime() const noexcept;
-		// Called before the frame described by the state is built. Issues every
-		// request that is due so that this frame's capture taps record it, and
-		// fails waiting after-ready requests for content with a failed gate.
+		// Called before the frame described by the state is built. Issues due
+		// requests restricted to this frame; conflicting diagnostic taps wait
+		// before metadata is fixed, or fail if they require an exact sequence frame.
+		// Fails waiting after-ready requests for content with a failed gate.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
 		// Called after the frame passed to BeginFrame was submitted.
 		void OnFrameSubmitted() noexcept;

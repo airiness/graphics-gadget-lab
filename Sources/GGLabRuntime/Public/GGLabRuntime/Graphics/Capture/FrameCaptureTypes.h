@@ -61,6 +61,8 @@ namespace gglab
 		// Serial of the render host frame that recorded the capture; 0 when the
 		// request finished before any frame recorded it.
 		uint64_t m_FrameSerial = 0;
+		// Actual recorded diagnostic tap; absent for Scene and Composited.
+		std::optional<PostProcessDebugTap> m_DiagnosticTap;
 		// Present only for Completed results. Requests captured by the same frame
 		// and tap share one immutable image.
 		std::shared_ptr<const FrameCaptureImage> m_Image;

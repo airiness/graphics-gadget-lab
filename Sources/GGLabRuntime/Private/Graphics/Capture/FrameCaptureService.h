@@ -37,8 +37,10 @@ namespace gglab
 		~FrameCaptureService() override;
 		GGLAB_DELETE_COPYABLE_MOVABLE(FrameCaptureService);
 
-		[[nodiscard]] uint64_t RequestCapture(FrameCaptureSource source) noexcept override;
-		[[nodiscard]] uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept override;
+		[[nodiscard]] uint64_t RequestCapture(FrameCaptureSource source,
+			uint64_t frameSerial = 0) noexcept override;
+		[[nodiscard]] uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap,
+			uint64_t frameSerial = 0) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept override;
 		[[nodiscard]] FrameCaptureAvailability GetAvailability(
@@ -54,7 +56,7 @@ namespace gglab
 		// The frame's GPU work, including its tap copies, was submitted.
 		void OnFrameSubmitted(uint64_t frameSerial, const RHIFencePoint& fence) noexcept;
 		// The frame ended without recording a submission. Its requests return to
-		// the queue in their original order.
+		// the queue in their original order, unless restricted to this frame.
 		void OnFrameAborted(uint64_t frameSerial) noexcept;
 		// The frame's submission failed; its requests finish as Failed.
 		void OnFrameSubmissionFailed(uint64_t frameSerial) noexcept;
@@ -70,6 +72,7 @@ namespace gglab
 		{
 			uint64_t m_Id = 0;
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+			uint64_t m_FrameSerial = 0;
 			// Diagnostic requests only.
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 		};
@@ -79,7 +82,7 @@ namespace gglab
 			uint64_t m_FrameSerial = 0;
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
-			std::vector<uint64_t> m_RequestIds;
+			std::vector<QueuedRequest> m_Requests;
 			RHIBufferOwner m_Buffer;
 			RHITextureCopyFootprint m_Footprint{};
 			RHIFencePoint m_Fence{};
@@ -95,7 +98,9 @@ namespace gglab
 		[[nodiscard]] bool IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,
 			PostProcessDebugTap diagnosticTap) const noexcept;
 		void PublishFailure(uint64_t requestId, FrameCaptureSource source,
-			uint64_t frameSerial, std::string failure) noexcept;
+			uint64_t frameSerial, std::string failure,
+			std::optional<PostProcessDebugTap> diagnosticTap = std::nullopt) noexcept;
+		void FailQueuedFrameRequests(uint64_t frameSerial, std::string_view failure) noexcept;
 		void FailTap(Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept;
 		void PublishTap(Tap& tap) noexcept;
 

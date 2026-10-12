@@ -121,6 +121,7 @@ namespace gglab
 			const TemporalAASettings& m_TemporalSettings;
 			const GTAOSettings& m_GTAOSettings;
 			ViewResolution m_ViewResolution{};
+			uint64_t m_FrameSerial = 0;
 			AppRuntimeRHIBackend m_Backend = AppRuntimeRHIBackend::Unknown;
 			bool m_DevelopmentTools = false;
 		};
@@ -318,6 +319,7 @@ namespace gglab
 					.m_DemoIndex = demoIndex,
 				},
 				.m_DisplayFormat = inputs.m_RenderServices.m_Presentation->GetSwapChain()->GetFormat(),
+				.m_FrameSerial = inputs.m_FrameSerial,
 				.m_FrameIndex = inputs.m_Time.GetFrameCount(),
 				.m_Camera = {
 					.m_Name = inputs.m_DisplayCameraSlot.m_Name,
@@ -600,6 +602,7 @@ namespace gglab
 			.m_TemporalSettings = displayViewSettings.m_TemporalAA,
 			.m_GTAOSettings = displayViewSettings.m_Lighting.m_GTAO,
 			.m_ViewResolution = viewResolution,
+			.m_FrameSerial = rendererFrame.GetSerial(),
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
 			});

@@ -25,7 +25,8 @@ namespace gglab
 			"FrameCaptureService must release its readback buffers before destruction.");
 	}
 
-	uint64_t FrameCaptureService::RequestCapture(FrameCaptureSource source) noexcept
+	uint64_t FrameCaptureService::RequestCapture(
+		FrameCaptureSource source, uint64_t frameSerial) noexcept
 	{
 		if (GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests)
 		{
@@ -37,11 +38,12 @@ namespace gglab
 			PublishFailure(requestId, source, 0, "The render host has been finalized.");
 			return requestId;
 		}
-		m_Queued.push_back({ .m_Id = requestId, .m_Source = source });
+		m_Queued.push_back({ .m_Id = requestId, .m_Source = source, .m_FrameSerial = frameSerial });
 		return requestId;
 	}
 
-	uint64_t FrameCaptureService::RequestDiagnosticCapture(PostProcessDebugTap tap) noexcept
+	uint64_t FrameCaptureService::RequestDiagnosticCapture(
+		PostProcessDebugTap tap, uint64_t frameSerial) noexcept
 	{
 		if (GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests)
 		{
@@ -63,6 +65,7 @@ namespace gglab
 		m_Queued.push_back({
 			.m_Id = requestId,
 			.m_Source = FrameCaptureSource::Diagnostic,
+			.m_FrameSerial = frameSerial,
 			.m_DiagnosticTap = tap,
 			});
 		return requestId;
@@ -90,7 +93,8 @@ namespace gglab
 				{
 					return false;
 				}
-				PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure));
+				PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure),
+					request.m_DiagnosticTap);
 				return true;
 			});
 	}
@@ -120,7 +124,7 @@ namespace gglab
 		size_t count = m_Queued.size();
 		for (const Tap& tap : m_Taps)
 		{
-			count += tap.m_RequestIds.size();
+			count += tap.m_Requests.size();
 		}
 		return static_cast<uint32_t>(count);
 	}
@@ -197,14 +201,19 @@ namespace gglab
 		const auto boundEnd = std::ranges::stable_partition(m_Queued,
 			[&](const QueuedRequest& request)
 			{
-				return !IsBoundBy(request, source, diagnosticTap);
+				return !IsBoundBy(request, source, diagnosticTap) ||
+					(request.m_FrameSerial != 0 && request.m_FrameSerial != frameSerial);
 			})
 			.begin();
 		for (auto request = boundEnd; request != m_Queued.end(); ++request)
 		{
-			tap.m_RequestIds.push_back(request->m_Id);
+			tap.m_Requests.push_back(*request);
 		}
 		m_Queued.erase(boundEnd, m_Queued.end());
+		if (tap.m_Requests.empty())
+		{
+			return std::nullopt;
+		}
 
 		if (!Test(displayTargetDesc.m_Usage, RHITextureUsage::CopySource))
 		{
@@ -266,6 +275,7 @@ namespace gglab
 				tap.m_Submitted = true;
 			}
 		}
+		FailQueuedFrameRequests(frameSerial, "The requested frame did not record its capture tap.");
 	}
 
 	void FrameCaptureService::OnFrameAborted(uint64_t frameSerial) noexcept
@@ -277,13 +287,23 @@ namespace gglab
 				{
 					return false;
 				}
-				for (const uint64_t requestId : tap.m_RequestIds)
+				for (const QueuedRequest& request : tap.m_Requests)
 				{
-					returned.push_back({ .m_Id = requestId, .m_Source = tap.m_Source,
-						.m_DiagnosticTap = tap.m_DiagnosticTap });
+					if (request.m_FrameSerial == 0)
+					{
+						returned.push_back(request);
+					}
+					else
+					{
+						PublishFailure(request.m_Id, request.m_Source, frameSerial,
+							"The requested capture frame was aborted before submission.",
+							request.m_Source == FrameCaptureSource::Diagnostic
+								? std::optional(request.m_DiagnosticTap) : std::nullopt);
+					}
 				}
 				return true;
 			});
+		FailQueuedFrameRequests(frameSerial, "The requested capture frame was aborted before submission.");
 		if (returned.empty())
 		{
 			return;
@@ -304,6 +324,7 @@ namespace gglab
 				FailTap(tap, frameSerial, "The frame that recorded the capture failed to submit.");
 				return true;
 			});
+		FailQueuedFrameRequests(frameSerial, "The requested capture frame failed to submit.");
 	}
 
 	void FrameCaptureService::CollectCompleted() noexcept
@@ -342,25 +363,45 @@ namespace gglab
 	}
 
 	void FrameCaptureService::PublishFailure(uint64_t requestId, FrameCaptureSource source,
-		uint64_t frameSerial, std::string failure) noexcept
+		uint64_t frameSerial, std::string failure,
+		std::optional<PostProcessDebugTap> diagnosticTap) noexcept
 	{
 		m_Results.push_back({
 			.m_RequestId = requestId,
 			.m_Source = source,
 			.m_Status = FrameCaptureStatus::Failed,
 			.m_FrameSerial = frameSerial,
+			.m_DiagnosticTap = diagnosticTap,
 			.m_Failure = std::move(failure),
+			});
+	}
+
+	void FrameCaptureService::FailQueuedFrameRequests(
+		uint64_t frameSerial, std::string_view failure) noexcept
+	{
+		std::erase_if(m_Queued, [&](const QueuedRequest& request)
+			{
+				if (request.m_FrameSerial == 0 || request.m_FrameSerial > frameSerial)
+				{
+					return false;
+				}
+				PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure),
+					request.m_Source == FrameCaptureSource::Diagnostic
+						? std::optional(request.m_DiagnosticTap) : std::nullopt);
+				return true;
 			});
 	}
 
 	void FrameCaptureService::FailTap(
 		Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept
 	{
-		for (const uint64_t requestId : tap.m_RequestIds)
+		for (const QueuedRequest& request : tap.m_Requests)
 		{
-			PublishFailure(requestId, tap.m_Source, frameSerial, std::string(failure));
+			PublishFailure(request.m_Id, tap.m_Source, frameSerial, std::string(failure),
+				tap.m_Source == FrameCaptureSource::Diagnostic
+					? std::optional(tap.m_DiagnosticTap) : std::nullopt);
 		}
-		tap.m_RequestIds.clear();
+		tap.m_Requests.clear();
 		tap.m_Buffer.Reset();
 	}
 
@@ -396,17 +437,19 @@ namespace gglab
 		std::shared_ptr<const FrameCaptureImage> sharedImage = std::move(image);
 		m_RetainedImages.push_back({ .m_Image = sharedImage,
 			.m_Bytes = footprint.m_RowSizeInBytes * footprint.m_Height });
-		for (const uint64_t requestId : tap.m_RequestIds)
+		for (const QueuedRequest& request : tap.m_Requests)
 		{
 			m_Results.push_back({
-				.m_RequestId = requestId,
+				.m_RequestId = request.m_Id,
 				.m_Source = tap.m_Source,
 				.m_Status = FrameCaptureStatus::Completed,
 				.m_FrameSerial = tap.m_FrameSerial,
+				.m_DiagnosticTap = tap.m_Source == FrameCaptureSource::Diagnostic
+					? std::optional(tap.m_DiagnosticTap) : std::nullopt,
 				.m_Image = sharedImage,
 				});
 		}
-		tap.m_RequestIds.clear();
+		tap.m_Requests.clear();
 		tap.m_Buffer.Reset();
 	}
 }
