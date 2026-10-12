@@ -15,6 +15,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/Camera.h"
@@ -559,6 +560,7 @@ namespace gglab
 				.m_SessionIdentity = temporalSessionIdentity,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
+				.m_NativeResolutionRequired = HasMaterialDiagnosticDemand(world, *m_AssetManager),
 				.m_ReferenceRequested = referenceSample.has_value(),
 				.m_AmbientOcclusionRequested =
 					displayViewSettings.m_Lighting.m_GTAO.m_Enabled &&

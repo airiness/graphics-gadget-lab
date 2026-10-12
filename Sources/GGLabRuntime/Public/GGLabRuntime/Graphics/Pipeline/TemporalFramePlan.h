@@ -213,6 +213,9 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		bool m_DisplayViewEligible = false;
 		bool m_DepthVelocityPathAvailable = false;
+		// Current-frame composition (for example material diagnostic MRTs) requires
+		// render and display extents to coincide, before any history is allocated.
+		bool m_NativeResolutionRequired = false;
 		// A supersampled reference sample is due this frame. It excludes Temporal AA and
 		// temporal GTAO.
 		bool m_ReferenceRequested = false;
@@ -409,7 +412,7 @@ namespace gglab
 			const TemporalAASettings& settings = info.m_TemporalAA.m_Settings;
 			plan.m_TemporalAA.m_HistoryAccumulation = settings.m_HistoryAccumulation;
 			plan.m_TemporalAA.m_TextureLodBiasOffset = settings.m_TextureLodBiasOffset;
-			if (info.m_TemporalAA.m_UpscalingAvailable)
+			if (info.m_TemporalAA.m_UpscalingAvailable && !info.m_NativeResolutionRequired)
 			{
 				plan.m_TemporalAA.m_ResolutionPreset = settings.m_ResolutionPreset;
 			}

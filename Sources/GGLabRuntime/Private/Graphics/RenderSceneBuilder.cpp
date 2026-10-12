@@ -1,4 +1,5 @@
 #include "Graphics/RenderSceneBuilder.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
@@ -19,6 +20,67 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] bool IsRenderableModel(const Model& model) noexcept
+		{
+			return model.m_ContentState == AssetContentState::Ready &&
+				model.m_ResidencyState == AssetResidencyState::Resident;
+		}
+
+		[[nodiscard]] bool IsRenderableMesh(const Mesh* mesh) noexcept
+		{
+			return mesh && mesh->m_IndexCount != 0 && mesh->m_IsUploaded &&
+				mesh->m_ResidencyState == AssetResidencyState::Resident;
+		}
+
+		struct SceneMaterialSource
+		{
+			const MaterialProperties* m_Properties = nullptr;
+			RenderMaterialKey m_Key{};
+		};
+
+		[[nodiscard]] SceneMaterialSource ResolveSceneMaterialSource(
+			const AssetManager& assets, const ModelMesh& mesh,
+			const components::MaterialInstanceComponent* instance) noexcept
+		{
+			if (instance && instance->m_Key.IsValid())
+			{
+				return { &instance->m_Properties, RenderMaterialKey::FromRuntime(instance->m_Key) };
+			}
+			return { assets.GetMaterial(mesh.m_MaterialId), RenderMaterialKey::FromAsset(mesh.m_MaterialId) };
+		}
+	}
+
+	bool HasMaterialDiagnosticDemand(const World& world, const AssetManager& assets) noexcept
+	{
+		const auto& registry = world.GetRegistry();
+		const auto entities = registry.view<const components::TransformComponent,
+			const components::ModelComponent>();
+		for (const auto entity : entities)
+		{
+			const Model* model = assets.GetModel(entities.get<const components::ModelComponent>(entity).m_ModelId);
+			if (!model || !IsRenderableModel(*model))
+			{
+				continue;
+			}
+			const auto* instance = registry.try_get<components::MaterialInstanceComponent>(entity);
+			for (const ModelMesh& mesh : model->m_MeshInstance)
+			{
+				if (!IsRenderableMesh(assets.GetMesh(mesh.m_MeshId)))
+				{
+					continue;
+				}
+				const auto material = ResolveSceneMaterialSource(assets, mesh, instance);
+				if (material.m_Properties && IsMaterialDiagnosticView(material.m_Properties->m_DebugView))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	LightGPU RenderSceneBuilder::BuildLightData(uint64_t entityKey,
 		const components::TransformComponent& transform, const components::LightComponent& light,
 		const RenderDirectionalLight& mainLight) noexcept
@@ -151,8 +213,7 @@ namespace gglab
 					GGLAB_LOG_GRAPHICS_WARN("Entity has no model.");
 					return;
 				}
-				if (model->m_ContentState != AssetContentState::Ready ||
-					model->m_ResidencyState != AssetResidencyState::Resident)
+				if (!IsRenderableModel(*model))
 				{
 					return;
 				}
@@ -166,8 +227,7 @@ namespace gglab
 				{
 					const ModelMesh& modelMesh = model->m_MeshInstance[modelMeshIndex];
 					const Mesh* mesh = assetManager.GetMesh(modelMesh.m_MeshId);
-					if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded ||
-						mesh->m_ResidencyState != AssetResidencyState::Resident)
+					if (!IsRenderableMesh(mesh))
 					{
 						continue;
 					}
@@ -176,20 +236,12 @@ namespace gglab
 					const Matrix world = modelMesh.m_LocalTransform * entityWorld;
 					const Matrix normalMat = math::CreateNormalMatrix(world);
 
-					const MaterialProperties* material = nullptr;
-					RenderMaterialKey materialKey{};
 					const auto* materialInstance =
 						registry.try_get<components::MaterialInstanceComponent>(entity);
-					if (materialInstance && materialInstance->m_Key.IsValid())
-					{
-						material = &materialInstance->m_Properties;
-						materialKey = RenderMaterialKey::FromRuntime(materialInstance->m_Key);
-					}
-					else
-					{
-						material = assetManager.GetMaterial(modelMesh.m_MaterialId);
-						materialKey = RenderMaterialKey::FromAsset(modelMesh.m_MaterialId);
-					}
+					const auto materialSource =
+						ResolveSceneMaterialSource(assetManager, modelMesh, materialInstance);
+					const MaterialProperties* material = materialSource.m_Properties;
+					const RenderMaterialKey materialKey = materialSource.m_Key;
 
 					if (!material)
 					{

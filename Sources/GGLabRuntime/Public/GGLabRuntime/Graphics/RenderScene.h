@@ -13,6 +13,16 @@
 
 namespace gglab
 {
+	class AssetManager;
+	class World;
+
+	// Query on the frame owner thread after content/publication updates, before
+	// resolution and history allocation. Sources must remain stable through scene build.
+	// This is conservative when GPU table capacity or conflicting material keys later
+	// discard a source. It does not upload, retain or change asset residency.
+	[[nodiscard]] bool HasMaterialDiagnosticDemand(
+		const World& world, const AssetManager& assets) noexcept;
+
 	struct RenderInstance
 	{
 		MeshID m_MeshId{};

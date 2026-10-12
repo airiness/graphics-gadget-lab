@@ -121,10 +121,9 @@ namespace gglab
 		// recipe always provides the depth/velocity path. A lost resolve closure is a
 		// frame contract failure in ValidateRenderFrame, not a capability.
 		info.m_DepthVelocityPathAvailable = true;
-		// The resolve reconstructs the display extent from a smaller render extent. Material
-		// diagnostics render at native resolution, so the frames after one that showed them
-		// stay native.
-		info.m_TemporalAA.m_UpscalingAvailable = !m_MaterialDiagnosticsShown;
+		// Upscaling is a recipe capability; the shared planner applies this frame's
+		// native-resolution requirement before selecting extents and allocating history.
+		info.m_TemporalAA.m_UpscalingAvailable = true;
 		const SceneExtensionTemporalParticipation participation = m_SceneExtension
 			? m_SceneExtension->GetTemporalParticipation()
 			: SceneExtensionTemporalParticipation::PostTAA;
@@ -151,7 +150,6 @@ namespace gglab
 		}
 		const FramePlan framePlan = std::move(*m_FramePlan);
 		m_FramePlan.reset();
-		m_MaterialDiagnosticsShown = context.m_RenderScene.m_HasMaterialDiagnostics;
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
 			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
@@ -621,6 +619,11 @@ namespace gglab
 			return RenderFrameValidationResult::ContractFailure(
 				"The frame requires prepared scene GPU data.");
 		}
+		if (inputs.m_MaterialDiagnostics && !inputs.m_NativeResolution)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"Material diagnostic attachments require native render and display extents.");
+		}
 		if (inputs.m_HasOpaqueDraws &&
 			!IsForwardPlusGlobalLightCountSupported(inputs.m_GlobalLightCount))
 		{
@@ -706,6 +709,8 @@ namespace gglab
 			.m_PresentationAvailable = true,
 			.m_DisplayExtentMatchesPresentation = true,
 			.m_RenderSceneReady = context.IsRenderSceneReady(),
+			.m_MaterialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics,
+			.m_NativeResolution = displayView.GetResolution().IsNative(),
 			.m_HasOpaqueDraws = depthCoverage.m_HasDepthCoverageDraws,
 			.m_GlobalLightCount =
 				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()),

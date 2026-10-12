@@ -39,6 +39,8 @@ namespace gglab
 		bool m_PresentationAvailable = false;
 		bool m_DisplayExtentMatchesPresentation = false;
 		bool m_RenderSceneReady = false;
+		bool m_MaterialDiagnostics = false;
+		bool m_NativeResolution = true;
 		// Opaque or alpha-test draws record Forward+ cull, opaque shading and GTAO.
 		bool m_HasOpaqueDraws = false;
 		uint32_t m_GlobalLightCount = 0;
@@ -56,7 +58,8 @@ namespace gglab
 
 	// The recipe always shades opaque draws with Forward+ after an EQUAL depth prepass.
 	// A display view built for another swap-chain extent is an expected resize state and
-	// skips the frame. Missing scene data, invalid depth coverage and a lost temporal resolve
+	// skips the frame. Diagnostic MRTs require native render/display extents. Missing
+	// scene data, invalid depth coverage and a lost temporal resolve
 	// closure are contract failures. Frames that record opaque work additionally fail when
 	// global lights exceed the Forward+ capacity, or when an enabled, supported GTAO has
 	// unprepared recipes or lacks the accumulation recipe or history that its temporal plan
@@ -137,8 +140,6 @@ namespace gglab
 		RenderPassAtmosphere m_AtmospherePass;
 		RenderPassAerialPerspective m_AerialPerspectivePass;
 		RenderPassTemporalAA m_TemporalAAPass;
-		// Whether the last built frame showed material diagnostics.
-		bool m_MaterialDiagnosticsShown = false;
 		RenderPassTemporalReference m_TemporalReferencePass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		PostProcessPipeline m_PostProcessPipeline;

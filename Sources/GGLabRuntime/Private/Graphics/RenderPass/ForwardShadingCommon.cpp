@@ -95,6 +95,24 @@ namespace gglab::forward_shading
 			? RasterizerPreset::TwoSided : RasterizerPreset::Default;
 	}
 
+	bool AreSceneAttachmentExtentsCompatible(const DepthCoverageRasterDomain& domain,
+		const RHITextureDesc& color, const RHITextureDesc& depth,
+		std::span<const RHITextureDesc> diagnostics) noexcept
+	{
+		if (!AreDepthCoverageTargetExtentsCompatible(domain, color, depth))
+		{
+			return false;
+		}
+		for (const RHITextureDesc& diagnostic : diagnostics)
+		{
+			if (!AreDepthCoverageTargetExtentsCompatible(domain, diagnostic, depth))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	void DeclareSceneInputs(RenderGraph::RGBuilder& builder, const RenderFrameContext& context,
 		const RenderServices& services, RenderViewID viewId, CompositionDomain domain,
 		SceneInputs& inputs) noexcept
@@ -119,6 +137,7 @@ namespace gglab::forward_shading
 
 		builder.ReadWriteInPlace(color, RGTextureAccess::RenderTarget);
 		inputs.m_SceneColor = color;
+		std::array<RHITextureDesc, MaterialDiagnosticTargetCount> diagnosticDescs{};
 		inputs.m_MaterialDiagnostics = displayTargets.m_MaterialDiagnosticColor.IsValid();
 		if (inputs.m_MaterialDiagnostics)
 		{
@@ -127,6 +146,7 @@ namespace gglab::forward_shading
 			static_assert(diagnostics.size() == MaterialDiagnosticTargetCount);
 			for (size_t index = 0; index < diagnostics.size(); ++index)
 			{
+				diagnosticDescs[index] = builder.GetTextureDesc(*diagnostics[index]);
 				builder.ReadWriteInPlace(*diagnostics[index], RGTextureAccess::RenderTarget);
 				inputs.m_MaterialDiagnosticRtvs[index] =
 					builder.CreateView<RHITextureViewType::RenderTarget>(*diagnostics[index]);
@@ -166,9 +186,11 @@ namespace gglab::forward_shading
 				"Forward rendering requires a valid raster domain.");
 			GGLAB_ASSERT_MSG(inputs.m_RasterDomain->m_DepthConvention == depthConvention,
 				"Forward raster and resource depth conventions must match.");
-			GGLAB_ASSERT_MSG(AreDepthCoverageTargetExtentsCompatible(*inputs.m_RasterDomain,
-				builder.GetTextureDesc(color), builder.GetTextureDesc(depth)),
-				"Forward color and depth extents must match the raster domain.");
+			GGLAB_ASSERT_MSG(AreSceneAttachmentExtentsCompatible(*inputs.m_RasterDomain,
+				builder.GetTextureDesc(color), builder.GetTextureDesc(depth),
+				inputs.m_MaterialDiagnostics ? std::span<const RHITextureDesc>(diagnosticDescs)
+					: std::span<const RHITextureDesc>{}),
+				"Every Forward color, diagnostic and depth attachment must match the raster domain.");
 			GGLAB_ASSERT_MSG(postTemporal || framePlan.m_RasterDomain == inputs.m_RasterDomain,
 				"Pre-temporal Forward must consume the frame-plan raster domain.");
 			GGLAB_ASSERT_MSG(inputs.m_ExpectedRenderQueue == std::addressof(renderQueue),

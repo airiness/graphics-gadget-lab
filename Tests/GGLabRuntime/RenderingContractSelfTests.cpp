@@ -2,6 +2,10 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
+#include "AssetTestServices.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
+#include "GGLabRuntime/Graphics/VertexData.h"
 #include "GGLabRuntime/Graphics/RHI/DX12/DX12ContextFactory.h"
 #if GGLAB_ENABLE_VULKAN
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
@@ -68,6 +72,8 @@
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/ForwardShadingCommon.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
@@ -3163,6 +3169,16 @@ namespace gglab
 			resizing.m_DepthCoverageValid = false;
 			ForwardPlusFrameValidationInputs sceneUnavailable = ready;
 			sceneUnavailable.m_RenderSceneReady = false;
+			ForwardPlusFrameValidationInputs nativeDiagnostics = ready;
+			nativeDiagnostics.m_MaterialDiagnostics = true;
+			ForwardPlusFrameValidationInputs upscaledDiagnostics = nativeDiagnostics;
+			upscaledDiagnostics.m_NativeResolution = false;
+			ForwardPlusFrameValidationInputs upscaledWithoutDiagnostics = upscaledDiagnostics;
+			upscaledWithoutDiagnostics.m_MaterialDiagnostics = false;
+			context.Check(classify(nativeDiagnostics) == RenderFrameValidationStatus::Ready &&
+				classify(upscaledWithoutDiagnostics) == RenderFrameValidationStatus::Ready &&
+				classify(upscaledDiagnostics) == RenderFrameValidationStatus::ContractFailure,
+				"Frame validation rejects diagnostic MRTs at an upscaled extent before graph construction");
 			ForwardPlusFrameValidationInputs closureLost = readyTemporal;
 			closureLost.m_TemporalResolveClosureValid = false;
 			ForwardPlusFrameValidationInputs closureUnusedWithoutTemporal = closureLost;
@@ -3660,6 +3676,23 @@ namespace gglab
 				!AreDepthCoverageTargetExtentsCompatible(
 					rasterDomain, coverageColorDesc, mismatchedCoverageDepthDesc),
 				"Raster domains and target descriptors reject color-depth extent mismatches");
+			std::array<RHITextureDesc, forward_shading::MaterialDiagnosticTargetCount> diagnostics{
+				coverageColorDesc, coverageColorDesc, coverageColorDesc };
+			bool diagnosticExtentsChecked = forward_shading::AreSceneAttachmentExtentsCompatible(
+				rasterDomain, coverageColorDesc, coverageDepthDesc, diagnostics) &&
+				forward_shading::AreSceneAttachmentExtentsCompatible(
+					rasterDomain, coverageColorDesc, coverageDepthDesc, {}) &&
+				!forward_shading::AreSceneAttachmentExtentsCompatible(
+					rasterDomain, coverageColorDesc, mismatchedCoverageDepthDesc, diagnostics);
+			for (auto& diagnostic : diagnostics)
+			{
+				diagnostic.m_Extent = {853, 480, 1};
+				diagnosticExtentsChecked &= !forward_shading::AreSceneAttachmentExtentsCompatible(
+					rasterDomain, coverageColorDesc, coverageDepthDesc, diagnostics);
+				diagnostic = coverageColorDesc;
+			}
+			context.Check(diagnosticExtentsChecked,
+				"Forward attachment validation checks every diagnostic MRT as well as color and depth");
 
 			DepthCoverageRasterDomain changedRasterDomain = rasterDomain;
 			++changedRasterDomain.m_FrameSerial;
@@ -8994,6 +9027,23 @@ namespace gglab
 					TemporalAAResolutionPreset::Native,
 				"The Forward+ resolve upscales a requested Quality preset; a pipeline without an "
 				"upscaling resolve renders native");
+			TemporalFramePlanResolveInfo diagnosticInfo = qualityInfo;
+			diagnosticInfo.m_NativeResolutionRequired = true;
+			const ResolvedTemporalFramePlan diagnosticPlan =
+				forwardPipeline.ResolveTemporalFramePlan(diagnosticInfo);
+			TemporalFramePlanResolveInfo nativeDiagnosticInfo = diagnosticInfo;
+			nativeDiagnosticInfo.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Native;
+			context.Check(diagnosticPlan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
+				diagnosticPlan.m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+				forwardPipeline.ResolveTemporalFramePlan(nativeDiagnosticInfo).m_TemporalAA.m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Native &&
+				forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
+					TemporalAAResolutionPreset::Quality,
+				"Current-frame diagnostic demand enters Native immediately and returns to Quality without a stale-frame latch");
+			diagnosticInfo.m_TemporalAA.m_UpscalingAvailable = true;
+			context.Check(ResolveTemporalFramePlan(diagnosticInfo).m_TemporalAA.m_ResolutionPreset ==
+				TemporalAAResolutionPreset::Native,
+				"The shared planner honors Native composition requirements even when upscaling is available");
 
 			Renderer renderer;
 			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),
@@ -9506,6 +9556,97 @@ namespace gglab
 		}
 	}
 
+	void RunMaterialDiagnosticDemandTests(SelfTestContext& context) noexcept
+	{
+		asset_test::AssetManagerHarness harness("material-diagnostic-demand");
+		context.Check(harness.IsValid(), "Diagnostic demand composes headless asset services");
+		if (!harness.IsValid())
+		{
+			return;
+		}
+		AssetManager& assets = harness.GetAssets();
+		auto materialOwner = std::make_unique<Material>();
+		materialOwner->m_Name = StringID("DiagnosticDemand.Material");
+		Material* material = materialOwner.get();
+		const MaterialID materialId = assets.AddProceduralMaterial(std::move(materialOwner));
+		auto meshOwner = std::make_unique<Mesh>();
+		meshOwner->m_Name = StringID("DiagnosticDemand.Mesh");
+		Mesh* mesh = meshOwner.get();
+		AssetManager::MeshUploadData upload{};
+		upload.m_VerticesData = {Vertex{}, Vertex{}, Vertex{}};
+		upload.m_IndicesData = {0, 1, 2};
+		const MeshID meshId = assets.AddProceduralMesh(std::move(meshOwner), upload);
+		auto modelOwner = std::make_unique<Model>();
+		modelOwner->m_Name = StringID("DiagnosticDemand.Model");
+		modelOwner->m_MeshInstance.push_back({ .m_MeshId = meshId, .m_MaterialId = materialId });
+		Model* model = modelOwner.get();
+		const ModelID modelId = assets.AddProceduralModel(std::move(modelOwner));
+		const bool ready = modelId.IsValid() && harness.PumpUntil([&]()
+			{
+				const Model* current = assets.GetModel(modelId);
+				return current && current->m_ContentState == AssetContentState::Ready &&
+					current->m_ResidencyState == AssetResidencyState::Resident;
+			});
+		context.Check(ready, "Diagnostic demand fixture publishes a resident model and mesh");
+		if (!ready)
+		{
+			return;
+		}
+		World world;
+		auto& registry = world.GetRegistry();
+		const auto entity = registry.create();
+		registry.emplace<components::TransformComponent>(entity);
+		registry.emplace<components::ModelComponent>(entity, modelId);
+		context.Check(!HasMaterialDiagnosticDemand(world, assets),
+			"An ordinary material does not require diagnostic attachments");
+		material->m_DebugView = MaterialDebugView::Normal;
+		context.Check(HasMaterialDiagnosticDemand(world, assets),
+			"Current asset material diagnostics are visible before scene upload or graph construction");
+		auto& instance = registry.emplace<components::MaterialInstanceComponent>(entity);
+		instance.m_Key = RuntimeMaterialKey("DiagnosticDemand.Override");
+		context.Check(!HasMaterialDiagnosticDemand(world, assets),
+			"A valid lit runtime override suppresses its asset material's diagnostic demand");
+		instance.m_Key = {};
+		context.Check(HasMaterialDiagnosticDemand(world, assets),
+			"An invalid runtime material key falls back to the asset's diagnostic material");
+		material->m_DebugView = MaterialDebugView::Lit;
+		instance.m_Key = RuntimeMaterialKey("DiagnosticDemand.Override");
+		instance.m_Properties.m_DebugView = MaterialDebugView::Normal;
+		bool allBuckets = true;
+		for (AlphaMode mode : {AlphaMode::Opaque, AlphaMode::Mask, AlphaMode::Blend})
+		{
+			instance.m_Properties.m_AlphaMode = mode;
+			allBuckets &= HasMaterialDiagnosticDemand(world, assets);
+		}
+		context.Check(allBuckets,
+			"Opaque, alpha-tested and transparent runtime diagnostic materials all require Native composition");
+		bool unavailableExcluded = true;
+		mesh->m_IsUploaded = false;
+		unavailableExcluded &= !HasMaterialDiagnosticDemand(world, assets);
+		mesh->m_IsUploaded = true;
+		mesh->m_ResidencyState = AssetResidencyState::NonResident;
+		unavailableExcluded &= !HasMaterialDiagnosticDemand(world, assets);
+		mesh->m_ResidencyState = AssetResidencyState::Resident;
+		const uint32_t indexCount = mesh->m_IndexCount;
+		mesh->m_IndexCount = 0;
+		unavailableExcluded &= !HasMaterialDiagnosticDemand(world, assets);
+		mesh->m_IndexCount = indexCount;
+		model->m_ContentState = AssetContentState::Loading;
+		unavailableExcluded &= !HasMaterialDiagnosticDemand(world, assets);
+		model->m_ContentState = AssetContentState::Ready;
+		model->m_ResidencyState = AssetResidencyState::NonResident;
+		unavailableExcluded &= !HasMaterialDiagnosticDemand(world, assets);
+		model->m_ResidencyState = AssetResidencyState::Resident;
+		context.Check(unavailableExcluded && HasMaterialDiagnosticDemand(world, assets),
+			"Diagnostic demand follows scene-build readiness and ignores unavailable or empty geometry");
+		instance.m_Properties.m_DebugView = MaterialDebugView::UnfilteredLit;
+		context.Check(!HasMaterialDiagnosticDemand(world, assets),
+			"Leaving diagnostics removes demand immediately; UnfilteredLit requires no diagnostic MRTs");
+		registry.clear();
+		context.Check(!HasMaterialDiagnosticDemand(world, assets),
+			"Removing diagnostic entities leaves no demand from a previous frame");
+	}
+
 	void RunMaterialFrameCacheContractTests(SelfTestContext& context) noexcept
 	{
 		class TextureAccess final : public RenderTextureAssetAccess
@@ -10006,6 +10147,7 @@ namespace gglab
 		RunMaterialDiagnosticPrewarmTests(context);
 		RunMaterialBaselineContractTests(context);
 		RunMaterialFrameCacheContractTests(context);
+		RunMaterialDiagnosticDemandTests(context);
 		RunGGXEnergyCompensationContractTests(context);
 		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };
 		context.Check(!CreateDX12Context(nativeContextDesc, nullptr),

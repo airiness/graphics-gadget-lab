@@ -102,6 +102,12 @@ namespace gglab::forward_shading
 		PostTemporal,
 	};
 
+	// Every bound attachment, including all diagnostic MRTs, belongs to the pass's
+	// raster domain. Empty diagnostics preserve the ordinary color/depth contract.
+	[[nodiscard]] bool AreSceneAttachmentExtentsCompatible(const DepthCoverageRasterDomain& domain,
+		const RHITextureDesc& color, const RHITextureDesc& depth,
+		std::span<const RHITextureDesc> diagnostics) noexcept;
+
 	// Declares the domain's color and material diagnostics as render targets, IBL,
 	// atmosphere and shadow inputs as samples, and the domain's depth as read-only depth.
 	void DeclareSceneInputs(RenderGraph::RGBuilder& builder, const RenderFrameContext& context,
