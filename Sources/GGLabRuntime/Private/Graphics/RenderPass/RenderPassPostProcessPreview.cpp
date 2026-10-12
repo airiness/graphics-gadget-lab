@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
+#include "Graphics/RenderPass/TemporalReferenceGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -178,9 +179,15 @@ namespace gglab
 			std::optional<RHITextureViewDesc> m_ViewDesc;
 		};
 
-		RGTextureId ResolveGTAOPreviewSource(
-			const RGGTAOResources& resources, PostProcessDebugTap tap) noexcept
+		// An ambient-occlusion reference frame presents its running mean as the final AO.
+		RGTextureId ResolveGTAOPreviewSource(const RGGTAOResources& resources,
+			const RGTemporalReferenceResources* reference, PostProcessDebugTap tap) noexcept
 		{
+			if (tap == PostProcessDebugTap::GTAOFinalAO && reference &&
+				reference->m_MeanAmbientOcclusion.IsValid())
+			{
+				return reference->m_MeanAmbientOcclusion;
+			}
 			switch (tap)
 			{
 			case PostProcessDebugTap::GTAORawAO:
@@ -232,7 +239,9 @@ namespace gglab
 		else if (IsGTAOPreview(tap))
 		{
 			const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
-			source.m_Texture = gtao ? ResolveGTAOPreviewSource(*gtao, tap) : RGTextureId{};
+			source.m_Texture = gtao ? ResolveGTAOPreviewSource(*gtao,
+				blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName), tap)
+				: RGTextureId{};
 		}
 		else if (IsDepthPreview(tap))
 		{
@@ -378,9 +387,11 @@ namespace gglab
 		}
 		if (IsGTAOPreview(selection.m_Tap))
 		{
-			const auto& gtaoResources =
-				rg.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
-			const RGTextureId source = ResolveGTAOPreviewSource(gtaoResources, selection.m_Tap);
+			auto& blackboard = rg.GetBlackboard();
+			const auto& gtaoResources = blackboard.Get<RGGTAOResources>(GTAOResourcesName);
+			const RGTextureId source = ResolveGTAOPreviewSource(gtaoResources,
+				blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName),
+				selection.m_Tap);
 			if (!source.IsValid())
 			{
 				registry->InvalidatePostProcessPreview(selection, channel);

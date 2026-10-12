@@ -11,6 +11,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
+#include "Graphics/RenderPass/TemporalReferenceGraphResources.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <cstdint>
@@ -98,7 +99,7 @@ namespace gglab
 				// The reference accumulates the complete composed scene, including
 				// post-temporal geometry; Temporal AA is inactive, so this is the scene color.
 				// An ambient-occlusion reference accumulates the final GTAO visibility instead.
-				RGGTAOResources* gtao = nullptr;
+				const RGGTAOResources* gtao = nullptr;
 				if (signal == TemporalReferenceSignal::AmbientOcclusion)
 				{
 					gtao = &builder.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
@@ -146,10 +147,12 @@ namespace gglab
 				data.m_Height = currentDesc.m_Extent.m_Height;
 
 				// Post-processing presents the running mean of every accumulated sample; an
-				// ambient-occlusion reference presents it through the GTAO preview.
+				// ambient-occlusion reference publishes it for the gtao-final-ao tap and leaves
+				// the GTAO record describing the frame's own visibility.
 				if (gtao)
 				{
-					gtao->m_FinalAO = mean;
+					builder.GetBlackboard().GetOrCreate<RGTemporalReferenceResources>(
+						TemporalReferenceResourcesName).m_MeanAmbientOcclusion = mean;
 				}
 				else
 				{

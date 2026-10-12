@@ -8,7 +8,8 @@ namespace gglab
 	// Evaluation-only supersampled reference accumulation. In a frame that carries a
 	// temporal reference sample, adds the HDR scene color to the persistent sum and
 	// replaces the display view's scene color with the running mean before
-	// post-processing.
+	// post-processing. An ambient-occlusion reference accumulates the final GTAO
+	// visibility and publishes its mean in RGTemporalReferenceResources instead.
 	class RenderPassTemporalReference final : public RenderPassBase
 	{
 	public:

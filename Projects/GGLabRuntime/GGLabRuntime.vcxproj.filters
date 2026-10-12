@@ -1349,6 +1349,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalGeometryGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalReferenceGraphResources.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.h">
       <Filter>Private\Graphics\RenderPipeline</Filter>
     </ClInclude>

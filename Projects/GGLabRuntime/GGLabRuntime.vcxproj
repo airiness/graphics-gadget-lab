@@ -476,6 +476,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalAAGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalReferenceGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\ForwardPlusTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\PipelineTypes.h" />
