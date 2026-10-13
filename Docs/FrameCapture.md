@@ -16,6 +16,7 @@ $session = 'Scripts/GGLabSession.ps1'
 
 | Need | Use |
 | --- | --- |
+| Interactive screenshot or graph export in an ordinary/F5 launch | DevTools **Application > Frame Capture** |
 | One image of one Lab or Demo | `--capture-on-ready` one-shot launch |
 | Several images, views or settings from one process | A session (`GGLabSession.ps1`) |
 | Every authored camera view of the content | `GGLabSession.ps1 batch` |
@@ -26,6 +27,49 @@ $session = 'Scripts/GGLabSession.ps1'
 Sessions and one-shot launches are hidden by default: the window is never shown
 or activated, input is ignored and simulation advances with a fixed 1/60 s step.
 Use `-Visible` only when the owner allows windows on the desktop.
+
+## Interactive capture and graph export
+
+For a normal visible launch, including F5 in Visual Studio or VS Code, open
+DevTools **Application > Frame Capture**. No `--session`, PowerShell command or
+control connection is needed. Keep DevTools enabled (`--no-devtools` removes the
+panel).
+
+- **Capture (F9)** writes the selected Scene or Composited PNG and its JSON
+  metadata sidecar. F9 remains a screenshot hotkey; exporting a graph does not
+  change its Source setting. When ImGui owns keyboard input, use the button or
+  return focus to the rendered view before pressing F9.
+- **Export Graph** writes the full compile and execution records described
+  [below](#render-graph-export).
+- **Export Graph Summary** writes the executed pass order and versioned
+  reads/writes to JSON, without the execution record.
+- Both export buttons share **Timing**, **Settle Frames**, **Reference View**,
+  **Output Directory**, **Label** and **Note** with screenshots. Timing defaults
+  to **Next frame**: the next rendered frame, not the already displayed frame.
+  Select **After ready** to wait for the readiness gates and settle frames.
+  Scene/Composited Source only affects screenshots.
+- The pending count and **Current Frame** readiness gates help explain waiting
+  requests. **History** retains the latest 16 results, showing the captured frame
+  serial and published PNG/JSON paths or a failure. A short notification and the
+  application log also name the actual output file, including graph-only JSON.
+- Click a path in History to copy it. Screenshots show both the PNG and metadata
+  path; graph exports show their single JSON path. Path text and the clipboard
+  use UTF-8; glyph availability follows the configured ImGui font.
+- **Open Output Folder** on a successful result opens that result's actual
+  directory through the Windows Shell. Editing Output Directory afterward does
+  not redirect it. Opening is explicit, never automatic on completion, and is
+  unavailable for unfinished/failed results or hosts without this capability.
+  The adapter does not create directories or open files with their associated
+  applications. Missing/inaccessible directories or Shell errors appear next to
+  the button without changing the capture's completed status. Acceptance by the
+  Shell does not guarantee that an Explorer window has appeared.
+
+The Windows adapter and `Shell32.lib` dependency belong only to WinApp;
+AppRuntime/Runtime still handle scheduling, fenced completion and publication
+without a Shell dependency. Hidden launches have no folder-opening callback.
+Graph export does not add GPU observation nodes or queries; per-pass timing,
+build identity and shader artifact identity retain their explicit unavailable
+status. Disable observation tools for performance measurements.
 
 ## One-shot capture
 

@@ -255,6 +255,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Shell.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32UnattendedProcess.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
@@ -268,6 +271,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationFrameCaptureSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp">
@@ -623,6 +629,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Shell.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32UnattendedProcess.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
@@ -636,6 +645,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationFrameCaptureSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h">
