@@ -16,8 +16,13 @@ namespace gglab
 		RGTextureId m_ResolvedSceneColor{};
 		// The selected TAA preview payload. Normally RGBA = history weight,
 		// rejection reason, previous U, previous V. TemporalHistoryColor carries
-		// current accumulated color; TemporalHistoryAge carries normalized NextAge.
+		// current accumulated color; TemporalHistorySamples carries the normalized next
+		// accumulation state.
 		RGTextureId m_ReprojectionDiagnostics{};
+		// Display-extent raw depth of the nearest render sample, resolved when the render
+		// extent is smaller; it becomes the post-temporal display depth.
+		RGTextureId m_DisplayDepthSource{};
+		// Display extent of the resolve output.
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 
@@ -34,10 +39,40 @@ namespace gglab
 		return tap == PostProcessDebugTap::TemporalHistoryColor;
 	}
 
-	[[nodiscard]] constexpr bool UsesTemporalAAHistoryAgePreviewPayload(
+	[[nodiscard]] constexpr bool UsesTemporalAAHistorySamplesPreviewPayload(
 		PostProcessDebugTap tap) noexcept
 	{
-		return tap == PostProcessDebugTap::TemporalHistoryAge;
+		return tap == PostProcessDebugTap::TemporalHistorySamples;
+	}
+
+	[[nodiscard]] constexpr bool UsesTemporalAAClipDistancePreviewPayload(
+		PostProcessDebugTap tap) noexcept
+	{
+		return tap == PostProcessDebugTap::TemporalClipDistance;
+	}
+
+	[[nodiscard]] constexpr bool UsesTemporalAAHistoryRelaxationPreviewPayload(
+		PostProcessDebugTap tap) noexcept
+	{
+		return tap == PostProcessDebugTap::TemporalHistoryRelaxation;
+	}
+
+	// Taps read from the Temporal AA diagnostics texture.
+	[[nodiscard]] constexpr bool IsTemporalAADiagnosticsTap(PostProcessDebugTap tap) noexcept
+	{
+		switch (tap)
+		{
+		case PostProcessDebugTap::TemporalHistoryColor:
+		case PostProcessDebugTap::TemporalReprojectionUV:
+		case PostProcessDebugTap::TemporalRejection:
+		case PostProcessDebugTap::TemporalHistoryWeight:
+		case PostProcessDebugTap::TemporalHistorySamples:
+		case PostProcessDebugTap::TemporalClipDistance:
+		case PostProcessDebugTap::TemporalHistoryRelaxation:
+			return true;
+		default:
+			return false;
+		}
 	}
 
 	[[nodiscard]] inline RGTextureId ResolveTemporalAAPreviewSource(
@@ -49,7 +84,9 @@ namespace gglab
 		case PostProcessDebugTap::TemporalReprojectionUV:
 		case PostProcessDebugTap::TemporalRejection:
 		case PostProcessDebugTap::TemporalHistoryWeight:
-		case PostProcessDebugTap::TemporalHistoryAge:
+		case PostProcessDebugTap::TemporalHistorySamples:
+		case PostProcessDebugTap::TemporalClipDistance:
+		case PostProcessDebugTap::TemporalHistoryRelaxation:
 			return resources.m_ReprojectionDiagnostics;
 		default:
 			return {};

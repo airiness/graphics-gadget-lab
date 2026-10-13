@@ -133,4 +133,9 @@ namespace gglab
 	{
 		m_Runtime.OnFrameSubmitted(feedback);
 	}
+
+	void DemoLabHost::OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+	{
+		m_Runtime.OnCameraPathFrameApplied(path, frame);
+	}
 }

@@ -12,6 +12,7 @@
 
 namespace gglab
 {
+	class GGLabAppRuntime;
 	// Interactive capture front end shared by the capture hotkey and the
 	// DevelopGui capture panel. It submits requests with the current interactive
 	// settings, logs every finished capture and keeps a short display history.
@@ -39,7 +40,7 @@ namespace gglab
 
 		static constexpr size_t MaxHistoryEntries = 16;
 
-		ApplicationFrameCapture(FrameCaptureCoordinator& coordinator,
+		ApplicationFrameCapture(GGLabAppRuntime& runtime,
 			std::filesystem::path defaultOutputDirectory) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ApplicationFrameCapture);
 		~ApplicationFrameCapture() = default;
@@ -76,6 +77,7 @@ namespace gglab
 		[[nodiscard]] uint32_t GetSettledFrameCount() const noexcept;
 
 	private:
+		GGLabAppRuntime* m_Runtime = nullptr;
 		FrameCaptureCoordinator* m_Coordinator = nullptr;
 		std::filesystem::path m_DefaultOutputDirectory;
 		Settings m_Settings{};

@@ -20,6 +20,7 @@ $session = 'Scripts/GGLabSession.ps1'
 | Several images, views or settings from one process | A session (`GGLabSession.ps1`) |
 | Every authored camera view of the content | `GGLabSession.ps1 batch` |
 | DX12 and Vulkan agreement | Two sessions, `batch` on each, `CompareCaptures.ps1` |
+| Temporal behavior along a fixed camera motion | `GGLabSession.ps1 sequence` |
 
 Sessions and one-shot launches are hidden by default: the window is never shown
 or activated, input is ignored and simulation advances with a fixed 1/60 s step.
@@ -74,16 +75,35 @@ output, and captures go to `Captures/` unless `-OutputDirectory` is given.
 
 - **Source.** `scene` (default) is the post-processed image without IBL
   previews, the always-visible debug overlay or tooling UI. `composited` is the
-  final presented image, including overlays and DevTools UI.
+  final presented image, including overlays and DevTools UI. `diagnostic`
+  records one diagnostic tap named by `-DiagnosticTap`, rendered at display
+  resolution with the post-process preview encoding: `temporal-motion-direction`,
+  `temporal-motion-magnitude`, `temporal-history-color`,
+  `temporal-reprojection-uv`, `temporal-rejection`, `temporal-history-weight`,
+  `temporal-history-samples`, `temporal-clip-distance`,
+  `temporal-history-relaxation`, `scene-depth-raw`,
+  `scene-depth-linear-view-z` and the
+  `gtao-*` taps. A tap whose feature produced nothing in that frame, such as a
+  temporal tap with Temporal AA inactive, fails the capture.
+  A frame records one diagnostic tap. Concurrent ordinary requests for the same
+  tap may share that frame; a different tap waits before being issued, so its
+  camera, time and temporal metadata come from the frame that records it.
 - **Timing.** `after-ready` (session default) waits until every readiness gate
-  is ready and then for `-SettleFrames` submitted frames with an unchanged
-  settle key (temporal session, camera cut, display view, size and Demo).
-  `next-frame` captures the next recorded frame, even while loading.
+  is ready, then counts `-SettleFrames` successfully submitted frames. A content
+  switch, camera cut, lost history or configuration change that resets temporal
+  history restarts settling, even when the window size stays the same.
+  History rendered while loading is reset before settling begins. Simulation
+  time holds until then. Captures without active temporal effects still settle
+  normally.
+  `next-frame` captures the next eligible frame, even while loading. A conflicting
+  diagnostic tap can delay an ordinary request before issuance.
 - **Readiness gates.** `shaders`, `content-transition`, `content`, `lab`,
-  `environment`, `ibl` and `asset-uploads`. A pending gate keeps an
-  after-ready capture waiting; `status` shows its detail. A failed gate fails
-  the waiting after-ready captures of that content at once, with the gate's
-  detail as the reason; submit them again after fixing the cause.
+  `environment`, `ibl`, `asset-loads` and `asset-uploads`. A pending gate keeps
+  an after-ready capture waiting; `status` shows its detail. A gate that leaves
+  Ready restarts settling, but does not rewind simulation time already advanced.
+  A failed gate fails the waiting after-ready captures of that content at once,
+  with the gate's detail as the reason; submit them again after fixing the
+  cause.
 - **Content.** `-RequiredContentId` additionally waits until that Lab or Demo
   id is active.
 - **Label and note.** `-Label` names the files and is stored with `-Note` in the
@@ -121,22 +141,172 @@ writing to the same directory, is never replaced: the capture takes the next
 free suffix (`-2`, `-3`, ...), and its sidecar's `image.file` names the PNG it
 belongs to.
 
-The dedicated writer thread runs one job with at most eight pending jobs. A new
-capture fails with `Capture writer queue is full.` when the pending queue is full.
+Capture capacity is bounded:
+
+| Limit | Capacity |
+| --- | --- |
+| Captures awaiting GPU completion or file writing | 9 total; at most 8 wait behind the running writer |
+| Runtime requests, including unconsumed results | 64 |
+| Distinct captured images in flight | 8, sharing a 256 MiB raw-image budget |
+
+The byte budget covers GPU readback and CPU image storage, excluding PNG output
+and encoder working memory. An ordinary capture without capacity fails before
+GPU submission. Sequences wait for temporary capacity pressure to clear; an
+unsupported or oversized image fails explicitly.
+
+Each issued capture stays bound to its recorded frame and metadata. If that
+frame aborts, fails submission or does not record the requested source, the
+capture fails; submit a new request to retry.
 
 The PNG and JSON sidecar are each written completely to temporary `.partial`
 files before publication. They are published separately, so either file may
 appear before the pair is complete. When the process shuts down it waits for
 unfinished writing up to 30 seconds in total. Captures still unfinished then
-fail: jobs that have not claimed publication are abandoned and never publish
-their files. Jobs that already claimed publication have an indeterminate
-outcome; their files may already exist or appear later, despite the failed result.
+fail. Files already being published may still appear after that failure; use
+the command result to determine whether the capture completed.
 
 The sidecar (`schemaVersion` 1) records the request (label, note, source,
-timing, settle frames), backend, Demo and Lab ids, frame serial and index, image
-size and display format, camera pose and `referenceView`, fixed time step and
-total time, whether DevTools were active, every readiness gate, and the UTC
-capture time.
+diagnostic tap, timing, settle frames), backend, Demo and Lab ids, frame serial
+and index, image size and display format, camera pose and `referenceView`, fixed
+time step and total time, whether DevTools were active, every readiness gate,
+and the UTC capture time. `temporal` records the Temporal AA frame plan
+(requested, status, disable reason), temporal session and reset identities, jitter index, sequence
+length and offset in pixels, the resolved Temporal AA settings, and the render
+and display extents. `sequence` names the camera path, its version, the
+sequence frame and frame count, or is null outside a sequence.
+
+## Sequences
+
+Content may register camera paths: versioned main-camera motions whose pose is
+a function of the sequence frame only, such as `SEQ_DollyDoorway` for the coastal
+retreat (`-Demo atrium`). A sequence plays one path and captures the requested
+frames:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_DollyDoorway -CaptureFrames '0,90,179' -Label dolly-taa
+```
+
+- Frame 0 starts after a rendered frame reports every readiness gate ready.
+  Each submitted frame then advances the path by exactly one frame; a frame that
+  ends without submission is posed again.
+- Frame 0 and every cut key of the path are camera cuts that reset temporal
+  history and the jitter sequence, so a replay starts from the same temporal
+  state. An unexpected history reset, loss of compatible history, content change
+  or readiness gate leaving Ready fails the sequence. A path cut permits
+  its camera reset and cold history, but does not permit simultaneous changes
+  to resolution, accumulation model or active temporal effects.
+- Each requested frame is captured on exactly that frame as a next-frame capture
+  labelled `<label>-f<frame>`; the label defaults to the path id. Every frame of
+  a path may be captured (`-CaptureFrames '0-179'`): when capture capacity is
+  temporarily full, the session waits before the next requested capture frame,
+  without advancing simulation time, the path or its reference sample. An
+  unsupported or oversized target fails the sequence instead of deferring forever.
+  If another diagnostic tap occupies an exact requested sequence frame, that
+  capture fails rather than silently substituting a later path frame. An issued
+  capture on an aborted frame also fails; a frame aborted before any capture was
+  issued remains eligible for the normal pose replay.
+- `sequence` waits until the sequence and its captures finish unless `-NoWait`;
+  `status` reports the active or last sequence, and `sequence-cancel` stops it.
+  One sequence runs at a time; avoid submitting capture views while it runs.
+
+A sequence records one evidence channel per run: the scene, or one diagnostic
+tap with `-Source diagnostic -DiagnosticTap <tap>`. Replay the path once per
+channel; the frames correspond because the replay is deterministic.
+
+### Supersampled reference
+
+`-ReferenceSamples <n>` (1 to 4096) renders every sequence frame as a
+supersampled reference instead of the production temporal path. Each frame is
+rendered n times with Temporal AA inactive, the camera at the frame's pose and
+simulation time held; every sample uses one Halton(2, 3) jitter phase (the first
+eight equal the production TAA phases). Each sample contributes HDR scene color,
+including transparent and depth-tested debug geometry. The mean of n samples is
+post-processed for the captured image: a one-pixel box reconstruction filter.
+Unlike the production path, transparent geometry is part of the accumulated image.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_StaticRailings -CaptureFrames 0 -ReferenceSamples 256 -Label static-ref
+```
+
+`-ReferenceTextureLodBias <b>` adds b to the material texture LOD of every
+reference sample. The default 0 filters textures for the whole pixel before the
+samples are averaged; `-0.5 * log2(n)` filters each sample for its own sub-pixel
+footprint instead, which keeps texture detail that a pixel-sized prefilter removes.
+
+A reference renders n frames per sequence frame for the whole path; capture
+the frames you need and cancel with `sequence-cancel` once their captures
+finished. Choose n by comparing references of n and 2n samples. Sidecars record
+`sequence.referenceSamples`, and `temporal` shows Temporal AA as disabled with
+the reference jitter index and sample count.
+
+### Temporal AA evaluation
+
+`-TemporalAA "name=value,..."` replaces display-view Temporal AA settings for
+every frame of the sequence, so one replay evaluates one configuration from the
+history reset at frame 0. Omitted settings keep the active content's values.
+Built-in defaults are listed for reference; a Lab or Demo may supply different
+values. Numeric ranges include both endpoints; out-of-range values are rejected
+rather than clamped.
+
+| Setting | Accepted values | Built-in default | Meaning |
+| --- | --- | --- | --- |
+| `enabled` | `true`, `false` | `false` | Request Temporal AA. |
+| `maxHistoryFeedback` | 0 to 0.99 | 0.97 | Maximum history feedback. |
+| `depthAbsoluteThreshold` | 0 to 1 | 0.05 | Absolute depth rejection threshold. |
+| `depthRelativeThreshold` | 0 to 1 | 0.02 | Relative depth rejection threshold. |
+| `velocityWeightScale` | 0 to 1 | 0.075 | History confidence reduction with motion. |
+| `luminanceWeightScale` | 0 to 16 | 0 | History confidence reduction with luminance changes. |
+| `neighborhoodClampExpansion` | 0 to 1 | 0 | Neighborhood clamp expansion. |
+| `historyRelaxation` | 0 to 4 | 1 | Further box expansion for history disagreement that alternates in sign. |
+| `historyAccumulation` | `effective-samples`, `compatibility-age` | `effective-samples` | History accumulation model; changing it resets history. |
+| `historyRectification` | `minmax-clamp`, `variance-clip`, `bounded-variance-clip` | `minmax-clamp` | History rectification method. |
+| `varianceClipGamma` | 0.25 to 4 | 1 | Variance clipping bound scale. |
+| `historyFilter` | `catmull-rom-clamped`, `bilinear` | `catmull-rom-clamped` | History color reconstruction filter. |
+| `currentFilter` | `gaussian`, `point` | `gaussian` | Current-frame reconstruction filter. |
+| `motionSelection` | `closest-depth`, `center` | `closest-depth` | Motion-vector selection. |
+| `postTemporalView` | `unjittered`, `jittered` | `unjittered` | Raster view for transparent and debug geometry drawn after the resolve. |
+| `resolutionPreset` | `native`, `quality` | `native` | Quality renders at 2/3 of the display extent while an active Temporal AA resolve can upscale. |
+| `textureLodBiasOffset` | -2 to 1 | -1 | Additional material texture LOD bias while Temporal AA is active. |
+
+Sidecars record the effective settings in `temporal`. Temporal AA overrides
+cannot be combined with `-ReferenceSamples`.
+
+### GPU timing
+
+`-GpuTiming` measures every successfully submitted sequence render, including
+frame zero, camera cuts and each reference sample. There is no warmup skip.
+The sequence status reports, for the whole frame and each scope such as
+`PostProcess.TemporalAA`, the sample count and the mean, median, 90th percentile,
+minimum and maximum in milliseconds.
+
+After the last sequence render, `finishing` waits for both capture writes and
+all pending profiles. Profiling returns to its prior state when timing collection
+ends. A missing profile fails the sequence after 64 later successful runtime
+submissions; polling, deferred frames and aborted renders do not consume this
+budget. Unavailable/disabled profiling or a bound profile with invalid durations
+also fails explicitly. Failed or cancelled sequences retain their collected
+partial statistics, which must not be treated as a complete run.
+
+For a completed timed sequence,
+`gpuTiming.frames` equals `frameCount` multiplied by `max(1, referenceSamples)`;
+an individual scope counts only renders that recorded it. Ordinary frames before
+or after the sequence, unsubmitted renders and duplicate profiles do not
+contribute. These statistics cover the full sequence, independently of the
+Temporal AA Lab's interactive timing window.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_StaticRailings -CaptureFrames 95 -GpuTiming `
+    -TemporalAA 'neighborhoodClampExpansion=1' -Label static-wide-clamp
+```
+
+Profiling adds timestamp queries but does not change the rendered image. Time
+Release builds and compare configurations within one session and backend.
+
+Replays are deterministic only for content whose state depends on the sequence
+frame alone. Check it by playing the same path twice and comparing the captures.
 
 ## Comparing captures
 

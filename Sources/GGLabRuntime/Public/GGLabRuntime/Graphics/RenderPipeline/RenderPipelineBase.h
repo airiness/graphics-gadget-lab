@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 
 #include <cstdint>
 #include <span>
@@ -75,6 +76,8 @@ namespace gglab
 			info.m_DepthVelocityPathAvailable = false;
 			info.m_SceneExtensionParticipation =
 				SceneExtensionTemporalParticipation::TemporalUnsupported;
+			// A pipeline without GTAO has no visibility to accumulate.
+			info.m_AmbientOcclusionAvailable = false;
 			return gglab::ResolveTemporalFramePlan(info);
 		}
 

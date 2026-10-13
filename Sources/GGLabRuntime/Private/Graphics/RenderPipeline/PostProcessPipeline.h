@@ -10,6 +10,10 @@ namespace gglab
 	public:
 		void AddPasses(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept;
+		// Records the display-resolution target of a pending Diagnostic capture, or
+		// fails its requests when the frame has no source for the tap.
+		void AddDiagnosticCapturePass(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services) noexcept;
 
 	private:
 		RenderPassBloom m_BloomPass;

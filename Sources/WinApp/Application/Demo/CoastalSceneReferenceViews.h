@@ -11,7 +11,7 @@ namespace gglab
 
 	// Blender (X, Y, Z) -> runtime (X, Z, Y), meters. Perspective, vertical FOV.
 	// Profile 2 pairs all retained poses with physical daylight and the distant coastal range.
-	inline const std::array<CameraReferenceView, 13> CoastalSceneReferenceViews = { {
+	inline const std::array<CameraReferenceView, 14> CoastalSceneReferenceViews = { {
 		{
 			.m_Id = "CAM_Courtyard",
 			.m_Name = "Courtyard",
@@ -167,6 +167,19 @@ namespace gglab
 			.m_FarPlane = 6000.0f,
 			.m_ManualEV100 = CoastalSceneManualEV100,
 			.m_ReferenceAspect = 1.6f,
+		},
+		// Temporal evaluation view (not an authored camera): through the sea terrace's
+		// alpha-blended guard glass toward the sun glint, dock and lifebuoy.
+		{
+			.m_Id = "Retreat_GlassTerrace",
+			.m_Name = "Retreat Glass Terrace",
+			.m_Purpose = "Guard glass over sea highlights, posts, dock and lifebuoy.",
+			.m_ProfileVersion = 2,
+			.m_Position = { 2.5f, 3.1f, -8.7f },
+			.m_Target = { 9.0f, 2.1f, -18.0f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.7984415392f),
+			.m_FarPlane = 6000.0f,
+			.m_ManualEV100 = CoastalSceneManualEV100,
 		},
 	} };
 }

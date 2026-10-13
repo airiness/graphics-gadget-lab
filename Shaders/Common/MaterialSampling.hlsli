@@ -63,6 +63,25 @@ float4 SampleTextureBinding(TextureSamplerBindingData bindingData, float2 uv)
 	return SampleTexture2D(bindingData.TextureIndex, bindingData.SamplerIndex, uv);
 }
 
+// View-level LOD bias of material texture samples (ViewData.TextureLodBias), added to
+// the asset-owned sampler bias. Pixel shader entry points that sample materials set it
+// from their view before sampling; it stays zero elsewhere, for example in shadow
+// views.
+static float g_MaterialTextureLodBias = 0.0;
+
+void SetMaterialTextureLodBias(float lodBias)
+{
+	g_MaterialTextureLodBias = lodBias;
+}
+
+// Material texture sample with the view-level LOD bias.
+float4 SampleMaterialTextureBinding(TextureSamplerBindingData bindingData, float2 uv)
+{
+	Texture2D<float4> tex = GetTexture2DFloat4(bindingData.TextureIndex);
+	SamplerState samp = GetSamplerState(bindingData.SamplerIndex);
+	return tex.SampleBias(samp, uv, g_MaterialTextureLodBias);
+}
+
 // Sample texture2DLevel with binding data
 float4 SampleTextureBindingLevel(TextureSamplerBindingData bindingData, float2 uv, float lod)
 {

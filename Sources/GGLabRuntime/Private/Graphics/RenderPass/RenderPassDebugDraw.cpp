@@ -85,6 +85,13 @@ namespace gglab
 		EnsureInitialized(services);
 		const auto* contextPtr = &context;
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		// World debug geometry composes after the temporal resolve, in the display raster
+		// view of post-temporal composition.
+		const DepthCoverageRasterDomain& postTemporalDomain =
+			context.GetRenderQueue(displayViewId).m_PostTemporalRasterDomain;
+		const uint32_t viewIndex = postTemporalDomain.IsValid()
+			? postTemporalDomain.m_ViewBindingId
+			: static_cast<uint32_t>(utils::ToIndex(displayViewId));
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
 			[frame, scene, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
@@ -94,13 +101,14 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				if (scene)
 				{
-					auto& sceneDepth =
-						builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
-					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
-					data.m_Color = targets.m_SceneColor;
+					// Depth-tested world geometry composes after the temporal resolve.
+					auto& displayDepth = builder.GetBlackboard().Get<RGDisplayDepthResources>(
+						DisplayDepthResourcesName);
+					builder.ReadWriteInPlace(targets.m_DisplayColor, RGTextureAccess::RenderTarget);
+					data.m_Color = targets.m_DisplayColor;
 					data.m_Depth =
-						builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
-					RHITextureViewDesc dsvDesc = sceneDepth.m_DsvDesc;
+						builder.Read(displayDepth.m_Texture, RGTextureAccess::DepthStencilRead);
+					RHITextureViewDesc dsvDesc = displayDepth.m_DsvDesc;
 					dsvDesc.m_ReadOnlyDepth = true;
 					data.m_Dsv =
 						builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, dsvDesc);
@@ -116,10 +124,12 @@ namespace gglab
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Color);
 				data.m_VertexBuffer = frame.m_VertexBuffer;
 				data.m_VertexBufferOffset = frame.m_VertexBufferOffset;
-				data.m_Width = targets.m_Width;
-				data.m_Height = targets.m_Height;
+				// Scene debug geometry composes after the temporal resolve and overlays into
+				// the back buffer, so both draw at the display extent.
+				data.m_Width = targets.m_DisplayWidth;
+				data.m_Height = targets.m_DisplayHeight;
 			},
-			[this, contextPtr, &services, scene, displayViewId](
+			[this, contextPtr, &services, scene, viewIndex](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -156,7 +166,7 @@ namespace gglab
 					0, std::span<const RHIVertexBufferBinding>(&binding, 1));
 
 				auto draw =
-					[this, contextPtr, commandContext, services, displayViewId](
+					[this, contextPtr, commandContext, services, viewIndex](
 						const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
 					{
 						if (range.IsEmpty())
@@ -175,7 +185,7 @@ namespace gglab
 							? RHIPrimitiveTopology::TriangleList
 							: RHIPrimitiveTopology::LineList);
 						const DebugDrawPassParameters parameters{
-							.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+							.ViewIndex = viewIndex,
 							.Flags = flags,
 						};
 						commandContext->SetPushConstants(

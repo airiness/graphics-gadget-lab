@@ -127,5 +127,12 @@ struct ViewData
 	uint PreviousDepthConvention;
 	float ScenePreExposure;
 	float PreviousScenePreExposure;
-	uint Padding;
+	// Frames since the view's temporal history was reset; seeds temporal noise.
+	uint TemporalFrameIndex;
+	// Added to the LOD of material texture samples: log2(render / display) plus the
+	// temporal offset while Temporal AA is active, or a reference's own bias.
+	float TextureLodBias;
+	uint Padding0;
+	uint Padding1;
+	uint Padding2;
 };

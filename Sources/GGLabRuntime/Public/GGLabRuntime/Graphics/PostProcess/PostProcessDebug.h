@@ -40,7 +40,7 @@ namespace gglab
 		TemporalReprojectionUV = 17,
 		TemporalRejection = 18,
 		TemporalHistoryWeight = 19,
-		TemporalHistoryAge = 20,
+		TemporalHistorySamples = 20,
 
 		AtmosphereTransmittance = 21,
 		AtmosphereMultipleScattering = 22,
@@ -48,7 +48,15 @@ namespace gglab
 		AtmosphereAerialTransmittance = 24,
 		AtmosphereAerialInScattering = 25,
 
-		Count = 26
+		// How far rectification moved accepted history, relative to the neighborhood box.
+		TemporalClipDistance = 26,
+		// Fraction of the configured history relaxation that widened the neighborhood box.
+		TemporalHistoryRelaxation = 27,
+		// Effective sample count of GTAO's own visibility history over its configured maximum;
+		// available only while temporal GTAO keeps that history.
+		GTAOHistorySamples = 28,
+
+		Count = 29
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -70,8 +78,11 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalRejection) == 18);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 26);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistorySamples) == 20);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::GTAOHistorySamples) == 28);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 29);
 
 	struct PostProcessDebugSelection
 	{

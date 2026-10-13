@@ -213,6 +213,12 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabDiagnostics.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabGpuTiming.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -304,6 +310,12 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabGpuTimingSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
@@ -479,6 +491,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneCameraPaths.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneReferenceViews.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
@@ -558,6 +573,12 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabDiagnostics.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabGpuTiming.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h">
@@ -648,6 +669,12 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabGpuTimingSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">
@@ -910,6 +937,15 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -935,6 +971,12 @@
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryAccumulationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryClipContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl">

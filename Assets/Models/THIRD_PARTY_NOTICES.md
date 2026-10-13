@@ -13,6 +13,17 @@ entries for the sample assets currently copied into this repository.
 Unless otherwise noted, local copies are used for renderer and asset-loading
 tests and have only been reorganized into this project's asset tree.
 
+## Original project assets
+
+| Local path | Source | Copyright / rights holder | License | Attribution |
+| --- | --- | --- | --- | --- |
+| `GGLabCoastalRetreat/` | Original GGLab procedural coastal scene, including the island, architecture, glazing, furniture, planting, dock and all 24 PNG textures | (c) 2026 airiness | Project MIT license, [LICENSE](../../LICENSE) | GGLab project; no third-party models or textures |
+
+The installed Retreat bundle is self-contained. Its editable authoring source
+is maintained separately and is not a build, loading or validation dependency
+of this public repository. The alpha-blend glass profile is documented in the
+[bundle README](GGLabCoastalRetreat/README.md).
+
 ## Licenses
 
 - CC BY 4.0 International: https://creativecommons.org/licenses/by/4.0/legalcode

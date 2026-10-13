@@ -28,6 +28,7 @@ namespace gglab
 		void OnExit() noexcept override;
 		void Update() noexcept override;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override;
+		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
 
 		World& GetWorld() noexcept override { return m_Runtime.GetWorld(); }
 		Camera& GetCamera() noexcept override { return m_Runtime.GetCamera(); }

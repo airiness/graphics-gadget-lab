@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "Graphics/RenderWorldExtractor.h"
@@ -33,8 +34,7 @@ namespace gglab
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
-			uint32_t m_WindowWidth = 0;
-			uint32_t m_WindowHeight = 0;
+			ViewResolution m_ViewResolution{};
 			uint32_t m_FrameSlotIndex = 0;
 			uint32_t m_BackBufferIndex = 0;
 			uint64_t m_FrameSerial = 0;

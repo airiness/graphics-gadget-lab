@@ -43,13 +43,19 @@ namespace gglab
 	{
 		bool m_Enabled = true;
 		float m_Radius = 1.0f;
-		float m_FalloffStart = 0.1f;
+		// Samples fade toward the unoccluded horizon between these distances.
+		float m_FalloffStart = 0.9f;
 		float m_FalloffEnd = 1.0f;
-		float m_Thickness = 0.25f;
 		float m_Power = 1.0f;
 		uint32_t m_DirectionCount = 2;
-		uint32_t m_StepCount = 4;
+		uint32_t m_StepCount = 6;
 		uint32_t m_DenoiseRadius = 3;
+		// Advances the sampling pattern every submitted frame as a temporal consumer of the
+		// display view: the Temporal AA resolve integrates it when active, and GTAO's own
+		// visibility history otherwise.
+		bool m_TemporalAccumulation = true;
+		// Effective sample count beyond which GTAO's own history gains no more weight.
+		uint32_t m_TemporalMaxSamples = 8;
 		GTAOFinalAOFormatPreference m_FinalAOFormatPreference =
 			GTAOFinalAOFormatPreference::PreferR8Unorm;
 	};

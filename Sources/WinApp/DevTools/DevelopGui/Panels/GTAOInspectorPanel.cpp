@@ -57,6 +57,8 @@ namespace gglab
 				return "Final AO Visibility";
 			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
 				return "AO-only Lighting Contribution";
+			case PostProcessDebugTap::GTAOHistorySamples:
+				return "History Samples";
 			default:
 				return "GTAO Preview";
 			}
@@ -73,6 +75,7 @@ namespace gglab
 				PostProcessDebugTap::GTAODenoiseY,
 				PostProcessDebugTap::GTAOFinalAO,
 				PostProcessDebugTap::GTAOAOOnlyLightingContribution,
+				PostProcessDebugTap::GTAOHistorySamples,
 			};
 			bool changed = false;
 			if (ImGui::BeginCombo("Preview Tap##GTAO", GetTapName(tap)))
@@ -103,14 +106,6 @@ namespace gglab
 				"Falloff Start", &settings.m_FalloffStart, 0.01f, 0.0f, 10.0f, "%.3f m");
 			ImGui::DragFloat(
 				"Falloff End", &settings.m_FalloffEnd, 0.01f, 0.0f, 10.0f, "%.3f m");
-			ImGui::DragFloat(
-				"Thickness Bias", &settings.m_Thickness, 0.005f, 0.0f, 10.0f, "%.3f m");
-			if (ImGui::IsItemHovered())
-			{
-				ImGui::SetTooltip(
-					"Rejects near self-occlusion in the current horizon approximation. Lower values "
-					"produce stronger contact occlusion.");
-			}
 			ImGui::DragFloat("Power", &settings.m_Power, 0.02f, 0.1f, 8.0f, "%.2f");
 			if (ImGui::IsItemHovered())
 			{
@@ -130,6 +125,13 @@ namespace gglab
 			if (ImGui::SliderInt("Denoise Radius", &denoiseRadius, 1, GTAOMaxDenoiseRadius))
 			{
 				settings.m_DenoiseRadius = static_cast<uint32_t>(denoiseRadius);
+			}
+			ImGui::Checkbox("Temporal Accumulation", &settings.m_TemporalAccumulation);
+			int temporalMaxSamples = static_cast<int>(settings.m_TemporalMaxSamples);
+			if (ImGui::SliderInt(
+				"Temporal Max Samples", &temporalMaxSamples, 1, GTAOMaxTemporalSamples))
+			{
+				settings.m_TemporalMaxSamples = static_cast<uint32_t>(temporalMaxSamples);
 			}
 			const char* formats[] = { "Prefer R8 Unorm", "Force R16 Float" };
 			int format = static_cast<int>(settings.m_FinalAOFormatPreference);
@@ -251,8 +253,6 @@ namespace gglab
 				resolved.m_FalloffStart);
 			drawFloat("Falloff End", authoring.m_FalloffEnd, requested.m_FalloffEnd,
 				resolved.m_FalloffEnd);
-			drawFloat("Thickness Bias", authoring.m_Thickness, requested.m_Thickness,
-				resolved.m_Thickness);
 			drawFloat("Power", authoring.m_Power, requested.m_Power, resolved.m_Power);
 			drawUInt("Directions", authoring.m_DirectionCount, requested.m_DirectionCount,
 				resolved.m_DirectionCount);
@@ -260,6 +260,11 @@ namespace gglab
 				resolved.m_StepCount);
 			drawUInt("Denoise Radius", authoring.m_DenoiseRadius, requested.m_DenoiseRadius,
 				resolved.m_DenoiseRadius);
+			drawText("Temporal Accumulation", authoring.m_TemporalAccumulation ? "Yes" : "No",
+				requested.m_TemporalAccumulation ? "Yes" : "No",
+				resolved.m_TemporalAccumulation ? "Yes" : "No");
+			drawUInt("Temporal Max Samples", authoring.m_TemporalMaxSamples,
+				requested.m_TemporalMaxSamples, resolved.m_TemporalMaxSamples);
 			const auto formatName = [](GTAOFinalAOFormatPreference preference) noexcept
 				{
 					return preference == GTAOFinalAOFormatPreference::PreferR8Unorm
@@ -286,8 +291,10 @@ namespace gglab
 			const auto preview = view->GetPostProcessPreviewDiagnostics(Channel);
 			ImGui::BeginDisabled(!control);
 			PostProcessDebugSelection selection = preview.m_Selected;
-			if (selection.m_Tap < PostProcessDebugTap::GTAORawAO ||
-				selection.m_Tap > PostProcessDebugTap::GTAOAOOnlyLightingContribution)
+			const bool gtaoTap = (selection.m_Tap >= PostProcessDebugTap::GTAORawAO &&
+				selection.m_Tap <= PostProcessDebugTap::GTAOAOOnlyLightingContribution) ||
+				selection.m_Tap == PostProcessDebugTap::GTAOHistorySamples;
+			if (!gtaoTap)
 			{
 				selection.m_Tap = PostProcessDebugTap::GTAOFinalAO;
 			}
@@ -302,6 +309,12 @@ namespace gglab
 			if (selection.m_Tap == PostProcessDebugTap::GTAOFinalAO)
 			{
 				ImGui::TextDisabled("FinalAO is visibility: white is unoccluded, black is occluded.");
+			}
+			else if (selection.m_Tap == PostProcessDebugTap::GTAOHistorySamples)
+			{
+				ImGui::TextDisabled(
+					"Effective history samples over the maximum; GTAO keeps its own history only "
+					"without Temporal AA.");
 			}
 			else if (selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution)
 			{

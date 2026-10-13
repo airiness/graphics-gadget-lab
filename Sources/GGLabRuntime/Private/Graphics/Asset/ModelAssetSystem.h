@@ -49,6 +49,10 @@ namespace gglab
 		{
 			std::erase_if(m_PendingModels, std::forward<Predicate>(predicate));
 		}
+		[[nodiscard]] size_t GetPendingModelCount() const noexcept
+		{
+			return m_PendingModels.size();
+		}
 
 	private:
 		MeshStore m_MeshStore;

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 namespace gglab
 {
@@ -27,9 +28,17 @@ namespace gglab
 		[[nodiscard]] virtual bool HasPendingRequests(FrameCaptureSource source) const noexcept = 0;
 		// Binds every queued request for the source to the frame and returns the
 		// readback target that the frame's tap pass must fill. Returns nullopt when
-		// nothing is queued; requests that the display target cannot satisfy
-		// finish as Failed instead of being bound.
+		// nothing is queued; requests that the display target or payload budget cannot satisfy
+		// finish as Failed instead of being bound. A Diagnostic tap binds only the
+		// requests for the pending diagnostic tap. Frame-restricted requests bind
+		// only to their named frame.
 		[[nodiscard]] virtual std::optional<FrameCaptureTapTarget> BindTap(uint64_t frameSerial,
 			FrameCaptureSource source, const RHITextureDesc& displayTargetDesc) noexcept = 0;
+		// Tap of the oldest queued Diagnostic request; a frame records one tap.
+		[[nodiscard]] virtual std::optional<PostProcessDebugTap> GetPendingDiagnosticTap()
+			const noexcept = 0;
+		// Fails the queued requests for the pending diagnostic tap when the frame has
+		// no source for it.
+		virtual void FailPendingDiagnosticRequests(std::string_view failure) noexcept = 0;
 	};
 }

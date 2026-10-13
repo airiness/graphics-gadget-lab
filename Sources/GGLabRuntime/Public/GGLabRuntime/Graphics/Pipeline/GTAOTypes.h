@@ -10,6 +10,7 @@ namespace gglab
 	inline constexpr uint32_t GTAOMaxDirectionCount = 8;
 	inline constexpr uint32_t GTAOMaxStepCount = 8;
 	inline constexpr uint32_t GTAOMaxDenoiseRadius = 8;
+	inline constexpr uint32_t GTAOMaxTemporalSamples = 64;
 
 	enum class GTAOFrameStatus : uint8_t
 	{
@@ -80,6 +81,13 @@ namespace gglab
 		[[nodiscard]] constexpr bool AreDiagnosticOutputsAvailable() const noexcept
 		{
 			return m_R16G16Float.IsSupported() && m_R16G16B16A16Float.IsSupported();
+		}
+
+		// Temporal accumulation keeps visibility with its sample count and the view Z of
+		// the selected surface as persistent history.
+		[[nodiscard]] constexpr bool IsTemporalAvailable() const noexcept
+		{
+			return IsCoreAvailable() && m_R16G16Float.IsSupported();
 		}
 	};
 }

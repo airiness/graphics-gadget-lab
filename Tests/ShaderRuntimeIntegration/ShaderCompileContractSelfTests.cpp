@@ -2406,7 +2406,11 @@ namespace gglab
 				GPUAbiMember{ "PreviousDepthConvention", offsetof(ViewGPU, PreviousDepthConvention) },
 				GPUAbiMember{ "ScenePreExposure", offsetof(ViewGPU, ScenePreExposure) },
 				GPUAbiMember{ "PreviousScenePreExposure", offsetof(ViewGPU, PreviousScenePreExposure) },
-				GPUAbiMember{ "Padding", offsetof(ViewGPU, Padding) },
+				GPUAbiMember{ "TemporalFrameIndex", offsetof(ViewGPU, TemporalFrameIndex) },
+				GPUAbiMember{ "TextureLodBias", offsetof(ViewGPU, TextureLodBias) },
+				GPUAbiMember{ "Padding0", offsetof(ViewGPU, Padding0) },
+				GPUAbiMember{ "Padding1", offsetof(ViewGPU, Padding1) },
+				GPUAbiMember{ "Padding2", offsetof(ViewGPU, Padding2) },
 			};
 			for (const GPUAbiMember& member : viewGPUAbiMembers)
 			{
@@ -2981,6 +2985,35 @@ namespace gglab
 			};
 			checkShaderNumericContracts(L"Tests/SpecularIntegrationContractCompile.hlsl", specularCases);
 
+			const std::array temporalHistoryClipCases{
+				ShaderNumericContractCase{ L"TestClipPreservesGrayHistory", "collapsed chroma axes retain in-box luminance history" },
+				ShaderNumericContractCase{ L"TestClipGrayHistoryAtBoundary", "gray history clips at the luminance boundary" },
+				ShaderNumericContractCase{ L"TestClipRejectsOutsideCollapsedAxis", "nonzero direction on a collapsed axis still rejects history" },
+				ShaderNumericContractCase{ L"TestClipMeanIsFinite", "the mean remains finite in a point box" },
+				ShaderNumericContractCase{ L"TestClipPointBox", "a point box clips outside history to its mean" },
+				ShaderNumericContractCase{ L"TestClipAsymmetricPositiveBoundary", "positive clipping preserves the mean-to-history segment" },
+				ShaderNumericContractCase{ L"TestClipAsymmetricNegativeBoundary", "negative clipping preserves the mean-to-history segment" },
+				ShaderNumericContractCase{ L"TestClipPreservesTinyInsideDirection", "small in-box directions do not lose history to an epsilon" },
+				ShaderNumericContractCase{ L"TestClipTinyOutsideDirection", "small out-of-box directions reach the boundary" },
+				ShaderNumericContractCase{ L"TestClipPlanarAxisPermutations", "planar boxes clip consistently across all axis permutations" },
+				ShaderNumericContractCase{ L"TestClipSegmentProperties", "clipping is finite, contained, maximal on the segment and idempotent" },
+			};
+			checkShaderNumericContracts(L"Tests/TemporalHistoryClipContractCompile.hlsl", temporalHistoryClipCases);
+
+			// Accumulation helpers retain isfinite guards in optimized DXIL. Compile
+			// both stages here; temporal-accumulation-gpu executes their numeric probes.
+			desc.m_SourcePath = L"Tests/TemporalHistoryAccumulationContractCompile.hlsl";
+			for (const ShaderStage stage : { ShaderStage::Vertex, ShaderStage::Pixel })
+			{
+				desc.m_Stage = stage;
+				desc.m_Entry = stage == ShaderStage::Vertex ? L"VSMain" : L"PSMain";
+				desc.m_Target = MakeDX12CompileTarget(stage);
+				context.Check(compiler.Compile(desc).IsSuccess(), "Temporal accumulation GPU probe compiles to DXIL");
+				desc.m_Target = MakeVulkan13CompileTarget(stage);
+				context.Check(compiler.Compile(desc).IsSuccess(), "Temporal accumulation GPU probe compiles to SPIR-V");
+			}
+			desc.m_Stage = ShaderStage::Pixel;
+
 			const std::array materialShadingCases{
 				ShaderNumericContractCase{ L"TestMaterialDirectionalEnergy", "prepared base retains GGX energy and diffuse partition" },
 				ShaderNumericContractCase{ L"TestMetalSuppressesDiffuseIBL", "metal endpoint suppresses diffuse IBL" },
@@ -3249,7 +3282,7 @@ namespace gglab
 				temporalAASpirVArtifact.IsSuccess() &&
 				postProcessPreviewDxilArtifact.IsSuccess() &&
 				postProcessPreviewSpirVArtifact.IsSuccess(),
-				"Production DXC compiles TAA reprojection and post-process age preview with point-sampled history age, split resolved/history alpha, transient diagnostics, depth rejection, YCoCg neighborhood clamp, and age-capped temporal blend for DX12 and Vulkan 1.3");
+				"Production DXC compiles TAA reprojection and post-process accumulation preview with point-sampled history accumulation, split resolved/history alpha, transient diagnostics, depth rejection, YCoCg neighborhood clamp, and accumulation-capped temporal blend for DX12 and Vulkan 1.3");
 
 			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

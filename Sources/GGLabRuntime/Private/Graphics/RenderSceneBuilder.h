@@ -65,17 +65,25 @@ namespace gglab
 			RenderDirectionalLight m_MainDirectionalLight{};
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_FrameSlotIndex = 0;
+			// Unjittered display raster view of post-temporal composition, when the frame
+			// uses one; it is uploaded after the shadow views.
+			const RenderView* m_PostTemporalView = nullptr;
 		};
+
+		static constexpr uint32_t UnassignedViewOffset = std::numeric_limits<uint32_t>::max();
 
 		struct ViewUploadData
 		{
 			std::vector<ViewGPU> m_Views;
 			uint32_t m_ShadowViewBaseOffset = DirectionalShadowFramePlan::UnassignedViewBaseOffset;
+			uint32_t m_PostTemporalViewOffset = UnassignedViewOffset;
 		};
 
 		struct BuildResult
 		{
 			uint32_t m_ShadowViewBaseOffset = DirectionalShadowFramePlan::UnassignedViewBaseOffset;
+			// View offset of BuildInfo::m_PostTemporalView; unassigned without one.
+			uint32_t m_PostTemporalViewOffset = UnassignedViewOffset;
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_GpuAllocations{};
 			RHIFencePoint m_UploadFencePoint{};
@@ -90,6 +98,7 @@ namespace gglab
 			const RenderDirectionalLight& mainLight) noexcept;
 
 		[[nodiscard]] static ViewUploadData BuildViewData(
-			std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept;
+			std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades,
+			const RenderView* postTemporalView = nullptr) noexcept;
 	};
 }

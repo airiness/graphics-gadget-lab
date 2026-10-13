@@ -39,6 +39,82 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 #endif
 }
 
+#elif defined(GGLAB_GTAO_TEMPORAL)
+
+struct GTAOTemporalPassParameters
+{
+	uint CurrentAOIndex;
+	uint HalfDepthIndex;
+	uint FullDepthIndex;
+	uint MotionIndex;
+	uint PreviousVisibilityIndex;
+	uint PreviousViewZIndex;
+	uint NextVisibilityUavIndex;
+	uint NextViewZUavIndex;
+	uint AccumulatedAOUavIndex;
+	// Diagnostics variant only: effective samples over their maximum.
+	uint SamplesUavIndex;
+	uint ViewIndex;
+	uint FullWidth;
+	uint FullHeight;
+	uint HalfWidth;
+	uint HalfHeight;
+	// Bits 0-15: maximum effective samples; bit 16: a previous history is defined.
+	uint MaxSamplesAndPreviousValid;
+};
+
+ConstantBuffer<GTAOTemporalPassParameters> g_Pass : register(b2);
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+	const uint2 halfPixel = dispatchThreadId.xy;
+	const uint2 halfExtent = uint2(g_Pass.HalfWidth, g_Pass.HalfHeight);
+	if (any(halfPixel >= halfExtent))
+	{
+		return;
+	}
+
+	Texture2D<float> currentAO = GetTexture2DFloat(g_Pass.CurrentAOIndex);
+	Texture2D<float> halfDepth = GetTexture2DFloat(g_Pass.HalfDepthIndex);
+	RWTexture2D<float2> nextVisibility = GetRWTexture2DFloat2(g_Pass.NextVisibilityUavIndex);
+	RWTexture2D<float> nextViewZ = GetRWTexture2DFloat(g_Pass.NextViewZUavIndex);
+	RWTexture2D<float> accumulatedAO = GetRWTexture2DFloat(g_Pass.AccumulatedAOUavIndex);
+
+	const float maxSamples = float(g_Pass.MaxSamplesAndPreviousValid & 0xffffu);
+	const bool previousValid = (g_Pass.MaxSamplesAndPreviousValid >> 16u) != 0u;
+	const float currentVisibility = currentAO.Load(int3(halfPixel, 0));
+	const float viewZ = halfDepth.Load(int3(halfPixel, 0));
+	GTAOTemporalResult result;
+	result.Visibility = currentVisibility;
+	result.Samples = viewZ > 0.0 ? 1.0 : 0.0;
+	if (previousValid && viewZ > 0.0)
+	{
+		Texture2D<float> fullDepth = GetTexture2DFloat(g_Pass.FullDepthIndex);
+		Texture2D<float2> motion = GetTexture2DFloat2(g_Pass.MotionIndex);
+		const uint2 fullExtent = uint2(g_Pass.FullWidth, g_Pass.FullHeight);
+		const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + g_Pass.ViewIndex];
+		const GTAOSurface surface =
+			SelectHalfResolutionSurface(fullDepth, halfPixel, fullExtent, viewData);
+		if (surface.IsValid)
+		{
+			const float2 currentRange =
+				ResolveGTAOVisibilityRange(currentAO, halfDepth, halfPixel, halfExtent);
+			result = AccumulateGTAOHistory(currentVisibility, surface,
+				motion.Load(int3(surface.FullPixel, 0)), fullExtent, halfExtent, viewData,
+				GetTexture2DFloat2(g_Pass.PreviousVisibilityIndex),
+				GetTexture2DFloat(g_Pass.PreviousViewZIndex), maxSamples, currentRange);
+		}
+	}
+	nextVisibility[halfPixel] = float2(result.Visibility, result.Samples);
+	nextViewZ[halfPixel] = viewZ;
+	accumulatedAO[halfPixel] = result.Visibility;
+#if defined(GGLAB_GTAO_TEMPORAL_DIAGNOSTICS)
+	RWTexture2D<float> samples = GetRWTexture2DFloat(g_Pass.SamplesUavIndex);
+	samples[halfPixel] = saturate(result.Samples / max(maxSamples, 1.0));
+#endif
+}
+
 #elif defined(GGLAB_GTAO_UPSAMPLE)
 
 struct GTAOUpsamplePassParameters
@@ -98,7 +174,7 @@ struct GTAOEvaluatePassParameters
 	float Radius;
 	float FalloffStart;
 	float FalloffEnd;
-	float Thickness;
+	uint SampleIndex;
 };
 
 ConstantBuffer<GTAOEvaluatePassParameters> g_Pass : register(b2);
@@ -138,8 +214,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	rawAO[halfPixel] = surface.HasValidNormal
 		? EvaluateGTAO(depthTexture, surface, halfPixel,
 			uint2(g_Pass.FullWidth, g_Pass.FullHeight), viewData, g_Pass.Radius,
-			g_Pass.FalloffStart, g_Pass.FalloffEnd, g_Pass.Thickness,
-			g_Pass.DirectionCount, g_Pass.StepCount)
+			g_Pass.FalloffStart, g_Pass.FalloffEnd,
+			g_Pass.DirectionCount, g_Pass.StepCount, g_Pass.SampleIndex)
 		: 1.0;
 	halfDepth[halfPixel] = surface.ViewZ;
 #if defined(GGLAB_GTAO_DIAGNOSTICS)

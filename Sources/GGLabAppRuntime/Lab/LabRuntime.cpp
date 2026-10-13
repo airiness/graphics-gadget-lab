@@ -196,6 +196,14 @@ namespace gglab
 		}
 	}
 
+	void LabRuntime::OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept
+	{
+		if (m_ActiveSession)
+		{
+			m_ActiveSession->OnCameraPathFrameApplied(path, frame);
+		}
+	}
+
 	void LabRuntime::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
 		m_LastFrameFeedback = feedback;
@@ -329,7 +337,7 @@ namespace gglab
 		}
 	}
 
-	LabSnapshot LabRuntime::GetLabSnapshot() const noexcept
+	LabSnapshot LabRuntime::GetLabSnapshot(const LabDiagnosticsFrameContext& context) const noexcept
 	{
 		LabSnapshot snapshot{};
 		snapshot.m_State = ToSnapshotRunState(m_State);
@@ -395,7 +403,10 @@ namespace gglab
 				.m_Value = parameter.m_Value,
 				});
 		}
-		m_ActiveSession->BuildDiagnostics(snapshot.m_Diagnostics);
+		// An inactive Lab may still supply catalog/authoring data, but the display
+		// frame belongs to another Demo and must not be attributed to this session.
+		m_ActiveSession->BuildFrameDiagnostics(snapshot.m_Diagnostics,
+			m_IsEntered ? context : LabDiagnosticsFrameContext{});
 		return snapshot;
 	}
 

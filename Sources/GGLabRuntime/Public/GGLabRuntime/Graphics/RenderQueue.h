@@ -50,7 +50,12 @@ namespace gglab
 		std::array<DrawItemsRange, utils::ToIndex(RenderBucket::Count)> m_BucketDrawRanges{};
 
 		RenderViewID m_ViewId = RenderViewID::Unknown;
+		// Render-domain raster state of the view's depth coverage and pre-temporal shading.
 		DepthCoverageRasterDomain m_CoverageRasterDomain{};
+		// Display-domain raster state of post-temporal composition. It is bound to the same
+		// view projection as the coverage domain; at native resolution both are equal.
+		// Invalid for views without a display extent, such as shadow views.
+		DepthCoverageRasterDomain m_PostTemporalRasterDomain{};
 		RenderQueueStatistics m_Statistics{};
 	};
 
@@ -64,6 +69,7 @@ namespace gglab
 			const RenderView& m_RenderView;
 			std::span<const math::Frustum> m_CullingFrustums;
 			DepthCoverageRasterDomain m_CoverageRasterDomain{};
+			DepthCoverageRasterDomain m_PostTemporalRasterDomain{};
 			RHIBufferHandle m_ObjectBuffer{};
 			uint32_t m_ObjectBaseIndex = 0;
 			RHIBufferHandle m_MaterialBuffer{};

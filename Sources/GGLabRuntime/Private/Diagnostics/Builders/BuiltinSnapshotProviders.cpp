@@ -385,8 +385,8 @@ namespace gglab
 					? &context.m_AuthoringViewRenderProfile->m_TemporalAA
 					: nullptr;
 				const TemporalAASettings* requestedSettings =
-					context.m_EffectiveViewRenderProfile
-					? &context.m_EffectiveViewRenderProfile->m_TemporalAA
+					context.m_DisplayViewSettings
+					? &context.m_DisplayViewSettings->m_TemporalAA
 					: nullptr;
 				snapshot = BuildTemporalAADiagnosticsSnapshot(*m_Renderer,
 					*context.m_RenderGraph, context.m_TemporalFramePlan, displayView,

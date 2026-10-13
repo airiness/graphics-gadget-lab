@@ -106,8 +106,6 @@ namespace gglab
 	{
 		// An encode normally finishes well within a second; a longer one is reported.
 		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
-		// The writer runs one job outside the queue; only pending jobs count here.
-		constexpr size_t MaxPendingEncodeJobs = 8;
 		constexpr size_t MaxFileStemComponentLength = 64;
 
 		// Empty when no gate failed.
@@ -304,10 +302,49 @@ namespace gglab
 		return m_LastFrameState ? &*m_LastFrameState : nullptr;
 	}
 
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source)
+		const noexcept
+	{
+		if (!m_Capture || m_IsShuttingDown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		return m_LastFrameState ? GetCaptureAvailability(source, *m_LastFrameState)
+			: FrameCaptureAvailability::Available;
+	}
+
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source,
+		const FrameCaptureFrameState& state) const noexcept
+	{
+		if (!m_Capture || m_IsShuttingDown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		// A write slot is reserved before GPU work and stays reserved through encoding.
+		// Counting only queued writer jobs misses issued captures still on the GPU.
+		const auto reserved = std::ranges::count_if(m_Entries, [](const Entry& entry)
+			{
+				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::Encoding;
+			});
+		if (reserved >= MaxInFlightCaptures)
+		{
+			return FrameCaptureAvailability::Busy;
+		}
+		const ViewExtent extent = state.m_SettleKey.m_Temporal.m_Identity.m_ColorExtent;
+		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic
+			? RHIFormat::R8G8B8A8Unorm : state.m_DisplayFormat,
+			extent.m_Width, extent.m_Height);
+	}
+
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
 		const bool ready = state.m_Readiness.IsReady();
-		if (!ready || !m_LastFrameState || m_LastFrameState->m_SettleKey != state.m_SettleKey)
+		const bool historyRestarted =
+			!m_LastFrameState || !state.m_SettleKey.Continues(m_LastFrameState->m_SettleKey);
+		// Temporal history keeps accumulating while gates are pending, so frames of
+		// content still loading stay in it until the settle key changes.
+		m_HistoryReady = historyRestarted ? ready : m_HistoryReady && ready;
+		if (!m_HistoryReady || historyRestarted)
 		{
 			m_SettledFrames = 0;
 		}
@@ -319,19 +356,20 @@ namespace gglab
 			}
 			if (!entry.m_ViewCameraResetSerial)
 			{
-				entry.m_ViewCameraResetSerial = state.m_SettleKey.m_CameraResetSerial;
+				entry.m_ViewCameraResetSerial = state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
 			}
-			else if (*entry.m_ViewCameraResetSerial != state.m_SettleKey.m_CameraResetSerial)
+			else if (*entry.m_ViewCameraResetSerial != state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity)
 			{
 				entry.m_ViewApplied = false;
 				entry.m_ViewCameraResetSerial.reset();
 			}
 		}
-		m_FrameReady = ready;
 		m_HasOpenFrame = true;
 
 		if (!m_IsShuttingDown)
 		{
+			std::optional<PostProcessDebugTap> diagnosticTap =
+				m_Capture ? m_Capture->GetPendingDiagnosticTap() : std::nullopt;
 			const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
 			for (Entry& entry : m_Entries)
 			{
@@ -348,9 +386,25 @@ namespace gglab
 				{
 					Finish(entry, FrameCaptureRequestStatus::Failed, readinessFailure);
 				}
-				else if (IsDue(entry, state, ready))
+				else if (IsDue(entry, state))
 				{
+					const FrameCaptureRequest& request = entry.m_Request;
+					if (request.m_Source == FrameCaptureSource::Diagnostic && request.m_DiagnosticTap &&
+						!GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty() &&
+						diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+					{
+						if (request.m_Sequence)
+						{
+							Finish(entry, FrameCaptureRequestStatus::Failed,
+								"A different diagnostic tap occupies the requested sequence frame.");
+						}
+						continue;
+					}
 					Issue(entry, state);
+					if (entry.m_Phase == Phase::Issued && request.m_Source == FrameCaptureSource::Diagnostic)
+					{
+						diagnosticTap = request.m_DiagnosticTap;
+					}
 				}
 			}
 		}
@@ -382,6 +436,37 @@ namespace gglab
 			.m_RequestId = head->m_Id,
 			.m_ReferenceViewId = head->m_Request.m_ReferenceViewId,
 		};
+	}
+
+	bool FrameCaptureCoordinator::ShouldRestartTemporalHistory() const noexcept
+	{
+		if (m_IsShuttingDown || !m_LastFrameState || m_HistoryReady ||
+			!m_LastFrameState->m_Readiness.IsReady())
+		{
+			return false;
+		}
+		return std::ranges::any_of(m_Entries, [this](const Entry& entry)
+			{
+				// A view restored for this frame is already a camera cut.
+				const bool viewSettling = entry.m_Request.m_ReferenceViewId.empty() ||
+					entry.m_ViewCameraResetSerial.has_value();
+				return entry.m_Phase == Phase::Waiting &&
+					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+					viewSettling && MatchesRequiredContent(entry, *m_LastFrameState);
+			});
+	}
+
+	bool FrameCaptureCoordinator::ShouldHoldTime() const noexcept
+	{
+		if (m_IsShuttingDown || m_HistoryReady)
+		{
+			return false;
+		}
+		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+			{
+				return entry.m_Phase == Phase::Waiting &&
+					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady;
+			});
 	}
 
 	void FrameCaptureCoordinator::OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept
@@ -420,7 +505,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::OnFrameSubmitted() noexcept
 	{
-		if (m_HasOpenFrame && m_FrameReady &&
+		if (m_HasOpenFrame && m_HistoryReady &&
 			m_SettledFrames < std::numeric_limits<uint32_t>::max())
 		{
 			++m_SettledFrames;
@@ -485,7 +570,7 @@ namespace gglab
 	}
 
 	bool FrameCaptureCoordinator::IsDue(
-		const Entry& entry, const FrameCaptureFrameState& state, bool ready) const noexcept
+		const Entry& entry, const FrameCaptureFrameState& state) const noexcept
 	{
 		const FrameCaptureRequest& request = entry.m_Request;
 		if (!request.m_ReferenceViewId.empty() && !entry.m_ViewApplied)
@@ -496,7 +581,7 @@ namespace gglab
 		{
 			return true;
 		}
-		return ready && MatchesRequiredContent(entry, state) &&
+		return m_HistoryReady && MatchesRequiredContent(entry, state) &&
 			m_SettledFrames >= request.m_SettleFrames;
 	}
 
@@ -507,8 +592,34 @@ namespace gglab
 			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture is unavailable.");
 			return;
 		}
-
+		if (state.m_FrameSerial == 0)
+		{
+			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture requires a live render frame serial.");
+			return;
+		}
 		const FrameCaptureRequest& request = entry.m_Request;
+		if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
+			GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+		{
+			Finish(entry, FrameCaptureRequestStatus::Failed, "A diagnostic capture requires a supported diagnostic tap.");
+			return;
+		}
+		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Request.m_Source, state);
+		if (availability != FrameCaptureAvailability::Available)
+		{
+			const char* failure = "Capture capacity is unavailable before GPU submission.";
+			if (availability == FrameCaptureAvailability::TooLarge)
+			{
+				failure = "The capture target exceeds the payload byte budget.";
+			}
+			else if (availability == FrameCaptureAvailability::Unsupported)
+			{
+				failure = "The display target has no capture footprint.";
+			}
+			Finish(entry, FrameCaptureRequestStatus::Failed, failure);
+			return;
+		}
+
 		FrameCaptureMetadata& metadata = entry.m_Metadata;
 		metadata.m_RequestId = entry.m_Id;
 		metadata.m_Label = request.m_Label;
@@ -521,6 +632,7 @@ namespace gglab
 		metadata.m_Backend = state.m_Backend;
 		metadata.m_DemoId = state.m_DemoId;
 		metadata.m_LabId = state.m_LabId;
+		metadata.m_FrameSerial = state.m_FrameSerial;
 		metadata.m_FrameIndex = state.m_FrameIndex;
 		metadata.m_Camera = state.m_Camera;
 		metadata.m_Camera.m_ReferenceViewId = request.m_ReferenceViewId;
@@ -528,10 +640,29 @@ namespace gglab
 		metadata.m_TotalTime = state.m_TotalTime;
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
 		metadata.m_Readiness = state.m_Readiness;
+		metadata.m_Temporal = state.m_Temporal;
+		metadata.m_Sequence = request.m_Sequence;
+		metadata.m_DiagnosticTap = request.m_Source == FrameCaptureSource::Diagnostic &&
+			request.m_DiagnosticTap
+			? std::string(GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap))
+			: std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
 			std::chrono::floor<std::chrono::milliseconds>(std::chrono::system_clock::now()));
 
-		entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source);
+		if (request.m_Source == FrameCaptureSource::Diagnostic)
+		{
+			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
+				*request.m_DiagnosticTap, state.m_FrameSerial);
+		}
+		else
+		{
+			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source, state.m_FrameSerial);
+		}
+		if (entry.m_CaptureRequestId == 0)
+		{
+			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture request capacity is exhausted.");
+			return;
+		}
 		entry.m_Phase = Phase::Issued;
 	}
 
@@ -549,12 +680,21 @@ namespace gglab
 			return;
 		}
 
-		entry->m_Metadata.m_FrameSerial = result.m_FrameSerial;
 		if (result.m_Status != FrameCaptureStatus::Completed || !result.m_Image)
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
 				result.m_Failure.empty() ? std::string("The frame capture failed.")
 				: std::move(result.m_Failure));
+			return;
+		}
+		const std::optional<PostProcessDebugTap> expectedTap =
+			entry->m_Request.m_Source == FrameCaptureSource::Diagnostic
+				? entry->m_Request.m_DiagnosticTap : std::nullopt;
+		if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial ||
+			result.m_Source != entry->m_Request.m_Source || result.m_DiagnosticTap != expectedTap)
+		{
+			Finish(*entry, FrameCaptureRequestStatus::Failed,
+				"The capture result does not match its requested render frame, source or diagnostic tap.");
 			return;
 		}
 		StartEncoding(*entry, result);
@@ -613,7 +753,9 @@ namespace gglab
 		}
 		{
 			std::scoped_lock lock(m_Writer->m_Mutex);
-			if (m_Writer->m_Queue.size() >= MaxPendingEncodeJobs)
+			// Slots were reserved before capture. All nine may enter the queue before
+			// the writer starts; once it claims one, at most eight remain pending.
+			if (m_Writer->m_Queue.size() >= MaxInFlightCaptures)
 			{
 				Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
 				return;
@@ -793,6 +935,9 @@ namespace gglab
 		std::string failure = job.m_Claim == PublicationClaim::Abandoned
 			? std::string("The capture was abandoned at shutdown.")
 			: WriteAndPublish(job, encoder);
+		// Release Runtime payload capacity on the writer thread before reporting
+		// completion. No frame-thread state or RHI resource is touched here.
+		job.m_Image.reset();
 		job.m_Stage = EncodeStage::Done;
 		{
 			std::scoped_lock lock(job.m_Mutex);

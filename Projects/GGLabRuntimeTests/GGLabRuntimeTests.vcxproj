@@ -88,6 +88,7 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\AssetResidencySelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\AssetTestServices.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\CameraPathSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\DiagnosticsContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\EnvironmentSelectionSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\FrameCaptureSelfTests.cpp" />
@@ -104,6 +105,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\AssetResidencySelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\AssetTestServices.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\CameraPathSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\DiagnosticsContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\EnvironmentSelectionSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\FrameCaptureSelfTests.h" />

@@ -24,6 +24,7 @@ namespace gglab
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 		void Update() noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
+		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept;
 
 		void RequestSwitchLab(const LabId& id) noexcept override
 		{
@@ -42,7 +43,8 @@ namespace gglab
 		}
 		void ProcessPendingCommands() noexcept;
 		void TickTransitions() noexcept;
-		LabSnapshot GetLabSnapshot() const noexcept override;
+		LabSnapshot GetLabSnapshot(
+			const LabDiagnosticsFrameContext& context = {}) const noexcept override;
 		[[nodiscard]] std::optional<LoadingProgress> GetLoadingProgress() const noexcept;
 
 		LabRunState GetState() const noexcept { return m_State; }

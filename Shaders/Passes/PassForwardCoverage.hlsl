@@ -29,5 +29,6 @@ ForwardCoverageVSOutput VSMain(VertexInputP3N3T2T2Tan4 input)
 	const float4 previousPositionWS =
 		mul(float4(input.Position, 1.0), objectData.PreviousModelMat);
 	output.PreviousPositionCS = mul(previousPositionWS, viewData.PreviousRasterViewProj);
+	output.MaterialTextureLodBias = viewData.TextureLodBias;
 	return output;
 }

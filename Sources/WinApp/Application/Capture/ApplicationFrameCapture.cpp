@@ -1,16 +1,19 @@
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "AppRuntimeLog.h"
+#include "GGLabAppRuntime.h"
 
 #include <utility>
 #include <vector>
 
 namespace gglab
 {
-	ApplicationFrameCapture::ApplicationFrameCapture(FrameCaptureCoordinator& coordinator,
+	ApplicationFrameCapture::ApplicationFrameCapture(GGLabAppRuntime& runtime,
 		std::filesystem::path defaultOutputDirectory) noexcept :
-		m_Coordinator(&coordinator),
+		m_Runtime(&runtime),
+		m_Coordinator(runtime.GetFrameCaptureCoordinator()),
 		m_DefaultOutputDirectory(std::move(defaultOutputDirectory))
 	{
+		GGLAB_ASSERT_NOT_NULL(m_Coordinator);
 	}
 
 	uint64_t ApplicationFrameCapture::Capture() noexcept
@@ -84,7 +87,7 @@ namespace gglab
 	std::vector<FrameCaptureRequestResult> ApplicationFrameCapture::Update() noexcept
 	{
 		std::vector<FrameCaptureRequestResult> results;
-		m_Coordinator->ConsumeResults(results);
+		m_Runtime->ConsumeFrameCaptureResults(results);
 		for (const FrameCaptureRequestResult& result : results)
 		{
 			if (result.m_Status == FrameCaptureRequestStatus::Completed)

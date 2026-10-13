@@ -67,8 +67,14 @@ namespace gglab
 				return "Temporal / Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight:
 				return "Temporal / History Weight";
-			case PostProcessDebugTap::TemporalHistoryAge:
-				return "Temporal / History Age";
+			case PostProcessDebugTap::TemporalHistorySamples:
+				return "Temporal / History Samples";
+			case PostProcessDebugTap::TemporalClipDistance:
+				return "Temporal / Clip Distance";
+			case PostProcessDebugTap::TemporalHistoryRelaxation:
+				return "Temporal / History Relaxation";
+			case PostProcessDebugTap::GTAOHistorySamples:
+				return "GTAO / History Samples";
 			default:
 				return "Unknown";
 			}

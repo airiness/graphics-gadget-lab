@@ -42,6 +42,15 @@ namespace gglab
 		}
 	}
 
+	void Time::Hold() noexcept
+	{
+		const auto currentTime = std::chrono::high_resolution_clock::now();
+		m_FpsTimer += std::chrono::duration<double>(currentTime - m_LastTime).count();
+		m_LastTime = currentTime;
+		m_DeltaTime = 0.0;
+		m_FrameCount++;
+	}
+
 	void Time::SetFixedDeltaTime(std::optional<double> seconds) noexcept
 	{
 		GGLAB_ASSERT_MSG(!seconds || (std::isfinite(*seconds) && *seconds > 0.0),

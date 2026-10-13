@@ -16,6 +16,10 @@ namespace gglab
 
 		void Initialize() noexcept;
 		void Update() noexcept;
+		// Starts a frame that repeats the previous simulation instant: delta time is
+		// zero and total time does not advance. Used by sub-frames of a supersampled
+		// reference; time stays deterministic only with a fixed step.
+		void Hold() noexcept;
 
 		// A fixed step makes every Update advance delta and total time by exactly
 		// that many seconds, independent of wall-clock frame pacing. The FPS

@@ -17,9 +17,11 @@
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderingSettingsDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/ShadowTemporalDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/SnapshotStore.h"
@@ -162,6 +164,10 @@ namespace gglab
 			void RequestEnabled(bool enabled) noexcept override { m_Enabled = enabled; }
 			bool IsEnabled() const noexcept override { return m_Enabled; }
 			GpuProfileFrameSnapshot GetLatestFrame() const override { return m_LatestFrame; }
+			void SetRenderFrameSerial(uint64_t serial) noexcept override
+			{
+				m_LatestFrame.m_RenderFrameSerial = serial;
+			}
 
 			bool m_Enabled = true;
 			GpuProfileFrameSnapshot m_LatestFrame;
@@ -179,6 +185,7 @@ namespace gglab
 
 				profiler.m_LatestFrame = {
 					.m_FrameIndex = 17,
+					.m_RenderFrameSerial = 81,
 					.m_FrameMilliseconds = 2.5,
 					.m_Samples = { { "Opaque", 1.5, 2 } },
 				};
@@ -191,13 +198,17 @@ namespace gglab
 					"GPU profiling queries observe the latest accepted enable request");
 
 				profiler.m_LatestFrame.m_FrameIndex = 18;
+				profiler.SetRenderFrameSerial(82);
 				profiler.m_LatestFrame.m_Samples.front().m_Name = "Transparent";
 				context.Check(view.GetLatestFrame().m_FrameIndex == 18 &&
+					view.GetLatestFrame().m_RenderFrameSerial == 82 &&
 					retainedFrame.m_FrameIndex == 17 &&
+					retainedFrame.m_RenderFrameSerial == 81 &&
 					retainedFrame.m_Samples.front().m_Name == "Opaque",
 					"GPU timing value copies remain independent of later backend publication");
 			}
 			context.Check(retainedFrame.IsValid() && retainedFrame.m_FrameMilliseconds == 2.5 &&
+				retainedFrame.m_RenderFrameSerial == 81 &&
 				retainedFrame.m_Samples.size() == 1 &&
 				retainedFrame.m_Samples.front().m_Milliseconds == 1.5 &&
 				retainedFrame.m_Samples.front().m_CallCount == 2,
@@ -271,12 +282,23 @@ namespace gglab
 			displayView.m_Height = 64;
 			ResolvedTemporalFramePlan temporalPlan{
 				.m_DisplayViewId = RenderViewID::DebugCamera0,
-				.m_Status = TemporalAAFrameStatus::Active,
-				.m_DisableReason = TemporalAADisableReason::None,
 				.m_SessionIdentity = 41,
-				.m_Requested = true,
-				.m_Active = true,
 				};
+			const auto setTemporalAAConsumer = [&temporalPlan](TemporalConsumerStatus status,
+				TemporalConsumerDisableReason reason) noexcept
+				{
+					const TemporalService services = status == TemporalConsumerStatus::Active
+						? GetTemporalConsumerRequiredServices(TemporalConsumer::TemporalAA)
+						: TemporalService::None;
+					temporalPlan.m_Consumers[static_cast<uint32_t>(TemporalConsumer::TemporalAA)] = {
+						.m_Status = status,
+						.m_DisableReason = reason,
+						.m_Services = services,
+						.m_Requested = true,
+					};
+					temporalPlan.m_Services = services;
+				};
+			setTemporalAAConsumer(TemporalConsumerStatus::Active, TemporalConsumerDisableReason::None);
 			DirectionalShadowFramePlan shadows{};
 			shadows.m_Settings = DirectionalShadowSettings{};
 			shadows.m_ShadingEnabled = true;
@@ -389,9 +411,8 @@ namespace gglab
 			auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
 			forward.m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
-			temporalPlan.m_Active = false;
-			temporalPlan.m_Status = TemporalAAFrameStatus::Unavailable;
-			temporalPlan.m_DisableReason = TemporalAADisableReason::DepthVelocityPathUnavailable;
+			setTemporalAAConsumer(TemporalConsumerStatus::Unavailable,
+				TemporalConsumerDisableReason::DepthVelocityPathUnavailable);
 			const auto unavailable = BuildRenderingSettingsDiagnosticsSnapshot(frame);
 			context.Check(unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Inactive &&
 				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::NoOpaqueDraws &&
@@ -421,9 +442,7 @@ namespace gglab
 
 			requested.m_EnableScenePreExposure = true;
 			resolved.m_PostProcess.m_Bloom = requested.m_PostProcess.m_Bloom;
-			temporalPlan.m_Active = true;
-			temporalPlan.m_Status = TemporalAAFrameStatus::Active;
-			temporalPlan.m_DisableReason = TemporalAADisableReason::None;
+			setTemporalAAConsumer(TemporalConsumerStatus::Active, TemporalConsumerDisableReason::None);
 			RenderGraph culledGraph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
@@ -503,14 +522,16 @@ namespace gglab
 		class DiagnosticsLabSnapshotSource final : public LabSnapshotSourceBase
 		{
 		public:
-			LabSnapshot GetLabSnapshot() const noexcept override
+			LabSnapshot GetLabSnapshot(const LabDiagnosticsFrameContext& frame = {}) const noexcept override
 			{
+				m_LastContext = frame;
 				LabSnapshot snapshot{};
 				snapshot.m_ActiveLabName = m_ActiveLabName;
 				return snapshot;
 			}
 
 			std::string m_ActiveLabName;
+			mutable LabDiagnosticsFrameContext m_LastContext{};
 		};
 	}
 
@@ -1047,10 +1068,18 @@ namespace gglab
 			std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		DiagnosticsLabSnapshotSource firstLabSource;
 		firstLabSource.m_ActiveLabName = "First Lab";
-		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &firstLabSource });
+		ResolvedViewRenderSettings labFrameSettings{};
+		ResolvedTemporalFramePlan labFramePlan{};
+		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &firstLabSource,
+			.m_FrameSerial = 71, .m_DisplayViewSettings = &labFrameSettings,
+			.m_TemporalFramePlan = &labFramePlan });
 		const LabSnapshot* firstLabSnapshot = labDiagnostics.GetSnapshot<LabSnapshot>();
 		context.Check(firstLabSnapshot && firstLabSnapshot->m_ActiveLabName == "First Lab",
 			"Lab diagnostics capture uses the Runtime-owned frame context source");
+		context.Check(firstLabSource.m_LastContext.m_RequestedTemporalAASettings ==
+				&labFrameSettings.m_TemporalAA && firstLabSource.m_LastContext.m_TemporalFramePlan ==
+				&labFramePlan && firstLabSource.m_LastContext.m_FrameSerial == 71,
+			"Lab diagnostics borrow final display settings and the plan from the same capture frame");
 
 		labDiagnostics.EndFrame();
 		DiagnosticsLabSnapshotSource secondLabSource;
@@ -1060,6 +1089,10 @@ namespace gglab
 		context.Check(secondLabSnapshot && secondLabSnapshot == firstLabSnapshot &&
 				secondLabSnapshot->m_ActiveLabName == "Second Lab",
 			"Lab diagnostics recaptures from the current AppRuntime-supplied source");
+		context.Check(!secondLabSource.m_LastContext.m_RequestedTemporalAASettings &&
+				!secondLabSource.m_LastContext.m_TemporalFramePlan &&
+				secondLabSource.m_LastContext.m_FrameSerial == 0,
+			"A new Lab source without a display frame receives no retained frame inputs");
 		labDiagnostics.EndFrame();
 
 		Renderer resourceSource;
@@ -1085,6 +1118,40 @@ namespace gglab
 				transientSnapshot && !transientSnapshot->m_SourceAvailable &&
 				retainedPersistentSnapshot.m_SourceAvailable,
 			"Missing-source recapture clears availability without changing a retained value copy");
+		resourceDiagnostics.EndFrame();
+
+		RenderGraph temporalGraph({
+			.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+			.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
+		ViewRenderProfile temporalAuthoring{};
+		temporalAuthoring.m_TemporalAA.m_Enabled = false;
+		ViewRenderProfile temporalOverride = temporalAuthoring;
+		temporalOverride.m_TemporalAA.m_Enabled = true;
+		ResolvedViewRenderSettings temporalDisplay{};
+		temporalDisplay.m_TemporalAA = temporalOverride.m_TemporalAA;
+		temporalDisplay.m_TemporalAA.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear;
+		temporalDisplay.m_TemporalAA.m_MaxHistoryFeedback = 0.5f;
+		resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource,
+			.m_RenderGraph = &temporalGraph,
+			.m_AuthoringViewRenderProfile = &temporalAuthoring,
+			.m_EffectiveViewRenderProfile = &temporalOverride,
+			.m_DisplayViewSettings = &temporalDisplay, .m_TemporalFramePlan = &labFramePlan });
+		const auto* temporalSnapshot = resourceDiagnostics.GetSnapshot<TemporalAADiagnosticsSnapshot>();
+		context.Check(temporalSnapshot && temporalSnapshot->m_Available &&
+				temporalSnapshot->m_AuthoringSettings == temporalAuthoring.m_TemporalAA &&
+				temporalSnapshot->m_RequestedSettings == temporalDisplay.m_TemporalAA &&
+				temporalSnapshot->m_RequestedSettings != temporalOverride.m_TemporalAA,
+			"TAA snapshot preserves authoring but publishes final display overrides, not the intermediate profile");
+		const auto retainedTemporal = temporalSnapshot ? *temporalSnapshot : TemporalAADiagnosticsSnapshot{};
+		resourceDiagnostics.EndFrame();
+		temporalDisplay.m_TemporalAA.m_MaxHistoryFeedback = 0.9f;
+		resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource,
+			.m_RenderGraph = &temporalGraph, .m_TemporalFramePlan = &labFramePlan });
+		temporalSnapshot = resourceDiagnostics.GetSnapshot<TemporalAADiagnosticsSnapshot>();
+		context.Check(temporalSnapshot && !temporalSnapshot->m_Available &&
+				retainedTemporal.m_RequestedSettings.m_MaxHistoryFeedback == 0.5f,
+			"Missing final settings clear TAA snapshot availability and retained snapshots own their values");
 		resourceDiagnostics.EndFrame();
 
 		RenderGraph shadowGraph({

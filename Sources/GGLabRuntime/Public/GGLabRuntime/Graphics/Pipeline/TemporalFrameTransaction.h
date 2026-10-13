@@ -6,19 +6,25 @@
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
+#include <optional>
 #include <tuple>
 #include <unordered_map>
 
 namespace gglab
 {
 	struct RenderView;
+	class GTAOTemporalHistory;
 	class TemporalHistoryManager;
+	class TemporalReferenceAccumulator;
 
 	struct TemporalCommittedViewState
 	{
@@ -30,8 +36,7 @@ namespace gglab
 		RenderViewID m_DisplayViewId = RenderViewID::Unknown;
 		uint64_t m_ResetIdentity = 0;
 		uint64_t m_SessionIdentity = 0;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		ViewResolution m_Resolution{};
 		float m_PreExposure = 1.0f;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 	};
@@ -40,6 +45,7 @@ namespace gglab
 	{
 		TemporalCommittedViewState m_Committed{};
 		uint32_t m_NextJitterIndex = 0;
+		uint32_t m_NextFrameIndex = 0;
 		bool m_Valid = false;
 
 		void Invalidate() noexcept;
@@ -116,9 +122,12 @@ namespace gglab
 	{
 	public:
 		void Begin(TemporalViewHistory& viewHistory, TemporalObjectHistory& objectHistory,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
 			TemporalHistoryManager* historyManager = nullptr,
-			float scenePreExposure = SceneColorStoragePreExposureV1) noexcept;
+			float scenePreExposure = SceneColorStoragePreExposureV1,
+			std::optional<TemporalReferenceSample> referenceSample = std::nullopt,
+			TemporalReferenceAccumulator* referenceAccumulator = nullptr,
+			GTAOTemporalHistory* ambientOcclusionHistory = nullptr) noexcept;
 		void PrepareDisplayView(RenderView& view) noexcept;
 		[[nodiscard]] Matrix ResolvePreviousObjectModel(
 			const RenderObjectHistoryKey& key, const Matrix& currentModel) const noexcept;
@@ -129,15 +138,58 @@ namespace gglab
 		[[nodiscard]] bool ExportHistoryResources(RenderGraph::RGBuilder& builder,
 			const TemporalHistoryRenderGraphResources& resources) noexcept;
 		void MarkResolveParticipated() noexcept;
+		// Reference frames only; the accumulator is null when the frame cannot accumulate.
+		[[nodiscard]] bool ImportReferenceResources(RenderGraph::RGBuilder& builder,
+			TemporalReferenceRenderGraphResources& outResources) noexcept;
+		[[nodiscard]] bool ExportReferenceResources(RenderGraph::RGBuilder& builder,
+			const TemporalReferenceRenderGraphResources& resources) noexcept;
+		// Temporal GTAO frames without Temporal AA only; the history is null when the
+		// consumer is inactive, the resolve integrates its samples, or the history could not
+		// be allocated, which fails a frame that records GTAO.
+		[[nodiscard]] bool ImportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
+			GTAOTemporalHistoryRenderGraphResources& outResources) noexcept;
+		[[nodiscard]] bool ExportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
+			const GTAOTemporalHistoryRenderGraphResources& resources) noexcept;
+		// The validated frame has no opaque/alpha-test draws. Submission preserves
+		// continuity without retaining AO samples from an earlier view.
+		[[nodiscard]] bool StageEmptyAmbientOcclusionFrame() noexcept;
+		[[nodiscard]] bool CanAccumulateAmbientOcclusion() const noexcept
+		{
+			return m_AmbientOcclusionHistory != nullptr;
+		}
 		void CommitCompleted(const RHIFencePoint& submittedFence = {}) noexcept;
 		void Abort(const RHIFencePoint& retirementFence = {}) noexcept;
 		void InvalidateAfterFatal(const RHIFencePoint& submittedFence = {}) noexcept;
 
 		[[nodiscard]] TemporalFrameTransactionState GetState() const noexcept { return m_State; }
 		[[nodiscard]] uint32_t GetJitterIndex() const noexcept { return m_JitterIndex; }
+		// Phases of the jitter owner's sequence: the Temporal AA sequence length, the
+		// reference sample count, or zero without a jitter owner.
+		[[nodiscard]] uint32_t GetJitterSequenceLength() const noexcept
+		{
+			return m_JitterSequenceLength;
+		}
+		// Material texture LOD bias that the display view applies, set by the jitter owner.
+		[[nodiscard]] float GetTextureLodBias() const noexcept { return m_TextureLodBias; }
+		// Frames since the temporal history was reset, counting this frame from zero.
+		[[nodiscard]] uint32_t GetFrameIndex() const noexcept { return m_FrameIndex; }
 		[[nodiscard]] float GetScenePreExposure() const noexcept { return m_ScenePreExposure; }
 		[[nodiscard]] TemporalColorAbi GetColorAbi() const noexcept { return m_ColorAbi; }
+		// Accumulation model of the color history this frame reads and writes.
+		[[nodiscard]] TemporalAAHistoryAccumulation GetHistoryAccumulation() const noexcept
+		{
+			return m_Plan.m_TemporalAA.m_HistoryAccumulation;
+		}
 		[[nodiscard]] const Vector2& GetJitterPixels() const noexcept { return m_JitterPixels; }
+		[[nodiscard]] const std::optional<TemporalReferenceSample>& GetReferenceSample()
+			const noexcept
+		{
+			return m_ReferenceSample;
+		}
+		[[nodiscard]] bool CanAccumulateReference() const noexcept
+		{
+			return m_ReferenceSample && m_ReferenceAccumulator;
+		}
 		[[nodiscard]] bool HasCompatiblePreviousView() const noexcept
 		{
 			return m_HasCompatiblePreviousView;
@@ -154,6 +206,11 @@ namespace gglab
 		{
 			return m_Plan.m_SessionIdentity;
 		}
+		// Latched at Begin, before graph recording or commit mutates any history owner.
+		[[nodiscard]] const TemporalFrameContinuity& GetContinuity() const noexcept
+		{
+			return m_Continuity;
+		}
 
 	private:
 		[[nodiscard]] bool IsCompatible(const TemporalViewHistory& history) const noexcept;
@@ -162,16 +219,23 @@ namespace gglab
 		TemporalViewHistory* m_ViewHistory = nullptr;
 		TemporalObjectHistory* m_ObjectHistory = nullptr;
 		TemporalHistoryManager* m_HistoryManager = nullptr;
+		TemporalReferenceAccumulator* m_ReferenceAccumulator = nullptr;
+		GTAOTemporalHistory* m_AmbientOcclusionHistory = nullptr;
+		std::optional<TemporalReferenceSample> m_ReferenceSample;
 		TemporalHistoryFrameState m_HistoryFrame{};
+		TemporalFrameContinuity m_Continuity{};
 		ResolvedTemporalFramePlan m_Plan{};
 		TemporalCommittedViewState m_PendingView{};
 		std::unordered_map<RenderObjectHistoryKey, Matrix, RenderObjectHistoryKeyHash>
 			m_PendingObjects;
 		TemporalFrameTransactionState m_State = TemporalFrameTransactionState::Idle;
 		Vector2 m_JitterPixels = Vector2::Zero;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
+		// Jitter is expressed in render pixels; histories follow their own domains.
+		ViewResolution m_Resolution{};
 		uint32_t m_JitterIndex = 0;
+		uint32_t m_JitterSequenceLength = 0;
+		uint32_t m_FrameIndex = 0;
+		float m_TextureLodBias = 0.0f;
 		float m_ScenePreExposure = SceneColorStoragePreExposureV1;
 		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 		bool m_HasCompatiblePreviousView = false;

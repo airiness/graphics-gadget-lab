@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
@@ -10,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -71,6 +73,21 @@ namespace gglab
 		}
 		bool RestoreReferenceView(std::string_view id) noexcept;
 
+		// Bound to the attached main camera like reference views. Every path must be
+		// valid with a unique id; otherwise nothing changes.
+		bool SetCameraPaths(std::vector<CameraPath> paths) noexcept;
+		[[nodiscard]] std::span<const CameraPath> GetCameraPaths() const noexcept
+		{
+			return m_CameraPaths;
+		}
+		[[nodiscard]] const CameraPath* FindCameraPath(std::string_view id) const noexcept;
+		// Poses the main camera at one frame of a registered path and makes it the
+		// display view. A cut pose is an explicit camera cut; every other pose moves
+		// the camera without a temporal reset, so history continues across frames.
+		// Returns the applied pose, or empty when the path or frame does not exist.
+		std::optional<CameraPathPose> ApplyCameraPathFrame(
+			std::string_view id, uint32_t frame) noexcept;
+
 		[[nodiscard]] size_t GetCameraCount() const noexcept { return m_Cameras.size(); }
 		[[nodiscard]] size_t GetActiveCameraIndex() const noexcept { return m_ActiveCameraIndex; }
 		void SetActiveCameraIndex(size_t index) noexcept;
@@ -110,6 +127,7 @@ namespace gglab
 
 		std::vector<CameraSlot> m_Cameras;
 		std::vector<CameraReferenceView> m_ReferenceViews;
+		std::vector<CameraPath> m_CameraPaths;
 		std::string m_LastRestoredReferenceId;
 		size_t m_ActiveCameraIndex = 0;
 		uint32_t m_NextDebugCameraIndex = 1;

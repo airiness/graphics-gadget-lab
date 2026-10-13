@@ -1,6 +1,7 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
@@ -12,6 +13,7 @@
 #include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
@@ -27,6 +29,7 @@
 #include <initializer_list>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <string_view>
 #include <string>
 #include <system_error>
@@ -945,6 +948,70 @@ namespace gglab
 				"Imported UVs preserve orientation/repeat and mirrored tangents preserve normal-map +Y up" + basisFailure);
 		}
 
+		void CheckCoastalSceneCameraPaths(SelfTestContext& context) noexcept
+		{
+			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
+			CameraController controller(CameraController::CreateInfo{});
+			CameraRig rig;
+			rig.AttachMainCamera(camera, controller);
+			const std::vector<CameraPath> paths = MakeCoastalSceneCameraPaths();
+			const bool registered = rig.SetReferenceViews(
+				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() }) &&
+				rig.SetCameraPaths(paths);
+			context.Check(registered && paths.size() == 9,
+				"Nine coastal temporal evaluation paths register on the main camera");
+			if (!registered) return;
+
+			// Each path starts at the reference view it was copied from; changing either
+			// side requires a deliberate edit and a path version change.
+			struct Expected
+			{
+				std::string_view m_PathId;
+				std::string_view m_ViewId;
+				uint32_t m_FrameCount;
+				uint32_t m_Cuts;
+			};
+			constexpr std::array<Expected, 9> expected{ {
+				{ "SEQ_StaticRailings", "CAM_ShadowStairs", 96, 1 },
+				{ "SEQ_LateralPanRailings", "CAM_ShadowStairs", 180, 1 },
+				{ "SEQ_PanStopRailings", "CAM_ShadowStairs", 180, 1 },
+				{ "SEQ_DollyDoorway", "CAM_InteriorExterior", 180, 1 },
+				{ "SEQ_OrbitLounge", "Retreat_Lounge", 241, 1 },
+				{ "SEQ_HorizonPan", "CAM_SkyHorizon", 181, 1 },
+				{ "SEQ_CutCourtyardToStairs", "CAM_Courtyard", 120, 2 },
+				{ "SEQ_StaticGlassTerrace", "Retreat_GlassTerrace", 96, 1 },
+				{ "SEQ_PanGlassTerrace", "Retreat_GlassTerrace", 180, 1 },
+			} };
+			for (const Expected& entry : expected)
+			{
+				const CameraPath* path = rig.FindCameraPath(entry.m_PathId);
+				const auto view = std::ranges::find(
+					CoastalSceneReferenceViews, entry.m_ViewId, &CameraReferenceView::m_Id);
+				const std::optional<CameraPathPose> start =
+					path ? EvaluateCameraPath(*path, 0) : std::nullopt;
+				context.Check(path && view != CoastalSceneReferenceViews.end() && start &&
+					path->m_Version == 1 && GetCameraPathFrameCount(*path) == entry.m_FrameCount &&
+					(start->m_Position - view->m_Position).LengthSquared() == 0.0f &&
+					(start->m_Target - view->m_Target).LengthSquared() == 0.0f &&
+					start->m_VerticalFovDegrees == view->m_VerticalFovDegrees &&
+					path->m_NearPlane == view->m_NearPlane && path->m_FarPlane == view->m_FarPlane &&
+					path->m_ManualEV100 == view->m_ManualEV100,
+					std::format("{} starts at {} with {} frames", entry.m_PathId, entry.m_ViewId,
+						entry.m_FrameCount));
+				if (!path) continue;
+
+				const uint64_t serial = camera.GetTemporalResetSerial();
+				bool applied = true;
+				for (uint32_t frame = 0; frame < entry.m_FrameCount; ++frame)
+				{
+					applied = applied && rig.ApplyCameraPathFrame(entry.m_PathId, frame).has_value();
+				}
+				context.Check(applied && camera.GetTemporalResetSerial() == serial + entry.m_Cuts,
+					std::format("{} applies every frame and resets temporal history only at its "
+						"{} cut(s)", entry.m_PathId, entry.m_Cuts));
+			}
+		}
+
 		void CheckCoastalSceneReferenceViews(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
@@ -953,8 +1020,9 @@ namespace gglab
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
 				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
-			context.Check(registered && CoastalSceneReferenceViews.size() == 13,
-				"Eight retained atrium views and five coastal retreat views register in runtime coordinates");
+			context.Check(registered && CoastalSceneReferenceViews.size() == 14,
+				"Eight retained atrium views, five coastal retreat views and one temporal "
+				"evaluation view register in runtime coordinates");
 			if (!registered) return;
 			for (const auto& reference : CoastalSceneReferenceViews)
 			{
@@ -1003,29 +1071,41 @@ namespace gglab
 			if (!imported.Succeeded()) return;
 			const auto& model = imported.m_Model;
 			CheckImportedTextures(context, model);
-			constexpr std::array<std::pair<std::string_view, size_t>, 19> expectedTriangles = { {
-				{ "MAT_RetreatStone", 156 },
-				{ "MAT_RetreatLime", 3996 },
-				{ "MAT_RetreatMetal", 14968 },
-				{ "MAT_RetreatTimber", 46900 },
-				{ "MAT_CoastalRock", 5798 },
+			constexpr std::array<std::pair<std::string_view, size_t>, 24> expectedTriangles = { {
+				{ "MAT_RetreatStone", 220 },
+				{ "MAT_RetreatLime", 4754 },
+				{ "MAT_RetreatMetal", 10268 },
+				{ "MAT_RetreatTimber", 75472 },
+				{ "MAT_CoastalRock", 6048 },
 				{ "MAT_LoungeCoatedShell", 1460 },
 				{ "MAT_LoungeUpholstery", 752 },
 				{ "MAT_LoungeJoints", 752 },
-				{ "MAT_LoungeBrushedAluminum", 1504 },
+				{ "MAT_LoungeBrushedAluminum", 12560 },
 				{ "MAT_RetreatPaint", 2832 },
-				{ "MAT_ServiceSeal", 3500 },
+				{ "MAT_ServiceSeal", 3392 },
 				{ "MAT_RetreatCeramic", 1784 },
 				{ "MAT_RetreatPaper", 188 },
-				{ "MAT_RetreatSoil", 48 },
-				{ "MAT_RetreatLeaf", 1121968 },
-				{ "MAT_RetreatSilverLeaf", 360900 },
-				{ "MAT_RetreatDryLeaf", 297272 },
+				{ "MAT_RetreatSoil", 36 },
+				{ "MAT_RetreatLeaf", 722280 },
+				{ "MAT_RetreatSilverLeaf", 192952 },
+				{ "MAT_RetreatDryLeaf", 229448 },
 				{ "MAT_RetreatSea", 2 },
 				{ "MAT_RetreatDistantRock", 2298 },
+				{ "MAT_CoastalCanopyGlass", 1176 },
+				{ "MAT_DockFender", 8476 },
+				{ "MAT_LandingRope", 23808 },
+				{ "MAT_LifebuoyRed", 1024 },
+				{ "MAT_LifebuoyWhite", 1024 },
 			} };
 			std::array<size_t, expectedTriangles.size()> triangles{};
 			bool geometryValid = true;
+			std::string geometryFailure;
+			// Assimp appends one anonymous default material to this glTF. Require
+			// exactly one copy of every source material and keep the default unbound.
+			bool materialBindingsValid = model.m_Materials.size() == expectedTriangles.size() + 1 &&
+				std::ranges::count(model.m_Materials, std::string{}, &ImportedMaterial::m_Name) == 1 &&
+				std::ranges::all_of(expectedTriangles, [&](const auto& entry)
+					{ return std::ranges::count(model.m_Materials, entry.first, &ImportedMaterial::m_Name) == 1; });
 			for (const auto& mesh : model.m_Meshes)
 			{
 				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
@@ -1034,11 +1114,18 @@ namespace gglab
 				for (const auto& vertex : mesh.m_Vertices)
 				{
 					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
-					geometryValid &= std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
+					const bool vertexValid = std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
 						std::isfinite(vertex.m_Position.m_Z) && std::isfinite(vertex.m_TexCoord0.m_X) &&
 						std::isfinite(vertex.m_TexCoord0.m_Y) && std::abs(vertex.m_Normal.LengthSquared() - 1.0f) < 0.0002f &&
 						std::abs(tangent.LengthSquared() - 1.0f) < 0.0002f &&
 						std::abs(vertex.m_Normal.Dot(tangent)) < 0.0002f && std::abs(std::abs(vertex.m_Tangent.m_W) - 1.0f) < 0.0002f;
+					if (!vertexValid && geometryFailure.empty())
+						geometryFailure = std::format("; mesh {} at ({}, {}, {}): normal squared length {}, "
+							"tangent squared length {}, normal/tangent dot {}, handedness {}", mesh.m_Name,
+							vertex.m_Position.m_X, vertex.m_Position.m_Y, vertex.m_Position.m_Z,
+							vertex.m_Normal.LengthSquared(), tangent.LengthSquared(), vertex.m_Normal.Dot(tangent),
+							vertex.m_Tangent.m_W);
+					geometryValid &= vertexValid;
 				}
 			}
 			// Count placed geometry through bindings so shared foliage meshes retain every instance.
@@ -1050,9 +1137,24 @@ namespace gglab
 					continue;
 				}
 				const auto& material = model.m_Materials[instance.m_MaterialIndex];
-				geometryValid &= material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
+				const auto& properties = material.m_Properties;
+				if (material.m_Name == "MAT_CoastalCanopyGlass")
+				{
+					// The installed core-glTF approximation must stay transparent until
+					// the Runtime supports the source scene's physical transmission.
+					materialBindingsValid &= properties.m_AlphaMode == AlphaMode::Blend &&
+						std::abs(properties.m_BaseColor[3] - 0.18f) < 0.00001f &&
+						std::abs(properties.m_RoughnessFactor - 0.075f) < 0.00001f &&
+						properties.m_MetallicFactor == 0.0f && properties.m_Ior == 1.5f;
+				}
+				else
+				{
+					materialBindingsValid &= properties.m_AlphaMode == AlphaMode::Opaque &&
+						properties.m_BaseColor[3] == 1.0f;
+				}
 				const auto match = std::ranges::find(expectedTriangles, material.m_Name,
 					&std::pair<std::string_view, size_t>::first);
+				materialBindingsValid &= match != expectedTriangles.end();
 				if (match == expectedTriangles.end()) { geometryValid = false; continue; }
 				triangles[static_cast<size_t>(match - expectedTriangles.begin())] +=
 					model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
@@ -1066,14 +1168,26 @@ namespace gglab
 						geometryValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic == GetMaterialTextureSlotSemantic(slot);
 				}
 			}
-			context.Check(geometryValid, "Coastal retreat retains valid opaque geometry, tangent frames and UV0 texture semantics");
+			context.Check(geometryValid,
+				"Coastal retreat retains valid geometry, tangent frames and UV0 texture semantics" + geometryFailure);
+			std::string materialDetail = std::format(" (allocated materials={})", model.m_Materials.size());
+			for (const auto& material : model.m_Materials)
+			{
+				const auto& properties = material.m_Properties;
+				materialDetail += std::format("; {}: alpha mode {}, alpha {}, roughness {}, metallic {}, IOR {}", material.m_Name,
+					static_cast<uint32_t>(properties.m_AlphaMode), properties.m_BaseColor[3], properties.m_RoughnessFactor,
+					properties.m_MetallicFactor, properties.m_Ior);
+			}
+			context.Check(materialBindingsValid,
+				"Coastal retreat retains twenty-three opaque materials and the explicit glass blend approximation" + materialDetail);
 			for (size_t index = 0; index < expectedTriangles.size(); ++index)
 				context.Check(triangles[index] == expectedTriangles[index].second,
 					std::format("Coastal retreat {} retains {} placed triangles (imported={})",
 						expectedTriangles[index].first, expectedTriangles[index].second, triangles[index]));
 
 			// Probe the upper front bevel in model space, independent of Assimp mesh
-			// merging. Nonplanar source quads once acquired flat normals here despite
+			// merging. The lowered seat moves these retained bevels down by 0.16 m.
+			// Nonplanar source quads once acquired flat normals here despite
 			// valid unit normals and tangent frames, producing block-shaped highlights.
 			constexpr std::array armCentersX{ 5.04f, 7.66f };
 			std::array<std::vector<std::pair<Vector3, Vector3>>, armCentersX.size()> frontCorners;
@@ -1086,7 +1200,7 @@ namespace gglab
 				for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
 				{
 					const Vector3 position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
-					if (position.m_Y < 3.1999f || position.m_Y > 3.4341f ||
+					if (position.m_Y < 3.0399f || position.m_Y > 3.2741f ||
 						position.m_Z < -1.6151f || position.m_Z > -1.5249f)
 						continue;
 					// The authored shells have rigid instance transforms.
@@ -1432,15 +1546,17 @@ namespace gglab
 			"Texture contract is not registered as a standalone Demo");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
 		context.Check(std::ranges::find(
-			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
-			"Renderer artifact demand includes the production Temporal AA compute program");
+			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end() &&
+			std::ranges::find(rendererDemands, shader_programs::TemporalAADepthHistoryCompute) !=
+				rendererDemands.end(),
+			"Renderer artifact demand includes the production Temporal AA compute programs");
 		context.Check(std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveBuildCompute) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveCompositeCompute) != rendererDemands.end(),
 			"Renderer startup artifacts include both aerial transport programs before any Lab enables atmosphere");
-		context.Check(rendererDemands.size() == 46 &&
+		context.Check(rendererDemands.size() == 50 &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportanceVertex) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportancePixel) != rendererDemands.end(),
-			"Renderer startup demand includes both IBL importance programs in its 46-program contract");
+			"Renderer startup demand includes both IBL importance programs in its 50-program contract");
 
 		const auto checkSelectedDemand = [&context, &desktop](
 			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
@@ -1453,22 +1569,23 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 50,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 54,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 50,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 54,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 48,
+		checkSelectedDemand("gglab.lab.napa_voxel", 52,
 			"Napa voxel selection contributes two stable shader demands");
-		checkSelectedDemand("gglab.lab.texture_contract", 46,
+		checkSelectedDemand("gglab.lab.texture_contract", 50,
 			"Texture contract uses the production renderer's shader demands");
-		checkSelectedDemand("gglab.lab.lighting_contract", 46,
+		checkSelectedDemand("gglab.lab.lighting_contract", 50,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		checkSelectedDemand("gglab.lab.atmosphere_range", 46,
+		checkSelectedDemand("gglab.lab.atmosphere_range", 50,
 			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
 		CheckCoastalSceneReferenceViews(context);
+		CheckCoastalSceneCameraPaths(context);
 		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.
 		std::thread textureWorker([&]
 			{

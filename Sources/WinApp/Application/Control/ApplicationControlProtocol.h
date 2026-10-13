@@ -1,5 +1,6 @@
 #pragma once
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameSequenceCoordinator.h"
 
 #include <cstdint>
 #include <optional>
@@ -19,6 +20,10 @@ namespace gglab
 		Capture,
 		Result,
 		Stop,
+		// Starts a camera-path sequence; the response reports it without waiting.
+		Sequence,
+		// Cancels the active sequence.
+		SequenceCancel,
 	};
 
 	struct ApplicationControlRequest
@@ -30,6 +35,8 @@ namespace gglab
 		bool m_Wait = true;
 		// Result: the capture request to report.
 		uint64_t m_CaptureRequestId = 0;
+		// Sequence: the sequence to start.
+		FrameSequenceRequest m_Sequence{};
 	};
 
 	struct ApplicationControlParseResult
@@ -55,6 +62,8 @@ namespace gglab
 		uint32_t m_SettledFrames = 0;
 		// Absent before the first rendered frame.
 		const FrameCaptureFrameState* m_Frame = nullptr;
+		// The active or most recent sequence; absent before the first one.
+		const FrameSequenceStatus* m_Sequence = nullptr;
 	};
 
 	// Response serializers. Every response carries the protocol version, the
@@ -68,4 +77,6 @@ namespace gglab
 	[[nodiscard]] std::string SerializeApplicationControlCaptureResult(
 		uint64_t id, const FrameCaptureRequestResult& result) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlStopping(uint64_t id) noexcept;
+	[[nodiscard]] std::string SerializeApplicationControlSequence(
+		uint64_t id, const FrameSequenceStatus& status) noexcept;
 }

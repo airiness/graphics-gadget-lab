@@ -194,6 +194,7 @@ namespace gglab
 			result.m_RenderViews[index].m_IsValid = false;
 		}
 
+		const ViewResolution& viewResolution = info.m_ViewResolution;
 		const Camera& mainCamera = info.m_CameraRig.GetMainCamera();
 		auto& mainViewSettings = result.m_ViewRenderSettings[utils::ToIndex(RenderViewID::Main)];
 		mainViewSettings = info.m_DisplayViewId == RenderViewID::Main
@@ -203,8 +204,7 @@ namespace gglab
 			.m_Camera = mainCamera,
 			.m_RenderSettings = mainViewSettings,
 			.m_TemporalFramePlan = info.m_TemporalFramePlan,
-			.m_Width = info.m_WindowWidth,
-			.m_Height = info.m_WindowHeight,
+			.m_Resolution = viewResolution,
 			.m_Name = StringID("MainView"),
 		};
 		result.m_RenderViews[utils::ToIndex(RenderViewID::Main)] =
@@ -225,8 +225,8 @@ namespace gglab
 				? info.m_DisplayViewSettings
 				: ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
 			result.m_RenderViews[utils::ToIndex(viewId)] = m_ViewBuilder.BuildDebugCameraView(
-				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan,
-				info.m_WindowWidth, info.m_WindowHeight, StringID(std::string_view(slot->m_Name)));
+				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan, viewResolution,
+				StringID(std::string_view(slot->m_Name)));
 		}
 
 		const auto& shadowSettings = result.m_WorldData.GetMainDirectionalShadowSettings();
@@ -246,10 +246,32 @@ namespace gglab
 			"Frame planning and scene writes must share one resolved pre-exposure.");
 		info.m_TemporalFrameTransaction->PrepareDisplayView(
 			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
-		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.m_Requested ==
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::TemporalAA)
+			.m_Requested ==
 			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
 				.m_TemporalAA.m_Enabled,
 			"Temporal frame plan must be resolved from the display view settings.");
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::AmbientOcclusion)
+			.m_Requested ==
+			(result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
+				.m_Lighting.m_GTAO.m_Enabled &&
+				result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
+				.m_Lighting.m_GTAO.m_TemporalAccumulation),
+			"Temporal GTAO planning must be resolved from the display view settings.");
+		// Temporal AA does not integrate post-temporal composition, so the jitter it owns
+		// may be removed from that composition's raster view. Below native resolution the
+		// jittered view does not exist at the display extent, so the view is unjittered.
+		std::optional<RenderView> postTemporalView;
+		const RenderView& builtDisplayView =
+			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)];
+		if (info.m_TemporalFramePlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
+			(result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_TemporalAA
+				.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered ||
+				!builtDisplayView.GetResolution().IsNative()))
+		{
+			postTemporalView = BuildUnjitteredPostTemporalView(
+				result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
+		}
 
 		const bool hasMainFrustum = IsValidBuiltView(result.m_RenderViews, RenderViewID::Main);
 		const math::Frustum mainFrustum =
@@ -285,6 +307,7 @@ namespace gglab
 			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
+			.m_PostTemporalView = postTemporalView ? std::addressof(*postTemporalView) : nullptr,
 		};
 		RenderSceneBuilder::BuildResult sceneBuildResult;
 		{
@@ -305,7 +328,8 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(viewBuffer);
 
 		const auto buildQueue = [&](const RenderView& renderView, RenderQueue& renderQueue,
-			uint32_t viewBindingId, const FrustumList& queueCullFrustums)
+			uint32_t viewBindingId, uint32_t postTemporalViewBindingId,
+			const FrustumList& queueCullFrustums)
 		{
 			if (!renderView.m_IsValid)
 			{
@@ -318,30 +342,27 @@ namespace gglab
 				return;
 			}
 
-			const DepthCoverageBufferSource viewSource{
-				.m_Buffer = viewBuffer->GetBufferHandle(),
-				.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + viewBindingId,
-			};
-			const RenderQueueBuilder::BuildInfo queueBuildInfo{
-				.m_AssetManager = info.m_AssetManager,
-				.m_RenderScene = result.m_RenderScene,
-				.m_RenderView = renderView,
-				.m_CullingFrustums = queueCullFrustums.AsSpan(),
-				.m_CoverageRasterDomain =
-					{
+			const auto makeRasterDomain =
+				[&](uint32_t bindingId, uint32_t width, uint32_t height) noexcept
+				{
+					const DepthCoverageBufferSource viewSource{
+						.m_Buffer = viewBuffer->GetBufferHandle(),
+						.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + bindingId,
+					};
+					return DepthCoverageRasterDomain{
 						.m_FrameSerial = info.m_FrameSerial,
-						.m_ViewBindingId = viewBindingId,
+						.m_ViewBindingId = bindingId,
 						.m_CurrentViewSource = viewSource,
 						.m_CurrentJitteredProjectionSource = viewSource,
 						.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
-						.m_TargetWidth = renderView.m_Width,
-						.m_TargetHeight = renderView.m_Height,
+						.m_TargetWidth = width,
+						.m_TargetHeight = height,
 						.m_Viewport =
 							{
 								.m_X = 0.0f,
 								.m_Y = 0.0f,
-								.m_Width = static_cast<float>(renderView.m_Width),
-								.m_Height = static_cast<float>(renderView.m_Height),
+								.m_Width = static_cast<float>(width),
+								.m_Height = static_cast<float>(height),
 								.m_MinDepth = 0.0f,
 								.m_MaxDepth = 1.0f,
 							},
@@ -349,11 +370,27 @@ namespace gglab
 							{
 								.m_Left = 0,
 								.m_Top = 0,
-								.m_Right = static_cast<int32_t>(renderView.m_Width),
-								.m_Bottom = static_cast<int32_t>(renderView.m_Height),
+								.m_Right = static_cast<int32_t>(width),
+								.m_Bottom = static_cast<int32_t>(height),
 							},
 						.m_DepthConvention = renderView.m_DepthConvention,
-					},
+					};
+				};
+			const RenderQueueBuilder::BuildInfo queueBuildInfo{
+				.m_AssetManager = info.m_AssetManager,
+				.m_RenderScene = result.m_RenderScene,
+				.m_RenderView = renderView,
+				.m_CullingFrustums = queueCullFrustums.AsSpan(),
+				.m_CoverageRasterDomain =
+					makeRasterDomain(viewBindingId, renderView.m_Width, renderView.m_Height),
+				// The display raster view of post-temporal composition: the view itself, or
+				// its unjittered post-temporal view. Views that are never displayed, such as
+				// shadow views, have none.
+				.m_PostTemporalRasterDomain =
+					renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0
+						? makeRasterDomain(postTemporalViewBindingId,
+							renderView.m_DisplayWidth, renderView.m_DisplayHeight)
+						: DepthCoverageRasterDomain{},
 				.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
 				.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
 				.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_FrameSlotIndex),
@@ -372,7 +409,11 @@ namespace gglab
 			const FrustumList frustums = BuildVisibilityFrustums(result.m_RenderViews,
 				renderView.m_ViewId, GetVisibilityModeForView(info.m_CameraRig, renderView.m_ViewId),
 				mainFrustum, hasMainFrustum);
-			buildQueue(renderView, result.m_RenderQueues[viewIndex], viewIndex, frustums);
+			const bool unjitteredPostTemporal = renderView.m_ViewId == result.m_DisplayViewId &&
+				sceneBuildResult.m_PostTemporalViewOffset != RenderSceneBuilder::UnassignedViewOffset;
+			buildQueue(renderView, result.m_RenderQueues[viewIndex], viewIndex,
+				unjitteredPostTemporal ? sceneBuildResult.m_PostTemporalViewOffset : viewIndex,
+				frustums);
 		}
 
 		auto& cascades = result.m_DirectionalShadowFramePlan;
@@ -380,7 +421,8 @@ namespace gglab
 		{
 			auto& cascade = cascades.m_Cascades[index];
 			// Preserve conservative all-caster submission until shadow caster culling is introduced.
-			buildQueue(cascade.m_View, cascade.m_RenderQueue, cascades.GetViewIndex(index), {});
+			buildQueue(cascade.m_View, cascade.m_RenderQueue, cascades.GetViewIndex(index),
+				cascades.GetViewIndex(index), {});
 		}
 
 		return result;

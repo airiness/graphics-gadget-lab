@@ -23,7 +23,9 @@ namespace gglab
 			return SceneExtensionTemporalParticipation::PostTAA;
 		}
 
-		// SceneColor writes use the display view's scene pre-exposure before FP16 storage.
+		// A PostTAA extension composes into the display domain: RGViewTargets::m_DisplayColor,
+		// RGDisplayDepthResources and the queue's post-temporal raster domain.
+		// Color writes use the display view's scene pre-exposure before FP16 storage.
 		// Keep depth, motion, alpha, and separate diagnostic payloads in their original units.
 		virtual void AddOpaqueScenePasses(RenderGraph& renderGraph,
 			const RenderFrameContext& frameContext, const RenderServices& services) noexcept = 0;

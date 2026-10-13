@@ -1,4 +1,5 @@
 #include "Graphics/RenderSceneBuilder.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
@@ -19,6 +20,67 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] bool IsRenderableModel(const Model& model) noexcept
+		{
+			return model.m_ContentState == AssetContentState::Ready &&
+				model.m_ResidencyState == AssetResidencyState::Resident;
+		}
+
+		[[nodiscard]] bool IsRenderableMesh(const Mesh* mesh) noexcept
+		{
+			return mesh && mesh->m_IndexCount != 0 && mesh->m_IsUploaded &&
+				mesh->m_ResidencyState == AssetResidencyState::Resident;
+		}
+
+		struct SceneMaterialSource
+		{
+			const MaterialProperties* m_Properties = nullptr;
+			RenderMaterialKey m_Key{};
+		};
+
+		[[nodiscard]] SceneMaterialSource ResolveSceneMaterialSource(
+			const AssetManager& assets, const ModelMesh& mesh,
+			const components::MaterialInstanceComponent* instance) noexcept
+		{
+			if (instance && instance->m_Key.IsValid())
+			{
+				return { &instance->m_Properties, RenderMaterialKey::FromRuntime(instance->m_Key) };
+			}
+			return { assets.GetMaterial(mesh.m_MaterialId), RenderMaterialKey::FromAsset(mesh.m_MaterialId) };
+		}
+	}
+
+	bool HasMaterialDiagnosticDemand(const World& world, const AssetManager& assets) noexcept
+	{
+		const auto& registry = world.GetRegistry();
+		const auto entities = registry.view<const components::TransformComponent,
+			const components::ModelComponent>();
+		for (const auto entity : entities)
+		{
+			const Model* model = assets.GetModel(entities.get<const components::ModelComponent>(entity).m_ModelId);
+			if (!model || !IsRenderableModel(*model))
+			{
+				continue;
+			}
+			const auto* instance = registry.try_get<components::MaterialInstanceComponent>(entity);
+			for (const ModelMesh& mesh : model->m_MeshInstance)
+			{
+				if (!IsRenderableMesh(assets.GetMesh(mesh.m_MeshId)))
+				{
+					continue;
+				}
+				const auto material = ResolveSceneMaterialSource(assets, mesh, instance);
+				if (material.m_Properties && IsMaterialDiagnosticView(material.m_Properties->m_DebugView))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	LightGPU RenderSceneBuilder::BuildLightData(uint64_t entityKey,
 		const components::TransformComponent& transform, const components::LightComponent& light,
 		const RenderDirectionalLight& mainLight) noexcept
@@ -53,11 +115,12 @@ namespace gglab
 	}
 
 	RenderSceneBuilder::ViewUploadData RenderSceneBuilder::BuildViewData(
-		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept
+		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades,
+		const RenderView* postTemporalView) noexcept
 	{
 		ViewUploadData result{};
 		auto& viewData = result.m_Views;
-		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size());
+		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size() + 1);
 		const auto appendView = [&viewData](const RenderView& renderView)
 		{
 			ViewGPU viewGpu{};
@@ -79,6 +142,8 @@ namespace gglab
 			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
 			viewGpu.ScenePreExposure = renderView.m_ScenePreExposure;
 			viewGpu.PreviousScenePreExposure = renderView.m_PreviousScenePreExposure;
+			viewGpu.TemporalFrameIndex = renderView.m_TemporalFrameIndex;
+			viewGpu.TextureLodBias = renderView.m_TextureLodBias;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
 			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
@@ -95,6 +160,11 @@ namespace gglab
 		for (const DirectionalShadowCascade& cascade : cascades.m_Cascades)
 		{
 			appendView(cascade.m_View);
+		}
+		if (postTemporalView)
+		{
+			result.m_PostTemporalViewOffset = static_cast<uint32_t>(viewData.size());
+			appendView(*postTemporalView);
 		}
 		return result;
 	}
@@ -123,9 +193,11 @@ namespace gglab
 		info.m_MaterialTable.BeginUpdate();
 		info.m_LightTable.BeginUpdate();
 
-		const auto viewUpload = BuildViewData(info.m_RenderViews, info.m_DirectionalShadowFramePlan);
+		const auto viewUpload = BuildViewData(
+			info.m_RenderViews, info.m_DirectionalShadowFramePlan, info.m_PostTemporalView);
 		const auto& viewData = viewUpload.m_Views;
 		result.m_ShadowViewBaseOffset = viewUpload.m_ShadowViewBaseOffset;
+		result.m_PostTemporalViewOffset = viewUpload.m_PostTemporalViewOffset;
 
 		RenderMaterialFrameCache materialCache(
 			info.m_MaterialTable, assetManager, info.m_SamplerRegistry);
@@ -141,8 +213,7 @@ namespace gglab
 					GGLAB_LOG_GRAPHICS_WARN("Entity has no model.");
 					return;
 				}
-				if (model->m_ContentState != AssetContentState::Ready ||
-					model->m_ResidencyState != AssetResidencyState::Resident)
+				if (!IsRenderableModel(*model))
 				{
 					return;
 				}
@@ -156,8 +227,7 @@ namespace gglab
 				{
 					const ModelMesh& modelMesh = model->m_MeshInstance[modelMeshIndex];
 					const Mesh* mesh = assetManager.GetMesh(modelMesh.m_MeshId);
-					if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded ||
-						mesh->m_ResidencyState != AssetResidencyState::Resident)
+					if (!IsRenderableMesh(mesh))
 					{
 						continue;
 					}
@@ -166,20 +236,12 @@ namespace gglab
 					const Matrix world = modelMesh.m_LocalTransform * entityWorld;
 					const Matrix normalMat = math::CreateNormalMatrix(world);
 
-					const MaterialProperties* material = nullptr;
-					RenderMaterialKey materialKey{};
 					const auto* materialInstance =
 						registry.try_get<components::MaterialInstanceComponent>(entity);
-					if (materialInstance && materialInstance->m_Key.IsValid())
-					{
-						material = &materialInstance->m_Properties;
-						materialKey = RenderMaterialKey::FromRuntime(materialInstance->m_Key);
-					}
-					else
-					{
-						material = assetManager.GetMaterial(modelMesh.m_MaterialId);
-						materialKey = RenderMaterialKey::FromAsset(modelMesh.m_MaterialId);
-					}
+					const auto materialSource =
+						ResolveSceneMaterialSource(assetManager, modelMesh, materialInstance);
+					const MaterialProperties* material = materialSource.m_Properties;
+					const RenderMaterialKey materialKey = materialSource.m_Key;
 
 					if (!material)
 					{
@@ -235,10 +297,14 @@ namespace gglab
 					}
 					if (info.m_TemporalFrameTransaction)
 					{
-						GGLAB_ASSERT_MSG(
+						// Staging supplies the next frame's previous model, so it must run in
+						// every build configuration rather than inside the assertion.
+						const bool objectStaged =
 							info.m_TemporalFrameTransaction->StageSubmittedObject(
-								objectHistoryKey, world),
+								objectHistoryKey, world);
+						GGLAB_ASSERT_MSG(objectStaged,
 							"Submitted object history must fit the bounded GPU object capacity.");
+						GGLAB_UNUSED(objectStaged);
 					}
 
 					Vector3 worldCenter = transformComp.m_Position;

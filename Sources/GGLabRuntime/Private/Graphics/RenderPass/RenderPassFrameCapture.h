@@ -4,9 +4,10 @@
 
 namespace gglab
 {
-	// Copies the display target into a capture-owned readback buffer at one
-	// capture tap. The pass is added only for frames with queued requests for its
-	// source, so ordinary frames carry no capture work.
+	// Copies the display target, or the diagnostic tap target for Diagnostic
+	// captures, into a capture-owned readback buffer at one capture tap. The pass is
+	// added only for frames with queued requests for its source, so ordinary frames
+	// carry no capture work.
 	class RenderPassFrameCapture : public RenderPassBase
 	{
 	public:

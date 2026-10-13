@@ -2,10 +2,17 @@
 
 The Coastal Atrium Demo (`--demo atrium`, persisted id
 `Demo.Playground.CoastalAtrium`) loads this original project scene. It replaces
-its Research Lounge presentation with pale mineral architecture, timber screens
-and decking, supported furniture and planters, coastal vegetation, an opaque
-sea surface and three distant landforms. Keep the `.gltf`, adjacent `.bin` and
-`Textures/` directory together. No third-party assets are used.
+its Research Lounge presentation with a U-shaped coastal retreat, a continuous
+L-shaped mineral roof, an open rear gallery and a same-level sea terrace.
+Four pale piers support the glazed terrace roof; glass guards keep the ocean
+view open. A straight timber dock, mooring pile and red/white lifebuoy establish
+the arrival route. Roof glazing retainers, graded collectors and open roof
+outlets complete the weather details without external downpipes. Stair guards
+retain the stepped openings beneath their glass, with supported posts and clips.
+Inset planters and supported seating complete the construction details.
+Keep the `.gltf`, adjacent `.bin` and `Textures/` directory together.
+All geometry and textures are original project work; see the
+[asset notices](../THIRD_PARTY_NOTICES.md#original-project-assets).
 
 ## Installed bundle identity
 
@@ -15,18 +22,26 @@ verification use the installed glTF Separate bundle directly. No asset
 generation step or additional asset repository is required. The SHA-256 values
 below identify the shipped files independently of authoring history.
 
-The bundle has 446 unique glTF meshes, 694 placed mesh nodes, 719 total nodes,
-318,952 unique / 1,867,078 placed triangles, nineteen opaque materials, nine
-reference cameras and one reference Sun. Twenty-four original 1024-square PNGs
-form eight PBR map sets: Retreat lime, stone, timber, sea and leaf, plus the
-retained project rock, metal and upholstery maps. Base Color uses sRGB; Normal
-and packed G roughness / B metallic use linear data through UV0. Material
-factors, texture transforms and instance transforms remain as exported.
+The bundle has 546 unique glTF meshes, 734 placed mesh nodes, 761 total nodes,
+205,048 unique / 1,303,006 placed triangles, twenty-three opaque materials,
+one transparent glass material, twelve saved cameras and one reference Sun.
+The glazing includes 28 roof panes and 70 guard panes. Twenty-four original
+1024-square PNGs form eight PBR map sets: Retreat lime, stone, timber, sea and
+leaf, plus the retained project rock, metal and upholstery maps. Base Color
+uses sRGB; Normal and packed G roughness / B metallic use linear data through
+UV0. Texture bytes and the repaired lounge front bevel normals are retained.
+
+The installed glass uses core glTF `alphaMode=BLEND`, base-color alpha 0.18,
+roughness 0.075 and metallic factor 0. It is the documented approximation for
+this Runtime. The editable source uses physical transmission 0.96, IOR 1.5
+and alpha 1; `KHR_materials_transmission` is removed from the shipped derivative.
+All other export data and the binary/texture dependencies are retained. Alpha
+blending does not establish physically correct glass refraction or transmission.
 
 | Installed file | SHA-256 |
 | --- | --- |
-| `GGLabCoastalRetreat.bin` | `df4cd64a1afd108df14cdbe6beaae6b5e75c50009e2245d875510613791ce4bc` |
-| `GGLabCoastalRetreat.gltf` | `551fe58fd3d31a5a99594dbbf831d2978bbe0740cb0f05d194fb2df03678f5c2` |
+| `GGLabCoastalRetreat.bin` | `cd48c435a38ae2d4d894bcfe58ced5222c993e0e486de7bbfcbe98b0d30143ae` |
+| `GGLabCoastalRetreat.gltf` | `13b113fab61cc791896d146b85c27cadec194f82011b250828087de864c9bb0e` |
 | `Textures/CoastalRock_BaseColor.png` | `56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9` |
 | `Textures/CoastalRock_MetallicRoughness.png` | `4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342` |
 | `Textures/CoastalRock_Normal.png` | `d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8` |
@@ -52,19 +67,20 @@ factors, texture transforms and instance transforms remain as exported.
 | `Textures/Upholstery_MetallicRoughness.png` | `15ea1ce5c4fc92f21e5588929b044b903ec137fbf15e44abcdb995a571ff1964` |
 | `Textures/Upholstery_Normal.png` | `5f433933356f2de09dcf550a2cc1e1267ce74287d5b7a89795b08a73dcf4b3d6` |
 
-The installed bundle repairs the two lounge armrests' authored corner normals.
-Some retained non-planar bevel faces had been classified as new boolean contact
-faces and assigned flat normals, producing disconnected clearcoat highlights
-around the front corners. The repair restores the retained bevel normals and
-their derived tangents. Triangle geometry and winding, UVs, material bindings,
-node transforms and all twenty-four PNGs retain their previous values.
-The Blender glTF exporter 5.2.40 reorders indices and writes the source reference
-Sun color `(1, 0.95, 0.85)` in place of the preceding export's white value. This
-reference light does not configure the Demo's Runtime Physical Sun.
+The lounge front bevel repair is retained after lowering the seating by
+160 mm. Imported coincident upper-front bevel corners must keep continuous
+normals within the 0.0005 export-noise tolerance. The four legs have their
+nonuniform seating scale applied to the source mesh, with inverse-transpose
+custom normals, so Assimp graph optimization retains unit, orthogonal imported
+normal/tangent frames. World-space shape, UVs and support contacts are preserved.
+This guards against the
+previous non-planar bevel classification error and its disconnected clearcoat
+highlights. The source reference Sun remains `(1, 0.95, 0.85)`; this exported
+light does not configure the Demo's Runtime Physical Sun.
 
 ## Physical daylight presentation
 
-The Demo uses physical daylight and opaque PBR shading. Its World has
+The Demo uses physical daylight, opaque PBR surfaces and transparent glazing. Its World has
 the default Earth atmosphere and one designated Physical Sun, aligned with the
 exported reference direction at 23 degrees elevation. The Sun uses 120,000 lux
 top-of-atmosphere perpendicular illuminance and a 0.2666 degree angular radius;
@@ -75,7 +91,7 @@ Environment intensity is 1, rotation is 0 and the skybox is enabled. The Demo
 retains the selected IBL quality and restores the previous environment settings
 on exit.
 
-All thirteen reference views use profile version 2 with manual EV100 15 and
+All fourteen reference views use profile version 2 with manual EV100 15 and
 zero exposure compensation. They share a 6000 m far plane so the sea and distant
 coast remain visible, including from the retained horizon and interior views.
 Scene pre-exposure is enabled, using
@@ -91,7 +107,7 @@ original settings and are not exposure-matched baselines for this presentation.
 
 ## Runtime views and verification
 
-The Demo starts at `Retreat_Overview`. Five new reference views register the
+The Demo starts at `Retreat_Overview`. Five Retreat reference views register the
 authored positions, targets and exported vertical FOV in runtime coordinates,
 mapping Blender `(X, Y, Z)` to `(X, Z, Y)` in meters. They use a 0.05 m near plane,
 6000 m far plane and reference aspect 16:10. Camera restoration
@@ -102,13 +118,19 @@ reference aspects, with the far plane extended to the same coastal range.
 | View | Purpose |
 | --- | --- |
 | `Retreat_Hero` | Whole island, sea and distant landforms |
-| `Retreat_Courtyard` | Window planting, timber screening and colonnade |
+| `Retreat_Courtyard` | Open gallery, planting and timber screening |
 | `Retreat_Lounge` | Lounge, deck and supported table props |
 | `Retreat_Planting` | Foliage, soil and planter seating detail |
-| `Retreat_Overview` | Both terraces, courtyard circulation and stair approach |
+| `Retreat_Overview` | Island layout, glazed sea terrace and arrival route |
 
-The production import suite checks placed triangles per material, opaque
-bindings, finite geometry, orthonormal tangent frames, normal continuity at both
+`Retreat_GlassTerrace` is a temporal evaluation view defined in code rather than an
+authored camera: it looks through the sea terrace guard glass toward the sun glint,
+the dock and the lifebuoy, with a 0.1 m near plane. The `SEQ_StaticGlassTerrace` and
+`SEQ_PanGlassTerrace` camera paths start from it.
+
+The production import suite checks placed triangles per material, explicit
+opaque and glass blend bindings, finite geometry, orthonormal tangent frames,
+normal continuity at both
 upper front armrest bevels and all twenty-four textures' semantic decoding and
 mip chains. Build WinApp and ShaderCompiler
 from the same code revision, then run from the code repository root:
@@ -126,38 +148,44 @@ default. See [Frame Capture](../../../Docs/FrameCapture.md) for sidecars and
 cross-backend comparisons. Import checks and shader compilation alone do not
 establish visual correctness.
 
-Local armrest repair verification on 2026-10-06: Debug WinApp and ShaderCompiler
-built successfully. `app-content-registration` passed all 295 checks using the
-installed assets, including exposure, pre-exposure, coastal range and camera
-restoration for all thirteen reference views. A negative run against the
-preceding bundle failed exactly the two new armrest checks: maximum normal
-delta at coincident upper front bevel corners was 0.565064 on each arm. The
-installed repair reduced it to 0.000173, below the 0.0005 export-noise tolerance.
-The checks select model-space corners independently of importer mesh merging.
+Installed-bundle verification on 2026-10-09: Debug WinApp and ShaderCompiler
+built with the x64-hosted MSVC toolchain, with zero build errors or warnings.
+`app-content-registration` passed all 321 checks against the installed public
+assets, including all 24 named materials and their placed triangle counts,
+texture decoding/mips, orthonormal imported vertex frames, camera/exposure
+restoration and the six registered temporal camera-path contracts. Both upper
+front armrest bevels had maximum coincident normal delta 0.000173, below 0.0005.
 
-Hidden DX12 and Vulkan sessions with isolated state each captured all thirteen
-reference views at 1280 x 800 after sixty-four settled frames. Separate hidden
-runs captured `Retreat_Lounge` at 2560 x 1600 with the same settling contract.
-All twenty-eight images and readiness sidecars were inspected. Every readiness
-gate was ready, and all four runs logged atomic Physical Sky IBL publication
-before capture. Both armrests now show continuous bevel shading; the previous
-rectangular clearcoat highlights at the front corners are gone. The remaining
-views retain their daylight, material detail, shadows, foliage and distant
-coast, with no missing content or previous-view temporal history visible.
+The source acceptance removed exactly eight independent objects: two stair
+upstands, two downpipes, their stays and splash pads. All retained meshes,
+object transforms, material bindings, packed images, cameras and lighting remain
+exact. Geometry checks retain the post bases, glass clips, stepped stair
+openings, roof falls, collector seats and open scuppers. Negative fixtures reject
+a displaced stair pane, a blocked stair opening and the existing construction
+contact/void failures; the historical detail profile still passes unchanged.
+Two 26-file exports are byte-identical. Both the physical and shipped
+Runtime-profile glTF were reimported and checked for geometry, supports,
+construction joints and open routes. Four focused Blender views review the
+stair edges, post base, rear canopy and roof outlet.
 
-All thirteen reference-view comparisons and the high-resolution lounge pair
-passed (`MaxMeanError=1`, `MaxDifferingPercent=1`, channel threshold 8). The
-reference views' mean absolute RGB differences ranged from 0.0183 to 0.1900 on
-the 8-bit scale; at most 0.1108% of pixels exceeded the channel threshold. The
-lounge detail pair had mean error 0.0358 and 0.0094% differing pixels. Camera and
-capture settings agreed. Only total simulation time differed, by at most
-0.9 seconds for the reference views and 1 second for the detail, in this static
-scene. No assertion, validation error or upload failure was reported. The
-existing startup HDR FP16 sanitization warning occurred on both backends.
-Vulkan reported the existing `Shader-OutputNotConsumed` performance warning for
-vertex output location 5. All sessions and detail runs exited successfully.
-Release, interactive Demo switching, temporal ghosting during camera motion
-and performance/LOD qualification were not run.
+Fresh hidden DX12 and Vulkan sessions loaded the normal Debug executable and
+this public bundle directly. Each captured all fourteen reference views at
+1280 x 800 after 64 settled frames, with DevTools disabled and every readiness
+gate ready. All 28 images and sidecars were reviewed; both sessions exited 0.
+All fourteen cross-backend pairs passed `MaxMeanError=1`,
+`MaxDifferingPercent=1` and channel threshold 8. Maximum mean absolute RGB error
+was 0.4979 / 255; at most 0.0201% of pixels exceeded the threshold. Compared
+presentation settings agreed; only `time.totalTime` differed.
+
+No assertion, validation error or upload failure was reported. Both backends
+logged the startup HDR FP16 sanitization warning. Vulkan logged unused vertex
+outputs at locations 5 and 8 as performance warnings. Release, interactive
+Demo switching, TAA quality during camera motion and performance/LOD
+qualification were not run for this asset installation. Older captures are
+historical evidence; compare current captures against the installed file
+identities above.
+
+![Installed Coastal Retreat, DX12 overview](../../Media/CoastalRetreat.png)
 
 ## Presentation limits
 
@@ -167,5 +195,6 @@ not glTF rendering contracts; the runtime Hero camera uses a symmetric
 projection. Runtime Physical Sun, Sky and IBL use the daylight contract above.
 The sea is static opaque PBR geometry. Vegetation is static
 solid geometry; this import adds no plant LOD, wind animation or performance
-budget guarantee. Existing Atrium/Research Lounge exports and their frozen
-capture baselines retain their bytes.
+budget guarantee. The construction details express architectural intent and
+have no structural or drainage-capacity certification. Existing Atrium/Research
+Lounge exports and their frozen capture baselines retain their bytes.

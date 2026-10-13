@@ -3,12 +3,15 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 namespace gglab
 {
@@ -71,5 +74,11 @@ namespace gglab
 		RHIFencePoint m_SubmittedFence{};
 		uint64_t m_FrameIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
+		// Owned values from the successfully submitted display frame. Render serial
+		// correlates with GPU profiles; m_FrameIndex remains the Application clock.
+		uint64_t m_RenderFrameSerial = 0;
+		TemporalAASettings m_TemporalAASettings{};
+		ResolvedTemporalFramePlan m_TemporalFramePlan{};
+		ViewResolution m_ViewResolution{};
 	};
 }

@@ -49,6 +49,10 @@ namespace gglab::shader_programs
 		"gglab.shader.gtao", "compute.evaluate", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateDiagnosticsCompute{
 		"gglab.shader.gtao", "compute.evaluate-diagnostics", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAOTemporalCompute{
+		"gglab.shader.gtao", "compute.temporal", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAOTemporalDiagnosticsCompute{
+		"gglab.shader.gtao", "compute.temporal-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAODenoiseXCompute{
 		"gglab.shader.gtao", "compute.denoise-x", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAODenoiseYCompute{
@@ -57,6 +61,14 @@ namespace gglab::shader_programs
 		"gglab.shader.gtao", "compute.upsample", ShaderStage::Compute };
 	inline const ShaderProgramRef TemporalAAReprojectionCompute{
 		"gglab.shader.temporal-aa", "compute.reprojection", ShaderStage::Compute };
+	inline const ShaderProgramRef TemporalAADepthHistoryCompute{
+		"gglab.shader.temporal-aa-depth-history", "compute.copy", ShaderStage::Compute };
+	inline const ShaderProgramRef TemporalAADisplayDepthVertex{
+		"gglab.shader.temporal-aa-display-depth", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef TemporalAADisplayDepthPixel{
+		"gglab.shader.temporal-aa-display-depth", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef TemporalReferenceAccumulateCompute{
+		"gglab.shader.temporal-reference", "compute.accumulate", ShaderStage::Compute };
 
 	inline const ShaderProgramRef DirectionalShadowMapVertex{
 		"gglab.shader.directional-shadow-map", "vertex", ShaderStage::Vertex };

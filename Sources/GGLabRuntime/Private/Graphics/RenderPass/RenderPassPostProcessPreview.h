@@ -31,6 +31,12 @@ namespace gglab
 		void AddPassForTap(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services, const RGPostProcessColor& source,
 			PostProcessDebugTap tap, uint32_t bloomPyramidLevel = 0) noexcept;
+		// Renders the tap's preview visualization at display resolution into a
+		// transient RGBA8 target published as RGDiagnosticCaptureResources, for a
+		// Diagnostic capture. Returns false when the frame has no source for the tap.
+		[[nodiscard]] bool AddDiagnosticCapturePass(RenderGraph& rg,
+			const RenderFrameContext& context, const RenderServices& services,
+			PostProcessDebugTap tap) noexcept;
 
 	private:
 		void AddPassForChannel(RenderGraph& rg, const RenderFrameContext& context,

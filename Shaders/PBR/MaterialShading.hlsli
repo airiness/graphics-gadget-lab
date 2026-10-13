@@ -93,7 +93,7 @@ float3x3 BuildNormalTextureFrame(MaterialTextureBindingData binding,
 float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale, float3x3 TBN, float2 uv)
 {
 	const float3 normalSampled = DecodeNormalTexture(
-		SampleTextureBinding(binding.TextureSamplerBinding, uv).rgb, normalScale);
+		SampleMaterialTextureBinding(binding.TextureSamplerBinding, uv).rgb, normalScale);
 	return SafeNormalize(mul(normalSampled, TBN), TBN[2]);
 }
 

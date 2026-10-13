@@ -171,8 +171,9 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
-						targets.m_Width = width;
-						targets.m_Height = height;
+						// The Lab composes only display-domain targets.
+						targets.m_DisplayWidth = width;
+						targets.m_DisplayHeight = height;
 						targets.m_BackBuffer = resources.m_BackBuffer;
 					});
 

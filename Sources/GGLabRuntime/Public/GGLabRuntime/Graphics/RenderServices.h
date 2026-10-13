@@ -203,6 +203,10 @@ namespace gglab
 		[[nodiscard]] virtual uint64_t GetBakingGeneration() const noexcept = 0;
 		[[nodiscard]] virtual const IBLBakeConfig& GetBakingConfig() const noexcept = 0;
 		[[nodiscard]] virtual const IBLBakeStatus& GetBakingStatus() const noexcept = 0;
+		// Latest bake request, including one made after the status last refreshed its
+		// requested generation while the previous frame was built. An environment
+		// source committed this frame is pending here before the status reports it.
+		[[nodiscard]] virtual uint64_t GetBakeRequestGeneration() const noexcept = 0;
 		[[nodiscard]] virtual IBLBakeStage GetStageForRecording() const noexcept = 0;
 		virtual void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept = 0;
 		virtual void NotifyBakeResourcesInitialized(uint64_t generation) noexcept = 0;

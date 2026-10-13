@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -92,6 +93,7 @@ namespace gglab
 	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class FrameCaptureCoordinator;
+	class FrameSequenceCoordinator;
 	class LabRuntimeLocatorBase;
 	class RenderCompositionAccess;
 	class RenderHost;
@@ -100,6 +102,7 @@ namespace gglab
 	class TaskSystem;
 	class Time;
 	struct LoadingProgress;
+	struct FrameCaptureRequestResult;
 
 	struct AppRuntimeServiceCreateInfo
 	{
@@ -204,10 +207,19 @@ namespace gglab
 			return m_DebugDrawService.get();
 		}
 		// Non-owning; null before runtime services are composed. It outlives
-		// Shutdown so hosts can drain the final capture results.
+		// Shutdown so hosts can inspect the final capture state. AppRuntime owns
+		// its result stream; hosts drain ConsumeFrameCaptureResults instead.
 		[[nodiscard]] FrameCaptureCoordinator* GetFrameCaptureCoordinator() const noexcept
 		{
 			return m_FrameCapture.get();
+		}
+		// Appends published results in completion order, once per result. Tick and
+		// Shutdown notify the sequence before publication, independently of host polling.
+		void ConsumeFrameCaptureResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
+		// Non-owning; null before runtime services are composed.
+		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
+		{
+			return m_FrameSequence.get();
 		}
 		// Non-owning; null unless optional diagnostics were composed with runtime services.
 		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
@@ -220,6 +232,8 @@ namespace gglab
 		[[nodiscard]] LoadingProgress GetStartupLoadingProgress() const noexcept;
 
 	private:
+		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
+		void CollectFrameCaptureResults() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
 		[[nodiscard]] bool BeginInitialShaderPreload(
@@ -227,6 +241,10 @@ namespace gglab
 		void Resize(uint32_t width, uint32_t height) noexcept;
 		// Records failure evidence that survives Release builds and makes Failed terminal.
 		[[nodiscard]] AppRuntimeTickResult FailRuntime(std::string_view failure) noexcept;
+		// Keeps GPU profiling enabled while a sequence records GPU timing and restores
+		// the previous request afterwards.
+		void SyncSequenceGpuProfiling() noexcept;
+		void CollectSequenceGpuTiming() noexcept;
 
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
@@ -244,8 +262,14 @@ namespace gglab
 		std::unique_ptr<DebugDrawService> m_DebugDrawService;
 		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
+		// Declared after the capture coordinator it submits to, so it is destroyed first.
+		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
+		// Results already routed to the sequence, awaiting host publication.
+		std::vector<FrameCaptureRequestResult> m_FrameCaptureResults;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
+		// Profiling request in effect before a timed sequence enabled profiling.
+		std::optional<bool> m_SequenceGpuProfilingRestore;
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
 		AppRuntimeLifecycleState m_LifecycleState = AppRuntimeLifecycleState::Uninitialized;

@@ -162,6 +162,9 @@ namespace gglab
 
 		void DrainCompletions(std::vector<AssetLoadCompletion>& output) noexcept;
 		[[nodiscard]] bool HasActiveOperations() const noexcept;
+		// An operation stays active from submission until its completion is handed off,
+		// including while the completion waits in the CPU payload queue.
+		[[nodiscard]] uint32_t GetActiveOperationCount() const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics()
 			const noexcept
 		{

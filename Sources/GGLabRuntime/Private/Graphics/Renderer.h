@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
@@ -47,6 +48,8 @@ namespace gglab
 	class ShadowPreviewViewBase;
 	class ShadowPreviewControlBase;
 	class TemporalHistoryManager;
+	class TemporalReferenceAccumulator;
+	class GTAOTemporalHistory;
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
 
@@ -89,8 +92,9 @@ namespace gglab
 		[[nodiscard]] RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept override;
 		TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-			float scenePreExposure) noexcept override;
+			const ResolvedTemporalFramePlan& plan, const ViewResolution& resolution,
+			float scenePreExposure,
+			const std::optional<TemporalReferenceSample>& referenceSample) noexcept override;
 		void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept override;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
 		void Render(RenderFrame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
@@ -178,6 +182,10 @@ namespace gglab
 		{
 			return m_TemporalAACapabilityStatus;
 		}
+		const GTAOCapabilityStatus& GetGTAOCapabilityStatus() const noexcept override
+		{
+			return m_GTAOCapabilityStatus;
+		}
 		// Explicit environment access for pass services. The concrete
 		// environment and bake services remain Runtime-internal.
 		[[nodiscard]] const EnvironmentLightingSettings& GetEnvironmentLightingSettings()
@@ -186,6 +194,7 @@ namespace gglab
 		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept override;
 		[[nodiscard]] const IBLBakeConfig& GetBakingConfig() const noexcept override;
 		[[nodiscard]] const IBLBakeStatus& GetBakingStatus() const noexcept override;
+		[[nodiscard]] uint64_t GetBakeRequestGeneration() const noexcept override;
 		[[nodiscard]] IBLBakeStage GetStageForRecording() const noexcept override;
 		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept override;
 		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept override;
@@ -326,6 +335,8 @@ namespace gglab
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
+		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;
+		std::unique_ptr<GTAOTemporalHistory> m_GTAOTemporalHistory;
 		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
 		// Outlives Finalize so the application can drain the final capture results.
@@ -340,6 +351,7 @@ namespace gglab
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
+		GTAOCapabilityStatus m_GTAOCapabilityStatus{};
 		TemporalViewHistory m_TemporalViewHistory{};
 		TemporalObjectHistory m_TemporalObjectHistory{};
 

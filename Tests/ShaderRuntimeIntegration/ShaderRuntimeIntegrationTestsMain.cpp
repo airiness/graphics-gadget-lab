@@ -2,6 +2,7 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "ShaderCompileContractSelfTests.h"
 #include "BrdfLutNumericSelfTests.h"
+#include "TemporalAccumulationNumericSelfTests.h"
 
 #include <cstdio>
 #include <string_view>
@@ -16,10 +17,13 @@ namespace
 		void OnSuiteStarted(std::string_view suite) noexcept override
 		{
 			std::printf("Running GPU %.*s self-tests (hidden window)...\n", static_cast<int>(suite.size()), suite.data());
+			std::fflush(stdout);
 		}
 		void OnCheckCompleted(std::string_view name, bool succeeded) noexcept override
 		{
 			m_Console.OnCheckCompleted(name, succeeded);
+			std::fflush(stdout);
+			std::fflush(stderr);
 		}
 		void OnSuiteFinished(std::string_view suite, const gglab::SelfTestSummary& summary) noexcept override
 		{
@@ -33,6 +37,13 @@ namespace
 	{
 		gglab::InitializeLogging();
 		gglab::ConsoleSelfTestReporter reporter;
+		if (selection == "temporal-accumulation-gpu")
+		{
+			GpuSelfTestReporter gpuReporter;
+			return gglab::RunSelfTestSuite({ .m_Id = selection,
+				.m_Run = backend == "dx12" ? &gglab::RunDX12TemporalAccumulationNumericSelfTests
+					: &gglab::RunVulkanTemporalAccumulationNumericSelfTests }, gpuReporter);
+		}
 		if (selection == "brdf-lut-gpu")
 		{
 			GpuSelfTestReporter gpuReporter;
@@ -78,13 +89,14 @@ int main(int argumentCount, char* arguments[])
 			return 2;
 		}
 	}
-	if ((selection == "brdf-lut-gpu" && backend != "dx12" && backend != "vulkan") ||
-		(selection != "brdf-lut-gpu" && !backend.empty()) ||
+	const bool gpuSuite = selection == "brdf-lut-gpu" || selection == "temporal-accumulation-gpu";
+	if ((gpuSuite && backend != "dx12" && backend != "vulkan") ||
+		(!gpuSuite && !backend.empty()) ||
 		(selection != "all" && selection != ShaderCompileContractsSuiteId &&
-			selection != "brdf-lut-reference" && selection != "brdf-lut-gpu"))
+			selection != "brdf-lut-reference" && !gpuSuite))
 	{
 		std::fputs("Usage: GGLabShaderRuntimeIntegrationTests.exe --suite <all|shader-compile-contracts|brdf-lut-reference>\n"
-			"       GGLabShaderRuntimeIntegrationTests.exe --suite brdf-lut-gpu --rhi <dx12|vulkan>\n", stderr);
+			"       GGLabShaderRuntimeIntegrationTests.exe --suite <brdf-lut-gpu|temporal-accumulation-gpu> --rhi <dx12|vulkan>\n", stderr);
 		return 2;
 	}
 	return RunSelection(selection, backend) ? 0 : 1;

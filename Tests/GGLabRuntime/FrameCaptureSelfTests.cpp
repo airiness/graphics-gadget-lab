@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -341,6 +342,163 @@ namespace gglab
 				"The capture service leaves no readback buffers alive");
 		}
 
+		void RunDiagnosticTests(SelfTestContext& context) noexcept
+		{
+			context.Check(GetFrameCaptureSourceName(FrameCaptureSource::Diagnostic) == "diagnostic" &&
+				FindFrameCaptureDiagnosticTap("temporal-history-weight") ==
+				PostProcessDebugTap::TemporalHistoryWeight &&
+				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::TemporalRejection) ==
+				"temporal-rejection" &&
+				FindFrameCaptureDiagnosticTap("temporal-clip-distance") ==
+				PostProcessDebugTap::TemporalClipDistance &&
+				FindFrameCaptureDiagnosticTap("temporal-history-relaxation") ==
+				PostProcessDebugTap::TemporalHistoryRelaxation &&
+				FindFrameCaptureDiagnosticTap("gtao-history-samples") ==
+				PostProcessDebugTap::GTAOHistorySamples &&
+				!FindFrameCaptureDiagnosticTap("bloom-result") &&
+				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::BloomResult).empty(),
+				"Diagnostic taps have stable names; non-diagnostic taps have none");
+
+			CaptureTestDevice device;
+			FrameCaptureService service(device);
+			const RHITextureDesc target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			const uint64_t unsupported = service.RequestDiagnosticCapture(PostProcessDebugTap::BloomResult);
+			const std::vector<FrameCaptureResult> rejected = Consume(service);
+			context.Check(rejected.size() == 1 && rejected[0].m_RequestId == unsupported &&
+				rejected[0].m_Status == FrameCaptureStatus::Failed &&
+				rejected[0].m_Source == FrameCaptureSource::Diagnostic,
+				"A tap without diagnostic support fails immediately");
+
+			const uint64_t weightA = service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight);
+			const uint64_t rejection = service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalRejection);
+			const uint64_t weightB = service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight);
+			context.Check(service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalHistoryWeight &&
+				service.HasPendingRequests(FrameCaptureSource::Diagnostic) &&
+				!service.HasPendingRequests(FrameCaptureSource::Scene),
+				"The pending diagnostic tap is the tap of the oldest diagnostic request");
+
+			const std::optional<FrameCaptureTapTarget> weightTap =
+				service.BindTap(3, FrameCaptureSource::Diagnostic, target);
+			context.Check(weightTap &&
+				service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalRejection &&
+				service.GetUnfinishedRequestCount() == 3,
+				"A diagnostic tap binds only the requests for the pending tap");
+
+			service.OnFrameAborted(3);
+			context.Check(service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalHistoryWeight,
+				"Requests of an aborted frame return to the queue with their diagnostic tap");
+
+			service.FailPendingDiagnosticRequests("No source.");
+			const std::vector<FrameCaptureResult> failed = Consume(service);
+			context.Check(failed.size() == 2 && failed[0].m_RequestId == weightA &&
+				failed[1].m_RequestId == weightB &&
+				failed[0].m_Status == FrameCaptureStatus::Failed &&
+				failed[0].m_Failure == "No source." &&
+				service.GetPendingDiagnosticTap() == PostProcessDebugTap::TemporalRejection,
+				"Failing the pending tap finishes only its requests");
+
+			const std::optional<FrameCaptureTapTarget> rejectionTap =
+				service.BindTap(4, FrameCaptureSource::Diagnostic, target);
+			if (rejectionTap)
+			{
+				device.FillReadback(rejectionTap->m_Buffer, rejectionTap->m_Footprint);
+				service.OnFrameSubmitted(4, MakeFence(1));
+				device.m_CompletedFenceValue = 1;
+				service.CollectCompleted();
+			}
+			const std::vector<FrameCaptureResult> completed = Consume(service);
+			context.Check(rejectionTap && completed.size() == 1 &&
+				completed[0].m_RequestId == rejection &&
+				completed[0].m_Status == FrameCaptureStatus::Completed &&
+				completed[0].m_Source == FrameCaptureSource::Diagnostic &&
+				!service.GetPendingDiagnosticTap(),
+				"A bound diagnostic tap completes like any other capture");
+			service.Shutdown();
+		}
+
+		void RunFrameBindingTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			FrameCaptureService service(device);
+			const RHITextureDesc target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			const auto weight = PostProcessDebugTap::TemporalHistoryWeight;
+			const auto rejection = PostProcessDebugTap::TemporalRejection;
+			const uint64_t sceneA = service.RequestCapture(FrameCaptureSource::Scene, 100);
+			const uint64_t sceneB = service.RequestCapture(FrameCaptureSource::Scene, 100);
+			const uint64_t weightA = service.RequestDiagnosticCapture(weight, 100);
+			const uint64_t rejected = service.RequestDiagnosticCapture(rejection, 100);
+			const uint64_t weightB = service.RequestDiagnosticCapture(weight, 100);
+			context.Check(!service.BindTap(99, FrameCaptureSource::Scene, target) &&
+				device.GetLiveBufferCount() == 0,
+				"A frame-restricted request cannot allocate or bind in another frame");
+			const auto sceneTap = service.BindTap(100, FrameCaptureSource::Scene, target);
+			const auto diagnosticTap = service.BindTap(100, FrameCaptureSource::Diagnostic, target);
+			if (sceneTap) device.FillReadback(sceneTap->m_Buffer, sceneTap->m_Footprint);
+			if (diagnosticTap) device.FillReadback(diagnosticTap->m_Buffer, diagnosticTap->m_Footprint);
+			service.OnFrameSubmitted(100, MakeFence(1));
+			const auto missed = Consume(service);
+			context.Check(sceneTap && diagnosticTap && missed.size() == 1 &&
+				missed[0].m_RequestId == rejected && missed[0].m_Status == FrameCaptureStatus::Failed &&
+				missed[0].m_DiagnosticTap == rejection && !service.GetPendingDiagnosticTap() &&
+				service.GetUnfinishedRequestCount() == 4,
+				"A conflicting frame-restricted tap fails at submission rather than moving to another frame");
+			context.Check(device.GetLiveBufferCount() == 2 && Consume(service).empty(),
+				"Frame identity does not bypass the GPU completion fence");
+			device.m_CompletedFenceValue = 1;
+			const auto completed = Consume(service);
+			const auto find = [&](uint64_t id)
+				{
+					return std::ranges::find(completed, id, &FrameCaptureResult::m_RequestId);
+				};
+			const auto a = find(sceneA), b = find(sceneB), c = find(weightA), d = find(weightB);
+			context.Check(completed.size() == 4 && a != completed.end() && b != completed.end() &&
+				c != completed.end() && d != completed.end() && a->m_Image == b->m_Image &&
+				c->m_Image == d->m_Image && a->m_Image != c->m_Image && !a->m_DiagnosticTap &&
+				c->m_DiagnosticTap == weight && a->m_FrameSerial == 100 && c->m_FrameSerial == 100,
+				"Scene and diagnostic taps share images only within their actual frame and source");
+
+			const uint64_t boundAbort = service.RequestDiagnosticCapture(weight, 101);
+			const uint64_t flexible = service.RequestDiagnosticCapture(weight);
+			const uint64_t queuedAbort = service.RequestCapture(FrameCaptureSource::Scene, 101);
+			const auto abortedTap = service.BindTap(101, FrameCaptureSource::Diagnostic, target);
+			service.OnFrameAborted(101);
+			const auto aborted = Consume(service);
+			context.Check(abortedTap && aborted.size() == 2 &&
+				std::ranges::any_of(aborted, [&](const auto& r) { return r.m_RequestId == boundAbort; }) &&
+				std::ranges::any_of(aborted, [&](const auto& r) { return r.m_RequestId == queuedAbort; }) &&
+				service.GetUnfinishedRequestCount() == 1 &&
+				!device.IsAlive(abortedTap->m_Buffer),
+				"Abort fails both bound and unbound frame-restricted requests and requeues only flexible requests");
+			const uint64_t retry = service.RequestDiagnosticCapture(weight, 102);
+			const auto retryTap = service.BindTap(102, FrameCaptureSource::Diagnostic, target);
+			if (retryTap) device.FillReadback(retryTap->m_Buffer, retryTap->m_Footprint);
+			service.OnFrameSubmitted(102, MakeFence(2));
+			device.m_CompletedFenceValue = 2;
+			const auto retried = Consume(service);
+			context.Check(retried.size() == 2 && retried[0].m_RequestId == flexible &&
+				retried[1].m_RequestId == retry && retried[0].m_FrameSerial == 102 &&
+				retried[1].m_FrameSerial == 102 && retried[0].m_DiagnosticTap == weight,
+				"An explicit retry has a new frame identity; flexible requests keep their original queue order");
+
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene, 103));
+			GGLAB_UNUSED(service.RequestDiagnosticCapture(weight, 103));
+			GGLAB_UNUSED(service.BindTap(103, FrameCaptureSource::Scene, target));
+			service.OnFrameSubmissionFailed(103);
+			const auto submissionFailed = Consume(service);
+			context.Check(submissionFailed.size() == 2 && device.GetLiveBufferCount() == 0 &&
+				service.GetUnfinishedRequestCount() == 0 &&
+				std::ranges::all_of(submissionFailed, [](const auto& r) {
+					return r.m_Status == FrameCaptureStatus::Failed && !r.m_Image;
+				}), "Submission failure closes bound and unbound frame-restricted requests");
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Composited, 104));
+			service.OnFrameSubmitted(104, MakeFence(3));
+			context.Check(Consume(service).size() == 1 &&
+				!service.BindTap(105, FrameCaptureSource::Composited, target),
+				"A frame without its source cannot leave a restricted capture pending for a later frame");
+			service.Shutdown();
+			context.Check(Consume(service).empty(), "Frame-restricted results are published exactly once");
+		}
+
 		void RunFrameEndTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -414,6 +572,111 @@ namespace gglab
 				"Shutdown fails submitted taps whose fence never completed and releases them");
 		}
 
+		void RunCapacityTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			const RHITextureDesc target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 4);
+			// Exactly one pitched GPU buffer plus its tight CPU copy fits. A retained
+			// CPU image must still prevent another copy even after ConsumeResults.
+			FrameCaptureService service(device, { .m_MaxRequests = 4, .m_MaxPayloads = 2,
+				.m_MaxPayloadBytes = 1088 });
+			const auto availability = [&]() { return service.GetAvailability(target.m_Format, 4, 4); };
+			context.Check(availability() == FrameCaptureAvailability::Available &&
+				service.GetAvailability(target.m_Format, 8, 4) == FrameCaptureAvailability::TooLarge &&
+				service.GetAvailability(target.m_Format, std::numeric_limits<uint32_t>::max(),
+					std::numeric_limits<uint32_t>::max()) == FrameCaptureAvailability::TooLarge &&
+				service.GetAvailability(RHIFormat::D32Float, 4, 4) == FrameCaptureAvailability::Unsupported,
+				"Capacity includes row pitch and the CPU copy, and rejects impossible or overflowing targets");
+			const uint64_t first = service.RequestCapture(FrameCaptureSource::Scene);
+			const uint64_t shared = service.RequestCapture(FrameCaptureSource::Scene);
+			const auto tap = service.BindTap(1, FrameCaptureSource::Scene, target);
+			service.OnFrameSubmitted(1, MakeFence(1));
+			context.Check(tap && availability() == FrameCaptureAvailability::Busy &&
+				device.GetLiveBufferCount() == 1 && Consume(service).empty(),
+				"An incomplete fence holds the full readback and CPU-copy reservation without mapping");
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Composited));
+			const auto overflow = service.BindTap(2, FrameCaptureSource::Composited, target);
+			auto rejected = Consume(service);
+			context.Check(!overflow && rejected.size() == 1 &&
+				rejected[0].m_Status == FrameCaptureStatus::Failed && rejected[0].m_FrameSerial == 0 &&
+				device.GetLiveBufferCount() == 1,
+				"An exhausted byte budget fails the requested frame before allocating another readback");
+			device.m_CompletedFenceValue = 1;
+			// No BeginFrame or explicit CollectCompleted: polling must drain a paused renderer.
+			auto results = Consume(service);
+			const bool completed = results.size() == 2 && results[0].m_RequestId == first &&
+				results[1].m_RequestId == shared && results[0].m_Image &&
+				results[0].m_Image == results[1].m_Image;
+			context.Check(completed && device.GetLiveBufferCount() == 0 &&
+				availability() == FrameCaptureAvailability::Busy,
+				"Result polling retires completed GPU work while consumers still reserve their shared CPU image");
+			std::shared_ptr<const FrameCaptureImage> held = completed ? results[0].m_Image : nullptr;
+			results.clear();
+			context.Check(held && availability() == FrameCaptureAvailability::Busy,
+				"Moving an image out of the result queue does not release its payload byte budget");
+			held.reset();
+			context.Check(availability() == FrameCaptureAvailability::Available,
+				"The last CPU image consumer releases the byte reservation without a new render frame");
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene));
+			const auto aborted = service.BindTap(3, FrameCaptureSource::Scene, target);
+			service.OnFrameAborted(3);
+			const auto retried = service.BindTap(4, FrameCaptureSource::Scene, target);
+			service.OnFrameSubmissionFailed(4);
+			context.Check(aborted && retried && device.GetLiveBufferCount() == 0 &&
+				Consume(service).size() == 1 && availability() == FrameCaptureAvailability::Available,
+				"Abort returns the request and its reservation; submission failure releases retry capacity");
+			service.Shutdown();
+			context.Check(availability() == FrameCaptureAvailability::Finalized,
+				"Shutdown reports permanent unavailability rather than temporary pressure");
+
+			FrameCaptureService countLimited(device, { .m_MaxRequests = 3, .m_MaxPayloads = 1,
+				.m_MaxPayloadBytes = 4096 });
+			GGLAB_UNUSED(countLimited.RequestCapture(FrameCaptureSource::Scene));
+			GGLAB_UNUSED(countLimited.RequestCapture(FrameCaptureSource::Composited));
+			GGLAB_UNUSED(countLimited.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight));
+			context.Check(countLimited.RequestCapture(FrameCaptureSource::Scene) == 0 &&
+				countLimited.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight) == 0 &&
+				Consume(countLimited).empty() && countLimited.GetUnfinishedRequestCount() == 3,
+				"Full request slots reject scene and diagnostic admission without allocating a result or id");
+			const auto single = countLimited.BindTap(5, FrameCaptureSource::Scene, target);
+			const auto second = countLimited.BindTap(5, FrameCaptureSource::Composited, target);
+			context.Check(single && !second && device.GetLiveBufferCount() == 1 &&
+				countLimited.RequestCapture(FrameCaptureSource::Scene) == 0,
+				"Payload count limits distinct taps and unconsumed failures continue occupying request slots");
+			GGLAB_UNUSED(Consume(countLimited));
+			countLimited.OnFrameSubmissionFailed(5);
+			GGLAB_UNUSED(Consume(countLimited));
+			const auto diagnostic = countLimited.BindTap(6, FrameCaptureSource::Diagnostic, target);
+			countLimited.OnFrameSubmitted(6, MakeFence(6));
+			device.m_CompletedFenceValue = 6;
+			auto imageResult = Consume(countLimited);
+			context.Check(diagnostic && imageResult.size() == 1 &&
+				countLimited.GetAvailability(target.m_Format, 4, 4) == FrameCaptureAvailability::Busy,
+				"A retained CPU image holds its payload slot even when ample byte budget remains");
+			imageResult.clear();
+			context.Check(countLimited.GetAvailability(target.m_Format, 4, 4) == FrameCaptureAvailability::Available,
+				"Consuming failures and releasing CPU images restores both admission limits");
+			device.m_FailBufferCreation = true;
+			GGLAB_UNUSED(countLimited.RequestCapture(FrameCaptureSource::Scene));
+			const auto failedAllocation = countLimited.BindTap(7, FrameCaptureSource::Scene, target);
+			device.m_FailBufferCreation = false;
+			context.Check(!failedAllocation && Consume(countLimited).size() == 1 &&
+				countLimited.GetAvailability(target.m_Format, 4, 4) == FrameCaptureAvailability::Available,
+				"Allocation failure leaves no payload reservation behind");
+			GGLAB_UNUSED(countLimited.RequestCapture(FrameCaptureSource::Scene));
+			const auto failedMapping = countLimited.BindTap(8, FrameCaptureSource::Scene, target);
+			countLimited.OnFrameSubmitted(8, MakeFence(8));
+			device.m_CompletedFenceValue = 8;
+			device.m_FailMapping = true;
+			const auto mapFailure = Consume(countLimited);
+			device.m_FailMapping = false;
+			context.Check(failedMapping && mapFailure.size() == 1 &&
+				mapFailure[0].m_Status == FrameCaptureStatus::Failed && device.GetLiveBufferCount() == 0 &&
+				countLimited.GetAvailability(target.m_Format, 4, 4) == FrameCaptureAvailability::Available,
+				"Mapping failure releases the single payload slot and byte reservation");
+			countLimited.Shutdown();
+		}
+
 		void RunFixedTimeStepTests(SelfTestContext& context) noexcept
 		{
 			Time time;
@@ -437,6 +700,9 @@ namespace gglab
 		RunFootprintTests(context);
 		RunConversionTests(context);
 		RunCompletionTests(context);
+		RunDiagnosticTests(context);
+		RunFrameBindingTests(context);
 		RunFrameEndTests(context);
+		RunCapacityTests(context);
 	}
 }

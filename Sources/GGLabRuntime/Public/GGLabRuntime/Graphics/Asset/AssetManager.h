@@ -148,6 +148,12 @@ namespace gglab
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void DrainLoadCompletions() noexcept;
 		void DrainStateEvents() noexcept;
+		// Model imports, mesh reloads and texture decodes from submission until their
+		// CPU payload is consumed, plus models whose state still waits on their
+		// dependencies; a model reaches Ready on the Tick after its last upload
+		// completes. With the upload scheduler's pending work, the count covers an
+		// asset without a gap until it is usable.
+		[[nodiscard]] uint32_t GetInFlightLoadCount() const noexcept;
 		// Closes public submission/owner creation before clients release interests.
 		void BeginShutdown() noexcept;
 		// Terminal owner-thread transition. Requires task/upload producers to be

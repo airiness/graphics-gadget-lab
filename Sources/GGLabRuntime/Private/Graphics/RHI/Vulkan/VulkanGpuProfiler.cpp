@@ -104,6 +104,15 @@ namespace gglab
 		return m_LatestFrame;
 	}
 
+	void VulkanGpuProfiler::SetRenderFrameSerial(uint64_t frameSerial) noexcept
+	{
+		if (m_ActiveFrame)
+		{
+			GGLAB_ASSERT(frameSerial != 0 && m_ActiveFrame->m_RenderFrameSerial == 0);
+			m_ActiveFrame->m_RenderFrameSerial = frameSerial;
+		}
+	}
+
 	void VulkanGpuProfiler::BeginFrame(
 		uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept
 	{
@@ -119,6 +128,7 @@ namespace gglab
 		FrameResource& frame = m_Frames[frameSlotIndex];
 		ResolveCompletedFrame(frame);
 		++m_NextFrameIndex;
+		frame.m_RenderFrameSerial = 0;
 		if (!IsEnabled())
 		{
 			return;
@@ -261,6 +271,7 @@ namespace gglab
 
 		GpuProfileFrameSnapshot snapshot{};
 		snapshot.m_FrameIndex = frame.m_FrameIndex;
+		snapshot.m_RenderFrameSerial = frame.m_RenderFrameSerial;
 		const auto milliseconds = [this](uint64_t begin, uint64_t end) noexcept
 			{
 				return static_cast<double>(VulkanTimestampDelta(
