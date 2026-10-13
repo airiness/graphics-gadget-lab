@@ -736,6 +736,12 @@ namespace gglab
 			});
 		if (result.IsReady() && transaction && transaction->GetReferenceSample())
 		{
+			result = RenderPassTemporalReference::ValidateSource(
+				transaction->GetReferenceSample()->m_Signal, plan.m_GTAOStatus);
+			if (!result.IsReady())
+			{
+				return result;
+			}
 			m_TemporalReferencePass.Prepare(services);
 			if (!transaction->CanAccumulateReference())
 			{

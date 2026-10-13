@@ -1,7 +1,10 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab
 {
@@ -28,6 +31,8 @@ namespace gglab
 		~RenderPassTemporalReference() override = default;
 
 		void Prepare(const RenderServices& services) noexcept;
+		[[nodiscard]] static RenderFrameValidationResult ValidateSource(
+			TemporalReferenceSignal signal, GTAOFrameStatus gtaoStatus) noexcept;
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 		[[nodiscard]] bool ValidatePipelineClosure(const RenderServices& services) noexcept;

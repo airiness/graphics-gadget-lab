@@ -9,12 +9,15 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/TemporalReferenceGraphResources.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
+#include <array>
 #include <cstdint>
+#include <span>
 
 namespace gglab
 {
@@ -43,6 +46,61 @@ namespace gglab
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 		};
+
+		RGTextureId AddUnoccludedAmbientOcclusionPass(RenderGraph& rg,
+			const RHIExtent3D& extent) noexcept
+		{
+			struct PassData
+			{
+				RGTextureViewId m_Rtv{};
+			};
+			RGTextureId visibility{};
+			rg.AddPass<PassData>("TemporalReference.UnoccludedAO",
+				[&visibility, extent](RenderGraph::RGBuilder& builder, PassData& data)
+				{
+					RHITextureDesc desc{};
+					desc.m_Format = RHIFormat::R16G16B16A16Float;
+					desc.m_Extent = extent;
+					desc.m_ClearValue = RHIClearValue{
+						.m_Format = desc.m_Format,
+						.m_Color = { 1.0f, 0.0f, 0.0f, 1.0f },
+					};
+					visibility = builder.CreateTexture("TemporalReference.UnoccludedAO", desc);
+					builder.WriteInPlace(visibility, RGTextureAccess::RenderTarget);
+					data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(visibility);
+				},
+				[](RGExecuteContext& executeContext, PassData& data)
+				{
+					auto* commandContext = executeContext.GetGraphicsCommandContext();
+					const std::array attachments{ RHIRenderingAttachment{
+						.m_View = executeContext.GetViewHandle(data.m_Rtv),
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					} };
+					commandContext->BeginRendering({ .m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(attachments) });
+					commandContext->ClearColorAttachment(0, { 1.0f, 0.0f, 0.0f, 1.0f });
+				});
+			return visibility;
+		}
+	}
+
+	RenderFrameValidationResult RenderPassTemporalReference::ValidateSource(
+		TemporalReferenceSignal signal, GTAOFrameStatus gtaoStatus) noexcept
+	{
+		if (signal == TemporalReferenceSignal::AmbientOcclusion)
+		{
+			if (gtaoStatus == GTAOFrameStatus::Disabled)
+			{
+				return RenderFrameValidationResult::ContractFailure(
+					"Ambient-occlusion reference requires GTAO to be enabled");
+			}
+			if (gtaoStatus == GTAOFrameStatus::CoreCapabilityUnavailable)
+			{
+				return RenderFrameValidationResult::ContractFailure(
+					"Ambient-occlusion reference requires GTAO core capabilities");
+			}
+		}
+		return RenderFrameValidationResult::Ready();
 	}
 
 	void RenderPassTemporalReference::Prepare(const RenderServices& services) noexcept
@@ -79,9 +137,39 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const uint32_t sampleIndex = transaction->GetReferenceSample()->m_Index;
 		const TemporalReferenceSignal signal = transaction->GetReferenceSample()->m_Signal;
+		const bool ambientOcclusion = signal == TemporalReferenceSignal::AmbientOcclusion;
+		auto& targets = rg.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+			.GetViewTargets(displayViewId);
+		RGTextureId source = targets.m_DisplayColor;
+		if (ambientOcclusion)
+		{
+			const auto& gtao = rg.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
+			const auto validation = ValidateSource(signal, gtao.m_Status);
+			GGLAB_ASSERT_MSG(validation.IsReady(), "Temporal reference source must be validated.");
+			if (!validation.IsReady())
+			{
+				return;
+			}
+			if (gtao.m_Status == GTAOFrameStatus::NoOpaqueDraws)
+			{
+				// No depth coverage is a fully visible sample, not missing input. Keep its
+				// full extent so accumulation writes every pixel and commits the sum normally.
+				source = AddUnoccludedAmbientOcclusionPass(rg,
+					{ targets.m_RenderWidth, targets.m_RenderHeight, 1 });
+			}
+			else
+			{
+				GGLAB_ASSERT_MSG(gtao.IsComplete(), "Active GTAO must publish complete reference input.");
+				if (!gtao.IsComplete())
+				{
+					return;
+				}
+				source = gtao.m_FinalAO;
+			}
+		}
 		rg.AddPass<TemporalReferencePassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
-			[transaction, displayViewId, sampleIndex, signal](
+			[transaction, displayViewId, sampleIndex, ambientOcclusion, source](
 				RenderGraph::RGBuilder& builder, TemporalReferencePassData& data)
 			{
 				auto& targets = builder.GetBlackboard()
@@ -99,19 +187,8 @@ namespace gglab
 				// The reference accumulates the complete composed scene, including
 				// post-temporal geometry; Temporal AA is inactive, so this is the scene color.
 				// An ambient-occlusion reference accumulates the final GTAO visibility instead.
-				const RGGTAOResources* gtao = nullptr;
-				if (signal == TemporalReferenceSignal::AmbientOcclusion)
-				{
-					gtao = &builder.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
-					GGLAB_ASSERT_MSG(gtao->IsComplete(),
-						"An ambient-occlusion reference requires active GTAO.");
-					if (!gtao->IsComplete())
-					{
-						return;
-					}
-				}
 				const RGTextureId currentColor = builder.Read(
-					gtao ? gtao->m_FinalAO : targets.m_DisplayColor, RGTextureAccess::Sample,
+					source, RGTextureAccess::Sample,
 					RHIStage::ComputeShader);
 				data.m_CurrentColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(currentColor);
@@ -133,7 +210,7 @@ namespace gglab
 				RHITextureDesc meanDesc{};
 				// The mean visibility keeps full precision in a four-channel format that the
 				// shader's typed float4 store supports on every backend.
-				meanDesc.m_Format = gtao ? RHIFormat::R16G16B16A16Float : currentDesc.m_Format;
+				meanDesc.m_Format = ambientOcclusion ? RHIFormat::R16G16B16A16Float : currentDesc.m_Format;
 				meanDesc.m_Extent = currentDesc.m_Extent;
 				RGTextureId mean = builder.CreateTexture("TemporalReference.MeanSceneColor", meanDesc);
 				builder.WriteInPlace(mean, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
@@ -149,7 +226,7 @@ namespace gglab
 				// Post-processing presents the running mean of every accumulated sample; an
 				// ambient-occlusion reference publishes it for the gtao-final-ao tap and leaves
 				// the GTAO record describing the frame's own visibility.
-				if (gtao)
+				if (ambientOcclusion)
 				{
 					builder.GetBlackboard().GetOrCreate<RGTemporalReferenceResources>(
 						TemporalReferenceResourcesName).m_MeanAmbientOcclusion = mean;

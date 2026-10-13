@@ -505,8 +505,7 @@ namespace gglab
 				};
 				// Still update history, but diagnostic MRTs describe this frame's raw
 				// radiance and coverage, not the temporally reconstructed image. Material
-				// diagnostics render at native resolution; a frame that discovers them at a
-				// smaller render extent shows the resolved image instead.
+				// diagnostics require native resolution, validated before graph recording.
 				if (!targets.m_MaterialDiagnosticColor.IsValid() || resolveDisplayDepth)
 				{
 					targets.m_DisplayColor = resources.m_ResolvedSceneColor;

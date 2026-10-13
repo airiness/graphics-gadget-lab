@@ -38,6 +38,9 @@
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "Graphics/Pipeline/TemporalReferenceAccumulator.h"
+#include "Graphics/RenderPass/RenderPassTemporalReference.h"
+#include "Graphics/RenderPass/TemporalReferenceGraphResources.h"
+#include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
@@ -5350,6 +5353,24 @@ namespace gglab
 
 		void RunTemporalReferenceContractTests(SelfTestContext& context) noexcept
 		{
+			const auto disabled = RenderPassTemporalReference::ValidateSource(
+				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Disabled);
+			const auto unsupported = RenderPassTemporalReference::ValidateSource(
+				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::CoreCapabilityUnavailable);
+			context.Check(disabled.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				unsupported.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				disabled.m_Reason != unsupported.m_Reason,
+				"AO references reject disabled and unsupported GTAO before graph recording with distinct reasons");
+			context.Check(RenderPassTemporalReference::ValidateSource(
+				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Active).IsReady() &&
+				RenderPassTemporalReference::ValidateSource(
+					TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::NoOpaqueDraws).IsReady() &&
+				RenderPassTemporalReference::ValidateSource(
+					TemporalReferenceSignal::SceneColor, GTAOFrameStatus::Disabled).IsReady() &&
+				RenderPassTemporalReference::ValidateSource(
+					TemporalReferenceSignal::SceneColor, GTAOFrameStatus::CoreCapabilityUnavailable).IsReady(),
+				"AO references accept active and empty input; scene-color references do not require GTAO");
+
 			bool productionPhasesMatch = true;
 			for (uint32_t index = 0; index < temporal::JitterSampleCount; ++index)
 			{
@@ -5467,6 +5488,111 @@ namespace gglab
 				transaction.GetJitterPixels().m_Y == expected.m_Y,
 				"A reference frame jitters with its sample phase while Temporal AA is inactive");
 			transaction.Abort();
+
+			class ShaderAccess final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef&) noexcept override { return ShaderID{ 1 }; }
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			} shaders;
+			class BindingAccess final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return { 1, 1 }; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+			} bindings;
+			const RenderServices services{ .m_ShaderPrograms = &shaders, .m_BindingLayout = &bindings };
+			RenderPassTemporalReference pass;
+			pass.Prepare(services);
+			auto recordAO = [&](uint32_t index, bool empty, bool submit)
+			{
+				const TemporalReferenceSample sample{ .m_Index = index, .m_Count = 3,
+					.m_Signal = TemporalReferenceSignal::AmbientOcclusion };
+				if (!accumulator.BeginFrame(sample, 8, 4, fence))
+				{
+					return false;
+				}
+				transaction.Begin(viewHistory, objectHistory, referencePlan,
+					ResolveNativeViewResolution({ 8, 4 }), nullptr, 1.0f, sample, &accumulator);
+				RenderGraph graph({ .m_Device = &device,
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
+				graph.AddPass<TemporalReferenceContractPassData>("TemporalReference.Input",
+					[empty](RenderGraph::RGBuilder& builder, TemporalReferenceContractPassData&)
+					{
+						auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(
+							ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+						targets.m_DisplayWidth = 8;
+						targets.m_DisplayHeight = 4;
+						targets.m_RenderWidth = 8;
+						targets.m_RenderHeight = 4;
+						const RHITextureDesc desc{ .m_Format = RHIFormat::R16G16B16A16Float,
+							.m_Extent = { 8, 4, 1 } };
+						targets.m_DisplayColor = builder.CreateTexture("ReferenceTest.Scene", desc);
+						builder.WriteInPlace(targets.m_DisplayColor, RGTextureAccess::RenderTarget);
+						auto& gtao = builder.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
+						gtao.m_Status = empty ? GTAOFrameStatus::NoOpaqueDraws : GTAOFrameStatus::Active;
+						if (!empty)
+						{
+							gtao.m_FinalAO = builder.CreateTexture("ReferenceTest.AO", desc);
+							builder.WriteInPlace(gtao.m_FinalAO, RGTextureAccess::StorageWrite);
+							gtao.m_RawAO = gtao.m_HalfDepthViewZ = gtao.m_DenoiseX =
+								gtao.m_DenoiseY = gtao.m_FinalAO;
+							gtao.m_HalfWidth = 4;
+							gtao.m_HalfHeight = 2;
+							gtao.m_FinalAOFormat = desc.m_Format;
+						}
+					});
+				RenderFrameBuildResult frame{};
+				frame.m_TemporalFrameTransaction = &transaction;
+				const auto frameContext = frame.MakeRenderFrameContext();
+				pass.AddPass(graph, frameContext, services);
+				auto& blackboard = graph.GetBlackboard();
+				const auto* reference = blackboard.TryGet<RGTemporalReferenceResources>(
+					TemporalReferenceResourcesName);
+				bool valid = reference && reference->m_MeanAmbientOcclusion.IsValid() &&
+					blackboard.Get<RGGTAOResources>(GTAOResourcesName).IsComplete() != empty &&
+					graph.Compile();
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				const auto clear = std::ranges::find(snapshot.m_Passes,
+					"TemporalReference.UnoccludedAO", &RGSnapshotPassInfo::m_Name);
+				const auto accumulate = std::ranges::find(snapshot.m_Passes,
+					"PostProcess.TemporalReference", &RGSnapshotPassInfo::m_Name);
+				valid = valid && accumulate != snapshot.m_Passes.end() && !accumulate->m_Culled;
+				if (empty)
+				{
+					const auto visibility = std::ranges::find(snapshot.m_Resources,
+						"TemporalReference.UnoccludedAO", &RGSnapshotResourceInfo::m_Name);
+					valid = valid && clear != snapshot.m_Passes.end() && !clear->m_Culled &&
+						clear->m_ExecutionOrder < accumulate->m_ExecutionOrder &&
+						visibility != snapshot.m_Resources.end() &&
+						visibility->m_TextureExtent.m_Width == 8 &&
+						visibility->m_TextureExtent.m_Height == 4 &&
+						visibility->m_TextureClearValue &&
+						visibility->m_TextureClearValue->m_Color[0] == 1.0f;
+				}
+				else
+				{
+					valid = valid && clear == snapshot.m_Passes.end();
+				}
+				if (submit)
+				{
+					transaction.CommitCompleted(fence);
+				}
+				else
+				{
+					transaction.Abort(fence);
+				}
+				return valid && accumulator.GetCommittedSampleCount() == (submit ? index + 1 : index);
+			};
+			const bool activeAO = recordAO(0, false, true);
+			const bool abortedEmptyAO = recordAO(1, true, false);
+			const bool emptyAO = recordAO(1, true, true);
+			const bool resumedAO = recordAO(2, false, true);
+			context.Check(activeAO && abortedEmptyAO && emptyAO && resumedAO,
+				"The reference pass accumulates full-size unoccluded input between active AO samples, "
+				"publishes its mean without fabricating GTAO outputs, and repeats aborted samples");
+			accumulator.Release(fence);
 			device.m_CompletedFenceValue = fence.m_Value;
 			pool.Tick();
 		}
