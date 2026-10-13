@@ -4,7 +4,7 @@ Starts, queries, captures from and stops GraphicsGadgetLab control sessions.
 
 .DESCRIPTION
 A session is a GraphicsGadgetLab process started with --session <id>. It serves
-the session control protocol (version 1) on \\.\pipe\gglab-session-<id>: one
+the session control protocol (version 2) on \\.\pipe\gglab-session-<id>: one
 JSON request line per connection, answered by one JSON response line.
 
 Every command prints one JSON object on stdout and exits 0 when the command
@@ -46,7 +46,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 sto
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'graph', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -86,6 +86,8 @@ param(
     [string]$Label,
     [string]$Note,
     [switch]$NoWait,
+    # graph: only executed passes with resource-version addresses.
+    [switch]$Summary,
 
     # result
     [long]$RequestId,
@@ -106,7 +108,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-$ProtocolVersion = 1
+$ProtocolVersion = 2
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'
@@ -344,6 +346,15 @@ switch ($Command) {
     'capture' {
         Require-Session
         $response = Invoke-SessionRequest $Session (New-CaptureRequest $View (-not $NoWait)) $TimeoutSeconds
+        Complete-SessionResponse $response $Session
+    }
+    'graph' {
+        Require-Session
+        $request = New-CaptureRequest $View (-not $NoWait)
+        $request['command'] = 'graph'
+        $request.Remove('source')
+        $request['summary'] = [bool]$Summary
+        $response = Invoke-SessionRequest $Session $request $TimeoutSeconds
         Complete-SessionResponse $response $Session
     }
     'batch' {

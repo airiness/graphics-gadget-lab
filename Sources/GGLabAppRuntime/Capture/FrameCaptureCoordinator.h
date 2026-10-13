@@ -40,6 +40,8 @@ namespace gglab
 		std::filesystem::path m_OutputDirectory;
 		std::string m_Label;
 		std::string m_Note;
+		// RenderGraph requests only: write the discovery summary instead of full records.
+		bool m_GraphSummary = false;
 		// Set by a camera-path sequence for the frame it captures.
 		std::optional<FrameCaptureSequenceInfo> m_Sequence;
 		// Required for Diagnostic captures and ignored by other sources.

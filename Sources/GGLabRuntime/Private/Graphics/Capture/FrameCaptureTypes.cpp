@@ -20,6 +20,8 @@ namespace gglab
 			return "composited";
 		case FrameCaptureSource::Diagnostic:
 			return "diagnostic";
+		case FrameCaptureSource::RenderGraph:
+			return "graph";
 		}
 		GGLAB_UNREACHABLE("Unhandled FrameCaptureSource.");
 	}

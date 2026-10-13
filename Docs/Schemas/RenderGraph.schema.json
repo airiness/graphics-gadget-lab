@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.render-graph.v1",
+  "title": "GGLab render graph frame export v1",
+  "type": "object",
+  "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
+  "properties": {
+    "schema": { "const": "gglab.render-graph" },
+    "schemaVersion": { "const": 1 },
+    "mode": { "enum": ["full", "summary"] },
+    "frameSerial": { "type": "integer", "minimum": 1 },
+    "frame": {
+      "type": "object",
+      "required": ["backend", "content", "frame", "camera", "time", "readiness", "temporal", "adapterDriverIdentity", "codeIdentity", "shaderIdentity", "parameterRevision"],
+      "properties": {
+        "backend": { "enum": ["dx12", "vulkan"] },
+        "content": { "type": "object" },
+        "frame": { "type": "object", "required": ["serial", "index"] },
+        "camera": { "type": "object" },
+        "time": { "type": "object" },
+        "readiness": { "type": "object" },
+        "temporal": { "type": "object" },
+        "adapterDriverIdentity": { "type": "string" },
+        "codeIdentity": { "$ref": "#/$defs/unavailable" },
+        "shaderIdentity": { "$ref": "#/$defs/unavailable" },
+        "parameterRevision": { "type": "null" }
+      }
+    },
+    "submission": {
+      "type": "object",
+      "required": ["fenceIndex", "fenceGeneration", "fenceValue", "completed"],
+      "properties": {
+        "fenceIndex": { "type": "integer", "minimum": 0 },
+        "fenceGeneration": { "type": "integer", "minimum": 0 },
+        "fenceValue": { "type": "integer", "minimum": 1 },
+        "completed": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": ["graph", "resourceExport", "nonFiniteWatch"],
+      "properties": {
+        "graph": { "const": true },
+        "resourceExport": { "const": false },
+        "nonFiniteWatch": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "compile": {
+      "type": "object",
+      "required": ["duplicatePassNames", "passes"],
+      "properties": {
+        "duplicatePassNames": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "passes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "name", "occurrence", "executionOrder"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 0 },
+              "name": { "type": "string" },
+              "occurrence": { "type": "integer", "minimum": 1 },
+              "executionOrder": { "type": "integer", "minimum": -1 },
+              "encoder": { "enum": ["Graphics", "Compute", "Copy"] },
+              "sideEffect": { "type": "boolean" },
+              "culled": { "type": "boolean" },
+              "dependencies": { "type": "array", "items": { "type": "integer" } },
+              "dependents": { "type": "array", "items": { "type": "integer" } },
+              "accesses": { "type": "array", "items": { "type": "object", "required": ["resourceNodeIndex", "resourceSlot", "version", "resourceIndex", "resource", "type", "dependencyAccess", "ordering", "access", "accessBits", "stages", "stageBits", "subresources"] } },
+              "preBarriers": { "type": "array", "items": { "$ref": "#/$defs/barrier" } },
+              "postBarriers": { "type": "array", "items": { "$ref": "#/$defs/barrier" } },
+              "devirtualize": { "type": "array", "items": { "type": "integer" } },
+              "destroy": { "type": "array", "items": { "type": "integer" } },
+              "reads": { "type": "array", "items": { "$ref": "#/$defs/summaryAccess" } },
+              "writes": { "type": "array", "items": { "$ref": "#/$defs/summaryAccess" } }
+            }
+          }
+        },
+        "resources": { "type": "array", "items": { "type": "object", "required": ["index", "name", "type", "imported", "referenceCount", "firstUser", "lastUser", "usageBits", "usage", "initialState", "finalState", "finalSubresources", "exportPass"] } },
+        "versions": { "type": "array", "items": { "type": "object", "required": ["index", "resourceSlot", "version", "resourceIndex", "resource", "type", "writer", "previous", "readers"] } },
+        "dependencyEdges": { "type": "array", "items": { "type": "object", "required": ["from", "to", "resourceNodeIndex", "reason"] } },
+        "diagnostics": { "type": "array", "items": { "type": "object", "required": ["severity", "code", "message", "passIndex", "resourceIndex"] } }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["status", "executedPassIndices", "allocations", "resolvedBarriers", "observationNodes", "gpuTiming"],
+      "properties": {
+        "status": { "const": "recorded" },
+        "executedPassIndices": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "allocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["resourceIndex", "passIndex", "imported", "poolSlot", "physical"],
+            "properties": {
+              "resourceIndex": { "type": "integer", "minimum": 0 },
+              "passIndex": { "type": "integer", "minimum": 0 },
+              "imported": { "type": "boolean" },
+              "poolSlot": { "type": ["integer", "null"], "minimum": 0 },
+              "physical": { "$ref": "#/$defs/physical" }
+            }
+          }
+        },
+        "resolvedBarriers": { "type": "array", "items": { "allOf": [{ "$ref": "#/$defs/barrier" }, { "required": ["physical", "passIndex", "phase"] }] } },
+        "observationNodes": { "type": "array", "maxItems": 0 },
+        "gpuTiming": { "$ref": "#/$defs/unavailable" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "full" } } },
+      "then": {
+        "required": ["execution"],
+        "properties": {
+          "compile": {
+            "required": ["resources", "versions", "dependencyEdges", "diagnostics"],
+            "properties": { "passes": { "items": { "required": ["encoder", "sideEffect", "culled", "dependencies", "dependents", "accesses", "preBarriers", "postBarriers", "devirtualize", "destroy"] } } }
+          }
+        }
+      },
+      "else": {
+        "not": { "required": ["execution"] },
+        "properties": { "compile": { "properties": { "passes": { "items": { "required": ["reads", "writes"] } } } } }
+      }
+    }
+  ],
+  "$defs": {
+    "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },
+    "physical": { "type": ["object", "null"], "required": ["index", "generation"], "properties": { "index": { "type": "integer", "minimum": 0 }, "generation": { "type": "integer", "minimum": 0 } } },
+    "barrier": { "type": "object", "required": ["resourceIndex", "resource", "type", "kind", "reason", "before", "after", "subresources"], "properties": { "kind": { "enum": ["Transition", "UAV"] }, "physical": { "$ref": "#/$defs/physical" } } },
+    "summaryAccess": {
+      "type": "object",
+      "required": ["version", "resourceNodeIndex", "subresources", "address"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "resourceNodeIndex": { "type": "integer", "minimum": 0 },
+        "address": { "type": "object", "required": ["resource", "at", "occurrence"], "properties": { "resource": { "type": "string" }, "at": { "type": "object", "oneOf": [{ "required": ["before"] }, { "required": ["after"] }] }, "occurrence": { "type": "integer", "minimum": 1 } } }
+      }
+    }
+  }
+}

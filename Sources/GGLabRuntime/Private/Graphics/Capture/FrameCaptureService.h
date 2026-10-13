@@ -15,6 +15,7 @@
 namespace gglab
 {
 	class RHIDevice;
+	class RenderGraph;
 
 	struct FrameCaptureLimits
 	{
@@ -53,6 +54,10 @@ namespace gglab
 			const noexcept override;
 		void FailPendingDiagnosticRequests(std::string_view failure) noexcept override;
 
+		// Reuses request admission and fenced completion without adding graph nodes.
+		void BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept;
+		void EndGraphRecording(uint64_t frameSerial, const RenderGraph& graph) noexcept;
+
 		// The frame's GPU work, including its tap copies, was submitted.
 		void OnFrameSubmitted(uint64_t frameSerial, const RHIFencePoint& fence) noexcept;
 		// The frame ended without recording a submission. Its requests return to
@@ -84,6 +89,7 @@ namespace gglab
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 			std::vector<QueuedRequest> m_Requests;
 			RHIBufferOwner m_Buffer;
+			std::shared_ptr<RGSnapshot> m_Graph;
 			RHITextureCopyFootprint m_Footprint{};
 			RHIFencePoint m_Fence{};
 			bool m_Submitted = false;

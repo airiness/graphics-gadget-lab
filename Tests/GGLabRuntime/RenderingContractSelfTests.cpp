@@ -6642,6 +6642,43 @@ namespace gglab
 				initializedWriteState && initializedPlan->GetPasses()[0].m_PostBarriers.empty(),
 				"Discardable graph textures keep their terminal layout for the next Undefined acquire");
 
+			// Release erases the live allocation. Snapshot execution evidence must survive it.
+			{
+				RecordingDevice snapshotDevice;
+				TransientResourcePool snapshotPool(&snapshotDevice);
+				RecordingComputeCommandContext snapshotCommands;
+				RenderGraph snapshotGraph({ .m_Device = &snapshotDevice,
+					.m_TransientResourcePool = &snapshotPool });
+				RHITextureHandle executedTexture;
+				snapshotGraph.AddPass<TextureStorageAccessPassData>("Snapshot.Write", RGPassEncoderType::Compute,
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+					{
+						data.m_Texture = builder.CreateTexture("Snapshot.Texture", graphTextureDesc);
+						builder.WriteInPlace(data.m_Texture, RGTextureAccess::StorageWrite);
+						builder.SideEffect();
+					},
+					[&](RGExecuteContext& execute, TextureStorageAccessPassData& data)
+					{
+						executedTexture = execute.GetTextureHandle(data.m_Texture);
+					});
+				context.Check(snapshotGraph.Compile(), "Execution snapshot allocation fixture compiles");
+				snapshotGraph.EnableExecutionRecord();
+				RGExecuteContext execute({ .m_DirectComputeCommandContext = &snapshotCommands });
+				snapshotGraph.Execute(execute);
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(snapshotGraph, snapshot);
+				context.Check(snapshot.m_Execution.m_Recorded && snapshot.m_Execution.m_Allocations.size() == 1 &&
+					snapshot.m_Execution.m_Allocations[0].m_PoolSlot.IsValid() &&
+					snapshot.m_Execution.m_Allocations[0].m_PhysicalHandleIndex == executedTexture.Index() &&
+					snapshot.m_Execution.m_Allocations[0].m_PhysicalHandleGeneration == executedTexture.Generation() &&
+					!snapshot.m_Resources[0].m_PoolSlot.IsValid() &&
+					!snapshot.m_Execution.m_Barriers.empty() &&
+					snapshot.m_Execution.m_Barriers[0].m_Barrier.m_PhysicalHandleIndex == executedTexture.Index(),
+					"Graph execution records actual pool slots and resolved barriers before allocation release");
+				snapshotGraph.Retire({});
+				snapshotPool.Tick();
+			}
+
 			RecordingDevice reuseDevice;
 			TransientResourcePool reusePool(&reuseDevice);
 			TransientResourcePoolSnapshot emptyPoolSnapshot;

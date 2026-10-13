@@ -11,6 +11,7 @@
 
 namespace gglab
 {
+	struct RGSnapshot;
 	// RenderGraph position whose display-target contents a capture reads.
 	enum class FrameCaptureSource : uint8_t
 	{
@@ -24,6 +25,8 @@ namespace gglab
 		// encoding of the post-process preview, recorded after post-processing. Each
 		// request names its tap; a tap without a source in that frame fails.
 		Diagnostic,
+		// CPU compile snapshot and execution record; no display tap or GPU readback.
+		RenderGraph,
 	};
 
 	enum class FrameCaptureStatus : uint8_t
@@ -66,6 +69,10 @@ namespace gglab
 		// Present only for Completed results. Requests captured by the same frame
 		// and tap share one immutable image.
 		std::shared_ptr<const FrameCaptureImage> m_Image;
+		std::shared_ptr<const RGSnapshot> m_Graph;
+		uint32_t m_SubmissionFenceIndex = 0;
+		uint32_t m_SubmissionFenceGeneration = 0;
+		uint64_t m_SubmissionFenceValue = 0;
 		std::string m_Failure;
 	};
 

@@ -6,6 +6,7 @@ namespace gglab
 {
 	class RHIDevice;
 	struct RGExecuteContext;
+	struct RGSnapshotExecutionRecord;
 
 	struct RGExecutorRuntime
 	{
@@ -13,6 +14,7 @@ namespace gglab
 		TransientResourcePool* m_TransientResourcePool = nullptr;
 		std::vector<TransientTextureAllocation>* m_RetireTextures = nullptr;
 		std::vector<TransientBufferAllocation>* m_RetireBuffers = nullptr;
+		RGSnapshotExecutionRecord* m_ExecutionRecord = nullptr;
 	};
 
 	class RGExecutor final

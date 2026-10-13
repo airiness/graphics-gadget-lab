@@ -60,6 +60,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Capture;
 			}
+			if (command == "graph")
+			{
+				return ApplicationControlCommand::Graph;
+			}
 			if (command == "result")
 			{
 				return ApplicationControlCommand::Result;
@@ -501,13 +505,20 @@ namespace gglab
 			FrameCaptureRequest& capture = request.m_Capture;
 			capture.m_Timing = FrameCaptureTiming::AfterReady;
 			capture.m_SettleFrames = 8;
+			const bool graph = request.m_Command == ApplicationControlCommand::Graph;
+			if (graph) capture.m_Source = FrameCaptureSource::RenderGraph;
 			for (const auto& [key, value] : document.items())
 			{
 				if (key == "protocol" || key == "id" || key == "command")
 				{
 					continue;
 				}
-				if (key == "source")
+				if (key == "summary" && graph)
+				{
+					if (!value.is_boolean()) return "Field 'summary' must be a boolean.";
+					capture.m_GraphSummary = value.get<bool>();
+				}
+				else if (key == "source" && !graph)
 				{
 					const std::string source = value.is_string() ? value.get<std::string>() : "";
 					if (source == "scene")
@@ -527,7 +538,7 @@ namespace gglab
 						return "Field 'source' must be 'scene', 'composited' or 'diagnostic'.";
 					}
 				}
-				else if (key == "diagnosticTap")
+				else if (key == "diagnosticTap" && !graph)
 				{
 					if (std::string error = ParseDiagnosticTap(value, capture.m_DiagnosticTap);
 						!error.empty())
@@ -590,7 +601,7 @@ namespace gglab
 				}
 				else
 				{
-					return std::format("Unknown field '{}' for command 'capture'.", key);
+					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : "capture");
 				}
 			}
 			return ValidateDiagnosticTap(capture.m_Source, capture.m_DiagnosticTap);
@@ -698,7 +709,7 @@ namespace gglab
 			: std::nullopt;
 		if (!command)
 		{
-			result.m_Error = "Field 'command' must be 'status', 'capture', 'result', 'stop', "
+			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'result', 'stop', "
 				"'sequence' or 'sequence-cancel'.";
 			return result;
 		}
@@ -708,6 +719,7 @@ namespace gglab
 		switch (*command)
 		{
 		case ApplicationControlCommand::Capture:
+		case ApplicationControlCommand::Graph:
 			error = ParseCaptureFields(document, request);
 			break;
 		case ApplicationControlCommand::Result:
@@ -811,7 +823,11 @@ namespace gglab
 		{
 		case FrameCaptureRequestStatus::Completed:
 			response["status"] = "completed";
-			response["image"] = ToUtf8(result.m_ImagePath);
+			if (result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph)
+			{
+				response["graph"] = ToUtf8(result.m_MetadataPath);
+			}
+			else response["image"] = ToUtf8(result.m_ImagePath);
 			response["metadata"] = ToUtf8(result.m_MetadataPath);
 			break;
 		case FrameCaptureRequestStatus::Cancelled:

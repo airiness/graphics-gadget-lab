@@ -150,6 +150,7 @@ namespace gglab
 	};
 
 	struct RGSnapshot;
+	struct RGSnapshotExecutionRecord;
 	void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
 
 	class RenderGraph
@@ -409,6 +410,8 @@ namespace gglab
 
 		[[nodiscard]] bool Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
+		// Opt-in CPU-only recording; does not change graph compilation or GPU work.
+		void EnableExecutionRecord() noexcept;
 		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
 		[[nodiscard]] const RGExecutionPlan* GetExecutionPlan() const noexcept
@@ -509,6 +512,7 @@ namespace gglab
 		std::vector<TransientTextureAllocation> m_MarkedRetireTextures;
 		std::vector<TransientBufferAllocation> m_MarkedRetireBuffers;
 		std::unique_ptr<RGExecutionPlan> m_ExecutionPlan;
+		std::unique_ptr<RGSnapshotExecutionRecord> m_ExecutionRecord;
 		std::vector<RGCompileDiagnostic> m_CompileDiagnostics;
 		bool m_BuildValid = true;
 

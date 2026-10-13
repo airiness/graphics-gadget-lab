@@ -28,13 +28,13 @@ namespace gglab
 		void RunParseTests(SelfTestContext& context) noexcept
 		{
 			const ApplicationControlParseResult status =
-				ParseApplicationControlRequest(R"({"protocol":1,"id":7,"command":"status"})");
+				ParseApplicationControlRequest(R"({"protocol":2,"id":7,"command":"status"})");
 			context.Check(status.m_Request && status.m_Request->m_Id == 7 &&
 				status.m_Request->m_Command == ApplicationControlCommand::Status,
 				"A status request parses with its id");
 
 			const ApplicationControlParseResult capture = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":8,"command":"capture","source":"composited",)"
+				R"({"protocol":2,"id":8,"command":"capture","source":"composited",)"
 				R"("timing":"next-frame","settleFrames":3,"requiredContentId":"gglab.lab.culling",)"
 				R"("view":"CAM_Courtyard","outputDirectory":"D:/captures","label":"a","note":"b",)"
 				R"("wait":false})");
@@ -53,7 +53,7 @@ namespace gglab
 				"A capture request carries every optional capture field");
 
 			const ApplicationControlParseResult defaults = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":9,"command":"capture"})");
+				R"({"protocol":2,"id":9,"command":"capture"})");
 			context.Check(defaults.m_Request &&
 				defaults.m_Request->m_Capture.m_Timing == FrameCaptureTiming::AfterReady &&
 				defaults.m_Request->m_Capture.m_SettleFrames == 8 &&
@@ -62,12 +62,12 @@ namespace gglab
 				"A bare capture waits for a settled after-ready scene capture");
 
 			const ApplicationControlParseResult result = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":10,"command":"result","requestId":4})");
+				R"({"protocol":2,"id":10,"command":"result","requestId":4})");
 			context.Check(result.m_Request && result.m_Request->m_CaptureRequestId == 4,
 				"A result request names one capture request");
 
 			const ApplicationControlParseResult sequence = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":11,"command":"sequence","path":"SEQ_DollyDoorway",)"
+				R"({"protocol":2,"id":11,"command":"sequence","path":"SEQ_DollyDoorway",)"
 				R"("requiredContentId":"Demo.CoastalAtrium","captureFrames":[0,90,179],)"
 				R"("source":"composited","outputDirectory":"D:/captures","label":"dolly",)"
 				R"("note":"baseline"})");
@@ -84,11 +84,11 @@ namespace gglab
 				sequence.m_Request->m_Sequence.m_Note == "baseline",
 				"A sequence request carries its path, capture frames and capture fields");
 			const ApplicationControlParseResult diagnosticSequence = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic",)"
+				R"({"protocol":2,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic",)"
 				R"("diagnosticTap":"temporal-rejection","referenceSamples":64,)"
 				R"("referenceTextureLodBias":-3})");
 			const ApplicationControlParseResult diagnosticCapture = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":14,"command":"capture","source":"diagnostic",)"
+				R"({"protocol":2,"id":14,"command":"capture","source":"diagnostic",)"
 				R"("diagnosticTap":"temporal-history-weight"})");
 			context.Check(diagnosticSequence.m_Request &&
 				diagnosticSequence.m_Request->m_Sequence.m_CaptureSource ==
@@ -102,7 +102,7 @@ namespace gglab
 				PostProcessDebugTap::TemporalHistoryWeight,
 				"Diagnostic captures and sequences name their tap");
 			const ApplicationControlParseResult evaluation = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
+				R"({"protocol":2,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
 				R"("temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,)"
 				R"("historyFilter":"bilinear","currentFilter":"point",)"
 				R"("motionSelection":"center","postTemporalView":"jittered",)"
@@ -128,7 +128,7 @@ namespace gglab
 				overrides->m_TextureLodBiasOffset == -1.5f && overrides->m_Enabled == false,
 				"A sequence request carries its Temporal AA overrides and GPU timing request");
 			const ApplicationControlParseResult gtaoEvaluation = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":16,"command":"sequence","path":"SEQ_A",)"
+				R"({"protocol":2,"id":16,"command":"sequence","path":"SEQ_A",)"
 				R"("gtao":{"temporal":true,"temporalMaxSamples":24,"directionCount":1,)"
 				R"("stepCount":8}})");
 			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request
@@ -140,10 +140,17 @@ namespace gglab
 				"A sequence request carries its GTAO overrides");
 
 			const ApplicationControlParseResult cancel = ParseApplicationControlRequest(
-				R"({"protocol":1,"id":12,"command":"sequence-cancel"})");
+				R"({"protocol":2,"id":12,"command":"sequence-cancel"})");
 			context.Check(cancel.m_Request &&
 				cancel.m_Request->m_Command == ApplicationControlCommand::SequenceCancel,
 				"A sequence-cancel request takes no fields");
+
+			const auto graph = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":50,"command":"graph","summary":true,"wait":false})");
+			context.Check(graph.m_Request && graph.m_Request->m_Command == ApplicationControlCommand::Graph &&
+				graph.m_Request->m_Capture.m_Source == FrameCaptureSource::RenderGraph &&
+				graph.m_Request->m_Capture.m_GraphSummary && !graph.m_Request->m_Wait,
+				"Graph requests reuse capture timing with a typed summary flag");
 
 			struct Rejected
 			{
@@ -153,50 +160,54 @@ namespace gglab
 			const Rejected rejected[] = {
 				{ "not json", 0 },
 				{ R"([1,2])", 0 },
-				{ R"({"protocol":1,"command":"status"})", 0 },
-				{ R"({"protocol":2,"id":3,"command":"status"})", 3 },
-				{ R"({"protocol":1,"id":4,"command":"reboot"})", 4 },
-				{ R"({"protocol":1,"id":5,"command":"status","extra":1})", 5 },
-				{ R"({"protocol":1,"id":6,"command":"capture","source":"hud"})", 6 },
-				{ R"({"protocol":1,"id":7,"command":"capture","settleFrames":-1})", 7 },
-				{ R"({"protocol":1,"id":8,"command":"capture","outputDirectory":"relative"})", 8 },
-				{ R"({"protocol":1,"id":9,"command":"capture","lable":"typo"})", 9 },
-				{ R"({"protocol":1,"id":10,"command":"result"})", 10 },
-				{ R"({"protocol":1,"id":11,"command":"result","requestId":0})", 11 },
-				{ R"({"protocol":1,"id":12,"command":"sequence"})", 12 },
-				{ R"({"protocol":1,"id":13,"command":"sequence","path":"A","captureFrames":[-1]})", 13 },
-				{ R"({"protocol":1,"id":14,"command":"sequence","path":"A","captureFrames":3})", 14 },
-				{ R"({"protocol":1,"id":15,"command":"sequence","path":"A","frames":[1]})", 15 },
-				{ R"({"protocol":1,"id":16,"command":"sequence-cancel","path":"A"})", 16 },
-				{ R"({"protocol":1,"id":17,"command":"capture","source":"diagnostic"})", 17 },
-				{ R"({"protocol":1,"id":20,"command":"sequence","path":"A","referenceSamples":5000})", 20 },
-				{ R"({"protocol":1,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})", 18 },
-				{ R"({"protocol":1,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
-				{ R"({"protocol":1,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})", 21 },
-				{ R"({"protocol":1,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})", 22 },
-				{ R"({"protocol":1,"id":26,"command":"sequence","path":"A","temporalAA":{"historyFilter":"bicubic"}})", 26 },
-				{ R"({"protocol":1,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})", 27 },
-				{ R"({"protocol":1,"id":28,"command":"sequence","path":"A","temporalAA":{"currentFilter":"box"}})", 28 },
-				{ R"({"protocol":1,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})", 29 },
-				{ R"({"protocol":1,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})", 30 },
-				{ R"({"protocol":1,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})", 31 },
-				{ R"({"protocol":1,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})", 32 },
-				{ R"({"protocol":1,"id":35,"command":"sequence","path":"A","temporalAA":{"postTemporalView":"none"}})", 35 },
-				{ R"({"protocol":1,"id":36,"command":"sequence","path":"A","temporalAA":{"resolutionPreset":"balanced"}})", 36 },
-				{ R"({"protocol":1,"id":37,"command":"sequence","path":"A","temporalAA":{"historyRectification":"variance"}})", 37 },
-				{ R"({"protocol":1,"id":38,"command":"sequence","path":"A","temporalAA":{"varianceClipGamma":8}})", 38 },
-				{ R"({"protocol":1,"id":39,"command":"sequence","path":"A","temporalAA":{"historyAccumulation":"age"}})", 39 },
-				{ R"({"protocol":1,"id":40,"command":"sequence","path":"A","temporalAA":{"historyRelaxation":5}})", 40 },
-				{ R"({"protocol":1,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})", 33 },
-				{ R"({"protocol":1,"id":34,"command":"sequence","path":"A","temporalAA":{"enabled":0}})", 34 },
-				{ R"({"protocol":1,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
-				{ R"({"protocol":1,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
-				{ R"({"protocol":1,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },
-				{ R"({"protocol":1,"id":41,"command":"sequence","path":"A","gtao":{"temporal":1}})", 41 },
-				{ R"({"protocol":1,"id":42,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":0}})", 42 },
-				{ R"({"protocol":1,"id":43,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":2.5}})", 43 },
-				{ R"({"protocol":1,"id":44,"command":"sequence","path":"A","gtao":{"radius":2}})", 44 },
-				{ R"({"protocol":1,"id":45,"command":"sequence","path":"A","gtao":{"directionCount":9}})", 45 },
+				{ R"({"protocol":2,"command":"status"})", 0 },
+				{ R"({"protocol":1,"id":3,"command":"status"})", 3 },
+				{ R"({"protocol":2,"id":4,"command":"reboot"})", 4 },
+				{ R"({"protocol":2,"id":5,"command":"status","extra":1})", 5 },
+				{ R"({"protocol":2,"id":6,"command":"capture","source":"hud"})", 6 },
+				{ R"({"protocol":2,"id":7,"command":"capture","settleFrames":-1})", 7 },
+				{ R"({"protocol":2,"id":8,"command":"capture","outputDirectory":"relative"})", 8 },
+				{ R"({"protocol":2,"id":9,"command":"capture","lable":"typo"})", 9 },
+				{ R"({"protocol":2,"id":10,"command":"result"})", 10 },
+				{ R"({"protocol":2,"id":11,"command":"result","requestId":0})", 11 },
+				{ R"({"protocol":2,"id":12,"command":"sequence"})", 12 },
+				{ R"({"protocol":2,"id":13,"command":"sequence","path":"A","captureFrames":[-1]})", 13 },
+				{ R"({"protocol":2,"id":14,"command":"sequence","path":"A","captureFrames":3})", 14 },
+				{ R"({"protocol":2,"id":15,"command":"sequence","path":"A","frames":[1]})", 15 },
+				{ R"({"protocol":2,"id":16,"command":"sequence-cancel","path":"A"})", 16 },
+				{ R"({"protocol":2,"id":17,"command":"capture","source":"diagnostic"})", 17 },
+				{ R"({"protocol":2,"id":20,"command":"sequence","path":"A","referenceSamples":5000})", 20 },
+				{ R"({"protocol":2,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})", 18 },
+				{ R"({"protocol":2,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})", 19 },
+				{ R"({"protocol":2,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})", 21 },
+				{ R"({"protocol":2,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})", 22 },
+				{ R"({"protocol":2,"id":26,"command":"sequence","path":"A","temporalAA":{"historyFilter":"bicubic"}})", 26 },
+				{ R"({"protocol":2,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})", 27 },
+				{ R"({"protocol":2,"id":28,"command":"sequence","path":"A","temporalAA":{"currentFilter":"box"}})", 28 },
+				{ R"({"protocol":2,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})", 29 },
+				{ R"({"protocol":2,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})", 30 },
+				{ R"({"protocol":2,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})", 31 },
+				{ R"({"protocol":2,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})", 32 },
+				{ R"({"protocol":2,"id":35,"command":"sequence","path":"A","temporalAA":{"postTemporalView":"none"}})", 35 },
+				{ R"({"protocol":2,"id":36,"command":"sequence","path":"A","temporalAA":{"resolutionPreset":"balanced"}})", 36 },
+				{ R"({"protocol":2,"id":37,"command":"sequence","path":"A","temporalAA":{"historyRectification":"variance"}})", 37 },
+				{ R"({"protocol":2,"id":38,"command":"sequence","path":"A","temporalAA":{"varianceClipGamma":8}})", 38 },
+				{ R"({"protocol":2,"id":39,"command":"sequence","path":"A","temporalAA":{"historyAccumulation":"age"}})", 39 },
+				{ R"({"protocol":2,"id":40,"command":"sequence","path":"A","temporalAA":{"historyRelaxation":5}})", 40 },
+				{ R"({"protocol":2,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})", 33 },
+				{ R"({"protocol":2,"id":34,"command":"sequence","path":"A","temporalAA":{"enabled":0}})", 34 },
+				{ R"({"protocol":2,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})", 23 },
+				{ R"({"protocol":2,"id":24,"command":"sequence","path":"A","temporalAA":[]})", 24 },
+				{ R"({"protocol":2,"id":25,"command":"sequence","path":"A","gpuTiming":1})", 25 },
+				{ R"({"protocol":2,"id":41,"command":"sequence","path":"A","gtao":{"temporal":1}})", 41 },
+				{ R"({"protocol":2,"id":42,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":0}})", 42 },
+				{ R"({"protocol":2,"id":43,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":2.5}})", 43 },
+				{ R"({"protocol":2,"id":44,"command":"sequence","path":"A","gtao":{"radius":2}})", 44 },
+				{ R"({"protocol":2,"id":45,"command":"sequence","path":"A","gtao":{"directionCount":9}})", 45 },
+				{ R"({"protocol":2,"id":51,"command":"graph","summary":1})", 51 },
+				{ R"({"protocol":2,"id":52,"command":"graph","source":"scene"})", 52 },
+				{ R"({"protocol":2,"id":53,"command":"graph","extra":true})", 53 },
+				{ R"({"protocol":2,"id":54,"command":"capture","summary":true})", 54 },
 			};
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)
@@ -213,7 +224,7 @@ namespace gglab
 		void RunSerializeTests(SelfTestContext& context) noexcept
 		{
 			const std::string error = SerializeApplicationControlError(3, "bad \"input\"");
-			context.Check(Contains(error, R"("protocol":1)") && Contains(error, R"("id":3)") &&
+			context.Check(Contains(error, R"("protocol":2)") && Contains(error, R"("id":3)") &&
 				Contains(error, R"("ok":false)") && Contains(error, R"(bad \"input\")"),
 				"Errors are versioned JSON with an escaped reason");
 

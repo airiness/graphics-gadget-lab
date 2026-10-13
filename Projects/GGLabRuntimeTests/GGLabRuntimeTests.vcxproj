@@ -45,6 +45,7 @@
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
+  <Import Project="..\..\PropertySheets\JsonImport.props" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <TargetName>GGLabRuntimeTests</TargetName>

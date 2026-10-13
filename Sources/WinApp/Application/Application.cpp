@@ -547,6 +547,7 @@ namespace gglab
 				}));
 			return;
 		case ApplicationControlCommand::Capture:
+		case ApplicationControlCommand::Graph:
 		{
 			if (!m_FrameCapture)
 			{

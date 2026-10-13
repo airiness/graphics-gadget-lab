@@ -5,6 +5,10 @@
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/Capture/FrameCaptureService.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -677,6 +681,65 @@ namespace gglab
 			countLimited.Shutdown();
 		}
 
+		void RunGraphCaptureTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			FrameCaptureService service(device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			context.Check(graph.Compile(), "Empty graph capture fixture compiles");
+			const uint64_t id = service.RequestCapture(FrameCaptureSource::RenderGraph, 7);
+			service.BeginGraphRecording(6, graph);
+			context.Check(service.GetUnfinishedRequestCount() == 1,
+				"Graph recording cannot retarget a frame-restricted request");
+			service.BeginGraphRecording(7, graph);
+			RGExecuteContext executeContext({});
+			graph.Execute(executeContext);
+			service.EndGraphRecording(7, graph);
+			service.OnFrameSubmitted(7, MakeFence(9));
+			context.Check(Consume(service).empty() && device.GetLiveBufferCount() == 0 && device.GetMapCount() == 0,
+				"CPU graph records still wait for the selected submission without GPU readback");
+			device.m_CompletedFenceValue = 9;
+			const auto results = Consume(service);
+			context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Graph &&
+				results[0].m_Graph->m_Execution.m_Recorded && !results[0].m_Image &&
+				results[0].m_FrameSerial == 7 && results[0].m_SubmissionFenceValue == 9 &&
+				results[0].m_SubmissionFenceIndex == 1 && Consume(service).empty(),
+				"Graph results preserve frame and fence identity and publish exactly once");
+			const uint64_t aborted = service.RequestCapture(FrameCaptureSource::RenderGraph, 8);
+			const uint64_t flexible = service.RequestCapture(FrameCaptureSource::RenderGraph);
+			service.BeginGraphRecording(8, graph);
+			service.OnFrameAborted(8);
+			const auto abortResults = Consume(service);
+			context.Check(abortResults.size() == 1 && abortResults[0].m_RequestId == aborted &&
+				service.GetUnfinishedRequestCount() == 1,
+				"Graph abort fails exact requests and requeues flexible requests");
+			service.BeginGraphRecording(9, graph);
+			service.OnFrameSubmissionFailed(9);
+			const auto failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_RequestId == flexible && !failed[0].m_Graph,
+				"Failed graph submissions do not publish execution evidence");
+			service.Shutdown();
+
+			RenderGraph duplicates({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			duplicates.AddTrivialSideEffectPass("Repeated", [](RGExecuteContext&) {});
+			duplicates.AddTrivialSideEffectPass("Repeated", [](RGExecuteContext&) {});
+			context.Check(duplicates.Compile(), "Duplicate graph pass names are legal");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(duplicates, snapshot);
+			using Json = nlohmann::json;
+			const Json full = Json::parse(SerializeRenderGraphSnapshot(snapshot));
+			const Json summary = Json::parse(SerializeRenderGraphSnapshot(snapshot, true));
+			context.Check(full["schema"] == "gglab.render-graph" && full["schemaVersion"] == 1 &&
+				full["compile"]["passes"][0]["occurrence"] == 1 &&
+				full["compile"]["passes"][1]["occurrence"] == 2 &&
+				full["compile"]["duplicatePassNames"] == Json::array({"Repeated"}) &&
+				full["execution"]["gpuTiming"]["status"] == "unavailable" &&
+				!full["execution"]["gpuTiming"]["reason"].get<std::string>().empty() &&
+				summary["compile"]["passes"].size() == 2 && !summary.contains("execution"),
+				"Graph JSON separates compile/execution and never guesses merged duplicate timings");
+		}
+
 		void RunFixedTimeStepTests(SelfTestContext& context) noexcept
 		{
 			Time time;
@@ -696,6 +759,7 @@ namespace gglab
 
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
+		RunGraphCaptureTests(context);
 		RunFixedTimeStepTests(context);
 		RunFootprintTests(context);
 		RunConversionTests(context);

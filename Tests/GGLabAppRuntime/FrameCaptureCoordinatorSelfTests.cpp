@@ -13,6 +13,9 @@
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -100,13 +103,23 @@ namespace gglab
 				image->m_Width = 2;
 				image->m_Height = 2;
 				image->m_Pixels = { 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 10, 20, 30, 0 };
+				std::shared_ptr<RGSnapshot> graph;
+				if (issued->m_Source == FrameCaptureSource::RenderGraph)
+				{
+					graph = std::make_shared<RGSnapshot>();
+					graph->m_Execution.m_Recorded = true;
+				}
 				m_Results.push_back({
 					.m_RequestId = id,
 					.m_Source = issued->m_Source,
 					.m_Status = FrameCaptureStatus::Completed,
 					.m_FrameSerial = frameSerial.value_or(issued->m_FrameSerial),
 					.m_DiagnosticTap = issued->m_DiagnosticTap,
-					.m_Image = std::move(image),
+					.m_Image = graph ? nullptr : std::move(image),
+					.m_Graph = graph,
+					.m_SubmissionFenceIndex = 3,
+					.m_SubmissionFenceGeneration = 1,
+					.m_SubmissionFenceValue = 19,
 					});
 			}
 			void Fail(uint64_t id, std::string failure) noexcept
@@ -2089,6 +2102,40 @@ namespace gglab
 			}
 		}
 
+		void RunGraphWritingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("graph-writing");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			const auto id = coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph,
+				.m_Label = "graph", .m_GraphSummary = false });
+			const auto summaryId = coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph,
+				.m_Label = "graph", .m_GraphSummary = true });
+			coordinator.BeginFrame(MakeFrameState(true));
+			coordinator.OnFrameSubmitted();
+			for (const auto& issued : control.m_Issued) control.Complete(issued.m_Id);
+			coordinator.Update();
+			std::vector<FrameCaptureRequestResult> results;
+			coordinator.ConsumeResults(results);
+			context.Check(results.size() == 2 && results[0].m_RequestId == id && results[1].m_RequestId == summaryId &&
+				results[0].m_Status == FrameCaptureRequestStatus::Completed &&
+				results[1].m_Status == FrameCaptureRequestStatus::Completed && results[0].m_ImagePath.empty(),
+				"Full and summary graph requests reuse the bounded writer without requiring a PNG encoder");
+			if (results.size() == 2 && results[0].m_Status == FrameCaptureRequestStatus::Completed &&
+				results[1].m_Status == FrameCaptureRequestStatus::Completed)
+			{
+				const auto full = nlohmann::json::parse(ReadText(results[0].m_MetadataPath));
+				const auto summary = nlohmann::json::parse(ReadText(results[1].m_MetadataPath));
+				context.Check(full["schema"] == "gglab.render-graph" && full["frameSerial"] == 17 &&
+					full["frame"]["frame"]["serial"] == 17 && full["submission"]["fenceValue"] == 19 &&
+					full["submission"]["completed"] == true && full["observation"]["graph"] == true &&
+					summary["mode"] == "summary" && !summary.contains("execution"),
+					"Graph JSON embeds the same frame block and completed submission identity in both modes");
+			}
+			coordinator.FinalizeAfterRenderHost();
+		}
+
 		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-sequence-failure");
@@ -2157,6 +2204,7 @@ namespace gglab
 
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
+		RunGraphWritingTests(context);
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
 		RunHistoryContinuitySettlingTests(context);

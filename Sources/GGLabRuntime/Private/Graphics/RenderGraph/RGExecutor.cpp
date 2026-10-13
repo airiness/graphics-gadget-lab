@@ -3,6 +3,9 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+
+#include <format>
 
 #include <cstddef>
 #include <string_view>
@@ -82,7 +85,8 @@ namespace gglab
 		}
 
 		void EmitBarriers(RHICommandContext* commandContext, const RGExecutionPlan& plan,
-			const std::vector<RGBarrierIntent>& barriers) noexcept
+			const std::vector<RGBarrierIntent>& barriers, RGSnapshotExecutionRecord* record,
+			uint32_t passIndex, bool post) noexcept
 		{
 			if (barriers.empty())
 			{
@@ -139,6 +143,22 @@ namespace gglab
 						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
 						bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
 					}
+				}
+				if (record && intent.m_HasResolvedPhysicalHandle)
+				{
+					record->m_Barriers.push_back({ passIndex, post, {
+						.m_VirtualResourceIndex = intent.m_Resource.Value(),
+						.m_ResourceName = std::string(resource.m_NameId.Name()),
+						.m_ResourceType = resource.m_ResourceType,
+						.m_Kind = intent.m_Kind,
+						.m_Reason = intent.m_Reason,
+						.m_HasPhysicalHandle = true,
+						.m_PhysicalHandleIndex = intent.m_ResolvedPhysicalHandleIndex,
+						.m_PhysicalHandleGeneration = intent.m_ResolvedPhysicalHandleGeneration,
+						.m_Before = intent.m_Before,
+						.m_After = intent.m_After,
+						.m_Subresources = intent.m_Subresources,
+					} });
 				}
 			}
 
@@ -281,9 +301,17 @@ namespace gglab
 		executeContext.m_ExecutionPlan = &plan;
 		executeContext.m_Device = runtime.m_Device;
 
+		if (runtime.m_ExecutionRecord)
+		{
+			*runtime.m_ExecutionRecord = {};
+		}
 		for (const auto passIndex : plan.GetExecutionOrder())
 		{
 			const auto& pass = plan.GetPasses()[passIndex.Value()];
+			if (runtime.m_ExecutionRecord)
+			{
+				runtime.m_ExecutionRecord->m_ExecutedPassIndices.push_back(passIndex.Value());
+			}
 			const auto previousEncoderType = executeContext.m_ActiveEncoderType;
 			executeContext.m_ActiveEncoderType = pass.m_EncoderType;
 			RHICommandContext* passCommandContext =
@@ -300,10 +328,38 @@ namespace gglab
 				const auto& resource = plan.GetResources()[resourceIndex.Value()];
 				resource.m_Resource->Devirtualize(
 					runtime.m_TransientResourcePool, resource.m_UsageBits);
+				if (runtime.m_ExecutionRecord)
+				{
+					RGSnapshotAllocation allocation{
+						.m_VirtualResourceIndex = resourceIndex.Value(),
+						.m_PassIndex = passIndex.Value(),
+						.m_Imported = resource.m_Imported,
+					};
+					if (resource.m_ResourceType == RGResourceType::RGTexture)
+					{
+						const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
+						const auto handle = ResolveTextureHandle(resource);
+						allocation.m_PoolSlot = texture->m_PhysicalAllocation.m_PoolSlot;
+						allocation.m_HasPhysicalHandle = handle.IsValid();
+						allocation.m_PhysicalHandleIndex = handle.Index();
+						allocation.m_PhysicalHandleGeneration = handle.Generation();
+					}
+					else
+					{
+						const auto* buffer = static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
+						const auto handle = ResolveBufferHandle(resource);
+						allocation.m_PoolSlot = buffer->m_PhysicalAllocation.m_PoolSlot;
+						allocation.m_HasPhysicalHandle = handle.IsValid();
+						allocation.m_PhysicalHandleIndex = handle.Index();
+						allocation.m_PhysicalHandleGeneration = handle.Generation();
+					}
+					runtime.m_ExecutionRecord->m_Allocations.push_back(allocation);
+				}
 			}
 
 			TrackPassResourceUses(passCommandContext, plan, pass);
-			EmitBarriers(passCommandContext, plan, pass.m_PreBarriers);
+			EmitBarriers(passCommandContext, plan, pass.m_PreBarriers,
+				runtime.m_ExecutionRecord, passIndex.Value(), false);
 			if (pass.m_Executor)
 			{
 				pass.m_Executor->Execute(executeContext);
@@ -318,7 +374,8 @@ namespace gglab
 					graphicsContext->EndRendering();
 				}
 			}
-			EmitBarriers(passCommandContext, plan, pass.m_PostBarriers);
+			EmitBarriers(passCommandContext, plan, pass.m_PostBarriers,
+				runtime.m_ExecutionRecord, passIndex.Value(), true);
 			if (passCommandContext)
 			{
 				passCommandContext->EndGpuProfileScope();
@@ -332,6 +389,10 @@ namespace gglab
 			executeContext.m_ActiveEncoderType = previousEncoderType;
 		}
 
+		if (runtime.m_ExecutionRecord)
+		{
+			runtime.m_ExecutionRecord->m_Recorded = true;
+		}
 		executeContext.m_ExecutionPlan = previousPlan;
 		executeContext.m_Device = previousDevice;
 	}

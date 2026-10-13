@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourceTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
@@ -44,6 +45,7 @@ namespace gglab
 	struct RGSnapshotPassInfo
 	{
 		uint32_t m_Index = 0;
+		uint32_t m_Occurrence = 1;
 		int32_t m_ExecutionOrder = -1;
 		std::string m_Name;
 		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
@@ -71,6 +73,12 @@ namespace gglab
 		uint64_t m_UsageBits = 0;
 		RHIFormat m_TextureFormat = RHIFormat::Unknown;
 		RHIExtent3D m_TextureExtent{};
+		uint16_t m_TextureMipLevels = 1;
+		uint16_t m_TextureArraySize = 1;
+		uint16_t m_TextureSampleCount = 1;
+		uint64_t m_BufferSizeInBytes = 0;
+		uint32_t m_BufferStrideInBytes = 0;
+		int32_t m_ExportPassIndex = -1;
 		std::optional<RHIClearValue> m_TextureClearValue = std::nullopt;
 		TransientResourcePoolSlot m_PoolSlot{};
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
@@ -103,13 +111,49 @@ namespace gglab
 		RGDependencyReason m_Reason = RGDependencyReason::WriterToReader;
 	};
 
+	// Physical identities are sampled during execution, before Release clears the allocation.
+	struct RGSnapshotAllocation
+	{
+		uint32_t m_VirtualResourceIndex = 0;
+		uint32_t m_PassIndex = 0;
+		bool m_Imported = false;
+		TransientResourcePoolSlot m_PoolSlot{};
+		bool m_HasPhysicalHandle = false;
+		uint32_t m_PhysicalHandleIndex = 0;
+		uint32_t m_PhysicalHandleGeneration = 0;
+	};
+
+	struct RGSnapshotResolvedBarrier
+	{
+		uint32_t m_PassIndex = 0;
+		bool m_Post = false;
+		RGSnapshotBarrierInfo m_Barrier{};
+	};
+
+	struct RGSnapshotExecutionRecord
+	{
+		bool m_Recorded = false;
+		std::vector<uint32_t> m_ExecutedPassIndices;
+		std::vector<RGSnapshotAllocation> m_Allocations;
+		std::vector<RGSnapshotResolvedBarrier> m_Barriers;
+	};
+
 	struct RGSnapshot
 	{
 		std::vector<RGSnapshotPassInfo> m_Passes;
 		std::vector<RGSnapshotResourceInfo> m_Resources;
 		std::vector<RGSnapshotResourceNodeInfo> m_ResourceNodes;
 		std::vector<RGSnapshotDependencyEdge> m_DependencyEdges;
+		std::vector<RGCompileDiagnostic> m_CompileDiagnostics;
+		std::vector<std::string> m_DuplicatePassNames;
+		RGSnapshotExecutionRecord m_Execution;
+		// Capturing service supplies the adapter/driver identity; generic builders leave it empty.
+		std::string m_AdapterCompatibilityIdentity;
 	};
+
+	// Versioned graph data; AppRuntime embeds its common frame metadata and submission identity.
+	[[nodiscard]] std::string SerializeRenderGraphSnapshot(
+		const RGSnapshot& snapshot, bool summary = false) noexcept;
 
 	template <> struct SnapshotTraits<RGSnapshot>
 	{
