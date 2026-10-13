@@ -5353,22 +5353,27 @@ namespace gglab
 
 		void RunTemporalReferenceContractTests(SelfTestContext& context) noexcept
 		{
-			const auto disabled = RenderPassTemporalReference::ValidateSource(
+			const auto disabled = RenderPassTemporalReference::GetSourceEligibility(
 				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Disabled);
-			const auto unsupported = RenderPassTemporalReference::ValidateSource(
+			const auto unsupported = RenderPassTemporalReference::GetSourceEligibility(
 				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::CoreCapabilityUnavailable);
-			context.Check(disabled.m_Status == RenderFrameValidationStatus::ContractFailure &&
-				unsupported.m_Status == RenderFrameValidationStatus::ContractFailure &&
-				disabled.m_Reason != unsupported.m_Reason,
-				"AO references reject disabled and unsupported GTAO before graph recording with distinct reasons");
-			context.Check(RenderPassTemporalReference::ValidateSource(
-				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Active).IsReady() &&
-				RenderPassTemporalReference::ValidateSource(
-					TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::NoOpaqueDraws).IsReady() &&
-				RenderPassTemporalReference::ValidateSource(
-					TemporalReferenceSignal::SceneColor, GTAOFrameStatus::Disabled).IsReady() &&
-				RenderPassTemporalReference::ValidateSource(
-					TemporalReferenceSignal::SceneColor, GTAOFrameStatus::CoreCapabilityUnavailable).IsReady(),
+			context.Check(disabled == TemporalReferenceSourceEligibility::GTAODisabled &&
+				unsupported == TemporalReferenceSourceEligibility::GTAOCoreCapabilityUnavailable,
+				"AO source eligibility distinguishes disabled GTAO from missing core capabilities");
+			const std::array gtaoStatuses{ GTAOFrameStatus::Disabled, GTAOFrameStatus::Active,
+				GTAOFrameStatus::CoreCapabilityUnavailable, GTAOFrameStatus::NoOpaqueDraws };
+			context.Check(RenderPassTemporalReference::GetSourceEligibility(
+				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Active) ==
+					TemporalReferenceSourceEligibility::Eligible &&
+				RenderPassTemporalReference::GetSourceEligibility(
+					TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::NoOpaqueDraws) ==
+					TemporalReferenceSourceEligibility::Eligible &&
+				std::ranges::all_of(gtaoStatuses, [](GTAOFrameStatus status)
+					{
+						return RenderPassTemporalReference::GetSourceEligibility(
+							TemporalReferenceSignal::SceneColor, status) ==
+							TemporalReferenceSourceEligibility::Eligible;
+					}),
 				"AO references accept active and empty input; scene-color references do not require GTAO");
 
 			bool productionPhasesMatch = true;

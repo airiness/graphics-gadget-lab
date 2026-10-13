@@ -4,10 +4,18 @@
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+
+#include <cstdint>
 
 namespace gglab
 {
+	enum class TemporalReferenceSourceEligibility : uint8_t
+	{
+		Eligible,
+		GTAODisabled,
+		GTAOCoreCapabilityUnavailable,
+	};
+
 	// Evaluation-only supersampled reference accumulation. In a frame that carries a
 	// temporal reference sample, adds the HDR scene color to the persistent sum and
 	// replaces the display view's scene color with the running mean before
@@ -31,7 +39,7 @@ namespace gglab
 		~RenderPassTemporalReference() override = default;
 
 		void Prepare(const RenderServices& services) noexcept;
-		[[nodiscard]] static RenderFrameValidationResult ValidateSource(
+		[[nodiscard]] static TemporalReferenceSourceEligibility GetSourceEligibility(
 			TemporalReferenceSignal signal, GTAOFrameStatus gtaoStatus) noexcept;
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;

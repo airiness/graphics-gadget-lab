@@ -84,23 +84,21 @@ namespace gglab
 		}
 	}
 
-	RenderFrameValidationResult RenderPassTemporalReference::ValidateSource(
+	TemporalReferenceSourceEligibility RenderPassTemporalReference::GetSourceEligibility(
 		TemporalReferenceSignal signal, GTAOFrameStatus gtaoStatus) noexcept
 	{
 		if (signal == TemporalReferenceSignal::AmbientOcclusion)
 		{
 			if (gtaoStatus == GTAOFrameStatus::Disabled)
 			{
-				return RenderFrameValidationResult::ContractFailure(
-					"Ambient-occlusion reference requires GTAO to be enabled");
+				return TemporalReferenceSourceEligibility::GTAODisabled;
 			}
 			if (gtaoStatus == GTAOFrameStatus::CoreCapabilityUnavailable)
 			{
-				return RenderFrameValidationResult::ContractFailure(
-					"Ambient-occlusion reference requires GTAO core capabilities");
+				return TemporalReferenceSourceEligibility::GTAOCoreCapabilityUnavailable;
 			}
 		}
-		return RenderFrameValidationResult::Ready();
+		return TemporalReferenceSourceEligibility::Eligible;
 	}
 
 	void RenderPassTemporalReference::Prepare(const RenderServices& services) noexcept
@@ -144,9 +142,10 @@ namespace gglab
 		if (ambientOcclusion)
 		{
 			const auto& gtao = rg.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
-			const auto validation = ValidateSource(signal, gtao.m_Status);
-			GGLAB_ASSERT_MSG(validation.IsReady(), "Temporal reference source must be validated.");
-			if (!validation.IsReady())
+			const bool sourceEligible = GetSourceEligibility(signal, gtao.m_Status) ==
+				TemporalReferenceSourceEligibility::Eligible;
+			GGLAB_ASSERT_MSG(sourceEligible, "Temporal reference source must be validated.");
+			if (!sourceEligible)
 			{
 				return;
 			}

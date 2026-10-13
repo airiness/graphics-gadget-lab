@@ -736,11 +736,17 @@ namespace gglab
 			});
 		if (result.IsReady() && transaction && transaction->GetReferenceSample())
 		{
-			result = RenderPassTemporalReference::ValidateSource(
-				transaction->GetReferenceSample()->m_Signal, plan.m_GTAOStatus);
-			if (!result.IsReady())
+			switch (RenderPassTemporalReference::GetSourceEligibility(
+				transaction->GetReferenceSample()->m_Signal, plan.m_GTAOStatus))
 			{
-				return result;
+			case TemporalReferenceSourceEligibility::Eligible:
+				break;
+			case TemporalReferenceSourceEligibility::GTAODisabled:
+				return RenderFrameValidationResult::ContractFailure(
+					"Ambient-occlusion reference requires GTAO to be enabled");
+			case TemporalReferenceSourceEligibility::GTAOCoreCapabilityUnavailable:
+				return RenderFrameValidationResult::ContractFailure(
+					"Ambient-occlusion reference requires GTAO core capabilities");
 			}
 			m_TemporalReferencePass.Prepare(services);
 			if (!transaction->CanAccumulateReference())
