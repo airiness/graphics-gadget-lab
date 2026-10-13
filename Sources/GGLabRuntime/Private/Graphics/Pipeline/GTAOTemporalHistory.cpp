@@ -69,7 +69,7 @@ namespace gglab
 	bool GTAOTemporalHistory::ImportRenderGraphResources(RenderGraph::RGBuilder& builder,
 		bool continuesPreviousView, GTAOTemporalHistoryRenderGraphResources& outResources) noexcept
 	{
-		if (!m_Active || m_Imported)
+		if (!m_Active || m_Imported || m_EmptyFrameStaged)
 		{
 			return false;
 		}
@@ -109,6 +109,16 @@ namespace gglab
 		return true;
 	}
 
+	bool GTAOTemporalHistory::StageEmptyFrame() noexcept
+	{
+		if (!m_Active || m_Imported || m_EmptyFrameStaged)
+		{
+			return false;
+		}
+		m_EmptyFrameStaged = true;
+		return true;
+	}
+
 	void GTAOTemporalHistory::CommitFrame() noexcept
 	{
 		if (m_Active)
@@ -117,7 +127,10 @@ namespace gglab
 			{
 				m_Textures.Commit();
 			}
-			m_CommittedValid = m_Exported;
+			// Never reuse samples from before a submitted empty frame. The empty outcome
+			// itself is compatible; an unexplained missing export remains a history loss.
+			m_CommittedFrame = m_Exported ? CommittedFrame::Samples :
+				(m_EmptyFrameStaged ? CommittedFrame::Empty : CommittedFrame::None);
 		}
 		AbortFrame();
 	}
@@ -127,6 +140,7 @@ namespace gglab
 		m_Active = false;
 		m_Imported = false;
 		m_Exported = false;
+		m_EmptyFrameStaged = false;
 	}
 
 	void GTAOTemporalHistory::Release(const RHIFencePoint& retirementFence) noexcept
@@ -137,7 +151,7 @@ namespace gglab
 			m_Textures.Release(*m_TexturePool, retirementFence);
 		}
 		m_Extent = {};
-		m_CommittedValid = false;
+		m_CommittedFrame = CommittedFrame::None;
 		AbortFrame();
 	}
 }

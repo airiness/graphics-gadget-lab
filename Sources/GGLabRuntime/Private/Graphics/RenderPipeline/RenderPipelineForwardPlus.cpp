@@ -491,6 +491,16 @@ namespace gglab
 		{
 			m_GTAOPass.AddPass(rg, context, services);
 		}
+		else if (gtaoStatus == GTAOFrameStatus::NoOpaqueDraws &&
+			context.GetTemporalFramePlan().UsesAmbientOcclusionHistory() &&
+			context.m_TemporalFrameTransaction &&
+			context.m_TemporalFrameTransaction->CanAccumulateAmbientOcclusion())
+		{
+			const bool staged =
+				context.m_TemporalFrameTransaction->StageEmptyAmbientOcclusionFrame();
+			GGLAB_ASSERT_MSG(staged, "An empty GTAO frame must stage its continuity outcome.");
+			GGLAB_UNUSED(staged);
+		}
 		m_SkyboxPass.AddPass(rg, context, services);
 		if (depthCoverageFramePlan.AddsForwardOpaquePass())
 		{

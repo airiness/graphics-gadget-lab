@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -37,10 +38,12 @@ namespace gglab
 
 		const Vector3 PresetViewPosition(0.0f, 2.3f, -9.0f);
 		const Vector3 PresetViewTarget(0.0f, 0.0f, 6.5f);
+		const Vector3 EmptyViewTarget = PresetViewPosition + Vector3(0.0f, 10.0f, 1.0f);
 		constexpr std::string_view StaticPathId = "SEQ_GTAOLab_Static";
 		constexpr std::string_view PanPathId = "SEQ_GTAOLab_Pan";
 		constexpr std::string_view MovingOccluderPathId = "SEQ_GTAOLab_MovingOccluder";
 		constexpr std::string_view OccluderStepPathId = "SEQ_GTAOLab_OccluderStep";
+		constexpr std::string_view EmptyViewPathId = "SEQ_GTAOLab_EmptyView";
 		constexpr uint32_t PathLastFrame = 179;
 		// Sequence frames advance the moving occluder at this rate.
 		constexpr float MovingOccluderFramesPerSecond = 60.0f;
@@ -530,6 +533,18 @@ namespace gglab
 					},
 				};
 			};
+		auto emptyViewPath = makePath(EmptyViewPathId, "Empty View",
+			"Turn toward an empty view, hold it, then return without a camera cut.", Vector3::Zero);
+		const auto makeKey = [this](uint32_t frame, const Vector3& target)
+			{
+				return CameraPathKey{ .m_Frame = frame, .m_Position = PresetViewPosition,
+					.m_Target = target, .m_VerticalFovDegrees = m_FovDegrees };
+			};
+		emptyViewPath.m_Keys = {
+			makeKey(0, PresetViewTarget), makeKey(29, PresetViewTarget),
+			makeKey(59, EmptyViewTarget), makeKey(119, EmptyViewTarget),
+			makeKey(149, PresetViewTarget), makeKey(PathLastFrame, PresetViewTarget),
+		};
 		const bool pathsRegistered = GetCameraRig().SetCameraPaths({
 			// Convergence and stability of visibility in a held view.
 			makePath(StaticPathId, "Static", "Preset view held for 180 frames.", Vector3::Zero),
@@ -545,9 +560,25 @@ namespace gglab
 			makePath(OccluderStepPathId, "Occluder Step",
 				"Preset view; a box stands in the wall corner for frames 60-119.",
 				Vector3::Zero),
+			emptyViewPath,
 			});
 		GGLAB_ASSERT_MSG(pathsRegistered, "The GTAO Lab camera paths must be valid.");
 		GGLAB_UNUSED(pathsRegistered);
+		// The held empty pose also exercises after-ready capture settling without AO input.
+		const bool viewsRegistered = GetCameraRig().SetReferenceViews({ {
+			.m_Id = "CAM_GTAOLab_EmptyView",
+			.m_Name = "Empty View",
+			.m_Purpose = "No opaque or alpha-test draws; capture continuity without AO samples.",
+			.m_Position = PresetViewPosition,
+			.m_Target = EmptyViewTarget,
+			.m_VerticalFovDegrees = m_FovDegrees,
+			.m_NearPlane = GetCamera().GetNear(),
+			.m_FarPlane = GetCamera().GetFar(),
+			.m_ManualEV100 = GetCamera().GetManualEV100(),
+			.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+			} });
+		GGLAB_ASSERT_MSG(viewsRegistered, "The GTAO Lab reference views must be valid.");
+		GGLAB_UNUSED(viewsRegistered);
 	}
 
 	void GTAOLabSession::OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept

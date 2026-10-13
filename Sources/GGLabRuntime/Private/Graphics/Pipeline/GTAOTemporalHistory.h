@@ -33,22 +33,42 @@ namespace gglab
 			GTAOTemporalHistoryRenderGraphResources& outResources) noexcept;
 		[[nodiscard]] bool ExportRenderGraphResources(RenderGraph::RGBuilder& builder,
 			const GTAOTemporalHistoryRenderGraphResources& resources) noexcept;
-		// The frame was submitted: an exported pair becomes the committed history, and an
-		// active frame that exported nothing leaves no history to continue.
+		// A frame without depth-coverage draws needs no AO samples. Stage that outcome
+		// explicitly before importing resources; only submission makes it continuous.
+		[[nodiscard]] bool StageEmptyFrame() noexcept;
+		// The frame was submitted: commit either exported samples or the staged empty
+		// outcome. An unstaged frame that exported nothing invalidates continuity.
 		void CommitFrame() noexcept;
 		// The frame ended without submission: the committed history is unchanged.
 		void AbortFrame() noexcept;
 		// Retires the pairs after a fatal submission, before shutdown, or when inactive.
 		void Release(const RHIFencePoint& retirementFence) noexcept;
 
-		[[nodiscard]] bool HasCommittedHistory() const noexcept { return m_CommittedValid; }
+		[[nodiscard]] bool HasCommittedHistory() const noexcept
+		{
+			return m_CommittedFrame == CommittedFrame::Samples;
+		}
 		[[nodiscard]] bool HasCompatiblePreviousHistory(bool continuesPreviousView) const noexcept
 		{
-			return m_Active && continuesPreviousView && m_CommittedValid &&
+			return m_Active && continuesPreviousView && HasCommittedHistory() &&
 				m_Textures.IsReadInitialized();
+		}
+		// An empty submitted frame preserves continuity but provides no samples to read.
+		[[nodiscard]] bool HasCompatiblePreviousFrame(bool continuesPreviousView) const noexcept
+		{
+			return m_Active && continuesPreviousView &&
+				(m_CommittedFrame == CommittedFrame::Empty ||
+					HasCompatiblePreviousHistory(continuesPreviousView));
 		}
 
 	private:
+		enum class CommittedFrame
+		{
+			None,
+			Samples,
+			Empty,
+		};
+
 		enum HistorySurface : size_t
 		{
 			VisibilitySurface,
@@ -59,9 +79,10 @@ namespace gglab
 		PersistentTexturePool* m_TexturePool = nullptr;
 		TemporalHistoryTextures<HistorySurfaceCount> m_Textures;
 		GTAOExtent m_Extent{};
-		bool m_CommittedValid = false;
+		CommittedFrame m_CommittedFrame = CommittedFrame::None;
 		bool m_Active = false;
 		bool m_Imported = false;
 		bool m_Exported = false;
+		bool m_EmptyFrameStaged = false;
 	};
 }

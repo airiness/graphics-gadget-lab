@@ -87,7 +87,7 @@ namespace gglab
 			.m_ReferenceActive = plan.IsConsumerActive(TemporalConsumer::Reference),
 			.m_HasCompatiblePreviousHistory = m_HasCompatiblePreviousView &&
 				(!plan.UsesAmbientOcclusionHistory() || (m_AmbientOcclusionHistory &&
-					m_AmbientOcclusionHistory->HasCompatiblePreviousHistory(m_HasCompatiblePreviousView))),
+					m_AmbientOcclusionHistory->HasCompatiblePreviousFrame(m_HasCompatiblePreviousView))),
 		};
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_FrameIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextFrameIndex : 0;
@@ -282,8 +282,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending &&
 			CanAccumulateAmbientOcclusion(),
 			"Only a pending temporal GTAO frame with a history can import it.");
-		// The history continues exactly when the view does: same session, reset identity,
-		// extents and a committed previous frame.
+		// Sample reuse requires a compatible view and exported samples in the previous
+		// submitted frame. A committed empty frame preserves continuity without samples.
 		return CanAccumulateAmbientOcclusion() &&
 			m_AmbientOcclusionHistory->ImportRenderGraphResources(
 				builder, m_HasCompatiblePreviousView, outResources);
@@ -297,6 +297,15 @@ namespace gglab
 			"Only a pending temporal GTAO frame with a history can export it.");
 		return CanAccumulateAmbientOcclusion() &&
 			m_AmbientOcclusionHistory->ExportRenderGraphResources(builder, resources);
+	}
+
+	bool TemporalFrameTransaction::StageEmptyAmbientOcclusionFrame() noexcept
+	{
+		const bool canStage = m_State == TemporalFrameTransactionState::Pending &&
+			CanAccumulateAmbientOcclusion();
+		GGLAB_ASSERT_MSG(canStage,
+			"Only a pending temporal GTAO frame with a history can stage an empty outcome.");
+		return canStage && m_AmbientOcclusionHistory->StageEmptyFrame();
 	}
 
 	void TemporalFrameTransaction::MarkResolveParticipated() noexcept

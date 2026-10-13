@@ -5485,6 +5485,7 @@ namespace gglab
 				bool m_Imported = false;
 				bool m_Exported = false;
 				bool m_PreviousValid = false;
+				bool m_PreviousFrameCompatible = false;
 				bool m_Compiled = false;
 			};
 			// Records one active temporal GTAO frame. A frame that does not fully write the
@@ -5492,6 +5493,7 @@ namespace gglab
 			const auto recordFrame = [&](bool continuesPreviousView, bool writesNext) noexcept
 				{
 					HistoryFrame frame{ .m_Begun = history.BeginFrame(true, halfExtent, fence) };
+					frame.m_PreviousFrameCompatible = history.HasCompatiblePreviousFrame(continuesPreviousView);
 					RenderGraph graph({
 						.m_Device = &device,
 						.m_TransientResourcePool =
@@ -5544,6 +5546,50 @@ namespace gglab
 				"Temporal GTAO commits an exported history only when its frame is submitted, and "
 				"the next frame that continues the view reads it");
 
+			const auto stageEmptyFrame = [&]() noexcept
+				{
+					return history.BeginFrame(true, halfExtent, fence) && history.StageEmptyFrame();
+				};
+			const bool abortedEmptyStaged = stageEmptyFrame();
+			history.AbortFrame();
+			const HistoryFrame afterEmptyAbort = recordFrame(true, true);
+			const bool stagedAfterImport = history.StageEmptyFrame();
+			history.CommitFrame();
+			context.Check(abortedEmptyStaged && recorded(afterEmptyAbort, true) &&
+				afterEmptyAbort.m_PreviousValid && !stagedAfterImport,
+				"An aborted empty GTAO frame preserves samples, and an imported frame cannot "
+				"be relabeled empty");
+
+			const bool emptyStaged = stageEmptyFrame();
+			bool importedAfterEmpty = true;
+			RenderGraph emptyGraph({ .m_Device = &device,
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+			emptyGraph.AddPass<GTAOTemporalHistoryContractPassData>("GTAO.TemporalHistory.Empty",
+				[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+				{
+					importedAfterEmpty = history.ImportRenderGraphResources(builder, true, data.m_History);
+					builder.SideEffect();
+				});
+			const bool emptyCompiled = emptyGraph.Compile();
+			history.CommitFrame();
+			const bool samplesAfterEmpty = history.HasCommittedHistory();
+			const bool nextEmptyBegun = history.BeginFrame(true, halfExtent, fence);
+			const bool emptyFrameCompatible = history.HasCompatiblePreviousFrame(true);
+			const bool emptySamplesCompatible = history.HasCompatiblePreviousHistory(true);
+			const bool emptyCutCompatible = history.HasCompatiblePreviousFrame(false);
+			const bool nextEmptyStaged = history.StageEmptyFrame();
+			history.CommitFrame();
+			const HistoryFrame resumed = recordFrame(true, true);
+			history.CommitFrame();
+			const HistoryFrame afterResumed = recordFrame(true, true);
+			history.CommitFrame();
+			context.Check(emptyStaged && !importedAfterEmpty && emptyCompiled && !samplesAfterEmpty &&
+				nextEmptyBegun && emptyFrameCompatible && !emptySamplesCompatible && !emptyCutCompatible &&
+				nextEmptyStaged && recorded(resumed, true) && resumed.m_PreviousFrameCompatible &&
+				!resumed.m_PreviousValid && recorded(afterResumed, true) && afterResumed.m_PreviousValid,
+				"Submitted empty GTAO frames preserve continuity without importing resources or "
+				"reusing samples from before the empty interval; returning geometry starts fresh samples");
+
 			const HistoryFrame cut = recordFrame(false, true);
 			history.CommitFrame();
 			const HistoryFrame unexported = recordFrame(true, false);
@@ -5554,7 +5600,8 @@ namespace gglab
 			context.Check(recorded(cut, true) && !cut.m_PreviousValid &&
 				recorded(unexported, false) && unexported.m_PreviousValid &&
 				!committedAfterUnexported && recorded(afterUnexported, true) &&
-				!afterUnexported.m_PreviousValid && history.HasCommittedHistory(),
+				!afterUnexported.m_PreviousValid && !afterUnexported.m_PreviousFrameCompatible &&
+				history.HasCommittedHistory(),
 				"Temporal GTAO reads no previous history when the view does not continue or the "
 				"last submitted frame exported none");
 
@@ -5643,7 +5690,8 @@ namespace gglab
 				.m_AmbientOcclusionAvailable = true,
 			};
 			uint64_t fenceValue = 1;
-			const auto record = [&](bool submit = true, float preExposure = 1.0f)
+			const auto record = [&](bool submit = true, float preExposure = 1.0f,
+				bool hasOpaqueDraws = true)
 				{
 					const ResolvedTemporalFramePlan plan = ResolveTemporalFramePlan(info);
 					const ViewResolution resolution = ResolveTemporalAAViewResolution(
@@ -5661,7 +5709,7 @@ namespace gglab
 					transaction.PrepareDisplayView(view);
 					RenderGraph graph({ .m_Device = &device,
 						.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
-					bool exported = !plan.HasService(TemporalService::FrameContinuity);
+					bool recorded = !plan.HasService(TemporalService::FrameContinuity);
 					if (plan.HasService(TemporalService::ColorDepthHistory))
 					{
 						graph.AddPass<TemporalHistoryContractPassData>("Continuity.Color",
@@ -5671,8 +5719,12 @@ namespace gglab
 								builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
 								builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
 								builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
-								exported = transaction.ExportHistoryResources(builder, data.m_History);
+								recorded = transaction.ExportHistoryResources(builder, data.m_History);
 							});
+					}
+					else if (plan.UsesAmbientOcclusionHistory() && !hasOpaqueDraws)
+					{
+						recorded = transaction.StageEmptyAmbientOcclusionFrame();
 					}
 					else if (plan.UsesAmbientOcclusionHistory())
 					{
@@ -5682,10 +5734,10 @@ namespace gglab
 								if (!transaction.ImportAmbientOcclusionHistory(builder, data.m_History)) return;
 								builder.WriteInPlace(data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
 								builder.WriteInPlace(data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
-								exported = transaction.ExportAmbientOcclusionHistory(builder, data.m_History);
+								recorded = transaction.ExportAmbientOcclusionHistory(builder, data.m_History);
 							});
 					}
-					context.Check(exported && graph.Compile(), "Continuity fixture exports its active history");
+					context.Check(recorded && graph.Compile(), "Continuity fixture records its active history outcome");
 					if (submit) transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, fenceValue++ });
 					else transaction.Abort();
 					context.Check(transaction.GetContinuity().m_HasCompatiblePreviousHistory ==
@@ -5733,10 +5785,35 @@ namespace gglab
 			const auto aoContinued = record();
 			context.Check(!aoCold.Continues(inactive) && !aoCold.m_HasCompatiblePreviousHistory &&
 				aoContinued.Continues(aoCold), "Standalone temporal GTAO reports its actual committed read history");
+			const auto aoEmptyAborted = record(false, 1.0f, false);
+			const bool samplesAfterEmptyAbort = ambientOcclusionHistory.HasCommittedHistory();
+			const auto aoEmpty = record(true, 1.0f, false);
+			const bool samplesAfterEmpty = ambientOcclusionHistory.HasCommittedHistory();
+			const auto aoStillEmpty = record(true, 1.0f, false);
+			const auto aoResumed = record();
+			const auto aoAfterResumed = record();
+			context.Check(aoEmptyAborted.Continues(aoContinued) && samplesAfterEmptyAbort &&
+				aoEmpty.Continues(aoContinued) && !samplesAfterEmpty &&
+				aoStillEmpty.Continues(aoEmpty) && aoResumed.Continues(aoStillEmpty) &&
+				aoAfterResumed.Continues(aoResumed),
+				"Standalone GTAO capture continuity survives draws, aborted and submitted empty "
+				"views, and returning draws without a camera cut");
 			ambientOcclusionHistory.Release({});
-			const auto aoLost = record();
-			context.Check(!aoLost.Continues(aoContinued) && aoLost.m_Identity == aoContinued.m_Identity,
+			const auto aoColdEmptyAborted = record(false, 1.0f, false);
+			const auto aoLost = record(true, 1.0f, false);
+			const auto aoColdEmptyContinued = record(true, 1.0f, false);
+			context.Check(!aoColdEmptyAborted.Continues(aoAfterResumed) &&
+				!aoLost.Continues(aoColdEmptyAborted) && aoLost.m_Identity == aoAfterResumed.m_Identity &&
+				aoColdEmptyContinued.Continues(aoLost),
 				"A lost GTAO allocation breaks continuity even while geometric view history survives");
+			ambientOcclusionHistory.Release({});
+			const auto aoLostEmpty = record();
+			context.Check(!aoLostEmpty.Continues(aoColdEmptyContinued),
+				"Losing an empty GTAO history owner still breaks continuity");
+			++info.m_ResetIdentity;
+			const auto aoEmptyCut = record(true, 1.0f, false);
+			context.Check(!aoEmptyCut.Continues(aoLostEmpty) && aoEmptyCut.Continues(aoLostEmpty, true) &&
+				record().Continues(aoEmptyCut), "Empty GTAO frames obey camera-cut continuity rules");
 			ambientOcclusionHistory.Release({});
 			colorHistory.Shutdown();
 			pool.Tick();

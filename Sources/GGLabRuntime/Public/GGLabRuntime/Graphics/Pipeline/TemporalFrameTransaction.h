@@ -150,6 +150,9 @@ namespace gglab
 			GTAOTemporalHistoryRenderGraphResources& outResources) noexcept;
 		[[nodiscard]] bool ExportAmbientOcclusionHistory(RenderGraph::RGBuilder& builder,
 			const GTAOTemporalHistoryRenderGraphResources& resources) noexcept;
+		// The validated frame has no opaque/alpha-test draws. Submission preserves
+		// continuity without retaining AO samples from an earlier view.
+		[[nodiscard]] bool StageEmptyAmbientOcclusionFrame() noexcept;
 		[[nodiscard]] bool CanAccumulateAmbientOcclusion() const noexcept
 		{
 			return m_AmbientOcclusionHistory != nullptr;

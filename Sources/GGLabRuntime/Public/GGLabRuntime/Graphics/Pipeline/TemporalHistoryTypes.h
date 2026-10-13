@@ -79,8 +79,9 @@ namespace gglab
 		};
 	}
 
-	// Immutable observation of the pending frame's effective identity and the histories
-	// it can actually read. Consumers must not infer continuity from window size alone.
+	// Immutable observation of the pending frame's effective identity and compatible
+	// committed history state. A standalone GTAO frame may continue a submitted empty
+	// outcome without readable AO samples. Window size alone does not imply continuity.
 	struct TemporalFrameContinuity
 	{
 		TemporalHistoryCompatibilityIdentity m_Identity{};
