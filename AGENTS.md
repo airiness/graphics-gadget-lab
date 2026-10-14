@@ -93,6 +93,9 @@ immediate updates only when the state can safely change in place.
 - Use C++20 and include semantic dependencies directly; PCH contents are not an
   include contract. Do not explicitly include removed or build-injected PCH
   headers in ordinary sources.
+- Use braces for every `if` and `else` branch body in first-party C++ and HLSL,
+  even for a single statement or a body that fits on one line. Keep conventional
+  `else if` chains, with braces around each branch body.
 - Follow neighboring naming and layout. Use `gglab` for GGLab code and
   `napa::voxel` for Napa core code. Use lasting semantic names instead of phase,
   commit or cache-epoch labels in durable identifiers, filenames and comments.
