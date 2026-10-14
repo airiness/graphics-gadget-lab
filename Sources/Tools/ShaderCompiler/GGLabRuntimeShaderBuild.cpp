@@ -85,6 +85,8 @@ namespace gglab
 		constexpr std::array ForwardPlusValidationMaterialDiagnosticsDefines{ ForwardPlusDefine, ForwardPlusValidationDefine, MaterialDiagnosticsDefine };
 		constexpr std::array ForwardPlusValidationGTAOMaterialDiagnosticsDefines{ GTAOContributionDefine, ForwardPlusDefine, ForwardPlusValidationDefine, MaterialDiagnosticsDefine };
 
+		constexpr ShaderProgramBuildDefine NonFiniteBufferDefines[]{ { L"GGLAB_NONFINITE_SCAN_BUFFER", L"1" } };
+
 		using namespace shader_programs;
 		const std::array BuildRecords{
 			ShaderProgramBuildRecord{ &ForwardCoverageVertex, L"Passes/PassForwardCoverage.hlsl", L"VSMain" },
@@ -154,6 +156,9 @@ namespace gglab
 			ShaderProgramBuildRecord{ &CoordinateFullscreenVertex, L"Passes/PassCoordinateConformance.hlsl", L"VSFullscreen" },
 			ShaderProgramBuildRecord{ &CoordinateMarkerPixel, L"Passes/PassCoordinateConformance.hlsl", L"PSMarker" },
 			ShaderProgramBuildRecord{ &CoordinateConformancePixel, L"Passes/PassCoordinateConformance.hlsl", L"PSConformance" },
+			ShaderProgramBuildRecord{ &NonFiniteScanClearCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSClear" },
+			ShaderProgramBuildRecord{ &NonFiniteScanTextureCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &NonFiniteScanBufferCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSMain", NonFiniteBufferDefines },
 			ShaderProgramBuildRecord{ &RenderGraphComputeWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewVertex, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"VSMain" },

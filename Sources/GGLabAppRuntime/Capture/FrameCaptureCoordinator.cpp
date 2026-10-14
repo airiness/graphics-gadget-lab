@@ -950,6 +950,7 @@ namespace gglab
 		FrameCaptureMetadata& metadata = entry.m_Metadata;
 		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
 		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
+		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
 		if (result.m_Image)
 		{
 			const FrameCaptureImage& image = *result.m_Image;

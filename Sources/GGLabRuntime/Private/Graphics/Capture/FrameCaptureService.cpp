@@ -40,6 +40,11 @@ namespace gglab
 			PublishFailure(requestId, source, 0, "The render host has been finalized.");
 			return requestId;
 		}
+		if (source == FrameCaptureSource::NonFiniteScan)
+		{
+			PublishFailure(requestId, source, 0, "Use RequestNonFiniteScan with explicit targets and a configuration version.");
+			return requestId;
+		}
 		m_Queued.push_back({ .m_Id = requestId, .m_Source = source, .m_FrameSerial = frameSerial, .m_GroupId = groupId });
 		DeferUnrelatedImages(frameSerial);
 		return requestId;
@@ -129,6 +134,7 @@ namespace gglab
 		{
 			if (groupId != 0 && request.m_GroupId == groupId &&
 				request.m_Source != FrameCaptureSource::ResourceExport && request.m_Source != FrameCaptureSource::RenderGraph &&
+				request.m_Source != FrameCaptureSource::NonFiniteScan &&
 				(request.m_FrameSerial == 0 || request.m_FrameSerial == selectedFrame))
 			{
 				requiredImages.push_back(request);
@@ -140,6 +146,7 @@ namespace gglab
 		std::erase_if(m_Queued, [&](const QueuedRequest& request)
 			{
 				if (request.m_Source == FrameCaptureSource::ResourceExport || request.m_Source == FrameCaptureSource::RenderGraph ||
+					request.m_Source == FrameCaptureSource::NonFiniteScan ||
 					(request.m_FrameSerial != 0 && request.m_FrameSerial != selectedFrame) ||
 					std::ranges::any_of(requiredImages, [&](const QueuedRequest& required)
 						{ return IsBoundBy(request, required.m_Source, required.m_DiagnosticTap); }))
@@ -314,7 +321,7 @@ namespace gglab
 	void FrameCaptureService::BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
 		const bool includeGraph = std::ranges::any_of(m_Taps, [&](const Tap& tap)
-			{ return tap.m_FrameSerial == frameSerial && tap.m_Source == FrameCaptureSource::ResourceExport &&
+			{ return tap.m_FrameSerial == frameSerial && (tap.m_Source == FrameCaptureSource::ResourceExport || tap.m_Source == FrameCaptureSource::NonFiniteScan) &&
 			std::ranges::any_of(tap.m_Requests, [](const auto& request) { return request.m_IncludeGraph; }); });
 		if (m_IsShutdown || (!HasPendingRequests(FrameCaptureSource::RenderGraph) && !includeGraph))
 		{
@@ -339,6 +346,7 @@ namespace gglab
 		BuildRenderGraphSnapshot(graph, *tap.m_Graph);
 		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		tap.m_ResourceExportActive = graph.HasResourceObservations();
+		tap.m_NonFiniteScanActive = graph.HasNonFiniteScans();
 		tap.m_GraphExportActive = true;
 		graph.EnableExecutionRecord();
 		for (auto& consumer : m_Taps)
@@ -347,7 +355,7 @@ namespace gglab
 				consumer.m_GraphExportActive = true;
 			}
 		for (auto& resources : m_Taps)
-			if (resources.m_FrameSerial == frameSerial && resources.m_Source == FrameCaptureSource::ResourceExport &&
+			if (resources.m_FrameSerial == frameSerial && (resources.m_Source == FrameCaptureSource::ResourceExport || resources.m_Source == FrameCaptureSource::NonFiniteScan) &&
 				resources.m_Requests[0].m_IncludeGraph)
 			{
 				resources.m_Graph = tap.m_Graph;
@@ -524,6 +532,11 @@ namespace gglab
 
 	void FrameCaptureService::PublishTap(Tap& tap) noexcept
 	{
+		if (tap.m_Source == FrameCaptureSource::NonFiniteScan)
+		{
+			PublishScanTap(tap);
+			return;
+		}
 		if (tap.m_Source == FrameCaptureSource::ResourceExport)
 		{
 			PublishResourceTap(tap);
@@ -546,6 +559,7 @@ namespace gglab
 					.m_Graph = tap.m_Graph,
 					.m_GraphExportActive = tap.m_GraphExportActive,
 					.m_ResourceExportActive = tap.m_ResourceExportActive,
+					.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
 					.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
 					.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(),
 					.m_SubmissionFenceValue = tap.m_Fence.m_Value,
@@ -597,6 +611,7 @@ namespace gglab
 				.m_Image = sharedImage,
 				.m_GraphExportActive = tap.m_GraphExportActive,
 				.m_ResourceExportActive = tap.m_ResourceExportActive,
+				.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
 				});
 		}
 		tap.m_Requests.clear();

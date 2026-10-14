@@ -4,6 +4,10 @@
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
@@ -16,6 +20,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -42,7 +47,7 @@ namespace gglab
 			}
 			RHIShaderWaveCapabilities GetShaderWaveCapabilities() const noexcept override
 			{
-				return {};
+				return { true, 32, 32 };
 			}
 			RHITextureSupportResult QueryTextureSupport(const RHITextureDesc&) const noexcept override
 			{
@@ -110,6 +115,7 @@ namespace gglab
 					return nullptr;
 				}
 				++m_MapCount;
+				if (entry->second.m_Desc.m_MemoryUsage == RHIMemoryUsage::GpuToCpu) { ++m_ReadbackMapCalls; }
 				return entry->second.m_Bytes.data();
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
@@ -160,6 +166,13 @@ namespace gglab
 				}
 			}
 
+			void CopyBufferBytes(RHIBufferHandle destination, uint64_t destinationOffset,
+				RHIBufferHandle source, uint64_t sourceOffset, uint64_t bytes) noexcept
+			{
+				std::memcpy(m_Buffers.at(destination).m_Bytes.data() + destinationOffset,
+					m_Buffers.at(source).m_Bytes.data() + sourceOffset, static_cast<size_t>(bytes));
+			}
+
 			[[nodiscard]] const RHIBufferDesc* FindBufferDesc(RHIBufferHandle buffer) const noexcept
 			{
 				const auto entry = m_Buffers.find(buffer);
@@ -168,6 +181,7 @@ namespace gglab
 			[[nodiscard]] size_t GetLiveBufferCount() const noexcept { return m_Buffers.size(); }
 			[[nodiscard]] int32_t GetMapCount() const noexcept { return m_MapCount; }
 
+			uint32_t m_ReadbackMapCalls = 0;
 			uint64_t m_CompletedFenceValue = 0;
 			bool m_FailBufferCreation = false;
 			bool m_FailMapping = false;
@@ -199,11 +213,7 @@ namespace gglab
 			void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 				RHIBufferHandle source, uint64_t sourceOffset, uint64_t bytes) noexcept override
 			{
-				auto* dest = static_cast<uint8_t*>(m_Device.MapBuffer(destination, {}));
-				const auto* src = static_cast<const uint8_t*>(m_Device.MapBuffer(source, {}));
-				std::memcpy(dest + destinationOffset, src + sourceOffset, static_cast<size_t>(bytes));
-				m_Device.UnmapBuffer(source, {});
-				m_Device.UnmapBuffer(destination, {});
+				m_Device.CopyBufferBytes(destination, destinationOffset, source, sourceOffset, bytes);
 			}
 			void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
 			{
@@ -249,6 +259,90 @@ namespace gglab
 			std::vector<RHITextureToBufferCopy> m_TextureCopies;
 		private:
 			CaptureTestDevice& m_Device;
+		};
+
+		// Test-only pipeline identities and CPU dispatch simulation exercise the
+		// service lifecycle, not shader or GPU correctness.
+		class ScanTestPrograms final : public RenderShaderProgramAccess, public RenderPipelineResolver, public RHIPipelineSystem
+		{
+		public:
+			ShaderID LoadProgram(const ShaderProgramRef& ref) noexcept override
+			{
+				++m_LoadCount;
+				return ShaderID{ ref == shader_programs::NonFiniteScanClearCompute ? 0u :
+					ref == shader_programs::NonFiniteScanTextureCompute ? 1u : 2u };
+			}
+			uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&, const RenderPassInfo&) noexcept override { return {}; }
+			RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe& recipe, const RenderPassInfo&) noexcept override
+			{
+				return m_FailResolution ? RHIPipelineHandle{} : RHIPipelineHandle{ recipe.m_CSId.Value(), 1 };
+			}
+			void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
+			RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc&) noexcept override { ++m_LayoutCount; return { 0, 1 }; }
+			RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
+			RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
+			bool IsAlive(RHIBindingLayoutHandle handle) const noexcept override { return handle.IsValid(); }
+			bool IsAlive(RHIPipelineHandle handle) const noexcept override { return handle.IsValid(); }
+			uint64_t GetRevision() const noexcept override { return 1; }
+			void Clear() noexcept override {}
+			uint32_t m_LoadCount = 0;
+			uint32_t m_LayoutCount = 0;
+			bool m_FailResolution = false;
+		};
+
+		class ScanTestCommands final : public RHIComputeCommandContext
+		{
+		public:
+			explicit ScanTestCommands(CaptureTestDevice& device) : m_Device(device) {}
+			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void FlushBarriers() noexcept override {}
+			void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override {}
+			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
+			void SetPipeline(RHIPipelineHandle pipeline) noexcept override { m_Pipeline = pipeline; }
+			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
+			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetReadOnlyBuffer(uint32_t slot, RHIBufferHandle buffer, uint64_t) noexcept override
+			{
+				if (slot == 1) { m_Source = buffer; } else { m_Components = buffer; }
+			}
+			void SetReadWriteBuffer(uint32_t, RHIBufferHandle buffer, uint64_t) noexcept override { m_Record = buffer; }
+			void SetPushConstants(uint32_t, std::span<const uint32_t> words, uint32_t) noexcept override
+			{
+				std::memcpy(&m_Parameters, words.data(), sizeof(m_Parameters));
+			}
+			void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override
+			{
+				++m_Dispatches;
+				auto* record = static_cast<NonFiniteScanRecord*>(m_Device.MapBuffer(m_Record, {}));
+				if (m_Pipeline.Index() == 0) { *record = {}; }
+				else if (!m_SkipScan)
+				{
+					const auto* source = static_cast<const uint8_t*>(m_Device.MapBuffer(m_Source, {}));
+					const auto* components = static_cast<const NonFiniteBufferComponent*>(m_Device.MapBuffer(m_Components, {}));
+					for (uint32_t i = 0; i < m_Parameters.m_ScalarCount; ++i)
+					{
+						uint32_t bits;
+						std::memcpy(&bits, source + (i / m_Parameters.m_ComponentCount) * m_Parameters.m_BufferStride +
+							components[i % m_Parameters.m_ComponentCount].m_Offset, 4);
+						AccumulateNonFiniteScanValue(*record, bits, i);
+					}
+					m_Device.UnmapBuffer(m_Components, {}); m_Device.UnmapBuffer(m_Source, {});
+				}
+				m_Device.UnmapBuffer(m_Record, {});
+			}
+			uint32_t m_Dispatches = 0;
+			bool m_SkipScan = false;
+		private:
+			CaptureTestDevice& m_Device;
+			RHIPipelineHandle m_Pipeline;
+			RHIBufferHandle m_Source, m_Components, m_Record;
+			NonFiniteScanParameters m_Parameters;
 		};
 
 		[[nodiscard]] RHIFencePoint MakeFence(uint64_t value) noexcept
@@ -1083,6 +1177,162 @@ namespace gglab
 			bounded.OnFrameAborted(8);
 		}
 
+		void RunNonFiniteObserverTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			ScanTestPrograms programs;
+			FrameCaptureService service(device, { .m_MaxPayloads = 4, .m_MaxPayloadBytes = 4096 });
+			service.ConfigureNonFiniteScans(programs, programs, programs);
+			struct Data { RGBufferId m_Buffer; };
+			const auto build = [&](RenderGraph& graph)
+				{
+					RGBufferId buffer;
+					graph.AddPass<Data>("Dead", RGPassEncoderType::Copy, [](auto& builder, auto&)
+						{ GGLAB_UNUSED(builder.Write(builder.CreateBuffer("Dead.Buffer", { .m_SizeInBytes = 8 }), RGBufferAccess::CopyDest)); });
+					graph.AddPass<Data>("Initialize", RGPassEncoderType::Copy, [&](auto& builder, auto& data)
+						{
+							buffer = builder.CreateBuffer("Scan.Buffer", { .m_SizeInBytes = 16, .m_StrideInBytes = 8 });
+							data.m_Buffer = builder.Write(buffer, RGBufferAccess::CopyDest); buffer = data.m_Buffer;
+						}, [&](auto& execution, auto& data)
+						{
+							const std::array<uint32_t, 4> words{ std::bit_cast<uint32_t>(1.0f), 0x7fc00000u, 0x7fc00000u, 0x7fc00000u };
+							const auto handle = execution.GetBufferHandle(data.m_Buffer);
+							std::memcpy(device.MapBuffer(handle, {}), words.data(), sizeof(words)); device.UnmapBuffer(handle, {});
+						});
+					graph.AddPass<Data>("Overwrite", RGPassEncoderType::Copy, [&](auto& builder, auto& data)
+						{ data.m_Buffer = builder.ReadWrite(buffer, RGBufferAccess::StorageReadWrite); builder.SideEffect(); },
+						[&](auto& execution, auto& data)
+						{
+							const auto handle = execution.GetBufferHandle(data.m_Buffer);
+							*static_cast<uint32_t*>(device.MapBuffer(handle, {})) = 0xff800000u; device.UnmapBuffer(handle, {});
+						});
+					return graph.Compile();
+				};
+			const std::array fields{ GpuBufferFieldLayout{ "value", 0, GpuBufferScalar::Float32 }, GpuBufferFieldLayout{ "flags", 4, GpuBufferScalar::Uint32 } };
+			const auto layout = BuildNonFiniteBufferScanLayout({ 8, fields }, 16, 1);
+			const RGResourceAddress before{ .m_Resource = "Scan.Buffer", .m_Position = RGObservationPosition::Before, .m_Pass = "Overwrite" };
+			const RGResourceAddress final{ .m_Resource = "Scan.Buffer" };
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			context.Check(build(graph) && service.PrepareResourceExports(30, graph) == FrameCaptureAvailability::Available &&
+				programs.m_LoadCount == 0 && programs.m_LayoutCount == 0 && !graph.HasNonFiniteScans(),
+				"An unobserved frame neither demands scan programs nor adds scan nodes");
+			const auto scanId = service.RequestNonFiniteScan({ { before, layout }, { final, layout } }, 19, 30, true);
+			const auto copyId = service.RequestResourceExport({ before, final }, 30, false, true);
+			context.Check(service.PrepareResourceExports(30, graph) == FrameCaptureAvailability::Available &&
+				graph.HasNonFiniteScans() && graph.HasResourceObservations(), "T2 copies and T3 scans attach together to the same original graph");
+			service.BeginGraphRecording(30, graph);
+			RGSnapshot snapshot; BuildRenderGraphSnapshot(graph, snapshot);
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			context.Check(json["schemaVersion"] == 3 && json["compile"]["passes"][0]["culled"] == true &&
+				json["compile"]["passes"][1]["executionOrder"] == 0 && json["compile"]["passes"][2]["executionOrder"] == 5,
+				"Mixed observers preserve original culling and exact version-cut ordering");
+			bool uav = false, copyTransition = false;
+			for (const auto& pass : snapshot.m_Passes)
+			{
+				for (const auto& barrier : pass.m_PreBarriers)
+				{
+					uav |= barrier.m_Kind == RGBarrierKind::Uav;
+					copyTransition |= Test(barrier.m_Before.m_Access, RHIAccess::UnorderedAccess) && Test(barrier.m_After.m_Access, RHIAccess::CopySource);
+				}
+			}
+			context.Check(uav && copyTransition, "The general barrier planner supplies clear-to-scan UAV and scan-to-copy ordering");
+			ExportTestCommands graphics(device); ScanTestCommands compute(device);
+			RGExecuteContext execution({ .m_GraphicsCommandContext = &graphics, .m_DirectComputeCommandContext = &compute });
+			graph.Execute(execution); service.EndGraphRecording(30, graph);
+			context.Check(device.m_ReadbackMapCalls == 0 && compute.m_Dispatches == 4, "Recording scans does not map a readback or wait on the CPU");
+			service.OnFrameSubmitted(30, MakeFence(10));
+			context.Check(Consume(service).empty() && device.m_ReadbackMapCalls == 0, "Scan publication waits for its actual frame fence");
+			device.m_CompletedFenceValue = 10;
+			auto results = Consume(service);
+			const auto scanned = std::ranges::find(results, scanId, &FrameCaptureResult::m_RequestId);
+			const auto copied = std::ranges::find(results, copyId, &FrameCaptureResult::m_RequestId);
+			context.Check(results.size() == 2 && scanned != results.end() && copied != results.end() && scanned->m_NonFiniteScans && copied->m_Resources,
+				"Both transports publish exactly once after the common fence");
+			if (scanned != results.end() && scanned->m_NonFiniteScans)
+			{
+				const auto& payload = *scanned->m_NonFiniteScans;
+				context.Check(payload.m_ConfigurationVersion == 19 && scanned->m_FrameSerial == 30 && scanned->m_SubmissionFenceValue == 10 &&
+					payload.m_Production.m_Status == NonFiniteClaimStatus::Unavailable, "Scan results preserve configuration/frame/fence identity and never claim production coverage");
+				context.Check(payload.m_Boundaries.size() == 2 && payload.m_Boundaries[0].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Passed &&
+					payload.m_Boundaries[1].m_Result.m_Claim.m_Failure == NonFiniteWatchFailure::NonFiniteDetected &&
+					payload.m_Boundaries[1].m_Record.m_NegativeInfCount == 1 && payload.m_Boundaries[1].m_Record.m_CheckedCount == 1,
+					"Observers see both exact versions and exclude integer flags and inactive capacity");
+				context.Check(scanned->m_Graph && scanned->m_Graph->m_Execution.m_Recorded && scanned->m_NonFiniteScanActive &&
+					copied != results.end() && copied->m_NonFiniteScanActive, "Mixed graph consumers report scan activity without fabricating watch coverage");
+			}
+			graph.Retire(MakeFence(10));
+			RenderGraph next({ .m_Device = &device, .m_TransientResourcePool = &pool }); context.Check(build(next), "Retry fixture compiles");
+			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout } }, 20, 31));
+			GGLAB_UNUSED(service.PrepareResourceExports(31, next));
+			auto busy = Consume(service);
+			context.Check(busy.size() == 1 && busy[0].m_Status == FrameCaptureStatus::Busy && !next.HasNonFiniteScans(),
+				"Retained CPU scan and resource payloads share the same bounded slots");
+			results.clear(); busy.clear();
+			const auto retry = service.RequestNonFiniteScan({ { final, layout } }, 21);
+			GGLAB_UNUSED(service.PrepareResourceExports(32, next)); service.OnFrameAborted(32);
+			context.Check(service.GetUnfinishedRequestCount() == 1, "An unsubmitted flexible scan returns to the queue");
+			RenderGraph retryGraph({ .m_Device = &device, .m_TransientResourcePool = &pool }); GGLAB_UNUSED(build(retryGraph));
+			GGLAB_UNUSED(service.PrepareResourceExports(33, retryGraph)); service.OnFrameSubmissionFailed(33);
+			auto failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_RequestId == retry && failed[0].m_Status == FrameCaptureStatus::Failed &&
+				service.GetUnfinishedRequestCount() == 0, "Submission failure releases a retried scan without publishing success");
+			RenderGraph atomic({ .m_Device = &device, .m_TransientResourcePool = &pool }); GGLAB_UNUSED(build(atomic));
+			const auto live = device.GetLiveBufferCount();
+			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout }, { { .m_Resource = "missing" }, layout } }, 22, 34));
+			GGLAB_UNUSED(service.PrepareResourceExports(34, atomic)); failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_ResourceFailure == RGObservationFailure::UnknownResource &&
+				!atomic.HasNonFiniteScans() && device.GetLiveBufferCount() == live, "A missing target rejects its entire scan group before allocation or graph mutation");
+			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, {} } }, 22, 35));
+			GGLAB_UNUSED(service.PrepareResourceExports(35, atomic)); failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_Status == FrameCaptureStatus::Failed && !atomic.HasNonFiniteScans(),
+				"A buffer without an explicit producer-valid interpretation cannot silently pass");
+			FrameCaptureService tiny(device, { .m_MaxPayloadBytes = 95 }); tiny.ConfigureNonFiniteScans(programs, programs, programs);
+			GGLAB_UNUSED(tiny.RequestNonFiniteScan({ { final, layout } }, 23, 36));
+			GGLAB_UNUSED(tiny.PrepareResourceExports(36, atomic)); failed = Consume(tiny);
+			context.Check(failed.size() == 1 && failed[0].m_ResourceFailure == RGObservationFailure::TooLarge && !atomic.HasNonFiniteScans(),
+				"Scan admission includes record, readback, CPU and layout-upload bytes");
+			programs.m_FailResolution = true;
+			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout } }, 24, 37));
+			GGLAB_UNUSED(service.PrepareResourceExports(37, atomic)); failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_Status == FrameCaptureStatus::Failed && !atomic.HasNonFiniteScans() && device.GetLiveBufferCount() == live,
+				"Unavailable scan pipelines fail explicitly without attaching partial observers");
+			programs.m_FailResolution = false;
+			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout } }, 25, 38));
+			GGLAB_UNUSED(service.PrepareResourceExports(38, atomic)); compute.m_SkipScan = true;
+			atomic.Execute(execution); service.OnFrameSubmitted(38, MakeFence(11)); device.m_CompletedFenceValue = 11;
+			failed = Consume(service); atomic.Retire(MakeFence(11));
+			context.Check(failed.size() == 1 && failed[0].m_NonFiniteScans &&
+				failed[0].m_NonFiniteScans->m_Boundaries[0].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+				"A completed transport with no checked scalars is Incomplete, not a boundary pass");
+			failed.clear();
+			RenderGraph mapFailure({ .m_Device = &device, .m_TransientResourcePool = &pool }); GGLAB_UNUSED(build(mapFailure));
+			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout } }, 26, 39));
+			GGLAB_UNUSED(service.PrepareResourceExports(39, mapFailure)); compute.m_SkipScan = false;
+			mapFailure.Execute(execution); service.OnFrameSubmitted(39, MakeFence(12));
+			device.m_CompletedFenceValue = 12; device.m_FailMapping = true;
+			failed = Consume(service); mapFailure.Retire(MakeFence(12)); device.m_FailMapping = false;
+			context.Check(failed.size() == 1 && failed[0].m_Status == FrameCaptureStatus::Failed && !failed[0].m_NonFiniteScans,
+				"A readback mapping failure cannot publish a successful scan payload");
+			RenderGraph imported({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			const RHIBufferDesc importDesc{ .m_SizeInBytes = 16, .m_StrideInBytes = 8, .m_Usage = RHIBufferUsage::Structured };
+			RHIBufferOwner importBuffer(&device, device.CreateBuffer(importDesc, {}));
+			imported.AddPass<Data>("Import", RGPassEncoderType::Compute, [&](auto& builder, auto&)
+				{
+					const auto input = builder.ImportBuffer("Imported.Scan", importBuffer.Get(), importDesc,
+						RGBufferAccess::StructuredRead, RGContentValidity::Defined);
+					GGLAB_UNUSED(builder.Read(input, RGBufferAccess::StructuredRead)); builder.SideEffect();
+				});
+			context.Check(imported.Compile() && imported.ResolveObservation({ .m_Resource = "Imported.Scan" }).m_Failure == RGObservationFailure::UnsupportedResource &&
+				imported.ResolveObservation({ .m_Resource = "Imported.Scan" }, RGObservationKind::NonFiniteScan).m_Failure == RGObservationFailure::None,
+				"Imported scan inputs require shader readability without weakening T2's CopySource contract");
+			const auto cancelled = service.RequestNonFiniteScan({ { { .m_Resource = "Imported.Scan" }, layout } }, 27, 40);
+			GGLAB_UNUSED(service.PrepareResourceExports(40, imported)); service.OnFrameAborted(40); failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_RequestId == cancelled && failed[0].m_Status == FrameCaptureStatus::Failed &&
+				service.GetUnfinishedRequestCount() == 0, "Aborting a frame-specific scan fails once and releases unsubmitted ownership");
+			service.Shutdown(); tiny.Shutdown();
+		}
+
 		void RunResourceExportSupportTests(SelfTestContext& context) noexcept
 		{
 			RHITextureDesc preview{ .m_Format = RHIFormat::R8G8B8A8Unorm,
@@ -1523,6 +1773,7 @@ namespace gglab
 
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
+		RunNonFiniteObserverTests(context);
 		RunResourceExportTests(context);
 		RunResourceTextureExportTests(context);
 		RunResourceTextureSliceAlignmentTests(context);

@@ -414,9 +414,14 @@ namespace gglab
 
 		[[nodiscard]] bool Compile() noexcept;
 		// Resolves only against original liveness. Observations never root producers.
-		[[nodiscard]] RGObservationTarget ResolveObservation(const RGResourceAddress& address) const noexcept;
+		[[nodiscard]] RGObservationTarget ResolveObservation(const RGResourceAddress& address,
+			RGObservationKind kind = RGObservationKind::ResourceExport) const noexcept;
 		[[nodiscard]] bool AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept;
-		[[nodiscard]] bool HasResourceObservations() const noexcept { return !m_ObservationPasses.empty(); }
+		// Resolve all T2/T3 targets first; attach them together to the original plan.
+		[[nodiscard]] bool AttachObservations(std::span<const RGObservationCopy> copies,
+			std::span<const RGObservationScan> scans) noexcept;
+		[[nodiscard]] bool HasResourceObservations() const noexcept;
+		[[nodiscard]] bool HasNonFiniteScans() const noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		// Opt-in CPU-only recording; does not change graph compilation or GPU work.
 		void EnableExecutionRecord() noexcept;

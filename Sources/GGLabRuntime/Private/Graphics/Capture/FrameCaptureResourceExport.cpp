@@ -210,7 +210,14 @@ namespace gglab
 			{
 				continue;
 			}
-			if (tap.m_Source == FrameCaptureSource::ResourceExport)
+			if (tap.m_Source == FrameCaptureSource::NonFiniteScan)
+			{
+				for (const auto& readback : tap.m_ScanReadbacks)
+				{
+					bytes += readback.GetPayloadBytes(); ++slots;
+				}
+			}
+			else if (tap.m_Source == FrameCaptureSource::ResourceExport)
 			{
 				for (const auto& readback : tap.m_ExportReadbacks)
 				{
@@ -222,6 +229,8 @@ namespace gglab
 		for (const auto& image : m_RetainedImages)
 			if (!image.m_Image.expired()) { bytes += image.m_Bytes; ++slots; }
 		for (const auto& payload : m_RetainedExports)
+			if (!payload.m_Payload.expired()) { bytes += payload.m_Bytes; slots += payload.m_Slots; }
+		for (const auto& payload : m_RetainedScans)
 			if (!payload.m_Payload.expired()) { bytes += payload.m_Bytes; slots += payload.m_Slots; }
 		return { bytes, slots };
 	}
@@ -299,11 +308,12 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::Finalized;
 		}
-		if (!HasPendingRequests(FrameCaptureSource::ResourceExport))
+		if (!HasPendingRequests(FrameCaptureSource::ResourceExport) && !HasPendingRequests(FrameCaptureSource::NonFiniteScan))
 		{
 			return FrameCaptureAvailability::Available;
 		}
 		std::erase_if(m_RetainedExports, [](const auto& entry) { return entry.m_Payload.expired(); });
+		std::erase_if(m_RetainedScans, [](const auto& entry) { return entry.m_Payload.expired(); });
 		std::vector<Tap> prepared;
 		auto [usedBytes, usedSlots] = GetPayloadUsage();
 		bool deferFrame = false;
@@ -312,12 +322,12 @@ namespace gglab
 			{ return a.m_DeferFrameOnBusy && !b.m_DeferFrameOnBusy; });
 		std::erase_if(m_Queued, [&](const QueuedRequest& request)
 			{
-				if (request.m_Source != FrameCaptureSource::ResourceExport ||
+				if ((request.m_Source != FrameCaptureSource::ResourceExport && request.m_Source != FrameCaptureSource::NonFiniteScan) ||
 					(request.m_FrameSerial != 0 && request.m_FrameSerial != frameSerial))
 				{
 					return false;
 				}
-				Tap tap{ .m_FrameSerial = frameSerial, .m_Source = FrameCaptureSource::ResourceExport };
+				Tap tap{ .m_FrameSerial = frameSerial, .m_Source = request.m_Source };
 				tap.m_Requests.push_back(request);
 				uint64_t pairedBytes = 0;
 				uint32_t pairedSlots = 0;
@@ -325,6 +335,7 @@ namespace gglab
 				{
 					if (request.m_GroupId != 0 && imageTap.m_FrameSerial == frameSerial &&
 						imageTap.m_Source != FrameCaptureSource::RenderGraph && imageTap.m_Source != FrameCaptureSource::ResourceExport &&
+						imageTap.m_Source != FrameCaptureSource::NonFiniteScan &&
 						std::ranges::any_of(imageTap.m_Requests, [&](const auto& imageRequest) { return imageRequest.m_GroupId == request.m_GroupId; }))
 					{
 						pairedBytes += imageTap.m_Footprint.m_SizeInBytes + imageTap.m_Footprint.m_RowSizeInBytes * imageTap.m_Footprint.m_Height;
@@ -380,12 +391,29 @@ namespace gglab
 					bytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
 					tap.m_ExportReadbacks.push_back(std::move(readback));
 				}
+				for (const auto& scanTarget : request.m_ScanTargets)
+				{
+					ScanReadback readback;
+					failure = PrepareScanTarget(graph, scanTarget, readback);
+					if (failure != RGObservationFailure::None)
+					{
+						break;
+					}
+					const uint64_t scanBytes = readback.GetPayloadBytes();
+					if (scanBytes > m_Limits.m_MaxPayloadBytes || bytes > m_Limits.m_MaxPayloadBytes - scanBytes)
+					{
+						failure = RGObservationFailure::TooLarge; break;
+					}
+					bytes += scanBytes;
+					tap.m_ScanReadbacks.push_back(std::move(readback));
+				}
+				const auto slots = tap.m_ExportReadbacks.size() + tap.m_ScanReadbacks.size();
 				if (failure == RGObservationFailure::None && request.m_DeferFrameOnBusy &&
-					(pairedSlots + tap.m_ExportReadbacks.size() > m_Limits.m_MaxPayloads || bytes > m_Limits.m_MaxPayloadBytes - pairedBytes))
+					(pairedSlots + slots > m_Limits.m_MaxPayloads || bytes > m_Limits.m_MaxPayloadBytes - pairedBytes))
 				{
 					failure = RGObservationFailure::TooLarge;
 				}
-				if (failure == RGObservationFailure::None && (usedSlots + tap.m_ExportReadbacks.size() > m_Limits.m_MaxPayloads ||
+				if (failure == RGObservationFailure::None && (usedSlots + slots > m_Limits.m_MaxPayloads ||
 					bytes > m_Limits.m_MaxPayloadBytes - usedBytes))
 				{
 					failure = RGObservationFailure::Busy;
@@ -399,11 +427,11 @@ namespace gglab
 					m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = request.m_Source,
 						.m_Status = failure == RGObservationFailure::Busy ? FrameCaptureStatus::Busy : FrameCaptureStatus::Failed,
 						.m_FrameSerial = frameSerial, .m_ResourceFailure = failure,
-						.m_Failure = std::format("{}: resource export group could not bind the selected frame.", GetRGObservationFailureName(failure)) });
+						.m_Failure = std::format("{}: observation group could not bind the selected frame.", GetRGObservationFailureName(failure)) });
 					return true;
 				}
 				usedBytes += bytes;
-				usedSlots += static_cast<uint32_t>(tap.m_ExportReadbacks.size());
+				usedSlots += static_cast<uint32_t>(slots);
 				tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 				prepared.push_back(std::move(tap));
 				return true;
@@ -415,6 +443,7 @@ namespace gglab
 			return FrameCaptureAvailability::Busy;
 		}
 		std::vector<RGObservationCopy> copies;
+		std::vector<RGObservationScan> scans;
 		for (auto& tap : prepared)
 		{
 			bool allocated = true;
@@ -425,27 +454,37 @@ namespace gglab
 				if (!readback.m_Buffer) { allocated = false; break; }
 				readback.m_Copy.m_Readback = readback.m_Buffer.Get();
 			}
-			if (!allocated) { FailTap(tap, frameSerial, "Resource export readback allocation failed."); tap.m_ExportReadbacks.clear(); continue; }
+			for (auto& readback : tap.m_ScanReadbacks)
+			{
+				if (!AllocateScanReadback(readback)) { allocated = false; break; }
+			}
+			if (!allocated)
+			{
+				FailTap(tap, frameSerial, "Observation readback allocation or scan program resolution failed.");
+				tap.m_ExportReadbacks.clear(); tap.m_ScanReadbacks.clear(); continue;
+			}
 			for (const auto& readback : tap.m_ExportReadbacks) copies.push_back(readback.m_Copy);
+			for (const auto& readback : tap.m_ScanReadbacks) scans.push_back(readback.m_Scan);
 		}
-		if (!graph.AttachObservationCopies(copies))
+		if (!graph.AttachObservations(copies, scans))
 		{
 			for (auto& tap : prepared)
 			{
 				if (!tap.m_Requests.empty())
 				{
-					FailTap(tap, frameSerial, "Resource export graph extension failed.");
+					FailTap(tap, frameSerial, "Observation graph extension failed.");
 				}
 			}
 			return FrameCaptureAvailability::Available;
 		}
-		if (!copies.empty())
+		if (!copies.empty() || !scans.empty())
 		{
 			for (auto& consumer : m_Taps)
 			{
 				if (consumer.m_FrameSerial == frameSerial)
 				{
-					consumer.m_ResourceExportActive = true;
+					consumer.m_ResourceExportActive = !copies.empty();
+					consumer.m_NonFiniteScanActive = !scans.empty();
 				}
 			}
 		}
@@ -455,10 +494,12 @@ namespace gglab
 			{
 				continue;
 			}
+			tap.m_ResourceExportActive = !copies.empty();
+			tap.m_NonFiniteScanActive = !scans.empty();
 			for (auto& readback : tap.m_ExportReadbacks)
 				readback.m_Array.m_ObservedLastUse = graph.GetExecutionPlan()->GetResources()[
 					readback.m_Copy.m_Target.m_VirtualResource.Value()].m_LastUser.Value();
-					m_Taps.push_back(std::move(tap));
+			m_Taps.push_back(std::move(tap));
 		}
 		return FrameCaptureAvailability::Available;
 	}
@@ -510,6 +551,7 @@ namespace gglab
 			m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = FrameCaptureSource::ResourceExport,
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial, .m_Graph = tap.m_Graph, .m_Resources = payload,
 				.m_GraphExportActive = tap.m_GraphExportActive, .m_ResourceExportActive = true,
+				.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
 				.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
 				.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(), .m_SubmissionFenceValue = tap.m_Fence.m_Value,
 				.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity });

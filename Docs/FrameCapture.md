@@ -168,7 +168,8 @@ or `<label>.<frameSerial>.graph-summary.json`, with a free suffix on collision.
 Without a label the subject is the Lab or Demo id. Publication and shutdown
 follow the capture writer's `.partial` and publication-claim rules.
 
-The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.json):
+The published schema is [`gglab.render-graph` v1/v2/v3](Schemas/RenderGraph.schema.json)
+(v1 without GPU observers, v2 with copies, v3 with non-finite scans):
 
 - `compile` is sampled before execution. Full mode contains declaration-order
   passes, name occurrences (1-based), culling, execution order, encoder,
@@ -196,7 +197,8 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
   and `writes`. Each entry includes its version, resource-node index, declared
   subresource range and an `address` object (`resource`, `at.before`/`at.after`,
   `occurrence`) for discovery. T2 resource exports use those addresses;
-  non-finite watch remains planned for T3.
+  the Runtime non-finite scan API uses the same addressing. Session `watch`
+  configuration and production instrumentation remain planned.
 - `frame` reuses capture metadata for content, camera, simulation time, render
   settings and readiness; `frame.frame.serial` equals the top-level `frameSerial`.
   It adds the Runtime adapter/driver compatibility identity. Build identity and
@@ -299,11 +301,14 @@ typed `failureCode` such as `Culled`, `UndefinedContent`, `UnsupportedFormat`,
   A group that cannot fit, including its paired image, fails instead of waiting
   forever. A PNG plus seven targets fills all eight payload slots.
 
-Graph-only frames retain `gglab.render-graph` v1. Frames with resource observers
+Graph-only frames retain `gglab.render-graph` v1. Frames with copy observers
 use v2, with pass `observation` markers, `ObservationOrder` dependency edges and
-`execution.observationNodes`. PNG metadata v1 gains additive `observation` flags
-so paired images also disclose active graph/resource observation. Keep these
-tools off for performance measurements.
+`execution.observationNodes`. Frames with non-finite scans use v3, whose observer
+kinds distinguish `ResourceExport` from `NonFiniteScan` (including clear and
+readback passes). Resource sidecars retain v1 unless scans also ran, when they
+use v2. PNG metadata v1 retains additive `observation` flags. The existing
+`nonFiniteWatch` flag describes scan activity only, not completed boundary or
+production coverage. Keep these tools off for performance measurements.
 
 Schedule one target group per sequence frame using `-Exports` or `-ExportsFile`:
 
@@ -330,6 +335,79 @@ python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium-dx12/Captures
 Schemas live in `Docs/Schemas/ResourceExport.schema.json` and
 `Docs/Schemas/RenderGraph.schema.json`. Both validators have `--self-test` gates
 in CI; GPU value/observation checks still require local hardware runs.
+
+## Non-finite boundary scans (Runtime foundation)
+
+T3 is **not yet an end-to-end watch tool**. There is no session `watch` command,
+`-WatchNonFinite` startup capability, production counter variant, tiered default
+list or fail-mode/sequence coverage gate. Ordinary frames demand no scan programs
+and dispatch no scans. A clean scan never proves that a sanitizing write or
+recovery branch did not hide NaN/Inf.
+
+Implemented Runtime integration:
+
+- `FrameCaptureControlBase::RequestNonFiniteScan` accepts explicit resource
+  addresses, an owner-assigned configuration version, optional exact frame
+  serial and optional paired graph. `PrepareResourceExports` prepares T2 copies
+  and T3 scans together, once, after ordinary graph compilation. Resolution
+  preserves the original pass occurrences, culling and version cuts; the ordinary
+  `Read`/`Export` assertions remain unchanged.
+- Each target gets graph-owned clear, scan and readback passes. The general
+  lifetime/barrier planner owns the transient record, clear-to-scan UAV ordering,
+  source reads and scan-to-copy transition. Texture SRVs select one mip and the
+  addressed array/cube-face range. Float16/Float32 R/RG/RGBA, RGB32F and D32
+  interpretations are accepted subject to backend SRV support; integer, normalized,
+  stencil and ambiguous typeless views fail explicitly.
+- Buffers require an owned `NonFiniteBufferScanLayout`, built from a registered
+  or explicit `GpuBufferLayout` and a producer-valid element count. Admission
+  revalidates it against this frame's descriptor; integers, padding and inactive
+  capacity are excluded. Allocated capacity is never a substitute for valid count.
+  Imported buffers need shader-readable `Structured` usage; imported textures
+  need `Sampled` usage. T2 independently still requires `CopySource`.
+- Scan programs resolve lazily through the Shader program catalog and Runtime
+  pipeline resolver. Unavailable programs fail the request before graph mutation;
+  no host-side compiler is added to Runtime.
+- Scans share capture's request, payload-slot and byte budgets with PNG/T2.
+  Reservations include GPU record/readback, peak CPU record copies, component
+  upload and owned CPU component tables. Readbacks and uploads survive submission
+  until the common frame fence completes. Final CPU record/table consumers keep
+  their payload slots and bytes until the last owner releases them. Normal polling
+  adds no CPU wait. Busy groups are not split; abort, retry, failed submission,
+  allocation and mapping errors use the existing capture lifecycle.
+- `FrameCaptureResult::m_NonFiniteScans` carries immutable records, addresses,
+  versions, buffer interpretation and evaluated boundary claims; the enclosing
+  result carries the frame serial and submission fence/adapter identity.
+  `Completed` describes transport, not a passing claim. Missing/partial/malformed
+  records evaluate to `Incomplete`; detections evaluate to `Failed`. The production
+  claim is explicitly `Unavailable`. Earliest index means the minimum checked
+  scalar index, not the origin of production. Texture order is `[slice,y,x,channel]`;
+  buffer order is `[valid element, floating-point component in byte-offset order]`.
+
+The Shader-domain foundation also includes the 32-byte CPU/GPU ABI, IEEE-bit
+classification, wave reductions, finite extrema and clamp-policy evaluation.
+`Shaders/Metadata/NonFiniteSites.json` inventories 75 sanitization/recovery/validity
+sites. Its checker is a conservative lexical review gate, not data-flow proof;
+replacing sites remain `pending-counter`, never completed production evidence.
+
+Developer checks (after building the named test projects):
+
+```powershell
+python Scripts/ValidateNonFiniteSites.py --self-test
+python Scripts/ValidateNonFiniteSites.py
+Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite nonfinite-watch
+Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite frame-capture
+Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi dx12
+Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi vulkan
+```
+
+The hidden-window hardware suite covers buffer clear/scan plus the real capture
+service and RenderGraph path. RGBA32F/RG16F cube-compatible textures exercise
+nonzero mip and face ranges, NaN/positive and negative infinity, finite extrema
+and first index. T2 exports of every fixture resource are byte-identical with
+scans off/on. This establishes fixture observation equivalence, not whole-Lab
+visual equivalence, production instrumentation or overhead. Debug/Release each
+passed 34 GPU checks per backend on the RTX 5080; Runtime frame-capture passed
+199 checks and scan/policy foundations passed 37.
 
 ## Capture settings
 

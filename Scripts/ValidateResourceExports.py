@@ -68,7 +68,7 @@ def validate(path, validator):
 		graph = json.loads((path.parent / document["graph"]).read_text(encoding="utf-8"))
 		if graph["frameSerial"] != document["frameSerial"] or graph["submission"] != document["submission"]:
 			raise ValueError("The paired graph belongs to a different submitted frame")
-		if graph["schemaVersion"] != 2 or not graph["observation"]["resourceExport"]:
+		if graph["schemaVersion"] != (3 if document["observation"]["nonFiniteWatch"] else 2) or not graph["observation"]["resourceExport"] or graph["observation"]["nonFiniteWatch"] != document["observation"]["nonFiniteWatch"]:
 			raise ValueError("Paired graphs must include resource observation nodes")
 	return document
 
@@ -91,6 +91,22 @@ def self_test(validator):
 			observation=dict(graph=False, resourceExport=True, nonFiniteWatch=False), graph=None, targets=[target])
 		path.write_text(json.dumps(document), encoding="utf-8")
 		validate(path, validator)
+		scanned = copy.deepcopy(document)
+		scanned["schemaVersion"] = 2
+		scanned["observation"]["nonFiniteWatch"] = True
+		path.write_text(json.dumps(scanned), encoding="utf-8")
+		validate(path, validator)
+		for version, active in [(1, True), (2, False)]:
+			invalid = copy.deepcopy(document)
+			invalid["schemaVersion"] = version
+			invalid["observation"]["nonFiniteWatch"] = active
+			path.write_text(json.dumps(invalid), encoding="utf-8")
+			try:
+				validate(path, validator)
+			except Exception:
+				pass
+			else:
+				raise AssertionError("Resource schema accepted incompatible scan activity/version")
 		structured = copy.deepcopy(document)
 		dtype = np.dtype(dict(names=["offset", "vector"], formats=["<u4", ("<f4", (2,))], offsets=[0, 8], itemsize=16))
 		np.save(path.parent / "structured.npy", np.zeros(2, dtype=dtype))
@@ -111,7 +127,7 @@ def self_test(validator):
 				pass
 			else:
 				raise AssertionError(f"Validator accepted invalid {key}")
-	print(f"Resource schema/NPY self-test passed ({len(cases)} rejection cases)")
+	print(f"Resource schema/NPY self-test passed ({len(cases) + 2} rejection cases)")
 
 
 def main():

@@ -117,7 +117,8 @@ namespace gglab
 
 	std::string SerializeRenderGraphSnapshot(const RGSnapshot& snapshot, bool summary) noexcept
 	{
-		Json root = { {"schema", "gglab.render-graph"}, {"schemaVersion", snapshot.m_ObservationNodes.empty() ? 1 : 2},
+		Json root = { {"schema", "gglab.render-graph"}, {"schemaVersion", std::ranges::any_of(snapshot.m_ObservationNodes, [](const auto& entry)
+			{ return entry.second.m_Kind == RGObservationKind::NonFiniteScan; }) ? 3 : snapshot.m_ObservationNodes.empty() ? 1 : 2},
 			{"mode", summary ? "summary" : "full"} };
 		Json compile = { {"duplicatePassNames", snapshot.m_DuplicatePassNames} };
 		Json passes = Json::array();
@@ -247,7 +248,7 @@ namespace gglab
 			}
 			for (const auto& [index, target] : snapshot.m_ObservationNodes)
 			{
-				execution["observationNodes"].push_back({ {"passIndex", index}, {"kind", "ResourceExport"},
+				execution["observationNodes"].push_back({ {"passIndex", index}, {"kind", target.m_Kind == RGObservationKind::ResourceExport ? "ResourceExport" : "NonFiniteScan"},
 					{"resource", target.m_Address.m_Resource}, {"resourceIndex", target.m_VirtualResource.Value()},
 					{"resourceNodeIndex", target.m_Node.Value()}, {"originalInsertionPosition", target.m_InsertionPosition} });
 			}

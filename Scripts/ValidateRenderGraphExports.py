@@ -13,13 +13,17 @@ def validate(document, validator):
 	passes = document["compile"]["passes"]
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
 		raise ValueError("Frame serials disagree")
-	observed = document["schemaVersion"] == 2
-	if observed != document["observation"]["resourceExport"]:
+	observed = document["schemaVersion"] != 1
+	flags = document["observation"]
+	if observed != (flags["resourceExport"] or flags["nonFiniteWatch"]):
 		raise ValueError("Graph schema version and observation flags disagree")
 	if document["mode"] == "full":
 		markers = {entry["index"] for entry in passes if entry.get("observation", False)}
-		nodes = {entry["passIndex"] for entry in document["execution"]["observationNodes"]}
-		if markers != nodes or bool(markers) != observed:
+		observers = document["execution"]["observationNodes"]
+		nodes = {entry["passIndex"] for entry in observers}
+		if flags["resourceExport"] != any(entry["kind"] == "ResourceExport" for entry in observers) or flags["nonFiniteWatch"] != any(entry["kind"] == "NonFiniteScan" for entry in observers):
+			raise ValueError("Observation kinds and activity flags disagree")
+		if markers != nodes or len(nodes) != len(observers) or bool(markers) != observed:
 			raise ValueError("Observation pass markers and execution nodes disagree")
 	if document["mode"] == "summary":
 		orders = [entry["executionOrder"] for entry in passes]
@@ -106,8 +110,24 @@ def self_test(validator):
 		resourceIndex=0, resourceNodeIndex=1, originalInsertionPosition=1)]
 	observed["compile"]["dependencyEdges"][0]["reason"] = "ObservationOrder"
 	validate(observed, validator)
+	scanned = copy.deepcopy(observed)
+	scanned["schemaVersion"] = 3
+	scanned["observation"].update(resourceExport=False, nonFiniteWatch=True)
+	scanned["execution"]["observationNodes"][0]["kind"] = "NonFiniteScan"
+	validate(scanned, validator)
+	mixed = copy.deepcopy(scanned)
+	mixed["observation"]["resourceExport"] = True
+	mixed["execution"]["observationNodes"].append(dict(mixed["execution"]["observationNodes"][0], passIndex=1, kind="ResourceExport"))
+	mixed["compile"]["passes"].append(dict(mixed["compile"]["passes"][0], index=1, executionOrder=1, accesses=[]))
+	validate(mixed, validator)
 
 	cases = [
+		(scanned, ("schemaVersion",), 2),
+		(scanned, ("observation", "resourceExport"), True),
+		(scanned, ("observation", "nonFiniteWatch"), False),
+		(mixed, ("observation", "resourceExport"), False),
+		(mixed, ("execution", "observationNodes", 1, "passIndex"), 0),
+		(observed, ("execution", "observationNodes", 0, "kind"), "NonFiniteScan"),
 		(full, ("compile", "dependencyEdges", 0, "reason"), "ObservationOrder"),
 		(observed, ("schemaVersion",), 1),
 		(observed, ("compile", "passes", 0, "observation"), False),

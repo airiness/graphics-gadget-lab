@@ -195,6 +195,8 @@ namespace gglab
 
 		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
 		m_FrameCapture = std::make_unique<FrameCaptureService>(m_RHIContext->GetDevice());
+		m_FrameCapture->ConfigureNonFiniteScans(*createInfo.m_ShaderManager, *m_PipelineCache,
+			m_RHIContext->GetPipelineSystem());
 		m_IsInitialized = true;
 		return true;
 	}

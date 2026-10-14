@@ -80,6 +80,23 @@ namespace gglab
 				append(original.m_ExecutionOrder[position]);
 			}
 		}
+		// New observer resources still have real data dependencies, in addition to
+		// fixed-cut ordering. Never rebuild liveness or original WAR dependencies.
+		for (uint32_t i = static_cast<uint32_t>(original.m_Passes.size()); i < plan.m_Passes.size(); ++i)
+		{
+			for (const auto& access : plan.m_Passes[i].m_Accesses)
+			{
+				if (access.m_DependencyAccess == RGDependencyAccess::Write)
+				{
+					continue;
+				}
+				const auto writer = graph.m_ResourceNodes[access.m_ResourceNodeIndex.Value()].m_Writer;
+				if (writer.IsValid() && writer.Value() != i)
+				{
+					edge(writer, RGPassNodeIndex{ i }, access.m_ResourceNodeIndex, RGDependencyReason::WriterToReader);
+				}
+			}
+		}
 		compiler.BuildResourceLifetimes();
 		RGBarrierPlanner(plan.m_Passes, plan.m_Resources, plan.m_ExecutionOrder).Build();
 		plan.m_Diagnostics = original.m_Diagnostics;

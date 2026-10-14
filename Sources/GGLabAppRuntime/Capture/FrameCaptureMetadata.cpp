@@ -176,7 +176,7 @@ namespace gglab
 		writer.BeginObject("observation");
 		writer.Bool("graph", metadata.m_GraphExportActive);
 		writer.Bool("resourceExport", metadata.m_ResourceExportActive);
-		writer.Bool("nonFiniteWatch", false);
+		writer.Bool("nonFiniteWatch", metadata.m_NonFiniteScanActive);
 		writer.EndObject();
 		if (metadata.m_DiagnosticTap.empty())
 		{

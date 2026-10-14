@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gglab.resource-export.v1",
-  "title": "GGLab resource export v1",
+  "$id": "gglab.resource-export",
+  "title": "GGLab resource export v1/v2",
   "type": "object",
   "required": [
     "schema",
@@ -18,7 +18,7 @@
       "const": "gglab.resource-export"
     },
     "schemaVersion": {
-      "const": 1
+      "enum": [1, 2]
     },
     "frameSerial": {
       "type": "integer",
@@ -124,7 +124,7 @@
           "const": true
         },
         "nonFiniteWatch": {
-          "const": false
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -461,6 +461,9 @@
     }
   },
   "additionalProperties": false,
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": false}}}}}, "else": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}}}}
+  ],
   "$defs": {
     "unavailable": {
       "type": "object",

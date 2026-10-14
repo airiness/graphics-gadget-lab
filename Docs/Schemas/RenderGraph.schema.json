@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.render-graph",
-  "title": "GGLab render graph frame export v1/v2",
+  "title": "GGLab render graph frame export v1/v2/v3",
   "type": "object",
   "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
   "properties": {
     "schema": { "const": "gglab.render-graph" },
-    "schemaVersion": { "enum": [1, 2] },
+    "schemaVersion": { "enum": [1, 2, 3] },
     "mode": { "enum": ["full", "summary"] },
     "frameSerial": { "type": "integer", "minimum": 1 },
     "frame": {
@@ -43,7 +43,7 @@
       "properties": {
         "graph": { "const": true },
         "resourceExport": { "type": "boolean" },
-        "nonFiniteWatch": { "const": false }
+        "nonFiniteWatch": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -105,7 +105,7 @@
           }
         },
         "resolvedBarriers": { "type": "array", "items": { "allOf": [{ "$ref": "#/$defs/barrier" }, { "required": ["physical", "passIndex", "phase"] }] } },
-        "observationNodes": {"type": "array", "items": {"type": "object", "required": ["passIndex", "kind", "resource", "resourceIndex", "resourceNodeIndex", "originalInsertionPosition"], "properties": {"kind": {"const": "ResourceExport"}, "resource": {"type": "string"}, "passIndex": {"type": "integer", "minimum": 0}, "resourceIndex": {"type": "integer", "minimum": 0}, "resourceNodeIndex": {"type": "integer", "minimum": 0}, "originalInsertionPosition": {"type": "integer", "minimum": 0}}, "additionalProperties": false}},
+        "observationNodes": {"type": "array", "items": {"type": "object", "required": ["passIndex", "kind", "resource", "resourceIndex", "resourceNodeIndex", "originalInsertionPosition"], "properties": {"kind": {"enum": ["ResourceExport", "NonFiniteScan"]}, "resource": {"type": "string"}, "passIndex": {"type": "integer", "minimum": 0}, "resourceIndex": {"type": "integer", "minimum": 0}, "resourceNodeIndex": {"type": "integer", "minimum": 0}, "originalInsertionPosition": {"type": "integer", "minimum": 0}}, "additionalProperties": false}},
         "gpuTiming": { "$ref": "#/$defs/unavailable" }
       }
     }
@@ -127,7 +127,9 @@
         "properties": { "compile": { "properties": { "passes": { "items": { "required": ["reads", "writes"] } } } } }
       }
     },
-    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"resourceExport": {"const": false}}}, "execution": {"properties": {"observationNodes": {"maxItems": 0}}}, "compile": {"properties": {"passes": {"items": {"properties": {"observation": {"const": false}}}}, "dependencyEdges": {"items": {"properties": {"reason": {"not": {"const": "ObservationOrder"}}}}}}}}}, "else": {"properties": {"observation": {"properties": {"resourceExport": {"const": true}}}, "execution": {"properties": {"observationNodes": {"minItems": 1}}}}}}
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"resourceExport": {"const": false}, "nonFiniteWatch": {"const": false}}}, "execution": {"properties": {"observationNodes": {"maxItems": 0}}}, "compile": {"properties": {"passes": {"items": {"properties": {"observation": {"const": false}}}}, "dependencyEdges": {"items": {"properties": {"reason": {"not": {"const": "ObservationOrder"}}}}}}}}}, "else": {"properties": {"execution": {"properties": {"observationNodes": {"minItems": 1}}}}}},
+    {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"properties": {"observation": {"properties": {"resourceExport": {"const": true}, "nonFiniteWatch": {"const": false}}}, "execution": {"properties": {"observationNodes": {"items": {"properties": {"kind": {"const": "ResourceExport"}}}}}}}}},
+    {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "NonFiniteScan"}}}}}}}}}
   ],
   "$defs": {
     "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },

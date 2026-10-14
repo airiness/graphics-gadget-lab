@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Resource/GpuBufferLayout.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -126,6 +127,30 @@ namespace gglab
 	// Missing, malformed, uncleared or partial readbacks can never pass.
 	[[nodiscard]] NonFiniteBoundaryResult EvaluateNonFiniteBoundary(
 		const std::optional<NonFiniteScanRecord>& record, uint32_t expectedScalarCount) noexcept;
+
+	// Explicit low-level boundary request. Buffer interpretations own their float
+	// component table; build it from a registered/explicit layout and a producer's
+	// valid element count, never from allocated capacity alone.
+	struct NonFiniteScanTarget
+	{
+		RGResourceAddress m_Address;
+		NonFiniteBufferScanLayout m_BufferLayout;
+	};
+	struct NonFiniteScanBoundary
+	{
+		RGObservationTarget m_Target;
+		NonFiniteScanParameters m_Parameters;
+		NonFiniteBufferScanLayout m_BufferLayout;
+		NonFiniteScanRecord m_Record;
+		NonFiniteBoundaryResult m_Result;
+	};
+	struct NonFiniteScanPayload
+	{
+		uint64_t m_ConfigurationVersion = 0;
+		// Boundary scans cannot establish production sanitization/recovery coverage.
+		NonFiniteClaimResult m_Production{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::MissingCoverage };
+		std::vector<NonFiniteScanBoundary> m_Boundaries;
+	};
 
 	enum class NonFiniteClampPolicyKind : uint8_t { Report, Error, Expected, Budgeted };
 	struct NonFiniteClampPolicy

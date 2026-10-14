@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -10,6 +11,8 @@
 
 namespace gglab
 {
+	struct RGExecuteContext;
+	enum class RGObservationKind : uint8_t { ResourceExport, NonFiniteScan };
 	enum class RGObservationPosition : uint8_t { Before, After, Final };
 	enum class RGObservationFailure : uint8_t
 	{
@@ -34,6 +37,7 @@ namespace gglab
 	struct RGObservationTarget
 	{
 		RGResourceAddress m_Address;
+		RGObservationKind m_Kind = RGObservationKind::ResourceExport;
 		RGObservationFailure m_Failure = RGObservationFailure::None;
 		RGResourceType m_Type = RGResourceType::RGTexture;
 		std::optional<RGResourceHandle> m_Resource;
@@ -59,6 +63,20 @@ namespace gglab
 		uint64_t m_ReadbackBytes = 0;
 		RHITextureCopyFootprint m_Footprint{};
 		uint64_t m_SlicePitch = 0;
+	};
+
+	// A read-only compute observer. The graph owns its transient record and all
+	// clear -> scan -> copy dependencies. Callbacks borrow handles for this frame;
+	// the caller retains the imported readback/component buffers through its fence.
+	struct RGObservationScan
+	{
+		RGObservationTarget m_Target;
+		RHIBufferHandle m_Readback;
+		RHIBufferHandle m_Components;
+		uint64_t m_ComponentBytes = 0;
+		uint32_t m_RecordBytes = 0;
+		std::function<void(RGExecuteContext&, RGBufferId)> m_Clear;
+		std::function<void(RGExecuteContext&, RGBufferId, RGTextureViewId)> m_Scan;
 	};
 
 	[[nodiscard]] std::string_view GetRGObservationFailureName(RGObservationFailure failure) noexcept;

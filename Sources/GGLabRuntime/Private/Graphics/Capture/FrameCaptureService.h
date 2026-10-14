@@ -4,7 +4,9 @@
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -16,11 +18,14 @@ namespace gglab
 {
 	class RHIDevice;
 	class RenderGraph;
+	class RenderShaderProgramAccess;
+	class RenderPipelineResolver;
+	class RHIPipelineSystem;
 
 	struct FrameCaptureLimits
 	{
 		uint32_t m_MaxRequests = 64;
-		// A payload slot spans GPU readback through the last CPU image consumer.
+		// A payload slot spans GPU readback through the last CPU payload consumer.
 		uint32_t m_MaxPayloads = 8;
 		// Includes pitched readback and reserved tight CPU rows during the copy.
 		uint64_t m_MaxPayloadBytes = 256ull * 1024 * 1024;
@@ -44,6 +49,12 @@ namespace gglab
 			uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override;
 		[[nodiscard]] uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets,
 			uint64_t frameSerial = 0, bool deferFrameOnBusy = false, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
+		[[nodiscard]] uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets,
+			uint64_t configurationVersion, uint64_t frameSerial = 0, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
+		// Borrows stable renderer services; no programs or pipelines are demanded
+		// until an explicit scan is admitted. Services outlive this capture service.
+		void ConfigureNonFiniteScans(RenderShaderProgramAccess& shaders,
+			RenderPipelineResolver& resolver, RHIPipelineSystem& pipelines) noexcept;
 		[[nodiscard]] FrameCaptureAvailability PrepareResourceExports(uint64_t frameSerial,
 			RenderGraph& graph, ResourceExportFrameContext context = {}) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
@@ -88,6 +99,8 @@ namespace gglab
 			// Diagnostic requests only.
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 			std::vector<RGResourceAddress> m_ResourceTargets;
+			std::vector<NonFiniteScanTarget> m_ScanTargets;
+			uint64_t m_ConfigurationVersion = 0;
 			bool m_DeferFrameOnBusy = false;
 			bool m_IncludeGraph = false;
 		};
@@ -100,6 +113,20 @@ namespace gglab
 			uint64_t m_CpuBytes = 0;
 		};
 
+		struct ScanReadback
+		{
+			RGObservationScan m_Scan;
+			RHIBufferOwner m_Buffer;
+			RHIBufferOwner m_Components;
+			NonFiniteScanBoundary m_Boundary;
+			// GPU record/readback, peak CPU record copies, and the upload plus
+			// two owned CPU layout tables. Metadata objects are not payload bytes.
+			[[nodiscard]] uint64_t GetPayloadBytes() const noexcept
+			{
+				return 4 * sizeof(NonFiniteScanRecord) + 3 * m_Scan.m_ComponentBytes;
+			}
+		};
+
 		struct Tap
 		{
 			uint64_t m_FrameSerial = 0;
@@ -109,12 +136,14 @@ namespace gglab
 			RHIBufferOwner m_Buffer;
 			std::shared_ptr<RGSnapshot> m_Graph;
 			std::vector<ExportReadback> m_ExportReadbacks;
+			std::vector<ScanReadback> m_ScanReadbacks;
 			std::string m_AdapterCompatibilityIdentity;
 			RHITextureCopyFootprint m_Footprint{};
 			RHIFencePoint m_Fence{};
 			bool m_Submitted = false;
 			bool m_GraphExportActive = false;
 			bool m_ResourceExportActive = false;
+			bool m_NonFiniteScanActive = false;
 		};
 
 		struct RetainedImage
@@ -128,6 +157,17 @@ namespace gglab
 			uint64_t m_Bytes = 0;
 			uint32_t m_Slots = 0;
 		};
+		struct RetainedScan
+		{
+			std::weak_ptr<const NonFiniteScanPayload> m_Payload;
+			uint64_t m_Bytes = 0;
+			uint32_t m_Slots = 0;
+		};
+		[[nodiscard]] RGObservationFailure PrepareScanTarget(RenderGraph& graph,
+			const NonFiniteScanTarget& target, ScanReadback& readback) noexcept;
+		[[nodiscard]] bool AllocateScanReadback(ScanReadback& readback) noexcept;
+		[[nodiscard]] RHIPipelineHandle ResolveScanPipeline(uint32_t variant) noexcept;
+		void PublishScanTap(Tap& tap) noexcept;
 		[[nodiscard]] std::pair<uint64_t, uint32_t> GetPayloadUsage() const noexcept;
 		void DeferFrameCaptures(uint64_t frameSerial) noexcept override;
 
@@ -150,6 +190,13 @@ namespace gglab
 		std::vector<FrameCaptureResult> m_Results;
 		std::vector<RetainedImage> m_RetainedImages;
 		std::vector<RetainedExport> m_RetainedExports;
+		std::vector<RetainedScan> m_RetainedScans;
+		RenderShaderProgramAccess* m_ScanShaders = nullptr;
+		RenderPipelineResolver* m_ScanResolver = nullptr;
+		RHIPipelineSystem* m_ScanPipelineSystem = nullptr;
+		RHIBindingLayoutHandle m_ScanBindingLayout;
+		std::array<ComputePipelineRecipe, 3> m_ScanRecipes{};
+		std::array<ComputePipelineSlot, 3> m_ScanSlots{};
 		bool m_IsShutdown = false;
 	};
 }

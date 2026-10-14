@@ -156,6 +156,7 @@ namespace gglab
 		std::string m_CapturedAtUtc;
 		bool m_GraphExportActive = false;
 		bool m_ResourceExportActive = false;
+		bool m_NonFiniteScanActive = false;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.

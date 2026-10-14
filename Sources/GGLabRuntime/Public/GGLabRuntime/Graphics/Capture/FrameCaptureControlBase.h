@@ -35,13 +35,21 @@ namespace gglab
 		{
 			return 0;
 		}
+		// Opt-in Runtime boundary scans; not a production-coverage watch capability.
+		// Completed describes readback transport, not the boundary claim's outcome.
+		[[nodiscard]] virtual uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget>,
+			uint64_t, uint64_t = 0, bool = false, uint64_t = 0) noexcept
+		{
+			return 0;
+		}
 		// Sizes are known only after compilation. Start a scheduled export frame
 		// with an idle payload pool, then check the complete group before submission.
 		[[nodiscard]] virtual FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept
 		{
 			return GetRequestAvailability();
 		}
-		// Called after ordinary compilation, before execution. Busy defers the entire
+		// Prepares both resource exports and explicit non-finite scans in one graph
+		// extension. Called after ordinary compilation, before execution. Busy defers the entire
 		// selected sequence frame; no original producer is revived by these reads.
 		[[nodiscard]] virtual FrameCaptureAvailability PrepareResourceExports(uint64_t,
 			RenderGraph&, ResourceExportFrameContext = {}) noexcept

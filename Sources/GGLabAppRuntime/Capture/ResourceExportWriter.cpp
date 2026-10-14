@@ -131,9 +131,9 @@ namespace gglab
 		{
 			throw std::runtime_error("Resource export file count disagrees with its group.");
 		}
-		Json root = { {"schema", "gglab.resource-export"}, {"schemaVersion", 1}, {"frameSerial", metadata.m_FrameSerial},
+		Json root = { {"schema", "gglab.resource-export"}, {"schemaVersion", metadata.m_NonFiniteScanActive ? 2 : 1}, {"frameSerial", metadata.m_FrameSerial},
 			{"frame", Frame(metadata, submission)}, {"submission", Submission(submission)},
-			{"observation", {{"graph", metadata.m_GraphExportActive}, {"resourceExport", true}, {"nonFiniteWatch", false}}},
+			{"observation", {{"graph", metadata.m_GraphExportActive}, {"resourceExport", true}, {"nonFiniteWatch", metadata.m_NonFiniteScanActive}}},
 			{"graph", graphFile.empty() ? Json(nullptr) : Json(GetFrameCapturePathText(graphFile.filename()))}, {"targets", Json::array()} };
 		for (size_t i = 0; i < payload.m_Arrays.size(); ++i)
 		{
@@ -175,7 +175,7 @@ namespace gglab
 		root["frame"] = Frame(metadata, submission);
 		root["frameSerial"] = metadata.m_FrameSerial;
 		root["submission"] = Submission(submission);
-		root["observation"] = { {"graph", true}, {"resourceExport", resourceExportActive}, {"nonFiniteWatch", false} };
+		root["observation"] = { {"graph", true}, {"resourceExport", resourceExportActive}, {"nonFiniteWatch", metadata.m_NonFiniteScanActive} };
 		return root.dump(2, ' ', false, Json::error_handler_t::replace);
 	}
 }

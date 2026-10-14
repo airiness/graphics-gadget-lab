@@ -2354,6 +2354,20 @@ namespace gglab
 				collision[0].m_MetadataPath.filename() == "resource.22.resource-export-2.json" &&
 				ReadText(occupied) == "other publisher" && !std::filesystem::exists(directory.GetPath() / "resource.22.resource-export.0.npy"),
 				"A mid-group filename collision withdraws only owned files and republishes the complete group under one new stem");
+			// Activity metadata discloses observers, not a successful watch claim.
+			FrameCaptureMetadata observedMetadata;
+			observedMetadata.m_NonFiniteScanActive = true;
+			RGSnapshot observedGraph;
+			observedGraph.m_Execution.m_Recorded = true;
+			observedGraph.m_ObservationNodes.emplace_back(0, RGObservationTarget{
+				.m_Address = { .m_Resource = "Observed" }, .m_Kind = RGObservationKind::NonFiniteScan });
+			const auto graphJson = nlohmann::json::parse(SerializeFrameGraphExport(observedGraph, observedMetadata, {}, false, false));
+			context.Check(graphJson["schemaVersion"] == 3 && graphJson["observation"]["nonFiniteWatch"] == true &&
+				graphJson["observation"]["resourceExport"] == false && graphJson["execution"]["observationNodes"][0]["kind"] == "NonFiniteScan",
+				"Scan-only graphs use v3 and distinguish scan activity from resource-copy observation");
+			const auto resourceJson = nlohmann::json::parse(SerializeResourceExportMetadata({}, observedMetadata, {}, {}, {}));
+			context.Check(resourceJson["schemaVersion"] == 2 && resourceJson["observation"]["nonFiniteWatch"] == true,
+				"Resource sidecars with concurrent scans use v2 without asserting production coverage");
 			ResourceExportArray structured{ .m_Type = RGResourceType::RGBuffer, .m_Shape = {2}, .m_Stride = 16,
 				.m_Fields = {{"first", 0, ResourceExportScalar::Uint32, 1}, {"vector", 8, ResourceExportScalar::Float32, 2}}, .m_Data = std::vector<uint8_t>(32) };
 			const auto header = MakeResourceExportNpyHeader(structured);

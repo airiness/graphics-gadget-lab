@@ -3095,6 +3095,16 @@ namespace gglab
 			desc.m_Defines.clear();
 			desc.m_Target = {};
 
+			for (const auto target : { MakeDX12CompileTarget(ShaderStage::Compute), MakeVulkan13CompileTarget(ShaderStage::Compute) })
+			{
+				for (uint32_t variant = 0; variant < 3; ++variant)
+				{
+					ShaderDesc scanDesc{ .m_SourcePath = L"Passes/PassNonFiniteScan.hlsl", .m_Stage = ShaderStage::Compute,
+						.m_Target = target, .m_Entry = variant == 0 ? L"CSClear" : L"CSMain", .m_IncludeDirs = { L"." } };
+					if (variant == 2) { scanDesc.m_Defines = { { L"GGLAB_NONFINITE_SCAN_BUFFER", L"1" } }; }
+					context.Check(compiler.Compile(scanDesc).IsSuccess(), "Non-finite clear/texture/buffer scan compiles for DXIL and SPIR-V");
+				}
+			}
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";
