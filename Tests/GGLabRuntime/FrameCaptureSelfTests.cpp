@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
@@ -1065,6 +1066,94 @@ namespace gglab
 			bounded.OnFrameAborted(8);
 		}
 
+		void RunResourceExportSupportTests(SelfTestContext& context) noexcept
+		{
+			RHITextureDesc preview{ .m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled, .m_Extent = { 1024, 768, 1 } };
+			context.Check(GetResourceExportSupport(preview, true) == RGObservationFailure::UnsupportedResource &&
+				GetResourceExportSupport(preview, false) == RGObservationFailure::None,
+				"Imported previews require creation-time CopySource while graph-owned textures can derive observation usage");
+			RHITextureDesc cube = preview;
+			cube.m_Format = RHIFormat::R16G16B16A16Float;
+			cube.m_ArraySize = 6;
+			cube.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
+			cube.m_Usage |= RHITextureUsage::CopySource;
+			context.Check(GetResourceExportSupport(cube, true) == RGObservationFailure::None,
+				"A copy-capable imported HDR cubemap is discoverable for resource export");
+			auto unsupported = cube;
+			unsupported.m_Dimension = RHITextureDimension::Texture3D;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedResource,
+				"Three-dimensional textures are excluded by the Runtime export capability");
+			unsupported = cube;
+			unsupported.m_SampleCount = 4;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedResource,
+				"Multisampled textures are excluded by the Runtime export capability");
+			unsupported = cube;
+			unsupported.m_Format = RHIFormat::Unknown;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedFormat,
+				"Unknown formats do not become export candidates");
+			unsupported = cube;
+			unsupported.m_Extent.m_Width = 0;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedResource,
+				"Empty texture extents do not become export candidates");
+			bool supportedFormats = true;
+			for (uint32_t value = 1; value < static_cast<uint32_t>(RHIFormat::Count); ++value)
+			{
+				RHITextureDesc desc = cube;
+				desc.m_Format = static_cast<RHIFormat>(value);
+				supportedFormats &= GetResourceExportSupport(desc, true) == RGObservationFailure::None;
+			}
+			context.Check(supportedFormats, "Discovery keeps the current typed, typeless and depth format families supported by T2");
+			RHIBufferDesc buffer{ .m_SizeInBytes = 32, .m_StrideInBytes = 8 };
+			context.Check(GetResourceExportSupport(buffer, false) == RGObservationFailure::None &&
+				GetResourceExportSupport(buffer, true) == RGObservationFailure::UnsupportedResource,
+				"Buffer discovery distinguishes graph-owned usage from an imported allocation's copy contract");
+			buffer.m_Usage = RHIBufferUsage::CopySource;
+			context.Check(GetResourceExportSupport(buffer, true) == RGObservationFailure::None,
+				"Copy-capable raw and structured buffers remain export candidates");
+			buffer.m_StrideInBytes = 3;
+			context.Check(GetResourceExportSupport(buffer, true) == RGObservationFailure::UnsupportedResource,
+				"Unsupported buffer word layouts are excluded by the same rule used for array descriptions");
+
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			graph.AddPass<Data>("Discovery", [&](auto& builder, auto&)
+				{
+					auto previewTexture = builder.ImportTexture("Preview.IBL.EnvironmentCubemap", RHITextureHandle{ 10, 1 },
+						preview, RGTextureAccess::Sample, RGContentValidity::Defined);
+					auto environment = builder.ImportTexture("IBL.EnvironmentCubemap", RHITextureHandle{ 11, 1 },
+						cube, RGTextureAccess::Sample, RGContentValidity::Defined);
+					GGLAB_UNUSED(builder.Read(previewTexture, RGTextureAccess::Sample));
+					GGLAB_UNUSED(builder.Read(environment, RGTextureAccess::Sample));
+					auto words = builder.CreateBuffer("Words", { .m_SizeInBytes = 32 });
+					builder.WriteInPlace(words, RGBufferAccess::CopyDest);
+					builder.SideEffect();
+				});
+			context.Check(graph.Compile(), "Resource export discovery fixture compiles without inserting observers");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const auto find = [&](std::string_view name)
+				{ return std::ranges::find(snapshot.m_Resources, name, &RGSnapshotResourceInfo::m_Name); };
+			const auto previewInfo = find("Preview.IBL.EnvironmentCubemap");
+			const auto cubeInfo = find("IBL.EnvironmentCubemap");
+			const auto wordsInfo = find("Words");
+			context.Check(previewInfo != snapshot.m_Resources.end() && cubeInfo != snapshot.m_Resources.end() &&
+				wordsInfo != snapshot.m_Resources.end() &&
+				previewInfo->m_ResourceExportSupport == RGObservationFailure::UnsupportedResource &&
+				cubeInfo->m_ResourceExportSupport == RGObservationFailure::None &&
+				wordsInfo->m_ResourceExportSupport == RGObservationFailure::None && !graph.HasResourceObservations(),
+				"Immutable diagnostics publish export capabilities without promoting imported usage or changing the graph");
+			context.Check(graph.ResolveObservation({ .m_Resource = "Preview.IBL.EnvironmentCubemap" }).m_Failure ==
+				RGObservationFailure::UnsupportedResource,
+				"The imported preview hidden by discovery is rejected by actual address resolution for the same reason");
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			context.Check(json["schemaVersion"] == 1 && std::ranges::none_of(json["compile"]["resources"],
+				[](const auto& resource) { return resource.contains("resourceExportSupport"); }),
+				"UI export capability diagnostics leave the persisted graph schema unchanged");
+		}
+
 		void RunObservationStateTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device; TransientResourcePool pool(&device); FrameCaptureService service(device);
@@ -1210,6 +1299,7 @@ namespace gglab
 	{
 		RunResourceExportTests(context);
 		RunResourceTextureExportTests(context);
+		RunResourceExportSupportTests(context);
 		RunObservationStateTests(context);
 		RunGraphCaptureTests(context);
 		RunGraphEnumTests(context);

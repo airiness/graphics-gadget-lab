@@ -6,11 +6,15 @@
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
 #include "DevTools/DevelopGui/Panels/FrameCapturePanel.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 
 #include <nlohmann/json.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -33,6 +37,13 @@ namespace gglab
 		class FakeCaptureControl final : public FrameCaptureControlBase
 		{
 		public:
+			struct ExportRequest
+			{
+				uint64_t m_Id = 0;
+				std::vector<RGResourceAddress> m_Targets;
+				bool m_IncludeGraph = false;
+			};
+
 			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial) noexcept override
 			{
 				m_Issued.push_back({ .m_RequestId = m_NextId++, .m_Source = source,
@@ -40,6 +51,13 @@ namespace gglab
 				return m_Issued.back().m_RequestId;
 			}
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t) noexcept override { return 0; }
+			uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets, uint64_t frameSerial,
+				bool, bool includeGraph) noexcept override
+			{
+				const uint64_t id = RequestCapture(FrameCaptureSource::ResourceExport, frameSerial);
+				m_Exports.push_back({ id, std::move(targets), includeGraph });
+				return id;
+			}
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override { return std::nullopt; }
 			FrameCaptureAvailability GetRequestAvailability() const noexcept override
 			{
@@ -54,7 +72,37 @@ namespace gglab
 			{
 				for (FrameCaptureResult result : m_Issued)
 				{
-					if (result.m_Source == FrameCaptureSource::RenderGraph)
+					if (result.m_Source == FrameCaptureSource::ResourceExport)
+					{
+						if (m_FailResourceExport)
+						{
+							result.m_Status = FrameCaptureStatus::Failed;
+							result.m_ResourceFailure = RGObservationFailure::UnknownResource;
+							result.m_Failure = "The resource is missing from the captured frame.";
+						}
+						else
+						{
+							const auto request = std::ranges::find(m_Exports, result.m_RequestId, &ExportRequest::m_Id);
+							auto payload = std::make_shared<ResourceExportPayload>();
+							for (const auto& target : request->m_Targets)
+							{
+								payload->m_Arrays.push_back({ .m_Address = target, .m_Scalar = ResourceExportScalar::Uint8,
+									.m_Shape = { 1, 1, 1, 1 }, .m_Data = { 42 } });
+							}
+							result.m_Resources = std::move(payload);
+							result.m_ResourceExportActive = true;
+							result.m_SubmissionFenceValue = 23;
+							if (request->m_IncludeGraph)
+							{
+								auto graph = std::make_shared<RGSnapshot>();
+								graph->m_Passes.push_back({ .m_Observation = true, .m_Name = "Observation.Copy" });
+								graph->m_Execution.m_Recorded = true;
+								result.m_Graph = std::move(graph);
+								result.m_GraphExportActive = true;
+							}
+						}
+					}
+					else if (result.m_Source == FrameCaptureSource::RenderGraph)
 					{
 						auto graph = std::make_shared<RGSnapshot>();
 						graph->m_Execution.m_Recorded = true;
@@ -72,12 +120,49 @@ namespace gglab
 					results.push_back(std::move(result));
 				}
 				m_Issued.clear();
+				m_Exports.clear();
 			}
 
 			std::vector<FrameCaptureResult> m_Issued;
+			std::vector<ExportRequest> m_Exports;
+			bool m_FailResourceExport = false;
 
 		private:
 			uint64_t m_NextId = 100;
+		};
+
+		class CaptureDiagnosticsView final : public DiagnosticsView
+		{
+		public:
+			CaptureDiagnosticsView()
+			{
+				m_Snapshot.m_Resources.push_back({ .m_Name = "Test.UI.Texture", .m_TextureMipLevels = 2,
+					.m_TextureArraySize = 4, .m_ResourceExportSupport = RGObservationFailure::None });
+				m_Snapshot.m_Resources.push_back({ .m_Name = "Preview.IBL.EnvironmentCubemap",
+					.m_Imported = true, .m_ResourceExportSupport = RGObservationFailure::UnsupportedResource });
+				m_Snapshot.m_Passes.push_back({ .m_Occurrence = 1, .m_Name = "Test.UI.Writer", .m_Culled = true,
+					.m_Accesses = { {.m_WrittenResourceNodeIndex = 1, .m_ResourceName = "Test.UI.Texture",
+						.m_DependencyAccess = RGDependencyAccess::Write } } });
+				m_Snapshot.m_Passes.push_back({ .m_Occurrence = 2, .m_Name = "Test.UI.Writer",
+					.m_Accesses = { {.m_WrittenResourceNodeIndex = 2, .m_ResourceName = "Test.UI.Texture",
+						.m_DependencyAccess = RGDependencyAccess::Write } } });
+			}
+			void AddResources(uint32_t count)
+			{
+				for (uint32_t i = 0; i < count; ++i)
+				{
+					m_Snapshot.m_Resources.push_back({ .m_Name = std::format("Test.UI.Extra.{}", i),
+						.m_ResourceExportSupport = RGObservationFailure::None });
+				}
+			}
+			std::vector<SnapshotProfile> GetProfiles() const override { return {}; }
+
+		private:
+			const void* GetSnapshotData(SnapshotId id) noexcept override
+			{
+				return id == SnapshotIdOf<RGSnapshot> ? &m_Snapshot : nullptr;
+			}
+			RGSnapshot m_Snapshot;
 		};
 
 		FrameCaptureFrameState MakeFrameState(uint64_t serial, uint64_t reset = 1) noexcept
@@ -86,15 +171,15 @@ namespace gglab
 				.m_Backend = "dx12",
 				.m_DemoId = "Demo.LabHost",
 				.m_LabId = "gglab.lab.test",
-				.m_SettleKey = { .m_Temporal = {
-					.m_Identity = { .m_DisplayViewId = RenderViewID::Main,
+				.m_SettleKey = {.m_Temporal = {
+					.m_Identity = {.m_DisplayViewId = RenderViewID::Main,
 						.m_ResetIdentity = reset, .m_SessionIdentity = 1,
 						.m_ColorExtent = { 1, 1 }, .m_DepthExtent = { 1, 1 } },
 					.m_Services = TemporalService::FrameContinuity | TemporalService::ColorDepthHistory,
 					.m_HasCompatiblePreviousHistory = true } },
 				.m_DisplayFormat = RHIFormat::B8G8R8A8Unorm,
 				.m_FrameSerial = serial,
-				.m_Camera = { .m_Name = "Main" },
+				.m_Camera = {.m_Name = "Main" },
 				.m_ReferenceViewIds = { "CAM_Test" },
 			};
 		}
@@ -197,8 +282,7 @@ namespace gglab
 				context.Check(frontEnd.Update().empty() && openCount == 0 &&
 					frontEnd.CanOpenOutputFolder(*full) && frontEnd.CanOpenOutputFolder(*image),
 					"Completion is consumed once and never automatically opens a folder");
-				// Draw the actual panel without a native window. Wrapped help must not
-				// collapse the first-use window into an unusable narrow strip.
+				// Draw the actual panel without a native window to check its first-use layout.
 				ImGuiContext* previousContext = ImGui::GetCurrentContext();
 				ImGuiContext* gui = ImGui::CreateContext();
 				ImGuiIO& io = ImGui::GetIO();
@@ -220,7 +304,7 @@ namespace gglab
 					if (frame == 1)
 					{
 						context.Check(ImGui::GetWindowWidth() >= 600.0f && ImGui::GetWindowHeight() >= 500.0f,
-							"The first-use capture panel has usable space for buttons and wrapped export help");
+							"The first-use capture panel has usable space for its controls and history");
 					}
 					ImGui::End();
 					DrawFrameCaptureNotification(frontEnd);
@@ -269,6 +353,209 @@ namespace gglab
 				settled->m_Metadata->m_Timing == FrameCaptureTiming::AfterReady &&
 				settled->m_Metadata->m_SettleFrames == 2 && settled->m_Metadata->m_FrameSerial == 20,
 				"Graph buttons honor the selected after-ready timing rather than forcing next-frame");
+
+			settings.m_Timing = FrameCaptureTiming::NextFrame;
+			settings.m_ReferenceViewId = "CAM_Test";
+			settings.m_OutputDirectory = directory / "resources";
+			std::vector<RGResourceAddress> targets{
+				{.m_Resource = "Test.Depth", .m_Position = RGObservationPosition::Before,
+					.m_Pass = "Test.Pass", .m_Occurrence = 2, .m_Mip = 1, .m_FirstSlice = 2,
+					.m_SliceCount = 3, .m_Aspect = RHITextureAspect::Depth },
+				{.m_Resource = "Test.Buffer" },
+			};
+			const uint64_t resourceId = frontEnd.ExportResources(targets, true);
+			targets.front().m_Resource = "Edited.After.Submission";
+			const auto resourceView = coordinator.GetPendingViewChange();
+			context.Check(resourceView && resourceView->m_RequestId == resourceId &&
+				resourceView->m_ReferenceViewId == "CAM_Test" && settings.m_Source == FrameCaptureSource::Composited,
+				"Interactive resource exports share the queued camera path without changing the screenshot source");
+			coordinator.OnReferenceViewApplied(resourceId, true);
+			coordinator.BeginFrame(MakeFrameState(21, 2));
+			context.Check(control.m_Exports.size() == 1 && control.m_Exports[0].m_IncludeGraph &&
+				control.m_Exports[0].m_Targets.size() == 2 && control.m_Exports[0].m_Targets[0].m_Resource == "Test.Depth" &&
+				control.m_Exports[0].m_Targets[0].m_Position == RGObservationPosition::Before &&
+				control.m_Exports[0].m_Targets[0].m_Occurrence == 2 && control.m_Exports[0].m_Targets[0].m_Mip == 1 &&
+				control.m_Exports[0].m_Targets[0].m_FirstSlice == 2 && control.m_Exports[0].m_Targets[0].m_SliceCount == 3 &&
+				control.m_Exports[0].m_Targets[0].m_Aspect == RHITextureAspect::Depth,
+				"The manual export queues a complete address copy, including pass occurrence, subresources and plane");
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			frontEnd.Update();
+			const auto* resources = frontEnd.FindResult(resourceId);
+			context.Check(resources && resources->m_Status == FrameCaptureRequestStatus::Completed &&
+				resources->m_ResourcePaths.size() == 2 && !resources->m_GraphPath.empty() && resources->m_ImagePath.empty() &&
+				ApplicationFrameCapture::GetOutputPath(*resources) == resources->m_MetadataPath,
+				"Manual resource groups publish arrays, sidecar and paired graph through the existing writer");
+			if (resources && resources->m_Status == FrameCaptureRequestStatus::Completed)
+			{
+				const auto json = ReadJson(resources->m_MetadataPath);
+				const auto graph = ReadJson(resources->m_GraphPath);
+				context.Check(!json.is_discarded() && !graph.is_discarded() &&
+					json["frameSerial"] == 21 && graph["frameSerial"] == 21 && json["targets"].size() == 2 &&
+					json["observation"]["graph"] == true && json["observation"]["resourceExport"] == true &&
+					resources->m_Metadata->m_Label == "interactive" && resources->m_Metadata->m_Note == "shared settings" &&
+					resources->m_Metadata->m_Camera.m_ReferenceViewId == "CAM_Test" &&
+					std::filesystem::exists(resources->m_ResourcePaths.front()),
+					"Manual export results retain the actual captured frame, shared settings and paired graph identity");
+				settings.m_OutputDirectory = directory / "later setting";
+				context.Check(frontEnd.OpenOutputFolder(resourceId, failure) && failure.empty() &&
+					openedDirectory == directory / "resources",
+					"Resource export folder opening uses the published group directory");
+			}
+			settings.m_ReferenceViewId.clear();
+			settings.m_Timing = FrameCaptureTiming::AfterReady;
+			settings.m_SettleFrames = 2;
+			const uint64_t readyResourceId = frontEnd.ExportResources({ {.m_Resource = "Test.Buffer" } });
+			for (uint64_t serial = 22; serial < 24; ++serial)
+			{
+				coordinator.BeginFrame(MakeFrameState(serial, 3));
+				context.Check(control.m_Issued.empty(), "After-ready manual resource export waits for its settle frames");
+				coordinator.OnFrameSubmitted();
+			}
+			coordinator.BeginFrame(MakeFrameState(24, 3));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			frontEnd.Update();
+			const auto* readyResources = frontEnd.FindResult(readyResourceId);
+			context.Check(readyResources && readyResources->m_Status == FrameCaptureRequestStatus::Completed &&
+				readyResources->m_Metadata->m_FrameSerial == 24 && readyResources->m_Metadata->m_SettleFrames == 2 &&
+				readyResources->m_GraphPath.empty(),
+				"Manual resource export honors after-ready timing and can omit the paired graph");
+			settings.m_Timing = FrameCaptureTiming::NextFrame;
+			control.m_FailResourceExport = true;
+			const uint64_t failedResourceId = frontEnd.ExportResources({ {.m_Resource = "Missing" } });
+			coordinator.BeginFrame(MakeFrameState(25, 3));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			frontEnd.Update();
+			const auto* failedResources = frontEnd.FindResult(failedResourceId);
+			context.Check(failedResources && failedResources->m_Status == FrameCaptureRequestStatus::Failed &&
+				failedResources->m_ResourceFailure == RGObservationFailure::UnknownResource &&
+				!failedResources->m_Failure.empty() && failedResources->m_ResourcePaths.empty() &&
+				!frontEnd.CanOpenOutputFolder(*failedResources),
+				"An address missing in the actual frame retains its typed failure in manual export history");
+
+			// Activate the real ImGui widgets by ID, without a native window or
+			// pixel-coordinate assumptions. ImGui internals stay in this host test.
+			{
+				ImGuiContext* previousContext = ImGui::GetCurrentContext();
+				ImGuiContext* gui = ImGui::CreateContext();
+				ImGuiIO& io = ImGui::GetIO();
+				io.IniFilename = nullptr;
+				io.DisplaySize = ImVec2(1280.0f, 900.0f);
+				unsigned char* pixels = nullptr;
+				int width = 0;
+				int height = 0;
+				io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+				CaptureDiagnosticsView diagnostics;
+				DevelopGuiStateStore store;
+				DevelopGuiContext drawContext{ .m_Diagnostics = &diagnostics, .m_StateStore = &store };
+				FrameCapturePanel panel(&frontEnd);
+				const auto draw = [&]()
+					{
+						ImGui::NewFrame();
+						ImGui::Begin("Manual resource capture test");
+						panel.Draw(drawContext);
+						ImGui::End();
+						ImGui::Render();
+					};
+				draw();
+				draw();
+				ImGuiWindow* window = ImGui::FindWindowByName("Manual resource capture test");
+				ImGuiTabBar* tabs = window ? gui->TabBars.GetByKey(window->GetID("##CaptureActions")) : nullptr;
+				context.Check(tabs && tabs->Tabs.Size == 3, "The capture panel separates screenshot, graph and resource actions");
+				if (tabs)
+				{
+					const ImGuiID resourceTabId = ImHashStr("Resources", 0, tabs->ID);
+					tabs->NextSelectedTabId = resourceTabId;
+					draw();
+					const ImGuiID choicesId = ImHashStr("##AvailableResources", 0, resourceTabId);
+					ImGuiTable* choices = ImGui::TableFindByID(choicesId);
+					context.Check(choices && choices->CurrentRow == 1,
+						"The resource list hides unsupported imported previews and shows only exportable rows");
+					const ImGuiID rowId = ImHashStr("Test.UI.Texture", 0, choicesId);
+					const ImGuiID plusId = ImHashStr("+", 0, rowId);
+					control.m_FailResourceExport = false;
+					ImGui::ActivateItemByID(plusId);
+					draw();
+					draw();
+					const ImGuiID targetsId = ImHashStr("##ResourceTargets", 0, resourceTabId);
+					const int firstTarget = 1;
+					const ImGuiID targetId = ImHashData(&firstTarget, sizeof(firstTarget), targetsId);
+					const ImGuiID addressTableId = ImHashStr("##TargetAddress", 0, targetId);
+					const auto select = [&](const char* combo, const char* choice, int choiceIndex = -1)
+						{
+							ImGui::ActivateItemByID(ImHashStr(combo, 0, addressTableId));
+							draw();
+							if (gui->OpenPopupStack.empty() || !gui->OpenPopupStack.back().Window)
+							{
+								return false;
+							}
+							ImGuiWindow* popup = gui->OpenPopupStack.back().Window;
+							const ImGuiID choiceId = choiceIndex < 0 ? popup->GetID(choice)
+								: ImHashStr(choice, 0, popup->GetID(choiceIndex));
+							ImGui::ActivateItemByID(choiceId);
+							draw();
+							return gui->OpenPopupStack.empty();
+						};
+					const bool selected = select("##Position", "After pass", 2) && select("##Pass", "Test.UI.Writer [#2]");
+					context.Check(selected, "A plus-added target exposes its own pass and declaration occurrence controls");
+					ImGui::ActivateItemByID(plusId);
+					draw();
+					const uint32_t pendingBefore = frontEnd.GetUnfinishedRequestCount();
+					ImGui::ActivateItemByID(ImHashStr("Export Resources", 0, resourceTabId));
+					draw();
+					context.Check(frontEnd.GetUnfinishedRequestCount() == pendingBefore + 1,
+						"The actual Export Resources button submits the added target through the front end");
+					coordinator.BeginFrame(MakeFrameState(26, 3));
+					context.Check(control.m_Exports.size() == 1 && control.m_Exports[0].m_Targets.size() == 2 &&
+						control.m_Exports[0].m_Targets[0].m_Resource == "Test.UI.Texture" &&
+						control.m_Exports[0].m_Targets[0].m_Position == RGObservationPosition::After &&
+						control.m_Exports[0].m_Targets[0].m_Pass == "Test.UI.Writer" &&
+						control.m_Exports[0].m_Targets[0].m_Occurrence == 2 &&
+						control.m_Exports[0].m_Targets[1].m_Position == RGObservationPosition::Final,
+						"Repeated plus additions retain independent addresses and declaration occurrences for the same resource");
+					coordinator.OnFrameSubmitted();
+					coordinator.Update();
+					frontEnd.Update();
+					draw();
+					context.Check(frontEnd.GetHistory().back().m_Result.m_Status == FrameCaptureRequestStatus::Completed,
+						"The real resource tab draws completed array history without opening the Shell");
+					diagnostics.AddResources(40);
+					draw();
+					draw();
+					choices = ImGui::TableFindByID(choicesId);
+					context.Check(choices && choices->InnerWindow->ScrollMax.y > 0.0f &&
+						choices->InnerWindow->Size.y <= ImGui::GetTextLineHeightWithSpacing() * 9.0f + 1.0f,
+						"A long resource list scrolls internally and retains its fixed height");
+					ImGui::ActivateItemByID(ImHashStr("##ResourceFilter", 0, resourceTabId));
+					draw();
+					io.AddInputCharactersUTF8("Test.UI.Texture");
+					draw();
+					choices = ImGui::TableFindByID(choicesId);
+					context.Check(choices && choices->CurrentRow == 1,
+						"Resource name search filters the available list without changing queued targets");
+					ImGui::ActivateItemByID(ImHashStr("###ResourceChoices", 0, resourceTabId));
+					draw();
+					context.Check(choices && choices->LastFrameActive < gui->FrameCount,
+						"The available resource list collapses while export targets remain accessible");
+					const int secondTarget = 2;
+					const ImGuiID secondId = ImHashData(&secondTarget, sizeof(secondTarget), targetsId);
+					ImGui::ActivateItemByID(ImHashStr("X", 0, secondId));
+					draw();
+					ImGui::ActivateItemByID(ImHashStr("Export Resources", 0, resourceTabId));
+					draw();
+					coordinator.BeginFrame(MakeFrameState(27, 3));
+					context.Check(control.m_Exports.size() == 1 && control.m_Exports[0].m_Targets.size() == 1 &&
+						control.m_Exports[0].m_Targets[0].m_Occurrence == 2,
+						"Removing one target retains the other target's independently configured address");
+					coordinator.OnFrameSubmitted();
+					coordinator.Update();
+					frontEnd.Update();
+				}
+				ImGui::DestroyContext(gui);
+				ImGui::SetCurrentContext(previousContext);
+			}
 
 			const uint32_t countBeforeCancellation = openCount;
 			for (size_t index = 0; index < ApplicationFrameCapture::MaxHistoryEntries; ++index)

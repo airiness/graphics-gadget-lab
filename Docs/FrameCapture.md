@@ -16,7 +16,7 @@ $session = 'Scripts/GGLabSession.ps1'
 
 | Need | Use |
 | --- | --- |
-| Interactive screenshot or graph export in an ordinary/F5 launch | DevTools **Application > Frame Capture** |
+| Interactive screenshot, graph or resource export in an ordinary/F5 launch | DevTools **Application > Frame Capture** |
 | One image of one Lab or Demo | `--capture-on-ready` one-shot launch |
 | Several images, views or settings from one process | A session (`GGLabSession.ps1`) |
 | Every authored camera view of the content | `GGLabSession.ps1 batch` |
@@ -29,7 +29,7 @@ Sessions and one-shot launches are hidden by default: the window is never shown
 or activated, input is ignored and simulation advances with a fixed 1/60 s step.
 Use `-Visible` only when the owner allows windows on the desktop.
 
-## Interactive capture and graph export
+## Interactive capture and exports
 
 For a normal visible launch, including F5 in Visual Studio or VS Code, open
 DevTools **Application > Frame Capture**. No `--session`, PowerShell command or
@@ -40,11 +40,32 @@ panel).
   metadata sidecar. F9 remains a screenshot hotkey; exporting a graph does not
   change its Source setting. When ImGui owns keyboard input, use the button or
   return focus to the rendered view before pressing F9.
-- **Export Graph** writes the full compile and execution records described
-  [below](#render-graph-export).
-- **Export Graph Summary** writes the executed pass order and versioned
-  reads/writes to JSON, without the execution record.
-- Both export buttons share **Timing**, **Settle Frames**, **Reference View**,
+- The **Screenshot**, **Render Graph** and **Resources** tabs share capture
+  settings. Source appears only in Screenshot; F9 keeps using that source.
+- **Export Graph** in Render Graph writes the full compile and execution records
+  described [below](#render-graph-export). Enable **Summary only** for executed
+  pass order and versioned reads/writes without the execution record.
+- **Resources** shows a searchable **Available resources** list from the latest
+  immutable RenderGraph diagnostics snapshot. The list can collapse and scrolls
+  inside a fixed-height area. Runtime supplies descriptor support using the same
+  format rules as actual export. Unsupported resource dimensions, multisampling,
+  formats/word layouts, and imported allocations without CopySource are hidden;
+  the menu does not grant copy usage to an allocation owned elsewhere.
+- Click a resource's **+** to add an independently configurable target. Expand
+  each target to choose **Final**, **Before pass** or **After pass**; pass choices
+  include declaration occurrences and a culled marker. Before lists readers;
+  After lists writers. Texture targets support mip, first slice, all remaining
+  slices or an explicit count, and an automatic or explicit color/depth/stencil
+  plane. Buffer targets use the full buffer. The same resource can be added more
+  than once for different versions or subresources. **X** removes only that target.
+- **Export Resources** writes one group of NPY arrays and a JSON sidecar;
+  **Include graph** adds the graph from the same captured frame. Target settings
+  remain editable after submitting; the queue owns a copy of each address.
+  Descriptor support is a discovery hint, independent of contents, pass liveness
+  and current capacity: the actual capture frame resolves every address again.
+  Missing/culled resources, undefined subresources and unsupported groups produce
+  explicit failures; they never retarget a different resource or split frames.
+- All export buttons share **Timing**, **Settle Frames**, **Reference View**,
   **Output Directory**, **Label** and **Note** with screenshots. Timing defaults
   to **Next frame**: the next rendered frame, not the already displayed frame.
   Select **After ready** to wait for the readiness gates and settle frames.
@@ -52,11 +73,12 @@ panel).
 - The pending count and **Current Frame** readiness gates help explain waiting
   requests. **History** retains the latest 16 results, showing the captured frame
   serial and published PNG/JSON paths or a failure. A short notification and the
-  application log also name the actual output file, including graph-only JSON.
-- Click a path in History to copy it. Screenshots show both the PNG and metadata
-  path; graph exports show their single JSON path. Path text and the clipboard
+  application log also name the actual output file, including graph/resource sidecars.
+- History groups results in collapsible rows, with the newest expanded. Click a
+  filename to copy its full path; hover to inspect it. Resource exports list the
+  sidecar, every NPY array and the optional graph. Path text and the clipboard
   use UTF-8; glyph availability follows the configured ImGui font.
-- **Open Output Folder** on a successful result opens that result's actual
+- **Open folder** on a successful result opens that result's actual
   directory through the Windows Shell. Editing Output Directory afterward does
   not redirect it. Opening is explicit, never automatic on completion, and is
   unavailable for unfinished/failed results or hosts without this capability.
@@ -168,8 +190,8 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
 - Summary mode lists only executed passes, sorted by execution order, with `reads`
   and `writes`. Each entry includes its version, resource-node index, declared
   subresource range and an `address` object (`resource`, `at.before`/`at.after`,
-  `occurrence`) for discovery. Resource export/watch addressing is introduced by
-  T2/T3; these commands are not implemented yet.
+  `occurrence`) for discovery. T2 resource exports use those addresses;
+  non-finite watch remains planned for T3.
 - `frame` reuses capture metadata for content, camera, simulation time, render
   settings and readiness; `frame.frame.serial` equals the top-level `frameSerial`.
   It adds the Runtime adapter/driver compatibility identity. Build identity and

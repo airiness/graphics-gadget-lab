@@ -40,7 +40,7 @@ namespace gglab
 			.m_OutputDirectory = m_Settings.m_OutputDirectory,
 			.m_Label = m_Settings.m_Label,
 			.m_Note = m_Settings.m_Note,
-			};
+		};
 	}
 
 	uint64_t ApplicationFrameCapture::Capture() noexcept
@@ -52,6 +52,15 @@ namespace gglab
 	{
 		FrameCaptureRequest request = MakeRequest(FrameCaptureSource::RenderGraph);
 		request.m_GraphSummary = summary;
+		return Submit(std::move(request));
+	}
+
+	uint64_t ApplicationFrameCapture::ExportResources(std::vector<RGResourceAddress> targets,
+		bool includeGraph) noexcept
+	{
+		FrameCaptureRequest request = MakeRequest(FrameCaptureSource::ResourceExport);
+		request.m_ResourceTargets = std::move(targets);
+		request.m_IncludeGraph = includeGraph;
 		return Submit(std::move(request));
 	}
 

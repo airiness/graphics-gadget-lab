@@ -1,6 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 #include "GGLabRuntime/Graphics/Resource/GpuBufferLayout.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>
 #include <optional>
@@ -60,5 +62,13 @@ namespace gglab
 	{
 		std::vector<ResourceExportArray> m_Arrays;
 	};
+	// Descriptor capability for discovery, independent of pass/content validity,
+	// a selected subresource range, GPU completion and current group capacity.
+	// Imported allocations must already have CopySource; graph-owned allocations
+	// acquire that usage through the observation compiler path.
+	[[nodiscard]] RGObservationFailure GetResourceExportSupport(const RHITextureDesc& desc,
+		bool imported) noexcept;
+	[[nodiscard]] RGObservationFailure GetResourceExportSupport(const RHIBufferDesc& desc,
+		bool imported) noexcept;
 	[[nodiscard]] std::string_view GetResourceExportDtype(ResourceExportScalar scalar) noexcept;
 }

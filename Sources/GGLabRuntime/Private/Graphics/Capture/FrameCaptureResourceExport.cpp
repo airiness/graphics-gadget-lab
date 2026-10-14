@@ -57,6 +57,48 @@ namespace gglab
 			return std::nullopt;
 		}
 
+		bool DescribeTextureFormat(RHIFormat format, RHITextureAspect aspect, bool rawTypeless,
+			ResourceExportScalar& scalar, uint32_t& channels) noexcept
+		{
+			channels = 1;
+			if (aspect == RHITextureAspect::Stencil)
+			{
+				scalar = ResourceExportScalar::Uint8;
+				return true;
+			}
+			if (rawTypeless)
+			{
+				const auto bytes = GetRHIFormatInfo(format).m_BytesPerBlock;
+				if (bytes == 0 || bytes % 4 != 0)
+				{
+					return false;
+				}
+				channels = bytes / 4;
+				scalar = ResourceExportScalar::Uint32;
+				return true;
+			}
+			switch (format)
+			{
+			case RHIFormat::R8Unorm: scalar = ResourceExportScalar::Uint8; break;
+			case RHIFormat::R8G8B8A8Unorm:
+			case RHIFormat::R8G8B8A8UnormSrgb:
+			case RHIFormat::B8G8R8A8Unorm:
+			case RHIFormat::B8G8R8A8UnormSrgb: scalar = ResourceExportScalar::Uint8; channels = 4; break;
+			case RHIFormat::R16Float: scalar = ResourceExportScalar::Float16; break;
+			case RHIFormat::R16G16Float: scalar = ResourceExportScalar::Float16; channels = 2; break;
+			case RHIFormat::R16G16B16A16Float: scalar = ResourceExportScalar::Float16; channels = 4; break;
+			case RHIFormat::R32Float:
+			case RHIFormat::D32Float:
+			case RHIFormat::D24UnormS8Uint: scalar = ResourceExportScalar::Float32; break;
+			case RHIFormat::R32G32Float: scalar = ResourceExportScalar::Float32; channels = 2; break;
+			case RHIFormat::R32G32B32Float: scalar = ResourceExportScalar::Float32; channels = 3; break;
+			case RHIFormat::R32G32B32A32Float: scalar = ResourceExportScalar::Float32; channels = 4; break;
+			case RHIFormat::R32Uint: scalar = ResourceExportScalar::Uint32; break;
+			default: return false;
+			}
+			return true;
+		}
+
 		bool DescribeArray(const RGObservationTarget& target, ResourceExportArray& array,
 			ResourceExportFrameContext context) noexcept
 		{
@@ -73,7 +115,7 @@ namespace gglab
 			{
 				const auto& desc = target.m_BufferDesc;
 				const uint32_t stride = desc.m_StrideInBytes == 0 ? 4 : desc.m_StrideInBytes;
-				if (desc.m_SizeInBytes == 0 || stride % 4 != 0 || desc.m_SizeInBytes % stride != 0)
+				if (GetResourceExportSupport(desc, false) != RGObservationFailure::None)
 				{
 					return false;
 				}
@@ -104,38 +146,10 @@ namespace gglab
 			const auto aspect = target.m_Subresources.m_Aspects;
 			uint32_t channels = 1;
 			const auto format = target.m_ViewFormat;
-			if (aspect == RHITextureAspect::Stencil)
+			if (!DescribeTextureFormat(target.m_RawTypeless ? target.m_TextureDesc.m_Format : format,
+				aspect, target.m_RawTypeless, array.m_Scalar, channels))
 			{
-				array.m_Scalar = ResourceExportScalar::Uint8;
-			}
-			else if (target.m_RawTypeless)
-			{
-				const auto bytes = GetRHIFormatInfo(target.m_TextureDesc.m_Format).m_BytesPerBlock;
-				if (bytes == 0 || bytes % 4 != 0)
-				{
-					return false;
-				}
-				channels = bytes / 4;
-				array.m_Scalar = ResourceExportScalar::Uint32;
-			}
-			else switch (format)
-			{
-			case RHIFormat::R8Unorm: array.m_Scalar = ResourceExportScalar::Uint8; break;
-			case RHIFormat::R8G8B8A8Unorm:
-			case RHIFormat::R8G8B8A8UnormSrgb:
-			case RHIFormat::B8G8R8A8Unorm:
-			case RHIFormat::B8G8R8A8UnormSrgb: array.m_Scalar = ResourceExportScalar::Uint8; channels = 4; break;
-			case RHIFormat::R16Float: array.m_Scalar = ResourceExportScalar::Float16; break;
-			case RHIFormat::R16G16Float: array.m_Scalar = ResourceExportScalar::Float16; channels = 2; break;
-			case RHIFormat::R16G16B16A16Float: array.m_Scalar = ResourceExportScalar::Float16; channels = 4; break;
-			case RHIFormat::R32Float:
-			case RHIFormat::D32Float:
-			case RHIFormat::D24UnormS8Uint: array.m_Scalar = ResourceExportScalar::Float32; break;
-			case RHIFormat::R32G32Float: array.m_Scalar = ResourceExportScalar::Float32; channels = 2; break;
-			case RHIFormat::R32G32B32Float: array.m_Scalar = ResourceExportScalar::Float32; channels = 3; break;
-			case RHIFormat::R32G32B32A32Float: array.m_Scalar = ResourceExportScalar::Float32; channels = 4; break;
-			case RHIFormat::R32Uint: array.m_Scalar = ResourceExportScalar::Uint32; break;
-			default: return false;
+				return false;
 			}
 			array.m_Address.m_Mip = target.m_Subresources.m_BaseMip;
 			array.m_Address.m_FirstSlice = target.m_Subresources.m_BaseArraySlice;
@@ -151,6 +165,38 @@ namespace gglab
 				: array.m_Scalar == ResourceExportScalar::Uint8 && aspect == RHITextureAspect::Color ? "unorm" : "raw";
 			return true;
 		}
+	}
+
+	RGObservationFailure GetResourceExportSupport(const RHITextureDesc& desc, bool imported) noexcept
+	{
+		if (desc.m_Dimension != RHITextureDimension::Texture2D || desc.m_SampleCount != 1 ||
+			desc.m_Extent.m_Width == 0 || desc.m_Extent.m_Height == 0 ||
+			(imported && !Test(desc.m_Usage, RHITextureUsage::CopySource)))
+		{
+			return RGObservationFailure::UnsupportedResource;
+		}
+		const auto& info = GetRHIFormatInfo(desc.m_Format);
+		if (info.m_BlockWidth != 1 || info.m_BlockHeight != 1 || info.m_BytesPerBlock == 0)
+		{
+			return RGObservationFailure::UnsupportedFormat;
+		}
+		const auto aspects = GetRHITextureAspects(desc);
+		const auto aspect = Test(aspects, RHITextureAspect::Depth) ? RHITextureAspect::Depth : RHITextureAspect::Color;
+		ResourceExportScalar scalar;
+		uint32_t channels;
+		return DescribeTextureFormat(desc.m_Format, aspect, info.m_IsTypeless, scalar, channels)
+			? RGObservationFailure::None : RGObservationFailure::UnsupportedFormat;
+	}
+
+	RGObservationFailure GetResourceExportSupport(const RHIBufferDesc& desc, bool imported) noexcept
+	{
+		const uint32_t stride = desc.m_StrideInBytes == 0 ? 4 : desc.m_StrideInBytes;
+		if (desc.m_SizeInBytes == 0 || stride % 4 != 0 || desc.m_SizeInBytes % stride != 0 ||
+			(imported && !Test(desc.m_Usage, RHIBufferUsage::CopySource)))
+		{
+			return RGObservationFailure::UnsupportedResource;
+		}
+		return RGObservationFailure::None;
 	}
 
 	std::pair<uint64_t, uint32_t> FrameCaptureService::GetPayloadUsage() const noexcept

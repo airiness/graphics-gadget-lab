@@ -90,6 +90,9 @@ namespace gglab
 		bool m_HasFinalBarrierState = false;
 		RHIResourceState m_FinalBarrierState = CommonRHIResourceState();
 		std::optional<RHISubresourceRange> m_FinalBarrierSubresources = std::nullopt;
+		// Descriptor-only discovery capability. This UI diagnostic is not serialized
+		// in the persisted graph schema; the capture frame validates the full address.
+		RGObservationFailure m_ResourceExportSupport = RGObservationFailure::UnsupportedResource;
 	};
 
 	struct RGSnapshotResourceNodeInfo
