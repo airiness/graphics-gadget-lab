@@ -79,7 +79,10 @@ namespace gglab
 		const EnvironmentTextureSource source = bakeScheduler->GetBakingSource();
 		if (physical)
 		{
-			if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(BakeAtmosphereResourcesName)) return;
+			if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(BakeAtmosphereResourcesName))
+			{
+				return;
+			}
 			sourceMode = EnvironmentSourceMode::PhysicalSky;
 			sourceSamplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 			hasSource = true;

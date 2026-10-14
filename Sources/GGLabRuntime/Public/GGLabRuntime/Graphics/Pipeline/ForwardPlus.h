@@ -20,6 +20,13 @@ namespace gglab
 		}
 	};
 	static_assert(sizeof(ForwardPlusTileDepthRange) == 8);
+	static_assert(offsetof(ForwardPlusTileDepthRange, m_MinViewZ) == 0);
+	static_assert(offsetof(ForwardPlusTileDepthRange, m_MaxViewZ) == 4);
+	inline constexpr std::array ForwardPlusTileDepthRangeFields = {
+		GpuBufferFieldLayout{ "minViewZ", offsetof(ForwardPlusTileDepthRange, m_MinViewZ), GpuBufferScalar::Float32 },
+		GpuBufferFieldLayout{ "maxViewZ", offsetof(ForwardPlusTileDepthRange, m_MaxViewZ), GpuBufferScalar::Float32 },
+	};
+	inline constexpr GpuBufferLayout ForwardPlusTileDepthRangeLayout{ sizeof(ForwardPlusTileDepthRange), ForwardPlusTileDepthRangeFields };
 
 	struct ForwardPlusGridMetrics
 	{

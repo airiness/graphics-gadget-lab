@@ -110,9 +110,13 @@ float4 TestClipSegmentProperties() : SV_Target0
 				const float middle = (low + high) * 0.5;
 				const float3 candidate = lerp(mean, history, middle);
 				if (all(candidate >= boxMin) && all(candidate <= boxMax))
+				{
 					low = middle;
+				}
 				else
+				{
 					high = middle;
+				}
 			}
 			const float3 expected = lerp(mean, history, low);
 			const float3 twice = ClipTemporalHistoryTowardMean(actual, mean, boxMin, boxMax);

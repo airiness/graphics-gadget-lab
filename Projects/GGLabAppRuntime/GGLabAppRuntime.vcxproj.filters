@@ -27,6 +27,9 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameSequenceCoordinator.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\ResourceExportWriter.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.cpp">
       <Filter>Demo</Filter>
     </ClCompile>
@@ -79,6 +82,9 @@
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameSequenceCoordinator.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\ResourceExportWriter.h">
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h">

@@ -292,7 +292,10 @@ namespace gglab
 				ImGui::TextDisabled("Background: Physical Sky preview | IBL: HDR texture");
 			}
 			const bool physicalSky = settings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky;
-			if (physicalSky) ImGui::TextDisabled("Physical Sky: calibrated intensity, world-aligned IBL, FP32 radiance.");
+			if (physicalSky)
+			{
+				ImGui::TextDisabled("Physical Sky: calibrated intensity, world-aligned IBL, FP32 radiance.");
+			}
 
 			auto* control = context.m_EnvironmentLightingControl;
 			ImGui::BeginDisabled(!control);
@@ -546,7 +549,10 @@ namespace gglab
 
 			ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
 		};
-		if (ImGui::CollapsingHeader("IBL BRDF LUT")) drawBrdfLut();
+		if (ImGui::CollapsingHeader("IBL BRDF LUT"))
+		{
+			drawBrdfLut();
+		}
 
 		const auto* environmentDesc = GetAllocatedTexture(resources.m_Environment);
 		const auto* environmentPreviewDesc =
@@ -767,7 +773,10 @@ namespace gglab
 					preview.m_Dirty ? " (refresh pending)" : "");
 			}
 		};
-		if (ImGui::CollapsingHeader("IBL Irradiance")) drawIrradiancePreview();
+		if (ImGui::CollapsingHeader("IBL Irradiance"))
+		{
+			drawIrradiancePreview();
+		}
 
 		const auto* prefilteredSpecularDesc =
 			GetAllocatedTexture(resources.m_PrefilteredSpecular);

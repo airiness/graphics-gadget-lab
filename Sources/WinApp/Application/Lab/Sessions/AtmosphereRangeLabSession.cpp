@@ -85,7 +85,10 @@ namespace gglab
 
 	void AtmosphereRangeLabSession::TickPrepare() noexcept
 	{
-		if (!m_LoadingProgress.IsPreparing()) return;
+		if (!m_LoadingProgress.IsPreparing())
+		{
+			return;
+		}
 		const Model* model = m_Services.m_AssetManager->GetModel(m_PendingModelId);
 		if (!model)
 		{
@@ -135,7 +138,10 @@ namespace gglab
 
 	void AtmosphereRangeLabSession::OnEnter() noexcept
 	{
-		if (m_HasEnvironmentOverride) return;
+		if (m_HasEnvironmentOverride)
+		{
+			return;
+		}
 		// Loading sessions must not change the active Lab's environment.
 		m_PreviousEnvironment = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
 		m_HasEnvironmentOverride = true;
@@ -148,7 +154,10 @@ namespace gglab
 
 	void AtmosphereRangeLabSession::OnExit() noexcept
 	{
-		if (!m_HasEnvironmentOverride) return;
+		if (!m_HasEnvironmentOverride)
+		{
+			return;
+		}
 		auto& control = *m_Services.m_EnvironmentLightingControl;
 		control.SetIntensity(m_PreviousEnvironment.m_Intensity);
 		control.SetRotationRadians(m_PreviousEnvironment.m_RotationRadians);

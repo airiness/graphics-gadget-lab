@@ -5846,7 +5846,10 @@ namespace gglab
 						graph.AddPass<TemporalHistoryContractPassData>("Continuity.Color",
 							[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
 							{
-								if (!transaction.ImportHistoryResources(builder, data.m_History)) return;
+								if (!transaction.ImportHistoryResources(builder, data.m_History))
+								{
+									return;
+								}
 								builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
 								builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
 								builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
@@ -5862,15 +5865,24 @@ namespace gglab
 						graph.AddPass<GTAOTemporalHistoryContractPassData>("Continuity.AmbientOcclusion",
 							[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
 							{
-								if (!transaction.ImportAmbientOcclusionHistory(builder, data.m_History)) return;
+								if (!transaction.ImportAmbientOcclusionHistory(builder, data.m_History))
+								{
+									return;
+								}
 								builder.WriteInPlace(data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
 								builder.WriteInPlace(data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
 								recorded = transaction.ExportAmbientOcclusionHistory(builder, data.m_History);
 							});
 					}
 					context.Check(recorded && graph.Compile(), "Continuity fixture records its active history outcome");
-					if (submit) transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, fenceValue++ });
-					else transaction.Abort();
+					if (submit)
+					{
+						transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, fenceValue++ });
+					}
+					else
+					{
+						transaction.Abort();
+					}
 					context.Check(transaction.GetContinuity().m_HasCompatiblePreviousHistory ==
 						continuity.m_HasCompatiblePreviousHistory,
 						"Continuity remains the Begin-time observation after commit or abort");
@@ -6464,7 +6476,10 @@ namespace gglab
 				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.ExposureMetadata",
 					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
 					{
-						if (!exposureManager.ImportRenderGraphResources(frame, builder, data.m_History)) return;
+						if (!exposureManager.ImportRenderGraphResources(frame, builder, data.m_History))
+						{
+							return;
+						}
 						builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
 						builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
 						builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
@@ -7923,7 +7938,10 @@ namespace gglab
 			changed=a; changed.m_Observer.m_X+=1.0f;
 			const bool updated=system.Begin(changed,{1,1,1});
 			context.Check(updated && system.GetDiagnostics().m_DirtyMask==4,"Observer edits schedule only the sky-view producer");
-			if (updated) system.NotifyExecuted(2);
+			if (updated)
+			{
+				system.NotifyExecuted(2);
+			}
 			system.EndFrame(false,{RHIFenceHandle{1,1},12});
 			context.Check(!system.GetDiagnostics().m_Available && system.GetDiagnostics().m_Generations[2]==1 &&
 				pool.GetDiagnostics().m_PendingRetirementTextureCount==3 && device.m_AtmosphereDestroyedBufferCount==0,
@@ -7933,7 +7951,10 @@ namespace gglab
 			context.Check(device.m_AtmosphereDestroyedBufferCount==3 && pool.GetDiagnostics().m_PendingRetirementTextureCount==0,
 				"Atmosphere constants and textures retire after GPU completion");
 			const bool retry=system.Begin(a,{1,1,1});
-			if (retry) system.NotifyExecuted(0);
+			if (retry)
+			{
+				system.NotifyExecuted(0);
+			}
 			system.EndFrame(false,{});
 			device.m_CompletedFenceValue=12;
 			system.Shutdown(); pool.Tick();
@@ -7973,7 +7994,10 @@ namespace gglab
 				frame.m_RenderViews[0].m_CameraPosition = Vector3::Zero;
 				for (uint32_t phase = 0; phase < 3; ++phase)
 				{
-					if (phase == 2) frame.m_RenderViews[0].m_CameraPosition = Vector3(0.0f, 1000.0f, 0.0f);
+					if (phase == 2)
+					{
+						frame.m_RenderViews[0].m_CameraPosition = Vector3(0.0f, 1000.0f, 0.0f);
+					}
 					RenderGraph previewGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
 					const auto previewContext = frame.MakeRenderFrameContext();
 					pass.AddPass(previewGraph, previewContext, previewServices);
@@ -8021,7 +8045,10 @@ namespace gglab
 					// Simulate a successful submission to exercise cache reuse in the next graph.
 					for (uint32_t i = 0; i < 3; ++i)
 					{
-						if (expectedMask & (1u << i)) previewAtmosphere.NotifyExecuted(i);
+						if (expectedMask & (1u << i))
+						{
+							previewAtmosphere.NotifyExecuted(i);
+						}
 					}
 					previewAtmosphere.EndFrame(previewCompiled, { RHIFenceHandle{ 1, 1 }, ++fenceValue });
 				}
@@ -8142,7 +8169,13 @@ namespace gglab
 			context.Check(bakeAtmosphere.CanPublish(), "GPU completion unlocks a complete pending atmosphere generation");
 			AtmosphereSystem activeAtmosphere(&device, &pool);
 			const bool activeBegun = activeAtmosphere.Begin(a, { 1,1,1 });
-			if (activeBegun) for (uint32_t i = 0; i < 3; ++i) activeAtmosphere.NotifyExecuted(i);
+			if (activeBegun)
+			{
+				for (uint32_t i = 0; i < 3; ++i)
+				{
+					activeAtmosphere.NotifyExecuted(i);
+				}
+			}
 			activeAtmosphere.EndFrame(activeBegun, { RHIFenceHandle{ 1, 1 }, 200 });
 			const auto oldTexture = activeAtmosphere.GetTexture(0);
 			const auto newTexture = bakeAtmosphere.GetTexture(0);
@@ -10553,7 +10586,10 @@ namespace gglab
 					const double layered = base + factor * coatReflectance;
 					coatLayerBounded &= std::isfinite(layered) && layered >= 0.0 &&
 						layered <= 1.0001 && base <= 1.0;
-					if (factor == 0.0) coatOffPreservesBase &= layered == 1.0;
+					if (factor == 0.0)
+					{
+						coatOffPreservesBase &= layered == 1.0;
+					}
 				}
 			}
 		}

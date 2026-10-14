@@ -294,13 +294,42 @@ namespace gglab
 		}
 
 		const D3D12_RESOURCE_DESC sourceDesc = sourceTexture->Get()->GetDesc();
+		if (copy.m_SourceMipLevel >= sourceDesc.MipLevels || copy.m_SourceMipLevel >= 32)
+		{
+			return false;
+		}
+		const uint32_t bytesPerTexel = copy.m_SourceAspect == RHITextureAspect::Stencil ? 1u :
+			GetRHIFormatInfo(footprint.m_Format).m_BytesPerBlock;
+		if (bytesPerTexel == 0 || footprint.m_BytesPerTexel != bytesPerTexel ||
+			footprint.m_RowSizeInBytes != static_cast<uint64_t>(footprint.m_Width) * bytesPerTexel ||
+			footprint.m_RowPitch < footprint.m_RowSizeInBytes ||
+			footprint.m_RowPitch > UINT_MAX || footprint.m_RowPitch % RHITextureCopyRowPitchAlignment != 0 ||
+			footprint.m_RowPitch % bytesPerTexel != 0 ||
+			footprint.m_SizeInBytes != footprint.m_RowPitch * footprint.m_Height)
+		{
+			return false;
+		}
+		const bool depthStencil = sourceDesc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT ||
+			sourceDesc.Format == DXGI_FORMAT_R24G8_TYPELESS;
+		const bool depth = depthStencil || sourceDesc.Format == DXGI_FORMAT_D32_FLOAT ||
+			(sourceDesc.Format == DXGI_FORMAT_R32_TYPELESS && (sourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL));
+		if ((copy.m_SourceAspect == RHITextureAspect::Color && depth) ||
+			(copy.m_SourceAspect == RHITextureAspect::Depth && !depth) ||
+			(copy.m_SourceAspect == RHITextureAspect::Stencil && !depthStencil) ||
+			(copy.m_SourceAspect != RHITextureAspect::Color && copy.m_SourceAspect != RHITextureAspect::Depth &&
+				copy.m_SourceAspect != RHITextureAspect::Stencil))
+		{
+			return false;
+		}
 		const uint64_t mipWidth = std::max<uint64_t>(sourceDesc.Width >> copy.m_SourceMipLevel, 1);
 		const uint64_t mipHeight = std::max<uint64_t>(
 			static_cast<uint64_t>(sourceDesc.Height) >> copy.m_SourceMipLevel, 1);
 		if (sourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
 			sourceDesc.SampleDesc.Count != 1 || copy.m_SourceMipLevel >= sourceDesc.MipLevels ||
 			copy.m_SourceArraySlice >= sourceDesc.DepthOrArraySize ||
-			sourceDesc.Format != ToDXGIFormat(footprint.m_Format) ||
+			(sourceDesc.Format != ToDXGIFormat(footprint.m_Format) &&
+				!(footprint.m_Format == RHIFormat::D32Float && sourceDesc.Format == DXGI_FORMAT_R32_TYPELESS) &&
+				!(footprint.m_Format == RHIFormat::D24UnormS8Uint && sourceDesc.Format == DXGI_FORMAT_R24G8_TYPELESS)) ||
 			footprint.m_Width > mipWidth || footprint.m_Height > mipHeight)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("DX12 texture-to-buffer copy footprint does not match the "
@@ -319,12 +348,27 @@ namespace gglab
 			.Depth = 1,
 			.RowPitch = static_cast<UINT>(footprint.m_RowPitch),
 		};
+		const uint32_t plane = copy.m_SourceAspect == RHITextureAspect::Stencil ? 1u : 0u;
+		const uint32_t subresource = copy.m_SourceMipLevel + copy.m_SourceArraySlice * sourceDesc.MipLevels +
+			plane * sourceDesc.MipLevels * sourceDesc.DepthOrArraySize;
+		if (copy.m_SourceAspect != RHITextureAspect::Color)
+		{
+			D3D12_PLACED_SUBRESOURCE_FOOTPRINT native{};
+			UINT rows = 0;
+			UINT64 rowBytes = 0;
+			device.Get()->GetCopyableFootprints(&sourceDesc, subresource, 1, 0, &native, &rows, &rowBytes, nullptr);
+			if (native.Footprint.Width != footprint.m_Width || native.Footprint.Height != footprint.m_Height ||
+				rowBytes != footprint.m_RowSizeInBytes || native.Footprint.RowPitch > footprint.m_RowPitch)
+			{
+				return false;
+			}
+			destination.PlacedFootprint.Footprint.Format = native.Footprint.Format;
+		}
 
 		D3D12_TEXTURE_COPY_LOCATION source{};
 		source.pResource = sourceTexture->Get();
 		source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-		source.SubresourceIndex =
-			copy.m_SourceMipLevel + copy.m_SourceArraySlice * sourceDesc.MipLevels;
+		source.SubresourceIndex = subresource;
 		const D3D12_BOX sourceBox{
 			.left = 0,
 			.top = 0,
@@ -333,7 +377,8 @@ namespace gglab
 			.bottom = footprint.m_Height,
 			.back = 1,
 		};
-		commandList.CopyTextureRegion(&destination, 0, 0, 0, &source, &sourceBox);
+		commandList.CopyTextureRegion(&destination, 0, 0, 0, &source,
+			copy.m_SourceAspect == RHITextureAspect::Color ? &sourceBox : nullptr);
 		return true;
 	}
 

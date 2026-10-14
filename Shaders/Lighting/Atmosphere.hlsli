@@ -22,7 +22,10 @@ float2 AtmosphereSkyViewUV(float3 direction, float3 up, float3 sun)
 	float3 zAxis = cross(xAxis,up);
 	float zenith = acos(clamp(dot(direction,up),-1.0,1.0));
 	float azimuth = atan2(dot(direction,zAxis),dot(direction,xAxis));
-	if (azimuth < 0.0) azimuth += 2.0 * AtmospherePi;
+	if (azimuth < 0.0)
+	{
+		azimuth += 2.0 * AtmospherePi;
+	}
 	float2 unitUV = float2(azimuth / (2.0 * AtmospherePi), zenith / AtmospherePi);
 	return (unitUV * float2(191,107) + 0.5) / float2(192,108);
 }
@@ -55,7 +58,10 @@ void AtmosphereMedium(float3 p, out float3 rayleigh, out float mie, out float3 e
 }
 float3 AtmosphereIntegrateTransmittance(float3 p, float3 d)
 {
-	if (AtmosphereGroundDistance(p,d) > 0.0) return 0.0;
+	if (AtmosphereGroundDistance(p,d) > 0.0)
+	{
+		return 0.0;
+	}
 	float stepSize = AtmosphereTopDistance(p,d)/64.0;
 	float3 opticalDepth = 0.0;
 	for (uint i=0; i<64; ++i)
@@ -74,7 +80,10 @@ float2 AtmosphereLutUV(float radius, float mu, float2 extent)
 }
 float3 AtmosphereSunTransmittance(Texture2D<float4> transmittance, SamplerState samplerState, float3 p, float3 sun)
 {
-	if (AtmosphereGroundDistance(p,sun)>0.0) return 0.0;
+	if (AtmosphereGroundDistance(p,sun)>0.0)
+	{
+		return 0.0;
+	}
 	float radius = length(p);
 	return transmittance.SampleLevel(samplerState, AtmosphereLutUV(radius, dot(p,sun)/radius, float2(256,64)), 0).rgb;
 }

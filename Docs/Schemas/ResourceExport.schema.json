@@ -1,0 +1,482 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.resource-export.v1",
+  "title": "GGLab resource export v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "schemaVersion",
+    "frameSerial",
+    "frame",
+    "submission",
+    "observation",
+    "graph",
+    "targets"
+  ],
+  "properties": {
+    "schema": {
+      "const": "gglab.resource-export"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "frameSerial": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "frame": {
+      "type": "object",
+      "required": [
+        "backend",
+        "content",
+        "frame",
+        "camera",
+        "time",
+        "readiness",
+        "temporal",
+        "adapterDriverIdentity",
+        "codeIdentity",
+        "shaderIdentity",
+        "parameterRevision"
+      ],
+      "properties": {
+        "backend": {
+          "enum": [
+            "dx12",
+            "vulkan"
+          ]
+        },
+        "content": {
+          "type": "object"
+        },
+        "frame": {
+          "type": "object",
+          "required": [
+            "serial",
+            "index"
+          ]
+        },
+        "camera": {
+          "type": "object"
+        },
+        "time": {
+          "type": "object"
+        },
+        "readiness": {
+          "type": "object"
+        },
+        "temporal": {
+          "type": "object"
+        },
+        "adapterDriverIdentity": {
+          "type": "string"
+        },
+        "codeIdentity": {
+          "$ref": "#/$defs/unavailable"
+        },
+        "shaderIdentity": {
+          "$ref": "#/$defs/unavailable"
+        },
+        "parameterRevision": {
+          "type": "null"
+        }
+      }
+    },
+    "submission": {
+      "type": "object",
+      "required": [
+        "fenceIndex",
+        "fenceGeneration",
+        "fenceValue",
+        "completed"
+      ],
+      "properties": {
+        "fenceIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fenceGeneration": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fenceValue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "completed": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "graph",
+        "resourceExport",
+        "nonFiniteWatch"
+      ],
+      "properties": {
+        "graph": {
+          "type": "boolean"
+        },
+        "resourceExport": {
+          "const": true
+        },
+        "nonFiniteWatch": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "graph": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[^\\\\/]+\\.json$"
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": [
+          "address",
+          "resourceNodeIndex",
+          "version",
+          "writerPassIndex",
+          "writerPass",
+          "writerOccurrence",
+          "type",
+          "array",
+          "physicalFormat",
+          "viewFormat",
+          "rawTypeless",
+          "dtype",
+          "shape",
+          "byteCount",
+          "encoding",
+          "channelOrder",
+          "strideBytes",
+          "elementCount",
+          "fields",
+          "semantics",
+          "extendedLifetimes"
+        ],
+        "properties": {
+          "address": {
+            "type": "object",
+            "required": [
+              "resource",
+              "at",
+              "occurrence",
+              "mip",
+              "slices",
+              "aspect"
+            ],
+            "properties": {
+              "resource": {
+                "type": "string",
+                "minLength": 1
+              },
+              "at": {
+                "oneOf": [
+                  {
+                    "const": "final"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "before"
+                    ],
+                    "properties": {
+                      "before": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "after"
+                    ],
+                    "properties": {
+                      "after": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "occurrence": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "mip": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "slices": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                ],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "aspect": {
+                "enum": [
+                  "None",
+                  "Color",
+                  "Depth",
+                  "Stencil"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "resourceNodeIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "writerPassIndex": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "writerPass": {
+            "type": "string"
+          },
+          "writerOccurrence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "type": {
+            "enum": [
+              "Texture",
+              "Buffer"
+            ]
+          },
+          "array": {
+            "type": "string",
+            "pattern": "^[^\\\\/]+\\.npy$"
+          },
+          "physicalFormat": {
+            "type": "string"
+          },
+          "viewFormat": {
+            "type": "string"
+          },
+          "rawTypeless": {
+            "type": "boolean"
+          },
+          "dtype": {
+            "enum": [
+              "|u1",
+              "<u4",
+              "<f2",
+              "<f4",
+              "structured"
+            ]
+          },
+          "shape": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "byteCount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "encoding": {
+            "enum": [
+              "raw",
+              "unorm",
+              "srgb",
+              "normalized-depth"
+            ]
+          },
+          "channelOrder": {
+            "enum": [
+              "",
+              "R",
+              "RG",
+              "RGB",
+              "RGBA",
+              "BGRA"
+            ]
+          },
+          "strideBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "elementCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "offset",
+                "dtype",
+                "count"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "dtype": {
+                  "enum": [
+                    "|u1",
+                    "<u4",
+                    "<f2",
+                    "<f4"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "semantics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "role",
+                  "units",
+                  "space",
+                  "description",
+                  "preExposure",
+                  "reversedDepth",
+                  "watchTier"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "string"
+                  },
+                  "space": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "preExposure": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "exclusiveMinimum": 0
+                  },
+                  "reversedDepth": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "watchTier": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 3
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "extendedLifetimes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "resource",
+                "originalLastUser",
+                "observedLastUser"
+              ],
+              "properties": {
+                "resource": {
+                  "type": "string"
+                },
+                "originalLastUser": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "observedLastUser": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "unavailable": {
+      "type": "object",
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "const": "unavailable"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 #pragma once
 #include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 
 #include <chrono>
 #include <cstddef>
@@ -75,8 +76,13 @@ namespace gglab
 		// Uses the same timing, view and output settings without changing the
 		// screenshot source used by Capture and F9. Default timing is next frame.
 		uint64_t ExportGraph(bool summary = false) noexcept;
+		// Copies an address group into the existing resource export queue. The live
+		// compiled frame resolves the names; discovery snapshots are only UI choices.
+		uint64_t ExportResources(std::vector<RGResourceAddress> targets,
+			bool includeGraph = false) noexcept;
 		// Submits one capture per reference view of the active content, in order,
-		// with the current settings. Returns the number of submitted requests.
+		// with the current settings, waiting for temporary capacity before changing
+		// views or issuing frames. Returns the number of submitted requests.
 		uint32_t CaptureReferenceViews() noexcept;
 		// Submits an explicit request and returns its request id.
 		uint64_t Submit(FrameCaptureRequest request) noexcept;
@@ -97,7 +103,7 @@ namespace gglab
 		[[nodiscard]] const FrameCaptureFrameState* GetLastFrameState() const noexcept;
 		[[nodiscard]] uint32_t GetSettledFrameCount() const noexcept;
 
-		// Images use their PNG; graph-only results use their published JSON.
+		// Images use their PNG; graph/resource exports use their published JSON.
 		[[nodiscard]] static const std::filesystem::path& GetOutputPath(
 			const FrameCaptureRequestResult& result) noexcept;
 		// ImGui, clipboard and logs use UTF-8, not the Windows narrow path encoding.

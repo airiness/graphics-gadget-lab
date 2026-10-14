@@ -2,8 +2,11 @@
 
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
@@ -14,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -52,7 +56,7 @@ namespace gglab
 			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
 				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				return {};
+				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
 			RHIBufferHandle CreateBuffer(
 				const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
@@ -113,7 +117,7 @@ namespace gglab
 				--m_MapCount;
 			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
-			bool IsAlive(RHITextureHandle) const noexcept override { return false; }
+			bool IsAlive(RHITextureHandle texture) const noexcept override { return texture.IsValid(); }
 			bool IsAlive(RHIBufferHandle buffer) const noexcept override
 			{
 				return m_Buffers.contains(buffer);
@@ -177,7 +181,74 @@ namespace gglab
 
 			std::unordered_map<RHIBufferHandle, Buffer> m_Buffers;
 			uint32_t m_NextBufferIndex = 0;
+			uint32_t m_NextTextureIndex = 0;
 			int32_t m_MapCount = 0;
+		};
+
+		class ExportTestCommands final : public RHIGraphicsCommandContext
+		{
+		public:
+			explicit ExportTestCommands(CaptureTestDevice& device) : m_Device(device) {}
+			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void FlushBarriers() noexcept override {}
+			void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+				RHIBufferHandle source, uint64_t sourceOffset, uint64_t bytes) noexcept override
+			{
+				auto* dest = static_cast<uint8_t*>(m_Device.MapBuffer(destination, {}));
+				const auto* src = static_cast<const uint8_t*>(m_Device.MapBuffer(source, {}));
+				std::memcpy(dest + destinationOffset, src + sourceOffset, static_cast<size_t>(bytes));
+				m_Device.UnmapBuffer(source, {});
+				m_Device.UnmapBuffer(destination, {});
+			}
+			void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
+			{
+				m_TextureCopies.push_back(copy);
+				auto* bytes = static_cast<uint8_t*>(m_Device.MapBuffer(copy.m_Destination, {})) + copy.m_DestinationOffset;
+				const auto& fp = copy.m_Footprint;
+				for (uint32_t row = 0; row < fp.m_Height; ++row)
+				{
+					std::memset(bytes + row * fp.m_RowPitch, 0xee, static_cast<size_t>(fp.m_RowPitch));
+					for (uint32_t x = 0; x < fp.m_Width; ++x)
+					{
+						if (copy.m_SourceAspect == RHITextureAspect::Depth)
+						{
+							const uint32_t depth = x == 0 ? 0u : 0x00ffffffu;
+							std::memcpy(bytes + row * fp.m_RowPitch + x * 4, &depth, 4);
+						}
+						else
+						{
+							std::memset(bytes + row * fp.m_RowPitch + x * fp.m_BytesPerTexel,
+								static_cast<int>(copy.m_SourceArraySlice * 32 + row * 8 + x), fp.m_BytesPerTexel);
+						}
+					}
+				}
+				m_Device.UnmapBuffer(copy.m_Destination, {});
+			}
+			void SetPipeline(RHIPipelineHandle) noexcept override {}
+			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
+			void BeginRendering(const RHIRenderingInfo&) noexcept override {}
+			void EndRendering() noexcept override {}
+			bool IsRendering() const noexcept override { return false; }
+			void ClearColorAttachment(uint32_t, const std::array<float, 4>&) noexcept override {}
+			void ClearDepthAttachment(float, std::optional<uint8_t>) noexcept override {}
+			void SetViewport(const RHIViewport&) noexcept override {}
+			void SetScissorRect(const RHIScissorRect&) noexcept override {}
+			void SetPrimitiveTopology(RHIPrimitiveTopology) noexcept override {}
+			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
+			void SetVertexBuffers(uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override {}
+			void SetIndexBuffer(const RHIIndexBufferBinding&) noexcept override {}
+			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
+			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override {}
+			std::vector<RHITextureToBufferCopy> m_TextureCopies;
+		private:
+			CaptureTestDevice& m_Device;
 		};
 
 		[[nodiscard]] RHIFencePoint MakeFence(uint64_t value) noexcept
@@ -438,8 +509,14 @@ namespace gglab
 				"A frame-restricted request cannot allocate or bind in another frame");
 			const auto sceneTap = service.BindTap(100, FrameCaptureSource::Scene, target);
 			const auto diagnosticTap = service.BindTap(100, FrameCaptureSource::Diagnostic, target);
-			if (sceneTap) device.FillReadback(sceneTap->m_Buffer, sceneTap->m_Footprint);
-			if (diagnosticTap) device.FillReadback(diagnosticTap->m_Buffer, diagnosticTap->m_Footprint);
+			if (sceneTap)
+			{
+				device.FillReadback(sceneTap->m_Buffer, sceneTap->m_Footprint);
+			}
+			if (diagnosticTap)
+			{
+				device.FillReadback(diagnosticTap->m_Buffer, diagnosticTap->m_Footprint);
+			}
 			service.OnFrameSubmitted(100, MakeFence(1));
 			const auto missed = Consume(service);
 			context.Check(sceneTap && diagnosticTap && missed.size() == 1 &&
@@ -476,7 +553,10 @@ namespace gglab
 				"Abort fails both bound and unbound frame-restricted requests and requeues only flexible requests");
 			const uint64_t retry = service.RequestDiagnosticCapture(weight, 102);
 			const auto retryTap = service.BindTap(102, FrameCaptureSource::Diagnostic, target);
-			if (retryTap) device.FillReadback(retryTap->m_Buffer, retryTap->m_Footprint);
+			if (retryTap)
+			{
+				device.FillReadback(retryTap->m_Buffer, retryTap->m_Footprint);
+			}
 			service.OnFrameSubmitted(102, MakeFence(2));
 			device.m_CompletedFenceValue = 2;
 			const auto retried = Consume(service);
@@ -749,7 +829,10 @@ namespace gglab
 			std::string ids;
 			for (const auto& entry : diagnostics::RGEnumTextTraits<E>::Entries)
 			{
-				if (!ids.empty()) ids += ',';
+				if (!ids.empty())
+				{
+					ids += ',';
+				}
 				ids += diagnostics::RGEnumId(entry.m_Value);
 			}
 			context.Check(ids == expected, "Graph schema enum identifiers are pinned independently of UI labels");
@@ -762,7 +845,7 @@ namespace gglab
 			CheckGraphEnumIds<RGOrderingRequirement>(context, "Ordered,Unordered");
 			CheckGraphEnumIds<RGDependencyAccess>(context, "Read,Write,ReadWrite");
 			CheckGraphEnumIds<RGDependencyReason>(context,
-				"WriterToReader,PreviousWriterToWriter,PreviousReaderToWriter,ExportWriterToExport,ExportReaderToExport");
+				"WriterToReader,PreviousWriterToWriter,PreviousReaderToWriter,ExportWriterToExport,ExportReaderToExport,ObservationOrder");
 			CheckGraphEnumIds<RGBarrierKind>(context, "Transition,Uav");
 			CheckGraphEnumIds<RGBarrierReason>(context, "AccessTransition,OrderedStorageHazard,FinalStateTransition");
 			CheckGraphEnumIds<RGTextureAccess>(context,
@@ -850,8 +933,11 @@ namespace gglab
 							access["writtenResourceNodeIndex"] == pass["writes"][i]["resourceNodeIndex"],
 							"Full ReadWrite accesses distinguish consumed and produced versions");
 					}
-					else context.Check(access["writtenVersion"].is_null() && access["writtenResourceNodeIndex"].is_null(),
-						"Read-only accesses have no written version");
+					else
+					{
+						context.Check(access["writtenVersion"].is_null() && access["writtenResourceNodeIndex"].is_null(),
+							"Read-only accesses have no written version");
+					}
 				}
 			}
 			const auto& range = full["compile"]["passes"][2]["accesses"][0]["subresources"];
@@ -877,6 +963,514 @@ namespace gglab
 				diagnostic["passIndex"] == 0 && diagnostic["resourceIndex"] == 0 &&
 				!diagnostic["message"].get<std::string>().empty() && failed["execution"]["status"] == "unavailable",
 				"Generic compile-only JSON retains diagnostics without claiming execution");
+		}
+
+		void RunResourceExportTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			FrameCaptureService service(device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data { RGBufferId m_Buffer; };
+			RGBufferId buffer;
+			graph.AddPass<Data>("Repeated", RGPassEncoderType::Copy, [](auto&, auto&) {});
+			graph.AddPass<Data>("Initialize", RGPassEncoderType::Copy, [&](auto& builder, auto& data)
+				{
+					buffer = builder.CreateBuffer("ForwardPlus.TileLightHeaders", { .m_SizeInBytes = 16, .m_StrideInBytes = 8 });
+					data.m_Buffer = builder.Write(buffer, RGBufferAccess::CopyDest);
+					buffer = data.m_Buffer;
+				}, [&](auto& execution, auto& data)
+				{
+					const auto handle = execution.GetBufferHandle(data.m_Buffer);
+					auto* words = static_cast<uint32_t*>(device.MapBuffer(handle, {}));
+					for (uint32_t i = 0; i < 4; ++i) words[i] = 10 + i;
+					device.UnmapBuffer(handle, {});
+				});
+			graph.AddPass<Data>("Repeated", RGPassEncoderType::Copy, [&](auto& builder, auto& data)
+				{ data.m_Buffer = builder.ReadWrite(buffer, RGBufferAccess::StorageReadWrite); buffer = data.m_Buffer; builder.SideEffect(); },
+				[&](auto& execution, auto& data)
+				{
+					const auto handle = execution.GetBufferHandle(data.m_Buffer);
+					auto* words = static_cast<uint32_t*>(device.MapBuffer(handle, {}));
+					for (uint32_t i = 0; i < 4; ++i) words[i] = 20 + i;
+					device.UnmapBuffer(handle, {});
+				});
+			context.Check(graph.Compile(), "Resource-version fixture compiles before observations");
+			const RGResourceAddress before{ .m_Resource = "ForwardPlus.TileLightHeaders", .m_Position = RGObservationPosition::Before,
+				.m_Pass = "Repeated", .m_Occurrence = 2 };
+			const RGResourceAddress final{ .m_Resource = "ForwardPlus.TileLightHeaders" };
+			auto ambiguous = before; ambiguous.m_Occurrence.reset();
+			auto culled = before; culled.m_Occurrence = 1;
+			context.Check(graph.ResolveObservation(ambiguous).m_Failure == RGObservationFailure::AmbiguousPass &&
+				graph.ResolveObservation(culled).m_Failure == RGObservationFailure::Culled,
+				"Observation occurrence counts include culled declarations and never revive them");
+			const auto id = service.RequestResourceExport({ before, final }, 7, false, true);
+			context.Check(service.PrepareResourceExports(7, graph) == FrameCaptureAvailability::Available,
+				"A complete resource group reserves its payloads together");
+			RGSnapshot snapshot; BuildRenderGraphSnapshot(graph, snapshot);
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			context.Check(json["schemaVersion"] == 2 && json["compile"]["passes"][0]["culled"] == true &&
+				json["compile"]["passes"][1]["executionOrder"] == 0 && json["compile"]["passes"][2]["executionOrder"] == 2,
+				"Observers preserve original liveness/order and occupy the exact version cut");
+			service.BeginGraphRecording(7, graph);
+			ExportTestCommands commands(device);
+			RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+			graph.Execute(execution);
+			service.EndGraphRecording(7, graph);
+			service.OnFrameSubmitted(7, MakeFence(3));
+			service.CollectCompleted();
+			std::vector<FrameCaptureResult> results; service.ConsumeResults(results);
+			context.Check(results.empty() && device.GetMapCount() == 0, "Resource payloads wait for their submission fence");
+			device.m_CompletedFenceValue = 3; service.CollectCompleted(); service.ConsumeResults(results);
+			context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Resources && results[0].m_Graph &&
+				results[0].m_Graph->m_Execution.m_Recorded, "Resource arrays and their optional graph publish once with the same completed frame");
+			if (!results.empty() && results[0].m_Resources)
+			{
+				const auto& arrays = results[0].m_Resources->m_Arrays;
+				uint32_t first = 0, last = 0;
+				std::memcpy(&first, arrays[0].m_Data.data(), 4); std::memcpy(&last, arrays[1].m_Data.data(), 4);
+				context.Check(first == 10 && last == 20 && arrays[0].m_Fields.size() == 2 && arrays[0].m_Stride == 8 &&
+					arrays[0].m_Shape == std::vector<uint64_t>{2}, "An overwritten physical buffer exports both exact logical versions and its registered layout");
+				ForwardPlusDebugReadback debugReadback;
+				debugReadback.Initialize(device, 1);
+				const auto grid = MakeForwardPlusTileGrid(32, 16);
+				debugReadback.PrepareGridBuffer(device, 0, grid);
+				const auto handle = debugReadback.GetGridBuffer(0);
+				auto* mapped = device.MapBuffer(handle, {});
+				std::memcpy(mapped, arrays[1].m_Data.data(), arrays[1].m_Data.size());
+				device.UnmapBuffer(handle, {});
+				debugReadback.MarkGridScheduled(0, 7, grid); debugReadback.ConsumeCompletedSlot(0);
+				const auto readback = debugReadback.GetLatestGrid();
+				context.Check(readback && readback->m_IsValid && readback->m_Headers.size() == 2 &&
+					std::memcmp(readback->m_Headers.data(), arrays[1].m_Data.data(), arrays[1].m_Data.size()) == 0,
+					"Resource-export tile-header bytes agree with the existing ForwardPlusDebugReadback decoder");
+			}
+			graph.Retire(MakeFence(3));
+
+			RenderGraph partial({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Empty {};
+			partial.AddPass<Empty>("Partial", RGPassEncoderType::Copy, [](auto& builder, auto&)
+				{
+					auto texture = builder.CreateTexture("Partial", { .m_Format = RHIFormat::R8Unorm,
+						.m_Extent = {4, 4, 1}, .m_ArraySize = 2, .m_MipLevels = 2 });
+					builder.WriteInPlace(texture, RGTextureAccess::CopyDest, RHISubresourceRange{1, 1, 1, 1, RHITextureAspect::Color});
+					builder.SideEffect();
+				});
+			context.Check(partial.Compile(), "Partial mip/slice fixture compiles");
+			context.Check(partial.ResolveObservation({ .m_Resource = "Partial", .m_Mip = 1, .m_FirstSlice = 1, .m_SliceCount = 1 }).m_Failure == RGObservationFailure::None &&
+				partial.ResolveObservation({ .m_Resource = "Partial" }).m_Failure == RGObservationFailure::UndefinedContent &&
+				partial.ResolveObservation({ .m_Resource = "missing" }).m_Failure == RGObservationFailure::UnknownResource,
+				"Only the defined mip and slice can be observed");
+
+			FrameCaptureService bounded(device, { .m_MaxPayloads = 1, .m_MaxPayloadBytes = 1024 });
+			const auto tooLarge = bounded.RequestResourceExport({ final, final }, 8);
+			std::vector<FrameCaptureResult> failures; bounded.ConsumeResults(failures);
+			context.Check(failures.size() == 1 && failures[0].m_RequestId == tooLarge && failures[0].m_ResourceFailure == RGObservationFailure::TooLarge,
+				"Never-fitting resource groups fail immediately instead of being split");
+			const auto imageId = bounded.RequestCapture(FrameCaptureSource::Scene, 8);
+			const auto imageTap = bounded.BindTap(8, FrameCaptureSource::Scene, { .m_Format = RHIFormat::R8G8B8A8Unorm, .m_Usage = RHITextureUsage::CopySource, .m_Extent = {1, 1, 1} });
+			context.Check(imageId != 0 && imageTap.has_value(), "Busy fixture occupies the shared payload slot");
+			context.Check(bounded.GetResourceExportFrameAvailability() == FrameCaptureAvailability::Busy,
+				"Scheduled exports wait for payload retirement before simulation begins");
+			const auto waiting = bounded.RequestResourceExport({{ .m_Resource = "Partial", .m_Mip = 1, .m_FirstSlice = 1, .m_SliceCount = 1 }}, 9, true);
+			const auto graphId = bounded.RequestCapture(FrameCaptureSource::RenderGraph, 9);
+			context.Check(bounded.PrepareResourceExports(9, partial) == FrameCaptureAvailability::Busy && !partial.HasResourceObservations(),
+				"Busy exact-sequence groups defer before graph extension or GPU submission");
+			failures.clear(); bounded.ConsumeResults(failures);
+			context.Check(failures.size() == 2 && failures[0].m_RequestId == waiting && failures[1].m_RequestId == graphId &&
+				std::ranges::all_of(failures, [](const auto& result) { return result.m_Status == FrameCaptureStatus::Busy && result.m_FrameSerial == 9; }),
+				"Every request on the deferred frame retries as one frame with fresh metadata");
+			bounded.OnFrameAborted(8);
+		}
+
+		void RunResourceExportSupportTests(SelfTestContext& context) noexcept
+		{
+			RHITextureDesc preview{ .m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled, .m_Extent = { 1024, 768, 1 } };
+			context.Check(GetResourceExportSupport(preview, true) == RGObservationFailure::UnsupportedResource &&
+				GetResourceExportSupport(preview, false) == RGObservationFailure::None,
+				"Imported previews require creation-time CopySource while graph-owned textures can derive observation usage");
+			RHITextureDesc cube = preview;
+			cube.m_Format = RHIFormat::R16G16B16A16Float;
+			cube.m_ArraySize = 6;
+			cube.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
+			cube.m_Usage |= RHITextureUsage::CopySource;
+			context.Check(GetResourceExportSupport(cube, true) == RGObservationFailure::None,
+				"A copy-capable imported HDR cubemap is discoverable for resource export");
+			auto unsupported = cube;
+			unsupported.m_Dimension = RHITextureDimension::Texture3D;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedResource,
+				"Three-dimensional textures are excluded by the Runtime export capability");
+			unsupported = cube;
+			unsupported.m_SampleCount = 4;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedResource,
+				"Multisampled textures are excluded by the Runtime export capability");
+			unsupported = cube;
+			unsupported.m_Format = RHIFormat::Unknown;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedFormat,
+				"Unknown formats do not become export candidates");
+			unsupported = cube;
+			unsupported.m_Extent.m_Width = 0;
+			context.Check(GetResourceExportSupport(unsupported, true) == RGObservationFailure::UnsupportedResource,
+				"Empty texture extents do not become export candidates");
+			bool supportedFormats = true;
+			for (uint32_t value = 1; value < static_cast<uint32_t>(RHIFormat::Count); ++value)
+			{
+				RHITextureDesc desc = cube;
+				desc.m_Format = static_cast<RHIFormat>(value);
+				supportedFormats &= GetResourceExportSupport(desc, true) == RGObservationFailure::None;
+			}
+			context.Check(supportedFormats, "Discovery keeps the current typed, typeless and depth format families supported by T2");
+			RHIBufferDesc buffer{ .m_SizeInBytes = 32, .m_StrideInBytes = 8 };
+			context.Check(GetResourceExportSupport(buffer, false) == RGObservationFailure::None &&
+				GetResourceExportSupport(buffer, true) == RGObservationFailure::UnsupportedResource,
+				"Buffer discovery distinguishes graph-owned usage from an imported allocation's copy contract");
+			buffer.m_Usage = RHIBufferUsage::CopySource;
+			context.Check(GetResourceExportSupport(buffer, true) == RGObservationFailure::None,
+				"Copy-capable raw and structured buffers remain export candidates");
+			buffer.m_StrideInBytes = 3;
+			context.Check(GetResourceExportSupport(buffer, true) == RGObservationFailure::UnsupportedResource,
+				"Unsupported buffer word layouts are excluded by the same rule used for array descriptions");
+
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			graph.AddPass<Data>("Discovery", [&](auto& builder, auto&)
+				{
+					auto previewTexture = builder.ImportTexture("Preview.IBL.EnvironmentCubemap", RHITextureHandle{ 10, 1 },
+						preview, RGTextureAccess::Sample, RGContentValidity::Defined);
+					auto environment = builder.ImportTexture("IBL.EnvironmentCubemap", RHITextureHandle{ 11, 1 },
+						cube, RGTextureAccess::Sample, RGContentValidity::Defined);
+					GGLAB_UNUSED(builder.Read(previewTexture, RGTextureAccess::Sample));
+					GGLAB_UNUSED(builder.Read(environment, RGTextureAccess::Sample));
+					auto words = builder.CreateBuffer("Words", { .m_SizeInBytes = 32 });
+					builder.WriteInPlace(words, RGBufferAccess::CopyDest);
+					builder.SideEffect();
+				});
+			context.Check(graph.Compile(), "Resource export discovery fixture compiles without inserting observers");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const auto find = [&](std::string_view name)
+				{ return std::ranges::find(snapshot.m_Resources, name, &RGSnapshotResourceInfo::m_Name); };
+			const auto previewInfo = find("Preview.IBL.EnvironmentCubemap");
+			const auto cubeInfo = find("IBL.EnvironmentCubemap");
+			const auto wordsInfo = find("Words");
+			context.Check(previewInfo != snapshot.m_Resources.end() && cubeInfo != snapshot.m_Resources.end() &&
+				wordsInfo != snapshot.m_Resources.end() &&
+				previewInfo->m_ResourceExportSupport == RGObservationFailure::UnsupportedResource &&
+				cubeInfo->m_ResourceExportSupport == RGObservationFailure::None &&
+				wordsInfo->m_ResourceExportSupport == RGObservationFailure::None && !graph.HasResourceObservations(),
+				"Immutable diagnostics publish export capabilities without promoting imported usage or changing the graph");
+			context.Check(graph.ResolveObservation({ .m_Resource = "Preview.IBL.EnvironmentCubemap" }).m_Failure ==
+				RGObservationFailure::UnsupportedResource,
+				"The imported preview hidden by discovery is rejected by actual address resolution for the same reason");
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			context.Check(json["schemaVersion"] == 1 && std::ranges::none_of(json["compile"]["resources"],
+				[](const auto& resource) { return resource.contains("resourceExportSupport"); }),
+				"UI export capability diagnostics leave the persisted graph schema unchanged");
+		}
+
+		void RunObservationStateTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device; TransientResourcePool pool(&device); FrameCaptureService service(device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			const RHITextureDesc desc{ .m_Format = RHIFormat::R8Unorm,
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopySource, .m_Extent = {2, 2, 1} };
+			graph.AddPass<Data>("UseImported", RGPassEncoderType::Copy, [&](auto& builder, auto&)
+				{
+					auto texture = builder.ImportTexture("Imported", RHITextureHandle{10, 1}, desc,
+						RGTextureAccess::Sample, RGContentValidity::Defined);
+					GGLAB_UNUSED(builder.Read(texture, RGTextureAccess::Sample));
+					builder.Export(texture, RGTextureAccess::Sample);
+				});
+			context.Check(graph.Compile(), "Imported export-state fixture compiles");
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene, 11));
+			const auto image = service.BindTap(11, FrameCaptureSource::Scene,
+				{ .m_Format = RHIFormat::R8G8B8A8Unorm, .m_Usage = RHITextureUsage::CopySource, .m_Extent = {1, 1, 1} });
+			GGLAB_UNUSED(service.RequestResourceExport({{ .m_Resource = "Imported" }}, 11, false, true));
+			context.Check(image && service.PrepareResourceExports(11, graph) == FrameCaptureAvailability::Available,
+				"A final observation can read a defined imported resource after its declared Export");
+			RGSnapshot snapshot; BuildRenderGraphSnapshot(graph, snapshot);
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			context.Check(std::ranges::any_of(json["compile"]["passes"][1]["postBarriers"], [](const auto& barrier)
+				{ return barrier["resource"] == "Imported" && barrier["reason"] == "FinalStateTransition" && barrier["before"]["layout"] == "CopySource"; }),
+				"The last observer restores the imported owner's final state before returning ownership");
+			service.BeginGraphRecording(11, graph); ExportTestCommands commands(device);
+			RGExecuteContext execution({ .m_GraphicsCommandContext = &commands }); graph.Execute(execution); service.EndGraphRecording(11, graph);
+			service.OnFrameSubmitted(11, MakeFence(5)); device.m_CompletedFenceValue = 5; service.CollectCompleted();
+			std::vector<FrameCaptureResult> results; service.ConsumeResults(results);
+			context.Check(results.size() == 2 && std::ranges::all_of(results, [](const auto& result)
+				{ return result.m_Status == FrameCaptureStatus::Completed && result.m_GraphExportActive && result.m_ResourceExportActive; }),
+				"Paired PNG and resource results both disclose every active observation tool");
+			graph.Retire(MakeFence(5));
+
+			RenderGraph views({ .m_Device = &device, .m_TransientResourcePool = &pool }); RGTextureId texture;
+			views.AddPass<Data>("FloatWriter", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					texture = builder.CreateTexture("Typeless", { .m_Format = RHIFormat::R32Typeless, .m_Extent = {2, 2, 1} });
+					builder.WriteInPlace(texture, RGTextureAccess::StorageWrite);
+					GGLAB_UNUSED(builder.CreateView<RHITextureViewType::UnorderedAccess>(texture, RHITextureViewDesc{ .m_Format = RHIFormat::R32Float }));
+					builder.SideEffect();
+				});
+			views.AddPass<Data>("UintReader", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					GGLAB_UNUSED(builder.Read(texture, RGTextureAccess::Sample));
+					GGLAB_UNUSED(builder.CreateView<RHITextureViewType::ShaderResource>(texture, RHITextureViewDesc{ .m_Format = RHIFormat::R32Uint }));
+					builder.SideEffect();
+				});
+			context.Check(views.Compile(), "Typeless views fixture compiles");
+			const auto final = views.ResolveObservation({ .m_Resource = "Typeless" });
+			const auto before = views.ResolveObservation({ .m_Resource = "Typeless", .m_Position = RGObservationPosition::Before, .m_Pass = "UintReader" });
+			context.Check(final.m_ViewFormat == RHIFormat::R32Float && before.m_ViewFormat == RHIFormat::R32Uint && !final.m_RawTypeless && !before.m_RawTypeless,
+				"Typeless interpretation follows the addressed pass instead of unrelated views elsewhere in the graph");
+		}
+
+		void RunResourceTextureExportTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			FrameCaptureService service(device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			graph.AddPass<Data>("Initialize", RGPassEncoderType::Copy, [](auto& builder, auto&)
+				{
+					auto color = builder.CreateTexture("ColorArray", { .m_Format = RHIFormat::R8G8B8A8UnormSrgb,
+						.m_Extent = {2, 2, 1}, .m_ArraySize = 2 });
+					auto depth = builder.CreateTexture("Depth", { .m_Format = RHIFormat::D24UnormS8Uint, .m_Extent = {2, 2, 1} });
+					builder.WriteInPlace(color, RGTextureAccess::CopyDest); builder.WriteInPlace(depth, RGTextureAccess::CopyDest);
+					builder.SideEffect();
+				});
+			context.Check(graph.Compile(), "Texture export fixture compiles");
+			GGLAB_UNUSED(service.RequestResourceExport({{ .m_Resource = "ColorArray" }, { .m_Resource = "Depth" },
+				{ .m_Resource = "Depth", .m_Aspect = RHITextureAspect::Stencil }}, 10));
+			context.Check(service.PrepareResourceExports(10, graph) == FrameCaptureAvailability::Available, "Color/depth/stencil group is admitted atomically");
+			ExportTestCommands commands(device); RGExecuteContext execution({ .m_GraphicsCommandContext = &commands }); graph.Execute(execution);
+			service.OnFrameSubmitted(10, MakeFence(4)); device.m_CompletedFenceValue = 4; service.CollectCompleted();
+			std::vector<FrameCaptureResult> results; service.ConsumeResults(results);
+			context.Check(results.size() == 1 && results[0].m_Resources && results[0].m_Resources->m_Arrays.size() == 3,
+				"Texture groups publish all planes together");
+			if (!results.empty() && results[0].m_Resources)
+			{
+				const auto& arrays = results[0].m_Resources->m_Arrays;
+				float depth[2]; std::memcpy(depth, arrays[1].m_Data.data(), sizeof(depth));
+				context.Check(arrays[0].m_Shape == std::vector<uint64_t>{2, 2, 2, 4} && arrays[0].m_Data.size() == 32 &&
+					arrays[0].m_Data[8] == 8 && arrays[0].m_Data[16] == 32 && arrays[0].m_Encoding == "srgb",
+					"Array slices/rows repack tightly without padding, swizzling or gamma conversion");
+				context.Check(depth[0] == 0 && depth[1] == 1 && arrays[2].m_Scalar == ResourceExportScalar::Uint8 && arrays[2].m_Data.size() == 4,
+					"D24 exports normalized depth and an explicitly selected byte stencil plane");
+			}
+			graph.Retire(MakeFence(4));
+		}
+
+		void RunResourceTextureSliceAlignmentTests(SelfTestContext& context) noexcept
+		{
+			struct TextureCase
+			{
+				uint32_t m_Height;
+				uint16_t m_Slices;
+				bool m_Cube;
+			};
+			constexpr std::array cases{ TextureCase{1, 2, false}, TextureCase{2, 2, false}, TextureCase{1, 6, true} };
+			for (const auto& textureCase : cases)
+			{
+				CaptureTestDevice device;
+				TransientResourcePool pool(&device);
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				struct Data {};
+				graph.AddPass<Data>("InitializeRGB", RGPassEncoderType::Copy, [&](auto& builder, auto&)
+					{
+						auto texture = builder.CreateTexture("RGB", { .m_Format = RHIFormat::R32G32B32Float,
+							.m_CreateFlags = textureCase.m_Cube ? RHITextureCreateFlags::CubeCompatible : RHITextureCreateFlags::None,
+							.m_Extent = {1, textureCase.m_Height, 1}, .m_ArraySize = textureCase.m_Slices });
+						builder.WriteInPlace(texture, RGTextureAccess::CopyDest);
+						builder.SideEffect();
+					});
+				context.Check(graph.Compile(), "RGB32F array/cube export fixture compiles");
+				if (textureCase.m_Height == 1 && !textureCase.m_Cube)
+				{
+					const auto target = graph.ResolveObservation({ .m_Resource = "RGB" });
+					const auto readback = device.CreateBuffer({ .m_SizeInBytes = 3072,
+						.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, {});
+					const std::array invalidCopies{ RGObservationCopy{ .m_Target = target, .m_Readback = readback,
+						.m_ReadbackBytes = 3072,
+						.m_Footprint = ComputeRHIObservationCopyFootprint(target.m_TextureDesc, 0, RHITextureAspect::Color),
+						.m_SlicePitch = 1024 } };
+					context.Check(!graph.AttachObservationCopies(invalidCopies) && !graph.HasResourceObservations(),
+						"RenderGraph rejects RGB32F slices aligned to 512 bytes but not to twelve-byte texels");
+					device.DestroyBuffer(readback);
+					FrameCaptureService bounded(device, { .m_MaxPayloadBytes = 3095 });
+					const uint64_t rejected = bounded.RequestResourceExport({{ .m_Resource = "RGB" }}, 12);
+					GGLAB_UNUSED(bounded.PrepareResourceExports(12, graph));
+					const auto failures = Consume(bounded);
+					context.Check(failures.size() == 1 && failures[0].m_RequestId == rejected &&
+						failures[0].m_ResourceFailure == RGObservationFailure::TooLarge && !graph.HasResourceObservations(),
+						"RGB32F capacity includes the aligned 3072-byte readback plus 24 tight CPU bytes");
+				}
+				const uint64_t id = service.RequestResourceExport({{ .m_Resource = "RGB" }}, 12);
+				context.Check(service.PrepareResourceExports(12, graph) == FrameCaptureAvailability::Available && graph.HasResourceObservations(),
+					"An RGB32F group binds with legal slice placement");
+				ExportTestCommands commands(device);
+				RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+				graph.Execute(execution);
+				bool copiesAligned = commands.m_TextureCopies.size() == textureCase.m_Slices;
+				for (size_t slice = 0; copiesAligned && slice < commands.m_TextureCopies.size(); ++slice)
+				{
+					const auto& copy = commands.m_TextureCopies[slice];
+					copiesAligned = copy.m_SourceArraySlice == slice && copy.m_DestinationOffset == slice * 1536 &&
+						copy.m_DestinationOffset % 512 == 0 && copy.m_DestinationOffset % 12 == 0 &&
+						copy.m_Footprint.m_RowPitch == 768;
+				}
+				context.Check(copiesAligned, "Every RGB32F array/cube slice uses an offset divisible by both placement and texel size");
+				service.OnFrameSubmitted(12, MakeFence(6));
+				device.m_CompletedFenceValue = 6;
+				service.CollectCompleted();
+				const auto results = Consume(service);
+				bool tightData = results.size() == 1 && results[0].m_RequestId == id &&
+					results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Resources &&
+					results[0].m_Resources->m_Arrays.size() == 1;
+				if (tightData)
+				{
+					const auto& array = results[0].m_Resources->m_Arrays[0];
+					tightData = array.m_Scalar == ResourceExportScalar::Float32 &&
+						array.m_Shape == std::vector<uint64_t>{textureCase.m_Slices, textureCase.m_Height, 1, 3} &&
+						array.m_Data.size() == static_cast<size_t>(textureCase.m_Slices) * textureCase.m_Height * 12;
+					for (size_t byte = 0; tightData && byte < array.m_Data.size(); ++byte)
+					{
+						const size_t row = byte / 12;
+						tightData = array.m_Data[byte] == static_cast<uint8_t>((row / textureCase.m_Height) * 32 + (row % textureCase.m_Height) * 8);
+					}
+				}
+				context.Check(tightData, "RGB32F export preserves every slice and row while removing readback padding");
+				graph.Retire(MakeFence(6));
+			}
+		}
+
+		void RunScheduledResourceGroupTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			const RHITextureDesc imageDesc = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 1, 1);
+			const std::vector<RGResourceAddress> eightTargets(8, RGResourceAddress{ .m_Resource = "Words" });
+			const auto build = [](RenderGraph& graph)
+				{
+					struct Data {};
+					graph.AddPass<Data>("Write", RGPassEncoderType::Copy, [](auto& builder, auto&)
+						{
+							auto words = builder.CreateBuffer("Words", { .m_SizeInBytes = 4 });
+							builder.WriteInPlace(words, RGBufferAccess::CopyDest);
+							builder.SideEffect();
+						});
+					return graph.Compile();
+				};
+			{
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				context.Check(build(graph), "Scheduled export concurrency fixture compiles");
+				const auto buffersBeforeTap = device.GetLiveBufferCount();
+				const auto image = service.RequestCapture(FrameCaptureSource::Scene, 20);
+				const auto diagnostic = service.RequestDiagnosticCapture(PostProcessDebugTap::GTAOFinalAO, 20);
+				const auto resources = service.RequestResourceExport(eightTargets, 20, true, true, 101);
+				context.Check(!service.HasPendingRequests(FrameCaptureSource::Diagnostic) && !service.GetPendingDiagnosticTap(),
+					"An unrelated diagnostic defers before feature selection can fail it on the scheduled frame");
+				context.Check(!service.BindTap(20, FrameCaptureSource::Scene, imageDesc) && device.GetLiveBufferCount() == buffersBeforeTap,
+					"An unrelated image defers before allocating or attaching a copy to a scheduled export frame");
+				context.Check(service.PrepareResourceExports(20, graph) == FrameCaptureAvailability::Available && graph.HasResourceObservations(),
+					"An eight-target scheduled group is admitted despite an independent screenshot on its requested frame");
+				const auto deferred = Consume(service);
+				context.Check(deferred.size() == 2 && std::ranges::all_of(deferred, [&](const auto& result)
+					{ return (result.m_RequestId == image || result.m_RequestId == diagnostic) && result.m_Status == FrameCaptureStatus::Busy && result.m_FrameSerial == 20; }),
+					"Only the unrelated screenshots return Busy; the resource group is not mislabeled TooLarge");
+				service.BeginGraphRecording(20, graph);
+				ExportTestCommands commands(device);
+				RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+				graph.Execute(execution);
+				service.EndGraphRecording(20, graph);
+				service.OnFrameSubmitted(20, MakeFence(20));
+				device.m_CompletedFenceValue = 20;
+				auto completed = Consume(service);
+				context.Check(completed.size() == 1 && completed[0].m_RequestId == resources &&
+					completed[0].m_Status == FrameCaptureStatus::Completed && completed[0].m_Resources && completed[0].m_Graph,
+					"The scheduled group submits and publishes rather than rolling back every frame");
+				graph.Retire(MakeFence(20));
+				completed.clear();
+				GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene, 21));
+				context.Check(service.BindTap(21, FrameCaptureSource::Scene, imageDesc).has_value(),
+					"The deferred independent screenshot can bind on a later frame after its competing group completes");
+				service.OnFrameAborted(21);
+				GGLAB_UNUSED(Consume(service));
+			}
+			{
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				GGLAB_UNUSED(build(graph));
+				const auto unrelated = service.RequestCapture(FrameCaptureSource::Scene, 22);
+				context.Check(service.BindTap(22, FrameCaptureSource::Scene, imageDesc).has_value(),
+					"A prebound unrelated image occupies shared capacity before an export is requested");
+				const auto resources = service.RequestResourceExport(eightTargets, 22, true, false, 102);
+				context.Check(service.PrepareResourceExports(22, graph) == FrameCaptureAvailability::Busy && !graph.HasResourceObservations(),
+					"Prebound unrelated image pressure is temporary Busy, not a permanent size error for the group");
+				const auto deferred = Consume(service);
+				context.Check(deferred.size() == 2 && std::ranges::all_of(deferred, [&](const auto& result)
+					{ return (result.m_RequestId == unrelated || result.m_RequestId == resources) && result.m_Status == FrameCaptureStatus::Busy; }),
+					"A genuinely busy frame withdraws its unsubmitted captures without publishing a TooLarge failure");
+			}
+			for (uint32_t targetCount : {7u, 8u})
+			{
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				GGLAB_UNUSED(build(graph));
+				const auto image = service.RequestCapture(FrameCaptureSource::Scene, 23, 103);
+				const auto shared = service.RequestCapture(FrameCaptureSource::Scene, 23);
+				const auto unrelated = service.RequestCapture(FrameCaptureSource::Composited, 23);
+				const auto resources = service.RequestResourceExport(std::vector<RGResourceAddress>(targetCount, eightTargets[0]), 23, true, false, 103);
+				const auto diagnostic = service.RequestDiagnosticCapture(PostProcessDebugTap::GTAOFinalAO, 23);
+				context.Check(!service.GetPendingDiagnosticTap(),
+					"Diagnostics submitted after the group claim also defer before pipeline construction");
+				const auto tap = service.BindTap(23, FrameCaptureSource::Scene, imageDesc);
+				context.Check(tap && !service.BindTap(23, FrameCaptureSource::Composited, imageDesc),
+					"A required group image may share its physical tap; a different independent image waits");
+				GGLAB_UNUSED(service.PrepareResourceExports(23, graph));
+				const auto pending = Consume(service);
+				const auto other = std::ranges::find(pending, unrelated, &FrameCaptureResult::m_RequestId);
+				const auto otherDiagnostic = std::ranges::find(pending, diagnostic, &FrameCaptureResult::m_RequestId);
+				const auto exported = std::ranges::find(pending, resources, &FrameCaptureResult::m_RequestId);
+				context.Check(other != pending.end() && other->m_Status == FrameCaptureStatus::Busy &&
+					otherDiagnostic != pending.end() && otherDiagnostic->m_Status == FrameCaptureStatus::Busy &&
+					(targetCount == 7 ? exported == pending.end() && graph.HasResourceObservations()
+						: exported != pending.end() && exported->m_ResourceFailure == RGObservationFailure::TooLarge),
+					"Only the group's required PNG counts in its permanent limit: seven targets fit and eight cannot");
+				if (targetCount == 7)
+				{
+					ExportTestCommands commands(device);
+					RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+					graph.Execute(execution);
+					service.OnFrameSubmitted(23, MakeFence(23));
+					device.FillReadback(tap->m_Buffer, tap->m_Footprint);
+					device.m_CompletedFenceValue = 23;
+					const auto completed = Consume(service);
+					const auto imageResult = std::ranges::find(completed, image, &FrameCaptureResult::m_RequestId);
+					const auto sharedResult = std::ranges::find(completed, shared, &FrameCaptureResult::m_RequestId);
+					context.Check(completed.size() == 3 && std::ranges::all_of(completed, [](const auto& result) { return result.m_Status == FrameCaptureStatus::Completed; }) &&
+						imageResult != completed.end() && sharedResult != completed.end() && imageResult->m_Image == sharedResult->m_Image,
+						"The PNG group, its shared image consumer and the resource group complete on one submitted frame");
+					graph.Retire(MakeFence(23));
+				}
+				else
+				{
+					service.OnFrameAborted(23);
+					GGLAB_UNUSED(Consume(service));
+				}
+			}
+			FrameCaptureService requests(device, { .m_MaxRequests = 2 });
+			GGLAB_UNUSED(requests.RequestCapture(FrameCaptureSource::RenderGraph));
+			context.Check(requests.GetRequestAvailability() == FrameCaptureAvailability::Available &&
+				requests.GetRequestAvailability(2) == FrameCaptureAvailability::Busy &&
+				requests.GetRequestAvailability(3) == FrameCaptureAvailability::TooLarge,
+				"Request admission distinguishes a temporarily missing group slot from an impossible request count");
+			requests.Shutdown();
 		}
 
 		void RunGraphRequestCapacityTests(SelfTestContext& context) noexcept
@@ -929,6 +1523,12 @@ namespace gglab
 
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
+		RunResourceExportTests(context);
+		RunResourceTextureExportTests(context);
+		RunResourceTextureSliceAlignmentTests(context);
+		RunScheduledResourceGroupTests(context);
+		RunResourceExportSupportTests(context);
+		RunObservationStateTests(context);
 		RunGraphCaptureTests(context);
 		RunGraphEnumTests(context);
 		RunGraphVersionTests(context);

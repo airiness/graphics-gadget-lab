@@ -24,7 +24,9 @@ namespace gglab
 		template <class T> [[nodiscard]] std::string DigestText(const T& digest, size_t byteCount)
 		{
 			if (!digest.IsValid())
+			{
 				return {};
+			}
 			constexpr char HexDigits[] = "0123456789abcdef";
 			const size_t count = std::min(byteCount, digest.m_Value.size());
 			std::string result(count * 2, '0');
@@ -50,7 +52,9 @@ namespace gglab
 		const TextureImportSettings& importSettings) noexcept
 	{
 		if (!sourceDigest.IsValid())
+		{
 			return {};
+		}
 		std::string sourceExtension = sourceIdentity.extension().generic_string();
 		std::ranges::transform(sourceExtension, sourceExtension.begin(),
 			[](unsigned char value) noexcept

@@ -154,6 +154,8 @@ namespace gglab
 		// Diagnostic tap name of a Diagnostic capture; empty otherwise.
 		std::string m_DiagnosticTap;
 		std::string m_CapturedAtUtc;
+		bool m_GraphExportActive = false;
+		bool m_ResourceExportActive = false;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.

@@ -61,7 +61,10 @@ namespace gglab
 		{
 			for (const auto& camera : m_Cameras)
 			{
-				if (camera.m_Id == id) return &camera;
+				if (camera.m_Id == id)
+				{
+					return &camera;
+				}
 			}
 			return nullptr;
 		}

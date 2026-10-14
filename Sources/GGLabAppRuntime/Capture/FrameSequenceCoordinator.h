@@ -69,6 +69,13 @@ namespace gglab
 	[[nodiscard]] GTAOSettings ApplyFrameSequenceGTAOOverrides(
 		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept;
 
+	struct FrameSequenceResourceExport
+	{
+		uint32_t m_Frame = 0;
+		std::vector<RGResourceAddress> m_Targets;
+		bool m_IncludeGraph = false;
+	};
+
 	struct FrameSequenceRequest
 	{
 		// Camera path registered by the active content.
@@ -78,6 +85,7 @@ namespace gglab
 		// Sequence frames captured on exactly that frame; each must be below the
 		// path's frame count. Duplicates are ignored.
 		std::vector<uint32_t> m_CaptureFrames;
+		std::vector<FrameSequenceResourceExport> m_Exports;
 		FrameCaptureSource m_CaptureSource = FrameCaptureSource::Scene;
 		// Required when the capture source is Diagnostic: the one evidence channel
 		// the run records.
@@ -264,6 +272,7 @@ namespace gglab
 		// The posed frame is a requested frame, at its last reference sample, and has
 		// not been captured yet.
 		[[nodiscard]] bool IsCaptureDue() const noexcept;
+		[[nodiscard]] const FrameSequenceResourceExport* GetDueExport() const noexcept;
 
 		FrameCaptureCoordinator* m_Capture = nullptr;
 		uint64_t m_NextSequenceId = 1;
@@ -278,6 +287,8 @@ namespace gglab
 		bool m_FrameBegun = false;
 		uint64_t m_BegunRenderFrameSerial = 0;
 		std::optional<uint32_t> m_CapturedFrame;
+		std::optional<uint32_t> m_ExportedFrame;
+		std::vector<uint32_t> m_CaptureRequestFrames;
 		std::optional<FrameCaptureSettleKey> m_LastSettleKey;
 		std::vector<PendingGpuTimingFrame> m_PendingGpuTimingFrames;
 		uint64_t m_GpuTimingSubmissionCount = 0;

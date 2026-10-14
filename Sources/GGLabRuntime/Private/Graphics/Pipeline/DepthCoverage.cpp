@@ -33,72 +33,130 @@ namespace gglab
 				AppendMismatch(mismatch, "Pipeline", "CoverageVertexShader");
 			}
 			if (lhs.m_VertexProgram != rhs.m_VertexProgram)
+			{
 				AppendMismatch(mismatch, "Pipeline", "VertexProgram");
+			}
 			if (lhs.m_Deformation != rhs.m_Deformation)
+			{
 				AppendMismatch(mismatch, "Pipeline", "Deformation");
+			}
 			if (lhs.m_InputLayout != rhs.m_InputLayout)
+			{
 				AppendMismatch(mismatch, "Pipeline", "InputLayout");
+			}
 			if (lhs.m_PositionPrecision != rhs.m_PositionPrecision)
+			{
 				AppendMismatch(mismatch, "Pipeline", "PositionPrecision");
+			}
 			if (lhs.m_PositionFormat != rhs.m_PositionFormat)
+			{
 				AppendMismatch(mismatch, "Pipeline", "PositionFormat");
+			}
 			if (lhs.m_TopologyType != rhs.m_TopologyType)
+			{
 				AppendMismatch(mismatch, "Pipeline", "TopologyType");
+			}
 			if (lhs.m_PrimitiveTopology != rhs.m_PrimitiveTopology)
+			{
 				AppendMismatch(mismatch, "Pipeline", "PrimitiveTopology");
+			}
 			if (lhs.m_FillMode != rhs.m_FillMode)
+			{
 				AppendMismatch(mismatch, "Pipeline", "FillMode");
+			}
 			if (lhs.m_CullMode != rhs.m_CullMode)
+			{
 				AppendMismatch(mismatch, "Pipeline", "CullMode");
+			}
 			if (lhs.m_FrontCounterClockwise != rhs.m_FrontCounterClockwise)
+			{
 				AppendMismatch(mismatch, "Pipeline", "FrontCounterClockwise");
+			}
 			if (lhs.m_DepthBias != rhs.m_DepthBias)
+			{
 				AppendMismatch(mismatch, "Pipeline", "DepthBias");
+			}
 			if (lhs.m_DepthBiasClamp != rhs.m_DepthBiasClamp)
+			{
 				AppendMismatch(mismatch, "Pipeline", "DepthBiasClamp");
+			}
 			if (lhs.m_SlopeScaledDepthBias != rhs.m_SlopeScaledDepthBias)
+			{
 				AppendMismatch(mismatch, "Pipeline", "SlopeScaledDepthBias");
+			}
 			if (lhs.m_DepthClipEnable != rhs.m_DepthClipEnable)
+			{
 				AppendMismatch(mismatch, "Pipeline", "DepthClipEnable");
+			}
 			if (lhs.m_DoubleSided != rhs.m_DoubleSided)
+			{
 				AppendMismatch(mismatch, "Pipeline", "DoubleSided");
+			}
 			if (lhs.m_SampleCount != rhs.m_SampleCount)
+			{
 				AppendMismatch(mismatch, "Pipeline", "SampleCount");
+			}
 			if (lhs.m_SampleQuality != rhs.m_SampleQuality)
+			{
 				AppendMismatch(mismatch, "Pipeline", "SampleQuality");
+			}
 			if (lhs.m_SampleMask != rhs.m_SampleMask)
+			{
 				AppendMismatch(mismatch, "Pipeline", "SampleMask");
+			}
 			if (lhs.m_AlphaToCoverageEnable != rhs.m_AlphaToCoverageEnable)
+			{
 				AppendMismatch(mismatch, "Pipeline", "AlphaToCoverage");
+			}
 			if (lhs.m_AlphaVariant != rhs.m_AlphaVariant)
+			{
 				AppendMismatch(mismatch, "Pipeline", "AlphaVariant");
+			}
 		}
 
 		void CompareRasterDomainFields(const DepthCoverageRasterDomain& lhs,
 			const DepthCoverageRasterDomain& rhs, std::string& mismatch)
 		{
 			if (lhs.m_FrameSerial != rhs.m_FrameSerial)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "FrameSerial");
+			}
 			if (lhs.m_ViewBindingId != rhs.m_ViewBindingId)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "ViewBindingId");
+			}
 			if (lhs.m_CurrentViewSource != rhs.m_CurrentViewSource)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "CurrentViewSource");
+			}
 			if (lhs.m_CurrentJitteredProjectionSource != rhs.m_CurrentJitteredProjectionSource)
 			{
 				AppendMismatch(mismatch, "RasterDomain", "CurrentJitteredProjectionSource");
 			}
 			if (lhs.m_ProjectionSource != rhs.m_ProjectionSource)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "ProjectionSource");
+			}
 			if (lhs.m_TargetWidth != rhs.m_TargetWidth)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "TargetWidth");
+			}
 			if (lhs.m_TargetHeight != rhs.m_TargetHeight)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "TargetHeight");
+			}
 			if (lhs.m_Viewport != rhs.m_Viewport)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "Viewport");
+			}
 			if (lhs.m_Scissor != rhs.m_Scissor)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "Scissor");
+			}
 			if (lhs.m_DepthConvention != rhs.m_DepthConvention)
+			{
 				AppendMismatch(mismatch, "RasterDomain", "DepthConvention");
+			}
 		}
 
 		std::string DescribeSource(const DepthCoverageBufferSource& source)

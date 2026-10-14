@@ -24,7 +24,10 @@ namespace gglab
 {
 	std::unique_ptr<RHIContext> CreateDX12Context(const RHIContextDesc& desc, HWND window) noexcept
 	{
-		if (!window) return {};
+		if (!window)
+		{
+			return {};
+		}
 		return std::make_unique<DX12Context>(desc, window);
 	}
 

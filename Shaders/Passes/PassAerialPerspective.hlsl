@@ -73,7 +73,10 @@ float2 AtlasUV(float2 screenUV, uint slice)
 [numthreads(8, 8, 1)]
 void CSBuild(uint3 dispatchId : SV_DispatchThreadID)
 {
-	if (dispatchId.x >= g_Pass.GridWidth || dispatchId.y >= g_Pass.GridHeight) return;
+	if (dispatchId.x >= g_Pass.GridWidth || dispatchId.y >= g_Pass.GridHeight)
+	{
+		return;
+	}
 	const ViewData viewData = g_Views[g_Pass.ViewIndex];
 	const float2 uv = PixelCenterToUV(dispatchId.xy,
 		uint2(g_Pass.GridWidth, g_Pass.GridHeight));
@@ -109,7 +112,10 @@ void CSBuild(uint3 dispatchId : SV_DispatchThreadID)
 			const float3 position = camera + direction *
 				(previousDistanceKm + (float(step) + 0.5) * stepKm);
 			const float radius = length(position);
-			if (radius <= g_Atmosphere.Radii.x || radius >= g_Atmosphere.Radii.y) continue;
+			if (radius <= g_Atmosphere.Radii.x || radius >= g_Atmosphere.Radii.y)
+			{
+				continue;
+			}
 			float3 rayleigh, extinction;
 			float mie;
 			AtmosphereMedium(position, rayleigh, mie, extinction);
@@ -135,7 +141,10 @@ void CSBuild(uint3 dispatchId : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void CSComposite(uint3 dispatchId : SV_DispatchThreadID)
 {
-	if (dispatchId.x >= g_Pass.Width || dispatchId.y >= g_Pass.Height) return;
+	if (dispatchId.x >= g_Pass.Width || dispatchId.y >= g_Pass.Height)
+	{
+		return;
+	}
 	const ViewData viewData = g_Views[g_Pass.ViewIndex];
 	const float2 uv = PixelCenterToUV(dispatchId.xy, uint2(g_Pass.Width, g_Pass.Height));
 	Texture2D<float4> sceneColor = GetTexture2DFloat4(g_Pass.Source0);

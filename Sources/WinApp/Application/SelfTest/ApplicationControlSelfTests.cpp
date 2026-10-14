@@ -152,12 +152,32 @@ namespace gglab
 				graph.m_Request->m_Capture.m_GraphSummary && !graph.m_Request->m_Wait,
 				"Graph requests reuse capture timing with a typed summary flag");
 
+			const auto resourceExport = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":60,"command":"export","targets":[{"resource":"Color","at":{"before":"Repeated"},"occurrence":2,"mip":1,"slices":[2,3]}],"graph":true})");
+			context.Check(resourceExport.m_Request && resourceExport.m_Request->m_Command == ApplicationControlCommand::Export &&
+				resourceExport.m_Request->m_Capture.m_IncludeGraph && resourceExport.m_Request->m_Capture.m_ResourceTargets.size() == 1 &&
+				resourceExport.m_Request->m_Capture.m_ResourceTargets[0].m_Occurrence == 2 &&
+				resourceExport.m_Request->m_Capture.m_ResourceTargets[0].m_SliceCount == 3,
+				"Resource exports preserve typed addresses and optional same-frame graphs");
+			const auto sequenceExport = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":61,"command":"sequence","path":"A","exports":[{"frame":1,"targets":[{"resource":"Depth","aspect":"stencil"}],"graph":true}]})");
+			context.Check(sequenceExport.m_Request && sequenceExport.m_Request->m_Sequence.m_Exports.size() == 1 &&
+				sequenceExport.m_Request->m_Sequence.m_Exports[0].m_Frame == 1 && sequenceExport.m_Request->m_Sequence.m_Exports[0].m_IncludeGraph,
+				"Sequence exports retain a complete target group at one selected frame");
+
 			struct Rejected
 			{
 				std::string_view m_Line;
 				uint64_t m_Id;
 			};
 			const Rejected rejected[] = {
+				{ R"({"protocol":2,"id":62,"command":"export","targets":[]})", 62 },
+				{ R"({"protocol":2,"id":63,"command":"export","targets":[{"resource":"A","at":{"before":"P","after":"P"}}]})", 63 },
+				{ R"({"protocol":2,"id":64,"command":"export","targets":[{"resource":"A","occurrence":0}]})", 64 },
+				{ R"({"protocol":2,"id":65,"command":"export","targets":[{"resource":"A","slices":[0,0]}]})", 65 },
+				{ R"({"protocol":2,"id":66,"command":"export","targets":[{"resource":"A","mipp":1}]})", 66 },
+				{ R"({"protocol":2,"id":67,"command":"export","targets":[{"resource":"A","aspect":"all"}]})", 67 },
+				{ R"({"protocol":2,"id":68,"command":"export","targets":[{"resource":"A"}],"graph":1})", 68 },
 				{ "not json", 0 },
 				{ R"([1,2])", 0 },
 				{ R"({"protocol":2,"command":"status"})", 0 },

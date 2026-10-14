@@ -333,7 +333,10 @@ namespace gglab
 				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest(channel)) return;
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			{
+				return;
+			}
 			AddResolvedPass(rg, context, services, aerial->m_Diagnostic,
 				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering
 					? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
@@ -345,7 +348,10 @@ namespace gglab
 			const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
 			if (!atmosphere) { registry->InvalidatePostProcessPreview(selection, channel); return; }
 			const auto index = static_cast<uint32_t>(selection.m_Tap) - static_cast<uint32_t>(PostProcessDebugTap::AtmosphereTransmittance);
-			if (!registry->ConsumePostProcessPreviewRequest(channel)) return;
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			{
+				return;
+			}
 			AddResolvedPass(rg, context, services, atmosphere->m_Luts[index], 1.0f, std::nullopt, selection, channel);
 			return;
 		}
@@ -449,14 +455,23 @@ namespace gglab
 		for (uint32_t index = 0; index < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++index)
 		{
 			const auto channel = static_cast<PostProcessPreviewChannel>(index);
-			if (!registry->IsPostProcessPreviewRequested(channel)) continue;
+			if (!registry->IsPostProcessPreviewRequested(channel))
+			{
+				continue;
+			}
 			const auto selection = registry->GetPostProcessPreviewSelection(channel);
 			const bool levelMatches = tap != PostProcessDebugTap::BloomPyramid ||
 				selection.m_BloomPyramidLevel == bloomPyramidLevel;
-			if (selection.m_Tap != tap || !levelMatches || !source.m_Texture.IsValid()) continue;
+			if (selection.m_Tap != tap || !levelMatches || !source.m_Texture.IsValid())
+			{
+				continue;
+			}
 			GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
 				"Post-process preview requires scene-linear Rec.709 input.");
-			if (!registry->ConsumePostProcessPreviewRequest(channel)) continue;
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			{
+				continue;
+			}
 			AddResolvedPass(rg, context, services, source.m_Texture, source.m_PreExposure,
 				std::nullopt, selection, channel);
 		}

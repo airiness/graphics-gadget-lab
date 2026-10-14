@@ -209,6 +209,16 @@ namespace gglab
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
+		std::ranges::sort(request.m_Exports, {}, &FrameSequenceResourceExport::m_Frame);
+		for (size_t i = 0; i < request.m_Exports.size(); ++i)
+		{
+			if (request.m_Exports[i].m_Targets.empty() || request.m_Exports[i].m_Targets.size() > 8 ||
+				(i != 0 && request.m_Exports[i - 1].m_Frame == request.m_Exports[i].m_Frame))
+			{
+				outError = "A sequence permits one resource export group of one to eight targets per frame.";
+				return 0;
+			}
+		}
 		if (request.m_Label.empty())
 		{
 			request.m_Label = request.m_CameraPathId;
@@ -229,6 +239,8 @@ namespace gglab
 		m_AppliedPose.reset();
 		m_FrameBegun = false;
 		m_CapturedFrame.reset();
+		m_ExportedFrame.reset();
+		m_CaptureRequestFrames.clear();
 		m_LastSettleKey.reset();
 		m_BegunRenderFrameSerial = 0;
 		m_PendingGpuTimingFrames.clear();
@@ -244,6 +256,10 @@ namespace gglab
 			return false;
 		}
 		m_Status->m_State = FrameSequenceState::Cancelled;
+		for (uint64_t requestId : m_Status->m_CaptureRequestIds)
+		{
+			GGLAB_UNUSED(m_Capture->Cancel(requestId));
+		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
 		return true;
@@ -261,10 +277,20 @@ namespace gglab
 
 	bool FrameSequenceCoordinator::ShouldDeferFrame() const noexcept
 	{
+		const bool exportFrame = (m_Request.m_ReferenceSamples == 0 || m_Sample + 1 == m_Request.m_ReferenceSamples) &&
+			std::ranges::any_of(m_Request.m_Exports, [&](const auto& entry) { return entry.m_Frame == m_Frame; });
+		const auto* previous = m_Capture->GetLastFrameState();
+		const bool startingExportFrame = m_Status && m_Status->m_State == FrameSequenceState::Waiting &&
+			previous && previous->m_Readiness.IsReady() && MatchesRequiredContent(m_Request.m_RequiredContentId, *previous);
+		const bool imageFrame = (m_Request.m_ReferenceSamples == 0 || m_Sample + 1 == m_Request.m_ReferenceSamples) &&
+			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame);
+		const uint32_t requestCount = static_cast<uint32_t>(imageFrame) + static_cast<uint32_t>(exportFrame);
 		// Capacity covers GPU payloads, retained images and reserved write slots.
 		// Only temporary pressure defers: an impossible target must fail explicitly.
-		return m_Status && m_Status->m_State == FrameSequenceState::Running && IsCaptureDue() &&
-			m_Capture->GetCaptureAvailability(m_Request.m_CaptureSource) == FrameCaptureAvailability::Busy;
+		return m_Status && ((m_Status->m_State == FrameSequenceState::Running && IsCaptureDue() &&
+			m_Capture->GetCaptureAvailability(m_Request.m_CaptureSource) == FrameCaptureAvailability::Busy) ||
+			((m_Status->m_State == FrameSequenceState::Running || startingExportFrame) && exportFrame &&
+				m_Capture->GetCaptureAvailability(FrameCaptureSource::ResourceExport, requestCount) == FrameCaptureAvailability::Busy));
 	}
 
 	bool FrameSequenceCoordinator::ShouldHoldTime() const noexcept
@@ -284,6 +310,17 @@ namespace gglab
 			m_Sample + 1 == m_Request.m_ReferenceSamples;
 		return lastSample && m_CapturedFrame != m_Frame &&
 			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame);
+	}
+
+	const FrameSequenceResourceExport* FrameSequenceCoordinator::GetDueExport() const noexcept
+	{
+		if (m_ExportedFrame == m_Frame || (m_Request.m_ReferenceSamples != 0 &&
+			m_Sample + 1 != m_Request.m_ReferenceSamples))
+		{
+			return nullptr;
+		}
+		const auto found = std::ranges::find(m_Request.m_Exports, m_Frame, &FrameSequenceResourceExport::m_Frame);
+		return found == m_Request.m_Exports.end() ? nullptr : &*found;
 	}
 
 	std::optional<FrameSequencePoseRequest> FrameSequenceCoordinator::PrepareFrame(
@@ -342,6 +379,11 @@ namespace gglab
 			{
 				Fail(std::format("Capture frame {} is outside camera path '{}' with {} frames.",
 					m_Request.m_CaptureFrames.back(), path->m_Id, frameCount));
+				return std::nullopt;
+			}
+			if (!m_Request.m_Exports.empty() && m_Request.m_Exports.back().m_Frame >= frameCount)
+			{
+				Fail("A resource export frame is outside the selected camera path.");
 				return std::nullopt;
 			}
 			m_Status->m_CameraPathVersion = path->m_Version;
@@ -433,7 +475,21 @@ namespace gglab
 				.m_DiagnosticTap = m_Request.m_DiagnosticTap,
 				});
 			m_Status->m_CaptureRequestIds.push_back(requestId);
+			m_CaptureRequestFrames.push_back(m_Frame);
 			m_CapturedFrame = m_Frame;
+		}
+		if (const auto* resourceExport = GetDueExport())
+		{
+			const uint64_t requestId = m_Capture->Submit(FrameCaptureRequest{
+				.m_Source = FrameCaptureSource::ResourceExport, .m_Timing = FrameCaptureTiming::NextFrame,
+				.m_OutputDirectory = m_Request.m_OutputDirectory, .m_Label = std::format("{}-f{:04}", m_Request.m_Label, m_Frame),
+				.m_Note = m_Request.m_Note, .m_ResourceTargets = resourceExport->m_Targets, .m_IncludeGraph = resourceExport->m_IncludeGraph,
+				.m_Sequence = FrameCaptureSequenceInfo{ .m_SequenceId = m_Status->m_SequenceId, .m_CameraPathId = m_Request.m_CameraPathId,
+					.m_CameraPathVersion = m_Status->m_CameraPathVersion, .m_Frame = m_Frame, .m_FrameCount = m_Status->m_FrameCount,
+					.m_ReferenceSamples = m_Request.m_ReferenceSamples, .m_ReferenceTextureLodBias = m_Request.m_ReferenceTextureLodBias } });
+			m_Status->m_CaptureRequestIds.push_back(requestId);
+			m_CaptureRequestFrames.push_back(m_Frame);
+			m_ExportedFrame = m_Frame;
 		}
 		m_BegunRenderFrameSerial = state.m_FrameSerial;
 		m_FrameBegun = true;
@@ -562,7 +618,7 @@ namespace gglab
 				continue;
 			}
 			const uint32_t frame =
-				m_Request.m_CaptureFrames[static_cast<size_t>(std::distance(ids.begin(), id))];
+				m_CaptureRequestFrames[static_cast<size_t>(std::distance(ids.begin(), id))];
 			Fail(std::format("Capture of sequence frame {} {}: {}", frame,
 				result.m_Status == FrameCaptureRequestStatus::Cancelled ? "was cancelled"
 																		 : "failed",
@@ -579,6 +635,10 @@ namespace gglab
 		}
 		m_Status->m_State = FrameSequenceState::Failed;
 		m_Status->m_Failure = std::move(failure);
+		for (uint64_t requestId : m_Status->m_CaptureRequestIds)
+		{
+			GGLAB_UNUSED(m_Capture->Cancel(requestId));
+		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
 	}

@@ -173,6 +173,11 @@ namespace gglab
 		writer.String("label", metadata.m_Label);
 		writer.String("note", metadata.m_Note);
 		writer.String("source", GetFrameCaptureSourceName(metadata.m_Source));
+		writer.BeginObject("observation");
+		writer.Bool("graph", metadata.m_GraphExportActive);
+		writer.Bool("resourceExport", metadata.m_ResourceExportActive);
+		writer.Bool("nonFiniteWatch", false);
+		writer.EndObject();
 		if (metadata.m_DiagnosticTap.empty())
 		{
 			writer.Null("diagnosticTap");

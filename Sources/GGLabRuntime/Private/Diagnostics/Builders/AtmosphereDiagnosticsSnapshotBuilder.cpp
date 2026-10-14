@@ -19,7 +19,10 @@ namespace gglab
 		{
 			snapshot.m_PhysicalSkyRequested = environment->GetRequestedPhysicalSky().has_value();
 			snapshot.m_PhysicalSkyActive = environment->GetActivePhysicalSky().has_value();
-			if (const auto& active = environment->GetActivePhysicalSky()) snapshot.m_ActiveSun = active->m_Sun;
+			if (const auto& active = environment->GetActivePhysicalSky())
+			{
+				snapshot.m_ActiveSun = active->m_Sun;
+			}
 			snapshot.m_PublicationMilliseconds = environment->GetPublicationMilliseconds();
 			snapshot.m_RequestedWorldLightingGeneration = environment->GetBakeRequestGeneration();
 		}

@@ -57,7 +57,10 @@ namespace gglab
 				const std::string_view identity(name.C_Str(), name.length);
 				// Assimp may synthesize unused materials. Their count and placement
 				// have no bearing on the identities of source-authored materials.
-				if (!identity.starts_with(GltfMaterialIdentityPrefix)) continue;
+				if (!identity.starts_with(GltfMaterialIdentityPrefix))
+				{
+					continue;
+				}
 				const std::string_view digits = identity.substr(GltfMaterialIdentityPrefix.size());
 				size_t sourceIndex = 0;
 				const auto parsed = std::from_chars(digits.data(), digits.data() + digits.size(), sourceIndex);
@@ -145,14 +148,20 @@ namespace gglab
 
 		[[nodiscard]] const Json* FindObjectField(const Json& parent, const char* name) noexcept
 		{
-			if (!parent.is_object()) return nullptr;
+			if (!parent.is_object())
+			{
+				return nullptr;
+			}
 			const auto found = parent.find(name);
 			return found != parent.end() && found->is_object() ? &*found : nullptr;
 		}
 
 		[[nodiscard]] const Json* FindArrayField(const Json& parent, const char* name) noexcept
 		{
-			if (!parent.is_object()) return nullptr;
+			if (!parent.is_object())
+			{
+				return nullptr;
+			}
 			const auto found = parent.find(name);
 			return found != parent.end() && found->is_array() ? &*found : nullptr;
 		}
@@ -167,8 +176,14 @@ namespace gglab
 
 			Assimp::IOStream* Open(const char* path, const char* mode = "rb") override
 			{
-				if (!ComparePaths(path, m_Path.c_str())) return DefaultIOSystem::Open(path, mode);
-				if (std::strchr(mode, 'w') || std::strchr(mode, 'a') || std::strchr(mode, '+')) return nullptr;
+				if (!ComparePaths(path, m_Path.c_str()))
+				{
+					return DefaultIOSystem::Open(path, mode);
+				}
+				if (std::strchr(mode, 'w') || std::strchr(mode, 'a') || std::strchr(mode, '+'))
+				{
+					return nullptr;
+				}
 				return new Assimp::MemoryIOStream(
 					reinterpret_cast<const uint8_t*>(m_Document.data()), m_Document.size());
 			}
@@ -181,7 +196,10 @@ namespace gglab
 
 		[[nodiscard]] bool PrepareGltfMaterialIdentities(Json& gltf, std::string& error)
 		{
-			if (!gltf.contains("materials")) gltf["materials"] = Json::array();
+			if (!gltf.contains("materials"))
+			{
+				gltf["materials"] = Json::array();
+			}
 			auto& materials = gltf["materials"];
 			if (!materials.is_array())
 			{
@@ -208,10 +226,16 @@ namespace gglab
 				for (Json& mesh : *meshes)
 				{
 					auto primitives = mesh.find("primitives");
-					if (primitives == mesh.end() || !primitives->is_array()) continue;
+					if (primitives == mesh.end() || !primitives->is_array())
+					{
+						continue;
+					}
 					for (Json& primitive : *primitives)
 					{
-						if (!primitive.is_object()) continue;
+						if (!primitive.is_object())
+						{
+							continue;
+						}
 						if (const auto material = primitive.find("material"); material != primitive.end())
 						{
 							if (!material->is_number_unsigned() || material->get<uint64_t>() >= defaultIndex)
@@ -239,11 +263,15 @@ namespace gglab
 			{
 			case MaterialTextureSlot::BaseColor:
 				if (const Json* pbr = FindObjectField(material, "pbrMetallicRoughness"))
+				{
 					return FindObjectField(*pbr, "baseColorTexture");
+				}
 				break;
 			case MaterialTextureSlot::MetallicRoughness:
 				if (const Json* pbr = FindObjectField(material, "pbrMetallicRoughness"))
+				{
 					return FindObjectField(*pbr, "metallicRoughnessTexture");
+				}
 				break;
 			case MaterialTextureSlot::Normal:
 				return FindObjectField(material, "normalTexture");
@@ -288,7 +316,10 @@ namespace gglab
 			auto readTexCoord = [&](const Json& source, const char* name) noexcept
 			{
 				const auto found = source.find("texCoord");
-				if (found == source.end()) return true;
+				if (found == source.end())
+				{
+					return true;
+				}
 				if (!found->is_number_unsigned())
 				{
 					error = std::format("Invalid {} texCoord.", name);
@@ -298,7 +329,10 @@ namespace gglab
 				texCoordSource = name;
 				return true;
 			};
-			if (!readTexCoord(textureInfo, "glTF texture")) return false;
+			if (!readTexCoord(textureInfo, "glTF texture"))
+			{
+				return false;
+			}
 			const Json* extensions = FindObjectField(textureInfo, "extensions");
 			if (extensions)
 			{
@@ -315,9 +349,15 @@ namespace gglab
 				auto readPair = [&](const char* name, Vector2& destination) noexcept
 				{
 					const auto found = transform->find(name);
-					if (found == transform->end()) return true;
+					if (found == transform->end())
+					{
+						return true;
+					}
 					if (!found->is_array() || found->size() != 2 || !(*found)[0].is_number() ||
-						!(*found)[1].is_number()) return false;
+						!(*found)[1].is_number())
+					{
+						return false;
+					}
 					destination = Vector2((*found)[0].get<float>(), (*found)[1].get<float>());
 					return std::isfinite(destination.m_X) && std::isfinite(destination.m_Y);
 				};
@@ -335,7 +375,10 @@ namespace gglab
 					}
 					binding.m_UVRotation = rotation->get<float>();
 				}
-				if (!readTexCoord(*transform, "KHR_texture_transform")) return false;
+				if (!readTexCoord(*transform, "KHR_texture_transform"))
+				{
+					return false;
+				}
 			}
 			// The extension can replace an unsupported fallback UV set with UV0/UV1.
 			// Validate the effective index before narrowing, not either source independently.
@@ -352,7 +395,10 @@ namespace gglab
 			float& destination, std::string& error) noexcept
 		{
 			const auto found = textureInfo.find(name);
-			if (found == textureInfo.end()) return true;
+			if (found == textureInfo.end())
+			{
+				return true;
+			}
 			if (!found->is_number() || !std::isfinite(found->get<float>()))
 			{
 				error = std::format("Invalid glTF texture {}.", name);
@@ -366,7 +412,10 @@ namespace gglab
 			const Json*& extension, std::string& error) noexcept
 		{
 			const auto found = extensions.find(name);
-			if (found == extensions.end()) return true;
+			if (found == extensions.end())
+			{
+				return true;
+			}
 			if (!found->is_object())
 			{
 				error = std::format("{} must be an object.", name);
@@ -380,7 +429,10 @@ namespace gglab
 			std::string_view extensionName, float& destination, std::string& error) noexcept
 		{
 			const auto found = extension.find(name);
-			if (found == extension.end()) return true;
+			if (found == extension.end())
+			{
+				return true;
+			}
 			if (!found->is_number() || !std::isfinite(found->get<float>()))
 			{
 				error = std::format("{}.{} must be a finite number.", extensionName, name);
@@ -393,7 +445,10 @@ namespace gglab
 		[[nodiscard]] bool ReadExtensionUnitFactor(const Json& extension, const char* name,
 			std::string_view extensionName, float& destination, std::string& error) noexcept
 		{
-			if (!ReadExtensionScalar(extension, name, extensionName, destination, error)) return false;
+			if (!ReadExtensionScalar(extension, name, extensionName, destination, error))
+			{
+				return false;
+			}
 			if (destination < 0.0f || destination > 1.0f)
 			{
 				error = std::format("{}.{} must be in [0, 1].", extensionName, name);
@@ -437,10 +492,16 @@ namespace gglab
 				const Json* anisotropy = nullptr;
 				if (!ReadMaterialExtension(*extensions, "KHR_materials_ior", ior, error) ||
 					!ReadMaterialExtension(*extensions, "KHR_materials_clearcoat", coat, error) ||
-					!ReadMaterialExtension(*extensions, "KHR_materials_anisotropy", anisotropy, error)) return false;
+					!ReadMaterialExtension(*extensions, "KHR_materials_anisotropy", anisotropy, error))
+				{
+					return false;
+				}
 				if (ior)
 				{
-					if (!ReadExtensionScalar(*ior, "ior", "KHR_materials_ior", properties.m_Ior, error)) return false;
+					if (!ReadExtensionScalar(*ior, "ior", "KHR_materials_ior", properties.m_Ior, error))
+					{
+						return false;
+					}
 					// Zero is glTF's infinite-Fresnel mode; Assimp may normalize it.
 					if (properties.m_Ior != 0.0f && properties.m_Ior < 1.0f)
 					{
@@ -454,26 +515,41 @@ namespace gglab
 						!ReadExtensionUnitFactor(*coat, "clearcoatRoughnessFactor", "KHR_materials_clearcoat",
 							properties.m_ClearcoatRoughness, error) ||
 						!ValidateExtensionTextureInfo(*coat, "KHR_materials_clearcoat",
-							{ "clearcoatTexture", "clearcoatRoughnessTexture", "clearcoatNormalTexture" }, error))) return false;
+							{ "clearcoatTexture", "clearcoatRoughnessTexture", "clearcoatNormalTexture" }, error)))
+				{
+					return false;
+				}
 				if (anisotropy &&
 					(!ReadExtensionUnitFactor(*anisotropy, "anisotropyStrength", "KHR_materials_anisotropy",
 						properties.m_AnisotropyStrength, error) ||
 						!ReadExtensionScalar(*anisotropy, "anisotropyRotation", "KHR_materials_anisotropy",
 							properties.m_AnisotropyRotation, error) ||
 						!ValidateExtensionTextureInfo(*anisotropy, "KHR_materials_anisotropy",
-							{ "anisotropyTexture" }, error))) return false;
+							{ "anisotropyTexture" }, error)))
+				{
+					return false;
+				}
 			}
 			if (const Json* normal = FindMaterialTextureInfo(material, MaterialTextureSlot::Normal))
 			{
-				if (!ReadTextureScalar(*normal, "scale", properties.m_NormalScale, error)) return false;
+				if (!ReadTextureScalar(*normal, "scale", properties.m_NormalScale, error))
+				{
+					return false;
+				}
 			}
 			if (const Json* normal = FindMaterialTextureInfo(material, MaterialTextureSlot::ClearcoatNormal))
 			{
-				if (!ReadTextureScalar(*normal, "scale", properties.m_ClearcoatNormalScale, error)) return false;
+				if (!ReadTextureScalar(*normal, "scale", properties.m_ClearcoatNormalScale, error))
+				{
+					return false;
+				}
 			}
 			if (const Json* occlusion = FindMaterialTextureInfo(material, MaterialTextureSlot::Occlusion))
 			{
-				if (!ReadTextureScalar(*occlusion, "strength", properties.m_OcclusionStrength, error)) return false;
+				if (!ReadTextureScalar(*occlusion, "strength", properties.m_OcclusionStrength, error))
+				{
+					return false;
+				}
 			}
 			return true;
 		}
@@ -578,9 +654,15 @@ namespace gglab
 			TextureBindingSource& destination, std::string& error) noexcept
 		{
 			const Json* texture = ReadIndexedObject(gltf, "textures", textureInfo, "index", error);
-			if (!texture) return false;
+			if (!texture)
+			{
+				return false;
+			}
 			const Json* image = ReadIndexedObject(gltf, "images", *texture, "source", error);
-			if (!image) return false;
+			if (!image)
+			{
+				return false;
+			}
 			const auto uri = image->find("uri");
 			if (uri == image->end() || !uri->is_string() || uri->get_ref<const std::string&>().empty() ||
 				uri->get_ref<const std::string&>().starts_with("data:"))
@@ -589,14 +671,23 @@ namespace gglab
 				return false;
 			}
 			destination.m_Path = aiString(uri->get_ref<const std::string&>());
-			if (!texture->contains("sampler")) return true;
+			if (!texture->contains("sampler"))
+			{
+				return true;
+			}
 			const Json* sampler = ReadIndexedObject(gltf, "samplers", *texture, "sampler", error);
-			if (!sampler) return false;
+			if (!sampler)
+			{
+				return false;
+			}
 			auto readSamplerValue = [&](const char* name, int& value,
 				std::initializer_list<int> allowed) noexcept
 			{
 				const auto found = sampler->find(name);
-				if (found == sampler->end()) return true;
+				if (found == sampler->end())
+				{
+					return true;
+				}
 				if (!found->is_number_unsigned() ||
 					std::ranges::find(allowed, found->get<uint64_t>()) == allowed.end())
 				{
@@ -613,7 +704,10 @@ namespace gglab
 				!readSamplerValue("magFilter", destination.m_MagFilter, { GltfNearest, GltfLinear }) ||
 				!readSamplerValue("minFilter", destination.m_MinFilter,
 					{ GltfNearest, GltfLinear, GltfNearestMipmapNearest, GltfLinearMipmapNearest,
-					GltfNearestMipmapLinear, GltfLinearMipmapLinear })) return false;
+					GltfNearestMipmapLinear, GltfLinearMipmapLinear }))
+			{
+				return false;
+			}
 			const auto mapMode = [](int wrap) noexcept
 			{
 				return wrap == GltfClampToEdge ? aiTextureMapMode_Clamp :
@@ -737,7 +831,10 @@ namespace gglab
 		for (const char* field : { "extensionsUsed", "extensionsRequired" })
 		{
 			const auto extensions = gltf.find(field);
-			if (extensions == gltf.end()) continue;
+			if (extensions == gltf.end())
+			{
+				continue;
+			}
 			if (!extensions->is_array())
 			{
 				result.m_Error = std::format("glTF {} must be an array.", field);
@@ -751,9 +848,15 @@ namespace gglab
 					return result;
 				}
 				const std::string name = entry.get<std::string>();
-				if (!name.starts_with("KHR_materials_")) continue;
+				if (!name.starts_with("KHR_materials_"))
+				{
+					continue;
+				}
 				if (name == "KHR_materials_ior" || name == "KHR_materials_clearcoat" ||
-					name == "KHR_materials_anisotropy") continue;
+					name == "KHR_materials_anisotropy")
+				{
+					continue;
+				}
 				if (std::string_view(field) == "extensionsRequired")
 				{
 					result.m_Error = std::format("Required material extension '{}' is not yet supported.", name);
@@ -768,7 +871,10 @@ namespace gglab
 		size_t assimpMaterialSourceCount = 0;
 		{
 			Json assimpGltf = gltf;
-			if (!PrepareGltfMaterialIdentities(assimpGltf, result.m_Error)) return result;
+			if (!PrepareGltfMaterialIdentities(assimpGltf, result.m_Error))
+			{
+				return result;
+			}
 			assimpMaterialSourceCount = assimpGltf["materials"].size();
 			// Keep ReadFile's real path so external buffers resolve beside the source.
 			// Only the root JSON is overlaid; source files and process CWD are untouched.
@@ -798,7 +904,10 @@ namespace gglab
 		for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
 		{
 			aiMesh* mesh = scene->mMeshes[meshIndex];
-			if (!mesh->HasTangentsAndBitangents()) continue;
+			if (!mesh->HasTangentsAndBitangents())
+			{
+				continue;
+			}
 			for (uint32_t vertexIndex = 0; vertexIndex < mesh->mNumVertices; ++vertexIndex)
 			{
 				mesh->mBitangents[vertexIndex] *= -1.0f;
@@ -825,12 +934,18 @@ namespace gglab
 		}
 		std::vector<size_t> materialSourceIndices;
 		if (!asset::interop::ResolveGltfMaterialSources(*scene, assimpMaterialSourceCount,
-			materialSourceIndices, result.m_Error)) return result;
+			materialSourceIndices, result.m_Error))
+		{
+			return result;
+		}
 		std::vector<const Json*> materialSources(scene->mNumMaterials, nullptr);
 		for (uint32_t index = 0; index < scene->mNumMaterials; ++index)
 		{
 			const size_t sourceIndex = materialSourceIndices[index];
-			if (sourceIndex == asset::interop::NoGltfMaterialSource) continue;
+			if (sourceIndex == asset::interop::NoGltfMaterialSource)
+			{
+				continue;
+			}
 			const Json* source = sourceMaterials && sourceIndex < sourceMaterials->size()
 				? &(*sourceMaterials)[sourceIndex] : nullptr;
 			materialSources[index] = source;
@@ -868,7 +983,10 @@ namespace gglab
 			destination.m_Name = source->GetName().C_Str();
 			const Json* sourceMaterial = materialSources[materialIndex];
 			if (sourceMaterial &&
-				!ReadGltfMaterialInputs(*sourceMaterial, destination.m_Properties, result.m_Error)) return result;
+				!ReadGltfMaterialInputs(*sourceMaterial, destination.m_Properties, result.m_Error))
+			{
+				return result;
+			}
 
 			for (uint32_t slotIndex = 0; slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
 				++slotIndex)
@@ -881,14 +999,23 @@ namespace gglab
 				{
 					// Extension bindings always come from source JSON, including disabled
 					// layers. Assimp may omit bindings when their factor is zero.
-					if (!textureInfo) continue;
-					if (!ReadGltfTextureBindingSource(gltf, *textureInfo, textureSource, result.m_Error)) return result;
+					if (!textureInfo)
+					{
+						continue;
+					}
+					if (!ReadGltfTextureBindingSource(gltf, *textureInfo, textureSource, result.m_Error))
+					{
+						return result;
+					}
 				}
 				else
 				{
 					const aiTextureType textureType = ToAssimpTextureType(slot);
 					if (source->GetTexture(textureType, 0, &textureSource.m_Path, nullptr,
-						&textureSource.m_UVIndex, nullptr, nullptr, textureSource.m_MapMode) != aiReturn_SUCCESS) continue;
+						&textureSource.m_UVIndex, nullptr, nullptr, textureSource.m_MapMode) != aiReturn_SUCCESS)
+					{
+						continue;
+					}
 					GGLAB_UNUSED(source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MAG(textureType, 0),
 						textureSource.m_MagFilter));
 					GGLAB_UNUSED(source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MIN(textureType, 0),
@@ -902,7 +1029,10 @@ namespace gglab
 				binding.m_SamplerKey = MakeSamplerKey(textureSource.m_MapMode,
 					textureSource.m_MagFilter, textureSource.m_MinFilter, settings);
 				binding.m_TexCoordIndex = textureSource.m_UVIndex;
-				if (textureInfo && !ReadTextureTransform(*textureInfo, binding, result.m_Error)) return result;
+				if (textureInfo && !ReadTextureTransform(*textureInfo, binding, result.m_Error))
+				{
+					return result;
+				}
 				if (binding.m_TexCoordIndex > 1)
 				{
 					result.m_Error = std::format(

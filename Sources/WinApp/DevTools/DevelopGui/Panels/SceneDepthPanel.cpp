@@ -40,7 +40,10 @@ namespace gglab
 				control->SetPostProcessPreviewSelection(selection, Channel);
 			}
 			ImGui::EndDisabled();
-			if (control) control->RequestPostProcessPreview(Channel);
+			if (control)
+			{
+				control->RequestPostProcessPreview(Channel);
+			}
 			if (preview.m_HasPublished && preview.m_Published == selection &&
 				preview.m_Width && preview.m_Height)
 			{
@@ -57,7 +60,10 @@ namespace gglab
 					static_cast<unsigned long long>(preview.m_FrameSerial),
 					static_cast<unsigned long long>(preview.m_UpdateCount));
 			}
-			else ImGui::TextDisabled("Depth preview pending.");
+			else
+			{
+				ImGui::TextDisabled("Depth preview pending.");
+			}
 		}
 		if (ImGui::CollapsingHeader("Diagnostics: Resource"))
 		{

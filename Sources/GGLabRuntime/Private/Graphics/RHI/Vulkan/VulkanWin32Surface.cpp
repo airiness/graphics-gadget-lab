@@ -11,7 +11,10 @@ namespace gglab
 {
 	int InspectVulkanWin32Adapters(const VulkanWin32AdapterInspectionDesc& desc) noexcept
 	{
-		if (!desc.m_Instance || !desc.m_Window) return 1;
+		if (!desc.m_Instance || !desc.m_Window)
+		{
+			return 1;
+		}
 		VulkanWin32SurfaceFactory surfaceFactory(desc.m_Instance, desc.m_Window);
 		VulkanBootstrapOptions options{};
 		options.m_SurfaceFactory = &surfaceFactory;
@@ -25,7 +28,10 @@ namespace gglab
 	std::unique_ptr<RHIContext> CreateVulkanWin32Context(const RHIContextDesc& desc,
 		HINSTANCE instance, HWND window, bool isHostAbiSupported) noexcept
 	{
-		if (!instance || !window) return {};
+		if (!instance || !window)
+		{
+			return {};
+		}
 		VulkanWin32SurfaceFactory surfaceFactory(instance, window);
 		return VulkanContext::Create(desc, surfaceFactory, isHostAbiSupported);
 	}

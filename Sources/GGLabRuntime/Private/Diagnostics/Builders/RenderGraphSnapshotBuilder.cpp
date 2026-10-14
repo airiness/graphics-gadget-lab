@@ -1,5 +1,6 @@
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 
@@ -220,6 +221,7 @@ namespace gglab
 						const auto* texture =
 							static_cast<const RGVirtualResource<RGTextureResource>*>(
 								virtualResource);
+						resourceInfo.m_ResourceExportSupport = GetResourceExportSupport(texture->m_Desc, virtualResource->m_Imported);
 						resourceInfo.m_TextureFormat = texture->m_Desc.m_Format;
 						resourceInfo.m_TextureExtent = texture->m_Desc.m_Extent;
 						resourceInfo.m_TextureMipLevels = texture->m_Desc.m_MipLevels;
@@ -230,6 +232,7 @@ namespace gglab
 					else
 					{
 						const auto* buffer = static_cast<const RGVirtualResource<RGBufferResource>*>(virtualResource);
+						resourceInfo.m_ResourceExportSupport = GetResourceExportSupport(buffer->m_Desc, virtualResource->m_Imported);
 						resourceInfo.m_BufferSizeInBytes = buffer->m_Desc.m_SizeInBytes;
 						resourceInfo.m_BufferStrideInBytes = buffer->m_Desc.m_StrideInBytes;
 					}
@@ -250,6 +253,10 @@ namespace gglab
 					resourceInfo.m_FinalBarrierSubresources =
 						compiledResource ? compiledResource->m_FinalSubresources
 						: virtualResource->m_FinalBarrierSubresources;
+					if (virtualResource->m_NameId.Name().empty())
+					{
+						resourceInfo.m_ResourceExportSupport = RGObservationFailure::UnknownResource;
+					}
 					m_OutSnapshot.m_Resources.push_back(std::move(resourceInfo));
 				}
 			}
@@ -400,6 +407,12 @@ namespace gglab
 			rg.m_ExecutionPlan.get(), outSnapshot)
 			.Build();
 		outSnapshot.m_CompileDiagnostics = rg.GetCompileDiagnostics();
+		outSnapshot.m_ObservationNodes = rg.m_ObservationPasses;
+		for (const auto& [index, target] : rg.m_ObservationPasses)
+		{
+			(void)target;
+			outSnapshot.m_Passes[index].m_Observation = true;
+		}
 		if (rg.m_ExecutionRecord)
 		{
 			outSnapshot.m_Execution = *rg.m_ExecutionRecord;

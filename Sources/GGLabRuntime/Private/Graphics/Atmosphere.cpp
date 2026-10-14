@@ -84,8 +84,14 @@ namespace gglab
 		{
 			const double t = (i + 0.5) * step;
 			const float h = static_cast<float>(std::sqrt(r*r + t*t + 2.0*r*t*mu) - a.m_Radii.m_X);
-			if (h < 0.0f) return Vector3::Zero;
-			if (h > a.m_Radii.m_Y - a.m_Radii.m_X) continue;
+			if (h < 0.0f)
+			{
+				return Vector3::Zero;
+			}
+			if (h > a.m_Radii.m_Y - a.m_Radii.m_X)
+			{
+				continue;
+			}
 			const float ray = std::exp(-h / a.m_Rayleigh.m_W);
 			const float mie = std::exp(-h / a.m_Mie.m_Z);
 			const float ozone = std::max(0.0f, 1.0f - std::abs(h-a.m_Absorption.m_W)/a.m_Ground.m_W);

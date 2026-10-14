@@ -40,7 +40,10 @@ namespace gglab
 	WorldToolingSnapshot WorldTooling::GetEntities() const
 	{
 		WorldToolingSnapshot result;
-		if (!HasWorld()) return result;
+		if (!HasWorld())
+		{
+			return result;
+		}
 		result.m_WorldId = m_WorldId;
 		const auto& registry = m_World.GetRegistry();
 		std::vector<entt::entity> entities;
@@ -56,11 +59,17 @@ namespace gglab
 			EntityToolingObservation observation;
 			observation.m_Target = { m_WorldId, entt::to_integral(entity) };
 			if (const auto* value = registry.try_get<components::TransformComponent>(entity))
+			{
 				observation.m_Transform = *value;
+			}
 			if (const auto* value = registry.try_get<components::LightComponent>(entity))
+			{
 				observation.m_Light = *value;
+			}
 			if (const auto* value = registry.try_get<components::ModelComponent>(entity))
+			{
 				observation.m_Model = *value;
+			}
 			result.m_Entities.push_back(observation);
 		}
 		return result;
@@ -68,7 +77,10 @@ namespace gglab
 
 	EntityToolingTarget WorldTooling::CreateEntity()
 	{
-		if (!HasWorld()) return {};
+		if (!HasWorld())
+		{
+			return {};
+		}
 		auto& registry = m_World.GetRegistry();
 		const auto entity = registry.create();
 		registry.emplace<components::TransformComponent>(entity);
@@ -77,28 +89,46 @@ namespace gglab
 
 	bool WorldTooling::DestroyEntity(EntityToolingTarget target)
 	{
-		if (!IsValid(target)) return false;
+		if (!IsValid(target))
+		{
+			return false;
+		}
 		m_World.GetRegistry().destroy(static_cast<entt::entity>(target.m_EntityId));
 		return true;
 	}
 
 	bool WorldTooling::AddTransform(EntityToolingTarget target)
 	{
-		if (!IsValid(target)) return false;
+		if (!IsValid(target))
+		{
+			return false;
+		}
 		auto& registry = m_World.GetRegistry();
 		const auto entity = static_cast<entt::entity>(target.m_EntityId);
-		if (registry.all_of<components::TransformComponent>(entity)) return false;
+		if (registry.all_of<components::TransformComponent>(entity))
+		{
+			return false;
+		}
 		registry.emplace<components::TransformComponent>(entity);
 		return true;
 	}
 
 	bool WorldTooling::AddLight(EntityToolingTarget target)
 	{
-		if (!IsValid(target)) return false;
+		if (!IsValid(target))
+		{
+			return false;
+		}
 		auto& registry = m_World.GetRegistry();
 		const auto entity = static_cast<entt::entity>(target.m_EntityId);
-		if (registry.all_of<components::LightComponent>(entity)) return false;
-		if (!registry.all_of<components::TransformComponent>(entity)) AddTransform(target);
+		if (registry.all_of<components::LightComponent>(entity))
+		{
+			return false;
+		}
+		if (!registry.all_of<components::TransformComponent>(entity))
+		{
+			AddTransform(target);
+		}
 		components::LightComponent light;
 		light.m_Type = LightType::Point;
 		light.m_Intensity = 3.0f;
@@ -110,31 +140,52 @@ namespace gglab
 
 	bool WorldTooling::AddModel(EntityToolingTarget target, ModelID model)
 	{
-		if (!IsValid(target) || !model.IsValid()) return false;
+		if (!IsValid(target) || !model.IsValid())
+		{
+			return false;
+		}
 		auto& registry = m_World.GetRegistry();
 		const auto entity = static_cast<entt::entity>(target.m_EntityId);
-		if (registry.all_of<components::ModelComponent>(entity)) return false;
-		if (!registry.all_of<components::TransformComponent>(entity)) AddTransform(target);
+		if (registry.all_of<components::ModelComponent>(entity))
+		{
+			return false;
+		}
+		if (!registry.all_of<components::TransformComponent>(entity))
+		{
+			AddTransform(target);
+		}
 		registry.emplace<components::ModelComponent>(entity, model);
 		return true;
 	}
 
 	bool WorldTooling::SetTransform(EntityToolingTarget target, const components::TransformComponent& value)
 	{
-		if (!IsValid(target)) return false;
+		if (!IsValid(target))
+		{
+			return false;
+		}
 		auto* transform = m_World.GetRegistry().try_get<components::TransformComponent>(
 			static_cast<entt::entity>(target.m_EntityId));
-		if (!transform) return false;
+		if (!transform)
+		{
+			return false;
+		}
 		*transform = value;
 		return true;
 	}
 
 	bool WorldTooling::SetLight(EntityToolingTarget target, const components::LightComponent& value)
 	{
-		if (!IsValid(target)) return false;
+		if (!IsValid(target))
+		{
+			return false;
+		}
 		auto* light = m_World.GetRegistry().try_get<components::LightComponent>(
 			static_cast<entt::entity>(target.m_EntityId));
-		if (!light) return false;
+		if (!light)
+		{
+			return false;
+		}
 		auto normalized = value;
 		normalized.m_Type = static_cast<LightType>(std::clamp(static_cast<int>(value.m_Type),
 			static_cast<int>(LightType::Directional), static_cast<int>(LightType::Point)));
@@ -142,7 +193,9 @@ namespace gglab
 		normalized.m_Range = std::max(value.m_Range, 0.001f);
 		normalized.m_SpotAngle = std::clamp(value.m_SpotAngle, 0.001f, 179.0f);
 		if (normalized.m_Type != light->m_Type && normalized.m_Type != LightType::Directional)
+		{
 			normalized.m_DirectionalShadowSettings.reset();
+		}
 		*light = normalized;
 		return true;
 	}

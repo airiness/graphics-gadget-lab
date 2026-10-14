@@ -48,6 +48,8 @@ namespace gglab
 		// ordered before the export transition when they remain live independently.
 		ExportWriterToExport,
 		ExportReaderToExport,
+		// Fixes observer placement without becoming a producer liveness edge.
+		ObservationOrder,
 	};
 
 	enum class RGBarrierKind : uint8_t

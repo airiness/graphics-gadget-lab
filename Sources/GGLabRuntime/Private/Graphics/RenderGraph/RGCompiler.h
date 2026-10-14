@@ -21,6 +21,9 @@ namespace gglab
 	{
 	public:
 		[[nodiscard]] static RGCompileResult Compile(const RenderGraph& graph) noexcept;
+		// Rebuilds allocation/barrier plans with a fixed original culled set and order.
+		[[nodiscard]] static RGCompileResult ExtendObservations(const RenderGraph& graph,
+			const RGExecutionPlan& original) noexcept;
 
 	private:
 		explicit RGCompiler(const RenderGraph& graph) noexcept;

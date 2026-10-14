@@ -193,6 +193,38 @@ namespace gglab
 		};
 	}
 
+	// One complete mip/plane for resource observation. Depth is a 32-bit word
+	// (D24 in the low 24 bits); stencil is one byte. Typeless data stays raw.
+	[[nodiscard]] constexpr RHITextureCopyFootprint ComputeRHIObservationCopyFootprint(
+		const RHITextureDesc& desc, uint32_t mip, RHITextureAspect aspect) noexcept
+	{
+		const auto& info = GetRHIFormatInfo(desc.m_Format);
+		if (desc.m_Dimension != RHITextureDimension::Texture2D || desc.m_SampleCount != 1 ||
+			mip >= desc.m_MipLevels || mip >= 32 || desc.m_Extent.m_Width == 0 || desc.m_Extent.m_Height == 0 ||
+			info.m_BlockWidth != 1 || info.m_BlockHeight != 1 || info.m_BytesPerBlock == 0 ||
+			(aspect != RHITextureAspect::Color && aspect != RHITextureAspect::Depth && aspect != RHITextureAspect::Stencil) ||
+			!Test(GetRHITextureAspects(desc), aspect))
+		{
+			return {};
+		}
+		const uint32_t width = (desc.m_Extent.m_Width >> mip) == 0 ? 1 : desc.m_Extent.m_Width >> mip;
+		const uint32_t height = (desc.m_Extent.m_Height >> mip) == 0 ? 1 : desc.m_Extent.m_Height >> mip;
+		const uint32_t bytes = aspect == RHITextureAspect::Stencil ? 1 : info.m_BytesPerBlock;
+		// Twelve-byte texels need a pitch divisible by both 256 and twelve.
+		const uint64_t alignment = bytes == 12 ? 3 * RHITextureCopyRowPitchAlignment : RHITextureCopyRowPitchAlignment;
+		if (bytes != 12 && alignment % bytes != 0)
+		{
+			return {};
+		}
+		const uint64_t row = static_cast<uint64_t>(width) * bytes;
+		const uint64_t pitch = (row + alignment - 1) / alignment * alignment;
+		if (pitch > UINT64_MAX / height)
+		{
+			return {};
+		}
+		return { desc.m_Format, width, height, bytes, row, pitch, pitch * height };
+	}
+
 	struct RHITextureViewDesc
 	{
 		RHITextureViewType m_Type = RHITextureViewType::ShaderResource;

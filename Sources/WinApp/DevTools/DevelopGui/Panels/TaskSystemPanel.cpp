@@ -215,7 +215,9 @@ namespace gglab
 			for (const TaskActivity& task : snapshot.m_ActiveTasks)
 			{
 				if (MatchesFilters(task, state))
+				{
 					tasks.push_back(&task);
+				}
 			}
 			if (!ImGui::BeginTable("ActiveTasks", 9,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
@@ -321,9 +323,13 @@ namespace gglab
 				}
 				ImGui::TableSetColumnIndex(6);
 				if (task->m_Status == TaskStatus::Running)
+				{
 					ImGui::Text("%u", task->m_WorkerIndex);
+				}
 				else
+				{
 					ImGui::TextUnformatted("-");
+				}
 				ImGui::TableSetColumnIndex(7);
 				ImGui::Text("%.3f", task->m_QueueMilliseconds);
 				ImGui::TableSetColumnIndex(8);
@@ -339,7 +345,9 @@ namespace gglab
 			for (const TaskCompletionInfo& task : snapshot.m_RecentTasks)
 			{
 				if (MatchesFilters(task, state))
+				{
 					tasks.push_back(&task);
+				}
 			}
 			if (!ImGui::BeginTable("RecentTasks", 7,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |

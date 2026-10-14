@@ -329,7 +329,10 @@ namespace gglab
 			const bool overview = context.m_ShadowVisualizationSettings &&
 				context.m_ShadowVisualizationSettings->m_PreviewAllCascades && cascadeCount > 1;
 			ImGui::Text("Preview layout: %s", overview ? "2x2 cascade overview" : "selected layer");
-			if (!overview) ImGui::Text("Selected layer: %d", state.m_SelectedCascade);
+			if (!overview)
+			{
+				ImGui::Text("Selected layer: %d", state.m_SelectedCascade);
+			}
 
 			if (!previewTextureId)
 			{

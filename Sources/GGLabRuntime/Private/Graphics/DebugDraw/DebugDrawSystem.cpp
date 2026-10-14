@@ -423,7 +423,9 @@ namespace gglab
 		if (!m_System || !std::isfinite(size) || size <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		const Vector3 x(size, 0.0f, 0.0f);
@@ -458,7 +460,9 @@ namespace gglab
 		if (!m_System || !std::isfinite(headLength) || headLength <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		Vector3 direction = end - start;
@@ -483,7 +487,9 @@ namespace gglab
 			length <= 0.0f || headLength <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		const Vector3 origin = math::TransformPoint(Vector3::Zero, transform);

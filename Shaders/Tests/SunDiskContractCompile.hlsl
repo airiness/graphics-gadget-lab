@@ -68,7 +68,10 @@ float3 ReferenceClearcoatDirect(float3 L, float3 V, ClearcoatShadingState coat,
 	bool worldSun, float angularRadius)
 {
 	const float NoL = saturate(dot(coat.NormalWS, L));
-	if (NoL <= 0.0) return 0.0.xxx;
+	if (NoL <= 0.0)
+	{
+		return 0.0.xxx;
+	}
 	const float3 F0 = 0.04.xxx;
 	if (worldSun && coat.BRDFAlpha < 0.04)
 	{

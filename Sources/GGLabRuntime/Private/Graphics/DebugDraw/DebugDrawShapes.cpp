@@ -131,7 +131,9 @@ namespace gglab
 			extents.m_X < 0.0f || extents.m_Y < 0.0f || extents.m_Z < 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		const auto corners = BuildBoxCorners(center, extents);
@@ -150,7 +152,9 @@ namespace gglab
 			extents.m_X < 0.0f || extents.m_Y < 0.0f || extents.m_Z < 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		auto corners = BuildBoxCorners(Vector3::Zero, extents);
@@ -173,7 +177,9 @@ namespace gglab
 		if (!m_System || !BuildBasis(normal, basis) || !std::isfinite(radius) || radius <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		segments = ClampSegments(segments);
@@ -209,7 +215,9 @@ namespace gglab
 		if (!m_System || !math::IsFinite(center) || !std::isfinite(radius) || radius <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		segments = ClampSegments(segments);
@@ -281,7 +289,9 @@ namespace gglab
 			height <= 0.0f || radius <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		segments = ClampSegments(segments);
@@ -319,7 +329,9 @@ namespace gglab
 			height <= 0.0f || radius <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		segments = ClampSegments(segments);
@@ -363,7 +375,9 @@ namespace gglab
 			halfHeight < 0.0f || radius <= 0.0f)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 		if (halfHeight <= 1.0e-6f)
@@ -472,7 +486,9 @@ namespace gglab
 			divisions == 0)
 		{
 			if (m_System)
+			{
 				m_System->RejectInvalid();
+			}
 			return;
 		}
 
@@ -497,7 +513,9 @@ namespace gglab
 	void DebugDrawContext::SetChannelEnabled(StringID channel, bool enabled) noexcept
 	{
 		if (m_System)
+		{
 			m_System->SetChannelEnabled(channel, enabled);
+		}
 	}
 
 	bool DebugDrawContext::IsChannelEnabled(StringID channel) const noexcept
@@ -513,6 +531,8 @@ namespace gglab
 	void DebugDrawContext::ClearChannel(StringID channel) noexcept
 	{
 		if (m_System)
+		{
 			m_System->ClearChannel(channel);
+		}
 	}
 }

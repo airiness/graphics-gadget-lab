@@ -43,9 +43,14 @@ namespace gglab
 			D3D12_GPU_DESCRIPTOR_HANDLE ResolveTexture(RHIDescriptorHandle descriptor) const noexcept override
 			{
 				if (!descriptor.IsValid() || descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
+				{
 					return {};
+				}
 				auto* heap = m_Context.GetDescriptorManager().GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
-				if (!heap) return {};
+				if (!heap)
+				{
+					return {};
+				}
 				return heap->GpuHandleAt(descriptor.m_Index);
 			}
 
@@ -54,7 +59,10 @@ namespace gglab
 			{
 				auto* native = dynamic_cast<DX12GraphicsCommandContext*>(commands);
 				GGLAB_ASSERT_NOT_NULL(native);
-				if (!native) return nullptr;
+				if (!native)
+				{
+					return nullptr;
+				}
 				const RHIRenderingAttachment attachment{ .m_View = target };
 				commands->BeginRendering({ .m_ColorAttachments =
 					std::span<const RHIRenderingAttachment>(&attachment, 1) });

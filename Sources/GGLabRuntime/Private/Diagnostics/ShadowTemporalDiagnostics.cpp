@@ -25,7 +25,10 @@ namespace gglab
 		{
 			const float aLength = a.LengthSquared();
 			const float bLength = b.LengthSquared();
-			if (aLength <= 1.0e-8f || bLength <= 1.0e-8f) return aLength == bLength;
+			if (aLength <= 1.0e-8f || bLength <= 1.0e-8f)
+			{
+				return aLength == bLength;
+			}
 			a /= std::sqrt(aLength);
 			b /= std::sqrt(bLength);
 			return std::abs(a.m_X - b.m_X) <= 1.0e-6f &&
@@ -40,10 +43,16 @@ namespace gglab
 
 		float FractionalGridError(float center, float worldUnitsPerTexel) noexcept
 		{
-			if (!std::isfinite(center) || !ValidTexelScale(worldUnitsPerTexel)) return 0.0f;
+			if (!std::isfinite(center) || !ValidTexelScale(worldUnitsPerTexel))
+			{
+				return 0.0f;
+			}
 			const double gridCoordinate = static_cast<double>(center) /
 				static_cast<double>(worldUnitsPerTexel);
-			if (!std::isfinite(gridCoordinate)) return 0.0f;
+			if (!std::isfinite(gridCoordinate))
+			{
+				return 0.0f;
+			}
 			return static_cast<float>(gridCoordinate - std::round(gridCoordinate));
 		}
 	}
@@ -106,7 +115,10 @@ namespace gglab
 			}
 			return false;
 		}
-		if (m_HasPrevious && snapshot.m_FrameSerial == m_Previous.m_FrameSerial) return false;
+		if (m_HasPrevious && snapshot.m_FrameSerial == m_Previous.m_FrameSerial)
+		{
+			return false;
+		}
 		const bool comparable = IsComparable(snapshot, cameraId, referenceId);
 		if (m_HasPrevious && !comparable)
 		{
@@ -146,7 +158,10 @@ namespace gglab
 				}
 			}
 		}
-		if (m_Samples.size() == MaxSamples) m_Samples.erase(m_Samples.begin());
+		if (m_Samples.size() == MaxSamples)
+		{
+			m_Samples.erase(m_Samples.begin());
+		}
 		m_Samples.push_back(sample);
 		m_Previous = snapshot;
 		m_CameraId = cameraId;

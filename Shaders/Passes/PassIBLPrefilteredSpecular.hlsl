@@ -38,7 +38,10 @@ float GetPerceptualRoughness()
 
 float3 ClampSampleLuminance(float3 radiance)
 {
-	if (g_Pass.PhysicalSky) return SanitizeSceneRadiance(radiance);
+	if (g_Pass.PhysicalSky)
+	{
+		return SanitizeSceneRadiance(radiance);
+	}
 	radiance = SanitizeHDRColor(radiance);
 	const float luminance = dot(radiance, float3(0.2126, 0.7152, 0.0722));
 	const float maxLuminance = max(g_Pass.MaxSampleLuminance, 1.0);

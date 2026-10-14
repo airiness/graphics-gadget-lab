@@ -20,7 +20,10 @@ namespace gglab
 		const RenderServices& services) noexcept
 	{
 		auto* atmosphere = services.m_Atmosphere;
-		if (!atmosphere) return;
+		if (!atmosphere)
+		{
+			return;
+		}
 		const auto& scene = context.m_RenderScene;
 		if (!scene.m_Atmosphere || !scene.m_WorldSun)
 		{
@@ -38,7 +41,10 @@ namespace gglab
 	void RenderPassAtmosphere::AddBakePass(RenderGraph& rg, const RenderServices& services) noexcept
 	{
 		if (!services.m_Environment || !services.m_BakeAtmosphere ||
-			services.m_Environment->GetStageForRecording() != IBLBakeStage::Environment) return;
+			services.m_Environment->GetStageForRecording() != IBLBakeStage::Environment)
+		{
+			return;
+		}
 		if (const auto* parameters = services.m_Environment->GetBakingAtmosphereParameters())
 		{
 			AddLuts(rg, services, *services.m_BakeAtmosphere, *parameters, true, true);
@@ -57,7 +63,10 @@ namespace gglab
 		const auto pipeline = services.m_PipelineResolver->Resolve(m_Slot, m_Recipe, GetInfo());
 		if (!pipeline.IsValid()) { atmosphere->Disable(); return; }
 		const uint64_t generation = services.m_ShaderPrograms->GetGeneration(m_Recipe.m_CSId);
-		if (!atmosphere->Begin(parameters, { generation, generation, generation }, skyConstants)) return;
+		if (!atmosphere->Begin(parameters, { generation, generation, generation }, skyConstants))
+		{
+			return;
+		}
 		const auto diagnostics = atmosphere->GetDiagnostics();
 		const auto* resourceName = bake ? BakeAtmosphereResourcesName : AtmosphereResourcesName;
 		const auto names = bake ? BakeAtmosphereLutNames : AtmosphereLutNames;
@@ -78,7 +87,10 @@ namespace gglab
 		const uint32_t sampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 		for (uint32_t stage = 0; stage < 3; ++stage)
 		{
-			if (!(diagnostics.m_DirtyMask & (1u << stage))) continue;
+			if (!(diagnostics.m_DirtyMask & (1u << stage)))
+			{
+				continue;
+			}
 			rg.AddPass<PassData>(names[stage], RGPassEncoderType::Compute,
 				[stage, resourceName](RenderGraph::RGBuilder& builder, PassData& data)
 				{
@@ -101,8 +113,14 @@ namespace gglab
 					auto* command = execute.GetDirectComputeCommandContext();
 					Parameters parameters{};
 					parameters.m_Output = execute.GetViewDescriptor(data.m_Output).m_Index;
-					if (stage > 0) parameters.m_Transmittance = execute.GetViewDescriptor(data.m_Transmittance).m_Index;
-					if (stage > 1) parameters.m_Multiple = execute.GetViewDescriptor(data.m_Multiple).m_Index;
+					if (stage > 0)
+					{
+						parameters.m_Transmittance = execute.GetViewDescriptor(data.m_Transmittance).m_Index;
+					}
+					if (stage > 1)
+					{
+						parameters.m_Multiple = execute.GetViewDescriptor(data.m_Multiple).m_Index;
+					}
 					parameters.m_Sampler = sampler;
 					parameters.m_Stage = stage;
 					parameters.m_Width = AtmosphereLutWidths[stage];
@@ -123,7 +141,10 @@ namespace gglab
 		for (const bool bake : { false, true })
 		{
 			const auto* resourceName = bake ? BakeAtmosphereResourcesName : AtmosphereResourcesName;
-			if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(resourceName)) continue;
+			if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(resourceName))
+			{
+				continue;
+			}
 			rg.AddPass<SetupData>(bake ? "IBL.Atmosphere.Export" : "Atmosphere.Export",
 				[resourceName](RenderGraph::RGBuilder& builder, SetupData&)
 				{

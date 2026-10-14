@@ -10,7 +10,10 @@ namespace gglab
 		for (size_t index = 0; index < m_Rig.GetCameraCount(); ++index)
 		{
 			const auto* slot = m_Rig.GetCameraSlot(index);
-			if (id != 0 && slot && slot->m_Id == id && slot->m_Camera) return index;
+			if (id != 0 && slot && slot->m_Id == id && slot->m_Camera)
+			{
+				return index;
+			}
 		}
 		return m_Rig.GetCameraCount();
 	}
@@ -25,7 +28,10 @@ namespace gglab
 		for (size_t index = 0; index < m_Rig.GetCameraCount(); ++index)
 		{
 			const auto* slot = m_Rig.GetCameraSlot(index);
-			if (!slot || !slot->m_Camera) continue;
+			if (!slot || !slot->m_Camera)
+			{
+				continue;
+			}
 			const auto& camera = *slot->m_Camera;
 			CameraToolingObservation observation;
 			observation.m_Id = slot->m_Id;
@@ -33,7 +39,10 @@ namespace gglab
 			observation.m_Settings = { camera.GetPosition(), camera.GetYaw(), camera.GetPitch(),
 				camera.GetFov(), camera.GetNear(), camera.GetFar(), camera.GetManualEV100(),
 				camera.GetExposureCompensationEV() };
-			if (slot->m_Controller) observation.m_Controller = slot->m_Controller->GetParams();
+			if (slot->m_Controller)
+			{
+				observation.m_Controller = slot->m_Controller->GetParams();
+			}
 			observation.m_FrustumColor = slot->m_FrustumColor;
 			observation.m_RenderViewId = slot->m_RenderViewId;
 			observation.m_VisibilityMode = slot->m_VisibilityMode;
@@ -47,7 +56,10 @@ namespace gglab
 			observation.m_ViewMatrix = camera.GetViewMatrix();
 			observation.m_ProjMatrix = camera.GetProjMatrix();
 			result.m_Cameras.push_back(observation);
-			if (index == m_Rig.GetActiveCameraIndex()) result.m_ActiveCameraId = slot->m_Id;
+			if (index == m_Rig.GetActiveCameraIndex())
+			{
+				result.m_ActiveCameraId = slot->m_Id;
+			}
 		}
 		return result;
 	}
@@ -55,7 +67,10 @@ namespace gglab
 	bool CameraTooling::SetActiveCamera(uint64_t id) noexcept
 	{
 		const size_t index = FindIndex(id);
-		if (index == m_Rig.GetCameraCount()) return false;
+		if (index == m_Rig.GetCameraCount())
+		{
+			return false;
+		}
 		m_Rig.SetActiveCameraIndex(index);
 		return true;
 	}
@@ -75,7 +90,10 @@ namespace gglab
 	uint64_t CameraTooling::AddDebugCamera() noexcept
 	{
 		const auto* active = m_Rig.GetActiveCameraSlot();
-		if (!active || !active->m_Camera) return 0;
+		if (!active || !active->m_Camera)
+		{
+			return 0;
+		}
 		const auto index = m_Rig.AddDebugCameraFromActive();
 		return m_Rig.GetCameraSlot(index)->m_Id;
 	}
@@ -88,7 +106,10 @@ namespace gglab
 	bool CameraTooling::SetCamera(uint64_t id, const CameraEditSettings& settings) noexcept
 	{
 		auto* slot = m_Rig.GetCameraSlot(FindIndex(id));
-		if (!slot) return false;
+		if (!slot)
+		{
+			return false;
+		}
 		auto& camera = *slot->m_Camera;
 		camera.SetPosition(settings.m_Position);
 		camera.SetYawPitch(settings.m_Yaw, settings.m_Pitch);
@@ -104,7 +125,10 @@ namespace gglab
 	bool CameraTooling::SetController(uint64_t id, const CameraControllerSettings& settings) noexcept
 	{
 		auto* slot = m_Rig.GetCameraSlot(FindIndex(id));
-		if (!slot || !slot->m_Controller) return false;
+		if (!slot || !slot->m_Controller)
+		{
+			return false;
+		}
 		slot->m_Controller->SetParams(settings);
 		return true;
 	}
@@ -112,7 +136,10 @@ namespace gglab
 	bool CameraTooling::ResetVelocity(uint64_t id) noexcept
 	{
 		auto* slot = m_Rig.GetCameraSlot(FindIndex(id));
-		if (!slot || !slot->m_Controller) return false;
+		if (!slot || !slot->m_Controller)
+		{
+			return false;
+		}
 		slot->m_Controller->ResetVelocity();
 		return true;
 	}
@@ -120,7 +147,10 @@ namespace gglab
 	bool CameraTooling::SetFrustum(uint64_t id, bool show, const Color& color) noexcept
 	{
 		auto* slot = m_Rig.GetCameraSlot(FindIndex(id));
-		if (!slot) return false;
+		if (!slot)
+		{
+			return false;
+		}
 		slot->m_ShowFrustum = show;
 		slot->m_FrustumColor = color;
 		return true;
@@ -134,7 +164,10 @@ namespace gglab
 	bool CameraTooling::SetVisibilityMode(uint64_t id, RenderViewVisibilityMode mode) noexcept
 	{
 		auto* slot = m_Rig.GetCameraSlot(FindIndex(id));
-		if (!slot || !slot->m_IsDebug || !slot->m_EnableRenderView) return false;
+		if (!slot || !slot->m_IsDebug || !slot->m_EnableRenderView)
+		{
+			return false;
+		}
 		switch (mode)
 		{
 		case RenderViewVisibilityMode::Self:

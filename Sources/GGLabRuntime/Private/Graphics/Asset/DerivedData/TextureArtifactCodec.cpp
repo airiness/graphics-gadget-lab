@@ -42,7 +42,9 @@ namespace gglab
 			{
 				uint64_t decoded = 0;
 				if (!Unsigned(decoded, 4))
+				{
 					return false;
+				}
 				value = static_cast<uint32_t>(decoded);
 				return true;
 			}
@@ -50,7 +52,9 @@ namespace gglab
 			bool Bytes(std::span<std::byte> value) noexcept
 			{
 				if (value.size() > Remaining())
+				{
 					return false;
+				}
 				std::memcpy(value.data(), m_Data.data() + m_Offset, value.size());
 				m_Offset += value.size();
 				return true;
@@ -61,7 +65,9 @@ namespace gglab
 			bool Unsigned(uint64_t& value, size_t width) noexcept
 			{
 				if (width > Remaining())
+				{
 					return false;
+				}
 				value = 0;
 				for (size_t i = 0; i < width; ++i)
 					value |= static_cast<uint64_t>(std::to_integer<uint8_t>(m_Data[m_Offset + i]))
@@ -77,7 +83,9 @@ namespace gglab
 	std::vector<std::byte> TextureArtifactCodec::Serialize(const TextureArtifact& artifact) noexcept
 	{
 		if (!artifact.IsValid())
+		{
 			return {};
+		}
 		return SerializeTextureData(artifact.m_Data);
 	}
 
@@ -85,7 +93,9 @@ namespace gglab
 		const TextureAssetData& texture) noexcept
 	{
 		if (!texture.IsValid())
+		{
 			return {};
+		}
 		Writer writer;
 		writer.U32(TextureArtifactSchemaVersion);
 		writer.U32(static_cast<uint32_t>(texture.m_ResourceFormat));

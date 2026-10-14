@@ -36,12 +36,18 @@ namespace gglab
 		// content before the capture. The view is applied only after every earlier
 		// request was issued, and its camera cut restarts settling.
 		std::string m_ReferenceViewId;
+		// Flexible batches may wait for temporary capacity before applying a view
+		// or issuing a capture. Once issued, the frame is fixed. Exact sequence
+		// frames ignore this option; permanent capacity errors still fail.
+		bool m_WaitForCapacity = false;
 		// Empty selects the coordinator's default output directory.
 		std::filesystem::path m_OutputDirectory;
 		std::string m_Label;
 		std::string m_Note;
 		// RenderGraph requests only: write the discovery summary instead of full records.
 		bool m_GraphSummary = false;
+		std::vector<RGResourceAddress> m_ResourceTargets;
+		bool m_IncludeGraph = false;
 		// Set by a camera-path sequence for the frame it captures.
 		std::optional<FrameCaptureSequenceInfo> m_Sequence;
 		// Required for Diagnostic captures and ignored by other sources.
@@ -62,6 +68,9 @@ namespace gglab
 		FrameCaptureRequestStatus m_Status = FrameCaptureRequestStatus::Failed;
 		std::filesystem::path m_ImagePath;
 		std::filesystem::path m_MetadataPath;
+		std::vector<std::filesystem::path> m_ResourcePaths;
+		std::filesystem::path m_GraphPath;
+		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
 		std::string m_Failure;
 		// Present once the capture was issued to a frame.
 		std::optional<FrameCaptureMetadata> m_Metadata;
@@ -153,7 +162,7 @@ namespace gglab
 		// Checks Runtime payload capacity and the write slots reserved by issued
 		// captures, using the last frame's display target. Busy sequences defer before
 		// simulation; permanent errors proceed to an explicit failed capture result.
-		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source)
+		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source, uint32_t requestCount = 1)
 			const noexcept;
 		// State of the most recent frame passed to BeginFrame; null before the
 		// first rendered frame.
@@ -184,6 +193,9 @@ namespace gglab
 		// before metadata is fixed, or fail if they require an exact sequence frame.
 		// Fails waiting after-ready requests for content with a failed gate.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
+		// Busy is handled before submission so a sequence keeps the same sample/frame.
+		[[nodiscard]] bool PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
+			ResourceExportFrameContext context) noexcept;
 		// Called after the frame passed to BeginFrame was submitted.
 		void OnFrameSubmitted() noexcept;
 		// Collects Runtime capture results, starts encoding and publishes
@@ -218,12 +230,15 @@ namespace gglab
 			FrameCaptureRequest m_Request{};
 			Phase m_Phase = Phase::Waiting;
 			uint64_t m_CaptureRequestId = 0;
+			// Transient Runtime association for the outputs of one sequence frame.
+			uint64_t m_GroupId = 0;
 			// The requested reference view was restored, and the camera reset
 			// serial of the first frame rendered with it. A different serial later
 			// means another camera cut replaced the view, which is then restored again.
 			bool m_ViewApplied = false;
 			std::optional<uint64_t> m_ViewCameraResetSerial;
 			FrameCaptureMetadata m_Metadata{};
+			RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
 			std::shared_ptr<EncodeJob> m_Job;
 		};
 
@@ -232,7 +247,8 @@ namespace gglab
 		[[nodiscard]] bool IsDue(
 			const Entry& entry, const FrameCaptureFrameState& state) const noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
-			const FrameCaptureFrameState& state) const noexcept;
+			const FrameCaptureFrameState& state, uint32_t requestCount = 1) const noexcept;
+		void IssueSequenceGroups(const FrameCaptureFrameState& state, std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;

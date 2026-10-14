@@ -16,7 +16,10 @@ ConstantBuffer<AtmospherePassParameters> g_Pass : register(b2);
 [numthreads(8,8,1)]
 void CSMain(uint3 dispatchId : SV_DispatchThreadID)
 {
-	if (dispatchId.x>=g_Pass.Width || dispatchId.y>=g_Pass.Height) return;
+	if (dispatchId.x>=g_Pass.Width || dispatchId.y>=g_Pass.Height)
+	{
+		return;
+	}
 	RWTexture2D<float4> output = GetRWTexture2DFloat4(g_Pass.OutputIndex);
 	float2 uv = float2(dispatchId.xy)/float2(g_Pass.Width-1,g_Pass.Height-1);
 	float radius = lerp(g_Atmosphere.Radii.x+0.001, g_Atmosphere.Radii.y-0.001, uv.y);

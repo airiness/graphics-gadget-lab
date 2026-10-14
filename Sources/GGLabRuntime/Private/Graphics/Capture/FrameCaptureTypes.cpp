@@ -22,6 +22,8 @@ namespace gglab
 			return "diagnostic";
 		case FrameCaptureSource::RenderGraph:
 			return "graph";
+		case FrameCaptureSource::ResourceExport:
+			return "resource-export";
 		}
 		GGLAB_UNREACHABLE("Unhandled FrameCaptureSource.");
 	}

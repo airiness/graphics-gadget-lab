@@ -10,9 +10,11 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <memory>
+#include <span>
 
 namespace gglab
 {
@@ -233,7 +235,7 @@ namespace gglab
 			RGTextureViewId CreateView(RGTextureId textureId,
 				std::optional<RHITextureViewDesc> desc = std::nullopt) noexcept
 			{
-				return m_RG.CreateTextureView<T>(textureId, desc);
+				return m_RG.CreateTextureView<T>(m_PassNodeIndex, textureId, desc);
 			}
 
 			RGBufferId ImportBuffer(const char* name, RHIBufferHandle buffer,
@@ -411,6 +413,10 @@ namespace gglab
 			ExecuteFunc&& executeFunc) noexcept;
 
 		[[nodiscard]] bool Compile() noexcept;
+		// Resolves only against original liveness. Observations never root producers.
+		[[nodiscard]] RGObservationTarget ResolveObservation(const RGResourceAddress& address) const noexcept;
+		[[nodiscard]] bool AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept;
+		[[nodiscard]] bool HasResourceObservations() const noexcept { return !m_ObservationPasses.empty(); }
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		// Opt-in CPU-only recording; does not change graph compilation or GPU work.
 		void EnableExecutionRecord() noexcept;
@@ -438,6 +444,7 @@ namespace gglab
 	private:
 		struct TextureViewRecord
 		{
+			RGPassNodeIndex m_Pass = InvalidRGPassNodeIndex;
 			RGTextureId m_Texture{};
 			std::optional<RHITextureViewDesc> m_Desc{};
 			RHITextureViewType m_Type = RHITextureViewType::RenderTarget;
@@ -479,7 +486,7 @@ namespace gglab
 
 		template <RHITextureViewType T>
 		RGTextureViewId CreateTextureView(
-			RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept;
+			RGPassNodeIndex pass, RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
 		[[nodiscard]] bool IsTextureFullyWrittenByPass(
@@ -516,6 +523,7 @@ namespace gglab
 		std::vector<TransientBufferAllocation> m_MarkedRetireBuffers;
 		std::unique_ptr<RGExecutionPlan> m_ExecutionPlan;
 		std::unique_ptr<RGSnapshotExecutionRecord> m_ExecutionRecord;
+		std::vector<std::pair<uint32_t, RGObservationTarget>> m_ObservationPasses;
 		std::vector<RGCompileDiagnostic> m_CompileDiagnostics;
 		bool m_BuildValid = true;
 
@@ -562,7 +570,7 @@ namespace gglab
 
 	template <RHITextureViewType T>
 	inline RGTextureViewId RenderGraph::CreateTextureView(
-		RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept
+		RGPassNodeIndex pass, RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept
 	{
 		GGLAB_ASSERT_MSG(
 			textureId.IsValid(), "RenderGraph::CreateTextureView requires a valid texture id.");
@@ -586,6 +594,7 @@ namespace gglab
 		}
 
 		TextureViewRecord view{
+			.m_Pass = pass,
 			.m_Texture = textureId,
 			.m_Desc = desc,
 			.m_Type = T,

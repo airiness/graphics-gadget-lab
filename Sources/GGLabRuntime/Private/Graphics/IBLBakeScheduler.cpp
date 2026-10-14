@@ -373,7 +373,10 @@ namespace gglab
 
 	void IBLBakeScheduler::StartRequestedBake(const RHIFencePoint& retireFence) noexcept
 	{
-		if (m_BakeAtmosphere) m_BakeAtmosphere->Disable();
+		if (m_BakeAtmosphere)
+		{
+			m_BakeAtmosphere->Disable();
+		}
 		// A frame abort keeps initialization recordable for the same generation.
 		// A superseding bake must discard that state before adopting new resources.
 		const bool resetInitialization = m_BakeResourceInitialization.ResetForRequestedBake();
