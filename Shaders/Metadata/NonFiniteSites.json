@@ -1,0 +1,1529 @@
+{
+  "schema": "gglab.shader-nonfinite-sites",
+  "schemaVersion": 1,
+  "sites": [
+    {
+      "id": "common.sanitize-hdrcolor.sanitize-hdrchannel",
+      "source": "Common/Common.hlsli",
+      "function": "SanitizeHDRColor",
+      "operation": "SanitizeHDRChannel",
+      "count": 3,
+      "bodySha256": "7206543371f60cc9ab243d4d82100888293ed7bff8ba25d47d353671042eacfc",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "common.encode-scene-color.encode-scene-color-channel",
+      "source": "Common/Common.hlsli",
+      "function": "EncodeSceneColor",
+      "operation": "EncodeSceneColorChannel",
+      "count": 3,
+      "bodySha256": "2ce3f2cd9170b9eabf23430740a29874261094936e2653d9808e5f1204e81594",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "common.sanitize-scene-radiance.sanitize-scene-radiance-channel",
+      "source": "Common/Common.hlsli",
+      "function": "SanitizeSceneRadiance",
+      "operation": "SanitizeSceneRadianceChannel",
+      "count": 3,
+      "bodySha256": "99d0f5846ebb734543ea20baf87b92955716407642459551ba875e5177123a0b",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "common.acesfitted.sanitize-hdrcolor",
+      "source": "Common/Common.hlsli",
+      "function": "ACESFitted",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "655d6a4a271dda7460276fe8eade3d2f3eed471faf7eabd7c7b567e408bf8bd8",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "depth-reconstruction.raw-depth-to-positive-view-z.isfinite",
+      "source": "Common/DepthReconstruction.hlsli",
+      "function": "RawDepthToPositiveViewZ",
+      "operation": "isfinite",
+      "count": 2,
+      "bodySha256": "2f7d8a72ff74ded69fcbcfc474e22221a8aa6aa62ecbd7b12b88a1091c673ff3",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.forward-plus-cull",
+        "gglab.shader.forward-plus-validation",
+        "gglab.shader.gtao",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "display-color.resolve-display-color.acesfitted",
+      "source": "Common/DisplayColor.hlsli",
+      "function": "ResolveDisplayColor",
+      "operation": "ACESFitted",
+      "count": 2,
+      "bodySha256": "c81bcc492e14b5c3a00e7b8404874373212786c31c8ffc659ced8f3ed4f77ac6",
+      "programs": [
+        "gglab.shader.final-color"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "hdrcolor-math.sanitize-scene-radiance-channel.isfinite",
+      "source": "Common/HDRColorMath.hlsli",
+      "function": "SanitizeSceneRadianceChannel",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "5ca66a1b0fd34a870ebde72db282eda3c622ebff67221b518c8bfd0121cfb653",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "hdrcolor-math.sanitize-hdrchannel.isfinite",
+      "source": "Common/HDRColorMath.hlsli",
+      "function": "SanitizeHDRChannel",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "99e47c7a9456c4a2881982ace76e7937701beebfb018a29bd44c97e481a11c1a",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "hdrcolor-math.encode-scene-color-channel.sanitize-hdrchannel",
+      "source": "Common/HDRColorMath.hlsli",
+      "function": "EncodeSceneColorChannel",
+      "operation": "SanitizeHDRChannel",
+      "count": 1,
+      "bodySha256": "128615971a7b304baf906c7d55a2cef3955a471aefd98642fba2bc01324ce7fd",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.bloom",
+        "gglab.shader.debug-draw",
+        "gglab.shader.depth-prepass",
+        "gglab.shader.directional-shadow-map",
+        "gglab.shader.final-color",
+        "gglab.shader.forward-coverage",
+        "gglab.shader.forward-pbr",
+        "gglab.shader.gtao",
+        "gglab.shader.ibl-brdf-lut",
+        "gglab.shader.ibl-cubemap-preview",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.ibl-environment-mip",
+        "gglab.shader.ibl-importance",
+        "gglab.shader.ibl-irradiance",
+        "gglab.shader.ibl-prefiltered-specular",
+        "gglab.shader.napa-voxel",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.render-graph-compute",
+        "gglab.shader.shadow-map-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "screen-space.reconstruct-position-from-raw-depth.isfinite",
+      "source": "Common/ScreenSpace.hlsli",
+      "function": "ReconstructPositionFromRawDepth",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "ba52678a967cce8b5f1c4caf382cbe5b8032ade48a462ccc11d5ef58f4ac6c89",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.forward-plus-cull",
+        "gglab.shader.forward-plus-validation",
+        "gglab.shader.gtao",
+        "gglab.shader.physical-sky-preview",
+        "gglab.shader.post-process-preview",
+        "gglab.shader.skybox",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "temporal.is-temporal-uvin-bounds.isfinite",
+      "source": "Common/Temporal.hlsli",
+      "function": "IsTemporalUVInBounds",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "4c79d83b6a97b4a879e7814778fae25129d7fcc9cf87333f3d55c9eecd3ce694",
+      "programs": [
+        "gglab.shader.gtao",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "temporal.is-temporal-depth-compatible.isfinite",
+      "source": "Common/Temporal.hlsli",
+      "function": "IsTemporalDepthCompatible",
+      "operation": "isfinite",
+      "count": 4,
+      "bodySha256": "e7f4fe569b0439516afdaef05f4b51310f39b20f8067af6846a39f83e35b9fa1",
+      "programs": [
+        "gglab.shader.gtao",
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "temporal-aa.is-temporal-color-finite.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "IsTemporalColorFinite",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "9e72677e896b38f8d3c6cd742e155bc7f425975b38407ca2d485a8484ec85ecd",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "temporal-aa.is-temporal-history-accumulation-valid.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "IsTemporalHistoryAccumulationValid",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "2eb447fba454415e4c2a8278a806ac30c0b30e8dc9606e79cbb0a0da98a275d4",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-reliability.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalReliability",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "ad643ace66516d2c2c8eb3b54382422fbc2f6c341e998f39a7a41f68664ef443",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-history-next-age.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalHistoryNextAge",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "91ba28aa8efa4de47dc53b59667f68f20c9940581d48c9690e3ea9e163b68fdf",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-aamax-history-samples.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalAAMaxHistorySamples",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "1511d3a25f39a1664e7c5635925adc13cca8b700e063147d546ee5560083464f",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-history-next-samples.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalHistoryNextSamples",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "ceab2df112931ed0589f88cb15cd74dc1fcb8d1ac3889e19df150a39539b13f1",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-history-next-samples.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalHistoryNextSamples",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "ceab2df112931ed0589f88cb15cd74dc1fcb8d1ac3889e19df150a39539b13f1",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-upscaled-static-fraction.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalUpscaledStaticFraction",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "d0d6d2f9d927a83a284884669eb7aa00c0ba08d4d1e745b0b4e39d6143efe4d1",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.reconstruct-temporal-current-color.is-temporal-color-finite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ReconstructTemporalCurrentColor",
+      "operation": "IsTemporalColorFinite",
+      "count": 1,
+      "bodySha256": "791185ef8cf437aa6264c850b30751916d2a0e43380a104c53d5f67f5c1aa581",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-aaoutput-alphas.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalAAOutputAlphas",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "f099cf5fc3a101b6a2c55af9a8532f0a31f7b646708e6e2fd66ae31a3f6a95d9",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-aafeedback-saturation-age.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalAAFeedbackSaturationAge",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "eb3cbb28bbee1a429c559937be1dcaf2776076156304e989ff769636b797c42e",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-aahistory-age-preview.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalAAHistoryAgePreview",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "d6f1f7ea3aaa412054a6c102e020a63c963df2ed736007bea36505ff66e0f34e",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.resolve-temporal-aahistory-samples-preview.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ResolveTemporalAAHistorySamplesPreview",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "3b48f19b0f9efe6bd01173b1fcc2443e4d2427a7c667eb4e8c700a7e6c4feea2",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.get-temporal-neighborhood-range.is-temporal-color-finite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "GetTemporalNeighborhoodRange",
+      "operation": "IsTemporalColorFinite",
+      "count": 1,
+      "bodySha256": "1d62fd1ec4f1ba4366f33c404a58af02cb9427d7d234993d6d9caf6ded9ad768",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.compute-temporal-history-confidence.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ComputeTemporalHistoryConfidence",
+      "operation": "isfinite",
+      "count": 3,
+      "bodySha256": "c1cab6de219fe9f8bb16c9289f24f9a857037cd8b7e33ba166baec4d71935dd1",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.compute-temporal-weighted-history-weight.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ComputeTemporalWeightedHistoryWeight",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "10d914fa96180a86579388cad80d9d1e570971225e15725c9dc6c29551b74aa6",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.compute-temporal-weighted-history-weight.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ComputeTemporalWeightedHistoryWeight",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "10d914fa96180a86579388cad80d9d1e570971225e15725c9dc6c29551b74aa6",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.compute-temporal-history-weight.is-temporal-history-accumulation-valid",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ComputeTemporalHistoryWeight",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "434abfcddd54b21e557bb43da387714cc4f5ca6e8b660e2c2d50ea4a76d104de",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.compute-temporal-history-weight.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ComputeTemporalHistoryWeight",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "434abfcddd54b21e557bb43da387714cc4f5ca6e8b660e2c2d50ea4a76d104de",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "temporal-aa.reproject-temporal-sky-uv.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ReprojectTemporalSkyUV",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "0fe8bc78574583f3fed9e4e1013a98644b01276802c5e76990347c2dc6f09f39",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "temporal-aa.validate-temporal-geometry-depth.isfinite",
+      "source": "Common/TemporalAA.hlsli",
+      "function": "ValidateTemporalGeometryDepth",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "2ab91ef00bc9c739469c6d06e40d0c3a19bcbd7b66893324c3d02a800acf3a61",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "atmosphere.atmosphere-validated.isfinite",
+      "source": "Lighting/Atmosphere.hlsli",
+      "function": "AtmosphereValidated",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "7a79e982992fc37f3ed3abe69c162d9a3c5816c50c9f28b6e03f906ffe517747",
+      "programs": [
+        "gglab.shader.aerial-perspective",
+        "gglab.shader.atmosphere-luts",
+        "gglab.shader.ibl-environment",
+        "gglab.shader.physical-sky-preview"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "gtao.load-gtaoposition.isfinite",
+      "source": "Lighting/GTAO.hlsli",
+      "function": "LoadGTAOPosition",
+      "operation": "isfinite",
+      "count": 2,
+      "bodySha256": "32940a943660296f9a87f65cc5b768354cf8995ef7d0933c02d686ce1e620d72",
+      "programs": [
+        "gglab.shader.gtao"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "gtao.reconstruct-gtaonormal.isfinite",
+      "source": "Lighting/GTAO.hlsli",
+      "function": "ReconstructGTAONormal",
+      "operation": "isfinite",
+      "count": 2,
+      "bodySha256": "44b4bed0af41ead5256acfb29e8f371d2e1962d9e1d76eaffedbf10d4ff93e7a",
+      "programs": [
+        "gglab.shader.gtao"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "gtao.accumulate-gtaohistory.isfinite",
+      "source": "Lighting/GTAO.hlsli",
+      "function": "AccumulateGTAOHistory",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "1308c6c5c77bec3b9f4793f79c6843bf9ea0b49b6ae55e7a4bba8f8a0bf53c49",
+      "programs": [
+        "gglab.shader.gtao"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "gtao.denoise-gtao.isfinite",
+      "source": "Lighting/GTAO.hlsli",
+      "function": "DenoiseGTAO",
+      "operation": "isfinite",
+      "count": 2,
+      "bodySha256": "fbfe2aae9702175806aa4729a872f83151c863c59eb302d97c949d2f53686865",
+      "programs": [
+        "gglab.shader.gtao"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "gtao.upsample-gtao.isfinite",
+      "source": "Lighting/GTAO.hlsli",
+      "function": "UpsampleGTAO",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "f94acbe35b7905149bb94122c85201ce049d467bd38ab5e9152878c95ae43050",
+      "programs": [
+        "gglab.shader.gtao"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "pass-aerial-perspective.csbuild.isfinite",
+      "source": "Passes/PassAerialPerspective.hlsl",
+      "function": "CSBuild",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "47ac291eb3ac0c06f3bbbcb7ef716b0651e83df65c8386d3534fcd0d11c02f9f",
+      "programs": [
+        "gglab.shader.aerial-perspective"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "pass-aerial-perspective.cscomposite.encode-scene-color",
+      "source": "Passes/PassAerialPerspective.hlsl",
+      "function": "CSComposite",
+      "operation": "EncodeSceneColor",
+      "count": 2,
+      "bodySha256": "75c33b2d3105d18078f4fb2dceadd63ceb22871b16a8ebb7252999866a68b4f2",
+      "programs": [
+        "gglab.shader.aerial-perspective"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-bloom.sample-source.sanitize-hdrcolor",
+      "source": "Passes/PassBloom.hlsl",
+      "function": "SampleSource",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "a5e796d26f820bc63f92a090b152f2f120cbf6fada6ffa528a5af12a2b8a5b9c",
+      "programs": [
+        "gglab.shader.bloom"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-bloom.psmain.sanitize-hdrcolor",
+      "source": "Passes/PassBloom.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "e488dcc3fafab22626cb164cb3956c42c1b529d18d4080bc4b662bf82041c023",
+      "programs": [
+        "gglab.shader.bloom"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-debug-draw.psmain.encode-scene-color",
+      "source": "Passes/PassDebugDraw.hlsl",
+      "function": "PSMain",
+      "operation": "EncodeSceneColor",
+      "count": 1,
+      "bodySha256": "0b52f6ea7d5cb931ceb95532b84291354ae020c4f76a303eb9f09b2e44a966a4",
+      "programs": [
+        "gglab.shader.debug-draw"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-final-color.psmain.sanitize-hdrcolor",
+      "source": "Passes/PassFinalColor.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 2,
+      "bodySha256": "a8678e30b595f3ac03ac811d629e0d85942a99c33c075a9895621748b4ecc930",
+      "programs": [
+        "gglab.shader.final-color"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-forward-pbr.encode-forward-scene-color.encode-scene-color",
+      "source": "Passes/PassForwardPBR.hlsl",
+      "function": "EncodeForwardSceneColor",
+      "operation": "EncodeSceneColor",
+      "count": 1,
+      "bodySha256": "07b5dedc08c5167d28bcecdd99ccc6ba9f9ac29366a48d22e405a8bf53d409b3",
+      "programs": [
+        "gglab.shader.forward-pbr"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-forward-pbr.make-forward-pbrpixel-output.encode-forward-scene-color",
+      "source": "Passes/PassForwardPBR.hlsl",
+      "function": "MakeForwardPBRPixelOutput",
+      "operation": "EncodeForwardSceneColor",
+      "count": 3,
+      "bodySha256": "cd35d22f5d97681c9506e08e8a08eeae0c6571867392b6eb111d8da41e25ed34",
+      "programs": [
+        "gglab.shader.forward-pbr"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-forward-pbr.global.sanitize-hdrcolor",
+      "source": "Passes/PassForwardPBR.hlsl",
+      "function": "global",
+      "operation": "SanitizeHDRColor",
+      "count": 2,
+      "bodySha256": "50837e655394f49a8f96dfd76527a7c1985b244b10869d8176ba6c8d689f05a0",
+      "programs": [
+        "gglab.shader.forward-pbr"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-forward-plus-cull.reconstruct-tile-ray.isfinite",
+      "source": "Passes/PassForwardPlusCull.hlsl",
+      "function": "ReconstructTileRay",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "eb17d3e05165093120dd080b581f8f51e22a22c9364c4d7df22ede8b3a6ddfe3",
+      "programs": [
+        "gglab.shader.forward-plus-cull"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "pass-forward-plus-cull.csmain.isfinite",
+      "source": "Passes/PassForwardPlusCull.hlsl",
+      "function": "CSMain",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "174394a71af805843b6a8b35359ade572479877d4cae2a820267dd316c873ad5",
+      "programs": [
+        "gglab.shader.forward-plus-cull"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "pass-forward-plus-validation.csreduce-tiles.isfinite",
+      "source": "Passes/PassForwardPlusValidation.hlsl",
+      "function": "CSReduceTiles",
+      "operation": "isfinite",
+      "count": 2,
+      "bodySha256": "251f62c8b09892acc14b1da22ac8267dd01c0ce90e7aa2ae28fd891c17629eb7",
+      "programs": [
+        "gglab.shader.forward-plus-validation"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Geometric/history validity or diagnostic classification; report non-finite inputs without treating discarded work as a color replacement."
+    },
+    {
+      "id": "pass-iblcubemap-preview.psmain.acesfitted",
+      "source": "Passes/PassIBLCubemapPreview.hlsl",
+      "function": "PSMain",
+      "operation": "ACESFitted",
+      "count": 1,
+      "bodySha256": "a701a399556378f4cd778ce074ac9a54937057b191f718e6d729bc64f7714677",
+      "programs": [
+        "gglab.shader.ibl-cubemap-preview"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblenvironment.psmain.sanitize-scene-radiance",
+      "source": "Passes/PassIBLEnvironment.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeSceneRadiance",
+      "count": 1,
+      "bodySha256": "885b84a107450c722092a92d787a642d9537cc8d94ccb87815d2800d7d7e6234",
+      "programs": [
+        "gglab.shader.ibl-environment"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblenvironment.psmain.sanitize-hdrcolor",
+      "source": "Passes/PassIBLEnvironment.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "885b84a107450c722092a92d787a642d9537cc8d94ccb87815d2800d7d7e6234",
+      "programs": [
+        "gglab.shader.ibl-environment"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblenvironment-mip.psmain.sanitize-scene-radiance",
+      "source": "Passes/PassIBLEnvironmentMip.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeSceneRadiance",
+      "count": 1,
+      "bodySha256": "aef91924793612316d12f5148b32088be454682b23f9123630be146ef0aa34c7",
+      "programs": [
+        "gglab.shader.ibl-environment-mip"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblenvironment-mip.psmain.sanitize-hdrcolor",
+      "source": "Passes/PassIBLEnvironmentMip.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "aef91924793612316d12f5148b32088be454682b23f9123630be146ef0aa34c7",
+      "programs": [
+        "gglab.shader.ibl-environment-mip"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblimportance.psmain.sanitize-scene-radiance",
+      "source": "Passes/PassIBLImportance.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeSceneRadiance",
+      "count": 1,
+      "bodySha256": "c830a345ba8a83448db2caaaf203cf2f61a138ec20e126cf5ec13eeaa25d89b7",
+      "programs": [
+        "gglab.shader.ibl-importance"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblimportance.psmain.sanitize-hdrcolor",
+      "source": "Passes/PassIBLImportance.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "c830a345ba8a83448db2caaaf203cf2f61a138ec20e126cf5ec13eeaa25d89b7",
+      "programs": [
+        "gglab.shader.ibl-importance"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblirradiance.integrate-irradiance.sanitize-scene-radiance",
+      "source": "Passes/PassIBLIrradiance.hlsl",
+      "function": "IntegrateIrradiance",
+      "operation": "SanitizeSceneRadiance",
+      "count": 2,
+      "bodySha256": "834bb15e972cc8cddd278f01c84a09a3857bf6c0c1259073dbde4e23b97baac6",
+      "programs": [
+        "gglab.shader.ibl-irradiance"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblirradiance.integrate-irradiance.sanitize-hdrcolor",
+      "source": "Passes/PassIBLIrradiance.hlsl",
+      "function": "IntegrateIrradiance",
+      "operation": "SanitizeHDRColor",
+      "count": 2,
+      "bodySha256": "834bb15e972cc8cddd278f01c84a09a3857bf6c0c1259073dbde4e23b97baac6",
+      "programs": [
+        "gglab.shader.ibl-irradiance"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblprefiltered-specular.clamp-sample-luminance.sanitize-scene-radiance",
+      "source": "Passes/PassIBLPrefilteredSpecular.hlsl",
+      "function": "ClampSampleLuminance",
+      "operation": "SanitizeSceneRadiance",
+      "count": 1,
+      "bodySha256": "eb994d8ae47d20338758f23cc11fc8a221241437b988d88ee7010e21af906f94",
+      "programs": [
+        "gglab.shader.ibl-prefiltered-specular"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblprefiltered-specular.clamp-sample-luminance.sanitize-hdrcolor",
+      "source": "Passes/PassIBLPrefilteredSpecular.hlsl",
+      "function": "ClampSampleLuminance",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "eb994d8ae47d20338758f23cc11fc8a221241437b988d88ee7010e21af906f94",
+      "programs": [
+        "gglab.shader.ibl-prefiltered-specular"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblprefiltered-specular.integrate-prefiltered-specular.sanitize-scene-radiance",
+      "source": "Passes/PassIBLPrefilteredSpecular.hlsl",
+      "function": "IntegratePrefilteredSpecular",
+      "operation": "SanitizeSceneRadiance",
+      "count": 2,
+      "bodySha256": "0b2392d41748df7fabdd212f2a3dbf88b6dab6a0469b8d1f4b056d79a13f4cb5",
+      "programs": [
+        "gglab.shader.ibl-prefiltered-specular"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-iblprefiltered-specular.integrate-prefiltered-specular.sanitize-hdrcolor",
+      "source": "Passes/PassIBLPrefilteredSpecular.hlsl",
+      "function": "IntegratePrefilteredSpecular",
+      "operation": "SanitizeHDRColor",
+      "count": 2,
+      "bodySha256": "0b2392d41748df7fabdd212f2a3dbf88b6dab6a0469b8d1f4b056d79a13f4cb5",
+      "programs": [
+        "gglab.shader.ibl-prefiltered-specular"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-napa-voxel.psmain.encode-scene-color",
+      "source": "Passes/PassNapaVoxel.hlsl",
+      "function": "PSMain",
+      "operation": "EncodeSceneColor",
+      "count": 1,
+      "bodySha256": "e29c227fc530371337fa4f7c04614a89fe9fe3e895cfd48b4b375b08324db84c",
+      "programs": [
+        "gglab.shader.napa-voxel"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-physical-sky.psmain.encode-scene-color",
+      "source": "Passes/PassPhysicalSky.hlsl",
+      "function": "PSMain",
+      "operation": "EncodeSceneColor",
+      "count": 1,
+      "bodySha256": "e3391ed6e91b7eb75c2b3e9e64a226a8eaba0beecf8faafb218306f77698e577",
+      "programs": [
+        "gglab.shader.physical-sky-preview"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-post-process-preview.psmain.isfinite",
+      "source": "Passes/PassPostProcessPreview.hlsl",
+      "function": "PSMain",
+      "operation": "isfinite",
+      "count": 2,
+      "bodySha256": "8d351e3dcd5b14f278f9d5c141748550680d40bf21587d38bf469cfdec500311",
+      "programs": [
+        "gglab.shader.post-process-preview"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "pass-post-process-preview.psmain.acesfitted",
+      "source": "Passes/PassPostProcessPreview.hlsl",
+      "function": "PSMain",
+      "operation": "ACESFitted",
+      "count": 2,
+      "bodySha256": "8d351e3dcd5b14f278f9d5c141748550680d40bf21587d38bf469cfdec500311",
+      "programs": [
+        "gglab.shader.post-process-preview"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-post-process-preview.psmain.sanitize-hdrcolor",
+      "source": "Passes/PassPostProcessPreview.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "de846e0141c12c474c5b3488e387f9ed7604f2f313390fc2c9f24079569d9bc8",
+      "programs": [
+        "gglab.shader.post-process-preview"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-skybox.psmain.encode-scene-color",
+      "source": "Passes/PassSkybox.hlsl",
+      "function": "PSMain",
+      "operation": "EncodeSceneColor",
+      "count": 1,
+      "bodySha256": "84726823104464036a9be7dc03034a45bfed7391fe7de4ac74827175b2ec238b",
+      "programs": [
+        "gglab.shader.skybox"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+    },
+    {
+      "id": "pass-temporal-aa.csmain.is-temporal-color-finite",
+      "source": "Passes/PassTemporalAA.hlsl",
+      "function": "CSMain",
+      "operation": "IsTemporalColorFinite",
+      "count": 4,
+      "bodySha256": "b23f02f42fcc25020e2770f3785d464baa1ab56d4d3277b9f61d0d6a830929b5",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "pass-temporal-aa.csmain.isfinite",
+      "source": "Passes/PassTemporalAA.hlsl",
+      "function": "CSMain",
+      "operation": "isfinite",
+      "count": 6,
+      "bodySha256": "956a0ac75c784e00e037f5e6d0756cf6a9fd0977cc258b8cbebe0ef12f38220d",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "pass-temporal-aa.csmain.is-temporal-history-accumulation-valid",
+      "source": "Passes/PassTemporalAA.hlsl",
+      "function": "CSMain",
+      "operation": "IsTemporalHistoryAccumulationValid",
+      "count": 1,
+      "bodySha256": "82103bbe3c313b200e8688577ab6e237acab7a46914865145afb31e67465d04b",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "pass-temporal-aa.csmain.sanitize-hdrcolor",
+      "source": "Passes/PassTemporalAA.hlsl",
+      "function": "CSMain",
+      "operation": "SanitizeHDRColor",
+      "count": 1,
+      "bodySha256": "82103bbe3c313b200e8688577ab6e237acab7a46914865145afb31e67465d04b",
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "kind": "sanitization",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "error"
+      },
+      "rationale": "YCoCg box rectification can legitimately return negative RGB (yellow history clipped by RGB neighbors); FP16 overflow is not expected."
+    },
+    {
+      "id": "pass-temporal-reference.csmain.isfinite",
+      "source": "Passes/PassTemporalReference.hlsl",
+      "function": "CSMain",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "94a6d041f4f4b844b06637c9e2f65e9a10781462ec6666268f439f281fba4263",
+      "programs": [
+        "gglab.shader.temporal-reference"
+      ],
+      "kind": "recovery",
+      "evidence": "pending-counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    }
+  ]
+}
