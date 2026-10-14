@@ -227,7 +227,7 @@ namespace gglab
 	}
 
 	uint64_t FrameCaptureService::RequestResourceExport(std::vector<RGResourceAddress> targets,
-		uint64_t frameSerial, bool deferFrameOnBusy, bool includeGraph) noexcept
+		uint64_t frameSerial, bool deferFrameOnBusy, bool includeGraph, uint64_t groupId) noexcept
 	{
 		if (GetRequestAvailability() == FrameCaptureAvailability::Busy)
 		{
@@ -242,7 +242,8 @@ namespace gglab
 			return id;
 		}
 		m_Queued.push_back({ .m_Id = id, .m_Source = FrameCaptureSource::ResourceExport, .m_FrameSerial = frameSerial,
-			.m_ResourceTargets = std::move(targets), .m_DeferFrameOnBusy = deferFrameOnBusy, .m_IncludeGraph = includeGraph });
+			.m_GroupId = groupId, .m_ResourceTargets = std::move(targets), .m_DeferFrameOnBusy = deferFrameOnBusy, .m_IncludeGraph = includeGraph });
+		DeferUnrelatedImages(frameSerial);
 		return id;
 	}
 
@@ -305,14 +306,6 @@ namespace gglab
 		std::erase_if(m_RetainedExports, [](const auto& entry) { return entry.m_Payload.expired(); });
 		std::vector<Tap> prepared;
 		auto [usedBytes, usedSlots] = GetPayloadUsage();
-		uint64_t pairedBytes = 0;
-		uint32_t pairedSlots = 0;
-		for (const auto& tap : m_Taps)
-			if (tap.m_FrameSerial == frameSerial && tap.m_Source != FrameCaptureSource::RenderGraph &&
-				tap.m_Source != FrameCaptureSource::ResourceExport)
-			{
-				pairedBytes += tap.m_Footprint.m_SizeInBytes + tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height; ++pairedSlots;
-			}
 		bool deferFrame = false;
 		// Exact sequence groups claim this frame before flexible concurrent exports.
 		std::stable_sort(m_Queued.begin(), m_Queued.end(), [](const auto& a, const auto& b)
@@ -326,6 +319,18 @@ namespace gglab
 				}
 				Tap tap{ .m_FrameSerial = frameSerial, .m_Source = FrameCaptureSource::ResourceExport };
 				tap.m_Requests.push_back(request);
+				uint64_t pairedBytes = 0;
+				uint32_t pairedSlots = 0;
+				for (const auto& imageTap : m_Taps)
+				{
+					if (request.m_GroupId != 0 && imageTap.m_FrameSerial == frameSerial &&
+						imageTap.m_Source != FrameCaptureSource::RenderGraph && imageTap.m_Source != FrameCaptureSource::ResourceExport &&
+						std::ranges::any_of(imageTap.m_Requests, [&](const auto& imageRequest) { return imageRequest.m_GroupId == request.m_GroupId; }))
+					{
+						pairedBytes += imageTap.m_Footprint.m_SizeInBytes + imageTap.m_Footprint.m_RowSizeInBytes * imageTap.m_Footprint.m_Height;
+						++pairedSlots;
+					}
+				}
 				uint64_t bytes = 0;
 				RGObservationFailure failure = RGObservationFailure::None;
 				for (const auto& address : request.m_ResourceTargets)

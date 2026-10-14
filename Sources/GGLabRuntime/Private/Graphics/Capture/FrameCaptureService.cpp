@@ -28,7 +28,7 @@ namespace gglab
 	}
 
 	uint64_t FrameCaptureService::RequestCapture(
-		FrameCaptureSource source, uint64_t frameSerial) noexcept
+		FrameCaptureSource source, uint64_t frameSerial, uint64_t groupId) noexcept
 	{
 		if (GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests)
 		{
@@ -40,12 +40,13 @@ namespace gglab
 			PublishFailure(requestId, source, 0, "The render host has been finalized.");
 			return requestId;
 		}
-		m_Queued.push_back({ .m_Id = requestId, .m_Source = source, .m_FrameSerial = frameSerial });
+		m_Queued.push_back({ .m_Id = requestId, .m_Source = source, .m_FrameSerial = frameSerial, .m_GroupId = groupId });
+		DeferUnrelatedImages(frameSerial);
 		return requestId;
 	}
 
 	uint64_t FrameCaptureService::RequestDiagnosticCapture(
-		PostProcessDebugTap tap, uint64_t frameSerial) noexcept
+		PostProcessDebugTap tap, uint64_t frameSerial, uint64_t groupId) noexcept
 	{
 		if (GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests)
 		{
@@ -68,8 +69,10 @@ namespace gglab
 			.m_Id = requestId,
 			.m_Source = FrameCaptureSource::Diagnostic,
 			.m_FrameSerial = frameSerial,
+			.m_GroupId = groupId,
 			.m_DiagnosticTap = tap,
 			});
+		DeferUnrelatedImages(frameSerial);
 		return requestId;
 	}
 
@@ -108,6 +111,48 @@ namespace gglab
 			request.m_DiagnosticTap == diagnosticTap);
 	}
 
+	void FrameCaptureService::DeferUnrelatedImages(uint64_t frameSerial) noexcept
+	{
+		const auto scheduledExport = std::ranges::find_if(m_Queued, [&](const QueuedRequest& request)
+			{
+				return request.m_Source == FrameCaptureSource::ResourceExport && request.m_DeferFrameOnBusy &&
+					(frameSerial == 0 || request.m_FrameSerial == 0 || request.m_FrameSerial == frameSerial);
+			});
+		if (scheduledExport == m_Queued.end())
+		{
+			return;
+		}
+		const uint64_t groupId = scheduledExport->m_GroupId;
+		const uint64_t selectedFrame = frameSerial != 0 ? frameSerial : scheduledExport->m_FrameSerial;
+		std::vector<QueuedRequest> requiredImages;
+		for (const auto& request : m_Queued)
+		{
+			if (groupId != 0 && request.m_GroupId == groupId &&
+				request.m_Source != FrameCaptureSource::ResourceExport && request.m_Source != FrameCaptureSource::RenderGraph &&
+				(request.m_FrameSerial == 0 || request.m_FrameSerial == selectedFrame))
+			{
+				requiredImages.push_back(request);
+			}
+		}
+		// Delay unrelated images before diagnostic generation as well as copy-pass
+		// construction. An unavailable diagnostic feature on this frame must not
+		// turn temporary scheduling pressure into an unrelated capture failure.
+		std::erase_if(m_Queued, [&](const QueuedRequest& request)
+			{
+				if (request.m_Source == FrameCaptureSource::ResourceExport || request.m_Source == FrameCaptureSource::RenderGraph ||
+					(request.m_FrameSerial != 0 && request.m_FrameSerial != selectedFrame) ||
+					std::ranges::any_of(requiredImages, [&](const QueuedRequest& required)
+						{ return IsBoundBy(request, required.m_Source, required.m_DiagnosticTap); }))
+				{
+					return false;
+				}
+				m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = request.m_Source,
+					.m_Status = FrameCaptureStatus::Busy, .m_FrameSerial = selectedFrame,
+					.m_DiagnosticTap = request.m_Source == FrameCaptureSource::Diagnostic ? std::optional(request.m_DiagnosticTap) : std::nullopt });
+				return true;
+			});
+	}
+
 	void FrameCaptureService::ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept
 	{
 		// A backpressured sequence may stop calling BeginFrame. Keep fence retirement
@@ -131,10 +176,17 @@ namespace gglab
 		return static_cast<uint32_t>(count);
 	}
 
-	FrameCaptureAvailability FrameCaptureService::GetRequestAvailability() const noexcept
+	FrameCaptureAvailability FrameCaptureService::GetRequestAvailability(uint32_t requestCount) const noexcept
 	{
-		if (m_IsShutdown) return FrameCaptureAvailability::Finalized;
-		return GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests
+		if (m_IsShutdown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		if (requestCount > m_Limits.m_MaxRequests)
+		{
+			return FrameCaptureAvailability::TooLarge;
+		}
+		return GetUnfinishedRequestCount() + m_Results.size() > m_Limits.m_MaxRequests - requestCount
 			? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
 	}
 
@@ -183,6 +235,7 @@ namespace gglab
 		{
 			return std::nullopt;
 		}
+		DeferUnrelatedImages(frameSerial);
 
 		const PostProcessDebugTap diagnosticTap =
 			GetPendingDiagnosticTap().value_or(PostProcessDebugTap::SceneColor);

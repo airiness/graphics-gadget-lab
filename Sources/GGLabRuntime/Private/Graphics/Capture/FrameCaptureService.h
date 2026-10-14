@@ -39,16 +39,16 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(FrameCaptureService);
 
 		[[nodiscard]] uint64_t RequestCapture(FrameCaptureSource source,
-			uint64_t frameSerial = 0) noexcept override;
+			uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override;
 		[[nodiscard]] uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap,
-			uint64_t frameSerial = 0) noexcept override;
+			uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override;
 		[[nodiscard]] uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets,
-			uint64_t frameSerial = 0, bool deferFrameOnBusy = false, bool includeGraph = false) noexcept override;
+			uint64_t frameSerial = 0, bool deferFrameOnBusy = false, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
 		[[nodiscard]] FrameCaptureAvailability PrepareResourceExports(uint64_t frameSerial,
 			RenderGraph& graph, ResourceExportFrameContext context = {}) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept override;
-		[[nodiscard]] FrameCaptureAvailability GetRequestAvailability() const noexcept override;
+		[[nodiscard]] FrameCaptureAvailability GetRequestAvailability(uint32_t requestCount = 1) const noexcept override;
 		[[nodiscard]] FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept override;
 		[[nodiscard]] FrameCaptureAvailability GetAvailability(
 			RHIFormat format, uint32_t width, uint32_t height) const noexcept override;
@@ -84,6 +84,7 @@ namespace gglab
 			uint64_t m_Id = 0;
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 			uint64_t m_FrameSerial = 0;
+			uint64_t m_GroupId = 0;
 			// Diagnostic requests only.
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 			std::vector<RGResourceAddress> m_ResourceTargets;
@@ -132,6 +133,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,
 			PostProcessDebugTap diagnosticTap) const noexcept;
+		void DeferUnrelatedImages(uint64_t frameSerial) noexcept;
 		void PublishFailure(uint64_t requestId, FrameCaptureSource source,
 			uint64_t frameSerial, std::string failure,
 			std::optional<PostProcessDebugTap> diagnosticTap = std::nullopt) noexcept;

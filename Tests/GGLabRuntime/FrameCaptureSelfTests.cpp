@@ -1333,6 +1333,131 @@ namespace gglab
 			}
 		}
 
+		void RunScheduledResourceGroupTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			const RHITextureDesc imageDesc = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 1, 1);
+			const std::vector<RGResourceAddress> eightTargets(8, RGResourceAddress{ .m_Resource = "Words" });
+			const auto build = [](RenderGraph& graph)
+				{
+					struct Data {};
+					graph.AddPass<Data>("Write", RGPassEncoderType::Copy, [](auto& builder, auto&)
+						{
+							auto words = builder.CreateBuffer("Words", { .m_SizeInBytes = 4 });
+							builder.WriteInPlace(words, RGBufferAccess::CopyDest);
+							builder.SideEffect();
+						});
+					return graph.Compile();
+				};
+			{
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				context.Check(build(graph), "Scheduled export concurrency fixture compiles");
+				const auto buffersBeforeTap = device.GetLiveBufferCount();
+				const auto image = service.RequestCapture(FrameCaptureSource::Scene, 20);
+				const auto diagnostic = service.RequestDiagnosticCapture(PostProcessDebugTap::GTAOFinalAO, 20);
+				const auto resources = service.RequestResourceExport(eightTargets, 20, true, true, 101);
+				context.Check(!service.HasPendingRequests(FrameCaptureSource::Diagnostic) && !service.GetPendingDiagnosticTap(),
+					"An unrelated diagnostic defers before feature selection can fail it on the scheduled frame");
+				context.Check(!service.BindTap(20, FrameCaptureSource::Scene, imageDesc) && device.GetLiveBufferCount() == buffersBeforeTap,
+					"An unrelated image defers before allocating or attaching a copy to a scheduled export frame");
+				context.Check(service.PrepareResourceExports(20, graph) == FrameCaptureAvailability::Available && graph.HasResourceObservations(),
+					"An eight-target scheduled group is admitted despite an independent screenshot on its requested frame");
+				const auto deferred = Consume(service);
+				context.Check(deferred.size() == 2 && std::ranges::all_of(deferred, [&](const auto& result)
+					{ return (result.m_RequestId == image || result.m_RequestId == diagnostic) && result.m_Status == FrameCaptureStatus::Busy && result.m_FrameSerial == 20; }),
+					"Only the unrelated screenshots return Busy; the resource group is not mislabeled TooLarge");
+				service.BeginGraphRecording(20, graph);
+				ExportTestCommands commands(device);
+				RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+				graph.Execute(execution);
+				service.EndGraphRecording(20, graph);
+				service.OnFrameSubmitted(20, MakeFence(20));
+				device.m_CompletedFenceValue = 20;
+				auto completed = Consume(service);
+				context.Check(completed.size() == 1 && completed[0].m_RequestId == resources &&
+					completed[0].m_Status == FrameCaptureStatus::Completed && completed[0].m_Resources && completed[0].m_Graph,
+					"The scheduled group submits and publishes rather than rolling back every frame");
+				graph.Retire(MakeFence(20));
+				completed.clear();
+				GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene, 21));
+				context.Check(service.BindTap(21, FrameCaptureSource::Scene, imageDesc).has_value(),
+					"The deferred independent screenshot can bind on a later frame after its competing group completes");
+				service.OnFrameAborted(21);
+				GGLAB_UNUSED(Consume(service));
+			}
+			{
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				GGLAB_UNUSED(build(graph));
+				const auto unrelated = service.RequestCapture(FrameCaptureSource::Scene, 22);
+				context.Check(service.BindTap(22, FrameCaptureSource::Scene, imageDesc).has_value(),
+					"A prebound unrelated image occupies shared capacity before an export is requested");
+				const auto resources = service.RequestResourceExport(eightTargets, 22, true, false, 102);
+				context.Check(service.PrepareResourceExports(22, graph) == FrameCaptureAvailability::Busy && !graph.HasResourceObservations(),
+					"Prebound unrelated image pressure is temporary Busy, not a permanent size error for the group");
+				const auto deferred = Consume(service);
+				context.Check(deferred.size() == 2 && std::ranges::all_of(deferred, [&](const auto& result)
+					{ return (result.m_RequestId == unrelated || result.m_RequestId == resources) && result.m_Status == FrameCaptureStatus::Busy; }),
+					"A genuinely busy frame withdraws its unsubmitted captures without publishing a TooLarge failure");
+			}
+			for (uint32_t targetCount : {7u, 8u})
+			{
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				GGLAB_UNUSED(build(graph));
+				const auto image = service.RequestCapture(FrameCaptureSource::Scene, 23, 103);
+				const auto shared = service.RequestCapture(FrameCaptureSource::Scene, 23);
+				const auto unrelated = service.RequestCapture(FrameCaptureSource::Composited, 23);
+				const auto resources = service.RequestResourceExport(std::vector<RGResourceAddress>(targetCount, eightTargets[0]), 23, true, false, 103);
+				const auto diagnostic = service.RequestDiagnosticCapture(PostProcessDebugTap::GTAOFinalAO, 23);
+				context.Check(!service.GetPendingDiagnosticTap(),
+					"Diagnostics submitted after the group claim also defer before pipeline construction");
+				const auto tap = service.BindTap(23, FrameCaptureSource::Scene, imageDesc);
+				context.Check(tap && !service.BindTap(23, FrameCaptureSource::Composited, imageDesc),
+					"A required group image may share its physical tap; a different independent image waits");
+				GGLAB_UNUSED(service.PrepareResourceExports(23, graph));
+				const auto pending = Consume(service);
+				const auto other = std::ranges::find(pending, unrelated, &FrameCaptureResult::m_RequestId);
+				const auto otherDiagnostic = std::ranges::find(pending, diagnostic, &FrameCaptureResult::m_RequestId);
+				const auto exported = std::ranges::find(pending, resources, &FrameCaptureResult::m_RequestId);
+				context.Check(other != pending.end() && other->m_Status == FrameCaptureStatus::Busy &&
+					otherDiagnostic != pending.end() && otherDiagnostic->m_Status == FrameCaptureStatus::Busy &&
+					(targetCount == 7 ? exported == pending.end() && graph.HasResourceObservations()
+						: exported != pending.end() && exported->m_ResourceFailure == RGObservationFailure::TooLarge),
+					"Only the group's required PNG counts in its permanent limit: seven targets fit and eight cannot");
+				if (targetCount == 7)
+				{
+					ExportTestCommands commands(device);
+					RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+					graph.Execute(execution);
+					service.OnFrameSubmitted(23, MakeFence(23));
+					device.FillReadback(tap->m_Buffer, tap->m_Footprint);
+					device.m_CompletedFenceValue = 23;
+					const auto completed = Consume(service);
+					const auto imageResult = std::ranges::find(completed, image, &FrameCaptureResult::m_RequestId);
+					const auto sharedResult = std::ranges::find(completed, shared, &FrameCaptureResult::m_RequestId);
+					context.Check(completed.size() == 3 && std::ranges::all_of(completed, [](const auto& result) { return result.m_Status == FrameCaptureStatus::Completed; }) &&
+						imageResult != completed.end() && sharedResult != completed.end() && imageResult->m_Image == sharedResult->m_Image,
+						"The PNG group, its shared image consumer and the resource group complete on one submitted frame");
+					graph.Retire(MakeFence(23));
+				}
+				else
+				{
+					service.OnFrameAborted(23);
+					GGLAB_UNUSED(Consume(service));
+				}
+			}
+			FrameCaptureService requests(device, { .m_MaxRequests = 2 });
+			GGLAB_UNUSED(requests.RequestCapture(FrameCaptureSource::RenderGraph));
+			context.Check(requests.GetRequestAvailability() == FrameCaptureAvailability::Available &&
+				requests.GetRequestAvailability(2) == FrameCaptureAvailability::Busy &&
+				requests.GetRequestAvailability(3) == FrameCaptureAvailability::TooLarge,
+				"Request admission distinguishes a temporarily missing group slot from an impossible request count");
+			requests.Shutdown();
+		}
+
 		void RunGraphRequestCapacityTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -1386,6 +1511,7 @@ namespace gglab
 		RunResourceExportTests(context);
 		RunResourceTextureExportTests(context);
 		RunResourceTextureSliceAlignmentTests(context);
+		RunScheduledResourceGroupTests(context);
 		RunResourceExportSupportTests(context);
 		RunObservationStateTests(context);
 		RunGraphCaptureTests(context);

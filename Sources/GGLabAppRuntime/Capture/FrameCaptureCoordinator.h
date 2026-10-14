@@ -162,7 +162,7 @@ namespace gglab
 		// Checks Runtime payload capacity and the write slots reserved by issued
 		// captures, using the last frame's display target. Busy sequences defer before
 		// simulation; permanent errors proceed to an explicit failed capture result.
-		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source)
+		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source, uint32_t requestCount = 1)
 			const noexcept;
 		// State of the most recent frame passed to BeginFrame; null before the
 		// first rendered frame.
@@ -230,6 +230,8 @@ namespace gglab
 			FrameCaptureRequest m_Request{};
 			Phase m_Phase = Phase::Waiting;
 			uint64_t m_CaptureRequestId = 0;
+			// Transient Runtime association for the outputs of one sequence frame.
+			uint64_t m_GroupId = 0;
 			// The requested reference view was restored, and the camera reset
 			// serial of the first frame rendered with it. A different serial later
 			// means another camera cut replaced the view, which is then restored again.
@@ -245,7 +247,8 @@ namespace gglab
 		[[nodiscard]] bool IsDue(
 			const Entry& entry, const FrameCaptureFrameState& state) const noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
-			const FrameCaptureFrameState& state) const noexcept;
+			const FrameCaptureFrameState& state, uint32_t requestCount = 1) const noexcept;
+		void IssueSequenceGroups(const FrameCaptureFrameState& state, std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;

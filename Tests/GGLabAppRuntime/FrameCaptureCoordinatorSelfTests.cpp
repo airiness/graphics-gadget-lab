@@ -58,32 +58,35 @@ namespace gglab
 				std::vector<RGResourceAddress> m_Targets;
 				bool m_IncludeGraph = false;
 				bool m_Defer = false;
+				uint64_t m_GroupId = 0;
 			};
 
-			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial = 0) noexcept override
+			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override
 			{
-				if (m_RejectRequest)
+				if (m_RejectRequest || GetRequestAvailability() != FrameCaptureAvailability::Available)
 				{
 					return 0;
 				}
-				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source, .m_FrameSerial = frameSerial });
+				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = source, .m_FrameSerial = frameSerial, .m_GroupId = groupId });
+				m_LiveRequests.push_back(m_NextId);
 				return m_NextId++;
 			}
-			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap, uint64_t frameSerial = 0) noexcept override
+			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap, uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override
 			{
-				if (m_RejectRequest)
+				if (m_RejectRequest || GetRequestAvailability() != FrameCaptureAvailability::Available)
 				{
 					return 0;
 				}
 				m_Issued.push_back({ .m_Id = m_NextId, .m_Source = FrameCaptureSource::Diagnostic,
 					.m_FrameSerial = frameSerial,
-					.m_DiagnosticTap = tap });
+					.m_DiagnosticTap = tap, .m_GroupId = groupId });
+				m_LiveRequests.push_back(m_NextId);
 				return m_NextId++;
 			}
 			uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets, uint64_t frameSerial,
-				bool defer, bool includeGraph) noexcept override
+				bool defer, bool includeGraph, uint64_t groupId = 0) noexcept override
 			{
-				const auto id = RequestCapture(FrameCaptureSource::ResourceExport, frameSerial);
+				const auto id = RequestCapture(FrameCaptureSource::ResourceExport, frameSerial, groupId);
 				if (id != 0) { m_Issued.back().m_Targets = std::move(targets); m_Issued.back().m_Defer = defer; m_Issued.back().m_IncludeGraph = includeGraph; }
 				return id;
 			}
@@ -98,11 +101,15 @@ namespace gglab
 			}
 			void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override
 			{
+				for (const auto& result : m_Results)
+				{
+					std::erase(m_LiveRequests, result.m_RequestId);
+				}
 				outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
 					std::make_move_iterator(m_Results.end()));
 				m_Results.clear();
 			}
-			uint32_t GetUnfinishedRequestCount() const noexcept override { return 0; }
+			uint32_t GetUnfinishedRequestCount() const noexcept override { return static_cast<uint32_t>(m_LiveRequests.size()); }
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override
 			{
 				return m_PendingDiagnosticTap;
@@ -111,9 +118,18 @@ namespace gglab
 			{
 				return m_ResourceFrameAvailability == FrameCaptureAvailability::Available ? m_RequestAvailability : m_ResourceFrameAvailability;
 			}
-			FrameCaptureAvailability GetRequestAvailability() const noexcept override
+			FrameCaptureAvailability GetRequestAvailability(uint32_t requestCount = 1) const noexcept override
 			{
-				return m_RequestAvailability;
+				m_QueriedRequestCount = requestCount;
+				if (m_RequestAvailability != FrameCaptureAvailability::Available)
+				{
+					return m_RequestAvailability;
+				}
+				if (requestCount > m_RequestLimit)
+				{
+					return FrameCaptureAvailability::TooLarge;
+				}
+				return m_LiveRequests.size() > m_RequestLimit - requestCount ? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
 			}
 			FrameCaptureAvailability GetAvailability(RHIFormat format, uint32_t width,
 				uint32_t height) const noexcept override
@@ -181,10 +197,13 @@ namespace gglab
 			FrameCaptureAvailability m_RequestAvailability = FrameCaptureAvailability::Available;
 			FrameCaptureAvailability m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
 			bool m_RejectRequest = false;
+			uint32_t m_RequestLimit = 64;
 			mutable RHIFormat m_QueriedFormat = RHIFormat::Unknown;
+			mutable uint32_t m_QueriedRequestCount = 0;
 			mutable std::array<uint32_t, 2> m_QueriedExtent{};
 
 		private:
+			std::vector<uint64_t> m_LiveRequests;
 			std::vector<FrameCaptureResult> m_Results;
 			uint64_t m_NextId = 100;
 		};
@@ -2317,6 +2336,150 @@ namespace gglab
 			coordinator.FinalizeAfterRenderHost();
 		}
 
+		void RunSequenceGroupAdmissionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("sequence-group-admission");
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
+					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
+				for (uint32_t index = 0; index < 8; ++index)
+				{
+					GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph, .m_WaitForCapacity = true }));
+				}
+				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 77, .m_Frame = 4 };
+				const auto image = coordinator.Submit({ .m_Sequence = sequence });
+				const auto resources = coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
+					.m_ResourceTargets = {{ .m_Resource = "A" }}, .m_IncludeGraph = true, .m_Sequence = sequence });
+				auto state = MakeFrameState(true);
+				state.m_FrameSerial = 100;
+				coordinator.BeginFrame(state);
+				context.Check(control.m_Issued.size() == 9 && control.m_Issued[0].m_Source == FrameCaptureSource::Scene &&
+					control.m_Issued[1].m_Source == FrameCaptureSource::ResourceExport && control.m_Issued[0].m_GroupId != 0 &&
+					control.m_Issued[0].m_GroupId == control.m_Issued[1].m_GroupId && control.m_Issued[1].m_IncludeGraph &&
+					Consume(coordinator).empty(),
+					"PNG and resource output claim both writer slots before eight earlier ordinary graphs can block the group");
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.OnFrameSubmitted();
+				coordinator.Update();
+				const auto completed = Consume(coordinator);
+				const auto png = std::ranges::find(completed, image, &FrameCaptureRequestResult::m_RequestId);
+				const auto arrays = std::ranges::find(completed, resources, &FrameCaptureRequestResult::m_RequestId);
+				context.Check(completed.size() == 9 && png != completed.end() && arrays != completed.end() &&
+					png->m_Status == FrameCaptureRequestStatus::Completed && arrays->m_Status == FrameCaptureRequestStatus::Completed &&
+					png->m_Metadata && arrays->m_Metadata && png->m_Metadata->m_FrameSerial == 100 && arrays->m_Metadata->m_FrameSerial == 100 &&
+					png->m_Metadata->m_Sequence && arrays->m_Metadata->m_Sequence &&
+					png->m_Metadata->m_Sequence->m_Frame == 4 && arrays->m_Metadata->m_Sequence->m_Frame == 4,
+					"The sequence PNG and arrays publish on the same admitted frame instead of entering rollback/re-admission livelock");
+				state.m_FrameSerial = 101;
+				coordinator.BeginFrame(state);
+				context.Check(control.m_Issued.size() == 10 && control.m_Issued.back().m_Source == FrameCaptureSource::RenderGraph &&
+					control.m_Issued.back().m_GroupId == 0,
+					"The ninth writer reservation stays bounded and the remaining flexible graph resumes after completion");
+				if (control.m_Issued.size() == 10)
+				{
+					control.Complete(control.m_Issued.back().m_Id);
+				}
+				coordinator.Update();
+				const auto remaining = Consume(coordinator);
+				context.Check(remaining.size() == 1 && remaining[0].m_Metadata && remaining[0].m_Metadata->m_FrameSerial == 101 &&
+					coordinator.GetUnfinishedRequestCount() == 0,
+					"Every request in the eight-graph/PNG/export burst completes without exceeding writer capacity");
+			}
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
+					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
+				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 79, .m_Frame = 5 };
+				GGLAB_UNUSED(coordinator.Submit({ .m_Sequence = sequence }));
+				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
+					.m_ResourceTargets = {{ .m_Resource = "A" }}, .m_Sequence = sequence }));
+				auto state = MakeFrameState(true);
+				coordinator.BeginFrame(state);
+				const uint64_t groupId = control.m_Issued.empty() ? 0 : control.m_Issued[0].m_GroupId;
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Busy(issued.m_Id);
+				}
+				coordinator.Update();
+				context.Check(Consume(coordinator).empty() && coordinator.GetUnfinishedRequestCount() == 2,
+					"A late whole-frame retry returns both group outputs to Waiting without a published failure");
+				++state.m_FrameSerial;
+				coordinator.BeginFrame(state);
+				context.Check(control.m_Issued.size() == 4 && groupId != 0 && control.m_Issued[2].m_GroupId == groupId &&
+					control.m_Issued[3].m_GroupId == groupId && control.m_Issued[2].m_FrameSerial == state.m_FrameSerial &&
+					control.m_Issued[3].m_FrameSerial == state.m_FrameSerial,
+					"Whole-frame retries keep their group association and bind both outputs to fresh metadata together");
+				coordinator.FinalizeAfterRenderHost();
+			}
+			for (bool requestPressure : {false, true})
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_AutoComplete = false;
+				GGLAB_UNUSED(harness.Frame());
+				const uint32_t occupied = requestPressure ? 1u : 8u;
+				if (requestPressure)
+				{
+					harness.m_Control.m_RequestLimit = 2;
+				}
+				for (uint32_t index = 0; index < occupied; ++index)
+				{
+					GGLAB_UNUSED(harness.m_Capture.Submit({ .m_Source = FrameCaptureSource::RenderGraph }));
+				}
+				GGLAB_UNUSED(harness.Frame());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = {0},
+					.m_Exports = {{ .m_Frame = 0, .m_Targets = {{ .m_Resource = "A" }} }} }, error));
+				const auto serial = harness.m_RenderSerial;
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_Deferred && harness.m_RenderSerial == serial && harness.m_Control.m_Issued.size() == occupied,
+					"One free writer or Runtime slot cannot begin a two-output sequence frame or advance simulation");
+				harness.m_Control.Complete(harness.m_Control.m_Issued.front().m_Id);
+				harness.m_Capture.Update();
+				GGLAB_UNUSED(Consume(harness.m_Capture));
+				GGLAB_UNUSED(harness.Frame());
+				const auto& issued = harness.m_Control.m_Issued;
+				context.Check(!harness.m_Deferred && issued.size() == occupied + 2 &&
+					issued[occupied].m_GroupId != 0 && issued[occupied].m_GroupId == issued[occupied + 1].m_GroupId &&
+					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 1,
+					"Releasing sufficient group capacity resumes the same sequence frame and admits both outputs together");
+				harness.m_Capture.FinalizeAfterRenderHost();
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Control.m_RequestLimit = 1;
+				GGLAB_UNUSED(harness.Frame());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = {0},
+					.m_Exports = {{ .m_Frame = 0, .m_Targets = {{ .m_Resource = "A" }} }} }, error));
+				GGLAB_UNUSED(harness.Frame());
+				const auto resource = std::ranges::find_if(harness.m_Results, [](const auto& result)
+					{ return result.m_ResourceFailure == RGObservationFailure::TooLarge; });
+				context.Check(!harness.m_Deferred && harness.m_Control.m_Issued.empty() &&
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed && resource != harness.m_Results.end() &&
+					harness.m_Capture.GetUnfinishedRequestCount() == 0,
+					"A two-output group that can never fit the Runtime request limit fails explicitly instead of deferring forever");
+			}
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control });
+				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 88 };
+				const auto image = coordinator.Submit({ .m_Sequence = sequence });
+				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport, .m_Sequence = sequence }));
+				control.m_ResourceFrameAvailability = FrameCaptureAvailability::Busy;
+				coordinator.BeginFrame(MakeFrameState(true));
+				context.Check(control.m_Issued.empty() && coordinator.Cancel(image),
+					"A busy sequence group remains wholly unissued and can be cancelled");
+				const auto cancelled = Consume(coordinator);
+				context.Check(cancelled.size() == 2 && coordinator.GetUnfinishedRequestCount() == 0 &&
+					std::ranges::all_of(cancelled, [](const auto& result) { return result.m_Status == FrameCaptureRequestStatus::Cancelled; }),
+					"Cancelling one waiting sequence member cancels its whole admission group");
+			}
+		}
+
 		void RunResourceSequenceTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("resource-sequence"); SequenceHarness harness(directory.GetPath());
@@ -2511,6 +2674,7 @@ namespace gglab
 	{
 		RunResourceWritingTests(context);
 		RunResourceSequenceTests(context);
+		RunSequenceGroupAdmissionTests(context);
 		RunGraphWritingTests(context);
 		RunGraphFailureTests(context);
 		RunNextFrameTests(context);

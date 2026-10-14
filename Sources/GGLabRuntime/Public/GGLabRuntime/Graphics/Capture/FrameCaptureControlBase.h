@@ -22,14 +22,16 @@ namespace gglab
 		// restricts the request to that live, begun render frame: abort, submission
 		// failure or a missing tap fails it instead of recording a later frame.
 		// Every accepted request finishes with exactly one result.
+		// A non-zero groupId associates outputs that must fit the same frame. It is
+		// a transient, owner-assigned token, independent of host sequence metadata.
 		[[nodiscard]] virtual uint64_t RequestCapture(FrameCaptureSource source,
-			uint64_t frameSerial = 0) noexcept = 0;
+			uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept = 0;
 		// Queues a Diagnostic capture of the tap, with the same lifecycle as
 		// RequestCapture. A tap without a diagnostic name fails immediately.
 		[[nodiscard]] virtual uint64_t RequestDiagnosticCapture(
-			PostProcessDebugTap tap, uint64_t frameSerial = 0) noexcept = 0;
+			PostProcessDebugTap tap, uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept = 0;
 		[[nodiscard]] virtual uint64_t RequestResourceExport(std::vector<RGResourceAddress>,
-			uint64_t = 0, bool = false, bool = false) noexcept
+			uint64_t = 0, bool = false, bool = false, uint64_t = 0) noexcept
 		{
 			return 0;
 		}
@@ -53,7 +55,8 @@ namespace gglab
 			const noexcept = 0;
 		// Request-only admission, including unconsumed results and the service's
 		// configured limit. Graph captures do not need an image payload reservation.
-		[[nodiscard]] virtual FrameCaptureAvailability GetRequestAvailability() const noexcept = 0;
+		// Checks all requestCount slots together; an impossible count is TooLarge.
+		[[nodiscard]] virtual FrameCaptureAvailability GetRequestAvailability(uint32_t requestCount = 1) const noexcept = 0;
 		// Checks request and payload capacity without reserving it. The tap rechecks
 		// its actual target before allocation; capacity exhaustion fails that frame's
 		// request rather than silently capturing a later frame. Retained CPU images

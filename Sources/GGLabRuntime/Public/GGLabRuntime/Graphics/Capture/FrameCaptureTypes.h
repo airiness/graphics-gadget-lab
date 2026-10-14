@@ -35,7 +35,7 @@ namespace gglab
 	{
 		Completed,
 		Failed,
-		// A whole resource group temporarily lacks capacity; coordination retries it.
+		// Deferred before GPU submission; coordination retries with fresh metadata.
 		Busy,
 	};
 

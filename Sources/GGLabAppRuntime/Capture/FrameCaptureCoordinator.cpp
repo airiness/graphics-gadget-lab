@@ -287,6 +287,17 @@ namespace gglab
 		Entry& entry = m_Entries.emplace_back();
 		entry.m_Id = m_NextRequestId++;
 		entry.m_Request = std::move(request);
+		if (entry.m_Request.m_Sequence)
+		{
+			const auto& sequence = *entry.m_Request.m_Sequence;
+			const auto first = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+				{
+					return candidate.m_GroupId != 0 && candidate.m_Request.m_Sequence &&
+						candidate.m_Request.m_Sequence->m_SequenceId == sequence.m_SequenceId &&
+						candidate.m_Request.m_Sequence->m_Frame == sequence.m_Frame;
+				});
+			entry.m_GroupId = first == m_Entries.end() ? entry.m_Id : first->m_GroupId;
+		}
 		if (m_IsShuttingDown)
 		{
 			Finish(entry, FrameCaptureRequestStatus::Cancelled,
@@ -301,7 +312,15 @@ namespace gglab
 		{
 			if (entry.m_Id == requestId && entry.m_Phase == Phase::Waiting)
 			{
-				Finish(entry, FrameCaptureRequestStatus::Cancelled, "Cancelled by request.");
+				const uint64_t groupId = entry.m_GroupId;
+				for (Entry& member : m_Entries)
+				{
+					if (member.m_Phase == Phase::Waiting &&
+						(member.m_Id == requestId || (groupId != 0 && member.m_GroupId == groupId)))
+					{
+						Finish(member, FrameCaptureRequestStatus::Cancelled, "Cancelled by request.");
+					}
+				}
 				return true;
 			}
 		}
@@ -328,19 +347,22 @@ namespace gglab
 		return m_LastFrameState ? &*m_LastFrameState : nullptr;
 	}
 
-	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source)
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source, uint32_t requestCount)
 		const noexcept
 	{
 		if (!m_Capture || m_IsShuttingDown)
 		{
 			return FrameCaptureAvailability::Finalized;
 		}
-		return m_LastFrameState ? GetCaptureAvailability(source, *m_LastFrameState)
-			: FrameCaptureAvailability::Available;
+		if (m_LastFrameState)
+		{
+			return GetCaptureAvailability(source, *m_LastFrameState, requestCount);
+		}
+		return GetCaptureAvailability(source, FrameCaptureFrameState{}, requestCount);
 	}
 
 	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source,
-		const FrameCaptureFrameState& state) const noexcept
+		const FrameCaptureFrameState& state, uint32_t requestCount) const noexcept
 	{
 		if (!m_Capture || m_IsShuttingDown)
 		{
@@ -352,14 +374,27 @@ namespace gglab
 			{
 				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::Encoding;
 			});
-		if (reserved >= MaxInFlightCaptures)
+		if (requestCount > MaxInFlightCaptures)
+		{
+			return FrameCaptureAvailability::TooLarge;
+		}
+		if (reserved > MaxInFlightCaptures - requestCount)
 		{
 			return FrameCaptureAvailability::Busy;
+		}
+		const auto requests = m_Capture->GetRequestAvailability(requestCount);
+		if (requests != FrameCaptureAvailability::Available)
+		{
+			return requests;
 		}
 		if (source == FrameCaptureSource::RenderGraph || source == FrameCaptureSource::ResourceExport)
 		{
 			return source == FrameCaptureSource::ResourceExport ? m_Capture->GetResourceExportFrameAvailability()
-				: m_Capture->GetRequestAvailability();
+				: requests;
+		}
+		if (state.m_FrameSerial == 0)
+		{
+			return FrameCaptureAvailability::Available;
 		}
 		const ViewExtent extent = state.m_SettleKey.m_Temporal.m_Identity.m_ColorExtent;
 		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic
@@ -402,9 +437,14 @@ namespace gglab
 			std::optional<PostProcessDebugTap> diagnosticTap =
 				m_Capture ? m_Capture->GetPendingDiagnosticTap() : std::nullopt;
 			const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
+			// Check every member's share together, then issue the group contiguously
+			// on the frame-driving thread before ordinary requests consume any slots.
+			IssueSequenceGroups(state, diagnosticTap);
 			for (Entry& entry : m_Entries)
 			{
-				if (entry.m_Phase != Phase::Waiting)
+				const bool scheduledGroup = entry.m_GroupId != 0 && std::ranges::any_of(m_Entries, [&](const Entry& member)
+					{ return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
+				if (entry.m_Phase != Phase::Waiting || scheduledGroup)
 				{
 					continue;
 				}
@@ -440,6 +480,110 @@ namespace gglab
 			}
 		}
 		m_LastFrameState = std::move(state);
+	}
+
+	void FrameCaptureCoordinator::IssueSequenceGroups(const FrameCaptureFrameState& state,
+		std::optional<PostProcessDebugTap>& diagnosticTap) noexcept
+	{
+		std::vector<uint64_t> visited;
+		const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
+		for (Entry& entry : m_Entries)
+		{
+			if (entry.m_Phase != Phase::Waiting || entry.m_GroupId == 0 ||
+				std::ranges::find(visited, entry.m_GroupId) != visited.end())
+			{
+				continue;
+			}
+			visited.push_back(entry.m_GroupId);
+			std::vector<Entry*> members;
+			for (Entry& member : m_Entries)
+			{
+				if (member.m_Phase == Phase::Waiting && member.m_GroupId == entry.m_GroupId)
+				{
+					members.push_back(&member);
+				}
+			}
+			if (!std::ranges::any_of(members, [](const Entry* member) { return member->m_Request.m_Source == FrameCaptureSource::ResourceExport; }))
+			{
+				continue;
+			}
+			if (!readinessFailure.empty() && std::ranges::any_of(members, [&](const Entry* member)
+				{ return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state); }))
+			{
+				for (Entry* member : members)
+				{
+					Finish(*member, FrameCaptureRequestStatus::Failed, readinessFailure);
+				}
+				continue;
+			}
+			if (!std::ranges::all_of(members, [&](const Entry* member) { return IsDue(*member, state); }))
+			{
+				continue;
+			}
+			FrameCaptureAvailability availability = FrameCaptureAvailability::Available;
+			std::string failure;
+			for (const Entry* member : members)
+			{
+				const auto& request = member->m_Request;
+				if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
+					GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+				{
+					failure = "A diagnostic capture requires a supported diagnostic tap.";
+					break;
+				}
+				if (request.m_Source == FrameCaptureSource::Diagnostic && diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+				{
+					failure = "A different diagnostic tap occupies the requested sequence frame.";
+					break;
+				}
+				availability = GetCaptureAvailability(request.m_Source, state, static_cast<uint32_t>(members.size()));
+				if (availability != FrameCaptureAvailability::Available)
+				{
+					break;
+				}
+			}
+			if (availability == FrameCaptureAvailability::Busy)
+			{
+				continue;
+			}
+			if (!failure.empty() || availability != FrameCaptureAvailability::Available)
+			{
+				if (failure.empty())
+				{
+					failure = availability == FrameCaptureAvailability::TooLarge
+						? "The sequence capture group exceeds the capture capacity budget."
+						: "The sequence capture group is unavailable.";
+				}
+				for (Entry* member : members)
+				{
+					if (member->m_Request.m_Source == FrameCaptureSource::ResourceExport && availability == FrameCaptureAvailability::TooLarge)
+					{
+						member->m_ResourceFailure = RGObservationFailure::TooLarge;
+					}
+					Finish(*member, FrameCaptureRequestStatus::Failed, failure);
+				}
+				continue;
+			}
+			for (Entry* member : members)
+			{
+				Issue(*member, state);
+				if (member->m_Phase == Phase::Issued && member->m_Request.m_Source == FrameCaptureSource::Diagnostic)
+				{
+					diagnosticTap = member->m_Request.m_DiagnosticTap;
+				}
+				if (member->m_Phase == Phase::Finished)
+				{
+					for (Entry* remaining : members)
+					{
+						if (remaining->m_Phase == Phase::Waiting)
+						{
+							Finish(*remaining, FrameCaptureRequestStatus::Failed, "The same-frame capture group could not be issued.");
+						}
+					}
+					break;
+				}
+			}
+		}
 	}
 
 	std::optional<FrameCaptureViewChange> FrameCaptureCoordinator::GetPendingViewChange()
@@ -720,16 +864,16 @@ namespace gglab
 		if (request.m_Source == FrameCaptureSource::ResourceExport)
 		{
 			entry.m_CaptureRequestId = m_Capture->RequestResourceExport(request.m_ResourceTargets,
-				state.m_FrameSerial, request.m_Sequence.has_value(), request.m_IncludeGraph);
+				state.m_FrameSerial, request.m_Sequence.has_value(), request.m_IncludeGraph, entry.m_GroupId);
 		}
 		else if (request.m_Source == FrameCaptureSource::Diagnostic)
 		{
 			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
-				*request.m_DiagnosticTap, state.m_FrameSerial);
+				*request.m_DiagnosticTap, state.m_FrameSerial, entry.m_GroupId);
 		}
 		else
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source, state.m_FrameSerial);
+			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source, state.m_FrameSerial, entry.m_GroupId);
 		}
 		if (entry.m_CaptureRequestId == 0)
 		{

@@ -44,22 +44,22 @@ namespace gglab
 				bool m_IncludeGraph = false;
 			};
 
-			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial) noexcept override
+			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial, uint64_t = 0) noexcept override
 			{
 				m_Issued.push_back({ .m_RequestId = m_NextId++, .m_Source = source,
 					.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = frameSerial });
 				return m_Issued.back().m_RequestId;
 			}
-			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t) noexcept override { return 0; }
+			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t, uint64_t = 0) noexcept override { return 0; }
 			uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets, uint64_t frameSerial,
-				bool, bool includeGraph) noexcept override
+				bool, bool includeGraph, uint64_t = 0) noexcept override
 			{
 				const uint64_t id = RequestCapture(FrameCaptureSource::ResourceExport, frameSerial);
 				m_Exports.push_back({ id, std::move(targets), includeGraph });
 				return id;
 			}
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override { return std::nullopt; }
-			FrameCaptureAvailability GetRequestAvailability() const noexcept override
+			FrameCaptureAvailability GetRequestAvailability(uint32_t = 1) const noexcept override
 			{
 				return FrameCaptureAvailability::Available;
 			}

@@ -256,6 +256,10 @@ namespace gglab
 			return false;
 		}
 		m_Status->m_State = FrameSequenceState::Cancelled;
+		for (uint64_t requestId : m_Status->m_CaptureRequestIds)
+		{
+			GGLAB_UNUSED(m_Capture->Cancel(requestId));
+		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
 		return true;
@@ -278,12 +282,15 @@ namespace gglab
 		const auto* previous = m_Capture->GetLastFrameState();
 		const bool startingExportFrame = m_Status && m_Status->m_State == FrameSequenceState::Waiting &&
 			previous && previous->m_Readiness.IsReady() && MatchesRequiredContent(m_Request.m_RequiredContentId, *previous);
+		const bool imageFrame = (m_Request.m_ReferenceSamples == 0 || m_Sample + 1 == m_Request.m_ReferenceSamples) &&
+			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame);
+		const uint32_t requestCount = static_cast<uint32_t>(imageFrame) + static_cast<uint32_t>(exportFrame);
 		// Capacity covers GPU payloads, retained images and reserved write slots.
 		// Only temporary pressure defers: an impossible target must fail explicitly.
 		return m_Status && ((m_Status->m_State == FrameSequenceState::Running && IsCaptureDue() &&
 			m_Capture->GetCaptureAvailability(m_Request.m_CaptureSource) == FrameCaptureAvailability::Busy) ||
 			((m_Status->m_State == FrameSequenceState::Running || startingExportFrame) && exportFrame &&
-				m_Capture->GetCaptureAvailability(FrameCaptureSource::ResourceExport) == FrameCaptureAvailability::Busy));
+				m_Capture->GetCaptureAvailability(FrameCaptureSource::ResourceExport, requestCount) == FrameCaptureAvailability::Busy));
 	}
 
 	bool FrameSequenceCoordinator::ShouldHoldTime() const noexcept
@@ -628,6 +635,10 @@ namespace gglab
 		}
 		m_Status->m_State = FrameSequenceState::Failed;
 		m_Status->m_Failure = std::move(failure);
+		for (uint64_t requestId : m_Status->m_CaptureRequestIds)
+		{
+			GGLAB_UNUSED(m_Capture->Cancel(requestId));
+		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
 	}
