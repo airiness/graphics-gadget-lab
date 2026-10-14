@@ -207,6 +207,7 @@ namespace gglab
 			}
 			void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
 			{
+				m_TextureCopies.push_back(copy);
 				auto* bytes = static_cast<uint8_t*>(m_Device.MapBuffer(copy.m_Destination, {})) + copy.m_DestinationOffset;
 				const auto& fp = copy.m_Footprint;
 				for (uint32_t row = 0; row < fp.m_Height; ++row)
@@ -245,6 +246,7 @@ namespace gglab
 			void SetIndexBuffer(const RHIIndexBufferBinding&) noexcept override {}
 			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
 			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override {}
+			std::vector<RHITextureToBufferCopy> m_TextureCopies;
 		private:
 			CaptureTestDevice& m_Device;
 		};
@@ -1247,6 +1249,90 @@ namespace gglab
 			graph.Retire(MakeFence(4));
 		}
 
+		void RunResourceTextureSliceAlignmentTests(SelfTestContext& context) noexcept
+		{
+			struct TextureCase
+			{
+				uint32_t m_Height;
+				uint16_t m_Slices;
+				bool m_Cube;
+			};
+			constexpr std::array cases{ TextureCase{1, 2, false}, TextureCase{2, 2, false}, TextureCase{1, 6, true} };
+			for (const auto& textureCase : cases)
+			{
+				CaptureTestDevice device;
+				TransientResourcePool pool(&device);
+				FrameCaptureService service(device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				struct Data {};
+				graph.AddPass<Data>("InitializeRGB", RGPassEncoderType::Copy, [&](auto& builder, auto&)
+					{
+						auto texture = builder.CreateTexture("RGB", { .m_Format = RHIFormat::R32G32B32Float,
+							.m_CreateFlags = textureCase.m_Cube ? RHITextureCreateFlags::CubeCompatible : RHITextureCreateFlags::None,
+							.m_Extent = {1, textureCase.m_Height, 1}, .m_ArraySize = textureCase.m_Slices });
+						builder.WriteInPlace(texture, RGTextureAccess::CopyDest);
+						builder.SideEffect();
+					});
+				context.Check(graph.Compile(), "RGB32F array/cube export fixture compiles");
+				if (textureCase.m_Height == 1 && !textureCase.m_Cube)
+				{
+					const auto target = graph.ResolveObservation({ .m_Resource = "RGB" });
+					const auto readback = device.CreateBuffer({ .m_SizeInBytes = 3072,
+						.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, {});
+					const std::array invalidCopies{ RGObservationCopy{ .m_Target = target, .m_Readback = readback,
+						.m_ReadbackBytes = 3072,
+						.m_Footprint = ComputeRHIObservationCopyFootprint(target.m_TextureDesc, 0, RHITextureAspect::Color),
+						.m_SlicePitch = 1024 } };
+					context.Check(!graph.AttachObservationCopies(invalidCopies) && !graph.HasResourceObservations(),
+						"RenderGraph rejects RGB32F slices aligned to 512 bytes but not to twelve-byte texels");
+					device.DestroyBuffer(readback);
+					FrameCaptureService bounded(device, { .m_MaxPayloadBytes = 3095 });
+					const uint64_t rejected = bounded.RequestResourceExport({{ .m_Resource = "RGB" }}, 12);
+					GGLAB_UNUSED(bounded.PrepareResourceExports(12, graph));
+					const auto failures = Consume(bounded);
+					context.Check(failures.size() == 1 && failures[0].m_RequestId == rejected &&
+						failures[0].m_ResourceFailure == RGObservationFailure::TooLarge && !graph.HasResourceObservations(),
+						"RGB32F capacity includes the aligned 3072-byte readback plus 24 tight CPU bytes");
+				}
+				const uint64_t id = service.RequestResourceExport({{ .m_Resource = "RGB" }}, 12);
+				context.Check(service.PrepareResourceExports(12, graph) == FrameCaptureAvailability::Available && graph.HasResourceObservations(),
+					"An RGB32F group binds with legal slice placement");
+				ExportTestCommands commands(device);
+				RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+				graph.Execute(execution);
+				bool copiesAligned = commands.m_TextureCopies.size() == textureCase.m_Slices;
+				for (size_t slice = 0; copiesAligned && slice < commands.m_TextureCopies.size(); ++slice)
+				{
+					const auto& copy = commands.m_TextureCopies[slice];
+					copiesAligned = copy.m_SourceArraySlice == slice && copy.m_DestinationOffset == slice * 1536 &&
+						copy.m_DestinationOffset % 512 == 0 && copy.m_DestinationOffset % 12 == 0 &&
+						copy.m_Footprint.m_RowPitch == 768;
+				}
+				context.Check(copiesAligned, "Every RGB32F array/cube slice uses an offset divisible by both placement and texel size");
+				service.OnFrameSubmitted(12, MakeFence(6));
+				device.m_CompletedFenceValue = 6;
+				service.CollectCompleted();
+				const auto results = Consume(service);
+				bool tightData = results.size() == 1 && results[0].m_RequestId == id &&
+					results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Resources &&
+					results[0].m_Resources->m_Arrays.size() == 1;
+				if (tightData)
+				{
+					const auto& array = results[0].m_Resources->m_Arrays[0];
+					tightData = array.m_Scalar == ResourceExportScalar::Float32 &&
+						array.m_Shape == std::vector<uint64_t>{textureCase.m_Slices, textureCase.m_Height, 1, 3} &&
+						array.m_Data.size() == static_cast<size_t>(textureCase.m_Slices) * textureCase.m_Height * 12;
+					for (size_t byte = 0; tightData && byte < array.m_Data.size(); ++byte)
+					{
+						const size_t row = byte / 12;
+						tightData = array.m_Data[byte] == static_cast<uint8_t>((row / textureCase.m_Height) * 32 + (row % textureCase.m_Height) * 8);
+					}
+				}
+				context.Check(tightData, "RGB32F export preserves every slice and row while removing readback padding");
+				graph.Retire(MakeFence(6));
+			}
+		}
+
 		void RunGraphRequestCapacityTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -1299,6 +1385,7 @@ namespace gglab
 	{
 		RunResourceExportTests(context);
 		RunResourceTextureExportTests(context);
+		RunResourceTextureSliceAlignmentTests(context);
 		RunResourceExportSupportTests(context);
 		RunObservationStateTests(context);
 		RunGraphCaptureTests(context);

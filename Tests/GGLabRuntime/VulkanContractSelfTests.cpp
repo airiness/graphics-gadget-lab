@@ -4,6 +4,9 @@
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "GGLabRuntime/Graphics/RHI/RHISampler.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
@@ -546,6 +549,36 @@ namespace gglab
 				layout->m_Regions.size() == 4 && layout->m_Subresources.size() == 4 &&
 				regionsAligned,
 				"Vulkan texture copy layout covers every mip and array layer with aligned offsets");
+			const RHITextureDesc rgb{ .m_Format = RHIFormat::R32G32B32Float,
+				.m_Usage = RHITextureUsage::CopySource, .m_Extent = {1, 1, 1}, .m_ArraySize = 2 };
+			const RHIBufferDesc readback{ .m_SizeInBytes = 3072, .m_Usage = RHIBufferUsage::CopyDest };
+			RHITextureToBufferCopy copy{ .m_SourceArraySlice = 1, .m_DestinationOffset = 1024,
+				.m_Footprint = ComputeRHIObservationCopyFootprint(rgb, 0, RHITextureAspect::Color) };
+			context.Check(copy.m_Footprint.m_RowPitch == 768 &&
+				!BuildVulkanTextureToBufferCopyRegion(rgb, readback, copy),
+				"Vulkan rejects RGB32F buffer offsets that satisfy placement but not texel-block alignment");
+			copy.m_DestinationOffset = 1536;
+			const auto rgbRegion = BuildVulkanTextureToBufferCopyRegion(rgb, readback, copy);
+			context.Check(rgbRegion && rgbRegion->bufferOffset == 1536 && rgbRegion->bufferRowLength == 64 &&
+				rgbRegion->imageSubresource.baseArrayLayer == 1,
+				"Vulkan accepts RGB32F slices aligned to both 512 and twelve bytes");
+			copy.m_DestinationOffset = 0;
+			copy.m_SourceArraySlice = 0;
+			context.Check(BuildVulkanTextureToBufferCopyRegion(rgb, readback, copy).has_value(),
+				"The first RGB32F slice remains copyable at offset zero");
+			for (const auto aspect : { RHITextureAspect::Depth, RHITextureAspect::Stencil })
+			{
+				const RHITextureDesc depthStencil{ .m_Format = RHIFormat::D24UnormS8Uint,
+					.m_Usage = RHITextureUsage::CopySource, .m_Extent = {1, 1, 1}, .m_ArraySize = 2 };
+				copy.m_DestinationOffset = 512;
+				copy.m_SourceArraySlice = 1;
+				copy.m_SourceAspect = aspect;
+				copy.m_Footprint = ComputeRHIObservationCopyFootprint(depthStencil, 0, aspect);
+				const auto region = BuildVulkanTextureToBufferCopyRegion(depthStencil, readback, copy);
+				context.Check(region && region->bufferOffset == 512 &&
+					region->imageSubresource.aspectMask == ToVulkanImageAspectFlags(aspect),
+					"Vulkan retains valid placement for depth and byte-stencil observation copies");
+			}
 
 			context.Check(
 				ToVulkanImageType(RHITextureDimension::Texture1D) == VK_IMAGE_TYPE_1D &&

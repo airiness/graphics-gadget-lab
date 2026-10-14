@@ -277,6 +277,10 @@ typed `failureCode` such as `Culled`, `UndefinedContent`, `UnsupportedFormat`,
   Uint32 formats retain their bits. D32 is Float32; D24 depth is converted from
   the low 24 bits to Float32 in `[0, 1]`, and stencil is Uint8. Typeless textures
   use a unique typed view of the addressed pass, or flagged raw unsigned words.
+- Readback slice starts satisfy both 512-byte placement and texel-block alignment;
+  RGB32F uses a 1536-byte alignment. Padding counts against the shared byte budget
+  and is removed from the exported array. RenderGraph validates slice placement,
+  and Vulkan validates each texture-to-buffer region's offset.
 - Registered buffers use a structured dtype with field offsets and stride.
   Initial layouts cover Forward+ tile headers and tile depth ranges. Other
   buffers use `[elements, wordsPerElement]` Uint32 arrays. Unwritten capacity in

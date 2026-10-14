@@ -10,6 +10,7 @@
 #include <cstring>
 #include <format>
 #include <limits>
+#include <numeric>
 
 namespace gglab
 {
@@ -345,8 +346,15 @@ namespace gglab
 						const auto& footprint = readback.m_Copy.m_Footprint;
 						if (!footprint.IsValid()) { failure = RGObservationFailure::UnsupportedFormat; break; }
 						if (footprint.m_SizeInBytes > m_Limits.m_MaxPayloadBytes) { failure = RGObservationFailure::TooLarge; break; }
-						readback.m_Copy.m_SlicePitch = (footprint.m_SizeInBytes + RHITextureCopyPlacementAlignment - 1) /
-							RHITextureCopyPlacementAlignment * RHITextureCopyPlacementAlignment;
+						// Every slice starts at both a placed-footprint and texel-block boundary.
+						// In particular, RGB32F needs lcm(512, 12), not just 512 bytes.
+						const uint64_t sliceAlignment = std::lcm<uint64_t>(RHITextureCopyPlacementAlignment, footprint.m_BytesPerTexel);
+						const uint64_t slicePadding = (sliceAlignment - footprint.m_SizeInBytes % sliceAlignment) % sliceAlignment;
+						if (slicePadding > m_Limits.m_MaxPayloadBytes - footprint.m_SizeInBytes)
+						{
+							failure = RGObservationFailure::TooLarge; break;
+						}
+						readback.m_Copy.m_SlicePitch = footprint.m_SizeInBytes + slicePadding;
 						if (readback.m_Copy.m_SlicePitch > m_Limits.m_MaxPayloadBytes / target.m_Subresources.m_ArraySliceCount)
 						{
 							failure = RGObservationFailure::TooLarge; break;

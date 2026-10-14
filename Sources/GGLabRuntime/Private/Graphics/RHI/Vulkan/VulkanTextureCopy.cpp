@@ -118,6 +118,7 @@ namespace gglab
 			footprint.m_Width > mipWidth || footprint.m_Height > mipHeight ||
 			!Test(destinationDesc.m_Usage, RHIBufferUsage::CopyDest) ||
 			copy.m_DestinationOffset % RHITextureCopyPlacementAlignment != 0 ||
+			copy.m_DestinationOffset % expected.m_BytesPerTexel != 0 ||
 			footprint.m_SizeInBytes > destinationDesc.m_SizeInBytes ||
 			copy.m_DestinationOffset > destinationDesc.m_SizeInBytes - footprint.m_SizeInBytes ||
 			footprint.m_RowPitch % footprint.m_BytesPerTexel != 0)

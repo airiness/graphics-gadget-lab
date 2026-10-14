@@ -344,6 +344,7 @@ namespace gglab
 					footprint.m_RowSizeInBytes != expected.m_RowSizeInBytes || footprint.m_RowPitch != expected.m_RowPitch ||
 					footprint.m_SizeInBytes != expected.m_SizeInBytes || copy.m_SlicePitch < footprint.m_SizeInBytes ||
 					copy.m_SlicePitch % RHITextureCopyPlacementAlignment != 0 ||
+					copy.m_SlicePitch % expected.m_BytesPerTexel != 0 ||
 					copy.m_SlicePitch > copy.m_ReadbackBytes / target.m_Subresources.m_ArraySliceCount)
 				{
 					return false;
