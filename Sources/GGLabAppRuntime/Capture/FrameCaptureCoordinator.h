@@ -42,6 +42,8 @@ namespace gglab
 		std::string m_Note;
 		// RenderGraph requests only: write the discovery summary instead of full records.
 		bool m_GraphSummary = false;
+		std::vector<RGResourceAddress> m_ResourceTargets;
+		bool m_IncludeGraph = false;
 		// Set by a camera-path sequence for the frame it captures.
 		std::optional<FrameCaptureSequenceInfo> m_Sequence;
 		// Required for Diagnostic captures and ignored by other sources.
@@ -62,6 +64,9 @@ namespace gglab
 		FrameCaptureRequestStatus m_Status = FrameCaptureRequestStatus::Failed;
 		std::filesystem::path m_ImagePath;
 		std::filesystem::path m_MetadataPath;
+		std::vector<std::filesystem::path> m_ResourcePaths;
+		std::filesystem::path m_GraphPath;
+		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
 		std::string m_Failure;
 		// Present once the capture was issued to a frame.
 		std::optional<FrameCaptureMetadata> m_Metadata;
@@ -184,6 +189,9 @@ namespace gglab
 		// before metadata is fixed, or fail if they require an exact sequence frame.
 		// Fails waiting after-ready requests for content with a failed gate.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
+		// Busy is handled before submission so a sequence keeps the same sample/frame.
+		[[nodiscard]] bool PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
+			ResourceExportFrameContext context) noexcept;
 		// Called after the frame passed to BeginFrame was submitted.
 		void OnFrameSubmitted() noexcept;
 		// Collects Runtime capture results, starts encoding and publishes
@@ -224,6 +232,7 @@ namespace gglab
 			bool m_ViewApplied = false;
 			std::optional<uint64_t> m_ViewCameraResetSerial;
 			FrameCaptureMetadata m_Metadata{};
+			RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
 			std::shared_ptr<EncodeJob> m_Job;
 		};
 

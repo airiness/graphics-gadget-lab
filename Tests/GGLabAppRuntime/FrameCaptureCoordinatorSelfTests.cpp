@@ -2,6 +2,7 @@
 
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureMetadata.h"
+#include "Capture/ResourceExportWriter.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -23,6 +24,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -53,6 +55,9 @@ namespace gglab
 				FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 				uint64_t m_FrameSerial = 0;
 				std::optional<PostProcessDebugTap> m_DiagnosticTap;
+				std::vector<RGResourceAddress> m_Targets;
+				bool m_IncludeGraph = false;
+				bool m_Defer = false;
 			};
 
 			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial = 0) noexcept override
@@ -75,6 +80,22 @@ namespace gglab
 					.m_DiagnosticTap = tap });
 				return m_NextId++;
 			}
+			uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets, uint64_t frameSerial,
+				bool defer, bool includeGraph) noexcept override
+			{
+				const auto id = RequestCapture(FrameCaptureSource::ResourceExport, frameSerial);
+				if (id != 0) { m_Issued.back().m_Targets = std::move(targets); m_Issued.back().m_Defer = defer; m_Issued.back().m_IncludeGraph = includeGraph; }
+				return id;
+			}
+			void Busy(uint64_t id) noexcept
+			{
+				const auto issued = std::ranges::find(m_Issued, id, &Issued::m_Id);
+				if (issued != m_Issued.end())
+				{
+					m_Results.push_back({ .m_RequestId = id, .m_Source = issued->m_Source,
+						.m_Status = FrameCaptureStatus::Busy, .m_FrameSerial = issued->m_FrameSerial, .m_ResourceFailure = RGObservationFailure::Busy });
+				}
+			}
 			void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override
 			{
 				outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
@@ -85,6 +106,10 @@ namespace gglab
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override
 			{
 				return m_PendingDiagnosticTap;
+			}
+			FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept override
+			{
+				return m_ResourceFrameAvailability == FrameCaptureAvailability::Available ? m_RequestAvailability : m_ResourceFrameAvailability;
 			}
 			FrameCaptureAvailability GetRequestAvailability() const noexcept override
 			{
@@ -108,10 +133,22 @@ namespace gglab
 				image->m_Height = 2;
 				image->m_Pixels = { 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 10, 20, 30, 0 };
 				std::shared_ptr<RGSnapshot> graph;
-				if (issued->m_Source == FrameCaptureSource::RenderGraph)
+				if (issued->m_Source == FrameCaptureSource::RenderGraph || issued->m_IncludeGraph)
 				{
 					graph = std::make_shared<RGSnapshot>();
 					graph->m_Execution.m_Recorded = true;
+				}
+				std::shared_ptr<ResourceExportPayload> resources;
+				if (issued->m_Source == FrameCaptureSource::ResourceExport)
+				{
+					resources = std::make_shared<ResourceExportPayload>();
+					for (const auto& target : issued->m_Targets)
+					{
+						ResourceExportArray array{ .m_Address = target, .m_Scalar = ResourceExportScalar::Float32,
+							.m_Shape = {1, 1, 2, 1} };
+						const float values[] = {1.25f, -2.0f}; array.m_Data.resize(sizeof(values)); std::memcpy(array.m_Data.data(), values, sizeof(values));
+						resources->m_Arrays.push_back(std::move(array));
+					}
 				}
 				m_Results.push_back({
 					.m_RequestId = id,
@@ -119,8 +156,10 @@ namespace gglab
 					.m_Status = FrameCaptureStatus::Completed,
 					.m_FrameSerial = frameSerial.value_or(issued->m_FrameSerial),
 					.m_DiagnosticTap = issued->m_DiagnosticTap,
-					.m_Image = graph ? nullptr : std::move(image),
+					.m_Image = graph || resources ? nullptr : std::move(image),
 					.m_Graph = graph,
+					.m_Resources = resources,
+					.m_ResourceExportActive = bool(resources),
 					.m_SubmissionFenceIndex = 3,
 					.m_SubmissionFenceGeneration = 1,
 					.m_SubmissionFenceValue = 19,
@@ -140,6 +179,7 @@ namespace gglab
 			std::optional<PostProcessDebugTap> m_PendingDiagnosticTap;
 			FrameCaptureAvailability m_Availability = FrameCaptureAvailability::Available;
 			FrameCaptureAvailability m_RequestAvailability = FrameCaptureAvailability::Available;
+			FrameCaptureAvailability m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
 			bool m_RejectRequest = false;
 			mutable RHIFormat m_QueriedFormat = RHIFormat::Unknown;
 			mutable std::array<uint32_t, 2> m_QueriedExtent{};
@@ -2108,6 +2148,93 @@ namespace gglab
 			}
 		}
 
+		void RunResourceWritingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("resource-writing");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			const auto id = coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport, .m_Label = "resource",
+				.m_ResourceTargets = {{ .m_Resource = "A" }, { .m_Resource = "B" }}, .m_IncludeGraph = true });
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Busy(control.m_Issued.back().m_Id); coordinator.Update();
+			context.Check(Consume(coordinator).empty(), "A busy group retries without publishing a partial result");
+			auto state = MakeFrameState(true); state.m_FrameSerial = 21; coordinator.BeginFrame(state); coordinator.OnFrameSubmitted();
+			control.Complete(control.m_Issued.back().m_Id); coordinator.Update();
+			const auto results = Consume(coordinator);
+			context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Status == FrameCaptureRequestStatus::Completed &&
+				results[0].m_ResourcePaths.size() == 2 && !results[0].m_GraphPath.empty() && results[0].m_ImagePath.empty(),
+				"The bounded writer atomically publishes every array, optional graph and one group sidecar");
+			if (!results.empty() && results[0].m_Status == FrameCaptureRequestStatus::Completed)
+			{
+				const auto metadata = nlohmann::json::parse(ReadText(results[0].m_MetadataPath));
+				const std::string npy = ReadText(results[0].m_ResourcePaths[0]);
+				context.Check(metadata["schema"] == "gglab.resource-export" && metadata["frameSerial"] == 21 &&
+					metadata["frame"]["frame"]["serial"] == 21 && metadata["targets"].size() == 2 && metadata["submission"]["completed"] == true &&
+					metadata["graph"] == GetFrameCapturePathText(results[0].m_GraphPath.filename()),
+					"Retried groups refresh frame metadata and retain the shared fence identity");
+				const uint16_t headerSize = static_cast<uint8_t>(npy[8]) | (static_cast<uint16_t>(static_cast<uint8_t>(npy[9])) << 8);
+				float values[2] = {}; std::memcpy(values, npy.data() + 10 + headerSize, sizeof(values));
+				context.Check(npy.substr(1, 5) == "NUMPY" && npy[6] == 1 && npy[7] == 0 && (headerSize + 10) % 16 == 0 &&
+					npy.find("'<f4'") != std::string::npos && npy.find("(1, 1, 2, 1,") != std::string::npos && values[0] == 1.25f && values[1] == -2,
+					"NPY v1 headers declare the exact dtype/shape and preserve numerical bytes");
+			}
+			std::filesystem::create_directories(directory.GetPath());
+			const auto occupied = directory.GetPath() / "resource.22.resource-export.1.npy";
+			{ std::ofstream file(occupied, std::ios::binary); file << "other publisher"; }
+			GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport, .m_Label = "resource",
+				.m_ResourceTargets = {{ .m_Resource = "A" }, { .m_Resource = "B" }} }));
+			state.m_FrameSerial = 22; coordinator.BeginFrame(state); coordinator.OnFrameSubmitted();
+			control.Complete(control.m_Issued.back().m_Id); coordinator.Update();
+			const auto collision = Consume(coordinator);
+			context.Check(collision.size() == 1 && collision[0].m_Status == FrameCaptureRequestStatus::Completed &&
+				collision[0].m_MetadataPath.filename() == "resource.22.resource-export-2.json" &&
+				ReadText(occupied) == "other publisher" && !std::filesystem::exists(directory.GetPath() / "resource.22.resource-export.0.npy"),
+				"A mid-group filename collision withdraws only owned files and republishes the complete group under one new stem");
+			ResourceExportArray structured{ .m_Type = RGResourceType::RGBuffer, .m_Shape = {2}, .m_Stride = 16,
+				.m_Fields = {{"first", 0, ResourceExportScalar::Uint32, 1}, {"vector", 8, ResourceExportScalar::Float32, 2}}, .m_Data = std::vector<uint8_t>(32) };
+			const auto header = MakeResourceExportNpyHeader(structured);
+			const std::string text(header.begin(), header.end());
+			context.Check(text.find("('', '|V4')") != std::string::npos && text.find("'vector', '<f4', (2,)") != std::string::npos,
+				"Structured GPU dtypes preserve field offsets, padding, vector counts and stride");
+			structured.m_Data.pop_back(); bool rejected = false;
+			try { GGLAB_UNUSED(MakeResourceExportNpyHeader(structured)); } catch (const std::exception&) { rejected = true; }
+			context.Check(rejected, "Mismatched array shape/stride/data fails before file publication");
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunResourceSequenceTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("resource-sequence"); SequenceHarness harness(directory.GetPath());
+			std::string error;
+			const auto id = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = {1},
+				.m_Exports = {{ .m_Frame = 1, .m_Targets = {{ .m_Resource = "A" }, { .m_Resource = "B" }}, .m_IncludeGraph = true }} }, error);
+			context.Check(id != 0, "A sequence accepts a resource group paired with a PNG on the same frame");
+			for (uint32_t i = 0; i < 15 && harness.m_Sequence.GetStatus()->m_State != FrameSequenceState::Completed; ++i) GGLAB_UNUSED(harness.Frame());
+			const auto image = std::ranges::find_if(harness.m_Results, [](const auto& result) { return !result.m_ImagePath.empty(); });
+			const auto resources = std::ranges::find_if(harness.m_Results, [](const auto& result) { return !result.m_ResourcePaths.empty(); });
+			context.Check(image != harness.m_Results.end() && resources != harness.m_Results.end() && image->m_Metadata && resources->m_Metadata &&
+				image->m_Metadata->m_FrameSerial == resources->m_Metadata->m_FrameSerial && resources->m_Metadata->m_Sequence->m_Frame == 1 &&
+				harness.m_Control.m_Issued.back().m_Defer,
+				"Scheduled resource and image outputs share the exact sequence frame and use pre-submit group deferral");
+			harness.m_Capture.FinalizeAfterRenderHost();
+
+			SequenceHarness delayed(directory.GetPath());
+			GGLAB_UNUSED(delayed.Frame()); // Ready frame before sequence startup.
+			GGLAB_UNUSED(delayed.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+				.m_Exports = {{ .m_Frame = 0, .m_Targets = {{ .m_Resource = "A" }} }} }, error));
+			delayed.m_Control.m_ResourceFrameAvailability = FrameCaptureAvailability::Busy;
+			const auto serial = delayed.m_RenderSerial;
+			GGLAB_UNUSED(delayed.Frame());
+			context.Check(delayed.m_Deferred && delayed.m_RenderSerial == serial && delayed.m_Control.m_Issued.empty(),
+				"Export pressure defers sequence frame zero before posing, simulating or issuing any capture");
+			delayed.m_Control.m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
+			const auto frame = delayed.Frame();
+			context.Check(frame == 0u && delayed.m_Results.size() == 1 && delayed.m_Results[0].m_Metadata->m_Sequence->m_Frame == 0,
+				"The deferred sequence resumes its exact frame once the complete payload pool is available");
+			delayed.m_Capture.FinalizeAfterRenderHost();
+		}
+
 		void RunGraphWritingTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("graph-writing");
@@ -2268,6 +2395,8 @@ namespace gglab
 
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
+		RunResourceWritingTests(context);
+		RunResourceSequenceTests(context);
 		RunGraphWritingTests(context);
 		RunGraphFailureTests(context);
 		RunNextFrameTests(context);

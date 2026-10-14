@@ -55,6 +55,7 @@ namespace gglab::diagnostics
 			EnumTextEntry{RGDependencyReason::PreviousReaderToWriter, "PreviousReaderToWriter", "Previous Reader -> Writer"},
 			EnumTextEntry{RGDependencyReason::ExportWriterToExport, "ExportWriterToExport", "Export Writer -> Export"},
 			EnumTextEntry{RGDependencyReason::ExportReaderToExport, "ExportReaderToExport", "Export Reader -> Export"},
+			EnumTextEntry{RGDependencyReason::ObservationOrder, "ObservationOrder", "Observation Order"},
 		};
 	};
 	template <> struct RGEnumTextTraits<RGBarrierKind>

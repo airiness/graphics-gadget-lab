@@ -23,6 +23,7 @@ $session = 'Scripts/GGLabSession.ps1'
 | DX12 and Vulkan agreement | Two sessions, `batch` on each, `CompareCaptures.ps1` |
 | Temporal behavior along a fixed camera motion | `GGLabSession.ps1 sequence` |
 | Pass order, versions, barriers and actual transient allocations | `GGLabSession.ps1 graph` |
+| Exact texture/buffer values before or after a pass | `GGLabSession.ps1 export` |
 
 Sessions and one-shot launches are hidden by default: the window is never shown
 or activated, input is ignored and simulation advances with a fixed 1/60 s step.
@@ -178,7 +179,7 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
 - `submission` records the fence handle index/generation and value. A successful
   graph result is published only after that exact fence completes. Aborted,
   failed or missing frames fail exact requests, never substitute another frame.
-- `observation` flags the graph export. `observationNodes` is empty: T1 adds no
+- `observation` flags the active tools. `observationNodes` is empty for T1 alone: T1 adds no
   RenderGraph nodes, resources, barriers or GPU queries. Recording is opt-in and
   inactive frames do not build a graph snapshot. Exports still add CPU/file work;
   performance runs must keep observation tools off.
@@ -202,6 +203,102 @@ python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium-dx12/Captures
 
 The validator checks full/summary schema contracts and version/writer consistency.
 Headless snapshot tests alone do not establish dual-backend GPU correctness.
+
+## GPU resource export
+
+`export` writes the stored values of a group of RenderGraph resources from one
+frame. It uses protocol v2 and the same readiness, view, timing, output directory,
+label, note and `-NoWait` options as `capture`. Discover resource/pass names with
+`graph -Summary` first:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session export -Session atrium `
+    -Targets '[{"resource":"TAA.ResolvedSceneColor"},{"resource":"DisplayView.DepthBuffer"}]' `
+    -IncludeGraph -View CAM_Courtyard -Label values
+# -TargetsFile reads the same JSON array from a UTF-8 file.
+```
+
+An address has `resource`, optional `at` (`"final"`, `{"before":"Pass"}` or
+`{"after":"Pass"}`), optional 1-based `occurrence`, `mip` (default 0), and
+`slices: [first, count]` (default all slices). Occurrences include culled pass
+declarations. `before` requires a read by that pass; `after` requires a write.
+`final` selects the last declared version. `aspect` is optionally `color`, `depth`
+or `stencil`; depth textures default to their depth plane. Stencil is exported
+only when explicitly requested.
+
+The original graph is compiled first. Dedicated copy observers enter at the
+selected execution cut, preserving the original culled set and pass order;
+lifetimes, usage and barriers are then rebuilt. They can extend transient
+lifetimes and change allocation reuse. A culled producer is never revived, and
+an undefined mip/slice is never filled in by exporting it. Imported resources
+must already support CopySource. Ordinary RenderGraph Read/Export assertions
+remain in force.
+
+One group publishes `.npy` files plus `<label>.<frameSerial>.resource-export.json`.
+`-IncludeGraph` adds the full graph of that same submitted frame. The completed
+response contains `exports`, `metadata`, optional `graph`, and `frameSerial`.
+Files publish as one group with the JSON sidecar last; consumers should discover
+groups through sidecars. Filename collisions choose one new stem for the whole
+group. A failed request reports a reason and, for address/admission failures, a
+typed `failureCode` such as `Culled`, `UndefinedContent`, `UnsupportedFormat`,
+`UnsupportedResource` or `TooLarge`.
+
+- NPY v1 arrays use little-endian values and C order. Textures have shape
+  `[slices, height, width, channels]`; cubes are slices in the existing face order.
+  2D textures/arrays, cubes, mips and buffers are supported; MSAA and 3D fail.
+- Unorm/sRGB textures retain their bytes and RGBA/BGRA order. Float16/Float32 and
+  Uint32 formats retain their bits. D32 is Float32; D24 depth is converted from
+  the low 24 bits to Float32 in `[0, 1]`, and stencil is Uint8. Typeless textures
+  use a unique typed view of the addressed pass, or flagged raw unsigned words.
+- Registered buffers use a structured dtype with field offsets and stride.
+  Initial layouts cover Forward+ tile headers and tile depth ranges. Other
+  buffers use `[elements, wordsPerElement]` Uint32 arrays. Unwritten capacity in
+  a buffer can contain arbitrary bytes; compare the active records defined by
+  the producer's count fields.
+- Sidecars record the address, version, writer, physical/view format, dtype,
+  shape, layout, extended lifetimes and optional semantics. Scene-color
+  semantics include pre-exposure; depth includes its convention; motion is
+  current UV minus previous UV, with positive Y down. Unregistered semantics
+  are null. Build/shader identities remain explicitly unavailable; parameter
+  revision remains null until T4.
+- Shared limits are 64 requests, 8 payload slots and 256 MiB including readback
+  and tight CPU data. Groups are never split. Standalone groups retry temporary
+  pressure with refreshed frame metadata. Scheduled exports wait for the payload
+  pool and writer before simulation starts, then check exact sizes after compile.
+  A group that cannot fit, including its paired image, fails instead of waiting
+  forever. A PNG plus seven targets fills all eight payload slots.
+
+Graph-only frames retain `gglab.render-graph` v1. Frames with resource observers
+use v2, with pass `observation` markers, `ObservationOrder` dependency edges and
+`execution.observationNodes`. PNG metadata v1 gains additive `observation` flags
+so paired images also disclose active graph/resource observation. Keep these
+tools off for performance measurements.
+
+Schedule one target group per sequence frame using `-Exports` or `-ExportsFile`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_StaticRailings -CaptureFrames 4,30 `
+    -Exports '[{"frame":4,"targets":[{"resource":"DisplayView.SceneColor"}],"graph":true}]' `
+    -Label observed
+```
+
+The arrays, optional graph and image of frame 4 share its render serial. With
+supersampled references, exports occur on the final sample. Duplicate export
+groups for one frame and frames outside the path are rejected. Existing capture
+and diagnostic sequence options retain their meaning.
+
+Validate sidecars, actual NPY headers/data and paired graph identity with Python
+`jsonschema` and `numpy` installed:
+
+```powershell
+python Scripts/ValidateResourceExports.py Build/Sessions/atrium-dx12/Captures Build/Sessions/atrium-vulkan/Captures
+python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium-dx12/Captures Build/Sessions/atrium-vulkan/Captures
+```
+
+Schemas live in `Docs/Schemas/ResourceExport.schema.json` and
+`Docs/Schemas/RenderGraph.schema.json`. Both validators have `--self-test` gates
+in CI; GPU value/observation checks still require local hardware runs.
 
 ## Capture settings
 

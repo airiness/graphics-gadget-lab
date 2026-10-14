@@ -22,6 +22,70 @@ namespace gglab
 		return RGCompiler(graph).Build();
 	}
 
+	RGCompileResult RGCompiler::ExtendObservations(const RenderGraph& graph,
+		const RGExecutionPlan& original) noexcept
+	{
+		RGCompiler compiler(graph);
+		compiler.InitializePlan();
+		if (compiler.HasErrors())
+		{
+			return { nullptr, std::move(compiler.m_Diagnostics) };
+		}
+		auto& plan = *compiler.m_Plan;
+		plan.m_DependencyEdges = original.m_DependencyEdges;
+		for (uint32_t i = 0; i < original.m_Passes.size(); ++i)
+		{
+			plan.m_Passes[i].m_Culled = original.m_Passes[i].m_Culled;
+			plan.m_Passes[i].m_Dependencies = original.m_Passes[i].m_Dependencies;
+			plan.m_Passes[i].m_Dependents = original.m_Passes[i].m_Dependents;
+		}
+		const auto append = [&](RGPassNodeIndex index)
+			{
+				plan.m_Passes[index.Value()].m_ExecutionOrder = static_cast<int32_t>(plan.m_ExecutionOrder.size());
+				plan.m_Passes[index.Value()].m_Culled = false;
+				plan.m_ExecutionOrder.push_back(index);
+			};
+		const auto edge = [&](RGPassNodeIndex from, RGPassNodeIndex to, RGResourceNodeIndex node,
+			RGDependencyReason reason)
+			{
+				plan.m_DependencyEdges.push_back({ from, to, node, reason });
+				plan.m_Passes[from.Value()].m_Dependents.push_back(to);
+				plan.m_Passes[to.Value()].m_Dependencies.push_back(from);
+			};
+		// Keep every original execution position, even across independent passes.
+		// The two surrounding edges describe the fixed insertion, without culling again.
+		for (uint32_t position = 0; position <= original.m_ExecutionOrder.size(); ++position)
+		{
+			for (const auto& [index, target] : graph.m_ObservationPasses)
+			{
+				if (target.m_InsertionPosition != position)
+				{
+					continue;
+				}
+				const RGPassNodeIndex observer{ index };
+				if (!plan.m_ExecutionOrder.empty())
+				{
+					edge(plan.m_ExecutionOrder.back(), observer,
+						target.m_Node, RGDependencyReason::ObservationOrder);
+				}
+				if (position < original.m_ExecutionOrder.size())
+				{
+					edge(observer,
+						original.m_ExecutionOrder[position], target.m_Node, RGDependencyReason::ObservationOrder);
+				}
+				append(observer);
+			}
+			if (position < original.m_ExecutionOrder.size())
+			{
+				append(original.m_ExecutionOrder[position]);
+			}
+		}
+		compiler.BuildResourceLifetimes();
+		RGBarrierPlanner(plan.m_Passes, plan.m_Resources, plan.m_ExecutionOrder).Build();
+		plan.m_Diagnostics = original.m_Diagnostics;
+		return { std::move(compiler.m_Plan), original.m_Diagnostics };
+	}
+
 	RGCompileResult RGCompiler::Build() noexcept
 	{
 		if (!m_Graph.m_BuildValid)
@@ -91,8 +155,8 @@ namespace gglab
 				AddDiagnostic(RGCompileDiagnosticCode::UndefinedContentRead,
 					"RenderGraph pass reads undefined resource contents. Initialize with Write or import as Defined.",
 					RGPassNodeIndex{ passIndex }, resourceIter != m_ResourceIndices.end()
-						? resourceIter->second
-						: InvalidRGVirtualResourceIndex);
+					? resourceIter->second
+					: InvalidRGVirtualResourceIndex);
 			}
 		}
 	}
@@ -260,7 +324,7 @@ namespace gglab
 				const bool writesNode = access.m_DependencyAccess == RGDependencyAccess::Write
 					? access.m_ResourceNodeIndex == RGResourceNodeIndex{ index }
 					: access.m_DependencyAccess == RGDependencyAccess::ReadWrite &&
-						access.m_ResourceNodeIndex == node.m_Previous;
+					access.m_ResourceNodeIndex == node.m_Previous;
 				if (!writesNode)
 				{
 					continue;

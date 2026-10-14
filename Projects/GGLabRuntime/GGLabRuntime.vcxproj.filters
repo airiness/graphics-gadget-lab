@@ -492,6 +492,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureResourceExport.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
@@ -571,6 +574,9 @@
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGObservation.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
@@ -1910,6 +1916,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\ResourceExportTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h">
       <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
     </ClInclude>
@@ -2063,6 +2072,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGCompileDiagnostic.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGObservation.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGPass.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -2137,6 +2149,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderViewTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\GpuBufferLayout.h">
+      <Filter>Public\GGLabRuntime\Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\RenderTextureIndex.h">
       <Filter>Public\GGLabRuntime\Graphics\Resource</Filter>

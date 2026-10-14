@@ -19,6 +19,7 @@ namespace gglab
 		Status,
 		Capture,
 		Graph,
+		Export,
 		Result,
 		Stop,
 		// Starts a camera-path sequence; the response reports it without waiting.

@@ -229,7 +229,7 @@ namespace gglab
 					.m_DisableReason = std::string(
 						GetTemporalConsumerDisableReasonName(consumerPlan.m_DisableReason)),
 					.m_Services = GetTemporalServiceNames(consumerPlan.m_Services),
-				});
+					});
 			}
 			const TemporalAASettings& settings = inputs.m_TemporalSettings;
 			const TemporalFrameTransaction& transaction = inputs.m_TemporalFrameTransaction;
@@ -574,7 +574,7 @@ namespace gglab
 					displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation,
 				.m_AmbientOcclusionAvailable =
 					m_RenderHost->GetGTAOCapabilityStatus().IsTemporalAvailable(),
-			});
+				});
 		// The window client extent is the display extent; the plan's effective preset
 		// derives the render extent from it.
 		const ViewResolution viewResolution = ResolveTemporalAAViewResolution(
@@ -662,6 +662,16 @@ namespace gglab
 		if (!renderGraphCompiled)
 		{
 			return FailRuntime("RenderGraph compilation failed.");
+		}
+		const auto& exportView = frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)];
+		if (!m_FrameCapture->PrepareResourceExports(frame.m_FrameSerial, renderGraph,
+			{ .m_PreExposure = exportView.m_ScenePreExposure,
+				.m_ReversedDepth = exportView.m_DepthConvention == DepthConvention::Reversed }))
+		{
+			// The RenderFrame aborts before submission. Sequence pose/sample and
+			// capture metadata are retried together when the complete group fits.
+			toolingFrame.Complete();
+			return AppRuntimeTickResult::Continue;
 		}
 
 		if (toolingFrame.IsOpen())

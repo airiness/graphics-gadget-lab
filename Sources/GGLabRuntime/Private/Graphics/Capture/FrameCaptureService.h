@@ -42,9 +42,14 @@ namespace gglab
 			uint64_t frameSerial = 0) noexcept override;
 		[[nodiscard]] uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap,
 			uint64_t frameSerial = 0) noexcept override;
+		[[nodiscard]] uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets,
+			uint64_t frameSerial = 0, bool deferFrameOnBusy = false, bool includeGraph = false) noexcept override;
+		[[nodiscard]] FrameCaptureAvailability PrepareResourceExports(uint64_t frameSerial,
+			RenderGraph& graph, ResourceExportFrameContext context = {}) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept override;
 		[[nodiscard]] FrameCaptureAvailability GetRequestAvailability() const noexcept override;
+		[[nodiscard]] FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept override;
 		[[nodiscard]] FrameCaptureAvailability GetAvailability(
 			RHIFormat format, uint32_t width, uint32_t height) const noexcept override;
 
@@ -81,6 +86,17 @@ namespace gglab
 			uint64_t m_FrameSerial = 0;
 			// Diagnostic requests only.
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
+			std::vector<RGResourceAddress> m_ResourceTargets;
+			bool m_DeferFrameOnBusy = false;
+			bool m_IncludeGraph = false;
+		};
+
+		struct ExportReadback
+		{
+			RGObservationCopy m_Copy;
+			RHIBufferOwner m_Buffer;
+			ResourceExportArray m_Array;
+			uint64_t m_CpuBytes = 0;
 		};
 
 		struct Tap
@@ -91,10 +107,13 @@ namespace gglab
 			std::vector<QueuedRequest> m_Requests;
 			RHIBufferOwner m_Buffer;
 			std::shared_ptr<RGSnapshot> m_Graph;
+			std::vector<ExportReadback> m_ExportReadbacks;
 			std::string m_AdapterCompatibilityIdentity;
 			RHITextureCopyFootprint m_Footprint{};
 			RHIFencePoint m_Fence{};
 			bool m_Submitted = false;
+			bool m_GraphExportActive = false;
+			bool m_ResourceExportActive = false;
 		};
 
 		struct RetainedImage
@@ -102,6 +121,14 @@ namespace gglab
 			std::weak_ptr<const FrameCaptureImage> m_Image;
 			uint64_t m_Bytes = 0;
 		};
+		struct RetainedExport
+		{
+			std::weak_ptr<const ResourceExportPayload> m_Payload;
+			uint64_t m_Bytes = 0;
+			uint32_t m_Slots = 0;
+		};
+		[[nodiscard]] std::pair<uint64_t, uint32_t> GetPayloadUsage() const noexcept;
+		void DeferFrameCaptures(uint64_t frameSerial) noexcept override;
 
 		[[nodiscard]] bool IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,
 			PostProcessDebugTap diagnosticTap) const noexcept;
@@ -111,6 +138,7 @@ namespace gglab
 		void FailQueuedFrameRequests(uint64_t frameSerial, std::string_view failure) noexcept;
 		void FailTap(Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept;
 		void PublishTap(Tap& tap) noexcept;
+		void PublishResourceTap(Tap& tap) noexcept;
 
 		RHIDevice* m_Device = nullptr;
 		FrameCaptureLimits m_Limits{};
@@ -119,6 +147,7 @@ namespace gglab
 		std::vector<Tap> m_Taps;
 		std::vector<FrameCaptureResult> m_Results;
 		std::vector<RetainedImage> m_RetainedImages;
+		std::vector<RetainedExport> m_RetainedExports;
 		bool m_IsShutdown = false;
 	};
 }

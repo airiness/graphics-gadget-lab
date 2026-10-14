@@ -64,6 +64,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Graph;
 			}
+			if (command == "export")
+			{
+				return ApplicationControlCommand::Export;
+			}
 			if (command == "result")
 			{
 				return ApplicationControlCommand::Result;
@@ -363,6 +367,112 @@ namespace gglab
 			return {};
 		}
 
+		[[nodiscard]] std::string ParseResourceAddresses(const Json& value, std::vector<RGResourceAddress>& targets)
+		{
+			if (!value.is_array() || value.empty() || value.size() > 64)
+			{
+				return "Field 'targets' must be an array of one to 64 resource addresses.";
+			}
+			for (const auto& item : value)
+			{
+				if (!item.is_object())
+				{
+					return "Each resource address must be an object.";
+				}
+				RGResourceAddress address;
+				for (const auto& [key, field] : item.items())
+				{
+					if (key == "resource")
+					{
+						if (!field.is_string() || field.get_ref<const std::string&>().empty())
+						{
+							return "A resource address requires a non-empty 'resource'.";
+						}
+						address.m_Resource = field.get<std::string>();
+					}
+					else if (key == "at")
+					{
+						if (field == "final")
+						{
+							address.m_Position = RGObservationPosition::Final;
+						}
+						else if (field.is_object() && field.size() == 1 && (field.contains("before") || field.contains("after")))
+						{
+							const bool before = field.contains("before");
+							const auto& pass = field[before ? "before" : "after"];
+							if (!pass.is_string() || pass.get_ref<const std::string&>().empty())
+							{
+								return "A pass address requires a non-empty pass name.";
+							}
+							address.m_Position = before ? RGObservationPosition::Before : RGObservationPosition::After;
+							address.m_Pass = pass.get<std::string>();
+						}
+						else
+						{
+							return "Field 'at' must be 'final', {'before': name} or {'after': name}.";
+						}
+					}
+					else if (key == "mip" || key == "occurrence")
+					{
+						if (!field.is_number_unsigned() || field.get<uint64_t>() > UINT32_MAX || (key == "occurrence" && field == 0))
+						{
+							return "Mip must be a uint32; occurrence must be a positive uint32.";
+						}
+						if (key == "mip")
+						{
+							address.m_Mip = field.get<uint32_t>();
+						}
+						else
+						{
+							address.m_Occurrence = field.get<uint32_t>();
+						}
+					}
+					else if (key == "slices")
+					{
+						if (!field.is_array() || field.size() != 2 || !field[0].is_number_unsigned() || !field[1].is_number_unsigned() ||
+							field[0].get<uint64_t>() > UINT32_MAX || field[1].get<uint64_t>() > UINT32_MAX || field[1] == 0)
+						{
+							return "Field 'slices' must be [first, count], with a positive count and uint32 values.";
+						}
+						address.m_FirstSlice = field[0].get<uint32_t>(); address.m_SliceCount = field[1].get<uint32_t>();
+					}
+					else if (key == "aspect")
+					{
+						if (field == "color")
+						{
+							address.m_Aspect = RHITextureAspect::Color;
+						}
+						else if (field == "depth")
+						{
+							address.m_Aspect = RHITextureAspect::Depth;
+						}
+						else if (field == "stencil")
+						{
+							address.m_Aspect = RHITextureAspect::Stencil;
+						}
+						else
+						{
+							return "Field 'aspect' must be 'color', 'depth' or 'stencil'.";
+						}
+					}
+					else
+					{
+						return std::format("Unknown resource address field '{}'.", key);
+					}
+				}
+				if (address.m_Resource.empty())
+				{
+					return "A resource address requires 'resource'.";
+				}
+				if (address.m_Position == RGObservationPosition::Final && address.m_Occurrence)
+				{
+					return "A final resource address has no pass occurrence.";
+				}
+				targets.push_back(std::move(address));
+			}
+			return {};
+		}
+
 		// Fills the sequence request; returns an error text.
 		[[nodiscard]] std::string ParseSequenceFields(
 			const Json& document, ApplicationControlRequest& request)
@@ -413,6 +523,39 @@ namespace gglab
 						!error.empty())
 					{
 						return error;
+					}
+				}
+				else if (key == "exports")
+				{
+					if (!value.is_array() || value.size() > MaxSequenceCaptureFrames)
+					{
+						return "Field 'exports' must be a bounded array.";
+					}
+					for (const auto& item : value)
+					{
+						if (!item.is_object() || !item.contains("frame") || !item["frame"].is_number_unsigned() ||
+							item["frame"].get<uint64_t>() > UINT32_MAX || !item.contains("targets"))
+						{
+							return "Each sequence export requires a uint32 'frame' and 'targets'.";
+						}
+						FrameSequenceResourceExport resourceExport{ .m_Frame = item["frame"].get<uint32_t>() };
+						for (const auto& [field, fieldValue] : item.items())
+						{
+							if (field == "frame" || field == "targets")
+							{
+								continue;
+							}
+							if (field != "graph" || !fieldValue.is_boolean())
+							{
+								return "Only a boolean 'graph' is optional in a sequence export.";
+							}
+							resourceExport.m_IncludeGraph = fieldValue.get<bool>();
+						}
+						if (auto error = ParseResourceAddresses(item["targets"], resourceExport.m_Targets); !error.empty())
+						{
+							return error;
+						}
+						sequence.m_Exports.push_back(std::move(resourceExport));
 					}
 				}
 				else if (key == "referenceSamples")
@@ -506,7 +649,15 @@ namespace gglab
 			capture.m_Timing = FrameCaptureTiming::AfterReady;
 			capture.m_SettleFrames = 8;
 			const bool graph = request.m_Command == ApplicationControlCommand::Graph;
-			if (graph) capture.m_Source = FrameCaptureSource::RenderGraph;
+			const bool resources = request.m_Command == ApplicationControlCommand::Export;
+			if (graph)
+			{
+				capture.m_Source = FrameCaptureSource::RenderGraph;
+			}
+			if (resources)
+			{
+				capture.m_Source = FrameCaptureSource::ResourceExport;
+			}
 			for (const auto& [key, value] : document.items())
 			{
 				if (key == "protocol" || key == "id" || key == "command")
@@ -515,10 +666,28 @@ namespace gglab
 				}
 				if (key == "summary" && graph)
 				{
-					if (!value.is_boolean()) return "Field 'summary' must be a boolean.";
+					if (!value.is_boolean())
+					{
+						return "Field 'summary' must be a boolean.";
+					}
 					capture.m_GraphSummary = value.get<bool>();
 				}
-				else if (key == "source" && !graph)
+				else if (key == "targets" && resources)
+				{
+					if (auto error = ParseResourceAddresses(value, capture.m_ResourceTargets); !error.empty())
+					{
+						return error;
+					}
+				}
+				else if (key == "graph" && resources)
+				{
+					if (!value.is_boolean())
+					{
+						return "Field 'graph' must be a boolean.";
+					}
+					capture.m_IncludeGraph = value.get<bool>();
+				}
+				else if (key == "source" && !graph && !resources)
 				{
 					const std::string source = value.is_string() ? value.get<std::string>() : "";
 					if (source == "scene")
@@ -538,7 +707,7 @@ namespace gglab
 						return "Field 'source' must be 'scene', 'composited' or 'diagnostic'.";
 					}
 				}
-				else if (key == "diagnosticTap" && !graph)
+				else if (key == "diagnosticTap" && !graph && !resources)
 				{
 					if (std::string error = ParseDiagnosticTap(value, capture.m_DiagnosticTap);
 						!error.empty())
@@ -601,8 +770,12 @@ namespace gglab
 				}
 				else
 				{
-					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : "capture");
+					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : resources ? "export" : "capture");
 				}
+			}
+			if (resources && capture.m_ResourceTargets.empty())
+			{
+				return "Command 'export' requires 'targets'.";
 			}
 			return ValidateDiagnosticTap(capture.m_Source, capture.m_DiagnosticTap);
 		}
@@ -709,7 +882,7 @@ namespace gglab
 			: std::nullopt;
 		if (!command)
 		{
-			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'result', 'stop', "
+			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
 				"'sequence' or 'sequence-cancel'.";
 			return result;
 		}
@@ -720,6 +893,7 @@ namespace gglab
 		{
 		case ApplicationControlCommand::Capture:
 		case ApplicationControlCommand::Graph:
+		case ApplicationControlCommand::Export:
 			error = ParseCaptureFields(document, request);
 			break;
 		case ApplicationControlCommand::Result:
@@ -823,7 +997,16 @@ namespace gglab
 		{
 		case FrameCaptureRequestStatus::Completed:
 			response["status"] = "completed";
-			if (result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph)
+			if (result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::ResourceExport)
+			{
+				response["exports"] = Json::array();
+				for (const auto& path : result.m_ResourcePaths) response["exports"].push_back(ToUtf8(path));
+				if (!result.m_GraphPath.empty())
+				{
+					response["graph"] = ToUtf8(result.m_GraphPath);
+				}
+			}
+			else if (result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph)
 			{
 				response["graph"] = ToUtf8(result.m_MetadataPath);
 			}
@@ -837,6 +1020,10 @@ namespace gglab
 		case FrameCaptureRequestStatus::Failed:
 			response["status"] = "failed";
 			response["failure"] = result.m_Failure;
+			if (result.m_ResourceFailure != RGObservationFailure::None)
+			{
+				response["failureCode"] = GetRGObservationFailureName(result.m_ResourceFailure);
+			}
 			break;
 		}
 		if (result.m_Metadata)

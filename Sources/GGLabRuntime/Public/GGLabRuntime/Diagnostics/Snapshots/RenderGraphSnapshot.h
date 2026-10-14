@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourceTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
@@ -8,6 +9,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gglab
@@ -48,6 +50,7 @@ namespace gglab
 	{
 		uint32_t m_Index = 0;
 		uint32_t m_Occurrence = 1;
+		bool m_Observation = false;
 		int32_t m_ExecutionOrder = -1;
 		std::string m_Name;
 		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
@@ -149,6 +152,8 @@ namespace gglab
 		std::vector<RGCompileDiagnostic> m_CompileDiagnostics;
 		std::vector<std::string> m_DuplicatePassNames;
 		RGSnapshotExecutionRecord m_Execution;
+		// Planned reads are reported alongside the actual fenced execution record.
+		std::vector<std::pair<uint32_t, RGObservationTarget>> m_ObservationNodes;
 	};
 
 	// Versioned graph data; AppRuntime embeds its common frame metadata and submission identity.

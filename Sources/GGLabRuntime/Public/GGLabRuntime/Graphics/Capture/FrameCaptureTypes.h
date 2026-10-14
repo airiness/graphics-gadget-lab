@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 
 #include <cstdint>
 #include <memory>
@@ -27,12 +28,15 @@ namespace gglab
 		Diagnostic,
 		// CPU compile snapshot and execution record; no display tap or GPU readback.
 		RenderGraph,
+		ResourceExport,
 	};
 
 	enum class FrameCaptureStatus : uint8_t
 	{
 		Completed,
 		Failed,
+		// A whole resource group temporarily lacks capacity; coordination retries it.
+		Busy,
 	};
 
 	// Admission for one new capture. Busy is temporary; unsupported or oversized
@@ -70,6 +74,10 @@ namespace gglab
 		// and tap share one immutable image.
 		std::shared_ptr<const FrameCaptureImage> m_Image;
 		std::shared_ptr<const RGSnapshot> m_Graph;
+		std::shared_ptr<const ResourceExportPayload> m_Resources;
+		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
+		bool m_GraphExportActive = false;
+		bool m_ResourceExportActive = false;
 		uint32_t m_SubmissionFenceIndex = 0;
 		uint32_t m_SubmissionFenceGeneration = 0;
 		uint64_t m_SubmissionFenceValue = 0;

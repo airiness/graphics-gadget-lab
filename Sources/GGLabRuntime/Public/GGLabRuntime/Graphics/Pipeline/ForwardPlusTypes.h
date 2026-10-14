@@ -1,5 +1,8 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Resource/GpuBufferLayout.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace gglab
@@ -46,4 +49,11 @@ namespace gglab
 		}
 	};
 	static_assert(sizeof(ForwardPlusTileHeader) == 8);
+	static_assert(offsetof(ForwardPlusTileHeader, m_Offset) == 0);
+	static_assert(offsetof(ForwardPlusTileHeader, m_CountAndFlags) == 4);
+	inline constexpr std::array ForwardPlusTileHeaderFields = {
+		GpuBufferFieldLayout{ "offset", offsetof(ForwardPlusTileHeader, m_Offset), GpuBufferScalar::Uint32 },
+		GpuBufferFieldLayout{ "countAndFlags", offsetof(ForwardPlusTileHeader, m_CountAndFlags), GpuBufferScalar::Uint32 },
+	};
+	inline constexpr GpuBufferLayout ForwardPlusTileHeaderLayout{ sizeof(ForwardPlusTileHeader), ForwardPlusTileHeaderFields };
 }

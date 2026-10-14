@@ -13,6 +13,14 @@ def validate(document, validator):
 	passes = document["compile"]["passes"]
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
 		raise ValueError("Frame serials disagree")
+	observed = document["schemaVersion"] == 2
+	if observed != document["observation"]["resourceExport"]:
+		raise ValueError("Graph schema version and observation flags disagree")
+	if document["mode"] == "full":
+		markers = {entry["index"] for entry in passes if entry.get("observation", False)}
+		nodes = {entry["passIndex"] for entry in document["execution"]["observationNodes"]}
+		if markers != nodes or bool(markers) != observed:
+			raise ValueError("Observation pass markers and execution nodes disagree")
 	if document["mode"] == "summary":
 		orders = [entry["executionOrder"] for entry in passes]
 		if orders != list(range(len(passes))):
@@ -90,7 +98,20 @@ def self_test(validator):
 	del buffer["compile"]["resources"][0]["texture"]
 	validate(buffer, validator)
 
+	observed = copy.deepcopy(full)
+	observed["schemaVersion"] = 2
+	observed["observation"]["resourceExport"] = True
+	observed["compile"]["passes"][0]["observation"] = True
+	observed["execution"]["observationNodes"] = [dict(passIndex=0, kind="ResourceExport", resource="SceneColor",
+		resourceIndex=0, resourceNodeIndex=1, originalInsertionPosition=1)]
+	observed["compile"]["dependencyEdges"][0]["reason"] = "ObservationOrder"
+	validate(observed, validator)
+
 	cases = [
+		(full, ("compile", "dependencyEdges", 0, "reason"), "ObservationOrder"),
+		(observed, ("schemaVersion",), 1),
+		(observed, ("compile", "passes", 0, "observation"), False),
+		(observed, ("execution", "observationNodes", 0, "kind"), "Unknown"),
 		(full, ("compile", "dependencyEdges", 0, "reason"), "Writer -> Reader"),
 		(full, ("compile", "passes", 0, "accesses", 0, "access"), "DSV Write"),
 		(full, ("compile", "passes", 0, "accesses", 0, "access"), "CopySrc"),

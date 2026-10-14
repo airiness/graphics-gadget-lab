@@ -27,6 +27,11 @@ namespace gglab
 
 	bool RenderGraph::Compile() noexcept
 	{
+		GGLAB_ASSERT_MSG(m_ObservationPasses.empty(), "An observed graph cannot be compiled again and revive culled producers.");
+		if (!m_ObservationPasses.empty())
+		{
+			return false;
+		}
 		m_ExecutionPlan.reset();
 		m_ExecutionRecord.reset();
 		m_CompileDiagnostics.clear();

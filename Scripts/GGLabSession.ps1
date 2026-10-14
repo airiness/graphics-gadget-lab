@@ -16,12 +16,17 @@ Commands:
   status   Report readiness gates, settled frames, camera and pending captures.
   capture  Capture a frame; waits for the PNG and metadata unless -NoWait.
            -View restores a camera reference view of the active content first.
+  graph    Export the full frame graph, or discovery addresses with -Summary.
+  export   Export one frame's resource group as NPY arrays and JSON metadata.
+           -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
+           the exact frame graph. See Docs/FrameCapture.md for the address format.
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
   result   Report a capture submitted with -NoWait.
   sequence Play a camera path registered by the active content (-CameraPath),
            capturing -CaptureFrames ("0,10,20-23"); waits until the sequence
            and its captures finish unless -NoWait. Poll with 'status'.
+           -Exports/-ExportsFile adds one target group at each selected frame.
            -Source diagnostic -DiagnosticTap <tap> records one diagnostic tap,
            such as temporal-history-weight, instead of the scene.
            -ReferenceSamples <n> renders every frame as a supersampled reference
@@ -46,7 +51,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 sto
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'graph', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -88,6 +93,10 @@ param(
     [switch]$NoWait,
     # graph: only executed passes with resource-version addresses.
     [switch]$Summary,
+    # export: a JSON array of resource addresses, directly or from a UTF-8 file.
+    [string]$Targets,
+    [string]$TargetsFile,
+    [switch]$IncludeGraph,
 
     # result
     [long]$RequestId,
@@ -95,6 +104,9 @@ param(
     # sequence: camera path id and frames to capture, as numbers and ranges.
     [string]$CameraPath,
     [string]$CaptureFrames,
+    # sequence: [{frame: n, targets: [...], graph: true}], directly or from a file.
+    [string]$Exports,
+    [string]$ExportsFile,
     [ValidateRange(0, 4096)]
     [int]$ReferenceSamples = 0,
     [double]$ReferenceTextureLodBias = 0,
@@ -269,6 +281,15 @@ function ConvertTo-SettingOverrides([string]$Text, [string]$Owner) {
     return $overrides
 }
 
+function Read-JsonArray([string]$Text, [string]$File, [string]$Name) {
+    if ($Text -and $File) { Fail "Use either -$Name or -${Name}File, not both." }
+    if ($File) { $Text = Get-Content -LiteralPath $File -Encoding UTF8 -Raw }
+    if (-not $Text -or -not $Text.TrimStart().StartsWith('[')) { Fail "-$Name requires a JSON array." }
+    try { $array = ConvertFrom-Json -InputObject $Text }
+    catch { Fail "-$Name contains invalid JSON: $($_.Exception.Message)" }
+    return ,([object[]]$array)
+}
+
 function Require-Session {
     if (-not $Session) {
         Fail "Command '$Command' requires -Session."
@@ -357,6 +378,17 @@ switch ($Command) {
         $response = Invoke-SessionRequest $Session $request $TimeoutSeconds
         Complete-SessionResponse $response $Session
     }
+    'export' {
+        Require-Session
+        $request = New-CaptureRequest $View (-not $NoWait)
+        $request['command'] = 'export'
+        $request.Remove('source')
+        $request.Remove('diagnosticTap')
+        $request['targets'] = (Read-JsonArray $Targets $TargetsFile 'Targets')
+        $request['graph'] = [bool]$IncludeGraph
+        $response = Invoke-SessionRequest $Session $request $TimeoutSeconds
+        Complete-SessionResponse $response $Session
+    }
     'batch' {
         Require-Session
         $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -434,6 +466,7 @@ switch ($Command) {
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
+        if ($Exports -or $ExportsFile) { $request['exports'] = (Read-JsonArray $Exports $ExportsFile 'Exports') }
         if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
         if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-SettingOverrides $TemporalAA 'Temporal AA') }
         if ($GTAO) { $request['gtao'] = (ConvertTo-SettingOverrides $GTAO 'GTAO') }

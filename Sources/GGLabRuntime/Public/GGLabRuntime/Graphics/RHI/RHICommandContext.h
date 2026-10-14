@@ -176,7 +176,7 @@ namespace gglab
 		return true;
 	}
 
-	// Copies the footprint extent from the origin of one color subresource into a
+	// Copies the footprint extent from the origin of one selected subresource into a
 	// placed buffer layout. The caller owns the source CopySource state and the
 	// destination CopyDest state.
 	struct RHITextureToBufferCopy
@@ -187,6 +187,7 @@ namespace gglab
 		RHIBufferHandle m_Destination{};
 		uint64_t m_DestinationOffset = 0;
 		RHITextureCopyFootprint m_Footprint{};
+		RHITextureAspect m_SourceAspect = RHITextureAspect::Color;
 	};
 
 	class RHICommandContext

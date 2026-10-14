@@ -400,6 +400,12 @@ namespace gglab
 			rg.m_ExecutionPlan.get(), outSnapshot)
 			.Build();
 		outSnapshot.m_CompileDiagnostics = rg.GetCompileDiagnostics();
+		outSnapshot.m_ObservationNodes = rg.m_ObservationPasses;
+		for (const auto& [index, target] : rg.m_ObservationPasses)
+		{
+			(void)target;
+			outSnapshot.m_Passes[index].m_Observation = true;
+		}
 		if (rg.m_ExecutionRecord)
 		{
 			outSnapshot.m_Execution = *rg.m_ExecutionRecord;

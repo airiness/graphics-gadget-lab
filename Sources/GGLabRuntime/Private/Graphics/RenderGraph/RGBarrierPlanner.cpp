@@ -429,8 +429,16 @@ namespace gglab
 			{
 				continue;
 			}
-			const RGPassNodeIndex finalBarrierPass =
+			RGPassNodeIndex finalBarrierPass =
 				resource.m_ExportPass.IsValid() ? resource.m_ExportPass : resource.m_LastUser;
+			// A post-compile observer may read after the declared export. Restore the
+			// imported owner's state after that last read, before returning ownership.
+			if (resource.m_LastUser.IsValid() && finalBarrierPass.IsValid() &&
+				m_Passes[resource.m_LastUser.Value()].m_ExecutionOrder >
+				m_Passes[finalBarrierPass.Value()].m_ExecutionOrder)
+			{
+				finalBarrierPass = resource.m_LastUser;
+			}
 			GGLAB_ASSERT_MSG(
 				finalBarrierPass.IsValid(), "RenderGraph final barrier requires an owning pass.");
 

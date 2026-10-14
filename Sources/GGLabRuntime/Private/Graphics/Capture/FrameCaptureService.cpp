@@ -79,7 +79,7 @@ namespace gglab
 		const auto request = std::ranges::find(
 			m_Queued, FrameCaptureSource::Diagnostic, &QueuedRequest::m_Source);
 		return request != m_Queued.end() ? std::optional(request->m_DiagnosticTap)
-										 : std::nullopt;
+			: std::nullopt;
 	}
 
 	void FrameCaptureService::FailPendingDiagnosticRequests(std::string_view failure) noexcept
@@ -162,22 +162,7 @@ namespace gglab
 			return FrameCaptureAvailability::TooLarge;
 		}
 		const uint64_t requiredBytes = footprint.m_SizeInBytes + imageBytes;
-		uint64_t usedBytes = 0;
-		size_t payloads = std::ranges::count_if(m_Taps,
-			[](const Tap& tap) { return !tap.m_Graph; });
-		for (const Tap& tap : m_Taps)
-		{
-			usedBytes += tap.m_Footprint.m_SizeInBytes +
-				tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height;
-		}
-		for (const RetainedImage& image : m_RetainedImages)
-		{
-			if (!image.m_Image.expired())
-			{
-				++payloads;
-				usedBytes += image.m_Bytes;
-			}
-		}
+		const auto [usedBytes, payloads] = GetPayloadUsage();
 		return payloads >= m_Limits.m_MaxPayloads ||
 			GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests ||
 			requiredBytes > m_Limits.m_MaxPayloadBytes - usedBytes
@@ -275,33 +260,69 @@ namespace gglab
 
 	void FrameCaptureService::BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
-		if (m_IsShutdown || !HasPendingRequests(FrameCaptureSource::RenderGraph)) return;
+		const bool includeGraph = std::ranges::any_of(m_Taps, [&](const Tap& tap)
+			{ return tap.m_FrameSerial == frameSerial && tap.m_Source == FrameCaptureSource::ResourceExport &&
+			std::ranges::any_of(tap.m_Requests, [](const auto& request) { return request.m_IncludeGraph; }); });
+		if (m_IsShutdown || (!HasPendingRequests(FrameCaptureSource::RenderGraph) && !includeGraph))
+		{
+			return;
+		}
 		Tap tap{ .m_FrameSerial = frameSerial, .m_Source = FrameCaptureSource::RenderGraph };
 		std::erase_if(m_Queued, [&](const QueuedRequest& request)
 			{
 				if (request.m_Source != FrameCaptureSource::RenderGraph ||
-					(request.m_FrameSerial != 0 && request.m_FrameSerial != frameSerial)) return false;
+					(request.m_FrameSerial != 0 && request.m_FrameSerial != frameSerial))
+				{
+					return false;
+				}
 				tap.m_Requests.push_back(request);
 				return true;
 			});
-		if (tap.m_Requests.empty()) return;
+		if (tap.m_Requests.empty() && !includeGraph)
+		{
+			return;
+		}
 		tap.m_Graph = std::make_shared<RGSnapshot>();
 		BuildRenderGraphSnapshot(graph, *tap.m_Graph);
 		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
+		tap.m_ResourceExportActive = graph.HasResourceObservations();
+		tap.m_GraphExportActive = true;
 		graph.EnableExecutionRecord();
-		m_Taps.push_back(std::move(tap));
+		for (auto& consumer : m_Taps)
+			if (consumer.m_FrameSerial == frameSerial)
+			{
+				consumer.m_GraphExportActive = true;
+			}
+		for (auto& resources : m_Taps)
+			if (resources.m_FrameSerial == frameSerial && resources.m_Source == FrameCaptureSource::ResourceExport &&
+				resources.m_Requests[0].m_IncludeGraph)
+			{
+				resources.m_Graph = tap.m_Graph;
+			}
+		if (!tap.m_Requests.empty())
+		{
+			m_Taps.push_back(std::move(tap));
+		}
 	}
 
 	void FrameCaptureService::EndGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
+		if (!std::ranges::any_of(m_Taps, [&](const Tap& tap)
+			{ return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted; }))
+		{
+			return;
+		}
+		auto record = graph.TakeExecutionRecord();
+		if (!record)
+		{
+			return;
+		}
 		for (Tap& tap : m_Taps)
 		{
 			if (tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted)
 			{
-				if (auto record = graph.TakeExecutionRecord())
-				{
-					tap.m_Graph->m_Execution = std::move(*record);
-				}
+				tap.m_Graph->m_Execution = std::move(*record);
+				break; // All graph consumers of this frame share this immutable snapshot.
 			}
 		}
 	}
@@ -341,7 +362,7 @@ namespace gglab
 						PublishFailure(request.m_Id, request.m_Source, frameSerial,
 							"The requested capture frame was aborted before submission.",
 							request.m_Source == FrameCaptureSource::Diagnostic
-								? std::optional(request.m_DiagnosticTap) : std::nullopt);
+							? std::optional(request.m_DiagnosticTap) : std::nullopt);
 					}
 				}
 				return true;
@@ -430,7 +451,7 @@ namespace gglab
 				}
 				PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure),
 					request.m_Source == FrameCaptureSource::Diagnostic
-						? std::optional(request.m_DiagnosticTap) : std::nullopt);
+					? std::optional(request.m_DiagnosticTap) : std::nullopt);
 				return true;
 			});
 	}
@@ -442,7 +463,7 @@ namespace gglab
 		{
 			PublishFailure(request.m_Id, tap.m_Source, frameSerial, std::string(failure),
 				tap.m_Source == FrameCaptureSource::Diagnostic
-					? std::optional(tap.m_DiagnosticTap) : std::nullopt);
+				? std::optional(tap.m_DiagnosticTap) : std::nullopt);
 		}
 		tap.m_Requests.clear();
 		tap.m_Buffer.Reset();
@@ -450,6 +471,11 @@ namespace gglab
 
 	void FrameCaptureService::PublishTap(Tap& tap) noexcept
 	{
+		if (tap.m_Source == FrameCaptureSource::ResourceExport)
+		{
+			PublishResourceTap(tap);
+			return;
+		}
 		if (tap.m_Graph)
 		{
 			if (!tap.m_Graph->m_Execution.m_Recorded)
@@ -465,11 +491,13 @@ namespace gglab
 					.m_Status = FrameCaptureStatus::Completed,
 					.m_FrameSerial = tap.m_FrameSerial,
 					.m_Graph = tap.m_Graph,
+					.m_GraphExportActive = tap.m_GraphExportActive,
+					.m_ResourceExportActive = tap.m_ResourceExportActive,
 					.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
 					.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(),
 					.m_SubmissionFenceValue = tap.m_Fence.m_Value,
 					.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity,
-				});
+					});
 			}
 			tap.m_Requests.clear();
 			return;
@@ -514,6 +542,8 @@ namespace gglab
 				.m_DiagnosticTap = tap.m_Source == FrameCaptureSource::Diagnostic
 					? std::optional(tap.m_DiagnosticTap) : std::nullopt,
 				.m_Image = sharedImage,
+				.m_GraphExportActive = tap.m_GraphExportActive,
+				.m_ResourceExportActive = tap.m_ResourceExportActive,
 				});
 		}
 		tap.m_Requests.clear();

@@ -7,6 +7,7 @@
 
 namespace gglab
 {
+	class RenderGraph;
 	// Application-facing frame capture control. Calls are made from the thread
 	// that drives the render host frames.
 	class FrameCaptureControlBase
@@ -27,6 +28,25 @@ namespace gglab
 		// RequestCapture. A tap without a diagnostic name fails immediately.
 		[[nodiscard]] virtual uint64_t RequestDiagnosticCapture(
 			PostProcessDebugTap tap, uint64_t frameSerial = 0) noexcept = 0;
+		[[nodiscard]] virtual uint64_t RequestResourceExport(std::vector<RGResourceAddress>,
+			uint64_t = 0, bool = false, bool = false) noexcept
+		{
+			return 0;
+		}
+		// Sizes are known only after compilation. Start a scheduled export frame
+		// with an idle payload pool, then check the complete group before submission.
+		[[nodiscard]] virtual FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept
+		{
+			return GetRequestAvailability();
+		}
+		// Called after ordinary compilation, before execution. Busy defers the entire
+		// selected sequence frame; no original producer is revived by these reads.
+		[[nodiscard]] virtual FrameCaptureAvailability PrepareResourceExports(uint64_t,
+			RenderGraph&, ResourceExportFrameContext = {}) noexcept
+		{
+			return FrameCaptureAvailability::Available;
+		}
+		virtual void DeferFrameCaptures(uint64_t) noexcept {}
 		// Tap of the oldest queued Diagnostic request. Scheduling can coalesce
 		// matching taps or wait before fixing metadata for a different tap.
 		[[nodiscard]] virtual std::optional<PostProcessDebugTap> GetPendingDiagnosticTap()

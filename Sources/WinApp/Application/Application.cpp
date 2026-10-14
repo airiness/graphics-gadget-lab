@@ -206,8 +206,8 @@ namespace gglab
 		activeShaderRegistry = activeRegistry.m_RegistryRef;
 		GGLAB_LOG_INFO("Artifact-only shader startup selected the packaged {} active registry.",
 			activeTargetProfile == ShaderTargetProfile::GGLabVulkan13
-				? "gglab-vulkan13"
-				: "gglab-dx12");
+			? "gglab-vulkan13"
+			: "gglab-dx12");
 #else
 		const DevelopmentShaderBuildResult shaderArtifacts =
 			RunDevelopmentShaderBuild(shaderBuildRequest);
@@ -255,18 +255,18 @@ namespace gglab
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
-				m_ShaderHotReload = std::make_unique<DevelopmentShaderHotReloadSystem>(
+			m_ShaderHotReload = std::make_unique<DevelopmentShaderHotReloadSystem>(
 				DevelopmentShaderHotReloadSystem::CreateInfo{
 					.m_BuildRequest = shaderBuildRequest,
 					.m_TaskSystem = taskSystem,
 					.m_ShaderManager = shaderManager,
 					.m_RenderTemporal = m_AppRuntime->GetRenderServices().m_Temporal,
 				});
-				if (!m_ShaderHotReload->Initialize())
-				{
-					GGLAB_LOG_WARN("Application will continue without shader hot reload.");
-					m_ShaderHotReload.reset();
-				}
+			if (!m_ShaderHotReload->Initialize())
+			{
+				GGLAB_LOG_WARN("Application will continue without shader hot reload.");
+				m_ShaderHotReload.reset();
+			}
 #else
 			GGLAB_LOG_INFO(
 				"Shader authoring and hot reload are omitted from the artifact-only target.");
@@ -550,6 +550,7 @@ namespace gglab
 			return;
 		case ApplicationControlCommand::Capture:
 		case ApplicationControlCommand::Graph:
+		case ApplicationControlCommand::Export:
 		{
 			if (!m_FrameCapture)
 			{
