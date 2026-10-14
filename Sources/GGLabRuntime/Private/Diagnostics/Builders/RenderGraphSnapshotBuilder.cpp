@@ -307,6 +307,12 @@ namespace gglab
 				accessInfo.m_ResourceNodeIndex = access.m_ResourceNodeIndex.Value();
 				accessInfo.m_ResourceSlot = resourceNode.m_ResourceHandle.GetHandle().Value();
 				accessInfo.m_ResourceVersion = resourceNode.m_ResourceHandle.GetVersion();
+				if (access.m_WrittenResourceNodeIndex.IsValid())
+				{
+					accessInfo.m_WrittenResourceNodeIndex = access.m_WrittenResourceNodeIndex.Value();
+					accessInfo.m_WrittenResourceVersion = m_ResourceNodes[
+						access.m_WrittenResourceNodeIndex.Value()].m_ResourceHandle.GetVersion();
+				}
 				accessInfo.m_VirtualResourceIndex =
 					LookupVirtualResourceIndex(resourceNode.m_VirtualResource);
 				accessInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());

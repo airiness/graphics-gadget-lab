@@ -6679,6 +6679,45 @@ namespace gglab
 				snapshotPool.Tick();
 			}
 
+#if defined(NDEBUG)
+			// Debug asserts on the violated live-handle invariant. Release must still
+			// retain the failed barrier attempt, not hide it or reuse old resolution evidence.
+			{
+				RecordingDevice barrierDevice;
+				TransientResourcePool barrierPool(&barrierDevice);
+				RecordingComputeCommandContext commands;
+				RenderGraph barrierGraph({ .m_Device = &barrierDevice, .m_TransientResourcePool = &barrierPool });
+				RGTextureId imported;
+				barrierGraph.AddPass<TextureStorageAccessPassData>("Snapshot.InvalidBarrier", RGPassEncoderType::Compute,
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+					{
+						imported = builder.ImportTexture("Snapshot.Imported", RHITextureHandle{ 91, 1 },
+							graphTextureDesc, RGTextureAccess::Sample, RGContentValidity::Defined);
+						builder.WriteInPlace(imported, RGTextureAccess::StorageWrite);
+						data.m_Texture = imported;
+					});
+				context.Check(barrierGraph.Compile(), "Failed barrier resolution fixture compiles");
+				barrierGraph.EnableExecutionRecord();
+				RGExecuteContext execute({ .m_DirectComputeCommandContext = &commands });
+				barrierGraph.Execute(execute);
+				auto first = barrierGraph.TakeExecutionRecord();
+				context.Check(first && first->m_Barriers.size() == 2 &&
+					std::ranges::all_of(first->m_Barriers, [](const auto& b) { return b.m_Barrier.m_HasPhysicalHandle; }),
+					"Live imported barriers resolve before the failed-resolution retry");
+				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(
+					barrierGraph.GetExecutionPlan()->GetResources()[0].m_Resource);
+				resource->m_ImportedHandle = {};
+				commands.m_TextureBarrierCount = 0;
+				barrierGraph.EnableExecutionRecord();
+				barrierGraph.Execute(execute);
+				auto failed = barrierGraph.TakeExecutionRecord();
+				context.Check(failed && failed->m_Recorded && failed->m_Barriers.size() == 2 &&
+					commands.m_TextureBarrierCount == 0 &&
+					std::ranges::none_of(failed->m_Barriers, [](const auto& b) { return b.m_Barrier.m_HasPhysicalHandle; }),
+					"Release records unresolved pre/post barriers without stale physical handles or GPU commands");
+			}
+#endif
+
 			RecordingDevice reuseDevice;
 			TransientResourcePool reusePool(&reuseDevice);
 			TransientResourcePoolSnapshot emptyPoolSnapshot;

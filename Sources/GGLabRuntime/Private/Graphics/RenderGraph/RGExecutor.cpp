@@ -113,6 +113,10 @@ namespace gglab
 						!NeedsRHIResourceTransition(intent.m_Before, intent.m_After)),
 					"RenderGraph UAV barriers require a stable UAV state.");
 				const auto& resource = plan.GetResources()[intent.m_Resource.Value()];
+				// Resolution evidence belongs to this execution, including failed resolution.
+				intent.m_HasResolvedPhysicalHandle = false;
+				intent.m_ResolvedPhysicalHandleIndex = 0;
+				intent.m_ResolvedPhysicalHandleGeneration = 0;
 				if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					const RHITextureHandle handle = ResolveTextureHandle(resource);
@@ -144,7 +148,7 @@ namespace gglab
 						bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
 					}
 				}
-				if (record && intent.m_HasResolvedPhysicalHandle)
+				if (record)
 				{
 					record->m_Barriers.push_back({ passIndex, post, {
 						.m_VirtualResourceIndex = intent.m_Resource.Value(),
@@ -152,7 +156,7 @@ namespace gglab
 						.m_ResourceType = resource.m_ResourceType,
 						.m_Kind = intent.m_Kind,
 						.m_Reason = intent.m_Reason,
-						.m_HasPhysicalHandle = true,
+						.m_HasPhysicalHandle = intent.m_HasResolvedPhysicalHandle,
 						.m_PhysicalHandleIndex = intent.m_ResolvedPhysicalHandleIndex,
 						.m_PhysicalHandleGeneration = intent.m_ResolvedPhysicalHandleGeneration,
 						.m_Before = intent.m_Before,

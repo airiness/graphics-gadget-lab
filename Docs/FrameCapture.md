@@ -62,14 +62,17 @@ panel).
   The adapter does not create directories or open files with their associated
   applications. Missing/inaccessible directories or Shell errors appear next to
   the button without changing the capture's completed status. Acceptance by the
-  Shell does not guarantee that an Explorer window has appeared.
+  Shell does not guarantee that an Explorer window has appeared. The explicit
+  open call is synchronous on the frame thread; slow/network paths can stall a frame.
 
 The Windows adapter and `Shell32.lib` dependency belong only to WinApp;
 AppRuntime/Runtime still handle scheduling, fenced completion and publication
 without a Shell dependency. Hidden launches have no folder-opening callback.
 Graph export does not add GPU observation nodes or queries; per-pass timing,
 build identity and shader artifact identity retain their explicit unavailable
-status. Disable observation tools for performance measurements.
+status. Disable observation tools for performance measurements. Interactive
+exports include DevTools passes, unlike hidden sessions with DevTools disabled;
+compare `frame.developmentTools` before comparing graph structure.
 
 ## One-shot capture
 
@@ -144,10 +147,16 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
   dependencies, accesses with resource versions, barrier intents, acquire/release
   lists, resource descriptors (including mip/slice counts and buffer size/stride),
   resource nodes, dependency edges and compile diagnostics. `duplicatePassNames`
-  reports repeated names, including culled declarations.
+  reports repeated names, including culled declarations. `occurrence` counts equal
+  names in declaration order, including culled passes, not in summary execution
+  order. Culling therefore cannot renumber a pass; T2/T3 addressing uses the same
+  definition. Full accesses include `writtenResourceNodeIndex`/`writtenVersion`
+  (null for read-only accesses). ReadWrite reads the incoming version and writes
+  the new version whose writer is that pass.
 - `execution` is a separate record. It contains executed pass indices, actual
   allocations with pool slot and physical handle index/generation, and resolved
-  pre/post barriers keyed by pass index. Allocation evidence is copied at
+  pre/post barriers keyed by pass index. A failed handle resolution is retained
+  with `physical: null`, rather than silently disappearing. Allocation evidence is copied at
   `Devirtualize`, before `Release` clears the live allocation. Imported resources
   have no transient pool slot. Pool slots describe actual pool reuse, not a claim
   of native heap aliasing.
@@ -174,11 +183,25 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
   inactive frames do not build a graph snapshot. Exports still add CPU/file work;
   performance runs must keep observation tools off.
 
-Stable enum names are shared by the JSON serializer and the existing DevTools
-Render Graph inspector. Bit fields also retain their numeric values; a null
-subresource range means all subresources, and `4294967295` in a range count means
+Stable enum identifiers and UI labels share one table, but JSON uses only the
+identifiers (for example `WriterToReader`, `DepthStencilWrite`, `CopySource`,
+`AccessTransition` and `Uav`). Editing a UI label does not change schema v1.
+Bit fields retain numeric values and join identifiers with ` | `; a null
+subresource range means all subresources, and `"remaining"` in a range count means
 Remaining. Physical handles are session-local evidence, not persisted asset ids.
-Sequence `graphFrames` scheduling is not implemented in T1.
+T1 uses the TD12 unavailable GPU-timing fallback; identity-preserving per-pass
+timing and sequence `graphFrames` scheduling are deferred. Existing sequence
+`gpuTiming` is independent and remains available for measurement runs.
+
+Validate published exports from **both** backend runs against the schema, not just
+with a JSON parser (Python with `jsonschema` installed):
+
+```powershell
+python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium-dx12/Captures Build/Sessions/atrium-vulkan/Captures
+```
+
+The validator checks full/summary schema contracts and version/writer consistency.
+Headless snapshot tests alone do not establish dual-backend GPU correctness.
 
 ## Capture settings
 

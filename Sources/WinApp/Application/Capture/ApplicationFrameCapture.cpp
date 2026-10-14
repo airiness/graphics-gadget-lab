@@ -140,8 +140,7 @@ namespace gglab
 
 	std::string ApplicationFrameCapture::GetPathText(const std::filesystem::path& path) noexcept
 	{
-		const std::u8string text = path.u8string();
-		return std::string(text.begin(), text.end());
+		return GetFrameCapturePathText(path);
 	}
 
 	bool ApplicationFrameCapture::CanOpenOutputFolder(

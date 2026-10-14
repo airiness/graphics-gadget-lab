@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -154,6 +155,9 @@ namespace gglab
 		std::string m_DiagnosticTap;
 		std::string m_CapturedAtUtc;
 	};
+
+	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.
+	[[nodiscard]] std::string GetFrameCapturePathText(const std::filesystem::path& path) noexcept;
 
 	// Serializes the metadata as schema-versioned UTF-8 JSON.
 	[[nodiscard]] std::string SerializeFrameCaptureMetadata(

@@ -345,7 +345,9 @@ namespace gglab
 		{
 			ImGui::TextColored(GetGateColor(completed ? FrameCaptureGateState::Ready
 				: FrameCaptureGateState::Failed),
-				"Capture #%llu %s", static_cast<unsigned long long>(result.m_RequestId),
+				"%s #%llu %s", result.m_Metadata &&
+					result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph ? "Graph export" : "Capture",
+				static_cast<unsigned long long>(result.m_RequestId),
 				GetStatusName(result.m_Status).data());
 			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
 			ImGui::TextUnformatted(completed ? ApplicationFrameCapture::GetPathText(

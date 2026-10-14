@@ -44,6 +44,7 @@ namespace gglab
 			uint64_t frameSerial = 0) noexcept override;
 		void ConsumeResults(std::vector<FrameCaptureResult>& outResults) noexcept override;
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept override;
+		[[nodiscard]] FrameCaptureAvailability GetRequestAvailability() const noexcept override;
 		[[nodiscard]] FrameCaptureAvailability GetAvailability(
 			RHIFormat format, uint32_t width, uint32_t height) const noexcept override;
 
@@ -56,7 +57,7 @@ namespace gglab
 
 		// Reuses request admission and fenced completion without adding graph nodes.
 		void BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept;
-		void EndGraphRecording(uint64_t frameSerial, const RenderGraph& graph) noexcept;
+		void EndGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept;
 
 		// The frame's GPU work, including its tap copies, was submitted.
 		void OnFrameSubmitted(uint64_t frameSerial, const RHIFencePoint& fence) noexcept;
@@ -90,6 +91,7 @@ namespace gglab
 			std::vector<QueuedRequest> m_Requests;
 			RHIBufferOwner m_Buffer;
 			std::shared_ptr<RGSnapshot> m_Graph;
+			std::string m_AdapterCompatibilityIdentity;
 			RHITextureCopyFootprint m_Footprint{};
 			RHIFencePoint m_Fence{};
 			bool m_Submitted = false;

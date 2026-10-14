@@ -7,6 +7,7 @@
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Diagnostics/RenderGraphEnumText.h"
 
 #include <nlohmann/json.hpp>
 
@@ -640,6 +641,7 @@ namespace gglab
 			GGLAB_UNUSED(countLimited.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight));
 			context.Check(countLimited.RequestCapture(FrameCaptureSource::Scene) == 0 &&
 				countLimited.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight) == 0 &&
+				countLimited.GetRequestAvailability() == FrameCaptureAvailability::Busy &&
 				Consume(countLimited).empty() && countLimited.GetUnfinishedRequestCount() == 3,
 				"Full request slots reject scene and diagnostic admission without allocating a result or id");
 			const auto single = countLimited.BindTap(5, FrameCaptureSource::Scene, target);
@@ -704,7 +706,8 @@ namespace gglab
 			context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Graph &&
 				results[0].m_Graph->m_Execution.m_Recorded && !results[0].m_Image &&
 				results[0].m_FrameSerial == 7 && results[0].m_SubmissionFenceValue == 9 &&
-				results[0].m_SubmissionFenceIndex == 1 && Consume(service).empty(),
+				results[0].m_SubmissionFenceIndex == 1 &&
+				results[0].m_AdapterCompatibilityIdentity == "GGLab.FrameCaptureTestDevice" && Consume(service).empty(),
 				"Graph results preserve frame and fence identity and publish exactly once");
 			const uint64_t aborted = service.RequestCapture(FrameCaptureSource::RenderGraph, 8);
 			const uint64_t flexible = service.RequestCapture(FrameCaptureSource::RenderGraph);
@@ -740,6 +743,173 @@ namespace gglab
 				"Graph JSON separates compile/execution and never guesses merged duplicate timings");
 		}
 
+		template <typename E>
+		void CheckGraphEnumIds(SelfTestContext& context, std::string_view expected) noexcept
+		{
+			std::string ids;
+			for (const auto& entry : diagnostics::RGEnumTextTraits<E>::Entries)
+			{
+				if (!ids.empty()) ids += ',';
+				ids += diagnostics::RGEnumId(entry.m_Value);
+			}
+			context.Check(ids == expected, "Graph schema enum identifiers are pinned independently of UI labels");
+		}
+
+		void RunGraphEnumTests(SelfTestContext& context) noexcept
+		{
+			CheckGraphEnumIds<RGPassEncoderType>(context, "Graphics,Compute,Copy");
+			CheckGraphEnumIds<RGResourceType>(context, "Texture,Buffer");
+			CheckGraphEnumIds<RGOrderingRequirement>(context, "Ordered,Unordered");
+			CheckGraphEnumIds<RGDependencyAccess>(context, "Read,Write,ReadWrite");
+			CheckGraphEnumIds<RGDependencyReason>(context,
+				"WriterToReader,PreviousWriterToWriter,PreviousReaderToWriter,ExportWriterToExport,ExportReaderToExport");
+			CheckGraphEnumIds<RGBarrierKind>(context, "Transition,Uav");
+			CheckGraphEnumIds<RGBarrierReason>(context, "AccessTransition,OrderedStorageHazard,FinalStateTransition");
+			CheckGraphEnumIds<RGTextureAccess>(context,
+				"None,Sample,RenderTarget,DepthStencilWrite,DepthStencilRead,StorageRead,StorageWrite,StorageReadWrite,CopySource,CopyDest,Present");
+			CheckGraphEnumIds<RGBufferAccess>(context,
+				"None,Vertex,Index,Constant,StructuredRead,StorageRead,StorageWrite,StorageReadWrite,CopySource,CopyDest,IndirectArgument");
+			CheckGraphEnumIds<RHITextureUsage>(context,
+				"Sampled,RenderTarget,DepthStencil,UnorderedAccess,CopySource,CopyDest,Present");
+			CheckGraphEnumIds<RHIBufferUsage>(context,
+				"Vertex,Index,Constant,Structured,UnorderedAccess,IndirectArgument,CopySource,CopyDest");
+			CheckGraphEnumIds<RHIStage>(context,
+				"DrawIndirect,IndexInput,VertexShader,PixelShader,ComputeShader,RenderTarget,DepthStencil,Copy,Resolve,Present");
+			CheckGraphEnumIds<RHITextureAspect>(context, "Color,Depth,Stencil");
+			CheckGraphEnumIds<RHIAccess>(context,
+				"Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,CopySource,CopyDest,VertexBuffer,IndexBuffer,ConstantBuffer,IndirectArgument,Present");
+			CheckGraphEnumIds<RHILayout>(context,
+				"Unknown,Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,CopySource,CopyDest,Present,Undefined");
+			context.Check(diagnostics::RGFlagsId(RHIStage::VertexShader | RHIStage::PixelShader) ==
+				"VertexShader | PixelShader" && diagnostics::RGFlagsId(RHIStage::None) == "None",
+				"Graph flag identifiers retain their schema separator and zero representation");
+		}
+
+		void RunGraphVersionTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			RGTextureId texture;
+			RGBufferId buffer;
+			const RHISubresourceRange remaining{};
+			graph.AddPass<Data>("Repeated", [](RenderGraph::RGBuilder&, Data&) {});
+			graph.AddPass<Data>("Initialize", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					texture = builder.CreateTexture("SceneColor", { .m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Extent = { 4, 4, 1 } });
+					buffer = builder.CreateBuffer("Structured", { .m_SizeInBytes = 65536, .m_StrideInBytes = 32 });
+					builder.WriteInPlace(texture, RGTextureAccess::RenderTarget);
+					builder.WriteInPlace(buffer, RGBufferAccess::StorageWrite);
+				});
+			for (uint32_t i = 0; i < 2; ++i)
+			{
+				graph.AddPass<Data>("Repeated", [&](RenderGraph::RGBuilder& builder, Data&)
+					{
+						builder.ReadWriteInPlace(texture, RGTextureAccess::RenderTarget, remaining);
+						builder.ReadWriteInPlace(buffer, RGBufferAccess::StorageReadWrite);
+					});
+			}
+			graph.AddPass<Data>("Consume", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					GGLAB_UNUSED(builder.Read(texture, RGTextureAccess::Sample));
+					GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead));
+					builder.SideEffect();
+				});
+			context.Check(graph.Compile(), "ReadWrite graph discovery fixture compiles");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			using Json = nlohmann::json;
+			const Json full = Json::parse(SerializeRenderGraphSnapshot(snapshot));
+			const Json summary = Json::parse(SerializeRenderGraphSnapshot(snapshot, true));
+			context.Check(full["compile"]["passes"][0]["culled"] == true &&
+				summary["compile"]["passes"].size() == 4 &&
+				summary["compile"]["passes"][1]["occurrence"] == 2 &&
+				summary["compile"]["passes"][2]["occurrence"] == 3,
+				"Summary occurrences retain declaration order including culled passes");
+			for (const auto& pass : summary["compile"]["passes"])
+			{
+				const uint32_t index = pass["index"];
+				for (const auto& write : pass["writes"])
+				{
+					const auto& node = full["compile"]["versions"][write["resourceNodeIndex"].get<uint32_t>()];
+					context.Check(node["writer"] == index && node["version"] == write["version"],
+						"Every summary write names the version whose writer is that pass");
+				}
+				for (size_t i = 0; i < pass["reads"].size(); ++i)
+				{
+					const auto& access = full["compile"]["passes"][index]["accesses"][i];
+					context.Check(pass["reads"][i]["version"] == access["version"] &&
+						pass["reads"][i]["resourceNodeIndex"] == access["resourceNodeIndex"],
+						"Summary reads preserve the incoming version");
+					if (access["dependencyAccess"] == "ReadWrite")
+					{
+						context.Check(access["writtenVersion"].get<uint32_t>() == access["version"].get<uint32_t>() + 1 &&
+							access["writtenVersion"] == pass["writes"][i]["version"] &&
+							access["writtenResourceNodeIndex"] == pass["writes"][i]["resourceNodeIndex"],
+							"Full ReadWrite accesses distinguish consumed and produced versions");
+					}
+					else context.Check(access["writtenVersion"].is_null() && access["writtenResourceNodeIndex"].is_null(),
+						"Read-only accesses have no written version");
+				}
+			}
+			const auto& range = full["compile"]["passes"][2]["accesses"][0]["subresources"];
+			context.Check(range["mipCount"] == "remaining" && range["sliceCount"] == "remaining" &&
+				full["compile"]["resources"][1]["buffer"]["sizeBytes"] == 65536 &&
+				full["compile"]["resources"][1]["buffer"]["strideBytes"] == 32 &&
+				full["compile"]["passes"][2]["accesses"][0]["access"] == "RenderTarget" &&
+				full["compile"]["dependencyEdges"][0]["reason"] == "WriterToReader",
+				"Full JSON preserves buffer descriptors, stable enum ids and readable remaining counts");
+
+			RenderGraph invalid({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			invalid.AddPass<Data>("ReadUndefined", [](RenderGraph::RGBuilder& builder, Data&)
+				{
+					const auto input = builder.CreateBuffer("Undefined");
+					GGLAB_UNUSED(builder.Read(input, RGBufferAccess::StructuredRead));
+					builder.SideEffect();
+				});
+			context.Check(!invalid.Compile(), "Undefined-read graph fixture fails compilation");
+			BuildRenderGraphSnapshot(invalid, snapshot);
+			const Json failed = Json::parse(SerializeRenderGraphSnapshot(snapshot));
+			const auto& diagnostic = failed["compile"]["diagnostics"][0];
+			context.Check(diagnostic["severity"] == "Error" && diagnostic["code"] == "UndefinedContentRead" &&
+				diagnostic["passIndex"] == 0 && diagnostic["resourceIndex"] == 0 &&
+				!diagnostic["message"].get<std::string>().empty() && failed["execution"]["status"] == "unavailable",
+				"Generic compile-only JSON retains diagnostics without claiming execution");
+		}
+
+		void RunGraphRequestCapacityTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			FrameCaptureService service(device, { .m_MaxRequests = 2 });
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			context.Check(graph.Compile(), "Graph capacity fixture compiles");
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::RenderGraph, 1));
+			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::RenderGraph, 1));
+			context.Check(service.GetRequestAvailability() == FrameCaptureAvailability::Busy,
+				"Graph admission uses the configured request limit rather than 64");
+			service.BeginGraphRecording(1, graph);
+			RGExecuteContext execute({});
+			graph.Execute(execute);
+			service.EndGraphRecording(1, graph);
+			context.Check(!graph.TakeExecutionRecord(), "Ending graph recording transfers the execution record exactly once");
+			service.OnFrameSubmitted(1, MakeFence(1));
+			device.m_CompletedFenceValue = 1;
+			service.CollectCompleted();
+			context.Check(service.GetUnfinishedRequestCount() == 0 &&
+				service.GetRequestAvailability() == FrameCaptureAvailability::Busy &&
+				service.RequestCapture(FrameCaptureSource::RenderGraph) == 0,
+				"Unconsumed graph results continue to occupy request admission slots");
+			context.Check(Consume(service).size() == 2 &&
+				service.GetRequestAvailability() == FrameCaptureAvailability::Available,
+				"Consuming graph results restores request-only capacity");
+			service.Shutdown();
+			context.Check(service.GetRequestAvailability() == FrameCaptureAvailability::Finalized,
+				"Request-only availability distinguishes a finalized service");
+		}
+
 		void RunFixedTimeStepTests(SelfTestContext& context) noexcept
 		{
 			Time time;
@@ -760,6 +930,9 @@ namespace gglab
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
 		RunGraphCaptureTests(context);
+		RunGraphEnumTests(context);
+		RunGraphVersionTests(context);
+		RunGraphRequestCapacityTests(context);
 		RunFixedTimeStepTests(context);
 		RunFootprintTests(context);
 		RunConversionTests(context);

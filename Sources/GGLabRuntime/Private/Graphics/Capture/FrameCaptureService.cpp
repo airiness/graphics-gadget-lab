@@ -131,6 +131,13 @@ namespace gglab
 		return static_cast<uint32_t>(count);
 	}
 
+	FrameCaptureAvailability FrameCaptureService::GetRequestAvailability() const noexcept
+	{
+		if (m_IsShutdown) return FrameCaptureAvailability::Finalized;
+		return GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests
+			? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
+	}
+
 	FrameCaptureAvailability FrameCaptureService::GetAvailability(
 		RHIFormat format, uint32_t width, uint32_t height) const noexcept
 	{
@@ -280,20 +287,21 @@ namespace gglab
 		if (tap.m_Requests.empty()) return;
 		tap.m_Graph = std::make_shared<RGSnapshot>();
 		BuildRenderGraphSnapshot(graph, *tap.m_Graph);
-		tap.m_Graph->m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
+		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		graph.EnableExecutionRecord();
 		m_Taps.push_back(std::move(tap));
 	}
 
-	void FrameCaptureService::EndGraphRecording(uint64_t frameSerial, const RenderGraph& graph) noexcept
+	void FrameCaptureService::EndGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
 		for (Tap& tap : m_Taps)
 		{
 			if (tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted)
 			{
-				RGSnapshot executed;
-				BuildRenderGraphSnapshot(graph, executed);
-				tap.m_Graph->m_Execution = std::move(executed.m_Execution);
+				if (auto record = graph.TakeExecutionRecord())
+				{
+					tap.m_Graph->m_Execution = std::move(*record);
+				}
 			}
 		}
 	}
@@ -460,6 +468,7 @@ namespace gglab
 					.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
 					.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(),
 					.m_SubmissionFenceValue = tap.m_Fence.m_Value,
+					.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity,
 				});
 			}
 			tap.m_Requests.clear();

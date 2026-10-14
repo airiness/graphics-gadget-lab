@@ -86,6 +86,10 @@ namespace gglab
 			{
 				return m_PendingDiagnosticTap;
 			}
+			FrameCaptureAvailability GetRequestAvailability() const noexcept override
+			{
+				return m_RequestAvailability;
+			}
 			FrameCaptureAvailability GetAvailability(RHIFormat format, uint32_t width,
 				uint32_t height) const noexcept override
 			{
@@ -120,6 +124,7 @@ namespace gglab
 					.m_SubmissionFenceIndex = 3,
 					.m_SubmissionFenceGeneration = 1,
 					.m_SubmissionFenceValue = 19,
+					.m_AdapterCompatibilityIdentity = "Capture.TestAdapter",
 					});
 			}
 			void Fail(uint64_t id, std::string failure) noexcept
@@ -134,6 +139,7 @@ namespace gglab
 			std::vector<Issued> m_Issued;
 			std::optional<PostProcessDebugTap> m_PendingDiagnosticTap;
 			FrameCaptureAvailability m_Availability = FrameCaptureAvailability::Available;
+			FrameCaptureAvailability m_RequestAvailability = FrameCaptureAvailability::Available;
 			bool m_RejectRequest = false;
 			mutable RHIFormat m_QueriedFormat = RHIFormat::Unknown;
 			mutable std::array<uint32_t, 2> m_QueriedExtent{};
@@ -2130,10 +2136,68 @@ namespace gglab
 				context.Check(full["schema"] == "gglab.render-graph" && full["frameSerial"] == 17 &&
 					full["frame"]["frame"]["serial"] == 17 && full["submission"]["fenceValue"] == 19 &&
 					full["submission"]["completed"] == true && full["observation"]["graph"] == true &&
+					full["frame"]["adapterDriverIdentity"] == "Capture.TestAdapter" &&
 					summary["mode"] == "summary" && !summary.contains("execution"),
 					"Graph JSON embeds the same frame block and completed submission identity in both modes");
 			}
 			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunGraphFailureTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("graph-failures");
+			{
+				FakeCaptureControl control;
+				control.m_RequestAvailability = FrameCaptureAvailability::Busy;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph }));
+				coordinator.BeginFrame(MakeFrameState(true));
+				const auto results = Consume(coordinator);
+				context.Check(coordinator.GetCaptureAvailability(FrameCaptureSource::RenderGraph) ==
+					FrameCaptureAvailability::Busy && control.m_Issued.empty() && results.size() == 1 &&
+					results[0].m_Status == FrameCaptureRequestStatus::Failed,
+					"Graph coordination respects Runtime request-only admission before issuing");
+				coordinator.FinalizeAfterRenderHost();
+			}
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph,
+					.m_Note = std::string(1, '\xFF') }));
+				coordinator.BeginFrame(MakeFrameState(true));
+				control.Complete(control.m_Issued[0].m_Id);
+				coordinator.Update();
+				const auto results = Consume(coordinator);
+				std::error_code error;
+				context.Check(results.size() == 1 && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+					results[0].m_Failure.find("Serializing the graph export failed") != std::string::npos &&
+					!std::filesystem::exists(directory.GetPath(), error),
+					"Invalid UTF-8 graph metadata fails safely before writing or publishing files");
+				coordinator.FinalizeAfterRenderHost();
+			}
+			std::error_code error;
+			std::filesystem::create_directories(directory.GetPath(), error);
+			const auto blocker = directory.GetPath() / std::filesystem::path(u8"\u4e2d\u6587 \U0001F9EA blocker");
+			{ std::ofstream file(blocker, std::ios::binary); file << "not a directory"; }
+			for (const auto source : { FrameCaptureSource::Scene, FrameCaptureSource::RenderGraph })
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = blocker / "output", .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true });
+				GGLAB_UNUSED(coordinator.Submit({ .m_Source = source }));
+				coordinator.BeginFrame(MakeFrameState(true));
+				control.Complete(control.m_Issued[0].m_Id);
+				coordinator.Update();
+				const auto results = Consume(coordinator);
+				context.Check(results.size() == 1 && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+					results[0].m_Failure.find(GetFrameCapturePathText(blocker)) != std::string::npos &&
+					results[0].m_MetadataPath.empty() && results[0].m_ImagePath.empty(),
+					"Image and graph write failures report Unicode paths as UTF-8 without code-page exceptions");
+				coordinator.FinalizeAfterRenderHost();
+			}
 		}
 
 		void RunFrameSequenceFailureTests(SelfTestContext& context) noexcept
@@ -2205,6 +2269,7 @@ namespace gglab
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
 		RunGraphWritingTests(context);
+		RunGraphFailureTests(context);
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
 		RunHistoryContinuitySettlingTests(context);

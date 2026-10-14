@@ -31,6 +31,9 @@ namespace gglab
 		// matching taps or wait before fixing metadata for a different tap.
 		[[nodiscard]] virtual std::optional<PostProcessDebugTap> GetPendingDiagnosticTap()
 			const noexcept = 0;
+		// Request-only admission, including unconsumed results and the service's
+		// configured limit. Graph captures do not need an image payload reservation.
+		[[nodiscard]] virtual FrameCaptureAvailability GetRequestAvailability() const noexcept = 0;
 		// Checks request and payload capacity without reserving it. The tap rechecks
 		// its actual target before allocation; capacity exhaustion fails that frame's
 		// request rather than silently capturing a later frame. Retained CPU images

@@ -126,6 +126,8 @@ namespace gglab
 		struct Access
 		{
 			RGResourceNodeIndex m_ResourceNodeIndex{};
+			// ReadWrite consumes the old node and produces a distinct written version.
+			RGResourceNodeIndex m_WrittenResourceNodeIndex{};
 			uint64_t m_AccessValue = 0;
 			RHIStage m_Stages = RHIStage::None;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
@@ -412,6 +414,7 @@ namespace gglab
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		// Opt-in CPU-only recording; does not change graph compilation or GPU work.
 		void EnableExecutionRecord() noexcept;
+		[[nodiscard]] std::unique_ptr<RGSnapshotExecutionRecord> TakeExecutionRecord() noexcept;
 		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
 		[[nodiscard]] const RGExecutionPlan* GetExecutionPlan() const noexcept
@@ -949,6 +952,7 @@ namespace gglab
 		access.m_Stages = stages;
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Write;
+		access.m_WrittenResourceNodeIndex = slot.m_ResourceNodeIndex;
 		access.m_Ordering = ordering;
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 		{
@@ -1033,6 +1037,7 @@ namespace gglab
 
 		passNode.m_Accesses.push_back({
 			.m_ResourceNodeIndex = previousNodeIndex,
+			.m_WrittenResourceNodeIndex = slot.m_ResourceNodeIndex,
 			.m_AccessValue = static_cast<uint64_t>(resourceAccess),
 			.m_Stages = stages,
 			.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,

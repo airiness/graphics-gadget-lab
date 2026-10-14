@@ -17,6 +17,8 @@ namespace gglab
 		uint32_t m_ResourceNodeIndex = 0;
 		uint32_t m_ResourceSlot = 0;
 		uint16_t m_ResourceVersion = 0;
+		std::optional<uint32_t> m_WrittenResourceNodeIndex;
+		std::optional<uint16_t> m_WrittenResourceVersion;
 		uint32_t m_VirtualResourceIndex = 0;
 		std::string m_ResourceName;
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
@@ -147,8 +149,6 @@ namespace gglab
 		std::vector<RGCompileDiagnostic> m_CompileDiagnostics;
 		std::vector<std::string> m_DuplicatePassNames;
 		RGSnapshotExecutionRecord m_Execution;
-		// Capturing service supplies the adapter/driver identity; generic builders leave it empty.
-		std::string m_AdapterCompatibilityIdentity;
 	};
 
 	// Versioned graph data; AppRuntime embeds its common frame metadata and submission identity.

@@ -214,6 +214,14 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Validate render-graph schema contracts
+        shell: pwsh
+        run: |
+          python -m pip install jsonschema==4.25.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Scripts/ValidateRenderGraphExports.py --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build GGLabFoundation standalone
         if: matrix.pch == 'enabled'
         shell: pwsh

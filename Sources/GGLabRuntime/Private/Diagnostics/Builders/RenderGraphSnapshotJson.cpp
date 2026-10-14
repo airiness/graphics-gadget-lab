@@ -10,24 +10,28 @@ namespace gglab
 	namespace
 	{
 		using Json = nlohmann::ordered_json;
-		using diagnostics::RGEnumName;
-		using diagnostics::RGFlagsName;
+		using diagnostics::RGEnumId;
+		using diagnostics::RGFlagsId;
 
 		Json State(const RHIResourceState& state)
 		{
-			return { {"stages", RGFlagsName(state.m_Stages)},
+			return { {"stages", RGFlagsId(state.m_Stages)},
 				{"stageBits", static_cast<uint64_t>(state.m_Stages)},
-				{"access", RGFlagsName(state.m_Access)},
+				{"access", RGFlagsId(state.m_Access)},
 				{"accessBits", static_cast<uint64_t>(state.m_Access)},
-				{"layout", RGEnumName(state.m_Layout)} };
+				{"layout", RGEnumId(state.m_Layout)} };
 		}
 
 		Json Subresources(const std::optional<RHISubresourceRange>& range)
 		{
 			if (!range) return nullptr;
-			return { {"baseMip", range->m_BaseMip}, {"mipCount", range->m_MipCount},
-				{"baseSlice", range->m_BaseArraySlice}, {"sliceCount", range->m_ArraySliceCount},
-				{"aspects", RGFlagsName(range->m_Aspects)} };
+			const auto count = [](uint32_t value)
+				{
+					return value == RHISubresourceRange::Remaining ? Json("remaining") : Json(value);
+				};
+			return { {"baseMip", range->m_BaseMip}, {"mipCount", count(range->m_MipCount)},
+				{"baseSlice", range->m_BaseArraySlice}, {"sliceCount", count(range->m_ArraySliceCount)},
+				{"aspects", RGFlagsId(range->m_Aspects)} };
 		}
 
 		Json Physical(bool valid, uint32_t index, uint32_t generation)
@@ -38,8 +42,8 @@ namespace gglab
 		Json Barrier(const RGSnapshotBarrierInfo& barrier, bool resolved)
 		{
 			Json result = { {"resourceIndex", barrier.m_VirtualResourceIndex},
-				{"resource", barrier.m_ResourceName}, {"type", RGEnumName(barrier.m_ResourceType)},
-				{"kind", RGEnumName(barrier.m_Kind)}, {"reason", RGEnumName(barrier.m_Reason)},
+				{"resource", barrier.m_ResourceName}, {"type", RGEnumId(barrier.m_ResourceType)},
+				{"kind", RGEnumId(barrier.m_Kind)}, {"reason", RGEnumId(barrier.m_Reason)},
 				{"before", State(barrier.m_Before)}, {"after", State(barrier.m_After)},
 				{"subresources", Subresources(barrier.m_Subresources)} };
 			if (resolved) result["physical"] = Physical(barrier.m_HasPhysicalHandle,
@@ -58,14 +62,18 @@ namespace gglab
 		{
 			return { {"resourceNodeIndex", access.m_ResourceNodeIndex},
 				{"resourceSlot", access.m_ResourceSlot}, {"version", access.m_ResourceVersion},
+				{"writtenResourceNodeIndex", access.m_WrittenResourceNodeIndex
+					? Json(*access.m_WrittenResourceNodeIndex) : Json(nullptr)},
+				{"writtenVersion", access.m_WrittenResourceVersion
+					? Json(*access.m_WrittenResourceVersion) : Json(nullptr)},
 				{"resourceIndex", access.m_VirtualResourceIndex}, {"resource", access.m_ResourceName},
-				{"type", RGEnumName(access.m_ResourceType)},
-				{"dependencyAccess", RGEnumName(access.m_DependencyAccess)},
-				{"ordering", RGEnumName(access.m_Ordering)},
+				{"type", RGEnumId(access.m_ResourceType)},
+				{"dependencyAccess", RGEnumId(access.m_DependencyAccess)},
+				{"ordering", RGEnumId(access.m_Ordering)},
 				{"access", access.m_ResourceType == RGResourceType::RGTexture
-					? RGEnumName(static_cast<RGTextureAccess>(access.m_AccessValue))
-					: RGEnumName(static_cast<RGBufferAccess>(access.m_AccessValue))},
-				{"accessBits", access.m_AccessValue}, {"stages", RGFlagsName(access.m_Stages)},
+					? RGEnumId(static_cast<RGTextureAccess>(access.m_AccessValue))
+					: RGEnumId(static_cast<RGBufferAccess>(access.m_AccessValue))},
+				{"accessBits", access.m_AccessValue}, {"stages", RGFlagsId(access.m_Stages)},
 				{"stageBits", static_cast<uint64_t>(access.m_Stages)},
 				{"subresources", Subresources(access.m_Subresources)} };
 		}
@@ -128,6 +136,11 @@ namespace gglab
 					}
 					if (access.m_DependencyAccess != RGDependencyAccess::Read)
 					{
+						// ReadWrite reads the incoming node but writes the version produced by this pass.
+						value["version"] = access.m_WrittenResourceVersion
+							? Json(*access.m_WrittenResourceVersion) : Json(nullptr);
+						value["resourceNodeIndex"] = access.m_WrittenResourceNodeIndex
+							? Json(*access.m_WrittenResourceNodeIndex) : Json(nullptr);
 						value["address"] = Address(pass, access, true);
 						item["writes"].push_back(value);
 					}
@@ -135,7 +148,7 @@ namespace gglab
 			}
 			else
 			{
-				item["encoder"] = RGEnumName(pass.m_EncoderType);
+				item["encoder"] = RGEnumId(pass.m_EncoderType);
 				item["sideEffect"] = pass.m_SideEffect;
 				item["culled"] = pass.m_Culled;
 				item["dependencies"] = pass.m_DependencyPassIndices;
@@ -161,12 +174,12 @@ namespace gglab
 			for (const auto& resource : snapshot.m_Resources)
 			{
 				Json item = { {"index", resource.m_Index}, {"name", resource.m_Name},
-					{"type", RGEnumName(resource.m_ResourceType)}, {"imported", resource.m_Imported},
+					{"type", RGEnumId(resource.m_ResourceType)}, {"imported", resource.m_Imported},
 					{"referenceCount", resource.m_RefCount}, {"firstUser", resource.m_FirstUserPassIndex},
 					{"lastUser", resource.m_LastUserPassIndex}, {"usageBits", resource.m_UsageBits},
 					{"usage", resource.m_ResourceType == RGResourceType::RGTexture
-						? RGFlagsName(static_cast<RHITextureUsage>(resource.m_UsageBits))
-						: RGFlagsName(static_cast<RHIBufferUsage>(resource.m_UsageBits))},
+						? RGFlagsId(static_cast<RHITextureUsage>(resource.m_UsageBits))
+						: RGFlagsId(static_cast<RHIBufferUsage>(resource.m_UsageBits))},
 					{"initialState", State(resource.m_InitialBarrierState)},
 					{"finalState", resource.m_HasFinalBarrierState ? State(resource.m_FinalBarrierState) : Json(nullptr)},
 					{"finalSubresources", Subresources(resource.m_FinalBarrierSubresources)},
@@ -187,7 +200,7 @@ namespace gglab
 			{
 				compile["versions"].push_back({ {"index", node.m_Index}, {"resourceSlot", node.m_ResourceSlot},
 					{"version", node.m_ResourceVersion}, {"resourceIndex", node.m_VirtualResourceIndex},
-					{"resource", node.m_ResourceName}, {"type", RGEnumName(node.m_ResourceType)},
+					{"resource", node.m_ResourceName}, {"type", RGEnumId(node.m_ResourceType)},
 					{"writer", node.m_WriterPassIndex}, {"previous", node.m_PreviousResourceNodeIndex},
 					{"readers", node.m_ReaderPassIndices} });
 			}
@@ -196,7 +209,7 @@ namespace gglab
 			{
 				compile["dependencyEdges"].push_back({ {"from", edge.m_FromPassIndex},
 					{"to", edge.m_ToPassIndex}, {"resourceNodeIndex", edge.m_ResourceNodeIndex},
-					{"reason", RGEnumName(edge.m_Reason)} });
+					{"reason", RGEnumId(edge.m_Reason)} });
 			}
 			compile["diagnostics"] = Json::array();
 			for (const auto& diagnostic : snapshot.m_CompileDiagnostics)

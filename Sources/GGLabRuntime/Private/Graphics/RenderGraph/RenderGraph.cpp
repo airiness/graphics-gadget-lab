@@ -74,6 +74,11 @@ namespace gglab
 		m_ExecutionRecord = std::make_unique<RGSnapshotExecutionRecord>();
 	}
 
+	std::unique_ptr<RGSnapshotExecutionRecord> RenderGraph::TakeExecutionRecord() noexcept
+	{
+		return std::move(m_ExecutionRecord);
+	}
+
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
 		GGLAB_ASSERT_MSG(

@@ -41,6 +41,10 @@ namespace gglab
 			}
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t) noexcept override { return 0; }
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override { return std::nullopt; }
+			FrameCaptureAvailability GetRequestAvailability() const noexcept override
+			{
+				return FrameCaptureAvailability::Available;
+			}
 			FrameCaptureAvailability GetAvailability(RHIFormat, uint32_t, uint32_t) const noexcept override
 			{
 				return FrameCaptureAvailability::Available;

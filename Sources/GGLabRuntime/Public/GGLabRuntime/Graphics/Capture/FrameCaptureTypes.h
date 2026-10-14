@@ -73,6 +73,7 @@ namespace gglab
 		uint32_t m_SubmissionFenceIndex = 0;
 		uint32_t m_SubmissionFenceGeneration = 0;
 		uint64_t m_SubmissionFenceValue = 0;
+		std::string m_AdapterCompatibilityIdentity;
 		std::string m_Failure;
 	};
 
