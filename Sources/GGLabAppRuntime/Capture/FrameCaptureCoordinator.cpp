@@ -463,6 +463,13 @@ namespace gglab
 		{
 			return std::nullopt;
 		}
+		// A flexible batch keeps its current camera while earlier images retain
+		// GPU/readback or writer capacity. The actual frame rechecks before issue.
+		if (head->m_Request.m_WaitForCapacity && !head->m_Request.m_Sequence &&
+			GetCaptureAvailability(head->m_Request.m_Source, *m_LastFrameState) == FrameCaptureAvailability::Busy)
+		{
+			return std::nullopt;
+		}
 		return FrameCaptureViewChange{
 			.m_RequestId = head->m_Id,
 			.m_ReferenceViewId = head->m_Request.m_ReferenceViewId,
@@ -662,7 +669,9 @@ namespace gglab
 		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Request.m_Source, state);
 		if (availability != FrameCaptureAvailability::Available)
 		{
-			if (request.m_Source == FrameCaptureSource::ResourceExport && availability == FrameCaptureAvailability::Busy)
+			if (availability == FrameCaptureAvailability::Busy &&
+				(request.m_Source == FrameCaptureSource::ResourceExport ||
+					(request.m_WaitForCapacity && !request.m_Sequence)))
 			{
 				return;
 			}

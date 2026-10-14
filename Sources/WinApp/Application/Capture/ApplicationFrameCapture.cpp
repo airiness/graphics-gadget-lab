@@ -76,6 +76,7 @@ namespace gglab
 		{
 			FrameCaptureRequest request = MakeRequest(m_Settings.m_Source);
 			request.m_ReferenceViewId = viewId;
+			request.m_WaitForCapacity = true;
 			Submit(std::move(request));
 		}
 		return static_cast<uint32_t>(viewIds.size());

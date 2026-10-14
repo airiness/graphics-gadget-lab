@@ -40,6 +40,11 @@ panel).
   metadata sidecar. F9 remains a screenshot hotkey; exporting a graph does not
   change its Source setting. When ImGui owns keyboard input, use the button or
   return focus to the rendered view before pressing F9.
+- **Capture All Views** queues one screenshot per authored reference view, using
+  the selected Source and shared settings. Temporary readback or writer pressure
+  keeps later views pending until capacity is available; views remain in order,
+  and the next camera change waits for capacity. Each screenshot records the
+  frame that actually admits it. The in-flight limits are not a batch-size limit.
 - The **Screenshot**, **Render Graph** and **Resources** tabs share capture
   settings. Source appears only in Screenshot; F9 keeps using that source.
 - **Export Graph** in Render Graph writes the full compile and execution records
@@ -401,9 +406,11 @@ Capture capacity is bounded:
 | Distinct captured images in flight | 8, sharing a 256 MiB raw-image budget |
 
 The byte budget covers GPU readback and CPU image storage, excluding PNG output
-and encoder working memory. An ordinary capture without capacity fails before
-GPU submission. Sequences wait for temporary capacity pressure to clear; an
-unsupported or oversized image fails explicitly.
+and encoder working memory. A single screenshot without capacity fails before
+GPU submission. Capture All Views waits for temporary pressure before applying
+the next view and issuing its capture; sequences wait before advancing their
+requested frame. Unsupported or oversized images fail explicitly. Once a
+capture is issued, its frame is fixed even if the request waited for capacity.
 
 Each issued capture stays bound to its recorded frame and metadata. If that
 frame aborts, fails submission or does not record the requested source, the

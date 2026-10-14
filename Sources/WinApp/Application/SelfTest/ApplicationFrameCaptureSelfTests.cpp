@@ -65,11 +65,15 @@ namespace gglab
 			}
 			FrameCaptureAvailability GetAvailability(RHIFormat, uint32_t, uint32_t) const noexcept override
 			{
-				return FrameCaptureAvailability::Available;
+				return m_Issued.size() >= m_MaxPendingCaptures ? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
 			}
 			uint32_t GetUnfinishedRequestCount() const noexcept override { return 0; }
 			void ConsumeResults(std::vector<FrameCaptureResult>& results) noexcept override
 			{
+				if (m_HoldResults)
+				{
+					return;
+				}
 				for (FrameCaptureResult result : m_Issued)
 				{
 					if (result.m_Source == FrameCaptureSource::ResourceExport)
@@ -126,6 +130,8 @@ namespace gglab
 			std::vector<FrameCaptureResult> m_Issued;
 			std::vector<ExportRequest> m_Exports;
 			bool m_FailResourceExport = false;
+			uint32_t m_MaxPendingCaptures = 8;
+			bool m_HoldResults = false;
 
 		private:
 			uint64_t m_NextId = 100;
@@ -188,6 +194,103 @@ namespace gglab
 		{
 			std::ifstream file(path, std::ios::binary);
 			return nlohmann::json::parse(file, nullptr, false);
+		}
+
+		void RunReferenceViewBatchTests(SelfTestContext& context, const std::filesystem::path& directory,
+			FrameCaptureSource source) noexcept
+		{
+			FakeCaptureControl control;
+			control.m_HoldResults = true;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory,
+				.m_ImageEncoder = &win32::EncodeFrameCapturePng, .m_WriteOnCallingThread = true });
+			ApplicationFrameCapture frontEnd({ .m_Coordinator = &coordinator,
+				.m_DefaultOutputDirectory = directory,
+				.m_ConsumeResults = [&coordinator](std::vector<FrameCaptureRequestResult>& results)
+					{ coordinator.ConsumeResults(results); } });
+			frontEnd.GetSettings().m_Source = source;
+			auto state = MakeFrameState(1);
+			state.m_ReferenceViewIds.clear();
+			constexpr uint32_t ViewCount = 14;
+			for (uint32_t index = 0; index < ViewCount; ++index)
+			{
+				state.m_ReferenceViewIds.push_back(std::format("CAM_Batch{}", index));
+			}
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			context.Check(frontEnd.CaptureReferenceViews() == ViewCount &&
+				frontEnd.GetUnfinishedRequestCount() == ViewCount,
+				"Capture All Views submits fourteen views with the interactive screenshot settings");
+			std::vector<uint64_t> issuedFrames;
+			bool viewsInOrder = true;
+			const auto captureView = [&](uint32_t index)
+				{
+					const auto change = coordinator.GetPendingViewChange();
+					if (!change)
+					{
+						viewsInOrder = false;
+						return;
+					}
+					viewsInOrder = viewsInOrder && change->m_ReferenceViewId == state.m_ReferenceViewIds[index];
+					coordinator.OnReferenceViewApplied(change->m_RequestId, true);
+					++state.m_FrameSerial;
+					++state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
+					state.m_Camera.m_Position = { static_cast<float>(index), 0.0f, 0.0f };
+					issuedFrames.push_back(state.m_FrameSerial);
+					coordinator.BeginFrame(state);
+					coordinator.OnFrameSubmitted();
+				};
+			for (uint32_t index = 0; index < control.m_MaxPendingCaptures; ++index)
+			{
+				captureView(index);
+			}
+			context.Check(viewsInOrder && control.m_Issued.size() == 8 &&
+				!coordinator.GetPendingViewChange() && frontEnd.GetUnfinishedRequestCount() == ViewCount,
+				"The batch reaches eight retained images and keeps the remaining views waiting without a camera cut");
+			for (uint32_t index = 0; index < 2; ++index)
+			{
+				++state.m_FrameSerial;
+				coordinator.BeginFrame(state);
+				coordinator.OnFrameSubmitted();
+				coordinator.Update();
+			}
+			context.Check(frontEnd.Update().empty() && control.m_Issued.size() == 8 &&
+				!coordinator.GetPendingViewChange() && frontEnd.GetUnfinishedRequestCount() == ViewCount,
+				"Repeated Busy frames produce no failed batch results or excess Runtime requests");
+
+			control.m_HoldResults = false;
+			coordinator.Update();
+			std::vector<FrameCaptureRequestResult> completed = frontEnd.Update();
+			for (uint32_t index = 8; index < ViewCount; ++index)
+			{
+				captureView(index);
+				coordinator.Update();
+				const auto results = frontEnd.Update();
+				completed.insert(completed.end(), results.begin(), results.end());
+			}
+			context.Check(viewsInOrder && completed.size() == ViewCount && issuedFrames.size() == ViewCount &&
+				frontEnd.GetUnfinishedRequestCount() == 0 && control.m_Issued.empty(),
+				"All fourteen Scene or Composited views finish after capacity drains");
+			bool matchingFiles = completed.size() == ViewCount && issuedFrames.size() == ViewCount;
+			for (size_t index = 0; matchingFiles && index < completed.size(); ++index)
+			{
+				const auto& result = completed[index];
+				matchingFiles = result.m_Status == FrameCaptureRequestStatus::Completed && result.m_Metadata &&
+					result.m_RequestId == index + 1 && result.m_Metadata->m_Source == source &&
+					result.m_Metadata->m_FrameSerial == issuedFrames[index] &&
+					result.m_Metadata->m_Camera.m_ReferenceViewId == state.m_ReferenceViewIds[index] &&
+					result.m_Metadata->m_Camera.m_Position[0] == static_cast<float>(index) &&
+					std::filesystem::exists(result.m_ImagePath) && std::filesystem::exists(result.m_MetadataPath);
+				if (matchingFiles)
+				{
+					const auto json = ReadJson(result.m_MetadataPath);
+					matchingFiles = !json.is_discarded() && json["frame"]["serial"] == issuedFrames[index] &&
+						json["camera"]["referenceView"] == state.m_ReferenceViewIds[index];
+				}
+			}
+			context.Check(matchingFiles,
+				"Each batch view publishes one PNG and sidecar with its own admitted frame and camera");
+			coordinator.FinalizeAfterRenderHost();
 		}
 	}
 
@@ -571,6 +674,9 @@ namespace gglab
 				"Cancelled or evicted results cannot launch folders and history stays bounded");
 			coordinator.FinalizeAfterRenderHost();
 		}
+
+		RunReferenceViewBatchTests(context, directory / "batch-scene", FrameCaptureSource::Scene);
+		RunReferenceViewBatchTests(context, directory / "batch-composited", FrameCaptureSource::Composited);
 
 		// Invalid inputs are rejected before Shell/COM use, so headless tests do
 		// not create Explorer windows. Successful desktop launch is a manual gate.

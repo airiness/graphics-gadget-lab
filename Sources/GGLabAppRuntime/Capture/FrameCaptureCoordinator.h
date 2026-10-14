@@ -36,6 +36,10 @@ namespace gglab
 		// content before the capture. The view is applied only after every earlier
 		// request was issued, and its camera cut restarts settling.
 		std::string m_ReferenceViewId;
+		// Flexible batches may wait for temporary capacity before applying a view
+		// or issuing a capture. Once issued, the frame is fixed. Exact sequence
+		// frames ignore this option; permanent capacity errors still fail.
+		bool m_WaitForCapacity = false;
 		// Empty selects the coordinator's default output directory.
 		std::filesystem::path m_OutputDirectory;
 		std::string m_Label;

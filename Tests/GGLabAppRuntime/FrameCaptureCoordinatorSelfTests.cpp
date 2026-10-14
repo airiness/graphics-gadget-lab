@@ -966,6 +966,112 @@ namespace gglab
 				"Shutdown finishes every reserved or cancelled request without allocating or writing an image");
 		}
 
+		void RunDeferredCapacityTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-deferred");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
+			const uint64_t viewA = coordinator.Submit({ .m_Timing = FrameCaptureTiming::AfterReady,
+				.m_SettleFrames = 1, .m_ReferenceViewId = "CAM_A", .m_WaitForCapacity = true });
+			const uint64_t viewB = coordinator.Submit({ .m_ReferenceViewId = "CAM_B", .m_WaitForCapacity = true });
+			control.m_Availability = FrameCaptureAvailability::Busy;
+			coordinator.BeginFrame(MakeViewFrameState(0));
+			coordinator.OnFrameSubmitted();
+			context.Check(!coordinator.GetPendingViewChange() && control.m_Issued.empty() &&
+				Consume(coordinator).empty() && coordinator.GetUnfinishedRequestCount() == 2,
+				"A flexible view batch waits for Runtime capacity before changing its camera");
+
+			control.m_Availability = FrameCaptureAvailability::Available;
+			const auto change = coordinator.GetPendingViewChange();
+			context.Check(change && change->m_RequestId == viewA,
+				"Capacity release resumes the first waiting view in submission order");
+			coordinator.OnReferenceViewApplied(viewA, true);
+			// Capacity can change between the camera query and the actual frame.
+			control.m_Availability = FrameCaptureAvailability::Busy;
+			coordinator.BeginFrame(MakeViewFrameState(1));
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(MakeViewFrameState(1));
+			coordinator.OnFrameSubmitted();
+			context.Check(control.m_Issued.empty() && !coordinator.GetPendingViewChange() &&
+				Consume(coordinator).empty() && coordinator.GetUnfinishedRequestCount() == 2,
+				"Busy at issue keeps an applied view waiting and prevents the next camera from overtaking it");
+
+			control.m_Availability = FrameCaptureAvailability::Available;
+			auto state = MakeViewFrameState(1);
+			state.m_FrameSerial = 42;
+			state.m_FrameIndex = 42;
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			context.Check(control.m_Issued.size() == 1 && control.m_Issued[0].m_FrameSerial == 42,
+				"A deferred capture binds only the actual frame that admits it");
+			if (!control.m_Issued.empty())
+			{
+				control.Complete(control.m_Issued[0].m_Id);
+			}
+			coordinator.Update();
+			const auto completed = Consume(coordinator);
+			context.Check(completed.size() == 1 && completed[0].m_RequestId == viewA &&
+				completed[0].m_Status == FrameCaptureRequestStatus::Completed && completed[0].m_Metadata &&
+				completed[0].m_Metadata->m_FrameSerial == 42 &&
+				completed[0].m_Metadata->m_Camera.m_ReferenceViewId == "CAM_A",
+				"Deferred view metadata records its admitted frame and camera exactly once");
+			control.m_Availability = FrameCaptureAvailability::Busy;
+			context.Check(coordinator.Cancel(viewB) && coordinator.GetUnfinishedRequestCount() == 0,
+				"A view waiting for capacity remains cancellable without reserving a slot");
+			GGLAB_UNUSED(Consume(coordinator));
+
+			for (const auto availability : { FrameCaptureAvailability::TooLarge,
+				FrameCaptureAvailability::Unsupported, FrameCaptureAvailability::Finalized })
+			{
+				control.m_Availability = availability;
+				const uint64_t id = coordinator.Submit({ .m_WaitForCapacity = true });
+				coordinator.BeginFrame(state);
+				const auto failed = Consume(coordinator);
+				context.Check(failed.size() == 1 && failed[0].m_RequestId == id &&
+					failed[0].m_Status == FrameCaptureRequestStatus::Failed && !failed[0].m_Metadata &&
+					coordinator.GetUnfinishedRequestCount() == 0,
+					"Permanent capture errors fail a flexible batch instead of waiting indefinitely");
+			}
+			control.m_Availability = FrameCaptureAvailability::Busy;
+			const uint64_t exact = coordinator.Submit({ .m_WaitForCapacity = true,
+				.m_Sequence = FrameCaptureSequenceInfo{} });
+			coordinator.BeginFrame(state);
+			const auto exactFailure = Consume(coordinator);
+			context.Check(exactFailure.size() == 1 && exactFailure[0].m_RequestId == exact &&
+				exactFailure[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				coordinator.GetUnfinishedRequestCount() == 0,
+				"An exact sequence frame ignores flexible capacity waiting");
+
+			control.m_Availability = FrameCaptureAvailability::Available;
+			const uint64_t issued = coordinator.Submit({ .m_WaitForCapacity = true });
+			coordinator.BeginFrame(state);
+			if (control.m_Issued.size() == 2)
+			{
+				control.Fail(control.m_Issued.back().m_Id, "Submission failed.");
+			}
+			coordinator.Update();
+			const auto submissionFailure = Consume(coordinator);
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			context.Check(submissionFailure.size() == 1 && submissionFailure[0].m_RequestId == issued &&
+				submissionFailure[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				control.m_Issued.size() == 2 && coordinator.GetUnfinishedRequestCount() == 0,
+				"An issued flexible capture fails once on submission failure and never substitutes a later frame");
+
+			control.m_Availability = FrameCaptureAvailability::Busy;
+			const uint64_t waiting = coordinator.Submit({ .m_WaitForCapacity = true });
+			coordinator.BeginFrame(state);
+			coordinator.PrepareForShutdown();
+			coordinator.FinalizeAfterRenderHost();
+			const auto shutdown = Consume(coordinator);
+			context.Check(shutdown.size() == 1 && shutdown[0].m_RequestId == waiting &&
+				shutdown[0].m_Status == FrameCaptureRequestStatus::Cancelled &&
+				coordinator.GetUnfinishedRequestCount() == 0,
+				"Shutdown cancels a flexible capture still waiting for capacity");
+		}
+
 		void RunWriterQueueLimitTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-queue");
@@ -1023,6 +1129,11 @@ namespace gglab
 			context.Check(coordinator.GetUnfinishedRequestCount() == 9 &&
 				control.m_Issued.size() == 9 && !HasAnyFile(directory.GetPath()),
 				"Only nine GPU captures are issued for one running writer and eight pending jobs");
+			const uint64_t deferredId = coordinator.Submit({ .m_ReferenceViewId = "CAM_A", .m_WaitForCapacity = true });
+			coordinator.BeginFrame(MakeFrameState(true));
+			context.Check(!coordinator.GetPendingViewChange() && Consume(coordinator).empty() &&
+				coordinator.GetUnfinishedRequestCount() == 10 && control.m_Issued.size() == 9,
+				"A flexible batch waits without changing its camera while the real writer queue is full");
 
 			{
 				std::scoped_lock lock(gate->m_Mutex);
@@ -1051,13 +1162,16 @@ namespace gglab
 					}),
 				"All accepted writer jobs publish their files and finish exactly once after release");
 
-			const uint64_t resumedId = coordinator.Submit({});
-			coordinator.BeginFrame(MakeFrameState(true));
+			const auto resumedView = coordinator.GetPendingViewChange();
+			context.Check(resumedView && resumedView->m_RequestId == deferredId,
+				"Draining the writer queue makes its waiting batch view available again");
+			coordinator.OnReferenceViewApplied(deferredId, true);
+			coordinator.BeginFrame(MakeViewFrameState(1));
 			control.Complete(control.m_Issued.back().m_Id);
 			coordinator.PrepareForShutdown();
 			coordinator.FinalizeAfterRenderHost();
 			const auto resumed = Consume(coordinator);
-			context.Check(resumed.size() == 1 && resumed[0].m_RequestId == resumedId &&
+			context.Check(resumed.size() == 1 && resumed[0].m_RequestId == deferredId &&
 				resumed[0].m_Status == FrameCaptureRequestStatus::Completed &&
 				coordinator.GetUnfinishedRequestCount() == 0,
 				"The writer accepts new captures after its pending queue drains");
@@ -2409,6 +2523,7 @@ namespace gglab
 		RunNameCollisionTests(context);
 		RunWriterThreadTests(context);
 		RunCapacityAdmissionTests(context);
+		RunDeferredCapacityTests(context);
 		RunWriterQueueLimitTests(context);
 		RunAbandonedWritingTests(context);
 		RunMetadataSerializationTests(context);

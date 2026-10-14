@@ -81,7 +81,8 @@ namespace gglab
 		uint64_t ExportResources(std::vector<RGResourceAddress> targets,
 			bool includeGraph = false) noexcept;
 		// Submits one capture per reference view of the active content, in order,
-		// with the current settings. Returns the number of submitted requests.
+		// with the current settings, waiting for temporary capacity before changing
+		// views or issuing frames. Returns the number of submitted requests.
 		uint32_t CaptureReferenceViews() noexcept;
 		// Submits an explicit request and returns its request id.
 		uint64_t Submit(FrameCaptureRequest request) noexcept;
