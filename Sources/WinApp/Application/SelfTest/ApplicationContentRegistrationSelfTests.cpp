@@ -67,7 +67,10 @@ namespace gglab
 			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
 				"Models/GGLabAtmosphereRange/GGLabAtmosphereRange.gltf"), {});
 			context.Check(imported.Succeeded(), std::format("Atmosphere range imports: {}", imported.m_Error));
-			if (!imported.Succeeded()) return;
+			if (!imported.Succeeded())
+			{
+				return;
+			}
 			const auto& model = imported.m_Model;
 			context.Check(model.m_TextureSources.empty(), "Atmosphere range has no texture dependencies");
 			constexpr std::array distances{ 25.0f, 50.0f, 100.0f, 250.0f, 500.0f, 1000.0f };
@@ -126,7 +129,10 @@ namespace gglab
 								return std::abs(delta.m_X) <= 1.0002f && std::abs(delta.m_Y) <= 3.0002f &&
 									std::abs(delta.m_Z) < 0.0002f;
 							});
-						if (!contains) continue;
+						if (!contains)
+						{
+							continue;
+						}
 						++matches;
 						++triangles[shape];
 						for (size_t channel = 0; channel < 3; ++channel)
@@ -155,7 +161,10 @@ namespace gglab
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews({ AtmosphereRangeReferenceViews.begin(), AtmosphereRangeReferenceViews.end() });
 			context.Check(registered, "Atmosphere range reference cameras register");
-			if (!registered) return;
+			if (!registered)
+			{
+				return;
+			}
 			for (size_t view = 0; view < AtmosphereRangeReferenceViews.size(); ++view)
 			{
 				const auto& reference = AtmosphereRangeReferenceViews[view];
@@ -182,7 +191,10 @@ namespace gglab
 			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
 				"Models/GGLabLightingContract/GGLabLightingContract.gltf"), {});
 			context.Check(imported.Succeeded(), std::format("Lighting contract imports: {}", imported.m_Error));
-			if (!imported.Succeeded()) return;
+			if (!imported.Succeeded())
+			{
+				return;
+			}
 			const auto& model = imported.m_Model;
 			context.Check(model.m_TextureSources.empty(),
 				"Lighting contract imports without texture dependencies");
@@ -324,7 +336,10 @@ namespace gglab
 									std::abs(d.m_Y) <= half.m_Y + 0.0001f && std::abs(d.m_Z) <= half.m_Z + 0.0001f;
 							});
 						// The meter cube bottom touches the ground; material identity separates those coplanar faces.
-						if (!contains || !matchesMaterial(material, materials[reference.m_MaterialReference])) continue;
+						if (!contains || !matchesMaterial(material, materials[reference.m_MaterialReference]))
+						{
+							continue;
+						}
 						++matchedShapes;
 						++triangleCounts[shape];
 						for (size_t corner = 0; corner < 3; ++corner)
@@ -337,11 +352,17 @@ namespace gglab
 							upper[shape].m_Y = std::max(upper[shape].m_Y, position.m_Y);
 							upper[shape].m_Z = std::max(upper[shape].m_Z, position.m_Z);
 							if (reference.m_Normal.LengthSquared() > 0.0f)
+							{
 								shapeValid[shape] &= (normals[corner] - reference.m_Normal).Length() < 0.0001f;
+							}
 							if (reference.m_Name.starts_with("Sphere_") || reference.m_Name.starts_with("SweepSphere_"))
+							{
 								shapeValid[shape] &= std::abs((position - reference.m_Center).Length() - 0.8f) < 0.0001f;
+							}
 							if (reference.m_Name.starts_with("SweepSphere_"))
+							{
 								shapeValid[shape] &= normals[corner].Dot((position - reference.m_Center) / 0.8f) > 0.998f;
+							}
 						}
 					}
 					allTrianglesClassified &= matchedShapes == 1;
@@ -364,7 +385,10 @@ namespace gglab
 			const bool registered = rig.SetReferenceViews(
 				{ LightingContractReferenceViews.begin(), LightingContractReferenceViews.end() });
 			context.Check(registered, "Lighting contract reference views register");
-			if (!registered) return;
+			if (!registered)
+			{
+				return;
+			}
 			for (const auto& reference : LightingContractReferenceViews)
 			{
 				camera.SetManualEV100(4.0f);
@@ -420,7 +444,10 @@ namespace gglab
 				context.Check(imported.Succeeded(),
 					std::format("Installed Blender material probe imports through Assimp ({}): {}",
 						path, imported.m_Error));
-				if (!imported.Succeeded()) continue;
+				if (!imported.Succeeded())
+				{
+					continue;
+				}
 				const auto& model = imported.m_Model;
 				const bool hasIor = std::ranges::any_of(model.m_Materials,
 					[](const ImportedMaterial& material) noexcept
@@ -537,7 +564,9 @@ namespace gglab
 							(normalBinding.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex) ==
 								reference.m_NormalMapped;
 						if (reference.m_NormalMapped)
+						{
 							valuesValid &= std::abs(properties.m_NormalScale - 0.4f) < 0.0001f && normalBinding.m_TexCoordIndex == 0;
+						}
 					}
 					context.Check(valuesValid, std::format("{} retains factors, rotation and base-normal binding", reference.m_Name));
 					const Vector3 front(80.0f + 2.2f * static_cast<float>(index % 3),
@@ -546,12 +575,18 @@ namespace gglab
 					bool basisValid = true;
 					for (const auto& instance : model.m_MeshInstances)
 					{
-						if (model.m_Materials[instance.m_MaterialIndex].m_Name != reference.m_Name) continue;
+						if (model.m_Materials[instance.m_MaterialIndex].m_Name != reference.m_Name)
+						{
+							continue;
+						}
 						const auto normalMatrix = math::CreateNormalMatrix(instance.m_LocalTransform);
 						for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
 						{
 							const auto position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
-							if ((position - front).Length() > 0.0001f) continue;
+							if ((position - front).Length() > 0.0001f)
+							{
+								continue;
+							}
 							frontFound = true;
 							const auto n = math::TransformDirection(vertex.m_Normal, normalMatrix);
 							const auto t = math::TransformDirection(
@@ -759,7 +794,10 @@ namespace gglab
 				bool valid = true;
 				for (const auto& source : model.m_TextureSources)
 				{
-					if (source.m_Semantic != TextureSemantic::Anisotropy) continue;
+					if (source.m_Semantic != TextureSemantic::Anisotropy)
+					{
+						continue;
+					}
 					found = true;
 					const auto texture = TextureLoader::LoadTextureData(
 						source.m_CanonicalPath, source.m_ImportSettings);
@@ -833,7 +871,10 @@ namespace gglab
 			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
 				"Models/GGLabTextureContract/GGLabTextureContract.gltf"), {});
 			context.Check(imported.Succeeded(), std::format("Texture contract imports: {}", imported.m_Error));
-			if (!imported.Succeeded()) return;
+			if (!imported.Succeeded())
+			{
+				return;
+			}
 			const auto& model = imported.m_Model;
 			const auto textures = CheckImportedTextures(context, model);
 			context.Check(textures.size() == 5, "Texture board resolves all five external diagnostic images");
@@ -844,11 +885,20 @@ namespace gglab
 					{
 						const auto& texture = textures[i];
 						if (model.m_TextureSources[i].m_CanonicalPath.filename().string() != filename ||
-							!texture.IsValid() || texture.m_Subresources.empty()) continue;
+							!texture.IsValid() || texture.m_Subresources.empty())
+						{
+							continue;
+						}
 						const auto& subresource = texture.m_Subresources.front();
-						if (x >= subresource.m_Width || y >= subresource.m_Height) continue;
+						if (x >= subresource.m_Width || y >= subresource.m_Height)
+						{
+							continue;
+						}
 						const size_t offset = static_cast<size_t>(subresource.m_DataOffset + y * subresource.m_RowPitch + x * 4);
-						if (offset + 3 > texture.m_Pixels.size()) continue;
+						if (offset + 3 > texture.m_Pixels.size())
+						{
+							continue;
+						}
 						for (size_t channel = 0; channel < 3; ++channel)
 							value[channel] = std::to_integer<int>(texture.m_Pixels[offset + channel]);
 					}
@@ -900,13 +950,18 @@ namespace gglab
 				for (size_t slot = 0; slot < material.m_TextureBindings.size(); ++slot)
 				{
 					const auto& binding = material.m_TextureBindings[slot];
-					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex) continue;
+					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex)
+					{
+						continue;
+					}
 					bindingsValid &= binding.m_TextureIndex < model.m_TextureSources.size() && binding.m_TexCoordIndex == 0 &&
 						binding.m_SamplerKey.m_AddressU == RHITextureAddressMode::Wrap &&
 						binding.m_SamplerKey.m_AddressV == RHITextureAddressMode::Wrap;
 					if (binding.m_TextureIndex < model.m_TextureSources.size())
+					{
 						bindingsValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic ==
 							GetMaterialTextureSlotSemantic(static_cast<MaterialTextureSlot>(slot));
+					}
 				}
 			}
 			context.Check(bindingsValid, "Diagnostic bindings use UV0/repeat with matching semantics and no implicit occlusion");
@@ -919,7 +974,10 @@ namespace gglab
 				for (const auto& vertex : mesh.m_Vertices)
 				{
 					const Vector3 p = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
-					if (p.m_X > -0.19f || p.m_Y < 1.39f) continue;
+					if (p.m_X > -0.19f || p.m_Y < 1.39f)
+					{
+						continue;
+					}
 					const bool right = p.m_X > -2.2f;
 					const bool top = p.m_Y > 3.4f;
 					++probeVertices[(top ? 0 : 2) + (right ? 1 : 0)];
@@ -937,10 +995,12 @@ namespace gglab
 						(t - ((!top && right) ? -Vector3::UnitX : Vector3::UnitX)).Length() < 0.0001f &&
 						(b - Vector3::UnitY).Length() < 0.0001f;
 					if (!valid && basisFailure.empty())
+					{
 						basisFailure = std::format("; at ({}, {}): UV ({}, {}) expected ({}, {}), N ({}, {}, {}), "
 							"T ({}, {}, {}), B ({}, {}, {})", p.m_X, p.m_Y,
 							vertex.m_TexCoord0.m_X, vertex.m_TexCoord0.m_Y, expectedU, expectedV,
 							n.m_X, n.m_Y, n.m_Z, t.m_X, t.m_Y, t.m_Z, b.m_X, b.m_Y, b.m_Z);
+					}
 					basisAndUVValid &= valid;
 				}
 			}
@@ -960,7 +1020,10 @@ namespace gglab
 				rig.SetCameraPaths(paths);
 			context.Check(registered && paths.size() == 9,
 				"Nine coastal temporal evaluation paths register on the main camera");
-			if (!registered) return;
+			if (!registered)
+			{
+				return;
+			}
 
 			// Each path starts at the reference view it was copied from; changing either
 			// side requires a deliberate edit and a path version change.
@@ -998,7 +1061,10 @@ namespace gglab
 					path->m_ManualEV100 == view->m_ManualEV100,
 					std::format("{} starts at {} with {} frames", entry.m_PathId, entry.m_ViewId,
 						entry.m_FrameCount));
-				if (!path) continue;
+				if (!path)
+				{
+					continue;
+				}
 
 				const uint64_t serial = camera.GetTemporalResetSerial();
 				bool applied = true;
@@ -1023,7 +1089,10 @@ namespace gglab
 			context.Check(registered && CoastalSceneReferenceViews.size() == 14,
 				"Eight retained atrium views, five coastal retreat views and one temporal "
 				"evaluation view register in runtime coordinates");
-			if (!registered) return;
+			if (!registered)
+			{
+				return;
+			}
 			for (const auto& reference : CoastalSceneReferenceViews)
 			{
 				const bool restored = rig.RestoreReferenceView(reference.m_Id);
@@ -1068,7 +1137,10 @@ namespace gglab
 				"Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf"), {});
 			context.Check(imported.Succeeded() && imported.m_Model.m_TextureSources.size() == 24,
 				std::format("Coastal retreat geometry and twenty-four surface textures import: {}", imported.m_Error));
-			if (!imported.Succeeded()) return;
+			if (!imported.Succeeded())
+			{
+				return;
+			}
 			const auto& model = imported.m_Model;
 			CheckImportedTextures(context, model);
 			constexpr std::array<std::pair<std::string_view, size_t>, 24> expectedTriangles = { {
@@ -1120,11 +1192,13 @@ namespace gglab
 						std::abs(tangent.LengthSquared() - 1.0f) < 0.0002f &&
 						std::abs(vertex.m_Normal.Dot(tangent)) < 0.0002f && std::abs(std::abs(vertex.m_Tangent.m_W) - 1.0f) < 0.0002f;
 					if (!vertexValid && geometryFailure.empty())
+					{
 						geometryFailure = std::format("; mesh {} at ({}, {}, {}): normal squared length {}, "
 							"tangent squared length {}, normal/tangent dot {}, handedness {}", mesh.m_Name,
 							vertex.m_Position.m_X, vertex.m_Position.m_Y, vertex.m_Position.m_Z,
 							vertex.m_Normal.LengthSquared(), tangent.LengthSquared(), vertex.m_Normal.Dot(tangent),
 							vertex.m_Tangent.m_W);
+					}
 					geometryValid &= vertexValid;
 				}
 			}
@@ -1162,10 +1236,15 @@ namespace gglab
 					MaterialTextureSlot::MetallicRoughness })
 				{
 					const auto& binding = material.m_TextureBindings[static_cast<size_t>(slot)];
-					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex) continue;
+					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex)
+					{
+						continue;
+					}
 					geometryValid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < model.m_TextureSources.size();
 					if (binding.m_TextureIndex < model.m_TextureSources.size())
+					{
 						geometryValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic == GetMaterialTextureSlotSemantic(slot);
+					}
 				}
 			}
 			context.Check(geometryValid,
@@ -1194,20 +1273,28 @@ namespace gglab
 			for (const auto& instance : model.m_MeshInstances)
 			{
 				if (instance.m_MeshIndex >= model.m_Meshes.size() || instance.m_MaterialIndex >= model.m_Materials.size())
+				{
 					continue;
+				}
 				if (model.m_Materials[instance.m_MaterialIndex].m_Name != "MAT_LoungeCoatedShell")
+				{
 					continue;
+				}
 				for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
 				{
 					const Vector3 position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
 					if (position.m_Y < 3.0399f || position.m_Y > 3.2741f ||
 						position.m_Z < -1.6151f || position.m_Z > -1.5249f)
+					{
 						continue;
+					}
 					// The authored shells have rigid instance transforms.
 					const Vector3 normal = math::TransformDirection(vertex.m_Normal, instance.m_LocalTransform).Normalized();
 					for (size_t arm = 0; arm < armCentersX.size(); ++arm)
 						if (std::abs(position.m_X - armCentersX[arm]) < 0.056f)
+						{
 							frontCorners[arm].emplace_back(position, normal);
+						}
 				}
 			}
 			for (size_t arm = 0; arm < frontCorners.size(); ++arm)

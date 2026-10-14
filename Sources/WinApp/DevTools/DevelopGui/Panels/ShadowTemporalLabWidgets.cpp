@@ -43,12 +43,18 @@ namespace gglab
 		const CameraToolingObservation* mainCamera = nullptr;
 		for (const auto& camera : cameras.m_Cameras)
 		{
-			if (camera.m_RenderViewId == RenderViewID::Main) mainCamera = &camera;
+			if (camera.m_RenderViewId == RenderViewID::Main)
+			{
+				mainCamera = &camera;
+			}
 		}
 		const CameraReferenceView* stairs = nullptr;
 		for (const auto& reference : cameras.m_ReferenceViews)
 		{
-			if (reference.m_Id == "CAM_ShadowStairs") stairs = &reference;
+			if (reference.m_Id == "CAM_ShadowStairs")
+			{
+				stairs = &reference;
+			}
 		}
 		if (!stairs)
 		{
@@ -89,9 +95,15 @@ namespace gglab
 		}
 		ImGui::EndDisabled();
 		ImGui::SameLine();
-		if (ImGui::Button("Stop replay")) state.m_ReplayActive = false;
+		if (ImGui::Button("Stop replay"))
+		{
+			state.m_ReplayActive = false;
+		}
 		ImGui::SameLine();
-		if (ImGui::Button("Clear comparison")) state.m_Temporal.Reset();
+		if (ImGui::Button("Clear comparison"))
+		{
+			state.m_Temporal.Reset();
+		}
 		if (state.m_ReplayActive)
 		{
 			if (!mainCamera || mainCamera->m_Id != state.m_ReplayCameraId ||
@@ -110,7 +122,10 @@ namespace gglab
 					state.m_ReplayForward * (0.35f * (1.0f - std::cos(phase)));
 				state.m_ReplayActive = context.m_CameraControl->SetCamera(mainCamera->m_Id, sample);
 				(void) context.m_CameraControl->ResetVelocity(mainCamera->m_Id);
-				if (state.m_ReplayStep++ == ReplayLastStep) state.m_ReplayActive = false;
+				if (state.m_ReplayStep++ == ReplayLastStep)
+				{
+					state.m_ReplayActive = false;
+				}
 			}
 		}
 		ImGui::Text("Replay sample: %u / 120", std::min(state.m_ReplayStep, 120u));
@@ -146,7 +161,10 @@ namespace gglab
 					ImGui::Text("  Scale change: %+.7f / %+.7f m/texel (%+.3f%% / %+.3f%%)",
 						scaleDelta.m_X, scaleDelta.m_Y, percentX, percentY);
 				}
-				else ImGui::TextDisabled("  Baseline frame: no adjacent-frame delta");
+				else
+				{
+					ImGui::TextDisabled("  Baseline frame: no adjacent-frame delta");
+				}
 				ImGui::Text("  Fractional grid error: %+7.3f / %+7.3f texels",
 					gridError.m_X, gridError.m_Y);
 			}
@@ -183,7 +201,10 @@ namespace gglab
 				static_cast<int>(samples.size()), 0, nullptr, 0.0f, 0.75f, ImVec2(0.0f, 55.0f));
 		}
 
-		if (!ImGui::CollapsingHeader("GPU Timing")) return;
+		if (!ImGui::CollapsingHeader("GPU Timing"))
+		{
+			return;
+		}
 		const auto* profiling = context.m_GpuProfiling;
 		const bool profilingEnabled = profiling && profiling->IsEnabled();
 		if (profilingEnabled && profiling)
@@ -206,10 +227,16 @@ namespace gglab
 						ImGui::Text("Cascade %u GPU: %.3f ms (%u calls)",
 							index, sample->m_Milliseconds, sample->m_CallCount);
 					}
-					else ImGui::TextDisabled("Cascade %u GPU: waiting for timestamps", index);
+					else
+					{
+						ImGui::TextDisabled("Cascade %u GPU: waiting for timestamps", index);
+					}
 				}
 			}
-			else ImGui::TextDisabled("Waiting for completed GPU timestamps...");
+			else
+			{
+				ImGui::TextDisabled("Waiting for completed GPU timestamps...");
+			}
 		}
 	}
 

@@ -1328,7 +1328,10 @@ namespace gglab
 			const auto* bytes = reinterpret_cast<const uint8_t*>(json.data());
 			job.m_Stage = EncodeStage::WritingGraph;
 			std::string failure = WriteFileContents(temporary, { bytes, json.size() });
-			if (!failure.empty()) return failure;
+			if (!failure.empty())
+			{
+				return failure;
+			}
 			PublicationClaim expected = PublicationClaim::Open;
 			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
 			{
@@ -1342,11 +1345,16 @@ namespace gglab
 				const auto path = job.m_Directory / ((attempt == 1 ? job.m_BaseStem
 					: std::format("{}-{}", job.m_BaseStem, attempt)) + ".json");
 				const PublishOutcome outcome = PublishNewFile(temporary, path);
-				if (outcome == PublishOutcome::NameTaken) continue;
+				if (outcome == PublishOutcome::NameTaken)
+				{
+					continue;
+				}
 				std::error_code error;
 				std::filesystem::remove(temporary, error);
 				if (outcome == PublishOutcome::Failed)
+				{
 					return std::format("Publishing '{}' failed.", GetFrameCapturePathText(path));
+				}
 				job.m_MetadataPath = path;
 				return {};
 			}

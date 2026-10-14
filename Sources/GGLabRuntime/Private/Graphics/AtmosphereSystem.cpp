@@ -36,7 +36,10 @@ namespace gglab
 				m_Textures[i] = m_Pool->AcquireTexture({ .m_Desc = desc }, AtmosphereLutNames[i]);
 				if (!m_Textures[i].IsValid()) { Disable(); return false; }
 			}
-			if (!m_Initialized[i] || shaders[i] != m_ShaderGenerations[i]) dirty |= 7u & (~0u << i);
+			if (!m_Initialized[i] || shaders[i] != m_ShaderGenerations[i])
+			{
+				dirty |= 7u & (~0u << i);
+			}
 		}
 		m_Diagnostics.m_Parameters = parameters;
 		m_Diagnostics.m_DirtyMask = dirty;
@@ -58,12 +61,24 @@ namespace gglab
 	}
 	void AtmosphereSystem::EndFrame(bool completed, const RHIFencePoint& fence) noexcept
 	{
-		if (!m_InFrame) return;
-		if (fence.IsValid()) m_LastFence = fence;
+		if (!m_InFrame)
+		{
+			return;
+		}
+		if (fence.IsValid())
+		{
+			m_LastFence = fence;
+		}
 		if (m_Constants.IsValid())
 		{
-			if (fence.IsValid()) m_PendingBuffers.push_back({ m_Constants, fence });
-			else m_Device->DestroyBuffer(m_Constants);
+			if (fence.IsValid())
+			{
+				m_PendingBuffers.push_back({ m_Constants, fence });
+			}
+			else
+			{
+				m_Device->DestroyBuffer(m_Constants);
+			}
 			m_Constants = {};
 		}
 		m_InFrame = false;
@@ -75,7 +90,10 @@ namespace gglab
 		}
 		for (uint32_t i = 0; i < 3; ++i)
 		{
-			if (m_ExecutedMask & (1u << i)) ++m_Diagnostics.m_Generations[i];
+			if (m_ExecutedMask & (1u << i))
+			{
+				++m_Diagnostics.m_Generations[i];
+			}
 			m_Initialized[i] = true;
 		}
 		m_Committed = m_Diagnostics.m_Parameters;
@@ -102,7 +120,10 @@ namespace gglab
 	{
 		std::erase_if(m_PendingBuffers, [this](const PendingBuffer& buffer)
 		{
-			if (!m_Device->IsFencePointCompleted(buffer.m_Fence)) return false;
+			if (!m_Device->IsFencePointCompleted(buffer.m_Fence))
+			{
+				return false;
+			}
 			m_Device->DestroyBuffer(buffer.m_Buffer);
 			return true;
 		});

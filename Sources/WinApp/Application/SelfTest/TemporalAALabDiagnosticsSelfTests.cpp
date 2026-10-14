@@ -41,7 +41,10 @@ namespace gglab
 		{
 			for (const auto& entry : snapshot.m_Metrics)
 			{
-				if (entry.m_Name == name) return entry.m_Value;
+				if (entry.m_Name == name)
+				{
+					return entry.m_Value;
+				}
 			}
 			return std::string{};
 		};

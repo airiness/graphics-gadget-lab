@@ -142,7 +142,10 @@ namespace gglab
 			void Complete(uint64_t id, std::optional<uint64_t> frameSerial = std::nullopt) noexcept
 			{
 				const auto issued = std::ranges::find(m_Issued, id, &Issued::m_Id);
-				if (issued == m_Issued.end()) return;
+				if (issued == m_Issued.end())
+				{
+					return;
+				}
 				auto image = std::make_shared<FrameCaptureImage>();
 				image->m_Format = RHIFormat::B8G8R8A8Unorm;
 				image->m_Width = 2;
@@ -1765,8 +1768,14 @@ namespace gglab
 				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::Diagnostic,
 					.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight }));
 				coordinator.BeginFrame(MakeFrameState(true));
-				if (mismatch == 1) control.m_Issued.front().m_Source = FrameCaptureSource::Scene;
-				if (mismatch == 2) control.m_Issued.front().m_DiagnosticTap = PostProcessDebugTap::TemporalRejection;
+				if (mismatch == 1)
+				{
+					control.m_Issued.front().m_Source = FrameCaptureSource::Scene;
+				}
+				if (mismatch == 2)
+				{
+					control.m_Issued.front().m_DiagnosticTap = PostProcessDebugTap::TemporalRejection;
+				}
 				control.Complete(control.m_Issued.front().m_Id, mismatch == 0 ? 18u : 17u);
 				coordinator.Update();
 				const auto results = Consume(coordinator);
@@ -2171,7 +2180,10 @@ namespace gglab
 						harness.m_Capture.Update();
 						harness.m_Sequence.OnCaptureResults(Consume(harness.m_Capture));
 					};
-				if (completeCaptureFirst) completeCapture();
+				if (completeCaptureFirst)
+				{
+					completeCapture();
+				}
 				else
 				{
 					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
@@ -2186,7 +2198,10 @@ namespace gglab
 					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
 					harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
 				}
-				else completeCapture();
+				else
+				{
+					completeCapture();
+				}
 				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed,
 					"Capture/profile completion is independent of which owner finishes first");
 			}
@@ -2240,8 +2255,14 @@ namespace gglab
 				harness.Frame();
 				harness.Frame();
 				auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial);
-				if (invalidScope) profile.m_Samples.front().m_Milliseconds = -1.0;
-				else profile.m_FrameMilliseconds = std::numeric_limits<double>::quiet_NaN();
+				if (invalidScope)
+				{
+					profile.m_Samples.front().m_Milliseconds = -1.0;
+				}
+				else
+				{
+					profile.m_FrameMilliseconds = std::numeric_limits<double>::quiet_NaN();
+				}
 				harness.m_Sequence.UpdateGpuTiming(profile, true);
 				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
 					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
@@ -2265,9 +2286,18 @@ namespace gglab
 					{
 						harness.Frame();
 					}
-					if (change == 0) harness.m_RenderExtent = { 43, 22 };
-					if (change == 1) harness.m_Accumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
-					if (change == 2) harness.m_HistoryCompatible = false;
+					if (change == 0)
+					{
+						harness.m_RenderExtent = { 43, 22 };
+					}
+					if (change == 1)
+					{
+						harness.m_Accumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+					}
+					if (change == 2)
+					{
+						harness.m_HistoryCompatible = false;
+					}
 					harness.Frame();
 					const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
 					// A path cut permits history loss; a simultaneous effective-identity

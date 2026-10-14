@@ -73,7 +73,10 @@ namespace gglab
 		for (uint32_t index = 0; index < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++index)
 		{
 			const auto channel = static_cast<PostProcessPreviewChannel>(index);
-			if (!registry->IsPostProcessPreviewRequested(channel)) continue;
+			if (!registry->IsPostProcessPreviewRequested(channel))
+			{
+				continue;
+			}
 			const auto tap = registry->GetPostProcessPreviewSelection(channel).m_Tap;
 			wantsIntermediateBloomTap |= tap == PostProcessDebugTap::BloomPrefilter ||
 				tap == PostProcessDebugTap::BloomPyramid;

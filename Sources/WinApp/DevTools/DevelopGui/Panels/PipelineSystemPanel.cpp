@@ -75,7 +75,9 @@ namespace gglab
 		std::string ShaderSummary(const RHIShaderSnapshot& shader)
 		{
 			if (!shader.m_Present)
+			{
 				return "-";
+			}
 			return shader.m_DebugName.empty() ? devtools::RHIHandleText(shader.m_Handle)
 				: shader.m_DebugName;
 		}
@@ -83,12 +85,16 @@ namespace gglab
 		std::string RenderTargetFormatsText(const RHIPipelineSnapshot& pipeline)
 		{
 			if (pipeline.m_RenderTargetFormats.empty())
+			{
 				return "None";
+			}
 			std::string result;
 			for (size_t index = 0; index < pipeline.m_RenderTargetFormats.size(); ++index)
 			{
 				if (index)
+				{
 					result += ", ";
+				}
 				result += FormatText(pipeline.m_RenderTargetFormats[index]);
 			}
 			return result;
@@ -97,12 +103,16 @@ namespace gglab
 		std::string PipelineUsagesText(const RHIPipelineSnapshot& pipeline)
 		{
 			if (pipeline.m_RenderPasses.empty())
+			{
 				return "Unregistered";
+			}
 			std::string result;
 			for (size_t index = 0; index < pipeline.m_RenderPasses.size(); ++index)
 			{
 				if (index)
+				{
 					result += ", ";
+				}
 				const auto& pass = pipeline.m_RenderPasses[index];
 				result += pass.m_DisplayName.empty() ? pass.m_TypeName : pass.m_DisplayName;
 			}
@@ -213,7 +223,9 @@ namespace gglab
 				std::ranges::find_if(snapshot.m_BindingLayouts, [&state](const auto& layout)
 					{ return layout.m_Handle.Index() == state.m_SelectedLayout; });
 			if (selected != snapshot.m_BindingLayouts.end())
+			{
 				DrawBindingLayoutDetail(*selected);
+			}
 		}
 
 		void DrawShaderTable(const RHIPipelineSnapshot& pipeline) noexcept
@@ -246,7 +258,9 @@ namespace gglab
 				for (const auto& stage : stages)
 				{
 					if (!stage.m_Shader->m_Present)
+					{
 						continue;
+					}
 					const std::string handle = devtools::RHIHandleText(stage.m_Shader->m_Handle);
 					const std::string hash = HashText(stage.m_Shader->m_Hash);
 					ImGui::TableNextRow();
@@ -402,7 +416,9 @@ namespace gglab
 			DrawRenderPassUsages(pipeline);
 			DrawShaderTable(pipeline);
 			if (pipeline.m_Type == RHIPipelineSnapshotType::Graphics)
+			{
 				DrawGraphicsState(pipeline);
+			}
 		}
 
 		void DrawPipelines(
@@ -446,7 +462,9 @@ namespace gglab
 					if (ImGui::Selectable(handle.c_str(),
 						state.m_SelectedPipeline == pipeline.m_Handle.Index(),
 						ImGuiSelectableFlags_SpanAllColumns))
+					{
 						state.m_SelectedPipeline = pipeline.m_Handle.Index();
+					}
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
 						? "Graphics"
@@ -473,7 +491,9 @@ namespace gglab
 				std::ranges::find_if(snapshot.m_Pipelines, [&state](const auto& pipeline)
 					{ return pipeline.m_Handle.Index() == state.m_SelectedPipeline; });
 			if (selected != snapshot.m_Pipelines.end())
+			{
 				DrawPipelineDetail(*selected);
+			}
 		}
 
 		void DrawCache(const RHIPipelineSystemSnapshot& snapshot) noexcept

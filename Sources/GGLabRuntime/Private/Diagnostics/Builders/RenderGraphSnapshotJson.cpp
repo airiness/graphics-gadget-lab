@@ -24,7 +24,10 @@ namespace gglab
 
 		Json Subresources(const std::optional<RHISubresourceRange>& range)
 		{
-			if (!range) return nullptr;
+			if (!range)
+			{
+				return nullptr;
+			}
 			const auto count = [](uint32_t value)
 				{
 					return value == RHISubresourceRange::Remaining ? Json("remaining") : Json(value);
@@ -46,8 +49,11 @@ namespace gglab
 				{"kind", RGEnumId(barrier.m_Kind)}, {"reason", RGEnumId(barrier.m_Reason)},
 				{"before", State(barrier.m_Before)}, {"after", State(barrier.m_After)},
 				{"subresources", Subresources(barrier.m_Subresources)} };
-			if (resolved) result["physical"] = Physical(barrier.m_HasPhysicalHandle,
-				barrier.m_PhysicalHandleIndex, barrier.m_PhysicalHandleGeneration);
+			if (resolved)
+			{
+				result["physical"] = Physical(barrier.m_HasPhysicalHandle,
+					barrier.m_PhysicalHandleIndex, barrier.m_PhysicalHandleGeneration);
+			}
 			return result;
 		}
 
@@ -117,7 +123,10 @@ namespace gglab
 		Json passes = Json::array();
 		for (const auto& pass : snapshot.m_Passes)
 		{
-			if (summary && (pass.m_Culled || pass.m_ExecutionOrder < 0)) continue;
+			if (summary && (pass.m_Culled || pass.m_ExecutionOrder < 0))
+			{
+				continue;
+			}
 			Json item = { {"index", pass.m_Index}, {"name", pass.m_Name},
 				{"occurrence", pass.m_Occurrence}, {"executionOrder", pass.m_ExecutionOrder}, {"observation", pass.m_Observation} };
 			if (summary)
@@ -191,8 +200,11 @@ namespace gglab
 							resource.m_TextureExtent.m_Depth}}, {"mips", resource.m_TextureMipLevels},
 						{"slices", resource.m_TextureArraySize}, {"samples", resource.m_TextureSampleCount} };
 				}
-				else item["buffer"] = { {"sizeBytes", resource.m_BufferSizeInBytes},
-					{"strideBytes", resource.m_BufferStrideInBytes} };
+				else
+				{
+					item["buffer"] = { {"sizeBytes", resource.m_BufferSizeInBytes},
+						{"strideBytes", resource.m_BufferStrideInBytes} };
+				}
 				compile["resources"].push_back(std::move(item));
 			}
 			compile["versions"] = Json::array();

@@ -123,8 +123,14 @@ namespace gglab
 			{
 				ImGui::TextColored(WarningColor, "Override");
 				ImGui::SameLine();
-				if (ImGui::SmallButton("Reset")) reset();
-				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Restore the current authoring profile.");
+				if (ImGui::SmallButton("Reset"))
+				{
+					reset();
+				}
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("Restore the current authoring profile.");
+				}
 			}
 			else
 			{
@@ -152,7 +158,10 @@ namespace gglab
 			if (ImGui::Checkbox("##Enabled", &enabled))
 			{
 				// Seed only the first edit; toggling never discards Inspector tuning.
-				if (!override->m_IsActive) override->Activate(authoring);
+				if (!override->m_IsActive)
+				{
+					override->Activate(authoring);
+				}
 				override->m_Settings.m_Enabled = enabled;
 			}
 			DrawIntentTooltip(authoring.m_Enabled, resolved);
@@ -171,7 +180,10 @@ namespace gglab
 			BeginRow(label);
 			bool enabled = override ? override->value_or(authoring) : published;
 			ImGui::BeginDisabled(!override);
-			if (ImGui::Checkbox("##Enabled", &enabled)) *override = enabled;
+			if (ImGui::Checkbox("##Enabled", &enabled))
+			{
+				*override = enabled;
+			}
 			DrawIntentTooltip(authoring, resolved);
 			ImGui::EndDisabled();
 			DrawOverride(override && override->has_value(), [&]() { override->reset(); });
@@ -204,7 +216,10 @@ namespace gglab
 			"%u DevTools Overrides Active", activeOverrides);
 		ImGui::SameLine();
 		ImGui::BeginDisabled(!overrides || activeOverrides == 0);
-		if (ImGui::SmallButton("Clear All Overrides")) overrides->ClearAll();
+		if (ImGui::SmallButton("Clear All Overrides"))
+		{
+			overrides->ClearAll();
+		}
 		ImGui::EndDisabled();
 
 		const auto* snapshot = context.m_Diagnostics

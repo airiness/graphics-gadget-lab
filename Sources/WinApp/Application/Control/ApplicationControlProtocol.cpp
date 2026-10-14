@@ -1010,7 +1010,10 @@ namespace gglab
 			{
 				response["graph"] = ToUtf8(result.m_MetadataPath);
 			}
-			else response["image"] = ToUtf8(result.m_ImagePath);
+			else
+			{
+				response["image"] = ToUtf8(result.m_ImagePath);
+			}
 			response["metadata"] = ToUtf8(result.m_MetadataPath);
 			break;
 		case FrameCaptureRequestStatus::Cancelled:

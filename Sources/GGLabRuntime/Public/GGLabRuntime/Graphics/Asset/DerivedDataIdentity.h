@@ -14,7 +14,9 @@ namespace gglab
 			for (const std::byte value : m_Value)
 			{
 				if (value != std::byte{})
+				{
 					return true;
+				}
 			}
 			return false;
 		}
@@ -30,7 +32,9 @@ namespace gglab
 			for (const std::byte value : m_Value)
 			{
 				if (value != std::byte{})
+				{
 					return true;
+				}
 			}
 			return false;
 		}

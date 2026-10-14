@@ -138,7 +138,10 @@ namespace gglab
 			RenderingSettingsPanel panel;
 			const auto draw = [&](ImGuiID activation = 0)
 			{
-				if (activation) ImGui::ActivateItemByID(activation);
+				if (activation)
+				{
+					ImGui::ActivateItemByID(activation);
+				}
 				ImGui::NewFrame();
 				ImGui::SetNextWindowPos(ImVec2(20, 20));
 				ImGui::SetNextWindowSize(ImVec2(1100, 1100));

@@ -224,7 +224,10 @@ namespace gglab
 			graph.AddPass<ShadowDiagnosticsFixturePassData>("Diagnostics.RenderingSettingsFixture",
 				[retained](RenderGraph::RGBuilder& builder, ShadowDiagnosticsFixturePassData&)
 				{
-					if (retained) builder.SideEffect();
+					if (retained)
+					{
+						builder.SideEffect();
+					}
 					const auto texture = [&](const char* name)
 					{
 						auto id = builder.CreateTexture(name, {

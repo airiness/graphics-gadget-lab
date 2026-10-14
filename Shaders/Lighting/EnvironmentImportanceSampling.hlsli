@@ -85,11 +85,17 @@ float EvaluateEnvironmentImportancePdf(Texture2DArray<float> importance, uint re
 	const float3 magnitude = abs(direction);
 	uint face;
 	if (magnitude.x >= magnitude.y && magnitude.x >= magnitude.z)
+	{
 		face = direction.x >= 0.0 ? CUBEMAP_FACE_POSITIVE_X : CUBEMAP_FACE_NEGATIVE_X;
+	}
 	else if (magnitude.y >= magnitude.z)
+	{
 		face = direction.y >= 0.0 ? CUBEMAP_FACE_POSITIVE_Y : CUBEMAP_FACE_NEGATIVE_Y;
+	}
 	else
+	{
 		face = direction.z >= 0.0 ? CUBEMAP_FACE_POSITIVE_Z : CUBEMAP_FACE_NEGATIVE_Z;
+	}
 	const float major = max(magnitude.x, max(magnitude.y, magnitude.z));
 	const float2 uv = float2(dot(direction, GetCubemapFaceRight(face)),
 		-dot(direction, GetCubemapFaceUp(face))) / major * 0.5 + 0.5;

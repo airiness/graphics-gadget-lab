@@ -302,7 +302,10 @@ namespace gglab
 			std::filesystem::path(u8"\u4e2d\u6587 captures");
 		std::filesystem::create_directories(directory, error);
 		context.Check(!error, "Interactive capture tests create a Unicode output directory with spaces");
-		if (error) return;
+		if (error)
+		{
+			return;
+		}
 
 		{
 			FakeCaptureControl control;
@@ -321,7 +324,10 @@ namespace gglab
 					{
 						++openCount;
 						openedDirectory = path;
-						if (rejectOpen) failure = "Injected Shell rejection.";
+						if (rejectOpen)
+						{
+							failure = "Injected Shell rejection.";
+						}
 						return !rejectOpen;
 					},
 				});
@@ -430,7 +436,12 @@ namespace gglab
 
 				ApplicationFrameCapture unavailable({ .m_Coordinator = &coordinator,
 					.m_ConsumeResults = [result = *full, pending = true](std::vector<FrameCaptureRequestResult>& output) mutable
-						{ if (std::exchange(pending, false)) output.push_back(result); } });
+						{
+							if (std::exchange(pending, false))
+							{
+								output.push_back(result);
+							}
+						} });
 				unavailable.Update();
 				context.Check(!unavailable.CanOpenOutputFolder(*full) &&
 					!unavailable.OpenOutputFolder(fullId, failure) && !failure.empty(),

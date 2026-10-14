@@ -29,7 +29,10 @@ namespace gglab
 			return;
 		}
 		m_Source = std::move(source);
-		if (!m_RequestedPhysicalSky) RequestRebake();
+		if (!m_RequestedPhysicalSky)
+		{
+			RequestRebake();
+		}
 	}
 
 	void EnvironmentLightingSystem::SetIntensity(float intensity) noexcept
@@ -169,7 +172,10 @@ namespace gglab
 	bool EnvironmentLightingSystem::PublishWorldLighting(const std::optional<PhysicalSkySource>& source,
 		uint64_t generation) noexcept
 	{
-		if (generation == 0 || generation != m_BakeRequestGeneration) return false;
+		if (generation == 0 || generation != m_BakeRequestGeneration)
+		{
+			return false;
+		}
 		m_ActivePhysicalSky = source;
 		m_PublicationMilliseconds = std::chrono::duration<double, std::milli>(
 			std::chrono::steady_clock::now() - m_RequestTime).count();

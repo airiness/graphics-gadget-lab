@@ -272,7 +272,9 @@ namespace gglab
 					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(size), static_cast<int32_t>(size) });
 					uint32_t sourceIndex;
 					if (mip == 0u)
+					{
 						sourceIndex = registry->GetIBLBakeShaderVisibleSrvIndex(RenderTextureIndex::IBL_EnvironmentCubemap);
+					}
 					else
 					{
 						const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);

@@ -408,9 +408,18 @@ namespace gglab
 			}
 			const auto HexValue = [](char character) noexcept -> int
 				{
-					if (character >= '0' && character <= '9') return character - '0';
-					if (character >= 'a' && character <= 'f') return character - 'a' + 10;
-					if (character >= 'A' && character <= 'F') return character - 'A' + 10;
+					if (character >= '0' && character <= '9')
+					{
+						return character - '0';
+					}
+					if (character >= 'a' && character <= 'f')
+					{
+						return character - 'a' + 10;
+					}
+					if (character >= 'A' && character <= 'F')
+					{
+						return character - 'A' + 10;
+					}
 					return -1;
 				};
 			ShaderProgramRegistryArtifactRef registryRef{};

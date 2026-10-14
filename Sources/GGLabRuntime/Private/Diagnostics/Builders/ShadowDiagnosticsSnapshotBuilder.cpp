@@ -33,7 +33,10 @@ namespace gglab
 	{
 		ShadowDiagnosticsSnapshot snapshot{};
 		snapshot.m_FrameSerial = frameSerial;
-		if (mainView) snapshot.m_MainView = *mainView;
+		if (mainView)
+		{
+			snapshot.m_MainView = *mainView;
+		}
 		if (cascades)
 		{
 			snapshot.m_Settings = cascades->m_Settings;

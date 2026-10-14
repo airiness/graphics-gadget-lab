@@ -493,8 +493,14 @@ namespace gglab
 		if (submittedFence.IsValid())
 		{
 			m_LastSubmittedFencePoint = submittedFence;
-			if (result.IsCompleted()) m_IBLBakeScheduler->OnFrameSubmitted(submittedFence);
-			else m_IBLBakeScheduler->OnFrameAborted(submittedFence);
+			if (result.IsCompleted())
+			{
+				m_IBLBakeScheduler->OnFrameSubmitted(submittedFence);
+			}
+			else
+			{
+				m_IBLBakeScheduler->OnFrameAborted(submittedFence);
+			}
 		}
 		else
 		{

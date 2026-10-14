@@ -30,10 +30,16 @@ namespace gglab
 		std::vector<EntityToolingObservation> m_Entities;
 		[[nodiscard]] const EntityToolingObservation* FindEntity(EntityToolingTarget target) const noexcept
 		{
-			if (target.m_WorldId != m_WorldId || m_WorldId == 0) return nullptr;
+			if (target.m_WorldId != m_WorldId || m_WorldId == 0)
+			{
+				return nullptr;
+			}
 			for (const auto& entity : m_Entities)
 			{
-				if (entity.m_Target == target) return &entity;
+				if (entity.m_Target == target)
+				{
+					return &entity;
+				}
 			}
 			return nullptr;
 		}

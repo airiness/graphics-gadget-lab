@@ -263,9 +263,13 @@ namespace gglab
 				ImGui::TextUnformatted(resource.m_Devirtualized ? "Yes" : "No");
 				ImGui::TableSetColumnIndex(4);
 				if (resource.m_PoolSlot.IsValid())
+				{
 					ImGui::Text("%u", resource.m_PoolSlot.Value());
+				}
 				else
+				{
 					ImGui::TextUnformatted("-");
+				}
 				ImGui::TableSetColumnIndex(5);
 				ImGui::TextUnformatted(usage.c_str());
 				ImGui::TableSetColumnIndex(6);

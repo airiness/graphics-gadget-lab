@@ -84,7 +84,9 @@ namespace gglab
 		std::scoped_lock lock(m_Mutex);
 		const auto iterator = m_Entries.find(path);
 		if (iterator == m_Entries.end())
+		{
 			return;
+		}
 		m_StoredBytes -= iterator->second;
 		m_Entries.erase(iterator);
 	}

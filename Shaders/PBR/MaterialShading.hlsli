@@ -136,7 +136,10 @@ AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 n
 	state.BitangentWS = 0.0.xxx;
 	state.AlphaB = saturate(authoredBaseAlpha + kernelAlpha);
 	state.AlphaT = state.AlphaB;
-	if (!evaluateFrame) return state;
+	if (!evaluateFrame)
+	{
+		return state;
+	}
 	const float2 filteredAlpha = FilterAnisotropicAlpha(authoredBaseAlpha,
 		state.Strength, kernelAlpha);
 	state.AlphaT = filteredAlpha.x;

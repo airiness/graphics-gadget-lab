@@ -186,7 +186,10 @@ namespace gglab
 
 	void DemoPlayground::OnEnter() noexcept
 	{
-		if (m_HasEnvironmentOverride) return;
+		if (m_HasEnvironmentOverride)
+		{
+			return;
+		}
 		auto* environmentView = m_Services.m_EnvironmentLighting;
 		auto* environmentControl = m_Services.m_EnvironmentLightingControl;
 		GGLAB_ASSERT_NOT_NULL(environmentView);

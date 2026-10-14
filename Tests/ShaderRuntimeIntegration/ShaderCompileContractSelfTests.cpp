@@ -2146,7 +2146,10 @@ namespace gglab
 							}
 						}
 					}
-					if (outCosineIntegral) *outCosineIntegral = cosineIntegral;
+					if (outCosineIntegral)
+					{
+						*outCosineIntegral = cosineIntegral;
+					}
 					return result * shader_irradiance_math::GetIrradianceNormalization(cosineIntegral);
 				};
 			bool constantEnvironmentMatches = true;
@@ -2701,14 +2704,23 @@ namespace gglab
 			bool forwardDxilVariantsCompile = true;
 			for (uint32_t variant = 0; variant < 8; ++variant)
 			{
-				if ((variant & 4u) != 0u && (variant & 1u) == 0u) continue;
+				if ((variant & 4u) != 0u && (variant & 1u) == 0u)
+				{
+					continue;
+				}
 				forwardDxilDesc.m_Defines.clear();
 				if ((variant & 1u) != 0u)
+				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS", L"1" });
+				}
 				if ((variant & 2u) != 0u)
+				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_GTAO_CONTRIBUTION_OUTPUT", L"1" });
+				}
 				if ((variant & 4u) != 0u)
+				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS_VALIDATION", L"1" });
+				}
 				forwardDxilVariantsCompile &= compiler.Compile(forwardDxilDesc).IsSuccess();
 			}
 			context.Check(forwardDxilVariantsCompile,
@@ -2717,14 +2729,23 @@ namespace gglab
 			bool diagnosticVariantsCompile = true;
 			for (uint32_t variant = 0; variant < 8u; ++variant)
 			{
-				if ((variant & 4u) != 0u && (variant & 1u) == 0u) continue;
+				if ((variant & 4u) != 0u && (variant & 1u) == 0u)
+				{
+					continue;
+				}
 				forwardDxilDesc.m_Defines = { { L"GGLAB_MATERIAL_DIAGNOSTICS", L"1" } };
 				if ((variant & 1u) != 0u)
+				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS", L"1" });
+				}
 				if ((variant & 2u) != 0u)
+				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_GTAO_CONTRIBUTION_OUTPUT", L"1" });
+				}
 				if ((variant & 4u) != 0u)
+				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS_VALIDATION", L"1" });
+				}
 				for (const auto& target : { MakeDX12CompileTarget(ShaderStage::Pixel),
 					MakeVulkan13CompileTarget(ShaderStage::Pixel) })
 				{
@@ -2773,7 +2794,10 @@ namespace gglab
 			auto entryBody = [](const std::string& text, std::string_view entry) -> std::string_view
 				{
 					const size_t function = text.find(std::format("define void @{}() {{", entry));
-					if (function == std::string::npos) return {};
+					if (function == std::string::npos)
+					{
+						return {};
+					}
 					const size_t begin = text.find('\n', function);
 					const size_t end = text.find("\n}", begin);
 					return begin != std::string::npos && end != std::string::npos

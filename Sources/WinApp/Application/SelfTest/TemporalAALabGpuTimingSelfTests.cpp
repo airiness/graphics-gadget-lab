@@ -187,7 +187,10 @@ namespace gglab
 		for (uint64_t serial = 516; serial < 516 + TemporalAALabGpuTimingSampleTarget; ++serial)
 		{
 			SubmitRange(window, feedback, serial, serial);
-			if (window.Capture(MakeProfile(serial))) ++completions;
+			if (window.Capture(MakeProfile(serial)))
+			{
+				++completions;
+			}
 		}
 		(void)window.Capture(MakeProfile(635));
 		context.Check(completions == 1 && window.GetSnapshot().m_SampleCount == 120 &&

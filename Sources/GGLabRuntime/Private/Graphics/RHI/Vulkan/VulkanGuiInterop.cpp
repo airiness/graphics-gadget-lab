@@ -34,7 +34,10 @@ namespace gglab
 			{
 				auto backing = m_Context.GetVulkanDevice().GetDescriptorManager().GetPublishedResourceBacking(index);
 				if (!backing || backing->GetKind() != VulkanDescriptorBacking::Kind::ImageView ||
-					backing->GetImageView() == VK_NULL_HANDLE) return {};
+					backing->GetImageView() == VK_NULL_HANDLE)
+				{
+					return {};
+				}
 				return backing;
 			}
 
@@ -43,7 +46,10 @@ namespace gglab
 			{
 				auto* native = dynamic_cast<VulkanGraphicsCommandContext*>(commands);
 				GGLAB_ASSERT_NOT_NULL(native);
-				if (!native || native->Get() == VK_NULL_HANDLE) return VK_NULL_HANDLE;
+				if (!native || native->Get() == VK_NULL_HANDLE)
+				{
+					return VK_NULL_HANDLE;
+				}
 				const RHIRenderingAttachment attachment{ .m_View = target };
 				commands->BeginRendering({ .m_ColorAttachments =
 					std::span<const RHIRenderingAttachment>(&attachment, 1) });

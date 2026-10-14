@@ -58,7 +58,10 @@ namespace gglab
 
 	bool CameraRig::SetReferenceViews(std::vector<CameraReferenceView> views) noexcept
 	{
-		if (!GetMainCameraSlot()) return false;
+		if (!GetMainCameraSlot())
+		{
+			return false;
+		}
 		for (size_t index = 0; index < views.size(); ++index)
 		{
 			const auto& view = views[index];
@@ -82,7 +85,10 @@ namespace gglab
 			}
 			for (size_t previous = 0; previous < index; ++previous)
 			{
-				if (views[previous].m_Id == view.m_Id) return false;
+				if (views[previous].m_Id == view.m_Id)
+				{
+					return false;
+				}
 			}
 		}
 		m_ReferenceViews = std::move(views);
@@ -115,13 +121,22 @@ namespace gglab
 
 	bool CameraRig::SetCameraPaths(std::vector<CameraPath> paths) noexcept
 	{
-		if (!GetMainCameraSlot()) return false;
+		if (!GetMainCameraSlot())
+		{
+			return false;
+		}
 		for (size_t index = 0; index < paths.size(); ++index)
 		{
-			if (!IsCameraPathValid(paths[index])) return false;
+			if (!IsCameraPathValid(paths[index]))
+			{
+				return false;
+			}
 			for (size_t previous = 0; previous < index; ++previous)
 			{
-				if (paths[previous].m_Id == paths[index].m_Id) return false;
+				if (paths[previous].m_Id == paths[index].m_Id)
+				{
+					return false;
+				}
 			}
 		}
 		m_CameraPaths = std::move(paths);

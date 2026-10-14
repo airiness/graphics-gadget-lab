@@ -73,10 +73,22 @@ namespace gglab
 				label += name;
 				hasAnyComponent = true;
 			};
-			if (entity.m_Transform) appendComponent("Transform");
-			if (entity.m_Model) appendComponent("Model");
-			if (entity.m_Light) appendComponent("Light");
-			if (hasAnyComponent) label += "]";
+			if (entity.m_Transform)
+			{
+				appendComponent("Transform");
+			}
+			if (entity.m_Model)
+			{
+				appendComponent("Model");
+			}
+			if (entity.m_Light)
+			{
+				appendComponent("Light");
+			}
+			if (hasAnyComponent)
+			{
+				label += "]";
+			}
 			return label;
 		}
 
@@ -431,11 +443,17 @@ namespace gglab
 
 				if (ImGui::MenuItem("Transform", "Required", false, !hasTransform))
 				{
-					if (control) control->AddTransform(entity);
+					if (control)
+					{
+						control->AddTransform(entity);
+					}
 				}
 				if (ImGui::MenuItem("Light", nullptr, false, !hasLight))
 				{
-					if (control) control->AddLight(entity);
+					if (control)
+					{
+						control->AddLight(entity);
+					}
 				}
 				if (hasModel)
 				{
@@ -457,7 +475,10 @@ namespace gglab
 							"{}##{}", devtools::ModelDisplayName(model), model.m_Id.Value());
 						if (ImGui::MenuItem(label.c_str()))
 						{
-							if (control) control->AddModel(entity, model.m_Id);
+							if (control)
+							{
+								control->AddModel(entity, model.m_Id);
+							}
 						}
 					}
 					ImGui::EndMenu();
@@ -486,7 +507,10 @@ namespace gglab
 			ImGui::SameLine();
 			DrawAddComponentButton(control, observation, assetSnapshot);
 			snapshot = view.GetEntities();
-			if (const auto* updated = snapshot.FindEntity(entity)) observation = *updated;
+			if (const auto* updated = snapshot.FindEntity(entity))
+			{
+				observation = *updated;
+			}
 			ImGui::SameLine();
 			ImGui::BeginDisabled(!control);
 			if (ImGui::Button("Delete Entity"))
@@ -498,18 +522,28 @@ namespace gglab
 			if (observation.m_Transform)
 			{
 				if (DrawTransformComponent(*observation.m_Transform) && control)
+				{
 					control->SetTransform(entity, *observation.m_Transform);
+				}
 			}
 			else
 			{
 				ImGui::TextColored(devtools::style::NoticeTextColor,
 					"Transform is missing. New entities always include it.");
-				if (ImGui::Button("Repair Transform") && control) control->AddTransform(entity);
+				if (ImGui::Button("Repair Transform") && control)
+				{
+					control->AddTransform(entity);
+				}
 			}
 			if (observation.m_Light && DrawLightComponent(*observation.m_Light) && control)
+			{
 				control->SetLight(entity, *observation.m_Light);
+			}
 			ImGui::EndDisabled();
-			if (observation.m_Model) DrawModelComponent(*observation.m_Model, assetSnapshot);
+			if (observation.m_Model)
+			{
+				DrawModelComponent(*observation.m_Model, assetSnapshot);
+			}
 			ImGui::PopID();
 		}
 
@@ -522,7 +556,9 @@ namespace gglab
 				state.m_RequestDelete = false;
 			}
 			if (!ImGui::BeginPopupModal("DeleteEntityConfirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			{
 				return;
+			}
 			if (!snapshot.FindEntity(state.m_DeleteTarget))
 			{
 				ImGui::CloseCurrentPopup();
@@ -534,12 +570,17 @@ namespace gglab
 			if (ImGui::Button("Delete") && control)
 			{
 				if (control->DestroyEntity(state.m_DeleteTarget) && state.m_SelectedEntity == state.m_DeleteTarget)
+				{
 					state.m_SelectedEntity = {};
+				}
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::EndDisabled();
 			ImGui::SameLine();
-			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			if (ImGui::Button("Cancel"))
+			{
+				ImGui::CloseCurrentPopup();
+			}
 			ImGui::EndPopup();
 		}
 
@@ -583,7 +624,10 @@ namespace gglab
 			std::vector<EntityToolingObservation> entities;
 			for (const auto& entity : snapshot.m_Entities)
 			{
-				if (PassesFilter(entity, updatedFilter)) entities.push_back(entity);
+				if (PassesFilter(entity, updatedFilter))
+				{
+					entities.push_back(entity);
+				}
 			}
 			entityAnchors.reserve(entities.size());
 			DrawEntityList(entities, state, entityAnchors);

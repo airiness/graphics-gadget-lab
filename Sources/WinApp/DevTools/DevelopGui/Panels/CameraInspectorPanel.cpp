@@ -82,7 +82,10 @@ namespace gglab
 			if (control.SetCamera(id, settings))
 			{
 				const auto updated = view.GetCameras();
-				if (const auto* camera = updated.FindCamera(id)) PullFromCamera(state, *camera);
+				if (const auto* camera = updated.FindCamera(id))
+				{
+					PullFromCamera(state, *camera);
+				}
 			}
 		}
 
@@ -121,7 +124,10 @@ namespace gglab
 			const CameraToolingObservation* display = nullptr;
 			for (const auto& camera : snapshot.m_Cameras)
 			{
-				if (camera.m_RenderViewId == snapshot.m_DisplayViewId) display = &camera;
+				if (camera.m_RenderViewId == snapshot.m_DisplayViewId)
+				{
+					display = &camera;
+				}
 			}
 			const std::string fallback = devtools::EnumText(snapshot.m_DisplayViewId);
 			ImGui::BeginDisabled(!control);
@@ -129,11 +135,19 @@ namespace gglab
 			{
 				for (const auto& camera : snapshot.m_Cameras)
 				{
-					if (!camera.m_EnableRenderView && camera.m_RenderViewId != RenderViewID::Main) continue;
+					if (!camera.m_EnableRenderView && camera.m_RenderViewId != RenderViewID::Main)
+					{
+						continue;
+					}
 					const bool selected = camera.m_RenderViewId == snapshot.m_DisplayViewId;
 					if (ImGui::Selectable(camera.m_Name.c_str(), selected) && control)
+					{
 						control->SetDisplayCamera(camera.m_Id);
-					if (selected) ImGui::SetItemDefaultFocus();
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
 				}
 				ImGui::EndCombo();
 			}
@@ -149,7 +163,10 @@ namespace gglab
 						state.m_SelectedCameraId = camera.m_Id;
 						state.m_Initialized = false;
 					}
-					if (selected) ImGui::SetItemDefaultFocus();
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
 				}
 				ImGui::EndCombo();
 			}
@@ -195,11 +212,15 @@ namespace gglab
 		}
 		snapshot = view.GetCameras();
 		if (!snapshot.FindCamera(state.m_SelectedCameraId))
+		{
 			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;
+		}
 		DrawCameraControls(state, snapshot, control);
 		snapshot = view.GetCameras();
 		if (!snapshot.FindCamera(state.m_SelectedCameraId))
+		{
 			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;
+		}
 		const auto* selected = snapshot.FindCamera(state.m_SelectedCameraId);
 		if (!selected)
 		{
@@ -213,13 +234,21 @@ namespace gglab
 		if (!state.m_Initialized || state.m_LastCameraId != id)
 		{
 			PullFromCamera(state, camera);
-			if (cameraCtrl) state.m_CtrlParams = *camera.m_Controller;
+			if (cameraCtrl)
+			{
+				state.m_CtrlParams = *camera.m_Controller;
+			}
 			state.m_LastCameraId = id;
 			state.m_Initialized = true;
 		}
-		if (state.m_SyncFromCamera && state.m_AutoApply) PullFromCamera(state, camera);
+		if (state.m_SyncFromCamera && state.m_AutoApply)
+		{
+			PullFromCamera(state, camera);
+		}
 		if (cameraCtrl && state.m_SyncFromController && state.m_AutoApply)
+		{
 			state.m_CtrlParams = *camera.m_Controller;
+		}
 
 		ImGui::TextUnformatted(camera.m_Name.c_str());
 		ImGui::Separator();
@@ -235,8 +264,13 @@ namespace gglab
 		ImGui::BeginDisabled(!control);
 		bool frustumChanged = ImGui::Checkbox("Draw Frustum", &camera.m_ShowFrustum);
 		if (camera.m_ShowFrustum)
+		{
 			frustumChanged |= ImGui::ColorEdit4("Frustum Color", &camera.m_FrustumColor.m_R);
-		if (frustumChanged && control) control->SetFrustum(id, camera.m_ShowFrustum, camera.m_FrustumColor);
+		}
+		if (frustumChanged && control)
+		{
+			control->SetFrustum(id, camera.m_ShowFrustum, camera.m_FrustumColor);
+		}
 		if (camera.m_IsDebug)
 		{
 			bool enabled = camera.m_EnableRenderView;
@@ -244,7 +278,10 @@ namespace gglab
 			{
 				control->SetRenderViewEnabled(id, enabled);
 				const auto updated = view.GetCameras();
-				if (const auto* current = updated.FindCamera(id)) camera = *current;
+				if (const auto* current = updated.FindCamera(id))
+				{
+					camera = *current;
+				}
 			}
 			if (camera.m_EnableRenderView && IsDebugCameraRenderViewID(camera.m_RenderViewId))
 			{
@@ -259,13 +296,21 @@ namespace gglab
 					{
 						const bool selectedMode = mode == camera.m_VisibilityMode;
 						if (ImGui::Selectable(devtools::EnumText(mode).c_str(), selectedMode) && control)
+						{
 							control->SetVisibilityMode(id, mode);
-						if (selectedMode) ImGui::SetItemDefaultFocus();
+						}
+						if (selectedMode)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
 					}
 					ImGui::EndCombo();
 				}
 			}
-			else ImGui::TextDisabled("RenderView: None");
+			else
+			{
+				ImGui::TextDisabled("RenderView: None");
+			}
 		}
 		ImGui::Spacing();
 
@@ -320,7 +365,10 @@ namespace gglab
 
 			if (ImGui::Button("Reset Velocity"))
 			{
-				if (control) control->ResetVelocity(id);
+				if (control)
+				{
+					control->ResetVelocity(id);
+				}
 			}
 		}
 		else
@@ -335,11 +383,17 @@ namespace gglab
 		{
 			if (camChanged)
 			{
-				if (control) PushToCamera(state, view, *control, id);
+				if (control)
+				{
+					PushToCamera(state, view, *control, id);
+				}
 			}
 			if (cameraCtrl && ctrlChanged)
 			{
-				if (control) control->SetController(id, state.m_CtrlParams);
+				if (control)
+				{
+					control->SetController(id, state.m_CtrlParams);
+				}
 			}
 		}
 		else
@@ -347,10 +401,16 @@ namespace gglab
 			ImGui::Separator();
 			if (ImGui::Button("Apply"))
 			{
-				if (control) PushToCamera(state, view, *control, id);
+				if (control)
+				{
+					PushToCamera(state, view, *control, id);
+				}
 				if (cameraCtrl)
 				{
-					if (control) control->SetController(id, state.m_CtrlParams);
+					if (control)
+					{
+						control->SetController(id, state.m_CtrlParams);
+					}
 				}
 			}
 			ImGui::SameLine();
@@ -366,7 +426,10 @@ namespace gglab
 
 		ImGui::EndDisabled();
 		const auto refreshed = view.GetCameras();
-		if (const auto* current = refreshed.FindCamera(id)) camera = *current;
+		if (const auto* current = refreshed.FindCamera(id))
+		{
+			camera = *current;
+		}
 
 		// Read only infos
 		ImGui::SeparatorText("Runtime Info");

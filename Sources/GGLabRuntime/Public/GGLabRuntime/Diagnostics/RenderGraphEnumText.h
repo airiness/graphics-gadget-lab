@@ -192,7 +192,10 @@ namespace gglab::diagnostics
 	{
 		for (const auto& entry : RGEnumTextTraits<E>::Entries)
 		{
-			if (entry.m_Value == value) return entry.m_Id;
+			if (entry.m_Value == value)
+			{
+				return entry.m_Id;
+			}
 		}
 		return "Unknown";
 	}
@@ -200,21 +203,30 @@ namespace gglab::diagnostics
 	template <typename E> [[nodiscard]] std::string RGFlagsId(E value)
 	{
 		auto bits = static_cast<std::underlying_type_t<E>>(value);
-		if (bits == 0) return "None";
+		if (bits == 0)
+		{
+			return "None";
+		}
 		std::string result;
 		for (const auto& entry : RGEnumTextTraits<E>::Entries)
 		{
 			const auto flag = static_cast<std::underlying_type_t<E>>(entry.m_Value);
 			if (flag != 0 && (bits & flag) == flag)
 			{
-				if (!result.empty()) result += " | ";
+				if (!result.empty())
+				{
+					result += " | ";
+				}
 				result += entry.m_Id;
 				bits &= ~flag;
 			}
 		}
 		if (bits != 0)
 		{
-			if (!result.empty()) result += " | ";
+			if (!result.empty())
+			{
+				result += " | ";
+			}
 			result += std::format("UnknownBits(0x{:X})", static_cast<uint64_t>(bits));
 		}
 		return result;

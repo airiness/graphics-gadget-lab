@@ -122,7 +122,10 @@ namespace gglab
 					changed |= ImGui::DragFloat("Meters per World Unit",
 						&settings.m_WorldUnitsToMeters, 0.01f, 0.0001f, 10000.0f);
 				}
-				if (changed && control) control->SetAtmosphere(settings);
+				if (changed && control)
+				{
+					control->SetAtmosphere(settings);
+				}
 				if (ImGui::Button("Restore Earth") && control)
 				{
 					control->SetAtmosphere(AtmosphereSettings{});
@@ -159,7 +162,9 @@ namespace gglab
 				{
 					ImGui::TextDisabled("Sun, sky and IBL switch together when the replacement is ready.");
 					if (!light->m_Atmosphere || !light->m_WorldSun)
+					{
 						ImGui::TextDisabled("Physical Sky requires Atmosphere and Physical Sun.");
+					}
 				}
 			}
 
@@ -230,7 +235,10 @@ namespace gglab
 						previewControl->SetPostProcessPreviewExposureEV(exposureEV, Channel);
 					}
 					ImGui::EndDisabled();
-					if (previewControl) previewControl->RequestPostProcessPreview(Channel);
+					if (previewControl)
+					{
+						previewControl->RequestPostProcessPreview(Channel);
+					}
 					if (preview.m_HasPublished && preview.m_Published == selection &&
 						preview.m_Width && preview.m_Height)
 					{
@@ -247,7 +255,10 @@ namespace gglab
 							static_cast<unsigned long long>(preview.m_FrameSerial),
 							static_cast<unsigned long long>(preview.m_UpdateCount));
 					}
-					else ImGui::TextDisabled("Atmosphere preview pending.");
+					else
+					{
+						ImGui::TextDisabled("Atmosphere preview pending.");
+					}
 				}
 				if (ImGui::CollapsingHeader("Diagnostics: Atmosphere GPU"))
 				{
@@ -269,7 +280,10 @@ namespace gglab
 							ImGui::Text("%s: %.3f ms", pass.m_Name.c_str(), pass.m_Milliseconds);
 						}
 					}
-					else ImGui::TextDisabled("Atmosphere timings: enable Diagnostics / Profiling.");
+					else
+					{
+						ImGui::TextDisabled("Atmosphere timings: enable Diagnostics / Profiling.");
+					}
 				}
 			}
 		}
@@ -277,7 +291,10 @@ namespace gglab
 
 	void WorldLightingPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!ImGui::BeginTabBar("WorldLightingTabs")) return;
+		if (!ImGui::BeginTabBar("WorldLightingTabs"))
+		{
+			return;
+		}
 		if (ImGui::BeginTabItem("Sun"))
 		{
 			DrawSun(context);

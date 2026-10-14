@@ -69,7 +69,9 @@ namespace gglab
 			bool ReadBytes(std::span<std::byte> output) noexcept
 			{
 				if (output.size() > m_Bytes.size() - m_Offset)
+				{
 					return false;
+				}
 				std::memcpy(output.data(), m_Bytes.data() + m_Offset, output.size());
 				m_Offset += output.size();
 				return true;
@@ -78,7 +80,9 @@ namespace gglab
 			{
 				uint64_t decoded = 0;
 				if (!ReadUnsigned(decoded, 4))
+				{
 					return false;
+				}
 				value = static_cast<uint32_t>(decoded);
 				return true;
 			}
@@ -89,7 +93,9 @@ namespace gglab
 			bool ReadUnsigned(uint64_t& value, size_t width) noexcept
 			{
 				if (width > m_Bytes.size() - m_Offset)
+				{
 					return false;
+				}
 				value = 0;
 				for (size_t i = 0; i < width; ++i)
 					value |= static_cast<uint64_t>(std::to_integer<uint8_t>(m_Bytes[m_Offset + i]))
@@ -228,7 +234,9 @@ namespace gglab
 		if (IsEnabled())
 		{
 			if (!utils::CreateDirectoryIfNotExist(m_RootDirectory))
+			{
 				return;
+			}
 			std::vector<std::filesystem::path> trashPaths;
 			{
 				std::unique_ptr maintenance = AcquireMaintenanceLock();
@@ -295,7 +303,9 @@ namespace gglab
 			std::error_code errorCode;
 			const uint64_t bytes = std::filesystem::file_size(path, errorCode);
 			if (!errorCode)
+			{
 				m_Catalog.RecordEntry(path, bytes);
+			}
 			m_HitCount.fetch_add(1, std::memory_order_relaxed);
 			m_ReadBytes.fetch_add(result.m_Payload.size(), std::memory_order_relaxed);
 			return result;
@@ -316,7 +326,9 @@ namespace gglab
 	{
 		if (!IsEnabled() || !key.IsValid() || artifactType.empty() ||
 			!artifactContentDigest.IsValid() || payload.empty())
+		{
 			return false;
+		}
 		BinaryWriter header;
 		header.AddBytes(ContainerMagic);
 		header.AddU32LE(ContainerVersion);
@@ -427,7 +439,9 @@ namespace gglab
 	DerivedDataPresence LocalDerivedDataStore::Probe(const DerivedDataKey& key) const noexcept
 	{
 		if (!IsEnabled() || !key.IsValid())
+		{
 			return DerivedDataPresence::Missing;
+		}
 		std::error_code errorCode;
 		const std::filesystem::file_status status =
 			std::filesystem::status(EntryPath(key), errorCode);
@@ -437,7 +451,9 @@ namespace gglab
 			return DerivedDataPresence::Missing;
 		}
 		if (errorCode)
+		{
 			return DerivedDataPresence::Inaccessible;
+		}
 		return std::filesystem::exists(status) ? DerivedDataPresence::Present
 			: DerivedDataPresence::Missing;
 	}
@@ -455,7 +471,9 @@ namespace gglab
 		std::scoped_lock lock(m_Mutex);
 		std::unique_ptr maintenance = AcquireMaintenanceLock();
 		if (!maintenance || !maintenance->IsAcquired())
+		{
 			return;
+		}
 		const std::filesystem::path path = EntryPath(key);
 		const DerivedDataReadResult current =
 			ReadEntry(path, key, artifactType, schemaVersion, options);
@@ -477,25 +495,33 @@ namespace gglab
 	bool LocalDerivedDataStore::Clear() noexcept
 	{
 		if (!IsEnabled())
+		{
 			return true;
+		}
 		std::vector<std::filesystem::path> trashPaths;
 		bool cleared = false;
 		{
 			std::scoped_lock lock(m_Mutex);
 			std::unique_ptr maintenance = AcquireMaintenanceLock();
 			if (!maintenance || !maintenance->IsAcquired())
+			{
 				return false;
+			}
 			trashPaths = CollectTrashPathsLocked();
 
 			std::error_code errorCode;
 			const bool rootExists = std::filesystem::exists(m_RootDirectory, errorCode);
 			if (errorCode)
+			{
 				return false;
+			}
 			if (!rootExists)
 			{
 				cleared = utils::CreateDirectoryIfNotExist(m_RootDirectory);
 				if (cleared)
+				{
 					m_Catalog.Clear();
+				}
 			}
 			else
 			{
@@ -529,7 +555,9 @@ namespace gglab
 	bool LocalDerivedDataStore::ReconcileCatalog() noexcept
 	{
 		if (!IsEnabled())
+		{
 			return false;
+		}
 		std::scoped_lock lock(m_Mutex);
 		return m_Catalog.Reconcile();
 	}
@@ -566,7 +594,9 @@ namespace gglab
 		std::unique_ptr maintenance =
 			m_MaintenanceLock ? m_MaintenanceLock->Acquire() : nullptr;
 		if (!maintenance || !maintenance->WasAbandoned())
+		{
 			return maintenance;
+		}
 		GGLAB_LOG_GRAPHICS_WARN("Recovered an abandoned local DDC maintenance lock for '{}'.",
 			m_RootDirectory.string());
 		GGLAB_UNUSED(m_Catalog.Reconcile());
@@ -655,7 +685,9 @@ namespace gglab
 		std::vector<std::filesystem::path> trashPaths) noexcept
 	{
 		if (trashPaths.empty())
+		{
 			return;
+		}
 		std::thread(
 			[trashPaths = std::move(trashPaths)]() noexcept
 			{

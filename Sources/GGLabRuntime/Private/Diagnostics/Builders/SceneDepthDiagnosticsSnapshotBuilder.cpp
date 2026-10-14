@@ -11,7 +11,10 @@ namespace gglab
 		SceneDepthDiagnosticsSnapshot snapshot{};
 		const auto* resources =
 			renderGraph.GetBlackboard().TryGet<RGSceneDepthResources>(SceneDepthResourcesName);
-		if (!resources || !resources->m_Texture.IsValid()) return snapshot;
+		if (!resources || !resources->m_Texture.IsValid())
+		{
+			return snapshot;
+		}
 		const auto& desc = renderGraph.GetTextureDesc(resources->m_Texture);
 		snapshot = {
 			.m_Width = static_cast<uint32_t>(desc.m_Extent.m_Width),

@@ -509,8 +509,14 @@ namespace gglab
 				"A frame-restricted request cannot allocate or bind in another frame");
 			const auto sceneTap = service.BindTap(100, FrameCaptureSource::Scene, target);
 			const auto diagnosticTap = service.BindTap(100, FrameCaptureSource::Diagnostic, target);
-			if (sceneTap) device.FillReadback(sceneTap->m_Buffer, sceneTap->m_Footprint);
-			if (diagnosticTap) device.FillReadback(diagnosticTap->m_Buffer, diagnosticTap->m_Footprint);
+			if (sceneTap)
+			{
+				device.FillReadback(sceneTap->m_Buffer, sceneTap->m_Footprint);
+			}
+			if (diagnosticTap)
+			{
+				device.FillReadback(diagnosticTap->m_Buffer, diagnosticTap->m_Footprint);
+			}
 			service.OnFrameSubmitted(100, MakeFence(1));
 			const auto missed = Consume(service);
 			context.Check(sceneTap && diagnosticTap && missed.size() == 1 &&
@@ -547,7 +553,10 @@ namespace gglab
 				"Abort fails both bound and unbound frame-restricted requests and requeues only flexible requests");
 			const uint64_t retry = service.RequestDiagnosticCapture(weight, 102);
 			const auto retryTap = service.BindTap(102, FrameCaptureSource::Diagnostic, target);
-			if (retryTap) device.FillReadback(retryTap->m_Buffer, retryTap->m_Footprint);
+			if (retryTap)
+			{
+				device.FillReadback(retryTap->m_Buffer, retryTap->m_Footprint);
+			}
 			service.OnFrameSubmitted(102, MakeFence(2));
 			device.m_CompletedFenceValue = 2;
 			const auto retried = Consume(service);
@@ -820,7 +829,10 @@ namespace gglab
 			std::string ids;
 			for (const auto& entry : diagnostics::RGEnumTextTraits<E>::Entries)
 			{
-				if (!ids.empty()) ids += ',';
+				if (!ids.empty())
+				{
+					ids += ',';
+				}
 				ids += diagnostics::RGEnumId(entry.m_Value);
 			}
 			context.Check(ids == expected, "Graph schema enum identifiers are pinned independently of UI labels");
@@ -921,8 +933,11 @@ namespace gglab
 							access["writtenResourceNodeIndex"] == pass["writes"][i]["resourceNodeIndex"],
 							"Full ReadWrite accesses distinguish consumed and produced versions");
 					}
-					else context.Check(access["writtenVersion"].is_null() && access["writtenResourceNodeIndex"].is_null(),
-						"Read-only accesses have no written version");
+					else
+					{
+						context.Check(access["writtenVersion"].is_null() && access["writtenResourceNodeIndex"].is_null(),
+							"Read-only accesses have no written version");
+					}
 				}
 			}
 			const auto& range = full["compile"]["passes"][2]["accesses"][0]["subresources"];

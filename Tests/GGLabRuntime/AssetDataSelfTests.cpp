@@ -942,7 +942,9 @@ namespace gglab
 				const bool recovered =
 					store.Write(key, ArtifactType, SchemaVersion, artifactDigest, Payload);
 				if (rawMutex)
+				{
 					::CloseHandle(rawMutex);
+				}
 				context.Check(rawMutex && acquired.load(std::memory_order_acquire) && recovered &&
 					!std::filesystem::exists(orphanTemporary),
 					"Local DDC recovers an abandoned mutex and removes orphan temporary files");
@@ -1020,7 +1022,9 @@ namespace gglab
 						nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 				const bool clearRejected = reader != INVALID_HANDLE_VALUE && !store.Clear();
 				if (reader != INVALID_HANDLE_VALUE)
+				{
 					::CloseHandle(reader);
+				}
 				const DerivedDataReadResult preserved =
 					store.Read(key, ArtifactType, SchemaVersion);
 				context.Check(wrote && clearRejected &&
@@ -1058,7 +1062,10 @@ namespace gglab
 				std::format("gglab-tangent-import-{}-{}", GetCurrentProcessId(), GetTickCount64());
 			const bool created = !errorCode && std::filesystem::create_directory(root, errorCode);
 			context.Check(created && !errorCode, "glTF tangent regression creates an isolated fixture directory");
-			if (!created || errorCode) return;
+			if (!created || errorCode)
+			{
+				return;
+			}
 			for (const bool authored : { false, true })
 			{
 				for (const bool mirrored : { false, true })
@@ -1173,7 +1180,10 @@ namespace gglab
 				std::format("gglab-material-import-{}-{}", GetCurrentProcessId(), GetTickCount64());
 			const bool created = !errorCode && std::filesystem::create_directory(root, errorCode);
 			context.Check(created && !errorCode, "Material import creates an isolated glTF fixture directory");
-			if (!created || errorCode) return;
+			if (!created || errorCode)
+			{
+				return;
+			}
 
 			const std::array<float, 30> vertices = {
 				0, 0, 0, 1, 0, 0, 0, 1, 0,
@@ -1205,7 +1215,10 @@ namespace gglab
 {"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
 )" << textureDeclarations << R"("materials":[)" << material << R"(],
 "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3,"TEXCOORD_2":2})";
-				if (firstMaterial >= 0) gltf << R"(,"material":)" << firstMaterial;
+				if (firstMaterial >= 0)
+				{
+					gltf << R"(,"material":)" << firstMaterial;
+				}
 				gltf << '}';
 				if (secondMaterial >= 0)
 				{
@@ -1752,7 +1765,10 @@ namespace gglab
 				std::format("gglab-texture-source-import-{}-{}", GetCurrentProcessId(), GetTickCount64());
 			const bool created = !errorCode && std::filesystem::create_directory(root, errorCode);
 			context.Check(created && !errorCode, "Texture source import creates an isolated glTF fixture directory");
-			if (!created || errorCode) return;
+			if (!created || errorCode)
+			{
+				return;
+			}
 
 			const std::array<float, 24> vertices = {
 				0, 0, 0, 1, 0, 0, 0, 1, 0,
@@ -1777,29 +1793,43 @@ namespace gglab
 "samplers":[{"wrapS":10497,"wrapT":10497},{"wrapS":33071,"wrapT":33071}],"images":[)";
 				for (uint32_t index = 0; index < UniqueTextureCount; ++index)
 				{
-					if (index != 0) gltf << ',';
+					if (index != 0)
+					{
+						gltf << ',';
+					}
 					gltf << "{\"uri\":\"" << prefix << '-' << index << ".png\"}";
 				}
 				gltf << ",{\"uri\":\"./" << prefix << R"(-0.png"}],"textures":[)";
 				for (uint32_t index = 0; index < UniqueTextureCount; ++index)
 				{
-					if (index != 0) gltf << ',';
+					if (index != 0)
+					{
+						gltf << ',';
+					}
 					gltf << "{\"source\":" << index << ",\"sampler\":0}";
 				}
 				gltf << ",{\"source\":" << UniqueTextureCount << R"(,"sampler":1}],"materials":[)";
 				for (uint32_t index = 0; index < MaterialCount; ++index)
 				{
-					if (index != 0) gltf << ',';
+					if (index != 0)
+					{
+						gltf << ',';
+					}
 					const uint32_t textureIndex = index == UniqueTextureCount ? UniqueTextureCount : index % UniqueTextureCount;
 					gltf << "{\"name\":\"Material-" << index << R"(","pbrMetallicRoughness":{"baseColorTexture":{"index":)" << textureIndex;
 					if (index == UniqueTextureCount)
+					{
 						gltf << R"(,"extensions":{"KHR_texture_transform":{"offset":[0.25,0.5]}})";
+					}
 					gltf << R"(}},"normalTexture":{"index":0},"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0.5,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0}}}})";
 				}
 				gltf << R"(],"meshes":[{"primitives":[)";
 				for (uint32_t index = 0; index < MaterialCount; ++index)
 				{
-					if (index != 0) gltf << ',';
+					if (index != 0)
+					{
+						gltf << ',';
+					}
 					gltf << R"({"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},"material":)" << index << '}';
 				}
 				gltf << R"(]}]})";
@@ -1807,7 +1837,9 @@ namespace gglab
 			const auto hasStableBindings = [](const ImportedModel& model) noexcept
 			{
 				if (model.m_Materials.size() < MaterialCount || model.m_TextureSources.size() != UniqueTextureCount + 2u)
+				{
 					return false;
+				}
 				// The first material adds base color, normal and coat in slot order.
 				// Later materials add only their previously unseen base-color sources.
 				for (uint32_t index = 0; index < MaterialCount; ++index)
@@ -1819,7 +1851,9 @@ namespace gglab
 						bindings[static_cast<size_t>(MaterialTextureSlot::Normal)].m_TextureIndex != 1u ||
 						bindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_TextureIndex != 2u ||
 						bindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatRoughness)].m_TextureIndex != 2u)
+					{
 						return false;
+					}
 				}
 				return true;
 			};
