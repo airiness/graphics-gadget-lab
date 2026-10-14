@@ -16,15 +16,63 @@ $session = 'Scripts/GGLabSession.ps1'
 
 | Need | Use |
 | --- | --- |
+| Interactive screenshot or graph export in an ordinary/F5 launch | DevTools **Application > Frame Capture** |
 | One image of one Lab or Demo | `--capture-on-ready` one-shot launch |
 | Several images, views or settings from one process | A session (`GGLabSession.ps1`) |
 | Every authored camera view of the content | `GGLabSession.ps1 batch` |
 | DX12 and Vulkan agreement | Two sessions, `batch` on each, `CompareCaptures.ps1` |
 | Temporal behavior along a fixed camera motion | `GGLabSession.ps1 sequence` |
+| Pass order, versions, barriers and actual transient allocations | `GGLabSession.ps1 graph` |
 
 Sessions and one-shot launches are hidden by default: the window is never shown
 or activated, input is ignored and simulation advances with a fixed 1/60 s step.
 Use `-Visible` only when the owner allows windows on the desktop.
+
+## Interactive capture and graph export
+
+For a normal visible launch, including F5 in Visual Studio or VS Code, open
+DevTools **Application > Frame Capture**. No `--session`, PowerShell command or
+control connection is needed. Keep DevTools enabled (`--no-devtools` removes the
+panel).
+
+- **Capture (F9)** writes the selected Scene or Composited PNG and its JSON
+  metadata sidecar. F9 remains a screenshot hotkey; exporting a graph does not
+  change its Source setting. When ImGui owns keyboard input, use the button or
+  return focus to the rendered view before pressing F9.
+- **Export Graph** writes the full compile and execution records described
+  [below](#render-graph-export).
+- **Export Graph Summary** writes the executed pass order and versioned
+  reads/writes to JSON, without the execution record.
+- Both export buttons share **Timing**, **Settle Frames**, **Reference View**,
+  **Output Directory**, **Label** and **Note** with screenshots. Timing defaults
+  to **Next frame**: the next rendered frame, not the already displayed frame.
+  Select **After ready** to wait for the readiness gates and settle frames.
+  Scene/Composited Source only affects screenshots.
+- The pending count and **Current Frame** readiness gates help explain waiting
+  requests. **History** retains the latest 16 results, showing the captured frame
+  serial and published PNG/JSON paths or a failure. A short notification and the
+  application log also name the actual output file, including graph-only JSON.
+- Click a path in History to copy it. Screenshots show both the PNG and metadata
+  path; graph exports show their single JSON path. Path text and the clipboard
+  use UTF-8; glyph availability follows the configured ImGui font.
+- **Open Output Folder** on a successful result opens that result's actual
+  directory through the Windows Shell. Editing Output Directory afterward does
+  not redirect it. Opening is explicit, never automatic on completion, and is
+  unavailable for unfinished/failed results or hosts without this capability.
+  The adapter does not create directories or open files with their associated
+  applications. Missing/inaccessible directories or Shell errors appear next to
+  the button without changing the capture's completed status. Acceptance by the
+  Shell does not guarantee that an Explorer window has appeared. The explicit
+  open call is synchronous on the frame thread; slow/network paths can stall a frame.
+
+The Windows adapter and `Shell32.lib` dependency belong only to WinApp;
+AppRuntime/Runtime still handle scheduling, fenced completion and publication
+without a Shell dependency. Hidden launches have no folder-opening callback.
+Graph export does not add GPU observation nodes or queries; per-pass timing,
+build identity and shader artifact identity retain their explicit unavailable
+status. Disable observation tools for performance measurements. Interactive
+exports include DevTools passes, unlike hidden sessions with DevTools disabled;
+compare `frame.developmentTools` before comparing graph structure.
 
 ## One-shot capture
 
@@ -70,6 +118,90 @@ failed (for example, no such session); a capture that ran but failed still exits
 
 Session files live in `Build/Sessions/<id>/`: `output.log` holds the process
 output, and captures go to `Captures/` unless `-OutputDirectory` is given.
+
+## Render-graph export
+
+Sessions use control protocol **version 2**. Version 1 requests are rejected;
+rebuild the application and use the matching session script together. The other
+capture and sequence commands retain their behavior.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session graph -Session atrium -Label frame-graph
+powershell -NoProfile -ExecutionPolicy Bypass -File $session graph -Session atrium -Summary -Label discovery
+# Optional: -Timing next-frame, -View CAM_Courtyard, -RequiredContentId,
+# -SettleFrames, -OutputDirectory, -Note and -NoWait.
+```
+
+`graph` uses the existing capture request queue, readiness/settling rules and
+bounded writer. It writes one JSON file, not a PNG. The response's `graph` and
+`metadata` fields name that file; `result -RequestId <id>` retrieves a request
+submitted with `-NoWait`. Files are named `<label>.<frameSerial>.graph.json`
+or `<label>.<frameSerial>.graph-summary.json`, with a free suffix on collision.
+Without a label the subject is the Lab or Demo id. Publication and shutdown
+follow the capture writer's `.partial` and publication-claim rules.
+
+The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.json):
+
+- `compile` is sampled before execution. Full mode contains declaration-order
+  passes, name occurrences (1-based), culling, execution order, encoder,
+  dependencies, accesses with resource versions, barrier intents, acquire/release
+  lists, resource descriptors (including mip/slice counts and buffer size/stride),
+  resource nodes, dependency edges and compile diagnostics. `duplicatePassNames`
+  reports repeated names, including culled declarations. `occurrence` counts equal
+  names in declaration order, including culled passes, not in summary execution
+  order. Culling therefore cannot renumber a pass; T2/T3 addressing uses the same
+  definition. Full accesses include `writtenResourceNodeIndex`/`writtenVersion`
+  (null for read-only accesses). ReadWrite reads the incoming version and writes
+  the new version whose writer is that pass.
+- `execution` is a separate record. It contains executed pass indices, actual
+  allocations with pool slot and physical handle index/generation, and resolved
+  pre/post barriers keyed by pass index. A failed handle resolution is retained
+  with `physical: null`, rather than silently disappearing. Allocation evidence is copied at
+  `Devirtualize`, before `Release` clears the live allocation. Imported resources
+  have no transient pool slot. Pool slots describe actual pool reuse, not a claim
+  of native heap aliasing.
+- `execution.gpuTiming` is explicitly `unavailable`: current backend profilers
+  aggregate scopes by name and do not preserve individual pass identity. No merged
+  duration is attributed to repeated passes, and graph requests do not enable GPU
+  profiling or wait for a timing tail that cannot provide this evidence.
+- Summary mode lists only executed passes, sorted by execution order, with `reads`
+  and `writes`. Each entry includes its version, resource-node index, declared
+  subresource range and an `address` object (`resource`, `at.before`/`at.after`,
+  `occurrence`) for discovery. Resource export/watch addressing is introduced by
+  T2/T3; these commands are not implemented yet.
+- `frame` reuses capture metadata for content, camera, simulation time, render
+  settings and readiness; `frame.frame.serial` equals the top-level `frameSerial`.
+  It adds the Runtime adapter/driver compatibility identity. Build identity and
+  per-pass shader artifact identity are explicitly unavailable with reasons;
+  the capture service currently has no authoritative sources for these. The
+  parameter revision is null until T4.
+- `submission` records the fence handle index/generation and value. A successful
+  graph result is published only after that exact fence completes. Aborted,
+  failed or missing frames fail exact requests, never substitute another frame.
+- `observation` flags the graph export. `observationNodes` is empty: T1 adds no
+  RenderGraph nodes, resources, barriers or GPU queries. Recording is opt-in and
+  inactive frames do not build a graph snapshot. Exports still add CPU/file work;
+  performance runs must keep observation tools off.
+
+Stable enum identifiers and UI labels share one table, but JSON uses only the
+identifiers (for example `WriterToReader`, `DepthStencilWrite`, `CopySource`,
+`AccessTransition` and `Uav`). Editing a UI label does not change schema v1.
+Bit fields retain numeric values and join identifiers with ` | `; a null
+subresource range means all subresources, and `"remaining"` in a range count means
+Remaining. Physical handles are session-local evidence, not persisted asset ids.
+T1 uses the TD12 unavailable GPU-timing fallback; identity-preserving per-pass
+timing and sequence `graphFrames` scheduling are deferred. Existing sequence
+`gpuTiming` is independent and remains available for measurement runs.
+
+Validate published exports from **both** backend runs against the schema, not just
+with a JSON parser (Python with `jsonschema` installed):
+
+```powershell
+python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium-dx12/Captures Build/Sessions/atrium-vulkan/Captures
+```
+
+The validator checks full/summary schema contracts and version/writer consistency.
+Headless snapshot tests alone do not establish dual-backend GPU correctness.
 
 ## Capture settings
 

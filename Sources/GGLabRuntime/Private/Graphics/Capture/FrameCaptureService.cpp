@@ -3,6 +3,8 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -129,6 +131,13 @@ namespace gglab
 		return static_cast<uint32_t>(count);
 	}
 
+	FrameCaptureAvailability FrameCaptureService::GetRequestAvailability() const noexcept
+	{
+		if (m_IsShutdown) return FrameCaptureAvailability::Finalized;
+		return GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests
+			? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
+	}
+
 	FrameCaptureAvailability FrameCaptureService::GetAvailability(
 		RHIFormat format, uint32_t width, uint32_t height) const noexcept
 	{
@@ -154,7 +163,8 @@ namespace gglab
 		}
 		const uint64_t requiredBytes = footprint.m_SizeInBytes + imageBytes;
 		uint64_t usedBytes = 0;
-		size_t payloads = m_Taps.size();
+		size_t payloads = std::ranges::count_if(m_Taps,
+			[](const Tap& tap) { return !tap.m_Graph; });
 		for (const Tap& tap : m_Taps)
 		{
 			usedBytes += tap.m_Footprint.m_SizeInBytes +
@@ -261,6 +271,39 @@ namespace gglab
 		};
 		m_Taps.push_back(std::move(tap));
 		return target;
+	}
+
+	void FrameCaptureService::BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
+	{
+		if (m_IsShutdown || !HasPendingRequests(FrameCaptureSource::RenderGraph)) return;
+		Tap tap{ .m_FrameSerial = frameSerial, .m_Source = FrameCaptureSource::RenderGraph };
+		std::erase_if(m_Queued, [&](const QueuedRequest& request)
+			{
+				if (request.m_Source != FrameCaptureSource::RenderGraph ||
+					(request.m_FrameSerial != 0 && request.m_FrameSerial != frameSerial)) return false;
+				tap.m_Requests.push_back(request);
+				return true;
+			});
+		if (tap.m_Requests.empty()) return;
+		tap.m_Graph = std::make_shared<RGSnapshot>();
+		BuildRenderGraphSnapshot(graph, *tap.m_Graph);
+		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
+		graph.EnableExecutionRecord();
+		m_Taps.push_back(std::move(tap));
+	}
+
+	void FrameCaptureService::EndGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
+	{
+		for (Tap& tap : m_Taps)
+		{
+			if (tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted)
+			{
+				if (auto record = graph.TakeExecutionRecord())
+				{
+					tap.m_Graph->m_Execution = std::move(*record);
+				}
+			}
+		}
 	}
 
 	void FrameCaptureService::OnFrameSubmitted(
@@ -407,6 +450,30 @@ namespace gglab
 
 	void FrameCaptureService::PublishTap(Tap& tap) noexcept
 	{
+		if (tap.m_Graph)
+		{
+			if (!tap.m_Graph->m_Execution.m_Recorded)
+			{
+				FailTap(tap, tap.m_FrameSerial, "The requested graph did not execute.");
+				return;
+			}
+			for (const QueuedRequest& request : tap.m_Requests)
+			{
+				m_Results.push_back({
+					.m_RequestId = request.m_Id,
+					.m_Source = tap.m_Source,
+					.m_Status = FrameCaptureStatus::Completed,
+					.m_FrameSerial = tap.m_FrameSerial,
+					.m_Graph = tap.m_Graph,
+					.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
+					.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(),
+					.m_SubmissionFenceValue = tap.m_Fence.m_Value,
+					.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity,
+				});
+			}
+			tap.m_Requests.clear();
+			return;
+		}
 		const RHITextureCopyFootprint& footprint = tap.m_Footprint;
 		const RHIBufferHandle buffer = tap.m_Buffer.Get();
 		const auto* mapped = static_cast<const std::byte*>(m_Device->MapBuffer(buffer, {

@@ -300,6 +300,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotJson.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderingSettingsDiagnosticsSnapshotBuilder.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
@@ -1680,6 +1683,9 @@
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsView.h">
+      <Filter>Public\GGLabRuntime\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\RenderGraphEnumText.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\RuntimeToolingAdapters.h">

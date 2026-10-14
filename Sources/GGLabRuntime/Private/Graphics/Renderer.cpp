@@ -445,7 +445,9 @@ namespace gglab
 			.m_DirectComputeCommandContext = &m_ActiveFrame.m_RHIFrame->GetDirectComputeContext(),
 			.m_AsyncComputeCommandContext = nullptr,
 		} };
+		m_FrameCapture->BeginGraphRecording(m_ActiveFrame.m_Serial, rg);
 		rg.Execute(executeContext);
+		m_FrameCapture->EndGraphRecording(m_ActiveFrame.m_Serial, rg);
 
 		m_ActiveFrame.m_Phase = FramePhase::Recorded;
 	}

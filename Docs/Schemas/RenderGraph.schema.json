@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.render-graph.v1",
+  "title": "GGLab render graph frame export v1",
+  "type": "object",
+  "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
+  "properties": {
+    "schema": { "const": "gglab.render-graph" },
+    "schemaVersion": { "const": 1 },
+    "mode": { "enum": ["full", "summary"] },
+    "frameSerial": { "type": "integer", "minimum": 1 },
+    "frame": {
+      "type": "object",
+      "required": ["backend", "content", "frame", "camera", "time", "readiness", "temporal", "adapterDriverIdentity", "codeIdentity", "shaderIdentity", "parameterRevision"],
+      "properties": {
+        "backend": { "enum": ["dx12", "vulkan"] },
+        "content": { "type": "object" },
+        "frame": { "type": "object", "required": ["serial", "index"] },
+        "camera": { "type": "object" },
+        "time": { "type": "object" },
+        "readiness": { "type": "object" },
+        "temporal": { "type": "object" },
+        "adapterDriverIdentity": { "type": "string" },
+        "codeIdentity": { "$ref": "#/$defs/unavailable" },
+        "shaderIdentity": { "$ref": "#/$defs/unavailable" },
+        "parameterRevision": { "type": "null" }
+      }
+    },
+    "submission": {
+      "type": "object",
+      "required": ["fenceIndex", "fenceGeneration", "fenceValue", "completed"],
+      "properties": {
+        "fenceIndex": { "type": "integer", "minimum": 0 },
+        "fenceGeneration": { "type": "integer", "minimum": 0 },
+        "fenceValue": { "type": "integer", "minimum": 1 },
+        "completed": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": ["graph", "resourceExport", "nonFiniteWatch"],
+      "properties": {
+        "graph": { "const": true },
+        "resourceExport": { "const": false },
+        "nonFiniteWatch": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "compile": {
+      "type": "object",
+      "required": ["duplicatePassNames", "passes"],
+      "properties": {
+        "duplicatePassNames": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "passes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "name", "occurrence", "executionOrder"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 0 },
+              "name": { "type": "string" },
+              "occurrence": { "type": "integer", "minimum": 1 },
+              "executionOrder": { "type": "integer", "minimum": -1 },
+              "encoder": { "enum": ["Graphics", "Compute", "Copy"] },
+              "sideEffect": { "type": "boolean" },
+              "culled": { "type": "boolean" },
+              "dependencies": { "type": "array", "items": { "type": "integer" } },
+              "dependents": { "type": "array", "items": { "type": "integer" } },
+              "accesses": { "type": "array", "items": { "$ref": "#/$defs/access" } },
+              "preBarriers": { "type": "array", "items": { "$ref": "#/$defs/barrier" } },
+              "postBarriers": { "type": "array", "items": { "$ref": "#/$defs/barrier" } },
+              "devirtualize": { "type": "array", "items": { "type": "integer" } },
+              "destroy": { "type": "array", "items": { "type": "integer" } },
+              "reads": { "type": "array", "items": { "$ref": "#/$defs/summaryAccess" } },
+              "writes": { "type": "array", "items": { "$ref": "#/$defs/summaryAccess" } }
+            }
+          }
+        },
+        "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } },
+        "versions": { "type": "array", "items": { "type": "object", "required": ["index", "resourceSlot", "version", "resourceIndex", "resource", "type", "writer", "previous", "readers"], "properties": { "type": { "$ref": "#/$defs/resourceType" } } } },
+        "dependencyEdges": { "type": "array", "items": { "type": "object", "required": ["from", "to", "resourceNodeIndex", "reason"], "properties": { "reason": { "enum": ["WriterToReader", "PreviousWriterToWriter", "PreviousReaderToWriter", "ExportWriterToExport", "ExportReaderToExport"] } } } },
+        "diagnostics": { "type": "array", "items": { "type": "object", "required": ["severity", "code", "message", "passIndex", "resourceIndex"], "properties": { "severity": { "enum": ["Info", "Warning", "Error"] }, "code": { "enum": ["InvalidDeclaration", "UndefinedContentRead", "DependencyCycle", "InvalidExecutionPlan"] } } } }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["status", "executedPassIndices", "allocations", "resolvedBarriers", "observationNodes", "gpuTiming"],
+      "properties": {
+        "status": { "const": "recorded" },
+        "executedPassIndices": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "allocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["resourceIndex", "passIndex", "imported", "poolSlot", "physical"],
+            "properties": {
+              "resourceIndex": { "type": "integer", "minimum": 0 },
+              "passIndex": { "type": "integer", "minimum": 0 },
+              "imported": { "type": "boolean" },
+              "poolSlot": { "type": ["integer", "null"], "minimum": 0 },
+              "physical": { "$ref": "#/$defs/physical" }
+            }
+          }
+        },
+        "resolvedBarriers": { "type": "array", "items": { "allOf": [{ "$ref": "#/$defs/barrier" }, { "required": ["physical", "passIndex", "phase"] }] } },
+        "observationNodes": { "type": "array", "maxItems": 0 },
+        "gpuTiming": { "$ref": "#/$defs/unavailable" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "full" } } },
+      "then": {
+        "required": ["execution"],
+        "properties": {
+          "compile": {
+            "required": ["resources", "versions", "dependencyEdges", "diagnostics"],
+            "properties": { "passes": { "items": { "required": ["encoder", "sideEffect", "culled", "dependencies", "dependents", "accesses", "preBarriers", "postBarriers", "devirtualize", "destroy"] } } }
+          }
+        }
+      },
+      "else": {
+        "not": { "required": ["execution"] },
+        "properties": { "compile": { "properties": { "passes": { "items": { "required": ["reads", "writes"] } } } } }
+      }
+    }
+  ],
+  "$defs": {
+    "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },
+    "physical": { "type": ["object", "null"], "required": ["index", "generation"], "properties": { "index": { "type": "integer", "minimum": 0 }, "generation": { "type": "integer", "minimum": 0 } } },
+    "resourceType": { "enum": ["Texture", "Buffer"] },
+    "rangeCount": { "oneOf": [{ "type": "integer", "minimum": 0, "maximum": 4294967294 }, { "const": "remaining" }] },
+    "subresources": {
+      "type": ["object", "null"],
+      "required": ["baseMip", "mipCount", "baseSlice", "sliceCount", "aspects"],
+      "properties": {
+        "baseMip": { "type": "integer", "minimum": 0 },
+        "mipCount": { "$ref": "#/$defs/rangeCount" },
+        "baseSlice": { "type": "integer", "minimum": 0 },
+        "sliceCount": { "$ref": "#/$defs/rangeCount" },
+        "aspects": { "type": "string", "pattern": "^(None|Color|Depth|Stencil)( \\| (Color|Depth|Stencil))*$" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["stages", "stageBits", "access", "accessBits", "layout"],
+      "properties": {
+        "stages": { "type": "string", "pattern": "^(None|DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present)( \\| (DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present))*$" },
+        "stageBits": { "type": "integer", "minimum": 0 },
+        "access": { "type": "string", "pattern": "^(None|Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present)( \\| (Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present))*$" },
+        "accessBits": { "type": "integer", "minimum": 0 },
+        "layout": { "enum": ["Unknown", "Common", "ShaderResource", "RenderTarget", "DepthStencilRead", "DepthStencilWrite", "UnorderedAccess", "CopySource", "CopyDest", "Present", "Undefined"] }
+      }
+    },
+    "access": {
+      "type": "object",
+      "required": ["resourceNodeIndex", "resourceSlot", "version", "writtenResourceNodeIndex", "writtenVersion", "resourceIndex", "resource", "type", "dependencyAccess", "ordering", "access", "accessBits", "stages", "stageBits", "subresources"],
+      "properties": {
+        "resourceNodeIndex": { "type": "integer", "minimum": 0 },
+        "version": { "type": "integer", "minimum": 1 },
+        "writtenResourceNodeIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "writtenVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "type": { "$ref": "#/$defs/resourceType" },
+        "dependencyAccess": { "enum": ["Read", "Write", "ReadWrite"] },
+        "ordering": { "enum": ["Ordered", "Unordered"] },
+        "stages": { "$ref": "#/$defs/state/properties/stages" },
+        "subresources": { "$ref": "#/$defs/subresources" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "dependencyAccess": { "const": "Read" } } },
+          "then": { "properties": { "writtenResourceNodeIndex": { "type": "null" }, "writtenVersion": { "type": "null" } } },
+          "else": { "properties": { "writtenResourceNodeIndex": { "type": "integer" }, "writtenVersion": { "type": "integer" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "Texture" } } },
+          "then": { "properties": { "access": { "enum": ["None", "Sample", "RenderTarget", "DepthStencilWrite", "DepthStencilRead", "StorageRead", "StorageWrite", "StorageReadWrite", "CopySource", "CopyDest", "Present"] } } },
+          "else": { "properties": { "access": { "enum": ["None", "Vertex", "Index", "Constant", "StructuredRead", "StorageRead", "StorageWrite", "StorageReadWrite", "CopySource", "CopyDest", "IndirectArgument"] } } }
+        }
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "required": ["index", "name", "type", "imported", "referenceCount", "firstUser", "lastUser", "usageBits", "usage", "initialState", "finalState", "finalSubresources", "exportPass"],
+      "properties": {
+        "type": { "$ref": "#/$defs/resourceType" },
+        "initialState": { "$ref": "#/$defs/state" },
+        "finalState": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/state" }] },
+        "finalSubresources": { "$ref": "#/$defs/subresources" },
+        "buffer": { "type": "object", "required": ["sizeBytes", "strideBytes"], "properties": { "sizeBytes": { "type": "integer", "minimum": 0 }, "strideBytes": { "type": "integer", "minimum": 0 } } },
+        "texture": { "type": "object", "required": ["format", "extent", "mips", "slices", "samples"] }
+      },
+      "allOf": [{ "if": { "properties": { "type": { "const": "Buffer" } } }, "then": { "required": ["buffer"] }, "else": { "required": ["texture"] } }]
+    },
+    "barrier": {
+      "type": "object",
+      "required": ["resourceIndex", "resource", "type", "kind", "reason", "before", "after", "subresources"],
+      "properties": {
+        "type": { "$ref": "#/$defs/resourceType" },
+        "kind": { "enum": ["Transition", "Uav"] },
+        "reason": { "enum": ["AccessTransition", "OrderedStorageHazard", "FinalStateTransition"] },
+        "before": { "$ref": "#/$defs/state" },
+        "after": { "$ref": "#/$defs/state" },
+        "subresources": { "$ref": "#/$defs/subresources" },
+        "physical": { "$ref": "#/$defs/physical" },
+        "phase": { "enum": ["pre", "post"] },
+        "passIndex": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "summaryAccess": {
+      "type": "object",
+      "required": ["version", "resourceNodeIndex", "subresources", "address"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "resourceNodeIndex": { "type": "integer", "minimum": 0 },
+        "subresources": { "$ref": "#/$defs/subresources" },
+        "address": { "type": "object", "required": ["resource", "at", "occurrence"], "properties": { "resource": { "type": "string" }, "at": { "type": "object", "oneOf": [{ "required": ["before"] }, { "required": ["after"] }] }, "occurrence": { "type": "integer", "minimum": 1 } } }
+      }
+    }
+  }
+}

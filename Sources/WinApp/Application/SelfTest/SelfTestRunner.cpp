@@ -8,6 +8,7 @@
 #include "Application/SelfTest/TemporalAALabDiagnosticsSelfTests.h"
 #include "Application/SelfTest/TemporalAALabGpuTimingSelfTests.h"
 #include "Application/SelfTest/FrameCaptureImageEncoderSelfTests.h"
+#include "Application/SelfTest/ApplicationFrameCaptureSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
@@ -71,6 +72,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-frame-capture-encoder",
 				.m_Run = &RunFrameCaptureImageEncoderSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-frame-capture",
+				.m_Run = &RunApplicationFrameCaptureSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-launch-options",

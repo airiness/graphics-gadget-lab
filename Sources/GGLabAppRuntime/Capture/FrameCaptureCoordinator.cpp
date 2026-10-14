@@ -3,6 +3,9 @@
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -27,6 +30,8 @@ namespace gglab
 		{
 			Queued,
 			Encoding,
+			SerializingGraph,
+			WritingGraph,
 			WritingImage,
 			WritingMetadata,
 			Publishing,
@@ -41,6 +46,10 @@ namespace gglab
 				return "queued";
 			case EncodeStage::Encoding:
 				return "encoding";
+			case EncodeStage::SerializingGraph:
+				return "serializing graph";
+			case EncodeStage::WritingGraph:
+				return "writing graph";
 			case EncodeStage::WritingImage:
 				return "writing image";
 			case EncodeStage::WritingMetadata:
@@ -68,6 +77,13 @@ namespace gglab
 	struct FrameCaptureCoordinator::EncodeJob
 	{
 		std::shared_ptr<const FrameCaptureImage> m_Image;
+		// Immutable JSON prepared from the fenced Runtime record on the writer thread.
+		std::shared_ptr<const RGSnapshot> m_Graph;
+		bool m_GraphSummary = false;
+		uint32_t m_SubmissionFenceIndex = 0;
+		uint32_t m_SubmissionFenceGeneration = 0;
+		uint64_t m_SubmissionFenceValue = 0;
+		std::string m_AdapterCompatibilityIdentity;
 		std::filesystem::path m_Directory;
 		// Preferred file stem; the writer appends a suffix when it is taken.
 		std::string m_BaseStem;
@@ -157,7 +173,7 @@ namespace gglab
 			if (!std::filesystem::is_directory(path.parent_path(), errorCode))
 			{
 				return std::format("The output directory '{}' could not be created.",
-					path.parent_path().string());
+					GetFrameCapturePathText(path.parent_path()));
 			}
 
 			std::ofstream file(path, std::ios::binary | std::ios::trunc);
@@ -167,7 +183,7 @@ namespace gglab
 			if (!file)
 			{
 				std::filesystem::remove(path, errorCode);
-				return std::format("Writing '{}' failed.", path.string());
+				return std::format("Writing '{}' failed.", GetFrameCapturePathText(path));
 			}
 			return {};
 		}
@@ -329,6 +345,10 @@ namespace gglab
 		if (reserved >= MaxInFlightCaptures)
 		{
 			return FrameCaptureAvailability::Busy;
+		}
+		if (source == FrameCaptureSource::RenderGraph)
+		{
+			return m_Capture->GetRequestAvailability();
 		}
 		const ViewExtent extent = state.m_SettleKey.m_Temporal.m_Identity.m_ColorExtent;
 		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic
@@ -680,7 +700,9 @@ namespace gglab
 			return;
 		}
 
-		if (result.m_Status != FrameCaptureStatus::Completed || !result.m_Image)
+		const bool graph = entry->m_Request.m_Source == FrameCaptureSource::RenderGraph;
+		if (result.m_Status != FrameCaptureStatus::Completed ||
+			(graph ? !result.m_Graph : !result.m_Image))
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
 				result.m_Failure.empty() ? std::string("The frame capture failed.")
@@ -714,10 +736,13 @@ namespace gglab
 		}
 
 		FrameCaptureMetadata& metadata = entry.m_Metadata;
-		const FrameCaptureImage& image = *result.m_Image;
-		metadata.m_Width = image.m_Width;
-		metadata.m_Height = image.m_Height;
-		metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
+		if (result.m_Image)
+		{
+			const FrameCaptureImage& image = *result.m_Image;
+			metadata.m_Width = image.m_Width;
+			metadata.m_Height = image.m_Height;
+			metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
+		}
 
 		const std::string_view subject = !entry.m_Request.m_Label.empty()
 			? std::string_view(entry.m_Request.m_Label)
@@ -739,9 +764,17 @@ namespace gglab
 		auto job = std::make_shared<EncodeJob>();
 		job->m_SubmittedAt = std::chrono::steady_clock::now();
 		job->m_Image = result.m_Image;
+		job->m_Graph = result.m_Graph;
+		job->m_GraphSummary = entry.m_Request.m_GraphSummary;
+		job->m_SubmissionFenceIndex = result.m_SubmissionFenceIndex;
+		job->m_SubmissionFenceGeneration = result.m_SubmissionFenceGeneration;
+		job->m_SubmissionFenceValue = result.m_SubmissionFenceValue;
+		job->m_AdapterCompatibilityIdentity = result.m_AdapterCompatibilityIdentity;
 		job->m_Directory = directory;
-		job->m_BaseStem = baseStem;
-		job->m_TemporaryStem = std::format("{}.{}", baseStem, m_TemporaryTag);
+		job->m_BaseStem = result.m_Graph
+			? std::format("{}.{}.graph{}", SanitizeFileStemComponent(subject), metadata.m_FrameSerial,
+				entry.m_Request.m_GraphSummary ? "-summary" : "") : baseStem;
+		job->m_TemporaryStem = std::format("{}.{}.{}", job->m_BaseStem, m_TemporaryTag, entry.m_Id);
 		job->m_Metadata = metadata;
 		entry.m_Job = job;
 		entry.m_Phase = Phase::Encoding;
@@ -938,6 +971,7 @@ namespace gglab
 		// Release Runtime payload capacity on the writer thread before reporting
 		// completion. No frame-thread state or RHI resource is touched here.
 		job.m_Image.reset();
+		job.m_Graph.reset();
 		job.m_Stage = EncodeStage::Done;
 		{
 			std::scoped_lock lock(job.m_Mutex);
@@ -948,8 +982,58 @@ namespace gglab
 	}
 
 	std::string FrameCaptureCoordinator::WriteAndPublish(
-		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
+		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept try
 	{
+		if (job.m_Graph)
+		{
+			job.m_Stage = EncodeStage::SerializingGraph;
+			using Json = nlohmann::ordered_json;
+			Json graph = Json::parse(SerializeRenderGraphSnapshot(*job.m_Graph, job.m_GraphSummary));
+			graph["frame"] = Json::parse(SerializeFrameCaptureMetadata(job.m_Metadata));
+			graph["frame"].erase("image"); // Graph exports do not contain a PNG.
+			graph["frame"].erase("schemaVersion"); // The enclosing graph schema owns this block.
+			graph["frameSerial"] = job.m_Metadata.m_FrameSerial;
+			graph["frame"]["adapterDriverIdentity"] = job.m_AdapterCompatibilityIdentity;
+			graph["frame"]["codeIdentity"] = { {"status", "unavailable"},
+				{"reason", "The capture metadata service has no build identity source."} };
+			graph["frame"]["shaderIdentity"] = { {"status", "unavailable"},
+				{"reason", "The graph does not retain per-pass shader artifact identities."} };
+			graph["frame"]["parameterRevision"] = nullptr; // Introduced with T4.
+			graph["submission"] = { {"fenceIndex", job.m_SubmissionFenceIndex},
+				{"fenceGeneration", job.m_SubmissionFenceGeneration},
+				{"fenceValue", job.m_SubmissionFenceValue}, {"completed", true} };
+			graph["observation"] = { {"graph", true}, {"resourceExport", false}, {"nonFiniteWatch", false} };
+			const std::string json = graph.dump(2, ' ', false, Json::error_handler_t::replace);
+			const auto temporary = job.m_Directory / (job.m_TemporaryStem + ".json.partial");
+			const auto* bytes = reinterpret_cast<const uint8_t*>(json.data());
+			job.m_Stage = EncodeStage::WritingGraph;
+			std::string failure = WriteFileContents(temporary, {bytes, json.size()});
+			if (!failure.empty()) return failure;
+			PublicationClaim expected = PublicationClaim::Open;
+			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
+			{
+				std::error_code error;
+				std::filesystem::remove(temporary, error);
+				return "The graph export was abandoned at shutdown.";
+			}
+			job.m_Stage = EncodeStage::Publishing;
+			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
+			{
+				const auto path = job.m_Directory / ((attempt == 1 ? job.m_BaseStem
+					: std::format("{}-{}", job.m_BaseStem, attempt)) + ".json");
+				const PublishOutcome outcome = PublishNewFile(temporary, path);
+				if (outcome == PublishOutcome::NameTaken) continue;
+				std::error_code error;
+				std::filesystem::remove(temporary, error);
+				if (outcome == PublishOutcome::Failed)
+					return std::format("Publishing '{}' failed.", GetFrameCapturePathText(path));
+				job.m_MetadataPath = path;
+				return {};
+			}
+			std::error_code error;
+			std::filesystem::remove(temporary, error);
+			return "No unused file name was found for the graph export.";
+		}
 		if (!encoder)
 		{
 			return "No capture image encoder is configured.";
@@ -1004,12 +1088,12 @@ namespace gglab
 			if (image == PublishOutcome::Failed)
 			{
 				removeTemporaryFiles();
-				return std::format("Publishing '{}' failed.", imagePath.string());
+				return std::format("Publishing '{}' failed.", GetFrameCapturePathText(imagePath));
 			}
 
 			// The sidecar names the image file, so it is written once the name is fixed.
 			job.m_Stage = EncodeStage::WritingMetadata;
-			job.m_Metadata.m_ImageFile = imagePath.filename().string();
+			job.m_Metadata.m_ImageFile = GetFrameCapturePathText(imagePath.filename());
 			const std::string json = SerializeFrameCaptureMetadata(job.m_Metadata);
 			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(json.data());
 			failure = WriteFileContents(
@@ -1041,7 +1125,7 @@ namespace gglab
 			{
 				removeTemporaryFiles();
 				return failure.empty()
-					? std::format("Publishing '{}' failed.", metadataPath.string())
+					? std::format("Publishing '{}' failed.", GetFrameCapturePathText(metadataPath))
 					: failure;
 			}
 			job.m_Stage = EncodeStage::Publishing;
@@ -1049,5 +1133,11 @@ namespace gglab
 		removeTemporaryFiles();
 		return std::format("No unused file name was found for '{}' after {} attempts.",
 			job.m_BaseStem, MaxPublishAttempts);
+	}
+	catch (const nlohmann::json::exception& error)
+	{
+		// Invalid UTF-8 or malformed metadata must fail the request, not terminate
+		// the noexcept writer. Serialization finishes before any graph file is written.
+		return std::format("Serializing the graph export failed: {}", error.what());
 	}
 }

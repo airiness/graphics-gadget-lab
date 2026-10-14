@@ -3,6 +3,10 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 
+#include <format>
+#include <limits>
+#include <unordered_map>
+
 namespace gglab
 {
 	namespace
@@ -120,6 +124,7 @@ namespace gglab
 
 			void BuildPasses() noexcept
 			{
+				std::unordered_map<std::string, uint32_t> occurrences;
 				for (uint32_t passIndex = 0; passIndex < m_PassNodes.size(); ++passIndex)
 				{
 					const auto& declaration = m_PassNodes[passIndex];
@@ -132,6 +137,11 @@ namespace gglab
 					passInfo.m_Index = passIndex;
 					passInfo.m_ExecutionOrder = compiledPass ? compiledPass->m_ExecutionOrder : -1;
 					passInfo.m_Name = ToSnapshotName(declaration.m_NameId);
+					passInfo.m_Occurrence = ++occurrences[passInfo.m_Name];
+					if (passInfo.m_Occurrence == 2)
+					{
+						m_OutSnapshot.m_DuplicatePassNames.push_back(passInfo.m_Name);
+					}
 					passInfo.m_EncoderType = declaration.m_EncoderType;
 					passInfo.m_SideEffect = declaration.m_SideEffect;
 					passInfo.m_Culled = compiledPass ? compiledPass->m_Culled : false;
@@ -212,8 +222,19 @@ namespace gglab
 								virtualResource);
 						resourceInfo.m_TextureFormat = texture->m_Desc.m_Format;
 						resourceInfo.m_TextureExtent = texture->m_Desc.m_Extent;
+						resourceInfo.m_TextureMipLevels = texture->m_Desc.m_MipLevels;
+						resourceInfo.m_TextureArraySize = texture->m_Desc.m_ArraySize;
+						resourceInfo.m_TextureSampleCount = texture->m_Desc.m_SampleCount;
 						resourceInfo.m_TextureClearValue = texture->m_Desc.m_ClearValue;
 					}
+					else
+					{
+						const auto* buffer = static_cast<const RGVirtualResource<RGBufferResource>*>(virtualResource);
+						resourceInfo.m_BufferSizeInBytes = buffer->m_Desc.m_SizeInBytes;
+						resourceInfo.m_BufferStrideInBytes = buffer->m_Desc.m_StrideInBytes;
+					}
+					resourceInfo.m_ExportPassIndex = compiledResource
+						? ToSnapshotPassIndex(compiledResource->m_ExportPass) : -1;
 					resourceInfo.m_PoolSlot = GetVirtualResourcePoolSlot(virtualResource);
 					resourceInfo.m_InitialBarrierState =
 						compiledResource ? compiledResource->m_InitialState
@@ -286,6 +307,12 @@ namespace gglab
 				accessInfo.m_ResourceNodeIndex = access.m_ResourceNodeIndex.Value();
 				accessInfo.m_ResourceSlot = resourceNode.m_ResourceHandle.GetHandle().Value();
 				accessInfo.m_ResourceVersion = resourceNode.m_ResourceHandle.GetVersion();
+				if (access.m_WrittenResourceNodeIndex.IsValid())
+				{
+					accessInfo.m_WrittenResourceNodeIndex = access.m_WrittenResourceNodeIndex.Value();
+					accessInfo.m_WrittenResourceVersion = m_ResourceNodes[
+						access.m_WrittenResourceNodeIndex.Value()].m_ResourceHandle.GetVersion();
+				}
 				accessInfo.m_VirtualResourceIndex =
 					LookupVirtualResourceIndex(resourceNode.m_VirtualResource);
 				accessInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());
@@ -372,5 +399,10 @@ namespace gglab
 		RGSnapshotBuilder(rg.m_ResourceNodes, rg.m_PassNodes, rg.m_VirtualResources,
 			rg.m_ExecutionPlan.get(), outSnapshot)
 			.Build();
+		outSnapshot.m_CompileDiagnostics = rg.GetCompileDiagnostics();
+		if (rg.m_ExecutionRecord)
+		{
+			outSnapshot.m_Execution = *rg.m_ExecutionRecord;
+		}
 	}
 }

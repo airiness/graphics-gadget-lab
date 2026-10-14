@@ -25,6 +25,8 @@ namespace gglab
 			std::array<char, 512> m_OutputDirectory{};
 			std::array<char, 128> m_Label{};
 			std::array<char, 512> m_Note{};
+			uint64_t m_OpenFolderRequestId = 0;
+			std::string m_OpenFolderFailure;
 			bool m_Initialized = false;
 		};
 
@@ -69,7 +71,7 @@ namespace gglab
 			ApplicationFrameCapture::Settings& settings = frameCapture.GetSettings();
 			if (!state.m_Initialized)
 			{
-				CopyToBuffer(state.m_OutputDirectory, settings.m_OutputDirectory.string());
+				CopyToBuffer(state.m_OutputDirectory, ApplicationFrameCapture::GetPathText(settings.m_OutputDirectory));
 				CopyToBuffer(state.m_Label, settings.m_Label);
 				CopyToBuffer(state.m_Note, settings.m_Note);
 				state.m_Initialized = true;
@@ -122,10 +124,12 @@ namespace gglab
 			if (ImGui::InputText(
 				"Output Directory", state.m_OutputDirectory.data(), state.m_OutputDirectory.size()))
 			{
-				settings.m_OutputDirectory = std::filesystem::path(state.m_OutputDirectory.data());
+				const char* text = state.m_OutputDirectory.data();
+				settings.m_OutputDirectory = std::filesystem::path(
+					std::u8string(text, text + std::strlen(text)));
 			}
 			ImGui::SetItemTooltip("Empty uses the default directory:\n%s",
-				frameCapture.GetDefaultOutputDirectory().string().c_str());
+				ApplicationFrameCapture::GetPathText(frameCapture.GetDefaultOutputDirectory()).c_str());
 			if (ImGui::InputText("Label", state.m_Label.data(), state.m_Label.size()))
 			{
 				settings.m_Label = state.m_Label.data();
@@ -152,8 +156,22 @@ namespace gglab
 				ImGui::SetTooltip("Captures every reference view of the active content in order.\n"
 					"After-ready timing lets each view settle before its capture.");
 			}
+
+			if (ImGui::Button("Export Graph"))
+			{
+				frameCapture.ExportGraph();
+			}
+			ImGui::SetItemTooltip("Writes full compile and execution records to JSON after GPU completion.\n"
+				"No image readback or per-pass GPU timing is added.");
 			ImGui::SameLine();
-			ImGui::TextDisabled("%u pending", frameCapture.GetUnfinishedRequestCount());
+			if (ImGui::Button("Export Graph Summary"))
+			{
+				frameCapture.ExportGraph(true);
+			}
+			ImGui::SetItemTooltip("Writes executed pass order and versioned reads/writes to JSON.");
+			ImGui::TextWrapped("Graph exports use Timing, Reference View and output settings above. "
+				"Source only affects screenshots. Next frame is the default timing.");
+			ImGui::TextDisabled("%u pending capture/export requests", frameCapture.GetUnfinishedRequestCount());
 		}
 
 		void DrawFrameState(const ApplicationFrameCapture& frameCapture) noexcept
@@ -208,7 +226,7 @@ namespace gglab
 			}
 		}
 
-		void DrawHistory(const ApplicationFrameCapture& frameCapture) noexcept
+		void DrawHistory(const ApplicationFrameCapture& frameCapture, FrameCapturePanelState& state) noexcept
 		{
 			const auto& history = frameCapture.GetHistory();
 			if (history.empty())
@@ -235,12 +253,37 @@ namespace gglab
 				ImGui::Indent();
 				if (completed)
 				{
-					const std::string path = result.m_ImagePath.string();
+					const std::string path = ApplicationFrameCapture::GetPathText(
+						ApplicationFrameCapture::GetOutputPath(result));
 					if (ImGui::Selectable(path.c_str()))
 					{
 						ImGui::SetClipboardText(path.c_str());
 					}
-					ImGui::SetItemTooltip("Click to copy the image path.");
+					ImGui::SetItemTooltip("Click to copy the output path:\n%s", path.c_str());
+					if (!result.m_ImagePath.empty() && !result.m_MetadataPath.empty())
+					{
+						const std::string metadataPath = ApplicationFrameCapture::GetPathText(result.m_MetadataPath);
+						if (ImGui::Selectable(metadataPath.c_str()))
+						{
+							ImGui::SetClipboardText(metadataPath.c_str());
+						}
+						ImGui::SetItemTooltip("Click to copy the metadata path:\n%s", metadataPath.c_str());
+					}
+					ImGui::BeginDisabled(!frameCapture.CanOpenOutputFolder(result));
+					if (ImGui::Button("Open Output Folder"))
+					{
+						state.m_OpenFolderRequestId = result.m_RequestId;
+						frameCapture.OpenOutputFolder(result.m_RequestId, state.m_OpenFolderFailure);
+					}
+					ImGui::EndDisabled();
+					ImGui::SetItemTooltip("Opens this completed result's directory, not the current Output Directory setting.");
+					if (state.m_OpenFolderRequestId == result.m_RequestId && !state.m_OpenFolderFailure.empty())
+					{
+						ImGui::PushTextWrapPos();
+						ImGui::TextColored(GetGateColor(FrameCaptureGateState::Failed), "%s",
+							state.m_OpenFolderFailure.c_str());
+						ImGui::PopTextWrapPos();
+					}
 				}
 				else
 				{
@@ -256,6 +299,7 @@ namespace gglab
 
 	void FrameCapturePanel::Draw(DevelopGuiContext& context) noexcept
 	{
+		ImGui::SetWindowSize(ImVec2(680.0f, 760.0f), ImGuiCond_FirstUseEver);
 		if (!m_FrameCapture)
 		{
 			ImGui::TextDisabled("Frame capture is not available.");
@@ -273,7 +317,7 @@ namespace gglab
 		}
 		if (ImGui::CollapsingHeader("History", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			DrawHistory(*m_FrameCapture);
+			DrawHistory(*m_FrameCapture, state);
 		}
 	}
 
@@ -301,11 +345,13 @@ namespace gglab
 		{
 			ImGui::TextColored(GetGateColor(completed ? FrameCaptureGateState::Ready
 				: FrameCaptureGateState::Failed),
-				"Capture #%llu %s", static_cast<unsigned long long>(result.m_RequestId),
+				"%s #%llu %s", result.m_Metadata &&
+					result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph ? "Graph export" : "Capture",
+				static_cast<unsigned long long>(result.m_RequestId),
 				GetStatusName(result.m_Status).data());
 			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
-			ImGui::TextUnformatted(
-				completed ? result.m_ImagePath.string().c_str() : result.m_Failure.c_str());
+			ImGui::TextUnformatted(completed ? ApplicationFrameCapture::GetPathText(
+				ApplicationFrameCapture::GetOutputPath(result)).c_str() : result.m_Failure.c_str());
 			ImGui::PopTextWrapPos();
 		}
 		ImGui::End();

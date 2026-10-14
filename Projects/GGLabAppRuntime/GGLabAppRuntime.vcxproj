@@ -40,6 +40,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\GGLabBuildBaseline.props" />
   </ImportGroup>
+  <Import Project="..\..\PropertySheets\JsonImport.props" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <TargetName>GGLabAppRuntime</TargetName>

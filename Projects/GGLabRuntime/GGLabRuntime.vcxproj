@@ -690,6 +690,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\RuntimeToolingAdapters.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotJson.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderingSettingsDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp" />
@@ -752,6 +753,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\RenderGraphEnumText.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowPreviewViewBase.h" />

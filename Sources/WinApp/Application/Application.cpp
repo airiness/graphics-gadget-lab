@@ -3,6 +3,7 @@
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
+#include "Application/Platform/Windows/Win32Shell.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "GGLabAppRuntime.h"
@@ -248,7 +249,8 @@ namespace gglab
 		if (m_AppRuntime->GetFrameCaptureCoordinator())
 		{
 			m_FrameCapture = std::make_unique<ApplicationFrameCapture>(
-				*m_AppRuntime, m_RuntimePaths.m_CaptureRoot);
+				*m_AppRuntime, m_RuntimePaths.m_CaptureRoot,
+				ApplicationFrameCapture::OpenDirectoryCallback(m_Hidden ? nullptr : &win32::OpenDirectory));
 		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
@@ -547,6 +549,7 @@ namespace gglab
 				}));
 			return;
 		case ApplicationControlCommand::Capture:
+		case ApplicationControlCommand::Graph:
 		{
 			if (!m_FrameCapture)
 			{

@@ -158,6 +158,12 @@ namespace gglab
 		};
 	}
 
+	std::string GetFrameCapturePathText(const std::filesystem::path& path) noexcept
+	{
+		const std::u8string text = path.u8string();
+		return std::string(text.begin(), text.end());
+	}
+
 	std::string SerializeFrameCaptureMetadata(const FrameCaptureMetadata& metadata) noexcept
 	{
 		JsonWriter writer;

@@ -4,6 +4,7 @@
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 
 #include <cstdint>
@@ -27,6 +28,7 @@ namespace gglab
 	bool RenderGraph::Compile() noexcept
 	{
 		m_ExecutionPlan.reset();
+		m_ExecutionRecord.reset();
 		m_CompileDiagnostics.clear();
 
 		RGCompileResult result = RGCompiler::Compile(*this);
@@ -67,6 +69,16 @@ namespace gglab
 			? RGCompiledResourceStatus::Referenced : RGCompiledResourceStatus::Culled;
 	}
 
+	void RenderGraph::EnableExecutionRecord() noexcept
+	{
+		m_ExecutionRecord = std::make_unique<RGSnapshotExecutionRecord>();
+	}
+
+	std::unique_ptr<RGSnapshotExecutionRecord> RenderGraph::TakeExecutionRecord() noexcept
+	{
+		return std::move(m_ExecutionRecord);
+	}
+
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
 		GGLAB_ASSERT_MSG(
@@ -83,6 +95,7 @@ namespace gglab
 				.m_TransientResourcePool = m_TransientResourcePool,
 				.m_RetireTextures = &m_MarkedRetireTextures,
 				.m_RetireBuffers = &m_MarkedRetireBuffers,
+				.m_ExecutionRecord = m_ExecutionRecord.get(),
 			},
 			executeContext);
 	}
