@@ -10,6 +10,7 @@ namespace gglab
 	struct RGAtmosphereResources
 	{
 		std::array<RGTextureId, 3> m_Luts{};
+		std::array<RHITextureHandle, 3> m_Textures{};
 		AtmosphereDiagnostics m_Diagnostics{};
 	};
 }

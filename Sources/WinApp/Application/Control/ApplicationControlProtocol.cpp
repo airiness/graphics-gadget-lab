@@ -955,7 +955,11 @@ namespace gglab
 			}
 			Json result = { { "address", address.m_Resource.empty() ? Json() : source },
 				{ "semantic", target.m_Semantic ? Json(GetNonFiniteWatchSemanticName(*target.m_Semantic)) : Json() },
-				{ "watchTier", target.m_Semantic ? Json(1) : Json() },{ "failure", target.m_Failure },
+				{ "watchTier", target.m_Semantic ? Json(GetNonFiniteWatchTier(*target.m_Semantic)) : Json() },{ "failure", target.m_Failure },
+				{ "generation", target.m_Generation.IsValid() ? Json(target.m_Generation.m_Revision) : Json() },
+				{ "resourceIdentity", target.m_Generation.IsValid() ? Json{ { "index", target.m_Generation.m_Texture.Index() },
+					{ "generation", target.m_Generation.m_Texture.Generation() } } : Json() },
+				{ "lastCheckedFrameSerial", target.m_CheckedFrameSerial },
 				{ "claim", ClaimName(target.m_Result.m_Claim.m_Status) }, { "reason", WatchFailureName(target.m_Result.m_Claim.m_Failure) },
 				{ "checked", target.m_Record.m_CheckedCount }, { "nan", target.m_Record.m_NanCount },
 				{ "positiveInf", target.m_Record.m_PositiveInfCount }, { "negativeInf", target.m_Record.m_NegativeInfCount },
@@ -988,7 +992,7 @@ namespace gglab
 			Json report = { { "configurationVersion", status.m_ConfigurationVersion }, { "enabled", status.m_Enabled },
 				{ "mode", "report" }, { "claims", claims }, { "coverage", "latest-completed-frame" },
 				{ "targetsMode", status.m_DefaultTargets ? "defaults" : "explicit" },
-				{ "defaultTiers", status.m_DefaultTargets && status.m_BoundaryRequested ? Json::array({ "A" }) : Json::array() },
+				{ "defaultTiers", status.m_DefaultTargets && status.m_BoundaryRequested ? Json::array({ "A", "B" }) : Json::array() },
 				{ "boundary", ClaimName(status.m_Boundary.m_Status) }, { "boundaryFrameSerial", status.m_BoundaryFrameSerial },
 				{ "production", ClaimName(status.m_Production.m_Status) }, { "productionFrameSerial", status.m_ProductionFrameSerial },
 				{ "failure", status.m_Failure }, { "productionFailure", status.m_ProductionFailure }, { "targets", Json::array() }, { "firstAnomaly", Json() } };

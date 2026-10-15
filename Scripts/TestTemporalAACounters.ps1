@@ -75,9 +75,10 @@ function Wait-CleanWatch([string]$SessionId, [bool]$Counters, [long]$MinimumSeri
             throw "Session $SessionId has the wrong instrumentation capability"
         }
         $clean = $status.frame.ready -and $report.boundary -eq 'Passed' -and
-            $report.boundaryFrameSerial -ge $MinimumSerial -and @($report.targets).Count -eq 4
+            $report.boundaryFrameSerial -ge $MinimumSerial -and @($report.targets | Where-Object { $_.watchTier -eq 1 }).Count -eq 4
+        $frameTargets = @($report.targets | Where-Object { $_.watchTier -eq 1 })
         for ($index = 0; $clean -and $index -lt 4; ++$index) {
-            $clean = $report.targets[$index].claim -eq $ExpectedClaims[$index]
+            $clean = $frameTargets[$index].claim -eq $ExpectedClaims[$index]
         }
         if ($Counters) {
             $clean = $clean -and $report.production -eq 'Passed' -and $report.productionFrameSerial -ge $MinimumSerial

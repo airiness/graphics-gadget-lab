@@ -339,8 +339,8 @@ in CI; GPU value/observation checks still require local hardware runs.
 ## Non-finite boundary scans and production counters
 
 The Runtime provides explicit boundary scans and opt-in production counters.
-Session `watch` supports explicit targets in report mode. Semantic default tiers,
-fail mode and sequence coverage remain pending. Boundary scans alone cannot prove
+Session `watch` supports explicit targets and semantic defaults in report mode.
+Fail mode and sequence coverage remain pending. Boundary scans alone cannot prove
 that sanitization or recovery hid no non-finite input.
 
 Start a counter-capable process with `--watch-nonfinite`, or use the session script:
@@ -423,11 +423,34 @@ register exact resource versions and observation cuts. Inactive features report
 `Incomplete` with `MissingCoverage`. A graph with no registry also reports missing
 coverage. These classifications never add graph dependencies or revive culled work.
 
-Reports expose `targetsMode`, `defaultTiers` (currently `["A"]`), and each default
+Reports expose `targetsMode`, `defaultTiers` (currently `["A", "B"]`), and each default
 target's `semantic`, `watchTier` and `failure`. Unbound targets have a null address.
 Resource export `watchTier` is present only for an exact registered default version;
-it is not inferred from a resource name. Tier B generation/cache-restored resources
-and Tier C GI resources are not covered by these defaults yet.
+it is not inferred from a resource name.
+
+Tier B covers active IBL environment, irradiance and specular cubes and the scene's
+transmittance, multiple-scattering and SkyView atmosphere LUTs. Each mip scans every
+array slice/cube face. Registration follows the active resource bank, including a
+generation published after cache upload; staging bake resources are excluded.
+Atmosphere revisions include writes of the current frame and become evidence only
+after a successful submission and completed readback.
+The report contains one target per generation mip, so semantic names can repeat.
+
+Generation targets report `generation`, an ephemeral `resourceIdentity` (texture
+index and handle generation), and `lastCheckedFrameSerial`. Unchanged, checked
+clean content reports `NotApplicable` while retaining its last checked record and extrema;
+those values describe that earlier check. Pending or unadmitted mips are `Incomplete`.
+Per-frame defaults retain scheduling priority, while generation mips rotate through
+the remaining shared payload allowance. In-flight mips are not duplicated. Failed
+or cancelled transport remains retryable; superseded results cannot certify a new
+generation, but late anomalies still enter `firstAnomaly`. Replacing the watch
+configuration rechecks already active content. Failed content remains `Failed` while
+that generation is active. Tier C GI defaults remain pending.
+
+`Scripts/TestNonFiniteGenerations.ps1 -Configuration Debug` (or `Release`) verifies
+both backends with isolated writable state. It checks fresh-baked and cache-restored
+active IBL publication receipts, all mip/face coverage, stable-content deduplication,
+watch reconfiguration, and physical atmosphere LUTs.
 
 A `fail` request that needs unavailable production instrumentation returns
 `RequiresRestart`; other `fail` requests return

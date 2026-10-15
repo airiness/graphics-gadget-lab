@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -31,6 +32,8 @@ namespace gglab
 		std::optional<uint32_t> m_Element;
 		std::optional<uint32_t> m_ByteOffset;
 		std::string m_Failure;
+		NonFiniteWatchGeneration m_Generation;
+		uint64_t m_CheckedFrameSerial = 0;
 	};
 	struct NonFiniteWatchAnomaly
 	{
@@ -85,6 +88,7 @@ namespace gglab
 			std::vector<size_t> m_ScanIndices;
 		};
 		void PublishBoundary(Pending pending) noexcept;
+		void ApplyGenerationEvidence(NonFiniteWatchTargetStatus& target, uint64_t frameSerial) const noexcept;
 		void RecordAnomaly(NonFiniteWatchAnomaly anomaly) noexcept;
 		FrameCaptureControlBase* m_Capture = nullptr;
 		NonFiniteWatchConfiguration m_Configuration;
@@ -92,5 +96,13 @@ namespace gglab
 		std::unordered_map<uint64_t, Pending> m_Pending;
 		uint64_t m_LastPreparedFrame = 0;
 		uint64_t m_FirstApplicableFrame = 0;
+		struct GenerationState
+		{
+			NonFiniteWatchGeneration m_Generation;
+			std::vector<std::optional<NonFiniteWatchTargetStatus>> m_Results;
+			std::vector<uint64_t> m_InFlight;
+		};
+		std::array<GenerationState, NonFiniteWatchSemanticCount> m_Generations;
+		size_t m_GenerationCursor = 0;
 	};
 }

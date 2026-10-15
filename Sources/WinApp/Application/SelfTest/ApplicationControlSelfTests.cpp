@@ -302,10 +302,17 @@ namespace gglab
 				.m_Result = { .m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None } } } };
 			watch.m_FirstAnomaly.reset();
 			const auto defaultsJson = SerializeApplicationControlWatch(6, watch, false);
-			context.Check(Contains(defaultsJson, R"("targetsMode":"defaults")") && Contains(defaultsJson, R"("defaultTiers":["A"])") &&
+			context.Check(Contains(defaultsJson, R"("targetsMode":"defaults")") && Contains(defaultsJson, R"("defaultTiers":["A","B"])") &&
 				Contains(defaultsJson, R"("semantic":"ambient-occlusion")") && Contains(defaultsJson, R"("address":null)") &&
 				Contains(defaultsJson, R"("claim":"NotApplicable")"),
 				"Default reports identify their tier and inactive semantic roles without inventing an address");
+			watch.m_Targets = { NonFiniteWatchTargetStatus{ .m_Semantic = NonFiniteWatchSemantic::Specular,
+				.m_Address = { .m_Resource = "IBL.Specular", .m_Mip = 4, .m_SliceCount = 6 },
+				.m_Generation = { { 12, 3 }, 9 }, .m_CheckedFrameSerial = 77 } };
+			const auto generationJson = SerializeApplicationControlWatch(7, watch, false);
+			context.Check(Contains(generationJson, R"("semantic":"ibl.specular")") && Contains(generationJson, R"("watchTier":2)") &&
+				Contains(generationJson, R"("lastCheckedFrameSerial":77)") && Contains(generationJson, R"("resourceIdentity":{"generation":3,"index":12})"),
+				"Generation reports distinguish content revision, physical resource identity, mip and last checked frame");
 
 			FrameCaptureFrameState frame{
 				.m_Backend = "vulkan",

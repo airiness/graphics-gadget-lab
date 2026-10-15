@@ -1,5 +1,6 @@
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
 
 #include <limits>
 #include <utility>
@@ -14,6 +15,12 @@ namespace gglab
 		case NonFiniteWatchSemantic::AmbientOcclusion: return "ambient-occlusion";
 		case NonFiniteWatchSemantic::TemporalInput: return "scene-color.temporal-input";
 		case NonFiniteWatchSemantic::PostProcessInput: return "scene-color.post-process-input";
+		case NonFiniteWatchSemantic::Environment: return "ibl.environment";
+		case NonFiniteWatchSemantic::Irradiance: return "ibl.irradiance";
+		case NonFiniteWatchSemantic::Specular: return "ibl.specular";
+		case NonFiniteWatchSemantic::AtmosphereTransmittance: return "atmosphere.transmittance";
+		case NonFiniteWatchSemantic::AtmosphereMultipleScattering: return "atmosphere.multiple-scattering";
+		case NonFiniteWatchSemantic::AtmosphereSkyView: return "atmosphere.sky-view";
 		default: return "unknown";
 		}
 	}
@@ -35,6 +42,16 @@ namespace gglab
 		if (index < m_Entries.size())
 		{
 			m_Entries[index].m_Bindings.push_back({ resource, std::move(address) });
+		}
+	}
+
+	void NonFiniteWatchDefaultRegistry::RegisterGeneration(NonFiniteWatchSemantic semantic,
+		RGResourceHandle resource, RGResourceAddress address, NonFiniteWatchGeneration generation) noexcept
+	{
+		const size_t index = static_cast<size_t>(semantic);
+		if (index < m_Entries.size())
+		{
+			m_Entries[index].m_Bindings.push_back({ resource, std::move(address), generation });
 		}
 	}
 
@@ -65,6 +82,7 @@ namespace gglab
 				for (const auto& binding : entry.m_Bindings)
 				{
 					conflicting |= binding.m_Resource != entry.m_Bindings.front().m_Resource;
+					conflicting |= binding.m_Generation != entry.m_Bindings.front().m_Generation;
 					const auto resolved = graph.ResolveObservation(binding.m_Address, RGObservationKind::NonFiniteScan);
 					conflicting |= resolved.m_Failure != RGObservationFailure::None && resolved.m_Failure != RGObservationFailure::Culled;
 					conflicting |= resolved.m_Failure == RGObservationFailure::None && resolved.m_Resource != binding.m_Resource;
@@ -75,7 +93,24 @@ namespace gglab
 						target.m_Address = binding.m_Address;
 						target.m_Resource = binding.m_Resource;
 						target.m_Ready = true;
+						target.m_Generation = binding.m_Generation;
 					}
+				}
+				if (GetNonFiniteWatchTier(target.m_Semantic) == 2 && target.m_Ready)
+				{
+					conflicting |= !target.m_Generation.IsValid();
+					const auto base = graph.ResolveObservation(target.m_Address, RGObservationKind::NonFiniteScan);
+					for (uint32_t mip = 0; mip < GetRHITextureMipLevelCount(base.m_TextureDesc); ++mip)
+					{
+						auto address = target.m_Address;
+						address.m_Mip = mip;
+						address.m_FirstSlice = 0;
+						address.m_SliceCount = GetRHITextureArraySize(base.m_TextureDesc);
+						const auto resolved = graph.ResolveObservation(address, RGObservationKind::NonFiniteScan);
+						conflicting |= resolved.m_Failure != RGObservationFailure::None || resolved.m_Resource != target.m_Resource;
+						target.m_Mips.push_back(std::move(address));
+					}
+					conflicting |= target.m_Mips.empty();
 				}
 				if (conflicting || !target.m_Ready)
 				{
@@ -100,7 +135,7 @@ namespace gglab
 		{
 			if (semantic.m_Ready && semantic.m_Resource == target.m_Resource && target.m_Resource)
 			{
-				return 1;
+				return GetNonFiniteWatchTier(semantic.m_Semantic);
 			}
 		}
 		return std::nullopt;

@@ -1259,6 +1259,52 @@ namespace gglab
 				"Duplicate pipeline declarations cannot overwrite applicability silently");
 		}
 
+		void RunNonFiniteGenerationDefaultTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			FrameCaptureService capacity(device, { .m_MaxPayloads = 4 });
+			context.Check(capacity.GetNonFiniteScanTargetLimit() == 4 && capacity.EnableNonFiniteProduction() &&
+				capacity.GetNonFiniteScanTargetLimit() == 2,
+				"Generation scheduling reserves production readback and CPU payload slots in the same budget");
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			auto& defaults = graph.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>();
+			defaults.Declare({ false, false, false, false, true });
+			RGTextureId cube;
+			struct Data {};
+			graph.AddPass<Data>("Import.Active", [&](auto& builder, auto&)
+				{
+					cube = builder.ImportTexture("Restored.Cube", RHITextureHandle{ 400, 1 },
+						{ .m_Format = RHIFormat::R16G16B16A16Float, .m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopySource,
+							.m_Extent = { 8, 8, 1 }, .m_ArraySize = 6, .m_MipLevels = 4 },
+						CommonRHIResourceState(), RGContentValidity::Defined);
+					defaults.RegisterGeneration(NonFiniteWatchSemantic::Environment, cube,
+						builder.GetObservationAddress(cube, RGObservationPosition::Final), { { 400, 1 }, 9 });
+					builder.Export(cube, RGTextureAccess::None);
+					builder.SideEffect();
+				});
+			context.Check(graph.Compile(), "A cache-restored imported generation compiles without a producer pass");
+			const auto resolved = defaults.Resolve(graph);
+			const auto& environment = resolved[static_cast<size_t>(NonFiniteWatchSemantic::Environment)];
+			context.Check(environment.m_Ready && environment.m_Generation.m_Revision == 9 && environment.m_Mips.size() == 4,
+				"Generation defaults cover every imported mip without requiring a bake pass");
+			context.Check(std::ranges::all_of(environment.m_Mips, [](const auto& address)
+				{ return address.m_FirstSlice == 0 && address.m_SliceCount == 6u; }) && environment.m_Mips.back().m_Mip == 3,
+				"Every cubemap mip scans all six faces including the smallest mip");
+			const auto exported = graph.ResolveObservation(environment.m_Mips.back(), RGObservationKind::ResourceExport);
+			context.Check(exported.m_Failure == RGObservationFailure::None && GetNonFiniteDefaultWatchTier(graph, exported) == 2u,
+				"Export metadata identifies the exact registered generation version");
+			defaults.RegisterGeneration(NonFiniteWatchSemantic::Environment, cube,
+				{ .m_Resource = "Restored.Cube" }, { { 400, 1 }, 10 });
+			context.Check(!defaults.Resolve(graph)[static_cast<size_t>(NonFiniteWatchSemantic::Environment)].m_Ready,
+				"Conflicting generation identities cannot certify one resource version");
+			NonFiniteWatchDefaultRegistry missing;
+			missing.Declare({ false, false, false, false, true });
+			missing.RegisterGeneration(NonFiniteWatchSemantic::Environment, cube, { .m_Resource = "Restored.Cube" }, {});
+			context.Check(!missing.Resolve(graph)[static_cast<size_t>(NonFiniteWatchSemantic::Environment)].m_Ready,
+				"Active generation bindings require a nonzero revision and physical resource identity");
+		}
+
 		void RunNonFiniteObserverTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -1856,6 +1902,7 @@ namespace gglab
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
 		RunNonFiniteDefaultTests(context);
+		RunNonFiniteGenerationDefaultTests(context);
 		RunNonFiniteObserverTests(context);
 		RunResourceExportTests(context);
 		RunResourceTextureExportTests(context);

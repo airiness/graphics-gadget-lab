@@ -47,6 +47,9 @@ namespace gglab
 		// Retained frames share the payload budget, including while awaiting this drain.
 		virtual void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>&) noexcept {}
 		[[nodiscard]] virtual bool HasNonFiniteInstrumentation() const noexcept { return false; }
+		// Target-count allowance for one scan group, including current slot pressure.
+		// Byte limits and occupancy are rechecked atomically by normal admission.
+		[[nodiscard]] virtual uint32_t GetNonFiniteScanTargetLimit() const noexcept { return 64; }
 		[[nodiscard]] virtual std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return {}; }
 		// Sizes are known only after compilation. Start a scheduled export frame
 		// with idle user payloads, then check the complete shared group before submission.

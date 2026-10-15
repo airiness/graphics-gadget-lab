@@ -168,9 +168,12 @@ namespace gglab
 			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO;
 		const GTAOFrameStatus gtaoStatus = framePlan.m_GTAOStatus;
 		const bool gtaoActive = gtaoStatus == GTAOFrameStatus::Active;
+		const bool activeIBL = services.m_Environment->GetBakingStatus().m_HasActiveBake;
+		const bool activeAtmosphere = context.m_RenderScene.m_Atmosphere.has_value() && context.m_RenderScene.m_WorldSun.has_value();
 		rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({
 			context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion), gtaoActive,
-			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA), true });
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA), true,
+			activeIBL, activeIBL, activeIBL, activeAtmosphere, activeAtmosphere, activeAtmosphere });
 
 		auto& forwardPlusResources =
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);

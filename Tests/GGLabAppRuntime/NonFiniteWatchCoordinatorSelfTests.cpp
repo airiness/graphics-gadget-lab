@@ -32,6 +32,7 @@ namespace gglab
 			FrameCaptureAvailability GetAvailability(RHIFormat, uint32_t, uint32_t) const noexcept override { return FrameCaptureAvailability::Available; }
 			uint32_t GetUnfinishedRequestCount() const noexcept override { return 0; }
 			bool HasNonFiniteInstrumentation() const noexcept override { return m_Instrumentation; }
+			uint32_t GetNonFiniteScanTargetLimit() const noexcept override { return m_ScanLimit; }
 			void ConsumeResults(std::vector<FrameCaptureResult>& results) noexcept override
 			{
 				results.insert(results.end(), std::make_move_iterator(m_Results.begin()), std::make_move_iterator(m_Results.end()));
@@ -46,16 +47,19 @@ namespace gglab
 			{
 				auto payload = std::make_shared<NonFiniteScanPayload>();
 				payload->m_ConfigurationVersion = m_Version;
-				NonFiniteScanBoundary boundary;
-				boundary.m_Target.m_Address = m_ScanTargets.front().m_Address;
-				boundary.m_Target.m_Subresources = { .m_BaseArraySlice = 2, .m_ArraySliceCount = 1 };
-				boundary.m_Parameters = { .m_ScalarCount = 8, .m_Width = 2, .m_Height = 2, .m_Channels = 2 };
-				for (uint32_t i = 0; i < 8; ++i)
+				for (const auto& scan : m_ScanTargets)
 				{
-					AccumulateNonFiniteScanValue(boundary.m_Record, anomaly && i == 5 ? 0x7fc00000u : 0x3f800000u, i);
+					NonFiniteScanBoundary boundary;
+					boundary.m_Target.m_Address = scan.m_Address;
+					boundary.m_Target.m_Subresources = { .m_BaseArraySlice = 2, .m_ArraySliceCount = 1 };
+					boundary.m_Parameters = { .m_ScalarCount = 8, .m_Width = 2, .m_Height = 2, .m_Channels = 2 };
+					for (uint32_t i = 0; i < 8; ++i)
+					{
+						AccumulateNonFiniteScanValue(boundary.m_Record, anomaly && i == 5 ? 0x7fc00000u : 0x3f800000u, i);
+					}
+					boundary.m_Result = EvaluateNonFiniteBoundary(boundary.m_Record, 8);
+					payload->m_Boundaries.push_back(std::move(boundary));
 				}
-				boundary.m_Result = EvaluateNonFiniteBoundary(boundary.m_Record, 8);
-				payload->m_Boundaries.push_back(std::move(boundary));
 				return { .m_RequestId = m_Id, .m_Source = FrameCaptureSource::NonFiniteScan,
 					.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = m_Frame, .m_NonFiniteScans = payload };
 			}
@@ -65,6 +69,7 @@ namespace gglab
 			uint64_t m_Frame = 0;
 			bool m_Busy = false;
 			bool m_Instrumentation = false;
+			uint32_t m_ScanLimit = 64;
 			std::vector<FrameCaptureResult> m_Results;
 			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_Production;
 		};
@@ -188,9 +193,9 @@ namespace gglab
 			context.Check(defaultsWatch.Configure({ .m_Production = false }, error), "Default boundary watch configures without instrumentation");
 			const auto& defaultStatus = defaultsWatch.GetStatus();
 			defaultsWatch.PrepareFrame(1);
-			context.Check(defaultControl.m_Id == 0 && defaultStatus.m_Targets.size() == 4 &&
+			context.Check(defaultControl.m_Id == 0 && defaultStatus.m_Targets.size() == NonFiniteWatchSemanticCount &&
 				defaultStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
-				"Missing pipeline applicability reports four incomplete roles and never submits an empty passing request");
+				"Missing pipeline applicability reports every incomplete role and never submits an empty passing request");
 			NonFiniteWatchDefaults defaults;
 			for (size_t i = 0; i < defaults.size(); ++i)
 			{
@@ -225,6 +230,108 @@ namespace gglab
 			context.Check(defaultStatus.m_Targets[0].m_Record.m_CheckedCount == 0 &&
 				defaultStatus.m_Targets[2].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::NotApplicable,
 				"Capacity pressure clears scan evidence while preserving inactive feature classifications");
+		}
+
+		{
+			WatchCaptureControl generations;
+			generations.m_ScanLimit = 2;
+			NonFiniteWatchCoordinator generationWatch(&generations);
+			context.Check(generationWatch.Configure({ .m_Production = false }, error), "Generation watch configures");
+			NonFiniteWatchDefaults defaults;
+			for (size_t i = 0; i < defaults.size(); ++i)
+			{
+				defaults[i].m_Semantic = static_cast<NonFiniteWatchSemantic>(i);
+				defaults[i].m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			}
+			auto& cube = defaults[static_cast<size_t>(NonFiniteWatchSemantic::Environment)];
+			cube.m_Ready = true;
+			cube.m_Generation = { { 100, 1 }, 1 };
+			for (uint32_t mip = 0; mip < 3; ++mip)
+			{
+				cube.m_Mips.push_back({ .m_Resource = "Active.Cube", .m_Mip = mip, .m_SliceCount = 6 });
+			}
+			generationWatch.PrepareFrame(1, false, defaults);
+			const auto first = generations.Complete();
+			context.Check(generations.m_ScanTargets.size() == 2, "Generation work respects the shared scan target allowance");
+			generationWatch.PrepareFrame(2, false, defaults);
+			const auto tail = generations.Complete();
+			context.Check(generations.m_ScanTargets.size() == 1 && generations.m_ScanTargets[0].m_Address.m_Mip == 2,
+				"Pending generation mips are not duplicated while remaining mips advance");
+			context.Check(generationWatch.OnScanResult(first) && generationWatch.GetStatus().m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Partial generation completion is incomplete coverage");
+			context.Check(generationWatch.OnScanResult(tail) && generationWatch.GetStatus().m_Boundary.m_Status == NonFiniteClaimStatus::Passed,
+				"A generation completes only after every admitted mip has valid results");
+			generationWatch.PrepareFrame(3, false, defaults);
+			const auto& generationStatus = generationWatch.GetStatus();
+			context.Check(generations.m_Id == 2 && generationStatus.m_Boundary.m_Status == NonFiniteClaimStatus::NotApplicable &&
+				generationStatus.m_Targets[4].m_CheckedFrameSerial == 1 && generationStatus.m_Targets[4].m_Record.m_CheckedCount == 8,
+				"Unchanged content is not rescanned and retains its last checked frame and record");
+			cube.m_Generation.m_Revision = 2;
+			generationWatch.PrepareFrame(4, false, defaults);
+			const auto superseded = generations.Complete(true);
+			cube.m_Generation.m_Revision = 3;
+			generationWatch.PrepareFrame(5, false, defaults);
+			const auto current = generations.Complete();
+			context.Check(generationWatch.OnScanResult(superseded) && generationStatus.m_FirstAnomaly &&
+				generationStatus.m_FirstAnomaly->m_Target->m_Generation.m_Revision == 2,
+				"A superseded generation's late anomaly remains diagnostic evidence");
+			generationWatch.PrepareFrame(6, false, defaults);
+			const auto currentTail = generations.Complete();
+			context.Check(generationWatch.OnScanResult(current) && generationWatch.OnScanResult(currentTail),
+				"Current generation completions drain independently of superseded work");
+			generationWatch.PrepareFrame(7, false, defaults);
+			context.Check(generations.m_Id == 5 && generationStatus.m_Targets[4].m_Generation.m_Revision == 3 &&
+				generationStatus.m_Targets[4].m_Record.m_NanCount == 0 && generationStatus.m_Boundary.m_Status == NonFiniteClaimStatus::NotApplicable,
+				"Old generation evidence cannot certify or overwrite the active generation");
+			cube.m_Generation.m_Revision = 4;
+			generationWatch.PrepareFrame(8, true, defaults);
+			context.Check(generations.m_Id == 5 && generationStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Yielded generation work remains unverified and retryable");
+			generationWatch.PrepareFrame(9, false, defaults);
+			auto cancelled = generations.Complete();
+			cancelled.m_Status = FrameCaptureStatus::Failed;
+			context.Check(generationWatch.OnScanResult(cancelled) && generationStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Failed transport cannot certify generation contents");
+			generationWatch.PrepareFrame(10, false, defaults);
+			context.Check(generations.m_Id == 7 && generations.m_ScanTargets.size() == 2,
+				"Failed generation scan slots are released for a later retry");
+			context.Check(generationWatch.Configure({ .m_Production = false }, error), "Generation configuration replaces atomically");
+			generationWatch.PrepareFrame(11, false, defaults);
+			context.Check(generations.m_Id == 8, "A new watch configuration rechecks already active content");
+		}
+
+		{
+			WatchCaptureControl resourceControl;
+			NonFiniteWatchCoordinator resourceWatch(&resourceControl);
+			NonFiniteWatchDefaults defaults;
+			for (size_t i = 0; i < defaults.size(); ++i)
+			{
+				defaults[i].m_Semantic = static_cast<NonFiniteWatchSemantic>(i);
+				defaults[i].m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			}
+			auto& lut = defaults[static_cast<size_t>(NonFiniteWatchSemantic::AtmosphereSkyView)];
+			lut.m_Ready = true;
+			lut.m_Generation = { { 200, 1 }, 1 };
+			lut.m_Mips = { RGResourceAddress{ .m_Resource = "SkyView", .m_SliceCount = 1 } };
+			context.Check(resourceWatch.Configure({ .m_Production = false }, error), "Resource revision watch configures");
+			resourceWatch.PrepareFrame(1, false, defaults);
+			context.Check(resourceWatch.OnScanResult(resourceControl.Complete()), "Initial resource revision completes");
+			resourceWatch.PrepareFrame(2, false, defaults);
+			context.Check(resourceControl.m_Id == 1, "Completed resource contents are reused without another scan");
+			lut.m_Generation.m_Texture = { 200, 2 };
+			resourceWatch.PrepareFrame(3, false, defaults);
+			context.Check(resourceControl.m_Id == 2 && resourceWatch.OnScanResult(resourceControl.Complete(true)),
+				"Recycled physical handles require new evidence even when their content revision number repeats");
+			resourceWatch.PrepareFrame(4, false, defaults);
+			context.Check(resourceControl.m_Id == 2 && resourceWatch.GetStatus().m_Boundary.m_Status == NonFiniteClaimStatus::Failed,
+				"A failed active generation cannot become clean merely because it needs no repeat scan");
+			context.Check(resourceWatch.Configure({ .m_Production = false }, error), "Completed generation watch reconfigures");
+			resourceWatch.PrepareFrame(5, false, defaults);
+			context.Check(resourceControl.m_Id == 3, "Replacing configuration invalidates completed generation evidence");
+			lut.m_Mips[0].m_Mip = 2;
+			resourceWatch.PrepareFrame(6, false, defaults);
+			context.Check(resourceControl.m_Id == 3 && resourceWatch.GetStatus().m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Malformed generation mip metadata is missing coverage and cannot index the completion cache");
 		}
 
 		control.m_Busy = true;

@@ -9,6 +9,7 @@
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -64,6 +65,14 @@ namespace gglab
 		}
 		void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>& frames) noexcept override;
 		bool HasNonFiniteInstrumentation() const noexcept override { return m_ProductionEnabled; }
+		uint32_t GetNonFiniteScanTargetLimit() const noexcept override
+		{
+			const uint32_t used = GetPayloadUsage().second;
+			const uint32_t reserved = m_ProductionEnabled ? 1u : 0u;
+			const uint32_t ceiling = m_Limits.m_MaxPayloads - (m_ProductionEnabled ? 2u : 0u);
+			return used > m_Limits.m_MaxPayloads - reserved ? 0u
+				: std::min(ceiling, m_Limits.m_MaxPayloads - reserved - used);
+		}
 		std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept override { return m_LatestProduction; }
 		// Borrows stable renderer services; programs and pipelines are demanded only
 		// when a scan or production frame is admitted. Services outlive this service.

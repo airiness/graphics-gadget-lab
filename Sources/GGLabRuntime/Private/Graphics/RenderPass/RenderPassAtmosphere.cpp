@@ -1,8 +1,14 @@
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+
 namespace gglab
 {
 	namespace
@@ -79,6 +85,7 @@ namespace gglab
 				for (uint32_t i = 0; i < 3; ++i)
 				{
 					const bool initialized = atmosphere->IsInitialized(i);
+					resources.m_Textures[i] = atmosphere->GetTexture(i);
 					resources.m_Luts[i] = builder.ImportTexture(names[i], atmosphere->GetTexture(i),
 						atmosphere->GetTextureDesc(i), initialized ? CommonRHIResourceState() : UndefinedRHITextureState(),
 						initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
@@ -146,13 +153,26 @@ namespace gglab
 				continue;
 			}
 			rg.AddPass<SetupData>(bake ? "IBL.Atmosphere.Export" : "Atmosphere.Export",
-				[resourceName](RenderGraph::RGBuilder& builder, SetupData&)
+				[resourceName, bake](RenderGraph::RGBuilder& builder, SetupData&)
 				{
 					builder.SideEffect();
 					const auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(resourceName);
-					for (const auto texture : resources.m_Luts)
+					const std::array semantics{ NonFiniteWatchSemantic::AtmosphereTransmittance,
+						NonFiniteWatchSemantic::AtmosphereMultipleScattering, NonFiniteWatchSemantic::AtmosphereSkyView };
+					for (size_t i = 0; i < resources.m_Luts.size(); ++i)
 					{
+						const auto texture = resources.m_Luts[i];
 						builder.Export(texture, RGTextureAccess::None);
+						if (!bake)
+						{
+							// EndFrame commits the next revision only after this frame submits.
+							// Aborted scan results cannot certify this prospective revision.
+							const uint64_t revision = resources.m_Diagnostics.m_Generations[i] +
+								((resources.m_Diagnostics.m_DirtyMask >> i) & 1u);
+							builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().RegisterGeneration(
+								semantics[i], texture, builder.GetObservationAddress(texture, RGObservationPosition::Final),
+								{ resources.m_Textures[i], revision });
+						}
 					}
 				});
 		}

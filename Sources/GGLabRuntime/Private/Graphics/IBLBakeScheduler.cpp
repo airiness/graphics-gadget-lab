@@ -963,7 +963,7 @@ namespace gglab
 		m_Status.m_ActiveGeneration = m_Status.m_BakingGeneration;
 		m_Status.m_HasActiveBake = true;
 		SetStage(IBLBakeStage::Ready, 1.0f);
-		GGLAB_LOG_GRAPHICS_INFO(
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 			"IBL bake generation {} published atomically (cacheStages={}, gpuStages={}, gpuMs={:.3f}, source={}, publicationMs={:.1f}).",
 			m_Status.m_ActiveGeneration, m_Status.m_CacheHitStageCount,
 			m_Status.m_GpuBuildStageCount, m_Status.m_GpuMilliseconds,

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 
 #include <array>
 #include <cstddef>
@@ -18,10 +19,29 @@ namespace gglab
 		AmbientOcclusion,
 		TemporalInput,
 		PostProcessInput,
+		Environment,
+		Irradiance,
+		Specular,
+		AtmosphereTransmittance,
+		AtmosphereMultipleScattering,
+		AtmosphereSkyView,
 		Count,
 	};
 
 	inline constexpr size_t NonFiniteWatchSemanticCount = static_cast<size_t>(NonFiniteWatchSemantic::Count);
+	[[nodiscard]] constexpr uint32_t GetNonFiniteWatchTier(NonFiniteWatchSemantic semantic) noexcept
+	{
+		return semantic < NonFiniteWatchSemantic::Environment ? 1u : 2u;
+	}
+	// Ephemeral content identity, not a persisted artifact/cache identity. A pooled
+	// texture can keep its handle while a producer publishes a different revision.
+	struct NonFiniteWatchGeneration
+	{
+		RHITextureHandle m_Texture;
+		uint64_t m_Revision = 0;
+		[[nodiscard]] bool IsValid() const noexcept { return m_Texture.IsValid() && m_Revision != 0; }
+		bool operator==(const NonFiniteWatchGeneration&) const noexcept = default;
+	};
 	[[nodiscard]] std::string_view GetNonFiniteWatchSemanticName(NonFiniteWatchSemantic semantic) noexcept;
 	struct NonFiniteWatchDefault
 	{
@@ -32,6 +52,8 @@ namespace gglab
 		// Ready means a live, exact version was resolved; the scan has not completed.
 		bool m_Ready = false;
 		std::optional<RGResourceHandle> m_Resource;
+		NonFiniteWatchGeneration m_Generation;
+		std::vector<RGResourceAddress> m_Mips;
 	};
 	using NonFiniteWatchDefaults = std::array<NonFiniteWatchDefault, NonFiniteWatchSemanticCount>;
 
@@ -44,10 +66,12 @@ namespace gglab
 		// Multiple consumer cuts must refer to the same version. Resolution selects
 		// the earliest live cut without changing original graph liveness.
 		void Register(NonFiniteWatchSemantic semantic, RGResourceHandle resource, RGResourceAddress address) noexcept;
+		void RegisterGeneration(NonFiniteWatchSemantic semantic, RGResourceHandle resource,
+			RGResourceAddress address, NonFiniteWatchGeneration generation) noexcept;
 		[[nodiscard]] NonFiniteWatchDefaults Resolve(const RenderGraph& graph) const noexcept;
 
 	private:
-		struct Binding { RGResourceHandle m_Resource; RGResourceAddress m_Address; };
+		struct Binding { RGResourceHandle m_Resource; RGResourceAddress m_Address; NonFiniteWatchGeneration m_Generation; };
 		struct Entry { bool m_Applicable = false; std::vector<Binding> m_Bindings; };
 		bool m_Declared = false;
 		bool m_ConflictingDeclaration = false;

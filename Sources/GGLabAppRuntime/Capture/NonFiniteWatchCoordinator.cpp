@@ -60,6 +60,8 @@ namespace gglab
 			.m_BoundaryRequested = m_Configuration.m_Boundary, .m_ProductionRequested = m_Configuration.m_Production,
 			.m_DefaultTargets = m_Configuration.m_Targets.empty() };
 		m_FirstApplicableFrame = m_LastPreparedFrame + 1;
+		m_Generations = {};
+		m_GenerationCursor = 0;
 		if (m_Status.m_Enabled)
 		{
 			if (m_Configuration.m_Boundary)
@@ -91,6 +93,7 @@ namespace gglab
 			return;
 		}
 		Pending pending{ m_Status.m_ConfigurationVersion, frameSerial };
+		std::vector<size_t> generationCandidates;
 		if (m_Status.m_DefaultTargets)
 		{
 			for (size_t i = 0; i < NonFiniteWatchSemanticCount; ++i)
@@ -99,12 +102,50 @@ namespace gglab
 				if (defaults.size() == NonFiniteWatchSemanticCount && defaults[i].m_Semantic == *target.m_Semantic)
 				{
 					const auto& resolved = defaults[i];
+					bool completeMips = !resolved.m_Mips.empty() && resolved.m_Mips.size() <= 32;
+					for (size_t mip = 0; mip < resolved.m_Mips.size(); ++mip)
+					{
+						const auto& address = resolved.m_Mips[mip];
+						completeMips &= address.m_Mip == mip && address.m_FirstSlice == 0 &&
+							address.m_SliceCount && *address.m_SliceCount != 0 && !address.m_Resource.empty();
+					}
+					if (GetNonFiniteWatchTier(*target.m_Semantic) == 2 && resolved.m_Ready &&
+						resolved.m_Generation.IsValid() && completeMips)
+					{
+						auto& generation = m_Generations[i];
+						if (generation.m_Generation != resolved.m_Generation || generation.m_Results.size() != resolved.m_Mips.size())
+						{
+							generation = { resolved.m_Generation };
+							generation.m_Results.resize(resolved.m_Mips.size());
+							generation.m_InFlight.resize(resolved.m_Mips.size());
+						}
+						for (size_t mip = 0; mip < resolved.m_Mips.size(); ++mip)
+						{
+							NonFiniteWatchTargetStatus surface{ .m_Semantic = target.m_Semantic,
+								.m_Address = resolved.m_Mips[mip], .m_Generation = resolved.m_Generation };
+							ApplyGenerationEvidence(surface, frameSerial);
+							if (!generation.m_Results[mip] && generation.m_InFlight[mip] == 0)
+							{
+								generationCandidates.push_back(pending.m_Targets.size());
+							}
+							pending.m_Targets.push_back(std::move(surface));
+						}
+						continue;
+					}
+					if (GetNonFiniteWatchTier(*target.m_Semantic) == 2)
+					{
+						m_Generations[i] = {};
+						target.m_Result.m_Claim = resolved.m_Ready ? NonFiniteClaimResult{} : resolved.m_Claim;
+						target.m_Failure = resolved.m_Ready ? "MissingCoverage: generation identity or mip coverage is missing." : resolved.m_Failure;
+						pending.m_Targets.push_back(std::move(target));
+						continue;
+					}
 					target.m_Address = resolved.m_Address;
 					target.m_Result.m_Claim = resolved.m_Claim;
 					target.m_Failure = resolved.m_Failure;
 					if (resolved.m_Ready)
 					{
-						pending.m_ScanIndices.push_back(i);
+						pending.m_ScanIndices.push_back(pending.m_Targets.size());
 						pending.m_Scans.push_back({ .m_Address = resolved.m_Address });
 					}
 				}
@@ -113,6 +154,24 @@ namespace gglab
 					target.m_Failure = "MissingCoverage: default applicability was not resolved for this frame.";
 				}
 				pending.m_Targets.push_back(std::move(target));
+			}
+			// A generation consists of individually scheduled mip scans, not one
+			// oversized group. Original per-frame scans retain priority. Rotate across
+			// generation surfaces so a frequently changing SkyView cannot starve IBL.
+			const size_t limit = m_Capture->GetNonFiniteScanTargetLimit();
+			const size_t count = pending.m_Targets.size();
+			for (size_t offset = 0; offset < count && pending.m_Scans.size() < limit; ++offset)
+			{
+				const size_t index = (m_GenerationCursor + offset) % count;
+				if (std::ranges::find(generationCandidates, index) != generationCandidates.end())
+				{
+					pending.m_ScanIndices.push_back(index);
+					pending.m_Scans.push_back({ .m_Address = pending.m_Targets[index].m_Address });
+				}
+			}
+			if (!pending.m_ScanIndices.empty())
+			{
+				m_GenerationCursor = (pending.m_ScanIndices.back() + 1) % count;
 			}
 		}
 		else
@@ -142,14 +201,59 @@ namespace gglab
 			PublishBoundary(std::move(pending));
 			return;
 		}
+		for (const size_t index : pending.m_ScanIndices)
+		{
+			const auto& target = pending.m_Targets[index];
+			if (target.m_Generation.IsValid())
+			{
+				m_Generations[static_cast<size_t>(*target.m_Semantic)].m_InFlight[target.m_Address.m_Mip] = id;
+			}
+		}
 		m_Pending.emplace(id, std::move(pending));
+	}
+
+	void NonFiniteWatchCoordinator::ApplyGenerationEvidence(NonFiniteWatchTargetStatus& target, uint64_t frameSerial) const noexcept
+	{
+		if (!target.m_Generation.IsValid() || !target.m_Semantic)
+		{
+			return;
+		}
+		const auto& generation = m_Generations[static_cast<size_t>(*target.m_Semantic)];
+		const size_t mip = target.m_Address.m_Mip;
+		if (generation.m_Generation != target.m_Generation || mip >= generation.m_Results.size())
+		{
+			return;
+		}
+		if (const auto& evidence = generation.m_Results[mip]; evidence)
+		{
+			const auto address = target.m_Address;
+			target = *evidence;
+			target.m_Address = address;
+			if (target.m_CheckedFrameSerial != frameSerial && target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Passed)
+			{
+				// No new generation: retain the last checked record without claiming a
+				// scan of this frame. Failed content stays failed while it is active.
+				target.m_Result.m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			}
+		}
+		else if (target.m_Failure.empty())
+		{
+			target.m_Failure = generation.m_InFlight[mip] != 0
+				? "MissingCoverage: generation scan is pending completion."
+				: "MissingCoverage: generation scan is awaiting admission.";
+		}
 	}
 
 	void NonFiniteWatchCoordinator::PublishBoundary(Pending pending) noexcept
 	{
 		if (pending.m_FrameSerial < m_Status.m_BoundaryFrameSerial)
 		{
-			return;
+			pending.m_FrameSerial = m_Status.m_BoundaryFrameSerial;
+			pending.m_Targets = m_Status.m_Targets;
+		}
+		for (auto& target : pending.m_Targets)
+		{
+			ApplyGenerationEvidence(target, pending.m_FrameSerial);
 		}
 		NonFiniteClaimResult claim{ NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
 		bool applicable = false;
@@ -221,6 +325,8 @@ namespace gglab
 				auto& target = pending.m_Targets[pending.m_ScanIndices[i]];
 				target.m_Record = boundary.m_Record;
 				target.m_Result = boundary.m_Result;
+				target.m_CheckedFrameSerial = pending.m_FrameSerial;
+				target.m_Failure.clear();
 				if (target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete)
 				{
 					target.m_Failure = "MissingCoverage: scan evidence is incomplete.";
@@ -254,6 +360,25 @@ namespace gglab
 			{
 				pending.m_Targets[index].m_Failure = result.m_Failure.empty()
 					? "MissingCoverage: the watch frame returned missing or mismatched scan evidence." : result.m_Failure;
+			}
+		}
+		for (const size_t index : pending.m_ScanIndices)
+		{
+			const auto& target = pending.m_Targets[index];
+			if (!target.m_Generation.IsValid() || !target.m_Semantic)
+			{
+				continue;
+			}
+			auto& generation = m_Generations[static_cast<size_t>(*target.m_Semantic)];
+			const size_t mip = target.m_Address.m_Mip;
+			if (generation.m_Generation == target.m_Generation && mip < generation.m_InFlight.size() &&
+				generation.m_InFlight[mip] == result.m_RequestId)
+			{
+				generation.m_InFlight[mip] = 0;
+				if (target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Passed || target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Failed)
+				{
+					generation.m_Results[mip] = target;
+				}
 			}
 		}
 		PublishBoundary(std::move(pending));
