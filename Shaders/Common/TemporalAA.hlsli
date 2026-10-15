@@ -242,8 +242,9 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 	float2 displayPerRender, float kernelScale, float3 centerColor)
 {
 	const int2 maxPixel = int2(extent) - 1;
-	float3 sum = 0.0.xxx;
-	float weightSum = 0.0;
+	// Keep reconstruction rounding stable when diagnostic observers change optimization.
+	precise float3 sum = 0.0.xxx;
+	precise float weightSum = 0.0;
 	[unroll]
 	for (int y = -1; y <= 1; ++y)
 	{
@@ -256,8 +257,11 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 			{
 				sampleColor = centerColor;
 			}
-			const float2 offset = (float2(x, y) - jitterPixels - outputOffset) * displayPerRender;
-			const float weight = exp(-kernelScale * dot(offset, offset));
+			precise float2 offset = (float2(x, y) - jitterPixels - outputOffset) * displayPerRender;
+			// Spell out the kernel's multiply/add order under the same precision contract.
+			precise float distanceSquared = offset.x * offset.x + offset.y * offset.y;
+			precise float exponent = -kernelScale * distanceSquared;
+			const float weight = exp(exponent);
 			sum += sampleColor * weight;
 			weightSum += weight;
 		}

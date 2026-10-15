@@ -820,9 +820,14 @@ recent capture per key). It reports per pair the mean and maximum absolute
 given. `-MaxMeanError` and `-MaxDifferingPercent` turn it into a check: exit
 code 1 when a pair exceeds them, sizes differ or a capture has no counterpart.
 
-Sidecars with an unsupported `schemaVersion` are listed under `rejected` and
-not compared, which also makes the exit code 1. Each pair lists the frame
-settings that differ between its sidecars under `metadataDifferences`: camera,
+Directory comparison enumerates PNGs and reads each matching JSON sidecar;
+session receipts and resource/graph exports in the same directory are ignored.
+A missing or malformed screenshot sidecar, an unsupported `schemaVersion`, or
+an `image.file` that does not name the paired PNG is listed under `rejected`
+and makes the exit code 1. `Scripts/TestCompareCaptures.ps1` checks this discovery
+and rejection behavior without a GPU, including exact pixel differences.
+Each pair lists the frame settings that differ between its sidecars under
+`metadataDifferences`: camera,
 time step, total simulated time, size, content and the like. Backends, request
 ids and capture times are expected to differ and are not listed. Check these
 before reading pixel differences as rendering differences. Sessions on

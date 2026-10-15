@@ -230,6 +230,12 @@ jobs:
           python Scripts/ValidateResourceExports.py --self-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Validate capture comparison discovery and rejection
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestCompareCaptures.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build GGLabFoundation standalone
         if: matrix.pch == 'enabled'
         shell: pwsh

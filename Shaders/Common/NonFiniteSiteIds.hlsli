@@ -79,5 +79,5 @@ static const uint NF_SITE_PASS_TEMPORAL_REFERENCE_CSMAIN_ISFINITE = 74u;
 static const uint NF_SITE_COUNT = 75u;
 static const uint NF_PROGRAM_COUNT = 27u;
 
-static const uint NF_INVENTORY_LOW = 0x96a9f2c6u;
-static const uint NF_INVENTORY_HIGH = 0x2c336e4fu;
+static const uint NF_INVENTORY_LOW = 0xdc62c451u;
+static const uint NF_INVENTORY_HIGH = 0x1e8e5959u;

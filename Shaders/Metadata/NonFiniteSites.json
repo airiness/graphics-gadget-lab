@@ -538,7 +538,7 @@
       "function": "ReconstructTemporalCurrentColor",
       "operation": "IsTemporalColorFinite",
       "count": 1,
-      "bodySha256": "b5ffb1b9f4bb5735c214d69ddfb571937f9c370cd996f2b0b03418aa5fd63bc0",
+      "bodySha256": "69fb9c6c5014ed0c617ca93c861acb30403d5c73822c8e6dc3eb3ebeaa2864a0",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1027,7 +1027,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "b3b0f236d6158a6ac574b65bd30a326f3d6161b7ed26c5944ed86fbe59c9b47f",
+      "bodySha256": "eae0a9e2754babc9e44cf5a901cbf95281515b0c97605fae3649aad4c899cab4",
       "programs": [
         "gglab.shader.forward-pbr"
       ],

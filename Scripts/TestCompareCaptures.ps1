@@ -1,0 +1,125 @@
+<#
+.SYNOPSIS
+Checks screenshot discovery, metadata rejection and exact pixel comparison without a GPU.
+#>
+[CmdletBinding()]
+param([string]$OutputDirectory)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 3.0
+$root = Split-Path -Parent $PSScriptRoot
+$comparisonScript = Join-Path $PSScriptRoot 'CompareCaptures.ps1'
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/CaptureComparisons' }
+$runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
+$output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
+New-Item -ItemType Directory -Path $output | Out-Null
+$utf8 = New-Object Text.UTF8Encoding($false)
+$checks = @()
+Add-Type -AssemblyName System.Drawing
+
+function Write-Json([string]$Path, $Value) {
+    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 12), $utf8)
+}
+
+function Write-Capture([string]$Directory, [string]$Name = 'capture', [int]$Red = 0,
+    [string]$CapturedAt = '2026-01-01T00:00:01Z') {
+    $image = Join-Path $Directory "$Name.png"
+    $bitmap = New-Object Drawing.Bitmap(2, 2)
+    try {
+        for ($y = 0; $y -lt 2; ++$y) {
+            for ($x = 0; $x -lt 2; ++$x) {
+                $bitmap.SetPixel($x, $y, [Drawing.Color]::FromArgb($Red, 0, 0))
+            }
+        }
+        $bitmap.Save($image, [Drawing.Imaging.ImageFormat]::Png)
+    } finally { $bitmap.Dispose() }
+    Write-Json ([IO.Path]::ChangeExtension($image, '.json')) @{
+        schemaVersion = 1; image = @{ file = "$Name.png" }; content = @{ labId = 'gglab.lab.fixture' }
+        source = 'scene'; label = 'fixture'; capturedAtUtc = $CapturedAt
+    }
+}
+
+function New-Case([string]$Name) {
+    $directory = Join-Path $output $Name
+    foreach ($arm in @('off', 'on')) {
+        $path = Join-Path $directory $arm
+        New-Item -ItemType Directory -Path $path | Out-Null
+        Write-Capture $path
+    }
+    return $directory
+}
+
+function Check-Comparison([string]$Name, [string]$Reference, [string]$Candidate,
+    [int]$ExitCode, [int]$Compared, [int]$Rejected, [int]$Failed = 0, [int]$Unmatched = 0) {
+    $text = & powershell -NoProfile -ExecutionPolicy Bypass -File $comparisonScript `
+        -Reference $Reference -Candidate $Candidate -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0
+    $actualExit = $LASTEXITCODE
+    $receipt = ($text -join "`n") | ConvertFrom-Json
+    Write-Json (Join-Path $output "$Name-result.json") $receipt
+    $actualCompared = if ($receipt.PSObject.Properties['compared']) { $receipt.compared } else { 0 }
+    $actualFailed = if ($receipt.PSObject.Properties['failed']) { $receipt.failed } else { 0 }
+    if ($actualExit -ne $ExitCode -or $receipt.ok -ne ($ExitCode -eq 0) -or
+        $actualCompared -ne $Compared -or @($receipt.rejected).Count -ne $Rejected -or
+        $actualFailed -ne $Failed -or @($receipt.unmatched).Count -ne $Unmatched) {
+        throw "Unexpected comparison result for ${Name}: $($text -join '')"
+    }
+    $script:checks += $Name
+}
+
+try {
+    $case = New-Case 'mixed-directory'
+    foreach ($arm in @('off', 'on')) {
+        $directory = Join-Path $case $arm
+        Write-Json (Join-Path $directory 'session.json') @{ ok = $true }
+        Write-Json (Join-Path $directory 'resource-export.json') @{ schemaVersion = 2 }
+        Write-Json (Join-Path $directory 'graph.json') @{ schemaVersion = 4 }
+        [IO.File]::WriteAllText((Join-Path $directory 'unrelated.json'), '{invalid', $utf8)
+    }
+    Write-Capture (Join-Path $case 'off') 'older' 255 '2026-01-01T00:00:00Z'
+    Check-Comparison 'mixed-directory' "$case/off" "$case/on" 0 1 0
+    Check-Comparison 'single-image' "$case/off/capture.png" "$case/on/capture.png" 0 1 0
+
+    $case = New-Case 'unsupported-sidecar'
+    $sidecar = "$case/on/capture.json"
+    $metadata = Get-Content -Raw $sidecar | ConvertFrom-Json
+    $metadata.schemaVersion = 99
+    Write-Json $sidecar $metadata
+    Check-Comparison 'unsupported-sidecar' "$case/off" "$case/on" 1 0 1 0 1
+    Check-Comparison 'unsupported-single-image' "$case/off/capture.png" "$case/on/capture.png" 1 0 1
+
+    $case = New-Case 'malformed-sidecar'
+    [IO.File]::WriteAllText("$case/on/capture.json", '{invalid', $utf8)
+    Check-Comparison 'malformed-sidecar' "$case/off" "$case/on" 1 0 1 0 1
+
+    $case = New-Case 'missing-sidecar'
+    Remove-Item -LiteralPath "$case/on/capture.json"
+    Check-Comparison 'missing-sidecar' "$case/off" "$case/on" 1 0 1 0 1
+    Check-Comparison 'single-image-optional-sidecar' "$case/off/capture.png" "$case/on/capture.png" 0 1 0
+
+    $case = New-Case 'mismatched-image'
+    $sidecar = "$case/on/capture.json"
+    $metadata = Get-Content -Raw $sidecar | ConvertFrom-Json
+    $metadata.image.file = 'other.png'
+    Write-Json $sidecar $metadata
+    Check-Comparison 'mismatched-image' "$case/off" "$case/on" 1 0 1 0 1
+
+    $case = New-Case 'pixel-difference'
+    Write-Capture "$case/on" 'capture' 1
+    Check-Comparison 'pixel-difference' "$case/off" "$case/on" 1 1 0 1
+
+    $case = New-Case 'unmatched-key'
+    $sidecar = "$case/on/capture.json"
+    $metadata = Get-Content -Raw $sidecar | ConvertFrom-Json
+    $metadata.label = 'unmatched'
+    Write-Json $sidecar $metadata
+    Check-Comparison 'unmatched-key' "$case/off" "$case/on" 1 0 0 0 2
+
+    $result = @{ ok = $true; checks = $checks; directory = $output }
+    Write-Json (Join-Path $output 'result.json') $result
+    [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress))
+} catch {
+    $result = @{ ok = $false; checks = $checks; directory = $output; error = $_.Exception.Message }
+    Write-Json (Join-Path $output 'result.json') $result
+    [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress))
+    exit 1
+}

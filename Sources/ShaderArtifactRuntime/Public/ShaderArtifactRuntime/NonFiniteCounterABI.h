@@ -13,9 +13,9 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x96a9f2c6;
-	inline constexpr uint32_t InventoryHigh = 0x2c336e4f;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.96a9f2c62c336e4fa0d72c35ac865230dd1cced3218c45f28cc50ee8970588ce";
+	inline constexpr uint32_t InventoryLow = 0xdc62c451;
+	inline constexpr uint32_t InventoryHigh = 0x1e8e5959;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.dc62c4511e8e5959cbccacdea91e0732b1c86b969ad999defa126487adc76e67";
 	inline constexpr uint32_t SiteCount = 75;
 	inline constexpr uint32_t ProgramCount = 27;
 	inline constexpr uint32_t BufferBytes = HeaderBytes + SiteCount * ProgramCount * RecordBytes;

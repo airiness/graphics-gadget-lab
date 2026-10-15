@@ -530,7 +530,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, gtao);
 	ibl.Specular *= ResolveSpecularIBLVisibility(ao);
 
-	float3 outputLighting = directLighting;
+	// The final radiance sum must keep its rounding when diagnostic observers are enabled.
+	precise float3 outputLighting = directLighting;
 	outputLighting += emissive;
 	outputLighting += ibl.Diffuse + ibl.Specular;
 	const float4 outputColor = float4(
