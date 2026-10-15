@@ -34,17 +34,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem Bypass the solution's version association and prefer the newest release IDE.
+rem Prefer newer VS major versions, with release IDEs before previews within each version.
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "DEVENV="
 
 if exist "%VSWHERE%" (
-    for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -property productPath`) do set "DEVENV=%%I"
-    rem Allow preview IDEs when no release IDE is installed.
-    if not defined DEVENV (
-        for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -prerelease -property productPath`) do set "DEVENV=%%I"
-    )
+    for /f "usebackq tokens=1 delims=." %%I in (`call "%VSWHERE%" -prerelease -sort -property installationVersion`) do call :FindVisualStudioForMajor %%I
 )
 
 if defined DEVENV (
@@ -57,3 +53,18 @@ if defined DEVENV (
 
 echo Visual Studio could not be located. Using the default solution handler.
 start "" "%SOLUTION%"
+exit /b
+
+:FindVisualStudioForMajor
+if defined DEVENV exit /b
+set /a "VS_NEXT_MAJOR=%~1 + 1"
+
+for /f "usebackq delims=" %%I in (`call "%VSWHERE%" -version "[%~1.0,%VS_NEXT_MAJOR%.0)" -sort -property productPath`) do (
+    if not defined DEVENV if exist "%%I" set "DEVENV=%%I"
+)
+if defined DEVENV exit /b
+
+for /f "usebackq delims=" %%I in (`call "%VSWHERE%" -version "[%~1.0,%VS_NEXT_MAJOR%.0)" -prerelease -sort -property productPath`) do (
+    if not defined DEVENV if exist "%%I" set "DEVENV=%%I"
+)
+exit /b
