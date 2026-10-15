@@ -142,4 +142,12 @@ namespace gglab
 					});
 			});
 	}
+
+	void AddFrameCaptureTapPass(RenderGraph& rg, const RenderFrameContext& context,
+		const RenderServices& services, FrameCaptureSource source) noexcept
+	{
+		// The pass setup runs while it is added; the graph keeps no reference to it.
+		RenderPassFrameCapture pass(source);
+		pass.AddPass(rg, context, services);
+	}
 }

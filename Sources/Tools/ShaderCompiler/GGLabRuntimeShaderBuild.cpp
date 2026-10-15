@@ -164,6 +164,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &NonFiniteScanBufferCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSMain", NonFiniteBufferDefines },
 			ShaderProgramBuildRecord{ &RenderGraphComputeWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },
+			ShaderProgramBuildRecord{ &RenderGraphComputeNonFiniteProbe, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSNonFiniteProbe" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewVertex, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewPixel, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &NapaVoxelVertex, L"Passes/PassNapaVoxel.hlsl", L"VSMain" },

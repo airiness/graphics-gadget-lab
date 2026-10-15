@@ -151,6 +151,8 @@ namespace gglab::shader_programs
 		"gglab.shader.render-graph-compute", "compute.write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
+	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{
+		"gglab.shader.render-graph-compute", "compute.nonfinite-probe", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputePreviewVertex{
 		"gglab.shader.render-graph-compute", "vertex.preview", ShaderStage::Vertex };
 	inline const ShaderProgramRef RenderGraphComputePreviewPixel{

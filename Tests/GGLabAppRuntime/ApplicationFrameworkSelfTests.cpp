@@ -2,11 +2,17 @@
 
 #include "ApplicationContentRegistration.h"
 #include "Demo/DemoManager.h"
+#include "Lab/LabParameter.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 
 #include <exception>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace gglab
 {
@@ -103,7 +109,7 @@ namespace gglab
 			GTAOCapabilityStatus m_GTAOCapabilities{};
 		};
 
-		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabId&,
+		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabStartupSelection&,
 			std::span<const LabRegistration>) noexcept
 		{
 			return nullptr;
@@ -203,11 +209,58 @@ namespace gglab
 				"Host state applied at the transition seam reaches the first preparation and commit");
 			manager.PrepareForAssetShutdown();
 		}
+
+		void RunLabParameterParseSelfTests(SelfTestContext& context) noexcept
+		{
+			const auto parse = [](const LabParameterDesc& desc, std::string_view text)
+				{
+					std::string error;
+					std::optional<LabValue> value = ParseLabParameterValue(desc, text, error);
+					return std::pair{ std::move(value), std::move(error) };
+				};
+			const LabParameterDesc count{ .m_Id = LabParameterId("test.count"), .m_Name = "Count",
+				.m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(2),
+				.m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(8)) };
+			const auto [inRange, inRangeError] = parse(count, "8");
+			context.Check(inRange && std::get<uint32_t>(*inRange) == 8 && inRangeError.empty(),
+				"Textual Lab parameters accept an in-range unsigned value");
+			context.Check(!parse(count, "9").first && !parse(count, "0").first &&
+				!parse(count, "-1").first && !parse(count, "3x").first && !parse(count, "").first,
+				"Textual Lab parameters reject out-of-range or malformed numbers instead of clamping");
+
+			const LabParameterDesc scale{ .m_Id = LabParameterId("test.scale"), .m_Name = "Scale",
+				.m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f,
+				.m_MinValue = LabValue(0.0f), .m_MaxValue = LabValue(4.0f) };
+			const auto [zero, zeroError] = parse(scale, "0");
+			context.Check(zero && std::get<float>(*zero) == 0.0f && !parse(scale, "nan").first &&
+				!parse(scale, "inf").first && !parse(scale, "4.5").first,
+				"Textual float parameters require a finite in-range value");
+
+			const LabParameterDesc mode{ .m_Id = LabParameterId("test.mode"), .m_Name = "Mode",
+				.m_Type = LabParameterType::Enum, .m_DefaultValue = int32_t(0),
+				.m_EnumItems = { { .m_Value = 0, .m_Name = "Off" }, { .m_Value = 2, .m_Name = "Sanitized" } } };
+			const auto [byName, byNameError] = parse(mode, "sanitized");
+			const auto [byValue, byValueError] = parse(mode, "2");
+			context.Check(byName && std::get<int32_t>(*byName) == 2 && byValue &&
+				std::get<int32_t>(*byValue) == 2 && !parse(mode, "1").first &&
+				!parse(mode, "Boundary").first,
+				"Textual enum parameters accept item names or values and reject unknown items");
+
+			const LabParameterDesc toggle{ .m_Id = LabParameterId("test.toggle"), .m_Name = "Toggle",
+				.m_Type = LabParameterType::Bool, .m_DefaultValue = false };
+			const LabParameterDesc color{ .m_Id = LabParameterId("test.color"), .m_Name = "Color",
+				.m_Type = LabParameterType::Color, .m_DefaultValue = Color(1.0f, 1.0f, 1.0f, 1.0f) };
+			const auto [enabled, enabledError] = parse(toggle, "TRUE");
+			context.Check(enabled && std::get<bool>(*enabled) && !parse(toggle, "yes").first &&
+				!parse(color, "1").first,
+				"Textual bool parameters are explicit and composite types have no textual form");
+		}
 	}
 
 	void RunApplicationFrameworkSelfTests(SelfTestContext& context) noexcept
 	{
 		RunDemoTransitionSynchronizationSelfTests(context);
+		RunLabParameterParseSelfTests(context);
 
 		ApplicationContentRegistration empty;
 		context.Check(!empty.IsValid(),

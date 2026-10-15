@@ -6,7 +6,7 @@
 
 namespace gglab
 {
-	DemoLabHost::DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab,
+	DemoLabHost::DemoLabHost(const DemoCreateInfo& createInfo, const LabStartupSelection& startupLab,
 		std::span<const LabRegistration> labRegistrations) noexcept :
 		m_StartupLab(startupLab),
 		m_Runtime({
@@ -24,7 +24,7 @@ namespace gglab
 
 	void DemoLabHost::BeginPrepare() noexcept
 	{
-		GGLAB_UNUSED(m_Runtime.Initialize(m_StartupLab));
+		GGLAB_UNUSED(m_Runtime.Initialize(m_StartupLab.m_Lab, m_StartupLab.m_Parameters));
 	}
 
 	void DemoLabHost::TickPrepare() noexcept
@@ -55,7 +55,7 @@ namespace gglab
 			.m_Status = LoadingStatus::Preparing,
 			.m_Fraction = 0.0f,
 			.m_Stage = "Initializing Lab runtime",
-			.m_Detail = std::string(m_StartupLab.GetName()),
+			.m_Detail = std::string(m_StartupLab.m_Lab.GetName()),
 		};
 	}
 

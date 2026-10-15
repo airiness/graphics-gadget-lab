@@ -126,6 +126,13 @@ namespace gglab
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
 		}
+		if (!m_Config.m_StartupLabParameters.empty() &&
+			!contentSelection.m_StartupDemo->m_ProvidesLabRuntime)
+		{
+			GGLAB_LOG_ERROR("Startup Lab parameters require a startup Demo that hosts Labs.");
+			return FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
+		}
 
 		m_LifecycleState = AppRuntimeLifecycleState::Initializing;
 		m_Input = createInfo.m_Input;
@@ -242,11 +249,15 @@ namespace gglab
 		};
 		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
 		const std::span<const LabRegistration> labRegistrations = m_ContentRegistration.m_Labs;
+		const LabStartupSelection startupLab{
+			.m_Lab = contentSelection.m_StartupLab,
+			.m_Parameters = m_Config.m_StartupLabParameters,
+		};
 		std::optional<uint32_t> startupDemoIndex;
 		for (const ApplicationDemoRegistration& registration : m_ContentRegistration.m_Demos)
 		{
 			const uint32_t registeredIndex = m_DemoManager->RegisterDemo(registration.m_Id,
-				[demoCreateInfo, startupLab = contentSelection.m_StartupLab, labRegistrations, factory = registration.m_Factory]
+				[demoCreateInfo, startupLab, labRegistrations, factory = registration.m_Factory]
 				() noexcept -> std::unique_ptr<DemoBase>
 				{
 					return factory(demoCreateInfo, startupLab, labRegistrations);

@@ -515,8 +515,46 @@ without counter capability: clean captures, graph/resource exports, full-sequenc
 coverage, capability rejection, missing-target failure, report-mode incomplete
 metadata and continued process operation after failure. CPU coordinator tests also
 exercise delayed anomalies, out-of-order results, missing readbacks, configuration
-changes, generation tails and reference-sample membership. Interactive Lab injection
-parameters and full-scene policy/overhead acceptance remain separate work.
+changes, generation tails and reference-sample membership. Full-scene
+policy/overhead acceptance remains separate work.
+
+### Debug injection in the RenderGraph Compute Lab
+
+Debug builds add `render_graph_compute.debug.nonfinite.*` parameters to
+`gglab.lab.render_graph_compute`; other builds declare none and render unchanged.
+`mode` is `Off`, `Boundary` or `Sanitized`; `value` is `NaN`, `PositiveInfinity`,
+`NegativeInfinity`, `Overflow` (131072, finite above the FP16 maximum) or
+`Negative` (-4); `x`, `y` and `channel` select the location.
+
+- `Boundary` adds a compute pass that writes an RGBA32F
+  `RenderGraphCompute.NonFiniteProbe` with finite values and the injected value at
+  probe texel (`x`, `y`) and `channel`. The preview declares a read so the probe stays
+  live for boundary scans; it is not displayed. A watch of that address reports the
+  exact location; finite values only change the reported extrema.
+- `Sanitized` creates the value in preview registers at display pixel (`x`, `y`) and
+  passes it through `SanitizeHDRChannel` at site
+  `pass-render-graph-compute-smoke.psmain.sanitize-hdrchannel`. No resource holds the
+  value and the written pixel is unchanged, so only the production claim can fail.
+  The site's negative clamps are `expected` and its FP16-maximum clamps are `error`.
+
+Debug launches accept repeatable startup assignments, parsed strictly against the
+startup Lab's declarations before its first preparation (unknown ids, malformed or
+out-of-range values fail Lab startup). Release builds reject the option.
+
+```powershell
+& $session start -Session inject -Configuration Debug -Lab gglab.lab.render_graph_compute `
+    -WatchNonFinite -LabParameters 'render_graph_compute.debug.nonfinite.mode=Boundary', `
+    'render_graph_compute.debug.nonfinite.value=NaN'
+& $session watch -Session inject -Targets '[{"resource":"RenderGraphCompute.NonFiniteProbe"}]'
+```
+
+This Lab renders no IBL, so its `ibl` readiness gate never opens; use
+`-Timing next-frame` captures. `Scripts/TestNonFiniteInjection.ps1` verifies Debug
+sessions on both backends: exact boundary locations and counts for NaN and both
+infinities, fail-mode capture failures naming the probe location, a finite overflow
+that passes with its maximum, a sanitized NaN that fails production at the site
+while the PNG pixels equal the uninjected control, an `expected` negative clamp that
+passes and an `error` FP16 clamp that fails with `ClampPolicyExceeded`.
 
 ### Runtime counter and scan mechanics
 
@@ -585,7 +623,7 @@ Implemented Runtime integration:
 
 The Shader-domain foundation also includes the 32-byte CPU/GPU ABI, IEEE-bit
 classification, wave reductions, finite extrema and clamp-policy evaluation.
-`Shaders/Metadata/NonFiniteSites.json` inventories 75 sanitization/recovery/validity
+`Shaders/Metadata/NonFiniteSites.json` inventories 76 sanitization/recovery/validity
 sites. Its checker is a conservative lexical review gate, not data-flow proof;
 counter and forwarded-counter routing are source evidence, not GPU verification.
 
@@ -596,6 +634,7 @@ python Scripts/GenerateNonFiniteSites.py --check
 python Scripts/ValidateNonFiniteSites.py --self-test
 python Scripts/ValidateNonFiniteSites.py
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestTemporalAACounters.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestNonFiniteInjection.ps1
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite nonfinite-watch
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite frame-capture
 Build/Output/x64/Debug/GGLabAppRuntimeTests.exe

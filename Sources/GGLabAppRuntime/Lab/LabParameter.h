@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -130,4 +131,10 @@ namespace gglab
 
 		std::vector<LabParameter> m_Parameters;
 	};
+
+	// Parses a textual value for one declared parameter without the clamping that
+	// interactive edits apply: out-of-range numbers and unknown enum items fail.
+	// Enum values accept an item name (ASCII case-insensitive) or its integer value.
+	[[nodiscard]] std::optional<LabValue> ParseLabParameterValue(
+		const LabParameterDesc& desc, std::string_view text, std::string& error) noexcept;
 }

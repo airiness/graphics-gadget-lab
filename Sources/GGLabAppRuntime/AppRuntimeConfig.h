@@ -1,8 +1,10 @@
 #pragma once
+#include "Lab/LabTypes.h"
 
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace gglab
 {
@@ -44,6 +46,9 @@ namespace gglab
 		std::optional<std::string> m_AdapterSelector;
 		std::string m_StartupDemoId;
 		std::optional<std::string> m_StartupLabId;
+		// Parsed against the startup Lab when its session is created; requires a
+		// startup Demo that provides the Lab runtime.
+		std::vector<LabParameterAssignment> m_StartupLabParameters;
 		AppRuntimeExtent m_InitialExtent{};
 		AppRuntimePointerMode m_InitialPointerMode = AppRuntimePointerMode::Absolute;
 		AppRuntimeCapability m_Capabilities = AppRuntimeCapability::None;

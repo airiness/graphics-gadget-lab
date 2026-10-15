@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
+#include "Lab/LabTypes.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -37,6 +39,8 @@ namespace gglab
 	{
 		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
+		// Debug-only startup assignments for the startup Lab, in command-line order.
+		std::vector<LabParameterAssignment> m_StartupLabParameters;
 		std::optional<std::string> m_SelfTestSelection;
 		std::filesystem::path m_StateRoot;
 		bool m_StartWithRelativeMouse = false;

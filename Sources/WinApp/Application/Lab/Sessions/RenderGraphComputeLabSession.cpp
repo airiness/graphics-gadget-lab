@@ -1,4 +1,6 @@
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
@@ -8,13 +10,39 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
+#include <bit>
+#include <cstddef>
+#include <format>
+
 namespace gglab
 {
+	// Values match COMPUTE_LAB_INJECTION_* in PassRenderGraphComputeSmoke.hlsl.
+	enum class ComputeLabInjectionMode : uint32_t
+	{
+		Off = 0,
+		// A compute pass writes the value into one declared probe texel and channel.
+		Boundary = 1,
+		// The preview sanitizes a register-only value at one display pixel.
+		Sanitized = 2,
+	};
+
+	enum class ComputeLabInjectionValue : int32_t
+	{
+		NaN,
+		PositiveInfinity,
+		NegativeInfinity,
+		// Finite but above the FP16 maximum of 65504.
+		Overflow,
+		// Finite and negative.
+		Negative,
+	};
+
 	struct RenderGraphComputeLabState
 	{
 		std::atomic<uint64_t> m_InitializeExecutions = 0;
 		std::atomic<uint64_t> m_WriteExecutions = 0;
 		std::atomic<uint64_t> m_ReadWriteExecutions = 0;
+		std::atomic<uint64_t> m_ProbeExecutions = 0;
 		std::atomic<uint64_t> m_PreviewExecutions = 0;
 		std::atomic<uint64_t> m_CulledExecutions = 0;
 		std::atomic<float> m_AnimationTimeSeconds = 0.0f;
@@ -23,6 +51,12 @@ namespace gglab
 		std::atomic<float> m_RingRadius = 0.46f;
 		std::atomic<float> m_RingIntensity = 0.82f;
 		std::atomic<uint32_t> m_CheckerCellSize = 32;
+		// Debug builds declare the injection parameters; other builds stay Off.
+		std::atomic<ComputeLabInjectionMode> m_InjectionMode = ComputeLabInjectionMode::Off;
+		std::atomic<ComputeLabInjectionValue> m_InjectionValue = ComputeLabInjectionValue::NaN;
+		std::atomic<uint32_t> m_InjectionX = 0;
+		std::atomic<uint32_t> m_InjectionY = 0;
+		std::atomic<uint32_t> m_InjectionChannel = 0;
 	};
 
 	namespace
@@ -30,12 +64,46 @@ namespace gglab
 		constexpr uint32_t WorkTextureWidth = 512;
 		constexpr uint32_t WorkTextureHeight = 512;
 		constexpr uint32_t ComputeThreadGroupSize = 8;
+		constexpr float InjectedOverflow = 131072.0f;
+		constexpr float InjectedNegative = -4.0f;
 
 		const LabParameterId AnimationSpeedId("render_graph_compute.animation.speed");
 		const LabParameterId PatternFrequencyId("render_graph_compute.pattern.frequency");
 		const LabParameterId RingRadiusId("render_graph_compute.ring.radius");
 		const LabParameterId RingIntensityId("render_graph_compute.ring.intensity");
 		const LabParameterId CheckerCellSizeId("render_graph_compute.checker.cell_size");
+#if defined(BUILD_DEBUG)
+		const LabParameterId InjectionModeId("render_graph_compute.debug.nonfinite.mode");
+		const LabParameterId InjectionValueId("render_graph_compute.debug.nonfinite.value");
+		const LabParameterId InjectionXId("render_graph_compute.debug.nonfinite.x");
+		const LabParameterId InjectionYId("render_graph_compute.debug.nonfinite.y");
+		const LabParameterId InjectionChannelId("render_graph_compute.debug.nonfinite.channel");
+		constexpr uint32_t DefaultInjectionX = 137;
+		constexpr uint32_t DefaultInjectionY = 91;
+		constexpr uint32_t DefaultInjectionChannel = 2;
+#endif
+
+		[[nodiscard]] uint32_t GetInjectionBits(ComputeLabInjectionValue value) noexcept
+		{
+			switch (value)
+			{
+			case ComputeLabInjectionValue::NaN: return 0x7fc00000u;
+			case ComputeLabInjectionValue::PositiveInfinity: return 0x7f800000u;
+			case ComputeLabInjectionValue::NegativeInfinity: return 0xff800000u;
+			case ComputeLabInjectionValue::Overflow: return std::bit_cast<uint32_t>(InjectedOverflow);
+			case ComputeLabInjectionValue::Negative: return std::bit_cast<uint32_t>(InjectedNegative);
+			}
+			GGLAB_UNREACHABLE("Unhandled ComputeLabInjectionValue.");
+		}
+
+		const RenderPassInfo NonFiniteProbePassInfo{
+			.m_TypeName = "Lab.RenderGraphCompute.NonFiniteProbe",
+			.m_DisplayName = "RenderGraph Compute Non-finite Probe",
+			.m_CategoryName = "Debug",
+			.m_Description = "Writes a float probe with one injected value for boundary-scan tests.",
+			.m_Category = RenderPassCategory::Debug,
+			.m_Type = RenderPassType::Compute,
+		};
 
 		const RenderPassInfo ComputeWritePassInfo{
 			.m_TypeName = "Lab.RenderGraphCompute.Write",
@@ -68,6 +136,8 @@ namespace gglab
 		{
 			RGTextureId m_WorkA{};
 			RGTextureId m_WorkB{};
+			// Present only while boundary injection is active.
+			RGTextureId m_NonFiniteProbe{};
 			RGTextureId m_BackBuffer{};
 		};
 
@@ -91,6 +161,11 @@ namespace gglab
 		struct ComputeReadWritePassData
 		{
 			RGTextureViewId m_WorkAUav{};
+		};
+
+		struct NonFiniteProbePassData
+		{
+			RGTextureViewId m_ProbeUav{};
 		};
 
 		struct CulledComputePassData
@@ -122,9 +197,18 @@ namespace gglab
 			float m_RingRadius = 0.46f;
 			float m_RingIntensity = 0.82f;
 			uint32_t m_CheckerCellSize = 32;
+			uint32_t m_ProbeIndex = 0;
+			ComputeLabInjectionMode m_InjectionMode = ComputeLabInjectionMode::Off;
+			uint32_t m_InjectionBits = 0;
+			uint32_t m_InjectionX = 0;
+			uint32_t m_InjectionY = 0;
+			uint32_t m_InjectionChannel = 0;
 		};
+		static_assert(sizeof(ComputeLabInjectionMode) == sizeof(uint32_t));
 		static_assert(IsPassRootConstantStruct<ComputeLabPassParameters>);
-		static_assert(sizeof(ComputeLabPassParameters) == 36);
+		static_assert(sizeof(ComputeLabPassParameters) == 60);
+		static_assert(offsetof(ComputeLabPassParameters, m_ProbeIndex) == 36);
+		static_assert(offsetof(ComputeLabPassParameters, m_InjectionChannel) == 56);
 
 		RHITextureDesc MakeWorkTextureDesc() noexcept
 		{
@@ -132,6 +216,16 @@ namespace gglab
 			// R32_UINT typed UAV loads are guaranteed by D3D12. The previous
 			// R16G16B16A16_FLOAT workload required optional typed-load support.
 			desc.m_Format = RHIFormat::R32Uint;
+			desc.m_Extent = { WorkTextureWidth, WorkTextureHeight, 1u };
+			return desc;
+		}
+
+		RHITextureDesc MakeNonFiniteProbeDesc() noexcept
+		{
+			RHITextureDesc desc{};
+			// Float32 storage keeps every injected bit pattern; the probe is only
+			// written (typed UAV store) and read by boundary scans.
+			desc.m_Format = RHIFormat::R32G32B32A32Float;
 			desc.m_Extent = { WorkTextureWidth, WorkTextureHeight, 1u };
 			return desc;
 		}
@@ -163,20 +257,33 @@ namespace gglab
 				const uint32_t displayWidth = swapChain->GetBufferWidth();
 				const uint32_t displayHeight = swapChain->GetBufferHeight();
 				const RenderViewID displayViewId = context.GetDisplayViewId();
-				const float patternFrequency =
-					m_State->m_PatternFrequency.load(std::memory_order_relaxed);
-				const float ringRadius = m_State->m_RingRadius.load(std::memory_order_relaxed);
-				const float ringIntensity =
-					m_State->m_RingIntensity.load(std::memory_order_relaxed);
-				const uint32_t checkerCellSize =
-					m_State->m_CheckerCellSize.load(std::memory_order_relaxed);
-				const float phase =
-					std::fmod(m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
-						6.28318530718f);
+				const ComputeLabInjectionMode injectionMode =
+					m_State->m_InjectionMode.load(std::memory_order_relaxed);
+				// Every pass of the frame receives the same pattern and injection values;
+				// each pass sets only its own descriptor indices.
+				const ComputeLabPassParameters frameParameters{
+					.m_Width = WorkTextureWidth,
+					.m_Height = WorkTextureHeight,
+					.m_Phase = std::fmod(
+						m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
+						6.28318530718f),
+					.m_PatternFrequency = m_State->m_PatternFrequency.load(std::memory_order_relaxed),
+					.m_RingRadius = m_State->m_RingRadius.load(std::memory_order_relaxed),
+					.m_RingIntensity = m_State->m_RingIntensity.load(std::memory_order_relaxed),
+					.m_CheckerCellSize = m_State->m_CheckerCellSize.load(std::memory_order_relaxed),
+					.m_InjectionMode = injectionMode,
+					.m_InjectionBits = GetInjectionBits(
+						m_State->m_InjectionValue.load(std::memory_order_relaxed)),
+					.m_InjectionX = m_State->m_InjectionX.load(std::memory_order_relaxed),
+					.m_InjectionY = m_State->m_InjectionY.load(std::memory_order_relaxed),
+					.m_InjectionChannel =
+						m_State->m_InjectionChannel.load(std::memory_order_relaxed),
+				};
+				const bool boundaryProbe = injectionMode == ComputeLabInjectionMode::Boundary;
 
 				rg.AddPass<SetupPassData>("Lab.RenderGraphCompute.Setup",
-					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId](
-						RenderGraph::RGBuilder& builder, SetupPassData&)
+					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId,
+						boundaryProbe](RenderGraph::RGBuilder& builder, SetupPassData&)
 					{
 						builder.SideEffect();
 
@@ -186,6 +293,11 @@ namespace gglab
 							"RenderGraphCompute.WorkA", MakeWorkTextureDesc());
 						resources.m_WorkB = builder.CreateTexture(
 							"RenderGraphCompute.WorkB", MakeWorkTextureDesc());
+						if (boundaryProbe)
+						{
+							resources.m_NonFiniteProbe = builder.CreateTexture(
+								"RenderGraphCompute.NonFiniteProbe", MakeNonFiniteProbeDesc());
+						}
 
 						RHITextureDesc backBufferDesc{};
 						backBufferDesc.m_Format = swapChain->GetFormat();
@@ -245,7 +357,7 @@ namespace gglab
 						data.m_WorkBUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 							resources.m_WorkB);
 					},
-					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
+					[this, frameParameters](
 						RGExecuteContext& executeContext, ComputeWritePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -254,25 +366,14 @@ namespace gglab
 						GGLAB_ASSERT_MSG(workAUav.IsValid() && workBUav.IsValid(),
 							"Compute Lab UAVs must be shader visible.");
 
+						ComputeLabPassParameters parameters = frameParameters;
+						parameters.m_WorkAIndex = workAUav.m_Index;
+						parameters.m_WorkBIndex = workBUav.m_Index;
 						commandContext->SetPipeline(GetOrCreateComputeWritePSO());
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							ComputeLabPassParameters{
-								.m_WorkAIndex = workAUav.m_Index,
-								.m_WorkBIndex = workBUav.m_Index,
-								.m_Width = WorkTextureWidth,
-								.m_Height = WorkTextureHeight,
-								.m_Phase = phase,
-								.m_PatternFrequency = patternFrequency,
-								.m_RingRadius = ringRadius,
-								.m_RingIntensity = ringIntensity,
-								.m_CheckerCellSize = checkerCellSize,
-							});
-						commandContext->Dispatch((WorkTextureWidth + ComputeThreadGroupSize - 1) /
-							ComputeThreadGroupSize,
-							(WorkTextureHeight + ComputeThreadGroupSize - 1) /
-							ComputeThreadGroupSize,
-							1);
+							parameters);
+						DispatchWorkTexture(*commandContext);
 						m_State->m_WriteExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
@@ -287,7 +388,7 @@ namespace gglab
 						data.m_WorkAUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 							resources.m_WorkA);
 					},
-					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
+					[this, frameParameters](
 						RGExecuteContext& executeContext, ComputeReadWritePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -295,26 +396,47 @@ namespace gglab
 						GGLAB_ASSERT_MSG(workAUav.IsValid(),
 							"Compute Lab read/write UAV must be shader visible.");
 
+						ComputeLabPassParameters parameters = frameParameters;
+						parameters.m_WorkAIndex = workAUav.m_Index;
 						commandContext->SetPipeline(GetOrCreateComputeReadWritePSO());
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							ComputeLabPassParameters{
-								.m_WorkAIndex = workAUav.m_Index,
-								.m_Width = WorkTextureWidth,
-								.m_Height = WorkTextureHeight,
-								.m_Phase = phase,
-								.m_PatternFrequency = patternFrequency,
-								.m_RingRadius = ringRadius,
-								.m_RingIntensity = ringIntensity,
-								.m_CheckerCellSize = checkerCellSize,
-							});
-						commandContext->Dispatch((WorkTextureWidth + ComputeThreadGroupSize - 1) /
-							ComputeThreadGroupSize,
-							(WorkTextureHeight + ComputeThreadGroupSize - 1) /
-							ComputeThreadGroupSize,
-							1);
+							parameters);
+						DispatchWorkTexture(*commandContext);
 						m_State->m_ReadWriteExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
+
+				if (boundaryProbe)
+				{
+					rg.AddPass<NonFiniteProbePassData>(
+						NonFiniteProbePassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
+						[](RenderGraph::RGBuilder& builder, NonFiniteProbePassData& data)
+						{
+							auto& resources = builder.GetBlackboard().Get<ComputeLabResources>(
+								ComputeLabResourcesName);
+							builder.WriteInPlace(resources.m_NonFiniteProbe,
+								RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+							data.m_ProbeUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
+								resources.m_NonFiniteProbe);
+						},
+						[this, frameParameters](
+							RGExecuteContext& executeContext, NonFiniteProbePassData& data)
+						{
+							auto* commandContext = executeContext.GetDirectComputeCommandContext();
+							const auto probeUav = executeContext.GetViewDescriptor(data.m_ProbeUav);
+							GGLAB_ASSERT_MSG(probeUav.IsValid(),
+								"Compute Lab probe UAV must be shader visible.");
+
+							ComputeLabPassParameters parameters = frameParameters;
+							parameters.m_ProbeIndex = probeUav.m_Index;
+							commandContext->SetPipeline(GetOrCreateNonFiniteProbePSO());
+							commandContext->SetPushConstants(
+								static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+								parameters);
+							DispatchWorkTexture(*commandContext);
+							m_State->m_ProbeExecutions.fetch_add(1, std::memory_order_relaxed);
+						});
+				}
 
 				rg.AddPass<CulledComputePassData>(
 					"Lab.RenderGraphCompute.Culled", RGPassEncoderType::Compute,
@@ -327,30 +449,19 @@ namespace gglab
 						data.m_OutputUav =
 							builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
 					},
-					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
+					[this, frameParameters](
 						RGExecuteContext& executeContext, CulledComputePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
 						const auto outputUav = executeContext.GetViewDescriptor(data.m_OutputUav);
+						ComputeLabPassParameters parameters = frameParameters;
+						parameters.m_WorkAIndex = outputUav.m_Index;
+						parameters.m_WorkBIndex = outputUav.m_Index;
 						commandContext->SetPipeline(GetOrCreateComputeWritePSO());
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							ComputeLabPassParameters{
-								.m_WorkAIndex = outputUav.m_Index,
-								.m_WorkBIndex = outputUav.m_Index,
-								.m_Width = WorkTextureWidth,
-								.m_Height = WorkTextureHeight,
-								.m_Phase = phase,
-								.m_PatternFrequency = patternFrequency,
-								.m_RingRadius = ringRadius,
-								.m_RingIntensity = ringIntensity,
-								.m_CheckerCellSize = checkerCellSize,
-							});
-						commandContext->Dispatch((WorkTextureWidth + ComputeThreadGroupSize - 1) /
-							ComputeThreadGroupSize,
-							(WorkTextureHeight + ComputeThreadGroupSize - 1) /
-							ComputeThreadGroupSize,
-							1);
+							parameters);
+						DispatchWorkTexture(*commandContext);
 						m_State->m_CulledExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
@@ -370,6 +481,13 @@ namespace gglab
 						data.m_WorkBSrv =
 							builder.CreateView<RHITextureViewType::ShaderResource>(builder.Read(
 								resources.m_WorkB, RGTextureAccess::Sample, RHIStage::PixelShader));
+						if (resources.m_NonFiniteProbe.IsValid())
+						{
+							// The declared read keeps the probe live for boundary scans; the
+							// preview does not display it.
+							GGLAB_UNUSED(builder.Read(resources.m_NonFiniteProbe,
+								RGTextureAccess::Sample, RHIStage::PixelShader));
+						}
 						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget,
 							RHIStage::RenderTarget);
 						resources.m_BackBuffer = targets.m_BackBuffer;
@@ -378,8 +496,7 @@ namespace gglab
 						data.m_Width = displayWidth;
 						data.m_Height = displayHeight;
 					},
-					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
-						RGExecuteContext& executeContext, PreviewPassData& data)
+					[this, frameParameters](RGExecuteContext& executeContext, PreviewPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
 						const auto workASrv = executeContext.GetViewDescriptor(data.m_WorkASrv);
@@ -410,27 +527,23 @@ namespace gglab
 							static_cast<int32_t>(data.m_Width),
 							static_cast<int32_t>(data.m_Height),
 							});
+						ComputeLabPassParameters parameters = frameParameters;
+						parameters.m_WorkAIndex = workASrv.m_Index;
+						parameters.m_WorkBIndex = workBSrv.m_Index;
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							ComputeLabPassParameters{
-								.m_WorkAIndex = workASrv.m_Index,
-								.m_WorkBIndex = workBSrv.m_Index,
-								.m_Width = WorkTextureWidth,
-								.m_Height = WorkTextureHeight,
-								.m_Phase = phase,
-								.m_PatternFrequency = patternFrequency,
-								.m_RingRadius = ringRadius,
-								.m_RingIntensity = ringIntensity,
-								.m_CheckerCellSize = checkerCellSize,
-							});
+							parameters);
 						commandContext->DrawFullscreenTriangle();
 						m_State->m_PreviewExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
+				// Scene captures exclude tooling overlays; composited captures include them.
+				AddFrameCaptureTapPass(rg, context, services, FrameCaptureSource::Scene);
 				if (services.m_OverlayExtension)
 				{
 					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
 				}
+				AddFrameCaptureTapPass(rg, context, services, FrameCaptureSource::Composited);
 
 				rg.AddPass<FinishPassData>("Lab.RenderGraphCompute.Finish",
 					[displayViewId](RenderGraph::RGBuilder& builder, FinishPassData&)
@@ -445,6 +558,15 @@ namespace gglab
 			}
 
 		private:
+			template <typename CommandContext>
+			static void DispatchWorkTexture(CommandContext& commandContext) noexcept
+			{
+				commandContext.Dispatch(
+					(WorkTextureWidth + ComputeThreadGroupSize - 1) / ComputeThreadGroupSize,
+					(WorkTextureHeight + ComputeThreadGroupSize - 1) / ComputeThreadGroupSize,
+					1);
+			}
+
 			void EnsureInitialized(const RenderServices& services) noexcept
 			{
 				if (m_IsInitialized)
@@ -467,9 +589,15 @@ namespace gglab
 				m_PreviewRecipe.m_PSId = shaderManager->LoadProgram(
 					shader_programs::RenderGraphComputePreviewPixel);
 
+#if defined(BUILD_DEBUG)
+				m_NonFiniteProbeRecipe.m_CSId =
+					shaderManager->LoadProgram(shader_programs::RenderGraphComputeNonFiniteProbe);
+#endif
+
 				const auto bindingLayout = m_BindingLayout->GetCommonBindingLayout();
 				m_ComputeWriteRecipe.m_BindingLayout = bindingLayout;
 				m_ComputeReadWriteRecipe.m_BindingLayout = bindingLayout;
+				m_NonFiniteProbeRecipe.m_BindingLayout = bindingLayout;
 
 				m_PreviewRecipe.m_BindingLayout = bindingLayout;
 				m_PreviewRecipe.m_InputLayoutId = InputLayoutID::None;
@@ -502,6 +630,16 @@ namespace gglab
 					m_ComputeReadWriteSlot, m_ComputeReadWriteRecipe, ComputeReadWritePassInfo);
 			}
 
+			RHIPipelineHandle GetOrCreateNonFiniteProbePSO() noexcept
+			{
+				auto* pipelineCache = m_PipelineResolver;
+				GGLAB_ASSERT_NOT_NULL(pipelineCache);
+				GGLAB_ASSERT_MSG(m_NonFiniteProbeRecipe.m_CSId.IsValid(),
+					"The non-finite probe exists only in Debug builds.");
+				return pipelineCache->Resolve(
+					m_NonFiniteProbeSlot, m_NonFiniteProbeRecipe, NonFiniteProbePassInfo);
+			}
+
 			RHIPipelineHandle GetOrCreatePreviewPSO() noexcept
 			{
 				auto* pipelineCache = m_PipelineResolver;
@@ -515,9 +653,11 @@ namespace gglab
 			RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 			ComputePipelineRecipe m_ComputeWriteRecipe{};
 			ComputePipelineRecipe m_ComputeReadWriteRecipe{};
+			ComputePipelineRecipe m_NonFiniteProbeRecipe{};
 			GraphicsPhysicalPipelineKey m_PreviewRecipe{};
 			ComputePipelineSlot m_ComputeWriteSlot{};
 			ComputePipelineSlot m_ComputeReadWriteSlot{};
+			ComputePipelineSlot m_NonFiniteProbeSlot{};
 			GraphicsPipelineSlot m_PreviewSlot{};
 			bool m_IsInitialized = false;
 		};
@@ -581,6 +721,68 @@ namespace gglab
 			.m_MinValue = LabValue(uint32_t(4)),
 			.m_MaxValue = LabValue(uint32_t(128)),
 			}));
+#if defined(BUILD_DEBUG)
+		// Debug-only test hooks for non-finite watch acceptance. X/Y address a probe
+		// texel in Boundary mode and a display pixel in Sanitized mode.
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = InjectionModeId,
+			.m_Name = "Injection Mode",
+			.m_Group = "Non-finite Injection (Debug)",
+			.m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = static_cast<int32_t>(ComputeLabInjectionMode::Off),
+			.m_EnumItems = {
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionMode::Off), .m_Name = "Off" },
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionMode::Boundary), .m_Name = "Boundary" },
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionMode::Sanitized), .m_Name = "Sanitized" },
+			},
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = InjectionValueId,
+			.m_Name = "Injected Value",
+			.m_Group = "Non-finite Injection (Debug)",
+			.m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = static_cast<int32_t>(ComputeLabInjectionValue::NaN),
+			.m_EnumItems = {
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::NaN), .m_Name = "NaN" },
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::PositiveInfinity), .m_Name = "PositiveInfinity" },
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::NegativeInfinity), .m_Name = "NegativeInfinity" },
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::Overflow), .m_Name = "Overflow" },
+				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::Negative), .m_Name = "Negative" },
+			},
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = InjectionXId,
+			.m_Name = "Injection X",
+			.m_Group = "Non-finite Injection (Debug)",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = DefaultInjectionX,
+			.m_MinValue = LabValue(uint32_t(0)),
+			.m_MaxValue = LabValue(WorkTextureWidth - 1),
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = InjectionYId,
+			.m_Name = "Injection Y",
+			.m_Group = "Non-finite Injection (Debug)",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = DefaultInjectionY,
+			.m_MinValue = LabValue(uint32_t(0)),
+			.m_MaxValue = LabValue(WorkTextureHeight - 1),
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = InjectionChannelId,
+			.m_Name = "Injection Channel",
+			.m_Group = "Non-finite Injection (Debug)",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = DefaultInjectionChannel,
+			.m_MinValue = LabValue(uint32_t(0)),
+			.m_MaxValue = LabValue(uint32_t(3)),
+			}));
+#endif
 		ApplyImmediateParameters();
 	}
 
@@ -614,6 +816,20 @@ namespace gglab
 			parameters.Get(RingIntensityId, 0.82f), std::memory_order_relaxed);
 		m_State->m_CheckerCellSize.store(
 			parameters.Get(CheckerCellSizeId, uint32_t(32)), std::memory_order_relaxed);
+#if defined(BUILD_DEBUG)
+		m_State->m_InjectionMode.store(static_cast<ComputeLabInjectionMode>(parameters.Get(
+			InjectionModeId, static_cast<int32_t>(ComputeLabInjectionMode::Off))),
+			std::memory_order_relaxed);
+		m_State->m_InjectionValue.store(static_cast<ComputeLabInjectionValue>(parameters.Get(
+			InjectionValueId, static_cast<int32_t>(ComputeLabInjectionValue::NaN))),
+			std::memory_order_relaxed);
+		m_State->m_InjectionX.store(
+			parameters.Get(InjectionXId, DefaultInjectionX), std::memory_order_relaxed);
+		m_State->m_InjectionY.store(
+			parameters.Get(InjectionYId, DefaultInjectionY), std::memory_order_relaxed);
+		m_State->m_InjectionChannel.store(
+			parameters.Get(InjectionChannelId, DefaultInjectionChannel), std::memory_order_relaxed);
+#endif
 	}
 
 	void RenderGraphComputeLabSession::BuildDiagnostics(
@@ -646,6 +862,20 @@ namespace gglab
 			{.m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions)},
 			{.m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions)},
 		};
+		const ComputeLabInjectionMode injectionMode =
+			m_State->m_InjectionMode.load(std::memory_order_relaxed);
+		if (injectionMode != ComputeLabInjectionMode::Off)
+		{
+			diagnostics.m_Metrics.push_back({ .m_Name = "Non-finite injection",
+				.m_Value = std::format("{} value {} at ({}, {}) channel {}",
+					injectionMode == ComputeLabInjectionMode::Boundary ? "boundary" : "sanitized",
+					static_cast<int32_t>(m_State->m_InjectionValue.load(std::memory_order_relaxed)),
+					m_State->m_InjectionX.load(std::memory_order_relaxed),
+					m_State->m_InjectionY.load(std::memory_order_relaxed),
+					m_State->m_InjectionChannel.load(std::memory_order_relaxed)) });
+			diagnostics.m_Metrics.push_back({ .m_Name = "Probe dispatches",
+				.m_Value = std::to_string(m_State->m_ProbeExecutions.load(std::memory_order_relaxed)) });
+		}
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Graphics / direct-compute / graphics chain",
 			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending

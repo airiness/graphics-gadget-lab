@@ -16,7 +16,10 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(LabRuntime);
 
 		bool RegisterLab(LabDescriptor descriptor, LabSessionFactory factory) noexcept;
-		bool Initialize(const LabId& startupLab) noexcept;
+		// Startup assignments are applied before the first preparation. Any rejected
+		// assignment fails initialization instead of being ignored or clamped.
+		bool Initialize(const LabId& startupLab,
+			std::span<const LabParameterAssignment> startupParameters = {}) noexcept;
 		void Shutdown() noexcept;
 
 		void OnEnter() noexcept;
@@ -76,8 +79,9 @@ namespace gglab
 		RenderPipelineBase& GetRenderPipeline() noexcept;
 
 	private:
-		bool BeginSessionTransition(
-			const LabId& id, std::span<const LabParameterValue> values = {}) noexcept;
+		bool BeginSessionTransition(const LabId& id,
+			std::span<const LabParameterValue> values = {},
+			std::span<const LabParameterAssignment> assignments = {}) noexcept;
 		bool CommitPendingSession() noexcept;
 		bool RestartActiveSessionWithValues(std::span<const LabParameterValue> values) noexcept;
 		void PollRetiringSessions() noexcept;

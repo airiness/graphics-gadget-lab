@@ -13,10 +13,10 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0xdc62c451;
-	inline constexpr uint32_t InventoryHigh = 0x1e8e5959;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.dc62c4511e8e5959cbccacdea91e0732b1c86b969ad999defa126487adc76e67";
-	inline constexpr uint32_t SiteCount = 75;
+	inline constexpr uint32_t InventoryLow = 0x013f6347;
+	inline constexpr uint32_t InventoryHigh = 0x3ef635d7;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.013f63473ef635d7fa1528cd598c6d1f2deef326cc959d18438a0472f08cc7b9";
+	inline constexpr uint32_t SiteCount = 76;
 	inline constexpr uint32_t ProgramCount = 27;
 	inline constexpr uint32_t BufferBytes = HeaderBytes + SiteCount * ProgramCount * RecordBytes;
 	struct Site { std::string_view m_Id; std::string_view m_NegativePolicy; std::string_view m_MaximumPolicy; };
@@ -90,6 +90,7 @@ namespace gglab::nonfinite
 		Site{ "pass-post-process-preview.psmain.isfinite", "report", "report" },
 		Site{ "pass-post-process-preview.psmain.acesfitted", "report", "report" },
 		Site{ "pass-post-process-preview.psmain.sanitize-hdrcolor", "report", "report" },
+		Site{ "pass-render-graph-compute-smoke.psmain.sanitize-hdrchannel", "expected", "error" },
 		Site{ "pass-skybox.psmain.encode-scene-color", "report", "report" },
 		Site{ "pass-temporal-aa.csmain.is-temporal-color-finite", "report", "report" },
 		Site{ "pass-temporal-aa.csmain.isfinite", "report", "report" },

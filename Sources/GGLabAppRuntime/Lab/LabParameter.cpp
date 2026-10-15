@@ -1,10 +1,60 @@
 #include "Lab/LabParameter.h"
 #include "AppRuntimeLog.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <format>
+#include <system_error>
+#include <type_traits>
 
 namespace gglab
 {
+	namespace
+	{
+		template <typename T>
+		[[nodiscard]] std::optional<T> ParseNumber(std::string_view text) noexcept
+		{
+			T result{};
+			const char* end = text.data() + text.size();
+			const auto [last, error] = std::from_chars(text.data(), end, result);
+			if (text.empty() || error != std::errc{} || last != end)
+			{
+				return std::nullopt;
+			}
+			return result;
+		}
+
+		template <typename T>
+		[[nodiscard]] std::optional<LabValue> ParseRangedNumber(
+			const LabParameterDesc& desc, std::string_view text, std::string& error) noexcept
+		{
+			const std::optional<T> value = ParseNumber<T>(text);
+			if (!value)
+			{
+				error = std::format("'{}' is not a valid number for this parameter", text);
+				return std::nullopt;
+			}
+			if constexpr (std::is_same_v<T, float>)
+			{
+				if (!std::isfinite(*value))
+				{
+					error = std::format("'{}' is not finite", text);
+					return std::nullopt;
+				}
+			}
+			const T* minimum = desc.m_MinValue ? std::get_if<T>(&*desc.m_MinValue) : nullptr;
+			const T* maximum = desc.m_MaxValue ? std::get_if<T>(&*desc.m_MaxValue) : nullptr;
+			if ((minimum && *value < *minimum) || (maximum && *value > *maximum))
+			{
+				error = std::format("'{}' is outside the declared range", text);
+				return std::nullopt;
+			}
+			return LabValue(*value);
+		}
+	}
+
 	bool LabParameterSet::Add(LabParameterDesc desc) noexcept
 	{
 		if (!desc.m_Id.IsValid() || desc.m_Name.empty() || Find(desc.m_Id) ||
@@ -181,5 +231,49 @@ namespace gglab
 	{
 		return static_cast<LabChangeImpact>(
 			std::max(static_cast<uint8_t>(lhs), static_cast<uint8_t>(rhs)));
+	}
+
+	std::optional<LabValue> ParseLabParameterValue(
+		const LabParameterDesc& desc, std::string_view text, std::string& error) noexcept
+	{
+		switch (desc.m_Type)
+		{
+		case LabParameterType::Bool:
+			if (utils::EqualsAsciiIgnoreCase(text, "true") || text == "1")
+			{
+				return LabValue(true);
+			}
+			if (utils::EqualsAsciiIgnoreCase(text, "false") || text == "0")
+			{
+				return LabValue(false);
+			}
+			error = std::format("'{}' is not true or false", text);
+			return std::nullopt;
+		case LabParameterType::Int:
+			return ParseRangedNumber<int32_t>(desc, text, error);
+		case LabParameterType::UInt:
+			return ParseRangedNumber<uint32_t>(desc, text, error);
+		case LabParameterType::Float:
+			return ParseRangedNumber<float>(desc, text, error);
+		case LabParameterType::Enum:
+		{
+			const std::optional<int32_t> number = ParseNumber<int32_t>(text);
+			for (const LabEnumItem& item : desc.m_EnumItems)
+			{
+				if (utils::EqualsAsciiIgnoreCase(text, item.m_Name) ||
+					(number && *number == item.m_Value))
+				{
+					return LabValue(item.m_Value);
+				}
+			}
+			error = std::format("'{}' is not an item of this enum", text);
+			return std::nullopt;
+		}
+		case LabParameterType::Vector3:
+		case LabParameterType::Color:
+			break;
+		}
+		error = "the parameter type has no textual form";
+		return std::nullopt;
 	}
 }

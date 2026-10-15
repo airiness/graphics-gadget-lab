@@ -1418,6 +1418,24 @@
       "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
     },
     {
+      "id": "pass-render-graph-compute-smoke.psmain.sanitize-hdrchannel",
+      "source": "Passes/PassRenderGraphComputeSmoke.hlsl",
+      "function": "PSMain",
+      "operation": "SanitizeHDRChannel",
+      "count": 1,
+      "bodySha256": "fdfc548460dd7bfc5cb4d994e56f117061848fec59328b81d92696ca9ceab6b7",
+      "programs": [
+        "gglab.shader.render-graph-compute"
+      ],
+      "kind": "sanitization",
+      "evidence": "counter",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "error"
+      },
+      "rationale": "Debug-only RenderGraph Compute Lab injection site: the preview sanitizes a register-only injected value, so negative clamps exercise the expected policy and FP16 overflow exercises the error policy; non-finite replacement is always an error."
+    },
+    {
       "id": "pass-skybox.psmain.encode-scene-color",
       "source": "Passes/PassSkybox.hlsl",
       "function": "PSMain",

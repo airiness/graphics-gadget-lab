@@ -1491,7 +1491,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 125;
+			constexpr size_t ExpectedRuntimeProgramCount = 127;
 			const std::string expectedProgramCountField =
 				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({

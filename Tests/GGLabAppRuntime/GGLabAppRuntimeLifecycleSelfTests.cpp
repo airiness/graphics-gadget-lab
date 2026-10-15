@@ -44,7 +44,7 @@ namespace gglab
 		};
 
 		std::unique_ptr<DemoBase> CreateLifecycleTestDemo(const DemoCreateInfo&,
-			const LabId&, std::span<const LabRegistration>) noexcept
+			const LabStartupSelection&, std::span<const LabRegistration>) noexcept
 		{
 			return nullptr;
 		}

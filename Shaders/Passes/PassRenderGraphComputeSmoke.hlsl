@@ -13,9 +13,20 @@ struct ComputeLabPassParameters
 	float RingRadius;
 	float RingIntensity;
 	uint CheckerCellSize;
+	uint ProbeIndex;
+	uint InjectionMode;
+	uint InjectionBits;
+	uint InjectionX;
+	uint InjectionY;
+	uint InjectionChannel;
 };
 
 ConstantBuffer<ComputeLabPassParameters> g_Pass : register(b2);
+
+// Debug-only non-finite injection modes; values match ComputeLabInjectionMode.
+static const uint COMPUTE_LAB_INJECTION_OFF = 0;
+static const uint COMPUTE_LAB_INJECTION_BOUNDARY = 1;
+static const uint COMPUTE_LAB_INJECTION_SANITIZED = 2;
 
 uint PackColor(float4 color)
 {
@@ -80,6 +91,26 @@ void CSReadWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 	workA[dispatchThreadId.xy] = PackColor(color);
 }
 
+// Writes finite probe values and the injected value at one declared texel and
+// channel, so a boundary scan of the probe must report exactly that location.
+[numthreads(8, 8, 1)]
+void CSNonFiniteProbe(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+	if (dispatchThreadId.x >= g_Pass.Width || dispatchThreadId.y >= g_Pass.Height)
+	{
+		return;
+	}
+
+	RWTexture2D<float4> probe = GetRWTexture2DFloat4(g_Pass.ProbeIndex);
+	const float2 uv = (float2(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
+	float4 value = float4(uv, 0.5, 1.0);
+	if (dispatchThreadId.x == g_Pass.InjectionX && dispatchThreadId.y == g_Pass.InjectionY)
+	{
+		value[min(g_Pass.InjectionChannel, 3u)] = asfloat(g_Pass.InjectionBits);
+	}
+	probe[dispatchThreadId.xy] = value;
+}
+
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
 	return FullscreenTriangleVS(vertexId);
@@ -101,5 +132,17 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 
 	const float divider = 1.0 - smoothstep(0.0, 0.0035, abs(input.UV.x - 0.68));
 	color = lerp(color, float3(1.0, 1.0, 1.0), divider);
-	return float4(saturate(color), 1.0);
+	float4 output = float4(color, 1.0);
+	if (g_Pass.InjectionMode == COMPUTE_LAB_INJECTION_SANITIZED)
+	{
+		// The injected value exists only in registers. The sanitizing write replaces
+		// non-finite and negative values with zero, so only the production counter of
+		// this site can observe them; every other pixel adds an exact zero.
+		const bool injectedPixel = uint(input.PositionCS.x) == g_Pass.InjectionX &&
+			uint(input.PositionCS.y) == g_Pass.InjectionY;
+		const float injected = injectedPixel ? asfloat(g_Pass.InjectionBits) : 0.0;
+		output[min(g_Pass.InjectionChannel, 3u)] += SanitizeHDRChannel(
+			injected, NF_SITE_PASS_RENDER_GRAPH_COMPUTE_SMOKE_PSMAIN_SANITIZE_HDRCHANNEL);
+	}
+	return saturate(output);
 }

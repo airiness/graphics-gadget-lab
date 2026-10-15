@@ -25,6 +25,7 @@ namespace gglab
 		config.m_AdapterSelector = options.m_AdapterSelector;
 		config.m_StartupLabId =
 			options.m_StartupLabId.value_or(std::string(DesktopDefaultLabId));
+		config.m_StartupLabParameters = options.m_StartupLabParameters;
 		config.m_InitialExtent = initialExtent;
 		config.m_InitialPointerMode = options.m_StartWithRelativeMouse
 			? AppRuntimePointerMode::Relative

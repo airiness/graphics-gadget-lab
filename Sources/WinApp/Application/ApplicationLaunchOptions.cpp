@@ -251,6 +251,41 @@ namespace gglab
 				result.m_Options.m_StartupLabId = std::string(arguments[index]);
 				continue;
 			}
+			if (argument == "--lab-parameter")
+			{
+#if defined(BUILD_DEBUG)
+				if (!requireValue(index, argument))
+				{
+					return result;
+				}
+				const std::string_view assignment = arguments[index];
+				const size_t separator = assignment.find('=');
+				if (separator == 0 || separator == std::string_view::npos ||
+					separator + 1 == assignment.size())
+				{
+					result.m_Error = std::format(
+						"Option '--lab-parameter' expects <parameter-id>=<value>, got '{}'.",
+						assignment);
+					return result;
+				}
+				const std::string_view id = assignment.substr(0, separator);
+				if (std::ranges::any_of(result.m_Options.m_StartupLabParameters,
+					[id](const LabParameterAssignment& existing) { return existing.m_Id == id; }))
+				{
+					result.m_Error = std::format(
+						"Option '--lab-parameter' assigns '{}' more than once.", id);
+					return result;
+				}
+				result.m_Options.m_StartupLabParameters.push_back({
+					.m_Id = std::string(id),
+					.m_Value = std::string(assignment.substr(separator + 1)),
+					});
+				continue;
+#else
+				result.m_Error = "Option '--lab-parameter' is available only in Debug builds.";
+				return result;
+#endif
+			}
 			if (argument == "--self-test")
 			{
 				if (result.m_Options.m_SelfTestSelection)
@@ -523,8 +558,19 @@ namespace gglab
 			}
 			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		}
+		if (!result.m_Options.m_StartupLabParameters.empty())
+		{
+			if (demoSpecified && result.m_Options.m_StartupDemo != ApplicationStartupDemo::LabHost)
+			{
+				result.m_Error =
+					"Option '--lab-parameter' cannot be combined with a non-LabHost '--demo' value.";
+				return result;
+			}
+			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
+		}
 		if (result.m_Options.m_SelfTestSelection &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
+				!result.m_Options.m_StartupLabParameters.empty() ||
 				result.m_Options.m_StartWithRelativeMouse ||
 				result.m_Options.m_DisableDevelopmentTools ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
@@ -567,6 +613,8 @@ namespace gglab
 			"Options:\n"
 			"  --demo <start|island|atrium|lab> Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
+			"  --lab-parameter <id>=<value>    Debug builds only: set a startup Lab parameter\n"
+			"                                  before preparation (repeatable, strict).\n"
 			"  --relative-mouse                Start with a captured cursor for camera control.\n"
 			"                                  Default: visible, uncaptured cursor (Absolute).\n"
 			"  --state-root <absolute-path>    Store artifacts, caches and settings outside deployed inputs.\n"

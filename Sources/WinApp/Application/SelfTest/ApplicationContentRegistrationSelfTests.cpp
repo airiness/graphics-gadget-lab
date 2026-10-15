@@ -1656,8 +1656,13 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
+#if defined(BUILD_DEBUG)
+		checkSelectedDemand("gglab.lab.render_graph_compute", 55,
+			"Render-graph compute selection contributes four stable and one Debug probe shader demand");
+#else
 		checkSelectedDemand("gglab.lab.render_graph_compute", 54,
 			"Render-graph compute selection contributes four stable shader demands");
+#endif
 		checkSelectedDemand("gglab.lab.coordinate_conformance", 54,
 			"Coordinate conformance selection contributes four stable shader demands");
 		checkSelectedDemand("gglab.lab.napa_voxel", 52,

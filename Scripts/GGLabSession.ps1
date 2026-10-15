@@ -13,6 +13,7 @@ still exits 0; inspect its "status".
 
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
+           -LabParameters "id=value",... sets startup Lab parameters (Debug builds).
   status   Report readiness gates, settled frames, camera and pending captures.
   capture  Capture a frame; waits for the PNG and metadata unless -NoWait.
            -View restores a camera reference view of the active content first.
@@ -76,6 +77,8 @@ param(
     [string]$StateRoot,
     [string]$SessionRoot,
     [int]$StartTimeoutSeconds = 300,
+    # Debug builds only: startup Lab parameter assignments as "id=value".
+    [string[]]$LabParameters,
 
     # capture
     [ValidateSet('scene', 'composited', 'diagnostic')]
@@ -329,6 +332,7 @@ switch ($Command) {
         if ($WindowSize) { $arguments += @('--window-size', $WindowSize) }
         if (-not $Visible) { $arguments += '--hidden' }
         if ($WatchNonFinite) { $arguments += '--watch-nonfinite' }
+        foreach ($assignment in $LabParameters) { $arguments += @('--lab-parameter', $assignment) }
         if ($PSBoundParameters.ContainsKey('FixedDeltaTime')) {
             $arguments += @('--fixed-delta-time', "$FixedDeltaTime")
         }

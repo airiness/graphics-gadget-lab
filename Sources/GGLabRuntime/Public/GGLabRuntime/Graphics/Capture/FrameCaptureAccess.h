@@ -10,6 +10,10 @@
 
 namespace gglab
 {
+	class RenderGraph;
+	struct RenderFrameContext;
+	struct RenderServices;
+
 	// Readback destination of one capture tap in one frame. The capture service
 	// owns the buffer until the frame's GPU work completes.
 	struct FrameCaptureTapTarget
@@ -41,4 +45,11 @@ namespace gglab
 		// no source for it.
 		virtual void FailPendingDiagnosticRequests(std::string_view failure) noexcept = 0;
 	};
+
+	// Adds the capture tap pass for the frame's queued requests of one source; frames
+	// without such requests receive no pass. Scene and Composited taps copy the display
+	// view's back buffer, so a pipeline adds them after the last writer of that tap's
+	// content and before the present export.
+	void AddFrameCaptureTapPass(RenderGraph& rg, const RenderFrameContext& context,
+		const RenderServices& services, FrameCaptureSource source) noexcept;
 }

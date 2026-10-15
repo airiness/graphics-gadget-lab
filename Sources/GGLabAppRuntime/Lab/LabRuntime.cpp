@@ -107,7 +107,8 @@ namespace gglab
 		return m_Catalog.Register(std::move(descriptor), factory);
 	}
 
-	bool LabRuntime::Initialize(const LabId& startupLab) noexcept
+	bool LabRuntime::Initialize(const LabId& startupLab,
+		std::span<const LabParameterAssignment> startupParameters) noexcept
 	{
 		if (m_State != LabRunState::Uninitialized)
 		{
@@ -120,7 +121,7 @@ namespace gglab
 			return false;
 		}
 
-		return BeginSessionTransition(startupLab);
+		return BeginSessionTransition(startupLab, {}, startupParameters);
 	}
 
 	void LabRuntime::Shutdown() noexcept
@@ -459,8 +460,9 @@ namespace gglab
 		return m_ActiveSession->GetRenderPipeline();
 	}
 
-	bool LabRuntime::BeginSessionTransition(
-		const LabId& id, std::span<const LabParameterValue> values) noexcept
+	bool LabRuntime::BeginSessionTransition(const LabId& id,
+		std::span<const LabParameterValue> values,
+		std::span<const LabParameterAssignment> assignments) noexcept
 	{
 		if (!m_PendingSession)
 		{
@@ -496,6 +498,26 @@ namespace gglab
 			{
 				restoredImpact = MaxImpact(restoredImpact, valueImpact);
 			}
+		}
+		for (const LabParameterAssignment& assignment : assignments)
+		{
+			std::string error = "the Lab declares no such parameter";
+			const LabParameter* parameter =
+				m_PendingSession->GetParameters().Find(LabParameterId(assignment.m_Id));
+			const std::optional<LabValue> value = parameter
+				? ParseLabParameterValue(parameter->m_Desc, assignment.m_Value, error)
+				: std::nullopt;
+			LabChangeImpact valueImpact = LabChangeImpact::Immediate;
+			if (!value || !m_PendingSession->SetParameter(
+				parameter->m_Desc.m_Id, *value, &valueImpact))
+			{
+				m_PendingSession.reset();
+				m_State = m_ActiveSession ? m_StateBeforeTransition : LabRunState::Failed;
+				SetError(std::format("Startup parameter '{}' of Lab '{}' was rejected: {}.",
+					assignment.m_Id, id.GetName(), error));
+				return false;
+			}
+			restoredImpact = MaxImpact(restoredImpact, valueImpact);
 		}
 		m_PendingSession->ApplyRestoredParametersForPrepare(restoredImpact);
 		m_PendingSession->OnResize(m_CreateInfo.m_WindowWidth, m_CreateInfo.m_WindowHeight);
