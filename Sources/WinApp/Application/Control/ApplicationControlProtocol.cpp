@@ -1,4 +1,5 @@
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
@@ -990,7 +991,7 @@ namespace gglab
 				claims.push_back("production");
 			}
 			Json report = { { "configurationVersion", status.m_ConfigurationVersion }, { "enabled", status.m_Enabled },
-				{ "mode", "report" }, { "claims", claims }, { "coverage", "latest-completed-frame" },
+				{ "mode", status.m_Mode == NonFiniteWatchMode::Fail ? "fail" : "report" }, { "claims", claims }, { "coverage", "latest-completed-frame" },
 				{ "targetsMode", status.m_DefaultTargets ? "defaults" : "explicit" },
 				{ "defaultTiers", status.m_DefaultTargets && status.m_BoundaryRequested ? Json::array({ "A", "B" }) : Json::array() },
 				{ "boundary", ClaimName(status.m_Boundary.m_Status) }, { "boundaryFrameSerial", status.m_BoundaryFrameSerial },
@@ -1076,6 +1077,10 @@ namespace gglab
 			if (status.m_GpuTiming)
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
+			}
+			if (status.m_WatchCoverage)
+			{
+				sequence["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*status.m_WatchCoverage));
 			}
 			if (!status.m_Failure.empty())
 			{
@@ -1312,6 +1317,10 @@ namespace gglab
 		if (result.m_Metadata)
 		{
 			response["frameSerial"] = result.m_Metadata->m_FrameSerial;
+			if (result.m_Metadata->m_WatchCoverage)
+			{
+				response["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*result.m_Metadata->m_WatchCoverage));
+			}
 		}
 		return Dump(response);
 	}

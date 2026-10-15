@@ -313,6 +313,9 @@ namespace gglab
 			context.Check(Contains(generationJson, R"("semantic":"ibl.specular")") && Contains(generationJson, R"("watchTier":2)") &&
 				Contains(generationJson, R"("lastCheckedFrameSerial":77)") && Contains(generationJson, R"("resourceIdentity":{"generation":3,"index":12})"),
 				"Generation reports distinguish content revision, physical resource identity, mip and last checked frame");
+			watch.m_Mode = NonFiniteWatchMode::Fail;
+			context.Check(Contains(SerializeApplicationControlWatch(8, watch, false), R"("mode":"fail")"),
+				"Watch responses preserve the selected fail mode");
 
 			FrameCaptureFrameState frame{
 				.m_Backend = "vulkan",

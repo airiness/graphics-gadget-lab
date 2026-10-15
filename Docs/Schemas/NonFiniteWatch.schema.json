@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.nonfinite-watch",
+  "title": "GGLab submitted non-finite coverage v1",
+  "type": "object",
+  "required": ["schema", "schemaVersion", "configurationVersion", "mode", "coverage", "instrumentation", "claims", "firstFrameSerial", "lastFrameSerial", "frames", "completedFrames", "complete", "boundary", "production", "failure", "firstAnomalyFrameSerial", "reason"],
+  "properties": {
+    "schema": {"const": "gglab.nonfinite-watch"},
+    "schemaVersion": {"const": 1},
+    "configurationVersion": {"type": "integer", "minimum": 1},
+    "mode": {"enum": ["report", "fail"]},
+    "coverage": {"const": "submitted-range"},
+    "instrumentation": {"enum": ["available", "unavailable"]},
+    "claims": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"enum": ["boundary", "production"]}},
+    "firstFrameSerial": {"type": "integer", "minimum": 0},
+    "lastFrameSerial": {"type": "integer", "minimum": 0},
+    "frames": {"type": "integer", "minimum": 0},
+    "completedFrames": {"type": "integer", "minimum": 0},
+    "complete": {"type": "boolean"},
+    "boundary": {"$ref": "#/$defs/claim"},
+    "production": {"$ref": "#/$defs/claim"},
+    "failure": {"type": "string"},
+    "firstAnomalyFrameSerial": {"type": ["integer", "null"], "minimum": 1},
+    "reason": {"enum": ["None", "NonFiniteDetected", "NonFiniteReplaced", "ClampPolicyExceeded", "MissingCoverage"]}
+  },
+  "$defs": {
+    "claim": {"enum": ["Unavailable", "Incomplete", "NotApplicable", "Passed", "Failed"]}
+  },
+  "additionalProperties": false
+}

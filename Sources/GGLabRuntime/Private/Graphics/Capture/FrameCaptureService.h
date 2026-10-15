@@ -53,7 +53,8 @@ namespace gglab
 		[[nodiscard]] uint64_t RequestResourceExport(std::vector<RGResourceAddress> targets,
 			uint64_t frameSerial = 0, bool deferFrameOnBusy = false, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
 		[[nodiscard]] uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets,
-			uint64_t configurationVersion, uint64_t frameSerial = 0, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
+			uint64_t configurationVersion, uint64_t frameSerial = 0, bool includeGraph = false,
+			uint64_t groupId = 0, bool deferFrameOnBusy = false) noexcept override;
 		bool EnableNonFiniteProduction() noexcept
 		{
 			if (m_Limits.m_MaxPayloads < 2 || ProductionPayloadBytes + ProductionCpuBytes > m_Limits.m_MaxPayloadBytes)

@@ -1396,6 +1396,27 @@ namespace gglab
 			auto busy = Consume(service);
 			context.Check(busy.size() == 1 && busy[0].m_Status == FrameCaptureStatus::Busy && !next.HasNonFiniteScans(),
 				"Retained CPU scan and resource payloads share the same bounded slots");
+			const auto deferredScan = service.RequestNonFiniteScan({ { final, layout } }, 20, 31, false, 0, true);
+			const auto deferredImage = service.RequestCapture(FrameCaptureSource::Scene, 31);
+			context.Check(service.PrepareResourceExports(31, next) == FrameCaptureAvailability::Busy && !next.HasNonFiniteScans(),
+				"Strict scan capacity pressure defers the entire frame before graph mutation");
+			auto deferred = Consume(service);
+			context.Check(deferred.size() == 2 && std::ranges::all_of(deferred, [](const auto& result)
+				{ return result.m_Status == FrameCaptureStatus::Busy; }) &&
+				std::ranges::any_of(deferred, [&](const auto& result) { return result.m_RequestId == deferredScan; }) &&
+				std::ranges::any_of(deferred, [&](const auto& result) { return result.m_RequestId == deferredImage; }) &&
+				service.GetUnfinishedRequestCount() == 0,
+				"Frame deferral returns scan and image requests exactly once without claiming a submission");
+			FrameCaptureService impossible(device, { .m_MaxPayloads = 2 });
+			impossible.ConfigureNonFiniteScans(programs, programs, programs);
+			GGLAB_UNUSED(impossible.RequestCapture(FrameCaptureSource::Scene, 31));
+			GGLAB_UNUSED(impossible.RequestNonFiniteScan({ { final, layout }, { before, layout } }, 20, 31, false, 0, true));
+			const auto impossibleAvailability = impossible.PrepareResourceExports(31, next);
+			const auto impossibleResults = Consume(impossible);
+			context.Check(impossibleAvailability == FrameCaptureAvailability::Available && impossibleResults.size() == 1 &&
+				impossibleResults[0].m_ResourceFailure == RGObservationFailure::TooLarge,
+				"An impossible image and scan frame fails explicitly instead of deferring forever");
+			impossible.OnFrameAborted(31); impossible.Shutdown();
 			results.clear(); busy.clear();
 			const auto retry = service.RequestNonFiniteScan({ { final, layout } }, 21);
 			GGLAB_UNUSED(service.PrepareResourceExports(32, next)); service.OnFrameAborted(32);

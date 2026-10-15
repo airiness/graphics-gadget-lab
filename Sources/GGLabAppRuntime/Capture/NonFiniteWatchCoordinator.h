@@ -3,8 +3,10 @@
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 
 #include <cstddef>
+#include <chrono>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -47,6 +49,7 @@ namespace gglab
 	{
 		uint64_t m_ConfigurationVersion = 0;
 		bool m_Enabled = false;
+		NonFiniteWatchMode m_Mode = NonFiniteWatchMode::Report;
 		bool m_BoundaryRequested = true;
 		bool m_ProductionRequested = true;
 		bool m_DefaultTargets = false;
@@ -59,6 +62,25 @@ namespace gglab
 		std::string m_Failure;
 		std::string m_ProductionFailure;
 	};
+	struct NonFiniteWatchCoverage
+	{
+		uint64_t m_ConfigurationVersion = 0;
+		NonFiniteWatchMode m_Mode = NonFiniteWatchMode::Report;
+		bool m_BoundaryRequested = false;
+		bool m_ProductionRequested = false;
+		bool m_InstrumentationAvailable = false;
+		uint64_t m_FirstFrameSerial = 0;
+		uint64_t m_LastFrameSerial = 0;
+		uint64_t m_FrameCount = 0;
+		uint64_t m_CompletedFrames = 0;
+		bool m_Complete = false;
+		NonFiniteClaimResult m_Boundary{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
+		NonFiniteClaimResult m_Production{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
+		std::optional<NonFiniteWatchAnomaly> m_FirstAnomaly;
+		std::string m_Failure;
+		[[nodiscard]] bool Fails() const noexcept;
+	};
+	[[nodiscard]] const char* GetNonFiniteWatchFailureName(NonFiniteWatchFailure failure) noexcept;
 
 	// Session report state. GPU work and payload ownership remain in Runtime;
 	// the capture coordinator routes the shared result stream here before encoding.
@@ -77,6 +99,18 @@ namespace gglab
 		bool OnScanResult(const FrameCaptureResult& result) noexcept;
 		void OnProductionFrame(const NonFiniteProductionFrame& frame) noexcept;
 		[[nodiscard]] const NonFiniteWatchStatus& GetStatus() const noexcept { return m_Status; }
+		// Ranges retain only unresolved frames. Completed frames reduce into claims;
+		// no consumer infers range coverage from the latest interactive status.
+		[[nodiscard]] uint64_t OpenCoverage() noexcept;
+		void TrackCoverageFrame(uint64_t id, uint64_t frameSerial) noexcept;
+		void CloseCoverage(uint64_t id) noexcept;
+		void ReleaseCoverage(uint64_t id) noexcept;
+		[[nodiscard]] std::shared_ptr<const NonFiniteWatchCoverage> GetCoverage(uint64_t id) const noexcept;
+		void OnFrameSubmitted(uint64_t frameSerial) noexcept;
+		void UpdateCoverage() noexcept;
+		void FinalizeCoverage() noexcept;
+		[[nodiscard]] std::string GetFailModeFailure() const noexcept;
+		static constexpr uint64_t MaxPendingCoverageSubmissions = 64;
 
 	private:
 		struct Pending
@@ -86,10 +120,38 @@ namespace gglab
 			std::vector<NonFiniteWatchTargetStatus> m_Targets;
 			std::vector<NonFiniteScanTarget> m_Scans;
 			std::vector<size_t> m_ScanIndices;
+			bool m_Submitted = false;
 		};
 		void PublishBoundary(Pending pending) noexcept;
 		void ApplyGenerationEvidence(NonFiniteWatchTargetStatus& target, uint64_t frameSerial) const noexcept;
 		void RecordAnomaly(NonFiniteWatchAnomaly anomaly) noexcept;
+		struct CoverageFrame
+		{
+			uint64_t m_FrameSerial = 0;
+			uint64_t m_SubmissionOrdinal = 0;
+			std::chrono::steady_clock::time_point m_TrackedAt;
+			bool m_BoundaryPending = false;
+			bool m_ProductionPending = false;
+			std::vector<NonFiniteWatchTargetStatus> m_Targets;
+			NonFiniteClaimResult m_Production;
+			std::optional<NonFiniteWatchAnomaly> m_Anomaly;
+			std::string m_Failure;
+		};
+		struct CoverageState
+		{
+			NonFiniteWatchCoverage m_Report;
+			bool m_Closed = false;
+			NonFiniteClaimResult m_Boundary{ NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			NonFiniteClaimResult m_Production{ NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			std::vector<CoverageFrame> m_Frames;
+		};
+		void RefreshCoverage() noexcept;
+		void ObserveCoverageBoundary(const Pending& pending) noexcept;
+		std::optional<CoverageFrame> m_PreparedCoverage;
+		std::unordered_map<uint64_t, CoverageState> m_Coverage;
+		uint64_t m_NextCoverageId = 1;
+		uint64_t m_SubmissionOrdinal = 0;
+		uint64_t m_LastSubmittedFrame = 0;
 		FrameCaptureControlBase* m_Capture = nullptr;
 		NonFiniteWatchConfiguration m_Configuration;
 		NonFiniteWatchStatus m_Status;

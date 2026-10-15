@@ -339,8 +339,8 @@ in CI; GPU value/observation checks still require local hardware runs.
 ## Non-finite boundary scans and production counters
 
 The Runtime provides explicit boundary scans and opt-in production counters.
-Session `watch` supports explicit targets and semantic defaults in report mode.
-Fail mode and sequence coverage remain pending. Boundary scans alone cannot prove
+Session `watch` supports explicit targets and semantic defaults in report or fail mode.
+Capture and sequence coverage completes asynchronously. Boundary scans alone cannot prove
 that sanitization or recovery hid no non-finite input.
 
 Start a counter-capable process with `--watch-nonfinite`, or use the session script:
@@ -453,8 +453,70 @@ active IBL publication receipts, all mip/face coverage, stable-content deduplica
 watch reconfiguration, and physical atmosphere LUTs.
 
 A `fail` request that needs unavailable production instrumentation returns
-`RequiresRestart`; other `fail` requests return
-`FailModeUnavailable`. Neither rejection changes the current configuration.
+`RequiresRestart` without changing the current configuration. Boundary-only fail
+mode works without counter variants:
+
+```powershell
+& $session watch -Session numeric-check -WatchMode fail
+& $session watch -Session numeric-check -WatchMode fail -WatchClaims boundary
+```
+
+### Submitted coverage and fail mode
+
+When watch is enabled as a capture is issued, that capture records coverage of its
+exact submitted frame. A sequence binds the watch configuration when its first
+frame begins and covers every successfully submitted sequence frame, including
+uncaptured frames and every reference sample. Aborted render frames are excluded.
+Each range retains its own unresolved evidence; it never infers a pass from the
+interactive report's latest frame. A generation's later completed mip scans can
+fulfil earlier frames that consumed that same physical content revision.
+
+Captures wait for both their payload and the requested watch claims before writing
+or publishing files. Sequences remain `finishing` until their watch tail, captures
+and requested GPU profiles resolve. A detection after the last sequence submission
+still fails fail mode. Changing or disabling the watch configuration invalidates
+unfinished ranges as `Incomplete`; it cannot convert their old coverage into a pass.
+
+PNG sidecars, resource/graph export frame metadata, capture responses and sequence
+status include a `watch` object (`gglab.nonfinite-watch` v1) when they report a range.
+It identifies the bound configuration and mode, requested claims, instrumentation,
+first/last submitted serial, frame count, completed result count, separate boundary
+and production claims, and the first checked anomaly frame and failure reason.
+Completed result counts include explicit incomplete outcomes. A requested production
+claim without instrumentation completes as `Incomplete`, even though interactive
+status labels the capability `Unavailable`. Unrequested claims remain `Unavailable`.
+`Scripts/ValidateNonFiniteCoverage.py` validates these nested records.
+
+Fail mode fails affected captures and the sequence with `NonFiniteDetected`,
+`NonFiniteReplaced`, `ClampPolicyExceeded` or `MissingCoverage`. Failure text names
+the frame and resource/location or program/site. Pending after-ready captures also
+fail when the active fail watch detects an anomaly or missing per-frame coverage.
+The process keeps running for inspection and watch reconfiguration. Report mode
+still writes artifacts with their failed or incomplete claims.
+
+Ranges add no GPU/CPU fence wait. Unresolved frames become `Incomplete` after 64
+further successful runtime submissions or 30 seconds without complete evidence;
+the time bound also handles a stalled/deferred renderer. Shutdown closes and
+adjudicates unfinished ranges after the render host has finalized. These are
+liveness limits, not a frames-in-flight assumption. Completed frames reduce into
+aggregate claims instead of retaining the whole sequence's records.
+
+Continuous report scans yield to scheduled resource exports and honestly report
+the resulting coverage gap. Fail mode attempts per-frame scans alongside exports;
+generation work yields priority on those frames and can complete later. Temporary
+pressure defers the entire unsubmitted frame, including its capture requests, so
+the same sequence pose/sample retries after retirement without a coverage gap.
+Unsubmitted `Busy` scan results contribute no failure history. A frame whose image,
+exports, scans and counters cannot fit even an idle budget fails explicitly instead
+of deferring forever. The shared payload budget remains authoritative.
+
+`Scripts/TestNonFiniteCoverage.ps1` verifies Debug/Release on both backends with and
+without counter capability: clean captures, graph/resource exports, full-sequence
+coverage, capability rejection, missing-target failure, report-mode incomplete
+metadata and continued process operation after failure. CPU coordinator tests also
+exercise delayed anomalies, out-of-order results, missing readbacks, configuration
+changes, generation tails and reference-sample membership. Interactive Lab injection
+parameters and full-scene policy/overhead acceptance remain separate work.
 
 ### Runtime counter and scan mechanics
 

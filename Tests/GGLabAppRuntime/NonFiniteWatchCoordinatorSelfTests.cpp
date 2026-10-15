@@ -1,6 +1,7 @@
 #include "NonFiniteWatchCoordinatorSelfTests.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameSequenceCoordinator.h"
 
 #include <iterator>
 #include <memory>
@@ -14,9 +15,14 @@ namespace gglab
 		class WatchCaptureControl final : public FrameCaptureControlBase
 		{
 		public:
-			uint64_t RequestCapture(FrameCaptureSource, uint64_t, uint64_t) noexcept override { return 0; }
+			uint64_t RequestCapture(FrameCaptureSource source, uint64_t serial, uint64_t) noexcept override
+			{
+				m_CaptureSource = source;
+				m_CaptureSerial = serial;
+				return ++m_CaptureId;
+			}
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t, uint64_t) noexcept override { return 0; }
-			uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets, uint64_t version, uint64_t serial, bool, uint64_t) noexcept override
+			uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets, uint64_t version, uint64_t serial, bool, uint64_t, bool defer) noexcept override
 			{
 				if (m_Busy)
 				{
@@ -25,6 +31,7 @@ namespace gglab
 				m_ScanTargets = std::move(targets);
 				m_Version = version;
 				m_Frame = serial;
+				m_DeferFrame = defer;
 				return ++m_Id;
 			}
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override { return {}; }
@@ -64,19 +71,266 @@ namespace gglab
 					.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = m_Frame, .m_NonFiniteScans = payload };
 			}
 			uint64_t m_Id = 0;
+			uint64_t m_CaptureId = 1000;
+			uint64_t m_CaptureSerial = 0;
+			FrameCaptureSource m_CaptureSource = FrameCaptureSource::Scene;
 			std::vector<NonFiniteScanTarget> m_ScanTargets;
 			uint64_t m_Version = 0;
 			uint64_t m_Frame = 0;
 			bool m_Busy = false;
+			bool m_DeferFrame = false;
 			bool m_Instrumentation = false;
 			uint32_t m_ScanLimit = 64;
 			std::vector<FrameCaptureResult> m_Results;
 			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_Production;
 		};
+
+		void RunCoverageTests(SelfTestContext& context)
+		{
+			WatchCaptureControl control;
+			control.m_Instrumentation = true;
+			NonFiniteWatchCoordinator watch(&control);
+			std::string error;
+			NonFiniteWatchConfiguration configuration{ .m_Mode = NonFiniteWatchMode::Fail,
+				.m_Targets = { NonFiniteScanTarget{ .m_Address = { .m_Resource = "Motion" } } } };
+			context.Check(watch.Configure(configuration, error), "Range fail mode configures with both claims");
+			const uint64_t range = watch.OpenCoverage();
+			watch.PrepareFrame(1);
+			const auto first = control.Complete();
+			watch.OnFrameSubmitted(1);
+			watch.TrackCoverageFrame(range, 1);
+			watch.PrepareFrame(2);
+			const auto last = control.Complete(true);
+			watch.OnFrameSubmitted(2);
+			watch.TrackCoverageFrame(range, 2);
+			watch.CloseCoverage(range);
+			context.Check(!watch.GetCoverage(range)->m_Complete && watch.GetCoverage(range)->m_FrameCount == 2,
+				"Closing a submitted range waits for the complete asynchronous tail");
+			watch.OnProductionFrame({ .m_FrameSerial = 2, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None } });
+			context.Check(watch.OnScanResult(first) && !watch.GetCoverage(range)->m_Complete,
+				"A latest counter frame and an earlier boundary do not imply complete range coverage");
+			watch.OnProductionFrame({ .m_FrameSerial = 1, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None } });
+			context.Check(watch.OnScanResult(last) && watch.GetCoverage(range)->m_Complete && watch.GetCoverage(range)->Fails() &&
+				watch.GetCoverage(range)->m_CompletedFrames == 2 && watch.GetCoverage(range)->m_Failure.find("frame 2") != std::string::npos &&
+				watch.GetCoverage(range)->m_Failure.find("channel 1") != std::string::npos,
+				"A boundary anomaly after the last sequence submission fails with its frame and exact location");
+			watch.ReleaseCoverage(range);
+			context.Check(!watch.GetCoverage(range), "Finished consumers release their retained range state");
+
+			context.Check(watch.Configure(configuration, error), "Missing-result range reconfigures");
+			const auto missing = watch.OpenCoverage();
+			watch.PrepareFrame(3);
+			watch.OnFrameSubmitted(3);
+			watch.TrackCoverageFrame(missing, 3);
+			watch.CloseCoverage(missing);
+			for (uint64_t serial = 4; serial <= 3 + NonFiniteWatchCoordinator::MaxPendingCoverageSubmissions; ++serial)
+			{
+				watch.OnFrameSubmitted(serial);
+			}
+			context.Check(watch.GetCoverage(missing)->m_Complete && watch.GetCoverage(missing)->Fails() &&
+				watch.GetCoverage(missing)->m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete &&
+				watch.GetCoverage(missing)->m_Production.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Missing results expire as Incomplete after a bounded number of successful submissions");
+			watch.ReleaseCoverage(missing);
+			const auto changed = watch.OpenCoverage();
+			context.Check(watch.Configure({ .m_Enabled = false }, error) && watch.GetCoverage(changed)->m_Complete &&
+				watch.GetCoverage(changed)->Fails(), "Disabling or replacing watch cannot certify an earlier coverage range");
+			watch.ReleaseCoverage(changed);
+
+			configuration.m_Production = false;
+			control.m_Instrumentation = false;
+			context.Check(watch.Configure(configuration, error), "Boundary-only fail mode is available without counter variants");
+			const auto aborted = watch.OpenCoverage();
+			watch.PrepareFrame(100);
+			const auto unsubmitted = control.Complete(true);
+			watch.PrepareFrame(101);
+			watch.OnFrameSubmitted(101);
+			watch.TrackCoverageFrame(aborted, 101);
+			watch.CloseCoverage(aborted);
+			context.Check(watch.OnScanResult(unsubmitted) && watch.OnScanResult(control.Complete()) &&
+				watch.GetCoverage(aborted)->m_Complete && !watch.GetCoverage(aborted)->Fails() &&
+				watch.GetCoverage(aborted)->m_FrameCount == 1 && watch.GetCoverage(aborted)->m_FirstFrameSerial == 101,
+				"An aborted serial is excluded from coverage even if a synthetic late result arrives");
+			watch.ReleaseCoverage(aborted);
+			configuration.m_Mode = NonFiniteWatchMode::Report;
+			configuration.m_Production = true;
+			configuration.m_Boundary = false;
+			configuration.m_Targets.clear();
+			context.Check(watch.Configure(configuration, error), "Unavailable production can still be inspected in report mode");
+			const auto unavailable = watch.OpenCoverage();
+			watch.OnFrameSubmitted(102);
+			watch.TrackCoverageFrame(unavailable, 102);
+			watch.CloseCoverage(unavailable);
+			context.Check(watch.GetCoverage(unavailable)->m_Complete && !watch.GetCoverage(unavailable)->Fails() &&
+				watch.GetCoverage(unavailable)->m_Production.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Report mode completes unavailable production as Incomplete without turning it into a clean claim");
+			watch.ReleaseCoverage(unavailable);
+
+			configuration = { .m_Mode = NonFiniteWatchMode::Fail, .m_Production = false };
+			context.Check(watch.Configure(configuration, error), "Missing default coverage configures");
+			NonFiniteWatchDefaults defaults;
+			for (size_t i = 0; i < defaults.size(); ++i)
+			{
+				defaults[i].m_Semantic = static_cast<NonFiniteWatchSemantic>(i);
+				defaults[i].m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			}
+			defaults[0].m_Claim = {};
+			defaults[0].m_Failure = "MissingCoverage: an active motion role was not bound.";
+			defaults[3].m_Ready = true;
+			defaults[3].m_Address.m_Resource = "SceneColor";
+			const auto absent = watch.OpenCoverage();
+			watch.PrepareFrame(103, false, defaults);
+			watch.OnFrameSubmitted(103);
+			watch.TrackCoverageFrame(absent, 103);
+			watch.CloseCoverage(absent);
+			context.Check(watch.OnScanResult(control.Complete()) && watch.GetCoverage(absent)->m_Complete && watch.GetCoverage(absent)->Fails() &&
+				watch.GetCoverage(absent)->m_Failure.find("motion-vectors") != std::string::npos,
+				"Inactive defaults with empty addresses cannot overwrite an unregistered active role's missing coverage");
+			watch.ReleaseCoverage(absent);
+			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Production = false,
+				.m_Targets = { NonFiniteScanTarget{ .m_Address = { .m_Resource = "Motion" } } } }, error), "Deferred-frame watch configures");
+			watch.PrepareFrame(104);
+			auto deferred = control.Complete(); deferred.m_Status = FrameCaptureStatus::Busy;
+			context.Check(control.m_DeferFrame && watch.OnScanResult(deferred) && watch.GetFailModeFailure().empty(),
+				"An admission-deferred unsubmitted frame contributes no missing-coverage failure history");
+		}
+
+		void RunCoverageConsumerTests(SelfTestContext& context)
+		{
+			WatchCaptureControl control;
+			control.m_Instrumentation = true;
+			NonFiniteWatchCoordinator watch(&control);
+			std::string error;
+			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error),
+				"Production-only fail mode configures for consumer lifecycle checks");
+			FrameCaptureCoordinator capture({ .m_Capture = &control, .m_WriteOnCallingThread = true, .m_NonFiniteWatch = &watch });
+			const auto id = capture.Submit({});
+			capture.BeginFrame({ .m_FrameSerial = 1 });
+			watch.OnFrameSubmitted(1);
+			capture.OnFrameSubmitted();
+			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
+				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = 1, .m_Image = std::make_shared<FrameCaptureImage>() });
+			capture.Update();
+			std::vector<FrameCaptureRequestResult> results;
+			capture.ConsumeResults(results);
+			context.Check(results.empty() && capture.GetUnfinishedRequestCount() == 1,
+				"A completed image does not publish before its watch result arrives");
+			NonFiniteProductionFrame production{ .m_FrameSerial = 1,
+				.m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced },
+				.m_Sites = { { .m_ProgramIndex = 2, .m_SiteIndex = 3,
+					.m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced } } } };
+			control.m_Production.push_back(std::make_shared<NonFiniteProductionFrame>(production));
+			capture.Update();
+			capture.ConsumeResults(results);
+			context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				results[0].m_ImagePath.empty() && results[0].m_Metadata->m_WatchCoverage->Fails() &&
+				results[0].m_Failure.find("NonFiniteReplaced: frame 1, program 2, site 3") != std::string::npos,
+				"A sanitized production anomaly fails the waiting capture before any image publication");
+			const auto pending = capture.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
+			capture.Update();
+			results.clear(); capture.ConsumeResults(results);
+			context.Check(results.size() == 1 && results[0].m_RequestId == pending && results[0].m_Status == FrameCaptureRequestStatus::Failed,
+				"Fail mode also fails an after-ready capture still waiting for readiness");
+
+			FrameSequenceCoordinator sequence(capture);
+			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error), "Sequence range starts with fresh diagnostic history");
+			const CameraPath path{ .m_Id = "SEQ_Watch", .m_Name = "Watch", .m_Version = 1,
+				.m_Keys = { { .m_Frame = 0, .m_Target = { 0, 0, 1 } }, { .m_Frame = 1, .m_Target = { 0, 0, 1 } } } };
+			context.Check(sequence.Start({ .m_CameraPathId = path.m_Id }, error) != 0, "Watch sequence starts");
+			for (uint64_t serial = 2; serial <= 3; ++serial)
+			{
+				FrameCaptureFrameState state{ .m_FrameSerial = serial };
+				state.m_SettleKey.m_Temporal.m_HasCompatiblePreviousHistory = true;
+				const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
+				sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
+				sequence.BeginFrame(state);
+				capture.BeginFrame(state);
+				watch.OnFrameSubmitted(serial);
+				capture.OnFrameSubmitted();
+				sequence.OnFrameSubmitted(serial);
+			}
+			context.Check(sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+				"A sequence with no PNG captures still drains every submitted frame's watch evidence");
+			watch.OnProductionFrame({ .m_FrameSerial = 2, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None } });
+			production.m_FrameSerial = 3;
+			watch.OnProductionFrame(production);
+			sequence.UpdateWatchCoverage();
+			context.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed && sequence.GetStatus()->m_WatchCoverage &&
+				sequence.GetStatus()->m_WatchCoverage->m_FrameCount == 2 && sequence.GetStatus()->m_Failure.starts_with("NonFiniteReplaced"),
+				"A late last-frame production anomaly fails the sequence even with no requested images");
+			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error) &&
+				sequence.Start({ .m_CameraPathId = path.m_Id, .m_ReferenceSamples = 3 }, error) != 0,
+				"A consecutive reference sequence starts with fresh range membership");
+			for (uint64_t serial = 4; serial <= 9; ++serial)
+			{
+				FrameCaptureFrameState state{ .m_FrameSerial = serial };
+				const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
+				sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
+				sequence.BeginFrame(state);
+				capture.BeginFrame(state);
+				watch.OnFrameSubmitted(serial);
+				capture.OnFrameSubmitted();
+				sequence.OnFrameSubmitted(serial);
+			}
+			context.Check(sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+				"Reference completion waits for every submitted sample rather than only its output frames");
+			for (uint64_t serial = 9; serial >= 4; --serial)
+			{
+				watch.OnProductionFrame({ .m_FrameSerial = serial, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None } });
+			}
+			sequence.UpdateWatchCoverage();
+			context.Check(sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+				sequence.GetStatus()->m_WatchCoverage->m_FrameCount == 6 && sequence.GetStatus()->m_WatchCoverage->m_Complete &&
+				sequence.GetStatus()->m_WatchCoverage->m_Production.m_Status == NonFiniteClaimStatus::Passed,
+				"A clean reference sequence completes after all six out-of-order sample results arrive");
+			context.Check(sequence.Start({ .m_CameraPathId = path.m_Id }, error) != 0, "A cancellable watch range starts");
+			FrameCaptureFrameState state{ .m_FrameSerial = 10 };
+			const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
+			sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
+			sequence.BeginFrame(state);
+			capture.BeginFrame(state);
+			watch.OnFrameSubmitted(10);
+			capture.OnFrameSubmitted();
+			sequence.OnFrameSubmitted(10);
+			sequence.UpdateWatchCoverage();
+			context.Check(sequence.Cancel(), "Cancelling a sequence releases its unresolved watch range");
+			production.m_FrameSerial = 10;
+			watch.OnProductionFrame(production);
+			sequence.UpdateWatchCoverage();
+			context.Check(sequence.GetStatus()->m_State == FrameSequenceState::Cancelled,
+				"A cancelled sequence cannot be revived or failed by its late counter result");
+			context.Check(watch.Configure({ .m_Boundary = false }, error), "Transport failure reporting configures");
+			const auto transport = capture.Submit({});
+			capture.BeginFrame({ .m_FrameSerial = 11 });
+			watch.OnFrameSubmitted(11); capture.OnFrameSubmitted();
+			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
+				.m_Status = FrameCaptureStatus::Failed, .m_FrameSerial = 11, .m_Failure = "Readback mapping failed" });
+			capture.Update(); results.clear(); capture.ConsumeResults(results);
+			context.Check(results.size() == 1 && results[0].m_RequestId == transport && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				results[0].m_Metadata->m_WatchCoverage && results[0].m_Metadata->m_WatchCoverage->m_Production.m_Status == NonFiniteClaimStatus::Incomplete,
+				"A capture transport failure retains the unresolved watch claims in its response metadata");
+			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error),
+				"Watch can fail an issued capture independently of image completion");
+			const auto early = capture.Submit({});
+			capture.BeginFrame({ .m_FrameSerial = 12 });
+			watch.OnFrameSubmitted(12); capture.OnFrameSubmitted();
+			production.m_FrameSerial = 12;
+			watch.OnProductionFrame(production);
+			capture.Update(); results.clear(); capture.ConsumeResults(results);
+			context.Check(results.size() == 1 && results[0].m_RequestId == early && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+				results[0].m_Failure.starts_with("NonFiniteReplaced"),
+				"An issued capture fails promptly when its watch fails before any image result");
+			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
+				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = 12, .m_Image = std::make_shared<FrameCaptureImage>() });
+			capture.Update(); results.clear(); capture.ConsumeResults(results);
+			context.Check(results.empty(), "Late payloads of a watch-failed capture drain without a second result or publication");
+		}
 	}
 
 	void RunNonFiniteWatchCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
+		RunCoverageTests(context);
+		RunCoverageConsumerTests(context);
 		WatchCaptureControl control;
 		NonFiniteWatchCoordinator watch(&control);
 		std::string error;
@@ -111,8 +365,8 @@ namespace gglab
 		context.Check(!watch.Configure(configuration, error) && error.starts_with("RequiresRestart") && status.m_ConfigurationVersion == 2,
 			"Production fail mode without startup capability rejects without changing active watch");
 		control.m_Instrumentation = true;
-		context.Check(!watch.Configure(configuration, error) && error.starts_with("FailModeUnavailable"),
-			"A report-only implementation cannot claim sequence fail-mode completion");
+		context.Check(watch.Configure(configuration, error) && status.m_Mode == NonFiniteWatchMode::Fail,
+			"Fail mode configures when production instrumentation is available");
 		configuration.m_Mode = NonFiniteWatchMode::Report;
 		configuration.m_Targets.clear();
 		context.Check(watch.Configure(configuration, error) && watch.UsesDefaultTargets(),
@@ -252,6 +506,10 @@ namespace gglab
 			}
 			generationWatch.PrepareFrame(1, false, defaults);
 			const auto first = generations.Complete();
+			const auto range = generationWatch.OpenCoverage();
+			generationWatch.OnFrameSubmitted(1);
+			generationWatch.TrackCoverageFrame(range, 1);
+			generationWatch.CloseCoverage(range);
 			context.Check(generations.m_ScanTargets.size() == 2, "Generation work respects the shared scan target allowance");
 			generationWatch.PrepareFrame(2, false, defaults);
 			const auto tail = generations.Complete();
@@ -261,6 +519,10 @@ namespace gglab
 				"Partial generation completion is incomplete coverage");
 			context.Check(generationWatch.OnScanResult(tail) && generationWatch.GetStatus().m_Boundary.m_Status == NonFiniteClaimStatus::Passed,
 				"A generation completes only after every admitted mip has valid results");
+			context.Check(generationWatch.GetCoverage(range)->m_Complete && generationWatch.GetCoverage(range)->m_FrameCount == 1 &&
+				generationWatch.GetCoverage(range)->m_Boundary.m_Status == NonFiniteClaimStatus::Passed,
+				"A range retains the consumed generation until its later mip scans complete");
+			generationWatch.ReleaseCoverage(range);
 			generationWatch.PrepareFrame(3, false, defaults);
 			const auto& generationStatus = generationWatch.GetStatus();
 			context.Check(generations.m_Id == 2 && generationStatus.m_Boundary.m_Status == NonFiniteClaimStatus::NotApplicable &&

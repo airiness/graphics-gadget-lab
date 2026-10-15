@@ -1,18 +1,82 @@
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <algorithm>
+#include <format>
 #include <utility>
 
 namespace gglab
 {
 	namespace
 	{
+		bool Clean(NonFiniteClaimResult claim) noexcept
+		{
+			return claim.m_Status == NonFiniteClaimStatus::Passed || claim.m_Status == NonFiniteClaimStatus::NotApplicable;
+		}
+		void Merge(NonFiniteClaimResult& aggregate, NonFiniteClaimResult claim) noexcept
+		{
+			if (claim.m_Status == NonFiniteClaimStatus::Failed ||
+				(aggregate.m_Status != NonFiniteClaimStatus::Failed && !Clean(claim)))
+			{
+				aggregate = claim.m_Status == NonFiniteClaimStatus::Unavailable ? NonFiniteClaimResult{} : claim;
+			}
+			else if (aggregate.m_Status == NonFiniteClaimStatus::NotApplicable && claim.m_Status == NonFiniteClaimStatus::Passed)
+			{
+				aggregate = claim;
+			}
+		}
+		std::string Describe(const NonFiniteWatchAnomaly& anomaly)
+		{
+			std::string text = std::format("{}: frame {}", GetNonFiniteWatchFailureName(anomaly.m_Failure), anomaly.m_FrameSerial);
+			if (anomaly.m_Target)
+			{
+				const auto& target = *anomaly.m_Target;
+				text += std::format(", resource '{}', mip {}", target.m_Address.m_Resource, target.m_Address.m_Mip);
+				if (target.m_TextureLocation)
+				{
+					const auto location = *target.m_TextureLocation;
+					text += std::format(", x {}, y {}, slice {}, channel {}", location.m_X, location.m_Y, location.m_Slice, location.m_Channel);
+				}
+				else if (target.m_Element && target.m_ByteOffset)
+				{
+					text += std::format(", element {}, byte offset {}", *target.m_Element, *target.m_ByteOffset);
+				}
+			}
+			else if (anomaly.m_ProgramIndex && anomaly.m_SiteIndex)
+			{
+				text += std::format(", program {}, site {}", *anomaly.m_ProgramIndex, *anomaly.m_SiteIndex);
+				if (*anomaly.m_ProgramIndex < nonfinite::ProgramCount && *anomaly.m_SiteIndex < nonfinite::SiteCount)
+				{
+					text += std::format(" ('{}', '{}')", nonfinite::Programs[*anomaly.m_ProgramIndex], nonfinite::Sites[*anomaly.m_SiteIndex].m_Id);
+				}
+			}
+			return text;
+		}
 		bool SameAddress(const RGResourceAddress& left, const RGResourceAddress& right) noexcept
 		{
 			return left.m_Resource == right.m_Resource && left.m_Position == right.m_Position && left.m_Pass == right.m_Pass &&
 				left.m_Occurrence == right.m_Occurrence && left.m_Mip == right.m_Mip && left.m_FirstSlice == right.m_FirstSlice &&
 				left.m_SliceCount == right.m_SliceCount && left.m_Aspect == right.m_Aspect;
 		}
+	}
+
+	const char* GetNonFiniteWatchFailureName(NonFiniteWatchFailure failure) noexcept
+	{
+		switch (failure)
+		{
+		case NonFiniteWatchFailure::NonFiniteDetected: return "NonFiniteDetected";
+		case NonFiniteWatchFailure::NonFiniteReplaced: return "NonFiniteReplaced";
+		case NonFiniteWatchFailure::ClampPolicyExceeded: return "ClampPolicyExceeded";
+		case NonFiniteWatchFailure::MissingCoverage: return "MissingCoverage";
+		default: return "None";
+		}
+	}
+
+	bool NonFiniteWatchCoverage::Fails() const noexcept
+	{
+		return m_Mode == NonFiniteWatchMode::Fail && (!m_Failure.empty() ||
+			(m_BoundaryRequested && m_Boundary.m_Status == NonFiniteClaimStatus::Failed) ||
+			(m_ProductionRequested && m_Production.m_Status == NonFiniteClaimStatus::Failed));
 	}
 
 	bool NonFiniteWatchCoordinator::Configure(NonFiniteWatchConfiguration configuration, std::string& error) noexcept
@@ -28,11 +92,9 @@ namespace gglab
 			{
 				error = "A watch configuration must request at least one claim.";
 			}
-			else if (configuration.m_Mode == NonFiniteWatchMode::Fail)
+			else if (configuration.m_Mode == NonFiniteWatchMode::Fail && configuration.m_Production && !m_Capture->HasNonFiniteInstrumentation())
 			{
-				error = configuration.m_Production && !m_Capture->HasNonFiniteInstrumentation()
-					? "RequiresRestart: production fail mode requires --watch-nonfinite at startup."
-					: "FailModeUnavailable: watch coverage and sequence completion are not implemented yet.";
+				error = "RequiresRestart: production fail mode requires --watch-nonfinite at startup.";
 			}
 			else if (configuration.m_Targets.size() > 64 || (!configuration.m_Boundary && !configuration.m_Targets.empty()))
 			{
@@ -55,8 +117,26 @@ namespace gglab
 			return false;
 		}
 		const uint64_t version = m_Status.m_ConfigurationVersion + 1;
+		for (auto& [id, coverage] : m_Coverage)
+		{
+			if (!coverage.m_Report.m_Complete)
+			{
+				coverage.m_Closed = true;
+				coverage.m_Frames.clear();
+				coverage.m_Report.m_CompletedFrames = coverage.m_Report.m_FrameCount;
+				if (coverage.m_Report.m_Failure.empty())
+				{
+					coverage.m_Report.m_Failure = "MissingCoverage: watch configuration changed during the coverage range.";
+				}
+				Merge(coverage.m_Boundary, {});
+				Merge(coverage.m_Production, {});
+			}
+		}
+		RefreshCoverage();
+		m_PreparedCoverage.reset();
 		m_Configuration = std::move(configuration);
 		m_Status = { .m_ConfigurationVersion = version, .m_Enabled = m_Configuration.m_Enabled,
+			.m_Mode = m_Configuration.m_Mode,
 			.m_BoundaryRequested = m_Configuration.m_Boundary, .m_ProductionRequested = m_Configuration.m_Production,
 			.m_DefaultTargets = m_Configuration.m_Targets.empty() };
 		m_FirstApplicableFrame = m_LastPreparedFrame + 1;
@@ -93,6 +173,8 @@ namespace gglab
 			return;
 		}
 		Pending pending{ m_Status.m_ConfigurationVersion, frameSerial };
+		const bool exportFrame = yieldBoundaryCapacity;
+		yieldBoundaryCapacity &= m_Configuration.m_Mode != NonFiniteWatchMode::Fail;
 		std::vector<size_t> generationCandidates;
 		if (m_Status.m_DefaultTargets)
 		{
@@ -158,7 +240,7 @@ namespace gglab
 			// A generation consists of individually scheduled mip scans, not one
 			// oversized group. Original per-frame scans retain priority. Rotate across
 			// generation surfaces so a frequently changing SkyView cannot starve IBL.
-			const size_t limit = m_Capture->GetNonFiniteScanTargetLimit();
+			const size_t limit = exportFrame ? pending.m_Scans.size() : m_Capture->GetNonFiniteScanTargetLimit();
 			const size_t count = pending.m_Targets.size();
 			for (size_t offset = 0; offset < count && pending.m_Scans.size() < limit; ++offset)
 			{
@@ -185,11 +267,14 @@ namespace gglab
 		}
 		if (pending.m_Scans.empty())
 		{
+			m_PreparedCoverage = CoverageFrame{ .m_FrameSerial = frameSerial, .m_Targets = pending.m_Targets };
 			PublishBoundary(std::move(pending));
 			return;
 		}
 		const uint64_t id = !yieldBoundaryCapacity && m_Pending.size() < 64
-			? m_Capture->RequestNonFiniteScan(pending.m_Scans, m_Status.m_ConfigurationVersion, frameSerial) : 0;
+			? m_Capture->RequestNonFiniteScan(pending.m_Scans, m_Status.m_ConfigurationVersion, frameSerial,
+				false, 0, m_Configuration.m_Mode == NonFiniteWatchMode::Fail) : 0;
+		m_PreparedCoverage = CoverageFrame{ .m_FrameSerial = frameSerial, .m_BoundaryPending = id != 0, .m_Targets = pending.m_Targets };
 		if (id == 0)
 		{
 			for (const size_t index : pending.m_ScanIndices)
@@ -381,7 +466,15 @@ namespace gglab
 				}
 			}
 		}
+		if (result.m_Status == FrameCaptureStatus::Busy && !pending.m_Submitted)
+		{
+			// Admission rolled back the entire frame. It contributes no coverage gap
+			// or fail-mode history; selected generation mips are now retryable.
+			return true;
+		}
+		ObserveCoverageBoundary(pending);
 		PublishBoundary(std::move(pending));
+		RefreshCoverage();
 		return true;
 	}
 
@@ -404,6 +497,259 @@ namespace gglab
 			m_Status.m_ProductionFrameSerial = frame.m_FrameSerial;
 			m_Status.m_Production = frame.m_Claim;
 			m_Status.m_ProductionFailure = frame.m_Failure;
+		}
+		for (auto& [id, coverage] : m_Coverage)
+		{
+			for (auto& pending : coverage.m_Frames)
+			{
+				if (pending.m_FrameSerial == frame.m_FrameSerial && pending.m_ProductionPending)
+				{
+					pending.m_ProductionPending = false;
+					pending.m_Production = frame.m_Claim;
+					pending.m_Failure = frame.m_Failure;
+					for (const auto& site : frame.m_Sites)
+					{
+						if (site.m_Claim.m_Status == NonFiniteClaimStatus::Failed && !pending.m_Anomaly)
+						{
+							pending.m_Anomaly = NonFiniteWatchAnomaly{ .m_FrameSerial = frame.m_FrameSerial,
+								.m_Failure = site.m_Claim.m_Failure, .m_ProgramIndex = site.m_ProgramIndex, .m_SiteIndex = site.m_SiteIndex };
+						}
+					}
+				}
+			}
+		}
+		RefreshCoverage();
+	}
+
+	uint64_t NonFiniteWatchCoordinator::OpenCoverage() noexcept
+	{
+		if (!m_Status.m_Enabled)
+		{
+			return 0;
+		}
+		const uint64_t id = m_NextCoverageId++;
+		auto& report = m_Coverage[id].m_Report;
+		report.m_ConfigurationVersion = m_Status.m_ConfigurationVersion;
+		report.m_Mode = m_Configuration.m_Mode;
+		report.m_BoundaryRequested = m_Configuration.m_Boundary;
+		report.m_ProductionRequested = m_Configuration.m_Production;
+		report.m_InstrumentationAvailable = m_Capture && m_Capture->HasNonFiniteInstrumentation();
+		return id;
+	}
+
+	void NonFiniteWatchCoordinator::TrackCoverageFrame(uint64_t id, uint64_t frameSerial) noexcept
+	{
+		const auto found = m_Coverage.find(id);
+		if (found == m_Coverage.end() || found->second.m_Closed)
+		{
+			return;
+		}
+		auto& coverage = found->second;
+		auto& report = coverage.m_Report;
+		if (frameSerial == 0 || frameSerial <= report.m_LastFrameSerial || frameSerial != m_LastSubmittedFrame)
+		{
+			report.m_Failure = "MissingCoverage: range frame does not match a new successful submission.";
+			return;
+		}
+		if (report.m_FrameCount++ == 0)
+		{
+			report.m_FirstFrameSerial = frameSerial;
+		}
+		report.m_LastFrameSerial = frameSerial;
+		CoverageFrame frame{ .m_FrameSerial = frameSerial, .m_SubmissionOrdinal = m_SubmissionOrdinal };
+		if (report.m_BoundaryRequested)
+		{
+			if (m_PreparedCoverage && m_PreparedCoverage->m_FrameSerial == frameSerial)
+			{
+				frame = *m_PreparedCoverage;
+				frame.m_SubmissionOrdinal = m_SubmissionOrdinal;
+			}
+			else
+			{
+				frame.m_Targets.emplace_back();
+			}
+		}
+		frame.m_ProductionPending = report.m_ProductionRequested && report.m_InstrumentationAvailable;
+		frame.m_TrackedAt = std::chrono::steady_clock::now();
+		frame.m_Production = report.m_InstrumentationAvailable ? NonFiniteClaimResult{}
+			: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::MissingCoverage };
+		coverage.m_Frames.push_back(std::move(frame));
+		RefreshCoverage();
+	}
+
+	void NonFiniteWatchCoordinator::CloseCoverage(uint64_t id) noexcept
+	{
+		if (const auto found = m_Coverage.find(id); found != m_Coverage.end())
+		{
+			found->second.m_Closed = true;
+			RefreshCoverage();
+		}
+	}
+	void NonFiniteWatchCoordinator::ReleaseCoverage(uint64_t id) noexcept { m_Coverage.erase(id); }
+	void NonFiniteWatchCoordinator::UpdateCoverage() noexcept { RefreshCoverage(); }
+	std::shared_ptr<const NonFiniteWatchCoverage> NonFiniteWatchCoordinator::GetCoverage(uint64_t id) const noexcept
+	{
+		const auto found = m_Coverage.find(id);
+		return found == m_Coverage.end() ? nullptr : std::make_shared<const NonFiniteWatchCoverage>(found->second.m_Report);
+	}
+	void NonFiniteWatchCoordinator::OnFrameSubmitted(uint64_t frameSerial) noexcept
+	{
+		if (frameSerial > m_LastSubmittedFrame)
+		{
+			m_LastSubmittedFrame = frameSerial;
+			++m_SubmissionOrdinal;
+			for (auto& [id, pending] : m_Pending)
+			{
+				if (pending.m_FrameSerial == frameSerial) { pending.m_Submitted = true; }
+			}
+			RefreshCoverage();
+		}
+	}
+	void NonFiniteWatchCoordinator::FinalizeCoverage() noexcept
+	{
+		m_SubmissionOrdinal += MaxPendingCoverageSubmissions;
+		for (auto& [id, coverage] : m_Coverage)
+		{
+			coverage.m_Closed = true;
+		}
+		RefreshCoverage();
+	}
+	std::string NonFiniteWatchCoordinator::GetFailModeFailure() const noexcept
+	{
+		if (!m_Status.m_Enabled || m_Status.m_Mode != NonFiniteWatchMode::Fail) { return {}; }
+		if (m_Status.m_FirstAnomaly) { return Describe(*m_Status.m_FirstAnomaly); }
+		for (const auto& target : m_Status.m_Targets)
+		{
+			if (m_Status.m_BoundaryFrameSerial != 0 && !target.m_Generation.IsValid() && target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete)
+			{
+				return std::format("MissingCoverage: frame {}, target '{}': {}", m_Status.m_BoundaryFrameSerial,
+					target.m_Semantic ? GetNonFiniteWatchSemanticName(*target.m_Semantic) : target.m_Address.m_Resource, target.m_Failure);
+			}
+		}
+		if (m_Status.m_ProductionFrameSerial != 0 && !Clean(m_Status.m_Production))
+		{
+			return std::format("MissingCoverage: frame {}, production: {}", m_Status.m_ProductionFrameSerial, m_Status.m_ProductionFailure);
+		}
+		return {};
+	}
+
+	void NonFiniteWatchCoordinator::ObserveCoverageBoundary(const Pending& pending) noexcept
+	{
+		for (auto& [id, coverage] : m_Coverage)
+		{
+			for (auto& frame : coverage.m_Frames)
+			{
+				if (frame.m_FrameSerial == pending.m_FrameSerial)
+				{
+					frame.m_BoundaryPending = false;
+				}
+				for (size_t index = 0; index < frame.m_Targets.size(); ++index)
+				{
+					auto& target = frame.m_Targets[index];
+					if (!target.m_Generation.IsValid())
+					{
+						// Default roles may share an empty address, and explicit requests
+						// may interpret the same buffer differently. Preserve row identity.
+						if (frame.m_FrameSerial == pending.m_FrameSerial && index < pending.m_Targets.size())
+						{
+							const auto& evidence = pending.m_Targets[index];
+							if (target.m_Semantic == evidence.m_Semantic && SameAddress(target.m_Address, evidence.m_Address))
+							{
+								target = evidence;
+							}
+						}
+						continue;
+					}
+					for (const auto& evidence : pending.m_Targets)
+					{
+						const bool generation = target.m_Generation.IsValid() && target.m_Generation == evidence.m_Generation &&
+							target.m_Semantic == evidence.m_Semantic && target.m_Address.m_Mip == evidence.m_Address.m_Mip;
+						if (generation && (Clean(evidence.m_Result.m_Claim) || evidence.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Failed))
+						{
+							target = evidence;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	void NonFiniteWatchCoordinator::RefreshCoverage() noexcept
+	{
+		for (auto& [id, coverage] : m_Coverage)
+		{
+			auto& report = coverage.m_Report;
+			std::erase_if(coverage.m_Frames, [&](CoverageFrame& frame)
+				{
+					bool pending = frame.m_BoundaryPending || frame.m_ProductionPending;
+					NonFiniteClaimResult boundary{ NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+					for (auto& target : frame.m_Targets)
+					{
+						ApplyGenerationEvidence(target, frame.m_FrameSerial);
+						pending |= target.m_Generation.IsValid() && !Clean(target.m_Result.m_Claim) &&
+							target.m_Result.m_Claim.m_Status != NonFiniteClaimStatus::Failed;
+						Merge(boundary, target.m_Result.m_Claim);
+						if (target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Failed && !frame.m_Anomaly)
+						{
+							frame.m_Anomaly = NonFiniteWatchAnomaly{ .m_FrameSerial = target.m_CheckedFrameSerial ? target.m_CheckedFrameSerial : frame.m_FrameSerial,
+								.m_Failure = target.m_Result.m_Claim.m_Failure, .m_Target = target };
+						}
+					}
+					if (frame.m_Anomaly && (!report.m_FirstAnomaly || frame.m_Anomaly->m_FrameSerial < report.m_FirstAnomaly->m_FrameSerial))
+					{
+						report.m_FirstAnomaly = frame.m_Anomaly;
+						report.m_Failure = Describe(*frame.m_Anomaly);
+					}
+					// A stalled/deferred renderer may submit no tail frames at all. The
+					// wall-clock bound also releases retained capture payloads in that case.
+					if (pending && m_SubmissionOrdinal - frame.m_SubmissionOrdinal < MaxPendingCoverageSubmissions &&
+						std::chrono::steady_clock::now() - frame.m_TrackedAt < std::chrono::seconds(30))
+					{
+						return false;
+					}
+					if (frame.m_BoundaryPending)
+					{
+						Merge(boundary, {});
+					}
+					if (report.m_BoundaryRequested)
+					{
+						Merge(coverage.m_Boundary, boundary);
+					}
+					if (report.m_ProductionRequested)
+					{
+						Merge(coverage.m_Production, frame.m_Production);
+					}
+					if (report.m_Failure.empty() && ((report.m_BoundaryRequested && !Clean(boundary)) ||
+						(report.m_ProductionRequested && !Clean(frame.m_Production))))
+					{
+						if (frame.m_Failure.empty())
+						{
+							for (const auto& target : frame.m_Targets)
+							{
+								if (!Clean(target.m_Result.m_Claim))
+								{
+									frame.m_Failure = target.m_Semantic ? std::string(GetNonFiniteWatchSemanticName(*target.m_Semantic)) : target.m_Address.m_Resource;
+									frame.m_Failure += ": " + (target.m_Failure.empty() ? "no complete scan result" : target.m_Failure);
+									break;
+								}
+							}
+						}
+						report.m_Failure = std::format("MissingCoverage: frame {}: {}", frame.m_FrameSerial,
+							frame.m_Failure.empty() ? "not every applicable target and site returned complete evidence" : frame.m_Failure);
+					}
+					++report.m_CompletedFrames;
+					return true;
+				});
+			report.m_Boundary = report.m_BoundaryRequested ? coverage.m_Boundary
+				: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
+			report.m_Production = report.m_ProductionRequested ? coverage.m_Production
+				: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
+			if (!coverage.m_Frames.empty())
+			{
+				if (report.m_BoundaryRequested) { Merge(report.m_Boundary, {}); }
+				if (report.m_ProductionRequested) { Merge(report.m_Production, {}); }
+			}
+			report.m_Complete = coverage.m_Closed && coverage.m_Frames.empty();
 		}
 	}
 }

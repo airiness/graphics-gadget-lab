@@ -161,8 +161,9 @@ namespace gglab
 		// GGLabAppRuntime, only that owner drains this stream; hosts consume the
 		// runtime's published results after it has notified the sequence.
 		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
-		[[nodiscard]] bool HasWaitingResourceExports() const noexcept;
+		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
+		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatch() const noexcept { return m_NonFiniteWatch; }
 		[[nodiscard]] std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return m_Capture ? m_Capture->GetLatestNonFiniteProductionFrame() : nullptr; }
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept;
 		// Checks Runtime payload capacity and the write slots reserved by issued
@@ -226,6 +227,7 @@ namespace gglab
 		{
 			Waiting,
 			Issued,
+			AwaitingWatch,
 			Encoding,
 			Finished,
 		};
@@ -246,6 +248,8 @@ namespace gglab
 			FrameCaptureMetadata m_Metadata{};
 			RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
 			std::shared_ptr<EncodeJob> m_Job;
+			uint64_t m_WatchCoverageId = 0;
+			std::optional<FrameCaptureResult> m_PendingResult;
 		};
 
 		[[nodiscard]] static bool MatchesRequiredContent(
@@ -257,6 +261,7 @@ namespace gglab
 		void IssueSequenceGroups(const FrameCaptureFrameState& state, std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
 		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
+		void PollWatchCaptures() noexcept;
 		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;
 		// Publishes the result of a written job; false while it is unfinished.
 		[[nodiscard]] bool TryFinishWritten(Entry& entry) noexcept;
@@ -288,6 +293,9 @@ namespace gglab
 		uint64_t m_NextRequestId = 1;
 		std::vector<Entry> m_Entries;
 		std::vector<FrameCaptureRequestResult> m_Results;
+		// Runtime retains and retires these payloads normally; only publication was
+		// cancelled by a watch failure before the capture result arrived.
+		std::vector<uint64_t> m_DiscardedCaptureResults;
 		// Names this coordinator's temporary files apart from those of other
 		// processes writing to the same directory.
 		std::string m_TemporaryTag;

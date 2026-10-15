@@ -667,7 +667,7 @@ namespace gglab
 		}
 		const auto defaults = m_NonFiniteWatch->UsesDefaultTargets()
 			? ResolveNonFiniteWatchDefaults(renderGraph) : NonFiniteWatchDefaults{};
-		m_NonFiniteWatch->PrepareFrame(frame.m_FrameSerial, m_FrameCapture->HasWaitingResourceExports(), defaults);
+		m_NonFiniteWatch->PrepareFrame(frame.m_FrameSerial, m_FrameCapture->HasFrameResourceExports(), defaults);
 		const auto& exportView = frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)];
 		if (!m_FrameCapture->PrepareResourceExports(frame.m_FrameSerial, renderGraph,
 			{ .m_PreExposure = exportView.m_ScenePreExposure,
@@ -766,6 +766,7 @@ namespace gglab
 			toolingFrame.Abort();
 			return FailRuntime("The render host failed to complete frame submission.");
 		}
+		m_NonFiniteWatch->OnFrameSubmitted(frame.m_FrameSerial);
 		m_FrameCapture->OnFrameSubmitted();
 		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial);
 

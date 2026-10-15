@@ -38,8 +38,10 @@ namespace gglab
 		}
 		// Opt-in Runtime boundary scans; not a production-coverage watch capability.
 		// Completed describes readback transport, not the boundary claim's outcome.
+		// The final flag defers the unsubmitted frame on temporary capacity pressure;
+		// exact-frame consumers retry their pose and requests on a later render serial.
 		[[nodiscard]] virtual uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget>,
-			uint64_t, uint64_t = 0, bool = false, uint64_t = 0) noexcept
+			uint64_t, uint64_t = 0, bool = false, uint64_t = 0, bool = false) noexcept
 		{
 			return 0;
 		}

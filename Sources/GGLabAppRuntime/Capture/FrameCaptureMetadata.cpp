@@ -1,4 +1,5 @@
 #include "Capture/FrameCaptureMetadata.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 
 #include <cmath>
 #include <cstdint>
@@ -52,6 +53,11 @@ namespace gglab
 			{
 				BeginValue(key);
 				m_Text += "null";
+			}
+			void Json(std::string_view key, std::string_view value)
+			{
+				BeginValue(key);
+				m_Text += value;
 			}
 			void Vector(std::string_view key, const std::array<float, 3>& value)
 			{
@@ -164,6 +170,53 @@ namespace gglab
 		return std::string(text.begin(), text.end());
 	}
 
+	std::string SerializeNonFiniteWatchCoverage(const NonFiniteWatchCoverage& coverage) noexcept
+	{
+		const auto claimName = [](NonFiniteClaimStatus status)
+			{
+				switch (status)
+				{
+				case NonFiniteClaimStatus::Passed: return "Passed";
+				case NonFiniteClaimStatus::Failed: return "Failed";
+				case NonFiniteClaimStatus::NotApplicable: return "NotApplicable";
+				case NonFiniteClaimStatus::Unavailable: return "Unavailable";
+				default: return "Incomplete";
+				}
+			};
+		JsonWriter writer;
+		writer.BeginObject();
+		writer.String("schema", "gglab.nonfinite-watch");
+		writer.Unsigned("schemaVersion", 1);
+		writer.Unsigned("configurationVersion", coverage.m_ConfigurationVersion);
+		writer.String("mode", coverage.m_Mode == NonFiniteWatchMode::Fail ? "fail" : "report");
+		writer.String("coverage", "submitted-range");
+		writer.String("instrumentation", coverage.m_InstrumentationAvailable ? "available" : "unavailable");
+		writer.BeginArray("claims");
+		if (coverage.m_BoundaryRequested) { writer.String({}, "boundary"); }
+		if (coverage.m_ProductionRequested) { writer.String({}, "production"); }
+		writer.EndArray();
+		writer.Unsigned("firstFrameSerial", coverage.m_FirstFrameSerial);
+		writer.Unsigned("lastFrameSerial", coverage.m_LastFrameSerial);
+		writer.Unsigned("frames", coverage.m_FrameCount);
+		writer.Unsigned("completedFrames", coverage.m_CompletedFrames);
+		writer.Bool("complete", coverage.m_Complete);
+		writer.String("boundary", claimName(coverage.m_Boundary.m_Status));
+		writer.String("production", claimName(coverage.m_Production.m_Status));
+		writer.String("failure", coverage.m_Failure);
+		if (coverage.m_FirstAnomaly)
+		{
+			writer.Unsigned("firstAnomalyFrameSerial", coverage.m_FirstAnomaly->m_FrameSerial);
+			writer.String("reason", GetNonFiniteWatchFailureName(coverage.m_FirstAnomaly->m_Failure));
+		}
+		else
+		{
+			writer.Null("firstAnomalyFrameSerial");
+			writer.String("reason", coverage.m_Failure.empty() ? "None" : "MissingCoverage");
+		}
+		writer.EndObject();
+		return writer.Finish();
+	}
+
 	std::string SerializeFrameCaptureMetadata(const FrameCaptureMetadata& metadata) noexcept
 	{
 		JsonWriter writer;
@@ -178,6 +231,10 @@ namespace gglab
 		writer.Bool("resourceExport", metadata.m_ResourceExportActive);
 		writer.Bool("nonFiniteWatch", metadata.m_NonFiniteScanActive);
 		writer.EndObject();
+		if (metadata.m_WatchCoverage)
+		{
+			writer.Json("watch", SerializeNonFiniteWatchCoverage(*metadata.m_WatchCoverage));
+		}
 		if (metadata.m_DiagnosticTap.empty())
 		{
 			writer.Null("diagnosticTap");

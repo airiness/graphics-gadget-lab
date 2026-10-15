@@ -65,7 +65,7 @@ namespace gglab
 	}
 
 	uint64_t FrameCaptureService::RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets,
-		uint64_t configurationVersion, uint64_t frameSerial, bool includeGraph, uint64_t groupId) noexcept
+		uint64_t configurationVersion, uint64_t frameSerial, bool includeGraph, uint64_t groupId, bool deferFrameOnBusy) noexcept
 	{
 		if (GetRequestAvailability() == FrameCaptureAvailability::Busy)
 		{
@@ -81,7 +81,7 @@ namespace gglab
 		}
 		m_Queued.push_back({ .m_Id = id, .m_Source = FrameCaptureSource::NonFiniteScan, .m_FrameSerial = frameSerial,
 			.m_GroupId = groupId, .m_ScanTargets = std::move(targets), .m_ConfigurationVersion = configurationVersion,
-			.m_IncludeGraph = includeGraph });
+			.m_DeferFrameOnBusy = deferFrameOnBusy, .m_IncludeGraph = includeGraph });
 		return id;
 	}
 

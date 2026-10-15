@@ -48,6 +48,7 @@ namespace gglab
 		m_FrameCapture->ConsumeResults(m_FrameCaptureResults);
 		if (m_FrameSequence)
 		{
+			m_FrameSequence->UpdateWatchCoverage();
 			m_FrameSequence->OnCaptureResults(
 				std::span<const FrameCaptureRequestResult>(m_FrameCaptureResults).subspan(firstResult));
 		}

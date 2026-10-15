@@ -359,6 +359,32 @@ namespace gglab
 			usedBytes += ProductionPayloadBytes; ++usedSlots;
 		}
 		bool deferFrame = false;
+		// Unbound images record after graph observation admission. Reserve their slots while
+		// admitting a strict scan, otherwise an admitted scan can crowd out its own
+		// frame's image. Multiple requests for one source share the same image tap.
+		std::vector<QueuedRequest> frameImages;
+		size_t boundImageSlots = 0;
+		uint64_t boundImageBytes = 0;
+		for (const auto& image : m_Taps)
+		{
+			if (image.m_FrameSerial == frameSerial && !image.m_Submitted &&
+				(image.m_Source == FrameCaptureSource::Scene || image.m_Source == FrameCaptureSource::Composited ||
+					image.m_Source == FrameCaptureSource::Diagnostic) && !image.m_ProductionCounters)
+			{
+				++boundImageSlots;
+				boundImageBytes += image.m_Footprint.m_SizeInBytes + image.m_Footprint.m_RowSizeInBytes * image.m_Footprint.m_Height;
+			}
+		}
+		for (const auto& request : m_Queued)
+		{
+			if ((request.m_FrameSerial == 0 || request.m_FrameSerial == frameSerial) &&
+				(request.m_Source == FrameCaptureSource::Scene || request.m_Source == FrameCaptureSource::Composited ||
+					request.m_Source == FrameCaptureSource::Diagnostic) &&
+				!std::ranges::any_of(frameImages, [&](const auto& image) { return IsBoundBy(image, request.m_Source, request.m_DiagnosticTap); }))
+			{
+				frameImages.push_back(request);
+			}
+		}
 		// Exact sequence groups claim this frame before flexible concurrent exports.
 		std::stable_sort(m_Queued.begin(), m_Queued.end(), [](const auto& a, const auto& b)
 			{ return a.m_DeferFrameOnBusy && !b.m_DeferFrameOnBusy; });
@@ -454,6 +480,20 @@ namespace gglab
 					tap.m_ScanReadbacks.push_back(std::move(readback));
 				}
 				const auto slots = tap.m_ExportReadbacks.size() + tap.m_ScanReadbacks.size();
+				const bool strictScan = request.m_Source == FrameCaptureSource::NonFiniteScan && request.m_DeferFrameOnBusy;
+				const size_t imageSlots = strictScan ? frameImages.size() : 0;
+				if (failure == RGObservationFailure::None && strictScan)
+				{
+					size_t required = slots + imageSlots + boundImageSlots + (m_ProductionEnabled ? 2u : 0u);
+					uint64_t requiredBytes = bytes + boundImageBytes + (m_ProductionEnabled ? ProductionPayloadBytes + ProductionCpuBytes : 0u);
+					for (const auto& observation : prepared)
+					{
+						required += observation.m_ExportReadbacks.size() + observation.m_ScanReadbacks.size();
+						for (const auto& readback : observation.m_ExportReadbacks) { requiredBytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes; }
+						for (const auto& readback : observation.m_ScanReadbacks) { requiredBytes += readback.GetPayloadBytes(); }
+					}
+					if (required > m_Limits.m_MaxPayloads || requiredBytes > m_Limits.m_MaxPayloadBytes) { failure = RGObservationFailure::TooLarge; }
+				}
 				if (failure == RGObservationFailure::None && m_ProductionEnabled &&
 					(slots + pairedSlots + 2 > m_Limits.m_MaxPayloads || bytes + pairedBytes + ProductionPayloadBytes + ProductionCpuBytes > m_Limits.m_MaxPayloadBytes))
 				{
@@ -464,7 +504,7 @@ namespace gglab
 				{
 					failure = RGObservationFailure::TooLarge;
 				}
-				if (failure == RGObservationFailure::None && (usedSlots + slots > m_Limits.m_MaxPayloads ||
+				if (failure == RGObservationFailure::None && (usedSlots + slots + imageSlots > m_Limits.m_MaxPayloads ||
 					bytes > m_Limits.m_MaxPayloadBytes - usedBytes))
 				{
 					failure = RGObservationFailure::Busy;

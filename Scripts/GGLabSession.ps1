@@ -20,8 +20,8 @@ Commands:
   export   Export one frame's resource group as NPY arrays and JSON metadata.
            -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
            the exact frame graph. See Docs/FrameCapture.md for the address format.
-  watch    Configure semantic defaults or explicit non-finite report targets.
-           Omit -Targets for Tier A defaults; -WatchOff disables reporting.
+  watch    Configure semantic defaults or explicit non-finite targets and mode.
+           Omit -Targets for tiered defaults; -WatchOff disables reporting.
            -WatchClaims selects boundary, production or both.
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
