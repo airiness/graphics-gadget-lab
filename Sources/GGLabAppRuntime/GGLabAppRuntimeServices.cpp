@@ -4,6 +4,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
@@ -181,11 +182,13 @@ namespace gglab
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
+		m_NonFiniteWatch = std::make_unique<NonFiniteWatchCoordinator>(m_RenderHost->GetFrameCaptureControl());
 		m_FrameCapture = std::make_unique<FrameCaptureCoordinator>(
 			FrameCaptureCoordinator::CreateInfo{
 				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
 				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
+				.m_NonFiniteWatch = m_NonFiniteWatch.get(),
 			});
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
@@ -242,9 +245,11 @@ namespace gglab
 		for (const ApplicationDemoRegistration& registration : m_ContentRegistration.m_Demos)
 		{
 			const uint32_t registeredIndex = m_DemoManager->RegisterDemo(registration.m_Id,
-				[demoCreateInfo, startupLab = contentSelection.m_StartupLab, labRegistrations,
-					factory = registration.m_Factory]() noexcept -> std::unique_ptr<DemoBase>
-				{ return factory(demoCreateInfo, startupLab, labRegistrations); });
+				[demoCreateInfo, startupLab = contentSelection.m_StartupLab, labRegistrations, factory = registration.m_Factory]
+				() noexcept -> std::unique_ptr<DemoBase>
+				{
+					return factory(demoCreateInfo, startupLab, labRegistrations);
+				});
 			if (registeredIndex >= m_DemoManager->GetDemoCount())
 			{
 				GGLAB_LOG_ERROR("Failed to register demo '{}'.", registration.m_Id);
@@ -270,18 +275,13 @@ namespace gglab
 		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
-				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value(),
-				});
+				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value() });
 		}
 
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			m_Config.m_StartupDemoId,
-			contentSelection.m_StartupLab.IsValid()
-				? contentSelection.m_StartupLab.GetName()
-				: std::string_view("none"),
-			m_Config.m_InitialPointerMode == AppRuntimePointerMode::Absolute
-				? "absolute"
-				: "relative");
+			contentSelection.m_StartupLab.IsValid() ? contentSelection.m_StartupLab.GetName() : std::string_view("none"),
+			m_Config.m_InitialPointerMode == AppRuntimePointerMode::Absolute ? "absolute" : "relative");
 		GGLAB_LOG_INFO(
 			"Runtime paths: assets='{}', shader_artifacts='{}', ibl_ddc='{}', texture_ddc='{}'.",
 			m_Paths.m_AssetRoot.string(), m_Paths.m_ShaderArtifactRoot.string(),
@@ -401,7 +401,7 @@ namespace gglab
 				"App runtime asset lifetime requires an initialized render host.");
 			if (m_RenderHost && m_RenderHost->IsInitialized())
 			{
-							m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
+				m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
 				m_RenderHost->GetRHIContext()->WaitIdle();
 				// Host-owned tooling may retain backend pipelines, descriptors and user
 				// textures referenced by the last submitted frame. Retire them only at

@@ -62,6 +62,7 @@ namespace gglab
 			m_ProductionEnabled = true;
 			return true;
 		}
+		void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>& frames) noexcept override;
 		bool HasNonFiniteInstrumentation() const noexcept override { return m_ProductionEnabled; }
 		std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept override { return m_LatestProduction; }
 		// Borrows stable renderer services; programs and pipelines are demanded only
@@ -184,6 +185,8 @@ namespace gglab
 		void PublishScanTap(Tap& tap) noexcept;
 		bool PrepareProductionCounters(uint64_t frameSerial, Tap& tap, RGProductionCounters& counters) noexcept;
 		void PublishProductionTap(Tap& tap) noexcept;
+		void PublishProductionFrame(std::shared_ptr<const NonFiniteProductionFrame> frame) noexcept;
+		std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_ProductionResults;
 		static constexpr uint64_t ProductionCpuBytes = nonfinite::SiteCount * nonfinite::ProgramCount * sizeof(NonFiniteProductionSite);
 		static constexpr uint64_t ProductionPayloadBytes = nonfinite::BufferBytes * 3 + ProductionCpuBytes;
 		std::vector<std::weak_ptr<const NonFiniteProductionFrame>> m_RetainedProduction;

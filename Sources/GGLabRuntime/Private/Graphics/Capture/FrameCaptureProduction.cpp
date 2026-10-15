@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <iterator>
 #include <span>
 #include <utility>
 
@@ -38,8 +39,11 @@ namespace gglab
 			return false;
 		}
 		m_ProductionClearRecipe.m_BindingLayout = m_ProductionClearLayout;
-		const auto pipeline = m_ScanResolver->Resolve(m_ProductionClearSlot, m_ProductionClearRecipe,
-			{ .m_TypeName = "NonFiniteCounters", .m_DisplayName = "Non-finite production counters", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute });
+		const auto pipeline = m_ScanResolver->Resolve(m_ProductionClearSlot, m_ProductionClearRecipe, {
+			.m_TypeName = "NonFiniteCounters",
+			.m_DisplayName = "Non-finite production counters",
+			.m_Category = RenderPassCategory::Debug,
+			.m_Type = RenderPassType::Compute });
 		if (!pipeline.IsValid())
 		{
 			return false;
@@ -49,22 +53,41 @@ namespace gglab
 		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		tap.m_ProductionCounters = true;
 		tap.m_NonFiniteScanActive = true;
-		tap.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = nonfinite::BufferBytes,
-			.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu, .m_DebugName = "NonFiniteCounters.Readback" }));
+		tap.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({
+			.m_SizeInBytes = nonfinite::BufferBytes,
+			.m_Usage = RHIBufferUsage::CopyDest,
+			.m_MemoryUsage = RHIMemoryUsage::GpuToCpu,
+			.m_DebugName = "NonFiniteCounters.Readback" }));
 		if (!tap.m_Buffer)
 		{
 			return false;
 		}
-		counters = { .m_Readback = tap.m_Buffer.Get(), .m_Bytes = nonfinite::BufferBytes, .m_Binding = nonfinite::CounterBinding,
+		counters = { .m_Readback = tap.m_Buffer.Get(),
+			.m_Bytes = nonfinite::BufferBytes,
+			.m_Binding = nonfinite::CounterBinding,
 			.m_Clear = [pipeline, frameSerial](RGExecuteContext& context, RGBufferId record)
-			{
-				auto* commands = context.GetDirectComputeCommandContext();
-				commands->SetPipeline(pipeline);
-				commands->SetReadWriteBuffer(0, context.GetBufferHandle(record));
-				commands->SetPushConstants(1, std::array{ static_cast<uint32_t>(frameSerial), static_cast<uint32_t>(frameSerial >> 32) });
-				commands->Dispatch((nonfinite::SiteCount * nonfinite::ProgramCount + 63) / 64, 1, 1);
-			} };
+				{
+					auto* commands = context.GetDirectComputeCommandContext();
+					commands->SetPipeline(pipeline);
+					commands->SetReadWriteBuffer(0, context.GetBufferHandle(record));
+					commands->SetPushConstants(1, std::array{ static_cast<uint32_t>(frameSerial), static_cast<uint32_t>(frameSerial >> 32) });
+					commands->Dispatch((nonfinite::SiteCount * nonfinite::ProgramCount + 63) / 64, 1, 1);
+				} };
 		return true;
+	}
+
+	void FrameCaptureService::PublishProductionFrame(std::shared_ptr<const NonFiniteProductionFrame> frame) noexcept
+	{
+		m_RetainedProduction.push_back(frame);
+		m_ProductionResults.push_back(frame);
+		m_LatestProduction = std::move(frame);
+	}
+
+	void FrameCaptureService::ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>& frames) noexcept
+	{
+		CollectCompleted();
+		frames.insert(frames.end(), std::make_move_iterator(m_ProductionResults.begin()), std::make_move_iterator(m_ProductionResults.end()));
+		m_ProductionResults.clear();
 	}
 
 	void FrameCaptureService::PublishProductionTap(Tap& tap) noexcept
@@ -75,7 +98,7 @@ namespace gglab
 		if (!mapped)
 		{
 			frame->m_Failure = "Production counter readback mapping failed.";
-			m_LatestProduction = std::move(frame);
+			PublishProductionFrame(std::move(frame));
 			return;
 		}
 		*frame = DecodeNonFiniteProductionFrame(std::span(reinterpret_cast<const std::byte*>(mapped), nonfinite::BufferBytes), tap.m_FrameSerial);
@@ -84,7 +107,6 @@ namespace gglab
 		frame->m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation();
 		frame->m_SubmissionFenceValue = tap.m_Fence.m_Value;
 		frame->m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity;
-		m_RetainedProduction.push_back(frame);
-		m_LatestProduction = std::move(frame);
+		PublishProductionFrame(std::move(frame));
 	}
 }

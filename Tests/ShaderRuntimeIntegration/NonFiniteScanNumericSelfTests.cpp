@@ -401,6 +401,12 @@ namespace gglab
 				{
 					context.Check(baseline && baseline->m_Arrays[0].m_Data == exported->m_Resources->m_Arrays[0].m_Data && baseline->m_Arrays[1].m_Data == exported->m_Resources->m_Arrays[1].m_Data,
 						"Production counter variants preserve compute exports and pixel image bit-for-bit");
+					std::vector<std::shared_ptr<const NonFiniteProductionFrame>> completedProduction;
+					service.ConsumeNonFiniteProductionFrames(completedProduction);
+					context.Check(completedProduction.size() == 1 && completedProduction.front() == service.GetLatestNonFiniteProductionFrame(),
+						"Every completed production frame is delivered through the budgeted result stream");
+					service.ConsumeNonFiniteProductionFrames(completedProduction);
+					context.Check(completedProduction.size() == 1, "Draining production frames does not redeliver a completed readback");
 					const auto production = service.GetLatestNonFiniteProductionFrame();
 					context.Check(production && production->m_FrameSerial == 502 && production->m_Claim.m_Status == NonFiniteClaimStatus::Failed,
 						"A normal sanitized image still fails production coverage at its completed frame");

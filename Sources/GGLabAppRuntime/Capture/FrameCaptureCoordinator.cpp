@@ -1,5 +1,6 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/ResourceExportWriter.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
@@ -252,6 +253,7 @@ namespace gglab
 
 	FrameCaptureCoordinator::FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept :
 		m_Capture(createInfo.m_Capture),
+		m_NonFiniteWatch(createInfo.m_NonFiniteWatch),
 		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
 		m_ImageEncoder(createInfo.m_ImageEncoder),
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
@@ -703,7 +705,19 @@ namespace gglab
 			m_Capture->ConsumeResults(results);
 			for (FrameCaptureResult& result : results)
 			{
-				HandleCaptureResult(std::move(result));
+				if (!m_NonFiniteWatch || !m_NonFiniteWatch->OnScanResult(result))
+				{
+					HandleCaptureResult(std::move(result));
+				}
+			}
+			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> production;
+			m_Capture->ConsumeNonFiniteProductionFrames(production);
+			if (m_NonFiniteWatch)
+			{
+				for (const auto& frame : production)
+				{
+					m_NonFiniteWatch->OnProductionFrame(*frame);
+				}
 			}
 		}
 		CollectWrittenJobs();
@@ -765,6 +779,12 @@ namespace gglab
 		}
 		return m_HistoryReady && MatchesRequiredContent(entry, state) &&
 			m_SettledFrames >= request.m_SettleFrames;
+	}
+
+	bool FrameCaptureCoordinator::HasWaitingResourceExports() const noexcept
+	{
+		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+			{ return entry.m_Phase == Phase::Waiting && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
 	}
 
 	bool FrameCaptureCoordinator::PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,

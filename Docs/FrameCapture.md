@@ -197,8 +197,8 @@ The published schema is [`gglab.render-graph` v1/v2/v3/v4](Schemas/RenderGraph.s
   and `writes`. Each entry includes its version, resource-node index, declared
   subresource range and an `address` object (`resource`, `at.before`/`at.after`,
   `occurrence`) for discovery. Resource exports use those addresses;
-  the Runtime non-finite scan API uses the same addressing. Session `watch`
-  configuration remains planned; startup production instrumentation is described below.
+  the Runtime non-finite scan API and session `watch` reports use the same
+  addressing; startup production instrumentation is described below.
 - `frame` reuses capture metadata for content, camera, simulation time, render
   settings and readiness; `frame.frame.serial` equals the top-level `frameSerial`.
   It adds the Runtime adapter/driver compatibility identity. Build identity and
@@ -339,9 +339,9 @@ in CI; GPU value/observation checks still require local hardware runs.
 ## Non-finite boundary scans and production counters
 
 The Runtime provides explicit boundary scans and opt-in production counters.
-Session `watch` configuration, default watch tiers and fail-mode/sequence coverage
-remain pending. Boundary scans alone cannot prove that sanitization or recovery
-hid no non-finite input.
+Session `watch` supports explicit targets in report mode. Semantic default tiers,
+fail mode and sequence coverage remain pending. Boundary scans alone cannot prove
+that sanitization or recovery hid no non-finite input.
 
 Start a counter-capable process with `--watch-nonfinite`, or use the session script:
 
@@ -363,6 +363,61 @@ nonzero counters or invalid evidence, with program/site identities, replacement
 and clamp counts and finite extrema. `submission` records fence/adapter identity.
 This is a latest-frame diagnostic, not a sequence acceptance result; it does not
 retain a first failing frame or complete a coverage range.
+
+### Session watch reports
+
+Configure explicit addresses with the same resource/pass/mip/slice syntax as
+resource exports. Configuration is replaced as a whole; success increments
+`configurationVersion` and resets report history. Invalid requests preserve the
+previous configuration. The next compiled frame issues the new boundary scans;
+late results of earlier configurations are drained without updating the report.
+
+```powershell
+& $session watch -Session numeric-check -Targets '[{"resource":"Temporal.MotionVectors"},{"resource":"GTAO.TemporalAO"}]'
+& $session status -Session numeric-check
+& $session watch -Session numeric-check -WatchOff
+```
+
+The default claims are `boundary` and `production`. `-WatchClaims boundary` works
+without startup instrumentation; `-WatchClaims production` needs no target list.
+Without instrumentation a requested production claim remains `Unavailable`.
+The startup switch enables counter shaders independently of report configuration:
+`-WatchOff` stops boundary scan requests and report tracking, while an instrumented
+process continues collecting production counters.
+
+`status.watch.report` and the `watch` response contain the configuration version,
+requested claims, separate boundary/production frame serials, per-target counts,
+finite extrema, scalar index and texture or buffer location. `firstAnomaly` retains
+the earliest observed failing frame since configuration, including a production
+frame followed by a clean frame in the same completion poll. These are reports of
+completed evidence, not proof of complete coverage over a sequence or frame range.
+Pending, missing, unsupported or mismatched evidence is `Incomplete`. Capacity
+pressure also yields `Incomplete`; continuous report scans yield capacity while
+a scheduled resource export waits for the shared payload pool to drain.
+
+Buffers require an explicit owned interpretation and producer-valid element count:
+
+```json
+[{"resource":"Values","buffer":{"stride":16,"validElementCount":3,"fields":[
+  {"offset":0,"type":"uint32"},
+  {"offset":4,"type":"float32","count":2},
+  {"offset":12,"type":"float16","count":2}
+]}}]
+```
+
+Only floating-point fields enter the scan; integers, padding and capacity beyond
+`validElementCount` are excluded. The interpretation is checked again against the
+actual compiled frame's buffer. Scalar types are `uint8`, `uint32`, `float16` and
+`float32`; count defaults to one. A target is limited to 256 fields and 4096 float
+components per element. Texture targets omit `buffer`. `-TargetsFile` accepts the
+same JSON array from a UTF-8 file.
+
+An enabled boundary report without explicit targets is rejected with
+`DefaultTargetsUnavailable`. A `fail` request that needs unavailable production
+instrumentation returns `RequiresRestart`; other `fail` requests return
+`FailModeUnavailable`. Neither rejection changes the current configuration.
+
+### Runtime counter and scan mechanics
 
 Production counter details:
 
@@ -441,6 +496,7 @@ python Scripts/ValidateNonFiniteSites.py --self-test
 python Scripts/ValidateNonFiniteSites.py
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite nonfinite-watch
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite frame-capture
+Build/Output/x64/Debug/GGLabAppRuntimeTests.exe
 Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi dx12
 Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi vulkan
 ```
@@ -456,12 +512,21 @@ exported image and values bit-for-bit, and checks exact per-site replacement/cla
 counts after the common frame fence. Whole-Lab acceptance and measured overhead
 remain separate checks.
 
-Local verification on 2026-10-15 passed 54 GPU checks per backend in both Debug
+Local verification on 2026-10-15 passed 56 GPU checks per backend in both Debug
 and Release, including bindless layout slots before the counter binding. Runtime
 frame-capture passed 199 checks and scan/policy foundations passed 45. The GTAO
 Lab also completed hidden Release captures and schema-valid graph exports on
 both backends, with production status `Passed`. These smoke runs do not establish
 acceptance across every Lab or a complete watch coverage range.
+
+The explicit session report layer passed 27 coordinator checks and 30 control
+checks in both configurations. Hidden Debug GTAO sessions on both backends
+reported clean motion/AO boundaries and production evidence, completed PNG and
+paired resource/graph exports while reporting, and classified an absent target
+as `Incomplete`. A Release session without counter capability reported clean
+boundaries with production `Unavailable`, preserved configuration on rejected
+requests, and exported an observer-free graph after disabling watch. Resource
+and graph validators accepted all exported groups, including graph v4 pairs.
 
 ## Capture settings
 

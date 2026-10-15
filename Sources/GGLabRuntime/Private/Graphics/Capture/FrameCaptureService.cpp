@@ -525,7 +525,7 @@ namespace gglab
 			auto frame = std::make_shared<NonFiniteProductionFrame>();
 			frame->m_FrameSerial = frameSerial;
 			frame->m_Failure = failure;
-			m_LatestProduction = std::move(frame);
+			PublishProductionFrame(std::move(frame));
 		}
 		for (const QueuedRequest& request : tap.m_Requests)
 		{

@@ -68,7 +68,8 @@ def validate(path, validator):
 		graph = json.loads((path.parent / document["graph"]).read_text(encoding="utf-8"))
 		if graph["frameSerial"] != document["frameSerial"] or graph["submission"] != document["submission"]:
 			raise ValueError("The paired graph belongs to a different submitted frame")
-		if graph["schemaVersion"] != (3 if document["observation"]["nonFiniteWatch"] else 2) or not graph["observation"]["resourceExport"] or graph["observation"]["nonFiniteWatch"] != document["observation"]["nonFiniteWatch"]:
+		versions = (3, 4) if document["observation"]["nonFiniteWatch"] else (2,)
+		if graph["schemaVersion"] not in versions or not graph["observation"]["resourceExport"] or graph["observation"]["nonFiniteWatch"] != document["observation"]["nonFiniteWatch"]:
 			raise ValueError("Paired graphs must include resource observation nodes")
 	return document
 
@@ -96,6 +97,29 @@ def self_test(validator):
 		scanned["observation"]["nonFiniteWatch"] = True
 		path.write_text(json.dumps(scanned), encoding="utf-8")
 		validate(path, validator)
+		paired_path = path.parent / "paired.graph.json"
+		for version, active in [(2, False), (3, True), (4, True)]:
+			paired = copy.deepcopy(scanned if active else document)
+			paired["graph"] = paired_path.name
+			paired["observation"]["graph"] = True
+			graph = dict(schemaVersion=version, frameSerial=1, submission=paired["submission"],
+				observation=dict(resourceExport=True, nonFiniteWatch=active))
+			path.write_text(json.dumps(paired), encoding="utf-8")
+			paired_path.write_text(json.dumps(graph), encoding="utf-8")
+			validate(path, validator)
+		paired_cases = [("schemaVersion", 1), ("schemaVersion", 2), ("schemaVersion", 5),
+			("frameSerial", 2), ("submission", dict(graph["submission"], fenceValue=2)),
+			("observation", dict(resourceExport=False, nonFiniteWatch=True)),
+			("observation", dict(resourceExport=True, nonFiniteWatch=False))]
+		for key, value in paired_cases:
+			invalid_graph = dict(graph, **{key: value})
+			paired_path.write_text(json.dumps(invalid_graph), encoding="utf-8")
+			try:
+				validate(path, validator)
+			except ValueError:
+				pass
+			else:
+				raise AssertionError(f"Paired graph accepted invalid {key}")
 		for version, active in [(1, True), (2, False)]:
 			invalid = copy.deepcopy(document)
 			invalid["schemaVersion"] = version
@@ -127,7 +151,7 @@ def self_test(validator):
 				pass
 			else:
 				raise AssertionError(f"Validator accepted invalid {key}")
-	print(f"Resource schema/NPY self-test passed ({len(cases) + 2} rejection cases)")
+	print(f"Resource schema/NPY self-test passed ({len(cases) + len(paired_cases) + 2} rejection cases)")
 
 
 def main():

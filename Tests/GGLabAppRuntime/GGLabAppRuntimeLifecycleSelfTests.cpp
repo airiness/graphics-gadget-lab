@@ -1,3 +1,4 @@
+#include "NonFiniteWatchCoordinatorSelfTests.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabAppRuntime.h"
@@ -682,5 +683,7 @@ int main()
 		.m_Id = "frame-capture-coordinator",
 		.m_Run = &gglab::RunFrameCaptureCoordinatorSelfTests,
 		}, reporter);
-	return lifecycleSucceeded && frameCaptureSucceeded ? 0 : 1;
+	const bool watchSucceeded = gglab::RunSelfTestSuite({ .m_Id = "nonfinite-watch-coordinator",
+		.m_Run = &gglab::RunNonFiniteWatchCoordinatorSelfTests }, reporter);
+	return lifecycleSucceeded && frameCaptureSucceeded && watchSucceeded ? 0 : 1;
 }

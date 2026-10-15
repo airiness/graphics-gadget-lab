@@ -36,26 +36,37 @@ namespace gglab
 				name == "TAA.ResolvedSceneColor" || name == "TAA.CurrentSceneColor")
 			{
 				return ResourceExportSemantics{ .m_Role = name == "TAA.ResolvedSceneColor" ? "scene-color.post-temporal" : "scene-color.pre-temporal",
-					.m_Units = "scene-linear Rec.709, pre-exposed", .m_Space = "display view",
+					.m_Units = "scene-linear Rec.709, pre-exposed",
+					.m_Space = "display view",
 					.m_Description = "Stored radiance is scene-linear radiance multiplied by preExposure.",
-					.m_PreExposure = context.m_PreExposure, .m_WatchTier = 1 };
+					.m_PreExposure = context.m_PreExposure,
+					.m_WatchTier = 1 };
 			}
 			if (name == "DisplayView.DepthBuffer" || name == "DisplayView.DisplayDepth")
 			{
-				return ResourceExportSemantics{ .m_Role = "depth", .m_Units = "device depth [0, 1]", .m_Space = "display view",
+				return ResourceExportSemantics{ .m_Role = "depth",
+					.m_Units = "device depth [0, 1]",
+					.m_Space = "display view",
 					.m_Description = "Projection depth; reversedDepth records the selected view convention.",
-					.m_ReversedDepth = context.m_ReversedDepth, .m_WatchTier = 1 };
+					.m_ReversedDepth = context.m_ReversedDepth,
+					.m_WatchTier = 1 };
 			}
 			if (name == "Temporal.MotionVectors")
 			{
-				return ResourceExportSemantics{ .m_Role = "motion-vectors", .m_Units = "UV displacement", .m_Space = "display view",
-					.m_Description = "Current UV minus previous UV; positive X points right and positive Y points down. Previous UV = current UV - motion.", .m_WatchTier = 1 };
+				return ResourceExportSemantics{ .m_Role = "motion-vectors",
+					.m_Units = "UV displacement",
+					.m_Space = "display view",
+					.m_Description = "Current UV minus previous UV; positive X points right and positive Y points down. Previous UV = current UV - motion.",
+					.m_WatchTier = 1 };
 			}
 			if (name == "GTAO.FinalAO" || name == "GTAO.TemporalAO" || name == "GTAO.RawAO" ||
 				name == "GTAO.DenoiseX" || name == "GTAO.DenoiseY")
 			{
-				return ResourceExportSemantics{ .m_Role = "ambient-occlusion", .m_Units = "dimensionless [0, 1]",
-					.m_Space = "display view", .m_Description = "Ambient visibility; one is unoccluded.", .m_WatchTier = 2 };
+				return ResourceExportSemantics{ .m_Role = "ambient-occlusion",
+					.m_Units = "dimensionless [0, 1]",
+					.m_Space = "display view",
+					.m_Description = "Ambient visibility; one is unoccluded.",
+					.m_WatchTier = 2 };
 			}
 			return std::nullopt;
 		}

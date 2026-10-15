@@ -20,6 +20,7 @@
 namespace gglab
 {
 	class FrameCaptureControlBase;
+	class NonFiniteWatchCoordinator;
 
 	struct FrameCaptureRequest
 	{
@@ -145,6 +146,7 @@ namespace gglab
 			// Writes on the calling thread instead of the writer thread, so a
 			// result is published by the Update that collected the capture.
 			bool m_WriteOnCallingThread = false;
+			NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -159,6 +161,7 @@ namespace gglab
 		// GGLabAppRuntime, only that owner drains this stream; hosts consume the
 		// runtime's published results after it has notified the sequence.
 		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
+		[[nodiscard]] bool HasWaitingResourceExports() const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
 		[[nodiscard]] std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return m_Capture ? m_Capture->GetLatestNonFiniteProductionFrame() : nullptr; }
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept;
@@ -271,6 +274,7 @@ namespace gglab
 			EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
 
 		FrameCaptureControlBase* m_Capture = nullptr;
+		NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
 		std::filesystem::path m_DefaultOutputDirectory;
 		FrameCaptureImageEncoder m_ImageEncoder;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };

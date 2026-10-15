@@ -20,6 +20,8 @@ Commands:
   export   Export one frame's resource group as NPY arrays and JSON metadata.
            -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
            the exact frame graph. See Docs/FrameCapture.md for the address format.
+  watch    Configure explicit non-finite report targets; -WatchOff disables it.
+           -WatchClaims selects boundary, production or both.
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
   result   Report a capture submitted with -NoWait.
@@ -51,7 +53,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 sto
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -98,6 +100,11 @@ param(
     [string]$TargetsFile,
     [switch]$IncludeGraph,
     [switch]$WatchNonFinite,
+    [switch]$WatchOff,
+    [ValidateSet('report', 'fail')]
+    [string]$WatchMode = 'report',
+    [ValidateSet('boundary', 'production')]
+    [string[]]$WatchClaims = @('boundary', 'production'),
 
     # result
     [long]$RequestId,
@@ -499,6 +506,17 @@ switch ($Command) {
             }
             Start-Sleep -Milliseconds 250
         }
+    }
+    'watch' {
+        Require-Session
+        $request = @{ command = 'watch'; enabled = (-not $WatchOff) }
+        if (-not $WatchOff) {
+            $request['mode'] = $WatchMode
+            $request['claims'] = @($WatchClaims)
+            if ($Targets -or $TargetsFile) { $request['targets'] = (Read-JsonArray $Targets $TargetsFile 'Targets') }
+        }
+        $response = Invoke-SessionRequest $Session $request 30
+        Complete-SessionResponse $response $Session
     }
     'sequence-cancel' {
         Require-Session

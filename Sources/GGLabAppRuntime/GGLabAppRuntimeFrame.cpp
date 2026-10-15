@@ -4,6 +4,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "GGLabRuntime/Core/Time.h"
@@ -663,6 +664,7 @@ namespace gglab
 		{
 			return FailRuntime("RenderGraph compilation failed.");
 		}
+		m_NonFiniteWatch->PrepareFrame(frame.m_FrameSerial, m_FrameCapture->HasWaitingResourceExports());
 		const auto& exportView = frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)];
 		if (!m_FrameCapture->PrepareResourceExports(frame.m_FrameSerial, renderGraph,
 			{ .m_PreExposure = exportView.m_ScenePreExposure,

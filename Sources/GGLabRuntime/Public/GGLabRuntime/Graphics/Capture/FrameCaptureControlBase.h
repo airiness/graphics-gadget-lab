@@ -43,6 +43,9 @@ namespace gglab
 		{
 			return 0;
 		}
+		// The application capture coordinator drains every completed production frame.
+		// Retained frames share the payload budget, including while awaiting this drain.
+		virtual void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>&) noexcept {}
 		[[nodiscard]] virtual bool HasNonFiniteInstrumentation() const noexcept { return false; }
 		[[nodiscard]] virtual std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return {}; }
 		// Sizes are known only after compilation. Start a scheduled export frame

@@ -165,12 +165,44 @@ namespace gglab
 				sequenceExport.m_Request->m_Sequence.m_Exports[0].m_Frame == 1 && sequenceExport.m_Request->m_Sequence.m_Exports[0].m_IncludeGraph,
 				"Sequence exports retain a complete target group at one selected frame");
 
+			const auto watch = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":70,"command":"watch","mode":"report","claims":["boundary"],"targets":[{"resource":"Motion","at":{"before":"TAA"},"occurrence":2,"slices":[2,1]}]})");
+			context.Check(watch.m_Request && watch.m_Request->m_Command == ApplicationControlCommand::Watch &&
+				!watch.m_Request->m_Watch.m_Production && watch.m_Request->m_Watch.m_Targets.size() == 1 &&
+				watch.m_Request->m_Watch.m_Targets[0].m_Address.m_Occurrence == 2u,
+				"Watch report requests preserve explicit boundary addresses and requested claims");
+			const auto bufferWatch = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":71,"command":"watch","targets":[{"resource":"Values","buffer":{"stride":16,"validElementCount":3,"fields":[{"offset":0,"type":"uint32"},{"offset":4,"type":"float32","count":2},{"offset":12,"type":"float16","count":2}]}}]})");
+			context.Check(bufferWatch.m_Request && bufferWatch.m_Request->m_Watch.m_Targets[0].m_BufferLayout.m_Components.size() == 4 &&
+				bufferWatch.m_Request->m_Watch.m_Targets[0].m_BufferLayout.m_ScalarCount == 12,
+				"Buffer watch interpretation owns only float fields within the supplied valid element count");
+			const auto watchOff = ParseApplicationControlRequest(R"({"protocol":2,"id":72,"command":"watch","enabled":false})");
+			context.Check(watchOff.m_Request && !watchOff.m_Request->m_Watch.m_Enabled,
+				"Watch can be disabled without specifying targets or a counter capability");
+			const auto productionWatch = ParseApplicationControlRequest(R"({"protocol":2,"id":73,"command":"watch","claims":["production"]})");
+			context.Check(productionWatch.m_Request && !productionWatch.m_Request->m_Watch.m_Boundary && productionWatch.m_Request->m_Watch.m_Production,
+				"Production-only watch does not fabricate boundary targets");
+
 			struct Rejected
 			{
 				std::string_view m_Line;
 				uint64_t m_Id;
 			};
 			const Rejected rejected[] = {
+				{ R"({"protocol":2,"id":80,"command":"watch","claims":[]})", 80 },
+				{ R"({"protocol":2,"id":81,"command":"watch","claims":["boundary","boundary"]})", 81 },
+				{ R"({"protocol":2,"id":82,"command":"watch","claims":["other"]})", 82 },
+				{ R"({"protocol":2,"id":83,"command":"watch","mode":"fatal"})", 83 },
+				{ R"({"protocol":2,"id":84,"command":"watch","enabled":1})", 84 },
+				{ R"({"protocol":2,"id":85,"command":"watch","enabled":false,"targets":[]})", 85 },
+				{ R"({"protocol":2,"id":86,"command":"watch","target":[]})", 86 },
+				{ R"({"protocol":2,"id":87,"command":"watch","targets":[null]})", 87 },
+				{ R"({"protocol":2,"id":88,"command":"watch","targets":[{"resource":"A","buffer":{}}]})", 88 },
+				{ R"({"protocol":2,"id":89,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":2,"fields":[{"offset":0,"type":"uint32"}]}}]})", 89 },
+				{ R"({"protocol":2,"id":90,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":-1,"fields":[{"offset":0,"type":"float32"}]}}]})", 90 },
+				{ R"({"protocol":2,"id":91,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":1,"fields":[{"offset":0,"type":"float32","count":4294967295}]}}]})", 91 },
+				{ R"({"protocol":2,"id":92,"command":"watch","targets":[{"resource":"A","buffer":{"stride":8,"validElementCount":1,"fields":[{"offset":0,"type":"float32","count":2},{"offset":4,"type":"float32"}]}}]})", 92 },
+				{ R"({"protocol":2,"id":93,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":1,"fields":[{"offset":0,"type":"float32","extra":1}]}}]})", 93 },
 				{ R"({"protocol":2,"id":62,"command":"export","targets":[]})", 62 },
 				{ R"({"protocol":2,"id":63,"command":"export","targets":[{"resource":"A","at":{"before":"P","after":"P"}}]})", 63 },
 				{ R"({"protocol":2,"id":64,"command":"export","targets":[{"resource":"A","occurrence":0}]})", 64 },
@@ -247,6 +279,23 @@ namespace gglab
 			context.Check(Contains(error, R"("protocol":2)") && Contains(error, R"("id":3)") &&
 				Contains(error, R"("ok":false)") && Contains(error, R"(bad \"input\")"),
 				"Errors are versioned JSON with an escaped reason");
+
+			NonFiniteWatchStatus watch{ .m_ConfigurationVersion = 4, .m_Enabled = true,
+				.m_BoundaryRequested = true, .m_ProductionRequested = false, .m_BoundaryFrameSerial = 123,
+				.m_Boundary = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteDetected } };
+			NonFiniteWatchTargetStatus target{ .m_Address = { .m_Resource = "Motion", .m_Mip = 1 },
+				.m_Record = { .m_CheckedCount = 8, .m_NanCount = 1 },
+				.m_Result = { .m_Claim = watch.m_Boundary, .m_FirstNonFiniteIndex = 0 },
+				.m_TextureLocation = NonFiniteTextureLocation{ 0, 0, 2, 0 } };
+			watch.m_Targets.push_back(target);
+			watch.m_FirstAnomaly = { .m_FrameSerial = 123, .m_Failure = NonFiniteWatchFailure::NonFiniteDetected, .m_Target = target };
+			const auto watchJson = SerializeApplicationControlWatch(4, watch, false);
+			context.Check(Contains(watchJson, R"("configurationVersion":4)") && Contains(watchJson, R"("boundaryFrameSerial":123)") &&
+				Contains(watchJson, R"("coverage":"latest-completed-frame")") && Contains(watchJson, R"("firstIndex":0)") &&
+				Contains(watchJson, R"("slice":2)") && Contains(watchJson, R"("reason":"NonFiniteDetected")"),
+				"Watch JSON carries configuration, separate frame identities and exact first anomaly location");
+			context.Check(Contains(SerializeApplicationControlStatus(5, { .m_Watch = &watch }), R"("report":{"boundary":"Failed")"),
+				"Session status includes the same watch report as configuration responses");
 
 			FrameCaptureFrameState frame{
 				.m_Backend = "vulkan",
