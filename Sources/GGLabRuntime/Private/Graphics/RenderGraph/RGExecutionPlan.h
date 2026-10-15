@@ -51,6 +51,8 @@ namespace gglab
 
 	struct RGCompiledPass
 	{
+		std::optional<RGBufferId> m_PassStorageBuffer;
+		uint32_t m_PassStorageBinding = 0;
 		RGPassNodeIndex m_Declaration = InvalidRGPassNodeIndex;
 		StringID m_NameId;
 		RGPassBase* m_Executor = nullptr;

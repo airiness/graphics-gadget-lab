@@ -12,7 +12,7 @@
 namespace gglab
 {
 	struct RGExecuteContext;
-	enum class RGObservationKind : uint8_t { ResourceExport, NonFiniteScan };
+	enum class RGObservationKind : uint8_t { ResourceExport, NonFiniteScan, ProductionCounters };
 	enum class RGObservationPosition : uint8_t { Before, After, Final };
 	enum class RGObservationFailure : uint8_t
 	{
@@ -68,6 +68,14 @@ namespace gglab
 	// A read-only compute observer. The graph owns its transient record and all
 	// clear -> scan -> copy dependencies. Callbacks borrow handles for this frame;
 	// the caller retains the imported readback/component buffers through its fence.
+	struct RGProductionCounters
+	{
+		RHIBufferHandle m_Readback;
+		uint32_t m_Bytes = 0;
+		uint32_t m_Binding = 0;
+		std::function<void(RGExecuteContext&, RGBufferId)> m_Clear;
+	};
+
 	struct RGObservationScan
 	{
 		RGObservationTarget m_Target;

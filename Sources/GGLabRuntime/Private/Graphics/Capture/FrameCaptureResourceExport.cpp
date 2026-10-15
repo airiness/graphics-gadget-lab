@@ -1,4 +1,5 @@
 #include "Graphics/Capture/FrameCaptureService.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
@@ -11,6 +12,7 @@
 #include <format>
 #include <limits>
 #include <numeric>
+#include <tuple>
 
 namespace gglab
 {
@@ -200,12 +202,20 @@ namespace gglab
 		return RGObservationFailure::None;
 	}
 
-	std::pair<uint64_t, uint32_t> FrameCaptureService::GetPayloadUsage() const noexcept
+	std::pair<uint64_t, uint32_t> FrameCaptureService::GetPayloadUsage(bool includeProduction) const noexcept
 	{
 		uint64_t bytes = 0;
 		uint32_t slots = 0;
 		for (const auto& tap : m_Taps)
 		{
+			if (tap.m_ProductionCounters)
+			{
+				if (includeProduction)
+				{
+					bytes += ProductionPayloadBytes; ++slots;
+				}
+				continue;
+			}
 			if (tap.m_Source == FrameCaptureSource::RenderGraph)
 			{
 				continue;
@@ -225,6 +235,13 @@ namespace gglab
 				}
 			}
 			else { bytes += tap.m_Footprint.m_SizeInBytes + tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height; ++slots; }
+		}
+		for (const auto& production : m_RetainedProduction)
+		{
+			if (includeProduction && !production.expired())
+			{
+				bytes += ProductionCpuBytes; ++slots;
+			}
 		}
 		for (const auto& image : m_RetainedImages)
 			if (!image.m_Image.expired()) { bytes += image.m_Bytes; ++slots; }
@@ -262,7 +279,9 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::Finalized;
 		}
-		if (GetRequestAvailability() != FrameCaptureAvailability::Available || GetPayloadUsage().second != 0)
+		// Continuous instrumentation never becomes idle. Only user payloads gate scheduling;
+		// the full shared budget is still reserved atomically against the compiled group.
+		if (GetRequestAvailability() != FrameCaptureAvailability::Available || GetPayloadUsage(false).second != 0)
 		{
 			return FrameCaptureAvailability::Busy;
 		}
@@ -308,14 +327,29 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::Finalized;
 		}
-		if (!HasPendingRequests(FrameCaptureSource::ResourceExport) && !HasPendingRequests(FrameCaptureSource::NonFiniteScan))
+		if (!HasPendingRequests(FrameCaptureSource::ResourceExport) && !HasPendingRequests(FrameCaptureSource::NonFiniteScan) && !m_ProductionEnabled)
 		{
 			return FrameCaptureAvailability::Available;
 		}
+		std::erase_if(m_RetainedProduction, [](const auto& entry) { return entry.expired(); });
 		std::erase_if(m_RetainedExports, [](const auto& entry) { return entry.m_Payload.expired(); });
 		std::erase_if(m_RetainedScans, [](const auto& entry) { return entry.m_Payload.expired(); });
 		std::vector<Tap> prepared;
 		auto [usedBytes, usedSlots] = GetPayloadUsage();
+		Tap production;
+		RGProductionCounters counters;
+		if (m_ProductionEnabled)
+		{
+			CollectCompleted();
+			std::tie(usedBytes, usedSlots) = GetPayloadUsage();
+			if (usedSlots == m_Limits.m_MaxPayloads || ProductionPayloadBytes > m_Limits.m_MaxPayloadBytes - usedBytes ||
+				!PrepareProductionCounters(frameSerial, production, counters))
+			{
+				DeferFrameCaptures(frameSerial);
+				return FrameCaptureAvailability::Busy;
+			}
+			usedBytes += ProductionPayloadBytes; ++usedSlots;
+		}
 		bool deferFrame = false;
 		// Exact sequence groups claim this frame before flexible concurrent exports.
 		std::stable_sort(m_Queued.begin(), m_Queued.end(), [](const auto& a, const auto& b)
@@ -408,6 +442,11 @@ namespace gglab
 					tap.m_ScanReadbacks.push_back(std::move(readback));
 				}
 				const auto slots = tap.m_ExportReadbacks.size() + tap.m_ScanReadbacks.size();
+				if (failure == RGObservationFailure::None && m_ProductionEnabled &&
+					(slots + pairedSlots + 2 > m_Limits.m_MaxPayloads || bytes + pairedBytes + ProductionPayloadBytes + ProductionCpuBytes > m_Limits.m_MaxPayloadBytes))
+				{
+					failure = RGObservationFailure::TooLarge;
+				}
 				if (failure == RGObservationFailure::None && request.m_DeferFrameOnBusy &&
 					(pairedSlots + slots > m_Limits.m_MaxPayloads || bytes > m_Limits.m_MaxPayloadBytes - pairedBytes))
 				{
@@ -466,7 +505,7 @@ namespace gglab
 			for (const auto& readback : tap.m_ExportReadbacks) copies.push_back(readback.m_Copy);
 			for (const auto& readback : tap.m_ScanReadbacks) scans.push_back(readback.m_Scan);
 		}
-		if (!graph.AttachObservations(copies, scans))
+		if (!graph.AttachObservations(copies, scans, m_ProductionEnabled ? &counters : nullptr))
 		{
 			for (auto& tap : prepared)
 			{
@@ -477,14 +516,18 @@ namespace gglab
 			}
 			return FrameCaptureAvailability::Available;
 		}
-		if (!copies.empty() || !scans.empty())
+		if (m_ProductionEnabled)
+		{
+			m_Taps.push_back(std::move(production));
+		}
+		if (!copies.empty() || !scans.empty() || m_ProductionEnabled)
 		{
 			for (auto& consumer : m_Taps)
 			{
 				if (consumer.m_FrameSerial == frameSerial)
 				{
 					consumer.m_ResourceExportActive = !copies.empty();
-					consumer.m_NonFiniteScanActive = !scans.empty();
+					consumer.m_NonFiniteScanActive = !scans.empty() || m_ProductionEnabled;
 				}
 			}
 		}
@@ -495,7 +538,7 @@ namespace gglab
 				continue;
 			}
 			tap.m_ResourceExportActive = !copies.empty();
-			tap.m_NonFiniteScanActive = !scans.empty();
+			tap.m_NonFiniteScanActive = !scans.empty() || m_ProductionEnabled;
 			for (auto& readback : tap.m_ExportReadbacks)
 				readback.m_Array.m_ObservedLastUse = graph.GetExecutionPlan()->GetResources()[
 					readback.m_Copy.m_Target.m_VirtualResource.Value()].m_LastUser.Value();

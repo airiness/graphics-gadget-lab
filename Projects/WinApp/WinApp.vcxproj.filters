@@ -934,6 +934,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteCounters.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -977,6 +980,9 @@
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\NonFiniteCounterFixture.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
@@ -1044,7 +1050,13 @@
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\NonFiniteCounters.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\NonFiniteScan.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteSiteIds.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\Sampling.hlsli">

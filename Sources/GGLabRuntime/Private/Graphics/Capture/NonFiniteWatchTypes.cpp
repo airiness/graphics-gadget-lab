@@ -1,10 +1,16 @@
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchTypes.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
+#include <array>
+#include <cstring>
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <initializer_list>
 #include <utility>
+#include <span>
+#include <vector>
+#include <string_view>
 
 namespace gglab
 {
@@ -260,5 +266,64 @@ namespace gglab
 			return { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::ClampPolicyExceeded };
 		}
 		return { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
+	}
+
+	NonFiniteProductionFrame DecodeNonFiniteProductionFrame(std::span<const std::byte> bytes, uint64_t frameSerial) noexcept
+	{
+		static_assert(nonfinite::HeaderBytes == sizeof(std::array<uint32_t, 8>));
+		static_assert(nonfinite::RecordBytes == sizeof(std::array<uint32_t, 8>));
+		NonFiniteProductionFrame frame;
+		frame.m_FrameSerial = frameSerial;
+		if (bytes.size() != nonfinite::BufferBytes)
+		{
+			return frame;
+		}
+		// memcpy permits callers to provide unaligned byte storage.
+		std::vector<uint32_t> words(bytes.size() / 4);
+		std::memcpy(words.data(), bytes.data(), bytes.size());
+		const auto* mapped = words.data();
+		const std::array expected{ nonfinite::CounterMagic, nonfinite::CounterAbiVersion, nonfinite::SiteCount, nonfinite::ProgramCount,
+			static_cast<uint32_t>(frameSerial), static_cast<uint32_t>(frameSerial >> 32), nonfinite::InventoryLow, nonfinite::InventoryHigh };
+		if (std::memcmp(mapped, expected.data(), nonfinite::HeaderBytes) == 0)
+		{
+			frame.m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
+			frame.m_Sites.reserve(nonfinite::SiteCount * nonfinite::ProgramCount);
+			const auto policy = [](std::string_view kind)
+			{
+				return NonFiniteClampPolicy{ kind == "error" ? NonFiniteClampPolicyKind::Error :
+					kind == "expected" ? NonFiniteClampPolicyKind::Expected : NonFiniteClampPolicyKind::Report };
+			};
+			for (uint32_t program = 0; program < nonfinite::ProgramCount; ++program)
+			{
+				for (uint32_t site = 0; site < nonfinite::SiteCount; ++site)
+				{
+					const auto* raw = mapped + 8 + (program * nonfinite::SiteCount + site) * 8;
+					NonFiniteProductionSite result{ .m_ProgramIndex = program, .m_SiteIndex = site,
+						.m_Counters = { .m_NonFiniteReplacements = raw[0], .m_NegativeClamps = raw[1], .m_Fp16MaximumClamps = raw[2] } };
+					if (raw[1] != 0)
+					{
+						result.m_Counters.m_MostNegative = -std::bit_cast<float>(raw[3]);
+					}
+					if (raw[2] != 0)
+					{
+						result.m_Counters.m_Maximum = std::bit_cast<float>(raw[4]);
+					}
+					result.m_Claim = EvaluateNonFiniteSite(true, result.m_Counters,
+						{ policy(nonfinite::Sites[site].m_NegativePolicy), policy(nonfinite::Sites[site].m_MaximumPolicy) });
+					// Wrapped counts, corrupt extrema and reserved words never establish coverage.
+					if (raw[5] != 0 || raw[6] != 0 || raw[7] != 0 || (raw[1] == 0 && raw[3] != 0) || (raw[2] == 0 && raw[4] != 0))
+					{
+						result.m_Claim = {};
+					}
+					if (result.m_Claim.m_Status == NonFiniteClaimStatus::Failed ||
+						(result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete && frame.m_Claim.m_Status != NonFiniteClaimStatus::Failed))
+					{
+						frame.m_Claim = result.m_Claim;
+					}
+					frame.m_Sites.push_back(std::move(result));
+				}
+			}
+		}
+		return frame;
 	}
 }

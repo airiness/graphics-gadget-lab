@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
+#include <string>
 #include <vector>
 
 namespace gglab
@@ -173,6 +175,27 @@ namespace gglab
 		std::optional<float> m_MostNegative;
 		std::optional<float> m_Maximum;
 	};
+	struct NonFiniteProductionSite
+	{
+		uint32_t m_ProgramIndex = 0;
+		uint32_t m_SiteIndex = 0;
+		NonFiniteSiteCounters m_Counters;
+		NonFiniteClaimResult m_Claim;
+	};
+	struct NonFiniteProductionFrame
+	{
+		uint64_t m_FrameSerial = 0;
+		uint32_t m_SubmissionFenceIndex = 0;
+		uint32_t m_SubmissionFenceGeneration = 0;
+		uint64_t m_SubmissionFenceValue = 0;
+		std::string m_AdapterCompatibilityIdentity;
+		std::string m_Failure;
+		NonFiniteClaimResult m_Claim;
+		std::vector<NonFiniteProductionSite> m_Sites;
+	};
+
+	[[nodiscard]] NonFiniteProductionFrame DecodeNonFiniteProductionFrame(std::span<const std::byte> bytes, uint64_t frameSerial) noexcept;
+
 	[[nodiscard]] NonFiniteClaimResult EvaluateNonFiniteSite(bool instrumentationAvailable,
 		const std::optional<NonFiniteSiteCounters>& counters, const NonFiniteSitePolicy& policy) noexcept;
 }

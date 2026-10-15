@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/MaterialSampling.hlsli>
@@ -30,7 +31,7 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 float3 SampleSource(float2 uv)
 {
 	return SanitizeHDRColor(
-		SampleTexture2DLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, uv, 0.0).rgb);
+		SampleTexture2DLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, uv, 0.0).rgb, NF_SITE_PASS_BLOOM_SAMPLE_SOURCE_SANITIZE_HDRCOLOR);
 }
 
 float3 Downsample(float2 uv)
@@ -90,5 +91,5 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 	{
 		color = Downsample(input.UV);
 	}
-	return float4(SanitizeHDRColor(color), 0.0);
+	return float4(SanitizeHDRColor(color, NF_SITE_PASS_BLOOM_PSMAIN_SANITIZE_HDRCOLOR), 0.0);
 }

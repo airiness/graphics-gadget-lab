@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/RenderServices.h"
 
 #include <cstdint>
+#include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>
@@ -36,6 +37,10 @@ namespace gglab
 			RHIPipelineHandle pipeline, std::vector<RenderPassInfo>& outUsages) const noexcept;
 
 	private:
+		RHIBindingLayoutHandle CounterLayout(RHIBindingLayoutHandle original) noexcept;
+		std::mutex m_CounterLayoutMutex;
+		std::unordered_map<RHIBindingLayoutHandle, RHIBindingLayoutHandle> m_CounterLayouts;
+		uint64_t m_CounterLayoutRevision = 0;
 		void RecordPipelineUsage(
 			RHIPipelineHandle pipeline, const RenderPassInfo& renderPassInfo) noexcept;
 

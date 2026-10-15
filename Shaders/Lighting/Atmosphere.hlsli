@@ -1,4 +1,5 @@
 #pragma once
+#include <Common/NonFiniteCounters.hlsli>
 // Original RGB atmosphere implementation. Lengths are km; coefficients are inverse km.
 // LUT decomposition follows Hillaire (2020); the multiple-scattering closure is isotropic.
 struct AtmosphereParameters
@@ -96,6 +97,6 @@ float3 AtmosphereSegmentIntegral(float3 extinction, float stepSize)
 }
 float4 AtmosphereValidated(float3 value)
 {
-	bool valid = all(isfinite(value)) && all(value >= 0.0);
+	bool valid = all(isfinite(NonFiniteObserveValue(NF_SITE_ATMOSPHERE_ATMOSPHERE_VALIDATED_ISFINITE, value))) && all(value >= 0.0);
 	return valid ? float4(value,1.0) : float4(1.0,0.0,1.0,0.0);
 }

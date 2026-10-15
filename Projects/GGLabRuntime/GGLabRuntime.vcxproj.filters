@@ -495,6 +495,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureNonFinite.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureProduction.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureResourceExport.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>

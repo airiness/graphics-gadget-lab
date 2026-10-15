@@ -147,6 +147,10 @@ namespace gglab
 			}
 			{
 				const auto defaults = parse({});
+				const auto instrumented = parse({ "--watch-nonfinite" });
+				const auto duplicateWatch = parse({ "--watch-nonfinite", "--watch-nonfinite" });
+				context.Check(instrumented.IsValid() && instrumented.m_Options.m_WatchNonFinite && !duplicateWatch.IsValid(),
+					"Production counter instrumentation is an explicit startup capability with strict duplicate validation");
 				const auto hidden = parse({ "--hidden", "--window-size", "3840x2160",
 					"--fixed-delta-time", "0.02" });
 				context.Check(defaults.IsValid() && !defaults.m_Options.m_Hidden &&

@@ -141,6 +141,7 @@ namespace gglab
 			.m_ActiveBackend = activeBackend,
 			.m_ArtifactRoot = std::move(createInfo.m_ShaderArtifactRoot),
 			.m_ActiveRegistry = createInfo.m_ActiveShaderRegistry,
+			.m_NonFiniteCounters = m_Config.m_NonFiniteCounters,
 			});
 		if (!m_ShaderManager->IsReady())
 		{

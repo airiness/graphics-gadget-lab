@@ -74,6 +74,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifact.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\NonFiniteCounterABI.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderLooseArtifactIO.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderProgramRegistry.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderProgramRegistryArtifact.h" />

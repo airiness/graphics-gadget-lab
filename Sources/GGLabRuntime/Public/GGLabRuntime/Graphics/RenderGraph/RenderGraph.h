@@ -138,6 +138,8 @@ namespace gglab
 			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
 
+		std::optional<RGBufferId> m_PassStorageBuffer;
+		uint32_t m_PassStorageBinding = 0;
 		StringID m_NameId;
 		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;
@@ -417,9 +419,9 @@ namespace gglab
 		[[nodiscard]] RGObservationTarget ResolveObservation(const RGResourceAddress& address,
 			RGObservationKind kind = RGObservationKind::ResourceExport) const noexcept;
 		[[nodiscard]] bool AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept;
-		// Resolve all T2/T3 targets first; attach them together to the original plan.
+		// Resolve all copy/scan targets first; attach them together to the original plan.
 		[[nodiscard]] bool AttachObservations(std::span<const RGObservationCopy> copies,
-			std::span<const RGObservationScan> scans) noexcept;
+			std::span<const RGObservationScan> scans, const RGProductionCounters* counters = nullptr) noexcept;
 		[[nodiscard]] bool HasResourceObservations() const noexcept;
 		[[nodiscard]] bool HasNonFiniteScans() const noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;

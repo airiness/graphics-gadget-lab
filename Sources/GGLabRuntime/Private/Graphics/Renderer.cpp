@@ -197,6 +197,19 @@ namespace gglab
 		m_FrameCapture = std::make_unique<FrameCaptureService>(m_RHIContext->GetDevice());
 		m_FrameCapture->ConfigureNonFiniteScans(*createInfo.m_ShaderManager, *m_PipelineCache,
 			m_RHIContext->GetPipelineSystem());
+		if (createInfo.m_ShaderManager->HasNonFiniteCounters())
+		{
+			if (!device->SupportsPixelStorageAtomics())
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("Non-finite instrumentation requires pixel storage atomics.");
+				return false;
+			}
+			if (!m_FrameCapture->EnableNonFiniteProduction())
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("Capture limits cannot hold production counter evidence.");
+				return false;
+			}
+		}
 		m_IsInitialized = true;
 		return true;
 	}

@@ -546,6 +546,8 @@ namespace gglab
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
+				.m_NonFiniteInstrumentation = m_AppRuntime && m_AppRuntime->GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation(),
+				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
 				}));
 			return;
 		case ApplicationControlCommand::Capture:

@@ -82,10 +82,20 @@ namespace gglab
 		}
 		// New observer resources still have real data dependencies, in addition to
 		// fixed-cut ordering. Never rebuild liveness or original WAR dependencies.
-		for (uint32_t i = static_cast<uint32_t>(original.m_Passes.size()); i < plan.m_Passes.size(); ++i)
+		for (uint32_t i = 0; i < plan.m_Passes.size(); ++i)
 		{
+			if (i < original.m_Passes.size() && !plan.m_Passes[i].m_PassStorageBuffer)
+			{
+				continue;
+			}
 			for (const auto& access : plan.m_Passes[i].m_Accesses)
 			{
+				// Existing accesses retain their original, subresource-aware dependency analysis.
+				if (i < original.m_Passes.size() && access.m_Resource != graph.m_ResourceSlots[
+					plan.m_Passes[i].m_PassStorageBuffer->GetHandle().Value()].m_VirtualResourceIndex)
+				{
+					continue;
+				}
 				if (access.m_DependencyAccess == RGDependencyAccess::Write)
 				{
 					continue;
@@ -212,6 +222,8 @@ namespace gglab
 			compiledPass.m_Executor = declaration.m_Pass;
 			compiledPass.m_EncoderType = declaration.m_EncoderType;
 			compiledPass.m_SideEffect = declaration.m_SideEffect;
+			compiledPass.m_PassStorageBuffer = declaration.m_PassStorageBuffer;
+			compiledPass.m_PassStorageBinding = declaration.m_PassStorageBinding;
 			compiledPass.m_Accesses.reserve(declaration.m_Accesses.size());
 			for (const auto& access : declaration.m_Accesses)
 			{

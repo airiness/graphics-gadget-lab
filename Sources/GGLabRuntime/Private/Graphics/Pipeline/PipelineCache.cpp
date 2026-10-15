@@ -3,6 +3,7 @@
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <algorithm>
 #include <mutex>
@@ -16,6 +17,43 @@ namespace gglab
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ShaderManager);
 		GGLAB_ASSERT_NOT_NULL(m_PipelineSystem);
+	}
+
+	RHIBindingLayoutHandle PipelineCache::CounterLayout(RHIBindingLayoutHandle original) noexcept
+	{
+		std::lock_guard lock(m_CounterLayoutMutex);
+		if (m_CounterLayoutRevision != m_PipelineSystem->GetRevision())
+		{
+			m_CounterLayouts.clear();
+			m_CounterLayoutRevision = m_PipelineSystem->GetRevision();
+		}
+		if (const auto found = m_CounterLayouts.find(original); found != m_CounterLayouts.end())
+		{
+			return found->second;
+		}
+		RHIBindingLayoutDesc desc;
+		if (!m_PipelineSystem->GetBindingLayoutDesc(original, desc) || desc.m_SlotCount == desc.MaxSlots)
+		{
+			return {};
+		}
+		for (uint32_t i = 0; i < desc.m_SlotCount; ++i)
+		{
+			const auto& slot = desc.m_Slots[i];
+			if (slot.m_Space == 0 && slot.m_Binding == nonfinite::CounterBinding &&
+				(slot.m_Type == RHIBindingType::ReadWriteStorageBuffer || slot.m_Type == RHIBindingType::StorageTexture))
+			{
+				return {}; // Never alias an existing shader register with observation storage.
+			}
+		}
+		desc.m_DebugName = "NonFiniteCounters.Instrumented";
+		desc.m_Slots[desc.m_SlotCount++] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer,
+			.m_Visibility = RHIShaderStage::Pixel | RHIShaderStage::Compute, .m_Binding = nonfinite::CounterBinding };
+		const auto result = m_PipelineSystem->CreateBindingLayout(desc);
+		if (result.IsValid())
+		{
+			m_CounterLayouts.emplace(original, result);
+		}
+		return result;
 	}
 
 	RHIPipelineHandle PipelineCache::Resolve(GraphicsPipelineSlot& slot,
@@ -49,6 +87,14 @@ namespace gglab
 
 		RHIGraphicsPipelineCreateInfo createInfo{};
 		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(physicalKey, shaderSnapshots[0].m_Bytecode.m_Format);
+		if (std::ranges::any_of(shaderIds, [&](ShaderID shader) { return m_ShaderManager->IsNonFiniteCounterShader(shader); }))
+		{
+			createInfo.m_Desc.m_BindingLayout = CounterLayout(createInfo.m_Desc.m_BindingLayout);
+			if (!createInfo.m_Desc.m_BindingLayout.IsValid())
+			{
+				return {};
+			}
+		}
 		createInfo.m_VertexShader = shaderSnapshots[0].m_Bytecode;
 		createInfo.m_PixelShader = shaderSnapshots[1].m_Bytecode;
 		createInfo.m_DomainShader = shaderSnapshots[2].m_Bytecode;
@@ -81,7 +127,11 @@ namespace gglab
 		}
 
 		RHIComputePipelineCreateInfo createInfo{};
-		createInfo.m_Desc.m_BindingLayout = recipe.m_BindingLayout;
+		createInfo.m_Desc.m_BindingLayout = m_ShaderManager->IsNonFiniteCounterShader(recipe.m_CSId) ? CounterLayout(recipe.m_BindingLayout) : recipe.m_BindingLayout;
+		if (!createInfo.m_Desc.m_BindingLayout.IsValid())
+		{
+			return {};
+		}
 		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid()
 			? RHIShaderHandle{ recipe.m_CSId.Value(), 1u }
 		: RHIShaderHandle{};

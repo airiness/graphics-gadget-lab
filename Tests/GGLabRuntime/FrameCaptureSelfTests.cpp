@@ -1220,7 +1220,7 @@ namespace gglab
 			const auto scanId = service.RequestNonFiniteScan({ { before, layout }, { final, layout } }, 19, 30, true);
 			const auto copyId = service.RequestResourceExport({ before, final }, 30, false, true);
 			context.Check(service.PrepareResourceExports(30, graph) == FrameCaptureAvailability::Available &&
-				graph.HasNonFiniteScans() && graph.HasResourceObservations(), "T2 copies and T3 scans attach together to the same original graph");
+				graph.HasNonFiniteScans() && graph.HasResourceObservations(), "Resource copies and boundary scans attach together to the same original graph");
 			service.BeginGraphRecording(30, graph);
 			RGSnapshot snapshot; BuildRenderGraphSnapshot(graph, snapshot);
 			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
@@ -1325,7 +1325,7 @@ namespace gglab
 				});
 			context.Check(imported.Compile() && imported.ResolveObservation({ .m_Resource = "Imported.Scan" }).m_Failure == RGObservationFailure::UnsupportedResource &&
 				imported.ResolveObservation({ .m_Resource = "Imported.Scan" }, RGObservationKind::NonFiniteScan).m_Failure == RGObservationFailure::None,
-				"Imported scan inputs require shader readability without weakening T2's CopySource contract");
+				"Imported scan inputs require shader readability without weakening resource export's CopySource contract");
 			const auto cancelled = service.RequestNonFiniteScan({ { { .m_Resource = "Imported.Scan" }, layout } }, 27, 40);
 			GGLAB_UNUSED(service.PrepareResourceExports(40, imported)); service.OnFrameAborted(40); failed = Consume(service);
 			context.Check(failed.size() == 1 && failed[0].m_RequestId == cancelled && failed[0].m_Status == FrameCaptureStatus::Failed &&

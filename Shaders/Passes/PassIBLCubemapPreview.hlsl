@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/Cubemap.hlsli>
@@ -112,6 +113,6 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	float3 hdr = SampleTextureCubeLevel(binding, dir, float(g_Pass.SampleMip)).rgb *
 		g_Scene.IBLResource.EnvironmentIntensity;
-	float3 color = LinearToSRGB(ACESFitted(hdr));
+	float3 color = LinearToSRGB(ACESFitted(hdr, NF_SITE_PASS_IBLCUBEMAP_PREVIEW_PSMAIN_ACESFITTED));
 	return float4(color, 1.0);
 }

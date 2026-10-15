@@ -41,6 +41,7 @@ namespace gglab
 		std::filesystem::path m_StateRoot;
 		bool m_StartWithRelativeMouse = false;
 		bool m_DisableDevelopmentTools = false;
+		bool m_WatchNonFinite = false;
 
 		// RHI backend selection. Defaults to DX12; an explicit --rhi vulkan
 		// never falls back to DX12.

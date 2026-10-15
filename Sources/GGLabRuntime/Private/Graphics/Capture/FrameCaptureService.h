@@ -6,6 +6,8 @@
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
+
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -51,8 +53,19 @@ namespace gglab
 			uint64_t frameSerial = 0, bool deferFrameOnBusy = false, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
 		[[nodiscard]] uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets,
 			uint64_t configurationVersion, uint64_t frameSerial = 0, bool includeGraph = false, uint64_t groupId = 0) noexcept override;
-		// Borrows stable renderer services; no programs or pipelines are demanded
-		// until an explicit scan is admitted. Services outlive this capture service.
+		bool EnableNonFiniteProduction() noexcept
+		{
+			if (m_Limits.m_MaxPayloads < 2 || ProductionPayloadBytes + ProductionCpuBytes > m_Limits.m_MaxPayloadBytes)
+			{
+				return false;
+			}
+			m_ProductionEnabled = true;
+			return true;
+		}
+		bool HasNonFiniteInstrumentation() const noexcept override { return m_ProductionEnabled; }
+		std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept override { return m_LatestProduction; }
+		// Borrows stable renderer services; programs and pipelines are demanded only
+		// when a scan or production frame is admitted. Services outlive this service.
 		void ConfigureNonFiniteScans(RenderShaderProgramAccess& shaders,
 			RenderPipelineResolver& resolver, RHIPipelineSystem& pipelines) noexcept;
 		[[nodiscard]] FrameCaptureAvailability PrepareResourceExports(uint64_t frameSerial,
@@ -140,6 +153,7 @@ namespace gglab
 			std::string m_AdapterCompatibilityIdentity;
 			RHITextureCopyFootprint m_Footprint{};
 			RHIFencePoint m_Fence{};
+			bool m_ProductionCounters = false;
 			bool m_Submitted = false;
 			bool m_GraphExportActive = false;
 			bool m_ResourceExportActive = false;
@@ -168,7 +182,17 @@ namespace gglab
 		[[nodiscard]] bool AllocateScanReadback(ScanReadback& readback) noexcept;
 		[[nodiscard]] RHIPipelineHandle ResolveScanPipeline(uint32_t variant) noexcept;
 		void PublishScanTap(Tap& tap) noexcept;
-		[[nodiscard]] std::pair<uint64_t, uint32_t> GetPayloadUsage() const noexcept;
+		bool PrepareProductionCounters(uint64_t frameSerial, Tap& tap, RGProductionCounters& counters) noexcept;
+		void PublishProductionTap(Tap& tap) noexcept;
+		static constexpr uint64_t ProductionCpuBytes = nonfinite::SiteCount * nonfinite::ProgramCount * sizeof(NonFiniteProductionSite);
+		static constexpr uint64_t ProductionPayloadBytes = nonfinite::BufferBytes * 3 + ProductionCpuBytes;
+		std::vector<std::weak_ptr<const NonFiniteProductionFrame>> m_RetainedProduction;
+		bool m_ProductionEnabled = false;
+		ComputePipelineRecipe m_ProductionClearRecipe;
+		ComputePipelineSlot m_ProductionClearSlot;
+		RHIBindingLayoutHandle m_ProductionClearLayout;
+		std::shared_ptr<const NonFiniteProductionFrame> m_LatestProduction;
+		[[nodiscard]] std::pair<uint64_t, uint32_t> GetPayloadUsage(bool includeProduction = true) const noexcept;
 		void DeferFrameCaptures(uint64_t frameSerial) noexcept override;
 
 		[[nodiscard]] bool IsBoundBy(const QueuedRequest& request, FrameCaptureSource source,

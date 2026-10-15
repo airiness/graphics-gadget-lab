@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/FrameCaptureReadiness.h"
@@ -158,6 +159,8 @@ namespace gglab
 		// GGLabAppRuntime, only that owner drains this stream; hosts consume the
 		// runtime's published results after it has notified the sequence.
 		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
+		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
+		[[nodiscard]] std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return m_Capture ? m_Capture->GetLatestNonFiniteProductionFrame() : nullptr; }
 		[[nodiscard]] uint32_t GetUnfinishedRequestCount() const noexcept;
 		// Checks Runtime payload capacity and the write slots reserved by issued
 		// captures, using the last frame's display target. Busy sequences defer before

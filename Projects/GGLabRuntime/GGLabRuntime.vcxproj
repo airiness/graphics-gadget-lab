@@ -226,6 +226,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureResourceExport.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureNonFinite.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureProduction.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\NonFiniteWatchTypes.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureTypes.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp" />

@@ -66,6 +66,8 @@ namespace gglab
 		const FrameCaptureFrameState* m_Frame = nullptr;
 		// The active or most recent sequence; absent before the first one.
 		const FrameSequenceStatus* m_Sequence = nullptr;
+		bool m_NonFiniteInstrumentation = false;
+		std::shared_ptr<const NonFiniteProductionFrame> m_NonFiniteProduction;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

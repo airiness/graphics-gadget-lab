@@ -316,7 +316,7 @@ namespace gglab
 	bool RenderGraph::HasNonFiniteScans() const noexcept
 	{
 		return std::ranges::any_of(m_ObservationPasses, [](const auto& entry)
-			{ return entry.second.m_Kind == RGObservationKind::NonFiniteScan; });
+			{ return entry.second.m_Kind != RGObservationKind::ResourceExport; });
 	}
 
 	bool RenderGraph::AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept
@@ -325,14 +325,14 @@ namespace gglab
 	}
 
 	bool RenderGraph::AttachObservations(std::span<const RGObservationCopy> copies,
-		std::span<const RGObservationScan> scans) noexcept
+		std::span<const RGObservationScan> scans, const RGProductionCounters* counters) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_ExecutionPlan && m_ObservationPasses.empty(), "Observations extend one original compiled graph exactly once.");
 		if (!m_ExecutionPlan || !m_ObservationPasses.empty())
 		{
 			return false;
 		}
-		if (copies.empty() && scans.empty())
+		if (copies.empty() && scans.empty() && !counters)
 		{
 			return true;
 		}
@@ -394,6 +394,57 @@ namespace gglab
 				return false;
 			}
 			scan.m_Target = target;
+		}
+		if (counters)
+		{
+			if (!counters->m_Clear || !m_Device->IsAlive(counters->m_Readback) || counters->m_Bytes == 0)
+			{
+				return false;
+			}
+			struct Data { RGBufferId m_Record; RGBufferId m_Readback; RGProductionCounters m_Config; };
+			RGBufferId record;
+			const uint32_t clearIndex = static_cast<uint32_t>(m_PassNodes.size());
+			AddPass<Data>("Observation.ProductionCounters.Clear", RGPassEncoderType::Compute,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Config = *counters;
+					record = builder.CreateBuffer("Observation.ProductionCounters.Record", { .m_SizeInBytes = counters->m_Bytes, .m_StrideInBytes = 4 });
+					data.m_Record = builder.Write(record, RGBufferAccess::StorageWrite);
+					record = data.m_Record;
+				}, [](RGExecuteContext& context, Data& data) { data.m_Config.m_Clear(context, data.m_Record); });
+			const auto originalOrder = m_ExecutionPlan->GetExecutionOrder();
+			for (const auto pass : originalOrder)
+			{
+				if (m_PassNodes[pass.Value()].m_EncoderType == RGPassEncoderType::Copy)
+				{
+					continue;
+				}
+				RGBuilder builder(*this, pass);
+				record = builder.ReadWrite(record, RGBufferAccess::StorageReadWrite);
+				m_PassNodes[pass.Value()].m_PassStorageBuffer = record;
+				m_PassNodes[pass.Value()].m_PassStorageBinding = counters->m_Binding;
+			}
+			const uint32_t copyIndex = static_cast<uint32_t>(m_PassNodes.size());
+			AddPass<Data>("Observation.ProductionCounters.Readback", RGPassEncoderType::Copy,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Config = *counters;
+					data.m_Record = builder.Read(record, RGBufferAccess::CopySource);
+					data.m_Readback = builder.ImportBuffer("Observation.ProductionCounters.Readback", counters->m_Readback,
+						{ .m_SizeInBytes = counters->m_Bytes, .m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu },
+						RGBufferAccess::CopyDest, RGContentValidity::Undefined);
+					builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest);
+				}, [](RGExecuteContext& context, Data& data)
+				{
+					context.GetCopyCommandContext()->CopyBuffer(context.GetBufferHandle(data.m_Readback), 0,
+						context.GetBufferHandle(data.m_Record), 0, data.m_Config.m_Bytes);
+				});
+			RGObservationTarget target{ .m_Address = { .m_Resource = "Observation.ProductionCounters.Record" },
+				.m_Kind = RGObservationKind::ProductionCounters, .m_Type = RGResourceType::RGBuffer,
+				.m_Resource = record, .m_Node = m_ResourceSlots[record.GetHandle().Value()].m_ResourceNodeIndex };
+			m_ObservationPasses.emplace_back(clearIndex, target);
+			target.m_InsertionPosition = static_cast<uint32_t>(originalOrder.size());
+			m_ObservationPasses.emplace_back(copyIndex, target);
 		}
 		for (const auto& copy : resolved)
 		{

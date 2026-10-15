@@ -278,6 +278,11 @@ namespace gglab
 				Contains(noFrame, R"("sequence":null)"),
 				"Status before the first frame reports no frame state and no sequence");
 
+			const auto availableWatch = SerializeApplicationControlStatus(6, { .m_NonFiniteInstrumentation = true });
+			context.Check(Contains(noFrame, R"("instrumentation":"unavailable")") && Contains(noFrame, R"("production":"Unavailable")") &&
+				Contains(availableWatch, R"("instrumentation":"available")") && Contains(availableWatch, R"("production":"Incomplete")"),
+				"Production capability availability never implies completed frame coverage");
+
 			const FrameSequenceStatus sequenceStatus{
 				.m_SequenceId = 3,
 				.m_State = FrameSequenceState::Failed,

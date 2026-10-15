@@ -139,6 +139,8 @@ namespace gglab::shader_programs
 		"gglab.shader.coordinate-conformance", "pixel.marker", ShaderStage::Pixel };
 	inline const ShaderProgramRef CoordinateConformancePixel{
 		"gglab.shader.coordinate-conformance", "pixel.conformance", ShaderStage::Pixel };
+	inline const ShaderProgramRef NonFiniteCountersClearCompute{
+		"gglab.shader.nonfinite-counters", "compute.clear", ShaderStage::Compute };
 	inline const ShaderProgramRef NonFiniteScanClearCompute{
 		"gglab.shader.nonfinite-scan", "compute.clear", ShaderStage::Compute };
 	inline const ShaderProgramRef NonFiniteScanTextureCompute{

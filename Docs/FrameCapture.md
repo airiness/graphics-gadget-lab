@@ -168,8 +168,8 @@ or `<label>.<frameSerial>.graph-summary.json`, with a free suffix on collision.
 Without a label the subject is the Lab or Demo id. Publication and shutdown
 follow the capture writer's `.partial` and publication-claim rules.
 
-The published schema is [`gglab.render-graph` v1/v2/v3](Schemas/RenderGraph.schema.json)
-(v1 without GPU observers, v2 with copies, v3 with non-finite scans):
+The published schema is [`gglab.render-graph` v1/v2/v3/v4](Schemas/RenderGraph.schema.json)
+(v1 without GPU observers, v2 with copies, v3 with boundary scans, v4 with production counters):
 
 - `compile` is sampled before execution. Full mode contains declaration-order
   passes, name occurrences (1-based), culling, execution order, encoder,
@@ -178,7 +178,7 @@ The published schema is [`gglab.render-graph` v1/v2/v3](Schemas/RenderGraph.sche
   resource nodes, dependency edges and compile diagnostics. `duplicatePassNames`
   reports repeated names, including culled declarations. `occurrence` counts equal
   names in declaration order, including culled passes, not in summary execution
-  order. Culling therefore cannot renumber a pass; T2/T3 addressing uses the same
+  order. Culling therefore cannot renumber a pass; resource addressing uses the same
   definition. Full accesses include `writtenResourceNodeIndex`/`writtenVersion`
   (null for read-only accesses). ReadWrite reads the incoming version and writes
   the new version whose writer is that pass.
@@ -196,9 +196,9 @@ The published schema is [`gglab.render-graph` v1/v2/v3](Schemas/RenderGraph.sche
 - Summary mode lists only executed passes, sorted by execution order, with `reads`
   and `writes`. Each entry includes its version, resource-node index, declared
   subresource range and an `address` object (`resource`, `at.before`/`at.after`,
-  `occurrence`) for discovery. T2 resource exports use those addresses;
+  `occurrence`) for discovery. Resource exports use those addresses;
   the Runtime non-finite scan API uses the same addressing. Session `watch`
-  configuration and production instrumentation remain planned.
+  configuration remains planned; startup production instrumentation is described below.
 - `frame` reuses capture metadata for content, camera, simulation time, render
   settings and readiness; `frame.frame.serial` equals the top-level `frameSerial`.
   It adds the Runtime adapter/driver compatibility identity. Build identity and
@@ -336,20 +336,64 @@ Schemas live in `Docs/Schemas/ResourceExport.schema.json` and
 `Docs/Schemas/RenderGraph.schema.json`. Both validators have `--self-test` gates
 in CI; GPU value/observation checks still require local hardware runs.
 
-## Non-finite boundary scans (Runtime foundation)
+## Non-finite boundary scans and production counters
 
-T3 is **not yet an end-to-end watch tool**. There is no session `watch` command,
-`-WatchNonFinite` startup capability, production counter variant, tiered default
-list or fail-mode/sequence coverage gate. Ordinary frames demand no scan programs
-and dispatch no scans. A clean scan never proves that a sanitizing write or
-recovery branch did not hide NaN/Inf.
+The Runtime provides explicit boundary scans and opt-in production counters.
+Session `watch` configuration, default watch tiers and fail-mode/sequence coverage
+remain pending. Boundary scans alone cannot prove that sanitization or recovery
+hid no non-finite input.
+
+Start a counter-capable process with `--watch-nonfinite`, or use the session script:
+
+```powershell
+& $session start -Session numeric-check -Rhi dx12 -Lab gglab.lab.gtao -WatchNonFinite
+& $session status -Session numeric-check
+& $session stop -Session numeric-check
+```
+
+This startup choice selects Shader-owned counter variants before preloading and
+pipeline creation. It does not enable default boundary scans or fail mode. Without
+the switch, no counter variant is loaded and no production clear/readback nodes are
+added. Vulkan enables pixel storage atomics only when supported; an instrumented
+render host rejects devices without that capability.
+
+`status.watch` reports `instrumentation: available | unavailable` and the latest
+completed production frame (`Incomplete` until evidence arrives). `sites` lists
+nonzero counters or invalid evidence, with program/site identities, replacement
+and clamp counts and finite extrema. `submission` records fence/adapter identity.
+This is a latest-frame diagnostic, not a sequence acceptance result; it does not
+retain a first failing frame or complete a coverage range.
+
+Production counter details:
+
+- The site inventory routes sanitization call-site IDs through the color helpers
+  to their actual scalar clamp. Recovery guards observe original operands without
+  changing their value. Geometric validity-only sites remain report-only.
+- Counter variants use a reserved `u31, space0` buffer in physical pipeline layouts.
+  Their durable variant identity includes the reviewed inventory's SHA-256. A
+  generated shared table keeps CPU/HLSL indices synchronized; a frame-tagged header
+  rejects stale, mismatched or partial records. Wrapped counters are `Incomplete`.
+- After the original graph's liveness is fixed, one clear and one readback bracket
+  the live passes. Each original shader pass declares its counter read/write;
+  ordinary dependency, lifetime and barrier planning owns synchronization.
+  Instrumentation never revives a culled producer or writes a rendered resource.
+- Counter readbacks and retained immutable CPU results share capture's payload
+  slots and byte budget. Completion polls the submission fence; normal operation
+  introduces no CPU wait. Counter helpers issue atomics only for anomalous values.
+- Non-finite recovery/replacement always fails. Finite clamps use the reviewed
+  site's `report`, `expected` or `error` policy. Budget evaluation exists in Runtime,
+  but budgeted inventory entries still require explicit reviewed limits.
+
+Graph frames containing production counters use schema v4 and mark clear/readback
+observers as `ProductionCounters`; original pass accesses expose their counter
+buffer dependency. Other graph schema versions retain their meaning.
 
 Implemented Runtime integration:
 
 - `FrameCaptureControlBase::RequestNonFiniteScan` accepts explicit resource
   addresses, an owner-assigned configuration version, optional exact frame
-  serial and optional paired graph. `PrepareResourceExports` prepares T2 copies
-  and T3 scans together, once, after ordinary graph compilation. Resolution
+  serial and optional paired graph. `PrepareResourceExports` prepares resource-export copies
+  and boundary scans together, once, after ordinary graph compilation. Resolution
   preserves the original pass occurrences, culling and version cuts; the ordinary
   `Read`/`Export` assertions remain unchanged.
 - Each target gets graph-owned clear, scan and readback passes. The general
@@ -363,11 +407,11 @@ Implemented Runtime integration:
   revalidates it against this frame's descriptor; integers, padding and inactive
   capacity are excluded. Allocated capacity is never a substitute for valid count.
   Imported buffers need shader-readable `Structured` usage; imported textures
-  need `Sampled` usage. T2 independently still requires `CopySource`.
+  need `Sampled` usage. Resource export independently still requires `CopySource`.
 - Scan programs resolve lazily through the Shader program catalog and Runtime
   pipeline resolver. Unavailable programs fail the request before graph mutation;
   no host-side compiler is added to Runtime.
-- Scans share capture's request, payload-slot and byte budgets with PNG/T2.
+- Scans share capture's request, payload-slot and byte budgets with PNG/resource exports.
   Reservations include GPU record/readback, peak CPU record copies, component
   upload and owned CPU component tables. Readbacks and uploads survive submission
   until the common frame fence completes. Final CPU record/table consumers keep
@@ -387,11 +431,12 @@ The Shader-domain foundation also includes the 32-byte CPU/GPU ABI, IEEE-bit
 classification, wave reductions, finite extrema and clamp-policy evaluation.
 `Shaders/Metadata/NonFiniteSites.json` inventories 75 sanitization/recovery/validity
 sites. Its checker is a conservative lexical review gate, not data-flow proof;
-replacing sites remain `pending-counter`, never completed production evidence.
+counter and forwarded-counter routing are source evidence, not GPU verification.
 
 Developer checks (after building the named test projects):
 
 ```powershell
+python Scripts/GenerateNonFiniteSites.py --check
 python Scripts/ValidateNonFiniteSites.py --self-test
 python Scripts/ValidateNonFiniteSites.py
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite nonfinite-watch
@@ -403,11 +448,20 @@ Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-
 The hidden-window hardware suite covers buffer clear/scan plus the real capture
 service and RenderGraph path. RGBA32F/RG16F cube-compatible textures exercise
 nonzero mip and face ranges, NaN/positive and negative infinity, finite extrema
-and first index. T2 exports of every fixture resource are byte-identical with
+and first index. Resource exports of every fixture resource are byte-identical with
 scans off/on. This establishes fixture observation equivalence, not whole-Lab
-visual equivalence, production instrumentation or overhead. Debug/Release each
-passed 34 GPU checks per backend on the RTX 5080; Runtime frame-capture passed
-199 checks and scan/policy foundations passed 37.
+visual equivalence or overhead. The hardware suite also renders a sanitizing
+pixel shader and a recovery compute shader with counters off/on, compares their
+exported image and values bit-for-bit, and checks exact per-site replacement/clamp
+counts after the common frame fence. Whole-Lab acceptance and measured overhead
+remain separate checks.
+
+Local verification on 2026-10-15 passed 54 GPU checks per backend in both Debug
+and Release, including bindless layout slots before the counter binding. Runtime
+frame-capture passed 199 checks and scan/policy foundations passed 45. The GTAO
+Lab also completed hidden Release captures and schema-valid graph exports on
+both backends, with production status `Passed`. These smoke runs do not establish
+acceptance across every Lab or a complete watch coverage range.
 
 ## Capture settings
 

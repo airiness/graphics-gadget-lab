@@ -356,7 +356,7 @@ namespace gglab
 			}
 		for (auto& resources : m_Taps)
 			if (resources.m_FrameSerial == frameSerial && (resources.m_Source == FrameCaptureSource::ResourceExport || resources.m_Source == FrameCaptureSource::NonFiniteScan) &&
-				resources.m_Requests[0].m_IncludeGraph)
+				!resources.m_Requests.empty() && resources.m_Requests[0].m_IncludeGraph)
 			{
 				resources.m_Graph = tap.m_Graph;
 			}
@@ -520,6 +520,13 @@ namespace gglab
 	void FrameCaptureService::FailTap(
 		Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept
 	{
+		if (tap.m_ProductionCounters)
+		{
+			auto frame = std::make_shared<NonFiniteProductionFrame>();
+			frame->m_FrameSerial = frameSerial;
+			frame->m_Failure = failure;
+			m_LatestProduction = std::move(frame);
+		}
 		for (const QueuedRequest& request : tap.m_Requests)
 		{
 			PublishFailure(request.m_Id, tap.m_Source, frameSerial, std::string(failure),
@@ -532,6 +539,11 @@ namespace gglab
 
 	void FrameCaptureService::PublishTap(Tap& tap) noexcept
 	{
+		if (tap.m_ProductionCounters)
+		{
+			PublishProductionTap(tap);
+			return;
+		}
 		if (tap.m_Source == FrameCaptureSource::NonFiniteScan)
 		{
 			PublishScanTap(tap);

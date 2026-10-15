@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <algorithm>
 #include <array>
@@ -11,6 +12,9 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
+#include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -98,9 +102,32 @@ namespace gglab
 			"Field size arithmetic cannot overflow into an accepted layout");
 		context.Check(BuildNonFiniteBufferScanLayout(ForwardPlusTileHeaderLayout, 80, 10).m_Failure == NonFiniteScanLayoutFailure::NoFloatFields &&
 			BuildNonFiniteBufferScanLayout(ForwardPlusTileDepthRangeLayout, 80, 10).m_ScalarCount == 20,
-			"Actual T2 Forward+ layouts exclude integer headers and include float depth ranges");
+			"Registered Forward+ layouts exclude integer headers and include float depth ranges");
 		context.Check(BuildNonFiniteBufferScanLayout(ForwardPlusTileDepthRangeLayout, uint64_t{ 1 } << 34, uint64_t{ 1 } << 31).m_Failure == NonFiniteScanLayoutFailure::TooLarge,
 			"Oversized buffer scans fail before scalar counters or byte addresses wrap");
+
+		std::vector<uint32_t> raw(nonfinite::BufferBytes / 4);
+		const std::array header{ nonfinite::CounterMagic, nonfinite::CounterAbiVersion, nonfinite::SiteCount, nonfinite::ProgramCount, 91u, 0u, nonfinite::InventoryLow, nonfinite::InventoryHigh };
+		std::ranges::copy(header, raw.begin());
+		const auto decode = [&] { return DecodeNonFiniteProductionFrame(std::as_bytes(std::span(raw)), 91); };
+		context.Check(decode().m_Claim.m_Status == NonFiniteClaimStatus::Passed, "A complete frame-tagged cleared counter record establishes zero replacements");
+		context.Check(DecodeNonFiniteProductionFrame(std::as_bytes(std::span(raw)), 92).m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+			"A stale counter header cannot establish a later frame's production coverage");
+		context.Check(DecodeNonFiniteProductionFrame(std::as_bytes(std::span(raw)).first(32), 91).m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+			"Partial production readbacks never pass");
+		const size_t expectedSite = static_cast<size_t>(std::ranges::find(nonfinite::Sites, std::string_view("pass-temporal-aa.csmain.sanitize-hdrcolor"), &nonfinite::Site::m_Id) - nonfinite::Sites.begin());
+		const size_t offset = 8 + expectedSite * 8;
+		raw[offset + 1] = 1; raw[offset + 3] = std::bit_cast<uint32_t>(0.25f);
+		context.Check(decode().m_Claim.m_Status == NonFiniteClaimStatus::Passed, "The inventoried TAA expected-negative policy accepts an actual decoded clamp");
+		raw[offset + 2] = 1; raw[offset + 4] = std::bit_cast<uint32_t>(70000.0f);
+		context.Check(decode().m_Claim.m_Failure == NonFiniteWatchFailure::ClampPolicyExceeded, "The inventoried TAA FP16 overflow policy rejects decoded overflow clamps");
+		raw[offset] = 1;
+		context.Check(decode().m_Claim.m_Failure == NonFiniteWatchFailure::NonFiniteReplaced, "A decoded replacement always fails even at an expected-clamp site");
+		raw[offset + 5] = 1;
+		context.Check(decode().m_Claim.m_Status == NonFiniteClaimStatus::Incomplete, "Counter wrap is incomplete evidence, never a clean frame");
+		context.Check(nonfinite::CounterVariant(shader_programs::TemporalAAReprojectionCompute).m_VariantId.ends_with(nonfinite::VariantSuffix) &&
+			nonfinite::CounterVariant(shader_programs::NonFiniteScanBufferCompute) == shader_programs::NonFiniteScanBufferCompute,
+			"Shader-owned counter identities select production variants without instrumenting the observers");
 
 		NonFiniteSiteCounters counters;
 		NonFiniteSitePolicy policy;

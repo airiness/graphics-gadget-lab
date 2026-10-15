@@ -33,7 +33,7 @@ TOKEN = re.compile(r"[A-Za-z_][A-Za-z_0-9]*|[0-9]+|[^\s]")
 POLICIES = {"report", "error", "expected", "budgeted"}
 
 
-def discover_sites(source):
+def discover_sites(source, evidence=None):
     """Return (function, operation) -> (count, normalized-body SHA-256)."""
     tokens = TOKEN.findall(TRIVIA.sub(" ", source.replace("\\\n", "")))
     pairs = {}
@@ -84,12 +84,34 @@ def discover_sites(source):
             name, begin, end = "global", -1, len(tokens)
         body = " ".join(tokens[begin + 1:end]).encode("utf-8")
         key = (name, token)
+        if evidence is not None:
+            arguments = tokens[i + 2:pairs[i + 1]] if i + 1 < len(tokens) and tokens[i + 1] == "(" else []
+            evidence.setdefault(key, []).append((arguments, tokens[begin + 1:end]))
         digest = hashlib.sha256(body).hexdigest()
         grouped.setdefault(key, []).append(digest)
     # Overloads and preprocessor alternatives share a semantic site. Include every
     # call's owner body, in source order, rather than silently taking one variant.
     return {key: (len(bodies), hashlib.sha256(" ".join(bodies).encode("ascii")).hexdigest())
             for key, bodies in grouped.items()}
+
+
+
+def counter_route_is_explicit(site, calls):
+    from GenerateNonFiniteSites import symbol
+    forwarding = SANITIZERS - {"ResolveDisplayColor"}
+    if not calls:
+        return False
+    for arguments, body in calls:
+        if site["function"] in {"SanitizeHDRChannel", "SanitizeSceneRadianceChannel"}:
+            if "NonFiniteRecordChannel" not in body or "nonFiniteSite" not in body:
+                return False
+        elif site["operation"] in SANITIZERS:
+            expected = {"nonFiniteSite", "NF_HDR_FORWARD"} if site["function"] in forwarding else {symbol(site)}
+            if not expected.intersection(arguments):
+                return False
+        elif arguments[:3] != ["NonFiniteObserveValue", "(", symbol(site)]:
+            return False
+    return True
 
 
 def discover_tree(root):
@@ -132,7 +154,7 @@ def discover_programs(root):
     return {source: sorted(values) for source, values in programs.items()}
 
 
-def validate(document, actual, programs=None):
+def validate(document, actual, programs=None, instrumented=None):
     if set(document) != {"schema", "schemaVersion", "sites"} or document["schema"] != "gglab.shader-nonfinite-sites" or type(document["schemaVersion"]) is not int or document["schemaVersion"] != 1:
         raise ValueError("Invalid site inventory envelope")
     if not isinstance(document["sites"], list):
@@ -161,10 +183,11 @@ def validate(document, actual, programs=None):
             raise ValueError(f"Shader program consumer inventory changed: {key}")
         if site["kind"] not in {"sanitization", "recovery", "validity"} or (site["operation"] in SANITIZERS and site["kind"] != "sanitization"):
             raise ValueError(f"Invalid site kind: {key}")
-        # No production counters have shipped yet. Never describe this source
-        # inventory as instrumented coverage. Extend with real evidence in that slice.
-        if site["evidence"] != ("report-only" if site["kind"] == "validity" else "pending-counter"):
-            raise ValueError(f"Unsupported production evidence claim: {key}")
+        if site["kind"] == "validity":
+            if site["evidence"] != "report-only":
+                raise ValueError(f"Invalid validity evidence: {key}")
+        elif site["evidence"] not in {"counter", "forwarded-counter"} or instrumented is None or key not in instrumented:
+            raise ValueError(f"Missing production operand/counter routing: {key}")
         if not isinstance(site["policy"], dict) or set(site["policy"]) != {"negative", "fp16Maximum"} or any(value not in POLICIES - {"budgeted"} for value in site["policy"].values()):
             raise ValueError(f"Invalid clamp policy (budgeted sites need explicit reviewed limits): {key}")
     missing = set(actual) - seen
@@ -178,12 +201,13 @@ class SourceCheckTests(unittest.TestCase):
         key, (count, digest) = next(iter(sites.items()))
         actual = {("Common/Test.hlsli", *key): (count, digest)}
         site = dict(id="test.f.guard", source="Common/Test.hlsli", function=key[0], operation=key[1], count=count,
-                    bodySha256=digest, programs=["gglab.shader.test"], kind="recovery", evidence="pending-counter",
+                    bodySha256=digest, programs=["gglab.shader.test"], kind="recovery", evidence="counter",
                     policy=dict(negative="report", fp16Maximum="report"), rationale="Test recovery")
         return dict(schema="gglab.shader-nonfinite-sites", schemaVersion=1, sites=[site]), actual
 
     def test_accept_registered(self):
-        validate(*self.fixture())
+        document, actual = self.fixture()
+        validate(document, actual, instrumented=set(actual))
 
     def test_comments_strings_and_declaration_are_not_calls(self):
         self.assertEqual(discover_sites('float SanitizeHDRChannel(float x) { return x; } // isfinite(x)\n#define S "isnan(x)"'), {})
@@ -218,19 +242,19 @@ class SourceCheckTests(unittest.TestCase):
         document, actual = self.fixture()
         document["sites"] = []
         with self.assertRaises(ValueError):
-            validate(document, actual)
+            validate(document, actual, instrumented=set(actual))
 
     def test_changed_guard_with_same_call_count_fails(self):
         document, _ = self.fixture()
         _, actual = self.fixture("float f(float x) { return isfinite(x) ? 0 : x; }")
         with self.assertRaises(ValueError):
-            validate(document, actual)
+            validate(document, actual, instrumented=set(actual))
 
     def test_added_call_fails(self):
         document, _ = self.fixture()
         _, actual = self.fixture("float f(float x) { return isfinite(x) && isfinite(x) ? x : 0; }")
         with self.assertRaises(ValueError):
-            validate(document, actual)
+            validate(document, actual, instrumented=set(actual))
 
     def test_stale_and_duplicate_sites_fail(self):
         for mutation in ("stale", "duplicate"):
@@ -240,13 +264,26 @@ class SourceCheckTests(unittest.TestCase):
             else:
                 document["sites"].append(document["sites"][0].copy())
             with self.assertRaises(ValueError):
-                validate(document, actual)
+                validate(document, actual, instrumented=set(actual))
+
+    def test_missing_counter_route_fails(self):
+        document, actual = self.fixture()
+        with self.assertRaises(ValueError):
+            validate(document, actual, instrumented=set())
+
+    def test_operand_route_is_required_for_every_guard_call(self):
+        site = self.fixture()[0]["sites"][0]
+        evidence = {}
+        discover_sites("float f(float x) { return isfinite(NonFiniteObserveValue(NF_SITE_TEST_F_GUARD, x)) ? x : 0; }", evidence)
+        self.assertTrue(counter_route_is_explicit(site, evidence[("f", "isfinite")]))
+        discover_sites("float f(float x) { return isfinite(x) ? x : 0; }", evidence)
+        self.assertFalse(counter_route_is_explicit(site, evidence[("f", "isfinite")]))
 
     def test_fabricated_instrumentation_fails(self):
         document, actual = self.fixture()
-        document["sites"][0]["evidence"] = "counter"
+        document["sites"][0]["evidence"] = "fabricated"
         with self.assertRaises(ValueError):
-            validate(document, actual)
+            validate(document, actual, instrumented=set(actual))
 
     def test_unknown_policy_and_unknown_fields_fail(self):
         for mutation in ("policy", "field"):
@@ -256,7 +293,7 @@ class SourceCheckTests(unittest.TestCase):
             else:
                 document["sites"][0]["ignored"] = True
             with self.assertRaises(ValueError):
-                validate(document, actual)
+                validate(document, actual, instrumented=set(actual))
 
     def test_bad_delimiters_fail_closed(self):
         with self.assertRaises(ValueError):
@@ -273,9 +310,19 @@ def main():
     try:
         document = json.loads((args.root / "Shaders/Metadata/NonFiniteSites.json").read_text(encoding="utf-8"))
         actual = discover_tree(args.root)
-        validate(document, actual, discover_programs(args.root))
+        instrumented = set()
+        by_source = {}
+        for site in document["sites"]:
+            if site["source"] not in by_source:
+                evidence = {}
+                discover_sites((args.root / "Shaders" / site["source"]).read_text(encoding="utf-8"), evidence)
+                by_source[site["source"]] = evidence
+            calls = by_source[site["source"]].get((site["function"], site["operation"]), [])
+            if counter_route_is_explicit(site, calls):
+                instrumented.add((site["source"], site["function"], site["operation"]))
+        validate(document, actual, discover_programs(args.root), instrumented)
         counts = Counter(site["kind"] for site in document["sites"])
-        print(json.dumps(dict(status="passed", sites=len(actual), kinds=dict(counts), productionCoverage="unavailable")))
+        print(json.dumps(dict(status="passed", sites=len(actual), kinds=dict(counts), productionCoverage="instrumented-source")))
         return 0
     except (OSError, ValueError, TypeError, KeyError) as error:
         print(f"Non-finite site validation failed: {error}", file=sys.stderr)

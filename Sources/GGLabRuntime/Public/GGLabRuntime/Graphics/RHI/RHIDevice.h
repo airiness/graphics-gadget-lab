@@ -29,6 +29,7 @@ namespace gglab
 	{
 	public:
 		virtual ~RHIDevice() = default;
+		[[nodiscard]] virtual bool SupportsPixelStorageAtomics() const noexcept { return false; }
 
 		virtual RHIBackendType GetBackendType() const noexcept = 0;
 		// Stable across process launches and changes when the adapter or driver

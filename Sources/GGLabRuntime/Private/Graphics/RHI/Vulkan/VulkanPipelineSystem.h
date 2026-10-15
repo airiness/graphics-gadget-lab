@@ -101,6 +101,7 @@ namespace gglab
 			const RHIGraphicsPipelineCreateInfo& createInfo) noexcept override;
 		RHIPipelineHandle CreateComputePipeline(
 			const RHIComputePipelineCreateInfo& createInfo) noexcept override;
+		bool GetBindingLayoutDesc(RHIBindingLayoutHandle layout, RHIBindingLayoutDesc& desc) const noexcept override;
 		bool IsAlive(RHIBindingLayoutHandle layout) const noexcept override;
 		bool IsAlive(RHIPipelineHandle pipeline) const noexcept override;
 		uint64_t GetRevision() const noexcept override { return m_Revision; }

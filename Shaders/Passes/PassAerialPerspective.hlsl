@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/BindlessResources.hlsli>
 #include <Common/BufferLayout.hlsli>
@@ -132,7 +133,7 @@ void CSBuild(uint3 dispatchId : SV_DispatchThreadID)
 		const uint2 atlasPixel = uint2(dispatchId.x,
 			dispatchId.y + slice * g_Pass.GridHeight);
 		radianceAtlas[atlasPixel] = AtmosphereValidated(radiance);
-		throughputAtlas[atlasPixel] = all(isfinite(throughput))
+		throughputAtlas[atlasPixel] = all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_AERIAL_PERSPECTIVE_CSBUILD_ISFINITE, throughput)))
 			? float4(saturate(throughput), 1.0) : float4(1.0, 0.0, 1.0, 0.0);
 		previousDistanceKm = distanceKm;
 	}
@@ -187,12 +188,12 @@ void CSComposite(uint3 dispatchId : SV_DispatchThreadID)
 		throughput = lerp(lowerThroughput.rgb, upperThroughput.rgb, frac(slicePosition));
 	}
 	output[dispatchId.xy] = float4(storedColor.rgb * throughput +
-		EncodeSceneColor(radiance, viewData.ScenePreExposure), storedColor.a);
+		EncodeSceneColor(radiance, viewData.ScenePreExposure, NF_SITE_PASS_AERIAL_PERSPECTIVE_CSCOMPOSITE_ENCODE_SCENE_COLOR), storedColor.a);
 	if (g_Pass.DiagnosticMode != 0)
 	{
 		RWTexture2D<float4> diagnostic = GetRWTexture2DFloat4(g_Pass.Output1);
 		diagnostic[dispatchId.xy] = float4(g_Pass.DiagnosticMode == 1
-			? throughput : EncodeSceneColor(radiance, viewData.ScenePreExposure), 1.0);
+			? throughput : EncodeSceneColor(radiance, viewData.ScenePreExposure, NF_SITE_PASS_AERIAL_PERSPECTIVE_CSCOMPOSITE_ENCODE_SCENE_COLOR), 1.0);
 	}
 }
 #endif

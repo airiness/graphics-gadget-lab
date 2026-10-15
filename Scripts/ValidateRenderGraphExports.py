@@ -21,7 +21,7 @@ def validate(document, validator):
 		markers = {entry["index"] for entry in passes if entry.get("observation", False)}
 		observers = document["execution"]["observationNodes"]
 		nodes = {entry["passIndex"] for entry in observers}
-		if flags["resourceExport"] != any(entry["kind"] == "ResourceExport" for entry in observers) or flags["nonFiniteWatch"] != any(entry["kind"] == "NonFiniteScan" for entry in observers):
+		if flags["resourceExport"] != any(entry["kind"] == "ResourceExport" for entry in observers) or flags["nonFiniteWatch"] != any(entry["kind"] in {"NonFiniteScan", "ProductionCounters"} for entry in observers):
 			raise ValueError("Observation kinds and activity flags disagree")
 		if markers != nodes or len(nodes) != len(observers) or bool(markers) != observed:
 			raise ValueError("Observation pass markers and execution nodes disagree")
@@ -121,7 +121,14 @@ def self_test(validator):
 	mixed["compile"]["passes"].append(dict(mixed["compile"]["passes"][0], index=1, executionOrder=1, accesses=[]))
 	validate(mixed, validator)
 
+	counters = copy.deepcopy(scanned)
+	counters["schemaVersion"] = 4
+	counters["execution"]["observationNodes"][0]["kind"] = "ProductionCounters"
+	validate(counters, validator)
+
 	cases = [
+		(counters, ("schemaVersion",), 3),
+		(counters, ("observation", "nonFiniteWatch"), False),
 		(scanned, ("schemaVersion",), 2),
 		(scanned, ("observation", "resourceExport"), True),
 		(scanned, ("observation", "nonFiniteWatch"), False),

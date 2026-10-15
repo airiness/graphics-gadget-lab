@@ -3,6 +3,7 @@
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Shader/Shader.h"
 #include "ShaderArtifactRuntime/ShaderArtifact.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
@@ -132,6 +133,7 @@ namespace gglab
 	}
 
 	ShaderManager::ShaderManager(ShaderManagerCreateInfo createInfo) noexcept :
+		m_NonFiniteCounters(createInfo.m_NonFiniteCounters),
 		m_ActiveBackend(createInfo.m_ActiveBackend),
 		m_ActiveRegistryRef(createInfo.m_ActiveRegistry)
 	{
@@ -183,8 +185,16 @@ namespace gglab
 		return m_ActiveRegistryRef;
 	}
 
-	ShaderID ShaderManager::LoadProgram(const ShaderProgramRef& programRef) noexcept
+	bool ShaderManager::IsNonFiniteCounterShader(ShaderID shader) const noexcept
 	{
+		std::shared_lock lock(m_Mutex);
+		return shader.IsValid() && shader.Value() < m_Shaders.size() &&
+			m_Shaders[shader.Value()]->GetProgramRef().m_VariantId.ends_with(nonfinite::VariantSuffix);
+	}
+
+	ShaderID ShaderManager::LoadProgram(const ShaderProgramRef& requestedProgram) noexcept
+	{
+		const auto programRef = m_NonFiniteCounters ? nonfinite::CounterVariant(requestedProgram) : requestedProgram;
 		if (!IsReady() || !programRef.IsValid())
 		{
 			return {};
@@ -256,6 +266,13 @@ namespace gglab
 		// Previously published programs need no further artifact I/O.
 		{
 			std::shared_lock lock(m_Mutex);
+			for (ShaderProgramRef& program : programRefs)
+			{
+				if (m_NonFiniteCounters)
+				{
+					program = nonfinite::CounterVariant(std::move(program));
+				}
+			}
 			for (const ShaderProgramRef& program : programRefs)
 			{
 				if (!m_ProgramIdMap.contains(program) &&
@@ -485,7 +502,7 @@ namespace gglab
 		}
 		std::shared_lock lock(m_Mutex);
 		return ResolveValidatedShaderProgramRegistryArtifact(m_RuntimeState->m_Registry,
-			programRef, GetActiveTargetProfile(m_ActiveBackend));
+			m_NonFiniteCounters ? nonfinite::CounterVariant(programRef) : programRef, GetActiveTargetProfile(m_ActiveBackend));
 	}
 
 	bool ShaderManager::CaptureArtifactRefs(
@@ -506,7 +523,7 @@ namespace gglab
 		{
 			const std::optional<ShaderArtifactRef> artifactRef =
 				ResolveValidatedShaderProgramRegistryArtifact(
-					m_RuntimeState->m_Registry, programRefs[index], targetProfile);
+					m_RuntimeState->m_Registry, m_NonFiniteCounters ? nonfinite::CounterVariant(programRefs[index]) : programRefs[index], targetProfile);
 			if (!artifactRef)
 			{
 				std::ranges::fill(outArtifactRefs, ShaderArtifactRef{});

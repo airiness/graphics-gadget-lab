@@ -8,7 +8,7 @@
       "function": "SanitizeHDRColor",
       "operation": "SanitizeHDRChannel",
       "count": 3,
-      "bodySha256": "7206543371f60cc9ab243d4d82100888293ed7bff8ba25d47d353671042eacfc",
+      "bodySha256": "bd10557cbad94b7d983cdef19df2c7deaa770fcf2966c9c156cc59127d654900",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -35,7 +35,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "forwarded-counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -48,7 +48,7 @@
       "function": "EncodeSceneColor",
       "operation": "EncodeSceneColorChannel",
       "count": 3,
-      "bodySha256": "2ce3f2cd9170b9eabf23430740a29874261094936e2653d9808e5f1204e81594",
+      "bodySha256": "871bf861c6e4d6795e1ad15f9bb94b3e7b41db1ff17902699a19d57183b3dc97",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -75,7 +75,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "forwarded-counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -88,7 +88,7 @@
       "function": "SanitizeSceneRadiance",
       "operation": "SanitizeSceneRadianceChannel",
       "count": 3,
-      "bodySha256": "99d0f5846ebb734543ea20baf87b92955716407642459551ba875e5177123a0b",
+      "bodySha256": "cc4225688692562015a78e3d835647a911813f8974983ed7c953a0e91a4ac943",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -115,7 +115,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "forwarded-counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -128,7 +128,7 @@
       "function": "ACESFitted",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "655d6a4a271dda7460276fe8eade3d2f3eed471faf7eabd7c7b567e408bf8bd8",
+      "bodySha256": "e5ef9986cc026a0365379edee97f08a8a489faa87e8f37817af50243ca47c41d",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -155,7 +155,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "forwarded-counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -193,12 +193,12 @@
       "function": "ResolveDisplayColor",
       "operation": "ACESFitted",
       "count": 2,
-      "bodySha256": "c81bcc492e14b5c3a00e7b8404874373212786c31c8ffc659ced8f3ed4f77ac6",
+      "bodySha256": "dee45cb16b1f3bd16360d6f5ded58565b573c9637d061689a0110c4c7cc15eb4",
       "programs": [
         "gglab.shader.final-color"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -211,7 +211,7 @@
       "function": "SanitizeSceneRadianceChannel",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "5ca66a1b0fd34a870ebde72db282eda3c622ebff67221b518c8bfd0121cfb653",
+      "bodySha256": "2e08b17f9ce4025d68cc2e60cdb5ebf153b01780758c8215d5e68e83c35178e5",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -238,7 +238,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -251,7 +251,7 @@
       "function": "SanitizeHDRChannel",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "99e47c7a9456c4a2881982ace76e7937701beebfb018a29bd44c97e481a11c1a",
+      "bodySha256": "d3f58310453953bf1e53c3068b0caa90a23efe9a90dc0e587b182592a3f9e3ca",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -278,7 +278,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -291,7 +291,7 @@
       "function": "EncodeSceneColorChannel",
       "operation": "SanitizeHDRChannel",
       "count": 1,
-      "bodySha256": "128615971a7b304baf906c7d55a2cef3955a471aefd98642fba2bc01324ce7fd",
+      "bodySha256": "52c72f6c114533e6d39c9ebbd7e84f32979e0c77ff9c263d5ea956f7d78f5e7c",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.bloom",
@@ -318,7 +318,7 @@
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "forwarded-counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -430,12 +430,12 @@
       "function": "ResolveTemporalReliability",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "ad643ace66516d2c2c8eb3b54382422fbc2f6c341e998f39a7a41f68664ef443",
+      "bodySha256": "323ea17a5d4df7d16c5de9a97f5c2bd1cdb5c78f33d5bc64dfad4c2e11c778d8",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -448,12 +448,12 @@
       "function": "ResolveTemporalHistoryNextAge",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "91ba28aa8efa4de47dc53b59667f68f20c9940581d48c9690e3ea9e163b68fdf",
+      "bodySha256": "cabbeeac49c0938eab0afd09ee349eea4d82f1f8a1777d638d335ce8b7e2d5f2",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -466,12 +466,12 @@
       "function": "ResolveTemporalAAMaxHistorySamples",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "1511d3a25f39a1664e7c5635925adc13cca8b700e063147d546ee5560083464f",
+      "bodySha256": "f67115c1b224ec3f1d562cf1a7e1e54028fb41b380f33beed3e0c96e8574f09a",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -484,12 +484,12 @@
       "function": "ResolveTemporalHistoryNextSamples",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "ceab2df112931ed0589f88cb15cd74dc1fcb8d1ac3889e19df150a39539b13f1",
+      "bodySha256": "6f2b5aee3084a3b5516b64298e187b144b421e9e7719d073b2f71e438872d5da",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -502,12 +502,12 @@
       "function": "ResolveTemporalHistoryNextSamples",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "ceab2df112931ed0589f88cb15cd74dc1fcb8d1ac3889e19df150a39539b13f1",
+      "bodySha256": "6f2b5aee3084a3b5516b64298e187b144b421e9e7719d073b2f71e438872d5da",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -520,12 +520,12 @@
       "function": "ResolveTemporalUpscaledStaticFraction",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "d0d6d2f9d927a83a284884669eb7aa00c0ba08d4d1e745b0b4e39d6143efe4d1",
+      "bodySha256": "ea7e84d244dd649f06a9516c84aaa2c990d63cfbc6605119fce55e69e03068db",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -538,12 +538,12 @@
       "function": "ReconstructTemporalCurrentColor",
       "operation": "IsTemporalColorFinite",
       "count": 1,
-      "bodySha256": "791185ef8cf437aa6264c850b30751916d2a0e43380a104c53d5f67f5c1aa581",
+      "bodySha256": "b5ffb1b9f4bb5735c214d69ddfb571937f9c370cd996f2b0b03418aa5fd63bc0",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -556,12 +556,12 @@
       "function": "ResolveTemporalAAOutputAlphas",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "f099cf5fc3a101b6a2c55af9a8532f0a31f7b646708e6e2fd66ae31a3f6a95d9",
+      "bodySha256": "d410cc97130ecdb8431fafd2fdbd442e2233865b6cfc645718ee73b9f27a3be7",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -574,12 +574,12 @@
       "function": "ResolveTemporalAAFeedbackSaturationAge",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "eb3cbb28bbee1a429c559937be1dcaf2776076156304e989ff769636b797c42e",
+      "bodySha256": "a8bcc1904ddbfb59a69f10db3b5432733e0de2019b0c097912fd9527f0858fed",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -592,12 +592,12 @@
       "function": "ResolveTemporalAAHistoryAgePreview",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "d6f1f7ea3aaa412054a6c102e020a63c963df2ed736007bea36505ff66e0f34e",
+      "bodySha256": "fc62aefaf94f126a0b22d7fccafa02559f2a4c11c3ae3ecb9f715993b6519cc5",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -610,12 +610,12 @@
       "function": "ResolveTemporalAAHistorySamplesPreview",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "3b48f19b0f9efe6bd01173b1fcc2443e4d2427a7c667eb4e8c700a7e6c4feea2",
+      "bodySha256": "a1e2409646a4800fc3edf5adf75dfa7b47606cd0207c0a2003e73e06f035d99f",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -628,12 +628,12 @@
       "function": "GetTemporalNeighborhoodRange",
       "operation": "IsTemporalColorFinite",
       "count": 1,
-      "bodySha256": "1d62fd1ec4f1ba4366f33c404a58af02cb9427d7d234993d6d9caf6ded9ad768",
+      "bodySha256": "32671532c1cc6e2c707a371d46108d67f077aedaae60da23810f4da6ba8baa3d",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -646,12 +646,12 @@
       "function": "ComputeTemporalHistoryConfidence",
       "operation": "isfinite",
       "count": 3,
-      "bodySha256": "c1cab6de219fe9f8bb16c9289f24f9a857037cd8b7e33ba166baec4d71935dd1",
+      "bodySha256": "629d1e007db59ed5ab478c6db6f0e4db3eac1c486e7959a7928fdede39ca781c",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -664,12 +664,12 @@
       "function": "ComputeTemporalWeightedHistoryWeight",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "10d914fa96180a86579388cad80d9d1e570971225e15725c9dc6c29551b74aa6",
+      "bodySha256": "d64aad44e01b1b633cf0e1c16eac59cc8d6bb803c475637b0d439da8472e8a9a",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -682,12 +682,12 @@
       "function": "ComputeTemporalWeightedHistoryWeight",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "10d914fa96180a86579388cad80d9d1e570971225e15725c9dc6c29551b74aa6",
+      "bodySha256": "d64aad44e01b1b633cf0e1c16eac59cc8d6bb803c475637b0d439da8472e8a9a",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -700,12 +700,12 @@
       "function": "ComputeTemporalHistoryWeight",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "434abfcddd54b21e557bb43da387714cc4f5ca6e8b660e2c2d50ea4a76d104de",
+      "bodySha256": "6287bac4a44076bed06a79fd6b80765cf9ac212914e5e752b39509c6e2e99de4",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -718,12 +718,12 @@
       "function": "ComputeTemporalHistoryWeight",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "434abfcddd54b21e557bb43da387714cc4f5ca6e8b660e2c2d50ea4a76d104de",
+      "bodySha256": "6287bac4a44076bed06a79fd6b80765cf9ac212914e5e752b39509c6e2e99de4",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -772,7 +772,7 @@
       "function": "AtmosphereValidated",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "7a79e982992fc37f3ed3abe69c162d9a3c5816c50c9f28b6e03f906ffe517747",
+      "bodySha256": "8b207853fb0173ff720a140449afe67f49215f1f6c3fcc92655795490c03d8bf",
       "programs": [
         "gglab.shader.aerial-perspective",
         "gglab.shader.atmosphere-luts",
@@ -780,7 +780,7 @@
         "gglab.shader.physical-sky-preview"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -829,12 +829,12 @@
       "function": "AccumulateGTAOHistory",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "1308c6c5c77bec3b9f4793f79c6843bf9ea0b49b6ae55e7a4bba8f8a0bf53c49",
+      "bodySha256": "a21353904d8e4ae20de6947d0010b4ef98cb1e9ab674836f5320004f8011ab6b",
       "programs": [
         "gglab.shader.gtao"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -883,12 +883,12 @@
       "function": "CSBuild",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "47ac291eb3ac0c06f3bbbcb7ef716b0651e83df65c8386d3534fcd0d11c02f9f",
+      "bodySha256": "288bed6275aff20ed796772854a475802bbacbd1266cc852ce749d58f65ea6a3",
       "programs": [
         "gglab.shader.aerial-perspective"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -901,12 +901,12 @@
       "function": "CSComposite",
       "operation": "EncodeSceneColor",
       "count": 2,
-      "bodySha256": "75c33b2d3105d18078f4fb2dceadd63ceb22871b16a8ebb7252999866a68b4f2",
+      "bodySha256": "e7f1c43872ac57f6542e185a0e85d2b787ce561dc5c68b0f7447f047a335c4c1",
       "programs": [
         "gglab.shader.aerial-perspective"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -919,12 +919,12 @@
       "function": "SampleSource",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "a5e796d26f820bc63f92a090b152f2f120cbf6fada6ffa528a5af12a2b8a5b9c",
+      "bodySha256": "edc21f903cf20a279751d1e3321bd94593519b0ec6be777f4860d0715c26b34f",
       "programs": [
         "gglab.shader.bloom"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -937,12 +937,12 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "e488dcc3fafab22626cb164cb3956c42c1b529d18d4080bc4b662bf82041c023",
+      "bodySha256": "177420a090a4a077041901b051cec54a2082a82a4a32778a964b95f79247aa4b",
       "programs": [
         "gglab.shader.bloom"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -955,12 +955,12 @@
       "function": "PSMain",
       "operation": "EncodeSceneColor",
       "count": 1,
-      "bodySha256": "0b52f6ea7d5cb931ceb95532b84291354ae020c4f76a303eb9f09b2e44a966a4",
+      "bodySha256": "e6bf6ef18a7346d58731c4cb08e939e6b9b758f7a81f47f75d5beb4f56d9f702",
       "programs": [
         "gglab.shader.debug-draw"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -973,12 +973,12 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "a8678e30b595f3ac03ac811d629e0d85942a99c33c075a9895621748b4ecc930",
+      "bodySha256": "24b23ee04ca75780eb6b7645deeb96827c24650de2a05e9a614d17354680289a",
       "programs": [
         "gglab.shader.final-color"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -991,12 +991,12 @@
       "function": "EncodeForwardSceneColor",
       "operation": "EncodeSceneColor",
       "count": 1,
-      "bodySha256": "07b5dedc08c5167d28bcecdd99ccc6ba9f9ac29366a48d22e405a8bf53d409b3",
+      "bodySha256": "3832af32e894200f60b32fc0860fde68936adccbc3b6c3cf3a4f491c93e481a3",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "forwarded-counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1009,12 +1009,12 @@
       "function": "MakeForwardPBRPixelOutput",
       "operation": "EncodeForwardSceneColor",
       "count": 3,
-      "bodySha256": "cd35d22f5d97681c9506e08e8a08eeae0c6571867392b6eb111d8da41e25ed34",
+      "bodySha256": "61c7a4667289b05b031bb6c5872ea0c43059c0f0d84fa0e7ad2446392087e3b9",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1027,12 +1027,12 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "50837e655394f49a8f96dfd76527a7c1985b244b10869d8176ba6c8d689f05a0",
+      "bodySha256": "b3b0f236d6158a6ac574b65bd30a326f3d6161b7ed26c5944ed86fbe59c9b47f",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1099,12 +1099,12 @@
       "function": "PSMain",
       "operation": "ACESFitted",
       "count": 1,
-      "bodySha256": "a701a399556378f4cd778ce074ac9a54937057b191f718e6d729bc64f7714677",
+      "bodySha256": "2dcc7037fe8f5645bc3d1f1ff6ff1d73f1e92282c11d505c649a2dcf83f83ef6",
       "programs": [
         "gglab.shader.ibl-cubemap-preview"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1117,12 +1117,12 @@
       "function": "PSMain",
       "operation": "SanitizeSceneRadiance",
       "count": 1,
-      "bodySha256": "885b84a107450c722092a92d787a642d9537cc8d94ccb87815d2800d7d7e6234",
+      "bodySha256": "66ebf3a56f8e5a56c73945424ef017d5dc6fdb54af18d88c893a67ea6a43b3d9",
       "programs": [
         "gglab.shader.ibl-environment"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1135,12 +1135,12 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "885b84a107450c722092a92d787a642d9537cc8d94ccb87815d2800d7d7e6234",
+      "bodySha256": "66ebf3a56f8e5a56c73945424ef017d5dc6fdb54af18d88c893a67ea6a43b3d9",
       "programs": [
         "gglab.shader.ibl-environment"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1153,12 +1153,12 @@
       "function": "PSMain",
       "operation": "SanitizeSceneRadiance",
       "count": 1,
-      "bodySha256": "aef91924793612316d12f5148b32088be454682b23f9123630be146ef0aa34c7",
+      "bodySha256": "d8507c5d19dd06050e7dcb9312515ca697452fca4480c4edd9217376fa6c6d20",
       "programs": [
         "gglab.shader.ibl-environment-mip"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1171,12 +1171,12 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "aef91924793612316d12f5148b32088be454682b23f9123630be146ef0aa34c7",
+      "bodySha256": "d8507c5d19dd06050e7dcb9312515ca697452fca4480c4edd9217376fa6c6d20",
       "programs": [
         "gglab.shader.ibl-environment-mip"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1189,12 +1189,12 @@
       "function": "PSMain",
       "operation": "SanitizeSceneRadiance",
       "count": 1,
-      "bodySha256": "c830a345ba8a83448db2caaaf203cf2f61a138ec20e126cf5ec13eeaa25d89b7",
+      "bodySha256": "adbd39c8ccbc0667933cdb1fb2693f2d972286f86e3d0ad4b7c182dabe99b93d",
       "programs": [
         "gglab.shader.ibl-importance"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1207,12 +1207,12 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "c830a345ba8a83448db2caaaf203cf2f61a138ec20e126cf5ec13eeaa25d89b7",
+      "bodySha256": "adbd39c8ccbc0667933cdb1fb2693f2d972286f86e3d0ad4b7c182dabe99b93d",
       "programs": [
         "gglab.shader.ibl-importance"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1225,12 +1225,12 @@
       "function": "IntegrateIrradiance",
       "operation": "SanitizeSceneRadiance",
       "count": 2,
-      "bodySha256": "834bb15e972cc8cddd278f01c84a09a3857bf6c0c1259073dbde4e23b97baac6",
+      "bodySha256": "aef4ae0d8c6bbb7ec94caf8f3750c2bf44cca944312c02ef5b0ff10484bcd36c",
       "programs": [
         "gglab.shader.ibl-irradiance"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1243,12 +1243,12 @@
       "function": "IntegrateIrradiance",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "834bb15e972cc8cddd278f01c84a09a3857bf6c0c1259073dbde4e23b97baac6",
+      "bodySha256": "aef4ae0d8c6bbb7ec94caf8f3750c2bf44cca944312c02ef5b0ff10484bcd36c",
       "programs": [
         "gglab.shader.ibl-irradiance"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1261,12 +1261,12 @@
       "function": "ClampSampleLuminance",
       "operation": "SanitizeSceneRadiance",
       "count": 1,
-      "bodySha256": "eb994d8ae47d20338758f23cc11fc8a221241437b988d88ee7010e21af906f94",
+      "bodySha256": "9f2d0966dffd290d7292aeaa37c159288b11a6773e2c10cd92aecebfdf5e4089",
       "programs": [
         "gglab.shader.ibl-prefiltered-specular"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1279,12 +1279,12 @@
       "function": "ClampSampleLuminance",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "eb994d8ae47d20338758f23cc11fc8a221241437b988d88ee7010e21af906f94",
+      "bodySha256": "9f2d0966dffd290d7292aeaa37c159288b11a6773e2c10cd92aecebfdf5e4089",
       "programs": [
         "gglab.shader.ibl-prefiltered-specular"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1297,12 +1297,12 @@
       "function": "IntegratePrefilteredSpecular",
       "operation": "SanitizeSceneRadiance",
       "count": 2,
-      "bodySha256": "0b2392d41748df7fabdd212f2a3dbf88b6dab6a0469b8d1f4b056d79a13f4cb5",
+      "bodySha256": "cdb0b8b61cd0f7ce85d411ec1d3b49738978ba955eddb51700407b809d50ab2f",
       "programs": [
         "gglab.shader.ibl-prefiltered-specular"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1315,12 +1315,12 @@
       "function": "IntegratePrefilteredSpecular",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "0b2392d41748df7fabdd212f2a3dbf88b6dab6a0469b8d1f4b056d79a13f4cb5",
+      "bodySha256": "cdb0b8b61cd0f7ce85d411ec1d3b49738978ba955eddb51700407b809d50ab2f",
       "programs": [
         "gglab.shader.ibl-prefiltered-specular"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1333,12 +1333,12 @@
       "function": "PSMain",
       "operation": "EncodeSceneColor",
       "count": 1,
-      "bodySha256": "e29c227fc530371337fa4f7c04614a89fe9fe3e895cfd48b4b375b08324db84c",
+      "bodySha256": "aa7817f44c72dce3bc1083f3e43f2c19c923fa00bf75d1bc8a68b2dea4035afe",
       "programs": [
         "gglab.shader.napa-voxel"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1351,12 +1351,12 @@
       "function": "PSMain",
       "operation": "EncodeSceneColor",
       "count": 1,
-      "bodySha256": "e3391ed6e91b7eb75c2b3e9e64a226a8eaba0beecf8faafb218306f77698e577",
+      "bodySha256": "0b2aa2686778e1062c38c87d89f6b2a58db6ba27de53675a8b3c8d560bef79f7",
       "programs": [
         "gglab.shader.physical-sky-preview"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1369,12 +1369,12 @@
       "function": "PSMain",
       "operation": "isfinite",
       "count": 2,
-      "bodySha256": "8d351e3dcd5b14f278f9d5c141748550680d40bf21587d38bf469cfdec500311",
+      "bodySha256": "ee643de7a2c2bf9ddd851d95508bd2fb8fdef03375aeb53fc48c21cd82c4f3a6",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1387,12 +1387,12 @@
       "function": "PSMain",
       "operation": "ACESFitted",
       "count": 2,
-      "bodySha256": "8d351e3dcd5b14f278f9d5c141748550680d40bf21587d38bf469cfdec500311",
+      "bodySha256": "ee643de7a2c2bf9ddd851d95508bd2fb8fdef03375aeb53fc48c21cd82c4f3a6",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1405,12 +1405,12 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "de846e0141c12c474c5b3488e387f9ed7604f2f313390fc2c9f24079569d9bc8",
+      "bodySha256": "bb1e8c0690cea4abaa2c76df613e18ddfd26e87424f90ebec318baa3557c9061",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1423,12 +1423,12 @@
       "function": "PSMain",
       "operation": "EncodeSceneColor",
       "count": 1,
-      "bodySha256": "84726823104464036a9be7dc03034a45bfed7391fe7de4ac74827175b2ec238b",
+      "bodySha256": "9a539ad33fa6331793b71213b3a80c76f35b567fcc2345bddee962e6e728a1be",
       "programs": [
         "gglab.shader.skybox"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1441,12 +1441,12 @@
       "function": "CSMain",
       "operation": "IsTemporalColorFinite",
       "count": 4,
-      "bodySha256": "b23f02f42fcc25020e2770f3785d464baa1ab56d4d3277b9f61d0d6a830929b5",
+      "bodySha256": "d42c545a40c1f02a267062a7383c754f3f58cdc2cf927d65fe7e5737d40c5697",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1459,12 +1459,12 @@
       "function": "CSMain",
       "operation": "isfinite",
       "count": 6,
-      "bodySha256": "956a0ac75c784e00e037f5e6d0756cf6a9fd0977cc258b8cbebe0ef12f38220d",
+      "bodySha256": "456820524544afe1f0b07ec12ecc1ae14e86ffe36c7c51e43273692a0d4c3110",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1477,12 +1477,12 @@
       "function": "CSMain",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "82103bbe3c313b200e8688577ab6e237acab7a46914865145afb31e67465d04b",
+      "bodySha256": "63c17364cc7b3b444d649d1a55e64f295ea1220714bed85d3ddd8382596b6cf8",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"
@@ -1495,12 +1495,12 @@
       "function": "CSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "82103bbe3c313b200e8688577ab6e237acab7a46914865145afb31e67465d04b",
+      "bodySha256": "63c17364cc7b3b444d649d1a55e64f295ea1220714bed85d3ddd8382596b6cf8",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
       "kind": "sanitization",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "expected",
         "fp16Maximum": "error"
@@ -1513,12 +1513,12 @@
       "function": "CSMain",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "94a6d041f4f4b844b06637c9e2f65e9a10781462ec6666268f439f281fba4263",
+      "bodySha256": "b0f789ee2d998e28b1a4c5e7dc1e8c04d35f35f89eaa73b9ecdcf4d8dcf67d86",
       "programs": [
         "gglab.shader.temporal-reference"
       ],
       "kind": "recovery",
-      "evidence": "pending-counter",
+      "evidence": "counter",
       "policy": {
         "negative": "report",
         "fp16Maximum": "report"

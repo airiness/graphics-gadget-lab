@@ -34,6 +34,7 @@ namespace gglab
 			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;
 		}
 		config.m_RequestRuntimeValidation = requestRuntimeValidation;
+		config.m_NonFiniteCounters = options.m_WatchNonFinite;
 		config.m_FixedDeltaTimeSeconds = options.m_FixedDeltaTimeSeconds
 			? options.m_FixedDeltaTimeSeconds
 			: options.m_Hidden ? std::optional<double>(HiddenLaunchFixedDeltaTimeSeconds)

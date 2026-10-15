@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/BindlessResources.hlsli>
 #include <Common/DepthReconstruction.hlsli>
@@ -53,7 +54,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	if (g_Pass.SourceMode >= 21 && g_Pass.SourceMode <= 23)
 	{
 		float4 sampleValue = GetTexture2DFloat4(g_Pass.SourceTextureIndex).SampleLevel(pointSampler,input.UV,0);
-		if (sampleValue.a < 0.999 || !all(isfinite(sampleValue)))
+		if (sampleValue.a < 0.999 || !all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ISFINITE, sampleValue))))
 		{
 			return float4(1,0,1,1);
 		}
@@ -64,7 +65,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 			return float4(saturate(color),1);
 		}
 		float exposure = g_Pass.SourceMode == 23 ? viewData.ExposureMultiplier : 1.0;
-		return float4(LinearToSRGB(ACESFitted(color*exposure*g_Pass.PreviewExposureScale)),1);
+		return float4(LinearToSRGB(ACESFitted(color*exposure*g_Pass.PreviewExposureScale, NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ACESFITTED)),1);
 	}
 	if (g_Pass.SourceMode == 24)
 	{
@@ -128,7 +129,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	{
 		Texture2D<float> depthTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
 		const float viewZ = depthTexture.SampleLevel(pointSampler, input.UV, 0.0);
-		if (!isfinite(viewZ) || viewZ <= 0.0)
+		if (!isfinite(NonFiniteObserveValue(NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ISFINITE, viewZ)) || viewZ <= 0.0)
 		{
 			return float4(0.0, 0.0, 0.0, 1.0);
 		}
@@ -177,9 +178,9 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	const float exposureScaleOverPreExposure =
 		ExposureScaleOverPreExposure(viewData.ExposureMultiplier, g_Pass.SourcePreExposure);
 	const float3 storedColor = SanitizeHDRColor(
-		SampleTexture2D(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, input.UV).rgb);
+		SampleTexture2D(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, input.UV).rgb, NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_SANITIZE_HDRCOLOR);
 	float3 color =
-		ACESFitted(storedColor * exposureScaleOverPreExposure * g_Pass.PreviewExposureScale);
+		ACESFitted(storedColor * exposureScaleOverPreExposure * g_Pass.PreviewExposureScale, NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ACESFITTED);
 	color = LinearToSRGB(color);
 	return float4(color, 1.0);
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include <Common/NonFiniteCounters.hlsli>
 
 #include <Common/DepthReconstruction.hlsli>
 #include <Common/Temporal.hlsli>
@@ -395,7 +396,7 @@ GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface su
 		return result;
 	}
 	float2 history = previousVisibility.Load(int3(historyPixel, 0));
-	if (!all(isfinite(history)))
+	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GTAO_ACCUMULATE_GTAOHISTORY_ISFINITE, history))))
 	{
 		return result;
 	}

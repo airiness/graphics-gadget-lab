@@ -1,5 +1,6 @@
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
@@ -950,6 +951,42 @@ namespace gglab
 			{ "height", status.m_Height },
 		};
 		response["capture"] = { { "unfinished", status.m_UnfinishedCaptures } };
+		const auto claimName = [](NonFiniteClaimStatus value)
+		{
+			switch (value)
+			{
+			case NonFiniteClaimStatus::Passed: return "Passed";
+			case NonFiniteClaimStatus::Failed: return "Failed";
+			case NonFiniteClaimStatus::NotApplicable: return "NotApplicable";
+			case NonFiniteClaimStatus::Unavailable: return "Unavailable";
+			default: return "Incomplete";
+			}
+		};
+		response["watch"] = { { "instrumentation", status.m_NonFiniteInstrumentation ? "available" : "unavailable" },
+			{ "production", status.m_NonFiniteInstrumentation ? "Incomplete" : "Unavailable" }, { "sites", Json::array() } };
+		if (const auto& production = status.m_NonFiniteProduction; production)
+		{
+			response["watch"]["production"] = claimName(production->m_Claim.m_Status);
+			response["watch"]["frameSerial"] = production->m_FrameSerial;
+			response["watch"]["failure"] = production->m_Failure;
+			response["watch"]["submission"] = { { "fenceIndex", production->m_SubmissionFenceIndex },
+				{ "fenceGeneration", production->m_SubmissionFenceGeneration }, { "fenceValue", production->m_SubmissionFenceValue },
+				{ "adapter", production->m_AdapterCompatibilityIdentity } };
+			for (const auto& site : production->m_Sites)
+			{
+				const auto& counts = site.m_Counters;
+				if (counts.m_NonFiniteReplacements == 0 && counts.m_NegativeClamps == 0 && counts.m_Fp16MaximumClamps == 0 && site.m_Claim.m_Status == NonFiniteClaimStatus::Passed)
+				{
+					continue;
+				}
+				response["watch"]["sites"].push_back({ { "program", nonfinite::Programs[site.m_ProgramIndex] },
+					{ "site", nonfinite::Sites[site.m_SiteIndex].m_Id }, { "claim", claimName(site.m_Claim.m_Status) },
+					{ "nonFiniteReplacements", counts.m_NonFiniteReplacements }, { "negativeClamps", counts.m_NegativeClamps },
+					{ "fp16MaximumClamps", counts.m_Fp16MaximumClamps },
+					{ "mostNegative", counts.m_MostNegative ? Json(*counts.m_MostNegative) : Json() },
+					{ "maximum", counts.m_Maximum ? Json(*counts.m_Maximum) : Json() } });
+			}
+		}
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{

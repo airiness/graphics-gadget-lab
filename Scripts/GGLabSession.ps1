@@ -97,6 +97,7 @@ param(
     [string]$Targets,
     [string]$TargetsFile,
     [switch]$IncludeGraph,
+    [switch]$WatchNonFinite,
 
     # result
     [long]$RequestId,
@@ -319,6 +320,7 @@ switch ($Command) {
         if ($Demo) { $arguments += @('--demo', $Demo) }
         if ($WindowSize) { $arguments += @('--window-size', $WindowSize) }
         if (-not $Visible) { $arguments += '--hidden' }
+        if ($WatchNonFinite) { $arguments += '--watch-nonfinite' }
         if ($PSBoundParameters.ContainsKey('FixedDeltaTime')) {
             $arguments += @('--fixed-delta-time', "$FixedDeltaTime")
         }

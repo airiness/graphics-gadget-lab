@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <vector>
@@ -33,6 +34,7 @@ namespace gglab
 			const RHIGraphicsPipelineCreateInfo& createInfo) noexcept override;
 		RHIPipelineHandle CreateComputePipeline(
 			const RHIComputePipelineCreateInfo& createInfo) noexcept override;
+		bool GetBindingLayoutDesc(RHIBindingLayoutHandle layout, RHIBindingLayoutDesc& desc) const noexcept override;
 		bool IsAlive(RHIBindingLayoutHandle layout) const noexcept override;
 		bool IsAlive(RHIPipelineHandle pipeline) const noexcept override;
 		uint64_t GetRevision() const noexcept override
@@ -41,6 +43,7 @@ namespace gglab
 		}
 		void Clear() noexcept override;
 
+		std::optional<uint32_t> GetStorageBufferParameterIndex(RHIPipelineHandle pipeline, uint32_t binding, uint32_t space) const noexcept;
 		bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,
 			DX12RootSignature*& outRootSignature,

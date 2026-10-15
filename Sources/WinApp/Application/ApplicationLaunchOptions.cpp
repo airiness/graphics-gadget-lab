@@ -146,6 +146,16 @@ namespace gglab
 				result.m_Options.m_DisableDevelopmentTools = true;
 				continue;
 			}
+			if (argument == "--watch-nonfinite")
+			{
+				if (result.m_Options.m_WatchNonFinite)
+				{
+					result.m_Error = "Option '--watch-nonfinite' may only be specified once.";
+					return result;
+				}
+				result.m_Options.m_WatchNonFinite = true;
+				continue;
+			}
 			if (argument == "--rhi")
 			{
 				if (result.m_Options.m_RhiBackendSpecified)
@@ -569,6 +579,7 @@ namespace gglab
 			"                                  index or device UUID/name prefix.\n"
 			"                                  Requires --rhi vulkan.\n"
 			"  --window-size <width>x<height>  Main window client size (default: 1920x1080).\n"
+			"  --watch-nonfinite                Enable production-counter shader variants at startup.\n"
 			"  --hidden                        Never show or activate the window; ignore input.\n"
 			"                                  Implies --fixed-delta-time 1/60 unless set.\n"
 			"  --fixed-delta-time <seconds>    Advance simulation time by a fixed step per frame.\n"

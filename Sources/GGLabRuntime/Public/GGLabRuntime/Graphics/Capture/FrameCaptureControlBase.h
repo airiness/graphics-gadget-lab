@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <memory>
 #include <vector>
 
 namespace gglab
@@ -42,8 +43,11 @@ namespace gglab
 		{
 			return 0;
 		}
+		[[nodiscard]] virtual bool HasNonFiniteInstrumentation() const noexcept { return false; }
+		[[nodiscard]] virtual std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return {}; }
 		// Sizes are known only after compilation. Start a scheduled export frame
-		// with an idle payload pool, then check the complete group before submission.
+		// with idle user payloads, then check the complete shared group before submission.
+		// Continuous production counters still count against the actual shared budget.
 		[[nodiscard]] virtual FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept
 		{
 			return GetRequestAvailability();
