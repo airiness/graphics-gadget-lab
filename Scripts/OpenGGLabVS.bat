@@ -34,4 +34,26 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem Bypass the solution's version association and prefer the newest release IDE.
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
+set "DEVENV="
+
+if exist "%VSWHERE%" (
+    for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -property productPath`) do set "DEVENV=%%I"
+    rem Allow preview IDEs when no release IDE is installed.
+    if not defined DEVENV (
+        for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -prerelease -property productPath`) do set "DEVENV=%%I"
+    )
+)
+
+if defined DEVENV (
+    if exist "%DEVENV%" (
+        echo Opening solution with "%DEVENV%"
+        start "" "%DEVENV%" "%SOLUTION%"
+        exit /b
+    )
+)
+
+echo Visual Studio could not be located. Using the default solution handler.
 start "" "%SOLUTION%"
