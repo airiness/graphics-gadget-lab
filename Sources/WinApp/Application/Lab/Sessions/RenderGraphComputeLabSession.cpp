@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -150,6 +151,7 @@ namespace gglab
 			void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 				const RenderServices& services) noexcept override
 			{
+				rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({});
 				GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 				GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 				EnsureInitialized(services);

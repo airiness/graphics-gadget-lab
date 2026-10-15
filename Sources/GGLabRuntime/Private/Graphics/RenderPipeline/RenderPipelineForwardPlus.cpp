@@ -1,4 +1,5 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -167,6 +168,9 @@ namespace gglab
 			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO;
 		const GTAOFrameStatus gtaoStatus = framePlan.m_GTAOStatus;
 		const bool gtaoActive = gtaoStatus == GTAOFrameStatus::Active;
+		rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({
+			context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion), gtaoActive,
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA), true });
 
 		auto& forwardPlusResources =
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);

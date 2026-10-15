@@ -1,4 +1,5 @@
 #include "NonFiniteScanNumericSelfTests.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "Compiler/ShaderCompiler.h"
 #include "DevelopmentShaderPaths.h"
 #include "Targets/DX12ShaderTarget.h"
@@ -166,6 +167,8 @@ namespace gglab
 				context.Check(begin.IsReady(), "Hidden observer-equivalence frame begins");
 				if (!begin.IsReady()) { break; }
 				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				auto& defaults = graph.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>();
+				defaults.Declare({ true, false, false, false });
 				struct Data {};
 				graph.AddPass<Data>("OriginalConsumer", RGPassEncoderType::Compute, [&](auto& builder, auto&)
 					{
@@ -179,16 +182,27 @@ namespace gglab
 							const auto texture = builder.ImportTexture(names[i].c_str(), textures[i].Get(), descriptions[i],
 								RGTextureAccess::Sample, RGContentValidity::Defined);
 							GGLAB_UNUSED(builder.Read(texture, RGTextureAccess::Sample));
+							if (i == 0)
+							{
+								auto address = builder.GetObservationAddress(texture);
+								address.m_Mip = 1;
+								address.m_FirstSlice = 2;
+								address.m_SliceCount = 2;
+								defaults.Register(NonFiniteWatchSemantic::MotionVectors, texture, std::move(address));
+							}
 							builder.Export(texture, RGTextureAccess::Sample);
 						}
 						builder.SideEffect();
 					});
 				context.Check(graph.Compile(), "Original GPU observation fixture compiles independently of observers");
+				const auto resolvedDefaults = ResolveNonFiniteWatchDefaults(graph);
+				context.Check(resolvedDefaults[0].m_Ready&& resolvedDefaults[0].m_Address.m_Pass == "OriginalConsumer" && !graph.HasNonFiniteScans(),
+					"GPU semantic defaults resolve the exact imported view before its live consumer without recording scans");
 				GGLAB_UNUSED(service.RequestResourceExport(exports, 100 + observed, false, true));
 				if (observed)
 				{
 					auto empty = layout; empty.m_ValidElementCount = empty.m_ScalarCount = 0;
-					GGLAB_UNUSED(service.RequestNonFiniteScan({ { exports[0], layout }, { exports[0], empty }, { exports[1], {} }, { exports[2], {} } },
+					GGLAB_UNUSED(service.RequestNonFiniteScan({ { exports[0], layout },{ exports[0], empty },{ resolvedDefaults[0].m_Address,{} },{ exports[2],{} } },
 						71, 101, true));
 				}
 				const auto prepared = service.PrepareResourceExports(100 + observed, graph);

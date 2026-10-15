@@ -953,7 +953,9 @@ namespace gglab
 			{
 				source["aspect"] = address.m_Aspect == RHITextureAspect::Depth ? "depth" : address.m_Aspect == RHITextureAspect::Stencil ? "stencil" : "color";
 			}
-			Json result = { { "address", source },
+			Json result = { { "address", address.m_Resource.empty() ? Json() : source },
+				{ "semantic", target.m_Semantic ? Json(GetNonFiniteWatchSemanticName(*target.m_Semantic)) : Json() },
+				{ "watchTier", target.m_Semantic ? Json(1) : Json() },{ "failure", target.m_Failure },
 				{ "claim", ClaimName(target.m_Result.m_Claim.m_Status) }, { "reason", WatchFailureName(target.m_Result.m_Claim.m_Failure) },
 				{ "checked", target.m_Record.m_CheckedCount }, { "nan", target.m_Record.m_NanCount },
 				{ "positiveInf", target.m_Record.m_PositiveInfCount }, { "negativeInf", target.m_Record.m_NegativeInfCount },
@@ -985,6 +987,8 @@ namespace gglab
 			}
 			Json report = { { "configurationVersion", status.m_ConfigurationVersion }, { "enabled", status.m_Enabled },
 				{ "mode", "report" }, { "claims", claims }, { "coverage", "latest-completed-frame" },
+				{ "targetsMode", status.m_DefaultTargets ? "defaults" : "explicit" },
+				{ "defaultTiers", status.m_DefaultTargets && status.m_BoundaryRequested ? Json::array({ "A" }) : Json::array() },
 				{ "boundary", ClaimName(status.m_Boundary.m_Status) }, { "boundaryFrameSerial", status.m_BoundaryFrameSerial },
 				{ "production", ClaimName(status.m_Production.m_Status) }, { "productionFrameSerial", status.m_ProductionFrameSerial },
 				{ "failure", status.m_Failure }, { "productionFailure", status.m_ProductionFailure }, { "targets", Json::array() }, { "firstAnomaly", Json() } };

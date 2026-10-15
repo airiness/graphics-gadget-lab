@@ -1,4 +1,5 @@
 #include "Demo/DemoLoadingShellRenderPipeline.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
@@ -40,6 +41,7 @@ namespace gglab
 			void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 				const RenderServices& services) noexcept override
 			{
+				rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({});
 				auto* swapChain = services.m_Presentation->GetSwapChain();
 				auto* resourceRegistry = services.m_Resources;
 				GGLAB_ASSERT_NOT_NULL(swapChain);
@@ -56,7 +58,7 @@ namespace gglab
 				rg.AddPass<LoadingShellSetupPassData>(
 					"LoadingShell.Setup",
 					[swapChain, resourceRegistry, backBufferIndex, displayViewId, shadowIndex,
-						shadowPreviewInitialized](
+					shadowPreviewInitialized](
 						RenderGraph::RGBuilder& builder, LoadingShellSetupPassData& data)
 					{
 						builder.SideEffect();

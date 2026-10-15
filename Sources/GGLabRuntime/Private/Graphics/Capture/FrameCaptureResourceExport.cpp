@@ -1,4 +1,5 @@
 #include "Graphics/Capture/FrameCaptureService.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -39,8 +40,7 @@ namespace gglab
 					.m_Units = "scene-linear Rec.709, pre-exposed",
 					.m_Space = "display view",
 					.m_Description = "Stored radiance is scene-linear radiance multiplied by preExposure.",
-					.m_PreExposure = context.m_PreExposure,
-					.m_WatchTier = 1 };
+					.m_PreExposure = context.m_PreExposure };
 			}
 			if (name == "DisplayView.DepthBuffer" || name == "DisplayView.DisplayDepth")
 			{
@@ -48,16 +48,14 @@ namespace gglab
 					.m_Units = "device depth [0, 1]",
 					.m_Space = "display view",
 					.m_Description = "Projection depth; reversedDepth records the selected view convention.",
-					.m_ReversedDepth = context.m_ReversedDepth,
-					.m_WatchTier = 1 };
+					.m_ReversedDepth = context.m_ReversedDepth };
 			}
 			if (name == "Temporal.MotionVectors")
 			{
 				return ResourceExportSemantics{ .m_Role = "motion-vectors",
 					.m_Units = "UV displacement",
 					.m_Space = "display view",
-					.m_Description = "Current UV minus previous UV; positive X points right and positive Y points down. Previous UV = current UV - motion.",
-					.m_WatchTier = 1 };
+					.m_Description = "Current UV minus previous UV; positive X points right and positive Y points down. Previous UV = current UV - motion." };
 			}
 			if (name == "GTAO.FinalAO" || name == "GTAO.TemporalAO" || name == "GTAO.RawAO" ||
 				name == "GTAO.DenoiseX" || name == "GTAO.DenoiseY")
@@ -65,8 +63,7 @@ namespace gglab
 				return ResourceExportSemantics{ .m_Role = "ambient-occlusion",
 					.m_Units = "dimensionless [0, 1]",
 					.m_Space = "display view",
-					.m_Description = "Ambient visibility; one is unoccluded.",
-					.m_WatchTier = 2 };
+					.m_Description = "Ambient visibility; one is unoccluded." };
 			}
 			return std::nullopt;
 		}
@@ -400,6 +397,10 @@ namespace gglab
 					}
 					const auto& target = readback.m_Copy.m_Target;
 					if (!DescribeArray(target, readback.m_Array, context)) { failure = RGObservationFailure::UnsupportedFormat; break; }
+					if (readback.m_Array.m_Semantics)
+					{
+						readback.m_Array.m_Semantics->m_WatchTier = GetNonFiniteDefaultWatchTier(graph, target);
+					}
 					if (target.m_Type == RGResourceType::RGTexture)
 					{
 						readback.m_Copy.m_Footprint = ComputeRHIObservationCopyFootprint(target.m_TextureDesc,
@@ -551,8 +552,10 @@ namespace gglab
 			tap.m_ResourceExportActive = !copies.empty();
 			tap.m_NonFiniteScanActive = !scans.empty() || m_ProductionEnabled;
 			for (auto& readback : tap.m_ExportReadbacks)
+			{
 				readback.m_Array.m_ObservedLastUse = graph.GetExecutionPlan()->GetResources()[
 					readback.m_Copy.m_Target.m_VirtualResource.Value()].m_LastUser.Value();
+			}
 			m_Taps.push_back(std::move(tap));
 		}
 		return FrameCaptureAvailability::Available;
@@ -602,6 +605,7 @@ namespace gglab
 		}
 		m_RetainedExports.push_back({ payload, retainedBytes, static_cast<uint32_t>(payload->m_Arrays.size()) });
 		for (const auto& request : tap.m_Requests)
+		{
 			m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = FrameCaptureSource::ResourceExport,
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial, .m_Graph = tap.m_Graph, .m_Resources = payload,
 				.m_GraphExportActive = tap.m_GraphExportActive, .m_ResourceExportActive = true,
@@ -609,6 +613,7 @@ namespace gglab
 				.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
 				.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(), .m_SubmissionFenceValue = tap.m_Fence.m_Value,
 				.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity });
+		}
 		tap.m_Requests.clear();
 	}
 }

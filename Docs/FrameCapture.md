@@ -366,13 +366,15 @@ retain a first failing frame or complete a coverage range.
 
 ### Session watch reports
 
-Configure explicit addresses with the same resource/pass/mip/slice syntax as
-resource exports. Configuration is replaced as a whole; success increments
+Omit targets to watch semantic defaults, or configure explicit addresses with the
+same resource/pass/mip/slice syntax as resource exports. Configuration is replaced
+as a whole; success increments
 `configurationVersion` and resets report history. Invalid requests preserve the
 previous configuration. The next compiled frame issues the new boundary scans;
 late results of earlier configurations are drained without updating the report.
 
 ```powershell
+& $session watch -Session numeric-check -WatchClaims boundary
 & $session watch -Session numeric-check -Targets '[{"resource":"Temporal.MotionVectors"},{"resource":"GTAO.TemporalAO"}]'
 & $session status -Session numeric-check
 & $session watch -Session numeric-check -WatchOff
@@ -412,9 +414,23 @@ actual compiled frame's buffer. Scalar types are `uint8`, `uint32`, `float16` an
 components per element. Texture targets omit `buffer`. `-TargetsFile` accepts the
 same JSON array from a UTF-8 file.
 
-An enabled boundary report without explicit targets is rejected with
-`DefaultTargetsUnavailable`. A `fail` request that needs unavailable production
-instrumentation returns `RequiresRestart`; other `fail` requests return
+Default boundary coverage currently implements Tier A: motion vectors when a
+temporal consumer requires them, the last floating-point GTAO output before
+upsampling, scene color before Temporal AA, and scene color before its earliest
+live post-process consumer. The owning pipeline declares applicability and passes
+register exact resource versions and observation cuts. Inactive features report
+`NotApplicable`; absent, culled, conflicting or mis-resolved active bindings report
+`Incomplete` with `MissingCoverage`. A graph with no registry also reports missing
+coverage. These classifications never add graph dependencies or revive culled work.
+
+Reports expose `targetsMode`, `defaultTiers` (currently `["A"]`), and each default
+target's `semantic`, `watchTier` and `failure`. Unbound targets have a null address.
+Resource export `watchTier` is present only for an exact registered default version;
+it is not inferred from a resource name. Tier B generation/cache-restored resources
+and Tier C GI resources are not covered by these defaults yet.
+
+A `fail` request that needs unavailable production instrumentation returns
+`RequiresRestart`; other `fail` requests return
 `FailModeUnavailable`. Neither rejection changes the current configuration.
 
 ### Runtime counter and scan mechanics
@@ -494,12 +510,29 @@ Developer checks (after building the named test projects):
 python Scripts/GenerateNonFiniteSites.py --check
 python Scripts/ValidateNonFiniteSites.py --self-test
 python Scripts/ValidateNonFiniteSites.py
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestTemporalAACounters.ps1
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite nonfinite-watch
 Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite frame-capture
 Build/Output/x64/Debug/GGLabAppRuntimeTests.exe
 Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi dx12
 Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi vulkan
 ```
+
+`TestTemporalAACounters.ps1` runs the production TAA Lab in hidden Debug/Release
+DX12/Vulkan sessions at 320x180 by default; `-Configuration`, `-Rhi` and
+`-WindowSize` can narrow or override that matrix. Native and Quality replays
+capture cold and accumulated history with counters off/on, requiring identical
+PNG pixels and same-frame pre-TAA/resolved-color NPY bytes within each backend.
+Counter-on transitions also exercise depth-only opaque and alpha-tested draws
+with TAA and temporal GTAO disabled, then restore TAA. It checks watch reports,
+native error logs and process exits. These reports
+retain latest completed evidence and the first observed anomaly, not complete
+sequence-range coverage. Results go to a unique run directory under
+`Build/Validation/TemporalAACounters`, or under `-OutputDirectory`.
+Each case separates `sessionChecksPassed` from `equivalencePassed`; any off/on
+pixel or array-byte difference still makes the overall check exit 1, even when
+the watch and lifecycle checks pass. Inspect `images.json`, `arrayDifferences`
+and the per-arm receipts instead of treating clean boundaries as equivalence.
 
 The hidden-window hardware suite covers buffer clear/scan plus the real capture
 service and RenderGraph path. RGBA32F/RG16F cube-compatible textures exercise

@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -78,6 +79,9 @@ namespace gglab
 					builder.ReadWriteInPlace(
 						temporalGeometry.m_MotionVectors, RGTextureAccess::RenderTarget);
 					data.m_Motion = temporalGeometry.m_MotionVectors;
+					builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Register(
+						NonFiniteWatchSemantic::MotionVectors, data.m_Motion,
+						builder.GetObservationAddress(data.m_Motion, RGObservationPosition::After));
 					data.m_MotionRtv = builder.CreateView<RHITextureViewType::RenderTarget>(
 						data.m_Motion);
 				}
@@ -177,29 +181,6 @@ namespace gglab
 				graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
-				graphicsContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					services.m_FrameBuffers->GetObjectStructuredBuffer()->GetBufferHandle(
-						contextPtr->m_FrameSlotIndex));
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(
-						contextPtr->m_FrameSlotIndex));
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-
-				const DepthPrepassParameters passParameters{
-					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
-				};
-				graphicsContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
-
 				DrawRenderQueue(graphicsContext, *contextPtr, services, displayViewId,
 					data.m_OutputMotion);
 			});
@@ -246,14 +227,16 @@ namespace gglab
 		const auto& renderQueue = context.GetRenderQueue(viewId);
 		const auto& ranges = renderQueue.m_BucketDrawRanges;
 		DrawRange(
-			graphicsContext, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)],
+			graphicsContext, context, services, viewId, renderQueue,
+			ranges[utils::ToIndex(RenderBucket::Opaque)],
 			outputMotion);
-		DrawRange(graphicsContext, services, renderQueue,
+		DrawRange(graphicsContext, context, services, viewId, renderQueue,
 			ranges[utils::ToIndex(RenderBucket::AlphaTest)], outputMotion);
 	}
 
 	void RenderPassDepthPrepass::DrawRange(RHIGraphicsCommandContext* graphicsContext,
-		const RenderServices& services, const RenderQueue& renderQueue,
+		const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
+		const RenderQueue& renderQueue,
 		const DrawItemsRange& range, bool outputMotion) noexcept
 	{
 		if (range.m_Count == 0)
@@ -279,6 +262,28 @@ namespace gglab
 				graphicsContext->SetPipeline(
 					GetOrCreatePSOForVariant(
 						services, drawItem.m_VariantBits, outputMotion));
+				// With counters enabled and motion off, opaque depth has no pixel shader
+				// while alpha-tested depth uses a counter layout. Rebind after every PSO switch.
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
+				graphicsContext->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+					sceneBuffer->GetBufferHandle(), context.m_RenderScene.m_SceneConstantBufferOffset);
+				graphicsContext->SetReadOnlyBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
+					services.m_FrameBuffers->GetObjectStructuredBuffer()->GetBufferHandle(
+						context.m_FrameSlotIndex));
+				graphicsContext->SetReadOnlyBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
+					services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(
+						context.m_FrameSlotIndex));
+				graphicsContext->SetReadOnlyBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+				const DepthPrepassParameters passParameters{
+					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(viewId)),
+				};
+				graphicsContext->SetPushConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 				lastVariantBits = drawItem.m_VariantBits;
 			}
 

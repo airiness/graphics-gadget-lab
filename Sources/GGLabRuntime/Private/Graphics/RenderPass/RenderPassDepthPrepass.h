@@ -43,7 +43,8 @@ namespace gglab
 			const RenderFrameContext& context, const RenderServices& services,
 			RenderViewID viewId, bool outputMotion) noexcept;
 
-		void DrawRange(RHIGraphicsCommandContext* graphicsContext, const RenderServices& services,
+		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
+			const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 			const RenderQueue& renderQueue, const DrawItemsRange& range,
 			bool outputMotion) noexcept;
 

@@ -177,6 +177,10 @@ namespace gglab
 			}
 			~RGBuilder() = default;
 
+			// Describes this declaration without adding a read or retaining a pass.
+			[[nodiscard]] RGResourceAddress GetObservationAddress(RGResourceHandle resource,
+				RGObservationPosition position = RGObservationPosition::Before) const noexcept;
+
 			template <typename RESOURCE>
 			RGResourceId<RESOURCE> Create(
 				const char* name, const RESOURCE::Descriptor& desc = {}) noexcept

@@ -1,4 +1,5 @@
 #include "FrameCaptureSelfTests.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
@@ -1177,6 +1178,87 @@ namespace gglab
 			bounded.OnFrameAborted(8);
 		}
 
+		void RunNonFiniteDefaultTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			const auto unknown = ResolveNonFiniteWatchDefaults(graph);
+			context.Check(std::ranges::all_of(unknown, [](const auto& target) { return target.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete; }),
+				"An unregistered pipeline cannot imply inactive features or complete coverage");
+			auto& defaults = graph.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>();
+			defaults.Declare({ true, false, true, true });
+			RGTextureId texture;
+			RGTextureId original;
+			RGResourceAddress consumer;
+			struct Data {};
+			graph.AddPass<Data>("Repeated", [](auto&, auto&) {});
+			graph.AddPass<Data>("Produce", [&](auto& builder, auto&)
+				{
+					texture = builder.CreateTexture("Renamed.FloatColor", { .m_Format = RHIFormat::R16G16B16A16Float, .m_Extent = { 4, 4, 1 } });
+					builder.WriteInPlace(texture, RGTextureAccess::RenderTarget);
+					original = texture;
+					defaults.Register(NonFiniteWatchSemantic::MotionVectors, texture,
+						builder.GetObservationAddress(texture, RGObservationPosition::After));
+				});
+			graph.AddPass<Data>("DeadConsumer", [&](auto& builder, auto&)
+				{
+					const auto input = builder.Read(texture, RGTextureAccess::Sample);
+					defaults.Register(NonFiniteWatchSemantic::PostProcessInput, input, builder.GetObservationAddress(input));
+				});
+			graph.AddPass<Data>("Repeated", [&](auto& builder, auto&)
+				{
+					const auto input = builder.Read(texture, RGTextureAccess::Sample);
+					consumer = builder.GetObservationAddress(input);
+					defaults.Register(NonFiniteWatchSemantic::TemporalInput, input, consumer);
+					defaults.Register(NonFiniteWatchSemantic::PostProcessInput, input, consumer);
+					builder.SideEffect();
+				});
+			graph.AddPass<Data>("LateConsumer", [&](auto& builder, auto&)
+				{
+					const auto input = builder.Read(texture, RGTextureAccess::Sample);
+					defaults.Register(NonFiniteWatchSemantic::PostProcessInput, input, builder.GetObservationAddress(input));
+					builder.SideEffect();
+				});
+			graph.AddPass<Data>("Overwrite", [&](auto& builder, auto&)
+				{
+					builder.ReadWriteInPlace(texture, RGTextureAccess::RenderTarget);
+					builder.SideEffect();
+				});
+			context.Check(graph.Compile(), "Semantic defaults fixture compiles before resolution");
+			const auto resolved = ResolveNonFiniteWatchDefaults(graph);
+			context.Check(resolved[0].m_Ready && resolved[0].m_Resource == original &&
+				resolved[1].m_Claim.m_Status == NonFiniteClaimStatus::NotApplicable &&
+				resolved[2].m_Ready && resolved[2].m_Resource == original && resolved[2].m_Resource != texture,
+				"Semantic registration survives resource renames and binds the consumed version before a later overwrite");
+			context.Check(consumer.m_Occurrence == 2u && resolved[3].m_Ready && resolved[3].m_Address.m_Pass == "Repeated",
+				"Address generation counts culled declarations and defaults select the earliest live consumer");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			context.Check(json["compile"]["passes"][2]["culled"] == true && !graph.HasNonFiniteScans(),
+				"Registration and resolution neither revive dead consumers nor add scan work while watch is off");
+			const auto target = graph.ResolveObservation(consumer, RGObservationKind::ResourceExport);
+			context.Check(GetNonFiniteDefaultWatchTier(graph, target) == 1u &&
+				!GetNonFiniteDefaultWatchTier(graph, graph.ResolveObservation({ .m_Resource = "Renamed.FloatColor" }, RGObservationKind::ResourceExport)),
+				"Export tiers follow the registered version rather than the final resource name");
+			NonFiniteWatchDefaultRegistry missing;
+			missing.Declare({ true, false, false, false });
+			context.Check(missing.Resolve(graph)[0].m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+				"An active feature with an omitted binding reports missing coverage");
+			missing.Register(NonFiniteWatchSemantic::MotionVectors, original,
+				{ .m_Resource = "Renamed.FloatColor", .m_Position = RGObservationPosition::Before, .m_Pass = "DeadConsumer" });
+			context.Check(!missing.Resolve(graph)[0].m_Ready, "A default with only a culled consumer remains missing coverage");
+			defaults.Register(NonFiniteWatchSemantic::TemporalInput, texture, consumer);
+			context.Check(!defaults.Resolve(graph)[2].m_Ready, "A conflicting resource version cannot resolve through another valid binding");
+			defaults.Register(NonFiniteWatchSemantic::AmbientOcclusion, original, consumer);
+			context.Check(defaults.Resolve(graph)[1].m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+				"An inactive declaration with an active binding is inconsistent coverage");
+			defaults.Declare({});
+			context.Check(defaults.Resolve(graph)[0].m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Duplicate pipeline declarations cannot overwrite applicability silently");
+		}
+
 		void RunNonFiniteObserverTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -1773,6 +1855,7 @@ namespace gglab
 
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
+		RunNonFiniteDefaultTests(context);
 		RunNonFiniteObserverTests(context);
 		RunResourceExportTests(context);
 		RunResourceTextureExportTests(context);

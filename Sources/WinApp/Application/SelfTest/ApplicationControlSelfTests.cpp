@@ -297,6 +297,16 @@ namespace gglab
 			context.Check(Contains(SerializeApplicationControlStatus(5, { .m_Watch = &watch }), R"("report":{"boundary":"Failed")"),
 				"Session status includes the same watch report as configuration responses");
 
+			watch.m_DefaultTargets = true;
+			watch.m_Targets = { NonFiniteWatchTargetStatus{ .m_Semantic = NonFiniteWatchSemantic::AmbientOcclusion,
+				.m_Result = { .m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None } } } };
+			watch.m_FirstAnomaly.reset();
+			const auto defaultsJson = SerializeApplicationControlWatch(6, watch, false);
+			context.Check(Contains(defaultsJson, R"("targetsMode":"defaults")") && Contains(defaultsJson, R"("defaultTiers":["A"])") &&
+				Contains(defaultsJson, R"("semantic":"ambient-occlusion")") && Contains(defaultsJson, R"("address":null)") &&
+				Contains(defaultsJson, R"("claim":"NotApplicable")"),
+				"Default reports identify their tier and inactive semantic roles without inventing an address");
+
 			FrameCaptureFrameState frame{
 				.m_Backend = "vulkan",
 				.m_DemoId = "Demo.LabHost",

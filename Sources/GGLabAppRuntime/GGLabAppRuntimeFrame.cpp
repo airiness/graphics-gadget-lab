@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
@@ -664,7 +665,9 @@ namespace gglab
 		{
 			return FailRuntime("RenderGraph compilation failed.");
 		}
-		m_NonFiniteWatch->PrepareFrame(frame.m_FrameSerial, m_FrameCapture->HasWaitingResourceExports());
+		const auto defaults = m_NonFiniteWatch->UsesDefaultTargets()
+			? ResolveNonFiniteWatchDefaults(renderGraph) : NonFiniteWatchDefaults{};
+		m_NonFiniteWatch->PrepareFrame(frame.m_FrameSerial, m_FrameCapture->HasWaitingResourceExports(), defaults);
 		const auto& exportView = frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)];
 		if (!m_FrameCapture->PrepareResourceExports(frame.m_FrameSerial, renderGraph,
 			{ .m_PreExposure = exportView.m_ScenePreExposure,

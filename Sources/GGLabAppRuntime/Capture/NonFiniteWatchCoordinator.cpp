@@ -34,10 +34,6 @@ namespace gglab
 					? "RequiresRestart: production fail mode requires --watch-nonfinite at startup."
 					: "FailModeUnavailable: watch coverage and sequence completion are not implemented yet.";
 			}
-			else if (configuration.m_Boundary && configuration.m_Targets.empty())
-			{
-				error = "DefaultTargetsUnavailable: supply explicit watch targets until semantic defaults are implemented.";
-			}
 			else if (configuration.m_Targets.size() > 64 || (!configuration.m_Boundary && !configuration.m_Targets.empty()))
 			{
 				error = "Watch targets require the boundary claim and are limited to 64 addresses.";
@@ -61,7 +57,8 @@ namespace gglab
 		const uint64_t version = m_Status.m_ConfigurationVersion + 1;
 		m_Configuration = std::move(configuration);
 		m_Status = { .m_ConfigurationVersion = version, .m_Enabled = m_Configuration.m_Enabled,
-			.m_BoundaryRequested = m_Configuration.m_Boundary, .m_ProductionRequested = m_Configuration.m_Production };
+			.m_BoundaryRequested = m_Configuration.m_Boundary, .m_ProductionRequested = m_Configuration.m_Production,
+			.m_DefaultTargets = m_Configuration.m_Targets.empty() };
 		m_FirstApplicableFrame = m_LastPreparedFrame + 1;
 		if (m_Status.m_Enabled)
 		{
@@ -81,7 +78,8 @@ namespace gglab
 		return true;
 	}
 
-	void NonFiniteWatchCoordinator::PrepareFrame(uint64_t frameSerial, bool yieldBoundaryCapacity) noexcept
+	void NonFiniteWatchCoordinator::PrepareFrame(uint64_t frameSerial, bool yieldBoundaryCapacity,
+		std::span<const NonFiniteWatchDefault> defaults) noexcept
 	{
 		if (frameSerial <= m_LastPreparedFrame)
 		{
@@ -92,21 +90,97 @@ namespace gglab
 		{
 			return;
 		}
-		const uint64_t id = !yieldBoundaryCapacity && m_Pending.size() < 64
-			? m_Capture->RequestNonFiniteScan(m_Configuration.m_Targets, m_Status.m_ConfigurationVersion, frameSerial) : 0;
-		if (id == 0)
+		Pending pending{ m_Status.m_ConfigurationVersion, frameSerial };
+		if (m_Status.m_DefaultTargets)
 		{
-			m_Status.m_BoundaryFrameSerial = frameSerial;
-			m_Status.m_Boundary = {};
-			m_Status.m_Failure = yieldBoundaryCapacity ? "MissingCoverage: boundary reporting yielded capacity to a scheduled resource export."
-				: "MissingCoverage: watch request capacity is exhausted.";
-			for (auto& target : m_Status.m_Targets)
+			for (size_t i = 0; i < NonFiniteWatchSemanticCount; ++i)
 			{
-				target = { .m_Address = target.m_Address };
+				NonFiniteWatchTargetStatus target{ .m_Semantic = static_cast<NonFiniteWatchSemantic>(i) };
+				if (defaults.size() == NonFiniteWatchSemanticCount && defaults[i].m_Semantic == *target.m_Semantic)
+				{
+					const auto& resolved = defaults[i];
+					target.m_Address = resolved.m_Address;
+					target.m_Result.m_Claim = resolved.m_Claim;
+					target.m_Failure = resolved.m_Failure;
+					if (resolved.m_Ready)
+					{
+						pending.m_ScanIndices.push_back(i);
+						pending.m_Scans.push_back({ .m_Address = resolved.m_Address });
+					}
+				}
+				else
+				{
+					target.m_Failure = "MissingCoverage: default applicability was not resolved for this frame.";
+				}
+				pending.m_Targets.push_back(std::move(target));
 			}
+		}
+		else
+		{
+			pending.m_Scans = m_Configuration.m_Targets;
+			for (const auto& scan : pending.m_Scans)
+			{
+				pending.m_ScanIndices.push_back(pending.m_Targets.size());
+				pending.m_Targets.push_back({ .m_Address = scan.m_Address });
+			}
+		}
+		if (pending.m_Scans.empty())
+		{
+			PublishBoundary(std::move(pending));
 			return;
 		}
-		m_Pending.emplace(id, Pending{ m_Status.m_ConfigurationVersion, frameSerial });
+		const uint64_t id = !yieldBoundaryCapacity && m_Pending.size() < 64
+			? m_Capture->RequestNonFiniteScan(pending.m_Scans, m_Status.m_ConfigurationVersion, frameSerial) : 0;
+		if (id == 0)
+		{
+			for (const size_t index : pending.m_ScanIndices)
+			{
+				pending.m_Targets[index].m_Failure = yieldBoundaryCapacity
+					? "MissingCoverage: boundary reporting yielded capacity to a scheduled resource export."
+					: "MissingCoverage: watch request capacity is exhausted.";
+			}
+			PublishBoundary(std::move(pending));
+			return;
+		}
+		m_Pending.emplace(id, std::move(pending));
+	}
+
+	void NonFiniteWatchCoordinator::PublishBoundary(Pending pending) noexcept
+	{
+		if (pending.m_FrameSerial < m_Status.m_BoundaryFrameSerial)
+		{
+			return;
+		}
+		NonFiniteClaimResult claim{ NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
+		bool applicable = false;
+		std::string failure;
+		for (const auto& target : pending.m_Targets)
+		{
+			const auto current = target.m_Result.m_Claim;
+			applicable |= current.m_Status != NonFiniteClaimStatus::NotApplicable;
+			if (current.m_Status == NonFiniteClaimStatus::Failed)
+			{
+				claim = current;
+			}
+			else if (claim.m_Status != NonFiniteClaimStatus::Failed && current.m_Status != NonFiniteClaimStatus::Passed &&
+				current.m_Status != NonFiniteClaimStatus::NotApplicable)
+			{
+				claim = {};
+			}
+			if (failure.empty() && !target.m_Failure.empty())
+			{
+				failure = target.m_Semantic ? std::string(GetNonFiniteWatchSemanticName(*target.m_Semantic)) + ": " : "";
+				failure += target.m_Failure;
+			}
+		}
+		if (!applicable)
+		{
+			claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+		}
+		m_Status.m_BoundaryFrameSerial = pending.m_FrameSerial;
+		m_Status.m_Boundary = claim;
+		m_Status.m_Targets = std::move(pending.m_Targets);
+		m_Status.m_Failure = std::move(failure);
 	}
 
 	void NonFiniteWatchCoordinator::RecordAnomaly(NonFiniteWatchAnomaly anomaly) noexcept
@@ -128,27 +202,29 @@ namespace gglab
 		{
 			return false;
 		}
-		const Pending pending = found->second;
+		Pending pending = std::move(found->second);
 		m_Pending.erase(found);
 		if (!m_Status.m_Enabled || pending.m_ConfigurationVersion != m_Status.m_ConfigurationVersion)
 		{
 			return true;
 		}
-		std::vector<NonFiniteWatchTargetStatus> targets;
-		NonFiniteClaimResult claim;
-		std::string failure = result.m_Failure;
 		const auto& payload = result.m_NonFiniteScans;
-		const bool addressesMatch = payload && payload->m_Boundaries.size() == m_Configuration.m_Targets.size() &&
-			std::ranges::equal(payload->m_Boundaries, m_Configuration.m_Targets, [](const auto& boundary, const auto& target)
+		const bool addressesMatch = payload && payload->m_Boundaries.size() == pending.m_Scans.size() &&
+			std::ranges::equal(payload->m_Boundaries, pending.m_Scans, [](const auto& boundary, const auto& target)
 				{ return SameAddress(boundary.m_Target.m_Address, target.m_Address); });
 		if (result.m_Status == FrameCaptureStatus::Completed && result.m_FrameSerial == pending.m_FrameSerial && payload &&
 			payload->m_ConfigurationVersion == pending.m_ConfigurationVersion && addressesMatch)
 		{
-			claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
-			for (const auto& boundary : payload->m_Boundaries)
+			for (size_t i = 0; i < payload->m_Boundaries.size(); ++i)
 			{
-				NonFiniteWatchTargetStatus target{ .m_Address = boundary.m_Target.m_Address,
-					.m_Record = boundary.m_Record, .m_Result = boundary.m_Result };
+				const auto& boundary = payload->m_Boundaries[i];
+				auto& target = pending.m_Targets[pending.m_ScanIndices[i]];
+				target.m_Record = boundary.m_Record;
+				target.m_Result = boundary.m_Result;
+				if (target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete)
+				{
+					target.m_Failure = "MissingCoverage: scan evidence is incomplete.";
+				}
 				if (const auto index = target.m_Result.m_FirstNonFiniteIndex; index)
 				{
 					if (boundary.m_Target.m_Type == RGResourceType::RGTexture)
@@ -169,33 +245,18 @@ namespace gglab
 				if (target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Failed)
 				{
 					RecordAnomaly({ .m_FrameSerial = pending.m_FrameSerial, .m_Failure = target.m_Result.m_Claim.m_Failure, .m_Target = target });
-					claim = target.m_Result.m_Claim;
 				}
-				else if (target.m_Result.m_Claim.m_Status != NonFiniteClaimStatus::Passed && claim.m_Status != NonFiniteClaimStatus::Failed)
-				{
-					claim = {};
-				}
-				targets.push_back(std::move(target));
 			}
 		}
 		else
 		{
-			for (const auto& target : m_Configuration.m_Targets)
+			for (const size_t index : pending.m_ScanIndices)
 			{
-				targets.push_back({ .m_Address = target.m_Address });
-			}
-			if (failure.empty())
-			{
-				failure = "MissingCoverage: the watch frame returned missing or mismatched scan evidence.";
+				pending.m_Targets[index].m_Failure = result.m_Failure.empty()
+					? "MissingCoverage: the watch frame returned missing or mismatched scan evidence." : result.m_Failure;
 			}
 		}
-		if (pending.m_FrameSerial >= m_Status.m_BoundaryFrameSerial)
-		{
-			m_Status.m_BoundaryFrameSerial = pending.m_FrameSerial;
-			m_Status.m_Boundary = claim;
-			m_Status.m_Targets = std::move(targets);
-			m_Status.m_Failure = std::move(failure);
-		}
+		PublishBoundary(std::move(pending));
 		return true;
 	}
 

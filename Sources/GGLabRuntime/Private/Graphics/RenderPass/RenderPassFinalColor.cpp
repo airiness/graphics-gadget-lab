@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassFinalColor.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -93,6 +94,9 @@ namespace gglab
 
 				data.m_SceneColor = builder.Read(
 					postProcess.m_Inputs.m_SceneColor.m_Texture, RGTextureAccess::Sample);
+				builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Register(
+					NonFiniteWatchSemantic::PostProcessInput, data.m_SceneColor,
+					builder.GetObservationAddress(data.m_SceneColor, RGObservationPosition::Before));
 				builder.WriteInPlace(postProcess.m_Output.m_Texture, RGTextureAccess::RenderTarget);
 				data.m_Output = postProcess.m_Output.m_Texture;
 				data.m_SceneColorSrv =

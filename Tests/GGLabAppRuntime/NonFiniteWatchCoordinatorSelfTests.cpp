@@ -16,12 +16,13 @@ namespace gglab
 		public:
 			uint64_t RequestCapture(FrameCaptureSource, uint64_t, uint64_t) noexcept override { return 0; }
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t, uint64_t) noexcept override { return 0; }
-			uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget>, uint64_t version, uint64_t serial, bool, uint64_t) noexcept override
+			uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget> targets, uint64_t version, uint64_t serial, bool, uint64_t) noexcept override
 			{
 				if (m_Busy)
 				{
 					return 0;
 				}
+				m_ScanTargets = std::move(targets);
 				m_Version = version;
 				m_Frame = serial;
 				return ++m_Id;
@@ -46,7 +47,7 @@ namespace gglab
 				auto payload = std::make_shared<NonFiniteScanPayload>();
 				payload->m_ConfigurationVersion = m_Version;
 				NonFiniteScanBoundary boundary;
-				boundary.m_Target.m_Address.m_Resource = "Motion";
+				boundary.m_Target.m_Address = m_ScanTargets.front().m_Address;
 				boundary.m_Target.m_Subresources = { .m_BaseArraySlice = 2, .m_ArraySliceCount = 1 };
 				boundary.m_Parameters = { .m_ScalarCount = 8, .m_Width = 2, .m_Height = 2, .m_Channels = 2 };
 				for (uint32_t i = 0; i < 8; ++i)
@@ -59,6 +60,7 @@ namespace gglab
 					.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = m_Frame, .m_NonFiniteScans = payload };
 			}
 			uint64_t m_Id = 0;
+			std::vector<NonFiniteScanTarget> m_ScanTargets;
 			uint64_t m_Version = 0;
 			uint64_t m_Frame = 0;
 			bool m_Busy = false;
@@ -108,8 +110,8 @@ namespace gglab
 			"A report-only implementation cannot claim sequence fail-mode completion");
 		configuration.m_Mode = NonFiniteWatchMode::Report;
 		configuration.m_Targets.clear();
-		context.Check(!watch.Configure(configuration, error) && error.starts_with("DefaultTargetsUnavailable"),
-			"Unimplemented semantic defaults are explicit rather than an empty passing boundary list");
+		context.Check(watch.Configure(configuration, error) && watch.UsesDefaultTargets(),
+			"Omitting addresses enables semantic default boundary coverage");
 		configuration.m_Boundary = false;
 		context.Check(watch.Configure(configuration, error), "Production-only report watch needs no boundary targets");
 		NonFiniteProductionFrame production{ .m_FrameSerial = 11, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None } };
@@ -180,6 +182,51 @@ namespace gglab
 		wrongAddress.m_NonFiniteScans = wrongAddressPayload;
 		context.Check(watch.OnScanResult(wrongAddress) && status.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
 			"A record for a different addressed subresource cannot establish coverage");
+		{
+			WatchCaptureControl defaultControl;
+			NonFiniteWatchCoordinator defaultsWatch(&defaultControl);
+			context.Check(defaultsWatch.Configure({ .m_Production = false }, error), "Default boundary watch configures without instrumentation");
+			const auto& defaultStatus = defaultsWatch.GetStatus();
+			defaultsWatch.PrepareFrame(1);
+			context.Check(defaultControl.m_Id == 0 && defaultStatus.m_Targets.size() == 4 &&
+				defaultStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Missing pipeline applicability reports four incomplete roles and never submits an empty passing request");
+			NonFiniteWatchDefaults defaults;
+			for (size_t i = 0; i < defaults.size(); ++i)
+			{
+				defaults[i].m_Semantic = static_cast<NonFiniteWatchSemantic>(i);
+				defaults[i].m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			}
+			defaultsWatch.PrepareFrame(2, false, defaults);
+			context.Check(defaultControl.m_Id == 0 && defaultStatus.m_Boundary.m_Status == NonFiniteClaimStatus::NotApplicable,
+				"An explicitly inactive pipeline reports not applicable without scanning");
+			defaults[0].m_Ready = true;
+			defaults[0].m_Claim = {};
+			defaults[0].m_Address.m_Resource = "Motion";
+			defaultsWatch.PrepareFrame(3, false, defaults);
+			const auto firstFrame = defaultControl.Complete();
+			defaults[0].m_Address.m_Resource = "DifferentMotion";
+			defaultsWatch.PrepareFrame(4, false, defaults);
+			const auto secondFrame = defaultControl.Complete(true);
+			context.Check(defaultsWatch.OnScanResult(firstFrame) && defaultStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Passed &&
+				defaultStatus.m_Targets[0].m_Address.m_Resource == "Motion" && defaultStatus.m_Targets[1].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::NotApplicable,
+				"Delayed evidence uses the submitting frame's resolved targets and retains inactive roles");
+			context.Check(defaultsWatch.OnScanResult(secondFrame) && defaultStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Failed &&
+				defaultStatus.m_FirstAnomaly->m_Target->m_Semantic == NonFiniteWatchSemantic::MotionVectors,
+				"Default anomalies retain their semantic role across target changes");
+			defaults[1].m_Claim = {};
+			defaults[1].m_Failure = "MissingCoverage: active AO has no binding.";
+			defaultsWatch.PrepareFrame(5, false, defaults);
+			context.Check(defaultsWatch.OnScanResult(defaultControl.Complete()) && defaultStatus.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete &&
+				defaultStatus.m_Targets[0].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Passed &&
+				defaultStatus.m_Failure.find("ambient-occlusion") != std::string::npos,
+				"A clean applicable scan cannot hide another active role's missing coverage");
+			defaultsWatch.PrepareFrame(6, true, defaults);
+			context.Check(defaultStatus.m_Targets[0].m_Record.m_CheckedCount == 0 &&
+				defaultStatus.m_Targets[2].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::NotApplicable,
+				"Capacity pressure clears scan evidence while preserving inactive feature classifications");
+		}
+
 		control.m_Busy = true;
 		watch.PrepareFrame(22);
 		context.Check(status.m_BoundaryFrameSerial == 22 && status.m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete &&

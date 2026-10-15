@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -341,6 +342,9 @@ namespace gglab
 					"Temporal AA packs its clamp sampler indices into 16 bits each.");
 				const RGTextureId currentColor = builder.Read(
 					targets.m_SceneColor, RGTextureAccess::Sample, RHIStage::ComputeShader);
+				builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Register(
+					NonFiniteWatchSemantic::TemporalInput, currentColor,
+					builder.GetObservationAddress(currentColor, RGObservationPosition::Before));
 				const RGTextureId motion = builder.Read(temporalGeometry.m_MotionVectors,
 					RGTextureAccess::Sample, RHIStage::ComputeShader);
 				const RGTextureId currentDepth = builder.Read(sceneDepth.m_Texture,
@@ -594,6 +598,15 @@ namespace gglab
 					1);
 
 				commandContext->SetPipeline(GetOrCreatePipeline(services));
+				// Counter instrumentation gives the resolve a different physical layout from
+				// the depth copy. Frame-buffer bindings cannot survive that layout switch.
+				commandContext->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+					context.m_RenderScene.m_SceneConstantBufferOffset);
+				commandContext->SetReadOnlyBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(

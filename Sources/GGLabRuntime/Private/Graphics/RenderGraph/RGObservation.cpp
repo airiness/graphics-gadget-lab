@@ -10,6 +10,31 @@
 
 namespace gglab
 {
+	RGResourceAddress RenderGraph::RGBuilder::GetObservationAddress(
+		RGResourceHandle resource, RGObservationPosition position) const noexcept
+	{
+		if (!resource.IsValid() || resource.GetHandle().Value() >= m_RG.m_ResourceSlots.size())
+		{
+			return {};
+		}
+		const auto* virtualResource = m_RG.GetVirtualResource(resource);
+		if (!virtualResource)
+		{
+			return {};
+		}
+		const auto name = m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_NameId.Name();
+		uint32_t occurrence = 1;
+		for (uint32_t i = 0; i < m_PassNodeIndex.Value(); ++i)
+		{
+			if (m_RG.m_PassNodes[i].m_NameId.Name() == name)
+			{
+				++occurrence;
+			}
+		}
+		return { .m_Resource = std::string(virtualResource->m_NameId.Name()), .m_Position = position,
+			.m_Pass = std::string(name), .m_Occurrence = occurrence };
+	}
+
 	std::string_view GetRGObservationFailureName(RGObservationFailure failure) noexcept
 	{
 		switch (failure)
@@ -163,7 +188,7 @@ namespace gglab
 				address.m_Mip >= GetRHITextureMipLevelCount(desc) || address.m_Mip >= 32 ||
 				address.m_FirstSlice >= GetRHITextureArraySize(desc) ||
 				(compiled.m_Imported && !Test(desc.m_Usage, kind == RGObservationKind::ResourceExport
-						? RHITextureUsage::CopySource : RHITextureUsage::Sampled)))
+					? RHITextureUsage::CopySource : RHITextureUsage::Sampled)))
 			{
 				return fail(RGObservationFailure::UnsupportedResource);
 			}
@@ -434,14 +459,17 @@ namespace gglab
 						{ .m_SizeInBytes = counters->m_Bytes, .m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu },
 						RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 					builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest);
-				}, [](RGExecuteContext& context, Data& data)
+				},
+				[](RGExecuteContext& context, Data& data)
 				{
 					context.GetCopyCommandContext()->CopyBuffer(context.GetBufferHandle(data.m_Readback), 0,
 						context.GetBufferHandle(data.m_Record), 0, data.m_Config.m_Bytes);
 				});
 			RGObservationTarget target{ .m_Address = { .m_Resource = "Observation.ProductionCounters.Record" },
-				.m_Kind = RGObservationKind::ProductionCounters, .m_Type = RGResourceType::RGBuffer,
-				.m_Resource = record, .m_Node = m_ResourceSlots[record.GetHandle().Value()].m_ResourceNodeIndex };
+				.m_Kind = RGObservationKind::ProductionCounters,
+				.m_Type = RGResourceType::RGBuffer,
+				.m_Resource = record,
+				.m_Node = m_ResourceSlots[record.GetHandle().Value()].m_ResourceNodeIndex };
 			m_ObservationPasses.emplace_back(clearIndex, target);
 			target.m_InsertionPosition = static_cast<uint32_t>(originalOrder.size());
 			m_ObservationPasses.emplace_back(copyIndex, target);
@@ -474,16 +502,21 @@ namespace gglab
 					const auto& range = data.m_Copy.m_Target.m_Subresources;
 					for (uint32_t slice = 0; slice < range.m_ArraySliceCount; ++slice)
 						commands->CopyTextureToBuffer({ .m_Source = context.GetTextureHandle(RGTextureId{ *data.m_Copy.m_Target.m_Resource }),
-							.m_SourceMipLevel = range.m_BaseMip, .m_SourceArraySlice = range.m_BaseArraySlice + slice,
-							.m_Destination = destination, .m_DestinationOffset = slice * data.m_Copy.m_SlicePitch,
-							.m_Footprint = data.m_Copy.m_Footprint, .m_SourceAspect = range.m_Aspects });
+							.m_SourceMipLevel = range.m_BaseMip,
+							.m_SourceArraySlice = range.m_BaseArraySlice + slice,
+							.m_Destination = destination,
+							.m_DestinationOffset = slice * data.m_Copy.m_SlicePitch,
+							.m_Footprint = data.m_Copy.m_Footprint,
+							.m_SourceAspect = range.m_Aspects });
 				});
 			// Dedicated stale-version read. The ordinary builder keeps its Read/Export assertions.
 			m_PassNodes[index].m_Accesses.push_back({ .m_ResourceNodeIndex = copy.m_Target.m_Node,
 				.m_AccessValue = copy.m_Target.m_Type == RGResourceType::RGTexture
 					? static_cast<uint64_t>(RGTextureAccess::CopySource) : static_cast<uint64_t>(RGBufferAccess::CopySource),
-				.m_Stages = RHIStage::Copy, .m_ResourceType = copy.m_Target.m_Type,
-				.m_DependencyAccess = RGDependencyAccess::Read, .m_Subresources = copy.m_Target.m_Type == RGResourceType::RGTexture
+				.m_Stages = RHIStage::Copy,
+				.m_ResourceType = copy.m_Target.m_Type,
+				.m_DependencyAccess = RGDependencyAccess::Read,
+				.m_Subresources = copy.m_Target.m_Type == RGResourceType::RGTexture
 					? std::optional(copy.m_Target.m_Subresources) : std::nullopt });
 			m_ResourceNodes[copy.m_Target.m_Node.Value()].m_Readers.push_back(RGPassNodeIndex{ index });
 			m_ObservationPasses.emplace_back(index, copy.m_Target);
@@ -531,11 +564,14 @@ namespace gglab
 					}
 				}, [](RGExecuteContext& context, Data& data) { data.m_Scan.m_Scan(context, data.m_Record, data.m_View); });
 			// Only this dedicated path may read the addressed, possibly stale version.
-			m_PassNodes[first + 1].m_Accesses.push_back({ .m_ResourceNodeIndex = scan.m_Target.m_Node,
+			m_PassNodes[first + 1].m_Accesses.push_back({
+				.m_ResourceNodeIndex = scan.m_Target.m_Node,
 				.m_AccessValue = scan.m_Target.m_Type == RGResourceType::RGTexture
 					? static_cast<uint64_t>(RGTextureAccess::Sample) : static_cast<uint64_t>(RGBufferAccess::StructuredRead),
-				.m_Stages = RHIStage::ComputeShader, .m_ResourceType = scan.m_Target.m_Type,
-				.m_DependencyAccess = RGDependencyAccess::Read, .m_Subresources = scan.m_Target.m_Type == RGResourceType::RGTexture
+				.m_Stages = RHIStage::ComputeShader,
+				.m_ResourceType = scan.m_Target.m_Type,
+				.m_DependencyAccess = RGDependencyAccess::Read,
+				.m_Subresources = scan.m_Target.m_Type == RGResourceType::RGTexture
 					? std::optional(scan.m_Target.m_Subresources) : std::nullopt });
 			m_ResourceNodes[scan.m_Target.m_Node.Value()].m_Readers.push_back(RGPassNodeIndex{ first + 1 });
 			AddPass<Data>((name + ".Readback").c_str(), RGPassEncoderType::Copy,
@@ -547,7 +583,8 @@ namespace gglab
 						{ .m_SizeInBytes = scan.m_RecordBytes, .m_Usage = RHIBufferUsage::CopyDest,
 							.m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 					builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest);
-				}, [](RGExecuteContext& context, Data& data)
+				},
+				[](RGExecuteContext& context, Data& data)
 				{
 					context.GetCopyCommandContext()->CopyBuffer(context.GetBufferHandle(data.m_Readback), 0,
 						context.GetBufferHandle(data.m_Record), 0, data.m_Scan.m_RecordBytes);
