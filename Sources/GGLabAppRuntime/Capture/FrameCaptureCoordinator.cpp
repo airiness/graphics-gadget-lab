@@ -754,6 +754,9 @@ namespace gglab
 	void FrameCaptureCoordinator::FinalizeAfterRenderHost() noexcept
 	{
 		m_IsShuttingDown = true;
+		// Render-host finalization publishes the last fence-completed readbacks.
+		// Drain them before closing only the coverage that still lacks evidence.
+		Update();
 		if (m_NonFiniteWatch) { m_NonFiniteWatch->FinalizeCoverage(); }
 		Update();
 		FinishWriting();

@@ -496,8 +496,29 @@ namespace gglab
 					}
 					if (required > m_Limits.m_MaxPayloads || requiredBytes > m_Limits.m_MaxPayloadBytes) { failure = RGObservationFailure::TooLarge; }
 				}
-				if (failure == RGObservationFailure::None && m_ProductionEnabled &&
-					(slots + pairedSlots + 2 > m_Limits.m_MaxPayloads || bytes + pairedBytes + ProductionPayloadBytes + ProductionCpuBytes > m_Limits.m_MaxPayloadBytes))
+				// A flexible export can follow an already admitted fail-mode scan. That
+				// scan is required on every retry, so include it in the idle-frame minimum
+				// instead of reporting permanent incompatibility as temporary pressure.
+				size_t requiredScanSlots = 0;
+				uint64_t requiredScanBytes = 0;
+				if (request.m_Source == FrameCaptureSource::ResourceExport)
+				{
+					for (const auto& observation : prepared)
+					{
+						if (observation.m_Source == FrameCaptureSource::NonFiniteScan &&
+							std::ranges::any_of(observation.m_Requests, [](const auto& scan) { return scan.m_DeferFrameOnBusy; }))
+						{
+							++requiredScanSlots;
+							for (const auto& readback : observation.m_ScanReadbacks)
+							{
+								requiredScanBytes += readback.GetPayloadBytes();
+							}
+						}
+					}
+				}
+				if (failure == RGObservationFailure::None &&
+					(slots + pairedSlots + requiredScanSlots + (m_ProductionEnabled ? 2u : 0u) > m_Limits.m_MaxPayloads ||
+						bytes + pairedBytes + requiredScanBytes + (m_ProductionEnabled ? ProductionPayloadBytes + ProductionCpuBytes : 0u) > m_Limits.m_MaxPayloadBytes))
 				{
 					failure = RGObservationFailure::TooLarge;
 				}

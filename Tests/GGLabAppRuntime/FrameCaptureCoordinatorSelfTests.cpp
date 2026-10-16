@@ -4,6 +4,7 @@
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/ResourceExportWriter.h"
 #include "Capture/FrameSequenceCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
@@ -28,6 +29,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -108,6 +110,12 @@ namespace gglab
 				outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
 					std::make_move_iterator(m_Results.end()));
 				m_Results.clear();
+			}
+			bool HasNonFiniteInstrumentation() const noexcept override { return m_Instrumentation; }
+			void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>& frames) noexcept override
+			{
+				frames.insert(frames.end(), std::make_move_iterator(m_Production.begin()), std::make_move_iterator(m_Production.end()));
+				m_Production.clear();
 			}
 			uint32_t GetUnfinishedRequestCount() const noexcept override { return static_cast<uint32_t>(m_LiveRequests.size()); }
 			std::optional<PostProcessDebugTap> GetPendingDiagnosticTap() const noexcept override
@@ -200,6 +208,8 @@ namespace gglab
 			FrameCaptureAvailability m_RequestAvailability = FrameCaptureAvailability::Available;
 			FrameCaptureAvailability m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
 			bool m_RejectRequest = false;
+			bool m_Instrumentation = false;
+			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_Production;
 			uint32_t m_RequestLimit = 64;
 			mutable RHIFormat m_QueriedFormat = RHIFormat::Unknown;
 			mutable uint32_t m_QueriedRequestCount = 0;
@@ -796,6 +806,65 @@ namespace gglab
 				lateResult->m_Status == FrameCaptureRequestStatus::Cancelled &&
 				coordinator.GetUnfinishedRequestCount() == 0,
 				"Shutdown gives every request one explicit result and encodes final captures");
+		}
+
+		void RunWatchShutdownTests(SelfTestContext& context) noexcept
+		{
+			for (const auto mode : { NonFiniteWatchMode::Report, NonFiniteWatchMode::Fail })
+			{
+				for (const auto claim : { NonFiniteClaimStatus::Passed, NonFiniteClaimStatus::Failed, NonFiniteClaimStatus::Incomplete })
+				{
+					TemporaryDirectory directory("frame-capture-watch-shutdown");
+					FakeCaptureControl control;
+					control.m_Instrumentation = true;
+					NonFiniteWatchCoordinator watch(&control);
+					std::string error;
+					context.Check(watch.Configure({ .m_Mode = mode, .m_Boundary = false }, error),
+						"Shutdown watch configures a production coverage range");
+					FrameCaptureCoordinator coordinator({
+						.m_Capture = &control,
+						.m_DefaultOutputDirectory = directory.GetPath(),
+						.m_ImageEncoder = &EncodeTestPng,
+						.m_WriteOnCallingThread = true,
+						.m_NonFiniteWatch = &watch,
+						});
+					const auto id = coordinator.Submit({});
+					const auto frame = MakeFrameState(false);
+					coordinator.BeginFrame(frame);
+					watch.OnFrameSubmitted(frame.m_FrameSerial);
+					coordinator.OnFrameSubmitted();
+					coordinator.PrepareForShutdown();
+
+					// The last fence completes during render-host finalization, after the
+					// coordinator's last ordinary poll. Missing evidence has no queued frame.
+					control.Complete(control.m_Issued[0].m_Id);
+					if (claim != NonFiniteClaimStatus::Incomplete)
+					{
+						auto production = std::make_shared<NonFiniteProductionFrame>();
+						production->m_FrameSerial = frame.m_FrameSerial;
+						production->m_Claim = { claim, NonFiniteWatchFailure::None };
+						if (claim == NonFiniteClaimStatus::Failed)
+						{
+							production->m_Claim.m_Failure = NonFiniteWatchFailure::NonFiniteReplaced;
+							production->m_Sites.push_back({ .m_ProgramIndex = 2, .m_SiteIndex = 3, .m_Claim = production->m_Claim });
+						}
+						control.m_Production.push_back(std::move(production));
+					}
+					coordinator.FinalizeAfterRenderHost();
+					const auto results = Consume(coordinator);
+					const bool publishes = mode == NonFiniteWatchMode::Report || claim == NonFiniteClaimStatus::Passed;
+					context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Metadata &&
+						results[0].m_Metadata->m_WatchCoverage && results[0].m_Metadata->m_WatchCoverage->m_Complete &&
+						results[0].m_Metadata->m_WatchCoverage->m_CompletedFrames == 1 &&
+						results[0].m_Metadata->m_WatchCoverage->m_Production.m_Status == claim &&
+						results[0].m_Status == (publishes ? FrameCaptureRequestStatus::Completed : FrameCaptureRequestStatus::Failed) &&
+						(publishes ? std::filesystem::exists(results[0].m_ImagePath) :
+							results[0].m_ImagePath.empty() && results[0].m_Failure.starts_with(
+								claim == NonFiniteClaimStatus::Failed ? "NonFiniteReplaced" : "MissingCoverage")) &&
+						coordinator.GetUnfinishedRequestCount() == 0,
+						"Shutdown drains final production evidence before adjudicating only genuinely missing coverage");
+				}
+			}
 		}
 
 		void RunNameCollisionTests(SelfTestContext& context) noexcept
@@ -2728,6 +2797,7 @@ namespace gglab
 		RunReferenceViewTests(context);
 		RunFailureTests(context);
 		RunShutdownTests(context);
+		RunWatchShutdownTests(context);
 		RunNameCollisionTests(context);
 		RunWriterThreadTests(context);
 		RunCapacityAdmissionTests(context);

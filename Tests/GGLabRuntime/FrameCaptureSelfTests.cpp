@@ -24,6 +24,7 @@
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -1420,6 +1421,45 @@ namespace gglab
 				impossibleResults[0].m_ResourceFailure == RGObservationFailure::TooLarge,
 				"An impossible image and scan frame fails explicitly instead of deferring forever");
 			impossible.OnFrameAborted(31); impossible.Shutdown();
+			for (const bool byteLimited : { false, true })
+			{
+				FrameCaptureService limited(device, { .m_MaxPayloads = 3, .m_MaxPayloadBytes = byteLimited ? 176u : 4096u });
+				limited.ConfigureNonFiniteScans(programs, programs, programs);
+				RenderGraph limitedGraph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				GGLAB_UNUSED(build(limitedGraph));
+				std::vector<RGResourceAddress> targets{ final };
+				if (!byteLimited)
+				{
+					targets.push_back(before);
+					targets.push_back({ .m_Resource = "Scan.Buffer", .m_Position = RGObservationPosition::After, .m_Pass = "Initialize" });
+				}
+				// Manual exports are flexible, so the later strict scan is admitted first.
+				// Each group fits alone, but they can never fit in the same idle frame.
+				const auto oversizedExport = limited.RequestResourceExport(std::move(targets), 31);
+				GGLAB_UNUSED(limited.RequestNonFiniteScan({ { final, layout } }, 20, 31, false, 0, true));
+				const auto availability = limited.PrepareResourceExports(31, limitedGraph);
+				const auto rejected = Consume(limited);
+				context.Check(availability == FrameCaptureAvailability::Available && rejected.size() == 1 &&
+					rejected[0].m_RequestId == oversizedExport && rejected[0].m_Status == FrameCaptureStatus::Failed &&
+					rejected[0].m_ResourceFailure == RGObservationFailure::TooLarge &&
+					limitedGraph.HasNonFiniteScans() && !limitedGraph.HasResourceObservations(),
+					"An export that cannot coexist with required fail-mode scans fails permanently for both slots and bytes");
+				limited.OnFrameAborted(31);
+				limited.Shutdown();
+			}
+			{
+				FrameCaptureService compatible(device, { .m_MaxPayloads = 3, .m_MaxPayloadBytes = 4096 });
+				compatible.ConfigureNonFiniteScans(programs, programs, programs);
+				RenderGraph compatibleGraph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				GGLAB_UNUSED(build(compatibleGraph));
+				GGLAB_UNUSED(compatible.RequestResourceExport({ before, final }, 31));
+				GGLAB_UNUSED(compatible.RequestNonFiniteScan({ { final, layout } }, 20, 31, false, 0, true));
+				context.Check(compatible.PrepareResourceExports(31, compatibleGraph) == FrameCaptureAvailability::Available &&
+					Consume(compatible).empty() && compatibleGraph.HasNonFiniteScans() && compatibleGraph.HasResourceObservations(),
+					"A flexible export and its required scan still admit together when the complete frame fits");
+				compatible.OnFrameAborted(31);
+				compatible.Shutdown();
+			}
 			results.clear(); busy.clear();
 			const auto retry = service.RequestNonFiniteScan({ { final, layout } }, 21);
 			GGLAB_UNUSED(service.PrepareResourceExports(32, next)); service.OnFrameAborted(32);
