@@ -582,6 +582,29 @@ PNG pixels equal the uninjected control, `expected` and `error` clamp policies, 
 Temporal AA history NaN/infinities that fail only at the color or accumulation recovery
 site. Every injected report and capture must carry the stamp.
 
+### Overhead
+
+`Scripts/MeasureNonFiniteOverhead.ps1` plays Coastal Atrium camera paths with
+`-GpuTiming` in three hidden sessions per backend: `baseline` (no counters, watch off),
+`counters` (`--watch-nonfinite`, watch off) and `watch` (counters plus report-mode
+semantic defaults). It reports mean frame time, per-frame pass time and per-frame
+`Observation.*` time, and writes `summary.md` under `Build/Validation/NonFiniteOverhead`.
+Compare arms only within one run and backend.
+
+Recorded on an RTX 5080, Release, 1920x1080, all nine Coastal Atrium paths (1454
+timed renders per arm):
+
+| Backend | Baseline frame | Counters | Counters + watch | Scans per frame |
+| --- | --- | --- | --- | --- |
+| DX12 | 1.43 ms | +0.71 ms | +1.93 ms | 1.18 ms |
+| Vulkan | 1.56 ms | +0.89 ms | +2.06 ms | 1.12 ms |
+
+The production clear and readback cost under 0.01 ms per frame. Counter variants cost
+most in `Geometry.ForwardOpaque` (about 2.7x): it draws with a read-only equal depth
+test after the prepass, and a pixel shader that writes the counter UAV loses implicit
+early depth testing, so occluded fragments are shaded. Per-frame Tier A scans cost
+about 0.2-0.5 ms per full-resolution target. The tools stay off for performance runs.
+
 ### Lab and Demo audit
 
 `Scripts/AuditNonFiniteLabs.ps1` starts one hidden, counter-capable session per Lab or
