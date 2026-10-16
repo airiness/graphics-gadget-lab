@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,6 +13,7 @@
 
 namespace gglab
 {
+	struct NonFiniteWatchCoverage;
 	// Version of the persisted capture sidecar JSON. Increment it for every
 	// change that renames, removes or reinterprets a field.
 	inline constexpr uint32_t FrameCaptureMetadataSchemaVersion = 1;
@@ -156,6 +158,8 @@ namespace gglab
 		std::string m_CapturedAtUtc;
 		bool m_GraphExportActive = false;
 		bool m_ResourceExportActive = false;
+		bool m_NonFiniteScanActive = false;
+		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.
@@ -164,4 +168,5 @@ namespace gglab
 	// Serializes the metadata as schema-versioned UTF-8 JSON.
 	[[nodiscard]] std::string SerializeFrameCaptureMetadata(
 		const FrameCaptureMetadata& metadata) noexcept;
+	[[nodiscard]] std::string SerializeNonFiniteWatchCoverage(const NonFiniteWatchCoverage& coverage) noexcept;
 }

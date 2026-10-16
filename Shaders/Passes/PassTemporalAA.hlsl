@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/BindlessResources.hlsli>
 #include <Common/TemporalAA.hlsli>
@@ -97,7 +98,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedLuminanceWeightAndHistoryRelaxation) *
 		float2(16.0, 4.0);
 	float3 centerColor = currentColorTexture.Load(int3(renderPixel, 0)).rgb;
-	if (!IsTemporalColorFinite(centerColor))
+	if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_COLOR_FINITE, centerColor)))
 	{
 		centerColor = 0.0.xxx;
 	}
@@ -135,7 +136,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 					const int2 samplePixel =
 						clamp(int2(renderPixel) + int2(x, y), 0, maxPixel);
 					const float sampleDepth = currentDepthTexture.Load(int3(samplePixel, 0));
-					if (isfinite(sampleDepth) && IsDepthNearer(
+					if (isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, sampleDepth)) && IsDepthNearer(
 						sampleDepth, correspondenceDepth, viewData.DepthConvention))
 					{
 						correspondencePixel = samplePixel;
@@ -171,8 +172,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 		if (!AreTemporalReprojectionUVsValid(previousHistoryUV, validationPreviousRasterUV))
 		{
-			rejectionReason = all(isfinite(previousHistoryUV)) &&
-				all(isfinite(validationPreviousRasterUV))
+			rejectionReason = all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, previousHistoryUV))) &&
+				all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, validationPreviousRasterUV)))
 				? TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS
 				: TAA_REJECTION_NON_FINITE;
 		}
@@ -200,8 +201,14 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				pointClampSampler, previousHistoryUV, 0.0).a;
 			previousReliability = GetTexture2DFloat2(g_Pass.PackedReliabilityIndices & 0xffffu)
 				.SampleLevel(pointClampSampler, previousHistoryUV, 0.0);
-			if (!IsTemporalColorFinite(historyColor) ||
-				!IsTemporalHistoryAccumulationValid(previousAccumulation))
+			// Debug verification can replace one history component (RGB color or alpha
+			// accumulation) in registers so the recovery guards below must observe it.
+			const float4 history = NonFiniteInject(NF_INJECT_PASS_TEMPORAL_AA_CSMAIN_HISTORY, pixel,
+				float4(historyColor, previousAccumulation));
+			historyColor = history.rgb;
+			previousAccumulation = history.a;
+			if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_COLOR_FINITE, historyColor)) ||
+				!IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousAccumulation)))
 			{
 				rejectionReason = TAA_REJECTION_NON_FINITE;
 			}
@@ -211,7 +218,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 					GetTexture2DFloat(g_Pass.PreviousDepthIndex);
 				const float previousRawDepth = previousDepthTexture.SampleLevel(
 					pointClampSampler, validationPreviousRasterUV, 0.0);
-				if (!isfinite(previousRawDepth))
+				if (!isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, previousRawDepth)))
 				{
 					rejectionReason = TAA_REJECTION_NON_FINITE;
 				}
@@ -318,7 +325,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		historyColor = TemporalYCoCgToRGB(rectifiedYCoCg);
 		clipDistance = saturate(length(rectifiedYCoCg - historyYCoCg) /
 			max(length(neighborhoodMax - neighborhoodMin), 1.0e-6));
-		if (!IsTemporalColorFinite(historyColor) || !isfinite(historyWeight))
+		if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_COLOR_FINITE, historyColor)) || !isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, historyWeight)))
 		{
 			historyColor = currentColor;
 			historyWeight = 0.0;
@@ -328,7 +335,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 
 	float3 outputColor = lerp(currentColor, historyColor, historyWeight);
-	if (!IsTemporalColorFinite(outputColor))
+	if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_COLOR_FINITE, outputColor)))
 	{
 		outputColor = currentColor;
 		accepted = false;
@@ -342,7 +349,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			historyConfidence, maxHistorySamples, currentSampleWeight)
 		: ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
 	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextAccumulation);
-	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor), outputAlphas.x);
+	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor, NF_SITE_PASS_TEMPORAL_AA_CSMAIN_SANITIZE_HDRCOLOR), outputAlphas.x);
 	// Half precision stores a compatibility age exactly and an effective sample count
 	// within a relative 2^-11.
 	const float4 historyOutput = float4(QuantizeTemporalHistoryColor(
@@ -350,7 +357,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
 	GetRWTexture2DFloat2(g_Pass.PackedReliabilityIndices >> 16)[pixel] =
-		accepted && all(isfinite(nextReliability)) ? nextReliability : 0.0.xx;
+		accepted && all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, nextReliability))) ? nextReliability : 0.0.xx;
 	float4 diagnosticsOutput =
 		float4(historyWeight, float(rejectionReason), previousHistoryUV);
 	if (writeHistoryColorPreview)

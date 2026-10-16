@@ -2,6 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\BrdfLutNumericSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\NonFiniteScanNumericSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\ShaderRuntimeIntegrationTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.cpp" />
@@ -9,6 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\BrdfLutNumericSelfTests.h" />
+    <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\NonFiniteScanNumericSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\TemporalAccumulationNumericSelfTests.h" />

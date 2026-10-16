@@ -496,6 +496,19 @@ namespace gglab
 		return RHIPipelineHandle(index, m_PipelineGeneration);
 	}
 
+	bool VulkanPipelineSystem::GetBindingLayoutDesc(RHIBindingLayoutHandle layout, RHIBindingLayoutDesc& desc) const noexcept
+	{
+		if (!IsAlive(layout))
+		{
+			return false;
+		}
+		const auto& entry = m_BindingLayouts[layout.Index()];
+		desc.m_SlotCount = entry.m_SlotCount;
+		desc.m_Slots = entry.m_Slots;
+		desc.m_DebugName = entry.m_DebugName.c_str();
+		return true;
+	}
+
 	bool VulkanPipelineSystem::IsAlive(RHIBindingLayoutHandle layout) const noexcept
 	{
 		return ResolveBindingLayout(layout) != nullptr;

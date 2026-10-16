@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -172,6 +173,7 @@ namespace gglab
 		uint32_t m_CompletedCaptures = 0;
 		// Set when the request records GPU timing.
 		std::optional<FrameSequenceGpuTiming> m_GpuTiming;
+		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
 		std::string m_Failure;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
@@ -257,6 +259,7 @@ namespace gglab
 		static constexpr uint32_t MaxPendingGpuTimingSubmissions = 64;
 		// Counts finished captures of the sequence; a failed capture fails it.
 		void OnCaptureResults(std::span<const FrameCaptureRequestResult> results) noexcept;
+		void UpdateWatchCoverage() noexcept;
 
 	private:
 		struct PendingGpuTimingFrame
@@ -293,5 +296,7 @@ namespace gglab
 		std::vector<PendingGpuTimingFrame> m_PendingGpuTimingFrames;
 		uint64_t m_GpuTimingSubmissionCount = 0;
 		uint64_t m_LastTimingSubmissionSerial = 0;
+		uint64_t m_WatchCoverageId = 0;
+		bool m_WatchStarted = false;
 	};
 }

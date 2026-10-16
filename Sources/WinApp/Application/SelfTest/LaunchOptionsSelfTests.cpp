@@ -147,6 +147,10 @@ namespace gglab
 			}
 			{
 				const auto defaults = parse({});
+				const auto instrumented = parse({ "--watch-nonfinite" });
+				const auto duplicateWatch = parse({ "--watch-nonfinite", "--watch-nonfinite" });
+				context.Check(instrumented.IsValid() && instrumented.m_Options.m_WatchNonFinite && !duplicateWatch.IsValid(),
+					"Production counter instrumentation is an explicit startup capability with strict duplicate validation");
 				const auto hidden = parse({ "--hidden", "--window-size", "3840x2160",
 					"--fixed-delta-time", "0.02" });
 				context.Check(defaults.IsValid() && !defaults.m_Options.m_Hidden &&
@@ -244,6 +248,32 @@ namespace gglab
 				context.Check(!unknownDemo.IsValid() &&
 					unknownDemo.m_Error.find("Unknown demo") != std::string::npos,
 					"Launch options reject unknown demo names");
+			}
+			{
+				const auto assignments = parse({ "--lab", "gglab.lab.render_graph_compute",
+					"--lab-parameter", "render_graph_compute.debug.nonfinite.mode=Boundary",
+					"--lab-parameter", "render_graph_compute.animation.speed=0" });
+#if defined(BUILD_DEBUG)
+				context.Check(assignments.IsValid() &&
+					assignments.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
+					assignments.m_Options.m_StartupLabParameters.size() == 2 &&
+					assignments.m_Options.m_StartupLabParameters[0].m_Id ==
+						"render_graph_compute.debug.nonfinite.mode" &&
+					assignments.m_Options.m_StartupLabParameters[0].m_Value == "Boundary" &&
+					assignments.m_Options.m_StartupLabParameters[1].m_Value == "0",
+					"Debug startup Lab parameters keep their order, ids and textual values");
+				context.Check(!parse({ "--lab-parameter", "speed" }).IsValid() &&
+					!parse({ "--lab-parameter", "=1" }).IsValid() &&
+					!parse({ "--lab-parameter", "speed=" }).IsValid() &&
+					!parse({ "--lab-parameter", "a=1", "--lab-parameter", "a=2" }).IsValid() &&
+					!parse({ "--demo", "atrium", "--lab-parameter", "a=1" }).IsValid() &&
+					!parse({ "--self-test", "all", "--lab-parameter", "a=1" }).IsValid(),
+					"Debug startup Lab parameters reject malformed, duplicate or non-Lab assignments");
+#else
+				context.Check(!assignments.IsValid() &&
+					assignments.m_Error.find("only in Debug builds") != std::string::npos,
+					"Startup Lab parameters are rejected outside Debug builds");
+#endif
 			}
 		}
 

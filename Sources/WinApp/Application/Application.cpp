@@ -546,8 +546,24 @@ namespace gglab
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
+				.m_NonFiniteInstrumentation = m_AppRuntime && m_AppRuntime->GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation(),
+				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
+				.m_Watch = m_AppRuntime && m_AppRuntime->GetNonFiniteWatchCoordinator() ? &m_AppRuntime->GetNonFiniteWatchCoordinator()->GetStatus() : nullptr,
 				}));
 			return;
+		case ApplicationControlCommand::Watch:
+		{
+			auto* watch = m_AppRuntime ? m_AppRuntime->GetNonFiniteWatchCoordinator() : nullptr;
+			std::string error;
+			if (!watch || !watch->Configure(request.m_Watch, error))
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id, watch ? error : "Non-finite watch is unavailable."));
+				return;
+			}
+			pipeRequest->Respond(SerializeApplicationControlWatch(request.m_Id, watch->GetStatus(),
+				m_AppRuntime->GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation()));
+			return;
+		}
 		case ApplicationControlCommand::Capture:
 		case ApplicationControlCommand::Graph:
 		case ApplicationControlCommand::Export:

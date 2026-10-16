@@ -437,6 +437,20 @@ namespace gglab
 			m_CurrentRootSignature = rootSignature;
 		}
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
+		if (const auto& binding = GetPassStorageBuffer(); binding)
+		{
+			// Use the pipeline system's owned layout, not the native creation description's borrowed pointers.
+			if (const auto parameter = m_PipelineSystem->GetStorageBufferParameterIndex(pipeline, binding->m_Binding, binding->m_Space); parameter)
+			{
+				const auto* buffer = m_Backend.GetDevice()->ResolveBuffer(binding->m_Buffer);
+				GGLAB_ASSERT_NOT_NULL(buffer);
+				if (buffer)
+				{
+					m_Backend.GetCommandList()->Get()->SetGraphicsRootUnorderedAccessView(*parameter, buffer->GPUVirtualAddress());
+					m_Backend.TrackBufferUse(binding->m_Buffer);
+				}
+			}
+		}
 		m_CurrentPipelineDesc = pipelineDesc;
 	}
 
@@ -887,6 +901,20 @@ namespace gglab
 			m_CurrentRootSignature = rootSignature;
 		}
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
+		if (const auto& binding = GetPassStorageBuffer(); binding)
+		{
+			// Use the pipeline system's owned layout, not the native creation description's borrowed pointers.
+			if (const auto parameter = m_PipelineSystem->GetStorageBufferParameterIndex(pipeline, binding->m_Binding, binding->m_Space); parameter)
+			{
+				const auto* buffer = (*m_Backend).GetDevice()->ResolveBuffer(binding->m_Buffer);
+				GGLAB_ASSERT_NOT_NULL(buffer);
+				if (buffer)
+				{
+					(*m_Backend).GetCommandList()->Get()->SetComputeRootUnorderedAccessView(*parameter, buffer->GPUVirtualAddress());
+					(*m_Backend).TrackBufferUse(binding->m_Buffer);
+				}
+			}
+		}
 	}
 
 	void DX12ComputeCommandContext::SetDescriptorTable(

@@ -56,6 +56,9 @@ namespace gglab
 
 		VkPhysicalDeviceFeatures2 features2{};
 		features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		VkPhysicalDeviceFeatures optionalFeatures{};
+		vkGetPhysicalDeviceFeatures(createInfo.m_PhysicalDevice, &optionalFeatures);
+		features2.features.fragmentStoresAndAtomics = optionalFeatures.fragmentStoresAndAtomics;
 		features2.features.samplerAnisotropy = capabilities.m_SamplerAnisotropy ? VK_TRUE : VK_FALSE;
 		features2.features.shaderStorageImageExtendedFormats =
 			capabilities.m_ShaderStorageImageExtendedFormats ? VK_TRUE : VK_FALSE;
@@ -132,6 +135,7 @@ namespace gglab
 		deviceCreateInfo.pNext = &features2;
 
 		auto device = std::make_unique<VulkanDevice>();
+		device->m_PixelStorageAtomics = optionalFeatures.fragmentStoresAndAtomics == VK_TRUE;
 		device->m_OwnerThreadId = std::this_thread::get_id();
 		device->m_Instance = createInfo.m_Instance;
 		device->m_PhysicalDevice = createInfo.m_PhysicalDevice;

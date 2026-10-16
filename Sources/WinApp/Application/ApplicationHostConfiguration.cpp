@@ -25,6 +25,7 @@ namespace gglab
 		config.m_AdapterSelector = options.m_AdapterSelector;
 		config.m_StartupLabId =
 			options.m_StartupLabId.value_or(std::string(DesktopDefaultLabId));
+		config.m_StartupLabParameters = options.m_StartupLabParameters;
 		config.m_InitialExtent = initialExtent;
 		config.m_InitialPointerMode = options.m_StartWithRelativeMouse
 			? AppRuntimePointerMode::Relative
@@ -34,6 +35,7 @@ namespace gglab
 			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;
 		}
 		config.m_RequestRuntimeValidation = requestRuntimeValidation;
+		config.m_NonFiniteCounters = options.m_WatchNonFinite;
 		config.m_FixedDeltaTimeSeconds = options.m_FixedDeltaTimeSeconds
 			? options.m_FixedDeltaTimeSeconds
 			: options.m_Hidden ? std::optional<double>(HiddenLaunchFixedDeltaTimeSeconds)

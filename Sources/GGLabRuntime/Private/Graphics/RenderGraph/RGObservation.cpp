@@ -10,6 +10,31 @@
 
 namespace gglab
 {
+	RGResourceAddress RenderGraph::RGBuilder::GetObservationAddress(
+		RGResourceHandle resource, RGObservationPosition position) const noexcept
+	{
+		if (!resource.IsValid() || resource.GetHandle().Value() >= m_RG.m_ResourceSlots.size())
+		{
+			return {};
+		}
+		const auto* virtualResource = m_RG.GetVirtualResource(resource);
+		if (!virtualResource)
+		{
+			return {};
+		}
+		const auto name = m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_NameId.Name();
+		uint32_t occurrence = 1;
+		for (uint32_t i = 0; i < m_PassNodeIndex.Value(); ++i)
+		{
+			if (m_RG.m_PassNodes[i].m_NameId.Name() == name)
+			{
+				++occurrence;
+			}
+		}
+		return { .m_Resource = std::string(virtualResource->m_NameId.Name()), .m_Position = position,
+			.m_Pass = std::string(name), .m_Occurrence = occurrence };
+	}
+
 	std::string_view GetRGObservationFailureName(RGObservationFailure failure) noexcept
 	{
 		switch (failure)
@@ -29,9 +54,9 @@ namespace gglab
 		return "Unknown";
 	}
 
-	RGObservationTarget RenderGraph::ResolveObservation(const RGResourceAddress& address) const noexcept
+	RGObservationTarget RenderGraph::ResolveObservation(const RGResourceAddress& address, RGObservationKind kind) const noexcept
 	{
-		RGObservationTarget result{ .m_Address = address };
+		RGObservationTarget result{ .m_Address = address, .m_Kind = kind };
 		const auto fail = [&](RGObservationFailure failure)
 			{ result.m_Failure = failure; return result; };
 		if (!m_ExecutionPlan || !m_ObservationPasses.empty())
@@ -139,7 +164,8 @@ namespace gglab
 			result.m_BufferDesc.m_DebugName = nullptr;
 			if (address.m_Mip != 0 || address.m_FirstSlice != 0 || address.m_SliceCount ||
 				address.m_Aspect != RHITextureAspect::None || (compiled.m_Imported &&
-					!Test(result.m_BufferDesc.m_Usage, RHIBufferUsage::CopySource)))
+					!Test(result.m_BufferDesc.m_Usage, kind == RGObservationKind::ResourceExport
+						? RHIBufferUsage::CopySource : RHIBufferUsage::Structured)))
 			{
 				return fail(RGObservationFailure::UnsupportedResource);
 			}
@@ -155,12 +181,14 @@ namespace gglab
 			if (!compiled.m_Imported)
 			{
 				result.m_TextureDesc.m_Usage = static_cast<RHITextureUsage>(compiled.m_UsageBits);
+				if (kind == RGObservationKind::NonFiniteScan) { result.m_TextureDesc.m_Usage |= RHITextureUsage::Sampled; }
 			}
 			const auto& desc = result.m_TextureDesc;
 			if (desc.m_Dimension != RHITextureDimension::Texture2D || desc.m_SampleCount != 1 ||
 				address.m_Mip >= GetRHITextureMipLevelCount(desc) || address.m_Mip >= 32 ||
 				address.m_FirstSlice >= GetRHITextureArraySize(desc) ||
-				(compiled.m_Imported && !Test(desc.m_Usage, RHITextureUsage::CopySource)))
+				(compiled.m_Imported && !Test(desc.m_Usage, kind == RGObservationKind::ResourceExport
+					? RHITextureUsage::CopySource : RHITextureUsage::Sampled)))
 			{
 				return fail(RGObservationFailure::UnsupportedResource);
 			}
@@ -304,14 +332,32 @@ namespace gglab
 		return result;
 	}
 
+	bool RenderGraph::HasResourceObservations() const noexcept
+	{
+		return std::ranges::any_of(m_ObservationPasses, [](const auto& entry)
+			{ return entry.second.m_Kind == RGObservationKind::ResourceExport; });
+	}
+
+	bool RenderGraph::HasNonFiniteScans() const noexcept
+	{
+		return std::ranges::any_of(m_ObservationPasses, [](const auto& entry)
+			{ return entry.second.m_Kind != RGObservationKind::ResourceExport; });
+	}
+
 	bool RenderGraph::AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept
+	{
+		return AttachObservations(copies, {});
+	}
+
+	bool RenderGraph::AttachObservations(std::span<const RGObservationCopy> copies,
+		std::span<const RGObservationScan> scans, const RGProductionCounters* counters) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_ExecutionPlan && m_ObservationPasses.empty(), "Observations extend one original compiled graph exactly once.");
 		if (!m_ExecutionPlan || !m_ObservationPasses.empty())
 		{
 			return false;
 		}
-		if (copies.empty())
+		if (copies.empty() && scans.empty() && !counters)
 		{
 			return true;
 		}
@@ -351,6 +397,83 @@ namespace gglab
 				}
 			}
 		}
+		std::vector<RGObservationScan> resolvedScans(scans.begin(), scans.end());
+		for (auto& scan : resolvedScans)
+		{
+			const auto target = ResolveObservation(scan.m_Target.m_Address, RGObservationKind::NonFiniteScan);
+			if (scan.m_Target.m_Failure != RGObservationFailure::None ||
+				scan.m_Target.m_Kind != RGObservationKind::NonFiniteScan ||
+				target.m_Failure != RGObservationFailure::None || target.m_Node != scan.m_Target.m_Node ||
+				target.m_Resource != scan.m_Target.m_Resource || !scan.m_Readback.IsValid() ||
+				!m_Device->IsAlive(scan.m_Readback) || scan.m_RecordBytes == 0 || scan.m_RecordBytes % 4 != 0 ||
+				!scan.m_Clear || !scan.m_Scan || (target.m_Type == RGResourceType::RGBuffer &&
+					(!scan.m_Components.IsValid() || !m_Device->IsAlive(scan.m_Components) || scan.m_ComponentBytes == 0)))
+			{
+				return false;
+			}
+			if (target.m_Type == RGResourceType::RGTexture && (target.m_RawTypeless ||
+				!m_Device->QueryTextureViewSupport(target.m_TextureDesc, {
+					.m_Type = RHITextureViewType::ShaderResource, .m_Dimension = RHITextureViewDimension::Texture2DArray,
+					.m_Format = target.m_ViewFormat, .m_Subresources = target.m_Subresources }).IsSupported()))
+			{
+				return false;
+			}
+			scan.m_Target = target;
+		}
+		if (counters)
+		{
+			if (!counters->m_Clear || !m_Device->IsAlive(counters->m_Readback) || counters->m_Bytes == 0)
+			{
+				return false;
+			}
+			struct Data { RGBufferId m_Record; RGBufferId m_Readback; RGProductionCounters m_Config; };
+			RGBufferId record;
+			const uint32_t clearIndex = static_cast<uint32_t>(m_PassNodes.size());
+			AddPass<Data>("Observation.ProductionCounters.Clear", RGPassEncoderType::Compute,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Config = *counters;
+					record = builder.CreateBuffer("Observation.ProductionCounters.Record", { .m_SizeInBytes = counters->m_Bytes, .m_StrideInBytes = 4 });
+					data.m_Record = builder.Write(record, RGBufferAccess::StorageWrite);
+					record = data.m_Record;
+				}, [](RGExecuteContext& context, Data& data) { data.m_Config.m_Clear(context, data.m_Record); });
+			const auto originalOrder = m_ExecutionPlan->GetExecutionOrder();
+			for (const auto pass : originalOrder)
+			{
+				if (m_PassNodes[pass.Value()].m_EncoderType == RGPassEncoderType::Copy)
+				{
+					continue;
+				}
+				RGBuilder builder(*this, pass);
+				record = builder.ReadWrite(record, RGBufferAccess::StorageReadWrite);
+				m_PassNodes[pass.Value()].m_PassStorageBuffer = record;
+				m_PassNodes[pass.Value()].m_PassStorageBinding = counters->m_Binding;
+			}
+			const uint32_t copyIndex = static_cast<uint32_t>(m_PassNodes.size());
+			AddPass<Data>("Observation.ProductionCounters.Readback", RGPassEncoderType::Copy,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Config = *counters;
+					data.m_Record = builder.Read(record, RGBufferAccess::CopySource);
+					data.m_Readback = builder.ImportBuffer("Observation.ProductionCounters.Readback", counters->m_Readback,
+						{ .m_SizeInBytes = counters->m_Bytes, .m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu },
+						RGBufferAccess::CopyDest, RGContentValidity::Undefined);
+					builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest);
+				},
+				[](RGExecuteContext& context, Data& data)
+				{
+					context.GetCopyCommandContext()->CopyBuffer(context.GetBufferHandle(data.m_Readback), 0,
+						context.GetBufferHandle(data.m_Record), 0, data.m_Config.m_Bytes);
+				});
+			RGObservationTarget target{ .m_Address = { .m_Resource = "Observation.ProductionCounters.Record" },
+				.m_Kind = RGObservationKind::ProductionCounters,
+				.m_Type = RGResourceType::RGBuffer,
+				.m_Resource = record,
+				.m_Node = m_ResourceSlots[record.GetHandle().Value()].m_ResourceNodeIndex };
+			m_ObservationPasses.emplace_back(clearIndex, target);
+			target.m_InsertionPosition = static_cast<uint32_t>(originalOrder.size());
+			m_ObservationPasses.emplace_back(copyIndex, target);
+		}
 		for (const auto& copy : resolved)
 		{
 			struct Data { RGBufferId m_Readback; RGObservationCopy m_Copy; };
@@ -379,19 +502,97 @@ namespace gglab
 					const auto& range = data.m_Copy.m_Target.m_Subresources;
 					for (uint32_t slice = 0; slice < range.m_ArraySliceCount; ++slice)
 						commands->CopyTextureToBuffer({ .m_Source = context.GetTextureHandle(RGTextureId{ *data.m_Copy.m_Target.m_Resource }),
-							.m_SourceMipLevel = range.m_BaseMip, .m_SourceArraySlice = range.m_BaseArraySlice + slice,
-							.m_Destination = destination, .m_DestinationOffset = slice * data.m_Copy.m_SlicePitch,
-							.m_Footprint = data.m_Copy.m_Footprint, .m_SourceAspect = range.m_Aspects });
+							.m_SourceMipLevel = range.m_BaseMip,
+							.m_SourceArraySlice = range.m_BaseArraySlice + slice,
+							.m_Destination = destination,
+							.m_DestinationOffset = slice * data.m_Copy.m_SlicePitch,
+							.m_Footprint = data.m_Copy.m_Footprint,
+							.m_SourceAspect = range.m_Aspects });
 				});
 			// Dedicated stale-version read. The ordinary builder keeps its Read/Export assertions.
 			m_PassNodes[index].m_Accesses.push_back({ .m_ResourceNodeIndex = copy.m_Target.m_Node,
 				.m_AccessValue = copy.m_Target.m_Type == RGResourceType::RGTexture
 					? static_cast<uint64_t>(RGTextureAccess::CopySource) : static_cast<uint64_t>(RGBufferAccess::CopySource),
-				.m_Stages = RHIStage::Copy, .m_ResourceType = copy.m_Target.m_Type,
-				.m_DependencyAccess = RGDependencyAccess::Read, .m_Subresources = copy.m_Target.m_Type == RGResourceType::RGTexture
+				.m_Stages = RHIStage::Copy,
+				.m_ResourceType = copy.m_Target.m_Type,
+				.m_DependencyAccess = RGDependencyAccess::Read,
+				.m_Subresources = copy.m_Target.m_Type == RGResourceType::RGTexture
 					? std::optional(copy.m_Target.m_Subresources) : std::nullopt });
 			m_ResourceNodes[copy.m_Target.m_Node.Value()].m_Readers.push_back(RGPassNodeIndex{ index });
 			m_ObservationPasses.emplace_back(index, copy.m_Target);
+		}
+		for (const auto& scan : resolvedScans)
+		{
+			struct Data
+			{
+				RGBufferId m_Record;
+				RGBufferId m_Readback;
+				RGTextureViewId m_View;
+				RGObservationScan m_Scan;
+			};
+			RGBufferId record;
+			const uint32_t first = static_cast<uint32_t>(m_PassNodes.size());
+			const std::string name = std::format("Observation.NonFiniteScan.{}", first);
+			AddPass<Data>((name + ".Clear").c_str(), RGPassEncoderType::Compute,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Scan = scan;
+					record = builder.CreateBuffer((name + ".Record").c_str(), {
+						.m_SizeInBytes = scan.m_RecordBytes, .m_StrideInBytes = scan.m_RecordBytes });
+					data.m_Record = builder.Write(record, RGBufferAccess::StorageWrite);
+					record = data.m_Record;
+				}, [](RGExecuteContext& context, Data& data) { data.m_Scan.m_Clear(context, data.m_Record); });
+			AddPass<Data>(name.c_str(), RGPassEncoderType::Compute,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Scan = scan;
+					data.m_Record = builder.ReadWrite(record, RGBufferAccess::StorageReadWrite);
+					record = data.m_Record;
+					if (scan.m_Target.m_Type == RGResourceType::RGTexture)
+					{
+						data.m_View = CreateTextureView<RHITextureViewType::ShaderResource>(RGPassNodeIndex{ first + 1 },
+							RGTextureId{ *scan.m_Target.m_Resource }, RHITextureViewDesc{
+								.m_Dimension = RHITextureViewDimension::Texture2DArray, .m_Format = scan.m_Target.m_ViewFormat,
+								.m_Subresources = scan.m_Target.m_Subresources });
+					}
+					else
+					{
+						const auto components = builder.ImportBuffer((name + ".Components").c_str(), scan.m_Components,
+							{ .m_SizeInBytes = scan.m_ComponentBytes, .m_StrideInBytes = 8, .m_Usage = RHIBufferUsage::Structured,
+								.m_MemoryUsage = RHIMemoryUsage::CpuToGpu }, RGBufferAccess::StructuredRead, RGContentValidity::Defined);
+						GGLAB_UNUSED(builder.Read(components, RGBufferAccess::StructuredRead));
+					}
+				}, [](RGExecuteContext& context, Data& data) { data.m_Scan.m_Scan(context, data.m_Record, data.m_View); });
+			// Only this dedicated path may read the addressed, possibly stale version.
+			m_PassNodes[first + 1].m_Accesses.push_back({
+				.m_ResourceNodeIndex = scan.m_Target.m_Node,
+				.m_AccessValue = scan.m_Target.m_Type == RGResourceType::RGTexture
+					? static_cast<uint64_t>(RGTextureAccess::Sample) : static_cast<uint64_t>(RGBufferAccess::StructuredRead),
+				.m_Stages = RHIStage::ComputeShader,
+				.m_ResourceType = scan.m_Target.m_Type,
+				.m_DependencyAccess = RGDependencyAccess::Read,
+				.m_Subresources = scan.m_Target.m_Type == RGResourceType::RGTexture
+					? std::optional(scan.m_Target.m_Subresources) : std::nullopt });
+			m_ResourceNodes[scan.m_Target.m_Node.Value()].m_Readers.push_back(RGPassNodeIndex{ first + 1 });
+			AddPass<Data>((name + ".Readback").c_str(), RGPassEncoderType::Copy,
+				[&](RGBuilder& builder, Data& data)
+				{
+					data.m_Scan = scan;
+					data.m_Record = builder.Read(record, RGBufferAccess::CopySource);
+					data.m_Readback = builder.ImportBuffer((name + ".Readback").c_str(), scan.m_Readback,
+						{ .m_SizeInBytes = scan.m_RecordBytes, .m_Usage = RHIBufferUsage::CopyDest,
+							.m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, RGBufferAccess::CopyDest, RGContentValidity::Undefined);
+					builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest);
+				},
+				[](RGExecuteContext& context, Data& data)
+				{
+					context.GetCopyCommandContext()->CopyBuffer(context.GetBufferHandle(data.m_Readback), 0,
+						context.GetBufferHandle(data.m_Record), 0, data.m_Scan.m_RecordBytes);
+				});
+			for (uint32_t i = first; i < first + 3; ++i)
+			{
+				m_ObservationPasses.emplace_back(i, scan.m_Target);
+			}
 		}
 		auto extended = RGCompiler::ExtendObservations(*this, *m_ExecutionPlan);
 		if (!extended)

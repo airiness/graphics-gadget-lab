@@ -36,6 +36,7 @@ namespace gglab
 		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
 		std::filesystem::path m_ArtifactRoot;
 		ShaderProgramRegistryArtifactRef m_ActiveRegistry;
+		bool m_NonFiniteCounters = false;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
@@ -130,6 +131,8 @@ namespace gglab
 			GetActiveRegistryRef() const noexcept;
 
 		ShaderID LoadProgram(const ShaderProgramRef& programRef) noexcept;
+		[[nodiscard]] bool HasNonFiniteCounters() const noexcept { return m_NonFiniteCounters; }
+		[[nodiscard]] bool IsNonFiniteCounterShader(ShaderID shader) const noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
 			std::vector<ShaderProgramRef> programRefs,
 			TaskPriority priority = TaskPriority::High) noexcept;
@@ -161,6 +164,7 @@ namespace gglab
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
 
 	private:
+		bool m_NonFiniteCounters = false;
 		mutable std::shared_mutex m_Mutex;
 		std::unordered_map<ShaderProgramRef, ShaderID, ShaderProgramRefHash> m_ProgramIdMap;
 		std::vector<std::unique_ptr<Shader>> m_Shaders;

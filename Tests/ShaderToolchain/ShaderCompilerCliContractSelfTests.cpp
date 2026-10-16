@@ -22,6 +22,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -198,25 +199,41 @@ namespace gglab
 				return result;
 			}
 
-			const DWORD waitResult = WaitForSingleObject(processInfo.hProcess, 60'000);
+			const auto drain = [](HANDLE pipe, std::string& output)
+			{
+				std::array<char, 4'096> buffer{};
+				DWORD available = 0;
+				while (PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr) && available != 0)
+				{
+					DWORD read = 0;
+					const DWORD requested = available < buffer.size() ? available : static_cast<DWORD>(buffer.size());
+					if (!ReadFile(pipe, buffer.data(), requested, &read, nullptr) || read == 0)
+					{
+						break;
+					}
+					output.append(buffer.data(), read);
+				}
+			};
+			// A complete catalog can fill either pipe before exit. Waiting without
+			// draining would deadlock the producer and manufacture a timeout.
+			// A catalog builds every ordinary/counter variant; use the host producer's
+			// existing two-minute batch budget. Individual CLI operations retain one minute.
+			const DWORD timeout = !arguments.empty() && arguments.front() == L"build-runtime" ? 120'000 : 60'000;
+			const ULONGLONG deadline = GetTickCount64() + timeout;
+			DWORD waitResult = WAIT_TIMEOUT;
+			do
+			{
+				drain(outRead, result.m_StdOut);
+				drain(errRead, result.m_StdErr);
+				waitResult = WaitForSingleObject(processInfo.hProcess, 20);
+			} while (waitResult == WAIT_TIMEOUT && GetTickCount64() < deadline);
 			if (waitResult == WAIT_TIMEOUT)
 			{
 				TerminateProcess(processInfo.hProcess, ERROR_TIMEOUT);
 				WaitForSingleObject(processInfo.hProcess, INFINITE);
 			}
-
-			std::array<char, 4'096> buffer{};
-			DWORD bytesRead = 0;
-			while (ReadFile(outRead, buffer.data(), static_cast<DWORD>(buffer.size()),
-				&bytesRead, nullptr) && bytesRead > 0)
-			{
-				result.m_StdOut.append(buffer.data(), bytesRead);
-			}
-			while (ReadFile(errRead, buffer.data(), static_cast<DWORD>(buffer.size()),
-				&bytesRead, nullptr) && bytesRead > 0)
-			{
-				result.m_StdErr.append(buffer.data(), bytesRead);
-			}
+			drain(outRead, result.m_StdOut);
+			drain(errRead, result.m_StdErr);
 
 			DWORD exitCode = ERROR_GEN_FAILURE;
 			GetExitCodeProcess(processInfo.hProcess, &exitCode);
@@ -1474,7 +1491,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 73;
+			constexpr size_t ExpectedRuntimeProgramCount = 127;
 			const std::string expectedProgramCountField =
 				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({
@@ -1540,6 +1557,10 @@ namespace gglab
 				*targetArgument = L"gglab-vulkan13";
 			}
 			const CliRunResult vulkanBuild = RunCli(vulkanArguments);
+			if (vulkanBuild.m_ExitCode != 0)
+			{
+				std::fprintf(stderr, "Vulkan catalog exit=%d\nstdout: %s\nstderr: %s\n", vulkanBuild.m_ExitCode, vulkanBuild.m_StdOut.c_str(), vulkanBuild.m_StdErr.c_str());
+			}
 			ShaderLooseActiveProgramRegistryReader vulkanActiveReader{
 				ShaderLooseActiveProgramRegistryLocator(
 					artifactRoot, ShaderTargetProfile::GGLabVulkan13)
@@ -1570,6 +1591,9 @@ namespace gglab
 				shader_programs::NapaVoxelVertex,
 				shader_programs::NapaVoxelPixel,
 				shader_programs::TemporalReferenceAccumulateCompute,
+				shader_programs::NonFiniteScanClearCompute,
+				shader_programs::NonFiniteScanTextureCompute,
+				shader_programs::NonFiniteScanBufferCompute,
 				shader_programs::TemporalAADepthHistoryCompute,
 				shader_programs::TemporalAADisplayDepthVertex,
 				shader_programs::TemporalAADisplayDepthPixel,

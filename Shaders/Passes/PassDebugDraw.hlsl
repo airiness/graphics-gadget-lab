@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
@@ -55,7 +56,7 @@ float4 PSMain(VSOutput input) : SV_Target
 	else
 	{
 		const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + g_Pass.ViewIndex];
-		color.rgb = EncodeSceneColor(color.rgb, viewData.ScenePreExposure);
+		color.rgb = EncodeSceneColor(color.rgb, viewData.ScenePreExposure, NF_SITE_PASS_DEBUG_DRAW_PSMAIN_ENCODE_SCENE_COLOR);
 	}
 	return color;
 }

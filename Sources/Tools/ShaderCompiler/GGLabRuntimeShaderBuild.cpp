@@ -6,6 +6,7 @@
 #include "GGLabFoundation/Platform/Win/Win32NamedMutex.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 
@@ -13,6 +14,7 @@
 #include <array>
 #include <cwctype>
 #include <format>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <span>
@@ -85,6 +87,8 @@ namespace gglab
 		constexpr std::array ForwardPlusValidationMaterialDiagnosticsDefines{ ForwardPlusDefine, ForwardPlusValidationDefine, MaterialDiagnosticsDefine };
 		constexpr std::array ForwardPlusValidationGTAOMaterialDiagnosticsDefines{ GTAOContributionDefine, ForwardPlusDefine, ForwardPlusValidationDefine, MaterialDiagnosticsDefine };
 
+		constexpr ShaderProgramBuildDefine NonFiniteBufferDefines[]{ { L"GGLAB_NONFINITE_SCAN_BUFFER", L"1" } };
+
 		using namespace shader_programs;
 		const std::array BuildRecords{
 			ShaderProgramBuildRecord{ &ForwardCoverageVertex, L"Passes/PassForwardCoverage.hlsl", L"VSMain" },
@@ -154,8 +158,13 @@ namespace gglab
 			ShaderProgramBuildRecord{ &CoordinateFullscreenVertex, L"Passes/PassCoordinateConformance.hlsl", L"VSFullscreen" },
 			ShaderProgramBuildRecord{ &CoordinateMarkerPixel, L"Passes/PassCoordinateConformance.hlsl", L"PSMarker" },
 			ShaderProgramBuildRecord{ &CoordinateConformancePixel, L"Passes/PassCoordinateConformance.hlsl", L"PSConformance" },
+			ShaderProgramBuildRecord{ &NonFiniteCountersClearCompute, L"Passes/PassNonFiniteCounters.hlsl", L"CSClear" },
+			ShaderProgramBuildRecord{ &NonFiniteScanClearCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSClear" },
+			ShaderProgramBuildRecord{ &NonFiniteScanTextureCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &NonFiniteScanBufferCompute, L"Passes/PassNonFiniteScan.hlsl", L"CSMain", NonFiniteBufferDefines },
 			ShaderProgramBuildRecord{ &RenderGraphComputeWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },
+			ShaderProgramBuildRecord{ &RenderGraphComputeNonFiniteProbe, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSNonFiniteProbe" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewVertex, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewPixel, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &NapaVoxelVertex, L"Passes/PassNapaVoxel.hlsl", L"VSMain" },
@@ -265,55 +274,69 @@ namespace gglab
 			compiler->SetDefaultShaderConfig(defaults);
 
 			std::vector<ShaderProgramRegistryEntry> entries;
-			entries.reserve(BuildRecords.size());
+			entries.reserve(BuildRecords.size() * 2);
 			for (const ShaderProgramBuildRecord& record : BuildRecords)
 			{
-				std::optional<ShaderDesc> desc = MakeBuildDesc(record);
-				if (!desc)
+				for (const bool counters : { false, true })
 				{
-					return {
-						.m_Status = GGLabRuntimeShaderBuildStatus::InvalidInput,
-						.m_Error = "The GGLab shader build catalog is invalid.",
-					};
+					if (counters && !nonfinite::HasCounterVariant(*record.m_ProgramRef))
+					{
+						continue;
+					}
+					const ShaderProgramRef program = counters ? nonfinite::CounterVariant(*record.m_ProgramRef) : *record.m_ProgramRef;
+					std::optional<ShaderDesc> desc = MakeBuildDesc(record);
+					if (!desc)
+					{
+						return {
+							.m_Status = GGLabRuntimeShaderBuildStatus::InvalidInput,
+							.m_Error = "The GGLab shader build catalog is invalid.",
+						};
+					}
+					if (counters)
+					{
+						desc->m_Defines.push_back({ L"GGLAB_NONFINITE_COUNTERS", L"1" });
+						const auto index = std::ranges::find(nonfinite::Programs, program.m_ProgramId) - nonfinite::Programs.begin();
+						desc->m_Defines.push_back({ L"GGLAB_NONFINITE_PROGRAM_INDEX", std::to_wstring(index) });
+					}
+					desc->m_Target = MakeTarget(targetProfile, desc->m_Stage);
+					desc->m_Target.m_Flags = ShaderCompileFlags::Optimization;
+					const ShaderResolvedRecipe recipe = compiler->Resolve(*desc);
+					const ShaderCompileResult compiled = recipe.IsSuccess()
+						? compiler->CompileOrLoad(recipe)
+						: ShaderCompileResult{
+							.m_Status = recipe.m_Diagnostics.m_Status,
+							.m_Diagnostics = recipe.m_Diagnostics,
+						};
+					if (!compiled.IsSuccess())
+					{
+						return {
+							.m_Status = compiled.m_Status == ShaderCompileStatus::CompilerUnavailable
+								? GGLabRuntimeShaderBuildStatus::CompilerUnavailable
+								: GGLabRuntimeShaderBuildStatus::CompileFailed,
+							.m_Error = std::format("Failed to build {}::{}: {}",
+								program.m_ProgramId,
+								program.m_VariantId,
+								utils::ToString(compiled.m_Diagnostics.m_Message)),
+						};
+					}
+					const ShaderRuntimeArtifactPublicationResult published =
+						PublishShaderRuntimeArtifact(artifactRoot, compiled.m_Artifact);
+					if (!published.IsSuccess())
+					{
+						return {
+							.m_Status = GGLabRuntimeShaderBuildStatus::ArtifactPublicationFailed,
+							.m_Error = std::format("Failed to publish {}::{} (status={}).",
+								program.m_ProgramId,
+								program.m_VariantId,
+								static_cast<uint32_t>(published.m_Status)),
+						};
+					}
+					entries.push_back({
+						.m_ProgramRef = program,
+						.m_TargetProfile = targetProfile,
+						.m_ArtifactRef = published.m_ArtifactRef,
+					});
 				}
-				desc->m_Target = MakeTarget(targetProfile, desc->m_Stage);
-				desc->m_Target.m_Flags = ShaderCompileFlags::Optimization;
-				const ShaderResolvedRecipe recipe = compiler->Resolve(*desc);
-				const ShaderCompileResult compiled = recipe.IsSuccess()
-					? compiler->CompileOrLoad(recipe)
-					: ShaderCompileResult{
-						.m_Status = recipe.m_Diagnostics.m_Status,
-						.m_Diagnostics = recipe.m_Diagnostics,
-					};
-				if (!compiled.IsSuccess())
-				{
-					return {
-						.m_Status = compiled.m_Status == ShaderCompileStatus::CompilerUnavailable
-							? GGLabRuntimeShaderBuildStatus::CompilerUnavailable
-							: GGLabRuntimeShaderBuildStatus::CompileFailed,
-						.m_Error = std::format("Failed to build {}::{}: {}",
-							record.m_ProgramRef->m_ProgramId,
-							record.m_ProgramRef->m_VariantId,
-							utils::ToString(compiled.m_Diagnostics.m_Message)),
-					};
-				}
-				const ShaderRuntimeArtifactPublicationResult published =
-					PublishShaderRuntimeArtifact(artifactRoot, compiled.m_Artifact);
-				if (!published.IsSuccess())
-				{
-					return {
-						.m_Status = GGLabRuntimeShaderBuildStatus::ArtifactPublicationFailed,
-						.m_Error = std::format("Failed to publish {}::{} (status={}).",
-							record.m_ProgramRef->m_ProgramId,
-							record.m_ProgramRef->m_VariantId,
-							static_cast<uint32_t>(published.m_Status)),
-					};
-				}
-				entries.push_back({
-					.m_ProgramRef = *record.m_ProgramRef,
-					.m_TargetProfile = targetProfile,
-					.m_ArtifactRef = published.m_ArtifactRef,
-				});
 			}
 
 			ShaderProgramRegistryArtifactBuildResult registryBuild =

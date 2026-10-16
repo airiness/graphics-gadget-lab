@@ -27,6 +27,7 @@ namespace gglab
 	class DX12Device : public RHIDevice
 	{
 	public:
+		bool SupportsPixelStorageAtomics() const noexcept override { return true; }
 		struct FeatureSupport
 		{
 			bool m_RayTracingSupported = false;

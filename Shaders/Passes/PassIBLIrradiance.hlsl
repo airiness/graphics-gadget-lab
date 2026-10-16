@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/Cubemap.hlsli>
@@ -53,7 +54,7 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 					float3 radiance = SampleTextureCubeLevel(
 						environmentBinding, directionWS, (float)sourceMip).rgb;
 					radiance = g_Pass.PhysicalSky
-						? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
+						? SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_HDRCOLOR);
 					irradiance += radiance * weight;
 					cosineIntegral += weight;
 				}
@@ -62,7 +63,7 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 	}
 
 	float3 result = irradiance * GetIrradianceNormalization(cosineIntegral);
-	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result) : SanitizeHDRColor(result);
+	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(result, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_HDRCOLOR);
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

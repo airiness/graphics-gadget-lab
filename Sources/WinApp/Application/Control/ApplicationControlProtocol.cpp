@@ -1,5 +1,7 @@
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
@@ -11,6 +13,7 @@
 #include <cmath>
 #include <filesystem>
 #include <format>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <span>
@@ -67,6 +70,10 @@ namespace gglab
 			if (command == "export")
 			{
 				return ApplicationControlCommand::Export;
+			}
+			if (command == "watch")
+			{
+				return ApplicationControlCommand::Watch;
 			}
 			if (command == "result")
 			{
@@ -473,6 +480,192 @@ namespace gglab
 			return {};
 		}
 
+		[[nodiscard]] bool IsUint32(const Json& value)
+		{
+			return value.is_number_unsigned() && value.get<uint64_t>() <= UINT32_MAX;
+		}
+
+#if defined(BUILD_DEBUG)
+		// {"point": "<registered id>", "value": "<NonFiniteInjectionValue>", "x": n, "y": n, "component": c}
+		[[nodiscard]] std::string ParseWatchInjection(const Json& value, std::optional<NonFiniteInjection>& injection)
+		{
+			NonFiniteInjection parsed;
+			bool point = false;
+			bool injected = false;
+			bool x = false;
+			bool y = false;
+			for (const auto& [key, field] : value.items())
+			{
+				if (key == "point" && field.is_string())
+				{
+					const auto found = std::ranges::find(nonfinite::InjectionPoints, field.get<std::string>(),
+						&nonfinite::InjectionPoint::m_Id);
+					if (found == nonfinite::InjectionPoints.end())
+					{
+						return std::format("Unknown non-finite injection point '{}'.", field.get<std::string>());
+					}
+					parsed.m_PointIndex = static_cast<uint32_t>(std::distance(nonfinite::InjectionPoints.begin(), found));
+					point = true;
+				}
+				else if (key == "value" && field.is_string())
+				{
+					const auto parsedValue = ParseNonFiniteInjectionValue(field.get<std::string>());
+					if (!parsedValue)
+					{
+						return "Injection value must be NaN, PositiveInfinity, NegativeInfinity, Overflow or Negative.";
+					}
+					parsed.m_Value = *parsedValue;
+					injected = true;
+				}
+				else if ((key == "x" || key == "y" || key == "component") && IsUint32(field))
+				{
+					(key == "x" ? parsed.m_X : key == "y" ? parsed.m_Y : parsed.m_Component) = field.get<uint32_t>();
+					x |= key == "x";
+					y |= key == "y";
+				}
+				else
+				{
+					return std::format("Unknown or invalid injection field '{}'.", key);
+				}
+			}
+			if (!point || !injected || !x || !y || parsed.m_Component > 3)
+			{
+				return "Injection requires 'point', 'value', 'x' and 'y', and a component from 0 to 3.";
+			}
+			injection = parsed;
+			return {};
+		}
+#endif
+
+		[[nodiscard]] std::string ParseWatchFields(const Json& document, NonFiniteWatchConfiguration& configuration)
+		{
+			for (const auto& [key, value] : document.items())
+			{
+				if (key == "protocol" || key == "id" || key == "command")
+				{
+					continue;
+				}
+				if (key == "enabled" && value.is_boolean())
+				{
+					configuration.m_Enabled = value.get<bool>();
+				}
+				else if (key == "mode" && (value == "report" || value == "fail"))
+				{
+					configuration.m_Mode = value == "fail" ? NonFiniteWatchMode::Fail : NonFiniteWatchMode::Report;
+				}
+				else if (key == "claims" && value.is_array() && !value.empty() && value.size() <= 2)
+				{
+					configuration.m_Boundary = false;
+					configuration.m_Production = false;
+					for (const auto& claim : value)
+					{
+						if (claim == "boundary" && !configuration.m_Boundary)
+						{
+							configuration.m_Boundary = true;
+						}
+						else if (claim == "production" && !configuration.m_Production)
+						{
+							configuration.m_Production = true;
+						}
+						else
+						{
+							return "Watch claims must contain unique 'boundary' and/or 'production' names.";
+						}
+					}
+				}
+				else if (key == "targets" && value.is_array() && value.size() <= 64)
+				{
+					for (const auto& item : value)
+					{
+						if (!item.is_object())
+						{
+							return "Watch targets must be resource address objects.";
+						}
+						Json address = item;
+						address.erase("buffer");
+						std::vector<RGResourceAddress> addresses;
+						if (auto error = ParseResourceAddresses(Json::array({address}), addresses); !error.empty())
+						{
+							return error;
+						}
+						NonFiniteScanTarget target{ .m_Address = std::move(addresses.front()) };
+						if (item.contains("buffer"))
+						{
+							const auto& buffer = item["buffer"];
+							if (!buffer.is_object() || buffer.size() != 3 || !buffer.contains("stride") || !buffer.contains("validElementCount") || !buffer.contains("fields") ||
+								!IsUint32(buffer["stride"]) || !IsUint32(buffer["validElementCount"]) || !buffer["fields"].is_array() || buffer["fields"].empty() || buffer["fields"].size() > 256)
+							{
+								return "A buffer interpretation requires uint32 stride/validElementCount and one to 256 fields.";
+							}
+							std::vector<GpuBufferFieldLayout> fields;
+							for (const auto& field : buffer["fields"])
+							{
+								if (!field.is_object() || !field.contains("offset") || !IsUint32(field["offset"]) || !field.contains("type"))
+								{
+									return "Each buffer field requires an offset and scalar type.";
+								}
+								for (const auto& [name, ignored] : field.items())
+								{
+									if (name != "offset" && name != "type" && name != "count")
+									{
+										return "Unknown buffer field property.";
+									}
+								}
+								const auto& type = field["type"];
+								if ((type != "float16" && type != "float32" && type != "uint8" && type != "uint32") ||
+									(field.contains("count") && (!IsUint32(field["count"]) || (field["count"] == 0 || field["count"].get<uint64_t>() > 4096))))
+								{
+									return "Buffer field type/count is invalid.";
+								}
+								fields.push_back({ "field", field["offset"].get<uint32_t>(), type == "float16" ? GpuBufferScalar::Float16 : type == "float32" ? GpuBufferScalar::Float32 :
+									type == "uint32" ? GpuBufferScalar::Uint32 : GpuBufferScalar::Uint8, field.value("count", 1u) });
+							}
+							uint64_t components = 0;
+							for (const auto& field : fields)
+							{
+								if (field.m_Scalar == GpuBufferScalar::Float16 || field.m_Scalar == GpuBufferScalar::Float32)
+								{
+									components += field.m_Count;
+								}
+							}
+							if (components > 4096)
+							{
+								return "A buffer interpretation is limited to 4096 floating-point components per element.";
+							}
+							const uint32_t stride = buffer["stride"].get<uint32_t>();
+							const uint32_t valid = buffer["validElementCount"].get<uint32_t>();
+							target.m_BufferLayout = BuildNonFiniteBufferScanLayout({ stride, fields }, static_cast<uint64_t>(stride) * valid, valid);
+							if (target.m_BufferLayout.m_Failure != NonFiniteScanLayoutFailure::None)
+							{
+								return "The buffer interpretation is invalid, oversized or contains no floating-point fields.";
+							}
+						}
+						configuration.m_Targets.push_back(std::move(target));
+					}
+				}
+				else if (key == "inject" && value.is_object())
+				{
+#if defined(BUILD_DEBUG)
+					if (auto error = ParseWatchInjection(value, configuration.m_Injection); !error.empty())
+					{
+						return error;
+					}
+#else
+					return "Watch field 'inject' is available only in Debug builds.";
+#endif
+				}
+				else
+				{
+					return std::format("Unknown or invalid watch field '{}'.", key);
+				}
+			}
+			if (!configuration.m_Enabled && document.size() != 4)
+			{
+				return "Disabling watch takes only 'enabled': false.";
+			}
+			return {};
+		}
+
 		// Fills the sequence request; returns an error text.
 		[[nodiscard]] std::string ParseSequenceFields(
 			const Json& document, ApplicationControlRequest& request)
@@ -780,6 +973,158 @@ namespace gglab
 			return ValidateDiagnosticTap(capture.m_Source, capture.m_DiagnosticTap);
 		}
 
+		[[nodiscard]] const char* ClaimName(NonFiniteClaimStatus status)
+		{
+			switch (status)
+			{
+			case NonFiniteClaimStatus::Passed: return "Passed";
+			case NonFiniteClaimStatus::Failed: return "Failed";
+			case NonFiniteClaimStatus::NotApplicable: return "NotApplicable";
+			case NonFiniteClaimStatus::Unavailable: return "Unavailable";
+			default: return "Incomplete";
+			}
+		}
+
+		[[nodiscard]] const char* WatchFailureName(NonFiniteWatchFailure failure)
+		{
+			switch (failure)
+			{
+			case NonFiniteWatchFailure::None: return "None";
+			case NonFiniteWatchFailure::NonFiniteDetected: return "NonFiniteDetected";
+			case NonFiniteWatchFailure::NonFiniteReplaced: return "NonFiniteReplaced";
+			case NonFiniteWatchFailure::ClampPolicyExceeded: return "ClampPolicyExceeded";
+			default: return "MissingCoverage";
+			}
+		}
+
+		[[nodiscard]] Json SerializeWatchTarget(const NonFiniteWatchTargetStatus& target)
+		{
+			const auto& address = target.m_Address;
+			Json at = "final";
+			if (address.m_Position != RGObservationPosition::Final)
+			{
+				at = Json{ { address.m_Position == RGObservationPosition::Before ? "before" : "after", address.m_Pass } };
+			}
+			Json source = { { "resource", address.m_Resource }, { "at", at }, { "mip", address.m_Mip } };
+			if (address.m_Occurrence)
+			{
+				source["occurrence"] = *address.m_Occurrence;
+			}
+			if (address.m_SliceCount)
+			{
+				source["slices"] = { address.m_FirstSlice, *address.m_SliceCount };
+			}
+			if (address.m_Aspect != RHITextureAspect::None)
+			{
+				source["aspect"] = address.m_Aspect == RHITextureAspect::Depth ? "depth" : address.m_Aspect == RHITextureAspect::Stencil ? "stencil" : "color";
+			}
+			Json result = { { "address", address.m_Resource.empty() ? Json() : source },
+				{ "semantic", target.m_Semantic ? Json(GetNonFiniteWatchSemanticName(*target.m_Semantic)) : Json() },
+				{ "watchTier", target.m_Semantic ? Json(GetNonFiniteWatchTier(*target.m_Semantic)) : Json() },{ "failure", target.m_Failure },
+				{ "generation", target.m_Generation.IsValid() ? Json(target.m_Generation.m_Revision) : Json() },
+				{ "resourceIdentity", target.m_Generation.IsValid() ? Json{ { "index", target.m_Generation.m_Texture.Index() },
+					{ "generation", target.m_Generation.m_Texture.Generation() } } : Json() },
+				{ "lastCheckedFrameSerial", target.m_CheckedFrameSerial },
+				{ "claim", ClaimName(target.m_Result.m_Claim.m_Status) }, { "reason", WatchFailureName(target.m_Result.m_Claim.m_Failure) },
+				{ "checked", target.m_Record.m_CheckedCount }, { "nan", target.m_Record.m_NanCount },
+				{ "positiveInf", target.m_Record.m_PositiveInfCount }, { "negativeInf", target.m_Record.m_NegativeInfCount },
+				{ "minimum", target.m_Result.m_Minimum ? Json(*target.m_Result.m_Minimum) : Json() },
+				{ "maximum", target.m_Result.m_Maximum ? Json(*target.m_Result.m_Maximum) : Json() },
+				{ "firstIndex", target.m_Result.m_FirstNonFiniteIndex ? Json(*target.m_Result.m_FirstNonFiniteIndex) : Json() },
+				{ "location", Json() } };
+			if (const auto& location = target.m_TextureLocation; location)
+			{
+				result["location"] = { { "x", location->m_X }, { "y", location->m_Y }, { "slice", location->m_Slice }, { "channel", location->m_Channel } };
+			}
+			else if (target.m_Element && target.m_ByteOffset)
+			{
+				result["location"] = { { "element", *target.m_Element }, { "byteOffset", *target.m_ByteOffset } };
+			}
+			return result;
+		}
+
+		[[nodiscard]] Json SerializeInjection(const NonFiniteInjection& injection)
+		{
+			return { { "point", injection.m_PointIndex < nonfinite::InjectionPoints.size()
+					? Json(nonfinite::InjectionPoints[injection.m_PointIndex].m_Id) : Json() },
+				{ "value", GetNonFiniteInjectionValueName(injection.m_Value) },
+				{ "x", injection.m_X }, { "y", injection.m_Y }, { "component", injection.m_Component } };
+		}
+
+		[[nodiscard]] Json SerializeWatchReport(const NonFiniteWatchStatus& status)
+		{
+			Json claims = Json::array();
+			if (status.m_BoundaryRequested)
+			{
+				claims.push_back("boundary");
+			}
+			if (status.m_ProductionRequested)
+			{
+				claims.push_back("production");
+			}
+			Json report = { { "configurationVersion", status.m_ConfigurationVersion }, { "enabled", status.m_Enabled },
+				{ "mode", status.m_Mode == NonFiniteWatchMode::Fail ? "fail" : "report" }, { "claims", claims }, { "coverage", "latest-completed-frame" },
+				{ "targetsMode", status.m_DefaultTargets ? "defaults" : "explicit" },
+				{ "defaultTiers", status.m_DefaultTargets && status.m_BoundaryRequested ? Json::array({ "A", "B" }) : Json::array() },
+				{ "boundary", ClaimName(status.m_Boundary.m_Status) }, { "boundaryFrameSerial", status.m_BoundaryFrameSerial },
+				{ "production", ClaimName(status.m_Production.m_Status) }, { "productionFrameSerial", status.m_ProductionFrameSerial },
+				{ "failure", status.m_Failure }, { "productionFailure", status.m_ProductionFailure }, { "targets", Json::array() }, { "firstAnomaly", Json() } };
+			for (const auto& target : status.m_Targets)
+			{
+				report["targets"].push_back(SerializeWatchTarget(target));
+			}
+			// Since-configuration history: every site and target with clamps or anomalies.
+			report["productionFrames"] = status.m_ProductionFrames;
+			report["siteTotals"] = Json::array();
+			for (const auto& totals : status.m_SiteTotals)
+			{
+				const auto& counts = totals.m_Counters;
+				report["siteTotals"].push_back({
+					{ "program", totals.m_ProgramIndex < nonfinite::ProgramCount ? Json(nonfinite::Programs[totals.m_ProgramIndex]) : Json() },
+					{ "site", totals.m_SiteIndex < nonfinite::SiteCount ? Json(nonfinite::Sites[totals.m_SiteIndex].m_Id) : Json() },
+					{ "frames", totals.m_Frames }, { "failedFrames", totals.m_FailedFrames }, { "firstFrameSerial", totals.m_FirstFrameSerial },
+					{ "nonFiniteReplacements", counts.m_NonFiniteReplacements }, { "negativeClamps", counts.m_NegativeClamps },
+					{ "fp16MaximumClamps", counts.m_Fp16MaximumClamps },
+					{ "mostNegative", counts.m_MostNegative ? Json(*counts.m_MostNegative) : Json() },
+					{ "maximum", counts.m_Maximum ? Json(*counts.m_Maximum) : Json() } });
+			}
+			report["targetTotals"] = Json::array();
+			for (const auto& totals : status.m_TargetTotals)
+			{
+				report["targetTotals"].push_back({
+					{ "resource", totals.m_Address.m_Resource }, { "mip", totals.m_Address.m_Mip },
+					{ "semantic", totals.m_Semantic ? Json(GetNonFiniteWatchSemanticName(*totals.m_Semantic)) : Json() },
+					{ "checkedFrames", totals.m_CheckedFrames }, { "failedFrames", totals.m_FailedFrames },
+					{ "firstFailedFrameSerial", totals.m_FirstFailedFrameSerial ? Json(totals.m_FirstFailedFrameSerial) : Json() },
+					{ "nan", totals.m_NanCount }, { "positiveInf", totals.m_PositiveInfCount }, { "negativeInf", totals.m_NegativeInfCount },
+					{ "minimum", totals.m_Minimum ? Json(*totals.m_Minimum) : Json() },
+					{ "maximum", totals.m_Maximum ? Json(*totals.m_Maximum) : Json() } });
+			}
+			report["injection"] = Json();
+			if (status.m_Injection)
+			{
+				// Debug verification: anomalies under this configuration were injected.
+				report["injection"] = SerializeInjection(*status.m_Injection);
+				report["injection"]["frameSerial"] = status.m_InjectionFrameSerial;
+				report["injection"]["appliedCount"] = status.m_InjectionAppliedCount;
+			}
+			if (const auto& anomaly = status.m_FirstAnomaly; anomaly)
+			{
+				Json first = { { "frameSerial", anomaly->m_FrameSerial }, { "reason", WatchFailureName(anomaly->m_Failure) } };
+				if (anomaly->m_Target)
+				{
+					first["target"] = SerializeWatchTarget(*anomaly->m_Target);
+				}
+				if (anomaly->m_ProgramIndex && anomaly->m_SiteIndex && *anomaly->m_ProgramIndex < nonfinite::ProgramCount && *anomaly->m_SiteIndex < nonfinite::SiteCount)
+				{
+					first["program"] = nonfinite::Programs[*anomaly->m_ProgramIndex];
+					first["site"] = nonfinite::Sites[*anomaly->m_SiteIndex].m_Id;
+				}
+				report["firstAnomaly"] = std::move(first);
+			}
+			return report;
+		}
+
 		[[nodiscard]] Json SerializeGates(const FrameCaptureReadiness& readiness)
 		{
 			Json gates = Json::array();
@@ -840,6 +1185,10 @@ namespace gglab
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
 			}
+			if (status.m_WatchCoverage)
+			{
+				sequence["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*status.m_WatchCoverage));
+			}
 			if (!status.m_Failure.empty())
 			{
 				sequence["failure"] = status.m_Failure;
@@ -883,7 +1232,7 @@ namespace gglab
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
-				"'sequence' or 'sequence-cancel'.";
+				"'watch', 'sequence' or 'sequence-cancel'.";
 			return result;
 		}
 
@@ -895,6 +1244,9 @@ namespace gglab
 		case ApplicationControlCommand::Graph:
 		case ApplicationControlCommand::Export:
 			error = ParseCaptureFields(document, request);
+			break;
+		case ApplicationControlCommand::Watch:
+			error = ParseWatchFields(document, request.m_Watch);
 			break;
 		case ApplicationControlCommand::Result:
 		{
@@ -950,6 +1302,52 @@ namespace gglab
 			{ "height", status.m_Height },
 		};
 		response["capture"] = { { "unfinished", status.m_UnfinishedCaptures } };
+		const auto claimName = [](NonFiniteClaimStatus value)
+		{
+			switch (value)
+			{
+			case NonFiniteClaimStatus::Passed: return "Passed";
+			case NonFiniteClaimStatus::Failed: return "Failed";
+			case NonFiniteClaimStatus::NotApplicable: return "NotApplicable";
+			case NonFiniteClaimStatus::Unavailable: return "Unavailable";
+			default: return "Incomplete";
+			}
+		};
+		response["watch"] = { { "instrumentation", status.m_NonFiniteInstrumentation ? "available" : "unavailable" },
+			{ "production", status.m_NonFiniteInstrumentation ? "Incomplete" : "Unavailable" }, { "sites", Json::array() } };
+		if (const auto& production = status.m_NonFiniteProduction; production)
+		{
+			response["watch"]["production"] = claimName(production->m_Claim.m_Status);
+			response["watch"]["frameSerial"] = production->m_FrameSerial;
+			response["watch"]["failure"] = production->m_Failure;
+			response["watch"]["injection"] = Json();
+			if (production->m_Injection)
+			{
+				response["watch"]["injection"] = SerializeInjection(production->m_Injection->m_Request);
+				response["watch"]["injection"]["appliedCount"] = production->m_Injection->m_AppliedCount;
+			}
+			response["watch"]["submission"] = { { "fenceIndex", production->m_SubmissionFenceIndex },
+				{ "fenceGeneration", production->m_SubmissionFenceGeneration }, { "fenceValue", production->m_SubmissionFenceValue },
+				{ "adapter", production->m_AdapterCompatibilityIdentity } };
+			for (const auto& site : production->m_Sites)
+			{
+				const auto& counts = site.m_Counters;
+				if (counts.m_NonFiniteReplacements == 0 && counts.m_NegativeClamps == 0 && counts.m_Fp16MaximumClamps == 0 && site.m_Claim.m_Status == NonFiniteClaimStatus::Passed)
+				{
+					continue;
+				}
+				response["watch"]["sites"].push_back({ { "program", nonfinite::Programs[site.m_ProgramIndex] },
+					{ "site", nonfinite::Sites[site.m_SiteIndex].m_Id }, { "claim", claimName(site.m_Claim.m_Status) },
+					{ "nonFiniteReplacements", counts.m_NonFiniteReplacements }, { "negativeClamps", counts.m_NegativeClamps },
+					{ "fp16MaximumClamps", counts.m_Fp16MaximumClamps },
+					{ "mostNegative", counts.m_MostNegative ? Json(*counts.m_MostNegative) : Json() },
+					{ "maximum", counts.m_Maximum ? Json(*counts.m_Maximum) : Json() } });
+			}
+		}
+		if (status.m_Watch)
+		{
+			response["watch"]["report"] = SerializeWatchReport(*status.m_Watch);
+		}
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{
@@ -1032,7 +1430,18 @@ namespace gglab
 		if (result.m_Metadata)
 		{
 			response["frameSerial"] = result.m_Metadata->m_FrameSerial;
+			if (result.m_Metadata->m_WatchCoverage)
+			{
+				response["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*result.m_Metadata->m_WatchCoverage));
+			}
 		}
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlWatch(uint64_t id, const NonFiniteWatchStatus& status, bool instrumentation) noexcept
+	{
+		Json response = MakeResponse(id, true);
+		response["watch"] = { { "instrumentation", instrumentation ? "available" : "unavailable" }, { "report", SerializeWatchReport(status) } };
 		return Dump(response);
 	}
 

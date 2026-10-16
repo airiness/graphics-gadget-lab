@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/Cubemap.hlsli>
@@ -24,5 +25,5 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 	float3 color =
 		SampleTextureCubeLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, direction, 0.0)
 			.rgb;
-	return float4(g_Pass.PhysicalSky ? SanitizeSceneRadiance(color) : SanitizeHDRColor(color), 1.0);
+	return float4(g_Pass.PhysicalSky ? SanitizeSceneRadiance(color, NF_SITE_PASS_IBLENVIRONMENT_MIP_PSMAIN_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(color, NF_SITE_PASS_IBLENVIRONMENT_MIP_PSMAIN_SANITIZE_HDRCOLOR), 1.0);
 }

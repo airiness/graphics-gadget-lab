@@ -9,7 +9,7 @@ namespace gglab
 	class DemoLabHost final : public DemoBase
 	{
 	public:
-		DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab,
+		DemoLabHost(const DemoCreateInfo& createInfo, const LabStartupSelection& startupLab,
 			std::span<const LabRegistration> labRegistrations) noexcept;
 		~DemoLabHost() override = default;
 
@@ -54,12 +54,12 @@ namespace gglab
 		const LabRuntime& GetLabRuntime() const noexcept { return m_Runtime; }
 		bool IsValid() const noexcept
 		{
-			return m_RegistrationsValid && m_StartupLab.IsValid() &&
-				m_Runtime.GetCatalog().Find(m_StartupLab);
+			return m_RegistrationsValid && m_StartupLab.m_Lab.IsValid() &&
+				m_Runtime.GetCatalog().Find(m_StartupLab.m_Lab);
 		}
 
 	private:
-		LabId m_StartupLab;
+		LabStartupSelection m_StartupLab;
 		LabRuntime m_Runtime;
 		bool m_RegistrationsValid = true;
 	};

@@ -1,4 +1,5 @@
 #pragma once
+#include <Common/NonFiniteCounters.hlsli>
 
 #include <Common/HDRColorMath.hlsli>
 
@@ -13,33 +14,33 @@ float Pow5(float x)
 	return xx * xx * x;
 }
 
-float3 SanitizeHDRColor(float3 color)
+float3 SanitizeHDRColor(float3 color, uint nonFiniteSite = NF_SITE_COMMON_SANITIZE_HDRCOLOR_SANITIZE_HDRCHANNEL)
 {
 	return float3(
-		SanitizeHDRChannel(color.r),
-		SanitizeHDRChannel(color.g),
-		SanitizeHDRChannel(color.b));
+		SanitizeHDRChannel(color.r, nonFiniteSite),
+		SanitizeHDRChannel(color.g, nonFiniteSite),
+		SanitizeHDRChannel(color.b, nonFiniteSite));
 }
 
-float3 EncodeSceneColor(float3 sceneLinearColor, float preExposure)
+float3 EncodeSceneColor(float3 sceneLinearColor, float preExposure, uint nonFiniteSite = NF_SITE_COMMON_ENCODE_SCENE_COLOR_ENCODE_SCENE_COLOR_CHANNEL)
 {
 	return float3(
-		EncodeSceneColorChannel(sceneLinearColor.r, preExposure),
-		EncodeSceneColorChannel(sceneLinearColor.g, preExposure),
-		EncodeSceneColorChannel(sceneLinearColor.b, preExposure));
+		EncodeSceneColorChannel(sceneLinearColor.r, preExposure, nonFiniteSite),
+		EncodeSceneColorChannel(sceneLinearColor.g, preExposure, nonFiniteSite),
+		EncodeSceneColorChannel(sceneLinearColor.b, preExposure, nonFiniteSite));
 }
 
 // Persistent FP32 physical lighting has no camera/storage scale or FP16 brightness ceiling.
-float3 SanitizeSceneRadiance(float3 color)
+float3 SanitizeSceneRadiance(float3 color, uint nonFiniteSite = NF_SITE_COMMON_SANITIZE_SCENE_RADIANCE_SANITIZE_SCENE_RADIANCE_CHANNEL)
 {
-	return float3(SanitizeSceneRadianceChannel(color.r),
-		SanitizeSceneRadianceChannel(color.g), SanitizeSceneRadianceChannel(color.b));
+	return float3(SanitizeSceneRadianceChannel(color.r, nonFiniteSite),
+		SanitizeSceneRadianceChannel(color.g, nonFiniteSite), SanitizeSceneRadianceChannel(color.b, nonFiniteSite));
 }
 
-float3 ACESFitted(float3 x)
+float3 ACESFitted(float3 x, uint nonFiniteSite = NF_SITE_COMMON_ACESFITTED_SANITIZE_HDRCOLOR)
 {
 	// Narkowicz 2015
-	x = SanitizeHDRColor(x);
+	x = SanitizeHDRColor(x, nonFiniteSite);
 	const float a = 2.51;
 	const float b = 0.03;
 	const float c = 2.43;

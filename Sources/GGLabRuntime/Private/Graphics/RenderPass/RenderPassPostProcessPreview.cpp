@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
@@ -527,6 +528,12 @@ namespace gglab
 			registry, PreviewIndex, channel](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
+				if (selection.m_Tap == PostProcessDebugTap::SceneColor)
+				{
+					builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Register(
+						NonFiniteWatchSemantic::PostProcessInput, data.m_Source,
+						builder.GetObservationAddress(data.m_Source, RGObservationPosition::Before));
+				}
 				constexpr const char* PreviewNames[] = {
 					"Preview.PostProcessing", "Preview.AmbientOcclusion", "Preview.TemporalAA",
 					"Preview.Atmosphere", "Preview.SceneDepth"

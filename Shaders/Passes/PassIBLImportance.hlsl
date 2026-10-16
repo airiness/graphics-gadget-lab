@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/Cubemap.hlsli>
@@ -31,7 +32,7 @@ float PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 		const float3 direction = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
 		float3 radiance = SampleTextureCubeLevel(g_Pass.SourceTextureIndex,
 			g_Pass.EnvironmentSamplerIndex, direction, g_Pass.EnvironmentSourceMip).rgb;
-		radiance = g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
+		radiance = g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLIMPORTANCE_PSMAIN_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(radiance, NF_SITE_PASS_IBLIMPORTANCE_PSMAIN_SANITIZE_HDRCOLOR);
 		return dot(radiance, float3(0.2126, 0.7152, 0.0722)) *
 			GetIrradianceTexelSolidAngle(texel.x, texel.y, g_Pass.ImportanceResolution);
 	}

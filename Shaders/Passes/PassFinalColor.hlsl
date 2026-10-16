@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/DisplayColor.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
@@ -33,12 +34,12 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	const ViewData viewData = g_Views[viewIndex];
 
 	float3 storedColor = SanitizeHDRColor(
-		SampleTexture2D(g_Pass.SceneColorTextureIndex, g_Pass.SceneColorSamplerIndex, IN.UV).rgb);
+		SampleTexture2D(g_Pass.SceneColorTextureIndex, g_Pass.SceneColorSamplerIndex, IN.UV).rgb, NF_SITE_PASS_FINAL_COLOR_PSMAIN_SANITIZE_HDRCOLOR);
 	if (g_Pass.BloomEnabled != 0)
 	{
 		storedColor +=
 			SanitizeHDRColor(
-				SampleTexture2D(g_Pass.BloomTextureIndex, g_Pass.BloomSamplerIndex, IN.UV).rgb) *
+				SampleTexture2D(g_Pass.BloomTextureIndex, g_Pass.BloomSamplerIndex, IN.UV).rgb, NF_SITE_PASS_FINAL_COLOR_PSMAIN_SANITIZE_HDRCOLOR) *
 			g_Pass.BloomIntensity;
 	}
 

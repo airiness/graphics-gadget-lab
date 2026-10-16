@@ -139,10 +139,20 @@ namespace gglab::shader_programs
 		"gglab.shader.coordinate-conformance", "pixel.marker", ShaderStage::Pixel };
 	inline const ShaderProgramRef CoordinateConformancePixel{
 		"gglab.shader.coordinate-conformance", "pixel.conformance", ShaderStage::Pixel };
+	inline const ShaderProgramRef NonFiniteCountersClearCompute{
+		"gglab.shader.nonfinite-counters", "compute.clear", ShaderStage::Compute };
+	inline const ShaderProgramRef NonFiniteScanClearCompute{
+		"gglab.shader.nonfinite-scan", "compute.clear", ShaderStage::Compute };
+	inline const ShaderProgramRef NonFiniteScanTextureCompute{
+		"gglab.shader.nonfinite-scan", "compute.texture", ShaderStage::Compute };
+	inline const ShaderProgramRef NonFiniteScanBufferCompute{
+		"gglab.shader.nonfinite-scan", "compute.buffer", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeWrite{
 		"gglab.shader.render-graph-compute", "compute.write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
+	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{
+		"gglab.shader.render-graph-compute", "compute.nonfinite-probe", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputePreviewVertex{
 		"gglab.shader.render-graph-compute", "vertex.preview", ShaderStage::Vertex };
 	inline const ShaderProgramRef RenderGraphComputePreviewPixel{

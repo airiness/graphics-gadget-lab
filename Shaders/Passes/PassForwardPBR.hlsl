@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/ForwardCoverageVaryings.hlsli>
@@ -39,10 +40,10 @@ StructuredBuffer<uint2> g_ForwardPlusTileHeaders : register(t5);
 StructuredBuffer<uint> g_ForwardPlusTileIndices : register(t6);
 #endif
 
-float4 EncodeForwardSceneColor(float4 color)
+float4 EncodeForwardSceneColor(float4 color, uint nonFiniteSite = NF_SITE_PASS_FORWARD_PBR_ENCODE_FORWARD_SCENE_COLOR_ENCODE_SCENE_COLOR)
 {
 	const float preExposure = LoadViewData(g_Pass.ViewIndex).ScenePreExposure;
-	return float4(EncodeSceneColor(color.rgb, preExposure), color.a);
+	return float4(EncodeSceneColor(color.rgb, preExposure, nonFiniteSite), color.a);
 }
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
@@ -80,9 +81,9 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 allLightsRe
 	float4 gtaoContribution, float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	ForwardPBRPixelOutput output;
-	output.Color = EncodeForwardSceneColor(color);
+	output.Color = EncodeForwardSceneColor(color, NF_SITE_PASS_FORWARD_PBR_MAKE_FORWARD_PBRPIXEL_OUTPUT_ENCODE_FORWARD_SCENE_COLOR);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	output.AllLightsReferenceColor = EncodeForwardSceneColor(allLightsReferenceColor);
+	output.AllLightsReferenceColor = EncodeForwardSceneColor(allLightsReferenceColor, NF_SITE_PASS_FORWARD_PBR_MAKE_FORWARD_PBRPIXEL_OUTPUT_ENCODE_FORWARD_SCENE_COLOR);
 #endif
 #if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 	output.GTAOContribution = gtaoContribution;
@@ -103,7 +104,7 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 allLightsRe
 float4 MakeForwardPBRPixelOutput(float4 color, float4 allLightsReferenceColor, float4 gtaoContribution,
 	float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
-	return EncodeForwardSceneColor(color);
+	return EncodeForwardSceneColor(color, NF_SITE_PASS_FORWARD_PBR_MAKE_FORWARD_PBRPIXEL_OUTPUT_ENCODE_FORWARD_SCENE_COLOR);
 }
 #endif
 
@@ -443,6 +444,13 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 }
 #endif
 
+#if defined(GGLAB_NONFINITE_COUNTERS)
+// Counter UAV writes would disable implicit early depth testing. Every pipeline using
+// this entry tests depth read-only (equal after the prepass, or transparent) without
+// stencil writes, so testing before shading rejects the same fragments, including
+// alpha-clipped ones, and counters observe only the fragments ordinary variants shade.
+[earlydepthstencil]
+#endif
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
 ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace)
 #else
@@ -529,7 +537,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, gtao);
 	ibl.Specular *= ResolveSpecularIBLVisibility(ao);
 
-	float3 outputLighting = directLighting;
+	// The final radiance sum must keep its rounding when diagnostic observers are enabled.
+	precise float3 outputLighting = directLighting;
 	outputLighting += emissive;
 	outputLighting += ibl.Diffuse + ibl.Specular;
 	const float4 outputColor = float4(
@@ -541,9 +550,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	const float4 allLightsReferenceColor = float4(
 		ApplyShadowDiagnosticsOverlay(allLightsOutputLighting, IN.PositionWS), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, allLightsReferenceColor,
-		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
+		float4(SanitizeHDRColor(gtaoContribution, NF_SITE_PASS_FORWARD_PBR_GLOBAL_SANITIZE_HDRCOLOR), 1.0), diagnosticColor, diagnostic);
 #else
 	return MakeForwardPBRPixelOutput(outputColor, outputColor,
-		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
+		float4(SanitizeHDRColor(gtaoContribution, NF_SITE_PASS_FORWARD_PBR_GLOBAL_SANITIZE_HDRCOLOR), 1.0), diagnosticColor, diagnostic);
 #endif
 }

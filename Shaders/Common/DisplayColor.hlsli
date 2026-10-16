@@ -1,4 +1,5 @@
 #pragma once
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 
 float3 ResolveDisplayColor(float3 storedSceneColor, float exposureScaleOverPreExposure,
@@ -7,7 +8,7 @@ float3 ResolveDisplayColor(float3 storedSceneColor, float exposureScaleOverPreEx
 {
 	if (materialDiagnosticCoverage <= 0.0)
 	{
-		return LinearToSRGB(ACESFitted(storedSceneColor * exposureScaleOverPreExposure));
+		return LinearToSRGB(ACESFitted(storedSceneColor * exposureScaleOverPreExposure, NF_SITE_DISPLAY_COLOR_RESOLVE_DISPLAY_COLOR_ACESFITTED));
 	}
 	const float litCoverage = 1.0 - saturate(materialDiagnosticCoverage);
 	float3 litDisplayColor = 0.0.xxx;
@@ -18,7 +19,7 @@ float3 ResolveDisplayColor(float3 storedSceneColor, float exposureScaleOverPreEx
 		// the residual background twice. All three diagnostic MRTs are premultiplied.
 		const float3 residualLighting = max(storedSceneColor - storedDiagnosticLighting, 0.0.xxx);
 		litDisplayColor = ACESFitted(residualLighting *
-			(exposureScaleOverPreExposure / litCoverage)) * litCoverage;
+			(exposureScaleOverPreExposure / litCoverage), NF_SITE_DISPLAY_COLOR_RESOLVE_DISPLAY_COLOR_ACESFITTED) * litCoverage;
 	}
 	return LinearToSRGB(litDisplayColor + materialDiagnosticColor);
 }

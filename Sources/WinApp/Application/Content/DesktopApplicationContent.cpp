@@ -30,25 +30,25 @@ namespace gglab
 	namespace
 	{
 		std::unique_ptr<DemoBase> CreateStartDemo(const DemoCreateInfo& createInfo,
-			const LabId&, std::span<const LabRegistration>) noexcept
+			const LabStartupSelection&, std::span<const LabRegistration>) noexcept
 		{
 			return std::make_unique<StartDemo>(createInfo);
 		}
 
 		std::unique_ptr<DemoBase> CreateIslandDemo(const DemoCreateInfo& createInfo,
-			const LabId&, std::span<const LabRegistration>) noexcept
+			const LabStartupSelection&, std::span<const LabRegistration>) noexcept
 		{
 			return std::make_unique<DemoPlayground>(createInfo, PlaygroundContent::Island);
 		}
 
 		std::unique_ptr<DemoBase> CreateCoastalAtriumDemo(const DemoCreateInfo& createInfo,
-			const LabId&, std::span<const LabRegistration>) noexcept
+			const LabStartupSelection&, std::span<const LabRegistration>) noexcept
 		{
 			return std::make_unique<DemoPlayground>(createInfo, PlaygroundContent::CoastalAtrium);
 		}
 
 		std::unique_ptr<DemoBase> CreateLabHostDemo(const DemoCreateInfo& createInfo,
-			const LabId& startupLab,
+			const LabStartupSelection& startupLab,
 			std::span<const LabRegistration> labRegistrations) noexcept
 		{
 			auto labHost =
@@ -94,6 +94,9 @@ namespace gglab
 				&RenderGraphComputeLabSession::Create,
 				{ shader_programs::RenderGraphComputeWrite,
 					shader_programs::RenderGraphComputeReadWrite,
+#if defined(BUILD_DEBUG)
+					shader_programs::RenderGraphComputeNonFiniteProbe,
+#endif
 					shader_programs::RenderGraphComputePreviewVertex,
 					shader_programs::RenderGraphComputePreviewPixel } },
 			{ CoordinateConformanceLabSession::GetDescriptor(),

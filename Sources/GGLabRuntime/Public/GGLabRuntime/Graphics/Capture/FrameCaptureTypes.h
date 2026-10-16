@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchTypes.h"
 
 #include <cstdint>
 #include <memory>
@@ -29,6 +30,7 @@ namespace gglab
 		// CPU compile snapshot and execution record; no display tap or GPU readback.
 		RenderGraph,
 		ResourceExport,
+		NonFiniteScan,
 	};
 
 	enum class FrameCaptureStatus : uint8_t
@@ -75,9 +77,11 @@ namespace gglab
 		std::shared_ptr<const FrameCaptureImage> m_Image;
 		std::shared_ptr<const RGSnapshot> m_Graph;
 		std::shared_ptr<const ResourceExportPayload> m_Resources;
+		std::shared_ptr<const NonFiniteScanPayload> m_NonFiniteScans;
 		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
 		bool m_GraphExportActive = false;
 		bool m_ResourceExportActive = false;
+		bool m_NonFiniteScanActive = false;
 		uint32_t m_SubmissionFenceIndex = 0;
 		uint32_t m_SubmissionFenceGeneration = 0;
 		uint64_t m_SubmissionFenceValue = 0;

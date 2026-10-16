@@ -76,6 +76,9 @@
     <Filter Include="Shaders\Lighting">
       <UniqueIdentifier>{80446F87-18BB-2D14-75F3-CAB5F71067B6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Metadata">
+      <UniqueIdentifier>{97D86F8E-2607-9674-AA84-07C8FF03C73B}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Shaders\Passes">
       <UniqueIdentifier>{FE748B4B-C4F3-5752-F507-4465EF6BD0AF}</UniqueIdentifier>
     </Filter>
@@ -931,6 +934,12 @@
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteCounters.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -971,6 +980,9 @@
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\NonFiniteCounterFixture.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
@@ -1038,6 +1050,15 @@
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\NonFiniteCounters.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteScan.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteSiteIds.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\Sampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -1091,6 +1112,9 @@
     </None>
     <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli">
       <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Metadata\NonFiniteSites.json">
+      <Filter>Shaders\Metadata</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli">
       <Filter>Shaders\PBR</Filter>

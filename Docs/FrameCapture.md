@@ -168,7 +168,8 @@ or `<label>.<frameSerial>.graph-summary.json`, with a free suffix on collision.
 Without a label the subject is the Lab or Demo id. Publication and shutdown
 follow the capture writer's `.partial` and publication-claim rules.
 
-The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.json):
+The published schema is [`gglab.render-graph` v1/v2/v3/v4](Schemas/RenderGraph.schema.json)
+(v1 without GPU observers, v2 with copies, v3 with boundary scans, v4 with production counters):
 
 - `compile` is sampled before execution. Full mode contains declaration-order
   passes, name occurrences (1-based), culling, execution order, encoder,
@@ -177,7 +178,7 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
   resource nodes, dependency edges and compile diagnostics. `duplicatePassNames`
   reports repeated names, including culled declarations. `occurrence` counts equal
   names in declaration order, including culled passes, not in summary execution
-  order. Culling therefore cannot renumber a pass; T2/T3 addressing uses the same
+  order. Culling therefore cannot renumber a pass; resource addressing uses the same
   definition. Full accesses include `writtenResourceNodeIndex`/`writtenVersion`
   (null for read-only accesses). ReadWrite reads the incoming version and writes
   the new version whose writer is that pass.
@@ -195,8 +196,9 @@ The published schema is [`gglab.render-graph` v1](Schemas/RenderGraph.schema.jso
 - Summary mode lists only executed passes, sorted by execution order, with `reads`
   and `writes`. Each entry includes its version, resource-node index, declared
   subresource range and an `address` object (`resource`, `at.before`/`at.after`,
-  `occurrence`) for discovery. T2 resource exports use those addresses;
-  non-finite watch remains planned for T3.
+  `occurrence`) for discovery. Resource exports use those addresses;
+  the Runtime non-finite scan API and session `watch` reports use the same
+  addressing; startup production instrumentation is described below.
 - `frame` reuses capture metadata for content, camera, simulation time, render
   settings and readiness; `frame.frame.serial` equals the top-level `frameSerial`.
   It adds the Runtime adapter/driver compatibility identity. Build identity and
@@ -299,11 +301,14 @@ typed `failureCode` such as `Culled`, `UndefinedContent`, `UnsupportedFormat`,
   A group that cannot fit, including its paired image, fails instead of waiting
   forever. A PNG plus seven targets fills all eight payload slots.
 
-Graph-only frames retain `gglab.render-graph` v1. Frames with resource observers
+Graph-only frames retain `gglab.render-graph` v1. Frames with copy observers
 use v2, with pass `observation` markers, `ObservationOrder` dependency edges and
-`execution.observationNodes`. PNG metadata v1 gains additive `observation` flags
-so paired images also disclose active graph/resource observation. Keep these
-tools off for performance measurements.
+`execution.observationNodes`. Frames with non-finite scans use v3, whose observer
+kinds distinguish `ResourceExport` from `NonFiniteScan` (including clear and
+readback passes). Resource sidecars retain v1 unless scans also ran, when they
+use v2. PNG metadata v1 retains additive `observation` flags. The existing
+`nonFiniteWatch` flag describes scan activity only, not completed boundary or
+production coverage. Keep these tools off for performance measurements.
 
 Schedule one target group per sequence frame using `-Exports` or `-ExportsFile`:
 
@@ -330,6 +335,432 @@ python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium-dx12/Captures
 Schemas live in `Docs/Schemas/ResourceExport.schema.json` and
 `Docs/Schemas/RenderGraph.schema.json`. Both validators have `--self-test` gates
 in CI; GPU value/observation checks still require local hardware runs.
+
+## Non-finite boundary scans and production counters
+
+The Runtime provides explicit boundary scans and opt-in production counters.
+Session `watch` supports explicit targets and semantic defaults in report or fail mode.
+Capture and sequence coverage completes asynchronously. Boundary scans alone cannot prove
+that sanitization or recovery hid no non-finite input.
+
+Start a counter-capable process with `--watch-nonfinite`, or use the session script:
+
+```powershell
+& $session start -Session numeric-check -Rhi dx12 -Lab gglab.lab.gtao -WatchNonFinite
+& $session status -Session numeric-check
+& $session stop -Session numeric-check
+```
+
+This startup choice selects Shader-owned counter variants before preloading and
+pipeline creation. It does not enable default boundary scans or fail mode. Without
+the switch, no counter variant is loaded and no production clear/readback nodes are
+added. Vulkan enables pixel storage atomics only when supported; an instrumented
+render host rejects devices without that capability.
+
+`status.watch` reports `instrumentation: available | unavailable` and the latest
+completed production frame (`Incomplete` until evidence arrives). `sites` lists
+nonzero counters or invalid evidence, with program/site identities, replacement
+and clamp counts and finite extrema. `submission` records fence/adapter identity.
+This is a latest-frame diagnostic, not a sequence acceptance result; it does not
+retain a first failing frame or complete a coverage range.
+
+### Session watch reports
+
+Omit targets to watch semantic defaults, or configure explicit addresses with the
+same resource/pass/mip/slice syntax as resource exports. Configuration is replaced
+as a whole; success increments
+`configurationVersion` and resets report history. Invalid requests preserve the
+previous configuration. The next compiled frame issues the new boundary scans;
+late results of earlier configurations are drained without updating the report.
+
+```powershell
+& $session watch -Session numeric-check -WatchClaims boundary
+& $session watch -Session numeric-check -Targets '[{"resource":"Temporal.MotionVectors"},{"resource":"GTAO.TemporalAO"}]'
+& $session status -Session numeric-check
+& $session watch -Session numeric-check -WatchOff
+```
+
+The default claims are `boundary` and `production`. `-WatchClaims boundary` works
+without startup instrumentation; `-WatchClaims production` needs no target list.
+Without instrumentation a requested production claim remains `Unavailable`.
+The startup switch enables counter shaders independently of report configuration:
+`-WatchOff` stops boundary scan requests and report tracking, while an instrumented
+process continues collecting production counters.
+
+`status.watch.report` and the `watch` response contain the configuration version,
+requested claims, separate boundary/production frame serials, per-target counts,
+finite extrema, scalar index and texture or buffer location. `firstAnomaly` retains
+the earliest observed failing frame since configuration, including a production
+frame followed by a clean frame in the same completion poll. These are reports of
+completed evidence, not proof of complete coverage over a sequence or frame range.
+Pending, missing, unsupported or mismatched evidence is `Incomplete`. Capacity
+pressure also yields `Incomplete`; continuous report scans yield capacity while
+a scheduled resource export waits for the shared payload pool to drain.
+
+The report also keeps since-configuration totals for audits over many frames.
+`productionFrames` counts complete production frames; `siteTotals` lists every
+program/site that recorded a replacement or clamp, with frame and failed-frame counts,
+summed counts, extremes and the first frame; `targetTotals` lists every scanned target
+with checked and failed frames, anomaly counts and finite extrema. Reconfiguration
+resets them.
+
+Buffers require an explicit owned interpretation and producer-valid element count:
+
+```json
+[{"resource":"Values","buffer":{"stride":16,"validElementCount":3,"fields":[
+  {"offset":0,"type":"uint32"},
+  {"offset":4,"type":"float32","count":2},
+  {"offset":12,"type":"float16","count":2}
+]}}]
+```
+
+Only floating-point fields enter the scan; integers, padding and capacity beyond
+`validElementCount` are excluded. The interpretation is checked again against the
+actual compiled frame's buffer. Scalar types are `uint8`, `uint32`, `float16` and
+`float32`; count defaults to one. A target is limited to 256 fields and 4096 float
+components per element. Texture targets omit `buffer`. `-TargetsFile` accepts the
+same JSON array from a UTF-8 file.
+
+Default boundary coverage currently implements Tier A: motion vectors when a
+temporal consumer requires them, the last floating-point GTAO output before
+upsampling, scene color before Temporal AA, and scene color before its earliest
+live post-process consumer. The owning pipeline declares applicability and passes
+register exact resource versions and observation cuts. Inactive features report
+`NotApplicable`; absent, culled, conflicting or mis-resolved active bindings report
+`Incomplete` with `MissingCoverage`. A graph with no registry also reports missing
+coverage. These classifications never add graph dependencies or revive culled work.
+
+Reports expose `targetsMode`, `defaultTiers` (currently `["A", "B"]`), and each default
+target's `semantic`, `watchTier` and `failure`. Unbound targets have a null address.
+Resource export `watchTier` is present only for an exact registered default version;
+it is not inferred from a resource name.
+
+Tier B covers active IBL environment, irradiance and specular cubes and the scene's
+transmittance, multiple-scattering and SkyView atmosphere LUTs. Each mip scans every
+array slice/cube face. Registration follows the active resource bank, including a
+generation published after cache upload; staging bake resources are excluded.
+Atmosphere revisions include writes of the current frame and become evidence only
+after a successful submission and completed readback.
+The report contains one target per generation mip, so semantic names can repeat.
+
+Generation targets report `generation`, an ephemeral `resourceIdentity` (texture
+index and handle generation), and `lastCheckedFrameSerial`. Unchanged, checked
+clean content reports `NotApplicable` while retaining its last checked record and extrema;
+those values describe that earlier check. Pending or unadmitted mips are `Incomplete`.
+Per-frame defaults retain scheduling priority, while generation mips rotate through
+the remaining shared payload allowance. A revision its producer wrote in the current
+frame, such as a view-dependent SkyView LUT while the camera moves, is scanned with the
+per-frame defaults instead, because a later write can replace it before rotation reaches
+it; fail mode therefore defers a busy frame rather than leave it unscanned. In-flight
+mips are not duplicated. Failed
+or cancelled transport remains retryable; superseded results cannot certify a new
+generation, but late anomalies still enter `firstAnomaly`. Replacing the watch
+configuration rechecks already active content. Failed content remains `Failed` while
+that generation is active. Tier C GI defaults remain pending.
+
+`Scripts/TestNonFiniteGenerations.ps1 -Configuration Debug` (or `Release`) verifies
+both backends with isolated writable state. It checks fresh-baked and cache-restored
+active IBL publication receipts, all mip/face coverage, stable-content deduplication,
+watch reconfiguration, and physical atmosphere LUTs.
+
+A `fail` request that needs unavailable production instrumentation returns
+`RequiresRestart` without changing the current configuration. Boundary-only fail
+mode works without counter variants:
+
+```powershell
+& $session watch -Session numeric-check -WatchMode fail
+& $session watch -Session numeric-check -WatchMode fail -WatchClaims boundary
+```
+
+### Submitted coverage and fail mode
+
+When watch is enabled as a capture is issued, that capture records coverage of its
+exact submitted frame. A sequence binds the watch configuration when its first
+frame begins and covers every successfully submitted sequence frame, including
+uncaptured frames and every reference sample. Aborted render frames are excluded.
+Each range retains its own unresolved evidence; it never infers a pass from the
+interactive report's latest frame. A generation's later completed mip scans can
+fulfil earlier frames that consumed that same physical content revision.
+
+Captures wait for both their payload and the requested watch claims before writing
+or publishing files. Sequences remain `finishing` until their watch tail, captures
+and requested GPU profiles resolve. A detection after the last sequence submission
+still fails fail mode. Changing or disabling the watch configuration invalidates
+unfinished ranges as `Incomplete`; it cannot convert their old coverage into a pass.
+
+PNG sidecars, resource/graph export frame metadata, capture responses and sequence
+status include a `watch` object (`gglab.nonfinite-watch` v2) when they report a range.
+It identifies the bound configuration and mode, requested claims, instrumentation,
+first/last submitted serial, frame count, completed result count, separate boundary
+and production claims, the first checked anomaly frame and failure reason, and any
+Debug injection stamp.
+Completed result counts include explicit incomplete outcomes. A requested production
+claim without instrumentation completes as `Incomplete`, even though interactive
+status labels the capability `Unavailable`. Unrequested claims remain `Unavailable`.
+`Scripts/ValidateNonFiniteCoverage.py` validates these nested records.
+
+Fail mode fails affected captures and the sequence with `NonFiniteDetected`,
+`NonFiniteReplaced`, `ClampPolicyExceeded` or `MissingCoverage`. Failure text names
+the frame and resource/location or program/site. Pending after-ready captures also
+fail when the active fail watch detects an anomaly or missing per-frame coverage.
+The process keeps running for inspection and watch reconfiguration. Report mode
+still writes artifacts with their failed or incomplete claims.
+
+Ranges add no GPU/CPU fence wait. Unresolved frames become `Incomplete` after 64
+further successful runtime submissions or 30 seconds without complete evidence;
+the time bound also handles a stalled/deferred renderer. Shutdown closes and
+adjudicates unfinished ranges after the render host has finalized. These are
+liveness limits, not a frames-in-flight assumption. Completed frames reduce into
+aggregate claims instead of retaining the whole sequence's records.
+
+Continuous report scans yield to scheduled resource exports and honestly report
+the resulting coverage gap. Fail mode attempts per-frame scans alongside exports;
+generation work yields priority on those frames and can complete later. Temporary
+pressure defers the entire unsubmitted frame, including its capture requests, so
+the same sequence pose/sample retries after retirement without a coverage gap.
+Unsubmitted `Busy` scan results contribute no failure history. A frame whose image,
+exports, scans and counters cannot fit even an idle budget fails explicitly instead
+of deferring forever. The shared payload budget remains authoritative.
+
+`Scripts/TestNonFiniteCoverage.ps1` verifies Debug/Release on both backends with and
+without counter capability: clean captures, graph/resource exports, full-sequence
+coverage, capability rejection, missing-target failure, report-mode incomplete
+metadata and continued process operation after failure. CPU coordinator tests also
+exercise delayed anomalies, out-of-order results, missing readbacks, configuration
+changes, generation tails and reference-sample membership. Full-scene
+policy/overhead acceptance remains separate work.
+
+### Debug non-finite injection
+
+Debug builds accept one injection request in `watch`, so tests can prove that watch
+catches what sanitization and recovery would hide. Injection points are registered in
+`Shaders/Metadata/NonFiniteSites.json` (`injectionPoints`) and checked like sites.
+Each point replaces one component of its operand at one location; the request names
+the point, a value and the location:
+
+| Point | Claim | Location | Component |
+| --- | --- | --- | --- |
+| `pass-temporal-aa.csmain.history` | production | display pixel | history RGB (0-2) or accumulation (3) |
+| `pass-render-graph-compute-smoke.psmain.preview` | production | display pixel | RGBA output (0-3), then `SanitizeHDRChannel` |
+| `pass-render-graph-compute-smoke.csnonfiniteprobe.probe` | boundary | probe texel | RGBA32F `RenderGraphCompute.NonFiniteProbe` |
+
+Values are `NaN`, `PositiveInfinity`, `NegativeInfinity`, `Overflow` (131072, finite
+above the FP16 maximum) and `Negative` (-4). The request needs the production claim and
+a process started with `--watch-nonfinite`; otherwise `watch` returns `RequiresRestart`
+or rejects it. Release builds reject `inject`.
+
+```powershell
+& $session start -Session inject -Configuration Debug -Lab gglab.lab.temporal_aa -WatchNonFinite
+& $session watch -Session inject -WatchMode fail -WatchClaims production `
+    -Inject '{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":161,"y":93,"component":1}'
+```
+
+The counter clear pass writes the frame's request after the site records, and each
+point reads it from the counter buffer. Only counter variants contain injection code,
+so ordinary pipelines, settings and root constants are unchanged. The readback returns
+the request and an applied count with the counters: evidence that does not carry the
+configured request is `Incomplete`. Reports (`watch.report.injection`, with the latest
+`appliedCount`), the latest production frame (`watch.injection`) and coverage metadata
+(`injection` with `injectedFrames` and `appliedFrames`) are stamped, and fail-mode
+failure text ends with `under Debug injection '<point>'`.
+
+The probe pass of `gglab.lab.render_graph_compute` exists only for frames whose
+injection targets the probe point; the preview declares a read so the probe stays live
+for boundary scans. The preview point adds the sanitized value to the written pixel,
+which therefore stays unchanged for non-finite and negative values. That site's
+negative clamps are `expected` and its FP16-maximum clamps are `error`. This Lab
+renders no IBL, so its `ibl` readiness gate never opens; use `-Timing next-frame`.
+
+Debug launches also accept repeatable `--lab-parameter <id>=<value>` startup
+assignments (`GGLabSession.ps1 start -LabParameters`), parsed strictly against the
+startup Lab's declarations before its first preparation. Release builds reject them.
+
+`Scripts/TestNonFiniteInjection.ps1` verifies Debug sessions on both backends with one
+session per Lab: exact probe locations and counts for NaN and both infinities, a finite
+overflow that only changes the maximum, a sanitized NaN that fails production while the
+PNG pixels equal the uninjected control, `expected` and `error` clamp policies, and
+Temporal AA history NaN/infinities that fail only at the color or accumulation recovery
+site. Every injected report and capture must carry the stamp.
+
+### Overhead
+
+`Scripts/MeasureNonFiniteOverhead.ps1` plays Coastal Atrium camera paths with
+`-GpuTiming` in three hidden sessions per backend: `baseline` (no counters, watch off),
+`counters` (`--watch-nonfinite`, watch off) and `watch` (counters plus report-mode
+semantic defaults). It reports mean frame time, per-frame pass time and per-frame
+`Observation.*` time, and writes `summary.md` under `Build/Validation/NonFiniteOverhead`.
+Compare arms only within one run and backend.
+
+Recorded on an RTX 5080, Release, 1920x1080, all nine Coastal Atrium paths (1454
+timed renders per arm):
+
+| Backend | Baseline frame | Counters | Counters + watch | Scans per frame |
+| --- | --- | --- | --- | --- |
+| DX12 | 1.43 ms | +0.14 ms | +1.36 ms | 1.21 ms |
+| Vulkan | 1.55 ms | +0.19 ms | +1.37 ms | 1.15 ms |
+
+The production clear and readback cost under 0.01 ms per frame. A pixel shader that
+writes the counter UAV loses implicit early depth testing, so Forward PBR counter
+variants declare `[earlydepthstencil]`; their pipelines test depth read-only, so the
+same fragments are shaded (without it, Forward Opaque cost about 2.7x and counters
+added 0.7-0.9 ms). Most remaining counter cost is in the Temporal AA compute pass.
+Per-frame Tier A scans cost about 0.2-0.5 ms per full-resolution target. The tools stay
+off for performance runs.
+
+### Lab and Demo audit
+
+`Scripts/AuditNonFiniteLabs.ps1` starts one hidden, counter-capable session per Lab or
+Demo and backend (Release by default), configures report-mode watch with semantic
+defaults and production before the first frame settles, waits for readiness, then plays
+every registered camera path as a sequence or observes content without paths. It
+writes `result.json` and `summary.md` (runs, per-site totals with the reviewed clamp
+policy, boundary targets with anomalies) under `Build/Validation/NonFiniteAudit`.
+`-Content` selects names, such as `gtao,coastal-atrium`. The audit gathers evidence
+for policy review; it does not change policies.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/AuditNonFiniteLabs.ps1 -Rhi dx12 -Content gtao
+```
+
+`gglab.lab.render_graph_compute` and `gglab.lab.coordinate_conformance` run custom
+pipelines without the IBL bake, so their `ibl` gate never opens; the audit observes
+them for `-ObserveSeconds` instead.
+
+### Runtime counter and scan mechanics
+
+Production counter details:
+
+- The site inventory routes sanitization call-site IDs through the color helpers
+  to their actual scalar clamp. Recovery guards observe original operands without
+  changing their value. Geometric validity-only sites remain report-only.
+- Counter variants use a reserved `u31, space0` buffer in physical pipeline layouts.
+  Their durable variant identity includes the reviewed inventory's SHA-256. A
+  generated shared table keeps CPU/HLSL indices synchronized; a frame-tagged header
+  rejects stale, mismatched or partial records. Wrapped counters are `Incomplete`.
+- After the original graph's liveness is fixed, one clear and one readback bracket
+  the live passes. Each original shader pass declares its counter read/write;
+  ordinary dependency, lifetime and barrier planning owns synchronization.
+  Instrumentation never revives a culled producer or writes a rendered resource.
+- Counter readbacks and retained immutable CPU results share capture's payload
+  slots and byte budget. Completion polls the submission fence; normal operation
+  introduces no CPU wait. Counter helpers issue atomics only for anomalous values.
+- Non-finite recovery/replacement always fails. Finite clamps use the reviewed
+  site's `report`, `expected` or `error` policy. Scene-color storage writes (Forward
+  PBR output, skybox, physical sky, aerial composite, debug draw, Napa voxel) fail
+  negative clamps; their FP16-maximum clamps stay report-only because exposure and
+  very bright sources can saturate FP16. The TAA output expects negative YCoCg
+  rectification clamps and fails FP16 overflow; other sites remain report-only. Budget evaluation exists in Runtime,
+  but budgeted inventory entries still require explicit reviewed limits.
+
+Graph frames containing production counters use schema v4 and mark clear/readback
+observers as `ProductionCounters`; original pass accesses expose their counter
+buffer dependency. Other graph schema versions retain their meaning.
+
+Implemented Runtime integration:
+
+- `FrameCaptureControlBase::RequestNonFiniteScan` accepts explicit resource
+  addresses, an owner-assigned configuration version, optional exact frame
+  serial and optional paired graph. `PrepareResourceExports` prepares resource-export copies
+  and boundary scans together, once, after ordinary graph compilation. Resolution
+  preserves the original pass occurrences, culling and version cuts; the ordinary
+  `Read`/`Export` assertions remain unchanged.
+- Each target gets graph-owned clear, scan and readback passes. The general
+  lifetime/barrier planner owns the transient record, clear-to-scan UAV ordering,
+  source reads and scan-to-copy transition. Texture SRVs select one mip and the
+  addressed array/cube-face range. Float16/Float32 R/RG/RGBA, RGB32F and D32
+  interpretations are accepted subject to backend SRV support; integer, normalized,
+  stencil and ambiguous typeless views fail explicitly.
+- Buffers require an owned `NonFiniteBufferScanLayout`, built from a registered
+  or explicit `GpuBufferLayout` and a producer-valid element count. Admission
+  revalidates it against this frame's descriptor; integers, padding and inactive
+  capacity are excluded. Allocated capacity is never a substitute for valid count.
+  Imported buffers need shader-readable `Structured` usage; imported textures
+  need `Sampled` usage. Resource export independently still requires `CopySource`.
+- Scan programs resolve lazily through the Shader program catalog and Runtime
+  pipeline resolver. Unavailable programs fail the request before graph mutation;
+  no host-side compiler is added to Runtime.
+- Scans share capture's request, payload-slot and byte budgets with PNG/resource exports.
+  One scan group (up to 64 targets of a frame) occupies a single payload slot, while
+  each PNG and each exported array takes its own; bytes are counted exactly for all of
+  them. Reservations include GPU record/readback, peak CPU record copies, component
+  upload and owned CPU component tables. Readbacks and uploads survive submission
+  until the common frame fence completes. Final CPU record/table consumers keep
+  their payload slots and bytes until the last owner releases them. Normal polling
+  adds no CPU wait. Busy groups are not split; abort, retry, failed submission,
+  allocation and mapping errors use the existing capture lifecycle.
+- `FrameCaptureResult::m_NonFiniteScans` carries immutable records, addresses,
+  versions, buffer interpretation and evaluated boundary claims; the enclosing
+  result carries the frame serial and submission fence/adapter identity.
+  `Completed` describes transport, not a passing claim. Missing/partial/malformed
+  records evaluate to `Incomplete`; detections evaluate to `Failed`. The production
+  claim is explicitly `Unavailable`. Earliest index means the minimum checked
+  scalar index, not the origin of production. Texture order is `[slice,y,x,channel]`;
+  buffer order is `[valid element, floating-point component in byte-offset order]`.
+
+The Shader-domain foundation also includes the 32-byte CPU/GPU ABI, IEEE-bit
+classification, wave reductions, finite extrema and clamp-policy evaluation.
+`Shaders/Metadata/NonFiniteSites.json` inventories 76 sanitization/recovery/validity
+sites and 3 Debug injection points. Its checker is a conservative lexical review
+gate, not data-flow proof; counter and forwarded-counter routing are source evidence,
+not GPU verification.
+
+Developer checks (after building the named test projects):
+
+```powershell
+python Scripts/GenerateNonFiniteSites.py --check
+python Scripts/ValidateNonFiniteSites.py --self-test
+python Scripts/ValidateNonFiniteSites.py
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestTemporalAACounters.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestNonFiniteInjection.ps1
+Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite nonfinite-watch
+Build/Output/x64/Debug/GGLabRuntimeTests.exe --suite frame-capture
+Build/Output/x64/Debug/GGLabAppRuntimeTests.exe
+Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi dx12
+Build/Output/x64/Debug/GGLabShaderRuntimeIntegrationTests.exe --suite nonfinite-scan-gpu --rhi vulkan
+```
+
+`TestTemporalAACounters.ps1` runs the production TAA Lab in hidden Debug/Release
+DX12/Vulkan sessions at 320x180 by default; `-Configuration`, `-Rhi` and
+`-WindowSize` can narrow or override that matrix. Native and Quality replays
+capture cold and accumulated history with counters off/on, requiring identical
+PNG pixels and same-frame pre-TAA/resolved-color NPY bytes within each backend.
+Counter-on transitions also exercise depth-only opaque and alpha-tested draws
+with TAA and temporal GTAO disabled, then restore TAA. It checks watch reports,
+native error logs and process exits. These reports
+retain latest completed evidence and the first observed anomaly, not complete
+sequence-range coverage. Results go to a unique run directory under
+`Build/Validation/TemporalAACounters`, or under `-OutputDirectory`.
+Each case separates `sessionChecksPassed` from `equivalencePassed`; any off/on
+pixel or array-byte difference still makes the overall check exit 1, even when
+the watch and lifecycle checks pass. Inspect `images.json`, `arrayDifferences`
+and the per-arm receipts instead of treating clean boundaries as equivalence.
+
+The hidden-window hardware suite covers buffer clear/scan plus the real capture
+service and RenderGraph path. RGBA32F/RG16F cube-compatible textures exercise
+nonzero mip and face ranges, NaN/positive and negative infinity, finite extrema
+and first index. Resource exports of every fixture resource are byte-identical with
+scans off/on. This establishes fixture observation equivalence, not whole-Lab
+visual equivalence or overhead. The hardware suite also renders a sanitizing
+pixel shader and a recovery compute shader with counters off/on, compares their
+exported image and values bit-for-bit, and checks exact per-site replacement/clamp
+counts after the common frame fence. Whole-Lab acceptance and measured overhead
+remain separate checks.
+
+Local verification on 2026-10-15 passed 56 GPU checks per backend in both Debug
+and Release, including bindless layout slots before the counter binding. Runtime
+frame-capture passed 199 checks and scan/policy foundations passed 45. The GTAO
+Lab also completed hidden Release captures and schema-valid graph exports on
+both backends, with production status `Passed`. These smoke runs do not establish
+acceptance across every Lab or a complete watch coverage range.
+
+The explicit session report layer passed 27 coordinator checks and 30 control
+checks in both configurations. Hidden Debug GTAO sessions on both backends
+reported clean motion/AO boundaries and production evidence, completed PNG and
+paired resource/graph exports while reporting, and classified an absent target
+as `Incomplete`. A Release session without counter capability reported clean
+boundaries with production `Unavailable`, preserved configuration on rejected
+requests, and exported an observer-free graph after disabling watch. Resource
+and graph validators accepted all exported groups, including graph v4 pairs.
 
 ## Capture settings
 
@@ -590,9 +1021,14 @@ recent capture per key). It reports per pair the mean and maximum absolute
 given. `-MaxMeanError` and `-MaxDifferingPercent` turn it into a check: exit
 code 1 when a pair exceeds them, sizes differ or a capture has no counterpart.
 
-Sidecars with an unsupported `schemaVersion` are listed under `rejected` and
-not compared, which also makes the exit code 1. Each pair lists the frame
-settings that differ between its sidecars under `metadataDifferences`: camera,
+Directory comparison enumerates PNGs and reads each matching JSON sidecar;
+session receipts and resource/graph exports in the same directory are ignored.
+A missing or malformed screenshot sidecar, an unsupported `schemaVersion`, or
+an `image.file` that does not name the paired PNG is listed under `rejected`
+and makes the exit code 1. `Scripts/TestCompareCaptures.ps1` checks this discovery
+and rejection behavior without a GPU, including exact pixel differences.
+Each pair lists the frame settings that differ between its sidecars under
+`metadataDifferences`: camera,
 time step, total simulated time, size, content and the like. Backends, request
 ids and capture times are expected to differ and are not listed. Check these
 before reading pixel differences as rendering differences. Sessions on

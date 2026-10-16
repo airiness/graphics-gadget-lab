@@ -1,7 +1,11 @@
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+
+#include <array>
+#include <cstddef>
 
 namespace gglab
 {
@@ -25,7 +29,8 @@ namespace gglab
 		const bool bakeResourcesInitialized = !bakeScheduler->ShouldInitializeBakeResources();
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[renderResRegistry, activeResourcesInitialized, bakeResourcesInitialized](
+			[renderResRegistry, activeResourcesInitialized, bakeResourcesInitialized,
+				activeGeneration = bakeScheduler->GetBakingStatus().m_ActiveGeneration](
 				RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();
@@ -49,6 +54,24 @@ namespace gglab
 				iblRes.m_BrdfLut = ImportRuntimeTexture(builder, *renderResRegistry,
 					RenderTextureIndex::IBL_BrdfLut, "IBL.BrdfLut",
 					activeResourcesInitialized);
+
+				if (activeGeneration != 0)
+				{
+					const std::array textures{ iblRes.m_EnvironmentCubemap,
+						iblRes.m_IrradianceCubemap, iblRes.m_PrefilteredSpecularCubemap };
+					const std::array semantics{ NonFiniteWatchSemantic::Environment,
+						NonFiniteWatchSemantic::Irradiance, NonFiniteWatchSemantic::Specular };
+					const std::array indices{ RenderTextureIndex::IBL_EnvironmentCubemap,
+						RenderTextureIndex::IBL_IrradianceCubemap, RenderTextureIndex::IBL_PrefilteredSpecularCubemap };
+					for (size_t i = 0; i < textures.size(); ++i)
+					{
+						// Publication follows either GPU baking or cache upload completion.
+						// Only the active bank is observed; staging is never certified here.
+						builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().RegisterGeneration(
+							semantics[i], textures[i], builder.GetObservationAddress(textures[i], RGObservationPosition::Final),
+							{ renderResRegistry->GetTextureHandle(indices[i]), activeGeneration });
+					}
+				}
 
 				if (renderResRegistry->HasIBLBakeResources())
 				{

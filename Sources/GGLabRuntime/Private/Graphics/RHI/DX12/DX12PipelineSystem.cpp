@@ -151,6 +151,52 @@ namespace gglab
 			{ pipelineState, rootSignature, PipelineType::Compute }, createInfo);
 	}
 
+	std::optional<uint32_t> DX12PipelineSystem::GetStorageBufferParameterIndex(RHIPipelineHandle pipeline, uint32_t binding, uint32_t space) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration || pipeline.Index() >= m_Pipelines.size())
+		{
+			return std::nullopt;
+		}
+		const auto& entry = m_Pipelines[pipeline.Index()];
+		const auto layout = entry.m_Type == PipelineType::Graphics ? entry.m_GraphicsDesc.m_BindingLayout : entry.m_ComputeDesc.m_BindingLayout;
+		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration || layout.Index() >= m_BindingLayouts.size())
+		{
+			return std::nullopt;
+		}
+		const auto& desc = m_BindingLayouts[layout.Index()];
+		uint32_t rootParameter = 0;
+		for (uint32_t i = 0; i < desc.m_SlotCount; ++i)
+		{
+			const auto& slot = desc.m_Slots[i];
+			// Directly indexed heaps are layout capabilities, not native root parameters.
+			if (slot.m_Type == RHIBindingType::Unknown || IsBindlessBindingType(slot.m_Type))
+			{
+				continue;
+			}
+			if (slot.m_Type == RHIBindingType::ReadWriteStorageBuffer && slot.m_Count == 1 && slot.m_Binding == binding && slot.m_Space == space)
+			{
+				return rootParameter;
+			}
+			++rootParameter;
+		}
+		return std::nullopt;
+	}
+
+	bool DX12PipelineSystem::GetBindingLayoutDesc(RHIBindingLayoutHandle layout, RHIBindingLayoutDesc& desc) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration || layout.Index() >= m_BindingLayouts.size())
+		{
+			return false;
+		}
+		const auto& entry = m_BindingLayouts[layout.Index()];
+		desc.m_SlotCount = entry.m_SlotCount;
+		desc.m_Slots = entry.m_Slots;
+		desc.m_DebugName = entry.m_DebugName.c_str();
+		return true;
+	}
+
 	bool DX12PipelineSystem::IsAlive(RHIBindingLayoutHandle layout) const noexcept
 	{
 		return ResolveBindingLayout(layout) != nullptr;

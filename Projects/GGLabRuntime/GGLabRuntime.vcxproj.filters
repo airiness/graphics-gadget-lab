@@ -492,6 +492,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureNonFinite.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureProduction.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureResourceExport.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
@@ -499,6 +505,12 @@
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureTypes.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\NonFiniteWatchDefaults.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\NonFiniteWatchTypes.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp">
@@ -1914,6 +1926,12 @@
       <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\NonFiniteWatchDefaults.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\NonFiniteWatchTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\ResourceExportTypes.h">

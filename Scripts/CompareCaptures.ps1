@@ -12,6 +12,10 @@ several captures with one key, the most recent one is compared. A typical use is
 a cross-backend comparison of one batch captured by a DX12 session and one by a
 Vulkan session.
 
+Directory discovery starts from PNG files and requires each one's matching JSON
+sidecar to name that PNG. Other JSON documents, such as session receipts and
+resource/graph exports, are not screenshot inputs.
+
 Metrics use the 8-bit RGB channels: the mean and maximum absolute channel
 difference, the percentage of pixels whose largest channel difference exceeds
 -Threshold, and PSNR (null for identical images). -DiffDirectory writes one
@@ -248,17 +252,23 @@ $rejected = @()
 # Most recent capture per comparison key: content|view|source|label.
 function Get-CaptureIndex([string]$Directory) {
     $index = @{}
-    foreach ($file in Get-ChildItem -Path $Directory -Filter '*.json' -File) {
-        $read = Read-CaptureMetadata $file.FullName
+    foreach ($file in Get-ChildItem -LiteralPath $Directory -Filter '*.png' -File) {
+        $sidecar = [System.IO.Path]::ChangeExtension($file.FullName, '.json')
+        if (-not (Test-Path -LiteralPath $sidecar -PathType Leaf)) {
+            $script:rejected += @{ file = $file.FullName; reason = 'The capture has no metadata sidecar.' }
+            continue
+        }
+        $read = Read-CaptureMetadata $sidecar
         if ($read.ContainsKey('rejected')) {
-            $script:rejected += @{ file = $file.FullName; reason = $read.rejected }
+            $script:rejected += @{ file = $sidecar; reason = $read.rejected }
             continue
         }
         $metadata = $read.metadata
         $image = Get-Field (Get-Field $metadata 'image') 'file'
-        if (-not $image) { continue }
-        $imagePath = Join-Path $Directory $image
-        if (-not (Test-Path $imagePath)) { continue }
+        if (-not $image -or $image -ine $file.Name) {
+            $script:rejected += @{ file = $sidecar; reason = 'The sidecar image.file does not name the paired PNG.' }
+            continue
+        }
         $content = Get-Field $metadata 'content'
         $contentId = Get-Field $content 'labId'
         if (-not $contentId) { $contentId = Get-Field $content 'demoId' }
@@ -267,7 +277,7 @@ function Get-CaptureIndex([string]$Directory) {
         $capturedAt = [string](Get-Field $metadata 'capturedAtUtc')
         if (-not $index.ContainsKey($key) -or $index[$key].capturedAt -lt $capturedAt) {
             $index[$key] = @{
-                key = $key; image = $imagePath; capturedAt = $capturedAt; metadata = $metadata
+                key = $key; image = $file.FullName; capturedAt = $capturedAt; metadata = $metadata
             }
         }
     }

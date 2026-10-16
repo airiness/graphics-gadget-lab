@@ -13,6 +13,7 @@ struct ComputeLabPassParameters
 	float RingRadius;
 	float RingIntensity;
 	uint CheckerCellSize;
+	uint ProbeIndex;
 };
 
 ConstantBuffer<ComputeLabPassParameters> g_Pass : register(b2);
@@ -80,6 +81,23 @@ void CSReadWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 	workA[dispatchThreadId.xy] = PackColor(color);
 }
 
+// Writes finite probe values. A watch injection at this point replaces one texel's
+// component, so a boundary scan of the probe must report exactly that location.
+[numthreads(8, 8, 1)]
+void CSNonFiniteProbe(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+	if (dispatchThreadId.x >= g_Pass.Width || dispatchThreadId.y >= g_Pass.Height)
+	{
+		return;
+	}
+
+	RWTexture2D<float4> probe = GetRWTexture2DFloat4(g_Pass.ProbeIndex);
+	const float2 uv = (float2(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
+	probe[dispatchThreadId.xy] = NonFiniteInject(
+		NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_CSNONFINITEPROBE_PROBE, dispatchThreadId.xy,
+		float4(uv, 0.5, 1.0));
+}
+
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
 	return FullscreenTriangleVS(vertexId);
@@ -101,5 +119,19 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 
 	const float divider = 1.0 - smoothstep(0.0, 0.0035, abs(input.UV.x - 0.68));
 	color = lerp(color, float3(1.0, 1.0, 1.0), divider);
-	return float4(saturate(color), 1.0);
+	float4 output = float4(color, 1.0);
+#if defined(GGLAB_NONFINITE_COUNTERS)
+	// A watch injection here exists only in registers at one display pixel. The
+	// sanitizing write replaces non-finite and negative values with zero, so only the
+	// production counter of this site can observe them; other components add zero.
+	const float4 injected = NonFiniteInject(NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_PSMAIN_PREVIEW,
+		uint2(input.PositionCS.xy), float4(0.0, 0.0, 0.0, 0.0));
+	[unroll]
+	for (uint channel = 0; channel < 4u; ++channel)
+	{
+		output[channel] += SanitizeHDRChannel(
+			injected[channel], NF_SITE_PASS_RENDER_GRAPH_COMPUTE_SMOKE_PSMAIN_SANITIZE_HDRCHANNEL);
+	}
+#endif
+	return saturate(output);
 }

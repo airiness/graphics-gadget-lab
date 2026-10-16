@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassBloom.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
@@ -142,6 +143,9 @@ namespace gglab
 
 				GGLAB_ASSERT_MSG(bloom.m_LevelCount > 0, "Bloom must create at least one level.");
 				data.m_Source = builder.Read(sceneColor.m_Texture, RGTextureAccess::Sample);
+				builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Register(
+					NonFiniteWatchSemantic::PostProcessInput, data.m_Source,
+					builder.GetObservationAddress(data.m_Source, RGObservationPosition::Before));
 				builder.WriteInPlace(bloom.m_Pyramid[0], RGTextureAccess::RenderTarget);
 				data.m_Output = bloom.m_Pyramid[0];
 				data.m_SourceSrv =

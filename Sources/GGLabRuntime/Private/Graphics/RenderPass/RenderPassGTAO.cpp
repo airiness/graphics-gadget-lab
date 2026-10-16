@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -542,6 +543,9 @@ namespace gglab
 				const RGTextureId denoisedAO = builder.Read(
 					resources.m_TemporalAO.IsValid() ? resources.m_TemporalAO : resources.m_DenoiseY,
 					RGTextureAccess::Sample, RHIStage::ComputeShader);
+				builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Register(
+					NonFiniteWatchSemantic::AmbientOcclusion, denoisedAO,
+					builder.GetObservationAddress(denoisedAO, RGObservationPosition::Before));
 				const RGTextureId halfDepth = builder.Read(resources.m_HalfDepthViewZ,
 					RGTextureAccess::Sample, RHIStage::ComputeShader);
 				const RGTextureId fullDepth = builder.Read(

@@ -24,6 +24,8 @@ namespace gglab
 			return "graph";
 		case FrameCaptureSource::ResourceExport:
 			return "resource-export";
+		case FrameCaptureSource::NonFiniteScan:
+			return "nonfinite-scan";
 		}
 		GGLAB_UNREACHABLE("Unhandled FrameCaptureSource.");
 	}

@@ -1,6 +1,7 @@
 #pragma once
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 
 #include <cstdint>
 #include <optional>
@@ -20,6 +21,7 @@ namespace gglab
 		Capture,
 		Graph,
 		Export,
+		Watch,
 		Result,
 		Stop,
 		// Starts a camera-path sequence; the response reports it without waiting.
@@ -39,6 +41,7 @@ namespace gglab
 		uint64_t m_CaptureRequestId = 0;
 		// Sequence: the sequence to start.
 		FrameSequenceRequest m_Sequence{};
+		NonFiniteWatchConfiguration m_Watch{};
 	};
 
 	struct ApplicationControlParseResult
@@ -66,6 +69,9 @@ namespace gglab
 		const FrameCaptureFrameState* m_Frame = nullptr;
 		// The active or most recent sequence; absent before the first one.
 		const FrameSequenceStatus* m_Sequence = nullptr;
+		bool m_NonFiniteInstrumentation = false;
+		std::shared_ptr<const NonFiniteProductionFrame> m_NonFiniteProduction;
+		const NonFiniteWatchStatus* m_Watch = nullptr;
 	};
 
 	// Response serializers. Every response carries the protocol version, the
@@ -79,6 +85,8 @@ namespace gglab
 	[[nodiscard]] std::string SerializeApplicationControlCaptureResult(
 		uint64_t id, const FrameCaptureRequestResult& result) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlStopping(uint64_t id) noexcept;
+	[[nodiscard]] std::string SerializeApplicationControlWatch(uint64_t id,
+		const NonFiniteWatchStatus& status, bool instrumentation) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlSequence(
 		uint64_t id, const FrameSequenceStatus& status) noexcept;
 }

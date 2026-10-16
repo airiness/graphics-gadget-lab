@@ -78,6 +78,7 @@ namespace gglab
 	class VulkanDevice final : public RHIDevice
 	{
 	public:
+		bool SupportsPixelStorageAtomics() const noexcept override { return m_PixelStorageAtomics; }
 		struct CreateInfo
 		{
 			VkInstance m_Instance = VK_NULL_HANDLE;
@@ -266,6 +267,7 @@ namespace gglab
 			const RHIFencePoint& fencePoint) const noexcept override;
 
 	private:
+		bool m_PixelStorageAtomics = false;
 		void Destroy() noexcept;
 
 		VkInstance m_Instance = VK_NULL_HANDLE;

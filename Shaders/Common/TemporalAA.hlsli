@@ -1,4 +1,5 @@
 #pragma once
+#include <Common/NonFiniteCounters.hlsli>
 
 #include <Common/DepthReconstruction.hlsli>
 #include <Common/Temporal.hlsli>
@@ -73,7 +74,7 @@ float ComputeTemporalRelativeLuminanceDifference(float currentLuminance, float h
 // luminance difference, exponentially smoothed. Rejected history starts again from zero.
 float2 ResolveTemporalReliability(float2 previousReliability, float difference)
 {
-	const float2 carried = all(isfinite(previousReliability)) ? previousReliability : 0.0.xx;
+	const float2 carried = all(isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_RELIABILITY_ISFINITE, previousReliability))) ? previousReliability : 0.0.xx;
 	return lerp(carried, float2(difference, abs(difference)), TAA_RELIABILITY_SMOOTHING);
 }
 
@@ -100,7 +101,7 @@ float ResolveTemporalHistoryRelaxation(float historyRelaxation, float accumulati
 // Compatibility age: consecutive accepted frames, whatever their confidence.
 float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryAge)
 {
-	return historyAccepted && IsTemporalHistoryAccumulationValid(previousHistoryAge)
+	return historyAccepted && IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_HISTORY_NEXT_AGE_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousHistoryAge))
 		? min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_ACCUMULATION)
 		: TAA_HISTORY_INITIAL_ACCUMULATION;
 }
@@ -110,7 +111,7 @@ float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryA
 // validity floor. Applying that storage floor here would retain history at zero feedback.
 float ResolveTemporalAAMaxHistorySamples(float maxHistoryFeedback)
 {
-	if (!isfinite(maxHistoryFeedback))
+	if (!isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAMAX_HISTORY_SAMPLES_ISFINITE, maxHistoryFeedback)))
 	{
 		return 0.0;
 	}
@@ -126,8 +127,8 @@ float ResolveTemporalAAMaxHistorySamples(float maxHistoryFeedback)
 float ResolveTemporalHistoryNextSamples(bool historyAccepted, float previousSamples,
 	float historyConfidence, float maxSamples, float currentSampleWeight)
 {
-	if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) ||
-		!isfinite(historyConfidence))
+	if (!historyAccepted || !IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_HISTORY_NEXT_SAMPLES_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousSamples)) ||
+		!isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_HISTORY_NEXT_SAMPLES_ISFINITE, historyConfidence)))
 	{
 		return TAA_HISTORY_INITIAL_ACCUMULATION;
 	}
@@ -142,7 +143,7 @@ float ResolveTemporalHistoryNextSamples(bool historyAccepted, float previousSamp
 // TAA_UPSCALED_STATIC_MOTION_PIXELS of motion.
 float ResolveTemporalUpscaledStaticFraction(float motionMagnitudePixels)
 {
-	return isfinite(motionMagnitudePixels)
+	return isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_UPSCALED_STATIC_FRACTION_ISFINITE, motionMagnitudePixels))
 		? 1.0 - saturate(motionMagnitudePixels / TAA_UPSCALED_STATIC_MOTION_PIXELS)
 		: 0.0;
 }
@@ -241,8 +242,9 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 	float2 displayPerRender, float kernelScale, float3 centerColor)
 {
 	const int2 maxPixel = int2(extent) - 1;
-	float3 sum = 0.0.xxx;
-	float weightSum = 0.0;
+	// Keep reconstruction rounding stable when diagnostic observers change optimization.
+	precise float3 sum = 0.0.xxx;
+	precise float weightSum = 0.0;
 	[unroll]
 	for (int y = -1; y <= 1; ++y)
 	{
@@ -251,12 +253,15 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 		{
 			const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
 			float3 sampleColor = currentColorTexture.Load(int3(samplePixel, 0)).rgb;
-			if (!IsTemporalColorFinite(sampleColor))
+			if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RECONSTRUCT_TEMPORAL_CURRENT_COLOR_IS_TEMPORAL_COLOR_FINITE, sampleColor)))
 			{
 				sampleColor = centerColor;
 			}
-			const float2 offset = (float2(x, y) - jitterPixels - outputOffset) * displayPerRender;
-			const float weight = exp(-kernelScale * dot(offset, offset));
+			precise float2 offset = (float2(x, y) - jitterPixels - outputOffset) * displayPerRender;
+			// Spell out the kernel's multiply/add order under the same precision contract.
+			precise float distanceSquared = offset.x * offset.x + offset.y * offset.y;
+			precise float exponent = -kernelScale * distanceSquared;
+			const float weight = exp(exponent);
 			sum += sampleColor * weight;
 			weightSum += weight;
 		}
@@ -316,14 +321,14 @@ float3 QuantizeTemporalHistoryColor(float3 color, uint2 pixel, uint temporalFram
 
 float2 ResolveTemporalAAOutputAlphas(float nextAccumulation)
 {
-	return float2(1.0, IsTemporalHistoryAccumulationValid(nextAccumulation)
+	return float2(1.0, IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAOUTPUT_ALPHAS_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, nextAccumulation))
 		? nextAccumulation
 		: TAA_HISTORY_INITIAL_ACCUMULATION);
 }
 
 float ResolveTemporalAAFeedbackSaturationAge(float maxHistoryFeedback)
 {
-	if (!isfinite(maxHistoryFeedback))
+	if (!isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAFEEDBACK_SATURATION_AGE_ISFINITE, maxHistoryFeedback)))
 	{
 		return TAA_HISTORY_INITIAL_ACCUMULATION;
 	}
@@ -337,7 +342,7 @@ float ResolveTemporalAAFeedbackSaturationAge(float maxHistoryFeedback)
 float ResolveTemporalAAHistoryAgePreview(float nextHistoryAge,
 	float maxHistoryFeedback)
 {
-	if (!IsTemporalHistoryAccumulationValid(nextHistoryAge))
+	if (!IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAHISTORY_AGE_PREVIEW_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, nextHistoryAge)))
 	{
 		return 0.0;
 	}
@@ -353,7 +358,7 @@ float ResolveTemporalAAHistoryAgePreview(float nextHistoryAge,
 // Stored effective samples from a reset (black) to the sample bound (white).
 float ResolveTemporalAAHistorySamplesPreview(float nextSamples, float maxSamples)
 {
-	if (!IsTemporalHistoryAccumulationValid(nextSamples))
+	if (!IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAHISTORY_SAMPLES_PREVIEW_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, nextSamples)))
 	{
 		return 0.0;
 	}
@@ -408,7 +413,7 @@ void GetTemporalNeighborhoodRange(Texture2D<float4> currentColorTexture,
 		{
 			const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
 			float3 sampleColor = currentColorTexture.Load(int3(samplePixel, 0)).rgb;
-			if (!IsTemporalColorFinite(sampleColor))
+			if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_GET_TEMPORAL_NEIGHBORHOOD_RANGE_IS_TEMPORAL_COLOR_FINITE, sampleColor)))
 			{
 				sampleColor = fallbackColor;
 			}
@@ -448,8 +453,8 @@ float ComputeTemporalHistoryConfidence(float motionMagnitudePixels,
 	float currentLuminance, float historyLuminance,
 	float velocityWeightScale, float luminanceWeightScale)
 {
-	if (!isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0 ||
-		!isfinite(currentLuminance) || !isfinite(historyLuminance))
+	if (!isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_HISTORY_CONFIDENCE_ISFINITE, motionMagnitudePixels)) || motionMagnitudePixels < 0.0 ||
+		!isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_HISTORY_CONFIDENCE_ISFINITE, currentLuminance)) || !isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_HISTORY_CONFIDENCE_ISFINITE, historyLuminance)))
 	{
 		return 0.0;
 	}
@@ -472,7 +477,7 @@ float ComputeTemporalHistoryConfidence(float motionMagnitudePixels,
 float ComputeTemporalWeightedHistoryWeight(float previousSamples, float historyConfidence,
 	float maxSamples, float currentSampleWeight)
 {
-	if (!IsTemporalHistoryAccumulationValid(previousSamples) || !isfinite(historyConfidence))
+	if (!IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_WEIGHTED_HISTORY_WEIGHT_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousSamples)) || !isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_WEIGHTED_HISTORY_WEIGHT_ISFINITE, historyConfidence)))
 	{
 		return 0.0;
 	}
@@ -486,8 +491,8 @@ float ComputeTemporalWeightedHistoryWeight(float previousSamples, float historyC
 float ComputeTemporalHistoryWeight(float previousAccumulation, float historyConfidence,
 	float maxHistoryFeedback)
 {
-	if (!IsTemporalHistoryAccumulationValid(previousAccumulation) ||
-		!isfinite(historyConfidence))
+	if (!IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_HISTORY_WEIGHT_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousAccumulation)) ||
+		!isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_COMPUTE_TEMPORAL_HISTORY_WEIGHT_ISFINITE, historyConfidence)))
 	{
 		return 0.0;
 	}

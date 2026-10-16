@@ -190,10 +190,26 @@ namespace gglab
 		RHITextureAspect m_SourceAspect = RHITextureAspect::Color;
 	};
 
+	struct RHIPassStorageBufferBinding
+	{
+		uint32_t m_Binding = 0;
+		uint32_t m_Space = 0;
+		RHIBufferHandle m_Buffer;
+	};
+
 	class RHICommandContext
 	{
 	public:
 		virtual ~RHICommandContext() = default;
+		// A declared pass storage buffer is rebound after every compatible pipeline
+		// switch. Clearing it at the pass boundary prevents cross-pass inheritance.
+		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept { m_PassStorageBuffer = binding; }
+		[[nodiscard]] const std::optional<RHIPassStorageBufferBinding>& GetPassStorageBuffer() const noexcept { return m_PassStorageBuffer; }
+
+	private:
+		std::optional<RHIPassStorageBufferBinding> m_PassStorageBuffer;
+
+	public:
 
 		virtual RHICommandContextHandle GetHandle() const noexcept = 0;
 		virtual RHIQueueType GetQueueType() const noexcept = 0;

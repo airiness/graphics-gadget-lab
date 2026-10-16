@@ -138,6 +138,8 @@ namespace gglab
 			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
 
+		std::optional<RGBufferId> m_PassStorageBuffer;
+		uint32_t m_PassStorageBinding = 0;
 		StringID m_NameId;
 		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;
@@ -174,6 +176,10 @@ namespace gglab
 			{
 			}
 			~RGBuilder() = default;
+
+			// Describes this declaration without adding a read or retaining a pass.
+			[[nodiscard]] RGResourceAddress GetObservationAddress(RGResourceHandle resource,
+				RGObservationPosition position = RGObservationPosition::Before) const noexcept;
 
 			template <typename RESOURCE>
 			RGResourceId<RESOURCE> Create(
@@ -414,9 +420,14 @@ namespace gglab
 
 		[[nodiscard]] bool Compile() noexcept;
 		// Resolves only against original liveness. Observations never root producers.
-		[[nodiscard]] RGObservationTarget ResolveObservation(const RGResourceAddress& address) const noexcept;
+		[[nodiscard]] RGObservationTarget ResolveObservation(const RGResourceAddress& address,
+			RGObservationKind kind = RGObservationKind::ResourceExport) const noexcept;
 		[[nodiscard]] bool AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept;
-		[[nodiscard]] bool HasResourceObservations() const noexcept { return !m_ObservationPasses.empty(); }
+		// Resolve all copy/scan targets first; attach them together to the original plan.
+		[[nodiscard]] bool AttachObservations(std::span<const RGObservationCopy> copies,
+			std::span<const RGObservationScan> scans, const RGProductionCounters* counters = nullptr) noexcept;
+		[[nodiscard]] bool HasResourceObservations() const noexcept;
+		[[nodiscard]] bool HasNonFiniteScans() const noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		// Opt-in CPU-only recording; does not change graph compilation or GPU work.
 		void EnableExecutionRecord() noexcept;

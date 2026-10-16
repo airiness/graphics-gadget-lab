@@ -1,5 +1,6 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/ResourceExportWriter.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
@@ -252,6 +253,7 @@ namespace gglab
 
 	FrameCaptureCoordinator::FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept :
 		m_Capture(createInfo.m_Capture),
+		m_NonFiniteWatch(createInfo.m_NonFiniteWatch),
 		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
 		m_ImageEncoder(createInfo.m_ImageEncoder),
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
@@ -372,7 +374,7 @@ namespace gglab
 		// Counting only queued writer jobs misses issued captures still on the GPU.
 		const auto reserved = std::ranges::count_if(m_Entries, [](const Entry& entry)
 			{
-				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::Encoding;
+				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch || entry.m_Phase == Phase::Encoding;
 			});
 		if (requestCount > MaxInFlightCaptures)
 		{
@@ -687,6 +689,18 @@ namespace gglab
 
 	void FrameCaptureCoordinator::OnFrameSubmitted() noexcept
 	{
+		if (m_NonFiniteWatch && m_LastFrameState)
+		{
+			for (auto& entry : m_Entries)
+			{
+				if (entry.m_Phase == Phase::Issued && entry.m_WatchCoverageId != 0 &&
+					entry.m_Metadata.m_FrameSerial == m_LastFrameState->m_FrameSerial)
+				{
+					m_NonFiniteWatch->TrackCoverageFrame(entry.m_WatchCoverageId, m_LastFrameState->m_FrameSerial);
+					m_NonFiniteWatch->CloseCoverage(entry.m_WatchCoverageId);
+				}
+			}
+		}
 		if (m_HasOpenFrame && m_HistoryReady &&
 			m_SettledFrames < std::numeric_limits<uint32_t>::max())
 		{
@@ -697,15 +711,29 @@ namespace gglab
 
 	void FrameCaptureCoordinator::Update() noexcept
 	{
+		if (m_NonFiniteWatch) { m_NonFiniteWatch->UpdateCoverage(); }
 		if (m_Capture)
 		{
 			std::vector<FrameCaptureResult> results;
 			m_Capture->ConsumeResults(results);
 			for (FrameCaptureResult& result : results)
 			{
-				HandleCaptureResult(std::move(result));
+				if (!m_NonFiniteWatch || !m_NonFiniteWatch->OnScanResult(result))
+				{
+					HandleCaptureResult(std::move(result));
+				}
+			}
+			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> production;
+			m_Capture->ConsumeNonFiniteProductionFrames(production);
+			if (m_NonFiniteWatch)
+			{
+				for (const auto& frame : production)
+				{
+					m_NonFiniteWatch->OnProductionFrame(*frame);
+				}
 			}
 		}
+		PollWatchCaptures();
 		CollectWrittenJobs();
 	}
 
@@ -726,6 +754,10 @@ namespace gglab
 	void FrameCaptureCoordinator::FinalizeAfterRenderHost() noexcept
 	{
 		m_IsShuttingDown = true;
+		// Render-host finalization publishes the last fence-completed readbacks.
+		// Drain them before closing only the coverage that still lacks evidence.
+		Update();
+		if (m_NonFiniteWatch) { m_NonFiniteWatch->FinalizeCoverage(); }
 		Update();
 		FinishWriting();
 		for (Entry& entry : m_Entries)
@@ -767,6 +799,12 @@ namespace gglab
 			m_SettledFrames >= request.m_SettleFrames;
 	}
 
+	bool FrameCaptureCoordinator::HasFrameResourceExports() const noexcept
+	{
+		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+			{ return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
+	}
+
 	bool FrameCaptureCoordinator::PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
 		ResourceExportFrameContext context) noexcept
 	{
@@ -774,14 +812,16 @@ namespace gglab
 		{
 			return true;
 		}
-		const bool waitingSequenceExport = m_LastFrameState && std::ranges::any_of(m_Entries, [&](const Entry& entry)
-			{ return entry.m_Phase == Phase::Waiting && entry.m_Request.m_Sequence &&
+		const bool strictWatch = m_NonFiniteWatch && m_NonFiniteWatch->GetStatus().m_Enabled &&
+			m_NonFiniteWatch->GetStatus().m_Mode == NonFiniteWatchMode::Fail;
+		const bool waitingExactExport = m_LastFrameState && std::ranges::any_of(m_Entries, [&](const Entry& entry)
+			{ return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
 			entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState); });
-		if (waitingSequenceExport)
+		if (waitingExactExport)
 		{
 			m_Capture->DeferFrameCaptures(frameSerial);
 		}
-		const bool prepared = !waitingSequenceExport &&
+		const bool prepared = !waitingExactExport &&
 			m_Capture->PrepareResourceExports(frameSerial, graph, context) != FrameCaptureAvailability::Busy;
 		if (!prepared)
 		{
@@ -881,6 +921,7 @@ namespace gglab
 			return;
 		}
 		entry.m_Phase = Phase::Issued;
+		entry.m_WatchCoverageId = m_NonFiniteWatch ? m_NonFiniteWatch->OpenCoverage() : 0;
 	}
 
 	void FrameCaptureCoordinator::HandleCaptureResult(FrameCaptureResult result) noexcept
@@ -892,6 +933,7 @@ namespace gglab
 			});
 		if (entry == m_Entries.end())
 		{
+			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0) { return; }
 			GGLAB_LOG_WARN("Frame capture result {} has no coordinator request.",
 				result.m_RequestId);
 			return;
@@ -906,6 +948,8 @@ namespace gglab
 				return;
 			}
 			entry->m_Phase = Phase::Waiting;
+			if (m_NonFiniteWatch) { m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId); }
+			entry->m_WatchCoverageId = 0;
 			entry->m_CaptureRequestId = 0;
 			entry->m_Metadata = {};
 			return;
@@ -931,7 +975,44 @@ namespace gglab
 				"The capture result does not match its requested render frame, source or diagnostic tap.");
 			return;
 		}
-		StartEncoding(*entry, result);
+		entry->m_PendingResult = std::move(result);
+		entry->m_Phase = Phase::AwaitingWatch;
+	}
+
+	void FrameCaptureCoordinator::PollWatchCaptures() noexcept
+	{
+		const std::string failure = m_NonFiniteWatch ? m_NonFiniteWatch->GetFailModeFailure() : std::string{};
+		for (auto& entry : m_Entries)
+		{
+			if (entry.m_Phase == Phase::Waiting && entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady && !failure.empty())
+			{
+				Finish(entry, FrameCaptureRequestStatus::Failed, failure);
+			}
+			if (entry.m_Phase == Phase::Issued && m_NonFiniteWatch)
+			{
+				const auto coverage = m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId);
+				if (coverage && coverage->Fails())
+				{
+					m_DiscardedCaptureResults.push_back(entry.m_CaptureRequestId);
+					entry.m_Metadata.m_WatchCoverage = coverage;
+					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
+					continue;
+				}
+			}
+			if (entry.m_Phase != Phase::AwaitingWatch) { continue; }
+			entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch ? m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId) : nullptr;
+			if (const auto& coverage = entry.m_Metadata.m_WatchCoverage; coverage)
+			{
+				if (coverage->Fails())
+				{
+					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
+					continue;
+				}
+				if (!coverage->m_Complete) { continue; }
+			}
+			StartEncoding(entry, *entry.m_PendingResult);
+			entry.m_PendingResult.reset();
+		}
 	}
 
 	void FrameCaptureCoordinator::StartEncoding(
@@ -950,6 +1031,7 @@ namespace gglab
 		FrameCaptureMetadata& metadata = entry.m_Metadata;
 		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
 		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
+		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
 		if (result.m_Image)
 		{
 			const FrameCaptureImage& image = *result.m_Image;
@@ -1146,10 +1228,17 @@ namespace gglab
 		}
 		if (entry.m_Phase != Phase::Waiting)
 		{
+			if (m_NonFiniteWatch && entry.m_WatchCoverageId != 0 && !entry.m_Metadata.m_WatchCoverage)
+			{
+				entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId);
+			}
 			result.m_Metadata = entry.m_Metadata;
 		}
 		result.m_ResourceFailure = entry.m_ResourceFailure;
 		m_Results.push_back(std::move(result));
+		if (m_NonFiniteWatch) { m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId); }
+		entry.m_WatchCoverageId = 0;
+		entry.m_PendingResult.reset();
 		entry.m_Job.reset();
 		entry.m_Phase = Phase::Finished;
 	}

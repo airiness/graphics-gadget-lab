@@ -455,6 +455,9 @@
     <None Include="..\..\Shaders\Common\HDRColorMath.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
+    <None Include="..\..\Shaders\Common\NonFiniteCounters.hlsli" />
+    <None Include="..\..\Shaders\Common\NonFiniteScan.hlsli" />
+    <None Include="..\..\Shaders\Common\NonFiniteSiteIds.hlsli" />
     <None Include="..\..\Shaders\Common\Sampling.hlsli" />
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
     <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli" />
@@ -473,6 +476,7 @@
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli" />
+    <None Include="..\..\Shaders\Metadata\NonFiniteSites.json" />
     <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\PBR\DirectLighting.hlsli" />
@@ -504,6 +508,8 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteCounters.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
@@ -518,6 +524,7 @@
     <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\NonFiniteCounterFixture.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl" />

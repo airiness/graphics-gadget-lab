@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/Sampling.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
@@ -40,9 +41,9 @@ float3 ClampSampleLuminance(float3 radiance)
 {
 	if (g_Pass.PhysicalSky)
 	{
-		return SanitizeSceneRadiance(radiance);
+		return SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLPREFILTERED_SPECULAR_CLAMP_SAMPLE_LUMINANCE_SANITIZE_SCENE_RADIANCE);
 	}
-	radiance = SanitizeHDRColor(radiance);
+	radiance = SanitizeHDRColor(radiance, NF_SITE_PASS_IBLPREFILTERED_SPECULAR_CLAMP_SAMPLE_LUMINANCE_SANITIZE_HDRCOLOR);
 	const float luminance = dot(radiance, float3(0.2126, 0.7152, 0.0722));
 	const float maxLuminance = max(g_Pass.MaxSampleLuminance, 1.0);
 	return luminance > maxLuminance ? radiance * (maxLuminance / luminance) : radiance;
@@ -56,7 +57,7 @@ float3 IntegratePrefilteredSpecular(
 	if (g_Pass.MipLevel == 0u || perceptualRoughness <= 0.0)
 	{
 		float3 radiance = SampleTextureCubeLevel(environmentBinding, normalWS, 0.0).rgb;
-		return g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
+		return g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLPREFILTERED_SPECULAR_INTEGRATE_PREFILTERED_SPECULAR_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(radiance, NF_SITE_PASS_IBLPREFILTERED_SPECULAR_INTEGRATE_PREFILTERED_SPECULAR_SANITIZE_HDRCOLOR);
 	}
 
 	const uint sampleCount = max(g_Pass.SampleCount, 1u);
@@ -109,7 +110,7 @@ float3 IntegratePrefilteredSpecular(
 
 	// Hammersley includes the normal GGX sample, so totalWeight is positive.
 	float3 result = prefilteredColor / totalWeight;
-	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result) : SanitizeHDRColor(result);
+	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result, NF_SITE_PASS_IBLPREFILTERED_SPECULAR_INTEGRATE_PREFILTERED_SPECULAR_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(result, NF_SITE_PASS_IBLPREFILTERED_SPECULAR_INTEGRATE_PREFILTERED_SPECULAR_SANITIZE_HDRCOLOR);
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

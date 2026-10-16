@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/Cubemap.hlsli>
@@ -56,5 +57,5 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float3 dir = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
 	float3 radiance = SampleEnvironmentSource(dir);
-	return float4(g_Pass.SourceMode == 2 ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance), 1.0);
+	return float4(g_Pass.SourceMode == 2 ? SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLENVIRONMENT_PSMAIN_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(radiance, NF_SITE_PASS_IBLENVIRONMENT_PSMAIN_SANITIZE_HDRCOLOR), 1.0);
 }

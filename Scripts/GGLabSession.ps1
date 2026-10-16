@@ -13,6 +13,7 @@ still exits 0; inspect its "status".
 
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
+           -LabParameters "id=value",... sets startup Lab parameters (Debug builds).
   status   Report readiness gates, settled frames, camera and pending captures.
   capture  Capture a frame; waits for the PNG and metadata unless -NoWait.
            -View restores a camera reference view of the active content first.
@@ -20,6 +21,11 @@ Commands:
   export   Export one frame's resource group as NPY arrays and JSON metadata.
            -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
            the exact frame graph. See Docs/FrameCapture.md for the address format.
+  watch    Configure semantic defaults or explicit non-finite targets and mode.
+           Omit -Targets for tiered defaults; -WatchOff disables reporting.
+           -WatchClaims selects boundary, production or both. Debug builds accept
+           -Inject '{"point":"<id>","value":"NaN","x":0,"y":0,"component":0}'
+           to inject at a registered point; it needs -WatchNonFinite at start.
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
   result   Report a capture submitted with -NoWait.
@@ -51,7 +57,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 sto
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -73,6 +79,8 @@ param(
     [string]$StateRoot,
     [string]$SessionRoot,
     [int]$StartTimeoutSeconds = 300,
+    # Debug builds only: startup Lab parameter assignments as "id=value".
+    [string[]]$LabParameters,
 
     # capture
     [ValidateSet('scene', 'composited', 'diagnostic')]
@@ -97,6 +105,14 @@ param(
     [string]$Targets,
     [string]$TargetsFile,
     [switch]$IncludeGraph,
+    [switch]$WatchNonFinite,
+    [switch]$WatchOff,
+    [ValidateSet('report', 'fail')]
+    [string]$WatchMode = 'report',
+    [ValidateSet('boundary', 'production')]
+    [string[]]$WatchClaims = @('boundary', 'production'),
+    # watch (Debug builds): one non-finite injection request as a JSON object.
+    [string]$Inject,
 
     # result
     [long]$RequestId,
@@ -319,6 +335,8 @@ switch ($Command) {
         if ($Demo) { $arguments += @('--demo', $Demo) }
         if ($WindowSize) { $arguments += @('--window-size', $WindowSize) }
         if (-not $Visible) { $arguments += '--hidden' }
+        if ($WatchNonFinite) { $arguments += '--watch-nonfinite' }
+        foreach ($assignment in $LabParameters) { $arguments += @('--lab-parameter', $assignment) }
         if ($PSBoundParameters.ContainsKey('FixedDeltaTime')) {
             $arguments += @('--fixed-delta-time', "$FixedDeltaTime")
         }
@@ -497,6 +515,20 @@ switch ($Command) {
             }
             Start-Sleep -Milliseconds 250
         }
+    }
+    'watch' {
+        Require-Session
+        $request = @{ command = 'watch'; enabled = (-not $WatchOff) }
+        if (-not $WatchOff) {
+            $request['mode'] = $WatchMode
+            $request['claims'] = @($WatchClaims)
+            if ($Targets -or $TargetsFile) { $request['targets'] = (Read-JsonArray $Targets $TargetsFile 'Targets') }
+            if ($Inject) {
+                try { $request['inject'] = ($Inject | ConvertFrom-Json) } catch { Fail "-Inject is not a JSON object: $($_.Exception.Message)" }
+            }
+        }
+        $response = Invoke-SessionRequest $Session $request 30
+        Complete-SessionResponse $response $Session
     }
     'sequence-cancel' {
         Require-Session

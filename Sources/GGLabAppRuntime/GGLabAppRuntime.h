@@ -150,6 +150,8 @@ namespace gglab
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
 	};
 
+	class NonFiniteWatchCoordinator;
+
 	class GGLabAppRuntime final
 	{
 	public:
@@ -209,6 +211,7 @@ namespace gglab
 		// Non-owning; null before runtime services are composed. It outlives
 		// Shutdown so hosts can inspect the final capture state. AppRuntime owns
 		// its result stream; hosts drain ConsumeFrameCaptureResults instead.
+		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatchCoordinator() const noexcept { return m_NonFiniteWatch.get(); }
 		[[nodiscard]] FrameCaptureCoordinator* GetFrameCaptureCoordinator() const noexcept
 		{
 			return m_FrameCapture.get();
@@ -261,6 +264,7 @@ namespace gglab
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<DebugDrawService> m_DebugDrawService;
 		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
+		std::unique_ptr<NonFiniteWatchCoordinator> m_NonFiniteWatch;
 		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;

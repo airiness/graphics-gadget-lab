@@ -1,4 +1,5 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
+#include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
@@ -480,6 +481,20 @@ namespace gglab
 		m_CurrentPipelineDesc = desc;
 		m_PrimitiveTopology = desc.m_PrimitiveTopology;
 		vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineState->Get());
+		if (const auto& binding = GetPassStorageBuffer(); binding)
+		{
+			const auto location = EvaluateVulkanFixedShaderBinding(VulkanShaderRegisterClass::UnorderedAccess,
+				binding->m_Binding, binding->m_Space);
+			for (uint32_t i = 0; i < bindingLayout->GetPlan().m_Set0BindingCount; ++i)
+			{
+				const auto& slot = bindingLayout->GetPlan().m_Set0Bindings[i];
+				if (location.IsSupported() && slot.m_Binding == location.m_Location.m_Binding && slot.m_DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+				{
+					(void)SetBufferDescriptor(slot.m_LogicalParameterIndex, binding->m_Buffer, 0,
+						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess, "SetPassStorageBuffer");
+				}
+			}
+		}
 	}
 
 	void VulkanGraphicsCommandContext::SetDescriptorTable(
@@ -1049,6 +1064,20 @@ namespace gglab
 		m_CurrentBindingLayout = bindingLayout;
 		vkCmdBindPipeline(m_GraphicsContext->m_CommandBuffer,
 			VK_PIPELINE_BIND_POINT_COMPUTE, pipelineState->Get());
+		if (const auto& binding = GetPassStorageBuffer(); binding)
+		{
+			const auto location = EvaluateVulkanFixedShaderBinding(VulkanShaderRegisterClass::UnorderedAccess,
+				binding->m_Binding, binding->m_Space);
+			for (uint32_t i = 0; i < bindingLayout->GetPlan().m_Set0BindingCount; ++i)
+			{
+				const auto& slot = bindingLayout->GetPlan().m_Set0Bindings[i];
+				if (location.IsSupported() && slot.m_Binding == location.m_Location.m_Binding && slot.m_DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+				{
+					(void)SetBufferDescriptor(slot.m_LogicalParameterIndex, binding->m_Buffer, 0,
+						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess, "SetPassStorageBuffer");
+				}
+			}
+		}
 	}
 
 	void VulkanComputeCommandContext::SetDescriptorTable(

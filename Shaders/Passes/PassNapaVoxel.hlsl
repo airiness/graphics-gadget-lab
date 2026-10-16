@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
@@ -58,5 +59,5 @@ float4 PSMain(VSOutput input) : SV_Target
 	const float lighting = 0.22 + diffuse * 0.78;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + g_Pass.ViewIndex];
 	return float4(EncodeSceneColor(
-		ResolveMaterialColor(g_Pass.Material) * lighting, viewData.ScenePreExposure), 1.0);
+		ResolveMaterialColor(g_Pass.Material) * lighting, viewData.ScenePreExposure, NF_SITE_PASS_NAPA_VOXEL_PSMAIN_ENCODE_SCENE_COLOR), 1.0);
 }

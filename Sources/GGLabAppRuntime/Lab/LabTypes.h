@@ -3,6 +3,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -52,5 +53,20 @@ namespace gglab
 		std::string m_Description;
 		LabKind m_Kind = LabKind::Scene;
 		uint32_t m_SchemaVersion = 1;
+	};
+
+	// Textual host assignment, parsed strictly against the declaring Lab parameter
+	// once the startup Lab session exists.
+	struct LabParameterAssignment
+	{
+		std::string m_Id;
+		std::string m_Value;
+	};
+
+	// Host-selected startup Lab and its parameter assignments.
+	struct LabStartupSelection
+	{
+		LabId m_Lab;
+		std::vector<LabParameterAssignment> m_Parameters;
 	};
 }

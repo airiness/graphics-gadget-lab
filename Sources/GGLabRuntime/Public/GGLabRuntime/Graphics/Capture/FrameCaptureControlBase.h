@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <memory>
 #include <vector>
 
 namespace gglab
@@ -35,13 +36,36 @@ namespace gglab
 		{
 			return 0;
 		}
+		// Opt-in Runtime boundary scans; not a production-coverage watch capability.
+		// Completed describes readback transport, not the boundary claim's outcome.
+		// The final flag defers the unsubmitted frame on temporary capacity pressure;
+		// exact-frame consumers retry their pose and requests on a later render serial.
+		[[nodiscard]] virtual uint64_t RequestNonFiniteScan(std::vector<NonFiniteScanTarget>,
+			uint64_t, uint64_t = 0, bool = false, uint64_t = 0, bool = false) noexcept
+		{
+			return 0;
+		}
+		// The application capture coordinator drains every completed production frame.
+		// Retained frames share the payload budget, including while awaiting this drain.
+		virtual void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>&) noexcept {}
+		[[nodiscard]] virtual bool HasNonFiniteInstrumentation() const noexcept { return false; }
+		// Debug verification: production counters of frames built after this call carry
+		// the injection request (nullopt clears it). Returns false without changing the
+		// request when instrumentation is unavailable or the request is invalid.
+		[[nodiscard]] virtual bool SetNonFiniteInjection(std::optional<NonFiniteInjection>) noexcept { return false; }
+		// Target-count allowance for one scan group, including current slot pressure.
+		// Byte limits and occupancy are rechecked atomically by normal admission.
+		[[nodiscard]] virtual uint32_t GetNonFiniteScanTargetLimit() const noexcept { return 64; }
+		[[nodiscard]] virtual std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return {}; }
 		// Sizes are known only after compilation. Start a scheduled export frame
-		// with an idle payload pool, then check the complete group before submission.
+		// with idle user payloads, then check the complete shared group before submission.
+		// Continuous production counters still count against the actual shared budget.
 		[[nodiscard]] virtual FrameCaptureAvailability GetResourceExportFrameAvailability() const noexcept
 		{
 			return GetRequestAvailability();
 		}
-		// Called after ordinary compilation, before execution. Busy defers the entire
+		// Prepares both resource exports and explicit non-finite scans in one graph
+		// extension. Called after ordinary compilation, before execution. Busy defers the entire
 		// selected sequence frame; no original producer is revived by these reads.
 		[[nodiscard]] virtual FrameCaptureAvailability PrepareResourceExports(uint64_t,
 			RenderGraph&, ResourceExportFrameContext = {}) noexcept

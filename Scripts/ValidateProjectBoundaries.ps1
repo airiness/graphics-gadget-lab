@@ -2948,8 +2948,9 @@ foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) + @($app
 }
 
 # Private visibility is reserved for Runtime and explicitly privileged tests.
-# Qualification and shader integration may directly inspect RHI implementation,
-# but may not use that include root to reach unrelated Runtime internals. An
+# Qualification and shader integration may directly inspect RHI implementation.
+# Scan integration additionally exercises the capture owner through one named
+# header; this is not access to the Capture subtree or unrelated internals. An
 # allowance that no source item actually uses is reported as stale so the
 # classified access list cannot silently accumulate dead privilege.
 function Test-RuntimePrivateImports {
@@ -3018,7 +3019,8 @@ Test-RuntimePrivateImports -SourceItems @($vulkanQualificationSourceItems) `
     -UsedAllowedPaths $vulkanQualificationUsedPrivatePaths
 
 $shaderRuntimeIntegrationAllowedPrivatePaths = @(
-    (Join-Path $runtimePrivateDir "Graphics/RHI")
+    (Join-Path $runtimePrivateDir "Graphics/RHI"),
+    (Join-Path $runtimePrivateDir "Graphics/Capture/FrameCaptureService.h")
 )
 $shaderRuntimeIntegrationUsedPrivatePaths = New-Object `
     'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)

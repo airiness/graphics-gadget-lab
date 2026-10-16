@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/Common.hlsli>
 #include <Common/BindlessResources.hlsli>
 #include <Common/BufferLayout.hlsli>
@@ -61,5 +62,5 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 		radiance += diskCoverage * g_Atmosphere.Sun.rgb / projectedSolidAngle *
 			AtmosphereSunTransmittance(transmittance, samplerState, observer, sun);
 	}
-	return float4(EncodeSceneColor(radiance, viewData.ScenePreExposure), 1.0);
+	return float4(EncodeSceneColor(radiance, viewData.ScenePreExposure, NF_SITE_PASS_PHYSICAL_SKY_PSMAIN_ENCODE_SCENE_COLOR), 1.0);
 }

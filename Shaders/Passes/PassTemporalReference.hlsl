@@ -1,3 +1,4 @@
+#include <Common/NonFiniteCounters.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/BindlessResources.hlsli>
 
@@ -30,7 +31,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	float3 currentColor = currentColorTexture.Load(int3(pixel, 0)).rgb;
 	// A non-finite sample would poison every later mean; it contributes black instead.
-	if (!all(isfinite(currentColor)))
+	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_REFERENCE_CSMAIN_ISFINITE, currentColor))))
 	{
 		currentColor = 0.0.xxx;
 	}

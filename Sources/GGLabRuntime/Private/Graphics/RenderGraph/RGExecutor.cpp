@@ -364,6 +364,11 @@ namespace gglab
 			TrackPassResourceUses(passCommandContext, plan, pass);
 			EmitBarriers(passCommandContext, plan, pass.m_PreBarriers,
 				runtime.m_ExecutionRecord, passIndex.Value(), false);
+			if (pass.m_PassStorageBuffer)
+			{
+				passCommandContext->SetPassStorageBuffer(RHIPassStorageBufferBinding{ pass.m_PassStorageBinding, 0,
+					executeContext.GetBufferHandle(*pass.m_PassStorageBuffer) });
+			}
 			if (pass.m_Executor)
 			{
 				pass.m_Executor->Execute(executeContext);
@@ -377,6 +382,10 @@ namespace gglab
 				{
 					graphicsContext->EndRendering();
 				}
+			}
+			if (passCommandContext)
+			{
+				passCommandContext->SetPassStorageBuffer(std::nullopt);
 			}
 			EmitBarriers(passCommandContext, plan, pass.m_PostBarriers,
 				runtime.m_ExecutionRecord, passIndex.Value(), true);

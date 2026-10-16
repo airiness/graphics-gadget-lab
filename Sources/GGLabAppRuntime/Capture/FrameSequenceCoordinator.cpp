@@ -1,4 +1,5 @@
 #include "Capture/FrameSequenceCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 
 #include <algorithm>
@@ -246,6 +247,7 @@ namespace gglab
 		m_PendingGpuTimingFrames.clear();
 		m_GpuTimingSubmissionCount = 0;
 		m_LastTimingSubmissionSerial = 0;
+		m_WatchStarted = false;
 		return m_Status->m_SequenceId;
 	}
 
@@ -262,6 +264,8 @@ namespace gglab
 		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
+		if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->ReleaseCoverage(m_WatchCoverageId); }
+		m_WatchCoverageId = 0;
 		return true;
 	}
 
@@ -491,6 +495,11 @@ namespace gglab
 			m_CaptureRequestFrames.push_back(m_Frame);
 			m_ExportedFrame = m_Frame;
 		}
+		if (!m_WatchStarted)
+		{
+			m_WatchStarted = true;
+			if (auto* watch = m_Capture->GetNonFiniteWatch()) { m_WatchCoverageId = watch->OpenCoverage(); }
+		}
 		m_BegunRenderFrameSerial = state.m_FrameSerial;
 		m_FrameBegun = true;
 	}
@@ -517,6 +526,7 @@ namespace gglab
 			Fail("Sequence submission did not match its begun RenderFrame serial.");
 			return;
 		}
+		if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->TrackCoverageFrame(m_WatchCoverageId, renderFrameSerial); }
 		if (WantsGpuTiming())
 		{
 			m_PendingGpuTimingFrames.push_back({ .m_RenderFrameSerial = renderFrameSerial,
@@ -534,6 +544,8 @@ namespace gglab
 		if (m_Frame >= m_Status->m_FrameCount)
 		{
 			m_Status->m_State = FrameSequenceState::Finishing;
+			if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->CloseCoverage(m_WatchCoverageId); }
+			UpdateWatchCoverage();
 			CompleteIfFinished();
 		}
 	}
@@ -641,15 +653,35 @@ namespace gglab
 		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
+		if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->ReleaseCoverage(m_WatchCoverageId); }
+		m_WatchCoverageId = 0;
+	}
+
+	void FrameSequenceCoordinator::UpdateWatchCoverage() noexcept
+	{
+		if (!IsActive()) { return; }
+		if (auto* watch = m_Capture->GetNonFiniteWatch())
+		{
+			m_Status->m_WatchCoverage = watch->GetCoverage(m_WatchCoverageId);
+			if (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->Fails())
+			{
+				Fail(m_Status->m_WatchCoverage->m_Failure);
+				return;
+			}
+		}
+		CompleteIfFinished();
 	}
 
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
 			m_Status->m_CompletedCaptures == m_Status->m_CaptureRequestIds.size() &&
-			m_PendingGpuTimingFrames.empty())
+			m_PendingGpuTimingFrames.empty() &&
+			(!m_Status->m_WatchCoverage || m_Status->m_WatchCoverage->m_Complete))
 		{
 			m_Status->m_State = FrameSequenceState::Completed;
+			if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->ReleaseCoverage(m_WatchCoverageId); }
+			m_WatchCoverageId = 0;
 		}
 	}
 }

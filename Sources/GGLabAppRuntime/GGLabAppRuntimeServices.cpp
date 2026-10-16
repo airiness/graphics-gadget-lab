@@ -4,6 +4,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
@@ -47,6 +48,7 @@ namespace gglab
 		m_FrameCapture->ConsumeResults(m_FrameCaptureResults);
 		if (m_FrameSequence)
 		{
+			m_FrameSequence->UpdateWatchCoverage();
 			m_FrameSequence->OnCaptureResults(
 				std::span<const FrameCaptureRequestResult>(m_FrameCaptureResults).subspan(firstResult));
 		}
@@ -124,6 +126,13 @@ namespace gglab
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
 		}
+		if (!m_Config.m_StartupLabParameters.empty() &&
+			!contentSelection.m_StartupDemo->m_ProvidesLabRuntime)
+		{
+			GGLAB_LOG_ERROR("Startup Lab parameters require a startup Demo that hosts Labs.");
+			return FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
+		}
 
 		m_LifecycleState = AppRuntimeLifecycleState::Initializing;
 		m_Input = createInfo.m_Input;
@@ -141,6 +150,7 @@ namespace gglab
 			.m_ActiveBackend = activeBackend,
 			.m_ArtifactRoot = std::move(createInfo.m_ShaderArtifactRoot),
 			.m_ActiveRegistry = createInfo.m_ActiveShaderRegistry,
+			.m_NonFiniteCounters = m_Config.m_NonFiniteCounters,
 			});
 		if (!m_ShaderManager->IsReady())
 		{
@@ -180,11 +190,13 @@ namespace gglab
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
+		m_NonFiniteWatch = std::make_unique<NonFiniteWatchCoordinator>(m_RenderHost->GetFrameCaptureControl());
 		m_FrameCapture = std::make_unique<FrameCaptureCoordinator>(
 			FrameCaptureCoordinator::CreateInfo{
 				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
 				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
+				.m_NonFiniteWatch = m_NonFiniteWatch.get(),
 			});
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
@@ -237,13 +249,19 @@ namespace gglab
 		};
 		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
 		const std::span<const LabRegistration> labRegistrations = m_ContentRegistration.m_Labs;
+		const LabStartupSelection startupLab{
+			.m_Lab = contentSelection.m_StartupLab,
+			.m_Parameters = m_Config.m_StartupLabParameters,
+		};
 		std::optional<uint32_t> startupDemoIndex;
 		for (const ApplicationDemoRegistration& registration : m_ContentRegistration.m_Demos)
 		{
 			const uint32_t registeredIndex = m_DemoManager->RegisterDemo(registration.m_Id,
-				[demoCreateInfo, startupLab = contentSelection.m_StartupLab, labRegistrations,
-					factory = registration.m_Factory]() noexcept -> std::unique_ptr<DemoBase>
-				{ return factory(demoCreateInfo, startupLab, labRegistrations); });
+				[demoCreateInfo, startupLab, labRegistrations, factory = registration.m_Factory]
+				() noexcept -> std::unique_ptr<DemoBase>
+				{
+					return factory(demoCreateInfo, startupLab, labRegistrations);
+				});
 			if (registeredIndex >= m_DemoManager->GetDemoCount())
 			{
 				GGLAB_LOG_ERROR("Failed to register demo '{}'.", registration.m_Id);
@@ -269,18 +287,13 @@ namespace gglab
 		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
-				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value(),
-				});
+				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value() });
 		}
 
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			m_Config.m_StartupDemoId,
-			contentSelection.m_StartupLab.IsValid()
-				? contentSelection.m_StartupLab.GetName()
-				: std::string_view("none"),
-			m_Config.m_InitialPointerMode == AppRuntimePointerMode::Absolute
-				? "absolute"
-				: "relative");
+			contentSelection.m_StartupLab.IsValid() ? contentSelection.m_StartupLab.GetName() : std::string_view("none"),
+			m_Config.m_InitialPointerMode == AppRuntimePointerMode::Absolute ? "absolute" : "relative");
 		GGLAB_LOG_INFO(
 			"Runtime paths: assets='{}', shader_artifacts='{}', ibl_ddc='{}', texture_ddc='{}'.",
 			m_Paths.m_AssetRoot.string(), m_Paths.m_ShaderArtifactRoot.string(),
@@ -400,7 +413,7 @@ namespace gglab
 				"App runtime asset lifetime requires an initialized render host.");
 			if (m_RenderHost && m_RenderHost->IsInitialized())
 			{
-							m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
+				m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
 				m_RenderHost->GetRHIContext()->WaitIdle();
 				// Host-owned tooling may retain backend pipelines, descriptors and user
 				// textures referenced by the last submitted frame. Retire them only at
