@@ -21,7 +21,8 @@ Commands:
   graph    Export the full frame graph, or discovery addresses with -Summary.
   export   Export one frame's resource group as NPY arrays and JSON metadata.
            -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
-           the exact frame graph. See Docs/FrameCapture.md for the address format.
+           the exact frame graph. Address format:
+           .agents/skills/gglab-frame-capture/references/graph-and-resources.md
   watch    Configure semantic defaults or explicit non-finite targets and mode.
            Omit -Targets for tiered defaults; -WatchOff disables reporting.
            -WatchClaims selects boundary, production or both. Debug and Develop builds accept

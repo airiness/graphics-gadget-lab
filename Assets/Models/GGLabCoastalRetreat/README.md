@@ -144,9 +144,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 sto
 ```
 
 Repeat with `-Rhi vulkan` and a separate session id. Sessions are hidden by
-default. See [Frame Capture](../../../Docs/FrameCapture.md) for sidecars and
-cross-backend comparisons. Import checks and shader compilation alone do not
-establish visual correctness.
+default. See the
+[frame capture skill](../../../.agents/skills/gglab-frame-capture/SKILL.md) for
+sidecars and cross-backend comparisons. Import checks and shader compilation
+alone do not establish visual correctness.
 
 Installed-bundle verification on 2026-10-09: Debug WinApp and ShaderCompiler
 built with the x64-hosted MSVC toolchain, with zero build errors or warnings.
