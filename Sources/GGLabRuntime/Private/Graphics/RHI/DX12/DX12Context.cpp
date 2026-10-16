@@ -70,7 +70,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(desc.m_FrameSlotCount >= 2,
 			"DX12Context currently requires at least two frame slots for its swapchain.");
 		m_Device = std::make_unique<DX12Device>();
-		m_Device->Initialize();
+		m_Device->Initialize({
+			.m_EnableDebugValidation = desc.m_EnableDebugValidation,
+			.m_EnableGpuBasedValidation = desc.m_EnableGpuBasedValidation,
+			});
 		m_PipelineSystem = std::make_unique<DX12PipelineSystem>(m_Device.get());
 		DX12QueueSystem::CreateInfo queueSystemInfo{};
 		queueSystemInfo.m_Device = m_Device.get();

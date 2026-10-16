@@ -24,9 +24,90 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  checks:
+    name: Checks
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate no-PCH source boundary
+        shell: pwsh
+        run: |
+          $pchCreatorSource =
+            (Resolve-Path -LiteralPath "Sources\WinApp\Application\ApplicationPch.cpp").Path
+          $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
+          $unexpectedIncludes = @(
+            Get-ChildItem -LiteralPath Sources -Recurse -File |
+              Where-Object {
+                $_.Extension -in $sourceExtensions -and
+                $_.FullName -ne $pchCreatorSource
+              } |
+              Select-String -Pattern '^\s*#\s*include\s*[<"]Application/ApplicationPch\.h[>"]'
+          )
+
+          if ($unexpectedIncludes.Count -ne 0) {
+            $locations = $unexpectedIncludes | ForEach-Object {
+              "$($_.Path):$($_.LineNumber)"
+            }
+            throw "Source-level PCH includes are not allowed: $($locations -join ', ')"
+          }
+
+      - name: Validate generated project filters
+        shell: pwsh
+        run: |
+          ./Scripts/GenerateProjectFilters.ps1 -Check
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Validate boundary rule self-tests
+        shell: pwsh
+        run: |
+          ./Scripts/ValidateProjectBoundaries.ps1 -SelfTest
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Validate project ownership and first-party boundaries
+        shell: pwsh
+        run: |
+          ./Scripts/ValidateProjectBoundaries.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run verification contracts
+        shell: pwsh
+        run: |
+          python -m pip install jsonschema==4.25.1 numpy
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Group contracts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload verification results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verification-checks
+          path: |
+            Build/Validation/Verification/**/result.json
+            Build/Validation/Verification/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   build:
     name: Build / ${{ matrix.display_name }}
-    runs-on: windows-2022
+    runs-on: windows-2025-vs2026
     timeout-minutes: 45
 
     strategy:
@@ -37,6 +118,10 @@ jobs:
             configuration: Debug
             pch: enabled
             log_name: Debug
+          - display_name: Develop
+            configuration: Develop
+            pch: enabled
+            log_name: Develop
           - display_name: Release
             configuration: Release
             pch: enabled
@@ -58,6 +143,7 @@ jobs:
         uses: microsoft/setup-msbuild@v3
         with:
           msbuild-architecture: x64
+          vs-version: '[18.0,19.0)'
 
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v3
@@ -164,78 +250,6 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Validate no-PCH source boundary
-        if: matrix.pch == 'disabled'
-        shell: pwsh
-        run: |
-          $pchCreatorSource =
-            (Resolve-Path -LiteralPath "Sources\WinApp\Application\ApplicationPch.cpp").Path
-          $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
-          $unexpectedIncludes = @(
-            Get-ChildItem -LiteralPath Sources -Recurse -File |
-              Where-Object {
-                $_.Extension -in $sourceExtensions -and
-                $_.FullName -ne $pchCreatorSource
-              } |
-              Select-String -Pattern '^\s*#\s*include\s*[<"]Application/ApplicationPch\.h[>"]'
-          )
-
-          if ($unexpectedIncludes.Count -ne 0) {
-            $locations = $unexpectedIncludes | ForEach-Object {
-              "$($_.Path):$($_.LineNumber)"
-            }
-            throw "Source-level PCH includes are not allowed: $($locations -join ', ')"
-          }
-
-      - name: Validate generated project filters
-        shell: pwsh
-        run: |
-          ./Scripts/GenerateProjectFilters.ps1 -Check
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Validate boundary rule self-tests
-        shell: pwsh
-        run: |
-          ./Scripts/ValidateProjectBoundaries.ps1 -SelfTest
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Validate project ownership and first-party boundaries
-        shell: pwsh
-        run: |
-          ./Scripts/ValidateProjectBoundaries.ps1
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Validate observation export schema contracts
-        shell: pwsh
-        run: |
-          python -m pip install jsonschema==4.25.1 numpy
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/GenerateNonFiniteSites.py --check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/ValidateNonFiniteSites.py --self-test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/ValidateNonFiniteSites.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/ValidateRenderGraphExports.py --self-test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/ValidateResourceExports.py --self-test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Validate capture comparison discovery and rejection
-        shell: pwsh
-        run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestCompareCaptures.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       - name: Build GGLabFoundation standalone
         if: matrix.pch == 'enabled'
         shell: pwsh
@@ -244,10 +258,12 @@ jobs:
 
           $foundationBuildArguments = @(
             "Projects\GGLabFoundation\GGLabFoundation.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-foundation-standalone-${{ matrix.log_name }}.binlog"
@@ -267,10 +283,12 @@ jobs:
 
           $foundationTestsBuildArguments = @(
             "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-foundation-tests-${{ matrix.log_name }}.binlog"
@@ -289,10 +307,12 @@ jobs:
 
           $runtimeBuildArguments = @(
             "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-runtime-standalone-${{ matrix.log_name }}.binlog"
@@ -312,10 +332,12 @@ jobs:
 
           $runtimeTestsBuildArguments = @(
             "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-runtime-tests-standalone-${{ matrix.log_name }}.binlog"
@@ -335,10 +357,12 @@ jobs:
 
           $appRuntimeBuildArguments = @(
             "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog"
@@ -358,10 +382,12 @@ jobs:
 
           $appRuntimeTestsBuildArguments = @(
             "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-app-runtime-tests-${{ matrix.log_name }}.binlog"
@@ -381,10 +407,12 @@ jobs:
 
           $shaderToolchainTestsBuildArguments = @(
             "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\shader-toolchain-tests-${{ matrix.log_name }}.binlog"
@@ -404,10 +432,12 @@ jobs:
 
           $shaderRuntimeIntegrationTestsBuildArguments = @(
             "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\shader-runtime-integration-tests-${{ matrix.log_name }}.binlog"
@@ -427,10 +457,12 @@ jobs:
 
           $qualificationBuildArguments = @(
             "Projects\GGLabVulkanQualification\GGLabVulkanQualification.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-vulkan-qualification-${{ matrix.log_name }}.binlog"
@@ -449,10 +481,12 @@ jobs:
 
           $applicationBuildArguments = @(
             "Projects\WinApp\WinApp.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-application-standalone-${{ matrix.log_name }}.binlog"
@@ -469,6 +503,7 @@ jobs:
           }
 
       - name: Build solution
+        if: matrix.pch == 'enabled'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force Build\Logs | Out-Null
@@ -479,14 +514,11 @@ jobs:
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-${{ matrix.log_name }}.binlog"
           )
-
-          if ("${{ matrix.pch }}" -eq "disabled") {
-            $buildArguments += "/p:GGLAB_USE_PCH=0"
-          }
 
           msbuild @buildArguments
 
@@ -499,23 +531,17 @@ jobs:
         shell: pwsh
         run: |
           ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
-            -Configuration Debug -Backend dx12
+            -Configuration Debug -Backend dx12,vulkan
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
 
-          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
-            -Configuration Debug -Backend vulkan
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Build and validate Release artifact-only runtime package
-        if: matrix.configuration == 'Release' && matrix.pch == 'enabled'
+      - name: Build and validate optimized artifact-only runtime package
+        if: (matrix.configuration == 'Develop' || matrix.configuration == 'Release') && matrix.pch == 'enabled'
         shell: pwsh
         run: |
           ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
-            -Configuration Release -Backend dx12
+            -Configuration ${{ matrix.configuration }} -Backend dx12
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -532,6 +558,7 @@ jobs:
           }
 
       - name: Run headless self-tests from unrelated CWD (Vulkan qualification)
+        if: matrix.pch == 'enabled'
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
@@ -554,6 +581,7 @@ jobs:
           }
 
       - name: Run headless self-tests (GGLabFoundationTests)
+        if: matrix.pch == 'enabled'
         shell: pwsh
         working-directory: Build/Output/x64/${{ matrix.configuration }}
         run: |
@@ -563,6 +591,7 @@ jobs:
           }
 
       - name: Run headless self-tests from unrelated CWD (GGLabRuntimeTests)
+        if: matrix.pch == 'enabled'
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
@@ -586,6 +615,7 @@ jobs:
           }
 
       - name: Run headless self-tests from unrelated CWD (ShaderToolchainTests)
+        if: matrix.pch == 'enabled'
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
@@ -597,6 +627,7 @@ jobs:
           }
 
       - name: Run headless self-tests from unrelated CWD (ShaderRuntimeIntegrationTests)
+        if: matrix.pch == 'enabled'
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
@@ -608,6 +639,7 @@ jobs:
           }
 
       - name: Run headless self-tests (NapaVoxelCoreTests)
+        if: matrix.pch == 'enabled'
         shell: pwsh
         working-directory: Build/Output/x64/${{ matrix.configuration }}
         run: |

@@ -73,6 +73,22 @@ namespace gglab
 			captureRequest->m_Label == "culling",
 			"Capture-on-ready waits for the requested Lab after readiness and settling");
 
+		ApplicationLaunchOptions validationOptions{};
+		validationOptions.m_ValidationMode = ApplicationValidationMode::Off;
+		const auto validationOff = TranslateApplicationLaunchOptions(validationOptions, { 1280, 720 }, true);
+		validationOptions.m_ValidationMode = ApplicationValidationMode::Standard;
+		const auto validationStandard = TranslateApplicationLaunchOptions(validationOptions, { 1280, 720 }, false);
+		validationOptions.m_ValidationMode = ApplicationValidationMode::Gpu;
+		const auto validationGpu = TranslateApplicationLaunchOptions(validationOptions, { 1280, 720 }, false);
+		context.Check(!validationOff.m_RequestRuntimeValidation && !validationOff.m_RequestGpuBasedValidation &&
+			validationStandard.m_RequestRuntimeValidation && !validationStandard.m_RequestGpuBasedValidation &&
+			validationGpu.m_RequestRuntimeValidation && validationGpu.m_RequestGpuBasedValidation,
+			"Validation overrides independently control the ordinary layer and GPU-based validation");
+#if defined(BUILD_DEVELOP)
+		const auto developDefaults = TranslateApplicationLaunchOptions(ApplicationLaunchOptions{}, { 1280, 720 }, true);
+		context.Check(developDefaults.m_RequestRuntimeValidation && !developDefaults.m_RequestGpuBasedValidation,
+			"Develop keeps ordinary validation enabled without GPU-based validation by default");
+#endif
 		ApplicationLaunchOptions islandOptions{};
 		islandOptions.m_StartupDemo = ApplicationStartupDemo::Island;
 		const AppRuntimeConfig islandConfig = TranslateApplicationLaunchOptions(

@@ -97,6 +97,7 @@ namespace gglab
 		contextDesc.m_Height = createInfo.m_Height;
 		contextDesc.m_AdapterSelector = createInfo.m_AdapterSelector;
 		contextDesc.m_EnableDebugValidation = createInfo.m_EnableDebugValidation;
+		contextDesc.m_EnableGpuBasedValidation = createInfo.m_EnableGpuBasedValidation;
 		m_RHIContext = createInfo.m_RHIContextFactory->CreateContext(contextDesc);
 		if (!m_RHIContext)
 		{

@@ -27,7 +27,7 @@ namespace gglab::win32
 				m_RequiresCleanup = SUCCEEDED(comResult);
 				if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE)
 				{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 					Log(TaskLogTag, LogLevel::Error,
 						"TaskSystem worker {} failed to initialize COM: 0x{:08X}.", workerIndex,
 						static_cast<uint32_t>(comResult));

@@ -29,6 +29,7 @@ namespace gglab
 			.m_Height = createInfo.m_Height,
 			.m_AdapterSelector = createInfo.m_AdapterSelector,
 			.m_EnableDebugValidation = createInfo.m_EnableDebugValidation,
+			.m_EnableGpuBasedValidation = createInfo.m_EnableGpuBasedValidation,
 		};
 		if (!renderer->Initialize(rendererCreateInfo))
 		{

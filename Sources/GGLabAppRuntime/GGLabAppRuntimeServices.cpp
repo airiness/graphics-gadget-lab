@@ -174,6 +174,7 @@ namespace gglab
 			.m_Height = m_WindowHeight,
 			.m_AdapterSelector = m_Config.m_AdapterSelector,
 			.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation,
+			.m_EnableGpuBasedValidation = m_Config.m_RequestGpuBasedValidation,
 			});
 		if (!renderHostInstance.m_Host)
 		{

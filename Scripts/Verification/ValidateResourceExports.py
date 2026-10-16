@@ -159,7 +159,7 @@ def main():
 	parser.add_argument("paths", nargs="*", type=Path)
 	parser.add_argument("--self-test", action="store_true")
 	args = parser.parse_args()
-	schema = json.loads((Path(__file__).resolve().parents[1] / "Docs/Schemas/ResourceExport.schema.json").read_text(encoding="utf-8"))
+	schema = json.loads((Path(__file__).resolve().parents[2] / "Schemas/ResourceExport.schema.json").read_text(encoding="utf-8"))
 	Draft202012Validator.check_schema(schema)
 	validator = Draft202012Validator(schema)
 	if args.self_test:

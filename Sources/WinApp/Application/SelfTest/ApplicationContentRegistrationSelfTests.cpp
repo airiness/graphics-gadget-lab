@@ -1656,7 +1656,7 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		checkSelectedDemand("gglab.lab.render_graph_compute", 55,
 			"Render-graph compute selection contributes four stable and one Debug probe shader demand");
 #else

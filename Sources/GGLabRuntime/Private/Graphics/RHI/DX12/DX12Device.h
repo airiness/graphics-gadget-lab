@@ -40,6 +40,8 @@ namespace gglab
 		struct CreateInfo
 		{
 			bool m_TryLoadWinPix = true;
+			bool m_EnableDebugValidation = false;
+			bool m_EnableGpuBasedValidation = false;
 		};
 
 	public:
@@ -144,9 +146,9 @@ namespace gglab
 
 	private:
 		void InitializeWinPIX() noexcept;
-		void InitializeDXGIFactory() noexcept;
+		void InitializeDXGIFactory(bool enableDebugValidation) noexcept;
 		void InitializeDXGIAdapter() noexcept;
-		void InitializeDebugLayer() noexcept;
+		void InitializeDebugLayer(bool enableGpuBasedValidation) noexcept;
 		void InitializeD3D12Device() noexcept;
 		void InitializeInfoQueue() noexcept;
 		void InitializeMemAllocator() noexcept;

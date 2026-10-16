@@ -250,6 +250,7 @@ namespace gglab
 		uint32_t m_Height = 0;
 		std::optional<std::string> m_AdapterSelector;
 		bool m_EnableDebugValidation = false;
+		bool m_EnableGpuBasedValidation = false;
 
 		[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
 		{

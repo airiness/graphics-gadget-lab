@@ -23,8 +23,8 @@
 #include <windows.h>
 #include <shlobj.h>
 
-#if defined(BUILD_DEBUG)
 #include <dxgidebug.h>
+#if defined(USE_PIX)
 #include <pix3.h>
 #endif
 
@@ -63,20 +63,28 @@ namespace gglab
 			return;
 		}
 
-#if defined(BUILD_DEBUG)
+#if defined(USE_PIX)
 		if (createInfo.m_TryLoadWinPix)
 		{
 			InitializeWinPIX();
 		}
 #endif
 
-		InitializeDXGIFactory();
+		const bool enableValidation =
+			createInfo.m_EnableDebugValidation || createInfo.m_EnableGpuBasedValidation;
+		if (enableValidation)
+		{
+			InitializeDebugLayer(createInfo.m_EnableGpuBasedValidation);
+		}
+		InitializeDXGIFactory(enableValidation);
 		InitializeDXGIAdapter();
-#if defined(BUILD_DEBUG)
-		InitializeDebugLayer();
-#endif
 		InitializeD3D12Device();
-		InitializeInfoQueue();
+		if (enableValidation)
+		{
+			InitializeInfoQueue();
+		}
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("DX12 validation requested: layer={}, gpuBased={}",
+			enableValidation, createInfo.m_EnableGpuBasedValidation);
 		CheckFeatureSupport();
 		InitializeMemAllocator();
 		m_ResourceManager.Initialize(this);
@@ -551,15 +559,14 @@ namespace gglab
 		m_ResourceManager.RetireCompletedResources();
 	}
 
-	void DX12Device::InitializeDebugLayer() noexcept
+	void DX12Device::InitializeDebugLayer(bool enableGpuBasedValidation) noexcept
 	{
-#if defined(BUILD_DEBUG)
 		// Validate Debug Layer
 		ComPtr<ID3D12Debug1> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
-			debugController->SetEnableGPUBasedValidation(true);
+			debugController->SetEnableGPUBasedValidation(enableGpuBasedValidation);
 
 			ComPtr<ID3D12Debug5> debugController5;
 			if (SUCCEEDED(debugController.As(&debugController5)))
@@ -567,44 +574,59 @@ namespace gglab
 				debugController5->SetEnableAutoName(true);
 			}
 		}
-#endif
 	}
 
 	void DX12Device::InitializeWinPIX() noexcept
 	{
-#if defined(BUILD_DEBUG)
-		// Try to load `WinPixGpuCapturer.dll` for Frame Capture.
-		if (GetModuleHandle(L"WinPixGpuCapturer.dll") != 0)
+#if defined(USE_PIX)
+		HMODULE capturer = GetModuleHandleW(L"WinPixGpuCapturer.dll");
+		if (capturer == nullptr)
 		{
-			return;
+			const auto dllPath = GetLatestWinPixGpuCapturerPath();
+			if (dllPath.empty())
+			{
+				return;
+			}
+			// Keep the capture DLL loaded for the lifetime of the process.
+			capturer = LoadLibraryW(dllPath.c_str());
+			if (capturer == nullptr)
+			{
+				GGLAB_LOG_GRAPHICS_WARN_ALWAYS("Failed to load the PIX GPU capturer: Win32 error {}.",
+					GetLastError());
+				return;
+			}
 		}
 
-		const auto dllPath = GetLatestWinPixGpuCapturerPath();
-		if (!dllPath.empty())
+		// Apply the same HUD policy when PIX injected the DLL before startup.
+		const HRESULT hudResult = PIXSetHUDOptions(PIX_HUD_SHOW_ON_NO_WINDOWS);
+		if (FAILED(hudResult))
 		{
-			LoadLibrary(dllPath.c_str());
+			GGLAB_LOG_GRAPHICS_WARN_ALWAYS("Failed to hide the PIX GPU capture HUD: HRESULT 0x{:08X}.",
+				static_cast<uint32_t>(hudResult));
 		}
-
-		PIXSetHUDOptions(PIX_HUD_SHOW_ON_NO_WINDOWS);
+		else
+		{
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("PIX GPU capturer initialized with its HUD hidden.");
+		}
 #endif
 	}
 
-	void DX12Device::InitializeDXGIFactory() noexcept
+	void DX12Device::InitializeDXGIFactory(bool enableDebugValidation) noexcept
 	{
 		UINT createFactoryFlags = 0;
 
-#if defined(BUILD_DEBUG)
-		createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-
-		ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
-		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
+		if (enableDebugValidation)
 		{
-			dxgiInfoQueue->SetBreakOnSeverity(
-				DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-			dxgiInfoQueue->SetBreakOnSeverity(
-				DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+			createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+			ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+			if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
+			{
+				dxgiInfoQueue->SetBreakOnSeverity(
+					DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+				dxgiInfoQueue->SetBreakOnSeverity(
+					DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+			}
 		}
-#endif
 		ComPtr<IDXGIFactory7> dxgiFactory;
 		GGLAB_HR(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
@@ -672,7 +694,6 @@ namespace gglab
 
 	void DX12Device::InitializeInfoQueue() noexcept
 	{
-#if defined(BUILD_DEBUG)
 		ComPtr<ID3D12InfoQueue> infoQueue;
 		if (SUCCEEDED(m_D3D12Device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
 		{
@@ -699,7 +720,6 @@ namespace gglab
 			filter.DenyList.pIDList = denyIds;
 			GGLAB_HR(infoQueue->PushStorageFilter(&filter));
 		}
-#endif
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

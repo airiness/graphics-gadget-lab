@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 if ([string]::IsNullOrWhiteSpace($RootDir)) {
-    $RootDir = Join-Path $PSScriptRoot ".."
+    $RootDir = Join-Path $PSScriptRoot "../.."
 }
 $RootDir = (Resolve-Path -LiteralPath $RootDir).Path
 if (-not [System.IO.Path]::IsPathRooted($ManifestPath)) {

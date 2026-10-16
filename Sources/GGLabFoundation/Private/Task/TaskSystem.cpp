@@ -39,7 +39,7 @@ namespace gglab
 		}
 	}
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 #define GGLAB_LOG_FOUNDATION_TASK(level, ...) Log(TaskLogTag, level, __VA_ARGS__)
 #else
 #define GGLAB_LOG_FOUNDATION_TASK(level, ...)

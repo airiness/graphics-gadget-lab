@@ -34,7 +34,7 @@ compared and stays within the optional tolerances and no sidecar was rejected,
 and 1 otherwise.
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CompareCaptures.ps1 -Reference Build/Sessions/dx12/Captures -Candidate Build/Sessions/vulkan/Captures -MaxMeanError 1.0
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/CompareCaptures.ps1 -Reference Build/Sessions/dx12/Captures -Candidate Build/Sessions/vulkan/Captures -MaxMeanError 1.0
 #>
 [CmdletBinding()]
 param(

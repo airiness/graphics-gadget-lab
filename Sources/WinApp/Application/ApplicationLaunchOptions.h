@@ -21,6 +21,13 @@ namespace gglab
 		LabHost,
 	};
 
+	enum class ApplicationValidationMode : uint8_t
+	{
+		Off,
+		Standard,
+		Gpu,
+	};
+
 	// One after-ready capture taken by an unattended launch, which then exits
 	// with the capture result.
 	struct ApplicationCaptureOnReadyOptions
@@ -39,13 +46,14 @@ namespace gglab
 	{
 		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
-		// Debug-only startup assignments for the startup Lab, in command-line order.
+		// Development startup assignments for the startup Lab, in command-line order.
 		std::vector<LabParameterAssignment> m_StartupLabParameters;
 		std::optional<std::string> m_SelfTestSelection;
 		std::filesystem::path m_StateRoot;
 		bool m_StartWithRelativeMouse = false;
 		bool m_DisableDevelopmentTools = false;
 		bool m_WatchNonFinite = false;
+		std::optional<ApplicationValidationMode> m_ValidationMode;
 
 		// RHI backend selection. Defaults to DX12; an explicit --rhi vulkan
 		// never falls back to DX12.

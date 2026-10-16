@@ -138,15 +138,16 @@ from the same code revision, then run from the code repository root:
 ```powershell
 Build/Output/x64/Debug/GraphicsGadgetLab.exe --self-test app-content-registration
 $retreatStateRoot = Join-Path (Get-Location) 'Build/Sessions/retreat-dx12/State'
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 start -Session retreat-dx12 -Rhi dx12 -Demo atrium -WindowSize 1280x800 -NoDevTools -StateRoot $retreatStateRoot
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 batch -Session retreat-dx12 -SettleFrames 64
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 stop -Session retreat-dx12
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 start -Session retreat-dx12 -Rhi dx12 -Demo atrium -WindowSize 1280x800 -NoDevTools -StateRoot $retreatStateRoot
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 batch -Session retreat-dx12 -SettleFrames 64
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 stop -Session retreat-dx12
 ```
 
 Repeat with `-Rhi vulkan` and a separate session id. Sessions are hidden by
-default. See [Frame Capture](../../../Docs/FrameCapture.md) for sidecars and
-cross-backend comparisons. Import checks and shader compilation alone do not
-establish visual correctness.
+default. See the
+[frame capture skill](../../../.agents/skills/gglab-frame-capture/SKILL.md) for
+sidecars and cross-backend comparisons. Import checks and shader compilation
+alone do not establish visual correctness.
 
 Installed-bundle verification on 2026-10-09: Debug WinApp and ShaderCompiler
 built with the x64-hosted MSVC toolchain, with zero build errors or warnings.

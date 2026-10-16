@@ -3,6 +3,10 @@
 #include <cassert>
 #include <cstdlib>
 
+#if defined(BUILD_DEVELOP) && (defined(_DEBUG) || defined(NDEBUG))
+#error "Develop builds require the release CRT and enabled assertions."
+#endif
+
 #define GGLAB_ASSERT(expression) assert(expression)
 #define GGLAB_ASSERT_MSG(expression, message) assert((expression) && (message))
 #define GGLAB_ASSERT_NOT_NULL(expression) assert(expression != nullptr)

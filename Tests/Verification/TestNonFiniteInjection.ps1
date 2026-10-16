@@ -3,8 +3,8 @@
 Checks that non-finite watch catches values injected at registered injection points.
 
 .DESCRIPTION
-Injection is a Debug-only watch request ('watch -Inject'), carried to the GPU with the
-frame's production counters, so this script runs Debug builds with --watch-nonfinite.
+Injection is a Debug/Develop watch request ('watch -Inject'), carried to the GPU with
+the frame's production counters, so this script starts with --watch-nonfinite.
 Each requested backend gets one hidden session per Lab; every case reconfigures watch.
 
 RenderGraph Compute Lab (animation speed 0, so every frame is identical):
@@ -35,17 +35,17 @@ param(
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
     [ValidateSet('render-graph-compute', 'temporal-aa')][string[]]$Lab = @('render-graph-compute', 'temporal-aa'),
     [string]$OutputDirectory,
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 180,
+    [ValidateSet('Debug', 'Develop')][string]$Configuration = 'Debug',
+    [string]$RunDirectory
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
-$root = Split-Path -Parent $PSScriptRoot
-$sessionScript = Join-Path $PSScriptRoot 'GGLabSession.ps1'
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteInjection' }
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
+if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteInjection' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
-$output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
-New-Item -ItemType Directory -Path $output | Out-Null
-$utf8 = New-Object Text.UTF8Encoding($false)
+$output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId $runId
 $cases = @()
 
 $computeLabId = 'gglab.lab.render_graph_compute'
@@ -70,26 +70,14 @@ $taaInjections = @(
     @{ Value = 'PositiveInfinity'; Component = 3; Site = $taaAccumulationSite }
 )
 
-function Save([string]$Path, $Value) {
-    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 32), $utf8)
-}
-function Call([string]$Verb, [string]$Session, [hashtable]$Options = @{}, [switch]$AllowFailure) {
-    $json = ($Options | ConvertTo-Json -Compress -Depth 12).Replace("'", "''")
-    $script = $sessionScript.Replace("'", "''")
-    $command = "`$ProgressPreference='SilentlyContinue'; `$p=@{}; `$data='$json'|ConvertFrom-Json; " +
-        "foreach (`$v in `$data.PSObject.Properties) {`$p[`$v.Name]=`$v.Value}; & '$script' '$Verb' -Session '$Session' @p"
-    $text = & powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
-    if ($LASTEXITCODE -and -not $AllowFailure) { throw "Session $Session $Verb failed: $text" }
-    return ($text -join "`n") | ConvertFrom-Json
-}
 function Wait-Report([string]$Session, [scriptblock]$Done, [string]$What) {
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    do {
-        $status = Call status $Session
-        if (& $Done $status.watch.report $status) { return $status }
-        if ((Get-Date) -ge $deadline) { throw "Timed out waiting for $What`: $($status.watch | ConvertTo-Json -Compress -Depth 12)" }
-        Start-Sleep -Milliseconds 100
-    } while ($true)
+    $poll = { Invoke-VerificationSession status $Session }.GetNewClosure()
+    $until = { param($status) & $Done $status.watch.report $status }.GetNewClosure()
+    $timeout = {
+        param($status)
+        throw "Timed out waiting for $What`: $($status.watch | ConvertTo-Json -Compress -Depth 12)"
+    }.GetNewClosure()
+    Wait-VerificationCondition -Poll $poll -Until $until -TimeoutSeconds $TimeoutSeconds -OnTimeout $timeout
 }
 function Assert([bool]$Condition, [string]$Message, $Evidence) {
     if (-not $Condition) { throw "$Message`: $($Evidence | ConvertTo-Json -Compress -Depth 12)" }
@@ -131,22 +119,20 @@ function Invoke-Session([string]$Backend, [string]$Name, [string]$LabId, [string
     $session = "inject-$runId-$Backend-$Name"
     $start = $null
     try {
-        $start = Call start $session @{ Configuration = 'Debug'; Rhi = $Backend; Lab = $LabId; NoDevTools = $true;
+        $start = Invoke-VerificationSession start $session @{ Configuration = $Configuration; Rhi = $Backend; Lab = $LabId; NoDevTools = $true;
             WindowSize = '320x180'; StateRoot = "$output/$Backend-state"; WatchNonFinite = $true;
             LabParameters = $Assignments; StartTimeoutSeconds = $TimeoutSeconds }
-        Save "$directory/start.json" $start
+        Write-VerificationJson "$directory/start.json" $start
         & $Body $session $directory
         # Disabling watch clears the injection and leaves the process usable.
-        $null = Call watch $session @{ WatchOff = $true }
-        $off = Call status $session
+        $null = Invoke-VerificationSession watch $session @{ WatchOff = $true }
+        $off = Invoke-VerificationSession status $session
         Assert ($null -eq $off.watch.report -or $null -eq $off.watch.report.injection) 'Disabling watch kept the injection' $off.watch
-        $recovered = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/recovered"; TimeoutSeconds = $TimeoutSeconds }
+        $recovered = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/recovered"; TimeoutSeconds = $TimeoutSeconds }
         Assert ($recovered.status -eq 'completed') 'The process did not recover after injection' $recovered
     } finally {
         if ($null -ne $start) {
-            $stop = Call stop $session
-            Save "$directory/stop.json" $stop
-            if ($stop.exitCode -ne 0) { throw "Session exited with $($stop.exitCode)" }
+            $null = Stop-VerificationSession $session -StartedSession $start -ReceiptPath "$directory/stop.json" -RequireCleanExit
         }
     }
     $log = Get-Content -Raw $start.outputLog
@@ -161,90 +147,90 @@ try {
         if ($Lab -contains 'render-graph-compute') {
             Invoke-Session $backend 'render-graph-compute' $computeLabId @('render_graph_compute.animation.speed=0') {
                 param($session, $directory)
-                $null = Call watch $session @{ WatchMode = 'fail'; WatchClaims = @('production') }
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production') }
                 $status = Wait-Report $session { param($r) $r.production -eq 'Passed' } 'clean production evidence'
                 Assert ($null -eq $status.watch.report.injection -and $null -eq $status.watch.injection) 'Uninjected evidence carries an injection' $status.watch
-                $image = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/control.json" $image
+                $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/control.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Passed' -and $null -eq $image.watch.injection) 'Control capture did not pass' $image
                 $script:controlHash = Get-PixelHash $image.image
-                $graph = Call graph $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
+                $graph = Invoke-VerificationSession graph $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
                 Assert ($graph.status -eq 'completed' -and -not (Select-String -LiteralPath $graph.graph -SimpleMatch 'NonFiniteProbe' -Quiet)) 'Probe work exists without injection' $graph
                 Add-Case $backend 'compute-control'
 
                 foreach ($value in @(@{ Name = 'NaN'; Field = 'nan' }, @{ Name = 'PositiveInfinity'; Field = 'positiveInf' }, @{ Name = 'NegativeInfinity'; Field = 'negativeInf' })) {
                     $inject = Inject $probePoint $value.Name $x $y $component
-                    $null = Call watch $session @{ WatchMode = 'report'; Targets = $probeTargets; Inject = $inject }
+                    $null = Invoke-VerificationSession watch $session @{ WatchMode = 'report'; Targets = $probeTargets; Inject = $inject }
                     $status = Wait-Report $session { param($r) $null -ne $r.firstAnomaly -and $r.production -eq 'Passed' -and $null -ne $r.injection -and $r.injection.appliedCount -ge 1 } "a boundary $($value.Name)"
-                    Save "$directory/boundary-$($value.Name).json" $status
+                    Write-VerificationJson "$directory/boundary-$($value.Name).json" $status
                     $anomaly = $status.watch.report.firstAnomaly
                     $target = $anomaly.target
                     Assert ($anomaly.reason -eq 'NonFiniteDetected' -and $target.address.resource -eq $probe) 'Boundary anomaly has the wrong reason or target' $anomaly
                     Assert ($target.location.x -eq $x -and $target.location.y -eq $y -and $target.location.slice -eq 0 -and $target.location.channel -eq $component) 'Boundary anomaly is not at the injected location' $target
                     Assert ($target.($value.Field) -eq 1 -and ($target.nan + $target.positiveInf + $target.negativeInf) -eq 1 -and $target.checked -eq 512 * 512 * 4) 'Boundary anomaly has wrong counts' $target
                     Assert ($status.watch.report.injection.appliedCount -eq 1) 'The probe point did not apply exactly once per frame' $status.watch.report.injection
-                    $null = Call watch $session @{ WatchMode = 'fail'; Targets = $probeTargets; Inject = $inject }
-                    $failed = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/boundary-$($value.Name)"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
-                    Save "$directory/boundary-$($value.Name)-fail.json" $failed
+                    $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; Targets = $probeTargets; Inject = $inject }
+                    $failed = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/boundary-$($value.Name)"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
+                    Write-VerificationJson "$directory/boundary-$($value.Name)-fail.json" $failed
                     Assert ($failed.status -eq 'failed' -and $failed.failure -match 'NonFiniteDetected' -and $failed.failure -match [regex]::Escape($probe) -and
                         $failed.failure -match 'under Debug injection') 'Fail mode did not fail at the probe under its injection' $failed
                     Add-Case $backend "compute-boundary-$($value.Name)"
                 }
 
                 $inject = Inject $probePoint 'Overflow' $x $y $component
-                $null = Call watch $session @{ WatchMode = 'fail'; Targets = $probeTargets; Inject = $inject }
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; Targets = $probeTargets; Inject = $inject }
                 $status = Wait-Report $session { param($r) $r.boundary -eq 'Passed' -and $r.production -eq 'Passed' -and $null -ne $r.injection -and $r.injection.appliedCount -ge 1 } 'a finite boundary overflow'
-                Save "$directory/boundary-Overflow.json" $status
+                Write-VerificationJson "$directory/boundary-Overflow.json" $status
                 Assert (@($status.watch.report.targets)[0].maximum -eq 131072 -and $null -eq $status.watch.report.firstAnomaly) 'Finite overflow was not only the finite maximum' $status.watch.report
-                $image = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/boundary-Overflow"; Label = 'overflow'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/boundary-Overflow-image.json" $image
+                $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/boundary-Overflow"; Label = 'overflow'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/boundary-Overflow-image.json" $image
                 Assert ($image.status -eq 'completed') 'A finite boundary overflow failed the capture' $image
                 Assert-Stamp $status.watch.report (Get-Coverage $image) $probePoint 'Overflow'
                 Add-Case $backend 'compute-boundary-Overflow'
 
                 $inject = Inject $previewPoint 'NaN' $x $y $component
-                $null = Call watch $session @{ WatchMode = 'report'; WatchClaims = @('production'); Inject = $inject }
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'report'; WatchClaims = @('production'); Inject = $inject }
                 $status = Wait-Report $session { param($r) $null -ne $r.firstAnomaly } 'a sanitized NaN'
-                Save "$directory/sanitized-NaN.json" $status
+                Write-VerificationJson "$directory/sanitized-NaN.json" $status
                 $anomaly = $status.watch.report.firstAnomaly
                 Assert ($anomaly.reason -eq 'NonFiniteReplaced' -and $anomaly.site -eq $sanitizeSite -and $anomaly.program -eq $computeProgram) 'Production anomaly has the wrong site' $anomaly
                 $counts = @(Find-Site $status $sanitizeSite $computeProgram)
                 Assert ($counts.Count -eq 1 -and $counts[0].nonFiniteReplacements -eq 1 -and $counts[0].claim -eq 'Failed') 'Site counters do not show one replacement' $status.watch
-                $image = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-NaN"; Label = 'reported'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/sanitized-NaN-image.json" $image
+                $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-NaN"; Label = 'reported'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/sanitized-NaN-image.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Failed' -and $image.watch.reason -eq 'NonFiniteReplaced') 'Report-mode capture lost the production failure' $image
                 Assert ((Get-PixelHash $image.image) -eq $script:controlHash) 'The sanitized NaN changed the PNG pixels' $image
                 Assert-Stamp $status.watch.report (Get-Coverage $image) $previewPoint 'NaN'
-                $null = Call watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
-                $failed = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-NaN"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/sanitized-NaN-fail.json" $failed
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
+                $failed = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-NaN"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/sanitized-NaN-fail.json" $failed
                 Assert ($failed.status -eq 'failed' -and $failed.failure -match 'NonFiniteReplaced' -and $failed.failure -match [regex]::Escape($sanitizeSite) -and
                     $failed.failure -match 'under Debug injection') 'Fail mode did not fail at the sanitizing site under its injection' $failed
                 Add-Case $backend 'compute-sanitized-NaN'
 
                 $inject = Inject $previewPoint 'Negative' $x $y $component
-                $null = Call watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
                 $status = Wait-Report $session { param($r, $s) $r.production -eq 'Passed' -and @(Find-Site $s $sanitizeSite $computeProgram).Count -eq 1 } 'an expected clamp'
-                Save "$directory/sanitized-Negative.json" $status
+                Write-VerificationJson "$directory/sanitized-Negative.json" $status
                 $counts = @(Find-Site $status $sanitizeSite $computeProgram)[0]
                 Assert ($counts.negativeClamps -eq 1 -and $counts.mostNegative -eq -4 -and $counts.claim -eq 'Passed') 'Expected negative clamp was not counted as passing' $counts
-                $image = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-Negative"; Label = 'expected'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/sanitized-Negative-image.json" $image
+                $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-Negative"; Label = 'expected'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/sanitized-Negative-image.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Passed') 'Expected clamp failed the capture' $image
                 Assert ((Get-PixelHash $image.image) -eq $script:controlHash) 'The clamped negative value changed the PNG pixels' $image
                 Assert-Stamp $status.watch.report (Get-Coverage $image) $previewPoint 'Negative'
                 Add-Case $backend 'compute-sanitized-Negative'
 
                 $inject = Inject $previewPoint 'Overflow' $x $y $component
-                $null = Call watch $session @{ WatchMode = 'report'; WatchClaims = @('production'); Inject = $inject }
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'report'; WatchClaims = @('production'); Inject = $inject }
                 $status = Wait-Report $session { param($r) $null -ne $r.firstAnomaly } 'an error clamp'
-                Save "$directory/sanitized-Overflow.json" $status
+                Write-VerificationJson "$directory/sanitized-Overflow.json" $status
                 Assert ($status.watch.report.firstAnomaly.reason -eq 'ClampPolicyExceeded' -and $status.watch.report.firstAnomaly.site -eq $sanitizeSite) 'Overflow did not exceed the error policy' $status.watch.report
                 $counts = @(Find-Site $status $sanitizeSite $computeProgram)[0]
                 Assert ($counts.fp16MaximumClamps -eq 1 -and $counts.maximum -eq 131072 -and $counts.claim -eq 'Failed') 'FP16 clamp counters are wrong' $counts
-                $null = Call watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
-                $failed = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-Overflow"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/sanitized-Overflow-fail.json" $failed
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
+                $failed = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-Overflow"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/sanitized-Overflow-fail.json" $failed
                 Assert ($failed.status -eq 'failed' -and $failed.failure -match 'ClampPolicyExceeded' -and $failed.failure -match [regex]::Escape($sanitizeSite)) 'Fail mode did not fail on the error clamp' $failed
                 Add-Case $backend 'compute-sanitized-Overflow'
             }
@@ -253,22 +239,22 @@ try {
         if ($Lab -contains 'temporal-aa') {
             Invoke-Session $backend 'temporal-aa' $taaLabId @('temporal_aa.object.animate=false') {
                 param($session, $directory)
-                $startup = Call capture $session @{ OutputDirectory = "$directory/startup"; Label = 'startup'; TimeoutSeconds = $TimeoutSeconds }
+                $startup = Invoke-VerificationSession capture $session @{ OutputDirectory = "$directory/startup"; Label = 'startup'; TimeoutSeconds = $TimeoutSeconds }
                 Assert ($startup.status -eq 'completed') 'Temporal AA Lab did not become ready' $startup
-                $null = Call watch $session @{ WatchMode = 'fail'; WatchClaims = @('production') }
+                $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production') }
                 $status = Wait-Report $session { param($r) $r.production -eq 'Passed' } 'clean Temporal AA production evidence'
-                Save "$directory/control.json" $status
+                Write-VerificationJson "$directory/control.json" $status
                 Assert (@($status.watch.sites | Where-Object { $_.claim -eq 'Failed' }).Count -eq 0) 'Uninjected Temporal AA has failing sites' $status.watch
-                $image = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/control-image.json" $image
+                $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/control-image.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Passed' -and $null -eq $image.watch.injection) 'Temporal AA control capture did not pass' $image
                 Add-Case $backend 'taa-control'
 
                 foreach ($injection in $taaInjections) {
                     $inject = Inject $taaPoint $injection.Value $taaX $taaY $injection.Component
-                    $null = Call watch $session @{ WatchMode = 'report'; WatchClaims = @('production'); Inject = $inject }
+                    $null = Invoke-VerificationSession watch $session @{ WatchMode = 'report'; WatchClaims = @('production'); Inject = $inject }
                     $status = Wait-Report $session { param($r) $null -ne $r.firstAnomaly } "a Temporal AA $($injection.Value) recovery"
-                    Save "$directory/taa-$($injection.Value).json" $status
+                    Write-VerificationJson "$directory/taa-$($injection.Value).json" $status
                     $anomaly = $status.watch.report.firstAnomaly
                     Assert ($anomaly.reason -eq 'NonFiniteReplaced' -and $anomaly.site -eq $injection.Site -and $anomaly.program -eq $taaProgram) 'Temporal AA anomaly is not at the recovery site' $anomaly
                     $counts = @(Find-Site $status $injection.Site $taaProgram)
@@ -277,9 +263,9 @@ try {
                     $escaped = @($status.watch.sites | Where-Object { ($_.claim -eq 'Failed' -or $_.nonFiniteReplacements -gt 0) -and $_.site -ne $injection.Site })
                     Assert ($escaped.Count -eq 0) 'The injected history reached another site' $status.watch
                     Assert-Stamp $status.watch.report $null $taaPoint $injection.Value
-                    $null = Call watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
-                    $failed = Call capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/taa-$($injection.Value)"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
-                    Save "$directory/taa-$($injection.Value)-fail.json" $failed
+                    $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
+                    $failed = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/taa-$($injection.Value)"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
+                    Write-VerificationJson "$directory/taa-$($injection.Value)-fail.json" $failed
                     Assert ($failed.status -eq 'failed' -and $failed.failure -match 'NonFiniteReplaced' -and $failed.failure -match [regex]::Escape($injection.Site) -and
                         $failed.failure -match 'under Debug injection') 'Fail mode did not fail at the recovery site under its injection' $failed
                     Add-Case $backend "taa-$($injection.Value)"
@@ -288,11 +274,11 @@ try {
         }
     }
     $result = @{ ok = $true; cases = $cases; directory = $output }
-    Save "$output/result.json" $result
+    Write-VerificationJson "$output/result.json" $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
 } catch {
     $result = @{ ok = $false; cases = $cases; directory = $output; error = $_.Exception.Message }
-    Save "$output/result.json" $result
+    Write-VerificationJson "$output/result.json" $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
     exit 1
 }

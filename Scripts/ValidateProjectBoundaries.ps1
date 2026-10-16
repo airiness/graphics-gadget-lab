@@ -1945,7 +1945,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
 $appRuntimeConfigurationTypes = @($appRuntimeProject.SelectNodes(
     "//msb:PropertyGroup[@Label='Configuration']/msb:ConfigurationType",
     $appRuntimeNamespace))
-if ($appRuntimeConfigurationTypes.Count -ne 2 -or
+if ($appRuntimeConfigurationTypes.Count -ne 3 -or
     @($appRuntimeConfigurationTypes | Where-Object { $_.InnerText -ne "StaticLibrary" }).Count -gt 0) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "build-policy"
@@ -1956,7 +1956,7 @@ if ($appRuntimeConfigurationTypes.Count -ne 2 -or
 $appRuntimePchNodes = @($appRuntimeProject.SelectNodes(
     "//msb:ItemDefinitionGroup/msb:ClCompile/msb:PrecompiledHeader",
     $appRuntimeNamespace))
-if ($appRuntimePchNodes.Count -ne 2 -or
+if ($appRuntimePchNodes.Count -ne 3 -or
     @($appRuntimePchNodes | Where-Object { $_.InnerText -ne "NotUsing" }).Count -gt 0) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "build-policy"
@@ -1969,7 +1969,7 @@ $appRuntimeImports = @($appRuntimeProject.SelectNodes("//msb:Import[@Project]",
 if (@($appRuntimeImports | Where-Object {
             $_.EndsWith("PropertySheets\GGLabBuildBaseline.props",
                 [System.StringComparison]::OrdinalIgnoreCase)
-        }).Count -ne 2 -or
+        }).Count -ne 3 -or
     @($appRuntimeImports | Where-Object {
             $_.EndsWith("PropertySheets\Common.props",
                 [System.StringComparison]::OrdinalIgnoreCase)
@@ -1983,7 +1983,7 @@ if (@($appRuntimeImports | Where-Object {
 $appRuntimeTestsPchNodes = @($appRuntimeTestsProject.SelectNodes(
     "//msb:ItemDefinitionGroup/msb:ClCompile/msb:PrecompiledHeader",
     $appRuntimeTestsNamespace))
-if ($appRuntimeTestsPchNodes.Count -ne 2 -or
+if ($appRuntimeTestsPchNodes.Count -ne 3 -or
     @($appRuntimeTestsPchNodes | Where-Object { $_.InnerText -ne "NotUsing" }).Count -gt 0) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "build-policy"
@@ -2505,7 +2505,7 @@ foreach ($reference in $foundationTestsProjectReferenceSet) {
         })
     }
 }
-$directXTexProjectPath = Join-Path $root "Externals/Vender/DirectXTex/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj"
+$directXTexProjectPath = Join-Path $root "Externals/Vender/DirectXTex/DirectXTex/DirectXTex_Desktop_2026.vcxproj"
 $runtimeTestsRequiredReferences = @($runtimeProjectPath, $shaderArtifactRuntimeProjectPath,
     $foundationProjectPath, $testCoreProjectPath)
 foreach ($requiredReference in $runtimeTestsRequiredReferences) {

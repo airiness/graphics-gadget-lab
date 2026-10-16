@@ -80,7 +80,7 @@ namespace gglab
 		return { .m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
 			.m_GpuHandle = IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex)
 											 : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 			.m_DebugType = GetHeap()->Type()
 #endif
 		};
@@ -147,7 +147,7 @@ namespace gglab
 			const auto descriptorIndex = localSpan.m_Index + index;
 			if (m_SlotStates[descriptorIndex] == SlotState::Pending)
 			{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				GGLAB_ASSERT_MSG(
 					false, "FreeHandleInternal: freeing a pending span. Use Retire() instead.");
 #endif
@@ -187,7 +187,7 @@ namespace gglab
 			const auto descriptorIndex = localSpan.m_Index + index;
 			if (m_SlotStates[descriptorIndex] != SlotState::Free)
 			{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				GGLAB_ASSERT_MSG(
 					false, "TryMarkAllocated: double allocate or allocator corruption.");
 #endif
@@ -224,7 +224,7 @@ namespace gglab
 			}
 			else
 			{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				GGLAB_ASSERT_MSG(false, "TryMarkPending: pending a freed slot.");
 #endif
 				return false;
@@ -233,7 +233,7 @@ namespace gglab
 
 		if (anyAllocated && anyPending)
 		{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 			GGLAB_ASSERT_MSG(false, "TryMarkPending: mixed Allocated/Pending state (overlap).");
 #endif
 			return false;
@@ -264,7 +264,7 @@ namespace gglab
 			const auto state = m_SlotStates[localSpan.m_Index + index];
 			if (state != SlotState::Allocated && state != SlotState::Pending)
 			{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				GGLAB_ASSERT_MSG(false, "MarkFreed: double free or freeing unallocated slot.");
 #endif
 				return false;
@@ -281,7 +281,7 @@ namespace gglab
 
 	void DX12DescriptorFreeListAllocator::AddPending(const Pending& pending) noexcept
 	{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		if (!m_PendingQueue.empty())
 		{
 			GGLAB_ASSERT_MSG(

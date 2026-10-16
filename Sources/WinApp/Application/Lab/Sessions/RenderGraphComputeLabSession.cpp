@@ -532,7 +532,7 @@ namespace gglab
 				m_PreviewRecipe.m_PSId = shaderManager->LoadProgram(
 					shader_programs::RenderGraphComputePreviewPixel);
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				m_NonFiniteProbeRecipe.m_CSId =
 					shaderManager->LoadProgram(shader_programs::RenderGraphComputeNonFiniteProbe);
 #endif
@@ -578,7 +578,7 @@ namespace gglab
 				auto* pipelineCache = m_PipelineResolver;
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
 				GGLAB_ASSERT_MSG(m_NonFiniteProbeRecipe.m_CSId.IsValid(),
-					"The non-finite probe exists only in Debug builds.");
+					"The non-finite probe exists only in Debug and Develop builds.");
 				return pipelineCache->Resolve(
 					m_NonFiniteProbeSlot, m_NonFiniteProbeRecipe, NonFiniteProbePassInfo);
 			}

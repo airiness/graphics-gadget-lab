@@ -12,7 +12,7 @@
       <Command>xcopy /y /d "$(GGLabRepositoryRoot)Externals\bin\assimp\x64\Debug\assimp-vc143-mtd.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Release'">
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Develop' or '$(Configuration)' == 'Release'">
     <Link>
       <AdditionalLibraryDirectories>$(GGLabRepositoryRoot)Externals\lib\assimp\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>assimp-vc143-mt.lib;zlibstatic.lib;%(AdditionalDependencies)</AdditionalDependencies>

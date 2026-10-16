@@ -296,7 +296,7 @@ namespace gglab
 		}
 	}
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 #define GGLAB_LOG_SHADER_COMPILER(level, ...) \
 	::gglab::Log(ShaderCompilerLogTag, level, __VA_ARGS__)
 #else

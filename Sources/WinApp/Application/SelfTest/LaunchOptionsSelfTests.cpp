@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <initializer_list>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -253,7 +254,7 @@ namespace gglab
 				const auto assignments = parse({ "--lab", "gglab.lab.render_graph_compute",
 					"--lab-parameter", "render_graph_compute.debug.nonfinite.mode=Boundary",
 					"--lab-parameter", "render_graph_compute.animation.speed=0" });
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				context.Check(assignments.IsValid() &&
 					assignments.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
 					assignments.m_Options.m_StartupLabParameters.size() == 2 &&
@@ -271,8 +272,8 @@ namespace gglab
 					"Debug startup Lab parameters reject malformed, duplicate or non-Lab assignments");
 #else
 				context.Check(!assignments.IsValid() &&
-					assignments.m_Error.find("only in Debug builds") != std::string::npos,
-					"Startup Lab parameters are rejected outside Debug builds");
+					assignments.m_Error.find("only in Debug and Develop builds") != std::string::npos,
+					"Startup Lab parameters are rejected outside Debug and Develop builds");
 #endif
 			}
 		}
@@ -282,6 +283,23 @@ namespace gglab
 	void RunLaunchOptionsSelfTests(SelfTestContext& context) noexcept
 	{
 		RunLaunchOptionContractTests(context);
+		const auto parseValidation = [](std::initializer_list<std::string_view> args)
+			{
+				return ParseApplicationLaunchOptions(std::span{ args.begin(), args.size() });
+			};
+		const auto gpuValidation = parseValidation({ "--validation", "gpu", "--rhi", "dx12" });
+		context.Check(gpuValidation.IsValid() &&
+			gpuValidation.m_Options.m_ValidationMode == ApplicationValidationMode::Gpu &&
+			parseValidation({ "--rhi", "vulkan", "--validation", "standard" }).IsValid() &&
+			parseValidation({ "--validation", "off", "--rhi", "vulkan" }).IsValid(),
+			"Validation modes parse independently of backend argument order");
+		context.Check(!parseValidation({ "--validation" }).IsValid() &&
+			!parseValidation({ "--validation", "unknown" }).IsValid() &&
+			!parseValidation({ "--validation", "off", "--validation", "gpu" }).IsValid() &&
+			!parseValidation({ "--validation", "gpu", "--rhi", "vulkan" }).IsValid() &&
+			!parseValidation({ "--list-adapters", "--validation", "gpu" }).IsValid() &&
+			!parseValidation({ "--self-test", "all", "--validation", "standard" }).IsValid(),
+			"Validation modes reject missing, duplicate, incompatible and unsupported requests");
 		RunPlaygroundContentCliContractTests(context);
 		RunTextureContractLabCliTests(context);
 	}

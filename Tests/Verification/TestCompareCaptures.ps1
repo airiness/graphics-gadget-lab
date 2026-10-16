@@ -7,8 +7,9 @@ param([string]$OutputDirectory)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
-$root = Split-Path -Parent $PSScriptRoot
-$comparisonScript = Join-Path $PSScriptRoot 'CompareCaptures.ps1'
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
+$comparisonScript = Join-Path $root 'Scripts/Verification/CompareCaptures.ps1'
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/CaptureComparisons' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
@@ -16,10 +17,6 @@ New-Item -ItemType Directory -Path $output | Out-Null
 $utf8 = New-Object Text.UTF8Encoding($false)
 $checks = @()
 Add-Type -AssemblyName System.Drawing
-
-function Write-Json([string]$Path, $Value) {
-    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 12), $utf8)
-}
 
 function Write-Capture([string]$Directory, [string]$Name = 'capture', [int]$Red = 0,
     [string]$CapturedAt = '2026-01-01T00:00:01Z') {
@@ -33,7 +30,7 @@ function Write-Capture([string]$Directory, [string]$Name = 'capture', [int]$Red 
         }
         $bitmap.Save($image, [Drawing.Imaging.ImageFormat]::Png)
     } finally { $bitmap.Dispose() }
-    Write-Json ([IO.Path]::ChangeExtension($image, '.json')) @{
+    Write-VerificationJson -Depth 12 ([IO.Path]::ChangeExtension($image, '.json')) @{
         schemaVersion = 1; image = @{ file = "$Name.png" }; content = @{ labId = 'gglab.lab.fixture' }
         source = 'scene'; label = 'fixture'; capturedAtUtc = $CapturedAt
     }
@@ -55,7 +52,7 @@ function Check-Comparison([string]$Name, [string]$Reference, [string]$Candidate,
         -Reference $Reference -Candidate $Candidate -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0
     $actualExit = $LASTEXITCODE
     $receipt = ($text -join "`n") | ConvertFrom-Json
-    Write-Json (Join-Path $output "$Name-result.json") $receipt
+    Write-VerificationJson -Depth 12 (Join-Path $output "$Name-result.json") $receipt
     $actualCompared = if ($receipt.PSObject.Properties['compared']) { $receipt.compared } else { 0 }
     $actualFailed = if ($receipt.PSObject.Properties['failed']) { $receipt.failed } else { 0 }
     if ($actualExit -ne $ExitCode -or $receipt.ok -ne ($ExitCode -eq 0) -or
@@ -70,9 +67,9 @@ try {
     $case = New-Case 'mixed-directory'
     foreach ($arm in @('off', 'on')) {
         $directory = Join-Path $case $arm
-        Write-Json (Join-Path $directory 'session.json') @{ ok = $true }
-        Write-Json (Join-Path $directory 'resource-export.json') @{ schemaVersion = 2 }
-        Write-Json (Join-Path $directory 'graph.json') @{ schemaVersion = 4 }
+        Write-VerificationJson -Depth 12 (Join-Path $directory 'session.json') @{ ok = $true }
+        Write-VerificationJson -Depth 12 (Join-Path $directory 'resource-export.json') @{ schemaVersion = 2 }
+        Write-VerificationJson -Depth 12 (Join-Path $directory 'graph.json') @{ schemaVersion = 4 }
         [IO.File]::WriteAllText((Join-Path $directory 'unrelated.json'), '{invalid', $utf8)
     }
     Write-Capture (Join-Path $case 'off') 'older' 255 '2026-01-01T00:00:00Z'
@@ -83,7 +80,7 @@ try {
     $sidecar = "$case/on/capture.json"
     $metadata = Get-Content -Raw $sidecar | ConvertFrom-Json
     $metadata.schemaVersion = 99
-    Write-Json $sidecar $metadata
+    Write-VerificationJson -Depth 12 $sidecar $metadata
     Check-Comparison 'unsupported-sidecar' "$case/off" "$case/on" 1 0 1 0 1
     Check-Comparison 'unsupported-single-image' "$case/off/capture.png" "$case/on/capture.png" 1 0 1
 
@@ -100,7 +97,7 @@ try {
     $sidecar = "$case/on/capture.json"
     $metadata = Get-Content -Raw $sidecar | ConvertFrom-Json
     $metadata.image.file = 'other.png'
-    Write-Json $sidecar $metadata
+    Write-VerificationJson -Depth 12 $sidecar $metadata
     Check-Comparison 'mismatched-image' "$case/off" "$case/on" 1 0 1 0 1
 
     $case = New-Case 'pixel-difference'
@@ -111,15 +108,15 @@ try {
     $sidecar = "$case/on/capture.json"
     $metadata = Get-Content -Raw $sidecar | ConvertFrom-Json
     $metadata.label = 'unmatched'
-    Write-Json $sidecar $metadata
+    Write-VerificationJson -Depth 12 $sidecar $metadata
     Check-Comparison 'unmatched-key' "$case/off" "$case/on" 1 0 0 0 2
 
     $result = @{ ok = $true; checks = $checks; directory = $output }
-    Write-Json (Join-Path $output 'result.json') $result
+    Write-VerificationJson -Depth 12 (Join-Path $output 'result.json') $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress))
 } catch {
     $result = @{ ok = $false; checks = $checks; directory = $output; error = $_.Exception.Message }
-    Write-Json (Join-Path $output 'result.json') $result
+    Write-VerificationJson -Depth 12 (Join-Path $output 'result.json') $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress))
     exit 1
 }

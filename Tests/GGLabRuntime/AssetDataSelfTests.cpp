@@ -395,7 +395,7 @@ namespace gglab
 			const DerivedDataKey key =
 				BuildTextureDerivedDataKey(sourceDigest, "Textures/Fixture.PNG", settings);
 			context.Check(MatchesHex(key.m_Value,
-				"5889e6c301b099379dab9713ef36830489dfba6fee4c20ed6e07e7e4203c7e88"),
+				"3786494b84c757cd25945c194278de557c02f62786494fb40b21b8e22e262dcd"),
 				"Texture derived-data key matches the stable golden vector");
 		}
 
@@ -2416,7 +2416,7 @@ namespace gglab
 			return identities;
 		}
 
-		void RunIBLDerivedDataShaderIdentityTests(SelfTestContext& context) noexcept
+		void RunIBLDerivedDataIdentityTests(SelfTestContext& context) noexcept
 		{
 			const std::filesystem::path cacheDirectory =
 				std::filesystem::temp_directory_path() / "gglab-ibl-key-self-test";
@@ -2430,6 +2430,21 @@ namespace gglab
 			const IBLBakeConfig config{};
 			const IBLDerivedDataLookupResult baseline = system.Lookup(source,
 				EnvironmentTextureSourceType::Equirectangular, config, identities, true);
+
+			AssetContentFingerprint decoderChanged = source;
+			++decoderChanged.m_DecoderVersion;
+			const IBLDerivedDataLookupResult changedDecoder = system.Lookup(decoderChanged,
+				EnvironmentTextureSourceType::Equirectangular, config, identities, true);
+			context.Check(
+				baseline.Get(IBLArtifactStage::Environment).m_Key !=
+					changedDecoder.Get(IBLArtifactStage::Environment).m_Key &&
+				baseline.Get(IBLArtifactStage::Irradiance).m_Key !=
+					changedDecoder.Get(IBLArtifactStage::Irradiance).m_Key &&
+				baseline.Get(IBLArtifactStage::PrefilteredSpecular).m_Key !=
+					changedDecoder.Get(IBLArtifactStage::PrefilteredSpecular).m_Key &&
+				baseline.Get(IBLArtifactStage::BrdfLut).m_Key ==
+					changedDecoder.Get(IBLArtifactStage::BrdfLut).m_Key,
+				"Texture decoder changes invalidate dependent IBL stages while preserving the BRDF LUT");
 
 			IBLShaderArtifactIdentities irradianceChanged = identities;
 			irradianceChanged[static_cast<size_t>(IBLArtifactStage::Irradiance)]
@@ -2899,7 +2914,7 @@ namespace gglab
 		RunGltfTextureSourceTests(context);
 		RunMaterialUVTransformTests(context);
 		RunRHITextureValidationTests(context);
-		RunIBLDerivedDataShaderIdentityTests(context);
+		RunIBLDerivedDataIdentityTests(context);
 		RunIBLDerivedDataLookupResolutionTests(context);
 		RunIBLBakeStageResolutionTests(context);
 		RunIBLCacheControlTests(context);

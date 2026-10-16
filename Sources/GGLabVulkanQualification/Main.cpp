@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
 	options.m_SurfaceFactory = &surfaceFactory;
 	options.m_Host = &host;
 	options.m_IsHostAbiSupported = sizeof(void*) == 8;
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 	options.m_RequestValidation = true;
 #else
 	options.m_RequestValidation = false;

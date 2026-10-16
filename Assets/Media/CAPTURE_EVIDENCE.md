@@ -16,6 +16,6 @@ are labelled separately from hashes recorded during capture.
 
 `baseline.json` remains authoritative for the frozen rendering baseline.
 Evidence references into it use `manifestPath` and a JSON `pointer`.
-`ValidateRenderingBaseline.ps1` accepts only baseline schema version 2, which
+`Scripts/Verification/ValidateRenderingBaseline.ps1` accepts only baseline schema version 2, which
 checks Runtime assets and archived images. Legacy schema version 1 also covered
 authoring files and is rejected; authoring validation belongs to its workspace.

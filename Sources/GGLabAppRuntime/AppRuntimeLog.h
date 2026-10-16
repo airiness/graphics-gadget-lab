@@ -18,7 +18,7 @@ namespace gglab::log_tags
 #define GGLAB_LOG_CRITICAL_ALWAYS(...) \
 	GGLAB_LOG_APPLICATION_ALWAYS(::gglab::LogLevel::Critical, __VA_ARGS__)
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 #define GGLAB_LOG_INFO(...) GGLAB_LOG_INFO_ALWAYS(__VA_ARGS__)
 #define GGLAB_LOG_WARN(...) GGLAB_LOG_WARN_ALWAYS(__VA_ARGS__)
 #define GGLAB_LOG_ERROR(...) GGLAB_LOG_ERROR_ALWAYS(__VA_ARGS__)

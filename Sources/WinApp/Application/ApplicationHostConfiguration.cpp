@@ -34,7 +34,16 @@ namespace gglab
 		{
 			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;
 		}
-		config.m_RequestRuntimeValidation = requestRuntimeValidation;
+		config.m_RequestRuntimeValidation = options.m_ValidationMode
+			? *options.m_ValidationMode != ApplicationValidationMode::Off : requestRuntimeValidation;
+		config.m_RequestGpuBasedValidation =
+			options.m_ValidationMode == ApplicationValidationMode::Gpu;
+#if defined(BUILD_DEBUG)
+		if (!options.m_ValidationMode && options.m_RhiBackend == RHIBackendType::DX12)
+		{
+			config.m_RequestGpuBasedValidation = requestRuntimeValidation;
+		}
+#endif
 		config.m_NonFiniteCounters = options.m_WatchNonFinite;
 		config.m_FixedDeltaTimeSeconds = options.m_FixedDeltaTimeSeconds
 			? options.m_FixedDeltaTimeSeconds
