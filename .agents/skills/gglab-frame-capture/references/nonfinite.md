@@ -140,9 +140,10 @@ Develop also accept startup `-LabParameters 'id=value'`; Release rejects them.
 
 ## Focused audits and regression gates
 
-Use existing scripts for repeatable checks; choose those affected by the change
-and build their required executables first. Most accept configuration/backend
-filters; inspect each parameter block rather than assuming identical defaults.
+Select regressions with `Tests/Verification/RunVerification.ps1 -List` and
+`-Suite <name>`; see [Run repeatable checks](../SKILL.md#run-repeatable-checks).
+Build GPU suites' required executables first. The scripts below also run
+independently; inspect their parameter blocks for individual defaults.
 
 | Script | Evidence |
 | --- | --- |

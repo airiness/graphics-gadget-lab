@@ -74,6 +74,27 @@ Use `status` to inspect pending gates. The custom-pipeline Labs
 open the `ibl` gate; use `-Timing next-frame` for their smoke captures and check
 the actual content/logs before treating the image as valid.
 
+## Run repeatable checks
+
+Use [RunVerification.ps1](../../../Tests/Verification/RunVerification.ps1) to list
+and select regression suites. It defaults to the `contracts` group without a
+GPU; GPU suites require an existing build and default to Develop on both APIs.
+Python suites require `jsonschema` and `numpy`; select an interpreter with `-Python`.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -List
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Group contracts
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Group gpu -Configuration Develop -Rhi dx12,vulkan
+```
+
+Use `-Suite nonfinite-injection` (or another listed name) for a focused run.
+Suite/configuration/backend lists accept comma-separated values. Injection requires
+Debug or Develop; unsupported combinations are rejected before launching sessions.
+Each run saves `result.json` and per-step logs under `Build/Validation/Verification/`
+(or `-OutputDirectory`) and exits nonzero on failure. Scripts remain independently
+callable. Audits, overhead measurements and frozen baselines remain separate tools;
+see [Non-finite diagnostics](references/nonfinite.md) for their evidence contracts.
+
 ## Inspect and finish
 
 - A session command's exit code 0 and `ok: true` describe the control request.

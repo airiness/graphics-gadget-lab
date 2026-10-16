@@ -12,32 +12,17 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$sessionScript = Join-Path $root 'Scripts/Verification/GGLabSession.ps1'
+Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteGenerations' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
 New-Item -ItemType Directory -Path $output | Out-Null
-$utf8 = New-Object Text.UTF8Encoding($false)
 $cases = @()
 
-function Save([string]$Path, $Value) {
-    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 32), $utf8)
-}
-
-function Call([string]$Verb, [string]$Session, [hashtable]$Options = @{}) {
-    $json = ($Options | ConvertTo-Json -Compress -Depth 12).Replace("'", "''")
-    $script = $sessionScript.Replace("'", "''")
-    $command = "`$ProgressPreference='SilentlyContinue'; `$p=@{}; `$data='$json'|ConvertFrom-Json; " +
-        "foreach (`$v in `$data.PSObject.Properties) {`$p[`$v.Name]=`$v.Value}; & '$script' '$Verb' -Session '$Session' @p"
-    $text = & powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
-    if ($LASTEXITCODE) { throw "Session $Session $Verb failed: $text" }
-    return ($text -join "`n") | ConvertFrom-Json
-}
-
 function Wait-Generations([string]$Session, [bool]$Atmosphere, [long]$After = 0) {
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    do {
-        $status = Call status $Session
+    $poll = { Invoke-VerificationSession status $Session }.GetNewClosure()
+    $until = {
+        param($status)
         $report = $status.watch.report
         if ($null -ne $report.firstAnomaly) { throw "Unexpected anomaly: $($report.firstAnomaly | ConvertTo-Json -Compress -Depth 16)" }
         $targets = @($report.targets | Where-Object { $_.watchTier -eq 2 -and $null -ne $_.generation })
@@ -48,10 +33,12 @@ function Wait-Generations([string]$Session, [bool]$Atmosphere, [long]$After = 0)
             $clean = $clean -and $target.lastCheckedFrameSerial -gt $After -and $target.checked -gt 0 -and
                 $target.claim -in @('Passed', 'NotApplicable')
         }
-        if ($clean) { return $status }
-        if ((Get-Date) -ge $deadline) { throw "Generation scans did not complete: $($report | ConvertTo-Json -Compress -Depth 20)" }
-        Start-Sleep -Milliseconds 100
-    } while ($true)
+        return $clean
+    }.GetNewClosure()
+    Wait-VerificationCondition -Poll $poll -Until $until -TimeoutSeconds $TimeoutSeconds -OnTimeout {
+        param($status)
+        throw "Generation scans did not complete: $($status.watch.report | ConvertTo-Json -Compress -Depth 20)"
+    }
 }
 
 function Fingerprint($Status) {
@@ -72,16 +59,16 @@ try {
             $lab = if ($atmosphere) { 'gglab.lab.atmosphere_range' } else { 'gglab.lab.temporal_aa' }
             $start = $null
             try {
-                $start = Call start $session @{ Configuration = $Configuration; Rhi = $backend; Lab = $lab;
+                $start = Invoke-VerificationSession start $session @{ Configuration = $Configuration; Rhi = $backend; Lab = $lab;
                     NoDevTools = $true; WindowSize = '320x180'; StateRoot = $state; WatchNonFinite = $true;
                     StartTimeoutSeconds = $TimeoutSeconds }
-                Save "$directory/start.json" $start
-                $null = Call capture $session @{ SettleFrames = 2; TimeoutSeconds = $TimeoutSeconds;
+                Write-VerificationJson "$directory/start.json" $start
+                $null = Invoke-VerificationSession capture $session @{ SettleFrames = 2; TimeoutSeconds = $TimeoutSeconds;
                     OutputDirectory = "$directory/Startup"; Label = 'startup' }
-                $null = Call watch $session
+                $null = Invoke-VerificationSession watch $session
                 $first = Wait-Generations $session $atmosphere
-                Save "$directory/first-watch.json" $first
-                $null = Call graph $session @{ OutputDirectory = $directory; Label = 'active'; TimeoutSeconds = $TimeoutSeconds }
+                Write-VerificationJson "$directory/first-watch.json" $first
+                $null = Invoke-VerificationSession graph $session @{ OutputDirectory = $directory; Label = 'active'; TimeoutSeconds = $TimeoutSeconds }
                 $graphFile = @(Get-ChildItem -LiteralPath $directory -Filter '*.graph.json')
                 if ($graphFile.Count -ne 1) { throw 'Missing active-generation graph' }
                 $graph = Get-Content -Raw $graphFile[0].FullName | ConvertFrom-Json
@@ -98,21 +85,19 @@ try {
                         if ($targets[$mip].checked -ne $expected) { throw "Incomplete scalar coverage: $($group.Name), mip $mip" }
                     }
                 }
-                $null = Call capture $session @{ SettleFrames = 16; TimeoutSeconds = $TimeoutSeconds;
+                $null = Invoke-VerificationSession capture $session @{ SettleFrames = 16; TimeoutSeconds = $TimeoutSeconds;
                     OutputDirectory = "$directory/Stable"; Label = 'stable' }
                 $stable = Wait-Generations $session $atmosphere
-                Save "$directory/stable-watch.json" $stable
+                Write-VerificationJson "$directory/stable-watch.json" $stable
                 if ((Fingerprint $first) -cne (Fingerprint $stable)) { throw 'An unchanged active generation was rescanned' }
                 $lastChecked = ($stable.watch.report.targets | Measure-Object lastCheckedFrameSerial -Maximum).Maximum
-                $null = Call watch $session @{ WatchOff = $true }
-                $null = Call watch $session
+                $null = Invoke-VerificationSession watch $session @{ WatchOff = $true }
+                $null = Invoke-VerificationSession watch $session
                 $reconfigured = Wait-Generations $session $atmosphere $lastChecked
-                Save "$directory/reconfigured-watch.json" $reconfigured
+                Write-VerificationJson "$directory/reconfigured-watch.json" $reconfigured
             } finally {
                 if ($null -ne $start) {
-                    $stop = Call stop $session
-                    Save "$directory/stop.json" $stop
-                    if ($stop.exitCode -ne 0) { throw "Session exited with $($stop.exitCode)" }
+                    $null = Stop-VerificationSession $session -StartedSession $start -ReceiptPath "$directory/stop.json" -RequireCleanExit
                 }
             }
             $log = Get-Content -Raw $start.outputLog
@@ -131,11 +116,11 @@ try {
         }
     }
     $result = @{ ok = $true; cases = $cases; directory = $output }
-    Save "$output/result.json" $result
+    Write-VerificationJson "$output/result.json" $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
 } catch {
     $result = @{ ok = $false; cases = $cases; directory = $output; error = $_.Exception.Message }
-    Save "$output/result.json" $result
+    Write-VerificationJson "$output/result.json" $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
     exit 1
 }

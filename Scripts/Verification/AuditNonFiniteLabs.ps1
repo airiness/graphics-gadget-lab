@@ -34,7 +34,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$sessionScript = Join-Path $PSScriptRoot 'GGLabSession.ps1'
+Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteAudit' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
@@ -72,21 +72,9 @@ if ($Content) {
     $catalog = @($catalog | Where-Object { $_.Name -in $Content })
 }
 
-function Save([string]$Path, $Value) {
-    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 32), $utf8)
-}
-function Call([string]$Verb, [string]$Session, [hashtable]$Options = @{}, [switch]$AllowFailure) {
-    $json = ($Options | ConvertTo-Json -Compress -Depth 12).Replace("'", "''")
-    $script = $sessionScript.Replace("'", "''")
-    $command = "`$ProgressPreference='SilentlyContinue'; `$p=@{}; `$data='$json'|ConvertFrom-Json; " +
-        "foreach (`$v in `$data.PSObject.Properties) {`$p[`$v.Name]=`$v.Value}; & '$script' '$Verb' -Session '$Session' @p"
-    $text = & powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
-    if ($LASTEXITCODE -and -not $AllowFailure) { throw "Session $Session $Verb failed: $text" }
-    return ($text -join "`n") | ConvertFrom-Json
-}
 # Debug DX12 sessions can stop answering while GPU-based validation patches pipelines.
 function Get-Status([string]$Session) {
-    $status = Call status $Session -AllowFailure
+    $status = Invoke-VerificationSession status $Session -AllowFailure
     if ($status.PSObject.Properties['ok'] -and -not $status.ok) { return $null }
     return $status
 }
@@ -106,23 +94,23 @@ foreach ($backend in $Rhi) {
             $options = @{ Configuration = $Configuration; Rhi = $backend; NoDevTools = $true; WindowSize = $WindowSize;
                 StateRoot = "$output/$backend-state"; WatchNonFinite = $true; StartTimeoutSeconds = $TimeoutSeconds }
             if ($item.ContainsKey('Lab')) { $options['Lab'] = $item.Lab } else { $options['Demo'] = $item.Demo }
-            $start = Call start $session $options
+            $start = Invoke-VerificationSession start $session $options
             # Watch from the first frames, so loading and bakes are audited too.
-            $null = Call watch $session @{ WatchMode = $WatchMode }
-            $deadline = (Get-Date).AddSeconds($ReadyTimeoutSeconds)
-            $status = $null
-            do {
-                Start-Sleep -Milliseconds 500
-                $status = Get-Status $session
-            } while ((Get-Date) -lt $deadline -and -not ($status -and $status.frame -and $status.frame.ready))
+            $null = Invoke-VerificationSession watch $session @{ WatchMode = $WatchMode }
+            # Keep this script's Get-Status helper in scope while polling.
+            $poll = { Get-Status $session }
+            $status = Wait-VerificationCondition -Poll $poll -Until {
+                param($value) $value -and $value.frame -and $value.frame.ready
+            } -TimeoutSeconds $ReadyTimeoutSeconds -IntervalMilliseconds 500 -DelayFirstPoll `
+                -OnTimeout { param($last) $last }
             $run.ready = [bool]($status -and $status.frame -and $status.frame.ready)
             if ($status -and $status.frame) {
                 $run.pendingGates = @($status.frame.gates | Where-Object { $_.state -ne 'ready' } | ForEach-Object { "$($_.name): $($_.detail)" })
             }
             if ($run.ready -and $item.ContainsKey('Paths')) {
                 foreach ($path in $item.Paths) {
-                    $sequence = Call sequence $session @{ CameraPath = $path; TimeoutSeconds = $TimeoutSeconds } -AllowFailure
-                    Save "$directory/sequence-$path.json" $sequence
+                    $sequence = Invoke-VerificationSession sequence $session @{ CameraPath = $path; TimeoutSeconds = $TimeoutSeconds } -AllowFailure
+                    Write-VerificationJson "$directory/sequence-$path.json" $sequence
                     $coverage = if ($sequence.PSObject.Properties['sequence'] -and $sequence.sequence -and $sequence.sequence.PSObject.Properties['watch']) { $sequence.sequence.watch } else { $null }
                     $run.sequences += [ordered]@{ path = $path;
                         state = if ($sequence.PSObject.Properties['sequence'] -and $sequence.sequence) { $sequence.sequence.state } else { $sequence.error }
@@ -135,7 +123,7 @@ foreach ($backend in $Rhi) {
                 Start-Sleep -Seconds $ObserveSeconds
             }
             $final = Get-Status $session
-            Save "$directory/status.json" $final
+            Write-VerificationJson "$directory/status.json" $final
             if ($final) {
                 $report = $final.watch.report
                 $run.report = [ordered]@{ boundary = $report.boundary; production = $report.production; failure = $report.failure;
@@ -143,20 +131,19 @@ foreach ($backend in $Rhi) {
                     firstAnomaly = $report.firstAnomaly; siteTotals = @($report.siteTotals);
                     targetTotals = @($report.targetTotals) }
             }
-            $null = Call watch $session @{ WatchOff = $true } -AllowFailure
+            $null = Invoke-VerificationSession watch $session @{ WatchOff = $true } -AllowFailure
         } catch {
             $run.error = $_.Exception.Message
         } finally {
             if ($null -ne $start) {
-                $stop = Call stop $session -AllowFailure
-                Save "$directory/stop.json" $stop
+                $null = Stop-VerificationSession $session -StartedSession $start -ReceiptPath "$directory/stop.json" -AllowFailure
                 if ($start.PSObject.Properties['outputLog'] -and (Test-Path $start.outputLog)) {
                     $run.logErrors = @(Select-String -LiteralPath $start.outputLog -Pattern '\[(error|critical)\]|VUID-|GPU_BASED_VALIDATION_|assertion failed' |
                         Select-Object -First 20 | ForEach-Object { $_.Line })
                 }
             }
         }
-        Save "$directory/run.json" $run
+        Write-VerificationJson "$directory/run.json" $run
         $runs += [pscustomobject]$run
         [Console]::Error.WriteLine("audited $backend $name ready=$($run.ready) error=$($run.error)")
     }
@@ -220,6 +207,6 @@ if ($boundaryRows.Count -eq 0) { $lines += 'None.' } else {
 }
 [IO.File]::WriteAllText((Join-Path $output 'summary.md'), ($lines -join "`r`n") + "`r`n", $utf8)
 $result = [ordered]@{ ok = -not ($runs | Where-Object { $_.error }); directory = $output; runs = $runs; sites = $siteRows; boundary = $boundaryRows }
-Save "$output/result.json" $result
+Write-VerificationJson "$output/result.json" $result
 [Console]::Out.WriteLine((@{ ok = $result.ok; directory = $output; runs = $runs.Count; sites = $siteRows.Count; boundaryAnomalies = $boundaryRows.Count } | ConvertTo-Json -Compress))
 if (-not $result.ok) { exit 1 }

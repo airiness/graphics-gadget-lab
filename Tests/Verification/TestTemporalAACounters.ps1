@@ -34,39 +34,19 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/TemporalAACounters' }
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
 New-Item -ItemType Directory -Path $output | Out-Null
-$sessionScript = Join-Path $root 'Scripts/Verification/GGLabSession.ps1'
 $comparisonScript = Join-Path $root 'Scripts/Verification/CompareCaptures.ps1'
-$utf8 = New-Object Text.UTF8Encoding($false)
 $results = @()
-
-function Save-Receipt([string]$Path, $Receipt) {
-    [IO.File]::WriteAllText($Path, ($Receipt | ConvertTo-Json -Depth 24), $utf8)
-}
-
-function Invoke-Session([string]$Verb, [string]$SessionId, [hashtable]$Options = @{}) {
-    # A child shell contains GGLabSession's exit calls and preserves typed arrays/switches.
-    $optionsJson = ($Options | ConvertTo-Json -Compress -Depth 12).Replace("'", "''")
-    $quotedScript = $sessionScript.Replace("'", "''")
-    $command = "`$ProgressPreference = 'SilentlyContinue'; `$options = @{}; `$data = '$optionsJson' | ConvertFrom-Json; " +
-        "foreach (`$property in `$data.PSObject.Properties) { `$options[`$property.Name] = `$property.Value }; " +
-        "& '$quotedScript' '$Verb' -Session '$SessionId' @options"
-    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
-    $text = & powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded
-    if ($LASTEXITCODE -ne 0) { throw "Session $SessionId $Verb failed: $text" }
-    $receipt = ($text -join "`n") | ConvertFrom-Json
-    if (-not $receipt.ok) { throw "Session $SessionId $Verb failed: $text" }
-    return $receipt
-}
 
 function Wait-CleanWatch([string]$SessionId, [bool]$Counters, [long]$MinimumSerial,
     [string[]]$ExpectedClaims = @('Passed', 'Passed', 'Passed', 'Passed')) {
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    do {
-        $status = Invoke-Session status $SessionId
+    $poll = { Invoke-VerificationSession status $SessionId }.GetNewClosure()
+    $until = {
+        param($status)
         $report = $status.watch.report
         if ($null -ne $report.firstAnomaly) {
             throw "Session $SessionId detected an anomaly: $($report.firstAnomaly | ConvertTo-Json -Compress -Depth 12)"
@@ -83,12 +63,14 @@ function Wait-CleanWatch([string]$SessionId, [bool]$Counters, [long]$MinimumSeri
         if ($Counters) {
             $clean = $clean -and $report.production -eq 'Passed' -and $report.productionFrameSerial -ge $MinimumSerial
         }
-        if ($clean) { return $status }
-        if ((Get-Date) -ge $deadline) {
-            throw "Session $SessionId watch did not complete: $($report | ConvertTo-Json -Compress -Depth 12)"
-        }
-        Start-Sleep -Milliseconds 50
-    } while ($true)
+        return $clean
+    }.GetNewClosure()
+    $timeout = {
+        param($status)
+        throw "Session $SessionId watch did not complete: $($status.watch.report | ConvertTo-Json -Compress -Depth 12)"
+    }.GetNewClosure()
+    Wait-VerificationCondition -Poll $poll -Until $until -TimeoutSeconds $TimeoutSeconds `
+        -IntervalMilliseconds 50 -OnTimeout $timeout
 }
 
 try {
@@ -106,26 +88,26 @@ try {
                     $options = @{ Configuration = $config; Rhi = $backend; Lab = 'gglab.lab.temporal_aa';
                         NoDevTools = $true; WindowSize = $WindowSize; StartTimeoutSeconds = $TimeoutSeconds }
                     if ($counters) { $options.WatchNonFinite = $true }
-                    $start = Invoke-Session start $sessionId $options
-                    Save-Receipt (Join-Path $armDirectory 'start.json') $start
+                    $start = Invoke-VerificationSession start $sessionId $options
+                    Write-VerificationJson -Depth 24 (Join-Path $armDirectory 'start.json') $start
                     # Cold Debug PSO validation can exceed status's fixed 30-second
                     # response timeout. A readiness-gated capture uses our bounded timeout.
-                    $warmup = Invoke-Session capture $sessionId @{ SettleFrames = 2; TimeoutSeconds = $TimeoutSeconds;
+                    $warmup = Invoke-VerificationSession capture $sessionId @{ SettleFrames = 2; TimeoutSeconds = $TimeoutSeconds;
                         OutputDirectory = (Join-Path $armDirectory 'Startup'); Label = 'startup' }
-                    Save-Receipt (Join-Path $armDirectory 'startup.json') $warmup
+                    Write-VerificationJson -Depth 24 (Join-Path $armDirectory 'startup.json') $warmup
                     if ($warmup.status -ne 'completed') { throw "Session $sessionId startup capture failed" }
                     $claims = if ($counters) { @('boundary', 'production') } else { @('boundary') }
-                    $null = Invoke-Session watch $sessionId @{ WatchClaims = $claims }
+                    $null = Invoke-VerificationSession watch $sessionId @{ WatchClaims = $claims }
                     $null = Wait-CleanWatch $sessionId $counters 1
                     foreach ($preset in @('native', 'quality')) {
                         $exports = @(
                             @{ frame = 1; targets = @(@{ resource = 'DisplayView.SceneColor' }, @{ resource = 'TAA.ResolvedSceneColor' }); graph = $true },
                             @{ frame = 179; targets = @(@{ resource = 'DisplayView.SceneColor' }, @{ resource = 'TAA.ResolvedSceneColor' }); graph = $true }
                         ) | ConvertTo-Json -Compress -Depth 8
-                        $sequence = Invoke-Session sequence $sessionId @{ CameraPath = 'SEQ_TemporalAALab_MovingObject';
+                        $sequence = Invoke-VerificationSession sequence $sessionId @{ CameraPath = 'SEQ_TemporalAALab_MovingObject';
                             CaptureFrames = '0,1,179'; TemporalAA = "enabled=true,resolutionPreset=$preset";
                             Exports = $exports; OutputDirectory = $armDirectory; Label = "taa-$preset"; TimeoutSeconds = $TimeoutSeconds }
-                        Save-Receipt (Join-Path $armDirectory "$preset-sequence.json") $sequence
+                        Write-VerificationJson -Depth 24 (Join-Path $armDirectory "$preset-sequence.json") $sequence
                         if ($sequence.sequence.state -ne 'completed' -or $sequence.sequence.submittedFrames -ne 180 -or
                             $sequence.sequence.completedCaptures -ne 5) {
                             throw "Session $sessionId $preset sequence did not complete"
@@ -142,42 +124,28 @@ try {
                             $minimumSerial = [Math]::Max($minimumSerial, [long]$metadata.frame.serial)
                         }
                         $status = Wait-CleanWatch $sessionId $counters $minimumSerial
-                        Save-Receipt (Join-Path $armDirectory "$preset-watch.json") $status
+                        Write-VerificationJson -Depth 24 (Join-Path $armDirectory "$preset-watch.json") $status
                     }
                     if ($counters) {
                         foreach ($temporalAO in @($true, $false)) {
                             $mode = if ($temporalAO) { 'temporal' } else { 'spatial' }
-                            $transition = Invoke-Session sequence $sessionId @{ CameraPath = 'SEQ_TemporalAALab_LightChange';
+                            $transition = Invoke-VerificationSession sequence $sessionId @{ CameraPath = 'SEQ_TemporalAALab_LightChange';
                                 CaptureFrames = '179'; TemporalAA = 'enabled=false'; GTAO = "temporal=$($temporalAO.ToString().ToLowerInvariant())";
                                 NoWait = $true; OutputDirectory = (Join-Path $armDirectory 'Transitions'); Label = "taa-off-$mode" }
-                            Save-Receipt (Join-Path $armDirectory "taa-off-$mode-sequence.json") $transition
+                            Write-VerificationJson -Depth 24 (Join-Path $armDirectory "taa-off-$mode-sequence.json") $transition
                             $claims = if ($temporalAO) { @('Passed', 'Passed', 'NotApplicable', 'Passed') }
                                 else { @('NotApplicable', 'Passed', 'NotApplicable', 'Passed') }
                             $status = Wait-CleanWatch $sessionId $true 1 $claims
-                            Save-Receipt (Join-Path $armDirectory "taa-off-$mode-watch.json") $status
-                            $null = Invoke-Session sequence-cancel $sessionId
+                            Write-VerificationJson -Depth 24 (Join-Path $armDirectory "taa-off-$mode-watch.json") $status
+                            $null = Invoke-VerificationSession sequence-cancel $sessionId
                             $status = Wait-CleanWatch $sessionId $true 1
-                            Save-Receipt (Join-Path $armDirectory "taa-restored-$mode-watch.json") $status
+                            Write-VerificationJson -Depth 24 (Join-Path $armDirectory "taa-restored-$mode-watch.json") $status
                         }
                     }
                 } finally {
-                    # A partially failed start can still own a live session; attempt cleanup too.
-                    $stopText = & powershell -NoProfile -ExecutionPolicy Bypass -File $sessionScript stop -Session $sessionId
-                    if ($LASTEXITCODE -ne 0) {
-                        if ($null -ne $start) {
-                            # Only force our own launch, never an unrelated/reused PID.
-                            $process = Get-CimInstance Win32_Process -Filter "ProcessId = $($start.pid)"
-                            if ($null -ne $process -and $process.Name -eq 'GraphicsGadgetLab.exe' -and
-                                $process.CommandLine -match [regex]::Escape("--session $sessionId")) {
-                                Stop-Process -Id $start.pid -Force
-                            }
-                            throw "Session $sessionId could not be stopped: $stopText"
-                        }
-                    } else {
-                        $stop = ($stopText -join "`n") | ConvertFrom-Json
-                        Save-Receipt (Join-Path $armDirectory 'stop.json') $stop
-                        if ($stop.exitCode -ne 0) { throw "Session $sessionId exited with $($stop.exitCode)" }
-                    }
+                    $null = Stop-VerificationSession $sessionId -StartedSession $start `
+                        -ReceiptPath (Join-Path $armDirectory 'stop.json') -Depth 24 `
+                        -RequireCleanExit -AllowMissing -ForceOwnedProcess
                 }
                 $errors = @(Select-String -Path $start.outputLog -Pattern '\[(error|critical)\]|VUID-|GPU_BASED_VALIDATION_|assertion failed')
                 if ($errors.Count -ne 0) { throw "Session $sessionId logged native errors: $($errors -join "`n")" }
@@ -186,7 +154,7 @@ try {
             $on = Join-Path $caseDirectory 'on'
             $comparisonText = & powershell -NoProfile -ExecutionPolicy Bypass -File $comparisonScript -Reference $off -Candidate $on -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0
             $comparison = ($comparisonText -join "`n") | ConvertFrom-Json
-            Save-Receipt (Join-Path $caseDirectory 'images.json') $comparison
+            Write-VerificationJson -Depth 24 (Join-Path $caseDirectory 'images.json') $comparison
             if ($comparison.compared -ne 6) { throw "Incomplete image comparison for $config/$backend" }
             $offGroups = @(Get-ChildItem $off -Filter '*.resource-export.json')
             $onGroups = @(Get-ChildItem $on -Filter '*.resource-export.json')
@@ -225,12 +193,12 @@ try {
     }
     $ok = @($results | Where-Object { -not $_.equivalencePassed }).Count -eq 0
     $result = @{ ok = $ok; directory = $output; cases = $results }
-    Save-Receipt (Join-Path $output 'result.json') $result
+    Write-VerificationJson -Depth 24 (Join-Path $output 'result.json') $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 8))
     if (-not $ok) { exit 1 }
 } catch {
     $result = @{ ok = $false; directory = $output; error = $_.Exception.Message; cases = $results }
-    Save-Receipt (Join-Path $output 'result.json') $result
+    Write-VerificationJson -Depth 24 (Join-Path $output 'result.json') $result
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 8))
     exit 1
 }
