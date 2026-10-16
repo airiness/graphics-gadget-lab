@@ -908,10 +908,10 @@
       "kind": "sanitization",
       "evidence": "counter",
       "policy": {
-        "negative": "report",
+        "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+      "rationale": "Scene-color storage write: negative radiance is invalid, so negative clamps fail. FP16-maximum clamps depend on exposure and very bright sources and stay report-only; non-finite replacement is always an error."
     },
     {
       "id": "pass-bloom.sample-source.sanitize-hdrcolor",
@@ -962,10 +962,10 @@
       "kind": "sanitization",
       "evidence": "counter",
       "policy": {
-        "negative": "report",
+        "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+      "rationale": "Scene-color storage write: negative radiance is invalid, so negative clamps fail. FP16-maximum clamps depend on exposure and very bright sources and stay report-only; non-finite replacement is always an error."
     },
     {
       "id": "pass-final-color.psmain.sanitize-hdrcolor",
@@ -1016,10 +1016,10 @@
       "kind": "sanitization",
       "evidence": "counter",
       "policy": {
-        "negative": "report",
+        "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+      "rationale": "Scene-color storage write: negative radiance is invalid, so negative clamps fail. FP16-maximum clamps depend on exposure and very bright sources and stay report-only; non-finite replacement is always an error."
     },
     {
       "id": "pass-forward-pbr.global.sanitize-hdrcolor",
@@ -1340,10 +1340,10 @@
       "kind": "sanitization",
       "evidence": "counter",
       "policy": {
-        "negative": "report",
+        "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+      "rationale": "Scene-color storage write: negative radiance is invalid, so negative clamps fail. FP16-maximum clamps depend on exposure and very bright sources and stay report-only; non-finite replacement is always an error."
     },
     {
       "id": "pass-physical-sky.psmain.encode-scene-color",
@@ -1358,10 +1358,10 @@
       "kind": "sanitization",
       "evidence": "counter",
       "policy": {
-        "negative": "report",
+        "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+      "rationale": "Scene-color storage write: negative radiance is invalid, so negative clamps fail. FP16-maximum clamps depend on exposure and very bright sources and stay report-only; non-finite replacement is always an error."
     },
     {
       "id": "pass-post-process-preview.psmain.isfinite",
@@ -1448,10 +1448,10 @@
       "kind": "sanitization",
       "evidence": "counter",
       "policy": {
-        "negative": "report",
+        "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Finite clamps remain report-only until counter-enabled hardware review; non-finite replacement is always an error."
+      "rationale": "Scene-color storage write: negative radiance is invalid, so negative clamps fail. FP16-maximum clamps depend on exposure and very bright sources and stay report-only; non-finite replacement is always an error."
     },
     {
       "id": "pass-temporal-aa.csmain.is-temporal-color-finite",

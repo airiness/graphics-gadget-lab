@@ -620,7 +620,11 @@ Production counter details:
   slots and byte budget. Completion polls the submission fence; normal operation
   introduces no CPU wait. Counter helpers issue atomics only for anomalous values.
 - Non-finite recovery/replacement always fails. Finite clamps use the reviewed
-  site's `report`, `expected` or `error` policy. Budget evaluation exists in Runtime,
+  site's `report`, `expected` or `error` policy. Scene-color storage writes (Forward
+  PBR output, skybox, physical sky, aerial composite, debug draw, Napa voxel) fail
+  negative clamps; their FP16-maximum clamps stay report-only because exposure and
+  very bright sources can saturate FP16. The TAA output expects negative YCoCg
+  rectification clamps and fails FP16 overflow; other sites remain report-only. Budget evaluation exists in Runtime,
   but budgeted inventory entries still require explicit reviewed limits.
 
 Graph frames containing production counters use schema v4 and mark clear/readback

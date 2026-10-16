@@ -13,9 +13,9 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0xaec8e228;
-	inline constexpr uint32_t InventoryHigh = 0x0b037404;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.aec8e2280b037404265d4f7b504a3df51b95c1dcb0725fadf0fd970f475ab76d";
+	inline constexpr uint32_t InventoryLow = 0x8fc8295c;
+	inline constexpr uint32_t InventoryHigh = 0x3179a3ed;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.8fc8295c3179a3edc33eb4555375cd057dc448d6d9ef34ee01a40eff2301791a";
 	inline constexpr uint32_t SiteCount = 76;
 	inline constexpr uint32_t ProgramCount = 27;
 	// The frame injection block follows the site records: point + 1 (zero is none),
@@ -65,13 +65,13 @@ namespace gglab::nonfinite
 		Site{ "gtao.denoise-gtao.isfinite", "report", "report" },
 		Site{ "gtao.upsample-gtao.isfinite", "report", "report" },
 		Site{ "pass-aerial-perspective.csbuild.isfinite", "report", "report" },
-		Site{ "pass-aerial-perspective.cscomposite.encode-scene-color", "report", "report" },
+		Site{ "pass-aerial-perspective.cscomposite.encode-scene-color", "error", "report" },
 		Site{ "pass-bloom.sample-source.sanitize-hdrcolor", "report", "report" },
 		Site{ "pass-bloom.psmain.sanitize-hdrcolor", "report", "report" },
-		Site{ "pass-debug-draw.psmain.encode-scene-color", "report", "report" },
+		Site{ "pass-debug-draw.psmain.encode-scene-color", "error", "report" },
 		Site{ "pass-final-color.psmain.sanitize-hdrcolor", "report", "report" },
 		Site{ "pass-forward-pbr.encode-forward-scene-color.encode-scene-color", "report", "report" },
-		Site{ "pass-forward-pbr.make-forward-pbrpixel-output.encode-forward-scene-color", "report", "report" },
+		Site{ "pass-forward-pbr.make-forward-pbrpixel-output.encode-forward-scene-color", "error", "report" },
 		Site{ "pass-forward-pbr.global.sanitize-hdrcolor", "report", "report" },
 		Site{ "pass-forward-plus-cull.reconstruct-tile-ray.isfinite", "report", "report" },
 		Site{ "pass-forward-plus-cull.csmain.isfinite", "report", "report" },
@@ -89,13 +89,13 @@ namespace gglab::nonfinite
 		Site{ "pass-iblprefiltered-specular.clamp-sample-luminance.sanitize-hdrcolor", "report", "report" },
 		Site{ "pass-iblprefiltered-specular.integrate-prefiltered-specular.sanitize-scene-radiance", "report", "report" },
 		Site{ "pass-iblprefiltered-specular.integrate-prefiltered-specular.sanitize-hdrcolor", "report", "report" },
-		Site{ "pass-napa-voxel.psmain.encode-scene-color", "report", "report" },
-		Site{ "pass-physical-sky.psmain.encode-scene-color", "report", "report" },
+		Site{ "pass-napa-voxel.psmain.encode-scene-color", "error", "report" },
+		Site{ "pass-physical-sky.psmain.encode-scene-color", "error", "report" },
 		Site{ "pass-post-process-preview.psmain.isfinite", "report", "report" },
 		Site{ "pass-post-process-preview.psmain.acesfitted", "report", "report" },
 		Site{ "pass-post-process-preview.psmain.sanitize-hdrcolor", "report", "report" },
 		Site{ "pass-render-graph-compute-smoke.psmain.sanitize-hdrchannel", "expected", "error" },
-		Site{ "pass-skybox.psmain.encode-scene-color", "report", "report" },
+		Site{ "pass-skybox.psmain.encode-scene-color", "error", "report" },
 		Site{ "pass-temporal-aa.csmain.is-temporal-color-finite", "report", "report" },
 		Site{ "pass-temporal-aa.csmain.isfinite", "report", "report" },
 		Site{ "pass-temporal-aa.csmain.is-temporal-history-accumulation-valid", "report", "report" },

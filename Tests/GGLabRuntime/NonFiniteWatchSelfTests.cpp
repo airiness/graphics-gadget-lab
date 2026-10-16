@@ -164,6 +164,20 @@ namespace gglab
 		context.Check(decode().m_Claim.m_Failure == NonFiniteWatchFailure::NonFiniteReplaced, "A decoded replacement always fails even at an expected-clamp site");
 		raw[offset + 5] = 1;
 		context.Check(decode().m_Claim.m_Status == NonFiniteClaimStatus::Incomplete, "Counter wrap is incomplete evidence, never a clean frame");
+		{
+			auto storage = std::vector<uint32_t>(nonfinite::BufferBytes / 4);
+			std::ranges::copy(header, storage.begin());
+			const size_t site = static_cast<size_t>(std::ranges::find(nonfinite::Sites,
+				std::string_view("pass-forward-pbr.make-forward-pbrpixel-output.encode-forward-scene-color"), &nonfinite::Site::m_Id) - nonfinite::Sites.begin());
+			const size_t words = 8 + site * 8;
+			const auto decodeStorage = [&] { return DecodeNonFiniteProductionFrame(std::as_bytes(std::span(storage)), 91); };
+			storage[words + 2] = 1; storage[words + 4] = std::bit_cast<uint32_t>(70000.0f);
+			context.Check(site < nonfinite::SiteCount && decodeStorage().m_Claim.m_Status == NonFiniteClaimStatus::Passed,
+				"Scene-color storage reports FP16 saturation from bright sources without failing");
+			storage[words + 1] = 1; storage[words + 3] = std::bit_cast<uint32_t>(0.01f);
+			context.Check(decodeStorage().m_Claim.m_Failure == NonFiniteWatchFailure::ClampPolicyExceeded,
+				"Negative radiance clamped at a scene-color storage write fails its reviewed policy");
+		}
 		context.Check(nonfinite::CounterVariant(shader_programs::TemporalAAReprojectionCompute).m_VariantId.ends_with(nonfinite::VariantSuffix) &&
 			nonfinite::CounterVariant(shader_programs::NonFiniteScanBufferCompute) == shader_programs::NonFiniteScanBufferCompute,
 			"Shader-owned counter identities select production variants without instrumenting the observers");
