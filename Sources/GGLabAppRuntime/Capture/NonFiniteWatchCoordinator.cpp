@@ -392,6 +392,76 @@ namespace gglab
 		m_Status.m_Failure = std::move(failure);
 	}
 
+	void NonFiniteWatchCoordinator::AccumulateSites(const NonFiniteProductionFrame& frame) noexcept
+	{
+		++m_Status.m_ProductionFrames;
+		for (const auto& site : frame.m_Sites)
+		{
+			const auto& counts = site.m_Counters;
+			if (counts.m_NonFiniteReplacements == 0 && counts.m_NegativeClamps == 0 && counts.m_Fp16MaximumClamps == 0)
+			{
+				continue;
+			}
+			auto found = std::ranges::find_if(m_Status.m_SiteTotals, [&site](const NonFiniteWatchSiteTotals& totals)
+				{ return totals.m_ProgramIndex == site.m_ProgramIndex && totals.m_SiteIndex == site.m_SiteIndex; });
+			if (found == m_Status.m_SiteTotals.end())
+			{
+				found = m_Status.m_SiteTotals.insert(m_Status.m_SiteTotals.end(), { .m_ProgramIndex = site.m_ProgramIndex,
+					.m_SiteIndex = site.m_SiteIndex, .m_FirstFrameSerial = frame.m_FrameSerial });
+			}
+			auto& totals = *found;
+			++totals.m_Frames;
+			totals.m_FailedFrames += site.m_Claim.m_Status == NonFiniteClaimStatus::Failed ? 1 : 0;
+			totals.m_FirstFrameSerial = std::min(totals.m_FirstFrameSerial, frame.m_FrameSerial);
+			totals.m_Counters.m_NonFiniteReplacements += counts.m_NonFiniteReplacements;
+			totals.m_Counters.m_NegativeClamps += counts.m_NegativeClamps;
+			totals.m_Counters.m_Fp16MaximumClamps += counts.m_Fp16MaximumClamps;
+			if (counts.m_MostNegative)
+			{
+				totals.m_Counters.m_MostNegative = std::min(totals.m_Counters.m_MostNegative.value_or(0.0f), *counts.m_MostNegative);
+			}
+			if (counts.m_Maximum)
+			{
+				totals.m_Counters.m_Maximum = std::max(totals.m_Counters.m_Maximum.value_or(0.0f), *counts.m_Maximum);
+			}
+		}
+	}
+
+	void NonFiniteWatchCoordinator::AccumulateTarget(const NonFiniteWatchTargetStatus& target, uint64_t frameSerial) noexcept
+	{
+		const auto status = target.m_Result.m_Claim.m_Status;
+		if (status != NonFiniteClaimStatus::Passed && status != NonFiniteClaimStatus::Failed)
+		{
+			return;
+		}
+		auto found = std::ranges::find_if(m_Status.m_TargetTotals, [&target](const NonFiniteWatchTargetTotals& totals)
+			{ return totals.m_Semantic == target.m_Semantic && SameAddress(totals.m_Address, target.m_Address); });
+		if (found == m_Status.m_TargetTotals.end())
+		{
+			found = m_Status.m_TargetTotals.insert(m_Status.m_TargetTotals.end(),
+				{ .m_Semantic = target.m_Semantic, .m_Address = target.m_Address });
+		}
+		auto& totals = *found;
+		++totals.m_CheckedFrames;
+		if (status == NonFiniteClaimStatus::Failed)
+		{
+			++totals.m_FailedFrames;
+			totals.m_FirstFailedFrameSerial = totals.m_FirstFailedFrameSerial == 0
+				? frameSerial : std::min(totals.m_FirstFailedFrameSerial, frameSerial);
+		}
+		totals.m_NanCount += target.m_Record.m_NanCount;
+		totals.m_PositiveInfCount += target.m_Record.m_PositiveInfCount;
+		totals.m_NegativeInfCount += target.m_Record.m_NegativeInfCount;
+		if (const auto minimum = target.m_Result.m_Minimum; minimum)
+		{
+			totals.m_Minimum = totals.m_Minimum ? std::min(*totals.m_Minimum, *minimum) : *minimum;
+		}
+		if (const auto maximum = target.m_Result.m_Maximum; maximum)
+		{
+			totals.m_Maximum = totals.m_Maximum ? std::max(*totals.m_Maximum, *maximum) : *maximum;
+		}
+	}
+
 	void NonFiniteWatchCoordinator::RecordAnomaly(NonFiniteWatchAnomaly anomaly) noexcept
 	{
 		if (!m_Status.m_FirstAnomaly || anomaly.m_FrameSerial < m_Status.m_FirstAnomaly->m_FrameSerial)
@@ -453,6 +523,7 @@ namespace gglab
 						target.m_ByteOffset = components[*index % components.size()].m_Offset;
 					}
 				}
+				AccumulateTarget(target, pending.m_FrameSerial);
 				if (target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Failed)
 				{
 					RecordAnomaly({ .m_FrameSerial = pending.m_FrameSerial, .m_Failure = target.m_Result.m_Claim.m_Failure, .m_Target = target });
@@ -517,6 +588,10 @@ namespace gglab
 		{
 			m_Status.m_InjectionFrameSerial = frame.m_FrameSerial;
 			m_Status.m_InjectionAppliedCount = frame.m_Injection->m_AppliedCount;
+		}
+		if (claim.m_Status == NonFiniteClaimStatus::Passed || claim.m_Status == NonFiniteClaimStatus::Failed)
+		{
+			AccumulateSites(frame);
 		}
 		for (const auto& site : frame.m_Sites)
 		{

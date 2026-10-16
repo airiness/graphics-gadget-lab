@@ -47,6 +47,31 @@ namespace gglab
 		std::optional<uint32_t> m_ProgramIndex;
 		std::optional<uint32_t> m_SiteIndex;
 	};
+	// History since configuration, so audits over many frames see every site and target
+	// that produced anomalies or clamps rather than only the latest completed frame.
+	struct NonFiniteWatchSiteTotals
+	{
+		uint32_t m_ProgramIndex = 0;
+		uint32_t m_SiteIndex = 0;
+		// Frames whose counters recorded any replacement or clamp at this site.
+		uint64_t m_Frames = 0;
+		uint64_t m_FailedFrames = 0;
+		uint64_t m_FirstFrameSerial = 0;
+		NonFiniteSiteCounters m_Counters;
+	};
+	struct NonFiniteWatchTargetTotals
+	{
+		std::optional<NonFiniteWatchSemantic> m_Semantic;
+		RGResourceAddress m_Address;
+		uint64_t m_CheckedFrames = 0;
+		uint64_t m_FailedFrames = 0;
+		uint64_t m_FirstFailedFrameSerial = 0;
+		uint64_t m_NanCount = 0;
+		uint64_t m_PositiveInfCount = 0;
+		uint64_t m_NegativeInfCount = 0;
+		std::optional<float> m_Minimum;
+		std::optional<float> m_Maximum;
+	};
 	struct NonFiniteWatchStatus
 	{
 		uint64_t m_ConfigurationVersion = 0;
@@ -67,6 +92,10 @@ namespace gglab
 		// Latest production evidence that carried the configured injection.
 		uint64_t m_InjectionFrameSerial = 0;
 		uint32_t m_InjectionAppliedCount = 0;
+		// Complete production frames accumulated into the site totals.
+		uint64_t m_ProductionFrames = 0;
+		std::vector<NonFiniteWatchSiteTotals> m_SiteTotals;
+		std::vector<NonFiniteWatchTargetTotals> m_TargetTotals;
 	};
 	struct NonFiniteWatchCoverage
 	{
@@ -136,6 +165,8 @@ namespace gglab
 		void PublishBoundary(Pending pending) noexcept;
 		void ApplyGenerationEvidence(NonFiniteWatchTargetStatus& target, uint64_t frameSerial) const noexcept;
 		void RecordAnomaly(NonFiniteWatchAnomaly anomaly) noexcept;
+		void AccumulateSites(const NonFiniteProductionFrame& frame) noexcept;
+		void AccumulateTarget(const NonFiniteWatchTargetStatus& target, uint64_t frameSerial) noexcept;
 		struct CoverageFrame
 		{
 			uint64_t m_FrameSerial = 0;

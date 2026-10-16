@@ -388,6 +388,42 @@ namespace gglab
 			context.Check(watch.Configure({ .m_Enabled = false }, error) && !control.m_Injection && !watch.GetStatus().m_Injection,
 				"Disabling watch clears the Runtime injection request");
 		}
+
+		void RunTotalsTests(SelfTestContext& context)
+		{
+			WatchCaptureControl control;
+			control.m_Instrumentation = true;
+			NonFiniteWatchCoordinator watch(&control);
+			std::string error;
+			context.Check(watch.Configure({ .m_Targets = { NonFiniteScanTarget{ .m_Address = { .m_Resource = "Motion" } } } }, error),
+				"Totals configuration accepts both claims");
+			const auto clamp = [](uint64_t negative, float mostNegative, NonFiniteClaimStatus status)
+				{
+					return NonFiniteProductionSite{ .m_ProgramIndex = 1, .m_SiteIndex = 2,
+						.m_Counters = { .m_NegativeClamps = negative, .m_MostNegative = mostNegative },
+						.m_Claim = { status, status == NonFiniteClaimStatus::Failed ? NonFiniteWatchFailure::ClampPolicyExceeded : NonFiniteWatchFailure::None } };
+				};
+			watch.OnProductionFrame({ .m_FrameSerial = 3, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None },
+				.m_Sites = { clamp(2, -0.5f, NonFiniteClaimStatus::Passed), NonFiniteProductionSite{ .m_SiteIndex = 4 } } });
+			watch.OnProductionFrame({ .m_FrameSerial = 2, .m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::ClampPolicyExceeded },
+				.m_Sites = { clamp(5, -3.0f, NonFiniteClaimStatus::Failed) } });
+			watch.OnProductionFrame({ .m_FrameSerial = 4 });
+			const auto& totals = watch.GetStatus().m_SiteTotals;
+			context.Check(watch.GetStatus().m_ProductionFrames == 2 && totals.size() == 1 && totals[0].m_Frames == 2 &&
+				totals[0].m_FailedFrames == 1 && totals[0].m_FirstFrameSerial == 2 && totals[0].m_Counters.m_NegativeClamps == 7 &&
+				totals[0].m_Counters.m_MostNegative == -3.0f,
+				"Site totals accumulate every complete frame's clamps, extremes and policy failures since configuration");
+
+			watch.PrepareFrame(5);
+			watch.OnFrameSubmitted(5);
+			context.Check(watch.OnScanResult(control.Complete(true)) && watch.GetStatus().m_TargetTotals.size() == 1 &&
+				watch.GetStatus().m_TargetTotals[0].m_CheckedFrames == 1 && watch.GetStatus().m_TargetTotals[0].m_FailedFrames == 1 &&
+				watch.GetStatus().m_TargetTotals[0].m_FirstFailedFrameSerial == 5 && watch.GetStatus().m_TargetTotals[0].m_NanCount == 1,
+				"Target totals count checked and failed boundary frames with their anomaly counts");
+			context.Check(watch.Configure({ .m_Production = false, .m_Targets = { NonFiniteScanTarget{ .m_Address = { .m_Resource = "Motion" } } } }, error) &&
+				watch.GetStatus().m_SiteTotals.empty() && watch.GetStatus().m_TargetTotals.empty() && watch.GetStatus().m_ProductionFrames == 0,
+				"Reconfiguration resets the since-configuration totals");
+		}
 	}
 
 	void RunNonFiniteWatchCoordinatorSelfTests(SelfTestContext& context) noexcept
@@ -395,6 +431,7 @@ namespace gglab
 		RunCoverageTests(context);
 		RunCoverageConsumerTests(context);
 		RunInjectionTests(context);
+		RunTotalsTests(context);
 		WatchCaptureControl control;
 		NonFiniteWatchCoordinator watch(&control);
 		std::string error;

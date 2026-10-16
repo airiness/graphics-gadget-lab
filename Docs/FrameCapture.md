@@ -397,6 +397,13 @@ Pending, missing, unsupported or mismatched evidence is `Incomplete`. Capacity
 pressure also yields `Incomplete`; continuous report scans yield capacity while
 a scheduled resource export waits for the shared payload pool to drain.
 
+The report also keeps since-configuration totals for audits over many frames.
+`productionFrames` counts complete production frames; `siteTotals` lists every
+program/site that recorded a replacement or clamp, with frame and failed-frame counts,
+summed counts, extremes and the first frame; `targetTotals` lists every scanned target
+with checked and failed frames, anomaly counts and finite extrema. Reconfiguration
+resets them.
+
 Buffers require an explicit owned interpretation and producer-valid element count:
 
 ```json
@@ -570,6 +577,25 @@ overflow that only changes the maximum, a sanitized NaN that fails production wh
 PNG pixels equal the uninjected control, `expected` and `error` clamp policies, and
 Temporal AA history NaN/infinities that fail only at the color or accumulation recovery
 site. Every injected report and capture must carry the stamp.
+
+### Lab and Demo audit
+
+`Scripts/AuditNonFiniteLabs.ps1` starts one hidden, counter-capable session per Lab or
+Demo and backend (Release by default), configures report-mode watch with semantic
+defaults and production before the first frame settles, waits for readiness, then plays
+every registered camera path as a sequence or observes content without paths. It
+writes `result.json` and `summary.md` (runs, per-site totals with the reviewed clamp
+policy, boundary targets with anomalies) under `Build/Validation/NonFiniteAudit`.
+`-Content` selects names, such as `gtao,coastal-atrium`. The audit gathers evidence
+for policy review; it does not change policies.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/AuditNonFiniteLabs.ps1 -Rhi dx12 -Content gtao
+```
+
+`gglab.lab.render_graph_compute` and `gglab.lab.coordinate_conformance` run custom
+pipelines without the IBL bake, so their `ibl` gate never opens; the audit observes
+them for `-ObserveSeconds` instead.
 
 ### Runtime counter and scan mechanics
 

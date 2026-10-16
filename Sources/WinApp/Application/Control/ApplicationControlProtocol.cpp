@@ -1073,6 +1073,33 @@ namespace gglab
 			{
 				report["targets"].push_back(SerializeWatchTarget(target));
 			}
+			// Since-configuration history: every site and target with clamps or anomalies.
+			report["productionFrames"] = status.m_ProductionFrames;
+			report["siteTotals"] = Json::array();
+			for (const auto& totals : status.m_SiteTotals)
+			{
+				const auto& counts = totals.m_Counters;
+				report["siteTotals"].push_back({
+					{ "program", totals.m_ProgramIndex < nonfinite::ProgramCount ? Json(nonfinite::Programs[totals.m_ProgramIndex]) : Json() },
+					{ "site", totals.m_SiteIndex < nonfinite::SiteCount ? Json(nonfinite::Sites[totals.m_SiteIndex].m_Id) : Json() },
+					{ "frames", totals.m_Frames }, { "failedFrames", totals.m_FailedFrames }, { "firstFrameSerial", totals.m_FirstFrameSerial },
+					{ "nonFiniteReplacements", counts.m_NonFiniteReplacements }, { "negativeClamps", counts.m_NegativeClamps },
+					{ "fp16MaximumClamps", counts.m_Fp16MaximumClamps },
+					{ "mostNegative", counts.m_MostNegative ? Json(*counts.m_MostNegative) : Json() },
+					{ "maximum", counts.m_Maximum ? Json(*counts.m_Maximum) : Json() } });
+			}
+			report["targetTotals"] = Json::array();
+			for (const auto& totals : status.m_TargetTotals)
+			{
+				report["targetTotals"].push_back({
+					{ "resource", totals.m_Address.m_Resource }, { "mip", totals.m_Address.m_Mip },
+					{ "semantic", totals.m_Semantic ? Json(GetNonFiniteWatchSemanticName(*totals.m_Semantic)) : Json() },
+					{ "checkedFrames", totals.m_CheckedFrames }, { "failedFrames", totals.m_FailedFrames },
+					{ "firstFailedFrameSerial", totals.m_FirstFailedFrameSerial ? Json(totals.m_FirstFailedFrameSerial) : Json() },
+					{ "nan", totals.m_NanCount }, { "positiveInf", totals.m_PositiveInfCount }, { "negativeInf", totals.m_NegativeInfCount },
+					{ "minimum", totals.m_Minimum ? Json(*totals.m_Minimum) : Json() },
+					{ "maximum", totals.m_Maximum ? Json(*totals.m_Maximum) : Json() } });
+			}
 			report["injection"] = Json();
 			if (status.m_Injection)
 			{
