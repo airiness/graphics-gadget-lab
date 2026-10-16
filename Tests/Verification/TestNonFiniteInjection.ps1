@@ -36,16 +36,16 @@ param(
     [ValidateSet('render-graph-compute', 'temporal-aa')][string[]]$Lab = @('render-graph-compute', 'temporal-aa'),
     [string]$OutputDirectory,
     [int]$TimeoutSeconds = 180,
-    [ValidateSet('Debug', 'Develop')][string]$Configuration = 'Debug'
+    [ValidateSet('Debug', 'Develop')][string]$Configuration = 'Debug',
+    [string]$RunDirectory
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteInjection' }
+if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteInjection' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
-$output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
-New-Item -ItemType Directory -Path $output | Out-Null
+$output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId $runId
 $cases = @()
 
 $computeLabId = 'gglab.lab.render_graph_compute'

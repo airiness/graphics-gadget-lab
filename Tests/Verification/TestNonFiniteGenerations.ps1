@@ -7,16 +7,16 @@ param(
     [ValidateSet('Debug', 'Develop', 'Release')][string]$Configuration = 'Release',
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
     [string]$OutputDirectory,
-    [int]$TimeoutSeconds = 240
+    [int]$TimeoutSeconds = 240,
+    [string]$RunDirectory
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteGenerations' }
+if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteGenerations' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
-$output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
-New-Item -ItemType Directory -Path $output | Out-Null
+$output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId $runId
 $cases = @()
 
 function Wait-Generations([string]$Session, [bool]$Atmosphere, [long]$After = 0) {

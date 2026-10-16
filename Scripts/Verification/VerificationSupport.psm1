@@ -1,6 +1,20 @@
 Set-StrictMode -Version 3.0
 $script:SessionScript = Join-Path $PSScriptRoot 'GGLabSession.ps1'
 
+function New-VerificationRunDirectory {
+    param([string]$OutputDirectory, [string]$RunDirectory, [string]$RunId)
+    if ($OutputDirectory -and $RunDirectory) { throw 'Use either OutputDirectory or RunDirectory, not both.' }
+    if ($RunDirectory) {
+        $path = [IO.Path]::GetFullPath($RunDirectory)
+    } else {
+        if (-not $OutputDirectory -or -not $RunId) { throw 'Standalone runs require OutputDirectory and RunId.' }
+        $path = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $RunId
+    }
+    # Refuse an existing run directory so independent runs cannot share writable state.
+    $null = New-Item -ItemType Directory -Path $path -ErrorAction Stop
+    return $path
+}
+
 function Write-VerificationJson {
     param([string]$Path, [AllowNull()]$Value, [int]$Depth = 32)
     [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth $Depth),
@@ -97,5 +111,5 @@ function Stop-VerificationSession {
     return $stop
 }
 
-Export-ModuleMember -Function Write-VerificationJson, Invoke-VerificationScript, Invoke-VerificationSession,
+Export-ModuleMember -Function New-VerificationRunDirectory, Write-VerificationJson, Invoke-VerificationScript, Invoke-VerificationSession,
     Wait-VerificationCondition, Stop-VerificationSession

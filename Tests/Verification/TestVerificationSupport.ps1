@@ -25,6 +25,14 @@ function Reject([scriptblock]$Action, [string]$Pattern, [string]$Name) {
     throw "Expected rejection: $Name"
 }
 try {
+    $standaloneRoot = Join-Path $output 'standalone'
+    $firstRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'first'
+    $secondRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'second'
+    Check ($firstRun -ne $secondRun -and (Test-Path $firstRun) -and (Test-Path $secondRun)) 'standalone-runs-stay-isolated'
+    $exactRun = Join-Path $output 'exact-run'
+    Check ((New-VerificationRunDirectory -RunDirectory $exactRun -RunId 'unused') -eq $exactRun) 'exact-run-directory-without-another-id'
+    Reject { New-VerificationRunDirectory -RunDirectory $exactRun } 'already exists' 'existing-run-directory-is-not-reused'
+    Reject { New-VerificationRunDirectory -RunDirectory $exactRun -OutputDirectory $standaloneRoot } 'either' 'ambiguous-run-directory'
     $fixtureDirectory = Join-Path $output "fixture ' quoted"
     $null = New-Item -ItemType Directory -Path $fixtureDirectory
     $fixture = Join-Path $fixtureDirectory 'session.ps1'
@@ -91,6 +99,32 @@ switch ($Command) {
         Check ($owned -eq $case.expected) "cleanup-owner-$($case.name)"
     }
     $runner = Join-Path $PSScriptRoot 'RunVerification.ps1'
+    # Exercise the real runner/leaf handoff without launching an application or compiling shaders.
+    $runnerRepository = Join-Path $output 'runner'
+    $runnerTests = Join-Path $runnerRepository 'Tests/Verification'
+    $runnerTools = Join-Path $runnerRepository 'Scripts/Verification'
+    $runnerBin = Join-Path $runnerRepository 'Build/Output/x64/Develop'
+    $null = New-Item -ItemType Directory -Path $runnerTests, $runnerTools, $runnerBin
+    Copy-Item -LiteralPath $runner -Destination $runnerTests
+    Copy-Item -LiteralPath (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1') -Destination $runnerTools
+    [IO.File]::WriteAllText((Join-Path $runnerBin 'GraphicsGadgetLab.exe'), '')
+    $leafSource = @'
+param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi)
+Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Scripts/Verification/VerificationSupport.psm1')
+$directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
+[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi } | ConvertTo-Json -Compress))
+'@
+    foreach ($leaf in @('TestNonFiniteCoverage.ps1', 'TestNonFiniteGenerations.ps1', 'TestNonFiniteInjection.ps1', 'TestTemporalAACounters.ps1')) {
+        [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
+    }
+    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{ Group='gpu'; OutputDirectory=(Join-Path $output 'runner-results') }
+    $gpuResult = $execution.output | ConvertFrom-Json
+    Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and $gpuResult.suites.Count -eq 4) 'runner-gpu-leaf-handoff'
+    foreach ($suiteResult in $gpuResult.suites) {
+        $leafResult = $suiteResult.steps[0].receipt
+        Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
+            $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)"
+    }
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json

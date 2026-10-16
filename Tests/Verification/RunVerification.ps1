@@ -78,7 +78,7 @@ try {
         foreach ($config in $configs) {
             $name = if ($item.group -eq 'gpu') { "$($item.name)-$config" } else { $item.name }
             [Console]::Error.WriteLine("Running $name")
-            # Leaf scripts add run ids; leave room for shader cache keys and publication suffixes.
+            # Keep GPU state under one run id; nested ids can exceed native publication path limits.
             $directory = Join-Path $output ('{0:D2}' -f ($results.Count + 1))
             $null = New-Item -ItemType Directory -Path $directory
             $steps = @()
@@ -87,7 +87,9 @@ try {
                 $log = Join-Path $directory (([IO.Path]::GetFileNameWithoutExtension($path)) + "-$($steps.Count).log")
                 if ($path.EndsWith('.ps1')) {
                     $parameters = @{ OutputDirectory = $directory }
-                    if ($item.group -eq 'gpu') { $parameters.Configuration = $config; $parameters.Rhi = $Rhi }
+                    if ($item.group -eq 'gpu') {
+                        $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
+                    }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error
                     $code = $execution.exitCode

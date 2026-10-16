@@ -28,7 +28,8 @@ param(
     [string]$WindowSize = '320x180',
     [string]$OutputDirectory,
     [ValidateRange(1, 1800)]
-    [int]$TimeoutSeconds = 120
+    [int]$TimeoutSeconds = 120,
+    [string]$RunDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,9 +37,8 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/TemporalAACounters' }
-$output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
-New-Item -ItemType Directory -Path $output | Out-Null
+if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/TemporalAACounters' }
+$output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId $runId
 $comparisonScript = Join-Path $root 'Scripts/Verification/CompareCaptures.ps1'
 $results = @()
 

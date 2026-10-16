@@ -92,7 +92,10 @@ Suite/configuration/backend lists accept comma-separated values. Injection requi
 Debug or Develop; unsupported combinations are rejected before launching sessions.
 Each run saves `result.json` and per-step logs under `Build/Validation/Verification/`
 (or `-OutputDirectory`) and exits nonzero on failure. Scripts remain independently
-callable. Audits, overhead measurements and frozen baselines remain separate tools;
+callable: `-OutputDirectory` creates a unique child run, while `-RunDirectory`
+selects an exact new GPU run directory. The runner supplies each GPU suite's
+`run/` directory directly to avoid nested run ids and excessive native paths.
+Audits, overhead measurements and frozen baselines remain separate tools;
 see [Non-finite diagnostics](references/nonfinite.md) for their evidence contracts.
 
 ## Inspect and finish
