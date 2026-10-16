@@ -72,11 +72,11 @@ namespace gglab
 			return 0;
 		}
 		const uint64_t id = m_NextRequestId++;
-		if (m_IsShutdown || targets.empty() || targets.size() > m_Limits.m_MaxPayloads)
+		if (m_IsShutdown || targets.empty() || targets.size() > MaxScanTargetsPerGroup)
 		{
 			m_Results.push_back({ .m_RequestId = id, .m_Source = FrameCaptureSource::NonFiniteScan,
-				.m_ResourceFailure = targets.size() > m_Limits.m_MaxPayloads ? RGObservationFailure::TooLarge : RGObservationFailure::UnsupportedResource,
-				.m_Failure = m_IsShutdown ? "The render host has been finalized." : "The scan group is empty or exceeds the payload slot limit." });
+				.m_ResourceFailure = targets.size() > MaxScanTargetsPerGroup ? RGObservationFailure::TooLarge : RGObservationFailure::UnsupportedResource,
+				.m_Failure = m_IsShutdown ? "The render host has been finalized." : "The scan group is empty or exceeds the scan target limit." });
 			return id;
 		}
 		m_Queued.push_back({ .m_Id = id, .m_Source = FrameCaptureSource::NonFiniteScan, .m_FrameSerial = frameSerial,
@@ -267,7 +267,7 @@ namespace gglab
 		{
 			retainedBytes += sizeof(NonFiniteScanRecord) + boundary.m_BufferLayout.m_Components.size() * sizeof(NonFiniteBufferComponent);
 		}
-		m_RetainedScans.push_back({ payload, retainedBytes, static_cast<uint32_t>(payload->m_Boundaries.size()) });
+		m_RetainedScans.push_back({ payload, retainedBytes, 1u });
 		for (const auto& request : tap.m_Requests)
 		{
 			m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = FrameCaptureSource::NonFiniteScan,

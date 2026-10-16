@@ -228,7 +228,18 @@ namespace gglab
 							ApplyGenerationEvidence(surface, frameSerial);
 							if (!generation.m_Results[mip] && generation.m_InFlight[mip] == 0)
 							{
-								generationCandidates.push_back(pending.m_Targets.size());
+								if (resolved.m_WrittenThisFrame)
+								{
+									// A later write can replace this revision before rotation reaches it,
+									// so it joins the per-frame scans: fail mode defers a busy frame
+									// instead of leaving the revision unscanned.
+									pending.m_ScanIndices.push_back(pending.m_Targets.size());
+									pending.m_Scans.push_back({ .m_Address = surface.m_Address });
+								}
+								else
+								{
+									generationCandidates.push_back(pending.m_Targets.size());
+								}
 							}
 							pending.m_Targets.push_back(std::move(surface));
 						}

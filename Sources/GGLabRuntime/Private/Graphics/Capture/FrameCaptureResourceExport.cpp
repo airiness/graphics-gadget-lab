@@ -232,8 +232,9 @@ namespace gglab
 			{
 				for (const auto& readback : tap.m_ScanReadbacks)
 				{
-					bytes += readback.GetPayloadBytes(); ++slots;
+					bytes += readback.GetPayloadBytes();
 				}
+				slots += tap.m_ScanReadbacks.empty() ? 0u : 1u;
 			}
 			else if (tap.m_Source == FrameCaptureSource::ResourceExport)
 			{
@@ -479,7 +480,8 @@ namespace gglab
 					bytes += scanBytes;
 					tap.m_ScanReadbacks.push_back(std::move(readback));
 				}
-				const auto slots = tap.m_ExportReadbacks.size() + tap.m_ScanReadbacks.size();
+				// Exports take a slot per array; a scan group shares one slot for all records.
+				const auto slots = tap.m_ExportReadbacks.size() + (tap.m_ScanReadbacks.empty() ? 0u : 1u);
 				const bool strictScan = request.m_Source == FrameCaptureSource::NonFiniteScan && request.m_DeferFrameOnBusy;
 				const size_t imageSlots = strictScan ? frameImages.size() : 0;
 				if (failure == RGObservationFailure::None && strictScan)
@@ -488,7 +490,7 @@ namespace gglab
 					uint64_t requiredBytes = bytes + boundImageBytes + (m_ProductionEnabled ? ProductionPayloadBytes + ProductionCpuBytes : 0u);
 					for (const auto& observation : prepared)
 					{
-						required += observation.m_ExportReadbacks.size() + observation.m_ScanReadbacks.size();
+						required += observation.m_ExportReadbacks.size() + (observation.m_ScanReadbacks.empty() ? 0u : 1u);
 						for (const auto& readback : observation.m_ExportReadbacks) { requiredBytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes; }
 						for (const auto& readback : observation.m_ScanReadbacks) { requiredBytes += readback.GetPayloadBytes(); }
 					}

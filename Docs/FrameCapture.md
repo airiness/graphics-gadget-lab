@@ -448,7 +448,11 @@ index and handle generation), and `lastCheckedFrameSerial`. Unchanged, checked
 clean content reports `NotApplicable` while retaining its last checked record and extrema;
 those values describe that earlier check. Pending or unadmitted mips are `Incomplete`.
 Per-frame defaults retain scheduling priority, while generation mips rotate through
-the remaining shared payload allowance. In-flight mips are not duplicated. Failed
+the remaining shared payload allowance. A revision its producer wrote in the current
+frame, such as a view-dependent SkyView LUT while the camera moves, is scanned with the
+per-frame defaults instead, because a later write can replace it before rotation reaches
+it; fail mode therefore defers a busy frame rather than leave it unscanned. In-flight
+mips are not duplicated. Failed
 or cancelled transport remains retryable; superseded results cannot certify a new
 generation, but late anomalies still enter `firstAnomaly`. Replacing the watch
 configuration rechecks already active content. Failed content remains `Failed` while
@@ -647,7 +651,9 @@ Implemented Runtime integration:
   pipeline resolver. Unavailable programs fail the request before graph mutation;
   no host-side compiler is added to Runtime.
 - Scans share capture's request, payload-slot and byte budgets with PNG/resource exports.
-  Reservations include GPU record/readback, peak CPU record copies, component
+  One scan group (up to 64 targets of a frame) occupies a single payload slot, while
+  each PNG and each exported array takes its own; bytes are counted exactly for all of
+  them. Reservations include GPU record/readback, peak CPU record copies, component
   upload and owned CPU component tables. Readbacks and uploads survive submission
   until the common frame fence completes. Final CPU record/table consumers keep
   their payload slots and bytes until the last owner releases them. Normal polling

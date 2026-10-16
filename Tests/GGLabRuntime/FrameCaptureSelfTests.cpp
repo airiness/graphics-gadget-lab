@@ -1262,10 +1262,11 @@ namespace gglab
 		void RunNonFiniteGenerationDefaultTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
-			FrameCaptureService capacity(device, { .m_MaxPayloads = 4 });
-			context.Check(capacity.GetNonFiniteScanTargetLimit() == 4 && capacity.EnableNonFiniteProduction() &&
-				capacity.GetNonFiniteScanTargetLimit() == 2,
-				"Generation scheduling reserves production readback and CPU payload slots in the same budget");
+			FrameCaptureService capacity(device, { .m_MaxPayloads = 2 });
+			context.Check(capacity.GetNonFiniteScanTargetLimit() == FrameCaptureService::MaxScanTargetsPerGroup &&
+				capacity.EnableNonFiniteProduction() &&
+				capacity.GetNonFiniteScanTargetLimit() == FrameCaptureService::MaxScanTargetsPerGroup,
+				"A whole scan group needs one payload slot beside the reserved production slot");
 			TransientResourcePool pool(&device);
 			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
 			auto& defaults = graph.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>();
@@ -1310,7 +1311,8 @@ namespace gglab
 			CaptureTestDevice device;
 			TransientResourcePool pool(&device);
 			ScanTestPrograms programs;
-			FrameCaptureService service(device, { .m_MaxPayloads = 4, .m_MaxPayloadBytes = 4096 });
+			// One scan group and two export arrays fill the three payload slots.
+			FrameCaptureService service(device, { .m_MaxPayloads = 3, .m_MaxPayloadBytes = 4096 });
 			service.ConfigureNonFiniteScans(programs, programs, programs);
 			struct Data { RGBufferId m_Buffer; };
 			const auto build = [&](RenderGraph& graph)
@@ -1407,7 +1409,8 @@ namespace gglab
 				std::ranges::any_of(deferred, [&](const auto& result) { return result.m_RequestId == deferredImage; }) &&
 				service.GetUnfinishedRequestCount() == 0,
 				"Frame deferral returns scan and image requests exactly once without claiming a submission");
-			FrameCaptureService impossible(device, { .m_MaxPayloads = 2 });
+			// An image and a scan group each need a slot, which one slot can never hold.
+			FrameCaptureService impossible(device, { .m_MaxPayloads = 1 });
 			impossible.ConfigureNonFiniteScans(programs, programs, programs);
 			GGLAB_UNUSED(impossible.RequestCapture(FrameCaptureSource::Scene, 31));
 			GGLAB_UNUSED(impossible.RequestNonFiniteScan({ { final, layout }, { before, layout } }, 20, 31, false, 0, true));

@@ -71,13 +71,14 @@ namespace gglab
 		{
 			return m_NonFiniteInjection;
 		}
+		// One scan group occupies one payload slot however many 32-byte records it holds;
+		// its bytes are still counted exactly. The target cap bounds one group's work.
+		static constexpr uint32_t MaxScanTargetsPerGroup = 64;
 		uint32_t GetNonFiniteScanTargetLimit() const noexcept override
 		{
 			const uint32_t used = GetPayloadUsage().second;
 			const uint32_t reserved = m_ProductionEnabled ? 1u : 0u;
-			const uint32_t ceiling = m_Limits.m_MaxPayloads - (m_ProductionEnabled ? 2u : 0u);
-			return used > m_Limits.m_MaxPayloads - reserved ? 0u
-				: std::min(ceiling, m_Limits.m_MaxPayloads - reserved - used);
+			return used + reserved + 1 > m_Limits.m_MaxPayloads ? 0u : MaxScanTargetsPerGroup;
 		}
 		std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept override { return m_LatestProduction; }
 		// Borrows stable renderer services; programs and pipelines are demanded only

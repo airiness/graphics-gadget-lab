@@ -588,6 +588,40 @@ namespace gglab
 		}
 
 		{
+			// A revision written this frame cannot wait for rotated spare capacity: a
+			// view-dependent SkyView LUT is rewritten before a later frame could scan it.
+			WatchCaptureControl writes;
+			writes.m_ScanLimit = 0;
+			NonFiniteWatchCoordinator writeWatch(&writes);
+			context.Check(writeWatch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Production = false }, error),
+				"Generation fail-mode watch configures");
+			NonFiniteWatchDefaults defaults;
+			for (size_t i = 0; i < defaults.size(); ++i)
+			{
+				defaults[i].m_Semantic = static_cast<NonFiniteWatchSemantic>(i);
+				defaults[i].m_Claim = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+			}
+			auto& cube = defaults[static_cast<size_t>(NonFiniteWatchSemantic::Environment)];
+			cube.m_Ready = true;
+			cube.m_Generation = { { 100, 1 }, 1 };
+			cube.m_Mips.push_back({ .m_Resource = "Active.Cube", .m_Mip = 0, .m_SliceCount = 6 });
+			auto& skyView = defaults[static_cast<size_t>(NonFiniteWatchSemantic::AtmosphereSkyView)];
+			skyView.m_Ready = true;
+			skyView.m_Generation = { { 200, 1 }, 7 };
+			skyView.m_WrittenThisFrame = true;
+			skyView.m_Mips.push_back({ .m_Resource = "Atmosphere.SkyView", .m_Mip = 0, .m_SliceCount = 1 });
+			writeWatch.PrepareFrame(1, false, defaults);
+			context.Check(writes.m_Id == 1 && writes.m_DeferFrame && writes.m_ScanTargets.size() == 1 &&
+				writes.m_ScanTargets[0].m_Address.m_Resource == "Atmosphere.SkyView",
+				"A generation written this frame is scanned with per-frame priority and can defer a busy frame");
+			skyView.m_Generation.m_Revision = 8;
+			writes.m_Busy = true;
+			writeWatch.PrepareFrame(2, false, defaults);
+			context.Check(writes.m_Id == 1 && writeWatch.GetStatus().m_Boundary.m_Status == NonFiniteClaimStatus::Incomplete,
+				"An unadmitted current-frame revision is missing coverage, never a pass");
+		}
+
+		{
 			WatchCaptureControl generations;
 			generations.m_ScanLimit = 2;
 			NonFiniteWatchCoordinator generationWatch(&generations);

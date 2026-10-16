@@ -46,12 +46,13 @@ namespace gglab
 	}
 
 	void NonFiniteWatchDefaultRegistry::RegisterGeneration(NonFiniteWatchSemantic semantic,
-		RGResourceHandle resource, RGResourceAddress address, NonFiniteWatchGeneration generation) noexcept
+		RGResourceHandle resource, RGResourceAddress address, NonFiniteWatchGeneration generation,
+		bool writtenThisFrame) noexcept
 	{
 		const size_t index = static_cast<size_t>(semantic);
 		if (index < m_Entries.size())
 		{
-			m_Entries[index].m_Bindings.push_back({ resource, std::move(address), generation });
+			m_Entries[index].m_Bindings.push_back({ resource, std::move(address), generation, writtenThisFrame });
 		}
 	}
 
@@ -83,6 +84,7 @@ namespace gglab
 				{
 					conflicting |= binding.m_Resource != entry.m_Bindings.front().m_Resource;
 					conflicting |= binding.m_Generation != entry.m_Bindings.front().m_Generation;
+					conflicting |= binding.m_WrittenThisFrame != entry.m_Bindings.front().m_WrittenThisFrame;
 					const auto resolved = graph.ResolveObservation(binding.m_Address, RGObservationKind::NonFiniteScan);
 					conflicting |= resolved.m_Failure != RGObservationFailure::None && resolved.m_Failure != RGObservationFailure::Culled;
 					conflicting |= resolved.m_Failure == RGObservationFailure::None && resolved.m_Resource != binding.m_Resource;
@@ -94,6 +96,7 @@ namespace gglab
 						target.m_Resource = binding.m_Resource;
 						target.m_Ready = true;
 						target.m_Generation = binding.m_Generation;
+						target.m_WrittenThisFrame = binding.m_WrittenThisFrame;
 					}
 				}
 				if (GetNonFiniteWatchTier(target.m_Semantic) == 2 && target.m_Ready)

@@ -53,6 +53,9 @@ namespace gglab
 		bool m_Ready = false;
 		std::optional<RGResourceHandle> m_Resource;
 		NonFiniteWatchGeneration m_Generation;
+		// The producer wrote this revision in the current frame. A later write can
+		// replace it before rotated scans reach it, so it is scanned in this frame.
+		bool m_WrittenThisFrame = false;
 		std::vector<RGResourceAddress> m_Mips;
 	};
 	using NonFiniteWatchDefaults = std::array<NonFiniteWatchDefault, NonFiniteWatchSemanticCount>;
@@ -67,11 +70,17 @@ namespace gglab
 		// the earliest live cut without changing original graph liveness.
 		void Register(NonFiniteWatchSemantic semantic, RGResourceHandle resource, RGResourceAddress address) noexcept;
 		void RegisterGeneration(NonFiniteWatchSemantic semantic, RGResourceHandle resource,
-			RGResourceAddress address, NonFiniteWatchGeneration generation) noexcept;
+			RGResourceAddress address, NonFiniteWatchGeneration generation, bool writtenThisFrame = false) noexcept;
 		[[nodiscard]] NonFiniteWatchDefaults Resolve(const RenderGraph& graph) const noexcept;
 
 	private:
-		struct Binding { RGResourceHandle m_Resource; RGResourceAddress m_Address; NonFiniteWatchGeneration m_Generation; };
+		struct Binding
+		{
+			RGResourceHandle m_Resource;
+			RGResourceAddress m_Address;
+			NonFiniteWatchGeneration m_Generation;
+			bool m_WrittenThisFrame = false;
+		};
 		struct Entry { bool m_Applicable = false; std::vector<Binding> m_Bindings; };
 		bool m_Declared = false;
 		bool m_ConflictingDeclaration = false;

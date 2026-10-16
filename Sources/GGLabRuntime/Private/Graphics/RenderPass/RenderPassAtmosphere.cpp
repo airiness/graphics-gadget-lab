@@ -167,11 +167,12 @@ namespace gglab
 						{
 							// EndFrame commits the next revision only after this frame submits.
 							// Aborted scan results cannot certify this prospective revision.
-							const uint64_t revision = resources.m_Diagnostics.m_Generations[i] +
-								((resources.m_Diagnostics.m_DirtyMask >> i) & 1u);
+							const bool written = ((resources.m_Diagnostics.m_DirtyMask >> i) & 1u) != 0;
+							const uint64_t revision = resources.m_Diagnostics.m_Generations[i] + (written ? 1u : 0u);
+							// A view-dependent SkyView LUT can be rewritten on consecutive frames.
 							builder.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().RegisterGeneration(
 								semantics[i], texture, builder.GetObservationAddress(texture, RGObservationPosition::Final),
-								{ resources.m_Textures[i], revision });
+								{ resources.m_Textures[i], revision }, written);
 						}
 					}
 				});
