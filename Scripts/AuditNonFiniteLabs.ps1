@@ -20,7 +20,7 @@ evidence for reviewing them. Any replacement or boundary anomaly is listed first
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    [ValidateSet('Debug', 'Develop', 'Release')][string]$Configuration = 'Release',
     [ValidateSet('report', 'fail')][string]$WatchMode = 'report',
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
     # Content names from the table below; empty audits everything.

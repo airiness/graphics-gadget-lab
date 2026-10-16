@@ -14,7 +14,9 @@
     Contract: only the policy every adopter actually shares:
       - repository root and the OutDir/IntDir layout;
       - the pinned C++20 language standard;
-      - conformance mode and SDLCheck.
+      - conformance mode and SDLCheck;
+      - a numeric development-build switch for Debug and Develop;
+      - optimized Develop compilation with release CRT and debug symbols.
 
     Windows platform macros, external include roots, /MP and warning levels are
     deliberately NOT here: they are not universal across adopters.
@@ -27,14 +29,35 @@
     <GGLabRepositoryRoot Condition="'$(GGLabRepositoryRoot)'==''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\'))</GGLabRepositoryRoot>
     <OutDir>$(GGLabRepositoryRoot)Build\Output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(GGLabRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <GGLabDevelopmentBuild>0</GGLabDevelopmentBuild>
+    <GGLabDevelopmentBuild Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Develop'">1</GGLabDevelopmentBuild>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>GGLAB_DEVELOPMENT_BUILD=$(GGLabDevelopmentBuild);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Develop'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <FloatingPointModel>Precise</FloatingPointModel>
+      <PreprocessorDefinitions>BUILD_DEVELOP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/Zo %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <OptimizeReferences>false</OptimizeReferences>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

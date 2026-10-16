@@ -116,6 +116,33 @@ namespace gglab
 				result.m_ShowHelp = true;
 				continue;
 			}
+			if (argument == "--validation")
+			{
+				if (result.m_Options.m_ValidationMode || !requireValue(index, argument))
+				{
+					result.m_Error = "Option '--validation' requires one mode and may only be specified once.";
+					return result;
+				}
+				const std::string_view mode = arguments[index];
+				if (mode == "off")
+				{
+					result.m_Options.m_ValidationMode = ApplicationValidationMode::Off;
+				}
+				else if (mode == "standard")
+				{
+					result.m_Options.m_ValidationMode = ApplicationValidationMode::Standard;
+				}
+				else if (mode == "gpu")
+				{
+					result.m_Options.m_ValidationMode = ApplicationValidationMode::Gpu;
+				}
+				else
+				{
+					result.m_Error = "Option '--validation' expects off, standard, or gpu.";
+					return result;
+				}
+				continue;
+			}
 			if (argument == "--relative-mouse")
 			{
 				result.m_Options.m_StartWithRelativeMouse = true;
@@ -253,7 +280,7 @@ namespace gglab
 			}
 			if (argument == "--lab-parameter")
 			{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 				if (!requireValue(index, argument))
 				{
 					return result;
@@ -282,7 +309,7 @@ namespace gglab
 					});
 				continue;
 #else
-				result.m_Error = "Option '--lab-parameter' is available only in Debug builds.";
+				result.m_Error = "Option '--lab-parameter' is available only in Debug and Develop builds.";
 				return result;
 #endif
 			}
@@ -537,6 +564,12 @@ namespace gglab
 			result.m_Error = "Capture options require '--capture-on-ready'.";
 			return result;
 		}
+		if (result.m_Options.m_ValidationMode == ApplicationValidationMode::Gpu &&
+			(result.m_Options.m_RhiBackend != RHIBackendType::DX12 || result.m_Options.m_ListAdapters))
+		{
+			result.m_Error = "GPU-based validation is supported only by the DX12 backend.";
+			return result;
+		}
 		if (result.m_Options.m_IdleTimeoutSpecified && !result.m_Options.m_SessionId)
 		{
 			result.m_Error = "Option '--idle-timeout' requires '--session'.";
@@ -571,7 +604,7 @@ namespace gglab
 		if (result.m_Options.m_SelfTestSelection &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
 				!result.m_Options.m_StartupLabParameters.empty() ||
-				result.m_Options.m_StartWithRelativeMouse ||
+				result.m_Options.m_StartWithRelativeMouse || result.m_Options.m_ValidationMode ||
 				result.m_Options.m_DisableDevelopmentTools ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
 				result.m_Options.m_AdapterSelector || result.m_Options.m_Hidden ||
@@ -613,8 +646,9 @@ namespace gglab
 			"Options:\n"
 			"  --demo <start|island|atrium|lab> Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
-			"  --lab-parameter <id>=<value>    Debug builds only: set a startup Lab parameter\n"
+			"  --lab-parameter <id>=<value>    Debug and Develop builds only: set a startup Lab parameter\n"
 			"                                  before preparation (repeatable, strict).\n"
+			"  --validation <off|standard|gpu> Override validation (gpu: DX12 only).\n"
 			"  --relative-mouse                Start with a captured cursor for camera control.\n"
 			"                                  Default: visible, uncaptured cursor (Absolute).\n"
 			"  --state-root <absolute-path>    Store artifacts, caches and settings outside deployed inputs.\n"

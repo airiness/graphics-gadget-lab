@@ -173,6 +173,11 @@ namespace gglab
 	std::unique_ptr<VulkanContext> VulkanContext::Create(const RHIContextDesc& desc,
 		const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept
 	{
+		if (desc.m_EnableGpuBasedValidation)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("GPU-based validation is not supported by the Vulkan backend.");
+			return {};
+		}
 		auto context = std::unique_ptr<VulkanContext>(new VulkanContext());
 		if (!context->Initialize(desc, surfaceFactory, isHostAbiSupported))
 		{

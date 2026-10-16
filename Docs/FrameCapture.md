@@ -12,6 +12,20 @@ they use (Debug by default):
 $session = 'Scripts/GGLabSession.ps1'
 ```
 
+Use `-Configuration Develop` for optimized code with assertions and development
+tools. Develop enables ordinary validation; `-Validation gpu` opts into DX12
+GPU-based validation, and `-Validation off` disables validation for timing runs.
+One-shot launches accept the equivalent `--validation off|standard|gpu` option.
+
+DX12 Debug and Develop builds load the PIX GPU capturer and hide its HUD,
+including when PIX injects its capture DLL before startup. Release does not
+automatically load PIX. To opt into PIX integration in a Release build, pass
+`/p:GGLAB_ENABLE_PIX=1` to MSBuild; `0` disables it in any configuration.
+This switch does not change optimization, CRT or validation settings. PIX can
+also launch and inject into a normal Release executable externally.
+For Release performance profiling with a PIX Timing Capture, use the normal
+Release build without enabling automatic GPU-capturer loading.
+
 ## Choosing a workflow
 
 | Need | Use |
@@ -458,7 +472,7 @@ generation, but late anomalies still enter `firstAnomaly`. Replacing the watch
 configuration rechecks already active content. Failed content remains `Failed` while
 that generation is active. Tier C GI defaults remain pending.
 
-`Scripts/TestNonFiniteGenerations.ps1 -Configuration Debug` (or `Release`) verifies
+`Scripts/TestNonFiniteGenerations.ps1 -Configuration Debug` (or `Develop` / `Release`) verifies
 both backends with isolated writable state. It checks fresh-baked and cache-restored
 active IBL publication receipts, all mip/face coverage, stable-content deduplication,
 watch reconfiguration, and physical atmosphere LUTs.
@@ -532,7 +546,7 @@ policy/overhead acceptance remains separate work.
 
 ### Debug non-finite injection
 
-Debug builds accept one injection request in `watch`, so tests can prove that watch
+Debug and Develop builds accept one injection request in `watch`, so tests can prove that watch
 catches what sanitization and recovery would hide. Injection points are registered in
 `Shaders/Metadata/NonFiniteSites.json` (`injectionPoints`) and checked like sites.
 Each point replaces one component of its operand at one location; the request names

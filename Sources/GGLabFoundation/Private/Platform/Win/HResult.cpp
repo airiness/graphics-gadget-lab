@@ -64,7 +64,7 @@ namespace gglab
 		output << "Action : Abort immediately.\n==============================";
 
 		win32::WriteDiagnosticOutput(output.str());
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		__debugbreak();
 #endif
 		std::abort();

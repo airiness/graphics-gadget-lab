@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
 		launchResult.m_Options.m_WindowWidth,
 		launchResult.m_Options.m_WindowHeight,
 	};
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 	constexpr bool RequestRuntimeValidation = true;
 #else
 	constexpr bool RequestRuntimeValidation = false;
@@ -171,7 +171,9 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 #else
 		return gglab::RunRenderingStartupPath(
-			launchResult.m_Options, hInstance, RequestRuntimeValidation);
+			launchResult.m_Options, hInstance, launchResult.m_Options.m_ValidationMode
+				? *launchResult.m_Options.m_ValidationMode != gglab::ApplicationValidationMode::Off
+				: RequestRuntimeValidation);
 #endif
 	}
 

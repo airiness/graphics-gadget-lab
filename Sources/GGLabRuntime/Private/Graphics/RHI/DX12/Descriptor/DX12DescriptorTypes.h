@@ -37,7 +37,7 @@ namespace gglab
 		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle = {};
 		uint32_t m_Index = std::numeric_limits<uint32_t>::max();
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		D3D12_DESCRIPTOR_HEAP_TYPE m_DebugType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
 #endif
 

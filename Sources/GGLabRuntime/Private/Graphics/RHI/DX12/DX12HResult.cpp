@@ -79,7 +79,7 @@ namespace gglab
 		const std::string text = os.str();
 		win32::WriteDiagnosticOutput(text);
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		__debugbreak();
 #endif
 		std::abort();

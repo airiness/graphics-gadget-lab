@@ -94,7 +94,7 @@ namespace gglab
 				&RenderGraphComputeLabSession::Create,
 				{ shader_programs::RenderGraphComputeWrite,
 					shader_programs::RenderGraphComputeReadWrite,
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 					shader_programs::RenderGraphComputeNonFiniteProbe,
 #endif
 					shader_programs::RenderGraphComputePreviewVertex,

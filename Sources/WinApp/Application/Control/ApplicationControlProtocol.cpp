@@ -485,7 +485,7 @@ namespace gglab
 			return value.is_number_unsigned() && value.get<uint64_t>() <= UINT32_MAX;
 		}
 
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		// {"point": "<registered id>", "value": "<NonFiniteInjectionValue>", "x": n, "y": n, "component": c}
 		[[nodiscard]] std::string ParseWatchInjection(const Json& value, std::optional<NonFiniteInjection>& injection)
 		{
@@ -645,13 +645,13 @@ namespace gglab
 				}
 				else if (key == "inject" && value.is_object())
 				{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 					if (auto error = ParseWatchInjection(value, configuration.m_Injection); !error.empty())
 					{
 						return error;
 					}
 #else
-					return "Watch field 'inject' is available only in Debug builds.";
+					return "Watch field 'inject' is available only in Debug and Develop builds.";
 #endif
 				}
 				else

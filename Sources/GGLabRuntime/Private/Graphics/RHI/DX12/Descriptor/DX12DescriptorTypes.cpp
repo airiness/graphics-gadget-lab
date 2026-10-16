@@ -15,7 +15,7 @@ namespace gglab
 	{
 		if (this != &rhs)
 		{
-#if defined (BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 			GGLAB_ASSERT_MSG(!IsValid(), "DX12DescriptorHandle overwritten while still valid (leak). Call Free/Retire first.");
 #endif
 			Reset();
@@ -27,7 +27,7 @@ namespace gglab
 
 	DX12DescriptorHandle::~DX12DescriptorHandle()
 	{
-#if defined (BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		if (IsValid())
 		{
 			GGLAB_ASSERT_MSG(false, "DX12DescriptorHandle leaked: must Free()/Retire() before destruction.");
@@ -76,7 +76,7 @@ namespace gglab
 			.m_CpuHandle = CpuHandleAt(offset),
 			.m_GpuHandle = IsShaderVisible() ? GpuHandleAt(offset) : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
 			.m_Index = m_Index + offset,
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 			.m_DebugType = HeapType()
 #endif
 		};

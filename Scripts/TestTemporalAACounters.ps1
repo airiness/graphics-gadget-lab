@@ -20,7 +20,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestTemporalAACounte
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')]
+    [ValidateSet('Debug', 'Develop', 'Release')]
     [string[]]$Configuration = @('Debug', 'Release'),
     [ValidateSet('dx12', 'vulkan')]
     [string[]]$Rhi = @('dx12', 'vulkan'),

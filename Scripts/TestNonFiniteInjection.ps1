@@ -3,8 +3,8 @@
 Checks that non-finite watch catches values injected at registered injection points.
 
 .DESCRIPTION
-Injection is a Debug-only watch request ('watch -Inject'), carried to the GPU with the
-frame's production counters, so this script runs Debug builds with --watch-nonfinite.
+Injection is a Debug/Develop watch request ('watch -Inject'), carried to the GPU with
+the frame's production counters, so this script starts with --watch-nonfinite.
 Each requested backend gets one hidden session per Lab; every case reconfigures watch.
 
 RenderGraph Compute Lab (animation speed 0, so every frame is identical):
@@ -35,7 +35,8 @@ param(
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
     [ValidateSet('render-graph-compute', 'temporal-aa')][string[]]$Lab = @('render-graph-compute', 'temporal-aa'),
     [string]$OutputDirectory,
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 180,
+    [ValidateSet('Debug', 'Develop')][string]$Configuration = 'Debug'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
@@ -131,7 +132,7 @@ function Invoke-Session([string]$Backend, [string]$Name, [string]$LabId, [string
     $session = "inject-$runId-$Backend-$Name"
     $start = $null
     try {
-        $start = Call start $session @{ Configuration = 'Debug'; Rhi = $Backend; Lab = $LabId; NoDevTools = $true;
+        $start = Call start $session @{ Configuration = $Configuration; Rhi = $Backend; Lab = $LabId; NoDevTools = $true;
             WindowSize = '320x180'; StateRoot = "$output/$Backend-state"; WatchNonFinite = $true;
             LabParameters = $Assignments; StartTimeoutSeconds = $TimeoutSeconds }
         Save "$directory/start.json" $start

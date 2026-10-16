@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("Debug", "Release")]
+    [ValidateSet("Debug", "Develop", "Release")]
     [string]$Configuration = "Debug",
 
     [ValidateSet("dx12", "vulkan")]

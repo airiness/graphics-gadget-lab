@@ -192,7 +192,7 @@ namespace gglab
 				R"({"protocol":2,"id":77,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0,"y":0,"component":4}})");
 			const auto missingInjectLocation = ParseApplicationControlRequest(
 				R"({"protocol":2,"id":78,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0}})");
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 			const auto& parsedInjection = injectWatch.m_Request ? injectWatch.m_Request->m_Watch.m_Injection : std::nullopt;
 			context.Check(parsedInjection && parsedInjection->m_Value == NonFiniteInjectionValue::NegativeInfinity &&
 				parsedInjection->m_X == 12 && parsedInjection->m_Y == 34 && parsedInjection->m_Component == 3,
@@ -203,7 +203,7 @@ namespace gglab
 #else
 			context.Check(!injectWatch.m_Request && !badInjectPoint.m_Request && !badInjectValue.m_Request &&
 				!badInjectComponent.m_Request && !missingInjectLocation.m_Request,
-				"Non-finite injection requests are rejected outside Debug builds");
+				"Non-finite injection requests are rejected outside Debug and Develop builds");
 #endif
 
 			struct Rejected

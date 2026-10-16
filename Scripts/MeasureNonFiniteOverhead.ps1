@@ -21,7 +21,7 @@ noise, so repeat runs before treating a small difference as real.
 [CmdletBinding()]
 param(
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
-    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    [ValidateSet('Debug', 'Develop', 'Release')][string]$Configuration = 'Release',
     [ValidatePattern('^\d+[xX]\d+$')][string]$WindowSize = '1920x1080',
     [string[]]$CameraPaths = @('SEQ_StaticRailings', 'SEQ_PanStopRailings', 'SEQ_LateralPanRailings', 'SEQ_StaticGlassTerrace',
         'SEQ_PanGlassTerrace', 'SEQ_DollyDoorway', 'SEQ_OrbitLounge', 'SEQ_HorizonPan', 'SEQ_CutCourtyardToStairs'),

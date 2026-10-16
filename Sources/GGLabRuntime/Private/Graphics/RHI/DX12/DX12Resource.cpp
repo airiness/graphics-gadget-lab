@@ -74,7 +74,7 @@ namespace gglab
 
 	void DX12Resource::SetDebugName(const wchar_t* name) noexcept
 	{
-#if defined(BUILD_DEBUG)
+#if GGLAB_DEVELOPMENT_BUILD
 		if (m_Resource)
 		{
 			m_Resource->SetName(name);

@@ -4,7 +4,7 @@ Checks non-finite fail/report coverage of captures, exports and complete sequenc
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')][string[]]$Configuration = @('Debug', 'Release'),
+    [ValidateSet('Debug', 'Develop', 'Release')][string[]]$Configuration = @('Debug', 'Release'),
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
     [string]$OutputDirectory,
     [int]$TimeoutSeconds = 180

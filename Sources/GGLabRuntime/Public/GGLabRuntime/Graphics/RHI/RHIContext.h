@@ -22,6 +22,7 @@ namespace gglab
 		uint32_t m_FrameSlotCount = 2;
 		std::optional<std::string> m_AdapterSelector;
 		bool m_EnableDebugValidation = false;
+		bool m_EnableGpuBasedValidation = false;
 		bool m_AllowTearing = true;
 		bool m_Vsync = false;
 	};

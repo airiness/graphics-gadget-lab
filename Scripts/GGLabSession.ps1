@@ -13,7 +13,8 @@ still exits 0; inspect its "status".
 
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
-           -LabParameters "id=value",... sets startup Lab parameters (Debug builds).
+           -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
+           -Validation off|standard|gpu overrides validation (gpu: DX12 only).
   status   Report readiness gates, settled frames, camera and pending captures.
   capture  Capture a frame; waits for the PNG and metadata unless -NoWait.
            -View restores a camera reference view of the active content first.
@@ -23,7 +24,7 @@ Commands:
            the exact frame graph. See Docs/FrameCapture.md for the address format.
   watch    Configure semantic defaults or explicit non-finite targets and mode.
            Omit -Targets for tiered defaults; -WatchOff disables reporting.
-           -WatchClaims selects boundary, production or both. Debug builds accept
+           -WatchClaims selects boundary, production or both. Debug and Develop builds accept
            -Inject '{"point":"<id>","value":"NaN","x":0,"y":0,"component":0}'
            to inject at a registered point; it needs -WatchNonFinite at start.
   batch    Capture every reference view of the active content (or -Views) in
@@ -70,8 +71,10 @@ param(
     [string]$Demo,
     [ValidatePattern('^\d+[xX]\d+$')]
     [string]$WindowSize,
-    [ValidateSet('Debug', 'Release')]
+    [ValidateSet('Debug', 'Develop', 'Release')]
     [string]$Configuration = 'Debug',
+    [ValidateSet('off', 'standard', 'gpu')]
+    [string]$Validation,
     [double]$IdleTimeout = 900,
     [double]$FixedDeltaTime,
     [switch]$Visible,
@@ -79,7 +82,7 @@ param(
     [string]$StateRoot,
     [string]$SessionRoot,
     [int]$StartTimeoutSeconds = 300,
-    # Debug builds only: startup Lab parameter assignments as "id=value".
+    # Debug and Develop builds only: startup Lab parameter assignments as "id=value".
     [string[]]$LabParameters,
 
     # capture
@@ -111,7 +114,7 @@ param(
     [string]$WatchMode = 'report',
     [ValidateSet('boundary', 'production')]
     [string[]]$WatchClaims = @('boundary', 'production'),
-    # watch (Debug builds): one non-finite injection request as a JSON object.
+    # watch (Debug and Develop builds): one non-finite injection request as a JSON object.
     [string]$Inject,
 
     # result
@@ -336,6 +339,7 @@ switch ($Command) {
         if ($WindowSize) { $arguments += @('--window-size', $WindowSize) }
         if (-not $Visible) { $arguments += '--hidden' }
         if ($WatchNonFinite) { $arguments += '--watch-nonfinite' }
+        if ($Validation) { $arguments += @('--validation', $Validation) }
         foreach ($assignment in $LabParameters) { $arguments += @('--lab-parameter', $assignment) }
         if ($PSBoundParameters.ContainsKey('FixedDeltaTime')) {
             $arguments += @('--fixed-delta-time', "$FixedDeltaTime")

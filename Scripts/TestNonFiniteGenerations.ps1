@@ -4,7 +4,7 @@ Checks default non-finite scans of baked/cache-restored IBL and active atmospher
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    [ValidateSet('Debug', 'Develop', 'Release')][string]$Configuration = 'Release',
     [ValidateSet('dx12', 'vulkan')][string[]]$Rhi = @('dx12', 'vulkan'),
     [string]$OutputDirectory,
     [int]$TimeoutSeconds = 240
