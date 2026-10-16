@@ -103,6 +103,6 @@ python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium/Captures
 ```
 
 Validate both backend runs when claiming shared correctness. Authoritative schemas
-remain [ResourceExport](../../../../Docs/Schemas/ResourceExport.schema.json) and
-[RenderGraph](../../../../Docs/Schemas/RenderGraph.schema.json); a JSON parse alone
+remain [ResourceExport](../../../../Schemas/ResourceExport.schema.json) and
+[RenderGraph](../../../../Schemas/RenderGraph.schema.json); a JSON parse alone
 does not validate their contracts.

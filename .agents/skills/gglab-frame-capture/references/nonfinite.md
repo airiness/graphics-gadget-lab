@@ -115,7 +115,7 @@ claims remain Unavailable. Validate nested `gglab.nonfinite-watch` v2 records:
 python Scripts/ValidateNonFiniteCoverage.py Build/Sessions/numeric-check/Captures
 ```
 
-The schema remains [NonFiniteWatch](../../../../Docs/Schemas/NonFiniteWatch.schema.json).
+The schema remains [NonFiniteWatch](../../../../Schemas/NonFiniteWatch.schema.json).
 
 ## Controlled injection
 
