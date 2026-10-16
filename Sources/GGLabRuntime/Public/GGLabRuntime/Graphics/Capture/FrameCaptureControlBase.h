@@ -49,6 +49,10 @@ namespace gglab
 		// Retained frames share the payload budget, including while awaiting this drain.
 		virtual void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>&) noexcept {}
 		[[nodiscard]] virtual bool HasNonFiniteInstrumentation() const noexcept { return false; }
+		// Debug verification: production counters of frames built after this call carry
+		// the injection request (nullopt clears it). Returns false without changing the
+		// request when instrumentation is unavailable or the request is invalid.
+		[[nodiscard]] virtual bool SetNonFiniteInjection(std::optional<NonFiniteInjection>) noexcept { return false; }
 		// Target-count allowance for one scan group, including current slot pressure.
 		// Byte limits and occupancy are rechecked atomically by normal admission.
 		[[nodiscard]] virtual uint32_t GetNonFiniteScanTargetLimit() const noexcept { return 64; }

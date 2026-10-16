@@ -25,7 +25,7 @@ namespace gglab
 				aggregate = claim;
 			}
 		}
-		std::string Describe(const NonFiniteWatchAnomaly& anomaly)
+		std::string Describe(const NonFiniteWatchAnomaly& anomaly, const std::optional<NonFiniteInjection>& injection)
 		{
 			std::string text = std::format("{}: frame {}", GetNonFiniteWatchFailureName(anomaly.m_Failure), anomaly.m_FrameSerial);
 			if (anomaly.m_Target)
@@ -49,6 +49,10 @@ namespace gglab
 				{
 					text += std::format(" ('{}', '{}')", nonfinite::Programs[*anomaly.m_ProgramIndex], nonfinite::Sites[*anomaly.m_SiteIndex].m_Id);
 				}
+			}
+			if (injection && injection->m_PointIndex < nonfinite::InjectionPoints.size())
+			{
+				text += std::format(", under Debug injection '{}'", nonfinite::InjectionPoints[injection->m_PointIndex].m_Id);
 			}
 			return text;
 		}
@@ -96,6 +100,14 @@ namespace gglab
 			{
 				error = "RequiresRestart: production fail mode requires --watch-nonfinite at startup.";
 			}
+			else if (configuration.m_Injection && !m_Capture->HasNonFiniteInstrumentation())
+			{
+				error = "RequiresRestart: non-finite injection requires --watch-nonfinite at startup.";
+			}
+			else if (configuration.m_Injection && (!configuration.m_Production || !IsValidNonFiniteInjection(*configuration.m_Injection)))
+			{
+				error = "Non-finite injection requires the production claim, a registered point and a component below 4.";
+			}
 			else if (configuration.m_Targets.size() > 64 || (!configuration.m_Boundary && !configuration.m_Targets.empty()))
 			{
 				error = "Watch targets require the boundary claim and are limited to 64 addresses.";
@@ -114,6 +126,14 @@ namespace gglab
 		}
 		if (!error.empty())
 		{
+			return false;
+		}
+		// Frames built after this call carry the new request; earlier frames are drained
+		// as an older configuration version.
+		const std::optional<NonFiniteInjection> injection = configuration.m_Enabled ? configuration.m_Injection : std::nullopt;
+		if ((injection || m_Status.m_Injection) && m_Capture && !m_Capture->SetNonFiniteInjection(injection))
+		{
+			error = "NonFiniteWatchUnavailable: the Runtime capture service rejected the injection request.";
 			return false;
 		}
 		const uint64_t version = m_Status.m_ConfigurationVersion + 1;
@@ -138,7 +158,7 @@ namespace gglab
 		m_Status = { .m_ConfigurationVersion = version, .m_Enabled = m_Configuration.m_Enabled,
 			.m_Mode = m_Configuration.m_Mode,
 			.m_BoundaryRequested = m_Configuration.m_Boundary, .m_ProductionRequested = m_Configuration.m_Production,
-			.m_DefaultTargets = m_Configuration.m_Targets.empty() };
+			.m_DefaultTargets = m_Configuration.m_Targets.empty(), .m_Injection = injection };
 		m_FirstApplicableFrame = m_LastPreparedFrame + 1;
 		m_Generations = {};
 		m_GenerationCursor = 0;
@@ -484,6 +504,20 @@ namespace gglab
 		{
 			return;
 		}
+		// Evidence must carry exactly the configured injection request. Otherwise the
+		// frame cannot say whether its anomalies were injected, so it proves nothing.
+		const std::optional<NonFiniteInjection> evidenceRequest =
+			frame.m_Injection ? std::optional(frame.m_Injection->m_Request) : std::nullopt;
+		const bool injectionMatches = evidenceRequest == m_Configuration.m_Injection;
+		const NonFiniteClaimResult claim = injectionMatches ? frame.m_Claim : NonFiniteClaimResult{};
+		const std::string failure = injectionMatches ? frame.m_Failure
+			: std::string("MissingCoverage: production evidence carries a different injection request than the watch configuration.");
+		const bool injectionApplied = injectionMatches && frame.m_Injection && frame.m_Injection->m_AppliedCount != 0;
+		if (injectionMatches && frame.m_Injection && frame.m_FrameSerial >= m_Status.m_InjectionFrameSerial)
+		{
+			m_Status.m_InjectionFrameSerial = frame.m_FrameSerial;
+			m_Status.m_InjectionAppliedCount = frame.m_Injection->m_AppliedCount;
+		}
 		for (const auto& site : frame.m_Sites)
 		{
 			if (site.m_Claim.m_Status == NonFiniteClaimStatus::Failed)
@@ -495,8 +529,8 @@ namespace gglab
 		if (frame.m_FrameSerial >= m_Status.m_ProductionFrameSerial)
 		{
 			m_Status.m_ProductionFrameSerial = frame.m_FrameSerial;
-			m_Status.m_Production = frame.m_Claim;
-			m_Status.m_ProductionFailure = frame.m_Failure;
+			m_Status.m_Production = claim;
+			m_Status.m_ProductionFailure = failure;
 		}
 		for (auto& [id, coverage] : m_Coverage)
 		{
@@ -505,8 +539,13 @@ namespace gglab
 				if (pending.m_FrameSerial == frame.m_FrameSerial && pending.m_ProductionPending)
 				{
 					pending.m_ProductionPending = false;
-					pending.m_Production = frame.m_Claim;
-					pending.m_Failure = frame.m_Failure;
+					pending.m_Production = claim;
+					pending.m_Failure = failure;
+					if (injectionMatches && frame.m_Injection)
+					{
+						++coverage.m_Report.m_InjectedFrames;
+						coverage.m_Report.m_AppliedFrames += injectionApplied ? 1 : 0;
+					}
 					for (const auto& site : frame.m_Sites)
 					{
 						if (site.m_Claim.m_Status == NonFiniteClaimStatus::Failed && !pending.m_Anomaly)
@@ -534,6 +573,7 @@ namespace gglab
 		report.m_BoundaryRequested = m_Configuration.m_Boundary;
 		report.m_ProductionRequested = m_Configuration.m_Production;
 		report.m_InstrumentationAvailable = m_Capture && m_Capture->HasNonFiniteInstrumentation();
+		report.m_Injection = m_Status.m_Injection;
 		return id;
 	}
 
@@ -617,7 +657,7 @@ namespace gglab
 	std::string NonFiniteWatchCoordinator::GetFailModeFailure() const noexcept
 	{
 		if (!m_Status.m_Enabled || m_Status.m_Mode != NonFiniteWatchMode::Fail) { return {}; }
-		if (m_Status.m_FirstAnomaly) { return Describe(*m_Status.m_FirstAnomaly); }
+		if (m_Status.m_FirstAnomaly) { return Describe(*m_Status.m_FirstAnomaly, m_Status.m_Injection); }
 		for (const auto& target : m_Status.m_Targets)
 		{
 			if (m_Status.m_BoundaryFrameSerial != 0 && !target.m_Generation.IsValid() && target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete)
@@ -698,7 +738,7 @@ namespace gglab
 					if (frame.m_Anomaly && (!report.m_FirstAnomaly || frame.m_Anomaly->m_FrameSerial < report.m_FirstAnomaly->m_FrameSerial))
 					{
 						report.m_FirstAnomaly = frame.m_Anomaly;
-						report.m_Failure = Describe(*frame.m_Anomaly);
+						report.m_Failure = Describe(*frame.m_Anomaly, report.m_Injection);
 					}
 					// A stalled/deferred renderer may submit no tail frames at all. The
 					// wall-clock bound also releases retained capture payloads in that case.

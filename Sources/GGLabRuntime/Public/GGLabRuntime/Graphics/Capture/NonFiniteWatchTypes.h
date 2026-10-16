@@ -8,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -175,6 +176,50 @@ namespace gglab
 		std::optional<float> m_MostNegative;
 		std::optional<float> m_Maximum;
 	};
+	// Debug verification: the counter clear pass asks one registered injection point
+	// (Shaders/Metadata/NonFiniteSites.json) to replace one component of its operand at
+	// one location. The value identities are shared by every injection point.
+	enum class NonFiniteInjectionValue : uint8_t
+	{
+		NaN,
+		PositiveInfinity,
+		NegativeInfinity,
+		// Finite, above the FP16 maximum.
+		Overflow,
+		// Finite and negative.
+		Negative,
+	};
+	inline constexpr float NonFiniteInjectionOverflow = 131072.0f;
+	inline constexpr float NonFiniteInjectionNegative = -4.0f;
+	[[nodiscard]] uint32_t GetNonFiniteInjectionBits(NonFiniteInjectionValue value) noexcept;
+	[[nodiscard]] std::optional<NonFiniteInjectionValue> FindNonFiniteInjectionValue(uint32_t ieeeBits) noexcept;
+	[[nodiscard]] std::string_view GetNonFiniteInjectionValueName(NonFiniteInjectionValue value) noexcept;
+	[[nodiscard]] std::optional<NonFiniteInjectionValue> ParseNonFiniteInjectionValue(std::string_view name) noexcept;
+
+	struct NonFiniteInjection
+	{
+		// Index into nonfinite::InjectionPoints of the counter ABI.
+		uint32_t m_PointIndex = 0;
+		NonFiniteInjectionValue m_Value = NonFiniteInjectionValue::NaN;
+		// Point-defined location, such as a display pixel or a probe texel.
+		uint32_t m_X = 0;
+		uint32_t m_Y = 0;
+		// Component of the point's operand, such as an RGBA channel.
+		uint32_t m_Component = 0;
+
+		bool operator==(const NonFiniteInjection&) const noexcept = default;
+	};
+	[[nodiscard]] bool IsValidNonFiniteInjection(const NonFiniteInjection& injection) noexcept;
+
+	// Read back with the frame's counters: the request the GPU received and how many
+	// times an injection point replaced a value. Zero applications mean the point's
+	// code did not run at that location in this frame.
+	struct NonFiniteInjectionEvidence
+	{
+		NonFiniteInjection m_Request;
+		uint32_t m_AppliedCount = 0;
+	};
+
 	struct NonFiniteProductionSite
 	{
 		uint32_t m_ProgramIndex = 0;
@@ -192,6 +237,7 @@ namespace gglab
 		std::string m_Failure;
 		NonFiniteClaimResult m_Claim;
 		std::vector<NonFiniteProductionSite> m_Sites;
+		std::optional<NonFiniteInjectionEvidence> m_Injection;
 	};
 
 	[[nodiscard]] NonFiniteProductionFrame DecodeNonFiniteProductionFrame(std::span<const std::byte> bytes, uint64_t frameSerial) noexcept;

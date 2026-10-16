@@ -25,7 +25,7 @@ namespace gglab
 		{
 			RHIBindingLayoutDesc desc;
 			desc.m_Slots[0] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 0 };
-			desc.m_Slots[1] = { .m_Type = RHIBindingType::PushConstants, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 2, .m_SizeInBytes = 8 };
+			desc.m_Slots[1] = { .m_Type = RHIBindingType::PushConstants, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 2, .m_SizeInBytes = 28 };
 			desc.m_SlotCount = 2;
 			desc.m_DebugName = "NonFiniteCounters.Clear";
 			m_ProductionClearLayout = m_ScanPipelineSystem->CreateBindingLayout(desc);
@@ -62,17 +62,38 @@ namespace gglab
 		{
 			return false;
 		}
+		// The clear pass writes this frame's injection request beside the header, so the
+		// readback records exactly what the frame's injection points were asked to do.
+		std::array<uint32_t, 7> constants{ static_cast<uint32_t>(frameSerial), static_cast<uint32_t>(frameSerial >> 32) };
+		if (m_NonFiniteInjection)
+		{
+			constants[2] = m_NonFiniteInjection->m_PointIndex + 1;
+			constants[3] = GetNonFiniteInjectionBits(m_NonFiniteInjection->m_Value);
+			constants[4] = m_NonFiniteInjection->m_X;
+			constants[5] = m_NonFiniteInjection->m_Y;
+			constants[6] = m_NonFiniteInjection->m_Component;
+		}
 		counters = { .m_Readback = tap.m_Buffer.Get(),
 			.m_Bytes = nonfinite::BufferBytes,
 			.m_Binding = nonfinite::CounterBinding,
-			.m_Clear = [pipeline, frameSerial](RGExecuteContext& context, RGBufferId record)
+			.m_Clear = [pipeline, constants](RGExecuteContext& context, RGBufferId record)
 				{
 					auto* commands = context.GetDirectComputeCommandContext();
 					commands->SetPipeline(pipeline);
 					commands->SetReadWriteBuffer(0, context.GetBufferHandle(record));
-					commands->SetPushConstants(1, std::array{ static_cast<uint32_t>(frameSerial), static_cast<uint32_t>(frameSerial >> 32) });
+					commands->SetPushConstants(1, constants);
 					commands->Dispatch((nonfinite::SiteCount * nonfinite::ProgramCount + 63) / 64, 1, 1);
 				} };
+		return true;
+	}
+
+	bool FrameCaptureService::SetNonFiniteInjection(std::optional<NonFiniteInjection> injection) noexcept
+	{
+		if (!m_ProductionEnabled || (injection && !IsValidNonFiniteInjection(*injection)))
+		{
+			return false;
+		}
+		m_NonFiniteInjection = injection;
 		return true;
 	}
 

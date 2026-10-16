@@ -66,6 +66,11 @@ namespace gglab
 		}
 		void ConsumeNonFiniteProductionFrames(std::vector<std::shared_ptr<const NonFiniteProductionFrame>>& frames) noexcept override;
 		bool HasNonFiniteInstrumentation() const noexcept override { return m_ProductionEnabled; }
+		[[nodiscard]] bool SetNonFiniteInjection(std::optional<NonFiniteInjection> injection) noexcept override;
+		[[nodiscard]] std::optional<NonFiniteInjection> GetNonFiniteInjection() const noexcept override
+		{
+			return m_NonFiniteInjection;
+		}
 		uint32_t GetNonFiniteScanTargetLimit() const noexcept override
 		{
 			const uint32_t used = GetPayloadUsage().second;
@@ -201,6 +206,7 @@ namespace gglab
 		static constexpr uint64_t ProductionPayloadBytes = nonfinite::BufferBytes * 3 + ProductionCpuBytes;
 		std::vector<std::weak_ptr<const NonFiniteProductionFrame>> m_RetainedProduction;
 		bool m_ProductionEnabled = false;
+		std::optional<NonFiniteInjection> m_NonFiniteInjection;
 		ComputePipelineRecipe m_ProductionClearRecipe;
 		ComputePipelineSlot m_ProductionClearSlot;
 		RHIBindingLayoutHandle m_ProductionClearLayout;

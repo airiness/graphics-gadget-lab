@@ -31,10 +31,16 @@ WATCHED = SANITIZERS | GUARDS
 TRIVIA = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"', re.S)
 TOKEN = re.compile(r"[A-Za-z_][A-Za-z_0-9]*|[0-9]+|[^\s]")
 POLICIES = {"report", "error", "expected", "budgeted"}
+INJECT = "NonFiniteInject"
+CLAIMS = {"boundary", "production"}
 
 
-def discover_sites(source, evidence=None):
-    """Return (function, operation) -> (count, normalized-body SHA-256)."""
+def discover_sites(source, evidence=None, injections=None):
+    """Return (function, operation) -> (count, normalized-body SHA-256).
+
+    When given, injections receives (function, first argument) -> call count for
+    every NonFiniteInject call, so each injection point names a registered symbol.
+    """
     tokens = TOKEN.findall(TRIVIA.sub(" ", source.replace("\\\n", "")))
     pairs = {}
     stack = []
@@ -73,6 +79,10 @@ def discover_sites(source, evidence=None):
 
     grouped = {}
     for i, token in enumerate(tokens):
+        if injections is not None and token == INJECT and i not in declarations:
+            owner = next((name for name, begin, end in functions if begin < i < end), "global")
+            argument = tokens[i + 2] if i + 2 < len(tokens) and tokens[i + 1] == "(" else ""
+            injections[(owner, argument)] = injections.get((owner, argument), 0) + 1
         # Include bare macro aliases (#define CHECK isfinite), not only direct calls.
         if token not in WATCHED or i in declarations:
             continue
@@ -114,14 +124,19 @@ def counter_route_is_explicit(site, calls):
     return True
 
 
-def discover_tree(root):
+def discover_tree(root, injections=None):
     result = {}
     shaders = root / "Shaders"
     for path in sorted(shaders.rglob("*")):
         if path.suffix not in {".hlsl", ".hlsli"} or "Tests" in path.relative_to(shaders).parts:
             continue
-        for (function, operation), evidence in discover_sites(path.read_text(encoding="utf-8-sig")).items():
-            result[(path.relative_to(shaders).as_posix(), function, operation)] = evidence
+        source = path.relative_to(shaders).as_posix()
+        calls = {}
+        for (function, operation), evidence in discover_sites(path.read_text(encoding="utf-8-sig"), injections=calls).items():
+            result[(source, function, operation)] = evidence
+        if injections is not None:
+            for (function, argument), count in calls.items():
+                injections[(source, function, argument)] = count
     return result
 
 
@@ -154,11 +169,12 @@ def discover_programs(root):
     return {source: sorted(values) for source, values in programs.items()}
 
 
-def validate(document, actual, programs=None, instrumented=None):
-    if set(document) != {"schema", "schemaVersion", "sites"} or document["schema"] != "gglab.shader-nonfinite-sites" or type(document["schemaVersion"]) is not int or document["schemaVersion"] != 1:
+def validate(document, actual, programs=None, instrumented=None, injections=None):
+    if set(document) != {"schema", "schemaVersion", "sites", "injectionPoints"} or document["schema"] != "gglab.shader-nonfinite-sites" or type(document["schemaVersion"]) is not int or document["schemaVersion"] != 2:
         raise ValueError("Invalid site inventory envelope")
-    if not isinstance(document["sites"], list):
-        raise ValueError("sites must be an array")
+    if not isinstance(document["sites"], list) or not isinstance(document["injectionPoints"], list):
+        raise ValueError("sites and injectionPoints must be arrays")
+    validate_injection_points(document["injectionPoints"], programs, injections or {})
     seen = set()
     ids = set()
     for site in document["sites"]:
@@ -195,6 +211,32 @@ def validate(document, actual, programs=None, instrumented=None):
         raise ValueError(f"Unregistered non-finite sites: {sorted(missing)}")
 
 
+def validate_injection_points(points, programs, injections):
+    """Each Debug verification injection call names exactly one registered point."""
+    from GenerateNonFiniteSites import injection_symbol
+    registered = {}
+    for point in points:
+        if set(point) != {"id", "source", "function", "count", "programs", "claim", "rationale"}:
+            raise ValueError("Invalid injection point fields")
+        if not isinstance(point["id"], str) or not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", point["id"]):
+            raise ValueError("Invalid injection point id")
+        if not all(isinstance(point[key], str) and point[key] for key in ("source", "function", "rationale")):
+            raise ValueError("Missing injection point identity or rationale")
+        key = (point["source"], point["function"], injection_symbol(point))
+        if key in registered:
+            raise ValueError(f"Duplicate injection point: {key}")
+        if point["claim"] not in CLAIMS:
+            raise ValueError(f"Invalid injection point claim: {key}")
+        if type(point["count"]) is not int or point["count"] <= 0 or injections.get(key) != point["count"]:
+            raise ValueError(f"Stale or changed injection point requires review: {key}")
+        if not isinstance(point["programs"], list) or not point["programs"] or (programs is not None and point["programs"] != programs.get(point["source"], [])):
+            raise ValueError(f"Injection point program consumer inventory changed: {key}")
+        registered[key] = point
+    unregistered = set(injections) - set(registered)
+    if unregistered:
+        raise ValueError(f"Unregistered injection points: {sorted(unregistered)}")
+
+
 class SourceCheckTests(unittest.TestCase):
     def fixture(self, source="float f(float x) { return isfinite(x) ? x : 0; }"):
         sites = discover_sites(source)
@@ -203,7 +245,16 @@ class SourceCheckTests(unittest.TestCase):
         site = dict(id="test.f.guard", source="Common/Test.hlsli", function=key[0], operation=key[1], count=count,
                     bodySha256=digest, programs=["gglab.shader.test"], kind="recovery", evidence="counter",
                     policy=dict(negative="report", fp16Maximum="report"), rationale="Test recovery")
-        return dict(schema="gglab.shader-nonfinite-sites", schemaVersion=1, sites=[site]), actual
+        return dict(schema="gglab.shader-nonfinite-sites", schemaVersion=2, sites=[site], injectionPoints=[]), actual
+
+    def injection_fixture(self):
+        source = "float f(float x, uint2 p) { return NonFiniteInject(NF_INJECT_TEST_F_VALUE, p, x); }"
+        calls = {}
+        discover_sites(source, injections=calls)
+        injections = {("Common/Test.hlsli", *key): count for key, count in calls.items()}
+        point = dict(id="test.f.value", source="Common/Test.hlsli", function="f", count=1,
+                     programs=["gglab.shader.test"], claim="production", rationale="Test injection")
+        return [point], injections
 
     def test_accept_registered(self):
         document, actual = self.fixture()
@@ -295,6 +346,32 @@ class SourceCheckTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate(document, actual, instrumented=set(actual))
 
+    def test_registered_injection_point_is_accepted(self):
+        points, injections = self.injection_fixture()
+        self.assertEqual(injections, {("Common/Test.hlsli", "f", "NF_INJECT_TEST_F_VALUE"): 1})
+        validate_injection_points(points, None, injections)
+
+    def test_injection_declaration_is_not_a_call(self):
+        calls = {}
+        discover_sites("float NonFiniteInject(uint point, uint2 p, float x) { return x; }", injections=calls)
+        self.assertEqual(calls, {})
+
+    def test_unregistered_stale_or_changed_injection_points_fail(self):
+        for mutation in ("unregistered", "stale", "count", "claim", "symbol"):
+            points, injections = self.injection_fixture()
+            if mutation == "unregistered":
+                points = []
+            elif mutation == "stale":
+                injections = {}
+            elif mutation == "count":
+                points[0]["count"] = 2
+            elif mutation == "claim":
+                points[0]["claim"] = "boundary-only"
+            else:
+                injections = {("Common/Test.hlsli", "f", "NF_INJECT_OTHER"): 1}
+            with self.assertRaises(ValueError):
+                validate_injection_points(points, None, injections)
+
     def test_bad_delimiters_fail_closed(self):
         with self.assertRaises(ValueError):
             discover_sites("float f(float x) { return isfinite(x);")
@@ -309,7 +386,8 @@ def main():
         return 0 if unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(SourceCheckTests)).wasSuccessful() else 1
     try:
         document = json.loads((args.root / "Shaders/Metadata/NonFiniteSites.json").read_text(encoding="utf-8"))
-        actual = discover_tree(args.root)
+        injections = {}
+        actual = discover_tree(args.root, injections)
         instrumented = set()
         by_source = {}
         for site in document["sites"]:
@@ -320,9 +398,10 @@ def main():
             calls = by_source[site["source"]].get((site["function"], site["operation"]), [])
             if counter_route_is_explicit(site, calls):
                 instrumented.add((site["source"], site["function"], site["operation"]))
-        validate(document, actual, discover_programs(args.root), instrumented)
+        validate(document, actual, discover_programs(args.root), instrumented, injections)
         counts = Counter(site["kind"] for site in document["sites"])
-        print(json.dumps(dict(status="passed", sites=len(actual), kinds=dict(counts), productionCoverage="instrumented-source")))
+        print(json.dumps(dict(status="passed", sites=len(actual), kinds=dict(counts),
+                              injectionPoints=len(document["injectionPoints"]), productionCoverage="instrumented-source")))
         return 0
     except (OSError, ValueError, TypeError, KeyError) as error:
         print(f"Non-finite site validation failed: {error}", file=sys.stderr)

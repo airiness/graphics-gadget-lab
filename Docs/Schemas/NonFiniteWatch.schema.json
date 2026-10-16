@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.nonfinite-watch",
-  "title": "GGLab submitted non-finite coverage v1",
+  "title": "GGLab submitted non-finite coverage v2",
   "type": "object",
-  "required": ["schema", "schemaVersion", "configurationVersion", "mode", "coverage", "instrumentation", "claims", "firstFrameSerial", "lastFrameSerial", "frames", "completedFrames", "complete", "boundary", "production", "failure", "firstAnomalyFrameSerial", "reason"],
+  "required": ["schema", "schemaVersion", "configurationVersion", "mode", "coverage", "instrumentation", "claims", "firstFrameSerial", "lastFrameSerial", "frames", "completedFrames", "complete", "boundary", "production", "failure", "firstAnomalyFrameSerial", "reason", "injection"],
   "properties": {
     "schema": {"const": "gglab.nonfinite-watch"},
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"const": 2},
     "configurationVersion": {"type": "integer", "minimum": 1},
     "mode": {"enum": ["report", "fail"]},
     "coverage": {"const": "submitted-range"},
@@ -21,10 +21,25 @@
     "production": {"$ref": "#/$defs/claim"},
     "failure": {"type": "string"},
     "firstAnomalyFrameSerial": {"type": ["integer", "null"], "minimum": 1},
-    "reason": {"enum": ["None", "NonFiniteDetected", "NonFiniteReplaced", "ClampPolicyExceeded", "MissingCoverage"]}
+    "reason": {"enum": ["None", "NonFiniteDetected", "NonFiniteReplaced", "ClampPolicyExceeded", "MissingCoverage"]},
+    "injection": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/injection"}]}
   },
   "$defs": {
-    "claim": {"enum": ["Unavailable", "Incomplete", "NotApplicable", "Passed", "Failed"]}
+    "claim": {"enum": ["Unavailable", "Incomplete", "NotApplicable", "Passed", "Failed"]},
+    "injection": {
+      "type": "object",
+      "required": ["point", "value", "x", "y", "component", "injectedFrames", "appliedFrames"],
+      "properties": {
+        "point": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+        "value": {"enum": ["NaN", "PositiveInfinity", "NegativeInfinity", "Overflow", "Negative"]},
+        "x": {"type": "integer", "minimum": 0},
+        "y": {"type": "integer", "minimum": 0},
+        "component": {"type": "integer", "minimum": 0, "maximum": 3},
+        "injectedFrames": {"type": "integer", "minimum": 0},
+        "appliedFrames": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

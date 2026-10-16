@@ -1,6 +1,6 @@
 {
   "schema": "gglab.shader-nonfinite-sites",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sites": [
     {
       "id": "common.sanitize-hdrcolor.sanitize-hdrchannel",
@@ -1423,7 +1423,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRChannel",
       "count": 1,
-      "bodySha256": "fdfc548460dd7bfc5cb4d994e56f117061848fec59328b81d92696ca9ceab6b7",
+      "bodySha256": "11d697517d828d408bcdd68d2817bcf410522a6d827999f1a9eaae107f2178bb",
       "programs": [
         "gglab.shader.render-graph-compute"
       ],
@@ -1459,7 +1459,7 @@
       "function": "CSMain",
       "operation": "IsTemporalColorFinite",
       "count": 4,
-      "bodySha256": "d42c545a40c1f02a267062a7383c754f3f58cdc2cf927d65fe7e5737d40c5697",
+      "bodySha256": "e6664adf0e433cceb653ff320efbfca8c90d401e114079523327f57072bc25fa",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1477,7 +1477,7 @@
       "function": "CSMain",
       "operation": "isfinite",
       "count": 6,
-      "bodySha256": "456820524544afe1f0b07ec12ecc1ae14e86ffe36c7c51e43273692a0d4c3110",
+      "bodySha256": "7cdbe0d04a358dfd1cb2d9458bb553ec8209b96de3c8c52040fb91a9f21352b2",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1495,7 +1495,7 @@
       "function": "CSMain",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "63c17364cc7b3b444d649d1a55e64f295ea1220714bed85d3ddd8382596b6cf8",
+      "bodySha256": "4c301afdc082430f234af3e592051e075b5802a9ab8f2f92340c805cca545264",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1513,7 +1513,7 @@
       "function": "CSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "63c17364cc7b3b444d649d1a55e64f295ea1220714bed85d3ddd8382596b6cf8",
+      "bodySha256": "4c301afdc082430f234af3e592051e075b5802a9ab8f2f92340c805cca545264",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1542,6 +1542,41 @@
         "fp16Maximum": "report"
       },
       "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    }
+  ],
+  "injectionPoints": [
+    {
+      "id": "pass-render-graph-compute-smoke.csnonfiniteprobe.probe",
+      "source": "Passes/PassRenderGraphComputeSmoke.hlsl",
+      "function": "CSNonFiniteProbe",
+      "count": 1,
+      "programs": [
+        "gglab.shader.render-graph-compute"
+      ],
+      "claim": "boundary",
+      "rationale": "RenderGraph Compute Lab probe texel written unsanitized to RenderGraphCompute.NonFiniteProbe; a boundary scan must report its exact location."
+    },
+    {
+      "id": "pass-render-graph-compute-smoke.psmain.preview",
+      "source": "Passes/PassRenderGraphComputeSmoke.hlsl",
+      "function": "PSMain",
+      "count": 1,
+      "programs": [
+        "gglab.shader.render-graph-compute"
+      ],
+      "claim": "production",
+      "rationale": "Register-only RenderGraph Compute Lab preview value passed through a sanitizing write; the PNG stays unchanged while the site counter must fail or apply its clamp policy."
+    },
+    {
+      "id": "pass-temporal-aa.csmain.history",
+      "source": "Passes/PassTemporalAA.hlsl",
+      "function": "CSMain",
+      "count": 1,
+      "programs": [
+        "gglab.shader.temporal-aa"
+      ],
+      "claim": "production",
+      "rationale": "Temporal AA history read (RGB color, alpha accumulation) before the recovery guards; the recovery branch hides the value from resource scans."
     }
   ]
 }

@@ -22,6 +22,13 @@ def validate(document, validator):
 			raise ValueError("A requested unavailable claim must complete as Incomplete")
 	if document["instrumentation"] == "unavailable" and document["production"] in {"Passed", "Failed"}:
 		raise ValueError("Production evidence requires counter instrumentation")
+	injection = document["injection"]
+	if injection is not None:
+		# Injection travels with the production counters of each frame.
+		if document["instrumentation"] != "available" or "production" not in document["claims"]:
+			raise ValueError("Injection requires instrumentation and the production claim")
+		if injection["appliedFrames"] > injection["injectedFrames"] or injection["injectedFrames"] > completed:
+			raise ValueError("Injection frame counts disagree")
 
 
 def find(document):
@@ -45,13 +52,17 @@ def main():
 	Draft202012Validator.check_schema(schema)
 	validator = Draft202012Validator(schema)
 	if args.self_test:
-		valid = dict(schema="gglab.nonfinite-watch", schemaVersion=1, configurationVersion=1, mode="fail",
+		valid = dict(schema="gglab.nonfinite-watch", schemaVersion=2, configurationVersion=1, mode="fail",
 			coverage="submitted-range", instrumentation="available", claims=["boundary", "production"], firstFrameSerial=4,
 			lastFrameSerial=6, frames=2, completedFrames=2, complete=True, boundary="Passed", production="Passed",
-			failure="", firstAnomalyFrameSerial=None, reason="None")
+			failure="", firstAnomalyFrameSerial=None, reason="None", injection=None)
 		validate(valid, validator)
+		injected = dict(point="pass-temporal-aa.csmain.history", value="NaN", x=1, y=2, component=0, injectedFrames=2, appliedFrames=1)
+		validate(dict(valid, injection=injected), validator)
 		for changes in ({"completedFrames": 1}, {"frames": 4}, {"firstFrameSerial": 0},
-			{"instrumentation": "unavailable"}, {"claims": ["boundary"]}, {"production": "Unavailable"}):
+			{"instrumentation": "unavailable"}, {"claims": ["boundary"]}, {"production": "Unavailable"},
+			{"injection": dict(injected, appliedFrames=3)}, {"injection": dict(injected, injectedFrames=3)},
+			{"injection": dict(injected, component=4)}, {"claims": ["boundary"], "production": "Unavailable", "injection": injected}):
 			invalid = copy.deepcopy(valid)
 			invalid.update(changes)
 			try:
@@ -60,7 +71,7 @@ def main():
 				pass
 			else:
 				raise AssertionError(f"Accepted invalid coverage: {changes}")
-		print("Coverage validator self-test passed (6 rejection cases)")
+		print("Coverage validator self-test passed (10 rejection cases)")
 	count = 0
 	for path in args.paths:
 		for file in sorted(path.rglob("*.json")) if path.is_dir() else [path]:

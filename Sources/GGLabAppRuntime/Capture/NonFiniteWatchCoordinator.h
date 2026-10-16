@@ -23,6 +23,8 @@ namespace gglab
 		bool m_Boundary = true;
 		bool m_Production = true;
 		std::vector<NonFiniteScanTarget> m_Targets;
+		// Debug verification; requires the production claim and startup instrumentation.
+		std::optional<NonFiniteInjection> m_Injection;
 	};
 	struct NonFiniteWatchTargetStatus
 	{
@@ -61,6 +63,10 @@ namespace gglab
 		std::optional<NonFiniteWatchAnomaly> m_FirstAnomaly;
 		std::string m_Failure;
 		std::string m_ProductionFailure;
+		std::optional<NonFiniteInjection> m_Injection;
+		// Latest production evidence that carried the configured injection.
+		uint64_t m_InjectionFrameSerial = 0;
+		uint32_t m_InjectionAppliedCount = 0;
 	};
 	struct NonFiniteWatchCoverage
 	{
@@ -78,6 +84,11 @@ namespace gglab
 		NonFiniteClaimResult m_Production{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
 		std::optional<NonFiniteWatchAnomaly> m_FirstAnomaly;
 		std::string m_Failure;
+		// Debug verification bound with the configuration. Injected frames carried the
+		// request in their production evidence; applied frames replaced at least one value.
+		std::optional<NonFiniteInjection> m_Injection;
+		uint64_t m_InjectedFrames = 0;
+		uint64_t m_AppliedFrames = 0;
 		[[nodiscard]] bool Fails() const noexcept;
 	};
 	[[nodiscard]] const char* GetNonFiniteWatchFailureName(NonFiniteWatchFailure failure) noexcept;

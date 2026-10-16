@@ -1,6 +1,8 @@
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchTypes.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include <array>
+#include <optional>
 #include <cstring>
 
 #include <algorithm>
@@ -268,6 +270,69 @@ namespace gglab
 		return { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
 	}
 
+	uint32_t GetNonFiniteInjectionBits(NonFiniteInjectionValue value) noexcept
+	{
+		switch (value)
+		{
+		case NonFiniteInjectionValue::NaN: return 0x7fc00000u;
+		case NonFiniteInjectionValue::PositiveInfinity: return 0x7f800000u;
+		case NonFiniteInjectionValue::NegativeInfinity: return 0xff800000u;
+		case NonFiniteInjectionValue::Overflow: return std::bit_cast<uint32_t>(NonFiniteInjectionOverflow);
+		case NonFiniteInjectionValue::Negative: return std::bit_cast<uint32_t>(NonFiniteInjectionNegative);
+		}
+		GGLAB_UNREACHABLE("Unhandled NonFiniteInjectionValue.");
+	}
+
+	namespace
+	{
+		constexpr std::array NonFiniteInjectionValues{ NonFiniteInjectionValue::NaN,
+			NonFiniteInjectionValue::PositiveInfinity, NonFiniteInjectionValue::NegativeInfinity,
+			NonFiniteInjectionValue::Overflow, NonFiniteInjectionValue::Negative };
+	}
+
+	std::optional<NonFiniteInjectionValue> FindNonFiniteInjectionValue(uint32_t ieeeBits) noexcept
+	{
+		for (const NonFiniteInjectionValue value : NonFiniteInjectionValues)
+		{
+			if (GetNonFiniteInjectionBits(value) == ieeeBits)
+			{
+				return value;
+			}
+		}
+		return std::nullopt;
+	}
+
+	std::string_view GetNonFiniteInjectionValueName(NonFiniteInjectionValue value) noexcept
+	{
+		switch (value)
+		{
+		case NonFiniteInjectionValue::NaN: return "NaN";
+		case NonFiniteInjectionValue::PositiveInfinity: return "PositiveInfinity";
+		case NonFiniteInjectionValue::NegativeInfinity: return "NegativeInfinity";
+		case NonFiniteInjectionValue::Overflow: return "Overflow";
+		case NonFiniteInjectionValue::Negative: return "Negative";
+		}
+		GGLAB_UNREACHABLE("Unhandled NonFiniteInjectionValue.");
+	}
+
+	std::optional<NonFiniteInjectionValue> ParseNonFiniteInjectionValue(std::string_view name) noexcept
+	{
+		for (const NonFiniteInjectionValue value : NonFiniteInjectionValues)
+		{
+			if (GetNonFiniteInjectionValueName(value) == name)
+			{
+				return value;
+			}
+		}
+		return std::nullopt;
+	}
+
+	bool IsValidNonFiniteInjection(const NonFiniteInjection& injection) noexcept
+	{
+		return injection.m_PointIndex < nonfinite::InjectionPoints.size() && injection.m_Component < 4 &&
+			std::ranges::find(NonFiniteInjectionValues, injection.m_Value) != NonFiniteInjectionValues.end();
+	}
+
 	NonFiniteProductionFrame DecodeNonFiniteProductionFrame(std::span<const std::byte> bytes, uint64_t frameSerial) noexcept
 	{
 		static_assert(nonfinite::HeaderBytes == sizeof(std::array<uint32_t, 8>));
@@ -322,6 +387,30 @@ namespace gglab
 					}
 					frame.m_Sites.push_back(std::move(result));
 				}
+			}
+			// Injection block: point + 1 (zero is none), IEEE bits, x, y, component,
+			// applied count and two reserved words. Malformed blocks establish nothing.
+			const auto* injection = mapped + nonfinite::InjectionOffset / 4;
+			bool injectionValid = injection[6] == 0 && injection[7] == 0;
+			if (injection[0] == 0)
+			{
+				injectionValid = injectionValid && std::all_of(injection + 1, injection + 6,
+					[](uint32_t word) { return word == 0; });
+			}
+			else
+			{
+				const auto value = FindNonFiniteInjectionValue(injection[1]);
+				const NonFiniteInjection request{ .m_PointIndex = injection[0] - 1,
+					.m_Value = value.value_or(NonFiniteInjectionValue::NaN),
+					.m_X = injection[2], .m_Y = injection[3], .m_Component = injection[4] };
+				injectionValid = injectionValid && value && IsValidNonFiniteInjection(request);
+				frame.m_Injection = NonFiniteInjectionEvidence{ .m_Request = request, .m_AppliedCount = injection[5] };
+			}
+			if (!injectionValid)
+			{
+				frame.m_Injection.reset();
+				frame.m_Claim = {};
+				frame.m_Failure = "Production counter injection block is malformed.";
 			}
 		}
 		return frame;

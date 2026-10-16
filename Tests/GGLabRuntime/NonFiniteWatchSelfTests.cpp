@@ -115,6 +115,45 @@ namespace gglab
 			"A stale counter header cannot establish a later frame's production coverage");
 		context.Check(DecodeNonFiniteProductionFrame(std::as_bytes(std::span(raw)).first(32), 91).m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
 			"Partial production readbacks never pass");
+		{
+			auto injected = raw;
+			const size_t block = nonfinite::InjectionOffset / 4;
+			const uint32_t point = static_cast<uint32_t>(std::ranges::find(nonfinite::InjectionPoints,
+				std::string_view("pass-temporal-aa.csmain.history"), &nonfinite::InjectionPoint::m_Id) - nonfinite::InjectionPoints.begin());
+			injected[block] = point + 1;
+			injected[block + 1] = GetNonFiniteInjectionBits(NonFiniteInjectionValue::NegativeInfinity);
+			injected[block + 2] = 12;
+			injected[block + 3] = 34;
+			injected[block + 4] = 3;
+			injected[block + 5] = 2;
+			const auto decodeInjected = [&] { return DecodeNonFiniteProductionFrame(std::as_bytes(std::span(injected)), 91); };
+			const auto frame = decodeInjected();
+			context.Check(point < nonfinite::InjectionPoints.size() && frame.m_Claim.m_Status == NonFiniteClaimStatus::Passed &&
+				frame.m_Injection && frame.m_Injection->m_AppliedCount == 2 &&
+				frame.m_Injection->m_Request == NonFiniteInjection{ .m_PointIndex = point,
+					.m_Value = NonFiniteInjectionValue::NegativeInfinity, .m_X = 12, .m_Y = 34, .m_Component = 3 },
+				"Production evidence carries the frame's injection request and applied count");
+			injected[block + 1] = std::bit_cast<uint32_t>(1.0f);
+			context.Check(decodeInjected().m_Claim.m_Status == NonFiniteClaimStatus::Incomplete && !decodeInjected().m_Injection,
+				"An unknown injected value makes the frame's production evidence incomplete");
+			injected[block + 1] = GetNonFiniteInjectionBits(NonFiniteInjectionValue::NaN);
+			injected[block + 4] = 4;
+			context.Check(decodeInjected().m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+				"An out-of-range injection component is malformed evidence");
+			injected = raw;
+			injected[block + 5] = 1;
+			context.Check(decodeInjected().m_Claim.m_Status == NonFiniteClaimStatus::Incomplete,
+				"Applied injections without a request cannot establish a clean frame");
+			bool namesRoundTrip = GetNonFiniteInjectionBits(NonFiniteInjectionValue::Overflow) == std::bit_cast<uint32_t>(131072.0f);
+			for (const auto value : { NonFiniteInjectionValue::NaN, NonFiniteInjectionValue::PositiveInfinity,
+				NonFiniteInjectionValue::NegativeInfinity, NonFiniteInjectionValue::Overflow, NonFiniteInjectionValue::Negative })
+			{
+				namesRoundTrip = namesRoundTrip && ParseNonFiniteInjectionValue(GetNonFiniteInjectionValueName(value)) == value &&
+					FindNonFiniteInjectionValue(GetNonFiniteInjectionBits(value)) == value;
+			}
+			context.Check(namesRoundTrip && !ParseNonFiniteInjectionValue("nan"),
+				"Injection value names and IEEE bit patterns round-trip exactly");
+		}
 		const size_t expectedSite = static_cast<size_t>(std::ranges::find(nonfinite::Sites, std::string_view("pass-temporal-aa.csmain.sanitize-hdrcolor"), &nonfinite::Site::m_Id) - nonfinite::Sites.begin());
 		const size_t offset = 8 + expectedSite * 8;
 		raw[offset + 1] = 1; raw[offset + 3] = std::bit_cast<uint32_t>(0.25f);

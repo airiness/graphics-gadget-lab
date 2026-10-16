@@ -478,10 +478,11 @@ still fails fail mode. Changing or disabling the watch configuration invalidates
 unfinished ranges as `Incomplete`; it cannot convert their old coverage into a pass.
 
 PNG sidecars, resource/graph export frame metadata, capture responses and sequence
-status include a `watch` object (`gglab.nonfinite-watch` v1) when they report a range.
+status include a `watch` object (`gglab.nonfinite-watch` v2) when they report a range.
 It identifies the bound configuration and mode, requested claims, instrumentation,
 first/last submitted serial, frame count, completed result count, separate boundary
-and production claims, and the first checked anomaly frame and failure reason.
+and production claims, the first checked anomaly frame and failure reason, and any
+Debug injection stamp.
 Completed result counts include explicit incomplete outcomes. A requested production
 claim without instrumentation completes as `Incomplete`, even though interactive
 status labels the capability `Unavailable`. Unrequested claims remain `Unavailable`.
@@ -518,43 +519,57 @@ exercise delayed anomalies, out-of-order results, missing readbacks, configurati
 changes, generation tails and reference-sample membership. Full-scene
 policy/overhead acceptance remains separate work.
 
-### Debug injection in the RenderGraph Compute Lab
+### Debug non-finite injection
 
-Debug builds add `render_graph_compute.debug.nonfinite.*` parameters to
-`gglab.lab.render_graph_compute`; other builds declare none and render unchanged.
-`mode` is `Off`, `Boundary` or `Sanitized`; `value` is `NaN`, `PositiveInfinity`,
-`NegativeInfinity`, `Overflow` (131072, finite above the FP16 maximum) or
-`Negative` (-4); `x`, `y` and `channel` select the location.
+Debug builds accept one injection request in `watch`, so tests can prove that watch
+catches what sanitization and recovery would hide. Injection points are registered in
+`Shaders/Metadata/NonFiniteSites.json` (`injectionPoints`) and checked like sites.
+Each point replaces one component of its operand at one location; the request names
+the point, a value and the location:
 
-- `Boundary` adds a compute pass that writes an RGBA32F
-  `RenderGraphCompute.NonFiniteProbe` with finite values and the injected value at
-  probe texel (`x`, `y`) and `channel`. The preview declares a read so the probe stays
-  live for boundary scans; it is not displayed. A watch of that address reports the
-  exact location; finite values only change the reported extrema.
-- `Sanitized` creates the value in preview registers at display pixel (`x`, `y`) and
-  passes it through `SanitizeHDRChannel` at site
-  `pass-render-graph-compute-smoke.psmain.sanitize-hdrchannel`. No resource holds the
-  value and the written pixel is unchanged, so only the production claim can fail.
-  The site's negative clamps are `expected` and its FP16-maximum clamps are `error`.
+| Point | Claim | Location | Component |
+| --- | --- | --- | --- |
+| `pass-temporal-aa.csmain.history` | production | display pixel | history RGB (0-2) or accumulation (3) |
+| `pass-render-graph-compute-smoke.psmain.preview` | production | display pixel | RGBA output (0-3), then `SanitizeHDRChannel` |
+| `pass-render-graph-compute-smoke.csnonfiniteprobe.probe` | boundary | probe texel | RGBA32F `RenderGraphCompute.NonFiniteProbe` |
 
-Debug launches accept repeatable startup assignments, parsed strictly against the
-startup Lab's declarations before its first preparation (unknown ids, malformed or
-out-of-range values fail Lab startup). Release builds reject the option.
+Values are `NaN`, `PositiveInfinity`, `NegativeInfinity`, `Overflow` (131072, finite
+above the FP16 maximum) and `Negative` (-4). The request needs the production claim and
+a process started with `--watch-nonfinite`; otherwise `watch` returns `RequiresRestart`
+or rejects it. Release builds reject `inject`.
 
 ```powershell
-& $session start -Session inject -Configuration Debug -Lab gglab.lab.render_graph_compute `
-    -WatchNonFinite -LabParameters 'render_graph_compute.debug.nonfinite.mode=Boundary', `
-    'render_graph_compute.debug.nonfinite.value=NaN'
-& $session watch -Session inject -Targets '[{"resource":"RenderGraphCompute.NonFiniteProbe"}]'
+& $session start -Session inject -Configuration Debug -Lab gglab.lab.temporal_aa -WatchNonFinite
+& $session watch -Session inject -WatchMode fail -WatchClaims production `
+    -Inject '{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":161,"y":93,"component":1}'
 ```
 
-This Lab renders no IBL, so its `ibl` readiness gate never opens; use
-`-Timing next-frame` captures. `Scripts/TestNonFiniteInjection.ps1` verifies Debug
-sessions on both backends: exact boundary locations and counts for NaN and both
-infinities, fail-mode capture failures naming the probe location, a finite overflow
-that passes with its maximum, a sanitized NaN that fails production at the site
-while the PNG pixels equal the uninjected control, an `expected` negative clamp that
-passes and an `error` FP16 clamp that fails with `ClampPolicyExceeded`.
+The counter clear pass writes the frame's request after the site records, and each
+point reads it from the counter buffer. Only counter variants contain injection code,
+so ordinary pipelines, settings and root constants are unchanged. The readback returns
+the request and an applied count with the counters: evidence that does not carry the
+configured request is `Incomplete`. Reports (`watch.report.injection`, with the latest
+`appliedCount`), the latest production frame (`watch.injection`) and coverage metadata
+(`injection` with `injectedFrames` and `appliedFrames`) are stamped, and fail-mode
+failure text ends with `under Debug injection '<point>'`.
+
+The probe pass of `gglab.lab.render_graph_compute` exists only for frames whose
+injection targets the probe point; the preview declares a read so the probe stays live
+for boundary scans. The preview point adds the sanitized value to the written pixel,
+which therefore stays unchanged for non-finite and negative values. That site's
+negative clamps are `expected` and its FP16-maximum clamps are `error`. This Lab
+renders no IBL, so its `ibl` readiness gate never opens; use `-Timing next-frame`.
+
+Debug launches also accept repeatable `--lab-parameter <id>=<value>` startup
+assignments (`GGLabSession.ps1 start -LabParameters`), parsed strictly against the
+startup Lab's declarations before its first preparation. Release builds reject them.
+
+`Scripts/TestNonFiniteInjection.ps1` verifies Debug sessions on both backends with one
+session per Lab: exact probe locations and counts for NaN and both infinities, a finite
+overflow that only changes the maximum, a sanitized NaN that fails production while the
+PNG pixels equal the uninjected control, `expected` and `error` clamp policies, and
+Temporal AA history NaN/infinities that fail only at the color or accumulation recovery
+site. Every injected report and capture must carry the stamp.
 
 ### Runtime counter and scan mechanics
 
@@ -624,8 +639,9 @@ Implemented Runtime integration:
 The Shader-domain foundation also includes the 32-byte CPU/GPU ABI, IEEE-bit
 classification, wave reductions, finite extrema and clamp-policy evaluation.
 `Shaders/Metadata/NonFiniteSites.json` inventories 76 sanitization/recovery/validity
-sites. Its checker is a conservative lexical review gate, not data-flow proof;
-counter and forwarded-counter routing are source evidence, not GPU verification.
+sites and 3 Debug injection points. Its checker is a conservative lexical review
+gate, not data-flow proof; counter and forwarded-counter routing are source evidence,
+not GPU verification.
 
 Developer checks (after building the named test projects):
 

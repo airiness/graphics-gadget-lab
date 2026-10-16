@@ -23,7 +23,9 @@ Commands:
            the exact frame graph. See Docs/FrameCapture.md for the address format.
   watch    Configure semantic defaults or explicit non-finite targets and mode.
            Omit -Targets for tiered defaults; -WatchOff disables reporting.
-           -WatchClaims selects boundary, production or both.
+           -WatchClaims selects boundary, production or both. Debug builds accept
+           -Inject '{"point":"<id>","value":"NaN","x":0,"y":0,"component":0}'
+           to inject at a registered point; it needs -WatchNonFinite at start.
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
   result   Report a capture submitted with -NoWait.
@@ -109,6 +111,8 @@ param(
     [string]$WatchMode = 'report',
     [ValidateSet('boundary', 'production')]
     [string[]]$WatchClaims = @('boundary', 'production'),
+    # watch (Debug builds): one non-finite injection request as a JSON object.
+    [string]$Inject,
 
     # result
     [long]$RequestId,
@@ -519,6 +523,9 @@ switch ($Command) {
             $request['mode'] = $WatchMode
             $request['claims'] = @($WatchClaims)
             if ($Targets -or $TargetsFile) { $request['targets'] = (Read-JsonArray $Targets $TargetsFile 'Targets') }
+            if ($Inject) {
+                try { $request['inject'] = ($Inject | ConvertFrom-Json) } catch { Fail "-Inject is not a JSON object: $($_.Exception.Message)" }
+            }
         }
         $response = Invoke-SessionRequest $Session $request 30
         Complete-SessionResponse $response $Session

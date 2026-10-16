@@ -201,6 +201,12 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				pointClampSampler, previousHistoryUV, 0.0).a;
 			previousReliability = GetTexture2DFloat2(g_Pass.PackedReliabilityIndices & 0xffffu)
 				.SampleLevel(pointClampSampler, previousHistoryUV, 0.0);
+			// Debug verification can replace one history component (RGB color or alpha
+			// accumulation) in registers so the recovery guards below must observe it.
+			const float4 history = NonFiniteInject(NF_INJECT_PASS_TEMPORAL_AA_CSMAIN_HISTORY, pixel,
+				float4(historyColor, previousAccumulation));
+			historyColor = history.rgb;
+			previousAccumulation = history.a;
 			if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_COLOR_FINITE, historyColor)) ||
 				!IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousAccumulation)))
 			{

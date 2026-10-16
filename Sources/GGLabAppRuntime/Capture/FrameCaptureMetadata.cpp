@@ -1,5 +1,6 @@
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <cmath>
 #include <cstdint>
@@ -186,7 +187,7 @@ namespace gglab
 		JsonWriter writer;
 		writer.BeginObject();
 		writer.String("schema", "gglab.nonfinite-watch");
-		writer.Unsigned("schemaVersion", 1);
+		writer.Unsigned("schemaVersion", 2);
 		writer.Unsigned("configurationVersion", coverage.m_ConfigurationVersion);
 		writer.String("mode", coverage.m_Mode == NonFiniteWatchMode::Fail ? "fail" : "report");
 		writer.String("coverage", "submitted-range");
@@ -212,6 +213,23 @@ namespace gglab
 		{
 			writer.Null("firstAnomalyFrameSerial");
 			writer.String("reason", coverage.m_Failure.empty() ? "None" : "MissingCoverage");
+		}
+		// Debug verification stamp: anomalies of this range were deliberately injected.
+		if (const auto& injection = coverage.m_Injection; injection && injection->m_PointIndex < nonfinite::InjectionPoints.size())
+		{
+			writer.BeginObject("injection");
+			writer.String("point", nonfinite::InjectionPoints[injection->m_PointIndex].m_Id);
+			writer.String("value", GetNonFiniteInjectionValueName(injection->m_Value));
+			writer.Unsigned("x", injection->m_X);
+			writer.Unsigned("y", injection->m_Y);
+			writer.Unsigned("component", injection->m_Component);
+			writer.Unsigned("injectedFrames", coverage.m_InjectedFrames);
+			writer.Unsigned("appliedFrames", coverage.m_AppliedFrames);
+			writer.EndObject();
+		}
+		else
+		{
+			writer.Null("injection");
 		}
 		writer.EndObject();
 		return writer.Finish();

@@ -39,6 +39,15 @@ namespace gglab
 			FrameCaptureAvailability GetAvailability(RHIFormat, uint32_t, uint32_t) const noexcept override { return FrameCaptureAvailability::Available; }
 			uint32_t GetUnfinishedRequestCount() const noexcept override { return 0; }
 			bool HasNonFiniteInstrumentation() const noexcept override { return m_Instrumentation; }
+			bool SetNonFiniteInjection(std::optional<NonFiniteInjection> injection) noexcept override
+			{
+				if (!m_Instrumentation)
+				{
+					return false;
+				}
+				m_Injection = injection;
+				return true;
+			}
 			uint32_t GetNonFiniteScanTargetLimit() const noexcept override { return m_ScanLimit; }
 			void ConsumeResults(std::vector<FrameCaptureResult>& results) noexcept override
 			{
@@ -80,6 +89,7 @@ namespace gglab
 			bool m_Busy = false;
 			bool m_DeferFrame = false;
 			bool m_Instrumentation = false;
+			std::optional<NonFiniteInjection> m_Injection;
 			uint32_t m_ScanLimit = 64;
 			std::vector<FrameCaptureResult> m_Results;
 			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_Production;
@@ -325,12 +335,66 @@ namespace gglab
 			capture.Update(); results.clear(); capture.ConsumeResults(results);
 			context.Check(results.empty(), "Late payloads of a watch-failed capture drain without a second result or publication");
 		}
+
+		void RunInjectionTests(SelfTestContext& context)
+		{
+			WatchCaptureControl control;
+			NonFiniteWatchCoordinator watch(&control);
+			std::string error;
+			const NonFiniteInjection injection{ .m_PointIndex = 0, .m_Value = NonFiniteInjectionValue::NaN,
+				.m_X = 3, .m_Y = 4, .m_Component = 1 };
+			NonFiniteWatchConfiguration configuration{ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false,
+				.m_Injection = injection };
+			context.Check(!watch.Configure(configuration, error) && error.starts_with("RequiresRestart") && !control.m_Injection,
+				"Injection without startup instrumentation requires a restart and requests nothing");
+			control.m_Instrumentation = true;
+			NonFiniteWatchConfiguration boundaryOnly = configuration;
+			boundaryOnly.m_Boundary = true;
+			boundaryOnly.m_Production = false;
+			NonFiniteWatchConfiguration badComponent = configuration;
+			badComponent.m_Injection->m_Component = 4;
+			context.Check(!watch.Configure(boundaryOnly, error) && !watch.Configure(badComponent, error) && !control.m_Injection,
+				"Injection evidence travels with production counters and needs a valid component");
+			context.Check(watch.Configure(configuration, error) && control.m_Injection == injection &&
+				watch.GetStatus().m_Injection == injection,
+				"An accepted watch configuration forwards its injection request to Runtime");
+
+			const uint64_t range = watch.OpenCoverage();
+			for (uint64_t frame = 1; frame <= 2; ++frame)
+			{
+				watch.PrepareFrame(frame);
+				watch.OnFrameSubmitted(frame);
+				watch.TrackCoverageFrame(range, frame);
+			}
+			watch.CloseCoverage(range);
+			watch.OnProductionFrame({ .m_FrameSerial = 1, .m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced },
+				.m_Sites = { NonFiniteProductionSite{ .m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced } } },
+				.m_Injection = NonFiniteInjectionEvidence{ .m_Request = injection, .m_AppliedCount = 2 } });
+			context.Check(watch.GetStatus().m_InjectionFrameSerial == 1 && watch.GetStatus().m_InjectionAppliedCount == 2 &&
+				watch.GetFailModeFailure().find("under Debug injection") != std::string::npos,
+				"Status and failures name the injection that produced their anomaly");
+			// A frame without the configured request cannot say whether it was injected.
+			watch.OnProductionFrame({ .m_FrameSerial = 2, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None } });
+			context.Check(watch.GetStatus().m_Production.m_Status == NonFiniteClaimStatus::Incomplete &&
+				watch.GetStatus().m_ProductionFailure.find("different injection request") != std::string::npos,
+				"Production evidence without the configured injection request is incomplete");
+			const auto coverage = watch.GetCoverage(range);
+			context.Check(coverage && coverage->m_Complete && coverage->m_Injection == injection &&
+				coverage->m_InjectedFrames == 1 && coverage->m_AppliedFrames == 1 &&
+				coverage->m_Production.m_Status == NonFiniteClaimStatus::Failed &&
+				coverage->m_Failure.find("under Debug injection") != std::string::npos,
+				"Coverage stamps its injection with injected and applied frame counts");
+			watch.ReleaseCoverage(range);
+			context.Check(watch.Configure({ .m_Enabled = false }, error) && !control.m_Injection && !watch.GetStatus().m_Injection,
+				"Disabling watch clears the Runtime injection request");
+		}
 	}
 
 	void RunNonFiniteWatchCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
 		RunCoverageTests(context);
 		RunCoverageConsumerTests(context);
+		RunInjectionTests(context);
 		WatchCaptureControl control;
 		NonFiniteWatchCoordinator watch(&control);
 		std::string error;

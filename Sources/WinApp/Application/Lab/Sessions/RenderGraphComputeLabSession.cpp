@@ -9,34 +9,13 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
-#include <bit>
 #include <cstddef>
-#include <format>
+#include <optional>
 
 namespace gglab
 {
-	// Values match COMPUTE_LAB_INJECTION_* in PassRenderGraphComputeSmoke.hlsl.
-	enum class ComputeLabInjectionMode : uint32_t
-	{
-		Off = 0,
-		// A compute pass writes the value into one declared probe texel and channel.
-		Boundary = 1,
-		// The preview sanitizes a register-only value at one display pixel.
-		Sanitized = 2,
-	};
-
-	enum class ComputeLabInjectionValue : int32_t
-	{
-		NaN,
-		PositiveInfinity,
-		NegativeInfinity,
-		// Finite but above the FP16 maximum of 65504.
-		Overflow,
-		// Finite and negative.
-		Negative,
-	};
-
 	struct RenderGraphComputeLabState
 	{
 		std::atomic<uint64_t> m_InitializeExecutions = 0;
@@ -51,12 +30,6 @@ namespace gglab
 		std::atomic<float> m_RingRadius = 0.46f;
 		std::atomic<float> m_RingIntensity = 0.82f;
 		std::atomic<uint32_t> m_CheckerCellSize = 32;
-		// Debug builds declare the injection parameters; other builds stay Off.
-		std::atomic<ComputeLabInjectionMode> m_InjectionMode = ComputeLabInjectionMode::Off;
-		std::atomic<ComputeLabInjectionValue> m_InjectionValue = ComputeLabInjectionValue::NaN;
-		std::atomic<uint32_t> m_InjectionX = 0;
-		std::atomic<uint32_t> m_InjectionY = 0;
-		std::atomic<uint32_t> m_InjectionChannel = 0;
 	};
 
 	namespace
@@ -64,43 +37,29 @@ namespace gglab
 		constexpr uint32_t WorkTextureWidth = 512;
 		constexpr uint32_t WorkTextureHeight = 512;
 		constexpr uint32_t ComputeThreadGroupSize = 8;
-		constexpr float InjectedOverflow = 131072.0f;
-		constexpr float InjectedNegative = -4.0f;
 
 		const LabParameterId AnimationSpeedId("render_graph_compute.animation.speed");
 		const LabParameterId PatternFrequencyId("render_graph_compute.pattern.frequency");
 		const LabParameterId RingRadiusId("render_graph_compute.ring.radius");
 		const LabParameterId RingIntensityId("render_graph_compute.ring.intensity");
 		const LabParameterId CheckerCellSizeId("render_graph_compute.checker.cell_size");
-#if defined(BUILD_DEBUG)
-		const LabParameterId InjectionModeId("render_graph_compute.debug.nonfinite.mode");
-		const LabParameterId InjectionValueId("render_graph_compute.debug.nonfinite.value");
-		const LabParameterId InjectionXId("render_graph_compute.debug.nonfinite.x");
-		const LabParameterId InjectionYId("render_graph_compute.debug.nonfinite.y");
-		const LabParameterId InjectionChannelId("render_graph_compute.debug.nonfinite.channel");
-		constexpr uint32_t DefaultInjectionX = 137;
-		constexpr uint32_t DefaultInjectionY = 91;
-		constexpr uint32_t DefaultInjectionChannel = 2;
-#endif
 
-		[[nodiscard]] uint32_t GetInjectionBits(ComputeLabInjectionValue value) noexcept
+		// The watch's boundary injection point in CSNonFiniteProbe; the probe exists
+		// only for frames whose production counters request that point.
+		[[nodiscard]] bool RequestsNonFiniteProbe(const RenderServices& services) noexcept
 		{
-			switch (value)
-			{
-			case ComputeLabInjectionValue::NaN: return 0x7fc00000u;
-			case ComputeLabInjectionValue::PositiveInfinity: return 0x7f800000u;
-			case ComputeLabInjectionValue::NegativeInfinity: return 0xff800000u;
-			case ComputeLabInjectionValue::Overflow: return std::bit_cast<uint32_t>(InjectedOverflow);
-			case ComputeLabInjectionValue::Negative: return std::bit_cast<uint32_t>(InjectedNegative);
-			}
-			GGLAB_UNREACHABLE("Unhandled ComputeLabInjectionValue.");
+			const std::optional<NonFiniteInjection> injection =
+				services.m_FrameCapture ? services.m_FrameCapture->GetNonFiniteInjection() : std::nullopt;
+			return injection && injection->m_PointIndex < nonfinite::InjectionPoints.size() &&
+				nonfinite::InjectionPoints[injection->m_PointIndex].m_Id ==
+					"pass-render-graph-compute-smoke.csnonfiniteprobe.probe";
 		}
 
 		const RenderPassInfo NonFiniteProbePassInfo{
 			.m_TypeName = "Lab.RenderGraphCompute.NonFiniteProbe",
 			.m_DisplayName = "RenderGraph Compute Non-finite Probe",
 			.m_CategoryName = "Debug",
-			.m_Description = "Writes a float probe with one injected value for boundary-scan tests.",
+			.m_Description = "Writes a float probe at the watch's boundary injection point.",
 			.m_Category = RenderPassCategory::Debug,
 			.m_Type = RenderPassType::Compute,
 		};
@@ -136,7 +95,7 @@ namespace gglab
 		{
 			RGTextureId m_WorkA{};
 			RGTextureId m_WorkB{};
-			// Present only while boundary injection is active.
+			// Present only while the watch injects at the probe's boundary point.
 			RGTextureId m_NonFiniteProbe{};
 			RGTextureId m_BackBuffer{};
 		};
@@ -198,17 +157,10 @@ namespace gglab
 			float m_RingIntensity = 0.82f;
 			uint32_t m_CheckerCellSize = 32;
 			uint32_t m_ProbeIndex = 0;
-			ComputeLabInjectionMode m_InjectionMode = ComputeLabInjectionMode::Off;
-			uint32_t m_InjectionBits = 0;
-			uint32_t m_InjectionX = 0;
-			uint32_t m_InjectionY = 0;
-			uint32_t m_InjectionChannel = 0;
 		};
-		static_assert(sizeof(ComputeLabInjectionMode) == sizeof(uint32_t));
 		static_assert(IsPassRootConstantStruct<ComputeLabPassParameters>);
-		static_assert(sizeof(ComputeLabPassParameters) == 60);
+		static_assert(sizeof(ComputeLabPassParameters) == 40);
 		static_assert(offsetof(ComputeLabPassParameters, m_ProbeIndex) == 36);
-		static_assert(offsetof(ComputeLabPassParameters, m_InjectionChannel) == 56);
 
 		RHITextureDesc MakeWorkTextureDesc() noexcept
 		{
@@ -257,10 +209,8 @@ namespace gglab
 				const uint32_t displayWidth = swapChain->GetBufferWidth();
 				const uint32_t displayHeight = swapChain->GetBufferHeight();
 				const RenderViewID displayViewId = context.GetDisplayViewId();
-				const ComputeLabInjectionMode injectionMode =
-					m_State->m_InjectionMode.load(std::memory_order_relaxed);
-				// Every pass of the frame receives the same pattern and injection values;
-				// each pass sets only its own descriptor indices.
+				// Every pass of the frame receives the same pattern values; each pass sets
+				// only its own descriptor indices.
 				const ComputeLabPassParameters frameParameters{
 					.m_Width = WorkTextureWidth,
 					.m_Height = WorkTextureHeight,
@@ -271,15 +221,8 @@ namespace gglab
 					.m_RingRadius = m_State->m_RingRadius.load(std::memory_order_relaxed),
 					.m_RingIntensity = m_State->m_RingIntensity.load(std::memory_order_relaxed),
 					.m_CheckerCellSize = m_State->m_CheckerCellSize.load(std::memory_order_relaxed),
-					.m_InjectionMode = injectionMode,
-					.m_InjectionBits = GetInjectionBits(
-						m_State->m_InjectionValue.load(std::memory_order_relaxed)),
-					.m_InjectionX = m_State->m_InjectionX.load(std::memory_order_relaxed),
-					.m_InjectionY = m_State->m_InjectionY.load(std::memory_order_relaxed),
-					.m_InjectionChannel =
-						m_State->m_InjectionChannel.load(std::memory_order_relaxed),
 				};
-				const bool boundaryProbe = injectionMode == ComputeLabInjectionMode::Boundary;
+				const bool boundaryProbe = RequestsNonFiniteProbe(services);
 
 				rg.AddPass<SetupPassData>("Lab.RenderGraphCompute.Setup",
 					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId,
@@ -721,68 +664,6 @@ namespace gglab
 			.m_MinValue = LabValue(uint32_t(4)),
 			.m_MaxValue = LabValue(uint32_t(128)),
 			}));
-#if defined(BUILD_DEBUG)
-		// Debug-only test hooks for non-finite watch acceptance. X/Y address a probe
-		// texel in Boundary mode and a display pixel in Sanitized mode.
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = InjectionModeId,
-			.m_Name = "Injection Mode",
-			.m_Group = "Non-finite Injection (Debug)",
-			.m_Type = LabParameterType::Enum,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = static_cast<int32_t>(ComputeLabInjectionMode::Off),
-			.m_EnumItems = {
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionMode::Off), .m_Name = "Off" },
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionMode::Boundary), .m_Name = "Boundary" },
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionMode::Sanitized), .m_Name = "Sanitized" },
-			},
-			}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = InjectionValueId,
-			.m_Name = "Injected Value",
-			.m_Group = "Non-finite Injection (Debug)",
-			.m_Type = LabParameterType::Enum,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = static_cast<int32_t>(ComputeLabInjectionValue::NaN),
-			.m_EnumItems = {
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::NaN), .m_Name = "NaN" },
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::PositiveInfinity), .m_Name = "PositiveInfinity" },
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::NegativeInfinity), .m_Name = "NegativeInfinity" },
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::Overflow), .m_Name = "Overflow" },
-				{ .m_Value = static_cast<int32_t>(ComputeLabInjectionValue::Negative), .m_Name = "Negative" },
-			},
-			}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = InjectionXId,
-			.m_Name = "Injection X",
-			.m_Group = "Non-finite Injection (Debug)",
-			.m_Type = LabParameterType::UInt,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = DefaultInjectionX,
-			.m_MinValue = LabValue(uint32_t(0)),
-			.m_MaxValue = LabValue(WorkTextureWidth - 1),
-			}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = InjectionYId,
-			.m_Name = "Injection Y",
-			.m_Group = "Non-finite Injection (Debug)",
-			.m_Type = LabParameterType::UInt,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = DefaultInjectionY,
-			.m_MinValue = LabValue(uint32_t(0)),
-			.m_MaxValue = LabValue(WorkTextureHeight - 1),
-			}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = InjectionChannelId,
-			.m_Name = "Injection Channel",
-			.m_Group = "Non-finite Injection (Debug)",
-			.m_Type = LabParameterType::UInt,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = DefaultInjectionChannel,
-			.m_MinValue = LabValue(uint32_t(0)),
-			.m_MaxValue = LabValue(uint32_t(3)),
-			}));
-#endif
 		ApplyImmediateParameters();
 	}
 
@@ -816,20 +697,6 @@ namespace gglab
 			parameters.Get(RingIntensityId, 0.82f), std::memory_order_relaxed);
 		m_State->m_CheckerCellSize.store(
 			parameters.Get(CheckerCellSizeId, uint32_t(32)), std::memory_order_relaxed);
-#if defined(BUILD_DEBUG)
-		m_State->m_InjectionMode.store(static_cast<ComputeLabInjectionMode>(parameters.Get(
-			InjectionModeId, static_cast<int32_t>(ComputeLabInjectionMode::Off))),
-			std::memory_order_relaxed);
-		m_State->m_InjectionValue.store(static_cast<ComputeLabInjectionValue>(parameters.Get(
-			InjectionValueId, static_cast<int32_t>(ComputeLabInjectionValue::NaN))),
-			std::memory_order_relaxed);
-		m_State->m_InjectionX.store(
-			parameters.Get(InjectionXId, DefaultInjectionX), std::memory_order_relaxed);
-		m_State->m_InjectionY.store(
-			parameters.Get(InjectionYId, DefaultInjectionY), std::memory_order_relaxed);
-		m_State->m_InjectionChannel.store(
-			parameters.Get(InjectionChannelId, DefaultInjectionChannel), std::memory_order_relaxed);
-#endif
 	}
 
 	void RenderGraphComputeLabSession::BuildDiagnostics(
@@ -862,19 +729,11 @@ namespace gglab
 			{.m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions)},
 			{.m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions)},
 		};
-		const ComputeLabInjectionMode injectionMode =
-			m_State->m_InjectionMode.load(std::memory_order_relaxed);
-		if (injectionMode != ComputeLabInjectionMode::Off)
+		if (const uint64_t probeExecutions = m_State->m_ProbeExecutions.load(std::memory_order_relaxed);
+			probeExecutions != 0)
 		{
-			diagnostics.m_Metrics.push_back({ .m_Name = "Non-finite injection",
-				.m_Value = std::format("{} value {} at ({}, {}) channel {}",
-					injectionMode == ComputeLabInjectionMode::Boundary ? "boundary" : "sanitized",
-					static_cast<int32_t>(m_State->m_InjectionValue.load(std::memory_order_relaxed)),
-					m_State->m_InjectionX.load(std::memory_order_relaxed),
-					m_State->m_InjectionY.load(std::memory_order_relaxed),
-					m_State->m_InjectionChannel.load(std::memory_order_relaxed)) });
-			diagnostics.m_Metrics.push_back({ .m_Name = "Probe dispatches",
-				.m_Value = std::to_string(m_State->m_ProbeExecutions.load(std::memory_order_relaxed)) });
+			diagnostics.m_Metrics.push_back({ .m_Name = "Non-finite probe dispatches",
+				.m_Value = std::to_string(probeExecutions) });
 		}
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Graphics / direct-compute / graphics chain",

@@ -13,6 +13,7 @@
 #include <cmath>
 #include <filesystem>
 #include <format>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <span>
@@ -484,6 +485,58 @@ namespace gglab
 			return value.is_number_unsigned() && value.get<uint64_t>() <= UINT32_MAX;
 		}
 
+#if defined(BUILD_DEBUG)
+		// {"point": "<registered id>", "value": "<NonFiniteInjectionValue>", "x": n, "y": n, "component": c}
+		[[nodiscard]] std::string ParseWatchInjection(const Json& value, std::optional<NonFiniteInjection>& injection)
+		{
+			NonFiniteInjection parsed;
+			bool point = false;
+			bool injected = false;
+			bool x = false;
+			bool y = false;
+			for (const auto& [key, field] : value.items())
+			{
+				if (key == "point" && field.is_string())
+				{
+					const auto found = std::ranges::find(nonfinite::InjectionPoints, field.get<std::string>(),
+						&nonfinite::InjectionPoint::m_Id);
+					if (found == nonfinite::InjectionPoints.end())
+					{
+						return std::format("Unknown non-finite injection point '{}'.", field.get<std::string>());
+					}
+					parsed.m_PointIndex = static_cast<uint32_t>(std::distance(nonfinite::InjectionPoints.begin(), found));
+					point = true;
+				}
+				else if (key == "value" && field.is_string())
+				{
+					const auto parsedValue = ParseNonFiniteInjectionValue(field.get<std::string>());
+					if (!parsedValue)
+					{
+						return "Injection value must be NaN, PositiveInfinity, NegativeInfinity, Overflow or Negative.";
+					}
+					parsed.m_Value = *parsedValue;
+					injected = true;
+				}
+				else if ((key == "x" || key == "y" || key == "component") && IsUint32(field))
+				{
+					(key == "x" ? parsed.m_X : key == "y" ? parsed.m_Y : parsed.m_Component) = field.get<uint32_t>();
+					x |= key == "x";
+					y |= key == "y";
+				}
+				else
+				{
+					return std::format("Unknown or invalid injection field '{}'.", key);
+				}
+			}
+			if (!point || !injected || !x || !y || parsed.m_Component > 3)
+			{
+				return "Injection requires 'point', 'value', 'x' and 'y', and a component from 0 to 3.";
+			}
+			injection = parsed;
+			return {};
+		}
+#endif
+
 		[[nodiscard]] std::string ParseWatchFields(const Json& document, NonFiniteWatchConfiguration& configuration)
 		{
 			for (const auto& [key, value] : document.items())
@@ -589,6 +642,17 @@ namespace gglab
 						}
 						configuration.m_Targets.push_back(std::move(target));
 					}
+				}
+				else if (key == "inject" && value.is_object())
+				{
+#if defined(BUILD_DEBUG)
+					if (auto error = ParseWatchInjection(value, configuration.m_Injection); !error.empty())
+					{
+						return error;
+					}
+#else
+					return "Watch field 'inject' is available only in Debug builds.";
+#endif
 				}
 				else
 				{
@@ -979,6 +1043,14 @@ namespace gglab
 			return result;
 		}
 
+		[[nodiscard]] Json SerializeInjection(const NonFiniteInjection& injection)
+		{
+			return { { "point", injection.m_PointIndex < nonfinite::InjectionPoints.size()
+					? Json(nonfinite::InjectionPoints[injection.m_PointIndex].m_Id) : Json() },
+				{ "value", GetNonFiniteInjectionValueName(injection.m_Value) },
+				{ "x", injection.m_X }, { "y", injection.m_Y }, { "component", injection.m_Component } };
+		}
+
 		[[nodiscard]] Json SerializeWatchReport(const NonFiniteWatchStatus& status)
 		{
 			Json claims = Json::array();
@@ -1000,6 +1072,14 @@ namespace gglab
 			for (const auto& target : status.m_Targets)
 			{
 				report["targets"].push_back(SerializeWatchTarget(target));
+			}
+			report["injection"] = Json();
+			if (status.m_Injection)
+			{
+				// Debug verification: anomalies under this configuration were injected.
+				report["injection"] = SerializeInjection(*status.m_Injection);
+				report["injection"]["frameSerial"] = status.m_InjectionFrameSerial;
+				report["injection"]["appliedCount"] = status.m_InjectionAppliedCount;
 			}
 			if (const auto& anomaly = status.m_FirstAnomaly; anomaly)
 			{
@@ -1213,6 +1293,12 @@ namespace gglab
 			response["watch"]["production"] = claimName(production->m_Claim.m_Status);
 			response["watch"]["frameSerial"] = production->m_FrameSerial;
 			response["watch"]["failure"] = production->m_Failure;
+			response["watch"]["injection"] = Json();
+			if (production->m_Injection)
+			{
+				response["watch"]["injection"] = SerializeInjection(production->m_Injection->m_Request);
+				response["watch"]["injection"]["appliedCount"] = production->m_Injection->m_AppliedCount;
+			}
 			response["watch"]["submission"] = { { "fenceIndex", production->m_SubmissionFenceIndex },
 				{ "fenceGeneration", production->m_SubmissionFenceGeneration }, { "fenceValue", production->m_SubmissionFenceValue },
 				{ "adapter", production->m_AdapterCompatibilityIdentity } };

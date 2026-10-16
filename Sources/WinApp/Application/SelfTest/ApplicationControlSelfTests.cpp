@@ -182,6 +182,29 @@ namespace gglab
 			const auto productionWatch = ParseApplicationControlRequest(R"({"protocol":2,"id":73,"command":"watch","claims":["production"]})");
 			context.Check(productionWatch.m_Request && !productionWatch.m_Request->m_Watch.m_Boundary && productionWatch.m_Request->m_Watch.m_Production,
 				"Production-only watch does not fabricate boundary targets");
+			const auto injectWatch = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":74,"command":"watch","mode":"fail","inject":{"point":"pass-temporal-aa.csmain.history","value":"NegativeInfinity","x":12,"y":34,"component":3}})");
+			const auto badInjectPoint = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":75,"command":"watch","inject":{"point":"unknown.point","value":"NaN","x":0,"y":0}})");
+			const auto badInjectValue = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":76,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"nan","x":0,"y":0}})");
+			const auto badInjectComponent = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":77,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0,"y":0,"component":4}})");
+			const auto missingInjectLocation = ParseApplicationControlRequest(
+				R"({"protocol":2,"id":78,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0}})");
+#if defined(BUILD_DEBUG)
+			const auto& parsedInjection = injectWatch.m_Request ? injectWatch.m_Request->m_Watch.m_Injection : std::nullopt;
+			context.Check(parsedInjection && parsedInjection->m_Value == NonFiniteInjectionValue::NegativeInfinity &&
+				parsedInjection->m_X == 12 && parsedInjection->m_Y == 34 && parsedInjection->m_Component == 3,
+				"Debug watch requests carry one registered non-finite injection point, value and location");
+			context.Check(!badInjectPoint.m_Request && !badInjectValue.m_Request && !badInjectComponent.m_Request &&
+				!missingInjectLocation.m_Request,
+				"Injection requests reject unknown points or values, invalid components and missing locations");
+#else
+			context.Check(!injectWatch.m_Request && !badInjectPoint.m_Request && !badInjectValue.m_Request &&
+				!badInjectComponent.m_Request && !missingInjectLocation.m_Request,
+				"Non-finite injection requests are rejected outside Debug builds");
+#endif
 
 			struct Rejected
 			{

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Capture/NonFiniteWatchTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
@@ -44,6 +45,13 @@ namespace gglab
 		// Fails the queued requests for the pending diagnostic tap when the frame has
 		// no source for it.
 		virtual void FailPendingDiagnosticRequests(std::string_view failure) noexcept = 0;
+		// Debug verification request carried by this frame's production counters. Only
+		// fixtures that must add the producer of an injection point consult it; injection
+		// points themselves read the request from the counter buffer.
+		[[nodiscard]] virtual std::optional<NonFiniteInjection> GetNonFiniteInjection() const noexcept
+		{
+			return std::nullopt;
+		}
 	};
 
 	// Adds the capture tap pass for the frame's queued requests of one source; frames
