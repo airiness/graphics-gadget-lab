@@ -154,6 +154,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'!='0'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'=='0'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>Application/ApplicationPch.h</PrecompiledHeaderFile>
@@ -323,6 +324,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\Mouse.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\WindowsInputMapping.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationPch.cpp">
+      <MultiProcessorCompilation Condition="'$(GGLAB_USE_PCH)'!='0'">false</MultiProcessorCompilation>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
