@@ -3,8 +3,7 @@ param(
     [ValidateSet("Debug", "Develop", "Release")]
     [string]$Configuration = "Debug",
 
-    [ValidateSet("dx12", "vulkan")]
-    [string]$Backend = "vulkan",
+    [string[]]$Backend = @("vulkan"),
 
     [ValidateRange(5, 120)]
     [int]$SmokeTimeoutSeconds = 30,
@@ -240,74 +239,85 @@ function Assert-PackageBackendContract {
     }
 }
 
+# Accept comma-separated backend lists from powershell -File as well as native arrays.
+$Backend = @($Backend | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
+if ($Backend.Count -eq 0 -or @($Backend | Where-Object { $_ -notin @('dx12', 'vulkan') }).Count) {
+    throw 'Backend must contain dx12 or vulkan.'
+}
+
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $artifactOnlyRoot = Join-Path $repositoryRoot "Build\ArtifactOnly"
 $packageBaseRoot = Join-Path $repositoryRoot "Build\Packages\ArtifactOnly"
-$packageRoot = Join-Path $packageBaseRoot "$Configuration\$Backend"
 $artifactOutputRoot = Join-Path $artifactOnlyRoot "Output\x64\$Configuration"
 $artifactIntermediateRoot =
     Join-Path $artifactOnlyRoot "Intermediate\WinApp\x64\$Configuration"
-$shaderCacheRoot = Join-Path $artifactOnlyRoot "ShaderCache\$Configuration\$Backend"
-$shaderArtifactRoot = Join-Path $packageRoot "ShaderArtifacts"
 $msbuild = Get-MSBuildPath
-$shaderTarget = if ($Backend -eq "dx12") { "gglab-dx12" } else { "gglab-vulkan13" }
 
-Remove-ContainedDirectory -Path $packageRoot -AllowedRoot $packageBaseRoot
 Remove-ContainedDirectory -Path $artifactOutputRoot -AllowedRoot $artifactOnlyRoot
 Remove-ContainedDirectory -Path $artifactIntermediateRoot -AllowedRoot $artifactOnlyRoot
-New-Item -ItemType Directory -Path $packageRoot, $shaderArtifactRoot, $shaderCacheRoot -Force |
-    Out-Null
 
 & $msbuild (Join-Path $repositoryRoot "Projects\ShaderCompiler\ShaderCompiler.vcxproj") /m `
     /p:Configuration=$Configuration /p:Platform=x64 /p:PreferredToolArchitecture=x64 `
     "/p:SolutionDir=$($repositoryRoot.TrimEnd('\'))\"
 Assert-Succeeded "Shader compiler build"
 
-$developmentOutputRoot = Join-Path $repositoryRoot "Build\Output\x64\$Configuration"
-$shaderCompiler = Join-Path $developmentOutputRoot "gglab-shaderc.exe"
-& $shaderCompiler build-runtime --source-root (Join-Path $repositoryRoot "Shaders") `
-    --target $shaderTarget --cache-root $shaderCacheRoot --artifact-root $shaderArtifactRoot `
-    --result-format json
-Assert-Succeeded "$shaderTarget artifact publication"
-
+# The C++ runtime reads the backend from each package's manifest; build it once.
 & $msbuild (Join-Path $repositoryRoot "Projects\WinApp\WinApp.vcxproj") /m `
     /p:Configuration=$Configuration /p:Platform=x64 /p:PreferredToolArchitecture=x64 `
     "/p:SolutionDir=$($repositoryRoot.TrimEnd('\'))\" /p:GGLAB_ARTIFACT_ONLY_RUNTIME=1
 Assert-Succeeded "Artifact-only WinApp build"
 
-Copy-Item -LiteralPath (Join-Path $artifactOutputRoot "GraphicsGadgetLab.exe") `
-    -Destination $packageRoot
-Get-ChildItem -LiteralPath $artifactOutputRoot -Filter *.dll -File | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $packageRoot
-}
-$d3d12RuntimeRoot = Join-Path $artifactOutputRoot "D3D12"
-if (Test-Path -LiteralPath $d3d12RuntimeRoot) {
-    Copy-Item -LiteralPath $d3d12RuntimeRoot -Destination $packageRoot -Recurse
-}
-Copy-Item -LiteralPath (Join-Path $repositoryRoot "Assets") -Destination $packageRoot -Recurse
-New-Item -ItemType Directory -Path (Join-Path $packageRoot "DerivedDataCache\IBL"), `
-    (Join-Path $packageRoot "DerivedDataCache\Texture") -Force | Out-Null
+$developmentOutputRoot = Join-Path $repositoryRoot "Build\Output\x64\$Configuration"
+$shaderCompiler = Join-Path $developmentOutputRoot "gglab-shaderc.exe"
+foreach ($selectedBackend in $Backend) {
+    $packageRoot = Join-Path $packageBaseRoot "$Configuration\$selectedBackend"
+    $shaderCacheRoot = Join-Path $artifactOnlyRoot "ShaderCache\$Configuration\$selectedBackend"
+    $shaderArtifactRoot = Join-Path $packageRoot "ShaderArtifacts"
+    $shaderTarget = if ($selectedBackend -eq "dx12") { "gglab-dx12" } else { "gglab-vulkan13" }
 
-$manifest = [ordered]@{
-    schemaVersion = 1
-    packageKind = "gglab.artifact-only-runtime"
-    configuration = $Configuration
-    backend = $Backend
-    shaderTarget = $shaderTarget
-    executable = "GraphicsGadgetLab.exe"
-    shaderArtifactRoot = "ShaderArtifacts"
-}
-$manifest | ConvertTo-Json | Set-Content -LiteralPath `
-    (Join-Path $packageRoot "artifact-only-package.json") -Encoding utf8
+    Remove-ContainedDirectory -Path $packageRoot -AllowedRoot $packageBaseRoot
+    New-Item -ItemType Directory -Path $packageRoot, $shaderArtifactRoot, $shaderCacheRoot -Force |
+        Out-Null
 
-Assert-ArtifactOnlyPackage -PackageRoot $packageRoot `
-    -IntermediateRoot $artifactIntermediateRoot -TargetProfile $shaderTarget
-Assert-PackageRuntimeStructure -PackageRoot $packageRoot `
-    -WorkingDirectory $repositoryRoot
-Assert-PackageBackendContract -PackageRoot $packageRoot -SelectedBackend $Backend
-if ($RunSmoke) {
-    Invoke-PackageSmoke -PackageRoot $packageRoot -SelectedBackend $Backend `
-        -TimeoutSeconds $SmokeTimeoutSeconds
-}
+    & $shaderCompiler build-runtime --source-root (Join-Path $repositoryRoot "Shaders") `
+        --target $shaderTarget --cache-root $shaderCacheRoot --artifact-root $shaderArtifactRoot `
+        --result-format json
+    Assert-Succeeded "$shaderTarget artifact publication"
 
-Write-Host "Artifact-only $Backend package validated: $packageRoot"
+    Copy-Item -LiteralPath (Join-Path $artifactOutputRoot "GraphicsGadgetLab.exe") `
+        -Destination $packageRoot
+    Get-ChildItem -LiteralPath $artifactOutputRoot -Filter *.dll -File | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $packageRoot
+    }
+    $d3d12RuntimeRoot = Join-Path $artifactOutputRoot "D3D12"
+    if (Test-Path -LiteralPath $d3d12RuntimeRoot) {
+        Copy-Item -LiteralPath $d3d12RuntimeRoot -Destination $packageRoot -Recurse
+    }
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "Assets") -Destination $packageRoot -Recurse
+    New-Item -ItemType Directory -Path (Join-Path $packageRoot "DerivedDataCache\IBL"), `
+        (Join-Path $packageRoot "DerivedDataCache\Texture") -Force | Out-Null
+
+    $manifest = [ordered]@{
+        schemaVersion = 1
+        packageKind = "gglab.artifact-only-runtime"
+        configuration = $Configuration
+        backend = $selectedBackend
+        shaderTarget = $shaderTarget
+        executable = "GraphicsGadgetLab.exe"
+        shaderArtifactRoot = "ShaderArtifacts"
+    }
+    $manifest | ConvertTo-Json | Set-Content -LiteralPath `
+        (Join-Path $packageRoot "artifact-only-package.json") -Encoding utf8
+
+    Assert-ArtifactOnlyPackage -PackageRoot $packageRoot `
+        -IntermediateRoot $artifactIntermediateRoot -TargetProfile $shaderTarget
+    Assert-PackageRuntimeStructure -PackageRoot $packageRoot `
+        -WorkingDirectory $repositoryRoot
+    Assert-PackageBackendContract -PackageRoot $packageRoot -SelectedBackend $selectedBackend
+    if ($RunSmoke) {
+        Invoke-PackageSmoke -PackageRoot $packageRoot -SelectedBackend $selectedBackend `
+            -TimeoutSeconds $SmokeTimeoutSeconds
+    }
+
+    Write-Host "Artifact-only $selectedBackend package validated: $packageRoot"
+}
