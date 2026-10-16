@@ -444,6 +444,13 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 }
 #endif
 
+#if defined(GGLAB_NONFINITE_COUNTERS)
+// Counter UAV writes would disable implicit early depth testing. Every pipeline using
+// this entry tests depth read-only (equal after the prepass, or transparent) without
+// stencil writes, so testing before shading rejects the same fragments, including
+// alpha-clipped ones, and counters observe only the fragments ordinary variants shade.
+[earlydepthstencil]
+#endif
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
 ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace)
 #else

@@ -596,14 +596,16 @@ timed renders per arm):
 
 | Backend | Baseline frame | Counters | Counters + watch | Scans per frame |
 | --- | --- | --- | --- | --- |
-| DX12 | 1.43 ms | +0.71 ms | +1.93 ms | 1.18 ms |
-| Vulkan | 1.56 ms | +0.89 ms | +2.06 ms | 1.12 ms |
+| DX12 | 1.43 ms | +0.14 ms | +1.36 ms | 1.21 ms |
+| Vulkan | 1.55 ms | +0.19 ms | +1.37 ms | 1.15 ms |
 
-The production clear and readback cost under 0.01 ms per frame. Counter variants cost
-most in `Geometry.ForwardOpaque` (about 2.7x): it draws with a read-only equal depth
-test after the prepass, and a pixel shader that writes the counter UAV loses implicit
-early depth testing, so occluded fragments are shaded. Per-frame Tier A scans cost
-about 0.2-0.5 ms per full-resolution target. The tools stay off for performance runs.
+The production clear and readback cost under 0.01 ms per frame. A pixel shader that
+writes the counter UAV loses implicit early depth testing, so Forward PBR counter
+variants declare `[earlydepthstencil]`; their pipelines test depth read-only, so the
+same fragments are shaded (without it, Forward Opaque cost about 2.7x and counters
+added 0.7-0.9 ms). Most remaining counter cost is in the Temporal AA compute pass.
+Per-frame Tier A scans cost about 0.2-0.5 ms per full-resolution target. The tools stay
+off for performance runs.
 
 ### Lab and Demo audit
 
