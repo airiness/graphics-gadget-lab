@@ -18,7 +18,8 @@
 
 namespace gglab
 {
-	inline constexpr uint32_t TextureDecoderVersion = 1;
+	// Covers upstream decode/conversion semantics for texture and dependent IBL caches.
+	inline constexpr uint32_t TextureDecoderVersion = 2;
 
 	struct TextureAssetSubresource
 	{

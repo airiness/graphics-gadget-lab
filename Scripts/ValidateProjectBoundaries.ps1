@@ -2505,7 +2505,7 @@ foreach ($reference in $foundationTestsProjectReferenceSet) {
         })
     }
 }
-$directXTexProjectPath = Join-Path $root "Externals/Vender/DirectXTex/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj"
+$directXTexProjectPath = Join-Path $root "Externals/Vender/DirectXTex/DirectXTex/DirectXTex_Desktop_2026.vcxproj"
 $runtimeTestsRequiredReferences = @($runtimeProjectPath, $shaderArtifactRuntimeProjectPath,
     $foundationProjectPath, $testCoreProjectPath)
 foreach ($requiredReference in $runtimeTestsRequiredReferences) {

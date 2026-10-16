@@ -17,3 +17,10 @@ visual quality, and experimenting with GPU resources, shaders, and diagnostics.
 ## Demo
 
 [![Start Demo](Assets/Media/StartDemo.gif)](Assets/Media/StartDemo.mp4)
+
+## Requirements
+
+- Visual Studio 2026
+- MSVC toolset v145
+- C++20
+- Vulkan SDK 1.3.296.0

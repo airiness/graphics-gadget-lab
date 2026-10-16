@@ -40,24 +40,16 @@ function Remove-ContainedDirectory {
 }
 
 function Get-MSBuildPath {
-    $knownPath =
-        "C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe"
-    if (Test-Path -LiteralPath $knownPath -PathType Leaf) {
-        return $knownPath
-    }
-
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     if (Test-Path -LiteralPath $vswhere -PathType Leaf) {
-        $installationPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `
-            -property installationPath
-        if ($installationPath) {
-            $candidate = Join-Path $installationPath "MSBuild\Current\Bin\MSBuild.exe"
-            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-                return $candidate
-            }
+        $candidate = & $vswhere -latest -products '*' -version '[18.0,19.0)' `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -find 'MSBuild\Current\Bin\amd64\MSBuild.exe'
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            return $candidate
         }
     }
-    throw "Visual Studio MSBuild was not found."
+    throw "Visual Studio 2026 x64 MSBuild with the Desktop development with C++ workload was not found."
 }
 
 function Assert-ArtifactOnlyPackage {
@@ -267,7 +259,8 @@ New-Item -ItemType Directory -Path $packageRoot, $shaderArtifactRoot, $shaderCac
     Out-Null
 
 & $msbuild (Join-Path $repositoryRoot "Projects\ShaderCompiler\ShaderCompiler.vcxproj") /m `
-    /p:Configuration=$Configuration /p:Platform=x64
+    /p:Configuration=$Configuration /p:Platform=x64 /p:PreferredToolArchitecture=x64 `
+    "/p:SolutionDir=$($repositoryRoot.TrimEnd('\'))\"
 Assert-Succeeded "Shader compiler build"
 
 $developmentOutputRoot = Join-Path $repositoryRoot "Build\Output\x64\$Configuration"
@@ -278,7 +271,8 @@ $shaderCompiler = Join-Path $developmentOutputRoot "gglab-shaderc.exe"
 Assert-Succeeded "$shaderTarget artifact publication"
 
 & $msbuild (Join-Path $repositoryRoot "Projects\WinApp\WinApp.vcxproj") /m `
-    /p:Configuration=$Configuration /p:Platform=x64 /p:GGLAB_ARTIFACT_ONLY_RUNTIME=1
+    /p:Configuration=$Configuration /p:Platform=x64 /p:PreferredToolArchitecture=x64 `
+    "/p:SolutionDir=$($repositoryRoot.TrimEnd('\'))\" /p:GGLAB_ARTIFACT_ONLY_RUNTIME=1
 Assert-Succeeded "Artifact-only WinApp build"
 
 Copy-Item -LiteralPath (Join-Path $artifactOutputRoot "GraphicsGadgetLab.exe") `

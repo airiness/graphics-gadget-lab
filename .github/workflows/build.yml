@@ -26,7 +26,7 @@ concurrency:
 jobs:
   build:
     name: Build / ${{ matrix.display_name }}
-    runs-on: windows-2022
+    runs-on: windows-2025-vs2026
     timeout-minutes: 45
 
     strategy:
@@ -58,6 +58,7 @@ jobs:
         uses: microsoft/setup-msbuild@v3
         with:
           msbuild-architecture: x64
+          vs-version: '[18.0,19.0)'
 
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v3
@@ -244,10 +245,12 @@ jobs:
 
           $foundationBuildArguments = @(
             "Projects\GGLabFoundation\GGLabFoundation.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-foundation-standalone-${{ matrix.log_name }}.binlog"
@@ -267,10 +270,12 @@ jobs:
 
           $foundationTestsBuildArguments = @(
             "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-foundation-tests-${{ matrix.log_name }}.binlog"
@@ -289,10 +294,12 @@ jobs:
 
           $runtimeBuildArguments = @(
             "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-runtime-standalone-${{ matrix.log_name }}.binlog"
@@ -312,10 +319,12 @@ jobs:
 
           $runtimeTestsBuildArguments = @(
             "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-runtime-tests-standalone-${{ matrix.log_name }}.binlog"
@@ -335,10 +344,12 @@ jobs:
 
           $appRuntimeBuildArguments = @(
             "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog"
@@ -358,10 +369,12 @@ jobs:
 
           $appRuntimeTestsBuildArguments = @(
             "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-app-runtime-tests-${{ matrix.log_name }}.binlog"
@@ -381,10 +394,12 @@ jobs:
 
           $shaderToolchainTestsBuildArguments = @(
             "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\shader-toolchain-tests-${{ matrix.log_name }}.binlog"
@@ -404,10 +419,12 @@ jobs:
 
           $shaderRuntimeIntegrationTestsBuildArguments = @(
             "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\shader-runtime-integration-tests-${{ matrix.log_name }}.binlog"
@@ -427,10 +444,12 @@ jobs:
 
           $qualificationBuildArguments = @(
             "Projects\GGLabVulkanQualification\GGLabVulkanQualification.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-vulkan-qualification-${{ matrix.log_name }}.binlog"
@@ -449,10 +468,12 @@ jobs:
 
           $applicationBuildArguments = @(
             "Projects\WinApp\WinApp.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-application-standalone-${{ matrix.log_name }}.binlog"
@@ -479,6 +500,7 @@ jobs:
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
             "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
             "/verbosity:minimal"
             "/nologo"
             "/bl:Build\Logs\gglab-${{ matrix.log_name }}.binlog"
