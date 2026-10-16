@@ -17,7 +17,7 @@ pending-gate details. Exit codes are 0 written, 2 failed and 3 timed out.
 
 ## Session settings
 
-Set `$session = 'Scripts/GGLabSession.ps1'` and use an id you started in place of
+Set `$session = 'Scripts/Verification/GGLabSession.ps1'` and use an id you started in place of
 `<id>`. `status` lists authored views in `frame.referenceViews`. Omit `-View` for
 content without them. `batch` captures all reported views, or a `-Views` subset,
 in order; each view change is a camera cut and restarts settling.
@@ -75,7 +75,7 @@ change. Keep labels identical across arms, and use fresh output directories to
 avoid selecting an older capture by accident.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CompareCaptures.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/CompareCaptures.ps1 `
     -Reference Build/Sessions/atrium-dx12/Captures `
     -Candidate Build/Sessions/atrium-vulkan/Captures `
     -DiffDirectory Build/Validation/FrameCapture/atrium-diff
@@ -99,4 +99,4 @@ pairs or size mismatch. Metadata differences alone do not fail the comparison.
 Inspect both images and amplified differences for shifted edges, missing passes
 or color changes. DX12/Vulkan need not be bit-identical; set tolerances according
 to the intended claim. The GPU-free regression gate is
-`Scripts/TestCompareCaptures.ps1`.
+`Tests/Verification/TestCompareCaptures.ps1`.

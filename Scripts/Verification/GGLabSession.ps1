@@ -51,10 +51,10 @@ Commands:
   list     List running sessions.
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 start -Session atrium -Rhi vulkan -Demo atrium
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 capture -Session atrium -SettleFrames 16 -Label overview
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 batch -Session atrium -SettleFrames 16
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GGLabSession.ps1 stop -Session atrium
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 start -Session atrium -Rhi vulkan -Demo atrium
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 capture -Session atrium -SettleFrames 16 -Label overview
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 batch -Session atrium -SettleFrames 16
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSession.ps1 stop -Session atrium
 #>
 [CmdletBinding()]
 param(
@@ -141,7 +141,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
 $ProtocolVersion = 2
-$RepositoryRoot = Split-Path -Parent $PSScriptRoot
+$RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'
 }

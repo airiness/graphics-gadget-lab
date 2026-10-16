@@ -22,7 +22,7 @@ on Windows with a supported GPU and the matching application build.
 | Owner-requested visible/F5 capture | [Interactive capture](references/interactive.md) |
 
 Read only the reference needed for the current verification. Keep script options
-authoritative in [GGLabSession.ps1](../../../Scripts/GGLabSession.ps1), and use
+authoritative in [GGLabSession.ps1](../../../Scripts/Verification/GGLabSession.ps1), and use
 the script and executable from the same revision (control protocol v2).
 
 ## Prepare a run
@@ -46,7 +46,7 @@ This example captures the GTAO Lab on DX12; change the content and backend to
 match the task. The returned `image` and `metadata` paths are the evidence.
 
 ```powershell
-$session = 'Scripts/GGLabSession.ps1'
+$session = 'Scripts/Verification/GGLabSession.ps1'
 $id = 'verify-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $state = Join-Path (Get-Location) "Build/Sessions/$id/State"
 $start = powershell -NoProfile -ExecutionPolicy Bypass -File $session start `

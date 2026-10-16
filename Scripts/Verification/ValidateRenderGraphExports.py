@@ -172,7 +172,7 @@ def main():
 	parser.add_argument("paths", nargs="*", type=Path, help="JSON files or capture directories")
 	parser.add_argument("--self-test", action="store_true", help="Check schema acceptance/rejection contracts")
 	args = parser.parse_args()
-	schema_path = Path(__file__).resolve().parents[1] / "Schemas/RenderGraph.schema.json"
+	schema_path = Path(__file__).resolve().parents[2] / "Schemas/RenderGraph.schema.json"
 	schema = json.loads(schema_path.read_text(encoding="utf-8"))
 	Draft202012Validator.check_schema(schema)
 	validator = Draft202012Validator(schema)

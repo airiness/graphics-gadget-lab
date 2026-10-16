@@ -16,7 +16,7 @@ each backend. Watch evidence is latest-completed-frame plus first observed
 anomaly, not complete sequence-range acceptance. All started sessions are stopped.
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestTemporalAACounters.ps1 -Configuration Debug -Rhi dx12
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestTemporalAACounters.ps1 -Configuration Debug -Rhi dx12
 #>
 [CmdletBinding()]
 param(
@@ -33,13 +33,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/TemporalAACounters' }
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
 New-Item -ItemType Directory -Path $output | Out-Null
-$sessionScript = Join-Path $PSScriptRoot 'GGLabSession.ps1'
-$comparisonScript = Join-Path $PSScriptRoot 'CompareCaptures.ps1'
+$sessionScript = Join-Path $root 'Scripts/Verification/GGLabSession.ps1'
+$comparisonScript = Join-Path $root 'Scripts/Verification/CompareCaptures.ps1'
 $utf8 = New-Object Text.UTF8Encoding($false)
 $results = @()
 

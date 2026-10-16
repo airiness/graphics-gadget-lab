@@ -5,7 +5,7 @@ the active content; inspect its registration rather than assuming another Lab's
 path exists. Coastal Atrium (`-Demo atrium`) includes `SEQ_DollyDoorway` and
 `SEQ_StaticRailings`.
 
-With `$session = 'Scripts/GGLabSession.ps1'` and an existing session `atrium`:
+With `$session = 'Scripts/Verification/GGLabSession.ps1'` and an existing session `atrium`:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `

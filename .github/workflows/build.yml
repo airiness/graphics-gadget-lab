@@ -230,15 +230,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python Scripts/ValidateNonFiniteSites.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/ValidateRenderGraphExports.py --self-test
+          python Scripts/Verification/ValidateRenderGraphExports.py --self-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python Scripts/ValidateResourceExports.py --self-test
+          python Scripts/Verification/ValidateResourceExports.py --self-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate capture comparison discovery and rejection
         shell: pwsh
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/TestCompareCaptures.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestCompareCaptures.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build GGLabFoundation standalone

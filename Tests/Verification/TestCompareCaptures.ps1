@@ -7,8 +7,8 @@ param([string]$OutputDirectory)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
-$root = Split-Path -Parent $PSScriptRoot
-$comparisonScript = Join-Path $PSScriptRoot 'CompareCaptures.ps1'
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$comparisonScript = Join-Path $root 'Scripts/Verification/CompareCaptures.ps1'
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/CaptureComparisons' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId

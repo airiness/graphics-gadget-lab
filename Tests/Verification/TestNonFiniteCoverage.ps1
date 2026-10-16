@@ -11,8 +11,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
-$root = Split-Path -Parent $PSScriptRoot
-$sessionScript = Join-Path $PSScriptRoot 'GGLabSession.ps1'
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$sessionScript = Join-Path $root 'Scripts/Verification/GGLabSession.ps1'
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/NonFiniteCoverage' }
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
 $output = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId

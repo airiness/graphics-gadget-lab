@@ -1,6 +1,6 @@
 # Graph and GPU resource exports
 
-Use `$session = 'Scripts/GGLabSession.ps1'` with a running session `atrium`.
+Use `$session = 'Scripts/Verification/GGLabSession.ps1'` with a running session `atrium`.
 Commands share capture view/timing/settling/output options and `-NoWait`.
 Require `status: completed` and use returned paths.
 
@@ -98,8 +98,8 @@ Validate schema, version/writer consistency, NPY data and paired frame identitie
 with Python `jsonschema` and `numpy` available:
 
 ```powershell
-python Scripts/ValidateResourceExports.py Build/Sessions/atrium/Captures
-python Scripts/ValidateRenderGraphExports.py Build/Sessions/atrium/Captures
+python Scripts/Verification/ValidateResourceExports.py Build/Sessions/atrium/Captures
+python Scripts/Verification/ValidateRenderGraphExports.py Build/Sessions/atrium/Captures
 ```
 
 Validate both backend runs when claiming shared correctness. Authoritative schemas

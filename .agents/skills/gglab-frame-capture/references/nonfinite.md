@@ -4,7 +4,7 @@ Boundary scans inspect stored resource values. Production counters detect
 sanitization/recovery and reviewed finite-clamp policy violations. Clean boundary
 values alone cannot prove that no non-finite input was replaced before storage.
 
-Use `$session = 'Scripts/GGLabSession.ps1'`. Start the intended configuration with
+Use `$session = 'Scripts/Verification/GGLabSession.ps1'`. Start the intended configuration with
 `-WatchNonFinite` when production evidence is needed:
 
 ```powershell
@@ -112,7 +112,7 @@ capability status and `Incomplete` in submitted-range coverage. Unrequested
 claims remain Unavailable. Validate nested `gglab.nonfinite-watch` v2 records:
 
 ```powershell
-python Scripts/ValidateNonFiniteCoverage.py Build/Sessions/numeric-check/Captures
+python Scripts/Verification/ValidateNonFiniteCoverage.py Build/Sessions/numeric-check/Captures
 ```
 
 The schema remains [NonFiniteWatch](../../../../Schemas/NonFiniteWatch.schema.json).
@@ -146,12 +146,12 @@ filters; inspect each parameter block rather than assuming identical defaults.
 
 | Script | Evidence |
 | --- | --- |
-| `Scripts/AuditNonFiniteLabs.ps1 -Rhi dx12 -Content gtao` | Hidden per-content report/fail audit, paths or observation interval, site/target totals. |
-| `Scripts/MeasureNonFiniteOverhead.ps1` | Same paths in baseline, counters-only and counters+watch arms; compare within backend/run. |
-| `Scripts/TestNonFiniteCoverage.ps1` | Capture/sequence ranges, missing capability/targets and failure lifecycle. |
-| `Scripts/TestNonFiniteGenerations.ps1` | Fresh/cache-restored IBL, mip/face coverage, reconfiguration and atmosphere revisions. |
-| `Scripts/TestNonFiniteInjection.ps1` | Injected anomalies, locations/counts, stamps and clamp policy. |
-| `Scripts/TestTemporalAACounters.ps1` | Counter off/on same-frame PNG and NPY equivalence plus watch/lifecycle checks. |
+| `Scripts/Verification/AuditNonFiniteLabs.ps1 -Rhi dx12 -Content gtao` | Hidden per-content report/fail audit, paths or observation interval, site/target totals. |
+| `Scripts/Verification/MeasureNonFiniteOverhead.ps1` | Same paths in baseline, counters-only and counters+watch arms; compare within backend/run. |
+| `Tests/Verification/TestNonFiniteCoverage.ps1` | Capture/sequence ranges, missing capability/targets and failure lifecycle. |
+| `Tests/Verification/TestNonFiniteGenerations.ps1` | Fresh/cache-restored IBL, mip/face coverage, reconfiguration and atmosphere revisions. |
+| `Tests/Verification/TestNonFiniteInjection.ps1` | Injected anomalies, locations/counts, stamps and clamp policy. |
+| `Tests/Verification/TestTemporalAACounters.ps1` | Counter off/on same-frame PNG and NPY equivalence plus watch/lifecycle checks. |
 
 Audit and overhead results go to unique directories under `Build/Validation/`.
 Audits gather policy evidence; report-mode ranges may be incomplete. A clean
