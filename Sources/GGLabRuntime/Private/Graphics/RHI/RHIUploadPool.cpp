@@ -1,4 +1,4 @@
-#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 
@@ -15,30 +15,30 @@ namespace gglab
 		constexpr size_t InvalidPage = std::numeric_limits<size_t>::max();
 	}
 
-	RHIConstantUploadPool::RHIConstantUploadPool(
-		RHIDevice& device, const RHIConstantUploadConfig& config) noexcept :
+	RHIUploadPool::RHIUploadPool(
+		RHIDevice& device, const RHIUploadConfig& config) noexcept :
 		m_Device(&device), m_Config(config)
 	{
 	}
 
-	RHIConstantUploadPool::~RHIConstantUploadPool() noexcept
+	RHIUploadPool::~RHIUploadPool() noexcept
 	{
 		for (const auto& page : m_Pages)
 		{
 			GGLAB_ASSERT_MSG(!page.m_Leased,
-				"Constant upload batches must be submitted or cancelled before pool destruction.");
+				"Upload batches must be submitted or cancelled before pool destruction.");
 			// Every write was published when its batch was; ending the mapping writes nothing.
 			m_Device->UnmapBuffer(page.m_Buffer, {});
 			m_Device->DestroyBuffer(page.m_Buffer);
 		}
 	}
 
-	std::unique_ptr<RHIConstantUploadBatch> RHIConstantUploadPool::BeginBatch() noexcept
+	std::unique_ptr<RHIUploadBatch> RHIUploadPool::BeginBatch() noexcept
 	{
-		return std::unique_ptr<RHIConstantUploadBatch>(new RHIConstantUploadBatch(*this));
+		return std::unique_ptr<RHIUploadBatch>(new RHIUploadBatch(*this));
 	}
 
-	void RHIConstantUploadPool::ReclaimCompleted() noexcept
+	void RHIUploadPool::ReclaimCompleted() noexcept
 	{
 		for (auto& page : m_Pages)
 		{
@@ -49,7 +49,7 @@ namespace gglab
 		}
 	}
 
-	void RHIConstantUploadPool::ReleaseQuarantinedAfterVerifiedIdle() noexcept
+	void RHIUploadPool::ReleaseQuarantinedAfterVerifiedIdle() noexcept
 	{
 		for (auto& page : m_Pages)
 		{
@@ -57,7 +57,7 @@ namespace gglab
 		}
 	}
 
-	size_t RHIConstantUploadPool::GetQuarantinedPageCount() const noexcept
+	size_t RHIUploadPool::GetQuarantinedPageCount() const noexcept
 	{
 		return std::ranges::count_if(m_Pages, [](const Page& page)
 			{
@@ -65,7 +65,7 @@ namespace gglab
 			});
 	}
 
-	size_t RHIConstantUploadPool::GetPendingPageCount() const noexcept
+	size_t RHIUploadPool::GetPendingPageCount() const noexcept
 	{
 		return std::ranges::count_if(m_Pages, [](const Page& page)
 			{
@@ -73,7 +73,7 @@ namespace gglab
 			});
 	}
 
-	size_t RHIConstantUploadPool::AcquirePage(uint64_t minimumSize) noexcept
+	size_t RHIUploadPool::AcquirePage(uint64_t minimumSize) noexcept
 	{
 		ReclaimCompleted();
 		for (size_t index = 0; index < m_Pages.size(); ++index)
@@ -88,7 +88,7 @@ namespace gglab
 		}
 		if (m_Pages.size() >= m_Config.m_MaxPoolPages || m_Config.m_PageSizeInBytes == 0)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Constant upload page allocation exhausted its budget.");
+			GGLAB_LOG_GRAPHICS_ERROR("Upload page allocation exhausted its budget.");
 			return InvalidPage;
 		}
 		const uint64_t capacity = std::max<uint64_t>(minimumSize, m_Config.m_PageSizeInBytes);
@@ -100,18 +100,18 @@ namespace gglab
 			},
 			{
 				.m_Domain = RHIResourceDebugDomain::Renderer,
-				.m_Label = "RHI.ConstantUpload",
+				.m_Label = "RHI.Upload.Page",
 			});
 		if (!buffer.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Constant upload page creation failed.");
+			GGLAB_LOG_GRAPHICS_ERROR("Upload page creation failed.");
 			return InvalidPage;
 		}
 		// Pages are mapped once and stay mapped; each batch publishes its leases by flushing.
 		auto* mapped = static_cast<std::byte*>(m_Device->MapBuffer(buffer, {}));
 		if (!mapped)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Constant upload page mapping failed.");
+			GGLAB_LOG_GRAPHICS_ERROR("Upload page mapping failed.");
 			m_Device->DestroyBuffer(buffer);
 			return InvalidPage;
 		}
@@ -119,19 +119,45 @@ namespace gglab
 		return m_Pages.size() - 1;
 	}
 
-	RHIConstantUploadBatch::RHIConstantUploadBatch(RHIConstantUploadPool& pool) noexcept :
+	RHIUploadBatch::RHIUploadBatch(RHIUploadPool& pool) noexcept :
 		m_Pool(&pool), m_Id(NextUploadBatchId.fetch_add(1, std::memory_order_relaxed))
 	{
 	}
 
-	RHIConstantUploadBatch::~RHIConstantUploadBatch() noexcept
+	RHIUploadBatch::~RHIUploadBatch() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == State::Submitted || m_State == State::Quarantined ||
 			m_State == State::Cancelled,
-			"A constant upload batch requires explicit submission or command-stream cancellation.");
+			"An upload batch requires explicit submission or command-stream cancellation.");
+		GGLAB_ASSERT_MSG(!m_Writer, "An upload batch must detach its writer before it ends.");
 	}
 
-	RHIConstantBufferBinding RHIConstantUploadBatch::Upload(std::span<const std::byte> bytes) noexcept
+	void RHIUploadBatch::Attach(RHIUploadWriter& writer) noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_Writer && !writer.m_Batch,
+			"An upload writer and its batch must both be detached before attaching.");
+		if (m_Writer || writer.m_Batch)
+		{
+			Fail();
+			return;
+		}
+		m_Writer = &writer;
+		writer.m_Batch = this;
+	}
+
+	void RHIUploadBatch::Detach(RHIUploadWriter& writer) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_Writer == &writer && writer.m_Batch == this,
+			"Only the attached upload writer can be detached.");
+		if (m_Writer != &writer || writer.m_Batch != this)
+		{
+			return;
+		}
+		writer.m_Batch = nullptr;
+		m_Writer = nullptr;
+	}
+
+	RHIConstantBufferBinding RHIUploadBatch::Upload(std::span<const std::byte> bytes) noexcept
 	{
 		auto& device = *m_Pool->m_Device;
 		if (m_State != State::Recording || m_Failed || bytes.empty() ||
@@ -148,7 +174,7 @@ namespace gglab
 		{
 			if (m_Leases.size() >= m_Pool->m_Config.m_MaxPagesPerBatch)
 			{
-				GGLAB_LOG_GRAPHICS_ERROR("Constant upload page allocation exhausted its budget.");
+				GGLAB_LOG_GRAPHICS_ERROR("Upload page allocation exhausted its budget.");
 				Fail();
 				return {};
 			}
@@ -170,7 +196,7 @@ namespace gglab
 		return { page.m_Buffer, offset, static_cast<uint32_t>(bytes.size()), m_Id };
 	}
 
-	bool RHIConstantUploadBatch::Owns(const RHIConstantBufferBinding& binding) const noexcept
+	bool RHIUploadBatch::Owns(const RHIConstantBufferBinding& binding) const noexcept
 	{
 		if (m_State != State::Recording || m_Failed || binding.m_UploadBatchId != m_Id)
 		{
@@ -184,7 +210,7 @@ namespace gglab
 			});
 	}
 
-	bool RHIConstantUploadBatch::PublishWrites() noexcept
+	bool RHIUploadBatch::Publish() noexcept
 	{
 		if (m_State != State::Recording)
 		{
@@ -195,7 +221,7 @@ namespace gglab
 			if (!m_Pool->m_Device->FlushMappedBufferWrites(
 				m_Pool->m_Pages[lease.m_PageIndex].m_Buffer, { 0, lease.m_CursorInBytes }))
 			{
-				GGLAB_LOG_GRAPHICS_ERROR("Constant upload write publication failed.");
+				GGLAB_LOG_GRAPHICS_ERROR("Upload write publication failed.");
 				Fail();
 			}
 		}
@@ -203,7 +229,7 @@ namespace gglab
 		return !m_Failed;
 	}
 
-	bool RHIConstantUploadBatch::Submitted(const RHIFencePoint& fence) noexcept
+	bool RHIUploadBatch::Submitted(const RHIFencePoint& fence) noexcept
 	{
 		if (m_State != State::Published || m_Failed || !fence.IsValid())
 		{
@@ -220,7 +246,7 @@ namespace gglab
 		return true;
 	}
 
-	void RHIConstantUploadBatch::SubmittedWithoutCompletionFence() noexcept
+	void RHIUploadBatch::SubmittedWithoutCompletionFence() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == State::Recording || m_State == State::Published,
 			"Only an unresolved batch can be quarantined.");
@@ -237,13 +263,13 @@ namespace gglab
 		m_State = State::Quarantined;
 	}
 
-	void RHIConstantUploadBatch::Cancel() noexcept
+	void RHIUploadBatch::Cancel() noexcept
 	{
 		// Accepted work may already be reading the pages; it needs a fence or quarantine.
 		GGLAB_ASSERT_MSG(!m_HasAcceptedSubmission,
-			"Constant uploads read by an accepted submission cannot be cancelled.");
+			"Uploads read by an accepted submission cannot be cancelled.");
 		GGLAB_ASSERT_MSG(m_State == State::Recording || m_State == State::Published,
-			"Submitted constant uploads must wait for GPU completion.");
+			"Submitted uploads must wait for GPU completion.");
 		if (m_State != State::Recording && m_State != State::Published)
 		{
 			return;

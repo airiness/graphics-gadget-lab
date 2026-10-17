@@ -175,6 +175,12 @@ namespace gglab
 		return *m_Context->m_DirectComputeContext;
 	}
 
+	RHIFrameUploads VulkanFrameContext::GetUploads() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_Active, "VulkanFrameContext::GetUploads requires an active frame.");
+		return m_UploadWriter.GetFrameUploads();
+	}
+
 	std::unique_ptr<VulkanContext> VulkanContext::Create(const RHIContextDesc& desc,
 		const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept
 	{
@@ -235,7 +241,7 @@ namespace gglab
 		m_PipelineSystem = std::make_unique<VulkanPipelineSystem>(&device);
 		m_TransferManager = std::make_unique<TransferManager>(
 			std::make_unique<VulkanTransferContext>(&device));
-		m_ConstantUploadPool = std::make_unique<RHIConstantUploadPool>(device);
+		m_UploadPool = std::make_unique<RHIUploadPool>(device);
 		m_Set0Frames = std::make_unique<VulkanSet0DynamicUniformFrames>();
 		if (!m_Set0Frames->Initialize(
 			&device, runtime.GetFrameSlotCount()))
@@ -390,9 +396,10 @@ namespace gglab
 		}
 
 		auto& frame = *m_Frames[begin.m_FrameSlotIndex];
-		frame.m_ConstantUploads = m_ConstantUploadPool->BeginBatch();
-		m_GraphicsContext->BeginConstantRecording(frame.m_ConstantUploads.get());
-		m_DirectComputeContext->BeginConstantRecording(frame.m_ConstantUploads.get());
+		frame.m_Uploads = m_UploadPool->BeginBatch();
+		frame.m_Uploads->Attach(frame.m_UploadWriter);
+		m_GraphicsContext->BeginRecordingScope(frame.m_UploadWriter);
+		m_DirectComputeContext->BeginRecordingScope(frame.m_UploadWriter);
 		frame.m_BackBufferIndex = begin.m_BackBufferIndex;
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
@@ -415,7 +422,7 @@ namespace gglab
 		const std::vector usedBuffers(
 			m_GraphicsContext->GetUsedBuffers().begin(), m_GraphicsContext->GetUsedBuffers().end());
 		if (m_GraphicsContext->HasRecordingError() || m_DirectComputeContext->HasRecordingError() ||
-			!frame->m_ConstantUploads->PublishWrites() || !m_GraphicsContext->FinishEncoding() ||
+			!frame->m_Uploads->Publish() || !m_GraphicsContext->FinishEncoding() ||
 			!m_Bootstrap->m_FrameRuntime->EndFrameRecording())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -429,7 +436,7 @@ namespace gglab
 			RHISubmittedStream{ result.GetSubmitEffect(), result.m_SubmittedFencePoint, false },
 		};
 		const RHISubmissionResolution resolution = ResolveFrameSubmission(
-			streams, *frame->m_ConstantUploads, MakeSubmissionVerification());
+			streams, *frame->m_Uploads, MakeSubmissionVerification());
 		switch (resolution.m_State)
 		{
 		case RHIFrameSubmissionState::Fenced:
@@ -501,7 +508,7 @@ namespace gglab
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->AbortFrame();
 		// The frame's own command buffer is never submitted, so no accepted stream reads the
 		// upload batch, whatever the abort submission returned.
-		frame->m_ConstantUploads->Cancel();
+		frame->m_Uploads->Cancel();
 		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
 		FinishFrame(*frame);
 		if (result.m_Submitted)
@@ -601,19 +608,19 @@ namespace gglab
 				return result;
 			}
 		}
-		if (m_ConstantUploadPool)
+		if (m_UploadPool)
 		{
 			// No queue can still read pages quarantined after an unknown completion.
-			m_ConstantUploadPool->ReleaseQuarantinedAfterVerifiedIdle();
+			m_UploadPool->ReleaseQuarantinedAfterVerifiedIdle();
 		}
 		return result;
 	}
 
 	void VulkanContext::RetireCompletedWork() noexcept
 	{
-		if (m_ConstantUploadPool)
+		if (m_UploadPool)
 		{
-			m_ConstantUploadPool->ReclaimCompleted();
+			m_UploadPool->ReclaimCompleted();
 		}
 		if (m_TransferManager)
 		{
@@ -763,9 +770,13 @@ namespace gglab
 
 	void VulkanContext::FinishFrame(VulkanFrameContext& frame) noexcept
 	{
-		m_GraphicsContext->EndConstantRecording();
-		m_DirectComputeContext->EndConstantRecording();
-		frame.m_ConstantUploads.reset();
+		m_GraphicsContext->EndRecordingScope();
+		m_DirectComputeContext->EndRecordingScope();
+		if (frame.m_Uploads)
+		{
+			frame.m_Uploads->Detach(frame.m_UploadWriter);
+			frame.m_Uploads.reset();
+		}
 		frame.m_Active = false;
 		m_ActiveFrame = nullptr;
 	}
@@ -791,7 +802,7 @@ namespace gglab
 		m_GraphicsContext.reset();
 		m_GpuProfiler.reset();
 		m_Set0Frames.reset();
-		m_ConstantUploadPool.reset();
+		m_UploadPool.reset();
 		m_TransferManager.reset();
 		m_PipelineSystem.reset();
 		m_Bootstrap.reset();

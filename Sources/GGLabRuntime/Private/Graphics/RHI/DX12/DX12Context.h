@@ -1,8 +1,9 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "Graphics/RHI/RHIFrameSubmission.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 
 #include <Windows.h>
 
@@ -36,6 +37,7 @@ namespace gglab
 		RHIGraphicsCommandContext& GetGraphicsContext() noexcept override;
 		RHIComputeCommandContext& GetDirectComputeContext() noexcept override;
 		RHIComputeCommandContext* GetComputeContext() noexcept override;
+		RHIFrameUploads GetUploads() noexcept override;
 
 	private:
 		friend class DX12Context;
@@ -46,7 +48,8 @@ namespace gglab
 		DX12CommandAllocator* m_GraphicsAllocator = nullptr;
 		DX12CommandAllocator* m_ComputeAllocator = nullptr;
 		RHIFencePoint m_SubmittedFence{};
-		std::unique_ptr<RHIConstantUploadBatch> m_ConstantUploads;
+		RHIUploadWriter m_UploadWriter;
+		std::unique_ptr<RHIUploadBatch> m_Uploads;
 		bool m_Active = false;
 	};
 
@@ -97,7 +100,7 @@ namespace gglab
 		void Finalize() noexcept;
 
 		std::unique_ptr<DX12Device> m_Device;
-		std::unique_ptr<RHIConstantUploadPool> m_ConstantUploadPool;
+		std::unique_ptr<RHIUploadPool> m_UploadPool;
 		std::unique_ptr<DX12QueueSystem> m_QueueSystem;
 		std::unique_ptr<RHIPipelineSystem> m_PipelineSystem;
 		std::unique_ptr<DX12SwapChain> m_SwapChain;

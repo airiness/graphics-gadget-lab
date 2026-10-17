@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -12,41 +13,24 @@
 namespace gglab
 {
 	class RHIDevice;
-	class RHIConstantUploadBatch;
 
-	struct RHIConstantBufferBinding
-	{
-		RHIBufferHandle m_Buffer{};
-		uint64_t m_OffsetInBytes = 0;
-		uint32_t m_SizeInBytes = 0;
-		// Zero identifies caller-owned storage. Upload bindings belong to one batch.
-		uint64_t m_UploadBatchId = 0;
-
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_Buffer.IsValid() && m_SizeInBytes != 0;
-		}
-	};
-
-	struct RHIConstantUploadConfig
+	struct RHIUploadConfig
 	{
 		uint32_t m_PageSizeInBytes = 64 * 1024;
 		uint32_t m_MaxPagesPerBatch = 256;
 		uint32_t m_MaxPoolPages = 1024;
 	};
 
-	// Owner-thread component shared by backend implementations. Pages stay mapped for
-	// their lifetime and are never reused until every command consuming the batch has
-	// completed.
-	class RHIConstantUploadPool
+	// Owner-thread component shared by the submission owners. Pages stay mapped for their
+	// lifetime and are never reused until every command consuming the batch has completed.
+	class RHIUploadPool
 	{
 	public:
-		explicit RHIConstantUploadPool(RHIDevice& device,
-			const RHIConstantUploadConfig& config = {}) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(RHIConstantUploadPool);
-		~RHIConstantUploadPool() noexcept;
+		explicit RHIUploadPool(RHIDevice& device, const RHIUploadConfig& config = {}) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(RHIUploadPool);
+		~RHIUploadPool() noexcept;
 
-		[[nodiscard]] std::unique_ptr<RHIConstantUploadBatch> BeginBatch() noexcept;
+		[[nodiscard]] std::unique_ptr<RHIUploadBatch> BeginBatch() noexcept;
 		void ReclaimCompleted() noexcept;
 		// Only after every queue that may have read quarantined pages was verified idle.
 		void ReleaseQuarantinedAfterVerifiedIdle() noexcept;
@@ -55,7 +39,7 @@ namespace gglab
 		[[nodiscard]] size_t GetQuarantinedPageCount() const noexcept;
 
 	private:
-		friend class RHIConstantUploadBatch;
+		friend class RHIUploadBatch;
 		struct Page
 		{
 			RHIBufferHandle m_Buffer{};
@@ -69,19 +53,25 @@ namespace gglab
 		[[nodiscard]] size_t AcquirePage(uint64_t minimumSize) noexcept;
 
 		RHIDevice* m_Device = nullptr;
-		RHIConstantUploadConfig m_Config{};
+		RHIUploadConfig m_Config{};
 		std::vector<Page> m_Pages;
 	};
 
-	class RHIConstantUploadBatch
+	// The pages one submission writes. Only its submission owner drives the transitions; a
+	// producer reaches the batch through the attached writer.
+	class RHIUploadBatch
 	{
 	public:
-		GGLAB_DELETE_COPYABLE_MOVABLE(RHIConstantUploadBatch);
-		~RHIConstantUploadBatch() noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(RHIUploadBatch);
+		// Requires a terminal state and no attached writer.
+		~RHIUploadBatch() noexcept;
 
+		// A writer serves one batch at a time; the owner detaches it before the batch ends.
+		void Attach(RHIUploadWriter& writer) noexcept;
+		void Detach(RHIUploadWriter& writer) noexcept;
 		[[nodiscard]] RHIConstantBufferBinding Upload(std::span<const std::byte> bytes) noexcept;
 		// Freezes allocation and flushes all leased writes before queue submission.
-		[[nodiscard]] bool PublishWrites() noexcept;
+		[[nodiscard]] bool Publish() noexcept;
 		// Called once the native submit of a stream that may read the batch was issued.
 		// From then on the batch can no longer be cancelled.
 		void RecordAcceptedSubmission() noexcept { m_HasAcceptedSubmission = true; }
@@ -95,13 +85,14 @@ namespace gglab
 		void Cancel() noexcept;
 		void Fail() noexcept { m_Failed = true; }
 		[[nodiscard]] bool HasFailed() const noexcept { return m_Failed; }
+		[[nodiscard]] bool IsRecording() const noexcept { return m_State == State::Recording; }
 		[[nodiscard]] bool Owns(const RHIConstantBufferBinding& binding) const noexcept;
-		[[nodiscard]] uint64_t GetId() const noexcept { return m_Id; }
+		[[nodiscard]] RHIUploadBatchId GetId() const noexcept { return m_Id; }
 		[[nodiscard]] size_t GetPageCount() const noexcept { return m_Leases.size(); }
 
 	private:
-		friend class RHIConstantUploadPool;
-		explicit RHIConstantUploadBatch(RHIConstantUploadPool& pool) noexcept;
+		friend class RHIUploadPool;
+		explicit RHIUploadBatch(RHIUploadPool& pool) noexcept;
 		enum class State : uint8_t
 		{
 			Recording,
@@ -116,9 +107,10 @@ namespace gglab
 			uint64_t m_CursorInBytes = 0;
 		};
 
-		RHIConstantUploadPool* m_Pool = nullptr;
+		RHIUploadPool* m_Pool = nullptr;
+		RHIUploadWriter* m_Writer = nullptr;
 		std::vector<PageLease> m_Leases;
-		uint64_t m_Id = 0;
+		RHIUploadBatchId m_Id = 0;
 		State m_State = State::Recording;
 		bool m_Failed = false;
 		bool m_HasAcceptedSubmission = false;

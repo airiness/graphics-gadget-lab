@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
-#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
@@ -202,29 +202,14 @@ namespace gglab
 	{
 	public:
 		virtual ~RHICommandContext() = default;
-		// The submission owner supplies the batch; contexts only borrow it while recording.
-		void BeginConstantRecording(RHIConstantUploadBatch* batch) noexcept
-		{
-			m_ConstantUploads = batch;
-			m_RecordingFailed = false;
-		}
-		void EndConstantRecording() noexcept { m_ConstantUploads = nullptr; }
-		void FailRecording() noexcept
-		{
-			m_RecordingFailed = true;
-			if (m_ConstantUploads)
-			{
-				m_ConstantUploads->Fail();
-			}
-		}
 		[[nodiscard]] bool HasRecordingError() const noexcept
 		{
-			return m_RecordingFailed || (m_ConstantUploads && m_ConstantUploads->HasFailed());
+			return m_RecordingFailed || (m_UploadWriter && m_UploadWriter->HasFailed());
 		}
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<const std::byte> bytes) noexcept
 		{
-			const auto binding = m_ConstantUploads ?
-				m_ConstantUploads->Upload(bytes) :
+			const auto binding = m_UploadWriter ?
+				m_UploadWriter->UploadConstants(bytes) :
 				RHIConstantBufferBinding{};
 			if (!binding.IsValid())
 			{
@@ -245,16 +230,6 @@ namespace gglab
 			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
 			return UploadConstants(std::as_bytes(std::span<const T>(&data, 1)));
 		}
-		[[nodiscard]] bool ValidateConstantBinding(const RHIConstantBufferBinding& binding) noexcept
-		{
-			if (HasRecordingError() || !binding.IsValid() || binding.m_SizeInBytes % sizeof(uint32_t) != 0 ||
-				(binding.m_UploadBatchId != 0 && (!m_ConstantUploads || !m_ConstantUploads->Owns(binding))))
-			{
-				FailRecording();
-				return false;
-			}
-			return true;
-		}
 		// A declared pass storage buffer is rebound after every compatible pipeline
 		// switch. Clearing it at the pass boundary prevents cross-pass inheritance.
 		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept
@@ -266,9 +241,40 @@ namespace gglab
 			return m_PassStorageBuffer;
 		}
 
+	protected:
+		// The submission owner binds the frame's upload writer for one recording scope, which
+		// resets the recording error. Binding null ends the scope and keeps the error.
+		void BindUploadWriter(RHIUploadWriter* writer) noexcept
+		{
+			m_UploadWriter = writer;
+			if (writer)
+			{
+				m_RecordingFailed = false;
+			}
+		}
+		// A failed recording also poisons the upload batch shared by the submission.
+		void FailRecording() noexcept
+		{
+			m_RecordingFailed = true;
+			if (m_UploadWriter)
+			{
+				m_UploadWriter->Fail();
+			}
+		}
+		[[nodiscard]] bool ValidateConstantBinding(const RHIConstantBufferBinding& binding) noexcept
+		{
+			if (HasRecordingError() || !binding.IsValid() || binding.m_SizeInBytes % sizeof(uint32_t) != 0 ||
+				(binding.m_UploadBatchId != 0 && (!m_UploadWriter || !m_UploadWriter->Owns(binding))))
+			{
+				FailRecording();
+				return false;
+			}
+			return true;
+		}
+
 	private:
 		std::optional<RHIPassStorageBufferBinding> m_PassStorageBuffer;
-		RHIConstantUploadBatch* m_ConstantUploads = nullptr;
+		RHIUploadWriter* m_UploadWriter = nullptr;
 		bool m_RecordingFailed = false;
 
 	public:

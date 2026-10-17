@@ -8,7 +8,7 @@
 
 namespace gglab
 {
-	class RHIConstantUploadBatch;
+	class RHIUploadBatch;
 
 	// Bound for the waits a frame transaction uses to verify an uncertain submission.
 	inline constexpr uint32_t RHIFrameVerificationTimeoutMilliseconds = 10'000;
@@ -54,6 +54,6 @@ namespace gglab
 	// cancel when nothing was accepted, retire on a fence that covers every accepted stream,
 	// or quarantine and try to verify idle. Shared by every backend frame transaction.
 	[[nodiscard]] RHISubmissionResolution ResolveFrameSubmission(
-		std::span<const RHISubmittedStream> streams, RHIConstantUploadBatch& batch,
+		std::span<const RHISubmittedStream> streams, RHIUploadBatch& batch,
 		const RHISubmissionVerification& verification) noexcept;
 }

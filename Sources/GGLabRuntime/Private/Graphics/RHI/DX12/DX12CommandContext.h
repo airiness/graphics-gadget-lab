@@ -93,6 +93,9 @@ namespace gglab
 		RHIQueueType GetQueueType() const noexcept override { return m_Backend.GetQueueType(); }
 		DX12CommandList* GetCommandList() const noexcept { return m_Backend.GetCommandList(); }
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_Backend.Get(); }
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 
 		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
 		{
@@ -202,6 +205,9 @@ namespace gglab
 		RHIQueueType GetQueueType() const noexcept override { return m_Backend->GetQueueType(); }
 		DX12CommandList* GetCommandList() const noexcept { return m_Backend->GetCommandList(); }
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_Backend->Get(); }
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 
 		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
 		{

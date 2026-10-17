@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 
 #include <cstdint>
 #include <memory>
@@ -38,6 +39,10 @@ namespace gglab
 		[[nodiscard]] virtual RHIGraphicsCommandContext& GetGraphicsContext() noexcept = 0;
 		[[nodiscard]] virtual RHIComputeCommandContext& GetDirectComputeContext() noexcept = 0;
 		[[nodiscard]] virtual RHIComputeCommandContext* GetComputeContext() noexcept = 0;
+		// Uploads into this frame's submission batch. The value is valid from the Ready
+		// result of BeginFrame until this frame's EndFrame or AbortFrame returns and must not
+		// be stored across frames.
+		[[nodiscard]] virtual RHIFrameUploads GetUploads() noexcept = 0;
 	};
 
 	enum class RHIFrameBeginStatus : uint8_t

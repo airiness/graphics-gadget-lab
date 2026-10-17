@@ -34,6 +34,9 @@ namespace gglab
 		[[nodiscard]] bool FinishEncoding() noexcept;
 		void AbortEncoding() noexcept;
 		[[nodiscard]] bool HasEncodingError() const noexcept { return m_HasEncodingError || HasRecordingError(); }
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 		// Borrowed native command buffer for backend adapters such as the
 		// official ImGui Vulkan renderer. Valid only while encoding.
 		[[nodiscard]] VkCommandBuffer Get() const noexcept { return m_CommandBuffer; }
@@ -135,6 +138,9 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanComputeCommandContext);
 		~VulkanComputeCommandContext() override;
 		using RHIComputeCommandContext::SetPushConstants;
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 
 		RHICommandContextHandle GetHandle() const noexcept override
 		{

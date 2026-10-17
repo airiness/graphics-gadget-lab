@@ -6,8 +6,8 @@
 #include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
-#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
@@ -1440,7 +1440,7 @@ namespace gglab
 
 			const uint32_t uniformAlignment = static_cast<uint32_t>(std::max<VkDeviceSize>(
 				device.GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1));
-			RHIConstantUploadPool constantPool(device, {
+			RHIUploadPool constantPool(device, {
 				.m_PageSizeInBytes = uniformAlignment * 2,
 				.m_MaxPagesPerBatch = 2,
 			});
@@ -1461,7 +1461,7 @@ namespace gglab
 			valid = valid && first.IsValid() && second.IsValid() &&
 				first.m_OffsetInBytes != second.m_OffsetInBytes &&
 				first.m_OffsetInBytes % uniformAlignment == 0 && second.m_OffsetInBytes % uniformAlignment == 0 &&
-				!overflow.IsValid() && constants->HasFailed() && !constants->PublishWrites();
+				!overflow.IsValid() && constants->HasFailed() && !constants->Publish();
 			// These allocation probes have no recorded GPU consumers.
 			constants->Cancel();
 			VulkanSet0DynamicUniformFrames set0Frames;
@@ -2036,7 +2036,7 @@ namespace gglab
 				}
 			}
 
-			RHIConstantUploadPool constantPool(device);
+			RHIUploadPool constantPool(device);
 			VulkanSet0DynamicUniformFrames set0Frames;
 			if (!set0Frames.Initialize(
 				&device, runtime.GetFrameSlotCount()))
@@ -2138,9 +2138,17 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics encoder did not begin.");
 				return 1;
 			}
+			RHIUploadWriter uploadWriter;
 			auto constantBatch = constantPool.BeginBatch();
-			commandContext.BeginConstantRecording(constantBatch.get());
-			computeContext.BeginConstantRecording(constantBatch.get());
+			constantBatch->Attach(uploadWriter);
+			commandContext.BeginRecordingScope(uploadWriter);
+			computeContext.BeginRecordingScope(uploadWriter);
+			const auto endUploadRecording = [&]() noexcept
+				{
+					commandContext.EndRecordingScope();
+					computeContext.EndRecordingScope();
+					constantBatch->Detach(uploadWriter);
+				};
 			constexpr RHIResourceState commonBufferState{
 				.m_Stages = RHIStage::All,
 				.m_Access = RHIAccess::Common,
@@ -2355,7 +2363,7 @@ namespace gglab
 			commandContext.SetInlineConstants(0, makeParameters(CoordinateConformanceMode::Position));
 			commandContext.DrawFullscreenTriangle();
 			commandContext.EndRendering();
-			const bool encodingSucceeded = constantBatch->PublishWrites() && commandContext.FinishEncoding();
+			const bool encodingSucceeded = constantBatch->Publish() && commandContext.FinishEncoding();
 			std::vector<RHITextureHandle> usedTextures(
 				commandContext.GetUsedTextures().begin(), commandContext.GetUsedTextures().end());
 			std::vector<RHIBufferHandle> usedBuffers(
@@ -2364,8 +2372,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				commandContext.EndConstantRecording();
-				computeContext.EndConstantRecording();
+				endUploadRecording();
 				constantBatch->Cancel();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics command validation failed.");
 				return 1;
@@ -2385,8 +2392,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				commandContext.EndConstantRecording();
-				computeContext.EndConstantRecording();
+				endUploadRecording();
 				constantBatch->Cancel();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: command recording did not finalize.");
 				return 1;
@@ -2395,14 +2401,12 @@ namespace gglab
 			if (!frame.m_Submitted || !frame.m_SubmittedFencePoint.IsValid())
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
-				commandContext.EndConstantRecording();
-				computeContext.EndConstantRecording();
+				endUploadRecording();
 				constantBatch->Cancel();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics submission failed.");
 				return 1;
 			}
-			commandContext.EndConstantRecording();
-			computeContext.EndConstantRecording();
+			endUploadRecording();
 			const bool constantsSubmitted = constantBatch->Submitted(frame.m_SubmittedFencePoint);
 			const bool uniformFrameEnded =
 				set0Frames.EndFrame(begin.m_FrameSlotIndex, frame.m_SubmittedFencePoint);

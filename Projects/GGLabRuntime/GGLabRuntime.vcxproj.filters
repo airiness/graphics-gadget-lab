@@ -849,9 +849,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIConstantUpload.cpp">
-      <Filter>Private\Graphics\RHI</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
@@ -862,6 +859,12 @@
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUpload.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.cpp">
@@ -1544,6 +1547,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHISubresourceUtils.h">
       <Filter>Private\Graphics\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.h">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.h">
       <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
     </ClInclude>
@@ -2207,9 +2213,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICommandContext.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIConstantUpload.h">
-      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIContext.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
@@ -2265,6 +2268,9 @@
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIUpload.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGuiInterop.h">

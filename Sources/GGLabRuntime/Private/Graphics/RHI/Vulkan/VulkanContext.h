@@ -1,8 +1,9 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "Graphics/RHI/RHIFrameSubmission.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 
 #include <cstdint>
 #include <memory>
@@ -36,6 +37,7 @@ namespace gglab
 		RHIGraphicsCommandContext& GetGraphicsContext() noexcept override;
 		RHIComputeCommandContext& GetDirectComputeContext() noexcept override;
 		RHIComputeCommandContext* GetComputeContext() noexcept override { return nullptr; }
+		RHIFrameUploads GetUploads() noexcept override;
 
 	private:
 		friend class VulkanContext;
@@ -43,7 +45,8 @@ namespace gglab
 		VulkanContext* m_Context = nullptr;
 		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
-		std::unique_ptr<RHIConstantUploadBatch> m_ConstantUploads;
+		RHIUploadWriter m_UploadWriter;
+		std::unique_ptr<RHIUploadBatch> m_Uploads;
 		bool m_Active = false;
 	};
 
@@ -118,7 +121,7 @@ namespace gglab
 		std::unique_ptr<VulkanBootstrapRuntimeResult> m_Bootstrap;
 		std::unique_ptr<VulkanPipelineSystem> m_PipelineSystem;
 		std::unique_ptr<TransferManager> m_TransferManager;
-		std::unique_ptr<RHIConstantUploadPool> m_ConstantUploadPool;
+		std::unique_ptr<RHIUploadPool> m_UploadPool;
 		std::unique_ptr<VulkanSet0DynamicUniformFrames> m_Set0Frames;
 		std::unique_ptr<VulkanGpuProfiler> m_GpuProfiler;
 		std::unique_ptr<VulkanGraphicsCommandContext> m_GraphicsContext;

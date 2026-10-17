@@ -48,7 +48,7 @@ namespace gglab
 	};
 
 	// Backend-owned immutable descriptor snapshots. Constant allocation and host
-	// write publication belong to RHIConstantUploadBatch; descriptor reset is
+	// write publication belong to RHIUploadBatch; descriptor reset is
 	// independently gated by the submitted command stream's fence.
 	class VulkanSet0DynamicUniformFrames
 	{

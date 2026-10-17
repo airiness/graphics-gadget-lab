@@ -93,6 +93,7 @@
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/RHIFrameSubmission.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
@@ -1095,6 +1096,8 @@ namespace gglab
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
 		public:
+			void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+			void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
 			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
 			void TrackTextureUse(RHITextureHandle) noexcept override {}
@@ -1190,6 +1193,8 @@ namespace gglab
 		class RecordingComputeCommandContext final : public RHIComputeCommandContext
 		{
 		public:
+			void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+			void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
 			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
 			void TrackTextureUse(RHITextureHandle) noexcept override {}
@@ -1684,13 +1689,26 @@ namespace gglab
 			device.m_PassConstantsEnabled = true;
 			device.m_UseControlledFenceCompletion = true;
 			device.m_CompletedFenceValue = 0;
-			RHIConstantUploadPool uploads(device);
+			RHIUploadPool uploads(device);
+			RHIUploadWriter writer;
 			auto batch = uploads.BeginBatch();
 			TransientResourcePool graphResources(&device);
 			RecordingGraphicsCommandContext graphics;
 			RecordingComputeCommandContext compute;
-			graphics.BeginConstantRecording(batch.get());
-			compute.BeginConstantRecording(batch.get());
+			// Both encoders share the frame writer, as in the backend submission owners.
+			const auto beginRecording = [&](RHIUploadBatch& uploadBatch) noexcept
+				{
+					uploadBatch.Attach(writer);
+					graphics.BeginRecordingScope(writer);
+					compute.BeginRecordingScope(writer);
+				};
+			const auto endRecording = [&](RHIUploadBatch& uploadBatch) noexcept
+				{
+					graphics.EndRecordingScope();
+					compute.EndRecordingScope();
+					uploadBatch.Detach(writer);
+				};
+			beginRecording(*batch);
 			RGExecuteContext execution({ &graphics, &compute, nullptr });
 			std::array<uint32_t, 24> payload{};
 			payload.fill(0x12345678u);
@@ -1751,7 +1769,7 @@ namespace gglab
 				"Non-graph uploads can be bound repeatedly by graphics and compute in the same batch");
 			context.Check(compute.SetConstantBufferData(passIndex, std::span(payload)),
 				"Span parameter overloads upload their elements rather than the span object");
-			context.Check(batch->GetPageCount() == 2 && batch->PublishWrites() &&
+			context.Check(batch->GetPageCount() == 2 && batch->Publish() &&
 				device.m_PassConstantPublishCount == 2 &&
 				graphics.m_LastInlineWords == std::vector<uint32_t>({ 17, 3 }) && graphics.m_LastInlineOffset == 1 &&
 				compute.m_LastInlineWords == std::vector<uint32_t>({ 23, 5 }) && compute.m_LastInlineOffset == 2,
@@ -1762,8 +1780,7 @@ namespace gglab
 			const auto presentFailed = RHIFrameEndResult::Fatal(submittedFence);
 			context.Check(batch->Submitted(presentFailed.GetSubmittedFence()),
 				"Submitted uploads remain fence-gated even when presentation fails");
-			graphics.EndConstantRecording();
-			compute.EndConstantRecording();
+			endRecording(*batch);
 			graph.Retire(submittedFence);
 			secondGraph.Retire(submittedFence);
 			uploads.ReclaimCompleted();
@@ -1771,24 +1788,24 @@ namespace gglab
 				"In-flight upload pages are retained independently of graph lifetime");
 
 			auto cancelled = uploads.BeginBatch();
-			graphics.BeginConstantRecording(cancelled.get());
+			beginRecording(*cancelled);
 			const auto later = graphics.UploadConstants(payload);
 			context.Check(later.IsValid() && later.m_Buffer != first.m_Buffer && uploads.GetPageCount() == 3,
 				"A later submission cannot overwrite an in-flight page");
 			context.Check(!graphics.SetConstantBuffer(passIndex, reusable) && graphics.HasRecordingError() &&
-				cancelled->HasFailed() && !cancelled->PublishWrites() && !cancelled->Submitted(submittedFence),
+				cancelled->HasFailed() && !cancelled->Publish() && !cancelled->Submitted(submittedFence),
 				"Cross-batch binding fails the recording transaction and prevents normal submission");
-			graphics.EndConstantRecording();
+			endRecording(*cancelled);
 			cancelled->Cancel();
 			auto reuse = uploads.BeginBatch();
-			graphics.BeginConstantRecording(reuse.get());
+			beginRecording(*reuse);
 			const auto afterCancel = graphics.UploadConstants(payload);
 			context.Check(afterCancel.m_Buffer == later.m_Buffer &&
 				afterCancel.m_UploadBatchId != later.m_UploadBatchId,
 				"Cancellation immediately recovers discarded storage with a new batch identity");
 			context.Check(device.m_PassConstantMapCount == 3 && device.m_PassConstantUnmapCount == 0,
 				"Cancellation keeps pages mapped and a reused page is not mapped again");
-			graphics.EndConstantRecording();
+			endRecording(*reuse);
 			reuse->Cancel();
 			device.m_CompletedFenceValue = 5;
 			uploads.ReclaimCompleted();
@@ -1797,16 +1814,14 @@ namespace gglab
 
 			const uint32_t unmapsBeforeLimitedPool = device.m_PassConstantUnmapCount;
 			{
-				RHIConstantUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
+				RHIUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
 				auto exhausted = limited.BeginBatch();
-				graphics.BeginConstantRecording(exhausted.get());
-				compute.BeginConstantRecording(exhausted.get());
+				beginRecording(*exhausted);
 				context.Check(graphics.SetConstantBufferData(passIndex, payload) &&
 					!compute.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError() &&
-					compute.HasRecordingError() && !exhausted->PublishWrites(),
+					compute.HasRecordingError() && !exhausted->Publish(),
 					"Page exhaustion poisons every encoder sharing the submission batch");
-				graphics.EndConstantRecording();
-				compute.EndConstantRecording();
+				endRecording(*exhausted);
 				exhausted->Cancel();
 				context.Check(device.m_PassConstantUnmapCount == unmapsBeforeLimitedPool,
 					"A failed publication and its cancellation leave the page mapped");
@@ -1820,37 +1835,122 @@ namespace gglab
 				failingDevice.m_PassConstantsEnabled = true;
 				failingDevice.m_ConstantCreateFails = failure == 0;
 				failingDevice.m_ConstantMapFails = failure == 1;
-				RHIConstantUploadPool failingPool(failingDevice);
+				RHIUploadPool failingPool(failingDevice);
 				auto failed = failingPool.BeginBatch();
-				graphics.BeginConstantRecording(failed.get());
+				beginRecording(*failed);
 				context.Check(!graphics.SetConstantBufferData(passIndex, payload) && failed->HasFailed(),
 					"Buffer creation and mapping failures fail the recording transaction");
-				graphics.EndConstantRecording();
+				endRecording(*failed);
 				failed->Cancel();
 			}
 			auto sealed = uploads.BeginBatch();
-			context.Check(sealed->PublishWrites() && !sealed->Upload(std::as_bytes(std::span(payload))).IsValid(),
+			context.Check(sealed->Publish() && !sealed->Upload(std::as_bytes(std::span(payload))).IsValid(),
 				"Publication freezes upload allocation before submission");
 			sealed->Cancel();
 			auto publicationFailure = uploads.BeginBatch();
-			graphics.BeginConstantRecording(publicationFailure.get());
+			beginRecording(*publicationFailure);
 			device.m_ConstantPublishFails = true;
 			context.Check(graphics.UploadConstants(payload).IsValid() &&
-				!publicationFailure->PublishWrites() && graphics.HasRecordingError() &&
+				!publicationFailure->Publish() && graphics.HasRecordingError() &&
+				compute.HasRecordingError() &&
 				!publicationFailure->Submitted(submittedFence),
-				"Host write publication failures prevent normal submission");
+				"Host write publication failures fail every encoder and prevent normal submission");
 			device.m_ConstantPublishFails = false;
-			graphics.EndConstantRecording();
+			endRecording(*publicationFailure);
 			publicationFailure->Cancel();
 			auto oversized = uploads.BeginBatch();
 			std::vector<std::byte> tooLarge(device.GetMaxConstantBufferRange() + 4);
 			context.Check(!oversized->Upload(tooLarge).IsValid() && oversized->HasFailed(),
 				"Constant uploads reject ranges beyond device capabilities");
 			oversized->Cancel();
-			graphics.BeginConstantRecording(nullptr);
-			context.Check(!graphics.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError(),
+			RecordingGraphicsCommandContext unscoped;
+			context.Check(!unscoped.SetConstantBufferData(passIndex, payload) && unscoped.HasRecordingError(),
 				"Data uploads require an explicit recording scope outside the RenderGraph too");
-			graphics.EndConstantRecording();
+		}
+
+		void RunUploadWriterContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(!std::is_copy_constructible_v<RHIUploadWriter> &&
+				!std::is_copy_assignable_v<RHIUploadWriter> &&
+				!std::is_move_constructible_v<RHIUploadWriter> &&
+				!std::is_move_assignable_v<RHIUploadWriter>);
+			static_assert(std::is_copy_constructible_v<RHIFrameUploads> &&
+				std::is_copy_assignable_v<RHIFrameUploads>);
+
+			const auto passIndex = static_cast<uint32_t>(CommonRSRootParamIndex::PassCB);
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_CompletedFenceValue = 0;
+			RHIUploadPool pool(device);
+			RHIUploadWriter writer;
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext compute;
+			const std::array<uint32_t, 4> frameData{ 1, 2, 3, 4 };
+
+			const RHIFrameUploads unattached = writer.GetFrameUploads();
+			context.Check(writer.GetBatchId() == 0 && !writer.IsRecording() &&
+				!unattached.IsCurrent() && !unattached.UploadConstants(frameData).IsValid(),
+				"Frame uploads issued without an attached batch never upload");
+
+			auto aborted = pool.BeginBatch();
+			aborted->Attach(writer);
+			const RHIFrameUploads abortedUploads = writer.GetFrameUploads();
+			const RHIConstantBufferBinding abortedBinding = abortedUploads.UploadConstants(frameData);
+			const bool abortPublished = aborted->Publish();
+			aborted->Cancel();
+			aborted->Detach(writer);
+			context.Check(abortedBinding.IsValid() && abortPublished && !abortedUploads.IsCurrent() &&
+				pool.GetPendingPageCount() == 0 && device.m_PassConstantUnmapCount == 0,
+				"A first-frame published abort invalidates its capability without a fence or unmap");
+
+			auto first = pool.BeginBatch();
+			first->Attach(writer);
+			const RHIFrameUploads frameUploads = writer.GetFrameUploads();
+			const RHIConstantBufferBinding prepared = frameUploads.UploadConstants(frameData);
+			graphics.BeginRecordingScope(writer);
+			compute.BeginRecordingScope(writer);
+			context.Check(frameUploads.IsCurrent() && frameUploads.GetBatchId() == first->GetId() &&
+				prepared.IsValid() && prepared.m_Buffer == abortedBinding.m_Buffer &&
+				prepared.m_UploadBatchId == first->GetId() &&
+				writer.Owns(prepared) && graphics.SetConstantBuffer(passIndex, prepared) &&
+				compute.SetConstantBuffer(passIndex, prepared) && !graphics.HasRecordingError() &&
+				!compute.HasRecordingError(),
+				"A frame-preparation upload binds on the graphics and direct-compute encoders of its batch");
+			graphics.EndRecordingScope();
+			compute.EndRecordingScope();
+			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 1 };
+			const bool firstSubmitted = first->Publish() && first->Submitted(firstFence);
+			first->Detach(writer);
+			context.Check(firstSubmitted && !frameUploads.IsCurrent() &&
+				!frameUploads.UploadConstants(frameData).IsValid(),
+				"Frame uploads kept past their frame fail while the writer is detached");
+
+			auto inFlight = pool.BeginBatch();
+			inFlight->Attach(writer);
+			const RHIConstantBufferBinding fresh = writer.GetFrameUploads().UploadConstants(frameData);
+			const bool staleUploadRejected = !frameUploads.UploadConstants(frameData).IsValid();
+			graphics.BeginRecordingScope(writer);
+			context.Check(fresh.IsValid() && fresh.m_Buffer != prepared.m_Buffer &&
+				staleUploadRejected && inFlight->HasFailed() && inFlight->GetPageCount() == 1,
+				"Frame uploads from an earlier batch fail the later batch on the same writer");
+			context.Check(!graphics.SetConstantBuffer(passIndex, prepared) && graphics.HasRecordingError(),
+				"A binding kept from an earlier batch fails the recording of a later one");
+			graphics.EndRecordingScope();
+			inFlight->Detach(writer);
+			inFlight->Cancel();
+
+			pool.ReclaimCompleted();
+			const bool heldUntilCompletion = pool.GetPendingPageCount() == 1;
+			device.m_CompletedFenceValue = firstFence.m_Value;
+			auto reuse = pool.BeginBatch();
+			reuse->Attach(writer);
+			const RHIConstantBufferBinding reused = writer.GetFrameUploads().UploadConstants(frameData);
+			context.Check(heldUntilCompletion && reused.m_Buffer == prepared.m_Buffer &&
+				reused.m_UploadBatchId != prepared.m_UploadBatchId && !writer.Owns(prepared),
+				"A submitted page is reused only after its fence completes, under a new batch identity");
+			reuse->Detach(writer);
+			reuse->Cancel();
 		}
 
 		class TeardownTestContext final : public RHIContext
@@ -1961,14 +2061,14 @@ namespace gglab
 			device.m_PassConstantsEnabled = true;
 			device.m_UseControlledFenceCompletion = true;
 			device.m_CompletedFenceValue = 0;
-			RHIConstantUploadPool pool(device);
+			RHIUploadPool pool(device);
 			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
 			bool batchesReady = true;
 			const auto beginPublishedBatch = [&]()
 				{
 					auto batch = pool.BeginBatch();
 					batchesReady &= batch->Upload(std::as_bytes(std::span(payload))).IsValid() &&
-						batch->PublishWrites();
+						batch->Publish();
 					return batch;
 				};
 			RHIGpuWaitResult fenceWaitResult = RHIGpuWaitResult::Completed;
@@ -1993,7 +2093,7 @@ namespace gglab
 			};
 			const RHIFencePoint computeFence{ RHIFenceHandle{ 2, 1 }, 4 };
 			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
-			const auto resolve = [&](RHIConstantUploadBatch& batch,
+			const auto resolve = [&](RHIUploadBatch& batch,
 				std::initializer_list<RHISubmittedStream> streams)
 				{
 					return ResolveFrameSubmission(
@@ -10524,6 +10624,7 @@ namespace gglab
 		RunRenderHostContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunPassParameterContractTests(context);
+		RunUploadWriterContractTests(context);
 		RunCheckedCompletionContractTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);

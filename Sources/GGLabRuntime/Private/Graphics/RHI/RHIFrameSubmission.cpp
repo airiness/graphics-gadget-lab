@@ -1,6 +1,6 @@
 #include "Graphics/RHI/RHIFrameSubmission.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 
 #include <vector>
 
@@ -37,7 +37,7 @@ namespace gglab
 	}
 
 	RHISubmissionResolution ResolveFrameSubmission(std::span<const RHISubmittedStream> streams,
-		RHIConstantUploadBatch& batch, const RHISubmissionVerification& verification) noexcept
+		RHIUploadBatch& batch, const RHISubmissionVerification& verification) noexcept
 	{
 		std::vector<const RHISubmittedStream*> accepted;
 		accepted.reserve(streams.size());
@@ -62,7 +62,7 @@ namespace gglab
 		{
 			const bool submitted = batch.Submitted(lastFence);
 			GGLAB_ASSERT_MSG(
-				submitted, "A fenced submission must retain its constant upload pages.");
+				submitted, "A fenced submission must retain its upload pages.");
 			if (submitted)
 			{
 				resolution.m_State = RHIFrameSubmissionState::Fenced;
