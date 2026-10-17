@@ -32,22 +32,22 @@ namespace gglab
 		LabDiagnosticsFrameContext frame{ .m_RequestedTemporalAASettings = &requested,
 			.m_TemporalFramePlan = &plan, .m_FrameSerial = 82 };
 		const auto capture = [&]()
-			{
-				LabDiagnosticsSnapshot snapshot;
-				AppendTemporalAALabSettingsDiagnostics(snapshot, authoring, frame, history);
-				return snapshot;
-			};
+		{
+			LabDiagnosticsSnapshot snapshot;
+			AppendTemporalAALabSettingsDiagnostics(snapshot, authoring, frame, history);
+			return snapshot;
+		};
 		const auto metric = [](const LabDiagnosticsSnapshot& snapshot, std::string_view name)
+		{
+			for (const auto& entry : snapshot.m_Metrics)
 			{
-				for (const auto& entry : snapshot.m_Metrics)
+				if (entry.m_Name == name)
 				{
-					if (entry.m_Name == name)
-					{
-						return entry.m_Value;
-					}
+					return entry.m_Value;
 				}
-				return std::string{};
-			};
+			}
+			return std::string{};
+		};
 		const auto active = capture();
 		context.Check(metric(active, "TAA authoring settings").find("disabled;") == 0 &&
 			metric(active, "TAA authoring settings").find("history catmull-rom-clamped") != std::string::npos &&

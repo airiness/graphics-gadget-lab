@@ -17,8 +17,7 @@ namespace napa::voxel::testing
 			napa::voxel::SampleCoord m_Sample{};
 			napa::voxel::SphereEditSampleEvaluation m_Evaluation{};
 
-			[[nodiscard]] friend bool operator==(
-				const EligibilityRecord&, const EligibilityRecord&) noexcept = default;
+			[[nodiscard]] friend bool operator==(const EligibilityRecord&, const EligibilityRecord&) noexcept = default;
 		};
 
 		[[nodiscard]] napa::voxel::VoxelWorldConfig MakeEditConfig(
@@ -65,8 +64,7 @@ namespace napa::voxel::testing
 					{
 						const napa::voxel::SampleCoord sample{ x, y, z };
 						napa::voxel::SphereEditSampleEvaluation evaluation{};
-						if (napa::voxel::EvaluateSphereEditSample(
-							context, sample, evaluation).Failed())
+						if (napa::voxel::EvaluateSphereEditSample(context, sample, evaluation).Failed())
 						{
 							return false;
 						}
@@ -123,8 +121,7 @@ namespace napa::voxel::testing
 
 			invalid = valid;
 			invalid.m_MaterialRules.m_StoneBreakThreshold = 0;
-			context.Check(ValidateEdit(invalid).m_Error ==
-				ValidationError::InvalidVoxelEditMaterialRules,
+			context.Check(ValidateEdit(invalid).m_Error == ValidationError::InvalidVoxelEditMaterialRules,
 				"Sphere edit validation rejects a zero Stone break threshold");
 
 			SphereEditContext negativeStrength{};
@@ -132,10 +129,8 @@ namespace napa::voxel::testing
 			SphereEditContext excessiveStrength{};
 			const bool strengthsPrepared = PrepareSphereEditContext(MakeEditConfig(),
 				MakeEditRequest({}, 1.0, -2.0, 0), negativeStrength).Succeeded() &&
-				PrepareSphereEditContext(MakeEditConfig(),
-					MakeEditRequest({}, 1.0, 0.5, 0), midpointStrength).Succeeded() &&
-				PrepareSphereEditContext(MakeEditConfig(),
-					MakeEditRequest({}, 1.0, 2.0, 0), excessiveStrength).Succeeded();
+				PrepareSphereEditContext(MakeEditConfig(), MakeEditRequest({}, 1.0, 0.5, 0), midpointStrength).Succeeded() &&
+				PrepareSphereEditContext(MakeEditConfig(), MakeEditRequest({}, 1.0, 2.0, 0), excessiveStrength).Succeeded();
 			context.Check(strengthsPrepared && negativeStrength.GetSanitizedStrength() == 0.0 &&
 				!negativeStrength.HasDensityPath() &&
 				midpointStrength.GetSanitizedStrength() == 0.5 &&
@@ -172,8 +167,7 @@ namespace napa::voxel::testing
 				"Damage edits use their narrower complete conservative bounds");
 
 			SphereEditContext disabledContext{};
-			const bool disabledPrepared = PrepareSphereEditContext(config,
-				MakeEditRequest({}, 1.0, 0.0, 0), disabledContext).Succeeded();
+			const bool disabledPrepared = PrepareSphereEditContext(config, MakeEditRequest({}, 1.0, 0.0, 0), disabledContext).Succeeded();
 			context.Check(disabledPrepared && !disabledContext.HasDensityPath() &&
 				!disabledContext.HasDamagePath() && disabledContext.GetScanBounds().IsEmpty(),
 				"A request with both edit paths disabled prepares an empty scan");
@@ -181,7 +175,7 @@ namespace napa::voxel::testing
 			const VoxelWorldConfig clippedConfig = MakeEditConfig(1.0f, 2.0f, {
 				.m_Min = { -4, -4, -4 },
 				.m_MaxExclusive = { 4, 4, 4 },
-				});
+			});
 			SphereEditContext clippedContext{};
 			const bool clippedPrepared = PrepareSphereEditContext(clippedConfig,
 				MakeEditRequest({ -4.0, -4.0, -4.0 }, 1.0, 1.0, 0), clippedContext).Succeeded();
@@ -191,7 +185,7 @@ namespace napa::voxel::testing
 					clippedContext.GetScanBounds().m_MaxExclusive.m_X - 1,
 					clippedContext.GetScanBounds().m_MaxExclusive.m_Y - 1,
 					clippedContext.GetScanBounds().m_MaxExclusive.m_Z - 1,
-					}),
+				}),
 					"Sphere edit scan bounds clip to the logical Sample Domain");
 
 			const SampleAabb preservedBounds = densityContext.GetScanBounds();
@@ -199,17 +193,14 @@ namespace napa::voxel::testing
 			const SphereEditRequest overflow = MakeEditRequest({
 				static_cast<double>(std::numeric_limits<std::int32_t>::max()), 0.0, 0.0,
 				}, 2.0, 1.0, 0);
-			const ValidationResult overflowResult =
-				PrepareSphereEditContext(config, overflow, densityContext);
+			const ValidationResult overflowResult = PrepareSphereEditContext(config, overflow, densityContext);
 			context.Check(overflowResult.m_Error == ValidationError::ArithmeticOverflow &&
 				densityContext.GetScanBounds() == preservedBounds &&
 				densityContext.GetSanitizedStrength() == preservedStrength,
 				"Coordinate-limit overflow leaves a prepared edit context unchanged");
 
-			const SphereEditRequest radiusAdditionOverflow = MakeEditRequest(
-				{}, std::numeric_limits<double>::max(), 1.0, 0);
-			const ValidationResult radiusAdditionResult = PrepareSphereEditContext(
-				config, radiusAdditionOverflow, densityContext);
+			const SphereEditRequest radiusAdditionOverflow = MakeEditRequest({}, std::numeric_limits<double>::max(), 1.0, 0);
+			const ValidationResult radiusAdditionResult = PrepareSphereEditContext(config, radiusAdditionOverflow, densityContext);
 			context.Check(radiusAdditionResult.m_Error == ValidationError::ArithmeticOverflow &&
 				densityContext.GetScanBounds() == preservedBounds &&
 				densityContext.GetSanitizedStrength() == preservedStrength,
@@ -220,8 +211,7 @@ namespace napa::voxel::testing
 		{
 			using namespace napa::voxel;
 			SphereEditContext basicContext{};
-			const bool basicPrepared = PrepareSphereEditContext(MakeEditConfig(),
-				MakeEditRequest({}, 1.0, 1.0, 0), basicContext).Succeeded();
+			const bool basicPrepared = PrepareSphereEditContext(MakeEditConfig(), MakeEditRequest({}, 1.0, 1.0, 0), basicContext).Succeeded();
 			SphereEditSampleEvaluation center{};
 			SphereEditSampleEvaluation surface{};
 			SphereEditSampleEvaluation outside{};
@@ -238,10 +228,9 @@ namespace napa::voxel::testing
 			const VoxelWorldConfig supportConfig = MakeEditConfig(1.0f, 127.0f, {
 				.m_Min = { -128, -128, -128 },
 				.m_MaxExclusive = { 128, 128, 128 },
-				});
+			});
 			SphereEditContext densityContext{};
-			const bool densityPrepared = PrepareSphereEditContext(supportConfig,
-				MakeEditRequest({}, 0.5, 1.0, 0), densityContext).Succeeded();
+			const bool densityPrepared = PrepareSphereEditContext(supportConfig, MakeEditRequest({}, 0.5, 1.0, 0), densityContext).Succeeded();
 			SphereEditSampleEvaluation positiveDensity{};
 			SphereEditSampleEvaluation negativeDensity{};
 			SphereEditSampleEvaluation outsideDensity{};
@@ -259,8 +248,7 @@ namespace napa::voxel::testing
 				"Positive and negative density support ties are included exactly once");
 
 			SphereEditContext damageContext{};
-			const bool damagePrepared = PrepareSphereEditContext(supportConfig,
-				MakeEditRequest({}, 0.5, 0.0, 1), damageContext).Succeeded();
+			const bool damagePrepared = PrepareSphereEditContext(supportConfig, MakeEditRequest({}, 0.5, 0.0, 1), damageContext).Succeeded();
 			SphereEditSampleEvaluation damageBoundary{};
 			SphereEditSampleEvaluation damageOutside{};
 			const bool damageEvaluated = damagePrepared &&
@@ -273,8 +261,7 @@ namespace napa::voxel::testing
 				"Damage eligibility includes its outer half-away-from-zero support tie");
 
 			SphereEditContext cornerContext{};
-			const bool cornerPrepared = PrepareSphereEditContext(MakeEditConfig(),
-				MakeEditRequest({}, 1.0, 1.0, 0), cornerContext).Succeeded();
+			const bool cornerPrepared = PrepareSphereEditContext(MakeEditConfig(), MakeEditRequest({}, 1.0, 1.0, 0), cornerContext).Succeeded();
 			SphereEditSampleEvaluation corner{};
 			const SampleCoord cornerSample{ 2, 2, 2 };
 			const bool cornerEvaluated = cornerPrepared &&
@@ -291,10 +278,8 @@ namespace napa::voxel::testing
 			};
 			const SphereEditSampleEvaluation expectedPreserved = preserved;
 			SphereEditContext unprepared{};
-			const ValidationResult unpreparedResult =
-				EvaluateSphereEditSample(unprepared, {}, preserved);
-			const ValidationResult outsideResult =
-				EvaluateSphereEditSample(cornerContext, { 100, 0, 0 }, preserved);
+			const ValidationResult unpreparedResult = EvaluateSphereEditSample(unprepared, {}, preserved);
+			const ValidationResult outsideResult = EvaluateSphereEditSample(cornerContext, { 100, 0, 0 }, preserved);
 			context.Check(unpreparedResult.m_Error == ValidationError::UnpreparedSphereEditContext &&
 				outsideResult.m_Error == ValidationError::SampleOutsideLogicalBounds &&
 				preserved == expectedPreserved,
@@ -309,14 +294,15 @@ namespace napa::voxel::testing
 				VoxelWorldConfig m_Config{};
 				SphereEditRequest m_Request{};
 			};
-			const std::array cases{
+			const std::array cases
+			{
 				OracleCase{ MakeEditConfig(),
 					MakeEditRequest({ -0.25, 0.5, 1.25 }, 2.0, 1.0, 0) },
 				OracleCase{ MakeEditConfig(),
 					MakeEditRequest({}, 1.0, 0.0, 128) },
 				OracleCase{ MakeEditConfig(0.5f, 4.0f),
 					MakeEditRequest({ -2.25, 3.5, -0.75 }, 0.75, 0.5, 64) },
-				OracleCase{ MakeEditConfig(1.0f, 1.0f, {
+				OracleCase{ MakeEditConfig(1.0f, 1.0f,{
 						.m_Min = { -4, -4, -4 },
 						.m_MaxExclusive = { 4, 4, 4 },
 					}), MakeEditRequest({ -3.75, 0.25, 0.5 }, 1.0, 1.0, 0) },
@@ -327,8 +313,7 @@ namespace napa::voxel::testing
 			for (const OracleCase& oracleCase : cases)
 			{
 				SphereEditContext editContext{};
-				if (PrepareSphereEditContext(
-					oracleCase.m_Config, oracleCase.m_Request, editContext).Failed())
+				if (PrepareSphereEditContext(oracleCase.m_Config, oracleCase.m_Request, editContext).Failed())
 				{
 					allCasesMatched = false;
 					break;
@@ -336,8 +321,7 @@ namespace napa::voxel::testing
 
 				std::vector<EligibilityRecord> fullDomainRecords;
 				std::vector<EligibilityRecord> boundedRecords;
-				if (!ScanEligibility(editContext, editContext.GetLogicalSampleBounds(),
-					fullDomainRecords) ||
+				if (!ScanEligibility(editContext, editContext.GetLogicalSampleBounds(), fullDomainRecords) ||
 					!ScanEligibility(editContext, editContext.GetScanBounds(), boundedRecords) ||
 					fullDomainRecords != boundedRecords ||
 					!std::ranges::all_of(fullDomainRecords,

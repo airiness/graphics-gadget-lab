@@ -95,8 +95,7 @@ namespace gglab
 			{
 				if (m_Set)
 				{
-					SetEnvironmentVariableW(m_Name.c_str(),
-						m_HadPreviousValue ? m_PreviousValue.c_str() : nullptr);
+					SetEnvironmentVariableW(m_Name.c_str(), m_HadPreviousValue ? m_PreviousValue.c_str() : nullptr);
 				}
 			}
 
@@ -154,8 +153,7 @@ namespace gglab
 			HANDLE outWrite = nullptr;
 			HANDLE errRead = nullptr;
 			HANDLE errWrite = nullptr;
-			if (!CreatePipe(&outRead, &outWrite, &securityAttributes, 0) ||
-				!CreatePipe(&errRead, &errWrite, &securityAttributes, 0))
+			if (!CreatePipe(&outRead, &outWrite, &securityAttributes, 0) || !CreatePipe(&errRead, &errWrite, &securityAttributes, 0))
 			{
 				return result;
 			}
@@ -182,8 +180,7 @@ namespace gglab
 			PROCESS_INFORMATION processInfo{};
 			const std::wstring exePath = ShaderCompilerExecutablePath().wstring();
 			const std::wstring exeDirectory = win32::GetExecutableDirectory().wstring();
-			const std::wstring& currentDirectory =
-				workingDirectory.empty() ? exeDirectory : workingDirectory;
+			const std::wstring& currentDirectory = workingDirectory.empty() ? exeDirectory : workingDirectory;
 			const BOOL created = CreateProcessW(
 				exePath.c_str(),
 				commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
@@ -226,7 +223,8 @@ namespace gglab
 				drain(outRead, result.m_StdOut);
 				drain(errRead, result.m_StdErr);
 				waitResult = WaitForSingleObject(processInfo.hProcess, 20);
-			} while (waitResult == WAIT_TIMEOUT && GetTickCount64() < deadline);
+			}
+			while (waitResult == WAIT_TIMEOUT && GetTickCount64() < deadline);
 			if (waitResult == WAIT_TIMEOUT)
 			{
 				TerminateProcess(processInfo.hProcess, ERROR_TIMEOUT);
@@ -296,13 +294,11 @@ namespace gglab
 		// Parse the describe wire output as JSON. Returns std::nullopt when the
 		// text is not a valid JSON object, so a caller can distinguish an
 		// unparsable document from a well-formed document with the wrong fields.
-		[[nodiscard]] std::optional<nlohmann::json> ParseWireDocument(
-			std::string_view text) noexcept
+		[[nodiscard]] std::optional<nlohmann::json> ParseWireDocument(std::string_view text) noexcept
 		{
 			try
 			{
-				const nlohmann::json document =
-					nlohmann::json::parse(text, nullptr, /*allow_exceptions=*/false);
+				const nlohmann::json document = nlohmann::json::parse(text, nullptr, /*allow_exceptions=*/false);
 				if (document.is_discarded() || !document.is_object())
 				{
 					return std::nullopt;
@@ -318,8 +314,7 @@ namespace gglab
 		// Safe typed reads for the describe wire: a missing key or a type
 		// mismatch is a failed read, never an exception. A malformed document
 		// must fail the check that reads it, not terminate the test process.
-		[[nodiscard]] bool ReadWireString(std::optional<nlohmann::json> doc,
-			std::string_view key, std::string& out) noexcept
+		[[nodiscard]] bool ReadWireString(std::optional<nlohmann::json> doc, std::string_view key, std::string& out) noexcept
 		{
 			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_string())
 			{
@@ -329,11 +324,9 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool ReadWireInteger(std::optional<nlohmann::json> doc,
-			std::string_view key, std::int64_t& out) noexcept
+		[[nodiscard]] bool ReadWireInteger(std::optional<nlohmann::json> doc, std::string_view key, std::int64_t& out) noexcept
 		{
-			if (!doc.has_value() || !doc->contains(key) ||
-				!doc->at(key).is_number_integer())
+			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_number_integer())
 			{
 				return false;
 			}
@@ -341,8 +334,7 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool ReadWireBoolean(std::optional<nlohmann::json> doc,
-			std::string_view key, bool& out) noexcept
+		[[nodiscard]] bool ReadWireBoolean(std::optional<nlohmann::json> doc, std::string_view key, bool& out) noexcept
 		{
 			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_boolean())
 			{
@@ -352,11 +344,9 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool WireDiagnosticsCount(std::optional<nlohmann::json> doc,
-			std::size_t& count) noexcept
+		[[nodiscard]] bool WireDiagnosticsCount(std::optional<nlohmann::json> doc, std::size_t& count) noexcept
 		{
-			if (!doc.has_value() || !doc->contains("diagnostics") ||
-				!doc->at("diagnostics").is_array())
+			if (!doc.has_value() || !doc->contains("diagnostics") || !doc->at("diagnostics").is_array())
 			{
 				return false;
 			}
@@ -369,19 +359,14 @@ namespace gglab
 			std::string_view command = "compile") noexcept
 		{
 			return result.m_ExitCode == exitCode && IsSingleJsonDocument(result) &&
-				result.m_StdOut.find(std::format("\"command\":\"{}\"", command)) !=
-					std::string::npos &&
-				result.m_StdOut.find(success ? "\"success\":true" : "\"success\":false") !=
-					std::string::npos &&
-				result.m_StdOut.find(std::format("\"status\":\"{}\"", status)) !=
-					std::string::npos &&
-				result.m_StdOut.find(std::format("\"exitCode\":{}", exitCode)) !=
-					std::string::npos &&
+				result.m_StdOut.find(std::format("\"command\":\"{}\"", command)) != std::string::npos &&
+				result.m_StdOut.find(success ? "\"success\":true" : "\"success\":false") != std::string::npos &&
+				result.m_StdOut.find(std::format("\"status\":\"{}\"", status)) != std::string::npos &&
+				result.m_StdOut.find(std::format("\"exitCode\":{}", exitCode)) != std::string::npos &&
 				result.m_StdOut.find("\"diagnostics\":[") != std::string::npos;
 		}
 
-		[[nodiscard]] std::string ExtractJsonField(
-			std::string_view json, std::string_view fieldName) noexcept
+		[[nodiscard]] std::string ExtractJsonField(std::string_view json, std::string_view fieldName) noexcept
 		{
 			const std::string prefix = std::string("\"") + std::string(fieldName) + "\":\"";
 			const std::size_t begin = json.find(prefix);
@@ -430,8 +415,7 @@ namespace gglab
 			return decoded;
 		}
 
-		void RunDescribeHandshakeTests(SelfTestContext& context,
-			const std::filesystem::path& tempRoot) noexcept
+		void RunDescribeHandshakeTests(SelfTestContext& context, const std::filesystem::path& tempRoot) noexcept
 		{
 			// Machine describe handshake contract — wire verification. These
 			// protocol self-tests go only through describe (per the consumer
@@ -441,36 +425,36 @@ namespace gglab
 			// Byte stability, a parsed JSON object document, and exact wire fields.
 			{
 				const CliRunResult first = RunCli({ L"describe" });
-				const CliRunResult second = RunCli({ L"describe" });
-				const auto firstDoc = ParseWireDocument(first.m_StdOut);
-				const auto secondDoc = ParseWireDocument(second.m_StdOut);
-				context.Check(
-					first.m_ExitCode == 0 && second.m_ExitCode == 0 &&
-						first.m_StdOut == second.m_StdOut &&
-						first.m_StdErr.empty() && second.m_StdErr.empty() &&
-						firstDoc.has_value() && secondDoc.has_value() &&
-						*firstDoc == *secondDoc,
-					"describe emits a byte-stable parsed JSON object document and no stderr");
-				std::string command;
-				std::string status;
-				bool success = false;
-				std::int64_t exitCode = -1;
-				std::int64_t contractVersion = -1;
-				std::int64_t compilePolicyRevision = -1;
-				std::size_t diagnosticsCount = 0;
-				context.Check(
-					ReadWireString(firstDoc, "command", command) &&
-						command == "describe" &&
-						ReadWireBoolean(firstDoc, "success", success) && success &&
-						ReadWireString(firstDoc, "status", status) && status == "ok" &&
-						ReadWireInteger(firstDoc, "exitCode", exitCode) && exitCode == 0 &&
-						ReadWireInteger(firstDoc, "processContractVersion", contractVersion) &&
-							contractVersion == gglab::ShaderProcessContractVersion &&
-						ReadWireInteger(firstDoc, "compilePolicyRevision", compilePolicyRevision) &&
-							compilePolicyRevision == gglab::ShaderCompilePolicyRevision &&
-						WireDiagnosticsCount(firstDoc, diagnosticsCount) &&
-							diagnosticsCount == 0,
-					"describe.success carries exact command/success/status/exitCode and an empty diagnostics array");
+			const CliRunResult second = RunCli({ L"describe" });
+			const auto firstDoc = ParseWireDocument(first.m_StdOut);
+			const auto secondDoc = ParseWireDocument(second.m_StdOut);
+			context.Check(
+				first.m_ExitCode == 0 && second.m_ExitCode == 0 &&
+				first.m_StdOut == second.m_StdOut &&
+				first.m_StdErr.empty() && second.m_StdErr.empty() &&
+				firstDoc.has_value() && secondDoc.has_value() &&
+				*firstDoc == *secondDoc,
+				"describe emits a byte-stable parsed JSON object document and no stderr");
+			std::string command;
+			std::string status;
+			bool success = false;
+			std::int64_t exitCode = -1;
+			std::int64_t contractVersion = -1;
+			std::int64_t compilePolicyRevision = -1;
+			std::size_t diagnosticsCount = 0;
+			context.Check(
+				ReadWireString(firstDoc, "command", command) &&
+				command == "describe" &&
+				ReadWireBoolean(firstDoc, "success", success) && success &&
+				ReadWireString(firstDoc, "status", status) && status == "ok" &&
+				ReadWireInteger(firstDoc, "exitCode", exitCode) && exitCode == 0 &&
+				ReadWireInteger(firstDoc, "processContractVersion", contractVersion) &&
+				contractVersion == gglab::ShaderProcessContractVersion &&
+				ReadWireInteger(firstDoc, "compilePolicyRevision", compilePolicyRevision) &&
+				compilePolicyRevision == gglab::ShaderCompilePolicyRevision &&
+				WireDiagnosticsCount(firstDoc, diagnosticsCount) &&
+				diagnosticsCount == 0,
+				"describe.success carries exact command/success/status/exitCode and an empty diagnostics array");
 			}
 
 			// compilePolicyRevision is the cross-process counterpart of the cache
@@ -479,11 +463,10 @@ namespace gglab
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
 				std::int64_t compilePolicyRevision = -1;
-				const bool revisionRead = ReadWireInteger(
-					doc, "compilePolicyRevision", compilePolicyRevision);
+				const bool revisionRead = ReadWireInteger(doc, "compilePolicyRevision", compilePolicyRevision);
 				context.Check(
 					revisionRead &&
-						compilePolicyRevision == gglab::ShaderCompilePolicyRevision,
+					compilePolicyRevision == gglab::ShaderCompilePolicyRevision,
 					"describe.compilePolicyRevision equals the BuildKey policy authority");
 			}
 
@@ -498,8 +481,7 @@ namespace gglab
 				std::string wireProducerIdentity;
 				const bool toolChain = ReadWireString(doc, "toolIdentity", wireToolIdentity) &&
 					wireToolIdentity == std::string(ShaderCompilerToolIdentity);
-				const bool producerChain = ReadWireString(
-						doc, "producerIdentity", wireProducerIdentity) &&
+				const bool producerChain = ReadWireString(doc, "producerIdentity", wireProducerIdentity) &&
 					wireProducerIdentity == utils::ToString(inProcess.m_CanonicalIdentity) &&
 					!wireProducerIdentity.empty() && wireProducerIdentity != "unknown";
 				context.Check(
@@ -518,8 +500,8 @@ namespace gglab
 				const bool versionRead = ReadWireString(doc, "toolVersion", wireVersion);
 				context.Check(
 					versionRead &&
-						wireVersion == utils::ToString(ShaderCompilerToolVersion) &&
-						IsSemver(wireVersion),
+					wireVersion == utils::ToString(ShaderCompilerToolVersion) &&
+					IsSemver(wireVersion),
 					"describe.toolVersion matches the tool-version constant and is semver-shaped");
 			}
 
@@ -529,11 +511,10 @@ namespace gglab
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
 				std::int64_t contractVersion = -1;
-				const bool versionRead = ReadWireInteger(
-					doc, "processContractVersion", contractVersion);
+				const bool versionRead = ReadWireInteger(doc, "processContractVersion", contractVersion);
 				context.Check(
 					versionRead &&
-						contractVersion == gglab::ShaderProcessContractVersion,
+					contractVersion == gglab::ShaderProcessContractVersion,
 					"describe.processContractVersion equals the declared process contract value");
 			}
 
@@ -547,7 +528,7 @@ namespace gglab
 				const bool kindRead = ReadWireString(doc, "producerKind", wireKind);
 				context.Check(
 					inProcess.m_Kind == ShaderCompilerKind::Dxc &&
-						kindRead && wireKind == "dxc",
+					kindRead && wireKind == "dxc",
 					"describe producer kind parity with the in-process descriptor kind (dxc)");
 			}
 
@@ -564,13 +545,13 @@ namespace gglab
 					parsedProfile == ShaderTargetProfile::GGLabVulkan13;
 				context.Check(
 					wireNames.size() == 2 &&
-						parseDx12 && parseVulkan,
+					parseDx12 && parseVulkan,
 					"target wire-name single-table authority enumerates and accepts the supported set");
-				const bool targetsMatches = doc
-					? doc->contains("supportedTargets") &&
+				const bool targetsMatches = doc ?
+					doc->contains("supportedTargets") &&
 						doc->at("supportedTargets").is_array() &&
-						doc->at("supportedTargets") == nlohmann::json(wireNames)
-					: false;
+						doc->at("supportedTargets") == nlohmann::json(wireNames) :
+					false;
 				context.Check(
 					targetsMatches,
 					"describe.supportedTargets exactly equals the single-table authority (no extras)");
@@ -592,8 +573,7 @@ namespace gglab
 					decoyWritten = output.good();
 				}
 				const CliRunResult reference = RunCli({ L"describe" });
-				const CliRunResult fromDecoy = RunCli(
-					{ L"describe" }, false, false, decoyRoot.wstring());
+				const CliRunResult fromDecoy = RunCli({ L"describe" }, false, false, decoyRoot.wstring());
 				const auto doc = ParseWireDocument(fromDecoy.m_StdOut);
 				const char* const callerContextFields[] = {
 					"sourceRoot", "source-root", "sourcePath", "cacheRoot", "cache-root",
@@ -606,10 +586,10 @@ namespace gglab
 				}
 				context.Check(
 					!errorCode && decoyWritten &&
-						reference.m_ExitCode == 0 && fromDecoy.m_ExitCode == 0 &&
-						reference.m_StdErr.empty() && fromDecoy.m_StdErr.empty() &&
-						reference.m_StdOut == fromDecoy.m_StdOut &&
-						absent,
+					reference.m_ExitCode == 0 && fromDecoy.m_ExitCode == 0 &&
+					reference.m_StdErr.empty() && fromDecoy.m_StdErr.empty() &&
+					reference.m_StdOut == fromDecoy.m_StdOut &&
+					absent,
 					"describe carries no caller build context and is byte-identical from a foreign cwd");
 			}
 
@@ -633,11 +613,9 @@ namespace gglab
 
 				// Each usage-error response must be a fully parsed describe document
 				// with the failure wire shape and no business-payload fields.
-				auto CheckDescribeUsageError = [&](
-					const CliRunResult& run, const char* label) noexcept
+				auto CheckDescribeUsageError = [&](const CliRunResult& run, const char* label) noexcept
 				{
-					const std::string checkName =
-						std::string("describe usage-error structured (") + label + ")";
+					const std::string checkName = std::string("describe usage-error structured (") + label + ")";
 					const auto doc = ParseWireDocument(run.m_StdOut);
 					std::string command;
 					std::string status;
@@ -647,16 +625,15 @@ namespace gglab
 					std::size_t diagnosticsCount = 0;
 					const bool structuredFailure =
 						ReadWireString(doc, "command", command) &&
-							command == "describe" &&
-							ReadWireBoolean(doc, "success", success) && !success &&
-							ReadWireString(doc, "status", status) &&
-								status == "usage-error" &&
-							ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 2 &&
-							ReadWireInteger(
-								doc, "processContractVersion", contractVersion) &&
-								contractVersion == gglab::ShaderProcessContractVersion &&
-							WireDiagnosticsCount(doc, diagnosticsCount) &&
-								diagnosticsCount > 0;
+						command == "describe" &&
+						ReadWireBoolean(doc, "success", success) && !success &&
+						ReadWireString(doc, "status", status) &&
+						status == "usage-error" &&
+						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 2 &&
+						ReadWireInteger(doc, "processContractVersion", contractVersion) &&
+						contractVersion == gglab::ShaderProcessContractVersion &&
+						WireDiagnosticsCount(doc, diagnosticsCount) &&
+						diagnosticsCount > 0;
 					const bool noBusinessLeak = doc.has_value() &&
 						!doc->contains("toolIdentity") &&
 						!doc->contains("toolVersion") &&
@@ -665,8 +642,8 @@ namespace gglab
 						!doc->contains("supportedTargets");
 					context.Check(
 						run.m_ExitCode == 2 &&
-							run.m_StdErr.empty() &&
-							structuredFailure && noBusinessLeak,
+						run.m_StdErr.empty() &&
+						structuredFailure && noBusinessLeak,
 						checkName.c_str());
 				};
 				CheckDescribeUsageError(positional, "extra positional argument");
@@ -676,8 +653,7 @@ namespace gglab
 
 			// Producer unavailable via the existing forced-unavailable seam.
 			{
-				const CliRunResult result =
-					RunCli({ L"describe" }, /*forceCompilerUnavailable*/ true);
+				const CliRunResult result = RunCli({ L"describe" }, /*forceCompilerUnavailable*/ true);
 				const auto doc = ParseWireDocument(result.m_StdOut);
 				std::string command;
 				std::string status;
@@ -686,17 +662,16 @@ namespace gglab
 				std::int64_t contractVersion = -1;
 				context.Check(
 					result.m_ExitCode == 4 &&
-						result.m_StdErr.empty() &&
-						ReadWireString(doc, "command", command) &&
-							command == "describe" &&
-						ReadWireBoolean(doc, "success", success) && !success &&
-						ReadWireString(doc, "status", status) &&
-							status == "compiler-unavailable" &&
-						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 4 &&
-						ReadWireInteger(
-							doc, "processContractVersion", contractVersion) &&
-							contractVersion == gglab::ShaderProcessContractVersion &&
-						doc.has_value() && !doc->contains("producerIdentity"),
+					result.m_StdErr.empty() &&
+					ReadWireString(doc, "command", command) &&
+					command == "describe" &&
+					ReadWireBoolean(doc, "success", success) && !success &&
+					ReadWireString(doc, "status", status) &&
+					status == "compiler-unavailable" &&
+					ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 4 &&
+					ReadWireInteger(doc, "processContractVersion", contractVersion) &&
+					contractVersion == gglab::ShaderProcessContractVersion &&
+					doc.has_value() && !doc->contains("producerIdentity"),
 					"describe reports compiler-unavailable (exit 4) when the producer is unavailable");
 			}
 
@@ -714,24 +689,22 @@ namespace gglab
 				std::size_t diagnosticsCount = 0;
 				context.Check(
 					result.m_ExitCode == 7 &&
-						result.m_StdErr.empty() &&
-						ReadWireString(doc, "command", command) &&
-							command == "describe" &&
-						ReadWireBoolean(doc, "success", success) && !success &&
-						ReadWireString(doc, "status", status) &&
-							status == "internal-error" &&
-						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 7 &&
-						ReadWireInteger(
-							doc, "processContractVersion", contractVersion) &&
-							contractVersion == gglab::ShaderProcessContractVersion &&
-						WireDiagnosticsCount(doc, diagnosticsCount) &&
-							diagnosticsCount > 0,
+					result.m_StdErr.empty() &&
+					ReadWireString(doc, "command", command) &&
+					command == "describe" &&
+					ReadWireBoolean(doc, "success", success) && !success &&
+					ReadWireString(doc, "status", status) &&
+					status == "internal-error" &&
+					ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 7 &&
+					ReadWireInteger(doc, "processContractVersion", contractVersion) &&
+					contractVersion == gglab::ShaderProcessContractVersion &&
+					WireDiagnosticsCount(doc, diagnosticsCount) &&
+					diagnosticsCount > 0,
 					"describe reports internal-error (exit 7) on a forced handled failure");
 			}
 		}
 
-		[[nodiscard]] bool WriteTextFile(
-			const std::filesystem::path& path, std::string_view content) noexcept
+		[[nodiscard]] bool WriteTextFile(const std::filesystem::path& path, std::string_view content) noexcept
 		{
 			std::filesystem::create_directories(path.parent_path());
 			std::ofstream output(path, std::ios::binary);
@@ -739,18 +712,15 @@ namespace gglab
 			return output.good();
 		}
 
-		[[nodiscard]] bool WriteBinaryFile(
-			const std::filesystem::path& path, const ShaderBinary& binary) noexcept
+		[[nodiscard]] bool WriteBinaryFile(const std::filesystem::path& path, const ShaderBinary& binary) noexcept
 		{
 			std::filesystem::create_directories(path.parent_path());
 			std::ofstream output(path, std::ios::binary);
-			output.write(static_cast<const char*>(binary.Data()),
-				static_cast<std::streamsize>(binary.SizeInBytes()));
+			output.write(static_cast<const char*>(binary.Data()), static_cast<std::streamsize>(binary.SizeInBytes()));
 			return output.good();
 		}
 
-		[[nodiscard]] std::optional<ShaderBinary> ReadFileBinary(
-			const std::filesystem::path& path) noexcept
+		[[nodiscard]] std::optional<ShaderBinary> ReadFileBinary(const std::filesystem::path& path) noexcept
 		{
 			std::error_code errorCode;
 			const auto fileSize = std::filesystem::file_size(path, errorCode);
@@ -772,8 +742,7 @@ namespace gglab
 			return binary;
 		}
 
-		[[nodiscard]] bool CliArtifactFieldsDescribeCommittedEntry(
-			const CliRunResult& result) noexcept
+		[[nodiscard]] bool CliArtifactFieldsDescribeCommittedEntry(const CliRunResult& result) noexcept
 		{
 			if (result.m_ExitCode != 0 ||
 				result.m_StdOut.find("\"manifestPath\"") != std::string::npos)
@@ -782,8 +751,7 @@ namespace gglab
 			}
 			const std::string binaryHash = ExtractJsonField(result.m_StdOut, "binaryHash");
 			const std::string binaryPathText = ExtractJsonField(result.m_StdOut, "binaryPath");
-			const std::string recordPathText = ExtractJsonField(
-				result.m_StdOut, "cacheRecordPath");
+			const std::string recordPathText = ExtractJsonField(result.m_StdOut, "cacheRecordPath");
 			if (binaryHash.empty() || binaryPathText.empty() || recordPathText.empty())
 			{
 				return false;
@@ -792,12 +760,10 @@ namespace gglab
 			const std::filesystem::path recordPath = utils::ToWideString(recordPathText);
 			auto expectedRecordPath = binaryPath;
 			expectedRecordPath += L".json";
-			const std::optional<ShaderArtifactCacheRecord> committed =
-				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
+			const std::optional<ShaderArtifactCacheRecord> committed = LoadShaderArtifactCacheRecord(recordPath, binaryPath);
 			return recordPath.lexically_normal() == expectedRecordPath.lexically_normal() &&
 				committed.has_value() &&
-				Sha256DigestToHex(
-					committed->m_Manifest.m_BinaryContentDigest.m_Digest) == binaryHash;
+				Sha256DigestToHex(committed->m_Manifest.m_BinaryContentDigest.m_Digest) == binaryHash;
 		}
 
 		[[nodiscard]] bool CliRuntimeArtifactFieldsDescribePublishedEntry(
@@ -806,12 +772,9 @@ namespace gglab
 			std::wstring_view expectedEntryPoint = L"VSMain") noexcept
 		{
 			const std::string artifactId = ExtractJsonField(result.m_StdOut, "artifactId");
-			const std::filesystem::path runtimeBinaryPath = utils::ToWideString(
-				ExtractJsonField(result.m_StdOut, "runtimeArtifactBinaryPath"));
-			const std::filesystem::path runtimeManifestPath = utils::ToWideString(
-				ExtractJsonField(result.m_StdOut, "runtimeArtifactManifestPath"));
-			const std::filesystem::path cacheBinaryPath = utils::ToWideString(
-				ExtractJsonField(result.m_StdOut, "binaryPath"));
+			const std::filesystem::path runtimeBinaryPath = utils::ToWideString(ExtractJsonField(result.m_StdOut, "runtimeArtifactBinaryPath"));
+			const std::filesystem::path runtimeManifestPath = utils::ToWideString(ExtractJsonField(result.m_StdOut, "runtimeArtifactManifestPath"));
+			const std::filesystem::path cacheBinaryPath = utils::ToWideString(ExtractJsonField(result.m_StdOut, "binaryPath"));
 			if (result.m_ExitCode != 0 || artifactId.empty() ||
 				runtimeBinaryPath.empty() || runtimeManifestPath.empty() ||
 				cacheBinaryPath.empty())
@@ -819,8 +782,7 @@ namespace gglab
 				return false;
 			}
 
-			const std::optional<ShaderBinary> serializedManifest =
-				ReadFileBinary(runtimeManifestPath);
+			const std::optional<ShaderBinary> serializedManifest = ReadFileBinary(runtimeManifestPath);
 			if (!serializedManifest.has_value())
 			{
 				return false;
@@ -829,8 +791,7 @@ namespace gglab
 				DeserializeShaderRuntimeArtifactManifest(std::span(
 					static_cast<const std::byte*>(serializedManifest->Data()),
 					serializedManifest->SizeInBytes()));
-			if (!manifest.has_value() || Sha256DigestToHex(
-				manifest->m_ArtifactId.m_DurableDigest) != artifactId ||
+			if (!manifest.has_value() || Sha256DigestToHex(manifest->m_ArtifactId.m_DurableDigest) != artifactId ||
 				manifest->m_EntryPoint != utils::ToString(expectedEntryPoint))
 			{
 				return false;
@@ -849,19 +810,13 @@ namespace gglab
 				.m_CoordinateOptions = manifest->m_CoordinateOptions,
 				.m_Stage = manifest->m_Stage,
 			};
-			const ShaderArtifactLoadResult loaded =
-				store.LoadArtifact(artifactRef, compatibility);
+			const ShaderArtifactLoadResult loaded = store.LoadArtifact(artifactRef, compatibility);
 			const std::optional<ShaderBinary> cacheBinary = ReadFileBinary(cacheBinaryPath);
-			return runtimeBinaryPath.lexically_normal() ==
-					expectedPaths.m_BinaryPath.lexically_normal() &&
-				runtimeManifestPath.lexically_normal() ==
-					expectedPaths.m_ManifestPath.lexically_normal() &&
+			return runtimeBinaryPath.lexically_normal() == expectedPaths.m_BinaryPath.lexically_normal() &&
+				runtimeManifestPath.lexically_normal() == expectedPaths.m_ManifestPath.lexically_normal() &&
 				loaded.IsSuccess() && cacheBinary.has_value() &&
 				loaded.m_Artifact.m_Binary.SizeInBytes() == cacheBinary->SizeInBytes() &&
-				std::memcmp(
-					loaded.m_Artifact.m_Binary.Data(),
-					cacheBinary->Data(),
-					cacheBinary->SizeInBytes()) == 0;
+				std::memcmp(loaded.m_Artifact.m_Binary.Data(), cacheBinary->Data(), cacheBinary->SizeInBytes()) == 0;
 		}
 
 		struct RuntimeCompileEvidence
@@ -904,8 +859,7 @@ namespace gglab
 			}
 			evidence.m_RecipeId = Sha256DigestToHex(recipe.m_RecipeId.m_DurableDigest);
 			evidence.m_BuildKey = Sha256DigestToHex(recipe.m_BuildKey.m_DurableDigest);
-			evidence.m_BinaryDigest = Sha256DigestToHex(
-				result.m_Artifact.m_Manifest.m_BinaryContentDigest.m_Digest);
+			evidence.m_BinaryDigest = Sha256DigestToHex(result.m_Artifact.m_Manifest.m_BinaryContentDigest.m_Digest);
 			evidence.m_Binary = result.m_Artifact.m_Binary;
 			evidence.m_Succeeded = true;
 			return evidence;
@@ -921,22 +875,16 @@ namespace gglab
 			std::string_view m_TargetName;
 		};
 
-		void RunParityTests(SelfTestContext& context, const std::filesystem::path& sourceRoot,
-			const std::filesystem::path& tempRoot) noexcept
+		void RunParityTests(SelfTestContext& context, const std::filesystem::path& sourceRoot, const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr std::array ParityCases{
-				ParityCase{ L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain",
-					"vertex", ShaderTargetProfile::GGLabDX12, "gglab-dx12" },
-				ParityCase{ L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain",
-					"pixel", ShaderTargetProfile::GGLabDX12, "gglab-dx12" },
-				ParityCase{ L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain",
-					"compute", ShaderTargetProfile::GGLabDX12, "gglab-dx12" },
-				ParityCase{ L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain",
-					"vertex", ShaderTargetProfile::GGLabVulkan13, "gglab-vulkan13" },
-				ParityCase{ L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain",
-					"pixel", ShaderTargetProfile::GGLabVulkan13, "gglab-vulkan13" },
-				ParityCase{ L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain",
-					"compute", ShaderTargetProfile::GGLabVulkan13, "gglab-vulkan13" },
+			constexpr std::array ParityCases
+			{
+				ParityCase{ L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain", "vertex", ShaderTargetProfile::GGLabDX12, "gglab-dx12" },
+				ParityCase{ L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain", "pixel", ShaderTargetProfile::GGLabDX12, "gglab-dx12" },
+				ParityCase{ L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain", "compute", ShaderTargetProfile::GGLabDX12, "gglab-dx12" },
+				ParityCase{ L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain", "vertex", ShaderTargetProfile::GGLabVulkan13, "gglab-vulkan13" },
+				ParityCase{ L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain", "pixel", ShaderTargetProfile::GGLabVulkan13, "gglab-vulkan13" },
+				ParityCase{ L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain", "compute", ShaderTargetProfile::GGLabVulkan13, "gglab-vulkan13" },
 			};
 
 			bool allParityCasesMatch = true;
@@ -976,26 +924,21 @@ namespace gglab
 				const std::string buildKey = ExtractJsonField(cliResult.m_StdOut, "buildKey");
 				const std::string binaryDigest = ExtractJsonField(cliResult.m_StdOut, "binaryHash");
 				const std::string binaryPath = ExtractJsonField(cliResult.m_StdOut, "binaryPath");
-				const std::optional<ShaderBinary> cliBinary = ReadFileBinary(
-					utils::ToWideString(binaryPath));
+				const std::optional<ShaderBinary> cliBinary = ReadFileBinary(utils::ToWideString(binaryPath));
 				allParityCasesMatch &= recipeId == runtimeEvidence.m_RecipeId &&
 					buildKey == runtimeEvidence.m_BuildKey &&
 					binaryDigest == runtimeEvidence.m_BinaryDigest &&
 					CliArtifactFieldsDescribeCommittedEntry(cliResult) &&
-					CliRuntimeArtifactFieldsDescribePublishedEntry(
-						cliResult, artifactRoot, parityCase.m_Entry) &&
-					cliBinary.has_value() && cliBinary->SizeInBytes() ==
-						runtimeEvidence.m_Binary.SizeInBytes() &&
+					CliRuntimeArtifactFieldsDescribePublishedEntry(cliResult, artifactRoot, parityCase.m_Entry) &&
+					cliBinary.has_value() && cliBinary->SizeInBytes() == runtimeEvidence.m_Binary.SizeInBytes() &&
 					(cliBinary->SizeInBytes() == 0 ||
-						std::memcmp(cliBinary->Data(), runtimeEvidence.m_Binary.Data(),
-							cliBinary->SizeInBytes()) == 0);
+						std::memcmp(cliBinary->Data(), runtimeEvidence.m_Binary.Data(), cliBinary->SizeInBytes()) == 0);
 			}
 			context.Check(allParityCasesMatch,
 				"gglab-shaderc and Runtime Store agree on identity, manifest, and exact bytes for VS/PS/CS across both targets");
 		}
 
-		void RunCliBehaviorTests(SelfTestContext& context, const std::filesystem::path& sourceRoot,
-			const std::filesystem::path& tempRoot) noexcept
+		void RunCliBehaviorTests(SelfTestContext& context, const std::filesystem::path& sourceRoot, const std::filesystem::path& tempRoot) noexcept
 		{
 			// Cache reuse: the second run reports a hit.
 			const std::filesystem::path cacheRoot = tempRoot / L"CliBehaviorCache";
@@ -1053,14 +996,11 @@ namespace gglab
 			winnerDesc.m_Entry = L"VSMain";
 			winnerDesc.m_IncludeDirs = { L"." };
 			const ShaderResolvedRecipe winnerRecipe = winnerCompiler.Resolve(winnerDesc);
-			const ShaderCompileResult winnerBaseline =
-				winnerCompiler.CompileOrLoad(winnerRecipe);
-			const std::filesystem::path winnerBinaryPath =
-				winnerCompiler.GetCacheBinaryPath(winnerRecipe);
+			const ShaderCompileResult winnerBaseline = winnerCompiler.CompileOrLoad(winnerRecipe);
+			const std::filesystem::path winnerBinaryPath = winnerCompiler.GetCacheBinaryPath(winnerRecipe);
 			auto winnerRecordPath = winnerBinaryPath;
 			winnerRecordPath += L".json";
-			const std::optional<ShaderArtifactCacheRecord> baselineRecord =
-				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			const std::optional<ShaderArtifactCacheRecord> baselineRecord = LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
 
 			ShaderCompiler variantCompiler(sourceRoot, tempRoot / L"CliCommittedByOtherVariant");
 			ShaderDesc variantDesc = winnerDesc;
@@ -1083,14 +1023,10 @@ namespace gglab
 				competingWinnerInstalled =
 					competingWinner.m_Manifest.m_RecipeId == winnerRecipe.m_RecipeId &&
 					competingWinner.m_Manifest.m_BuildKey == winnerRecipe.m_BuildKey &&
-					competingWinner.m_Manifest.m_CompilerIdentity.m_CanonicalIdentity !=
-						winnerRecipe.m_CompilerIdentity.m_CanonicalIdentity &&
-					competingWinner.m_Manifest.m_Dependencies ==
-						baselineRecord->m_Manifest.m_Dependencies &&
-					competingWinner.m_Manifest.m_Dependencies ==
-						variantResult.m_Artifact.m_Manifest.m_Dependencies &&
-					competingWinner.m_Manifest.m_BinaryContentDigest !=
-						baselineRecord->m_Manifest.m_BinaryContentDigest &&
+					competingWinner.m_Manifest.m_CompilerIdentity.m_CanonicalIdentity != winnerRecipe.m_CompilerIdentity.m_CanonicalIdentity &&
+					competingWinner.m_Manifest.m_Dependencies == baselineRecord->m_Manifest.m_Dependencies &&
+					competingWinner.m_Manifest.m_Dependencies == variantResult.m_Artifact.m_Manifest.m_Dependencies &&
+					competingWinner.m_Manifest.m_BinaryContentDigest != baselineRecord->m_Manifest.m_BinaryContentDigest &&
 					WriteBinaryFile(winnerBinaryPath, competingWinner.m_Binary) &&
 					WriteShaderArtifactCacheRecord(winnerRecordPath, competingWinner);
 			}
@@ -1108,16 +1044,11 @@ namespace gglab
 				CloseHandle(winnerBinaryGuard);
 			}
 
-			const std::optional<ShaderArtifactCacheRecord> observedWinner =
-				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
-			const std::string committedByOtherHash =
-				ExtractJsonField(committedByOther.m_StdOut, "binaryHash");
-			const std::string expectedWinnerHash = Sha256DigestToHex(
-				competingWinner.m_Manifest.m_BinaryContentDigest.m_Digest);
-			const std::filesystem::path cliWinnerBinaryPath = utils::ToWideString(
-				ExtractJsonField(committedByOther.m_StdOut, "binaryPath"));
-			const std::filesystem::path cliWinnerRecordPath = utils::ToWideString(
-				ExtractJsonField(committedByOther.m_StdOut, "cacheRecordPath"));
+			const std::optional<ShaderArtifactCacheRecord> observedWinner = LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			const std::string committedByOtherHash = ExtractJsonField(committedByOther.m_StdOut, "binaryHash");
+			const std::string expectedWinnerHash = Sha256DigestToHex(competingWinner.m_Manifest.m_BinaryContentDigest.m_Digest);
+			const std::filesystem::path cliWinnerBinaryPath = utils::ToWideString(ExtractJsonField(committedByOther.m_StdOut, "binaryPath"));
+			const std::filesystem::path cliWinnerRecordPath = utils::ToWideString(ExtractJsonField(committedByOther.m_StdOut, "cacheRecordPath"));
 			context.Check(competingWinnerInstalled && winnerBinaryGuard != INVALID_HANDLE_VALUE &&
 				committedByOther.m_ExitCode == 0 &&
 				committedByOther.m_StdOut.find("\"fromCache\":true") != std::string::npos &&
@@ -1126,8 +1057,7 @@ namespace gglab
 				cliWinnerRecordPath.lexically_normal() == winnerRecordPath.lexically_normal() &&
 				observedWinner.has_value() && observedWinner->m_Manifest == competingWinner.m_Manifest &&
 				observedWinner->m_Binary.SizeInBytes() == competingWinner.m_Binary.SizeInBytes() &&
-				std::memcmp(observedWinner->m_Binary.Data(), competingWinner.m_Binary.Data(),
-					competingWinner.m_Binary.SizeInBytes()) == 0 &&
+				std::memcmp(observedWinner->m_Binary.Data(), competingWinner.m_Binary.Data(), competingWinner.m_Binary.SizeInBytes()) == 0 &&
 				CliArtifactFieldsDescribeCommittedEntry(committedByOther),
 				"CLI CommittedByOther success fields describe the delivered committed winner");
 
@@ -1178,8 +1108,7 @@ namespace gglab
 
 			// DXC syntax error maps to exit code 4.
 			const std::filesystem::path badSourceRoot = tempRoot / L"BadCliSources";
-			const bool badSourceWritten =
-				WriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
+			const bool badSourceWritten = WriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
 			const CliRunResult syntaxError = RunCli({
 				L"compile", L"--source-root", badSourceRoot.wstring(), L"--source", L"Bad.hlsl",
 				L"--stage", L"compute", L"--entry", L"CSMain", L"--target", L"gglab-dx12",
@@ -1229,17 +1158,16 @@ namespace gglab
 			const bool exoticPathsCompiled = exoticSourceWritten && exoticDx12.m_ExitCode == 0 &&
 				exoticVulkan.m_ExitCode == 0 &&
 				exoticVulkan.m_StdOut.find("\"success\":true") != std::string::npos;
-			const std::string exoticPathDiagnostics = exoticPathsCompiled
-				? "CLI compiles through source roots containing spaces and Unicode"
-				: std::format(
+			const std::string exoticPathDiagnostics = exoticPathsCompiled ?
+				"CLI compiles through source roots containing spaces and Unicode" :
+				std::format(
 					"CLI compiles through source roots containing spaces and Unicode "
 					"[sourceWritten={}, dx12Exit={}, dx12Out=\"{}\", dx12Err=\"{}\", "
 					"vulkanExit={}, vulkanOut=\"{}\", vulkanErr=\"{}\"]",
 					exoticSourceWritten, exoticDx12.m_ExitCode, exoticDx12.m_StdOut,
 					exoticDx12.m_StdErr, exoticVulkan.m_ExitCode, exoticVulkan.m_StdOut,
 					exoticVulkan.m_StdErr);
-			context.Check(exoticPathsCompiled,
-				exoticPathDiagnostics.c_str());
+			context.Check(exoticPathsCompiled, exoticPathDiagnostics.c_str());
 
 			// Observability commands.
 			const CliRunResult targets = RunCli({ L"targets" });
@@ -1265,9 +1193,7 @@ namespace gglab
 				matrixCache.wstring(), L"--result-format", L"json",
 			};
 			const CliRunResult success = RunCli(successArguments);
-			const CliRunResult unknownCommand = RunCli({
-				L"unknown-command", L"--result-format", L"json",
-			});
+			const CliRunResult unknownCommand = RunCli({ L"unknown-command", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({
 				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
 				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
@@ -1300,8 +1226,7 @@ namespace gglab
 			const CliRunResult compilerUnavailable = RunCli(successArguments, true);
 
 			const std::filesystem::path badSourceRoot = tempRoot / L"JsonMatrixBadSources";
-			const bool badSourceWritten =
-				WriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
+			const bool badSourceWritten = WriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
 			const CliRunResult compileFailure = RunCli({
 				L"compile", L"--source-root", badSourceRoot.wstring(), L"--source", L"Bad.hlsl",
 				L"--stage", L"compute", L"--entry", L"CSMain", L"--target", L"gglab-dx12",
@@ -1338,8 +1263,7 @@ namespace gglab
 				L"--result-format", L"json",
 			};
 			const CliRunResult sourceChangedBaseline = RunCli(sourceChangedArguments);
-			const std::filesystem::path sourceChangedBinaryPath = utils::ToWideString(
-				ExtractJsonField(sourceChangedBaseline.m_StdOut, "binaryPath"));
+			const std::filesystem::path sourceChangedBinaryPath = utils::ToWideString(ExtractJsonField(sourceChangedBaseline.m_StdOut, "binaryPath"));
 			const bool dependencyChanged = WriteTextFile(sourceChangedRoot / L"Probe.hlsli",
 				"static const float ProbeValue = 0.75f;\n");
 			const HANDLE sourceChangedBinaryGuard = CreateFileW(sourceChangedBinaryPath.c_str(),
@@ -1373,20 +1297,19 @@ namespace gglab
 				HasJsonEnvelope(compilerUnavailable, "compiler-unavailable", 4, false) &&
 				badSourceWritten && HasJsonEnvelope(compileFailure, "compile-failed", 4, false) &&
 				fileBlockWritten &&
-					HasJsonEnvelope(artifactIoFailure, "artifact-io-failure", 5, false) &&
+				HasJsonEnvelope(artifactIoFailure, "artifact-io-failure", 5, false) &&
 				sourceChangedFilesWritten && dependencyChanged &&
-					sourceChangedBinaryGuard != INVALID_HANDLE_VALUE &&
-					HasJsonEnvelope(sourceChanged, "source-changed", 6, false);
+				sourceChangedBinaryGuard != INVALID_HANDLE_VALUE &&
+				HasJsonEnvelope(sourceChanged, "source-changed", 6, false);
 			context.Check(allOutcomesStructured,
 				"CLI JSON mode emits one stdout document and empty stderr for all 12 outcomes");
 
 			context.Check(invalidResultFormat.m_ExitCode == 2 &&
 				invalidResultFormat.m_StdOut.empty() &&
-				invalidResultFormat.m_StdErr.find("Invalid --result-format value: xml") !=
-					std::string::npos &&
+				invalidResultFormat.m_StdErr.find("Invalid --result-format value: xml") != std::string::npos &&
 				HasJsonEnvelope(duplicateResultFormat, "usage-error", 2, false) &&
 				ExtractJsonField(duplicateResultFormat.m_StdOut, "message") ==
-					"--result-format specified multiple times",
+				"--result-format specified multiple times",
 				"Result-format pre-scan resolves invalid and duplicate mode selection without ambiguity");
 		}
 
@@ -1430,12 +1353,9 @@ namespace gglab
 				const std::string firstHash = ExtractJsonField(first.m_StdOut, "binaryHash");
 				const std::string secondHash = ExtractJsonField(second.m_StdOut, "binaryHash");
 				const std::string thirdHash = ExtractJsonField(thirdRun.m_StdOut, "binaryHash");
-				const std::string firstArtifactId =
-					ExtractJsonField(first.m_StdOut, "artifactId");
-				const std::string secondArtifactId =
-					ExtractJsonField(second.m_StdOut, "artifactId");
-				const std::string thirdArtifactId =
-					ExtractJsonField(thirdRun.m_StdOut, "artifactId");
+				const std::string firstArtifactId = ExtractJsonField(first.m_StdOut, "artifactId");
+				const std::string secondArtifactId = ExtractJsonField(second.m_StdOut, "artifactId");
+				const std::string thirdArtifactId = ExtractJsonField(thirdRun.m_StdOut, "artifactId");
 				allWorkersSucceeded &= first.m_ExitCode == 0 && second.m_ExitCode == 0;
 				allThirdRunsHitCache &= thirdRun.m_ExitCode == 0 &&
 					thirdRun.m_StdOut.find("\"fromCache\":true") != std::string::npos;
@@ -1453,13 +1373,13 @@ namespace gglab
 					CliRuntimeArtifactFieldsDescribePublishedEntry(thirdRun, gateArtifacts);
 				if (first.m_ExitCode != 0 || second.m_ExitCode != 0 || thirdRun.m_ExitCode != 0)
 				{
-					const auto AppendProcessDiagnostics = [&workerDiagnostics](int round,
-						std::string_view tag, const CliRunResult& result) noexcept
-						{
-							workerDiagnostics += std::format(
-								" [round{}-{}: exit={} stdout=\"{}\" stderr=\"{}\"]",
-								round, tag, result.m_ExitCode, result.m_StdOut, result.m_StdErr);
-						};
+					const auto AppendProcessDiagnostics = [&workerDiagnostics]
+					(int round, std::string_view tag, const CliRunResult& result) noexcept
+					{
+						workerDiagnostics += std::format(
+							" [round{}-{}: exit={} stdout=\"{}\" stderr=\"{}\"]",
+							round, tag, result.m_ExitCode, result.m_StdOut, result.m_StdErr);
+					};
 					if (first.m_ExitCode != 0)
 					{
 						AppendProcessDiagnostics(round, "A", first);
@@ -1475,8 +1395,7 @@ namespace gglab
 				}
 			}
 			context.Check(allWorkersSucceeded,
-				("Both concurrent gglab-shaderc processes complete their publication"
-					+ workerDiagnostics).c_str());
+				("Both concurrent gglab-shaderc processes complete their publication" + workerDiagnostics).c_str());
 			context.Check(allThirdRunsHitCache,
 				"Post-race reload hits the committed cross-process cache entry");
 			context.Check(allHashesConverged,
@@ -1492,25 +1411,14 @@ namespace gglab
 			const std::filesystem::path& tempRoot) noexcept
 		{
 			constexpr size_t ExpectedRuntimeProgramCount = 127;
-			const std::string expectedProgramCountField =
-				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
-			const CliRunResult missingRequiredOption = RunCli({
-				L"build-runtime", L"--result-format", L"json",
-			});
-			const CliRunResult unknownOption = RunCli({
-				L"build-runtime", L"--bogus", L"--result-format", L"json",
-			});
-			const CliRunResult duplicateResultFormat = RunCli({
-				L"build-runtime", L"--result-format", L"json",
-				L"--result-format", L"json",
-			});
+			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
+			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
+			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
+			const CliRunResult duplicateResultFormat = RunCli({ L"build-runtime", L"--result-format", L"json", L"--result-format", L"json", });
 			context.Check(
-				HasJsonEnvelope(missingRequiredOption, "usage-error", 2, false,
-					"build-runtime") &&
-				HasJsonEnvelope(unknownOption, "usage-error", 2, false,
-					"build-runtime") &&
-				HasJsonEnvelope(duplicateResultFormat, "usage-error", 2, false,
-					"build-runtime"),
+				HasJsonEnvelope(missingRequiredOption, "usage-error", 2, false, "build-runtime") &&
+				HasJsonEnvelope(unknownOption, "usage-error", 2, false, "build-runtime") &&
+				HasJsonEnvelope(duplicateResultFormat, "usage-error", 2, false, "build-runtime"),
 				"build-runtime JSON usage errors truthfully identify their command");
 
 			const std::filesystem::path cacheRoot = tempRoot / L"RuntimeBuildCache";
@@ -1527,27 +1435,24 @@ namespace gglab
 			const CliRunResult first = RunCli(arguments);
 			const std::string firstRegistryId = ExtractJsonField(first.m_StdOut, "registryId");
 			ShaderLooseActiveProgramRegistryReader activeReader{
-				ShaderLooseActiveProgramRegistryLocator(
-					artifactRoot, ShaderTargetProfile::GGLabDX12)
+				ShaderLooseActiveProgramRegistryLocator(artifactRoot, ShaderTargetProfile::GGLabDX12)
 			};
 			const ActiveShaderProgramRegistryReadResult firstActive = activeReader.Read();
 			ShaderLooseProgramRegistryArtifactReader registryReader{
 				ShaderLooseProgramRegistryArtifactLocator(artifactRoot)
 			};
-			const ShaderProgramRegistryArtifactReadResult firstRegistry = firstActive.IsSuccess()
-				? registryReader.ReadArtifact(firstActive.m_RegistryRef)
-				: ShaderProgramRegistryArtifactReadResult{};
+			const ShaderProgramRegistryArtifactReadResult firstRegistry = firstActive.IsSuccess() ?
+				registryReader.ReadArtifact(firstActive.m_RegistryRef) :
+				ShaderProgramRegistryArtifactReadResult{};
 			context.Check(
 				first.m_ExitCode == 0 && IsSingleJsonDocument(first) &&
-					first.m_StdOut.find("\"command\":\"build-runtime\"") != std::string::npos &&
-					first.m_StdOut.find("\"success\":true") != std::string::npos &&
-					first.m_StdOut.find(expectedProgramCountField) != std::string::npos,
+				first.m_StdOut.find("\"command\":\"build-runtime\"") != std::string::npos &&
+				first.m_StdOut.find("\"success\":true") != std::string::npos &&
+				first.m_StdOut.find(expectedProgramCountField) != std::string::npos,
 				"build-runtime reports the complete DX12 catalog in JSON");
 			context.Check(firstRegistryId.size() == 64 && firstActive.IsSuccess() &&
-					Sha256DigestToHex(
-						firstActive.m_RegistryRef.m_RegistryId.m_DurableDigest) ==
-							firstRegistryId && firstRegistry.IsSuccess() &&
-					firstRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount,
+				Sha256DigestToHex(firstActive.m_RegistryRef.m_RegistryId.m_DurableDigest) == firstRegistryId && firstRegistry.IsSuccess() &&
+				firstRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount,
 				"build-runtime activates the complete DX12 registry");
 
 			std::vector<std::wstring> vulkanArguments = arguments;
@@ -1562,15 +1467,12 @@ namespace gglab
 				std::fprintf(stderr, "Vulkan catalog exit=%d\nstdout: %s\nstderr: %s\n", vulkanBuild.m_ExitCode, vulkanBuild.m_StdOut.c_str(), vulkanBuild.m_StdErr.c_str());
 			}
 			ShaderLooseActiveProgramRegistryReader vulkanActiveReader{
-				ShaderLooseActiveProgramRegistryLocator(
-					artifactRoot, ShaderTargetProfile::GGLabVulkan13)
+				ShaderLooseActiveProgramRegistryLocator(artifactRoot, ShaderTargetProfile::GGLabVulkan13)
 			};
-			const ActiveShaderProgramRegistryReadResult vulkanActive =
-				vulkanActiveReader.Read();
-			const ShaderProgramRegistryArtifactReadResult vulkanRegistry =
-				vulkanActive.IsSuccess()
-				? registryReader.ReadArtifact(vulkanActive.m_RegistryRef)
-				: ShaderProgramRegistryArtifactReadResult{};
+			const ActiveShaderProgramRegistryReadResult vulkanActive = vulkanActiveReader.Read();
+			const ShaderProgramRegistryArtifactReadResult vulkanRegistry = vulkanActive.IsSuccess() ?
+				registryReader.ReadArtifact(vulkanActive.m_RegistryRef) :
+				ShaderProgramRegistryArtifactReadResult{};
 			context.Check(targetArgument != vulkanArguments.end() &&
 				vulkanBuild.m_ExitCode == 0 && IsSingleJsonDocument(vulkanBuild) &&
 				vulkanBuild.m_StdOut.find("\"success\":true") != std::string::npos &&
@@ -1580,7 +1482,8 @@ namespace gglab
 				vulkanRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount,
 				"build-runtime activates the complete Vulkan 1.3 registry");
 
-			const std::array requiredPrograms{
+			const std::array requiredPrograms
+			{
 				shader_programs::AerialPerspectiveBuildCompute,
 				shader_programs::AerialPerspectiveCompositeCompute,
 				shader_programs::ForwardPBRAllLightsMaterialDiagnosticsPixel,
@@ -1603,10 +1506,8 @@ namespace gglab
 			for (const ShaderProgramRef& programRef : requiredPrograms)
 			{
 				context.Check(firstRegistry.IsSuccess() && vulkanRegistry.IsSuccess() &&
-					ResolveShaderProgramRegistryArtifact(firstRegistry.m_Artifact,
-						programRef, ShaderTargetProfile::GGLabDX12).has_value() &&
-					ResolveShaderProgramRegistryArtifact(vulkanRegistry.m_Artifact,
-						programRef, ShaderTargetProfile::GGLabVulkan13).has_value(),
+					ResolveShaderProgramRegistryArtifact(firstRegistry.m_Artifact, programRef, ShaderTargetProfile::GGLabDX12).has_value() &&
+					ResolveShaderProgramRegistryArtifact(vulkanRegistry.m_Artifact, programRef, ShaderTargetProfile::GGLabVulkan13).has_value(),
 					std::format("build-runtime activates {}::{} for DX12 and Vulkan 1.3",
 						programRef.m_ProgramId, programRef.m_VariantId).c_str());
 			}
@@ -1614,18 +1515,17 @@ namespace gglab
 			const CliRunResult second = RunCli(arguments);
 			const ActiveShaderProgramRegistryReadResult secondActive = activeReader.Read();
 			context.Check(
-				second.m_ExitCode == 0 && ExtractJsonField(second.m_StdOut, "registryId") ==
-					firstRegistryId && secondActive.IsSuccess() &&
-					secondActive.m_RegistryRef == firstActive.m_RegistryRef,
+				second.m_ExitCode == 0 && ExtractJsonField(second.m_StdOut, "registryId") == firstRegistryId && secondActive.IsSuccess() &&
+				secondActive.m_RegistryRef == firstActive.m_RegistryRef,
 				"Repeated build-runtime invocation reuses the same immutable active snapshot");
 
 			const CliRunResult unavailable = RunCli(arguments, true);
 			const ActiveShaderProgramRegistryReadResult afterFailure = activeReader.Read();
 			context.Check(
 				unavailable.m_ExitCode == 4 && IsSingleJsonDocument(unavailable) &&
-					unavailable.m_StdOut.find("\"success\":false") != std::string::npos &&
-					afterFailure.IsSuccess() &&
-					afterFailure.m_RegistryRef == firstActive.m_RegistryRef,
+				unavailable.m_StdOut.find("\"success\":false") != std::string::npos &&
+				afterFailure.IsSuccess() &&
+				afterFailure.m_RegistryRef == firstActive.m_RegistryRef,
 				"Failed external runtime build preserves the last-known-good active snapshot");
 
 			CliRunResult concurrentFirst{};
@@ -1637,10 +1537,10 @@ namespace gglab
 			const ActiveShaderProgramRegistryReadResult concurrentActive = activeReader.Read();
 			context.Check(
 				concurrentFirst.m_ExitCode == 0 && concurrentSecond.m_ExitCode == 0 &&
-					ExtractJsonField(concurrentFirst.m_StdOut, "registryId") == firstRegistryId &&
-					ExtractJsonField(concurrentSecond.m_StdOut, "registryId") == firstRegistryId &&
-					concurrentActive.IsSuccess() &&
-					concurrentActive.m_RegistryRef == firstActive.m_RegistryRef,
+				ExtractJsonField(concurrentFirst.m_StdOut, "registryId") == firstRegistryId &&
+				ExtractJsonField(concurrentSecond.m_StdOut, "registryId") == firstRegistryId &&
+				concurrentActive.IsSuccess() &&
+				concurrentActive.m_RegistryRef == firstActive.m_RegistryRef,
 				"Artifact-root writer lease serializes concurrent complete runtime builds");
 		}
 	}

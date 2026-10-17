@@ -26,9 +26,9 @@ namespace gglab
 			}),
 			"Ordinary renderer startup never demands observation scan programs");
 		const auto incomplete = [](const auto& result)
-			{
-				return result.m_Status == NonFiniteClaimStatus::Incomplete && result.m_Failure == NonFiniteWatchFailure::MissingCoverage;
-			};
+		{
+			return result.m_Status == NonFiniteClaimStatus::Incomplete && result.m_Failure == NonFiniteWatchFailure::MissingCoverage;
+		};
 		context.Check(incomplete(EvaluateNonFiniteBoundary(std::nullopt, 4).m_Claim), "Missing scan evidence is incomplete");
 		context.Check(incomplete(EvaluateNonFiniteBoundary(NonFiniteScanRecord{}, 4).m_Claim), "An undispatched record never passes a nonempty scan");
 		context.Check(EvaluateNonFiniteBoundary(NonFiniteScanRecord{}, 0).m_Claim.m_Status == NonFiniteClaimStatus::Passed,
@@ -82,7 +82,8 @@ namespace gglab
 			dispatch.m_X <= 65535 && dispatch.m_Y <= 65535 && uint64_t{ dispatch.m_X } * dispatch.m_Y * 64 >= NonFiniteNoIndex,
 			"Large scans use a bounded rectangular dispatch without rounding overflow");
 
-		constexpr std::array fields{
+		constexpr std::array fields
+		{
 			GpuBufferFieldLayout{ "flags", 0, GpuBufferScalar::Uint32 },
 			GpuBufferFieldLayout{ "halfPair", 12, GpuBufferScalar::Float16, 2 },
 			GpuBufferFieldLayout{ "position", 4, GpuBufferScalar::Float32, 2 },

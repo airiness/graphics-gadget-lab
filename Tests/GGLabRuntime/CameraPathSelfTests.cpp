@@ -126,8 +126,7 @@ namespace gglab
 				rig.GetCameraPaths().empty(),
 				"Duplicate path ids are rejected without registering any path");
 
-			const CameraPath path = MakePath({ MakeKey(0, 0.0f), MakeKey(4, 4.0f),
-				MakeKey(5, 50.0f, true, 45.0f), MakeKey(6, 51.0f, false, 45.0f) });
+			const CameraPath path = MakePath({ MakeKey(0, 0.0f), MakeKey(4, 4.0f), MakeKey(5, 50.0f, true, 45.0f), MakeKey(6, 51.0f, false, 45.0f) });
 			context.Check(rig.SetCameraPaths({ path }) && rig.FindCameraPath("SEQ_Test") &&
 				!rig.FindCameraPath("SEQ_Missing"),
 				"Valid paths register and are found by id");

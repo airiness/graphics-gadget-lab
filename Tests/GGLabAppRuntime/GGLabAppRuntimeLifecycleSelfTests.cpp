@@ -36,8 +36,7 @@ namespace gglab
 		class NullRHIContextFactory final : public RHIContextFactoryBase
 		{
 		public:
-			std::unique_ptr<RHIContext> CreateContext(
-				const RHIContextDesc&) const noexcept override
+			std::unique_ptr<RHIContext> CreateContext(const RHIContextDesc&) const noexcept override
 			{
 				return nullptr;
 			}
@@ -55,7 +54,7 @@ namespace gglab
 			registration.m_Demos.push_back({
 				.m_Id = "test.demo.start",
 				.m_Factory = &CreateLifecycleTestDemo,
-				});
+			});
 			return registration;
 		}
 
@@ -78,7 +77,10 @@ namespace gglab
 		{
 		public:
 			EnvironmentLightingSettings GetEnvironmentLightingSettings()
-				const noexcept override { return {}; }
+				const noexcept override
+			{
+				return {};
+			}
 		};
 
 		class TestEnvironmentLightingControl final : public EnvironmentLightingControlBase
@@ -118,14 +120,18 @@ namespace gglab
 		{
 		public:
 			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel)
-				const noexcept override { return {}; }
+				const noexcept override
+			{
+				return {};
+			}
 		};
 
 		class TestPostProcessPreviewControl final : public PostProcessPreviewControlBase
 		{
 		public:
-			void SetPostProcessPreviewSelection(
-				PostProcessDebugSelection, PostProcessPreviewChannel) noexcept override {}
+			void SetPostProcessPreviewSelection(PostProcessDebugSelection, PostProcessPreviewChannel) noexcept override
+			{
+			}
 			void SetPostProcessPreviewExposureEV(float, PostProcessPreviewChannel) noexcept override {}
 			void RequestPostProcessPreview(PostProcessPreviewChannel) noexcept override {}
 		};
@@ -134,7 +140,10 @@ namespace gglab
 		{
 		public:
 			ShadowPreviewDiagnostics GetShadowPreviewDiagnostics()
-				const noexcept override { return {}; }
+				const noexcept override
+			{
+				return {};
+			}
 		};
 
 
@@ -142,7 +151,10 @@ namespace gglab
 		{
 		public:
 			IBLPreviewResourcesDiagnostics GetIBLPreviewResourcesDiagnostics()
-				const noexcept override { return {}; }
+				const noexcept override
+			{
+				return {};
+			}
 		};
 
 		class TestIBLPreviewControl final : public IBLPreviewControlBase
@@ -204,9 +216,9 @@ namespace gglab
 
 			RenderPipelineOverlayExtensionBase* GetOverlayExtension() noexcept override
 			{
-				return m_HasOverlay
-					? reinterpret_cast<RenderPipelineOverlayExtensionBase*>(this)
-					: nullptr;
+				return m_HasOverlay ?
+					reinterpret_cast<RenderPipelineOverlayExtensionBase*>(this) :
+					nullptr;
 			}
 
 			bool m_BeginSucceeds = true;
@@ -226,34 +238,33 @@ namespace gglab
 			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
 			PostProcessPreviewControlBase* m_LastPostProcessPreviewControl = nullptr;
 			const ShadowPreviewViewBase* m_LastShadowPreview = nullptr;
-			ApplicationToolingFrameEndReason m_LastEndReason =
-				ApplicationToolingFrameEndReason::Completed;
+			ApplicationToolingFrameEndReason m_LastEndReason = ApplicationToolingFrameEndReason::Completed;
 		};
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
 			{
 				RecordingApplicationTooling tooling;
-				TestEnvironmentSelectionControl control;
-				ApplicationToolingFrame frame(&tooling);
-				frame.Draw({});
-				context.Check(!tooling.m_LastEnvironmentSelectionControl,
-					"Environment selection control is absent by default");
-				frame.Draw({ .m_EnvironmentSelectionControl = &control });
-				context.Check(tooling.m_LastEnvironmentSelectionControl == &control &&
-					!tooling.m_LastEnvironmentLighting && !tooling.m_LastIBLPreview,
-					"Tooling forwards selection independently of Renderer, settings and previews");
-				context.Check(tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(7) &&
-					control.m_LastEntryIndex == 7 && control.m_RequestCount == 1,
-					"The borrowed selection capability forwards the requested catalog index");
-				control.m_AcceptSelection = false;
-				context.Check(!tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(9) &&
-					control.m_LastEntryIndex == 9 && control.m_RequestCount == 2,
-					"Selection rejection reaches tooling without being converted into success");
-				frame.Draw({});
-				context.Check(!tooling.m_LastEnvironmentSelectionControl && control.m_RequestCount == 2,
-					"A later draw neither retains nor replays an omitted selection capability");
-				frame.Complete();
+			TestEnvironmentSelectionControl control;
+			ApplicationToolingFrame frame(&tooling);
+			frame.Draw({});
+			context.Check(!tooling.m_LastEnvironmentSelectionControl,
+				"Environment selection control is absent by default");
+			frame.Draw({ .m_EnvironmentSelectionControl = &control });
+			context.Check(tooling.m_LastEnvironmentSelectionControl == &control &&
+				!tooling.m_LastEnvironmentLighting && !tooling.m_LastIBLPreview,
+				"Tooling forwards selection independently of Renderer, settings and previews");
+			context.Check(tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(7) &&
+				control.m_LastEntryIndex == 7 && control.m_RequestCount == 1,
+				"The borrowed selection capability forwards the requested catalog index");
+			control.m_AcceptSelection = false;
+			context.Check(!tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(9) &&
+				control.m_LastEntryIndex == 9 && control.m_RequestCount == 2,
+				"Selection rejection reaches tooling without being converted into success");
+			frame.Draw({});
+			context.Check(!tooling.m_LastEnvironmentSelectionControl && control.m_RequestCount == 2,
+				"A later draw neither retains nor replays an omitted selection capability");
+			frame.Complete();
 			}
 
 			{
@@ -495,8 +506,7 @@ namespace gglab
 
 		[[nodiscard]] GGLabAppRuntimeCreateInfo MakeCreateInfo() noexcept
 		{
-			const std::filesystem::path runtimeRoot =
-				std::filesystem::temp_directory_path() / "gglab-app-runtime-test";
+			const std::filesystem::path runtimeRoot = std::filesystem::temp_directory_path() / "gglab-app-runtime-test";
 			return {
 				.m_Config = {
 					.m_RhiBackend = AppRuntimeRHIBackend::DX12,
@@ -529,11 +539,9 @@ namespace gglab
 				context.Check(runtime.GetDiagnosticsView() == nullptr &&
 					runtime.GetDiagnosticsControl() == nullptr,
 					"Diagnostics session remains absent before runtime service composition");
-				context.Check(runtime.Initialize(MakeCreateInfo()) ==
-					AppRuntimeInitializeResult::Succeeded,
+				context.Check(runtime.Initialize(MakeCreateInfo()) == AppRuntimeInitializeResult::Succeeded,
 					"Valid explicit config and paths initialize the app runtime");
-				context.Check(runtime.Initialize(MakeCreateInfo()) ==
-					AppRuntimeInitializeResult::AlreadyInitialized &&
+				context.Check(runtime.Initialize(MakeCreateInfo()) == AppRuntimeInitializeResult::AlreadyInitialized &&
 					runtime.Tick() == AppRuntimeTickResult::Continue,
 					"Running app runtime rejects repeated initialization");
 				RecordingApplicationTooling uncomposedTooling;
@@ -550,41 +558,40 @@ namespace gglab
 					.m_Type = AppHostEventType::Resized,
 					.m_Width = 1920,
 					.m_Height = 1080,
-					});
+				});
 				context.Check(runtime.Tick() == AppRuntimeTickResult::Continue,
 					"A lifecycle-only runtime accepts a host resize without platform access");
 
 				runtime.HandleHostEvent({
 					.m_Type = AppHostEventType::Suspended,
-					});
+				});
 				runtime.HandleHostEvent({
 					.m_Type = AppHostEventType::Suspended,
-					});
+				});
 				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Suspended &&
 					runtime.Tick() == AppRuntimeTickResult::Suspended,
 					"Duplicate suspend events are idempotent and never block inside the runtime");
 				runtime.HandleHostEvent({
 					.m_Type = AppHostEventType::Resumed,
-					});
+				});
 				context.Check(runtime.Tick() == AppRuntimeTickResult::Continue,
 					"Resumed host state returns Continue");
 				runtime.HandleHostEvent({
 					.m_Type = AppHostEventType::ExitRequested,
-					});
+				});
 				runtime.HandleHostEvent({
 					.m_Type = AppHostEventType::Resumed,
-					});
-				context.Check(runtime.GetLifecycleState() ==
-					AppRuntimeLifecycleState::ExitRequested &&
+				});
+				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::ExitRequested &&
 					runtime.Tick() == AppRuntimeTickResult::Exit,
 					"Host exit request is terminal and produces a non-blocking Exit result");
 
 				runtime.Shutdown({
 					.m_ApplicationTooling = &uncomposedTooling,
-					});
+				});
 				runtime.Shutdown({
 					.m_ApplicationTooling = &uncomposedTooling,
-					});
+				});
 				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped &&
 					uncomposedTooling.m_PrepareForShutdownCount == 1,
 					"Repeated shutdown prepares host tooling exactly once");
@@ -593,16 +600,14 @@ namespace gglab
 			GGLabAppRuntime stoppedRuntime;
 			stoppedRuntime.Shutdown();
 			stoppedRuntime.Shutdown();
-			context.Check(stoppedRuntime.Initialize(MakeCreateInfo()) ==
-				AppRuntimeInitializeResult::InvalidState &&
+			context.Check(stoppedRuntime.Initialize(MakeCreateInfo()) == AppRuntimeInitializeResult::InvalidState &&
 				stoppedRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped,
 				"Stopped runtime cannot reinitialize");
 
 			GGLabAppRuntimeCreateInfo invalidConfig = MakeCreateInfo();
 			invalidConfig.m_Config.m_InitialExtent.m_Width = 0;
 			GGLabAppRuntime invalidConfigRuntime;
-			context.Check(invalidConfigRuntime.Initialize(invalidConfig) ==
-				AppRuntimeInitializeResult::InvalidConfig &&
+			context.Check(invalidConfigRuntime.Initialize(invalidConfig) == AppRuntimeInitializeResult::InvalidConfig &&
 				invalidConfigRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Invalid shared config fails atomically");
 			context.Check(invalidConfigRuntime.Tick() == AppRuntimeTickResult::Fatal &&
@@ -616,24 +621,20 @@ namespace gglab
 			GGLabAppRuntimeCreateInfo missingStartupDemo = MakeCreateInfo();
 			missingStartupDemo.m_Config.m_StartupDemoId.clear();
 			GGLabAppRuntime missingStartupDemoRuntime;
-			context.Check(missingStartupDemoRuntime.Initialize(missingStartupDemo) ==
-				AppRuntimeInitializeResult::InvalidConfig,
+			context.Check(missingStartupDemoRuntime.Initialize(missingStartupDemo) == AppRuntimeInitializeResult::InvalidConfig,
 				"Shared runtime config requires an explicit host-selected startup Demo ID");
 
 			GGLabAppRuntimeCreateInfo invalidPaths = MakeCreateInfo();
 			invalidPaths.m_Paths.m_AssetRoot.clear();
 			GGLabAppRuntime invalidPathsRuntime;
-			context.Check(invalidPathsRuntime.Initialize(invalidPaths) ==
-				AppRuntimeInitializeResult::InvalidRuntimePaths &&
+			context.Check(invalidPathsRuntime.Initialize(invalidPaths) == AppRuntimeInitializeResult::InvalidRuntimePaths &&
 				invalidPathsRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Invalid runtime paths fail atomically");
 
 			GGLabAppRuntime invalidServiceCreateInfoRuntime;
 			GGLAB_UNUSED(invalidServiceCreateInfoRuntime.Initialize(MakeCreateInfo()));
-			context.Check(invalidServiceCreateInfoRuntime.InitializeServices({}) ==
-				AppRuntimeServiceInitializeResult::InvalidCreateInfo &&
-				invalidServiceCreateInfoRuntime.GetLifecycleState() ==
-				AppRuntimeLifecycleState::Failed,
+			context.Check(invalidServiceCreateInfoRuntime.InitializeServices({}) == AppRuntimeServiceInitializeResult::InvalidCreateInfo &&
+				invalidServiceCreateInfoRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Invalid service composition fails atomically before creating runtime services");
 
 			NullRHIContextFactory nullRhiContextFactory;
@@ -658,8 +659,7 @@ namespace gglab
 				.m_WindowWidth = 640,
 				.m_WindowHeight = 480,
 				}) == AppRuntimeServiceInitializeResult::ShaderManagerInitializationFailed &&
-				rendererFailureRuntime.GetLifecycleState() ==
-				AppRuntimeLifecycleState::Failed &&
+				rendererFailureRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed &&
 				!rendererFailureRuntime.AreServicesInitialized() &&
 				rendererFailureRuntime.GetRenderHost() == nullptr &&
 				rendererFailureRuntime.GetRenderComposition() == nullptr,

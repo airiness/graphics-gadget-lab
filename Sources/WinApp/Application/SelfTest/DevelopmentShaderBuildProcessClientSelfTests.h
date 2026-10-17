@@ -3,6 +3,5 @@
 
 namespace gglab
 {
-	void RunDevelopmentShaderBuildProcessClientSelfTests(
-		SelfTestContext& context) noexcept;
+	void RunDevelopmentShaderBuildProcessClientSelfTests(SelfTestContext& context) noexcept;
 }

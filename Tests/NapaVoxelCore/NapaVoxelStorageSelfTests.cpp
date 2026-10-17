@@ -37,12 +37,8 @@ namespace napa::voxel::testing
 				std::underlying_type_t<VoxelMaterial>,
 				std::uint8_t>,
 				"VoxelMaterial uses uint8_t as its underlying type");
-			context.Check(
-				std::is_standard_layout_v<VoxelSample>,
-				"VoxelSample has standard layout");
-			context.Check(
-				std::is_trivially_copyable_v<VoxelSample>,
-				"VoxelSample is trivially copyable");
+			context.Check(std::is_standard_layout_v<VoxelSample>, "VoxelSample has standard layout");
+			context.Check(std::is_trivially_copyable_v<VoxelSample>, "VoxelSample is trivially copyable");
 			context.Check(
 				sizeof(VoxelSample) == 3,
 				"VoxelSample occupies exactly three bytes");
@@ -53,8 +49,7 @@ namespace napa::voxel::testing
 				"VoxelSample fields have the canonical byte offsets");
 
 			context.Check(
-				DefaultVoxelSample ==
-				VoxelSample{
+				DefaultVoxelSample == VoxelSample{
 					.m_Density = 0,
 					.m_Material = VoxelMaterial::Empty,
 					.m_Damage = 0,
@@ -73,15 +68,11 @@ namespace napa::voxel::testing
 				.m_Damage = 11,
 			};
 			context.Check(
-				ValidateVoxelSample(nonCanonicalEmpty).m_Error ==
-				ValidationError::NonCanonicalVoxelSample,
+				ValidateVoxelSample(nonCanonicalEmpty).m_Error == ValidationError::NonCanonicalVoxelSample,
 				"Voxel validation detects non-canonical empty data");
 			context.Check(
-				PrepareVoxelSampleForStorage(
-					nonCanonicalEmpty,
-					prepared).Succeeded() &&
-				prepared ==
-				VoxelSample{
+				PrepareVoxelSampleForStorage(nonCanonicalEmpty, prepared).Succeeded() &&
+				prepared == VoxelSample{
 					.m_Density = IsoValue - 1,
 					.m_Material = VoxelMaterial::Empty,
 					.m_Damage = 0,
@@ -107,10 +98,7 @@ namespace napa::voxel::testing
 				.m_Damage = 0,
 			};
 			context.Check(
-				PrepareVoxelSampleForStorage(
-					solidWithoutMaterial,
-					prepared).m_Error ==
-				ValidationError::NonCanonicalVoxelSample &&
+				PrepareVoxelSampleForStorage(solidWithoutMaterial, prepared).m_Error == ValidationError::NonCanonicalVoxelSample &&
 				prepared == unchanged,
 				"Storage preparation rejects solid data without a material");
 
@@ -120,15 +108,11 @@ namespace napa::voxel::testing
 				.m_Damage = 20,
 			};
 			context.Check(
-				PrepareVoxelSampleForStorage(
-					unknownEmpty,
-					prepared).m_Error ==
-				ValidationError::InvalidVoxelMaterial &&
+				PrepareVoxelSampleForStorage(unknownEmpty, prepared).m_Error == ValidationError::InvalidVoxelMaterial &&
 				prepared == unchanged,
 				"Storage preparation rejects unknown material before normalization");
 			context.Check(
-				ValidateVoxelSample(unknownEmpty).m_Error ==
-				ValidationError::InvalidVoxelMaterial,
+				ValidateVoxelSample(unknownEmpty).m_Error == ValidationError::InvalidVoxelMaterial,
 				"Voxel validation rejects unknown materials independently");
 		}
 
@@ -151,8 +135,7 @@ namespace napa::voxel::testing
 
 			VoxelChunk* const validChunk = chunk.get();
 			context.Check(
-				VoxelChunk::Create(7, chunk).m_Error ==
-				ValidationError::InvalidChunkCellCount &&
+				VoxelChunk::Create(7, chunk).m_Error == ValidationError::InvalidChunkCellCount &&
 				chunk.get() == validChunk,
 				"VoxelChunk creation rejects an unsupported permanent state");
 
@@ -177,10 +160,7 @@ namespace napa::voxel::testing
 			};
 			bool changed = false;
 			context.Check(
-				chunk->WriteOriginalAndCurrentSample(
-					local,
-					solid,
-					changed).Succeeded() &&
+				chunk->WriteOriginalAndCurrentSample(local, solid, changed).Succeeded() &&
 				changed &&
 				chunk->GetVoxelRevision() == 1 &&
 				chunk->ReadOriginalSample(local, original).Succeeded() &&
@@ -191,10 +171,7 @@ namespace napa::voxel::testing
 
 			changed = true;
 			context.Check(
-				chunk->WriteOriginalAndCurrentSample(
-					local,
-					solid,
-					changed).Succeeded() &&
+				chunk->WriteOriginalAndCurrentSample(local, solid, changed).Succeeded() &&
 				!changed &&
 				chunk->GetVoxelRevision() == 1,
 				"An identical initialization write does not advance revision");
@@ -202,10 +179,7 @@ namespace napa::voxel::testing
 			VoxelSample damaged = solid;
 			damaged.m_Damage = 99;
 			context.Check(
-				chunk->WriteCurrentSample(
-					local,
-					damaged,
-					changed).Succeeded() &&
+				chunk->WriteCurrentSample(local, damaged, changed).Succeeded() &&
 				changed &&
 				chunk->GetVoxelRevision() == 2 &&
 				chunk->ReadOriginalSample(local, original).Succeeded() &&
@@ -221,11 +195,7 @@ namespace napa::voxel::testing
 			};
 			changed = true;
 			context.Check(
-				chunk->WriteCurrentSample(
-					local,
-					unknown,
-					changed).m_Error ==
-				ValidationError::InvalidVoxelMaterial &&
+				chunk->WriteCurrentSample(local, unknown, changed).m_Error == ValidationError::InvalidVoxelMaterial &&
 				changed &&
 				chunk->GetVoxelRevision() == 2 &&
 				chunk->ReadCurrentSample(local, current).Succeeded() &&
@@ -234,10 +204,7 @@ namespace napa::voxel::testing
 
 			VoxelSample unchangedRead = damaged;
 			context.Check(
-				chunk->ReadCurrentSample(
-					{ 8, 0, 0 },
-					unchangedRead).m_Error ==
-				ValidationError::InvalidLocalCoordinate &&
+				chunk->ReadCurrentSample({ 8, 0, 0 }, unchangedRead).m_Error == ValidationError::InvalidLocalCoordinate &&
 				unchangedRead == damaged,
 				"Chunk reads reject local coordinates outside storage");
 		}
@@ -252,20 +219,16 @@ namespace napa::voxel::testing
 				VoxelWorld::Create(config, world).Succeeded() &&
 				world &&
 				world->GetConfig().m_ChunkCellCount == 8 &&
-				world->GetLogicalSampleBounds() ==
-				SampleAabb{
+				world->GetLogicalSampleBounds() == SampleAabb{
 					.m_Min = { -8, -8, -8 },
 					.m_MaxExclusive = { 9, 9, 9 },
 				} &&
-				world->GetLogicalDomainMetrics().m_TotalSampleCount ==
-				4913 &&
-				world->GetLogicalDomainMetrics().m_CellOwnerChunkBounds ==
-				ChunkAabb{
+				world->GetLogicalDomainMetrics().m_TotalSampleCount == 4913 &&
+				world->GetLogicalDomainMetrics().m_CellOwnerChunkBounds == ChunkAabb{
 					.m_Min = { -1, -1, -1 },
 					.m_MaxExclusive = { 1, 1, 1 },
 				} &&
-				world->GetLogicalDomainMetrics().m_SampleOwnerChunkBounds ==
-				ChunkAabb{
+				world->GetLogicalDomainMetrics().m_SampleOwnerChunkBounds == ChunkAabb{
 					.m_Min = { -1, -1, -1 },
 					.m_MaxExclusive = { 2, 2, 2 },
 				} &&
@@ -290,10 +253,7 @@ namespace napa::voxel::testing
 
 			bool changed = true;
 			context.Check(
-				world->WriteCurrentSample(
-					{ 0, 0, 0 },
-					DefaultVoxelSample,
-					changed).Succeeded() &&
+				world->WriteCurrentSample({ 0, 0, 0 }, DefaultVoxelSample, changed).Succeeded() &&
 				!changed &&
 				world->GetResidentChunkCount() == 0 &&
 				world->GetWorldVoxelRevision() == 0,
@@ -306,11 +266,7 @@ namespace napa::voxel::testing
 			};
 			changed = true;
 			context.Check(
-				world->WriteCurrentSample(
-					{ 0, 0, 0 },
-					unknown,
-					changed).m_Error ==
-				ValidationError::InvalidVoxelMaterial &&
+				world->WriteCurrentSample({ 0, 0, 0 }, unknown, changed).m_Error == ValidationError::InvalidVoxelMaterial &&
 				changed &&
 				world->GetResidentChunkCount() == 0 &&
 				world->GetWorldVoxelRevision() == 0,
@@ -322,11 +278,7 @@ namespace napa::voxel::testing
 				.m_Damage = 0,
 			};
 			context.Check(
-				world->WriteCurrentSample(
-					{ 0, 0, 0 },
-					solidWithoutMaterial,
-					changed).m_Error ==
-				ValidationError::NonCanonicalVoxelSample &&
+				world->WriteCurrentSample({ 0, 0, 0 }, solidWithoutMaterial, changed).m_Error == ValidationError::NonCanonicalVoxelSample &&
 				world->GetResidentChunkCount() == 0,
 				"A solid sample without material cannot enter world storage");
 
@@ -338,38 +290,27 @@ namespace napa::voxel::testing
 			};
 			changed = false;
 			context.Check(
-				world->WriteOriginalAndCurrentSample(
-					negativeCoordinate,
-					solid,
-					changed).Succeeded() &&
+				world->WriteOriginalAndCurrentSample(negativeCoordinate, solid, changed).Succeeded() &&
 				changed &&
 				world->GetResidentChunkCount() == 1 &&
 				world->GetWorldVoxelRevision() == 1,
 				"A negative global write allocates its canonical owner chunk");
 
-			const VoxelChunk* negativeChunk =
-				world->FindChunk({ -1, -1, -1 });
+			const VoxelChunk* negativeChunk = world->FindChunk({ -1, -1, -1 });
 			VoxelSample original{};
 			VoxelSample current{};
 			context.Check(
 				negativeChunk &&
 				negativeChunk->GetVoxelRevision() == 1 &&
-				world->ReadOriginalSample(
-					negativeCoordinate,
-					original).Succeeded() &&
-				world->ReadCurrentSample(
-					negativeCoordinate,
-					current).Succeeded() &&
+				world->ReadOriginalSample(negativeCoordinate, original).Succeeded() &&
+				world->ReadCurrentSample(negativeCoordinate, current).Succeeded() &&
 				original == solid &&
 				current == solid,
 				"World reads recover original and current data across negatives");
 
 			changed = true;
 			context.Check(
-				world->WriteOriginalAndCurrentSample(
-					negativeCoordinate,
-					solid,
-					changed).Succeeded() &&
+				world->WriteOriginalAndCurrentSample(negativeCoordinate, solid, changed).Succeeded() &&
 				!changed &&
 				world->GetWorldVoxelRevision() == 1 &&
 				negativeChunk->GetVoxelRevision() == 1,
@@ -378,19 +319,12 @@ namespace napa::voxel::testing
 			VoxelSample damaged = solid;
 			damaged.m_Damage = 99;
 			context.Check(
-				world->WriteCurrentSample(
-					negativeCoordinate,
-					damaged,
-					changed).Succeeded() &&
+				world->WriteCurrentSample(negativeCoordinate, damaged, changed).Succeeded() &&
 				changed &&
 				world->GetWorldVoxelRevision() == 2 &&
 				negativeChunk->GetVoxelRevision() == 2 &&
-				world->ReadOriginalSample(
-					negativeCoordinate,
-					original).Succeeded() &&
-				world->ReadCurrentSample(
-					negativeCoordinate,
-					current).Succeeded() &&
+				world->ReadOriginalSample(negativeCoordinate, original).Succeeded() &&
+				world->ReadCurrentSample(negativeCoordinate, current).Succeeded() &&
 				original == solid &&
 				current == damaged,
 				"World current writes preserve independent original data");
@@ -401,10 +335,7 @@ namespace napa::voxel::testing
 				.m_Damage = 7,
 			};
 			context.Check(
-				world->WriteOriginalAndCurrentSample(
-					{ 8, 0, 0 },
-					positiveHalo,
-					changed).Succeeded() &&
+				world->WriteOriginalAndCurrentSample({ 8, 0, 0 }, positiveHalo, changed).Succeeded() &&
 				changed &&
 				world->FindChunk({ 1, 0, 0 }) &&
 				world->GetResidentChunkCount() == 2 &&
@@ -413,8 +344,7 @@ namespace napa::voxel::testing
 
 			read = damaged;
 			context.Check(
-				world->ReadCurrentSample({ 9, 0, 0 }, read).m_Error ==
-				ValidationError::SampleOutsideLogicalBounds &&
+				world->ReadCurrentSample({ 9, 0, 0 }, read).m_Error == ValidationError::SampleOutsideLogicalBounds &&
 				read == damaged,
 				"Logical bounds reject padding inside an allocated halo chunk");
 
@@ -433,34 +363,24 @@ namespace napa::voxel::testing
 				"Guard allocation reports an already resident chunk");
 			allocated = true;
 			context.Check(
-				world->EnsureChunkAllocated({ 4, 0, 0 }, allocated).m_Error ==
-				ValidationError::ChunkOutsideLogicalSampleDomain &&
+				world->EnsureChunkAllocated({ 4, 0, 0 }, allocated).m_Error == ValidationError::ChunkOutsideLogicalSampleDomain &&
 				allocated &&
 				world->GetResidentChunkCount() == 3,
 				"Chunk allocation rejects owners unrelated to the logical sample domain");
 
-			const std::size_t residentBeforeRejectedWrite =
-				world->GetResidentChunkCount();
-			const std::uint64_t revisionBeforeRejectedWrite =
-				world->GetWorldVoxelRevision();
+			const std::size_t residentBeforeRejectedWrite = world->GetResidentChunkCount();
+			const std::uint64_t revisionBeforeRejectedWrite = world->GetWorldVoxelRevision();
 			changed = true;
 			context.Check(
-				world->WriteCurrentSample(
-					{ 0, 0, 9 },
-					unknown,
-					changed).m_Error ==
-				ValidationError::SampleOutsideLogicalBounds &&
+				world->WriteCurrentSample({ 0, 0, 9 }, unknown, changed).m_Error == ValidationError::SampleOutsideLogicalBounds &&
 				changed &&
-				world->GetResidentChunkCount() ==
-				residentBeforeRejectedWrite &&
-				world->GetWorldVoxelRevision() ==
-				revisionBeforeRejectedWrite,
+				world->GetResidentChunkCount() == residentBeforeRejectedWrite &&
+				world->GetWorldVoxelRevision() == revisionBeforeRejectedWrite,
 				"World writes validate logical bounds before sample data");
 
 			read = damaged;
 			context.Check(
-				world->ReadCurrentSample({ 0, 0, 9 }, read).m_Error ==
-				ValidationError::SampleOutsideLogicalBounds &&
+				world->ReadCurrentSample({ 0, 0, 9 }, read).m_Error == ValidationError::SampleOutsideLogicalBounds &&
 				read == damaged,
 				"Allocated guard chunks remain inaccessible as logical samples");
 
@@ -471,19 +391,12 @@ namespace napa::voxel::testing
 			context.Check(
 				VoxelWorld::Create(config, currentFirstWorld).Succeeded() &&
 				currentFirstWorld &&
-				currentFirstWorld->WriteCurrentSample(
-					negativeCoordinate,
-					solid,
-					currentFirstChanged).Succeeded() &&
+				currentFirstWorld->WriteCurrentSample(negativeCoordinate, solid, currentFirstChanged).Succeeded() &&
 				currentFirstChanged &&
 				currentFirstWorld->GetResidentChunkCount() == 1 &&
 				currentFirstWorld->GetWorldVoxelRevision() == 1 &&
-				currentFirstWorld->ReadOriginalSample(
-					negativeCoordinate,
-					currentFirstOriginal).Succeeded() &&
-				currentFirstWorld->ReadCurrentSample(
-					negativeCoordinate,
-					currentFirstCurrent).Succeeded() &&
+				currentFirstWorld->ReadOriginalSample(negativeCoordinate, currentFirstOriginal).Succeeded() &&
+				currentFirstWorld->ReadCurrentSample(negativeCoordinate, currentFirstCurrent).Succeeded() &&
 				currentFirstOriginal == DefaultVoxelSample &&
 				currentFirstCurrent == solid,
 				"A current-first write allocates storage without changing original data");
@@ -492,8 +405,7 @@ namespace napa::voxel::testing
 			VoxelWorldConfig invalidConfig = config;
 			invalidConfig.m_ChunkCellCount = 7;
 			context.Check(
-				VoxelWorld::Create(invalidConfig, world).m_Error ==
-				ValidationError::InvalidChunkCellCount &&
+				VoxelWorld::Create(invalidConfig, world).m_Error == ValidationError::InvalidChunkCellCount &&
 				world.get() == existingWorld,
 				"Failed world creation leaves the output world unchanged");
 		}

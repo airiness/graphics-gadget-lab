@@ -55,11 +55,7 @@ namespace gglab::foundation::tests
 	GGLAB_ENUM_FLAGS(TestFlags);
 
 	enum class TestValue : std::uint8_t
-	{
-		First,
-		Second,
-		Count,
-	};
+	{ First, Second, Count, };
 
 	struct TestIndexTag {};
 	using TestIndex = TypedIndex<TestIndexTag, std::uint16_t>;
@@ -82,11 +78,9 @@ namespace gglab::foundation::tests
 	static_assert(utils::IsPow2(std::uint32_t{ 8 }));
 	static_assert(utils::AlignUpPow2(std::uint32_t{ 9 }, std::uint32_t{ 8 }) == 16);
 	static_assert(utils::SaturatingAdd(std::uint8_t{ 3 }, std::uint8_t{ 4 }) == 7);
-	static_assert(utils::SaturatingAdd(std::numeric_limits<std::uint8_t>::max(),
-		std::uint8_t{ 1 }) == std::numeric_limits<std::uint8_t>::max());
+	static_assert(utils::SaturatingAdd(std::numeric_limits<std::uint8_t>::max(), std::uint8_t{ 1 }) == std::numeric_limits<std::uint8_t>::max());
 	static_assert(utils::SaturatingMultiply(std::uint32_t{ 6 }, std::uint32_t{ 7 }) == 42);
-	static_assert(utils::SaturatingMultiply(std::uint64_t{ 0 },
-		std::numeric_limits<std::uint64_t>::max()) == 0);
+	static_assert(utils::SaturatingMultiply(std::uint64_t{ 0 }, std::numeric_limits<std::uint64_t>::max()) == 0);
 	static_assert(utils::SaturatingMultiply(std::numeric_limits<std::uint64_t>::max(),
 		std::uint64_t{ 2 }) == std::numeric_limits<std::uint64_t>::max());
 	static_assert(TestIndex{ 7 }.Value() == 7);
@@ -99,8 +93,7 @@ namespace gglab::foundation::tests
 		return first.Value() == 0 && second.Value() == 1 && counter.Next() == 2;
 	}
 
-	[[nodiscard]] bool MatchesHex(
-		const Sha256Digest& digest, std::string_view expected) noexcept
+	[[nodiscard]] bool MatchesHex(const Sha256Digest& digest, std::string_view expected) noexcept
 	{
 		return Sha256DigestToHex(digest) == expected;
 	}
@@ -108,24 +101,21 @@ namespace gglab::foundation::tests
 	[[nodiscard]] bool RunSha256Tests() noexcept
 	{
 		const Sha256Digest empty = ComputeSha256({});
-		if (!MatchesHex(empty,
-			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"))
+		if (!MatchesHex(empty, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"))
 		{
 			return false;
 		}
 
 		constexpr std::string_view Abc = "abc";
 		const Sha256Digest abc = ComputeSha256(std::as_bytes(std::span{ Abc }));
-		if (!MatchesHex(abc,
-			"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))
+		if (!MatchesHex(abc, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))
 		{
 			return false;
 		}
 
 		constexpr std::string_view MultiBlock =
 			"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-		const Sha256Digest multiBlock =
-			ComputeSha256(std::as_bytes(std::span{ MultiBlock }));
+		const Sha256Digest multiBlock = ComputeSha256(std::as_bytes(std::span{ MultiBlock }));
 		if (!MatchesHex(multiBlock,
 			"248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"))
 		{
@@ -156,8 +146,7 @@ namespace gglab::foundation::tests
 		};
 		std::array<char, 65> paddingInput;
 		paddingInput.fill('a');
-		const std::span<const std::byte> paddingBytes =
-			std::as_bytes(std::span{ paddingInput });
+		const std::span<const std::byte> paddingBytes = std::as_bytes(std::span{ paddingInput });
 		for (const PaddingBoundaryVector& vector : PaddingBoundaryVectors)
 		{
 			const std::span<const std::byte> input = paddingBytes.first(vector.m_Size);
@@ -183,8 +172,7 @@ namespace gglab::foundation::tests
 		}
 		const Sha256Digest chunked = incremental.Finish();
 		if (chunked != ComputeSha256(chunkedBytes) ||
-			!MatchesHex(chunked,
-				"d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"))
+			!MatchesHex(chunked, "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"))
 		{
 			return false;
 		}
@@ -326,8 +314,7 @@ namespace gglab::foundation::tests
 		{
 		}
 
-		[[nodiscard]] std::unique_ptr<TaskWorkerContext> CreateContext(
-			uint32_t workerIndex) const override
+		[[nodiscard]] std::unique_ptr<TaskWorkerContext> CreateContext(uint32_t workerIndex) const override
 		{
 			GGLAB_UNUSED(workerIndex);
 			return std::make_unique<RecordingWorkerContext>(m_State);
@@ -343,7 +330,8 @@ namespace gglab::foundation::tests
 		const std::thread::id ownerThread = std::this_thread::get_id();
 		bool ownerThreadCallbacks = true;
 		TaskSystem taskSystem({ .m_WorkerCount = 1 });
-		std::array<TaskWork, 4> work{
+		std::array<TaskWork, 4> work
+		{
 			[](std::stop_token) { return TaskResult::Failure("Explicit task failure."); },
 			[](std::stop_token) -> TaskResult { throw std::runtime_error("Task exception."); },
 			[](std::stop_token) -> TaskResult { throw 42; },
@@ -442,7 +430,9 @@ namespace gglab::foundation::tests
 			}
 		}
 		if (!WaitUntil([&]
-			{ return taskSystem.GetStatistics().m_PendingCompletionCount == TaskCount; }) ||
+			{
+				return taskSystem.GetStatistics().m_PendingCompletionCount == TaskCount;
+			}) ||
 			executed.load() != TaskCount || callbacks != 0 ||
 			taskSystem.PumpCompletions({ .m_MaxCallbacks = 0 }) != 0 ||
 			taskSystem.GetStatistics().m_PendingCompletionCount != TaskCount)
@@ -508,7 +498,9 @@ namespace gglab::foundation::tests
 		owner.reset();
 		// Work retains its backing state until it finishes; a weak callback must not retain it.
 		if (weakOwner.expired() || !taskSystem.Cancel(handle) || !WaitUntil([&]
-			{ return taskSystem.GetStatistics().m_PendingCompletionCount == 1; }) ||
+			{
+				return taskSystem.GetStatistics().m_PendingCompletionCount == 1;
+			}) ||
 			!weakOwner.expired())
 		{
 			return false;
@@ -536,7 +528,9 @@ namespace gglab::foundation::tests
 					++*state;
 					discardedCallbackRan = true;
 				}) || !WaitUntil([&]
-				{ return pendingSystem.GetStatistics().m_PendingCompletionCount == 1; }))
+					{
+						return pendingSystem.GetStatistics().m_PendingCompletionCount == 1;
+					}))
 			{
 				return false;
 			}
@@ -571,7 +565,9 @@ namespace gglab::foundation::tests
 					successStatus = info.m_Status;
 				});
 			if (!handle || !WaitUntil([&]
-				{ return taskSystem.GetStatistics().m_PendingCompletionCount == 1; }) ||
+				{
+					return taskSystem.GetStatistics().m_PendingCompletionCount == 1;
+				}) ||
 				taskSystem.PumpCompletions() != 1 || successStatus != TaskStatus::Succeeded ||
 				workThread == ownerThread || completionThread != ownerThread)
 			{
@@ -591,7 +587,7 @@ namespace gglab::foundation::tests
 			TaskSystem taskSystem({
 				.m_WorkerCount = 1,
 				.m_WorkerLifecycle = lifecycle,
-				});
+			});
 			if (!WaitUntil([&] { return lifecycleState->m_Created.load() == 1; }))
 			{
 				return false;
@@ -620,7 +616,8 @@ namespace gglab::foundation::tests
 					return TaskResult::Success();
 				},
 				[&](const TaskCompletionInfo& info) { cancelledStatus = info.m_Status; });
-			constexpr std::array Priorities{
+			constexpr std::array Priorities
+			{
 				TaskPriority::Background, TaskPriority::High, TaskPriority::Normal, TaskPriority::Critical,
 			};
 			// Queue every priority twice behind one running worker to verify priority and FIFO order.
@@ -644,7 +641,9 @@ namespace gglab::foundation::tests
 			}
 			releaseBlocker = true;
 			if (!WaitUntil([&]
-				{ return taskSystem.GetStatistics().m_PendingCompletionCount == 10; }))
+				{
+					return taskSystem.GetStatistics().m_PendingCompletionCount == 10;
+				}))
 			{
 				return false;
 			}
@@ -729,18 +728,17 @@ namespace gglab::foundation::tests
 	[[nodiscard]] bool RunPathTests() noexcept
 	{
 		std::error_code errorCode;
-		const std::filesystem::path temporaryRoot =
-			std::filesystem::temp_directory_path(errorCode);
+		const std::filesystem::path temporaryRoot = std::filesystem::temp_directory_path(errorCode);
 		if (errorCode || temporaryRoot.empty())
 		{
 			return false;
 		}
 
 		const std::filesystem::path testRoot = temporaryRoot /
-			("gglab.foundation-path-test." + std::to_string(win32::GetCurrentProcessId()) + "." +
-				std::to_string(win32::GetTickCount64()));
+			("gglab.foundation-path-test." + std::to_string(win32::GetCurrentProcessId()) + "." + std::to_string(win32::GetTickCount64()));
 		ScopedTestDirectory cleanup(testRoot);
-		constexpr std::array<std::byte, 4> Payload{
+		constexpr std::array<std::byte, 4> Payload
+		{
 			std::byte{ 0x00 }, std::byte{ 0x12 }, std::byte{ 0xab }, std::byte{ 0xff }
 		};
 		const std::filesystem::path file = testRoot / "nested" / "fixture.BIN";
@@ -753,8 +751,7 @@ namespace gglab::foundation::tests
 
 		std::array<std::byte, Payload.size()> actual{};
 		std::ifstream input(file, std::ios::binary);
-		input.read(reinterpret_cast<char*>(actual.data()),
-			static_cast<std::streamsize>(actual.size()));
+		input.read(reinterpret_cast<char*>(actual.data()), static_cast<std::streamsize>(actual.size()));
 		return input && actual == Payload &&
 			utils::CreateDirectoryIfNotExist(file.parent_path()) &&
 			utils::CreateParentDirectoryIfNotExist(testRoot / "other" / "file.bin");
@@ -878,8 +875,7 @@ namespace gglab::foundation::tests
 				disposition.store(guard.GetDisposition(), std::memory_order_relaxed);
 			});
 		thread.join();
-		if (disposition.load(std::memory_order_relaxed) !=
-			win32::NamedMutexAcquireDisposition::TimedOut)
+		if (disposition.load(std::memory_order_relaxed) != win32::NamedMutexAcquireDisposition::TimedOut)
 		{
 			return false;
 		}
@@ -893,7 +889,7 @@ namespace gglab::foundation::tests
 		TaskSystem windowsTaskSystem({
 			.m_WorkerCount = 1,
 			.m_WorkerLifecycle = std::make_shared<win32::Win32TaskWorkerLifecycle>(),
-			});
+		});
 		windowsTaskSystem.Shutdown();
 		return true;
 	}
@@ -909,7 +905,7 @@ int main()
 		gglab::foundation::tests::RunTaskTests() &&
 		gglab::foundation::tests::RunPathTests() &&
 		gglab::foundation::tests::RunLoggingTests() &&
-		gglab::foundation::tests::RunWindowsLeafTests()
-		? 0
-		: 1;
+		gglab::foundation::tests::RunWindowsLeafTests() ?
+			0 :
+			1;
 }

@@ -37,8 +37,7 @@ namespace napa::voxel::testing
 			return config;
 		}
 
-		void RunCanonicalHashWriterTests(
-			TestContext& context) noexcept
+		void RunCanonicalHashWriterTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -50,10 +49,10 @@ namespace napa::voxel::testing
 			CanonicalHashWriter hello;
 			for (const std::uint8_t byte : {
 				std::uint8_t{ 'h' },
-				std::uint8_t{ 'e' },
-				std::uint8_t{ 'l' },
-				std::uint8_t{ 'l' },
-				std::uint8_t{ 'o' },
+					std::uint8_t{ 'e' },
+					std::uint8_t{ 'l' },
+					std::uint8_t{ 'l' },
+					std::uint8_t{ 'o' },
 			})
 			{
 				hello.WriteU8(byte);
@@ -112,8 +111,7 @@ namespace napa::voxel::testing
 			negativeZero32.WriteFloat32(-0.0f);
 			context.Check(
 				positiveZero32.GetValue() == 0x4d25767f9dce13f5ull &&
-					negativeZero32.GetValue() ==
-						positiveZero32.GetValue(),
+				negativeZero32.GetValue() == positiveZero32.GetValue(),
 				"WriteFloat32 canonicalizes negative zero");
 
 			CanonicalHashWriter positiveZero64;
@@ -122,18 +120,15 @@ namespace napa::voxel::testing
 			negativeZero64.WriteFloat64(-0.0);
 			context.Check(
 				positiveZero64.GetValue() == 0xa8c7f832281a39c5ull &&
-					negativeZero64.GetValue() ==
-						positiveZero64.GetValue(),
+				negativeZero64.GetValue() == positiveZero64.GetValue(),
 				"WriteFloat64 canonicalizes negative zero");
 
 			CanonicalHashWriter enumWriter;
 			CanonicalHashWriter enumUnderlyingWriter;
 			enumWriter.WriteEnum(VoxelMaterial::Stone);
-			enumUnderlyingWriter.WriteU8(
-				static_cast<std::uint8_t>(VoxelMaterial::Stone));
+			enumUnderlyingWriter.WriteU8(static_cast<std::uint8_t>(VoxelMaterial::Stone));
 			context.Check(
-				enumWriter.GetValue() ==
-					enumUnderlyingWriter.GetValue(),
+				enumWriter.GetValue() == enumUnderlyingWriter.GetValue(),
 				"WriteEnum uses the declared underlying integer width");
 
 			CanonicalHashWriter count32;
@@ -145,29 +140,22 @@ namespace napa::voxel::testing
 			count64.WriteCount(std::uint64_t{ 0x0123456789abcdefull });
 			count64Underlying.WriteU64(0x0123456789abcdefull);
 			context.Check(
-				count32.GetValue() ==
-					count32Underlying.GetValue() &&
-					count64.GetValue() ==
-						count64Underlying.GetValue(),
+				count32.GetValue() == count32Underlying.GetValue() &&
+				count64.GetValue() == count64Underlying.GetValue(),
 				"WriteCount preserves the selected canonical width");
 		}
 
-		void RunLogicalVoxelWorldHashTests(
-			TestContext& context) noexcept
+		void RunLogicalVoxelWorldHashTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
 			std::unique_ptr<VoxelWorld> goldenWorld;
 			std::uint64_t goldenHash = 0;
 			context.Check(
-				VoxelWorld::Create(
-					MakeGoldenHashConfig(),
-					goldenWorld).Succeeded() &&
-					goldenWorld &&
-					ComputeLogicalVoxelWorldHash(
-						*goldenWorld,
-						goldenHash).Succeeded() &&
-					goldenHash == 0x3447718e07eed74aull,
+				VoxelWorld::Create(MakeGoldenHashConfig(), goldenWorld).Succeeded() &&
+				goldenWorld &&
+				ComputeLogicalVoxelWorldHash(*goldenWorld, goldenHash).Succeeded() &&
+				goldenHash == 0x3447718e07eed74aull,
 				"The default logical voxel world matches its golden hash");
 
 			std::unique_ptr<VoxelWorld> nonEmptyGoldenWorld;
@@ -179,19 +167,12 @@ namespace napa::voxel::testing
 			};
 			bool goldenChanged = false;
 			context.Check(
-				VoxelWorld::Create(
-					MakeGoldenHashConfig(),
-					nonEmptyGoldenWorld).Succeeded() &&
-					nonEmptyGoldenWorld &&
-					nonEmptyGoldenWorld->WriteOriginalAndCurrentSample(
-						{ 0, 0, 0 },
-						goldenStone,
-						goldenChanged).Succeeded() &&
-					goldenChanged &&
-					ComputeLogicalVoxelWorldHash(
-						*nonEmptyGoldenWorld,
-						nonEmptyGoldenHash).Succeeded() &&
-					nonEmptyGoldenHash == 0x22acf3d1636e3855ull,
+				VoxelWorld::Create(MakeGoldenHashConfig(), nonEmptyGoldenWorld).Succeeded() &&
+				nonEmptyGoldenWorld &&
+				nonEmptyGoldenWorld->WriteOriginalAndCurrentSample({ 0, 0, 0 }, goldenStone, goldenChanged).Succeeded() &&
+				goldenChanged &&
+				ComputeLogicalVoxelWorldHash(*nonEmptyGoldenWorld, nonEmptyGoldenHash).Succeeded() &&
+				nonEmptyGoldenHash == 0x22acf3d1636e3855ull,
 				"A non-empty logical voxel world matches its golden hash");
 
 			const VoxelWorldConfig config = MakeAllocationHashConfig();
@@ -202,24 +183,16 @@ namespace napa::voxel::testing
 			std::uint64_t allocatedHash = 0;
 			context.Check(
 				VoxelWorld::Create(config, implicitWorld).Succeeded() &&
-					VoxelWorld::Create(config, allocatedWorld).Succeeded() &&
-					implicitWorld &&
-					allocatedWorld &&
-					allocatedWorld->EnsureChunkAllocated(
-						{ 1, 0, 0 },
-						allocated).Succeeded() &&
-					allocated &&
-					allocatedWorld->EnsureChunkAllocated(
-						{ 0, 0, 0 },
-						allocated).Succeeded() &&
-					allocated &&
-					ComputeLogicalVoxelWorldHash(
-						*implicitWorld,
-						implicitHash).Succeeded() &&
-					ComputeLogicalVoxelWorldHash(
-						*allocatedWorld,
-						allocatedHash).Succeeded() &&
-					implicitHash == allocatedHash,
+				VoxelWorld::Create(config, allocatedWorld).Succeeded() &&
+				implicitWorld &&
+				allocatedWorld &&
+				allocatedWorld->EnsureChunkAllocated({ 1, 0, 0 }, allocated).Succeeded() &&
+				allocated &&
+				allocatedWorld->EnsureChunkAllocated({ 0, 0, 0 }, allocated).Succeeded() &&
+				allocated &&
+				ComputeLogicalVoxelWorldHash(*implicitWorld, implicitHash).Succeeded() &&
+				ComputeLogicalVoxelWorldHash(*allocatedWorld, allocatedHash).Succeeded() &&
+				implicitHash == allocatedHash,
 				"Logical voxel hashing ignores resident and guard allocation");
 			const std::uint64_t defaultAllocationHash = implicitHash;
 
@@ -237,55 +210,31 @@ namespace napa::voxel::testing
 			const SampleCoord secondCoordinate{ 8, 8, 8 };
 			bool changed = false;
 			context.Check(
-				implicitWorld->WriteCurrentSample(
-					firstCoordinate,
-					stone,
-					changed).Succeeded() &&
-					changed &&
-					implicitWorld->WriteCurrentSample(
-						secondCoordinate,
-						soil,
-						changed).Succeeded() &&
-					changed &&
-					allocatedWorld->WriteCurrentSample(
-						secondCoordinate,
-						soil,
-						changed).Succeeded() &&
-					changed &&
-					allocatedWorld->WriteCurrentSample(
-						firstCoordinate,
-						stone,
-						changed).Succeeded() &&
-					changed &&
-					ComputeLogicalVoxelWorldHash(
-						*implicitWorld,
-						implicitHash).Succeeded() &&
-					ComputeLogicalVoxelWorldHash(
-						*allocatedWorld,
-						allocatedHash).Succeeded() &&
-					implicitHash == allocatedHash,
+				implicitWorld->WriteCurrentSample(firstCoordinate, stone, changed).Succeeded() &&
+				changed &&
+				implicitWorld->WriteCurrentSample(secondCoordinate, soil, changed).Succeeded() &&
+				changed &&
+				allocatedWorld->WriteCurrentSample(secondCoordinate, soil, changed).Succeeded() &&
+				changed &&
+				allocatedWorld->WriteCurrentSample(firstCoordinate, stone, changed).Succeeded() &&
+				changed &&
+				ComputeLogicalVoxelWorldHash(*implicitWorld, implicitHash).Succeeded() &&
+				ComputeLogicalVoxelWorldHash(*allocatedWorld, allocatedHash).Succeeded() &&
+				implicitHash == allocatedHash,
 				"Logical voxel hashing is independent of allocation and write order");
 
 			std::unique_ptr<VoxelWorld> clearedWorld;
 			std::uint64_t clearedHash = 0;
 			context.Check(
 				VoxelWorld::Create(config, clearedWorld).Succeeded() &&
-					clearedWorld &&
-					clearedWorld->WriteCurrentSample(
-						firstCoordinate,
-						stone,
-						changed).Succeeded() &&
-					changed &&
-					clearedWorld->WriteCurrentSample(
-						firstCoordinate,
-						DefaultVoxelSample,
-						changed).Succeeded() &&
-					changed &&
-					clearedWorld->GetResidentChunkCount() == 1 &&
-					ComputeLogicalVoxelWorldHash(
-						*clearedWorld,
-						clearedHash).Succeeded() &&
-					clearedHash == defaultAllocationHash,
+				clearedWorld &&
+				clearedWorld->WriteCurrentSample(firstCoordinate, stone, changed).Succeeded() &&
+				changed &&
+				clearedWorld->WriteCurrentSample(firstCoordinate, DefaultVoxelSample, changed).Succeeded() &&
+				changed &&
+				clearedWorld->GetResidentChunkCount() == 1 &&
+				ComputeLogicalVoxelWorldHash(*clearedWorld, clearedHash).Succeeded() &&
+				clearedHash == defaultAllocationHash,
 				"Clearing current data restores the allocation-independent hash");
 		}
 	}

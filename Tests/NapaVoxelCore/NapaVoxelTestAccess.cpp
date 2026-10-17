@@ -15,15 +15,13 @@ namespace napa::voxel::testing
 		probe.m_CommitAllocationCount = 0;
 		detail::IsVoxelOperationCommitPhase = false;
 		detail::ActiveOperationAllocationProbe = &probe;
-		const ValidationResult mutationResult =
-			napa::voxel::ApplySphereEdit(world, request, result);
+		const ValidationResult mutationResult = napa::voxel::ApplySphereEdit(world, request, result);
 		detail::ActiveOperationAllocationProbe = nullptr;
 		detail::IsVoxelOperationCommitPhase = false;
 		return mutationResult;
 	}
 
-	ValidationResult ApplySphereEditWithExhaustedRevision(
-		VoxelWorld& world, const SphereEditRequest& request, VoxelMutationResult& result)
+	ValidationResult ApplySphereEditWithExhaustedRevision(VoxelWorld& world, const SphereEditRequest& request, VoxelMutationResult& result)
 	{
 		if (detail::SimulateExhaustedWorldRevision)
 		{
@@ -31,14 +29,12 @@ namespace napa::voxel::testing
 		}
 
 		detail::SimulateExhaustedWorldRevision = true;
-		const ValidationResult mutationResult =
-			napa::voxel::ApplySphereEdit(world, request, result);
+		const ValidationResult mutationResult = napa::voxel::ApplySphereEdit(world, request, result);
 		detail::SimulateExhaustedWorldRevision = false;
 		return mutationResult;
 	}
 
-	ValidationResult RestoreAllWithAllocationProbe(
-		VoxelWorld& world, VoxelMutationResult& result, VoxelRestoreAllocationProbe& probe)
+	ValidationResult RestoreAllWithAllocationProbe(VoxelWorld& world, VoxelMutationResult& result, VoxelRestoreAllocationProbe& probe)
 	{
 		if (detail::ActiveOperationAllocationProbe != nullptr)
 		{
@@ -55,8 +51,7 @@ namespace napa::voxel::testing
 		return restoreResult;
 	}
 
-	ValidationResult RestoreAllWithExhaustedRevision(
-		VoxelWorld& world, VoxelMutationResult& result)
+	ValidationResult RestoreAllWithExhaustedRevision(VoxelWorld& world, VoxelMutationResult& result)
 	{
 		if (detail::SimulateExhaustedWorldRevision)
 		{
@@ -79,8 +74,7 @@ namespace napa::voxel::testing
 			return { ValidationError::InvalidDataOnlyPublication };
 		}
 		detail::SimulatedAuthoritativeRevision = authoritativeRevision;
-		const ValidationResult result = PrepareDataOnlyPublication(
-			authoritativeWorld, mutation, visible, pending);
+		const ValidationResult result = PrepareDataOnlyPublication(authoritativeWorld, mutation, visible, pending);
 		detail::SimulatedAuthoritativeRevision = 0;
 		return result;
 	}
@@ -95,8 +89,7 @@ namespace napa::voxel::testing
 			return { ValidationError::InvalidDataOnlyPublication };
 		}
 		detail::SimulatePublicationAllocationFailure = true;
-		const ValidationResult result = PrepareDataOnlyPublication(
-			authoritativeWorld, mutation, visible, pending);
+		const ValidationResult result = PrepareDataOnlyPublication(authoritativeWorld, mutation, visible, pending);
 		detail::SimulatePublicationAllocationFailure = false;
 		return result;
 	}

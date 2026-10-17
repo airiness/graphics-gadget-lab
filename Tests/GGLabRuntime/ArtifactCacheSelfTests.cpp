@@ -16,13 +16,12 @@ namespace gglab
 		using CacheTestCore = ArtifactCacheCore<uint32_t, CacheTestArtifact>;
 		using CacheTestHandle = std::shared_ptr<const CacheTestArtifact>;
 
-		[[nodiscard]] CacheTestHandle Admit(CacheTestCore& cache, uint32_t key, uint32_t artifactId,
-			uint64_t physicalBytes) noexcept
+		[[nodiscard]] CacheTestHandle Admit(CacheTestCore& cache, uint32_t key, uint32_t artifactId, uint64_t physicalBytes) noexcept
 		{
 			return cache.Admit(key, std::make_shared<const CacheTestArtifact>(CacheTestArtifact{
-										.m_Id = artifactId,
-										.m_AllocatedBytes = physicalBytes,
-				}));
+				.m_Id = artifactId,
+				.m_AllocatedBytes = physicalBytes,
+			}));
 		}
 
 		void RunDuplicateAdmissionTests(SelfTestContext& context) noexcept
@@ -50,7 +49,7 @@ namespace gglab
 			CacheTestHandle artifact = std::make_shared<const CacheTestArtifact>(CacheTestArtifact{
 				.m_Id = 10,
 				.m_AllocatedBytes = 4,
-				});
+			});
 			CacheTestHandle first = cache.Admit(1, artifact);
 			CacheTestHandle alias = cache.Admit(2, artifact);
 			const ArtifactCacheCoreStatistics statistics = cache.GetStatistics();

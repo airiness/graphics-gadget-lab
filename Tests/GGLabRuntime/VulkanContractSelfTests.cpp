@@ -103,8 +103,7 @@ namespace gglab
 				"Sampler descriptor capacity is fixed at 2,048");
 			context.Check(GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_ResourceDescriptorCount ==
 				GGLabDescriptorCapacityContract.m_ResourceDescriptorCount &&
-				GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_SamplerDescriptorCount ==
-				GGLabDescriptorCapacityContract.m_SamplerDescriptorCount,
+				GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_SamplerDescriptorCount == GGLabDescriptorCapacityContract.m_SamplerDescriptorCount,
 				"Vulkan binding ABI consumes the backend-neutral descriptor capacity contract");
 		}
 
@@ -114,20 +113,19 @@ namespace gglab
 				GGLabVulkanFormatRequirements,
 				[](const VulkanFormatRequirement& requirement) noexcept
 				{
-					return requirement.m_Group ==
-						VulkanFormatRequirementGroup::GtaoAlternative;
+					return requirement.m_Group == VulkanFormatRequirementGroup::GtaoAlternative;
 				}));
 			context.Check(GGLabVulkanFormatRequirements.size() == 6 &&
 				gtaoAlternativeCount == 2,
 				"Vulkan format profile exposes four mandatory formats and two GTAO alternatives");
 			const auto hasFormat = [](VkFormat format) noexcept
-				{
-					return std::ranges::any_of(GGLabVulkanFormatRequirements,
-						[format](const VulkanFormatRequirement& requirement) noexcept
-						{
-							return requirement.m_Format == format;
-						});
-				};
+			{
+				return std::ranges::any_of(GGLabVulkanFormatRequirements,
+					[format](const VulkanFormatRequirement& requirement) noexcept
+					{
+						return requirement.m_Format == format;
+					});
+			};
 			context.Check(hasFormat(VK_FORMAT_D32_SFLOAT) &&
 				hasFormat(VK_FORMAT_R16G16B16A16_SFLOAT) &&
 				hasFormat(VK_FORMAT_B8G8R8A8_UNORM),
@@ -149,10 +147,8 @@ namespace gglab
 			multipleMissing.m_SamplerAnisotropy = false;
 			const auto multipleMissingEvaluation = EvaluateVulkanDeviceProfile(multipleMissing);
 			context.Check(multipleMissingEvaluation.m_RejectionReasonCount == 2 &&
-				multipleMissingEvaluation.HasReason(
-					VulkanDeviceProfileRejectionReason::DynamicRenderingUnavailable) &&
-				multipleMissingEvaluation.HasReason(
-					VulkanDeviceProfileRejectionReason::SamplerAnisotropyUnavailable),
+				multipleMissingEvaluation.HasReason(VulkanDeviceProfileRejectionReason::DynamicRenderingUnavailable) &&
+				multipleMissingEvaluation.HasReason(VulkanDeviceProfileRejectionReason::SamplerAnisotropyUnavailable),
 				"Vulkan profile reports every missing requirement in one evaluation");
 
 			struct RequiredBooleanCase
@@ -161,79 +157,28 @@ namespace gglab
 				VulkanDeviceProfileRejectionReason m_Reason;
 				std::string_view m_CheckName;
 			};
-			constexpr std::array RequiredBooleanCases{
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasSwapchainExtension,
-					VulkanDeviceProfileRejectionReason::SwapchainExtensionUnavailable,
-					"Vulkan profile reports a missing swapchain extension" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasGraphicsPresentQueue,
-					VulkanDeviceProfileRejectionReason::GraphicsPresentQueueUnavailable,
-					"Vulkan profile reports a missing graphics-present queue" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DynamicRendering,
-					VulkanDeviceProfileRejectionReason::DynamicRenderingUnavailable,
-					"Vulkan profile reports missing dynamic rendering" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_Synchronization2,
-					VulkanDeviceProfileRejectionReason::Synchronization2Unavailable,
-					"Vulkan profile reports missing synchronization2" },
-				RequiredBooleanCase{
-					&VulkanDeviceProfileCapabilities::m_ShaderDemoteToHelperInvocation,
-					VulkanDeviceProfileRejectionReason::
-						ShaderDemoteToHelperInvocationUnavailable,
-					"Vulkan profile reports missing shader demote support for alpha clipping" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_TimelineSemaphore,
-					VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable,
-					"Vulkan profile reports missing timeline semaphores" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ScalarBlockLayout,
-					VulkanDeviceProfileRejectionReason::ScalarBlockLayoutUnavailable,
-					"Vulkan profile reports missing scalar block layout" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_SamplerAnisotropy,
-					VulkanDeviceProfileRejectionReason::SamplerAnisotropyUnavailable,
-					"Vulkan profile reports missing sampler anisotropy" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ShaderStorageImageExtendedFormats,
-					VulkanDeviceProfileRejectionReason::ShaderStorageImageExtendedFormatsUnavailable,
-					"Vulkan profile reports missing storage-image extended formats" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_RuntimeDescriptorArray,
-					VulkanDeviceProfileRejectionReason::RuntimeDescriptorArrayUnavailable,
-					"Vulkan profile reports missing runtime descriptor arrays" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DescriptorBindingPartiallyBound,
-					VulkanDeviceProfileRejectionReason::DescriptorBindingPartiallyBoundUnavailable,
-					"Vulkan profile reports missing partially-bound descriptors" },
-				RequiredBooleanCase{
-					&VulkanDeviceProfileCapabilities::m_DescriptorBindingUpdateUnusedWhilePending,
-					VulkanDeviceProfileRejectionReason::
-						DescriptorBindingUpdateUnusedWhilePendingUnavailable,
-					"Vulkan profile reports missing update-unused-while-pending" },
-				RequiredBooleanCase{
-					&VulkanDeviceProfileCapabilities::m_DescriptorBindingSampledImageUpdateAfterBind,
-					VulkanDeviceProfileRejectionReason::
-						DescriptorBindingSampledImageUpdateAfterBindUnavailable,
-					"Vulkan profile reports missing sampled-image update-after-bind" },
-				RequiredBooleanCase{
-					&VulkanDeviceProfileCapabilities::m_DescriptorBindingStorageImageUpdateAfterBind,
-					VulkanDeviceProfileRejectionReason::
-						DescriptorBindingStorageImageUpdateAfterBindUnavailable,
-					"Vulkan profile reports missing storage-image update-after-bind" },
-				RequiredBooleanCase{
-					&VulkanDeviceProfileCapabilities::m_ShaderSampledImageArrayNonUniformIndexing,
-					VulkanDeviceProfileRejectionReason::
-						ShaderSampledImageArrayNonUniformIndexingUnavailable,
-					"Vulkan profile reports missing sampled-image non-uniform indexing" },
-				RequiredBooleanCase{
-					&VulkanDeviceProfileCapabilities::m_ShaderStorageImageArrayNonUniformIndexing,
-					VulkanDeviceProfileRejectionReason::
-						ShaderStorageImageArrayNonUniformIndexingUnavailable,
-					"Vulkan profile reports missing storage-image non-uniform indexing" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasMutableDescriptorTypeExtension,
-					VulkanDeviceProfileRejectionReason::MutableDescriptorTypeExtensionUnavailable,
-					"Vulkan profile reports a missing mutable descriptor extension" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_MutableDescriptorType,
-					VulkanDeviceProfileRejectionReason::MutableDescriptorTypeUnavailable,
-					"Vulkan profile reports a missing mutable descriptor feature" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_GlobalDescriptorSetLayoutSupported,
-					VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported,
-					"Vulkan profile reports an unsupported global descriptor-set layout" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_RequiredFormatFeaturesSupported,
-					VulkanDeviceProfileRejectionReason::RequiredFormatFeaturesUnavailable,
-					"Vulkan profile reports missing rendering format features" },
+			constexpr std::array RequiredBooleanCases
+			{
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasSwapchainExtension, VulkanDeviceProfileRejectionReason::SwapchainExtensionUnavailable, "Vulkan profile reports a missing swapchain extension" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasGraphicsPresentQueue, VulkanDeviceProfileRejectionReason::GraphicsPresentQueueUnavailable, "Vulkan profile reports a missing graphics-present queue" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DynamicRendering, VulkanDeviceProfileRejectionReason::DynamicRenderingUnavailable, "Vulkan profile reports missing dynamic rendering" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_Synchronization2, VulkanDeviceProfileRejectionReason::Synchronization2Unavailable, "Vulkan profile reports missing synchronization2" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ShaderDemoteToHelperInvocation, VulkanDeviceProfileRejectionReason::ShaderDemoteToHelperInvocationUnavailable, "Vulkan profile reports missing shader demote support for alpha clipping" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_TimelineSemaphore, VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable, "Vulkan profile reports missing timeline semaphores" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ScalarBlockLayout, VulkanDeviceProfileRejectionReason::ScalarBlockLayoutUnavailable, "Vulkan profile reports missing scalar block layout" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_SamplerAnisotropy, VulkanDeviceProfileRejectionReason::SamplerAnisotropyUnavailable, "Vulkan profile reports missing sampler anisotropy" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ShaderStorageImageExtendedFormats, VulkanDeviceProfileRejectionReason::ShaderStorageImageExtendedFormatsUnavailable, "Vulkan profile reports missing storage-image extended formats" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_RuntimeDescriptorArray, VulkanDeviceProfileRejectionReason::RuntimeDescriptorArrayUnavailable, "Vulkan profile reports missing runtime descriptor arrays" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DescriptorBindingPartiallyBound, VulkanDeviceProfileRejectionReason::DescriptorBindingPartiallyBoundUnavailable, "Vulkan profile reports missing partially-bound descriptors" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DescriptorBindingUpdateUnusedWhilePending, VulkanDeviceProfileRejectionReason::DescriptorBindingUpdateUnusedWhilePendingUnavailable, "Vulkan profile reports missing update-unused-while-pending" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DescriptorBindingSampledImageUpdateAfterBind, VulkanDeviceProfileRejectionReason::DescriptorBindingSampledImageUpdateAfterBindUnavailable, "Vulkan profile reports missing sampled-image update-after-bind" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_DescriptorBindingStorageImageUpdateAfterBind, VulkanDeviceProfileRejectionReason::DescriptorBindingStorageImageUpdateAfterBindUnavailable, "Vulkan profile reports missing storage-image update-after-bind" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ShaderSampledImageArrayNonUniformIndexing, VulkanDeviceProfileRejectionReason::ShaderSampledImageArrayNonUniformIndexingUnavailable, "Vulkan profile reports missing sampled-image non-uniform indexing" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_ShaderStorageImageArrayNonUniformIndexing, VulkanDeviceProfileRejectionReason::ShaderStorageImageArrayNonUniformIndexingUnavailable, "Vulkan profile reports missing storage-image non-uniform indexing" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasMutableDescriptorTypeExtension, VulkanDeviceProfileRejectionReason::MutableDescriptorTypeExtensionUnavailable, "Vulkan profile reports a missing mutable descriptor extension" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_MutableDescriptorType, VulkanDeviceProfileRejectionReason::MutableDescriptorTypeUnavailable, "Vulkan profile reports a missing mutable descriptor feature" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_GlobalDescriptorSetLayoutSupported, VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported, "Vulkan profile reports an unsupported global descriptor-set layout" },
+				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_RequiredFormatFeaturesSupported, VulkanDeviceProfileRejectionReason::RequiredFormatFeaturesUnavailable, "Vulkan profile reports missing rendering format features" },
 			};
 
 			for (const auto& testCase : RequiredBooleanCases)
@@ -264,48 +209,16 @@ namespace gglab
 			const uint32_t samplerCount =
 				GGLabDescriptorCapacityContract.m_SamplerDescriptorCount;
 			const uint32_t combinedCount = resourceCount + samplerCount;
-			const std::array CapacityLimitCases{
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindSampledImages,
-					resourceCount,
-					VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient,
-					"Vulkan profile checks the descriptor-set sampled-image limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindSampledImages,
-					resourceCount,
-					VulkanDeviceProfileRejectionReason::PerStageSampledImageLimitInsufficient,
-					"Vulkan profile checks the per-stage sampled-image limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindStorageImages,
-					resourceCount,
-					VulkanDeviceProfileRejectionReason::DescriptorSetStorageImageLimitInsufficient,
-					"Vulkan profile checks the descriptor-set storage-image limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindStorageImages,
-					resourceCount,
-					VulkanDeviceProfileRejectionReason::PerStageStorageImageLimitInsufficient,
-					"Vulkan profile checks the per-stage storage-image limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindSamplers,
-					samplerCount,
-					VulkanDeviceProfileRejectionReason::DescriptorSetSamplerLimitInsufficient,
-					"Vulkan profile checks the descriptor-set sampler limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindSamplers,
-					samplerCount,
-					VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient,
-					"Vulkan profile checks the per-stage sampler limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxPerStageUpdateAfterBindResources,
-					combinedCount,
-					VulkanDeviceProfileRejectionReason::
-						PerStageUpdateAfterBindResourceLimitInsufficient,
-					"Vulkan profile checks the combined per-stage update-after-bind limit" },
-				CapacityLimitCase{
-					&VulkanDescriptorCapacityLimits::m_MaxUpdateAfterBindDescriptorsInAllPools,
-					combinedCount,
-					VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient,
-					"Vulkan profile checks the update-after-bind pool limit" },
+			const std::array CapacityLimitCases
+			{
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindSampledImages, resourceCount, VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient, "Vulkan profile checks the descriptor-set sampled-image limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindSampledImages, resourceCount, VulkanDeviceProfileRejectionReason::PerStageSampledImageLimitInsufficient, "Vulkan profile checks the per-stage sampled-image limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindStorageImages, resourceCount, VulkanDeviceProfileRejectionReason::DescriptorSetStorageImageLimitInsufficient, "Vulkan profile checks the descriptor-set storage-image limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindStorageImages, resourceCount, VulkanDeviceProfileRejectionReason::PerStageStorageImageLimitInsufficient, "Vulkan profile checks the per-stage storage-image limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindSamplers, samplerCount, VulkanDeviceProfileRejectionReason::DescriptorSetSamplerLimitInsufficient, "Vulkan profile checks the descriptor-set sampler limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindSamplers, samplerCount, VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient, "Vulkan profile checks the per-stage sampler limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxPerStageUpdateAfterBindResources, combinedCount, VulkanDeviceProfileRejectionReason::PerStageUpdateAfterBindResourceLimitInsufficient, "Vulkan profile checks the combined per-stage update-after-bind limit" },
+				CapacityLimitCase{ &VulkanDescriptorCapacityLimits::m_MaxUpdateAfterBindDescriptorsInAllPools, combinedCount, VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient, "Vulkan profile checks the update-after-bind pool limit" },
 			};
 			for (const auto& testCase : CapacityLimitCases)
 			{
@@ -319,8 +232,7 @@ namespace gglab
 			auto asymmetricLimits = supported.m_DescriptorCapacityLimits;
 			asymmetricLimits.m_MaxPerStageDescriptorUpdateAfterBindStorageImages = resourceCount - 7;
 			asymmetricLimits.m_MaxPerStageUpdateAfterBindResources = combinedCount - 3;
-			const auto availability =
-				CalculateVulkanDescriptorCapacityAvailability(asymmetricLimits);
+			const auto availability = CalculateVulkanDescriptorCapacityAvailability(asymmetricLimits);
 			context.Check(availability.m_ResourceDescriptorCount == resourceCount - 7 &&
 				availability.m_SamplerDescriptorCount == samplerCount &&
 				availability.m_CombinedDescriptorCount == combinedCount - 3,
@@ -348,24 +260,18 @@ namespace gglab
 
 		void RunVulkanBarrierContractTests(SelfTestContext& context) noexcept
 		{
-			const VkPipelineStageFlags2 shaderStages =
-				ToVulkanPipelineStages(RHIStage::VertexShader | RHIStage::PixelShader);
-			context.Check(shaderStages == (VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
-				VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT),
+			const VkPipelineStageFlags2 shaderStages = ToVulkanPipelineStages(RHIStage::VertexShader | RHIStage::PixelShader);
+			context.Check(shaderStages == (VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT),
 				"Vulkan barrier lowering preserves combined shader stages");
 
-			const VkAccessFlags2 transferAccess =
-				ToVulkanAccessFlags(RHIAccess::CopySource | RHIAccess::CopyDest);
-			context.Check(transferAccess ==
-				(VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT),
+			const VkAccessFlags2 transferAccess = ToVulkanAccessFlags(RHIAccess::CopySource | RHIAccess::CopyDest);
+			context.Check(transferAccess == (VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT),
 				"Vulkan barrier lowering preserves combined transfer access");
 
 			context.Check(
 				ToVulkanImageLayout(RHILayout::Undefined) == VK_IMAGE_LAYOUT_UNDEFINED &&
-				ToVulkanImageLayout(RHILayout::CopyDest) ==
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-				ToVulkanImageLayout(RHILayout::RenderTarget) ==
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+				ToVulkanImageLayout(RHILayout::CopyDest) == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+				ToVulkanImageLayout(RHILayout::RenderTarget) == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
 				ToVulkanImageLayout(RHILayout::Present) == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 				"Vulkan barrier lowering maps transfer, attachment, and presentation layouts");
 			context.Check(!ToVulkanImageLayout(RHILayout::Unknown).has_value(),
@@ -438,20 +344,13 @@ namespace gglab
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::UnorderedAccess,
 			};
-			const auto undefinedToCopy = BuildVulkanTextureBarrier(
-				{ {}, UndefinedRHITextureState(), copyDestState }, image, colorDesc);
-			const auto undefinedToColor = BuildVulkanTextureBarrier(
-				{ {}, UndefinedRHITextureState(), renderTargetState }, image, colorDesc);
-			const auto undefinedToDepth = BuildVulkanTextureBarrier(
-				{ {}, UndefinedRHITextureState(), depthWriteState }, image, depthDesc);
-			const auto presentToColor = BuildVulkanTextureBarrier(
-				{ {}, PresentRHITextureState(), renderTargetState }, image, colorDesc);
-			const auto colorToPresent = BuildVulkanTextureBarrier(
-				{ {}, renderTargetState, PresentRHITextureState() }, image, colorDesc);
-			const auto copyToShader = BuildVulkanTextureBarrier(
-				{ {}, copyDestState, shaderReadState }, image, colorDesc);
-			const auto orderedStorage = BuildVulkanTextureBarrier(
-				{ {}, storageState, storageState }, image, colorDesc);
+			const auto undefinedToCopy = BuildVulkanTextureBarrier({ {}, UndefinedRHITextureState(), copyDestState }, image, colorDesc);
+			const auto undefinedToColor = BuildVulkanTextureBarrier({ {}, UndefinedRHITextureState(), renderTargetState }, image, colorDesc);
+			const auto undefinedToDepth = BuildVulkanTextureBarrier({ {}, UndefinedRHITextureState(), depthWriteState }, image, depthDesc);
+			const auto presentToColor = BuildVulkanTextureBarrier({ {}, PresentRHITextureState(), renderTargetState }, image, colorDesc);
+			const auto colorToPresent = BuildVulkanTextureBarrier({ {}, renderTargetState, PresentRHITextureState() }, image, colorDesc);
+			const auto copyToShader = BuildVulkanTextureBarrier({ {}, copyDestState, shaderReadState }, image, colorDesc);
+			const auto orderedStorage = BuildVulkanTextureBarrier({ {}, storageState, storageState }, image, colorDesc);
 			context.Check(undefinedToCopy && undefinedToColor && undefinedToDepth &&
 				presentToColor && colorToPresent && copyToShader && orderedStorage &&
 				undefinedToCopy->oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
@@ -465,8 +364,7 @@ namespace gglab
 				copyToShader->srcAccessMask == VK_ACCESS_2_TRANSFER_WRITE_BIT &&
 				copyToShader->dstAccessMask == VK_ACCESS_2_SHADER_READ_BIT &&
 				orderedStorage->oldLayout == orderedStorage->newLayout &&
-				orderedStorage->srcAccessMask ==
-				(VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT) &&
+				orderedStorage->srcAccessMask == (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT) &&
 				orderedStorage->dstAccessMask == orderedStorage->srcAccessMask,
 				"Vulkan texture barrier lowering covers the required synchronization matrix");
 
@@ -481,12 +379,9 @@ namespace gglab
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::Common,
 			};
-			const auto graphicsToCompute = BuildVulkanBufferBarrier(
-				{ {}, graphicsStorageState, computeStorageState }, buffer);
-			const auto computeToGraphics = BuildVulkanBufferBarrier(
-				{ {}, computeStorageState, graphicsStorageState }, buffer);
-			const auto sameLayoutBuffer = BuildVulkanBufferBarrier(
-				{ {}, computeStorageState, computeStorageState }, buffer);
+			const auto graphicsToCompute = BuildVulkanBufferBarrier({ {}, graphicsStorageState, computeStorageState }, buffer);
+			const auto computeToGraphics = BuildVulkanBufferBarrier({ {}, computeStorageState, graphicsStorageState }, buffer);
+			const auto sameLayoutBuffer = BuildVulkanBufferBarrier({ {}, computeStorageState, computeStorageState }, buffer);
 			context.Check(graphicsToCompute && computeToGraphics && sameLayoutBuffer &&
 				graphicsToCompute->srcStageMask == VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT &&
 				graphicsToCompute->dstStageMask == VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT &&
@@ -511,25 +406,18 @@ namespace gglab
 				.m_Access = RHIAccess::IndexBuffer,
 				.m_Layout = RHILayout::Common,
 			};
-			const auto vertexBufferRead = BuildVulkanBufferBarrier(
-				{ {}, commonBufferState, vertexBufferReadState }, buffer);
-			const auto vertexBufferRelease = BuildVulkanBufferBarrier(
-				{ {}, vertexBufferReadState, commonBufferState }, buffer);
-			const auto indexBufferRead = BuildVulkanBufferBarrier(
-				{ {}, commonBufferState, indexBufferReadState }, buffer);
+			const auto vertexBufferRead = BuildVulkanBufferBarrier({ {}, commonBufferState, vertexBufferReadState }, buffer);
+			const auto vertexBufferRelease = BuildVulkanBufferBarrier({ {}, vertexBufferReadState, commonBufferState }, buffer);
+			const auto indexBufferRead = BuildVulkanBufferBarrier({ {}, commonBufferState, indexBufferReadState }, buffer);
 			context.Check(vertexBufferRead && vertexBufferRelease && indexBufferRead &&
-				(vertexBufferRead->dstStageMask &
-					VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
+				(vertexBufferRead->dstStageMask & VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
 				vertexBufferRead->dstAccessMask == VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT &&
-				(vertexBufferRelease->srcStageMask &
-					VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
+				(vertexBufferRelease->srcStageMask & VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
 				(indexBufferRead->dstStageMask & VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT) != 0 &&
 				indexBufferRead->dstAccessMask == VK_ACCESS_2_INDEX_READ_BIT,
 				"Vulkan buffer barriers synchronize vertex and index reads at input-assembly stages");
-			context.Check(!BuildVulkanTextureBarrier(
-				{ {}, renderTargetState, UndefinedRHITextureState() }, image, colorDesc) &&
-				!BuildVulkanBufferBarrier(
-					{ {}, UndefinedRHITextureState(), computeStorageState }, buffer),
+			context.Check(!BuildVulkanTextureBarrier({ {}, renderTargetState, UndefinedRHITextureState() }, image, colorDesc) &&
+				!BuildVulkanBufferBarrier({ {}, UndefinedRHITextureState(), computeStorageState }, buffer),
 				"Vulkan barrier builders reject invalid destination and buffer states");
 		}
 
@@ -611,7 +499,8 @@ namespace gglab
 			mutable uint32_t m_CreateCount = 0;
 
 		private:
-			static constexpr std::array<std::string_view, 1> RequiredExtensions{
+			static constexpr std::array<std::string_view, 1> RequiredExtensions
+			{
 				"VK_GGLAB_non_win32_surface",
 			};
 		};
@@ -663,14 +552,12 @@ namespace gglab
 			snapshot.m_Identity.m_DeviceType = type;
 			for (uint32_t byte = 0; byte < snapshot.m_Identity.m_DeviceUuid.size(); ++byte)
 			{
-				snapshot.m_Identity.m_DeviceUuid[byte] =
-					static_cast<uint8_t>((index + 1) * 17 + byte);
+				snapshot.m_Identity.m_DeviceUuid[byte] = static_cast<uint8_t>((index + 1) * 17 + byte);
 			}
 			snapshot.m_ProfileCapabilities = capabilities;
 			// A well-formed snapshot models an adapter whose layout probe ran.
 			snapshot.m_GlobalDescriptorSetLayoutProbed = true;
-			snapshot.m_ProfileEvaluation =
-				EvaluateVulkanDeviceProfile(snapshot.m_ProfileCapabilities);
+			snapshot.m_ProfileEvaluation = EvaluateVulkanDeviceProfile(snapshot.m_ProfileCapabilities);
 			return snapshot;
 		}
 
@@ -706,20 +593,18 @@ namespace gglab
 			// Default selection prefers a discrete accepted adapter.
 			{
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
-				snapshots.push_back(MakeAdapterSnapshot(0, "Intel Integrated", VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, satisfied));
-				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Discrete", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
-				const VulkanAdapterSelectionResult result =
-					SelectVulkanAdapter(snapshots, {});
-				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
-					"Default adapter selection prefers a discrete GPU over integrated");
+			snapshots.push_back(MakeAdapterSnapshot(0, "Intel Integrated", VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, satisfied));
+			snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Discrete", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+			const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
+			context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
+				"Default adapter selection prefers a discrete GPU over integrated");
 			}
 			// Default selection is stable by enumeration index within one rank.
 			{
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
 				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA First", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
 				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Second", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
-				const VulkanAdapterSelectionResult result =
-					SelectVulkanAdapter(snapshots, {});
+				const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
 				context.Check(result.IsSelected() && result.m_SelectedIndex == 0,
 					"Default adapter selection is deterministic by enumeration index");
 			}
@@ -762,8 +647,7 @@ namespace gglab
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
 				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA Alpha", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
 				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Beta", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
-				const std::string uuidPrefix =
-					snapshots[1].m_Identity.UuidHex().substr(0, 6);
+				const std::string uuidPrefix = snapshots[1].m_Identity.UuidHex().substr(0, 6);
 				const VulkanAdapterSelectionResult result =
 					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Prefix, .m_Prefix = uuidPrefix });
 				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
@@ -807,8 +691,7 @@ namespace gglab
 				snapshots[0].m_GlobalDescriptorSetLayoutProbed = true;
 				const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
 				context.Check(result.m_Status == VulkanAdapterSelectionStatus::NoAcceptedAdapter &&
-					snapshots[0].m_ProfileEvaluation.HasReason(
-						VulkanDeviceProfileRejectionReason::ApiVersionTooLow),
+					snapshots[0].m_ProfileEvaluation.HasReason(VulkanDeviceProfileRejectionReason::ApiVersionTooLow),
 					"Default selection without accepted adapters reports the profile rejection");
 			}
 			// A rejected adapter preserves every missing capability reason.
@@ -827,8 +710,7 @@ namespace gglab
 				degraded.m_GlobalDescriptorSetLayoutSupported = false;
 				degraded.m_RequiredFormatFeaturesSupported = false;
 
-				VulkanAdapterCapabilitySnapshot snapshot =
-					MakeAdapterSnapshot(0, "Degraded", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, degraded);
+				VulkanAdapterCapabilitySnapshot snapshot = MakeAdapterSnapshot(0, "Degraded", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, degraded);
 				// The degraded snapshot models an adapter whose layout probe
 				// ran and reported unsupported.
 				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
@@ -856,38 +738,30 @@ namespace gglab
 				missingTimeline.m_TimelineSemaphore = false;
 				VulkanAdapterCapabilitySnapshot snapshot = MakeAdapterSnapshot(0, "MissingTimeline",
 					VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, missingTimeline);
-				const VulkanDeviceProfileEvaluation preliminary =
-					EvaluateVulkanAdapterProfilePreliminary(snapshot);
+				const VulkanDeviceProfileEvaluation preliminary = EvaluateVulkanAdapterProfilePreliminary(snapshot);
 				context.Check(!preliminary.IsAccepted() &&
-					preliminary.HasReason(
-						VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable) &&
-					!preliminary.HasReason(
-						VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported),
+					preliminary.HasReason(VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable) &&
+					!preliminary.HasReason(VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported),
 					"Preliminary rejection never reports an unprobed layout as unsupported");
 			}
 			// All preliminary requirements pass and the layout probe reports
 			// unsupported: the final evaluation carries the layout reason.
 			{
 				VulkanAdapterCapabilitySnapshot snapshot =
-					MakeAdapterSnapshot(0, "LayoutUnsupported",
-						VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
-				const VulkanDeviceProfileEvaluation preliminary =
-					EvaluateVulkanAdapterProfilePreliminary(snapshot);
+					MakeAdapterSnapshot(0, "LayoutUnsupported", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
+				const VulkanDeviceProfileEvaluation preliminary = EvaluateVulkanAdapterProfilePreliminary(snapshot);
 				context.Check(preliminary.IsAccepted(),
 					"All non-layout requirements pass the preliminary evaluation");
 				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
 				snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported = false;
 				EvaluateVulkanAdapterProfile(snapshot);
 				context.Check(!snapshot.m_ProfileEvaluation.IsAccepted() &&
-					snapshot.m_ProfileEvaluation.HasReason(
-						VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported),
+					snapshot.m_ProfileEvaluation.HasReason(VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported),
 					"A real layout probe result of unsupported rejects the adapter");
 			}
 			// All requirements pass and the layout probe reports supported.
 			{
-				VulkanAdapterCapabilitySnapshot snapshot =
-					MakeAdapterSnapshot(0, "LayoutSupported",
-						VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
+				VulkanAdapterCapabilitySnapshot snapshot = MakeAdapterSnapshot(0, "LayoutSupported", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
 				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
 				snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported = true;
 				EvaluateVulkanAdapterProfile(snapshot);
@@ -900,10 +774,8 @@ namespace gglab
 				auto rejectedCapabilities = satisfied;
 				rejectedCapabilities.m_DescriptorBindingUpdateUnusedWhilePending = false;
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
-				snapshots.push_back(MakeAdapterSnapshot(0, "Rejected First",
-					VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
-				snapshots.push_back(MakeAdapterSnapshot(1, "Accepted Second",
-					VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				snapshots.push_back(MakeAdapterSnapshot(0, "Rejected First", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
+				snapshots.push_back(MakeAdapterSnapshot(1, "Accepted Second", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
 				const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
 				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
 					"Default selection skips a rejected adapter and picks the accepted one");
@@ -911,8 +783,7 @@ namespace gglab
 			// An adapter whose layout probe failed (probed stays false, but the
 			// preliminary evaluation passed) is never selectable.
 			{
-				VulkanAdapterCapabilitySnapshot unverified = MakeAdapterSnapshot(0,
-					"ProbeFailed", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
+				VulkanAdapterCapabilitySnapshot unverified = MakeAdapterSnapshot(0, "ProbeFailed", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
 				unverified.m_GlobalDescriptorSetLayoutProbed = false;
 				unverified.m_LayoutProbeError = "vkCreateDevice failed";
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
@@ -936,39 +807,37 @@ namespace gglab
 			// acquire and are recorded, never derived from the slot.
 			{
 				VulkanFrameIndexModel model(2);
-				context.Check(model.GetFrameSlotCount() == 2,
-					"frame-slot count is fixed at construction");
-				const std::array<uint32_t, 5> slotSequence = { 0, 1, 0, 1, 0 };
-				const std::array<uint32_t, 5> imageSequence = { 0, 1, 2, 0, 1 };
-				for (uint32_t i = 0; i < 5; ++i)
-				{
-					const uint32_t slot = model.NextFrameSlot();
-					context.Check(slot == slotSequence[i],
-						"frame-slot ring returns slots in order");
-					model.CommitFrame(slot, imageSequence[i]);
-				}
-				const auto& pairs = model.GetFramePairs();
-				context.Check(pairs.size() == 5,
-					"frame pairs are recorded per commit");
-				bool domainsSeparate = true;
-				for (uint32_t i = 0; i < 5; ++i)
-				{
-					domainsSeparate &= pairs[i].first == slotSequence[i] &&
-						pairs[i].second == imageSequence[i];
-				}
-				context.Check(domainsSeparate,
-					"frame-slot and backbuffer domains never cross");
-				for (uint32_t i = 0; i < 100; ++i)
-				{
-					model.CommitFrame(i % 2, i % 3);
-				}
-				context.Check(model.GetFramePairs().size() ==
-					VulkanFrameIndexModel::MaxDiagnosticFramePairs &&
-					model.GetFramePairs().back() == std::pair<uint32_t, uint32_t>{ 1, 0 },
-					"frame-pair diagnostics retain a bounded recent history");
-				model.ResetFramePairs();
-				context.Check(model.GetFramePairs().empty() && model.NextFrameSlot() == 0,
-					"reset clears pairs and restarts the ring");
+			context.Check(model.GetFrameSlotCount() == 2,
+				"frame-slot count is fixed at construction");
+			const std::array<uint32_t, 5> slotSequence = { 0, 1, 0, 1, 0 };
+			const std::array<uint32_t, 5> imageSequence = { 0, 1, 2, 0, 1 };
+			for (uint32_t i = 0; i < 5; ++i)
+			{
+				const uint32_t slot = model.NextFrameSlot();
+				context.Check(slot == slotSequence[i],
+					"frame-slot ring returns slots in order");
+				model.CommitFrame(slot, imageSequence[i]);
+			}
+			const auto& pairs = model.GetFramePairs();
+			context.Check(pairs.size() == 5,
+				"frame pairs are recorded per commit");
+			bool domainsSeparate = true;
+			for (uint32_t i = 0; i < 5; ++i)
+			{
+				domainsSeparate &= pairs[i].first == slotSequence[i] &&
+					pairs[i].second == imageSequence[i];
+			}
+			context.Check(domainsSeparate, "frame-slot and backbuffer domains never cross");
+			for (uint32_t i = 0; i < 100; ++i)
+			{
+				model.CommitFrame(i % 2, i % 3);
+			}
+			context.Check(model.GetFramePairs().size() == VulkanFrameIndexModel::MaxDiagnosticFramePairs &&
+				model.GetFramePairs().back() == std::pair<uint32_t, uint32_t>{ 1, 0 },
+				"frame-pair diagnostics retain a bounded recent history");
+			model.ResetFramePairs();
+			context.Check(model.GetFramePairs().empty() && model.NextFrameSlot() == 0,
+				"reset clears pairs and restarts the ring");
 			}
 
 			// Per-image tracked layout: new images start Undefined, present
@@ -981,14 +850,12 @@ namespace gglab
 				context.Check(tracker.Get(0) == VulkanPresentImageLayout::Undefined &&
 					tracker.Get(2) == VulkanPresentImageLayout::Undefined,
 					"new swapchain images start Undefined");
-				context.Check(ToRHIBackBufferInitialState(tracker.Get(0)) ==
-					UndefinedRHITextureState(),
+				context.Check(ToRHIBackBufferInitialState(tracker.Get(0)) == UndefinedRHITextureState(),
 					"new swapchain images publish Undefined to RenderGraph imports");
 				tracker.Set(1, VulkanPresentImageLayout::Present);
 				context.Check(tracker.Get(1) == VulkanPresentImageLayout::Present,
 					"successful present updates the tracked state");
-				context.Check(ToRHIBackBufferInitialState(tracker.Get(1)) ==
-					PresentRHITextureState(),
+				context.Check(ToRHIBackBufferInitialState(tracker.Get(1)) == PresentRHITextureState(),
 					"presented swapchain images publish Present to RenderGraph imports");
 				tracker.Reset(2);
 				context.Check(tracker.GetImageCount() == 2 &&
@@ -1003,55 +870,39 @@ namespace gglab
 			{
 				VulkanFrameSlotStateMachine machine;
 				machine.Reset(2);
-				context.Check(!machine.TryEnd(0) && !machine.TryAbort(0),
-					"End/Abort without Begin are rejected");
-				context.Check(machine.TryBegin(0) && machine.IsActive(0),
-					"Begin activates the slot");
-				context.Check(!machine.TryBegin(0),
-					"double Begin is rejected");
-				context.Check(machine.TryEnd(0) && !machine.IsActive(0),
-					"End deactivates the slot");
+				context.Check(!machine.TryEnd(0) && !machine.TryAbort(0), "End/Abort without Begin are rejected");
+				context.Check(machine.TryBegin(0) && machine.IsActive(0), "Begin activates the slot");
+				context.Check(!machine.TryBegin(0), "double Begin is rejected");
+				context.Check(machine.TryEnd(0) && !machine.IsActive(0), "End deactivates the slot");
 				context.Check(!machine.TryEnd(0) && !machine.TryAbort(0),
 					"double End and End after End are rejected");
 				context.Check(machine.TryBegin(0) && machine.TryAbort(0),
 					"a slot is reusable after End and aborts after Begin");
 				context.Check(!machine.TryAbort(0) && !machine.TryEnd(0),
 					"double Abort and End after Abort are rejected");
-				context.Check(machine.TryBegin(0) && machine.TryEnd(0) && machine.TryBegin(0),
-					"reuse after a completed transaction");
-				context.Check(machine.TryAbort(0),
-					"abort after Begin");
-				context.Check(machine.TryBegin(0),
-					"a slot starts a fresh transaction after Abort");
-				context.Check(!machine.TryBegin(9),
-					"out-of-range slots are rejected");
+				context.Check(machine.TryBegin(0) && machine.TryEnd(0) && machine.TryBegin(0), "reuse after a completed transaction");
+				context.Check(machine.TryAbort(0), "abort after Begin");
+				context.Check(machine.TryBegin(0), "a slot starts a fresh transaction after Abort");
+				context.Check(!machine.TryBegin(9), "out-of-range slots are rejected");
 			}
 
 			// Acquire/present result classification.
 			{
-				context.Check(ClassifyVulkanAcquireResult(VK_SUCCESS) ==
-					VulkanAcquireOutcome::Acquired,
+				context.Check(ClassifyVulkanAcquireResult(VK_SUCCESS) == VulkanAcquireOutcome::Acquired,
 					"acquire SUCCESS hands over an image");
-				context.Check(ClassifyVulkanAcquireResult(VK_SUBOPTIMAL_KHR) ==
-					VulkanAcquireOutcome::RecreatePending,
+				context.Check(ClassifyVulkanAcquireResult(VK_SUBOPTIMAL_KHR) == VulkanAcquireOutcome::RecreatePending,
 					"acquire SUBOPTIMAL hands over an image and schedules recreate");
-				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_OUT_OF_DATE_KHR) ==
-					VulkanAcquireOutcome::OutOfDate,
+				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_OUT_OF_DATE_KHR) == VulkanAcquireOutcome::OutOfDate,
 					"acquire OUT_OF_DATE hands over no image; the caller recreates and retries");
-				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_DEVICE_LOST) ==
-					VulkanAcquireOutcome::Fatal,
+				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_DEVICE_LOST) == VulkanAcquireOutcome::Fatal,
 					"other acquire results are fatal");
-				context.Check(ClassifyVulkanPresentResult(VK_SUCCESS) ==
-					VulkanPresentOutcome::Presented,
+				context.Check(ClassifyVulkanPresentResult(VK_SUCCESS) == VulkanPresentOutcome::Presented,
 					"present SUCCESS");
-				context.Check(ClassifyVulkanPresentResult(VK_SUBOPTIMAL_KHR) ==
-					VulkanPresentOutcome::RecreatePending,
+				context.Check(ClassifyVulkanPresentResult(VK_SUBOPTIMAL_KHR) == VulkanPresentOutcome::RecreatePending,
 					"present SUBOPTIMAL is non-fatal and schedules recreate");
-				context.Check(ClassifyVulkanPresentResult(VK_ERROR_OUT_OF_DATE_KHR) ==
-					VulkanPresentOutcome::RecreatePending,
+				context.Check(ClassifyVulkanPresentResult(VK_ERROR_OUT_OF_DATE_KHR) == VulkanPresentOutcome::RecreatePending,
 					"present OUT_OF_DATE keeps the submission valid");
-				context.Check(ClassifyVulkanPresentResult(VK_ERROR_SURFACE_LOST_KHR) ==
-					VulkanPresentOutcome::Failed,
+				context.Check(ClassifyVulkanPresentResult(VK_ERROR_SURFACE_LOST_KHR) == VulkanPresentOutcome::Failed,
 					"other present results are failures");
 			}
 
@@ -1059,20 +910,16 @@ namespace gglab
 			// a failed submit never presents, and a non-fatal present keeps
 			// the frame completed.
 			{
-				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_SUCCESS) ==
-					VulkanFrameTransactionOutcome::Completed,
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_SUCCESS) == VulkanFrameTransactionOutcome::Completed,
 					"submit+present SUCCESS completes the frame");
-				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_SUBOPTIMAL_KHR) ==
-					VulkanFrameTransactionOutcome::RecreatePending,
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_SUBOPTIMAL_KHR) == VulkanFrameTransactionOutcome::RecreatePending,
 					"submit SUCCESS + present SUBOPTIMAL completes and schedules recreate");
 				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_ERROR_OUT_OF_DATE_KHR) ==
 					VulkanFrameTransactionOutcome::RecreatePending,
 					"submit SUCCESS + present OUT_OF_DATE keeps the submission valid");
-				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_ERROR_SURFACE_LOST_KHR) ==
-					VulkanFrameTransactionOutcome::PresentFailed,
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_ERROR_SURFACE_LOST_KHR) == VulkanFrameTransactionOutcome::PresentFailed,
 					"submit SUCCESS + fatal present fails the runtime");
-				context.Check(ClassifySubmitPresentTransaction(VK_ERROR_DEVICE_LOST, VK_SUCCESS) ==
-					VulkanFrameTransactionOutcome::SubmitFailed,
+				context.Check(ClassifySubmitPresentTransaction(VK_ERROR_DEVICE_LOST, VK_SUCCESS) == VulkanFrameTransactionOutcome::SubmitFailed,
 					"a failed submit never reaches present");
 
 				const RHIFencePoint submittedFence{ RHIFenceHandle{ 0, 1 }, 7 };
@@ -1114,16 +961,13 @@ namespace gglab
 			{
 				const RHIFenceHandle transferFence{ 7, 1 };
 				RHIFencePoint pendingWait{};
-				context.Check(MergeVulkanTimelineWait(
-					pendingWait, RHIFencePoint{ transferFence, 3 }) &&
+				context.Check(MergeVulkanTimelineWait(pendingWait, RHIFencePoint{ transferFence, 3 }) &&
 					pendingWait == RHIFencePoint{ transferFence, 3 },
 					"the first transfer timeline wait is retained for graphics submission");
-				context.Check(MergeVulkanTimelineWait(
-					pendingWait, RHIFencePoint{ transferFence, 9 }) &&
+				context.Check(MergeVulkanTimelineWait(pendingWait, RHIFencePoint{ transferFence, 9 }) &&
 					pendingWait == RHIFencePoint{ transferFence, 9 },
 					"graphics submission waits on the greatest transfer timeline value");
-				context.Check(!MergeVulkanTimelineWait(
-					pendingWait, RHIFencePoint{ RHIFenceHandle{ 8, 1 }, 10 }) &&
+				context.Check(!MergeVulkanTimelineWait(pendingWait, RHIFencePoint{ RHIFenceHandle{ 8, 1 }, 10 }) &&
 					pendingWait == RHIFencePoint{ transferFence, 9 },
 					"a foreign timeline wait is rejected without replacing the dependency");
 			}
@@ -1133,29 +977,16 @@ namespace gglab
 			// selection the swapchain creation path feeds with the surface's
 			// actual mode list.
 			{
-				const std::vector<VkPresentModeKHR> full{
-					VK_PRESENT_MODE_FIFO_KHR,
-					VK_PRESENT_MODE_IMMEDIATE_KHR,
-					VK_PRESENT_MODE_MAILBOX_KHR,
-				};
-				const std::vector<VkPresentModeKHR> noMailbox{
-					VK_PRESENT_MODE_FIFO_KHR,
-					VK_PRESENT_MODE_IMMEDIATE_KHR,
-				};
-				const std::vector<VkPresentModeKHR> fifoOnly{
-					VK_PRESENT_MODE_FIFO_KHR,
-				};
-				context.Check(SelectVulkanPresentModeFromList(full, true) ==
-					VK_PRESENT_MODE_FIFO_KHR,
+				const std::vector<VkPresentModeKHR> full{ VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, };
+				const std::vector<VkPresentModeKHR> noMailbox{ VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, };
+				const std::vector<VkPresentModeKHR> fifoOnly{ VK_PRESENT_MODE_FIFO_KHR, };
+				context.Check(SelectVulkanPresentModeFromList(full, true) == VK_PRESENT_MODE_FIFO_KHR,
 					"vsync on always selects FIFO");
-				context.Check(SelectVulkanPresentModeFromList(full, false) ==
-					VK_PRESENT_MODE_MAILBOX_KHR,
+				context.Check(SelectVulkanPresentModeFromList(full, false) == VK_PRESENT_MODE_MAILBOX_KHR,
 					"vsync off prefers MAILBOX");
-				context.Check(SelectVulkanPresentModeFromList(noMailbox, false) ==
-					VK_PRESENT_MODE_IMMEDIATE_KHR,
+				context.Check(SelectVulkanPresentModeFromList(noMailbox, false) == VK_PRESENT_MODE_IMMEDIATE_KHR,
 					"vsync off falls back to IMMEDIATE");
-				context.Check(SelectVulkanPresentModeFromList(fifoOnly, false) ==
-					VK_PRESENT_MODE_FIFO_KHR,
+				context.Check(SelectVulkanPresentModeFromList(fifoOnly, false) == VK_PRESENT_MODE_FIFO_KHR,
 					"vsync off falls back to FIFO");
 			}
 
@@ -1167,8 +998,7 @@ namespace gglab
 				fixed.currentExtent = { 1920, 1080 };
 				fixed.minImageExtent = { 1920, 1080 };
 				fixed.maxImageExtent = { 1920, 1080 };
-				const VkExtent2D selectedFixed =
-					SelectVulkanSwapchainExtent(fixed, 1278, 1360);
+				const VkExtent2D selectedFixed = SelectVulkanSwapchainExtent(fixed, 1278, 1360);
 				context.Check(selectedFixed.width == 1920 && selectedFixed.height == 1080,
 					"fixed surface extent overrides a transient requested client size");
 
@@ -1178,8 +1008,7 @@ namespace gglab
 				};
 				variable.minImageExtent = { 320, 240 };
 				variable.maxImageExtent = { 2560, 1440 };
-				const VkExtent2D selectedVariable =
-					SelectVulkanSwapchainExtent(variable, 128, 2160);
+				const VkExtent2D selectedVariable = SelectVulkanSwapchainExtent(variable, 128, 2160);
 				context.Check(selectedVariable.width == 320 && selectedVariable.height == 1440,
 					"variable surface extent clamps the requested drawable size");
 			}
@@ -1201,21 +1030,15 @@ namespace gglab
 			// together with the last committed submission.
 			{
 				VulkanInstance validationInstance;
-				validationInstance.RecordValidationMessage(
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT);
-				validationInstance.RecordValidationMessage(
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT);
-				validationInstance.RecordValidationMessage(
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT);
-				validationInstance.RecordValidationMessage(
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT);
-				const VulkanValidationDiagnostics validation =
-					validationInstance.GetValidationDiagnostics();
+				validationInstance.RecordValidationMessage(VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT);
+				validationInstance.RecordValidationMessage(VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT);
+				validationInstance.RecordValidationMessage(VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT);
+				validationInstance.RecordValidationMessage(VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT);
+				const VulkanValidationDiagnostics validation = validationInstance.GetValidationDiagnostics();
 				context.Check(validation.m_ErrorCount == 1 && validation.m_WarningCount == 1 &&
 					validation.m_InfoCount == 1 && validation.m_VerboseCount == 1,
 					"Vulkan validation diagnostics preserve all severity counters");
-				const VulkanRuntimeFailureDiagnostics submitFailure = CaptureVulkanRuntimeFailure(
-					{}, VK_ERROR_DEVICE_LOST, "vkQueueSubmit2", 37);
+				const VulkanRuntimeFailureDiagnostics submitFailure = CaptureVulkanRuntimeFailure({}, VK_ERROR_DEVICE_LOST, "vkQueueSubmit2", 37);
 				const VulkanRuntimeFailureDiagnostics preserved = CaptureVulkanRuntimeFailure(
 					submitFailure, VK_ERROR_SURFACE_LOST_KHR, "vkQueuePresentKHR", 41);
 				context.Check(submitFailure.m_Operation == "vkQueueSubmit2" &&
@@ -1233,51 +1056,39 @@ namespace gglab
 			// VkDevice is still usable, so cleanup still quiesces; only
 			// VK_ERROR_DEVICE_LOST marks the device lost.
 			{
-				context.Check(!IsVulkanDeviceLostError(VK_ERROR_SURFACE_LOST_KHR),
-					"SURFACE_LOST is not device lost");
-				context.Check(!IsVulkanDeviceLostError(VK_ERROR_OUT_OF_HOST_MEMORY),
-					"OUT_OF_HOST_MEMORY is not device lost");
+				context.Check(!IsVulkanDeviceLostError(VK_ERROR_SURFACE_LOST_KHR), "SURFACE_LOST is not device lost");
+				context.Check(!IsVulkanDeviceLostError(VK_ERROR_OUT_OF_HOST_MEMORY), "OUT_OF_HOST_MEMORY is not device lost");
 				context.Check(!IsVulkanDeviceLostError(VK_ERROR_OUT_OF_DEVICE_MEMORY),
 					"OUT_OF_DEVICE_MEMORY is not device lost");
 				context.Check(!IsVulkanDeviceLostError(VK_ERROR_INITIALIZATION_FAILED),
 					"INITIALIZATION_FAILED is not device lost");
-				context.Check(IsVulkanDeviceLostError(VK_ERROR_DEVICE_LOST),
-					"DEVICE_LOST is device lost");
+				context.Check(IsVulkanDeviceLostError(VK_ERROR_DEVICE_LOST), "DEVICE_LOST is device lost");
 
-				const VulkanRuntimeHealthState surfaceLost =
-					UpdateVulkanRuntimeHealth({}, VK_ERROR_SURFACE_LOST_KHR);
+				const VulkanRuntimeHealthState surfaceLost = UpdateVulkanRuntimeHealth({}, VK_ERROR_SURFACE_LOST_KHR);
 				context.Check(surfaceLost.m_Fatal && !surfaceLost.m_DeviceLost,
 					"a present SURFACE_LOST marks fatal but not device lost");
-				const VulkanRuntimeHealthState deviceLost =
-					UpdateVulkanRuntimeHealth({}, VK_ERROR_DEVICE_LOST);
+				const VulkanRuntimeHealthState deviceLost = UpdateVulkanRuntimeHealth({}, VK_ERROR_DEVICE_LOST);
 				context.Check(deviceLost.m_Fatal && deviceLost.m_DeviceLost,
 					"DEVICE_LOST marks fatal and device lost");
-				const VulkanRuntimeHealthState hostOom =
-					UpdateVulkanRuntimeHealth({}, VK_ERROR_OUT_OF_HOST_MEMORY);
+				const VulkanRuntimeHealthState hostOom = UpdateVulkanRuntimeHealth({}, VK_ERROR_OUT_OF_HOST_MEMORY);
 				context.Check(hostOom.m_Fatal && !hostOom.m_DeviceLost,
 					"OUT_OF_HOST_MEMORY marks fatal but not device lost");
-				const VulkanRuntimeHealthState escalated =
-					UpdateVulkanRuntimeHealth(surfaceLost, VK_ERROR_DEVICE_LOST);
+				const VulkanRuntimeHealthState escalated = UpdateVulkanRuntimeHealth(surfaceLost, VK_ERROR_DEVICE_LOST);
 				context.Check(escalated.m_Fatal && escalated.m_DeviceLost,
 					"a later DEVICE_LOST escalates fatal health to device lost");
-				const VulkanRuntimeHealthState unchanged =
-					UpdateVulkanRuntimeHealth(deviceLost, VK_SUCCESS);
-				context.Check(unchanged.m_Fatal && unchanged.m_DeviceLost,
-					"SUCCESS never changes runtime health");
+				const VulkanRuntimeHealthState unchanged = UpdateVulkanRuntimeHealth(deviceLost, VK_SUCCESS);
+				context.Check(unchanged.m_Fatal && unchanged.m_DeviceLost, "SUCCESS never changes runtime health");
 			}
 
 			// The frame-slot reuse gate wait decides whether BeginFrame may
 			// continue to command-pool reset and acquire: any failed wait
 			// stops the frame before those steps.
 			{
-				context.Check(ClassifyVulkanBeginGateResult(VK_SUCCESS) ==
-					VulkanBeginGateOutcome::Ready,
+				context.Check(ClassifyVulkanBeginGateResult(VK_SUCCESS) == VulkanBeginGateOutcome::Ready,
 					"timeline wait success continues BeginFrame");
-				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_DEVICE_LOST) ==
-					VulkanBeginGateOutcome::Fatal,
+				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_DEVICE_LOST) == VulkanBeginGateOutcome::Fatal,
 					"device-lost wait stops BeginFrame before reset/acquire");
-				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_SURFACE_LOST_KHR) ==
-					VulkanBeginGateOutcome::Fatal,
+				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_SURFACE_LOST_KHR) == VulkanBeginGateOutcome::Fatal,
 					"any failed wait stops BeginFrame before reset/acquire");
 			}
 		}
@@ -1294,16 +1105,14 @@ namespace gglab
 		// aspect of the typeless family.
 		bool allFormatsMapped = true;
 		bool allAspectsMatch = true;
-		for (uint32_t raw = static_cast<uint32_t>(RHIFormat::Unknown) + 1;
-			raw < static_cast<uint32_t>(RHIFormat::Count); ++raw)
+		for (uint32_t raw = static_cast<uint32_t>(RHIFormat::Unknown) + 1; raw < static_cast<uint32_t>(RHIFormat::Count); ++raw)
 		{
 			const RHIFormat format = static_cast<RHIFormat>(raw);
 			allFormatsMapped &= IsVulkanFormatSupported(format);
 			const RHIFormatInfo& rhiInfo = GetRHIFormatInfo(format);
-			const RHITextureAspect effectiveAspects = rhiInfo.m_DepthStencilAspects !=
-				RHITextureAspect::None
-				? rhiInfo.m_DepthStencilAspects
-				: rhiInfo.m_Aspects;
+			const RHITextureAspect effectiveAspects = rhiInfo.m_DepthStencilAspects != RHITextureAspect::None ?
+				rhiInfo.m_DepthStencilAspects :
+				rhiInfo.m_Aspects;
 			const VkImageAspectFlags expected = ToVulkanImageAspectFlags(effectiveAspects);
 			allAspectsMatch &= GetVulkanFormatInfo(format).m_Aspects == expected;
 		}
@@ -1318,84 +1127,63 @@ namespace gglab
 			IsVulkanViewFormatCompatible(RHIFormat::R32Typeless, RHIFormat::R32Float) &&
 			!IsVulkanViewFormatCompatible(RHIFormat::R32Typeless, RHIFormat::R8G8B8A8Unorm),
 			"R32Typeless accepts only the depth view family");
-		context.Check(ToVulkanViewFormat(RHIFormat::R32Typeless, RHIFormat::R32Float) ==
-			VK_FORMAT_D32_SFLOAT &&
-			ToVulkanViewFormat(RHIFormat::R32Typeless, RHIFormat::D32Float) ==
-			VK_FORMAT_D32_SFLOAT,
+		context.Check(ToVulkanViewFormat(RHIFormat::R32Typeless, RHIFormat::R32Float) == VK_FORMAT_D32_SFLOAT &&
+			ToVulkanViewFormat(RHIFormat::R32Typeless, RHIFormat::D32Float) == VK_FORMAT_D32_SFLOAT,
 			"R32Typeless sampled views stay on the D32 depth image format");
 
 		// RGBA8 typeless family: UNORM/SRGB views only, with mutable-format
 		// creation required.
-		context.Check(IsVulkanViewFormatCompatible(
-			RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8Unorm) &&
-			IsVulkanViewFormatCompatible(
-				RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8UnormSrgb) &&
+		context.Check(IsVulkanViewFormatCompatible(RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8Unorm) &&
+			IsVulkanViewFormatCompatible(RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8UnormSrgb) &&
 			!IsVulkanViewFormatCompatible(RHIFormat::R8G8B8A8Typeless, RHIFormat::R32Float),
 			"R8G8B8A8Typeless accepts only the UNORM/SRGB view family");
 		context.Check(NeedsVulkanMutableFormat(RHIFormat::R8G8B8A8Typeless) &&
 			!NeedsVulkanMutableFormat(RHIFormat::R32Typeless) &&
 			!NeedsVulkanMutableFormat(RHIFormat::R16G16B16A16Float),
 			"Only non-depth typeless families require mutable-format images");
-		context.Check(ToVulkanViewFormat(
-			RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8UnormSrgb) ==
-			VK_FORMAT_R8G8B8A8_SRGB,
+		context.Check(ToVulkanViewFormat(RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8UnormSrgb) == VK_FORMAT_R8G8B8A8_SRGB,
 			"RGBA8 typeless SRGB views resolve to the native SRGB format");
 
 		// Non-typeless formats only view as themselves.
-		context.Check(IsVulkanViewFormatCompatible(
-			RHIFormat::R16G16B16A16Float, RHIFormat::R16G16B16A16Float) &&
-			!IsVulkanViewFormatCompatible(
-				RHIFormat::R16G16B16A16Float, RHIFormat::R16G16B16A16Typeless) &&
+		context.Check(IsVulkanViewFormatCompatible(RHIFormat::R16G16B16A16Float, RHIFormat::R16G16B16A16Float) &&
+			!IsVulkanViewFormatCompatible(RHIFormat::R16G16B16A16Float, RHIFormat::R16G16B16A16Typeless) &&
 			!IsVulkanViewFormatCompatible(RHIFormat::R16G16B16A16Float, RHIFormat::R8Unorm),
 			"Non-typeless formats accept exactly their own view format");
 
 		// Usage lowering: native image usage flags and required format
 		// features stay exact; Present contributes no ordinary feature.
 		context.Check(ToVulkanImageUsageFlags(
-			RHITextureUsage::Sampled | RHITextureUsage::RenderTarget) ==
-			(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
+			RHITextureUsage::Sampled | RHITextureUsage::RenderTarget) == (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
 			"Texture usage maps to the exact native image usage flags");
-		context.Check(ToVulkanFormatFeatureFlags(
-			RHITextureUsage::UnorderedAccess | RHITextureUsage::CopyDest) ==
+		context.Check(ToVulkanFormatFeatureFlags(RHITextureUsage::UnorderedAccess | RHITextureUsage::CopyDest) ==
 			(VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT),
 			"Texture usage maps to the exact required format features");
 		context.Check(ToVulkanFormatFeatureFlags(RHITextureUsage::Present) == 0,
 			"Present contributes no ordinary format feature");
 
 		// Depth formats carry only depth/stencil aspects, never color.
-		context.Check((GetVulkanFormatInfo(RHIFormat::D32Float).m_Aspects &
-			VK_IMAGE_ASPECT_COLOR_BIT) == 0 &&
+		context.Check((GetVulkanFormatInfo(RHIFormat::D32Float).m_Aspects & VK_IMAGE_ASPECT_COLOR_BIT) == 0 &&
 			(GetVulkanFormatInfo(RHIFormat::D24UnormS8Uint).m_Aspects &
-				(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) ==
-			(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT),
+				(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT),
 			"Depth/stencil formats expose depth and stencil aspects only");
 
 		// View dimension lowering covers every RHI dimension.
-		context.Check(ToVulkanImageViewType(RHITextureViewDimension::Texture2D) ==
-			VK_IMAGE_VIEW_TYPE_2D &&
-			ToVulkanImageViewType(RHITextureViewDimension::TextureCube) ==
-			VK_IMAGE_VIEW_TYPE_CUBE &&
-			ToVulkanImageViewType(RHITextureViewDimension::TextureCubeArray) ==
-			VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
+		context.Check(ToVulkanImageViewType(RHITextureViewDimension::Texture2D) == VK_IMAGE_VIEW_TYPE_2D &&
+			ToVulkanImageViewType(RHITextureViewDimension::TextureCube) == VK_IMAGE_VIEW_TYPE_CUBE &&
+			ToVulkanImageViewType(RHITextureViewDimension::TextureCubeArray) == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
 			"Texture view dimensions map to the exact native view types");
 
 		// Sampler address modes map to the frozen native contract;
 		// mirror-once lowers to mirror-clamp-to-edge, which needs the
 		// samplerMirrorClampToEdge feature at sampler creation.
 		context.Check(
-			ToVulkanSamplerAddressMode(RHITextureAddressMode::Wrap) ==
-			VK_SAMPLER_ADDRESS_MODE_REPEAT &&
-			ToVulkanSamplerAddressMode(RHITextureAddressMode::Mirror) ==
-			VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT &&
-			ToVulkanSamplerAddressMode(RHITextureAddressMode::Clamp) ==
-			VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE &&
-			ToVulkanSamplerAddressMode(RHITextureAddressMode::Border) ==
-			VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER &&
-			ToVulkanSamplerAddressMode(RHITextureAddressMode::MirrorOnce) ==
-			VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Wrap) == VK_SAMPLER_ADDRESS_MODE_REPEAT &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Mirror) == VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Clamp) == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Border) == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::MirrorOnce) == VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
 			"Sampler address modes map to the exact native address modes");
-		context.Check(ToVulkanCompareOp(RHICompareOp::LessEqual) ==
-			VK_COMPARE_OP_LESS_OR_EQUAL,
+		context.Check(ToVulkanCompareOp(RHICompareOp::LessEqual) == VK_COMPARE_OP_LESS_OR_EQUAL,
 			"Shadow comparison sampling preserves LessEqual semantics");
 
 		// Non-power-of-two sample counts are rejected by the public
@@ -1527,38 +1315,31 @@ namespace gglab
 			"Front-face lowering applies the coordinate policy exactly once");
 		RHIGraphicsPipelineDesc duplicateLocation = desc;
 		duplicateLocation.m_VertexInput.m_Attributes[1].m_Location = 0;
-		context.Check(BuildVulkanGraphicsPipelinePlan(duplicateLocation).m_Error ==
-			VulkanGraphicsPipelineError::InvalidVertexBinding,
+		context.Check(BuildVulkanGraphicsPipelinePlan(duplicateLocation).m_Error == VulkanGraphicsPipelineError::InvalidVertexBinding,
 			"Graphics pipeline lowering rejects duplicate vertex locations");
 		RHIGraphicsPipelineDesc outsideStride = desc;
 		outsideStride.m_VertexInput.m_Attributes[1].m_AlignedByteOffset = 16;
-		context.Check(BuildVulkanGraphicsPipelinePlan(outsideStride).m_Error ==
-			VulkanGraphicsPipelineError::InvalidVertexFormat,
+		context.Check(BuildVulkanGraphicsPipelinePlan(outsideStride).m_Error == VulkanGraphicsPipelineError::InvalidVertexFormat,
 			"Graphics pipeline lowering rejects attributes that exceed their binding stride");
 		RHIGraphicsPipelineDesc mismatchedTopology = desc;
 		mismatchedTopology.m_TopologyType = RHIPrimitiveTopologyType::Line;
-		context.Check(BuildVulkanGraphicsPipelinePlan(mismatchedTopology).m_Error ==
-			VulkanGraphicsPipelineError::InvalidTopology,
+		context.Check(BuildVulkanGraphicsPipelinePlan(mismatchedTopology).m_Error == VulkanGraphicsPipelineError::InvalidTopology,
 			"Graphics pipeline lowering rejects mismatched topology families");
 		RHIGraphicsPipelineDesc invalidStencil = desc;
 		invalidStencil.m_DepthStencil.m_StencilEnable = true;
-		context.Check(BuildVulkanGraphicsPipelinePlan(invalidStencil).m_Error ==
-			VulkanGraphicsPipelineError::InvalidDepthStencilFormat,
+		context.Check(BuildVulkanGraphicsPipelinePlan(invalidStencil).m_Error == VulkanGraphicsPipelineError::InvalidDepthStencilFormat,
 			"Graphics pipeline lowering rejects stencil state without a stencil format");
 		RHIGraphicsPipelineDesc invalidSamples = desc;
 		invalidSamples.m_SampleCount = 3;
-		context.Check(BuildVulkanGraphicsPipelinePlan(invalidSamples).m_Error ==
-			VulkanGraphicsPipelineError::InvalidSampleCount,
+		context.Check(BuildVulkanGraphicsPipelinePlan(invalidSamples).m_Error == VulkanGraphicsPipelineError::InvalidSampleCount,
 			"Graphics pipeline lowering rejects non-power-of-two sample counts");
 	}
 
 	void RunVulkanDescriptorArenaTests(SelfTestContext& context) noexcept
 	{
 		// Arena capacity matches the frozen backend-neutral contract.
-		VulkanDescriptorIndexArena resourceArena(
-			GGLabDescriptorCapacityContract.m_ResourceDescriptorCount);
-		VulkanDescriptorIndexArena samplerArena(
-			GGLabDescriptorCapacityContract.m_SamplerDescriptorCount);
+		VulkanDescriptorIndexArena resourceArena(GGLabDescriptorCapacityContract.m_ResourceDescriptorCount);
+		VulkanDescriptorIndexArena samplerArena(GGLabDescriptorCapacityContract.m_SamplerDescriptorCount);
 		context.Check(resourceArena.GetCapacity() == 65'536 &&
 			samplerArena.GetCapacity() == 2'048,
 			"Descriptor arenas match the frozen capacity contract");
@@ -1607,8 +1388,7 @@ namespace gglab
 		VulkanDescriptorPublicationArena arena(2);
 		const std::optional<uint32_t> first = arena.Allocate();
 		context.Check(first && *first == 0 &&
-			arena.GetState(*first) ==
-			VulkanDescriptorPublicationState::AllocatedUnpublished,
+			arena.GetState(*first) == VulkanDescriptorPublicationState::AllocatedUnpublished,
 			"Descriptor publication starts in the private allocated state");
 		context.Check(!arena.Publish(*first, 1),
 			"Descriptor publication rejects a slot before its native write is ready");
@@ -1793,14 +1573,12 @@ namespace gglab
 
 		RHIBindingLayoutDesc oversized = desc;
 		oversized.m_Slots[0].m_SizeInBytes = 128;
-		context.Check(BuildVulkanBindingLayoutPlan(oversized, 64).m_Error ==
-			VulkanBindingLayoutError::InvalidPushConstantSize,
+		context.Check(BuildVulkanBindingLayoutPlan(oversized, 64).m_Error == VulkanBindingLayoutError::InvalidPushConstantSize,
 			"Vulkan binding layout rejects dynamic uniform ranges beyond the device limit");
 		RHIBindingLayoutDesc duplicate{};
 		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];
 		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];
-		context.Check(BuildVulkanBindingLayoutPlan(duplicate, 64 * 1024).m_Error ==
-			VulkanBindingLayoutError::DuplicateNativeBinding,
+		context.Check(BuildVulkanBindingLayoutPlan(duplicate, 64 * 1024).m_Error == VulkanBindingLayoutError::DuplicateNativeBinding,
 			"Vulkan binding layout rejects duplicate native set-0 bindings");
 	}
 
@@ -1810,7 +1588,7 @@ namespace gglab
 			.m_PageSizeInBytes = 64,
 			.m_MaxPageCount = 2,
 			.m_Alignment = 16,
-			});
+		});
 		const VulkanDynamicUniformArenaAllocation first = arena.Allocate(12);
 		const VulkanDynamicUniformArenaAllocation second = arena.Allocate(48);
 		const VulkanDynamicUniformArenaAllocation third = arena.Allocate(16);
@@ -1832,7 +1610,7 @@ namespace gglab
 			.m_PageSizeInBytes = 48,
 			.m_MaxPageCount = 2,
 			.m_Alignment = 32,
-			});
+		});
 		const VulkanDynamicUniformArenaAllocation normalizedFirst = normalizedPages.Allocate(48);
 		const VulkanDynamicUniformArenaAllocation normalizedSecond = normalizedPages.Allocate(16);
 		context.Check(normalizedFirst.m_OffsetInBytes == 0 &&
@@ -1843,7 +1621,7 @@ namespace gglab
 			.m_PageSizeInBytes = UINT32_MAX,
 			.m_MaxPageCount = 2,
 			.m_Alignment = UINT32_MAX,
-			});
+		});
 		context.Check(overflowingConfig.GetCapacityInBytes() == 0 &&
 			!overflowingConfig.Allocate(16).IsValid() &&
 			overflowingConfig.GetDiagnostics().m_OverflowCount == 1,
@@ -1911,8 +1689,7 @@ namespace gglab
 		// Out-of-range base subresources are rejected.
 		RHITextureViewDesc baseOutOfRange = sampledView;
 		baseOutOfRange.m_Subresources = { .m_BaseMip = 4, .m_MipCount = 1 };
-		context.Check(!NormalizeVulkanTextureView(depthResource, baseOutOfRange).has_value(),
-			"Out-of-range base mip is rejected");
+		context.Check(!NormalizeVulkanTextureView(depthResource, baseOutOfRange).has_value(), "Out-of-range base mip is rejected");
 
 		// Unknown dimension (the RHI default) derives from the resource
 		// dimension and array size; the public validator accepts it.
@@ -1936,8 +1713,7 @@ namespace gglab
 		explicitView.m_Dimension = RHITextureViewDimension::Texture2DArray;
 		const auto explicitNormalized = NormalizeVulkanTextureView(derivedResource, explicitView);
 		context.Check(explicitNormalized.has_value() &&
-			explicitNormalized->m_EffectiveDimension ==
-			derived->m_EffectiveDimension,
+			explicitNormalized->m_EffectiveDimension == derived->m_EffectiveDimension,
 			"Explicit and derived dimensions normalize to the same effective dimension");
 		RHITextureViewDesc canonicalUnknown = derivedView;
 		canonicalUnknown.m_Format = derived->m_EffectiveFormat;
@@ -1969,8 +1745,7 @@ namespace gglab
 			const auto imageView = reinterpret_cast<VkImageView>(uintptr_t{ 1 });
 			auto parent = std::make_shared<int>(7);
 			std::weak_ptr<int> parentLifetime = parent;
-			auto backing = std::make_shared<VulkanDescriptorBacking>(
-				VK_NULL_HANDLE, imageView, parent);
+			auto backing = std::make_shared<VulkanDescriptorBacking>(VK_NULL_HANDLE, imageView, parent);
 			std::shared_ptr<const VulkanImageViewLeaseBase> first = backing;
 			std::shared_ptr<const VulkanImageViewLeaseBase> second = backing;
 			context.Check(first.get() == second.get() && first->GetImageView() == imageView &&

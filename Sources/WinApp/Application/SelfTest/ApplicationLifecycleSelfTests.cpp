@@ -68,8 +68,7 @@ namespace gglab
 
 		Application::CreateInfo MakeCreateInfo(std::unique_ptr<PlatformHost> host) noexcept
 		{
-			const std::filesystem::path runtimeRoot =
-				std::filesystem::temp_directory_path() / "gglab-application-lifecycle-self-test";
+			const std::filesystem::path runtimeRoot = std::filesystem::temp_directory_path() / "gglab-application-lifecycle-self-test";
 			return {
 				.m_WindowName = L"ApplicationLifecycleSelfTest",
 				.m_PlatformHost = std::move(host),
@@ -134,15 +133,14 @@ namespace gglab
 
 		const auto stoppedProbe = std::make_shared<HostLifetimeProbe>();
 		{
-			Application application(
-				MakeCreateInfo(std::make_unique<FailingPlatformHost>(stoppedProbe)));
-			application.Shutdown();
-			application.Shutdown();
-			context.Check(application.GetLifecycleState() == Application::LifecycleState::Stopped,
-				"Shutdown before initialization produces a stable stopped state");
-			context.Check(
-				stoppedProbe->m_InitializeCount == 0 && stoppedProbe->m_FinalizeCount == 0,
-				"Shutdown before initialization does not touch an unstarted platform host");
+			Application application(MakeCreateInfo(std::make_unique<FailingPlatformHost>(stoppedProbe)));
+		application.Shutdown();
+		application.Shutdown();
+		context.Check(application.GetLifecycleState() == Application::LifecycleState::Stopped,
+			"Shutdown before initialization produces a stable stopped state");
+		context.Check(
+			stoppedProbe->m_InitializeCount == 0 && stoppedProbe->m_FinalizeCount == 0,
+			"Shutdown before initialization does not touch an unstarted platform host");
 		}
 	}
 }

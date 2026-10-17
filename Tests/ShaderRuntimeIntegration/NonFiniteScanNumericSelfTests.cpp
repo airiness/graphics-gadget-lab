@@ -45,15 +45,22 @@ namespace gglab
 		{
 		public:
 			HiddenScanWindow() noexcept : m_Window(CreateWindowExW(0, L"STATIC", L"GGLab non-finite numeric test",
-				WS_POPUP, 0, 0, 64, 64, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr)) {}
-			~HiddenScanWindow() { if (m_Window) { DestroyWindow(m_Window); } }
+				WS_POPUP, 0, 0, 64, 64, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr))
+			{
+			}
+			~HiddenScanWindow()
+			{
+				if (m_Window)
+				{
+					DestroyWindow(m_Window);
+				}
+			}
 			HiddenScanWindow(const HiddenScanWindow&) = delete;
 			HiddenScanWindow& operator=(const HiddenScanWindow&) = delete;
 			HWND m_Window = nullptr;
 		};
 
-		void BufferTransition(RHICommandContext& commands, RHIBufferHandle buffer,
-			RHIResourceState before, RHIResourceState after) noexcept
+		void BufferTransition(RHICommandContext& commands, RHIBufferHandle buffer, RHIResourceState before, RHIResourceState after) noexcept
 		{
 			// Test-owned resources are outside RenderGraph. This fixture owns their
 			// transitions and completion, including clear->scan UAV ordering.
@@ -78,8 +85,11 @@ namespace gglab
 			}
 			ShaderID LoadProgram(const ShaderProgramRef& ref) noexcept override
 			{
-				return ShaderID{ ref == shader_programs::NonFiniteCountersClearCompute ? 3u : ref == shader_programs::NonFiniteScanClearCompute ? 0u :
-					ref == shader_programs::NonFiniteScanTextureCompute ? 1u : 2u };
+				return ShaderID{ ref == shader_programs::NonFiniteCountersClearCompute ?
+					3u :
+					ref == shader_programs::NonFiniteScanClearCompute ?
+						0u :
+						ref == shader_programs::NonFiniteScanTextureCompute ? 1u : 2u };
 			}
 			uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
 			RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&, const RenderPassInfo&) noexcept override { return {}; }
@@ -113,7 +123,11 @@ namespace gglab
 				desc = { .m_Format = formats[texture], .m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopySource | RHITextureUsage::CopyDest,
 					.m_CreateFlags = RHITextureCreateFlags::CubeCompatible, .m_Extent = { 4, 4, 1 }, .m_ArraySize = 6, .m_MipLevels = 2 };
 				textures[texture] = RHITextureOwner(&device, device.CreateTexture({ desc }));
-				if (!textures[texture]) { uploaded = false; break; }
+				if (!textures[texture])
+				{
+					uploaded = false;
+					break;
+				}
 				RHITextureUploadData upload;
 				storage[texture].resize(12);
 				const uint32_t channels = texture == 0 ? 4 : 2;
@@ -130,9 +144,21 @@ namespace gglab
 						{
 							uint32_t bits = i % 2 == 0 ? 0x3f800000u : 0xbe800000u;
 							uint16_t half = i % 2 == 0 ? 0x3c00u : 0xb400u;
-							if (mip == 0 || slice < 2 || slice > 3 || (slice == 2 && i == 5)) { bits = 0x7fc00000u; half = 0x7e00u; }
-							if (mip == 1 && slice == 3 && i == 2) { bits = 0x7f800000u; half = 0x7c00u; }
-							if (mip == 1 && slice == 3 && i == 7) { bits = 0xff800000u; half = 0xfc00u; }
+							if (mip == 0 || slice < 2 || slice > 3 || (slice == 2 && i == 5))
+							{
+								bits = 0x7fc00000u;
+								half = 0x7e00u;
+							}
+							if (mip == 1 && slice == 3 && i == 2)
+							{
+								bits = 0x7f800000u;
+								half = 0x7c00u;
+							}
+							if (mip == 1 && slice == 3 && i == 7)
+							{
+								bits = 0xff800000u;
+								half = 0xfc00u;
+							}
 							std::memcpy(reinterpret_cast<uint8_t*>(words.data()) + i * scalarBytes,
 								texture == 0 ? static_cast<const void*>(&bits) : static_cast<const void*>(&half), scalarBytes);
 							if (mip == 1 && slice >= 2 && slice <= 3)
@@ -152,20 +178,29 @@ namespace gglab
 			}
 			const auto uploadSubmission = batch.Submit(true); // Fixture setup only; capture never waits.
 			context.Check(uploaded && uploadSubmission.m_Completion.IsValid(), "Observer fixtures upload both cube-compatible float textures and all mips/faces");
-			if (!uploaded || !uploadSubmission.m_Completion.IsValid()) { return; }
+			if (!uploaded || !uploadSubmission.m_Completion.IsValid())
+			{
+				return;
+			}
 			TransientResourcePool pool(&device);
 			// Retain the baseline's three payloads while the observed frame reserves seven.
 			FrameCaptureService service(device, { .m_MaxPayloads = 10 });
 			service.ConfigureNonFiniteScans(programs, programs, rhi.GetPipelineSystem());
 			const std::array<std::string, 2> names{ "Numeric.Texture32", "Numeric.Texture16" };
 			std::vector<RGResourceAddress> exports{ { .m_Resource = "Numeric.Buffer" } };
-			for (const auto& name : names) { exports.push_back({ .m_Resource = name, .m_Mip = 1, .m_FirstSlice = 2, .m_SliceCount = 2 }); }
+			for (const auto& name : names)
+			{
+				exports.push_back({ .m_Resource = name, .m_Mip = 1, .m_FirstSlice = 2, .m_SliceCount = 2 });
+			}
 			std::shared_ptr<const ResourceExportPayload> baseline;
 			for (uint32_t observed = 0; observed < 2; ++observed)
 			{
 				const auto begin = rhi.BeginFrame();
 				context.Check(begin.IsReady(), "Hidden observer-equivalence frame begins");
-				if (!begin.IsReady()) { break; }
+				if (!begin.IsReady())
+				{
+					break;
+				}
 				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
 				auto& defaults = graph.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>();
 				defaults.Declare({ true, false, false, false });
@@ -196,12 +231,13 @@ namespace gglab
 					});
 				context.Check(graph.Compile(), "Original GPU observation fixture compiles independently of observers");
 				const auto resolvedDefaults = ResolveNonFiniteWatchDefaults(graph);
-				context.Check(resolvedDefaults[0].m_Ready&& resolvedDefaults[0].m_Address.m_Pass == "OriginalConsumer" && !graph.HasNonFiniteScans(),
+				context.Check(resolvedDefaults[0].m_Ready && resolvedDefaults[0].m_Address.m_Pass == "OriginalConsumer" && !graph.HasNonFiniteScans(),
 					"GPU semantic defaults resolve the exact imported view before its live consumer without recording scans");
 				GGLAB_UNUSED(service.RequestResourceExport(exports, 100 + observed, false, true));
 				if (observed)
 				{
-					auto empty = layout; empty.m_ValidElementCount = empty.m_ScalarCount = 0;
+					auto empty = layout;
+					empty.m_ValidElementCount = empty.m_ScalarCount = 0;
 					GGLAB_UNUSED(service.RequestNonFiniteScan({ { exports[0], layout },{ exports[0], empty },{ resolvedDefaults[0].m_Address,{} },{ exports[2],{} } },
 						71, 101, true));
 				}
@@ -211,27 +247,38 @@ namespace gglab
 				service.BeginGraphRecording(100 + observed, graph);
 				RGExecuteContext execution({ .m_GraphicsCommandContext = &begin.GetFrame()->GetGraphicsContext(),
 					.m_DirectComputeCommandContext = &begin.GetFrame()->GetDirectComputeContext() });
-				graph.Execute(execution); service.EndGraphRecording(100 + observed, graph);
-				std::vector<FrameCaptureResult> early; service.ConsumeResults(early);
+				graph.Execute(execution);
+				service.EndGraphRecording(100 + observed, graph);
+				std::vector<FrameCaptureResult> early;
+				service.ConsumeResults(early);
 				context.Check(early.empty(), "Recorded but unsubmitted observers publish no CPU result");
 				auto& graphics = begin.GetFrame()->GetGraphicsContext();
 				const auto backbuffer = begin.GetFrame()->GetBackBuffer();
 				const auto rtv = device.CreateTextureView(backbuffer, { .m_Type = RHITextureViewType::RenderTarget, .m_Dimension = RHITextureViewDimension::Texture2D });
 				const RHIResourceState renderTarget{ RHIStage::RenderTarget, RHIAccess::RenderTarget, RHILayout::RenderTarget };
 				RHITextureBarrier barrier{ backbuffer, UndefinedRHITextureState(), renderTarget };
-				graphics.TextureBarrier(std::span(&barrier, 1)); graphics.FlushBarriers();
+				graphics.TextureBarrier(std::span(&barrier, 1));
+				graphics.FlushBarriers();
 				const RHIRenderingAttachment attachment{ .m_View = rtv, .m_LoadOp = RHIContentLoadOp::DontCare };
 				graphics.BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) });
-				graphics.ClearColorAttachment(0, { 0, 0, 0, 1 }); graphics.EndRendering();
+				graphics.ClearColorAttachment(0, { 0, 0, 0, 1 });
+				graphics.EndRendering();
 				barrier = { backbuffer, renderTarget, PresentRHITextureState() };
-				graphics.TextureBarrier(std::span(&barrier, 1)); graphics.FlushBarriers();
+				graphics.TextureBarrier(std::span(&barrier, 1));
+				graphics.FlushBarriers();
 				const auto end = rhi.EndFrame(*begin.GetFrame());
 				context.Check(end.IsCompleted() && end.HasSubmission(), "Observed GPU fixture submits its common frame fence");
-				if (!end.HasSubmission()) { service.OnFrameSubmissionFailed(100 + observed); rhi.WaitIdle(); break; }
+				if (!end.HasSubmission())
+				{
+					service.OnFrameSubmissionFailed(100 + observed);
+					rhi.WaitIdle();
+					break;
+				}
 				service.OnFrameSubmitted(100 + observed, end.GetSubmittedFence());
 				graph.Retire(end.GetSubmittedFence());
 				rhi.WaitIdle(); // Test verification only, after normal asynchronous submission.
-				std::vector<FrameCaptureResult> results; service.ConsumeResults(results);
+				std::vector<FrameCaptureResult> results;
+				service.ConsumeResults(results);
 				const auto resource = std::ranges::find(results, FrameCaptureSource::ResourceExport, &FrameCaptureResult::m_Source);
 				context.Check(resource != results.end() && resource->m_Resources && resource->m_Graph && resource->m_Graph->m_Execution.m_Recorded,
 					"Fenced readbacks retain imported buffers and paired execution evidence");
@@ -240,11 +287,17 @@ namespace gglab
 					const auto& arrays = resource->m_Resources->m_Arrays;
 					context.Check(arrays.size() == 3 && arrays[1].m_Data == expectedBytes[0] && arrays[2].m_Data == expectedBytes[1],
 						"Texture readbacks select exactly the addressed mip and cube-face range, retaining non-finite bits");
-					if (!observed) { baseline = resource->m_Resources; }
+					if (!observed)
+					{
+						baseline = resource->m_Resources;
+					}
 					else
 					{
 						bool identical = baseline && baseline->m_Arrays.size() == arrays.size();
-						for (size_t i = 0; identical && i < arrays.size(); ++i) { identical &= baseline->m_Arrays[i].m_Data == arrays[i].m_Data; }
+						for (size_t i = 0; identical && i < arrays.size(); ++i)
+						{
+							identical &= baseline->m_Arrays[i].m_Data == arrays[i].m_Data;
+						}
 						context.Check(identical, "Enabling scans leaves every exported fixture resource bit-identical");
 					}
 				}
@@ -270,7 +323,8 @@ namespace gglab
 				}
 				device.DestroyTextureView(rtv);
 			}
-			service.Shutdown(); rhi.RetireCompletedWork();
+			service.Shutdown();
+			rhi.RetireCompletedWork();
 		}
 
 		void RunProductionGpuTests(SelfTestContext& context, RHIContext& rhi, ShaderCompiler& compiler, RHIBackendType backend) noexcept
@@ -286,7 +340,7 @@ namespace gglab
 				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
 				if (counters)
 				{
-					desc.m_Defines = { { L"GGLAB_NONFINITE_COUNTERS", L"1" }, { L"GGLAB_NONFINITE_PROGRAM_INDEX", std::to_wstring(program) } };
+					desc.m_Defines = { { L"GGLAB_NONFINITE_COUNTERS", L"1" },{ L"GGLAB_NONFINITE_PROGRAM_INDEX", std::to_wstring(program) } };
 				}
 				return compiler.Compile(desc);
 			};
@@ -296,7 +350,10 @@ namespace gglab
 			const auto clear = compiler.Compile(clearDesc);
 			const auto vs = compile(L"VSMain", ShaderStage::Vertex, false);
 			context.Check(clear.IsSuccess() && vs.IsSuccess(), "Production counter clear and fullscreen fixture compile");
-			if (!clear.IsSuccess() || !vs.IsSuccess()) { return; }
+			if (!clear.IsSuccess() || !vs.IsSuccess())
+			{
+				return;
+			}
 			NumericScanPrograms programs(pipelines, clear, clear, clear, &clear);
 			const auto bytecode = [](const ShaderCompileResult& code, const char* entry)
 			{
@@ -308,10 +365,19 @@ namespace gglab
 				0xff800000u, 0u, 0u, 0u };
 			RHIBufferOwner source(&device, device.CreateBuffer({ .m_SizeInBytes = sizeof(input), .m_StrideInBytes = 4,
 				.m_Usage = RHIBufferUsage::Structured, .m_MemoryUsage = RHIMemoryUsage::CpuToGpu }));
-			if (!source) { context.Check(false, "Counter input allocates"); return; }
+			if (!source)
+			{
+				context.Check(false, "Counter input allocates");
+				return;
+			}
 			void* mapped = device.MapBuffer(source.Get(), {});
-			if (!mapped) { context.Check(false, "Counter input maps"); return; }
-			std::memcpy(mapped, input.data(), sizeof(input)); device.UnmapBuffer(source.Get(), { 0, sizeof(input) });
+			if (!mapped)
+			{
+				context.Check(false, "Counter input maps");
+				return;
+			}
+			std::memcpy(mapped, input.data(), sizeof(input));
+			device.UnmapBuffer(source.Get(), { 0, sizeof(input) });
 			TransientResourcePool pool(&device);
 			std::shared_ptr<const ResourceExportPayload> baseline;
 			for (uint32_t enabled = 0; enabled < 2; ++enabled)
@@ -319,13 +385,17 @@ namespace gglab
 				const auto cs = compile(L"CSMain", ShaderStage::Compute, enabled != 0);
 				const auto ps = compile(L"PSMain", ShaderStage::Pixel, enabled != 0);
 				context.Check(cs.IsSuccess() && ps.IsSuccess(), "Optimized compute and pixel counter variants compile");
-				if (!cs.IsSuccess() || !ps.IsSuccess()) { return; }
+				if (!cs.IsSuccess() || !ps.IsSuccess())
+				{
+					return;
+				}
 				RHIBindingLayoutDesc computeLayout;
 				computeLayout.m_Slots[0] = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer, .m_Visibility = RHIShaderStage::All, .m_Binding = 0 };
 				computeLayout.m_Slots[1] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 0 };
 				computeLayout.m_SlotCount = 2;
 				RHIBindingLayoutDesc graphicsLayout;
-				graphicsLayout.m_Slots[0] = computeLayout.m_Slots[0]; graphicsLayout.m_SlotCount = 1;
+				graphicsLayout.m_Slots[0] = computeLayout.m_Slots[0];
+				graphicsLayout.m_SlotCount = 1;
 				for (const auto type : { RHIBindingType::BindlessResourceTable, RHIBindingType::BindlessSamplerTable })
 				{
 					const RHIBindingSlotDesc heap{ .m_Type = type, .m_Visibility = RHIShaderStage::All, .m_Count = 0 };
@@ -341,20 +411,38 @@ namespace gglab
 				const auto compute = pipelines.CreateComputePipeline({ .m_Desc = { .m_BindingLayout = pipelines.CreateBindingLayout(computeLayout) }, .m_ComputeShader = bytecode(cs, "CSMain") });
 				RHIGraphicsPipelineCreateInfo graphicsInfo;
 				graphicsInfo.m_Desc.m_BindingLayout = pipelines.CreateBindingLayout(graphicsLayout);
-				graphicsInfo.m_Desc.m_RenderTargetCount = 1; graphicsInfo.m_Desc.m_RenderTargetFormats[0] = RHIFormat::R32G32B32A32Float;
+				graphicsInfo.m_Desc.m_RenderTargetCount = 1;
+				graphicsInfo.m_Desc.m_RenderTargetFormats[0] = RHIFormat::R32G32B32A32Float;
 				graphicsInfo.m_Desc.m_Rasterizer.m_CullMode = RHICullMode::None;
 				graphicsInfo.m_Desc.m_DepthStencil.m_DepthTestEnable = false;
 				graphicsInfo.m_Desc.m_DepthStencil.m_DepthWriteEnable = false;
-				graphicsInfo.m_VertexShader = bytecode(vs, "VSMain"); graphicsInfo.m_PixelShader = bytecode(ps, "PSMain");
+				graphicsInfo.m_VertexShader = bytecode(vs, "VSMain");
+				graphicsInfo.m_PixelShader = bytecode(ps, "PSMain");
 				const auto graphics = pipelines.CreateGraphicsPipeline(graphicsInfo);
 				context.Check(compute.IsValid() && graphics.IsValid(), "Pixel and compute storage layouts create real pipelines");
-				if (!compute.IsValid() || !graphics.IsValid()) { return; }
+				if (!compute.IsValid() || !graphics.IsValid())
+				{
+					return;
+				}
 				FrameCaptureService service(device);
 				service.ConfigureNonFiniteScans(programs, programs, pipelines);
-				if (enabled) { service.EnableNonFiniteProduction(); }
-				const auto begin = rhi.BeginFrame(); if (!begin.IsReady()) { context.Check(false, "Counter frame begins"); return; }
+				if (enabled)
+				{
+					service.EnableNonFiniteProduction();
+				}
+				const auto begin = rhi.BeginFrame();
+				if (!begin.IsReady())
+				{
+					context.Check(false, "Counter frame begins");
+					return;
+				}
 				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
-				struct Data { RGBufferId m_Input; RGBufferId m_Output; RGTextureViewId m_View; };
+				struct Data
+				{
+					RGBufferId m_Input;
+					RGBufferId m_Output;
+					RGTextureViewId m_View;
+				};
 				RGBufferId inputId;
 				graph.AddPass<Data>("Fixture.SanitizingWrite", RGPassEncoderType::Compute, [&](auto& builder, auto& data)
 					{
@@ -362,78 +450,116 @@ namespace gglab
 							.m_Usage = RHIBufferUsage::Structured, .m_MemoryUsage = RHIMemoryUsage::CpuToGpu }, RGBufferAccess::StructuredRead, RGContentValidity::Defined);
 						data.m_Input = builder.Read(inputId, RGBufferAccess::StructuredRead);
 						const auto output = builder.CreateBuffer("Fixture.Output", { .m_SizeInBytes = 32, .m_StrideInBytes = 4 });
-						data.m_Output = builder.Write(output, RGBufferAccess::StorageWrite); builder.SideEffect();
+						data.m_Output = builder.Write(output, RGBufferAccess::StorageWrite);
+						builder.SideEffect();
 					}, [&](RGExecuteContext& execution, Data& data)
-					{
-						auto* commands = execution.GetDirectComputeCommandContext(); commands->SetPipeline(compute);
-						commands->SetReadOnlyBuffer(0, execution.GetBufferHandle(data.m_Input)); commands->SetReadWriteBuffer(1, execution.GetBufferHandle(data.m_Output)); commands->Dispatch(1, 1, 1);
-					});
+						{
+							auto* commands = execution.GetDirectComputeCommandContext();
+							commands->SetPipeline(compute);
+							commands->SetReadOnlyBuffer(0, execution.GetBufferHandle(data.m_Input));
+							commands->SetReadWriteBuffer(1, execution.GetBufferHandle(data.m_Output));
+							commands->Dispatch(1, 1, 1);
+						});
 				graph.AddPass<Data>("Fixture.PixelSanitization", RGPassEncoderType::Graphics, [&](auto& builder, auto& data)
 					{
 						data.m_Input = builder.Read(inputId, RGBufferAccess::StructuredRead);
 						const auto image = builder.CreateTexture("Fixture.Image", { .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = { 2, 2, 1 } });
-						const auto written = builder.Write(image, RGTextureAccess::RenderTarget); data.m_View = builder.template CreateView<RHITextureViewType::RenderTarget>(written);
+						const auto written = builder.Write(image, RGTextureAccess::RenderTarget);
+						data.m_View = builder.template CreateView<RHITextureViewType::RenderTarget>(written);
 						builder.SideEffect();
 					}, [&](RGExecuteContext& execution, Data& data)
-					{
-						auto* commands = execution.GetGraphicsCommandContext(); commands->SetPipeline(graphics); commands->SetReadOnlyBuffer(0, execution.GetBufferHandle(data.m_Input));
-						const RHIRenderingAttachment attachment{ .m_View = execution.GetViewHandle(data.m_View), .m_LoadOp = RHIContentLoadOp::DontCare };
-						commands->BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) }); commands->SetViewport({ 0, 0, 2, 2, 0, 1 }); commands->SetScissorRect({ 0, 0, 2, 2 }); commands->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList); commands->Draw(3); commands->EndRendering();
-					});
+						{
+							auto* commands = execution.GetGraphicsCommandContext();
+							commands->SetPipeline(graphics);
+							commands->SetReadOnlyBuffer(0, execution.GetBufferHandle(data.m_Input));
+							const RHIRenderingAttachment attachment{ .m_View = execution.GetViewHandle(data.m_View), .m_LoadOp = RHIContentLoadOp::DontCare };
+							commands->BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) });
+							commands->SetViewport({ 0, 0, 2, 2, 0, 1 });
+							commands->SetScissorRect({ 0, 0, 2, 2 });
+							commands->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+							commands->Draw(3);
+							commands->EndRendering();
+						});
 				graph.AddPass<Data>("Fixture.Culled", RGPassEncoderType::Compute, [](auto& builder, auto& data)
 					{
 						const auto unused = builder.CreateBuffer("Fixture.Unused", { .m_SizeInBytes = 4 });
 						data.m_Output = builder.Write(unused, RGBufferAccess::StorageWrite);
 					});
 				context.Check(graph.Compile(), "Counter fixture freezes ordinary graph liveness first");
-				GGLAB_UNUSED(service.RequestResourceExport({ { .m_Resource = "Fixture.Output" }, { .m_Resource = "Fixture.Image" } }, 501 + enabled, false, true));
+				GGLAB_UNUSED(service.RequestResourceExport({ { .m_Resource = "Fixture.Output" },{ .m_Resource = "Fixture.Image" } }, 501 + enabled, false, true));
 				context.Check(service.PrepareResourceExports(501 + enabled, graph) == FrameCaptureAvailability::Available, "Production and resource readbacks share one graph extension");
-				RGSnapshot snapshot; BuildRenderGraphSnapshot(graph, snapshot);
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
 				context.Check(std::ranges::any_of(snapshot.m_Passes, [](const auto& pass) { return pass.m_Name == "Fixture.Culled" && pass.m_Culled; }),
 					"Production counter writes do not revive a culled original producer");
 				service.BeginGraphRecording(501 + enabled, graph);
 				RGExecuteContext execution({ &begin.GetFrame()->GetGraphicsContext(), &begin.GetFrame()->GetDirectComputeContext() });
-				graph.Execute(execution); service.EndGraphRecording(501 + enabled, graph);
-				service.CollectCompleted(); context.Check(!service.GetLatestNonFiniteProductionFrame(), "Unsubmitted production counters publish no evidence");
-				auto& commands = begin.GetFrame()->GetGraphicsContext(); const auto back = begin.GetFrame()->GetBackBuffer();
+				graph.Execute(execution);
+				service.EndGraphRecording(501 + enabled, graph);
+				service.CollectCompleted();
+				context.Check(!service.GetLatestNonFiniteProductionFrame(), "Unsubmitted production counters publish no evidence");
+				auto& commands = begin.GetFrame()->GetGraphicsContext();
+				const auto back = begin.GetFrame()->GetBackBuffer();
 				const auto rtv = device.CreateTextureView(back, { .m_Type = RHITextureViewType::RenderTarget, .m_Dimension = RHITextureViewDimension::Texture2D });
 				const RHIResourceState target{ RHIStage::RenderTarget, RHIAccess::RenderTarget, RHILayout::RenderTarget };
-				RHITextureBarrier barrier{ back, UndefinedRHITextureState(), target }; commands.TextureBarrier(std::span(&barrier, 1)); commands.FlushBarriers();
+				RHITextureBarrier barrier{ back, UndefinedRHITextureState(), target };
+				commands.TextureBarrier(std::span(&barrier, 1));
+				commands.FlushBarriers();
 				const RHIRenderingAttachment attachment{ .m_View = rtv, .m_LoadOp = RHIContentLoadOp::DontCare };
-				commands.BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) }); commands.ClearColorAttachment(0, { 0, 0, 0, 1 }); commands.EndRendering();
-				barrier = { back, target, PresentRHITextureState() }; commands.TextureBarrier(std::span(&barrier, 1)); commands.FlushBarriers();
+				commands.BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) });
+				commands.ClearColorAttachment(0, { 0, 0, 0, 1 });
+				commands.EndRendering();
+				barrier = { back, target, PresentRHITextureState() };
+				commands.TextureBarrier(std::span(&barrier, 1));
+				commands.FlushBarriers();
 				const auto end = rhi.EndFrame(*begin.GetFrame());
-				if (!end.HasSubmission()) { service.OnFrameSubmissionFailed(501 + enabled); rhi.WaitIdle(); context.Check(false, "Counter frame submits"); return; }
-				service.OnFrameSubmitted(501 + enabled, end.GetSubmittedFence()); graph.Retire(end.GetSubmittedFence()); rhi.WaitIdle();
+				if (!end.HasSubmission())
+				{
+					service.OnFrameSubmissionFailed(501 + enabled);
+					rhi.WaitIdle();
+					context.Check(false, "Counter frame submits");
+					return;
+				}
+				service.OnFrameSubmitted(501 + enabled, end.GetSubmittedFence());
+				graph.Retire(end.GetSubmittedFence());
+				rhi.WaitIdle();
 				device.DestroyTextureView(rtv);
-				std::vector<FrameCaptureResult> results; service.ConsumeResults(results);
+				std::vector<FrameCaptureResult> results;
+				service.ConsumeResults(results);
 				const auto exported = std::ranges::find(results, FrameCaptureSource::ResourceExport, &FrameCaptureResult::m_Source);
 				context.Check(exported != results.end() && exported->m_Resources && exported->m_Resources->m_Arrays.size() == 2, "Counter fixture exports both compute values and pixel image");
-				if (exported == results.end() || !exported->m_Resources) { return; }
-				if (!enabled) { baseline = exported->m_Resources; }
-				else
+				if (exported == results.end() || !exported->m_Resources)
 				{
-					context.Check(baseline && baseline->m_Arrays[0].m_Data == exported->m_Resources->m_Arrays[0].m_Data && baseline->m_Arrays[1].m_Data == exported->m_Resources->m_Arrays[1].m_Data,
-						"Production counter variants preserve compute exports and pixel image bit-for-bit");
-					std::vector<std::shared_ptr<const NonFiniteProductionFrame>> completedProduction;
-					service.ConsumeNonFiniteProductionFrames(completedProduction);
-					context.Check(completedProduction.size() == 1 && completedProduction.front() == service.GetLatestNonFiniteProductionFrame(),
-						"Every completed production frame is delivered through the budgeted result stream");
-					service.ConsumeNonFiniteProductionFrames(completedProduction);
-					context.Check(completedProduction.size() == 1, "Draining production frames does not redeliver a completed readback");
-					const auto production = service.GetLatestNonFiniteProductionFrame();
-					context.Check(production && production->m_FrameSerial == 502 && production->m_Claim.m_Status == NonFiniteClaimStatus::Failed,
-						"A normal sanitized image still fails production coverage at its completed frame");
-					if (production)
-					{
-						const auto find = [&](std::string_view id) { return std::ranges::find_if(production->m_Sites, [&](const auto& site) { return site.m_ProgramIndex == program && nonfinite::Sites[site.m_SiteIndex].m_Id == id; }); };
-						const auto output = find("pass-temporal-aa.csmain.sanitize-hdrcolor"); const auto history = find("pass-temporal-aa.csmain.is-temporal-color-finite");
-						context.Check(output != production->m_Sites.end() && output->m_Counters.m_NonFiniteReplacements == 10 && output->m_Counters.m_NegativeClamps == 5 && output->m_Counters.m_Fp16MaximumClamps == 1,
-							"Compute and pixel counters retain exact scalar replacements and finite clamp counts");
-						context.Check(history != production->m_Sites.end() && history->m_Counters.m_NonFiniteReplacements == 1,
-							"A non-finite history recovered before sanitization still records its recovery site");
-					}
+					return;
 				}
+				if (!enabled)
+				{
+					baseline = exported->m_Resources;
+				}
+						else
+						{
+							context.Check(baseline && baseline->m_Arrays[0].m_Data == exported->m_Resources->m_Arrays[0].m_Data && baseline->m_Arrays[1].m_Data == exported->m_Resources->m_Arrays[1].m_Data,
+								"Production counter variants preserve compute exports and pixel image bit-for-bit");
+							std::vector<std::shared_ptr<const NonFiniteProductionFrame>> completedProduction;
+							service.ConsumeNonFiniteProductionFrames(completedProduction);
+							context.Check(completedProduction.size() == 1 && completedProduction.front() == service.GetLatestNonFiniteProductionFrame(),
+								"Every completed production frame is delivered through the budgeted result stream");
+							service.ConsumeNonFiniteProductionFrames(completedProduction);
+							context.Check(completedProduction.size() == 1, "Draining production frames does not redeliver a completed readback");
+							const auto production = service.GetLatestNonFiniteProductionFrame();
+							context.Check(production && production->m_FrameSerial == 502 && production->m_Claim.m_Status == NonFiniteClaimStatus::Failed,
+								"A normal sanitized image still fails production coverage at its completed frame");
+							if (production)
+							{
+								const auto find = [&](std::string_view id) { return std::ranges::find_if(production->m_Sites, [&](const auto& site) { return site.m_ProgramIndex == program && nonfinite::Sites[site.m_SiteIndex].m_Id == id; }); };
+								const auto output = find("pass-temporal-aa.csmain.sanitize-hdrcolor");
+								const auto history = find("pass-temporal-aa.csmain.is-temporal-color-finite");
+								context.Check(output != production->m_Sites.end() && output->m_Counters.m_NonFiniteReplacements == 10 && output->m_Counters.m_NegativeClamps == 5 && output->m_Counters.m_Fp16MaximumClamps == 1,
+									"Compute and pixel counters retain exact scalar replacements and finite clamp counts");
+								context.Check(history != production->m_Sites.end() && history->m_Counters.m_NonFiniteReplacements == 1,
+									"A non-finite history recovered before sanitization still records its recovery site");
+							}
+						}
 				if (enabled)
 				{
 					results.clear();
@@ -488,7 +614,8 @@ namespace gglab
 			RunProductionGpuTests(context, *rhi, compiler, backend);
 			auto& device = rhi->GetDevice();
 			std::printf("Non-finite scan adapter: %s\n", std::string(device.GetAdapterCompatibilityIdentity()).c_str());
-			constexpr std::array fields{
+			constexpr std::array fields
+			{
 				GpuBufferFieldLayout{ "flags", 0, GpuBufferScalar::Uint32 },
 				GpuBufferFieldLayout{ "position", 4, GpuBufferScalar::Float32, 2 },
 				GpuBufferFieldLayout{ "halfPair", 12, GpuBufferScalar::Float16, 2 },
@@ -513,20 +640,23 @@ namespace gglab
 			words[37 * 5 + 3] = 0x7e003c00u;
 			const auto layout = BuildNonFiniteBufferScanLayout({ 20, fields }, sizeof(words), 201);
 			const auto upload = [&](const void* data, uint64_t bytes, uint32_t stride)
+			{
+				RHIBufferOwner buffer(&device, device.CreateBuffer({ .m_SizeInBytes = bytes, .m_StrideInBytes = stride,
+					.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopySource, .m_MemoryUsage = RHIMemoryUsage::CpuToGpu, .m_DebugName = "Numeric.ScanInput" }));
+				if (buffer)
 				{
-					RHIBufferOwner buffer(&device, device.CreateBuffer({ .m_SizeInBytes = bytes, .m_StrideInBytes = stride,
-						.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopySource, .m_MemoryUsage = RHIMemoryUsage::CpuToGpu, .m_DebugName = "Numeric.ScanInput" }));
-					if (buffer)
+					if (void* mapped = device.MapBuffer(buffer.Get(), {}))
 					{
-						if (void* mapped = device.MapBuffer(buffer.Get(), {}))
-						{
-							std::memcpy(mapped, data, static_cast<size_t>(bytes));
-							device.UnmapBuffer(buffer.Get(), { 0, bytes });
-						}
-						else { buffer.Reset(); }
+						std::memcpy(mapped, data, static_cast<size_t>(bytes));
+						device.UnmapBuffer(buffer.Get(), { 0, bytes });
 					}
-					return buffer;
-				};
+					else
+					{
+						buffer.Reset();
+					}
+				}
+				return buffer;
+			};
 			auto source = upload(words.data(), sizeof(words), 0);
 			auto components = upload(layout.m_Components.data(), layout.m_Components.size() * sizeof(NonFiniteBufferComponent), sizeof(NonFiniteBufferComponent));
 			RHIBufferOwner record(&device, device.CreateBuffer({ .m_SizeInBytes = sizeof(NonFiniteScanRecord),
@@ -544,12 +674,12 @@ namespace gglab
 			bindings.m_SlotCount = 4;
 			const auto bindingLayout = pipelines.CreateBindingLayout(bindings);
 			const auto pipeline = [&](const ShaderCompileResult& compiled, std::string_view entry)
-				{
-					const auto& artifact = compiled.m_Artifact;
-					return pipelines.CreateComputePipeline({ .m_Desc = { .m_BindingLayout = bindingLayout },
-						.m_ComputeShader = { artifact.m_Binary.Data(), artifact.m_Binary.SizeInBytes(), artifact.GetBinaryFormat(),
-							ComputeShaderBinaryHash(artifact.m_Binary, artifact.GetBinaryFormat()), entry } });
-				};
+			{
+				const auto& artifact = compiled.m_Artifact;
+				return pipelines.CreateComputePipeline({ .m_Desc = { .m_BindingLayout = bindingLayout },
+					.m_ComputeShader = { artifact.m_Binary.Data(), artifact.m_Binary.SizeInBytes(), artifact.GetBinaryFormat(),
+						ComputeShaderBinaryHash(artifact.m_Binary, artifact.GetBinaryFormat()), entry } });
+			};
 			const auto clearPipeline = bindingLayout.IsValid() ? pipeline(clear, "CSClear") : RHIPipelineHandle{};
 			const auto scanPipeline = bindingLayout.IsValid() ? pipeline(scan, "CSMain") : RHIPipelineHandle{};
 			context.Check(source && components && record && readback && clearPipeline.IsValid() && scanPipeline.IsValid(),

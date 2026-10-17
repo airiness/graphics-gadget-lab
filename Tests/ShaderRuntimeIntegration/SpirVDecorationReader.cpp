@@ -94,8 +94,7 @@ namespace gglab
 			}
 		}
 
-		void ApplyDecoration(DecorationInfo& destination, uint32_t decoration,
-			std::optional<uint32_t> value) noexcept
+		void ApplyDecoration(DecorationInfo& destination, uint32_t decoration, std::optional<uint32_t> value) noexcept
 		{
 			switch (decoration)
 			{
@@ -150,24 +149,19 @@ namespace gglab
 		}
 	}
 
-	const SpirVEntryPointReflection* SpirVDecorationReflection::FindEntryPoint(
-		std::string_view name) const noexcept
+	const SpirVEntryPointReflection* SpirVDecorationReflection::FindEntryPoint(std::string_view name) const noexcept
 	{
-		const auto iterator = std::ranges::find(m_EntryPoints, name,
-			&SpirVEntryPointReflection::m_Name);
+		const auto iterator = std::ranges::find(m_EntryPoints, name, &SpirVEntryPointReflection::m_Name);
 		return iterator != m_EntryPoints.end() ? &*iterator : nullptr;
 	}
 
-	const SpirVStructLayoutReflection* SpirVDecorationReflection::FindStructLayout(
-		std::string_view name) const noexcept
+	const SpirVStructLayoutReflection* SpirVDecorationReflection::FindStructLayout(std::string_view name) const noexcept
 	{
-		const auto iterator =
-			std::ranges::find(m_StructLayouts, name, &SpirVStructLayoutReflection::m_Name);
+		const auto iterator = std::ranges::find(m_StructLayouts, name, &SpirVStructLayoutReflection::m_Name);
 		return iterator != m_StructLayouts.end() ? &*iterator : nullptr;
 	}
 
-	bool ReadSpirVDecorations(
-		const ShaderBinary& binary, SpirVDecorationReflection& outReflection) noexcept
+	bool ReadSpirVDecorations(const ShaderBinary& binary, SpirVDecorationReflection& outReflection) noexcept
 	{
 		outReflection = {};
 		if (!binary.IsValid() || binary.SizeInBytes() % sizeof(uint32_t) != 0 ||
@@ -225,8 +219,7 @@ namespace gglab
 				if (wordCount >= 4)
 				{
 					uint16_t nextWord = 0;
-					if (!ReadLiteralString(operands, wordCount, 3,
-						memberNames[MemberKey(operands[1], operands[2])], nextWord))
+					if (!ReadLiteralString(operands, wordCount, 3, memberNames[MemberKey(operands[1], operands[2])], nextWord))
 					{
 						outReflection.m_Error = "SPIR-V member name is not terminated";
 						return false;
@@ -246,8 +239,7 @@ namespace gglab
 						outReflection.m_Error = "SPIR-V entry-point name is not terminated";
 						return false;
 					}
-					entry.m_Interfaces.assign(
-						operands + interfaceWord, operands + wordCount);
+					entry.m_Interfaces.assign(operands + interfaceWord, operands + wordCount);
 					rawEntryPoints.push_back(std::move(entry));
 				}
 				break;
@@ -262,8 +254,9 @@ namespace gglab
 				if (wordCount >= 4)
 				{
 					ApplyDecoration(memberDecorations[MemberKey(operands[1], operands[2])],
-						operands[3], wordCount >= 5 ? std::optional<uint32_t>(operands[4]) :
-						std::nullopt);
+						operands[3], wordCount >= 5 ?
+							std::optional<uint32_t>(operands[4]) :
+							std::nullopt);
 				}
 				break;
 			case OpTypeInt:
@@ -286,8 +279,7 @@ namespace gglab
 			case OpTypeStruct:
 				if (wordCount >= 2)
 				{
-					structTypes[operands[1]] =
-						std::vector<uint32_t>(operands + 2, operands + wordCount);
+					structTypes[operands[1]] = std::vector<uint32_t>(operands + 2, operands + wordCount);
 				}
 				break;
 			case OpTypeRuntimeArray:
@@ -328,7 +320,7 @@ namespace gglab
 					.m_TargetId = targetId,
 					.m_DescriptorSet = *decoration.m_DescriptorSet,
 					.m_Binding = *decoration.m_Binding,
-					});
+				});
 			}
 		}
 		std::ranges::sort(outReflection.m_DescriptorBindings,
@@ -366,7 +358,7 @@ namespace gglab
 				layout.m_Members.push_back({
 					.m_Name = memberNameIterator->second,
 					.m_Offset = *decorationIterator->second.m_Offset,
-					});
+				});
 				const auto typeSize = typeSizes.find(memberTypes[member]);
 				if (typeSize == typeSizes.end())
 				{
@@ -374,8 +366,7 @@ namespace gglab
 				}
 				else
 				{
-					reflectedSize = std::max(reflectedSize,
-						*decorationIterator->second.m_Offset + typeSize->second);
+					reflectedSize = std::max(reflectedSize, *decorationIterator->second.m_Offset + typeSize->second);
 				}
 			}
 			if (hasCompleteSize && !layout.m_Members.empty())
@@ -467,8 +458,7 @@ namespace gglab
 				}
 				for (uint32_t member = 0; member < structIterator->second.size(); ++member)
 				{
-					const auto memberIterator =
-						memberDecorations.find(MemberKey(structId, member));
+					const auto memberIterator = memberDecorations.find(MemberKey(structId, member));
 					if (memberIterator == memberDecorations.end())
 					{
 						continue;

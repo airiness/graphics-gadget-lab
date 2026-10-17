@@ -16,8 +16,7 @@ namespace gglab
 		options.m_StartWithRelativeMouse = true;
 		options.m_RhiBackend = RHIBackendType::Vulkan;
 		options.m_AdapterSelector = "0";
-		const AppRuntimeConfig config = TranslateApplicationLaunchOptions(
-			options, { 1920, 1080 }, true);
+		const AppRuntimeConfig config = TranslateApplicationLaunchOptions(options, { 1920, 1080 }, true);
 		context.Check(config.IsValid() && config.m_RhiBackend == AppRuntimeRHIBackend::Vulkan &&
 			config.m_AdapterSelector == "0" &&
 			config.m_StartupDemoId == "Demo.LabHost" &&
@@ -32,12 +31,10 @@ namespace gglab
 			"Host selects optional development tooling explicitly");
 		ApplicationLaunchOptions noToolingOptions = options;
 		noToolingOptions.m_DisableDevelopmentTools = true;
-		const AppRuntimeConfig noToolingConfig = TranslateApplicationLaunchOptions(
-			noToolingOptions, { 1920, 1080 }, true);
+		const AppRuntimeConfig noToolingConfig = TranslateApplicationLaunchOptions(noToolingOptions, { 1920, 1080 }, true);
 		context.Check(!noToolingConfig.HasCapability(AppRuntimeCapability::DevelopmentTools),
 			"Host can omit optional development tooling");
-		const AppRuntimeConfig defaultContentConfig = TranslateApplicationLaunchOptions(
-			ApplicationLaunchOptions{}, { 1920, 1080 }, true);
+		const AppRuntimeConfig defaultContentConfig = TranslateApplicationLaunchOptions(ApplicationLaunchOptions{}, { 1920, 1080 }, true);
 		context.Check(defaultContentConfig.m_StartupDemoId == "Demo.Start" &&
 			defaultContentConfig.m_StartupLabId == "gglab.lab.culling" &&
 			defaultContentConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute,
@@ -49,10 +46,8 @@ namespace gglab
 		ApplicationLaunchOptions explicitStepOptions = hiddenOptions;
 		explicitStepOptions.m_FixedDeltaTimeSeconds = 0.05;
 		context.Check(!defaultContentConfig.m_FixedDeltaTimeSeconds &&
-			TranslateApplicationLaunchOptions(hiddenOptions, { 1920, 1080 }, true)
-			.m_FixedDeltaTimeSeconds == HiddenLaunchFixedDeltaTimeSeconds &&
-			TranslateApplicationLaunchOptions(explicitStepOptions, { 1920, 1080 }, true)
-			.m_FixedDeltaTimeSeconds == 0.05,
+			TranslateApplicationLaunchOptions(hiddenOptions, { 1920, 1080 }, true).m_FixedDeltaTimeSeconds == HiddenLaunchFixedDeltaTimeSeconds &&
+			TranslateApplicationLaunchOptions(explicitStepOptions, { 1920, 1080 }, true).m_FixedDeltaTimeSeconds == 0.05,
 			"Hidden launches default to a fixed time step that an explicit step overrides");
 
 		ApplicationLaunchOptions captureOptions = options;
@@ -62,8 +57,7 @@ namespace gglab
 			.m_SettleFrames = 12,
 			.m_Label = "culling",
 		};
-		const std::optional<FrameCaptureRequest> captureRequest =
-			TranslateCaptureOnReadyOptions(captureOptions);
+		const std::optional<FrameCaptureRequest> captureRequest = TranslateCaptureOnReadyOptions(captureOptions);
 		context.Check(!TranslateCaptureOnReadyOptions(options) && captureRequest &&
 			captureRequest->m_Timing == FrameCaptureTiming::AfterReady &&
 			captureRequest->m_Source == FrameCaptureSource::Composited &&
@@ -91,16 +85,14 @@ namespace gglab
 #endif
 		ApplicationLaunchOptions islandOptions{};
 		islandOptions.m_StartupDemo = ApplicationStartupDemo::Island;
-		const AppRuntimeConfig islandConfig = TranslateApplicationLaunchOptions(
-			islandOptions, { 1920, 1080 }, true);
+		const AppRuntimeConfig islandConfig = TranslateApplicationLaunchOptions(islandOptions, { 1920, 1080 }, true);
 		context.Check(islandConfig.IsValid() &&
 			islandConfig.m_StartupDemoId == "Demo.Playground.Island",
 			"Island launch policy selects its stable Playground content identity");
 
 		ApplicationLaunchOptions atriumOptions{};
 		atriumOptions.m_StartupDemo = ApplicationStartupDemo::CoastalAtrium;
-		const AppRuntimeConfig atriumConfig = TranslateApplicationLaunchOptions(
-			atriumOptions, { 1920, 1080 }, true);
+		const AppRuntimeConfig atriumConfig = TranslateApplicationLaunchOptions(atriumOptions, { 1920, 1080 }, true);
 		context.Check(atriumConfig.IsValid() &&
 			atriumConfig.m_StartupDemoId == "Demo.Playground.CoastalAtrium",
 			"Coastal atrium launch policy selects its stable Playground content identity");
@@ -108,15 +100,13 @@ namespace gglab
 		ApplicationLaunchOptions textureOptions{};
 		textureOptions.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		textureOptions.m_StartupLabId = "gglab.lab.texture_contract";
-		const AppRuntimeConfig textureConfig = TranslateApplicationLaunchOptions(
-			textureOptions, { 1920, 1080 }, true);
+		const AppRuntimeConfig textureConfig = TranslateApplicationLaunchOptions(textureOptions, { 1920, 1080 }, true);
 		context.Check(textureConfig.IsValid() &&
 			textureConfig.m_StartupDemoId == "Demo.LabHost" &&
 			textureConfig.m_StartupLabId == "gglab.lab.texture_contract",
 			"Texture contract launch policy preserves its stable Lab identity");
 
-		const std::filesystem::path executableDirectory =
-			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";
+		const std::filesystem::path executableDirectory = std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";
 		const std::filesystem::path runtimeRoot = utils::Canonical(executableDirectory);
 		const RuntimePaths paths = BuildRuntimePaths(executableDirectory);
 		context.Check(paths.IsValid() && paths.m_RuntimeRoot == runtimeRoot &&

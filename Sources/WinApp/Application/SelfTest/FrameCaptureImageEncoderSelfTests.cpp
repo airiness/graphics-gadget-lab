@@ -44,10 +44,8 @@ namespace gglab
 			WICPixelFormatGUID format{};
 			DecodedPng decoded;
 			if (!stream ||
-				FAILED(::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-					IID_PPV_ARGS(&factory))) ||
-				FAILED(factory->CreateDecoderFromStream(
-					stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder)) ||
+				FAILED(::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))) ||
+				FAILED(factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder)) ||
 				FAILED(decoder->GetFrame(0, &frame)) ||
 				FAILED(frame->GetSize(&decoded.m_Width, &decoded.m_Height)) ||
 				FAILED(frame->GetPixelFormat(&format)) || format != GUID_WICPixelFormat24bppBGR)
@@ -56,8 +54,7 @@ namespace gglab
 			}
 			const UINT stride = decoded.m_Width * 3;
 			decoded.m_Bgr.resize(static_cast<size_t>(stride) * decoded.m_Height);
-			if (FAILED(frame->CopyPixels(nullptr, stride,
-				static_cast<UINT>(decoded.m_Bgr.size()), decoded.m_Bgr.data())))
+			if (FAILED(frame->CopyPixels(nullptr, stride, static_cast<UINT>(decoded.m_Bgr.size()), decoded.m_Bgr.data())))
 			{
 				return std::nullopt;
 			}
@@ -106,8 +103,7 @@ namespace gglab
 					decoded->m_Bgr[pixel * 3 + 1] == (*rgba)[pixel * 4 + 1] &&
 					decoded->m_Bgr[pixel * 3 + 2] == (*rgba)[pixel * 4 + 0];
 			}
-			context.Check(pixelsMatch,
-				"PNG round trips preserve display bytes and channel order");
+			context.Check(pixelsMatch, "PNG round trips preserve display bytes and channel order");
 			context.Check(decoded && decoded->m_HasSrgbChunk,
 				"The PNG records that its pixels are sRGB-encoded");
 			if (SUCCEEDED(decodeCom))

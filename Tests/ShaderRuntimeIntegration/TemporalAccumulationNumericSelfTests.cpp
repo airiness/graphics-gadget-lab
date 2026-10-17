@@ -52,15 +52,15 @@ namespace gglab
 			HWND m_Window = nullptr;
 		};
 
-		constexpr std::array<std::string_view, 11> ProbeNames{
+		constexpr std::array<std::string_view, 11> ProbeNames
+		{
 			"Zero feedback", "Fractional capacity", "Unit sample matches Native",
 			"Low-feedback weighted goldens", "Valid low-capacity storage",
 			"Rejected and invalid history", "Monotonic feedback", "Packed low feedback",
 			"Default compatibility", "Feedback capacity transition", "Invalid feedback",
 		};
 
-		void Transition(RHIGraphicsCommandContext& commands, RHITextureHandle texture,
-			RHIResourceState before, RHIResourceState after) noexcept
+		void Transition(RHIGraphicsCommandContext& commands, RHITextureHandle texture, RHIResourceState before, RHIResourceState after) noexcept
 		{
 			// Test-owned targets are outside RenderGraph; this fixture owns every state
 			// transition and waits for graphics completion before readback or destruction.
@@ -69,8 +69,7 @@ namespace gglab
 			commands.FlushBarriers();
 		}
 
-		void ValidateReadback(SelfTestContext& context, RHIContext& rhi,
-			RHITextureHandle texture, const RHITextureDesc& desc) noexcept
+		void ValidateReadback(SelfTestContext& context, RHIContext& rhi, RHITextureHandle texture, const RHITextureDesc& desc) noexcept
 		{
 			auto& transfers = rhi.GetTransferManager();
 			auto batch = transfers.BeginBatch();
@@ -100,8 +99,7 @@ namespace gglab
 			for (size_t index = 0; index < ProbeNames.size(); ++index)
 			{
 				std::array<float, 4> result{};
-				std::memcpy(result.data(), data.m_Pixels.data() + subresource.m_DataOffset +
-					index * sizeof(result), sizeof(result));
+				std::memcpy(result.data(), data.m_Pixels.data() + subresource.m_DataOffset + index * sizeof(result), sizeof(result));
 				context.Check(result == std::array<float, 4>{}, std::format(
 					"Production temporal HLSL: {} ({}, {}, {}, {})",
 					ProbeNames[index], result[0], result[1], result[2], result[3]));
@@ -113,13 +111,14 @@ namespace gglab
 			const auto runtimeRoot = win32::GetExecutableDirectory();
 			ShaderCompiler compiler(ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			const auto compile = [&](ShaderStage stage, const wchar_t* entry)
-				{
-					ShaderDesc desc{ .m_SourcePath = L"Tests/TemporalHistoryAccumulationContractCompile.hlsl",
-						.m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
-					desc.m_Target = backend == RHIBackendType::DX12
-						? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
-					return compiler.Compile(desc);
-				};
+			{
+				ShaderDesc desc{ .m_SourcePath = L"Tests/TemporalHistoryAccumulationContractCompile.hlsl",
+					.m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
+				desc.m_Target = backend == RHIBackendType::DX12 ?
+					MakeDX12CompileTarget(stage) :
+					MakeVulkan13CompileTarget(stage);
+				return compiler.Compile(desc);
+			};
 			const auto vertex = compile(ShaderStage::Vertex, L"VSMain");
 			const auto pixel = compile(ShaderStage::Pixel, L"PSMain");
 			context.Check(vertex.IsSuccess() && pixel.IsSuccess(), "Temporal numeric probe shaders compile");
@@ -172,11 +171,11 @@ namespace gglab
 			pipelineInfo.m_Desc.m_RenderTargetFormats[0] = targetDesc.m_Format;
 			pipelineInfo.m_Desc.m_RenderTargetCount = 1;
 			const auto bytecode = [](const ShaderCompileResult& result, std::string_view entry)
-				{
-					const auto& artifact = result.m_Artifact;
-					return ShaderBytecode{ artifact.m_Binary.Data(), artifact.m_Binary.SizeInBytes(),
-						artifact.GetBinaryFormat(), ComputeShaderBinaryHash(artifact.m_Binary, artifact.GetBinaryFormat()), entry };
-				};
+			{
+				const auto& artifact = result.m_Artifact;
+				return ShaderBytecode{ artifact.m_Binary.Data(), artifact.m_Binary.SizeInBytes(),
+					artifact.GetBinaryFormat(), ComputeShaderBinaryHash(artifact.m_Binary, artifact.GetBinaryFormat()), entry };
+			};
 			pipelineInfo.m_VertexShader = bytecode(vertex, "VSMain");
 			pipelineInfo.m_PixelShader = bytecode(pixel, "PSMain");
 			const auto pipeline = layout.IsValid() ? pipelines.CreateGraphicsPipeline(pipelineInfo) : RHIPipelineHandle{};

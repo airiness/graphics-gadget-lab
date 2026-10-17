@@ -60,8 +60,7 @@ namespace gglab
 
 	template <> struct SnapshotTraits<DiagnosticsViewContractSnapshot>
 	{
-		static constexpr SnapshotId Id =
-			MakeSnapshotId("Diagnostics.DiagnosticsViewContractSnapshot");
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.DiagnosticsViewContractSnapshot");
 	};
 
 	struct UnregisteredDiagnosticsViewContractSnapshot
@@ -70,18 +69,19 @@ namespace gglab
 
 	template <> struct SnapshotTraits<UnregisteredDiagnosticsViewContractSnapshot>
 	{
-		static constexpr SnapshotId Id =
-			MakeSnapshotId("Diagnostics.UnregisteredDiagnosticsViewContractSnapshot");
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.UnregisteredDiagnosticsViewContractSnapshot");
 	};
 
 	template <typename T>
-	concept DiagnosticsSnapshotQuery = requires(T& value) {
+	concept DiagnosticsSnapshotQuery = requires(T& value)
+	{
 		{ value.template GetSnapshot<DiagnosticsViewContractSnapshot>() } ->
 			std::same_as<const DiagnosticsViewContractSnapshot*>;
 	};
 
 	template <typename T>
-	concept DiagnosticsRefreshControl = requires(T& value) {
+	concept DiagnosticsRefreshControl = requires(T& value)
+	{
 		value.template RequestRefresh<DiagnosticsViewContractSnapshot>();
 	};
 
@@ -91,13 +91,15 @@ namespace gglab
 	static_assert(DiagnosticsRefreshControl<DiagnosticsControl>);
 
 	template <typename T>
-	concept GpuProfilingQuery = requires(const T& value) {
+	concept GpuProfilingQuery = requires(const T& value)
+	{
 		{ value.IsEnabled() } -> std::same_as<bool>;
 		{ value.GetLatestFrame() } -> std::same_as<GpuProfileFrameSnapshot>;
 	};
 
 	template <typename T>
-	concept GpuProfilingControl = requires(T& value) {
+	concept GpuProfilingControl = requires(T& value)
+	{
 		value.RequestEnabled(true);
 	};
 
@@ -107,12 +109,14 @@ namespace gglab
 	static_assert(GpuProfilingControl<GpuProfilingControlBase>);
 
 	template <typename T>
-	concept DirectionalLightQuery = requires(const T& value) {
+	concept DirectionalLightQuery = requires(const T& value)
+	{
 		{ value.GetLight() } -> std::same_as<std::optional<DirectionalLightObservation>>;
 	};
 
 	template <typename T>
-	concept DirectionalLightControl = requires(T& value) {
+	concept DirectionalLightControl = requires(T& value)
+	{
 		value.SetRadiance(0, Color::White, 1.0f);
 	};
 
@@ -122,7 +126,8 @@ namespace gglab
 	static_assert(DirectionalLightControl<DirectionalLightControlBase>);
 
 	template <typename T>
-	concept AssetToolingSubmission = requires(T& value, const std::filesystem::path& path) {
+	concept AssetToolingSubmission = requires(T& value, const std::filesystem::path& path)
+	{
 		{ value.LoadModelAsync(path) } -> std::same_as<ModelLoadReceipt>;
 		{ value.LoadTextureAsync(path, TextureSemantic::Normal) } -> std::same_as<TextureLoadReceipt>;
 		{ value.ClearTextureDerivedDataCache() } -> std::same_as<bool>;
@@ -135,7 +140,8 @@ namespace gglab
 	static_assert(!LiveModelAccess<AssetToolingControlBase>);
 
 	template <typename T>
-	concept CameraToolingQuery = requires(const T& value) {
+	concept CameraToolingQuery = requires(const T& value)
+	{
 		{ value.GetCameras() } -> std::same_as<CameraToolingSnapshot>;
 	};
 	template <typename T>
@@ -146,7 +152,8 @@ namespace gglab
 	static_assert(CameraToolingMutation<CameraToolingControlBase>);
 
 	template <typename T>
-	concept WorldToolingQuery = requires(const T& value) {
+	concept WorldToolingQuery = requires(const T& value)
+	{
 		{ value.GetEntities() } -> std::same_as<WorldToolingSnapshot>;
 	};
 	template <typename T>
@@ -232,7 +239,7 @@ namespace gglab
 					{
 						auto id = builder.CreateTexture(name, {
 							.m_Format = RHIFormat::R16Float, .m_Extent = { 32, 32, 1 },
-							});
+						});
 						builder.WriteInPlace(id, RGTextureAccess::RenderTarget);
 						return id;
 					};
@@ -286,21 +293,21 @@ namespace gglab
 			ResolvedTemporalFramePlan temporalPlan{
 				.m_DisplayViewId = RenderViewID::DebugCamera0,
 				.m_SessionIdentity = 41,
+			};
+			const auto setTemporalAAConsumer = [&temporalPlan]
+			(TemporalConsumerStatus status, TemporalConsumerDisableReason reason) noexcept
+			{
+				const TemporalService services = status == TemporalConsumerStatus::Active ?
+					GetTemporalConsumerRequiredServices(TemporalConsumer::TemporalAA) :
+					TemporalService::None;
+				temporalPlan.m_Consumers[static_cast<uint32_t>(TemporalConsumer::TemporalAA)] = {
+					.m_Status = status,
+					.m_DisableReason = reason,
+					.m_Services = services,
+					.m_Requested = true,
 				};
-			const auto setTemporalAAConsumer = [&temporalPlan](TemporalConsumerStatus status,
-				TemporalConsumerDisableReason reason) noexcept
-				{
-					const TemporalService services = status == TemporalConsumerStatus::Active
-						? GetTemporalConsumerRequiredServices(TemporalConsumer::TemporalAA)
-						: TemporalService::None;
-					temporalPlan.m_Consumers[static_cast<uint32_t>(TemporalConsumer::TemporalAA)] = {
-						.m_Status = status,
-						.m_DisableReason = reason,
-						.m_Services = services,
-						.m_Requested = true,
-					};
-					temporalPlan.m_Services = services;
-				};
+				temporalPlan.m_Services = services;
+			};
 			setTemporalAAConsumer(TemporalConsumerStatus::Active, TemporalConsumerDisableReason::None);
 			DirectionalShadowFramePlan shadows{};
 			shadows.m_Settings = DirectionalShadowSettings{};
@@ -308,7 +315,7 @@ namespace gglab
 			RenderGraph graph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
-				});
+			});
 			PopulateRenderingSettingsGraph(graph, true);
 			DiagnosticsFrameContext frame{
 				.m_RenderGraph = &graph,
@@ -321,7 +328,7 @@ namespace gglab
 				.m_DisplayViewId = RenderViewID::DebugCamera0,
 				.m_DisplayViewSettings = &resolved,
 				.m_TemporalFramePlan = &temporalPlan,
-				};
+			};
 			const auto uncompiled = BuildRenderingSettingsDiagnosticsSnapshot(frame);
 			context.Check(uncompiled.m_SettingsAvailable && !uncompiled.m_RuntimeAvailable &&
 				uncompiled.m_GTAO.m_State == ViewRenderFeatureState::Unavailable &&
@@ -332,7 +339,7 @@ namespace gglab
 			const TemporalHistorySummary history{
 				.m_DisplayViewId = RenderViewID::DebugCamera0, .m_SessionIdentity = 41,
 				.m_HasActiveHistory = true, .m_HistoryValid = true,
-				};
+			};
 			const auto active = BuildRenderingSettingsDiagnosticsSnapshot(frame, &history);
 			context.Check(active.m_SettingsAvailable && active.m_RuntimeAvailable && active.m_FrameSerial == 17 &&
 				active.m_Width == 128 && active.m_Height == 64 && !active.m_AuthoringProfile.m_Lighting.m_GTAO.m_Enabled &&
@@ -414,8 +421,7 @@ namespace gglab
 			auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
 			forward.m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
-			setTemporalAAConsumer(TemporalConsumerStatus::Unavailable,
-				TemporalConsumerDisableReason::DepthVelocityPathUnavailable);
+			setTemporalAAConsumer(TemporalConsumerStatus::Unavailable, TemporalConsumerDisableReason::DepthVelocityPathUnavailable);
 			const auto unavailable = BuildRenderingSettingsDiagnosticsSnapshot(frame);
 			context.Check(unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Inactive &&
 				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::NoOpaqueDraws &&
@@ -449,7 +455,7 @@ namespace gglab
 			RenderGraph culledGraph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
-				});
+			});
 			PopulateRenderingSettingsGraph(culledGraph, false);
 			context.Check(culledGraph.Compile(), "Unused settings fixture compiles with resource culling");
 			frame.m_RenderGraph = &culledGraph;
@@ -475,9 +481,9 @@ namespace gglab
 			bool onlySettingsCaptured = true;
 			for (const auto& profile : diagnostics.GetProfiles())
 			{
-				onlySettingsCaptured &= profile.m_Id == SnapshotIdOf<RenderingSettingsDiagnosticsSnapshot>
-					? profile.m_CaptureCount == 1 && profile.m_CacheHitCount == 1
-					: profile.m_CaptureCount == 0;
+				onlySettingsCaptured &= profile.m_Id == SnapshotIdOf<RenderingSettingsDiagnosticsSnapshot> ?
+					profile.m_CaptureCount == 1 && profile.m_CacheHitCount == 1 :
+					profile.m_CaptureCount == 0;
 			}
 			context.Check(captured && cached == captured && captured->m_RuntimeAvailable && onlySettingsCaptured,
 				"Reading settings captures only its lightweight provider and reuses it within the frame");
@@ -864,8 +870,7 @@ namespace gglab
 				context.Check(view.GetLight()->m_Direction.m_Y < -0.999f,
 					"Zero and non-finite directions leave the light orientation unchanged");
 				RenderFrameBuildResult builtFrame{};
-				builtFrame.m_DirectionalShadowSettings =
-					RenderWorldExtractor().Extract(world).GetMainDirectionalShadowSettings();
+				builtFrame.m_DirectionalShadowSettings = RenderWorldExtractor().Extract(world).GetMainDirectionalShadowSettings();
 				const auto renderContext = builtFrame.MakeRenderFrameContext();
 				control.SetShadowSettings(id, std::nullopt);
 				context.Check(renderContext.m_DirectionalShadowSettings.m_ShadowMapSize == 2048 &&
@@ -1004,71 +1009,64 @@ namespace gglab
 			"Diagnostics view returns no value for an unregistered snapshot contract");
 
 		runtime.BeginFrame({ .m_World = &firstWorld });
-		const DiagnosticsViewContractSnapshot* initial =
-			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* initial = view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(initial && initial->m_CaptureSerial == 1 &&
-				providerObserver->m_CaptureCount == 1 &&
-				providerObserver->m_LastWorld == &firstWorld,
+			providerObserver->m_CaptureCount == 1 &&
+			providerObserver->m_LastWorld == &firstWorld,
 			"Diagnostics view lazily captures a registered immutable snapshot");
 
-		const DiagnosticsViewContractSnapshot* cached =
-			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* cached = view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(cached == initial && cached && cached->m_CaptureSerial == 1 &&
-				providerObserver->m_CaptureCount == 1,
+			providerObserver->m_CaptureCount == 1,
 			"Diagnostics view reuses the published snapshot until refresh is requested");
 
 		control.RequestRefresh<DiagnosticsViewContractSnapshot>();
-		const DiagnosticsViewContractSnapshot* refreshed =
-			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* refreshed = view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(refreshed == initial && refreshed && refreshed->m_CaptureSerial == 2 &&
-				providerObserver->m_CaptureCount == 2,
+			providerObserver->m_CaptureCount == 2,
 			"Diagnostics control refresh requests recapture through the Runtime-owned provider");
 
 		const auto profiles = view.GetProfiles();
 		context.Check(profiles.size() == 1 && profiles.front().m_HasSnapshot &&
-				profiles.front().m_CaptureCount == 2 &&
-				profiles.front().m_CacheHitCount == 1 &&
-				!profiles.front().m_RefreshPending,
+			profiles.front().m_CaptureCount == 2 &&
+			profiles.front().m_CacheHitCount == 1 &&
+			!profiles.front().m_RefreshPending,
 			"Diagnostics view exposes immutable capture profile observations");
 
 		runtime.EndFrame();
 		control.RequestRefresh<DiagnosticsViewContractSnapshot>();
-		const DiagnosticsViewContractSnapshot* closedFrameSnapshot =
-			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* closedFrameSnapshot = view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(closedFrameSnapshot && closedFrameSnapshot == refreshed &&
-				closedFrameSnapshot->m_CaptureSerial == 2 &&
-				providerObserver->m_CaptureCount == 2 &&
-				providerObserver->m_LastWorld == &firstWorld,
+			closedFrameSnapshot->m_CaptureSerial == 2 &&
+			providerObserver->m_CaptureCount == 2 &&
+			providerObserver->m_LastWorld == &firstWorld,
 			"Closed diagnostics frames cannot capture through a borrowed context");
 
 		runtime.BeginFrame({ .m_World = &secondWorld });
-		const DiagnosticsViewContractSnapshot* nextFrameSnapshot =
-			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* nextFrameSnapshot = view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(nextFrameSnapshot && nextFrameSnapshot == refreshed &&
-				nextFrameSnapshot->m_CaptureSerial == 3 &&
-				providerObserver->m_CaptureCount == 3 &&
-				providerObserver->m_LastWorld == &secondWorld,
+			nextFrameSnapshot->m_CaptureSerial == 3 &&
+			providerObserver->m_CaptureCount == 3 &&
+			providerObserver->m_LastWorld == &secondWorld,
 			"Pending refresh captures against the next active frame context");
 
 		runtime.EndFrame();
 		runtime.EndFrame();
 		control.RequestRefresh<DiagnosticsViewContractSnapshot>();
-		const DiagnosticsViewContractSnapshot* repeatedlyClosedSnapshot =
-			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* repeatedlyClosedSnapshot = view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(repeatedlyClosedSnapshot &&
-				repeatedlyClosedSnapshot == nextFrameSnapshot &&
-				repeatedlyClosedSnapshot->m_CaptureSerial == 3 &&
-				providerObserver->m_CaptureCount == 3,
+			repeatedlyClosedSnapshot == nextFrameSnapshot &&
+			repeatedlyClosedSnapshot->m_CaptureSerial == 3 &&
+			providerObserver->m_CaptureCount == 3,
 			"Diagnostics frame closure is idempotent and preserves immutable publication");
 
 		runtime.Reset();
 		context.Check(view.GetSnapshot<DiagnosticsViewContractSnapshot>() == nullptr &&
-				providerObserver->m_CaptureCount == 3,
+			providerObserver->m_CaptureCount == 3,
 			"Diagnostics reset clears publication without capturing outside a frame");
 
 		DiagnosticsRuntime labDiagnostics;
-		labDiagnostics.RegisterProvider(
-			std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		labDiagnostics.RegisterProvider(std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		DiagnosticsLabSnapshotSource firstLabSource;
 		firstLabSource.m_ActiveLabName = "First Lab";
 		ResolvedViewRenderSettings labFrameSettings{};
@@ -1080,8 +1078,8 @@ namespace gglab
 		context.Check(firstLabSnapshot && firstLabSnapshot->m_ActiveLabName == "First Lab",
 			"Lab diagnostics capture uses the Runtime-owned frame context source");
 		context.Check(firstLabSource.m_LastContext.m_RequestedTemporalAASettings ==
-				&labFrameSettings.m_TemporalAA && firstLabSource.m_LastContext.m_TemporalFramePlan ==
-				&labFramePlan && firstLabSource.m_LastContext.m_FrameSerial == 71,
+			&labFrameSettings.m_TemporalAA && firstLabSource.m_LastContext.m_TemporalFramePlan ==
+			&labFramePlan && firstLabSource.m_LastContext.m_FrameSerial == 71,
 			"Lab diagnostics borrow final display settings and the plan from the same capture frame");
 
 		labDiagnostics.EndFrame();
@@ -1101,13 +1099,11 @@ namespace gglab
 		Renderer resourceSource;
 		DiagnosticsRuntime resourceDiagnostics;
 		RegisterBuiltinSnapshotProviders(resourceDiagnostics, &resourceSource);
-				resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource });
-		const auto* persistentSnapshot =
-			resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();
-		const auto* transientSnapshot =
-			resourceDiagnostics.GetSnapshot<TransientResourcePoolSnapshot>();
+		resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource });
+		const auto* persistentSnapshot = resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();
+		const auto* transientSnapshot = resourceDiagnostics.GetSnapshot<TransientResourcePoolSnapshot>();
 		context.Check(persistentSnapshot && persistentSnapshot->m_SourceAvailable &&
-				persistentSnapshot->m_Objects.m_BufferVersions.empty(),
+			persistentSnapshot->m_Objects.m_BufferVersions.empty(),
 			"Persistent buffer diagnostics distinguish a bound source from empty tables");
 		context.Check(transientSnapshot && !transientSnapshot->m_SourceAvailable,
 			"Transient pool diagnostics report a missing pool even with a bound renderer");
@@ -1126,7 +1122,7 @@ namespace gglab
 		RenderGraph temporalGraph({
 			.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 			.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
-			});
+		});
 		ViewRenderProfile temporalAuthoring{};
 		temporalAuthoring.m_TemporalAA.m_Enabled = false;
 		ViewRenderProfile temporalOverride = temporalAuthoring;
@@ -1161,21 +1157,20 @@ namespace gglab
 			.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 			.m_TransientResourcePool =
 				reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
-			});
+		});
 		shadowGraph.GetBlackboard().Create<RGShadowResources>(ShadowResourcesName);
 		shadowGraph.AddPass<ShadowDiagnosticsFixturePassData>("Diagnostics.ShadowFixture",
 			[](RenderGraph::RGBuilder& builder, ShadowDiagnosticsFixturePassData&)
 			{
-				auto& resources =
-					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+				auto& resources = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 				resources.m_DirectionalShadowMap = builder.CreateTexture("Shadow.Map", {
 					.m_Format = RHIFormat::R32Typeless,
 					.m_Extent = { 2048, 2048, 1 },
-					});
+				});
 				resources.m_DirectionalShadowMapPreview = builder.CreateTexture("Shadow.Preview", {
 					.m_Format = RHIFormat::R32Float,
 					.m_Extent = { 512, 512, 1 },
-					});
+				});
 				resources.m_ShadowMapSize = 2048;
 				resources.m_ShadowMapPreviewSize = 512;
 			});
@@ -1218,8 +1213,7 @@ namespace gglab
 		mainView.m_IsValid = true;
 		mainView.m_Aspect = 16.0f / 9.0f;
 		mainView.m_TemporalSessionIdentity = 42;
-		const ShadowDiagnosticsSnapshot shadowSnapshot =
-			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades, &mainView, 77);
+		const ShadowDiagnosticsSnapshot shadowSnapshot = BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades, &mainView, 77);
 		cascades = {};
 		context.Check(shadowSnapshot.m_Cascades.size() == 2 &&
 			shadowSnapshot.m_Cascades[0].m_ViewIndex == 7 &&
@@ -1306,14 +1300,16 @@ namespace gglab
 		scaleFrame.m_FrameSerial = 100;
 		scaleFrame.m_Cascades[0].m_Projection.m_CenterLS = Vector2(0.0625f, 0.1875f);
 		const bool scaleBaselineRecorded = scaleHistory.Record(scaleFrame, 7, "CAM_ShadowStairs");
-		const auto baseline = scaleBaselineRecorded
-			? scaleHistory.GetSamples().front() : ShadowTemporalSample{};
+		const auto baseline = scaleBaselineRecorded ?
+			scaleHistory.GetSamples().front() :
+			ShadowTemporalSample{};
 		++scaleFrame.m_FrameSerial;
 		scaleFrame.m_Cascades[0].m_Projection.m_WorldUnitsPerTexel = Vector2(0.5f, 0.125f);
 		scaleFrame.m_Cascades[0].m_Projection.m_CenterLS = Vector2(0.5625f, -0.3125f);
 		const bool scaleChangedRecorded = scaleHistory.Record(scaleFrame, 7, "CAM_ShadowStairs");
-		const auto scaleChanged = scaleChangedRecorded
-			? scaleHistory.GetSamples().back() : ShadowTemporalSample{};
+		const auto scaleChanged = scaleChangedRecorded ?
+			scaleHistory.GetSamples().back() :
+			ShadowTemporalSample{};
 		context.Check(scaleBaselineRecorded && scaleChangedRecorded &&
 			scaleHistory.GetResetCount() == 0 && scaleHistory.GetSamples().size() == 2 &&
 			!baseline.m_HasComparison && baseline.m_TexelScaleDelta[0].m_X == 0.0f &&
@@ -1330,19 +1326,18 @@ namespace gglab
 			scaleChanged.m_GridErrorTexels[0].m_Y == 0.5f,
 			"Texel scale changes remain comparable while scale deltas and signed grid error are recorded");
 
-		const auto resetsOn = [&](ShadowDiagnosticsSnapshot changed, uint64_t cameraId,
-			std::string_view referenceId) noexcept
-			{
-				ShadowTemporalDiagnostics history;
-				auto first = temporalFrame;
-				first.m_FrameSerial = 1;
-				(void)history.Record(first, 7, "CAM_ShadowStairs");
-				changed.m_FrameSerial = 2;
-				const bool recorded = history.Record(changed, cameraId, referenceId);
-				return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&
-					!history.GetSamples().front().m_HasComparison &&
-					history.GetSamples().front().m_ProjectionDeltaTexels[0].m_X == 0.0f;
-			};
+		const auto resetsOn = [&](ShadowDiagnosticsSnapshot changed, uint64_t cameraId, std::string_view referenceId) noexcept
+		{
+			ShadowTemporalDiagnostics history;
+			auto first = temporalFrame;
+			first.m_FrameSerial = 1;
+			(void)history.Record(first, 7, "CAM_ShadowStairs");
+			changed.m_FrameSerial = 2;
+			const bool recorded = history.Record(changed, cameraId, referenceId);
+			return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&
+				!history.GetSamples().front().m_HasComparison &&
+				history.GetSamples().front().m_ProjectionDeltaTexels[0].m_X == 0.0f;
+		};
 		auto changed = temporalFrame;
 		changed.m_LightDirection = { 0.2f, -1.0f, 0.2f };
 		const bool lightReset = resetsOn(changed, 7, "CAM_ShadowStairs");

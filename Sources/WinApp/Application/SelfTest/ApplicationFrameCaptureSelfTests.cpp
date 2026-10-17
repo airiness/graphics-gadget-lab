@@ -196,8 +196,7 @@ namespace gglab
 			return nlohmann::json::parse(file, nullptr, false);
 		}
 
-		void RunReferenceViewBatchTests(SelfTestContext& context, const std::filesystem::path& directory,
-			FrameCaptureSource source) noexcept
+		void RunReferenceViewBatchTests(SelfTestContext& context, const std::filesystem::path& directory, FrameCaptureSource source) noexcept
 		{
 			FakeCaptureControl control;
 			control.m_HoldResults = true;
@@ -226,22 +225,22 @@ namespace gglab
 			std::vector<uint64_t> issuedFrames;
 			bool viewsInOrder = true;
 			const auto captureView = [&](uint32_t index)
+			{
+				const auto change = coordinator.GetPendingViewChange();
+				if (!change)
 				{
-					const auto change = coordinator.GetPendingViewChange();
-					if (!change)
-					{
-						viewsInOrder = false;
-						return;
-					}
-					viewsInOrder = viewsInOrder && change->m_ReferenceViewId == state.m_ReferenceViewIds[index];
-					coordinator.OnReferenceViewApplied(change->m_RequestId, true);
-					++state.m_FrameSerial;
-					++state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
-					state.m_Camera.m_Position = { static_cast<float>(index), 0.0f, 0.0f };
-					issuedFrames.push_back(state.m_FrameSerial);
-					coordinator.BeginFrame(state);
-					coordinator.OnFrameSubmitted();
-				};
+					viewsInOrder = false;
+					return;
+				}
+				viewsInOrder = viewsInOrder && change->m_ReferenceViewId == state.m_ReferenceViewIds[index];
+				coordinator.OnReferenceViewApplied(change->m_RequestId, true);
+				++state.m_FrameSerial;
+				++state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
+				state.m_Camera.m_Position = { static_cast<float>(index), 0.0f, 0.0f };
+				issuedFrames.push_back(state.m_FrameSerial);
+				coordinator.BeginFrame(state);
+				coordinator.OnFrameSubmitted();
+			};
 			for (uint32_t index = 0; index < control.m_MaxPendingCaptures; ++index)
 			{
 				captureView(index);
@@ -334,7 +333,7 @@ namespace gglab
 					}
 					return !rejectOpen;
 				},
-				});
+			});
 			context.Check(frontEnd.GetSettings().m_Timing == FrameCaptureTiming::NextFrame,
 				"Interactive exports default to the next rendered frame without a control session");
 			coordinator.BeginFrame(MakeFrameState(16));
@@ -440,12 +439,12 @@ namespace gglab
 
 				ApplicationFrameCapture unavailable({ .m_Coordinator = &coordinator,
 					.m_ConsumeResults = [result = *full, pending = true](std::vector<FrameCaptureRequestResult>& output) mutable
+					{
+						if (std::exchange(pending, false))
 						{
-							if (std::exchange(pending, false))
-							{
-								output.push_back(result);
-							}
-						} });
+							output.push_back(result);
+						}
+					} });
 				unavailable.Update();
 				context.Check(!unavailable.CanOpenOutputFolder(*full) &&
 					!unavailable.OpenOutputFolder(fullId, failure) && !failure.empty(),
@@ -570,13 +569,13 @@ namespace gglab
 				DevelopGuiContext drawContext{ .m_Diagnostics = &diagnostics, .m_StateStore = &store };
 				FrameCapturePanel panel(&frontEnd);
 				const auto draw = [&]()
-					{
-						ImGui::NewFrame();
-						ImGui::Begin("Manual resource capture test");
-						panel.Draw(drawContext);
-						ImGui::End();
-						ImGui::Render();
-					};
+				{
+					ImGui::NewFrame();
+					ImGui::Begin("Manual resource capture test");
+					panel.Draw(drawContext);
+					ImGui::End();
+					ImGui::Render();
+				};
 				draw();
 				draw();
 				ImGuiWindow* window = ImGui::FindWindowByName("Manual resource capture test");
@@ -602,21 +601,21 @@ namespace gglab
 					const ImGuiID targetId = ImHashData(&firstTarget, sizeof(firstTarget), targetsId);
 					const ImGuiID addressTableId = ImHashStr("##TargetAddress", 0, targetId);
 					const auto select = [&](const char* combo, const char* choice, int choiceIndex = -1)
+					{
+						ImGui::ActivateItemByID(ImHashStr(combo, 0, addressTableId));
+						draw();
+						if (gui->OpenPopupStack.empty() || !gui->OpenPopupStack.back().Window)
 						{
-							ImGui::ActivateItemByID(ImHashStr(combo, 0, addressTableId));
-							draw();
-							if (gui->OpenPopupStack.empty() || !gui->OpenPopupStack.back().Window)
-							{
-								return false;
-							}
-							ImGuiWindow* popup = gui->OpenPopupStack.back().Window;
-							const ImGuiID choiceId = choiceIndex < 0 ?
-								popup->GetID(choice) :
-								ImHashStr(choice, 0, popup->GetID(choiceIndex));
-							ImGui::ActivateItemByID(choiceId);
-							draw();
-							return gui->OpenPopupStack.empty();
-						};
+							return false;
+						}
+						ImGuiWindow* popup = gui->OpenPopupStack.back().Window;
+						const ImGuiID choiceId = choiceIndex < 0 ?
+							popup->GetID(choice) :
+							ImHashStr(choice, 0, popup->GetID(choiceIndex));
+						ImGui::ActivateItemByID(choiceId);
+						draw();
+						return gui->OpenPopupStack.empty();
+					};
 					const bool selected = select("##Position", "After pass", 2) && select("##Pass", "Test.UI.Writer [#2]");
 					context.Check(selected, "A plus-added target exposes its own pass and declaration occurrence controls");
 					ImGui::ActivateItemByID(plusId);

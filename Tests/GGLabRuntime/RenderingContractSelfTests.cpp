@@ -130,7 +130,8 @@ namespace gglab
 		static_assert(!CameraRoutingMutation<CameraRenderViewQueryBase>);
 		static_assert(!CameraRoutingSlotAccess<CameraRenderViewQueryBase>);
 		template <typename T>
-		concept ResourceLifecycleQuery = requires(const T& value) {
+		concept ResourceLifecycleQuery = requires(const T& value)
+		{
 			{ value.GetSnapshot() } -> std::same_as<DX12ResourceLifecycleSnapshot>;
 		};
 		template <typename T>
@@ -148,7 +149,8 @@ namespace gglab
 		template <typename T>
 		concept EnvironmentLifecycleControl = requires(T& value) { value.Tick(); value.Reset(); };
 		template <typename T>
-		concept EnvironmentFileSelection = requires(T& value, const std::filesystem::path& path) {
+		concept EnvironmentFileSelection = requires(T& value, const std::filesystem::path& path)
+		{
 			value.SelectEnvironmentFile(path);
 		};
 		static_assert(std::derived_from<EnvironmentAssetController, EnvironmentSelectionControlBase>);
@@ -162,36 +164,43 @@ namespace gglab
 		static_assert(!EnvironmentFileSelection<EnvironmentSelectionControlBase>);
 
 		template <typename T>
-		concept PostProcessPreviewQuery = requires(const T& value) {
+		concept PostProcessPreviewQuery = requires(const T& value)
+		{
 			{ value.GetPostProcessPreviewDiagnostics() } ->
 				std::same_as<PostProcessPreviewDiagnostics>;
 		};
 		template <typename T>
-		concept PostProcessPreviewRequest = requires(T& value) {
+		concept PostProcessPreviewRequest = requires(T& value)
+		{
 			value.SetPostProcessPreviewSelection(PostProcessDebugSelection{});
 			value.SetPostProcessPreviewExposureEV(0.0f);
 			value.RequestPostProcessPreview();
 		};
 		template <typename T>
-		concept PostProcessPreviewConsumption = requires(T& value) {
+		concept PostProcessPreviewConsumption = requires(T& value)
+		{
 			value.ConsumePostProcessPreviewRequest();
 		};
 		template <typename T>
-		concept IBLPreviewQuery = requires(const T& value) {
+		concept IBLPreviewQuery = requires(const T& value)
+		{
 			{ value.GetIBLPreviewResourcesDiagnostics() } ->
 				std::same_as<IBLPreviewResourcesDiagnostics>;
 		};
 		template <typename T>
-		concept IBLPreviewRequest = requires(T& value) {
+		concept IBLPreviewRequest = requires(T& value)
+		{
 			value.RequestIBLPreview(IBLPreviewType::Environment);
 			value.SetIBLEnvironmentPreviewMip(1);
 		};
 		template <typename T>
-		concept IBLPreviewConsumption = requires(T& value) {
+		concept IBLPreviewConsumption = requires(T& value)
+		{
 			value.ConsumeIBLPreviewRequest(IBLPreviewType::Environment);
 		};
 		template <typename T>
-		concept IBLPreviewAllocation = requires(T& value) {
+		concept IBLPreviewAllocation = requires(T& value)
+		{
 			value.EnsureIblResources();
 		};
 		static_assert(IBLPreviewQuery<IBLPreviewViewBase>);
@@ -211,7 +220,8 @@ namespace gglab
 		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
 
 		template <typename T>
-		concept ShadowPreviewAllocation = requires(T& value) {
+		concept ShadowPreviewAllocation = requires(T& value)
+		{
 			value.EnsureShadowPreviewResources();
 		};
 		static_assert(requires(const ShadowPreviewViewBase& view)
@@ -222,12 +232,14 @@ namespace gglab
 		static_assert(ShadowPreviewAllocation<RenderResourceRegistry>);
 
 		template <typename T>
-		concept EnvironmentSettingsQuery = requires(const T& value) {
+		concept EnvironmentSettingsQuery = requires(const T& value)
+		{
 			{ value.GetEnvironmentLightingSettings() } noexcept ->
 				std::same_as<EnvironmentLightingSettings>;
 		};
 		template <typename T>
-		concept EnvironmentSettingsControl = requires(T& value) {
+		concept EnvironmentSettingsControl = requires(T& value)
+		{
 			value.SetIntensity(1.0f);
 			value.SetRotationRadians(0.0f);
 			value.SetQualityPreset(IBLQualityPreset::Medium);
@@ -238,7 +250,8 @@ namespace gglab
 			value.RequestRebake();
 		};
 		template <typename T>
-		concept EnvironmentSourceCommit = requires(T& value) {
+		concept EnvironmentSourceCommit = requires(T& value)
+		{
 			value.CommitEnvironmentSource(EnvironmentTextureSource{});
 		};
 		static_assert(EnvironmentSettingsQuery<EnvironmentLightingViewBase>);
@@ -315,31 +328,26 @@ namespace gglab
 		concept HasPublicFrameCompletionWait = requires(T & value) { value.WaitFrameCompletion(); };
 
 		template <typename T>
-		concept HasPublicCurrentBackBufferIndex =
-			requires(const T & value) { value.GetCurrentBackBufferIndex(); };
+		concept HasPublicCurrentBackBufferIndex = requires(const T & value) { value.GetCurrentBackBufferIndex(); };
 
 		class RecordingOpaqueSceneExtension final : public RenderPipelineSceneExtensionBase
 		{
 		public:
-			RecordingOpaqueSceneExtension(RGBufferId& scenePhaseBuffer,
-				uint32_t& addPassCount, uint32_t& destructionCount) noexcept :
+			RecordingOpaqueSceneExtension(RGBufferId& scenePhaseBuffer, uint32_t& addPassCount, uint32_t& destructionCount) noexcept :
 				m_ScenePhaseBuffer(scenePhaseBuffer), m_AddPassCount(addPassCount),
 				m_DestructionCount(destructionCount)
 			{
 			}
 			~RecordingOpaqueSceneExtension() override { ++m_DestructionCount; }
 
-			void AddOpaqueScenePasses(RenderGraph& renderGraph,
-				const RenderFrameContext&, const RenderServices&) noexcept override
+			void AddOpaqueScenePasses(RenderGraph& renderGraph, const RenderFrameContext&, const RenderServices&) noexcept override
 			{
 				++m_AddPassCount;
 				renderGraph.AddPass<OpaqueSceneExtensionFixturePassData>(
 					"RenderingContract.OpaqueSceneExtension",
-					[this](RenderGraph::RGBuilder& builder,
-						OpaqueSceneExtensionFixturePassData& data)
+					[this](RenderGraph::RGBuilder& builder, OpaqueSceneExtensionFixturePassData& data)
 					{
-						builder.ReadWriteInPlace(
-							m_ScenePhaseBuffer, RGBufferAccess::StorageReadWrite);
+						builder.ReadWriteInPlace(m_ScenePhaseBuffer, RGBufferAccess::StorageReadWrite);
 						data.m_ScenePhaseBuffer = m_ScenePhaseBuffer;
 					});
 			}
@@ -358,8 +366,7 @@ namespace gglab
 			{
 			}
 
-			void AddOverlayPasses(RenderGraph& renderGraph,
-				const RenderFrameContext&, const RenderServices&) noexcept override
+			void AddOverlayPasses(RenderGraph& renderGraph, const RenderFrameContext&, const RenderServices&) noexcept override
 			{
 				++m_AddPassCount;
 				renderGraph.AddPass<OverlayExtensionFixturePassData>(
@@ -382,8 +389,7 @@ namespace gglab
 				return SceneExtensionTemporalParticipation::TemporalIntegrated;
 			}
 
-			void AddOpaqueScenePasses(
-				RenderGraph&, const RenderFrameContext&, const RenderServices&) noexcept override
+			void AddOpaqueScenePasses(RenderGraph&, const RenderFrameContext&, const RenderServices&) noexcept override
 			{
 			}
 		};
@@ -408,8 +414,7 @@ namespace gglab
 					.m_MaxLaneCount = 64,
 				};
 			}
-			RHITextureSupportResult QueryTextureSupport(
-				const RHITextureDesc&) const noexcept override
+			RHITextureSupportResult QueryTextureSupport(const RHITextureDesc&) const noexcept override
 			{
 				return {};
 			}
@@ -422,32 +427,30 @@ namespace gglab
 				++m_TextureViewQueryCount;
 				return { .m_Supported = m_TextureViewsSupported };
 			}
-			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
-				const RHIResourceDebugIdentityDesc&) noexcept override
+			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
 				++m_CreateTextureCount;
 				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
-			RHIBufferHandle CreateBuffer(
-				const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			RHIBufferHandle CreateBuffer(const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
 				return m_AtmosphereBuffersEnabled ? RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } : RHIBufferHandle{};
 			}
-			RHITextureViewHandle CreateTextureView(
-				RHITextureHandle, const RHITextureViewDesc&) noexcept override
+			RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
-				return m_CreateValidDescriptors
-					? RHITextureViewHandle{ m_NextTextureViewIndex++, 1 } : RHITextureViewHandle{};
+				return m_CreateValidDescriptors ?
+					RHITextureViewHandle{ m_NextTextureViewIndex++, 1 } :
+					RHITextureViewHandle{};
 			}
-			RHIBufferViewHandle CreateBufferView(
-				RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
+			RHIBufferViewHandle CreateBufferView(RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
 			{
 				return {};
 			}
 			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override
 			{
-				return m_CreateValidDescriptors
-					? RHISamplerHandle{ m_NextSamplerIndex++, 1 } : RHISamplerHandle{};
+				return m_CreateValidDescriptors ?
+					RHISamplerHandle{ m_NextSamplerIndex++, 1 } :
+					RHISamplerHandle{};
 			}
 			void DestroyTexture(RHITextureHandle) noexcept override
 			{
@@ -457,12 +460,10 @@ namespace gglab
 			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
 			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
 			void DestroySampler(RHISamplerHandle) noexcept override {}
-			void SetTextureDebugBinding(
-				RHITextureHandle, const RHIResourceDebugBindingDesc&) noexcept override
+			void SetTextureDebugBinding(RHITextureHandle, const RHIResourceDebugBindingDesc&) noexcept override
 			{
 			}
-			void SetBufferDebugBinding(
-				RHIBufferHandle, const RHIResourceDebugBindingDesc&) noexcept override
+			void SetBufferDebugBinding(RHIBufferHandle, const RHIResourceDebugBindingDesc&) noexcept override
 			{
 			}
 			std::string_view GetTextureDebugName(RHITextureHandle) const noexcept override
@@ -496,19 +497,17 @@ namespace gglab
 				return !m_UseControlledFenceCompletion ||
 					(fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue);
 			}
-			void RecordTextureUse(
-				RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
+			void RecordTextureUse(RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
 			{
 				++m_RecordTextureUseCount;
 				m_LastRecordedFencePoint = fencePoint;
 			}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
-			RHIDescriptorHandle GetTextureViewDescriptor(
-				RHITextureViewHandle view) const noexcept override
+			RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept override
 			{
-				return m_CreateValidDescriptors && view.IsValid()
-					? RHIDescriptorHandle{ RHIDescriptorHeapType::CbvSrvUav, view.Index() }
-					: RHIDescriptorHandle{};
+				return m_CreateValidDescriptors && view.IsValid() ?
+					RHIDescriptorHandle{ RHIDescriptorHeapType::CbvSrvUav, view.Index() } :
+					RHIDescriptorHandle{};
 			}
 			RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle) const noexcept override
 			{
@@ -516,9 +515,9 @@ namespace gglab
 			}
 			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override
 			{
-				return m_CreateValidDescriptors && sampler.IsValid()
-					? RHIDescriptorHandle{ RHIDescriptorHeapType::Sampler, sampler.Index() }
-					: RHIDescriptorHandle{};
+				return m_CreateValidDescriptors && sampler.IsValid() ?
+					RHIDescriptorHandle{ RHIDescriptorHeapType::Sampler, sampler.Index() } :
+					RHIDescriptorHandle{};
 			}
 			void RetireCompletedWork() noexcept override {}
 
@@ -550,7 +549,7 @@ namespace gglab
 				.m_Device = &device,
 				.m_TransientResourcePool = &pool,
 				.m_SamplerRegistry = &samplers,
-				});
+			});
 			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
 			const EnvironmentLightingViewBase& view = environment;
 			EnvironmentLightingControlBase& control = environment;
@@ -566,17 +565,19 @@ namespace gglab
 				IBLPreviewType::Environment,
 				IBLPreviewType::Irradiance,
 				IBLPreviewType::PrefilteredSpecular,
-				};
-			const auto clearPreviews = [&]() {
+			};
+			const auto clearPreviews = [&]()
+			{
 				for (auto type : PreviewTypes)
 				{
 					registry.ClearIBLPreviewDirty(type);
 				}
-				};
-			const auto allPreviewsDirty = [&]() {
+			};
+			const auto allPreviewsDirty = [&]()
+			{
 				return std::ranges::all_of(PreviewTypes,
 					[&](auto type) { return registry.IsIBLPreviewDirty(type); });
-				};
+			};
 			clearPreviews();
 			control.SetIntensity(2.0f);
 			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
@@ -598,8 +599,7 @@ namespace gglab
 			constexpr float Rotation = 2.5f * std::numbers::pi_v<float>;
 			control.SetRotationRadians(Rotation);
 			const auto rotated = view.GetEnvironmentLightingSettings();
-			context.Check(std::abs(rotated.m_RotationRadians -
-				std::remainder(Rotation, 2.0f * std::numbers::pi_v<float>)) < 1.0e-6f &&
+			context.Check(std::abs(rotated.m_RotationRadians - std::remainder(Rotation, 2.0f * std::numbers::pi_v<float>)) < 1.0e-6f &&
 				allPreviewsDirty() && environment.GetBakeRequestGeneration() == 0,
 				"Environment yaw wraps and invalidates previews without scheduling a bake");
 			clearPreviews();
@@ -611,8 +611,7 @@ namespace gglab
 			control.SetBackgroundMode(static_cast<EnvironmentBackgroundMode>(255));
 			context.Check(view.GetEnvironmentLightingSettings().m_RotationRadians ==
 				rotated.m_RotationRadians && !view.GetEnvironmentLightingSettings().m_EnableSkybox &&
-				view.GetEnvironmentLightingSettings().m_BackgroundMode ==
-					EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
+				view.GetEnvironmentLightingSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
 				environment.GetBakeRequestGeneration() == 0 &&
 				std::ranges::none_of(PreviewTypes,
 					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
@@ -732,7 +731,7 @@ namespace gglab
 				.m_Device = &device,
 				.m_TransientResourcePool = &pool,
 				.m_SamplerRegistry = &samplers,
-				});
+			});
 			const IBLPreviewViewBase& view = registry;
 			IBLPreviewControlBase& control = registry;
 			const auto empty = view.GetIBLPreviewResourcesDiagnostics();
@@ -801,8 +800,7 @@ namespace gglab
 				"IBL preview queries expose active allocation metadata without initializing GPU content");
 			registry.EnsureIblResources(info);
 			context.Check(device.m_CreateTextureCount == 7 &&
-				view.GetIBLPreviewResourcesDiagnostics().m_Environment.m_SrvDescriptor.m_Index ==
-					allocated.m_Environment.m_SrvDescriptor.m_Index,
+				view.GetIBLPreviewResourcesDiagnostics().m_Environment.m_SrvDescriptor.m_Index == allocated.m_Environment.m_SrvDescriptor.m_Index,
 				"Compatible allocations and repeated queries preserve descriptor identity");
 
 			IBLBakeConfig config;
@@ -811,17 +809,15 @@ namespace gglab
 			const auto staging = view.GetIBLPreviewResourcesDiagnostics();
 			context.Check(device.m_CreateTextureCount == 11 &&
 				staging.m_Environment.m_Width == allocated.m_Environment.m_Width &&
-				staging.m_Environment.m_SrvDescriptor.m_Index ==
-					allocated.m_Environment.m_SrvDescriptor.m_Index,
+				staging.m_Environment.m_SrvDescriptor.m_Index == allocated.m_Environment.m_SrvDescriptor.m_Index,
 				"Staging bake allocations remain hidden from the tooling view");
 			registry.PublishIBLBakeResources();
 			const auto published = view.GetIBLPreviewResourcesDiagnostics();
 			context.Check(published.m_Environment.m_Width == 64 &&
-				published.m_Environment.m_SrvDescriptor.m_Index !=
-					allocated.m_Environment.m_SrvDescriptor.m_Index &&
+				published.m_Environment.m_SrvDescriptor.m_Index != allocated.m_Environment.m_SrvDescriptor.m_Index &&
 				published.m_Environment.m_BakeState == IBLBakeState::Ready &&
 				published.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index ==
-					allocated.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index &&
+				allocated.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index &&
 				published.m_EnvironmentPreview.m_Dirty && registry.HasInitializedActiveIBL(),
 				"Runtime publication switches the active source while preserving preview ownership");
 
@@ -860,7 +856,7 @@ namespace gglab
 				.m_Device = &device,
 				.m_TransientResourcePool = &pool,
 				.m_SamplerRegistry = &samplers,
-				});
+			});
 			const ShadowPreviewViewBase& view = registry;
 			ShadowPreviewControlBase& control = registry;
 			context.Check(!registry.ConsumeShadowPreviewRequest(), "Shadow previews start without rendering demand");
@@ -874,8 +870,7 @@ namespace gglab
 				empty.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 0,
 				"Shadow preview query is safe before pipeline allocation and does not allocate");
 
-			constexpr auto Index =
-				RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap;
+			constexpr auto Index = RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap;
 			registry.EnsureShadowPreviewResources();
 			const auto allocated = view.GetShadowPreviewDiagnostics();
 			context.Check(allocated.m_Allocated && allocated.m_SrvDescriptor.IsValid() &&
@@ -934,7 +929,7 @@ namespace gglab
 				.m_Device = &device,
 				.m_TransientResourcePool = &pool,
 				.m_SamplerRegistry = &samplers,
-				});
+			});
 			const PostProcessPreviewViewBase& view = registry;
 			PostProcessPreviewControlBase& control = registry;
 			const auto empty = view.GetPostProcessPreviewDiagnostics();
@@ -968,8 +963,7 @@ namespace gglab
 				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
 				device.m_CreateTextureCount == 1,
 				"Preview observation distinguishes allocated descriptors from recorded contents");
-			registry.PublishPostProcessPreview(selected.m_Selected,
-				PostProcessPreviewChannel::PostProcessing, 42);
+			registry.PublishPostProcessPreview(selected.m_Selected, PostProcessPreviewChannel::PostProcessing, 42);
 			const auto published = view.GetPostProcessPreviewDiagnostics();
 			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
 			control.SetPostProcessPreviewSelection(nextSelection);
@@ -990,8 +984,7 @@ namespace gglab
 				"Preview invalidation changes live availability without rewriting copied metadata");
 
 			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
-			registry.PublishPostProcessPreview(nextSelection,
-				PostProcessPreviewChannel::PostProcessing, 43);
+			registry.PublishPostProcessPreview(nextSelection, PostProcessPreviewChannel::PostProcessing, 43);
 			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
 			const auto resized = view.GetPostProcessPreviewDiagnostics();
 			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
@@ -1058,8 +1051,7 @@ namespace gglab
 				GGLAB_ASSERT(!m_IsRendering);
 				++m_FlushBarrierCount;
 			}
-			void CopyBuffer(
-				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
+			void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
 				GGLAB_ASSERT(!m_IsRendering);
 				++m_CopyBufferCount;
@@ -1097,8 +1089,7 @@ namespace gglab
 			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override
 			{
 			}
-			void SetVertexBuffers(
-				uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override
+			void SetVertexBuffers(uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override
 			{
 			}
 			void SetIndexBuffer(const RHIIndexBufferBinding&) noexcept override {}
@@ -1133,8 +1124,7 @@ namespace gglab
 				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
 			}
 			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
-			void CopyBuffer(
-				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
+			void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
 			}
 			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
@@ -1173,8 +1163,7 @@ namespace gglab
 				m_BufferBarriers.insert(m_BufferBarriers.end(), barriers.begin(), barriers.end());
 			}
 			void FlushBarriers() noexcept override {}
-			void CopyBuffer(
-				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
+			void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
 			}
 			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
@@ -1186,18 +1175,15 @@ namespace gglab
 			}
 			void Abort() noexcept override { ++m_AbortCallCount; }
 			void ReclaimCompleted() noexcept override {}
-			bool UploadBuffer(
-				const void*, uint64_t, RHIBufferHandle, uint64_t) noexcept override
+			bool UploadBuffer(const void*, uint64_t, RHIBufferHandle, uint64_t) noexcept override
 			{
 				return !m_FailUploads;
 			}
-			bool UploadTexture(
-				const RHITextureUploadData&, RHITextureHandle) noexcept override
+			bool UploadTexture(const RHITextureUploadData&, RHITextureHandle) noexcept override
 			{
 				return !m_FailUploads;
 			}
-			RHITextureReadbackRequest ReadbackTexture(
-				RHITextureHandle, const RHITextureDesc& desc) noexcept override
+			RHITextureReadbackRequest ReadbackTexture(RHITextureHandle, const RHITextureDesc& desc) noexcept override
 			{
 				if (m_FailReadbacks)
 				{
@@ -1241,8 +1227,7 @@ namespace gglab
 				NearlyEqual(lhs.m_Z, rhs.m_Z, tolerance);
 		}
 
-		[[nodiscard]] ProjectedPosition ProjectPosition(
-			const Vector3& position, const Matrix& transform) noexcept
+		[[nodiscard]] ProjectedPosition ProjectPosition(const Vector3& position, const Matrix& transform) noexcept
 		{
 			const Vector4 clipPosition = math::Transform(Vector4(position, 1.0f), transform);
 			const float inverseW = 1.0f / clipPosition.m_W;
@@ -1258,27 +1243,23 @@ namespace gglab
 			static_assert(std::is_abstract_v<RenderPipelineSceneExtensionBase>);
 			static_assert(std::has_virtual_destructor_v<RenderPipelineSceneExtensionBase>);
 			static_assert(!std::is_copy_constructible_v<RenderPipelineForwardPlus::CreateInfo>);
-			static_assert(std::is_nothrow_move_constructible_v<
-				RenderPipelineForwardPlus::CreateInfo>);
+			static_assert(std::is_nothrow_move_constructible_v< RenderPipelineForwardPlus::CreateInfo>);
 
 			uint32_t addPassCount = 0;
 			uint32_t destructionCount = 0;
 			RGBufferId scenePhaseBuffer;
-			auto extension = std::make_unique<RecordingOpaqueSceneExtension>(
-				scenePhaseBuffer, addPassCount, destructionCount);
+			auto extension = std::make_unique<RecordingOpaqueSceneExtension>(scenePhaseBuffer, addPassCount, destructionCount);
 			RecordingOpaqueSceneExtension* extensionPtr = extension.get();
-			context.Check(extensionPtr->GetTemporalParticipation() ==
-				SceneExtensionTemporalParticipation::PostTAA,
+			context.Check(extensionPtr->GetTemporalParticipation() == SceneExtensionTemporalParticipation::PostTAA,
 				"Scene extensions default to post-TAA participation until they declare a temporal contract");
 
 			RenderGraph graph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			graph.AddPass<OpaqueSceneExtensionFixturePassData>(
 				"RenderingContract.BuiltInOpaque",
-				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder,
-					OpaqueSceneExtensionFixturePassData& data)
+				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder, OpaqueSceneExtensionFixturePassData& data)
 				{
 					scenePhaseBuffer = builder.CreateBuffer("OpaqueScenePhaseBuffer");
 					builder.WriteInPlace(scenePhaseBuffer, RGBufferAccess::StorageWrite);
@@ -1286,38 +1267,29 @@ namespace gglab
 				});
 			graph.AddPass<OpaqueSceneExtensionFixturePassData>(
 				"RenderingContract.TemporalAA",
-				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder,
-					OpaqueSceneExtensionFixturePassData& data)
+				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder, OpaqueSceneExtensionFixturePassData& data)
 				{
-					builder.ReadWriteInPlace(
-						scenePhaseBuffer, RGBufferAccess::StorageReadWrite);
+					builder.ReadWriteInPlace(scenePhaseBuffer, RGBufferAccess::StorageReadWrite);
 					data.m_ScenePhaseBuffer = scenePhaseBuffer;
 				});
 			const RenderScene renderScene{};
 			const RenderFrameContext frameContext{ .m_RenderScene = renderScene };
 			const RenderServices services{};
 			extensionPtr->AddOpaqueScenePasses(graph, frameContext, services);
-			for (const char* passName : {
-				"RenderingContract.ForwardTransparent",
-				"RenderingContract.DebugDrawScene",
-				})
+			for (const char* passName : { "RenderingContract.ForwardTransparent", "RenderingContract.DebugDrawScene", })
 			{
 				graph.AddPass<OpaqueSceneExtensionFixturePassData>(passName,
-					[&scenePhaseBuffer](RenderGraph::RGBuilder& builder,
-						OpaqueSceneExtensionFixturePassData& data)
+					[&scenePhaseBuffer](RenderGraph::RGBuilder& builder, OpaqueSceneExtensionFixturePassData& data)
 					{
-						builder.ReadWriteInPlace(
-							scenePhaseBuffer, RGBufferAccess::StorageReadWrite);
+						builder.ReadWriteInPlace(scenePhaseBuffer, RGBufferAccess::StorageReadWrite);
 						data.m_ScenePhaseBuffer = scenePhaseBuffer;
 					});
 			}
 			graph.AddPass<OpaqueSceneExtensionFixturePassData>(
 				"RenderingContract.PostProcess",
-				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder,
-					OpaqueSceneExtensionFixturePassData& data)
+				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder, OpaqueSceneExtensionFixturePassData& data)
 				{
-					data.m_ScenePhaseBuffer =
-						builder.Read(scenePhaseBuffer, RGBufferAccess::StorageRead);
+					data.m_ScenePhaseBuffer = builder.Read(scenePhaseBuffer, RGBufferAccess::StorageRead);
 					builder.SideEffect();
 				});
 			const bool compiled = graph.Compile();
@@ -1334,15 +1306,15 @@ namespace gglab
 					"Opaque scene extension passes remain live in the compiled graph");
 				context.Check(snapshot.m_Passes.size() == 6 &&
 					snapshot.m_Passes[0].m_ExecutionOrder <
-						snapshot.m_Passes[1].m_ExecutionOrder &&
+					snapshot.m_Passes[1].m_ExecutionOrder &&
 					snapshot.m_Passes[1].m_ExecutionOrder <
-						snapshot.m_Passes[2].m_ExecutionOrder &&
+					snapshot.m_Passes[2].m_ExecutionOrder &&
 					snapshot.m_Passes[2].m_ExecutionOrder <
-						snapshot.m_Passes[3].m_ExecutionOrder &&
+					snapshot.m_Passes[3].m_ExecutionOrder &&
 					snapshot.m_Passes[3].m_ExecutionOrder <
-						snapshot.m_Passes[4].m_ExecutionOrder &&
+					snapshot.m_Passes[4].m_ExecutionOrder &&
 					snapshot.m_Passes[4].m_ExecutionOrder <
-						snapshot.m_Passes[5].m_ExecutionOrder,
+					snapshot.m_Passes[5].m_ExecutionOrder,
 					"Forward scene composition orders opaque, TAA, post-TAA extension, transparent, "
 					"scene debug, and post-process consumers");
 			}
@@ -1353,7 +1325,7 @@ namespace gglab
 				RenderPipelineForwardPlus pipeline(RenderPipelineForwardPlus::CreateInfo{
 					.m_ForwardPlusDebugReadback = debugReadback,
 					.m_SceneExtension = std::move(extension),
-					});
+				});
 				context.Check(extension == nullptr && destructionCount == 0 &&
 					debugReadback.use_count() > debugReadbackOwnerCount,
 					"The Forward+ pipeline owns the optional extension alongside Forward+ diagnostics");
@@ -1371,8 +1343,7 @@ namespace gglab
 		{
 			static_assert(std::is_abstract_v<RenderPipelineOverlayExtensionBase>);
 			static_assert(std::has_virtual_destructor_v<RenderPipelineOverlayExtensionBase>);
-			static_assert(std::is_same_v<decltype(RenderServices::m_OverlayExtension),
-				RenderPipelineOverlayExtensionBase*>);
+			static_assert(std::is_same_v<decltype(RenderServices::m_OverlayExtension), RenderPipelineOverlayExtensionBase*>);
 
 			uint32_t addPassCount = 0;
 			RecordingOverlayExtension extension(addPassCount);
@@ -1380,9 +1351,9 @@ namespace gglab
 			const RenderScene renderScene{};
 			const RenderFrameContext frameContext{ .m_RenderScene = renderScene };
 			RenderGraph graph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			services.m_OverlayExtension->AddOverlayPasses(graph, frameContext, services);
 
 			const bool compiled = graph.Compile();
@@ -1404,8 +1375,7 @@ namespace gglab
 			class RecordingContextFactory final : public RHIContextFactoryBase
 			{
 			public:
-				std::unique_ptr<RHIContext> CreateContext(
-					const RHIContextDesc& desc) const noexcept override
+				std::unique_ptr<RHIContext> CreateContext(const RHIContextDesc& desc) const noexcept override
 				{
 					m_CreateCalled = true;
 					m_Desc = desc;
@@ -1418,8 +1388,7 @@ namespace gglab
 
 			static_assert(std::is_abstract_v<RHIContextFactoryBase>);
 			static_assert(std::has_virtual_destructor_v<RHIContextFactoryBase>);
-			static_assert(std::is_same_v<decltype(Renderer::CreateInfo::m_RHIContextFactory),
-				const RHIContextFactoryBase*>);
+			static_assert(std::is_same_v<decltype(Renderer::CreateInfo::m_RHIContextFactory), const RHIContextFactoryBase*>);
 
 			Renderer::CreateInfo createInfo{};
 			context.Check(!createInfo.HasRequiredRuntimePaths(),
@@ -1455,8 +1424,8 @@ namespace gglab
 			RecordingDevice device;
 			RenderGraph graph({
 				.m_Device = &device,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGTextureId sceneColor{};
 			RGTextureId sceneDepth{};
 			graph.AddPass<FixturePassData>("RenderingContract.BuiltInOpaque",
@@ -1500,10 +1469,8 @@ namespace gglab
 					data.m_Index = builder.ImportBuffer("NapaVoxel.Index",
 						RHIBufferHandle{ 42, 1 }, indexDesc, RGBufferAccess::None,
 						RGContentValidity::Defined);
-					data.m_Vertex = builder.Read(
-						data.m_Vertex, RGBufferAccess::Vertex, RHIStage::VertexShader);
-					data.m_Index = builder.Read(
-						data.m_Index, RGBufferAccess::Index, RHIStage::IndexInput);
+					data.m_Vertex = builder.Read(data.m_Vertex, RGBufferAccess::Vertex, RHIStage::VertexShader);
+					data.m_Index = builder.Read(data.m_Index, RGBufferAccess::Index, RHIStage::IndexInput);
 					builder.Export(data.m_Vertex, RGBufferAccess::None);
 					builder.Export(data.m_Index, RGBufferAccess::None);
 				});
@@ -1512,8 +1479,7 @@ namespace gglab
 				{
 					builder.ReadWriteInPlace(sceneColor, RGTextureAccess::RenderTarget);
 					data.m_Color = sceneColor;
-					data.m_Depth =
-						builder.Read(sceneDepth, RGTextureAccess::DepthStencilRead);
+					data.m_Depth = builder.Read(sceneDepth, RGTextureAccess::DepthStencilRead);
 				});
 			graph.AddPass<FixturePassData>("RenderingContract.PostProcess",
 				[&sceneColor](RenderGraph::RGBuilder& builder, FixturePassData& data)
@@ -1542,23 +1508,19 @@ namespace gglab
 			{
 				const RGCompiledPass& voxelPass = plan->GetPasses()[1];
 				const auto hasAccess = [&voxelPass](RGResourceType type, uint64_t access) noexcept
-					{
-						return std::ranges::any_of(voxelPass.m_Accesses,
-							[type, access](const RGCompiledAccess& compiledAccess) noexcept
-							{
-								return compiledAccess.m_ResourceType == type &&
-									compiledAccess.m_AccessValue == access;
-							});
-					};
+				{
+					return std::ranges::any_of(voxelPass.m_Accesses,
+						[type, access](const RGCompiledAccess& compiledAccess) noexcept
+						{
+							return compiledAccess.m_ResourceType == type &&
+								compiledAccess.m_AccessValue == access;
+						});
+				};
 				resourceContractMatches =
-					hasAccess(RGResourceType::RGTexture,
-						static_cast<uint64_t>(RGTextureAccess::RenderTarget)) &&
-					hasAccess(RGResourceType::RGTexture,
-						static_cast<uint64_t>(RGTextureAccess::DepthStencilWrite)) &&
-					hasAccess(RGResourceType::RGBuffer,
-						static_cast<uint64_t>(RGBufferAccess::Vertex)) &&
-					hasAccess(RGResourceType::RGBuffer,
-						static_cast<uint64_t>(RGBufferAccess::Index));
+					hasAccess(RGResourceType::RGTexture, static_cast<uint64_t>(RGTextureAccess::RenderTarget)) &&
+					hasAccess(RGResourceType::RGTexture, static_cast<uint64_t>(RGTextureAccess::DepthStencilWrite)) &&
+					hasAccess(RGResourceType::RGBuffer, static_cast<uint64_t>(RGBufferAccess::Vertex)) &&
+					hasAccess(RGResourceType::RGBuffer, static_cast<uint64_t>(RGBufferAccess::Index));
 			}
 			context.Check(resourceContractMatches,
 				"Napa voxel declares HDR color load/write, depth load/write, and mesh buffer reads");
@@ -1572,24 +1534,32 @@ namespace gglab
 				const RHIResourceState index = ToRHIResourceState(RGBufferAccess::Index);
 				const auto matchesTransition = [](const RGBarrierIntent& barrier,
 					const RHIResourceState& before, const RHIResourceState& after) noexcept
-					{
-						return barrier.m_Kind == RGBarrierKind::Transition &&
-							barrier.m_Before == before && barrier.m_After == after;
-					};
+				{
+					return barrier.m_Kind == RGBarrierKind::Transition &&
+						barrier.m_Before == before && barrier.m_After == after;
+				};
 				barrierContractMatches = voxelPass.m_PreBarriers.size() == 2 &&
 					voxelPass.m_PostBarriers.size() == 2 &&
 					std::ranges::any_of(voxelPass.m_PreBarriers,
 						[&](const RGBarrierIntent& barrier)
-						{ return matchesTransition(barrier, common, vertex); }) &&
+						{
+							return matchesTransition(barrier, common, vertex);
+						}) &&
 					std::ranges::any_of(voxelPass.m_PreBarriers,
 						[&](const RGBarrierIntent& barrier)
-						{ return matchesTransition(barrier, common, index); }) &&
+						{
+							return matchesTransition(barrier, common, index);
+						}) &&
 					std::ranges::any_of(voxelPass.m_PostBarriers,
 						[&](const RGBarrierIntent& barrier)
-						{ return matchesTransition(barrier, vertex, common); }) &&
+						{
+							return matchesTransition(barrier, vertex, common);
+						}) &&
 					std::ranges::any_of(voxelPass.m_PostBarriers,
 						[&](const RGBarrierIntent& barrier)
-						{ return matchesTransition(barrier, index, common); });
+						{
+							return matchesTransition(barrier, index, common);
+						});
 			}
 			context.Check(barrierContractMatches,
 				"Napa voxel mesh buffers transition from Common for draw and return to Common");
@@ -1658,20 +1628,16 @@ namespace gglab
 			context.Check(bgraUnorm.m_Family == RHIFormatFamily::B8G8R8A8 &&
 				bgraSrgb.m_Family == RHIFormatFamily::B8G8R8A8 &&
 				AreRHIFormatsInSameFamily(bgraUnorm.m_Format, bgraSrgb.m_Format) &&
-				!AreRHIFormatsInSameFamily(
-					RHIFormat::B8G8R8A8Unorm, RHIFormat::R8G8B8A8Unorm) &&
+				!AreRHIFormatsInSameFamily(RHIFormat::B8G8R8A8Unorm, RHIFormat::R8G8B8A8Unorm) &&
 				bgraUnorm.m_BytesPerBlock == 4,
 				"Pure RHI format metadata keeps BGRA8 in its own color-view family");
 
 			bool locationsAreExplicit = true;
-			for (uint32_t layoutIndex = 0;
-				layoutIndex < static_cast<uint32_t>(InputLayoutID::Count); ++layoutIndex)
+			for (uint32_t layoutIndex = 0; layoutIndex < static_cast<uint32_t>(InputLayoutID::Count); ++layoutIndex)
 			{
-				const auto vertexLayout =
-					BuildRHIVertexInputLayoutDesc(static_cast<InputLayoutID>(layoutIndex));
+				const auto vertexLayout = BuildRHIVertexInputLayoutDesc(static_cast<InputLayoutID>(layoutIndex));
 				locationsAreExplicit &= vertexLayout.m_AttributeCount > 0;
-				for (uint32_t attributeIndex = 0;
-					attributeIndex < vertexLayout.m_AttributeCount; ++attributeIndex)
+				for (uint32_t attributeIndex = 0; attributeIndex < vertexLayout.m_AttributeCount; ++attributeIndex)
 				{
 					locationsAreExplicit &=
 						vertexLayout.m_Attributes[attributeIndex].m_Location == attributeIndex;
@@ -1679,8 +1645,7 @@ namespace gglab
 			}
 			context.Check(locationsAreExplicit,
 				"Built-in RHI vertex layouts assign deterministic explicit attribute locations");
-			const auto shadowInput = BuildRHIVertexInputLayoutDesc(
-				InputLayoutID::MeshPositionUVs, ShaderBinaryFormat::SpirV);
+			const auto shadowInput = BuildRHIVertexInputLayoutDesc(InputLayoutID::MeshPositionUVs, ShaderBinaryFormat::SpirV);
 			context.Check(shadowInput.m_AttributeCount == 3 && shadowInput.m_VertexBufferCount == 1 &&
 				shadowInput.m_VertexBuffers[0].m_StrideInBytes == 56 &&
 				shadowInput.m_Attributes[0].m_AlignedByteOffset == 0 &&
@@ -1711,19 +1676,15 @@ namespace gglab
 			pipelineDesc.m_RenderTargetCount = 1;
 			pipelineDesc.m_DepthStencilFormat = RHIFormat::D32Float;
 			pipelineDesc.m_SampleCount = 4;
-			const bool matchingSignature =
-				IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			const bool matchingSignature = IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
 			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::B8G8R8A8Unorm;
-			const bool rejectsColorMismatch =
-				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			const bool rejectsColorMismatch = !IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
 			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
 			pipelineDesc.m_DepthStencilFormat = RHIFormat::Unknown;
-			const bool rejectsDepthMismatch =
-				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			const bool rejectsDepthMismatch = !IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
 			pipelineDesc.m_DepthStencilFormat = RHIFormat::D32Float;
 			pipelineDesc.m_SampleCount = 1;
-			const bool rejectsSampleMismatch =
-				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			const bool rejectsSampleMismatch = !IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
 			context.Check(matchingSignature && rejectsColorMismatch && rejectsDepthMismatch &&
 				rejectsSampleMismatch,
 				"Graphics pipeline compatibility covers active color, depth, and sample signature");
@@ -1749,7 +1710,7 @@ namespace gglab
 				"the render resource registry implements the explicit resource contract");
 			static_assert(std::is_base_of_v<RenderFrameBufferAccess, Renderer> &&
 				std::is_base_of_v<RenderEnvironmentAccess, Renderer> &&
-				std::is_base_of_v<RenderPresentationAccess, Renderer>,
+					std::is_base_of_v<RenderPresentationAccess, Renderer>,
 				"the renderer implements the explicit frame, environment and presentation contracts");
 
 			const RenderFrame unavailable(RHIFrameBeginStatus::Unavailable);
@@ -1775,19 +1736,16 @@ namespace gglab
 				!missingFactory.m_Services.m_Presentation,
 				"render host factory rejects a missing host context factory");
 			RenderHostCreateInfo missingPaths{};
-			missingPaths.m_RHIContextFactory =
-				reinterpret_cast<const RHIContextFactoryBase*>(1);
+			missingPaths.m_RHIContextFactory = reinterpret_cast<const RHIContextFactoryBase*>(1);
 			const RenderHostInstance missingPathsInstance = CreateRenderHost(missingPaths);
 			context.Check(!missingPathsInstance.m_Host &&
 				!missingPathsInstance.m_Services.m_PipelineResolver,
 				"render host factory rejects missing runtime paths");
 
 			RenderHostCreateInfo missingShaderManager{};
-			missingShaderManager.m_RHIContextFactory =
-				reinterpret_cast<const RHIContextFactoryBase*>(1);
+			missingShaderManager.m_RHIContextFactory = reinterpret_cast<const RHIContextFactoryBase*>(1);
 			missingShaderManager.m_IblDerivedDataCacheDirectory = "cache";
-			const RenderHostInstance missingShaderManagerInstance =
-				CreateRenderHost(missingShaderManager);
+			const RenderHostInstance missingShaderManagerInstance = CreateRenderHost(missingShaderManager);
 			context.Check(!missingShaderManagerInstance.m_Host &&
 				!missingShaderManagerInstance.m_Services.m_PipelineResolver,
 				"render host factory rejects a missing host shader manager");
@@ -1797,8 +1755,7 @@ namespace gglab
 				"render host instances default to no host and no composition access");
 			RenderHostInstance hostInstance{};
 			hostInstance.m_Composition = reinterpret_cast<RenderCompositionAccess*>(1);
-			context.Check(hostInstance.m_Composition ==
-				reinterpret_cast<RenderCompositionAccess*>(1),
+			context.Check(hostInstance.m_Composition == reinterpret_cast<RenderCompositionAccess*>(1),
 				"render host instances carry the composition access alongside the host and services");
 		}
 
@@ -1806,11 +1763,9 @@ namespace gglab
 		{
 			const bool bgraRoundTrips =
 				ToDXGIFormat(RHIFormat::B8G8R8A8Unorm) == DXGI_FORMAT_B8G8R8A8_UNORM &&
-				ToDXGIFormat(RHIFormat::B8G8R8A8UnormSrgb) ==
-				DXGI_FORMAT_B8G8R8A8_UNORM_SRGB &&
+				ToDXGIFormat(RHIFormat::B8G8R8A8UnormSrgb) == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB &&
 				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM) == RHIFormat::B8G8R8A8Unorm &&
-				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB) ==
-				RHIFormat::B8G8R8A8UnormSrgb;
+				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB) == RHIFormat::B8G8R8A8UnormSrgb;
 			context.Check(bgraRoundTrips,
 				"DX12 preserves actual BGRA8 swapchain formats through RHI conversion");
 
@@ -1820,10 +1775,8 @@ namespace gglab
 			RHIGraphicsPipelineDesc changedDesc = baseDesc;
 			++changedDesc.m_VertexInput.m_Attributes[1].m_Location;
 			const DX12GraphicsPipelineShaderInputs shaders{};
-			const auto baseKey =
-				MakeDX12RHIGraphicsPSOKey(baseDesc, RootSignatureID{ 3 }, shaders);
-			const auto changedKey =
-				MakeDX12RHIGraphicsPSOKey(changedDesc, RootSignatureID{ 3 }, shaders);
+			const auto baseKey = MakeDX12RHIGraphicsPSOKey(baseDesc, RootSignatureID{ 3 }, shaders);
+			const auto changedKey = MakeDX12RHIGraphicsPSOKey(changedDesc, RootSignatureID{ 3 }, shaders);
 			context.Check(baseKey != changedKey,
 				"DX12 normalized graphics keys include explicit RHI vertex locations");
 
@@ -1840,8 +1793,7 @@ namespace gglab
 				},
 			};
 			auto* nativeResource = reinterpret_cast<ID3D12Resource*>(uintptr_t{ 0x1234 });
-			const D3D12_BUFFER_BARRIER nativeBarrier =
-				BuildD3D12BufferBarrier(copyBarrier, nativeResource);
+			const D3D12_BUFFER_BARRIER nativeBarrier = BuildD3D12BufferBarrier(copyBarrier, nativeResource);
 			context.Check(nativeBarrier.SyncBefore == D3D12_BARRIER_SYNC_COPY &&
 				nativeBarrier.SyncAfter == D3D12_BARRIER_SYNC_COPY &&
 				nativeBarrier.AccessBefore == D3D12_BARRIER_ACCESS_COPY_SOURCE &&
@@ -1857,19 +1809,13 @@ namespace gglab
 			constexpr float FovRadians = math::ToRadians(67.0f);
 			constexpr float Aspect = 16.0f / 9.0f;
 
-			const Matrix standardProjection =
-				math::CreatePerspectiveFieldOfViewLH(FovRadians, Aspect, NearZ, FarZ);
-			const Matrix reversedProjection =
-				math::CreatePerspectiveFieldOfViewLHReversedZ(FovRadians, Aspect, NearZ, FarZ);
+			const Matrix standardProjection = math::CreatePerspectiveFieldOfViewLH(FovRadians, Aspect, NearZ, FarZ);
+			const Matrix reversedProjection = math::CreatePerspectiveFieldOfViewLHReversedZ(FovRadians, Aspect, NearZ, FarZ);
 
-			const float standardNear =
-				ProjectPosition(Vector3(0.0f, 0.0f, NearZ), standardProjection).m_RawDepth;
-			const float standardFar =
-				ProjectPosition(Vector3(0.0f, 0.0f, FarZ), standardProjection).m_RawDepth;
-			const float reversedNear =
-				ProjectPosition(Vector3(0.0f, 0.0f, NearZ), reversedProjection).m_RawDepth;
-			const float reversedFar =
-				ProjectPosition(Vector3(0.0f, 0.0f, FarZ), reversedProjection).m_RawDepth;
+			const float standardNear = ProjectPosition(Vector3(0.0f, 0.0f, NearZ), standardProjection).m_RawDepth;
+			const float standardFar = ProjectPosition(Vector3(0.0f, 0.0f, FarZ), standardProjection).m_RawDepth;
+			const float reversedNear = ProjectPosition(Vector3(0.0f, 0.0f, NearZ), reversedProjection).m_RawDepth;
+			const float reversedFar = ProjectPosition(Vector3(0.0f, 0.0f, FarZ), reversedProjection).m_RawDepth;
 
 			context.Check(NearlyEqual(standardNear, 0.0f) && NearlyEqual(standardFar, 1.0f),
 				"Standard-Z projection maps near to zero and far to one");
@@ -1889,24 +1835,16 @@ namespace gglab
 			constexpr float PrecisionNearZ = 0.05f;
 			constexpr float PrecisionFarZ = 5000.0f;
 			constexpr float FarGeometryZ = PrecisionFarZ * 0.95f;
-			const Matrix precisionStandardProjection = math::CreatePerspectiveFieldOfViewLH(
-				FovRadians, Aspect, PrecisionNearZ, PrecisionFarZ);
+			const Matrix precisionStandardProjection = math::CreatePerspectiveFieldOfViewLH(FovRadians, Aspect, PrecisionNearZ, PrecisionFarZ);
 			const Matrix precisionReversedProjection =
-				math::CreatePerspectiveFieldOfViewLHReversedZ(
-					FovRadians, Aspect, PrecisionNearZ, PrecisionFarZ);
-			const float precisionStandardDepth =
-				ProjectPosition(Vector3(0.0f, 0.0f, FarGeometryZ), precisionStandardProjection)
-				.m_RawDepth;
-			const float precisionReversedDepth =
-				ProjectPosition(Vector3(0.0f, 0.0f, FarGeometryZ), precisionReversedProjection)
-				.m_RawDepth;
+				math::CreatePerspectiveFieldOfViewLHReversedZ(FovRadians, Aspect, PrecisionNearZ, PrecisionFarZ);
+			const float precisionStandardDepth = ProjectPosition(Vector3(0.0f, 0.0f, FarGeometryZ), precisionStandardProjection).m_RawDepth;
+			const float precisionReversedDepth = ProjectPosition(Vector3(0.0f, 0.0f, FarGeometryZ), precisionReversedProjection).m_RawDepth;
 			context.Check(precisionStandardDepth < 1.0f &&
 				1.0f - precisionStandardDepth < 1.0e-6f &&
-				!screen_space::IsDepthBackground(
-					precisionStandardDepth, DepthConvention::Standard) &&
+				!screen_space::IsDepthBackground(precisionStandardDepth, DepthConvention::Standard) &&
 				precisionReversedDepth > 0.0f && precisionReversedDepth < 1.0e-6f &&
-				!screen_space::IsDepthBackground(
-					precisionReversedDepth, DepthConvention::Reversed),
+				!screen_space::IsDepthBackground(precisionReversedDepth, DepthConvention::Reversed),
 				"Geometry at 95 percent of the far range is not classified as background");
 			context.Check(
 				screen_space::IsDepthNearer(0.25f, 0.75f, DepthConvention::Standard) &&
@@ -1920,49 +1858,39 @@ namespace gglab
 		{
 			constexpr float NearZ = 0.1f;
 			constexpr float FarZ = 500.0f;
-			const Matrix standardProjection = math::CreatePerspectiveFieldOfViewLH(
-				math::ToRadians(60.0f), 16.0f / 9.0f, NearZ, FarZ);
-			const Matrix reversedProjection = math::CreatePerspectiveFieldOfViewLHReversedZ(
-				math::ToRadians(60.0f), 16.0f / 9.0f, NearZ, FarZ);
+			const Matrix standardProjection = math::CreatePerspectiveFieldOfViewLH(math::ToRadians(60.0f), 16.0f / 9.0f, NearZ, FarZ);
+			const Matrix reversedProjection = math::CreatePerspectiveFieldOfViewLHReversedZ(math::ToRadians(60.0f), 16.0f / 9.0f, NearZ, FarZ);
 			const Vector3 positionVS(0.75f, -0.35f, 17.0f);
 
-			const ProjectedPosition standardSample =
-				ProjectPosition(positionVS, standardProjection);
-			const ProjectedPosition reversedSample =
-				ProjectPosition(positionVS, reversedProjection);
+			const ProjectedPosition standardSample = ProjectPosition(positionVS, standardProjection);
+			const ProjectedPosition reversedSample = ProjectPosition(positionVS, reversedProjection);
 			const Vector3 reconstructedStandard = screen_space::ReconstructViewPosition(
 				standardSample.m_UV, standardSample.m_RawDepth, math::Inverse(standardProjection));
 			const Vector3 reconstructedReversed = screen_space::ReconstructViewPosition(
 				reversedSample.m_UV, reversedSample.m_RawDepth, math::Inverse(reversedProjection));
-			const Vector4 standardDepthParams =
-				screen_space::MakeDepthReconstructionParams(standardProjection);
-			const Vector4 reversedDepthParams =
-				screen_space::MakeDepthReconstructionParams(reversedProjection);
+			const Vector4 standardDepthParams = screen_space::MakeDepthReconstructionParams(standardProjection);
+			const Vector4 reversedDepthParams = screen_space::MakeDepthReconstructionParams(reversedProjection);
 
 			context.Check(NearlyEqual(reconstructedStandard, positionVS),
 				"Standard-Z reconstructs a mid-depth view position");
 			context.Check(NearlyEqual(reconstructedReversed, positionVS),
 				"Reversed-Z reconstructs a mid-depth view position");
 			context.Check(
-				NearlyEqual(screen_space::RawDepthToPositiveViewZ(reversedSample.m_UV,
-					reversedSample.m_RawDepth, math::Inverse(reversedProjection)),
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(reversedSample.m_UV, reversedSample.m_RawDepth, math::Inverse(reversedProjection)),
 					positionVS.m_Z, PositionTolerance),
 				"Raw depth reconstructs positive left-handed view Z");
 			context.Check(
-				NearlyEqual(screen_space::RawDepthToPositiveViewZ(standardSample.m_UV,
-					standardSample.m_RawDepth, math::Inverse(standardProjection)),
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(standardSample.m_UV, standardSample.m_RawDepth, math::Inverse(standardProjection)),
 					positionVS.m_Z, PositionTolerance),
 				"Standard-Z raw depth reconstructs positive left-handed view Z");
 			context.Check(NearlyEqual(screen_space::RawDepthToPositiveViewZ(
 				standardSample.m_RawDepth, standardDepthParams, DepthConvention::Standard),
 				positionVS.m_Z, PositionTolerance) &&
-				NearlyEqual(screen_space::RawDepthToPositiveViewZ(
-					reversedSample.m_RawDepth, reversedDepthParams, DepthConvention::Reversed),
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(reversedSample.m_RawDepth, reversedDepthParams, DepthConvention::Reversed),
 					positionVS.m_Z, PositionTolerance),
 				"Compact depth reconstruction matches Standard-Z and Reversed-Z projection contracts");
 
-			const Matrix view = math::CreateLookAtLH(
-				Vector3(3.0f, 2.0f, -4.0f), Vector3(0.0f, 1.0f, 5.0f), Vector3::UnitY);
+			const Matrix view = math::CreateLookAtLH(Vector3(3.0f, 2.0f, -4.0f), Vector3(0.0f, 1.0f, 5.0f), Vector3::UnitY);
 			const Matrix viewProjection = view * reversedProjection;
 			const Vector3 positionWS(1.25f, 0.5f, 8.0f);
 			const ProjectedPosition worldSample = ProjectPosition(positionWS, viewProjection);
@@ -1972,8 +1900,7 @@ namespace gglab
 				"Reversed-Z raw depth reconstructs world position");
 
 			const Matrix standardViewProjection = view * standardProjection;
-			const ProjectedPosition standardWorldSample =
-				ProjectPosition(positionWS, standardViewProjection);
+			const ProjectedPosition standardWorldSample = ProjectPosition(positionWS, standardViewProjection);
 			const Vector3 reconstructedStandardWorld =
 				screen_space::ReconstructWorldPosition(standardWorldSample.m_UV,
 					standardWorldSample.m_RawDepth, math::Inverse(standardViewProjection));
@@ -1981,8 +1908,7 @@ namespace gglab
 				"Standard-Z raw depth reconstructs world position");
 
 			const Matrix degenerateInverseTransform{};
-			context.Check(NearlyEqual(screen_space::ReconstructPositionFromRawDepth(
-				Vector2(0.5f, 0.5f), 0.5f, degenerateInverseTransform),
+			context.Check(NearlyEqual(screen_space::ReconstructPositionFromRawDepth(Vector2(0.5f, 0.5f), 0.5f, degenerateInverseTransform),
 				Vector3::Zero),
 				"Position reconstruction returns zero when homogeneous W is degenerate");
 		}
@@ -2007,7 +1933,7 @@ namespace gglab
 			};
 			const RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>(
 				RenderViewBuildInfo<RenderViewID::Main>{
-					.m_Camera = camera,
+				.m_Camera = camera,
 					.m_RenderSettings = settings,
 					.m_TemporalFramePlan = temporalFramePlan,
 					.m_Resolution = ResolveNativeViewResolution({ 1280, 720 }),
@@ -2026,12 +1952,8 @@ namespace gglab
 				"A camera view carries its render and display extents, which native rendering "
 				"keeps equal; shadow views have no display extent");
 
-			const float mainNear =
-				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near),
-					mainView.m_RasterProj).m_RawDepth;
-			const float mainFar =
-				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Far),
-					mainView.m_RasterProj).m_RawDepth;
+			const float mainNear = ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near), mainView.m_RasterProj).m_RawDepth;
+			const float mainFar = ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Far), mainView.m_RasterProj).m_RawDepth;
 			context.Check(mainView.m_DepthConvention == DepthConvention::Reversed &&
 				NearlyEqual(mainNear, 1.0f) && NearlyEqual(mainFar, 0.0f),
 				"Main view records and projects with its Reversed-Z contract");
@@ -2090,12 +2012,10 @@ namespace gglab
 			{
 				const auto& uploadedView = multipleViewData.m_Views[cascades.GetViewIndex(index)];
 				contiguousViews &= cascades.GetViewIndex(index) == frame.m_RenderViews.size() + index &&
-					uploadedView.ViewMat.ToArray() ==
-						cascades.m_Cascades[index].m_View.m_View.ToArray();
+					uploadedView.ViewMat.ToArray() == cascades.m_Cascades[index].m_View.m_View.ToArray();
 				for (uint32_t other = index + 1; other < 4; ++other)
 				{
-					distinctCascades &= uploadedView.ViewMat.ToArray() !=
-						cascades.m_Cascades[other].m_View.m_View.ToArray();
+					distinctCascades &= uploadedView.ViewMat.ToArray() != cascades.m_Cascades[other].m_View.m_View.ToArray();
 				}
 			}
 			context.Check(contiguousViews && distinctCascades &&
@@ -2121,8 +2041,7 @@ namespace gglab
 
 			RenderView jitteredView = mainView;
 			jitteredView.m_JitterPixels = Vector2(0.25f, -0.125f);
-			jitteredView.m_JitterUV = temporal::JitterPixelsToUV(jitteredView.m_JitterPixels,
-				jitteredView.m_Width, jitteredView.m_Height);
+			jitteredView.m_JitterUV = temporal::JitterPixelsToUV(jitteredView.m_JitterPixels, jitteredView.m_Width, jitteredView.m_Height);
 			Matrix clipJitter = Matrix::Identity;
 			clipJitter.m_41 = 0.001f;
 			clipJitter.m_42 = -0.002f;
@@ -2131,16 +2050,14 @@ namespace gglab
 			const RenderView postTemporalView = BuildUnjitteredPostTemporalView(jitteredView);
 			const auto withPostTemporal = RenderSceneBuilder::BuildViewData(
 				moved.m_RenderViews, moved.m_DirectionalShadowFramePlan, &postTemporalView);
-			const auto withoutPostTemporal = RenderSceneBuilder::BuildViewData(
-				moved.m_RenderViews, moved.m_DirectionalShadowFramePlan);
+			const auto withoutPostTemporal = RenderSceneBuilder::BuildViewData(moved.m_RenderViews, moved.m_DirectionalShadowFramePlan);
 			const ViewGPU& postTemporalGpu =
 				withPostTemporal.m_Views[withPostTemporal.m_PostTemporalViewOffset];
 			context.Check(withPostTemporal.m_PostTemporalViewOffset ==
-					moved.m_RenderViews.size() + moved.m_DirectionalShadowFramePlan.m_Cascades.size() &&
+				moved.m_RenderViews.size() + moved.m_DirectionalShadowFramePlan.m_Cascades.size() &&
 				withPostTemporal.m_Views.size() == withPostTemporal.m_PostTemporalViewOffset + 1 &&
 				withPostTemporal.m_ShadowViewBaseOffset == withoutPostTemporal.m_ShadowViewBaseOffset &&
-				withoutPostTemporal.m_PostTemporalViewOffset ==
-					RenderSceneBuilder::UnassignedViewOffset &&
+				withoutPostTemporal.m_PostTemporalViewOffset == RenderSceneBuilder::UnassignedViewOffset &&
 				postTemporalGpu.ProjMat.ToArray() == jitteredView.m_UnjitteredProj.ToArray() &&
 				postTemporalGpu.ProjMat.ToArray() != jitteredView.m_RasterProj.ToArray() &&
 				postTemporalGpu.ViewMat.ToArray() == jitteredView.m_View.ToArray() &&
@@ -2174,8 +2091,8 @@ namespace gglab
 				frame.m_DirectionalShadowFramePlan.m_ViewBaseOffset = 7;
 				const auto frameContext = frame.MakeRenderFrameContext();
 				RenderGraph graph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
 				});
 				struct GraphPassData {};
 				graph.AddPass<GraphPassData>("ShadowTest.Setup",
@@ -2241,8 +2158,7 @@ namespace gglab
 					const auto& cascade = cascades.m_Cascades[index];
 					const float uniformSplit = 1.0f + 20.0f * static_cast<float>(index + 1);
 					const float logarithmicSplit = std::pow(3.0f, static_cast<float>(index + 1));
-					valid &= NearlyEqual(cascade.m_SplitFar,
-						uniformSplit * (1.0f - lambda) + logarithmicSplit * lambda) &&
+					valid &= NearlyEqual(cascade.m_SplitFar, uniformSplit * (1.0f - lambda) + logarithmicSplit * lambda) &&
 						cascade.m_SplitFar > cascade.m_SplitNear &&
 						cascade.m_SplitNear == (index ? cascades.m_Cascades[index - 1].m_SplitFar : 1.0f);
 					// Every receiver corner must remain inside its independently fitted light volume.
@@ -2299,8 +2215,8 @@ namespace gglab
 			settings.m_Enable = false;
 			const auto disabled = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, settings);
 			const auto upload = RenderSceneBuilder::BuildViewData({}, disabled);
-			RenderGraph emptyGraph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+			RenderGraph emptyGraph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
 			RenderFrameBuildResult frame{};
 			frame.m_DirectionalShadowFramePlan = disabled;
 			RenderPassDirectionalShadowMap shadowPass;
@@ -2359,8 +2275,8 @@ namespace gglab
 			{
 				for (const bool sampleWhole : { false, true })
 				{
-					RenderGraph graph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-						.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+					RenderGraph graph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+						.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
 					RGTextureId texture{};
 					struct Data {};
 					const RHISubresourceRange first{ .m_MipCount = 1, .m_ArraySliceCount = 1 };
@@ -2374,9 +2290,13 @@ namespace gglab
 							builder.WriteInPlace(texture, RGTextureAccess::RenderTarget);
 						});
 					graph.AddPass<Data>("OverwrittenFirst", [&](RenderGraph::RGBuilder& builder, Data&)
-						{ builder.WriteInPlace(texture, RGTextureAccess::RenderTarget, first); });
+						{
+							builder.WriteInPlace(texture, RGTextureAccess::RenderTarget, first);
+						});
 					graph.AddPass<Data>("FinalFirst", [&](RenderGraph::RGBuilder& builder, Data&)
-						{ builder.WriteInPlace(texture, RGTextureAccess::RenderTarget, first); });
+						{
+							builder.WriteInPlace(texture, RGTextureAccess::RenderTarget, first);
+						});
 					graph.AddPass<Data>("Sample", [&](RenderGraph::RGBuilder& builder, Data&)
 						{
 							builder.Read(texture, RGTextureAccess::Sample, sampleWhole ? RHISubresourceRange{} : second);
@@ -2456,8 +2376,7 @@ namespace gglab
 			{
 				const auto& projection = baseline.m_Cascades[index].m_Projection;
 				const Vector2 centerOffset = projection.m_CenterLS - projection.m_UnsnappedCenterLS;
-				const RenderView centeredView = translateView(mainView,
-					lightRight * centerOffset.m_X + lightUp * centerOffset.m_Y);
+				const RenderView centeredView = translateView(mainView, lightRight * centerOffset.m_X + lightUp * centerOffset.m_Y);
 				const auto centered = BuildDirectionalShadowFramePlan(centeredView, lightDirection, settings).m_Cascades[index];
 				const float texelSize = centered.m_Projection.m_WorldUnitsPerTexel.m_X;
 				const auto moved = BuildDirectionalShadowFramePlan(translateView(centeredView,
@@ -2605,8 +2524,7 @@ namespace gglab
 				const auto& high = highResolution.m_Cascades[index];
 				resolutionScales &= std::abs(low.m_Bias.m_ReceiverDepthBias / high.m_Bias.m_ReceiverDepthBias - 2.0f) < 0.01f &&
 					std::abs(low.m_Bias.m_ReceiverSlopeWorld / high.m_Bias.m_ReceiverSlopeWorld - 2.0f) < 0.01f &&
-					low.m_Bias.m_WorldUnitsPerTexel == std::max(low.m_Projection.m_WorldUnitsPerTexel.m_X,
-						low.m_Projection.m_WorldUnitsPerTexel.m_Y);
+					low.m_Bias.m_WorldUnitsPerTexel == std::max(low.m_Projection.m_WorldUnitsPerTexel.m_X, low.m_Projection.m_WorldUnitsPerTexel.m_Y);
 			}
 			context.Check(resolutionScales,
 				"Doubling resolution approximately halves residual bias including the filter guard, using the larger axis footprint");
@@ -2648,7 +2566,7 @@ namespace gglab
 			const RHITextureDesc depthDesc{
 				.m_Format = RHIFormat::R32Typeless,
 				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::DepthStencil,
-				.m_Extent = {1280, 720, 1},
+				.m_Extent = { 1280, 720, 1 },
 				.m_ClearValue =
 					RHIClearValue{
 						.m_Format = RHIFormat::D32Float,
@@ -2690,20 +2608,16 @@ namespace gglab
 
 			GraphicsPhysicalPipelineKey reversedWriteRecipe{};
 			reversedWriteRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
-			const auto reversedWrite =
-				BuildRHIGraphicsPipelineDesc(reversedWriteRecipe).m_DepthStencil;
+			const auto reversedWrite = BuildRHIGraphicsPipelineDesc(reversedWriteRecipe).m_DepthStencil;
 			GraphicsPhysicalPipelineKey reversedReadRecipe{};
 			reversedReadRecipe.m_DepthPreset = DepthPreset::ReversedZReadOnly;
-			const auto reversedRead =
-				BuildRHIGraphicsPipelineDesc(reversedReadRecipe).m_DepthStencil;
+			const auto reversedRead = BuildRHIGraphicsPipelineDesc(reversedReadRecipe).m_DepthStencil;
 			GraphicsPhysicalPipelineKey reversedEqualRecipe{};
 			reversedEqualRecipe.m_DepthPreset = DepthPreset::ReversedZEqualReadOnly;
-			const auto reversedEqual =
-				BuildRHIGraphicsPipelineDesc(reversedEqualRecipe).m_DepthStencil;
+			const auto reversedEqual = BuildRHIGraphicsPipelineDesc(reversedEqualRecipe).m_DepthStencil;
 			GraphicsPhysicalPipelineKey standardWriteRecipe{};
 			standardWriteRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
-			const auto standardWrite =
-				BuildRHIGraphicsPipelineDesc(standardWriteRecipe).m_DepthStencil;
+			const auto standardWrite = BuildRHIGraphicsPipelineDesc(standardWriteRecipe).m_DepthStencil;
 			context.Check(reversedWrite.m_DepthTestEnable && reversedWrite.m_DepthWriteEnable &&
 				reversedWrite.m_DepthCompareOp == RHICompareOp::GreaterEqual &&
 				reversedRead.m_DepthTestEnable && !reversedRead.m_DepthWriteEnable &&
@@ -2724,42 +2638,34 @@ namespace gglab
 			constexpr RHITextureHandle graphDepthHandle{ 41, 7 };
 			RenderGraph graph({
 				.m_Device = &recordingDevice,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGTextureId graphDepth;
 			RHITextureDesc graphDepthDesc = depthDesc;
 			graphDepthDesc.m_Usage = RHITextureUsage::None;
 			graph.AddPass<SampleableDepthPassData>("SampleableDepth.Write",
-				[&graphDepth, graphDepthDesc, graphDepthHandle, dsvDesc](
-					RenderGraph::RGBuilder& builder, SampleableDepthPassData& data)
+				[&graphDepth, graphDepthDesc, graphDepthHandle, dsvDesc](RenderGraph::RGBuilder& builder, SampleableDepthPassData& data)
 				{
 					graphDepth = builder.ImportTexture("DisplayView.DepthBuffer", graphDepthHandle,
 						graphDepthDesc, CommonRHIResourceState(), RGContentValidity::Undefined);
 					builder.WriteInPlace(graphDepth, RGTextureAccess::DepthStencilWrite);
-					data.m_View =
-						builder.CreateView<RHITextureViewType::DepthStencil>(graphDepth, dsvDesc);
+					data.m_View = builder.CreateView<RHITextureViewType::DepthStencil>(graphDepth, dsvDesc);
 				});
 			graph.AddPass<SampleableDepthPassData>("SampleableDepth.Sample",
-				[&graphDepth, srvDesc](
-					RenderGraph::RGBuilder& builder, SampleableDepthPassData& data)
+				[&graphDepth, srvDesc](RenderGraph::RGBuilder& builder, SampleableDepthPassData& data)
 				{
-					graphDepth =
-						builder.Read(graphDepth, RGTextureAccess::Sample, RHIStage::PixelShader);
-					data.m_View =
-						builder.CreateView<RHITextureViewType::ShaderResource>(graphDepth, srvDesc);
+					graphDepth = builder.Read(graphDepth, RGTextureAccess::Sample, RHIStage::PixelShader);
+					data.m_View = builder.CreateView<RHITextureViewType::ShaderResource>(graphDepth, srvDesc);
 					builder.SideEffect();
 				});
 
 			const bool graphCompiled = graph.Compile();
-			context.Check(
-				graphCompiled, "RenderGraph sampleable-depth DSV-to-SRV fixture compiles");
+			context.Check(graphCompiled, "RenderGraph sampleable-depth DSV-to-SRV fixture compiles");
 			if (graphCompiled)
 			{
 				const RHIResourceState commonState = CommonRHIResourceState();
-				const RHIResourceState depthWriteState =
-					ToRHIResourceState(RGTextureAccess::DepthStencilWrite);
-				const RHIResourceState pixelSampleState =
-					ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader);
+				const RHIResourceState depthWriteState = ToRHIResourceState(RGTextureAccess::DepthStencilWrite);
+				const RHIResourceState pixelSampleState = ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader);
 				const auto* executionPlan = graph.GetExecutionPlan();
 				const bool hasExactPlannerContract =
 					executionPlan && executionPlan->GetResources().size() == 1 &&
@@ -2775,11 +2681,11 @@ namespace gglab
 					const auto& sampleBarrier = executionPlan->GetPasses()[1].m_PreBarriers[0];
 					const auto& finalBarrier = executionPlan->GetPasses()[1].m_PostBarriers[0];
 					const auto isFullTextureTransition = [](const RGBarrierIntent& barrier) noexcept
-						{
-							return barrier.m_Resource.Value() == 0 &&
-								barrier.m_Kind == RGBarrierKind::Transition &&
-								!barrier.m_Subresources.has_value();
-						};
+					{
+						return barrier.m_Resource.Value() == 0 &&
+							barrier.m_Kind == RGBarrierKind::Transition &&
+							!barrier.m_Subresources.has_value();
+					};
 					plannerBarrierFieldsMatch =
 						isFullTextureTransition(writeBarrier) &&
 						writeBarrier.m_Reason == RGBarrierReason::AccessTransition &&
@@ -2808,8 +2714,7 @@ namespace gglab
 				context.Check(dependencyMatches,
 					"Sampleable depth preserves its writer-to-reader dependency");
 
-				bool compiledViewsMatch =
-					executionPlan && executionPlan->GetTextureViews().size() == 2;
+				bool compiledViewsMatch = executionPlan && executionPlan->GetTextureViews().size() == 2;
 				if (compiledViewsMatch)
 				{
 					const auto& compiledDsv = executionPlan->GetTextureViews()[0].m_Desc;
@@ -2832,13 +2737,10 @@ namespace gglab
 				const auto expectedUsage = RHITextureUsage::DepthStencil | RHITextureUsage::Sampled;
 				context.Check(
 					snapshot.m_Resources.size() == 1 &&
-					snapshot.m_Resources[0].m_UsageBits ==
-					static_cast<uint64_t>(expectedUsage) &&
+					snapshot.m_Resources[0].m_UsageBits == static_cast<uint64_t>(expectedUsage) &&
 					snapshot.m_Resources[0].m_TextureFormat == RHIFormat::R32Typeless &&
-					snapshot.m_Passes[0].m_Accesses[0].m_AccessValue ==
-					static_cast<uint64_t>(RGTextureAccess::DepthStencilWrite) &&
-					snapshot.m_Passes[1].m_Accesses[0].m_AccessValue ==
-					static_cast<uint64_t>(RGTextureAccess::Sample) &&
+					snapshot.m_Passes[0].m_Accesses[0].m_AccessValue == static_cast<uint64_t>(RGTextureAccess::DepthStencilWrite) &&
+					snapshot.m_Passes[1].m_Accesses[0].m_AccessValue == static_cast<uint64_t>(RGTextureAccess::Sample) &&
 					snapshot.m_Passes[0].m_PreBarriers.size() == 1 &&
 					snapshot.m_Passes[1].m_PreBarriers.size() == 1 &&
 					snapshot.m_Passes[1].m_PostBarriers.size() == 1,
@@ -2846,10 +2748,12 @@ namespace gglab
 
 				RGExecuteContext executeContext({
 					.m_GraphicsCommandContext = &recordingGraphicsContext,
-					});
+				});
 				graph.Execute(executeContext);
 				const auto isFullResourceBarrier = [](const RHITextureBarrier& barrier) noexcept
-					{ return !barrier.m_Subresources.has_value(); };
+				{
+					return !barrier.m_Subresources.has_value();
+				};
 				const bool loweredBarriersMatch =
 					recordingGraphicsContext.m_TextureBarriers.size() == 3 &&
 					recordingGraphicsContext.m_TextureBarriers[0].m_Texture == graphDepthHandle &&
@@ -2880,8 +2784,7 @@ namespace gglab
 				if (recordingGraphicsContext.m_TextureBarriers.size() == 3)
 				{
 					const D3D12_TEXTURE_BARRIER nativeBarrier =
-						BuildD3D12TextureBarrier(recordingGraphicsContext.m_TextureBarriers[1],
-							nativeResource, nativeResourceDesc);
+						BuildD3D12TextureBarrier(recordingGraphicsContext.m_TextureBarriers[1], nativeResource, nativeResourceDesc);
 					nativeBarrierMatches =
 						nativeBarrier.SyncBefore == D3D12_BARRIER_SYNC_DEPTH_STENCIL &&
 						nativeBarrier.SyncAfter == D3D12_BARRIER_SYNC_PIXEL_SHADING &&
@@ -2890,8 +2793,7 @@ namespace gglab
 						nativeBarrier.LayoutBefore == D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE &&
 						nativeBarrier.LayoutAfter == D3D12_BARRIER_LAYOUT_SHADER_RESOURCE &&
 						nativeBarrier.pResource == nativeResource &&
-						nativeBarrier.Subresources.IndexOrFirstMipLevel ==
-						D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES &&
+						nativeBarrier.Subresources.IndexOrFirstMipLevel == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES &&
 						nativeBarrier.Flags == D3D12_TEXTURE_BARRIER_FLAG_NONE;
 				}
 				context.Check(nativeBarrierMatches,
@@ -2903,12 +2805,11 @@ namespace gglab
 			};
 			RenderGraph accessChainGraph({
 				.m_Device = &recordingDevice,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGTextureId accessChainDepth;
 			accessChainGraph.AddPass<DepthAccessChainPassData>("DepthAccessChain.Prepass",
-				[&accessChainDepth, graphDepthDesc, graphDepthHandle](
-					RenderGraph::RGBuilder& builder, DepthAccessChainPassData&)
+				[&accessChainDepth, graphDepthDesc, graphDepthHandle](RenderGraph::RGBuilder& builder, DepthAccessChainPassData&)
 				{
 					accessChainDepth = builder.ImportTexture("DepthAccessChain.Depth",
 						graphDepthHandle, graphDepthDesc, RGTextureAccess::None,
@@ -2918,15 +2819,13 @@ namespace gglab
 			accessChainGraph.AddPass<DepthAccessChainPassData>("DepthAccessChain.Sample",
 				[&accessChainDepth](RenderGraph::RGBuilder& builder, DepthAccessChainPassData&)
 				{
-					accessChainDepth = builder.Read(
-						accessChainDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					accessChainDepth = builder.Read(accessChainDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					builder.SideEffect();
 				});
 			accessChainGraph.AddPass<DepthAccessChainPassData>("DepthAccessChain.Forward",
 				[&accessChainDepth](RenderGraph::RGBuilder& builder, DepthAccessChainPassData&)
 				{
-					accessChainDepth =
-						builder.Read(accessChainDepth, RGTextureAccess::DepthStencilRead);
+					accessChainDepth = builder.Read(accessChainDepth, RGTextureAccess::DepthStencilRead);
 					builder.SideEffect();
 				});
 
@@ -2935,12 +2834,9 @@ namespace gglab
 			if (accessChainCompiled)
 			{
 				const auto* plan = accessChainGraph.GetExecutionPlan();
-				const RHIResourceState writeState =
-					ToRHIResourceState(RGTextureAccess::DepthStencilWrite);
-				const RHIResourceState sampleState =
-					ToRHIResourceState(RGTextureAccess::Sample, RHIStage::ComputeShader);
-				const RHIResourceState readState =
-					ToRHIResourceState(RGTextureAccess::DepthStencilRead);
+				const RHIResourceState writeState = ToRHIResourceState(RGTextureAccess::DepthStencilWrite);
+				const RHIResourceState sampleState = ToRHIResourceState(RGTextureAccess::Sample, RHIStage::ComputeShader);
+				const RHIResourceState readState = ToRHIResourceState(RGTextureAccess::DepthStencilRead);
 				accessChainMatches = plan && plan->GetPasses().size() == 3 &&
 					plan->GetPasses()[0].m_PreBarriers.size() == 1 &&
 					plan->GetPasses()[1].m_PreBarriers.size() == 1 &&
@@ -2973,15 +2869,17 @@ namespace gglab
 						return ShaderID{ static_cast<uint32_t>(entry - demand.begin()) };
 					}
 					// Only the Lab-composed validation recipe may resolve HDR-diff programs.
-					const std::array validation{
+					const std::array validation
+					{
 						shader_programs::ForwardPBRForwardPlusValidationPixel,
 						shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
 						shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
 						shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
 					};
 					const auto entry = std::ranges::find(validation, program);
-					return !m_AllowValidationPrograms || entry == validation.end() ? ShaderID{}
-						: ShaderID{ static_cast<uint32_t>(demand.size() + (entry - validation.begin())) };
+					return !m_AllowValidationPrograms || entry == validation.end() ?
+						ShaderID{} :
+						ShaderID{ static_cast<uint32_t>(demand.size() + (entry - validation.begin())) };
 				}
 				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
 				bool m_AllowValidationPrograms = false;
@@ -2998,8 +2896,9 @@ namespace gglab
 				RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc& desc) noexcept override
 				{
 					m_OwnerOnly &= std::this_thread::get_id() == m_Owner;
-					return { std::string_view(desc.m_DebugName).find("ForwardPlus") != std::string_view::npos
-						? 2u : 1u, 1 };
+					return { std::string_view(desc.m_DebugName).find("ForwardPlus") != std::string_view::npos ?
+						2u :
+						1u, 1 };
 				}
 				RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
 				RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
@@ -3013,19 +2912,26 @@ namespace gglab
 			class PipelineAccess final : public RenderPipelineResolver
 			{
 			public:
-				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey& key,
-					const RenderPassInfo&) noexcept override
+				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey& key, const RenderPassInfo&) noexcept override
 				{
 					++m_ResolveCount;
 					m_OwnerOnly &= std::this_thread::get_id() == m_Owner;
-					if (m_FailResolve) { return {}; }
+					if (m_FailResolve)
+					{
+						return {};
+					}
 					const auto found = std::ranges::find(m_Keys, key);
-					if (found == m_Keys.end()) { m_Keys.push_back(key); }
+					if (found == m_Keys.end())
+					{
+						m_Keys.push_back(key);
+					}
 					const auto entry = std::ranges::find(m_Keys, key);
 					return RHIPipelineHandle{ static_cast<uint32_t>(entry - m_Keys.begin()) + 1, 1 };
 				}
-				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
-					const RenderPassInfo&) noexcept override { return {}; }
+				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&, const RenderPassInfo&) noexcept override
+				{
+					return {};
+				}
 				void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
 				std::vector<GraphicsPhysicalPipelineKey> m_Keys;
 				std::thread::id m_Owner = std::this_thread::get_id();
@@ -3072,7 +2978,8 @@ namespace gglab
 				.m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
 				.m_Presentation = &presentation, .m_BindingLayout = &bindings,
 			};
-			const std::array variants{
+			const std::array variants
+			{
 				RenderQueueBuilder::EncodeMaterialVariantBits(AlphaMode::Opaque, MaterialFlags::None),
 				RenderQueueBuilder::EncodeMaterialVariantBits(AlphaMode::Mask, MaterialFlags::DoubleSided),
 				RenderQueueBuilder::EncodeMaterialVariantBits(AlphaMode::Blend, MaterialFlags::DoubleSided),
@@ -3103,16 +3010,15 @@ namespace gglab
 			for (const auto& key : pipelines.m_Keys)
 			{
 				// Transparent recipes read depth without EQUAL and never bind Forward+ light lists.
-				separateLighting &= (key.m_DepthPreset == DepthPreset::ReversedZReadOnly) ==
-					(key.m_BindingLayout != forwardPlusLayout);
+				separateLighting &= (key.m_DepthPreset == DepthPreset::ReversedZReadOnly) == (key.m_BindingLayout != forwardPlusLayout);
 				const uint32_t count = key.m_Formats.m_RenderTargetCount;
 				validAttachments &= count >= 4 && count <= 6 &&
 					key.m_Formats.m_RenderTargetFormats[count - 3] == RHIFormat::R16G16B16A16Float &&
 					key.m_Formats.m_RenderTargetFormats[count - 2] == RHIFormat::R16Float &&
 					key.m_Formats.m_RenderTargetFormats[count - 1] == RHIFormat::R16G16B16A16Float;
-				validBlend &= key.m_DepthPreset == DepthPreset::ReversedZReadOnly
-					? key.m_BlendPreset == BlendPreset::AlphaBlendAllTargets
-					: key.m_BlendPreset == BlendPreset::Default &&
+				validBlend &= key.m_DepthPreset == DepthPreset::ReversedZReadOnly ?
+					key.m_BlendPreset == BlendPreset::AlphaBlendAllTargets :
+					key.m_BlendPreset == BlendPreset::Default &&
 						key.m_DepthPreset == DepthPreset::ReversedZEqualReadOnly;
 			}
 			context.Check(validAttachments && validBlend && pipelines.m_Keys.size() == 5,
@@ -3128,7 +3034,7 @@ namespace gglab
 			shaders.m_AllowValidationPrograms = true;
 			RenderPipelineForwardPlus validationPipeline(RenderPipelineForwardPlus::CreateInfo{
 				.m_ForwardPlusDebugReadback = std::make_shared<ForwardPlusDebugReadback>(),
-				});
+			});
 			MaterialDiagnosticPrewarmProgress validationProgress;
 			for (uint32_t tick = 0; tick < 9; ++tick)
 			{
@@ -3161,9 +3067,9 @@ namespace gglab
 				.m_DepthCoverageValid = true,
 			};
 			const auto classify = [](ForwardPlusFrameValidationInputs inputs)
-				{
-					return ClassifyForwardPlusFrame(inputs).m_Status;
-				};
+			{
+				return ClassifyForwardPlusFrame(inputs).m_Status;
+			};
 			ForwardPlusFrameValidationInputs readyTemporal = ready;
 			readyTemporal.m_TemporalActive = true;
 			readyTemporal.m_TemporalResolveClosureValid = true;
@@ -3206,8 +3112,7 @@ namespace gglab
 			ForwardPlusFrameValidationInputs coverageMismatch = ready;
 			coverageMismatch.m_DepthCoverageValid = false;
 			coverageMismatch.m_DepthCoverageDiagnostic = "Coverage variant 1 mismatch";
-			const RenderFrameValidationResult coverageFailure =
-				ClassifyForwardPlusFrame(coverageMismatch);
+			const RenderFrameValidationResult coverageFailure = ClassifyForwardPlusFrame(coverageMismatch);
 			context.Check(classify(ready) == RenderFrameValidationStatus::Ready &&
 				classify(readyTemporal) == RenderFrameValidationStatus::Ready &&
 				classify(closureUnusedWithoutTemporal) == RenderFrameValidationStatus::Ready &&
@@ -3220,8 +3125,7 @@ namespace gglab
 				classify(gtaoRecipesMissing) == RenderFrameValidationStatus::ContractFailure &&
 				classify(transparentOnly) == RenderFrameValidationStatus::Ready &&
 				lightFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
-				lightFailure.m_Detail == std::format("requested {}, limit {}",
-					ForwardPlusGlobalLightCapacity + 1, ForwardPlusGlobalLightCapacity) &&
+				lightFailure.m_Detail == std::format("requested {}, limit {}", ForwardPlusGlobalLightCapacity + 1, ForwardPlusGlobalLightCapacity) &&
 				coverageFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
 				coverageFailure.m_Detail == "Coverage variant 1 mismatch" &&
 				!coverageFailure.m_Reason.empty(),
@@ -3241,10 +3145,8 @@ namespace gglab
 			gtaoHistoryNotRequired.m_GTAOHistoryRequired = false;
 			ForwardPlusFrameValidationInputs gtaoHistoryWithoutOpaqueDraws = gtaoHistoryUnallocated;
 			gtaoHistoryWithoutOpaqueDraws.m_HasOpaqueDraws = false;
-			const RenderFrameValidationResult gtaoRecipeFailure =
-				ClassifyForwardPlusFrame(gtaoHistoryRecipeMissing);
-			const RenderFrameValidationResult gtaoAllocationFailure =
-				ClassifyForwardPlusFrame(gtaoHistoryUnallocated);
+			const RenderFrameValidationResult gtaoRecipeFailure = ClassifyForwardPlusFrame(gtaoHistoryRecipeMissing);
+			const RenderFrameValidationResult gtaoAllocationFailure = ClassifyForwardPlusFrame(gtaoHistoryUnallocated);
 			context.Check(classify(gtaoHistoryReady) == RenderFrameValidationStatus::Ready &&
 				gtaoRecipeFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
 				gtaoAllocationFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
@@ -3254,9 +3156,9 @@ namespace gglab
 				"A recorded GTAO whose temporal plan keeps its own history fails without the accumulation recipe or an allocated history instead of falling back to spatial-only visibility");
 
 			// Production composition must not depend on Lab-owned validation programs.
-			const auto productionDemand =
-				shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
-			const std::array validationPrograms{
+			const auto productionDemand = shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
+			const std::array validationPrograms
+			{
 				shader_programs::ForwardPBRForwardPlusValidationPixel,
 				shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
 				shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
@@ -3272,10 +3174,11 @@ namespace gglab
 			// artifact must fail the preload, not the first frame that needs it.
 			const auto initialDemand = shader_programs::GetRendererInitialShaderProgramDemand();
 			const auto inInitialDemand = [&initialDemand](const ShaderProgramRef& program) noexcept
-				{
-					return std::ranges::find(initialDemand, program) != initialDemand.end();
-				};
-			const std::array productionPrograms{
+			{
+				return std::ranges::find(initialDemand, program) != initialDemand.end();
+			};
+			const std::array productionPrograms
+			{
 				shader_programs::ForwardPBRAllLightsPixel,
 				shader_programs::ForwardPBRForwardPlusPixel,
 				shader_programs::ForwardPBRForwardPlusGTAOPixel,
@@ -3287,7 +3190,8 @@ namespace gglab
 				shader_programs::GTAOUpsampleCompute,
 				shader_programs::AtmosphereLutCompute,
 			};
-			const std::array labOwnedPrograms{
+			const std::array labOwnedPrograms
+			{
 				shader_programs::ForwardPBRForwardPlusValidationPixel,
 				shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
 				shader_programs::ForwardPlusCullDiagnosticsCompute,
@@ -3311,11 +3215,9 @@ namespace gglab
 			shaderSet.m_AllLightsMaterialDiagnosticsPixelShader = ShaderID{ 10 };
 			shaderSet.m_ForwardPlus.m_MaterialDiagnostics = ShaderID{ 11 };
 			shaderSet.m_ForwardPlus.m_GTAOContributionMaterialDiagnostics = ShaderID{ 12 };
-			const bool productionValid =
-				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid();
+			const bool productionValid = shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid();
 			shaderSet.m_IncludesHdrDiffValidation = true;
-			const bool validationRequiresPrograms =
-				!shaderSet.IsValid() && !shaderSet.AreMaterialDiagnosticsValid();
+			const bool validationRequiresPrograms = !shaderSet.IsValid() && !shaderSet.AreMaterialDiagnosticsValid();
 			shaderSet.m_ForwardPlusValidation = {
 				.m_Shading = ShaderID{ 20 },
 				.m_GTAOContribution = ShaderID{ 21 },
@@ -3328,15 +3230,12 @@ namespace gglab
 
 			const ForwardPlusHdrDiffReadback withinTolerance{
 				.m_MaxAbsoluteError = ForwardPlusHdrDiffAbsoluteTolerance,
-				.m_MaxRelativeLuminanceError =
-					ForwardPlusHdrDiffRelativeLuminanceTolerance,
+				.m_MaxRelativeLuminanceError = ForwardPlusHdrDiffRelativeLuminanceTolerance,
 				.m_ComparedPixelCount = 1,
 				.m_IsValid = true,
 			};
 			ForwardPlusHdrDiffReadback outsideTolerance = withinTolerance;
-			outsideTolerance.m_MaxAbsoluteError =
-				std::nextafter(ForwardPlusHdrDiffAbsoluteTolerance,
-					std::numeric_limits<float>::infinity());
+			outsideTolerance.m_MaxAbsoluteError = std::nextafter(ForwardPlusHdrDiffAbsoluteTolerance, std::numeric_limits<float>::infinity());
 			context.Check(IsForwardPlusHdrDiffWithinTolerance(withinTolerance) &&
 				!IsForwardPlusHdrDiffWithinTolerance(outsideTolerance),
 				"Forward+ HDR diff acceptance uses explicit inclusive absolute and relative luminance tolerances");
@@ -3357,16 +3256,17 @@ namespace gglab
 			context.Check(unsortedGlobalLightIndices == std::array<uint32_t, 4>{ 4, 7, 19, 31 },
 				"Forward+ establishes a stable ascending global-light order");
 			const ForwardPlusTileGrid metricsGrid = MakeForwardPlusTileGrid(32, 16);
-			const std::array<ForwardPlusTileHeader, 2> metricHeaders{
-				ForwardPlusTileHeader{.m_Offset = 0, .m_CountAndFlags = 0 },
-				ForwardPlusTileHeader{.m_Offset = 64, .m_CountAndFlags = 3 },
+			const std::array<ForwardPlusTileHeader, 2> metricHeaders
+			{
+				ForwardPlusTileHeader{ .m_Offset = 0, .m_CountAndFlags = 0 },
+				ForwardPlusTileHeader{ .m_Offset = 64, .m_CountAndFlags = 3 },
 			};
-			const std::array<ForwardPlusTileDepthRange, 2> metricDepthRanges{
+			const std::array<ForwardPlusTileDepthRange, 2> metricDepthRanges
+			{
 				ForwardPlusTileDepthRange{},
-				ForwardPlusTileDepthRange{.m_MinViewZ = 2.0f, .m_MaxViewZ = 7.0f },
+				ForwardPlusTileDepthRange{ .m_MinViewZ = 2.0f, .m_MaxViewZ = 7.0f },
 			};
-			const ForwardPlusGridMetrics gridMetrics = BuildForwardPlusGridMetrics(
-				metricsGrid, metricHeaders, metricDepthRanges);
+			const ForwardPlusGridMetrics gridMetrics = BuildForwardPlusGridMetrics(metricsGrid, metricHeaders, metricDepthRanges);
 			context.Check(gridMetrics.m_IsValid &&
 				gridMetrics.m_NonEmptyLightListTileCount == 1 &&
 				gridMetrics.m_EmptyLightListTileCount == 1 &&
@@ -3416,7 +3316,7 @@ namespace gglab
 			const auto patternedWave32 = BuildStableForwardPlusLightList(patternedHits, 32);
 			const auto patternedWave64 = BuildStableForwardPlusLightList(patternedHits, 64);
 			context.Check(emptyWave32.empty() && emptyWave32 == emptyWave64 &&
-				oneWave32 == std::vector<uint32_t>{37}&& oneWave32 == oneWave64 &&
+				oneWave32 == std::vector<uint32_t>{37} && oneWave32 == oneWave64 &&
 				allWave32.size() == ForwardPlusTileLightCapacity &&
 				allWave32 == allWave64 && allWave32.front() == 0 &&
 				allWave32.back() == 63 && patternedWave32 == patternedWave64 &&
@@ -3452,15 +3352,15 @@ namespace gglab
 		void RunDepthCoverageContractTests(SelfTestContext& context) noexcept
 		{
 			const auto makeVariantBits = [](RenderBucket bucket, bool doubleSided) noexcept
+			{
+				uint64_t bits = static_cast<uint64_t>(bucket)
+					<< RenderQueueBuilder::VariantBit::BucketShift;
+				if (doubleSided)
 				{
-					uint64_t bits = static_cast<uint64_t>(bucket)
-						<< RenderQueueBuilder::VariantBit::BucketShift;
-					if (doubleSided)
-					{
-						bits |= RenderQueueBuilder::VariantBit::DoubleSided;
-					}
-					return bits;
-				};
+					bits |= RenderQueueBuilder::VariantBit::DoubleSided;
+				}
+				return bits;
+			};
 
 			GraphicsPhysicalPipelineKey basePhysicalKey{};
 			basePhysicalKey.m_VSId = ShaderID{ 17 };
@@ -3474,17 +3374,14 @@ namespace gglab
 			basePhysicalKey.m_BlendPreset = BlendPreset::Default;
 
 			const auto opaque =
-				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(
-					basePhysicalKey, makeVariantBits(RenderBucket::Opaque, false));
+				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(basePhysicalKey, makeVariantBits(RenderBucket::Opaque, false));
 			const auto opaqueRepeat =
-				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(
-					basePhysicalKey, makeVariantBits(RenderBucket::Opaque, false));
+				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(basePhysicalKey, makeVariantBits(RenderBucket::Opaque, false));
 			const auto alphaTest =
 				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey, makeVariantBits(RenderBucket::AlphaTest, false));
 			const auto doubleSided =
-				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(
-					basePhysicalKey, makeVariantBits(RenderBucket::Opaque, true));
+				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(basePhysicalKey, makeVariantBits(RenderBucket::Opaque, true));
 			const auto transparent =
 				RenderPassForwardOpaque::BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey, makeVariantBits(RenderBucket::Transparent, false));
@@ -3510,14 +3407,11 @@ namespace gglab
 
 			const uint64_t opaqueVariant = makeVariantBits(RenderBucket::Opaque, false);
 			const GraphicsLogicalPipelineMetadata forwardMetadata =
-				RenderPassForwardOpaque::BuildLogicalPipelineMetadataForVariant(
-					basePhysicalKey, opaqueVariant);
+				RenderPassForwardOpaque::BuildLogicalPipelineMetadataForVariant(basePhysicalKey, opaqueVariant);
 			const GraphicsLogicalPipelineMetadata forwardMetadataRepeat =
-				RenderPassForwardOpaque::BuildLogicalPipelineMetadataForVariant(
-					basePhysicalKey, opaqueVariant);
+				RenderPassForwardOpaque::BuildLogicalPipelineMetadataForVariant(basePhysicalKey, opaqueVariant);
 			const GraphicsLogicalPipelineMetadata prepassMetadata =
-				RenderPassDepthPrepass::BuildLogicalPipelineMetadataForVariant(
-					prepassPhysicalKey, opaqueVariant);
+				RenderPassDepthPrepass::BuildLogicalPipelineMetadataForVariant(prepassPhysicalKey, opaqueVariant);
 			context.Check(
 				forwardMetadata == forwardMetadataRepeat && forwardMetadata == prepassMetadata,
 				"Logical coverage metadata is deterministic before any physical pipeline is resolved");
@@ -3531,26 +3425,34 @@ namespace gglab
 				"Coverage variants differ only in their declared pipeline fields");
 
 			const auto differsAfter = [&opaque](auto mutate) noexcept
-				{
-					DepthCoveragePipelineSignature changed = *opaque;
-					mutate(changed);
-					return changed != *opaque;
-				};
+			{
+				DepthCoveragePipelineSignature changed = *opaque;
+				mutate(changed);
+				return changed != *opaque;
+			};
 			const bool pipelineFieldsParticipate =
 				differsAfter([](auto& value) { value.m_CoverageVertexShader = ShaderID{ 18 }; }) &&
 				differsAfter([](auto& value)
-					{ value.m_VertexProgram = DepthCoverageVertexProgram::SkinnedMesh; }) &&
+					{
+						value.m_VertexProgram = DepthCoverageVertexProgram::SkinnedMesh;
+					}) &&
 				differsAfter([](auto& value)
-					{ value.m_Deformation = DepthCoverageDeformationVariant::Skinned; }) &&
+					{
+						value.m_Deformation = DepthCoverageDeformationVariant::Skinned;
+					}) &&
 				differsAfter([](auto& value) { value.m_InputLayout = InputLayoutID::P3C4; }) &&
 				differsAfter([](auto& value)
-					{ value.m_PositionPrecision = DepthCoveragePositionPrecision::Float16; }) &&
+					{
+						value.m_PositionPrecision = DepthCoveragePositionPrecision::Float16;
+					}) &&
 				differsAfter(
 					[](auto& value) { value.m_PositionFormat = RHIFormat::R32G32B32A32Float; }) &&
 				differsAfter(
 					[](auto& value) { value.m_TopologyType = RHIPrimitiveTopologyType::Line; }) &&
 				differsAfter([](auto& value)
-					{ value.m_PrimitiveTopology = RHIPrimitiveTopology::LineList; }) &&
+					{
+						value.m_PrimitiveTopology = RHIPrimitiveTopology::LineList;
+					}) &&
 				differsAfter([](auto& value) { value.m_FillMode = RHIFillMode::Wireframe; }) &&
 				differsAfter([](auto& value) { value.m_CullMode = RHICullMode::Front; }) &&
 				differsAfter([](auto& value) { value.m_FrontCounterClockwise = true; }) &&
@@ -3564,7 +3466,9 @@ namespace gglab
 				differsAfter([](auto& value) { value.m_SampleMask = 0x7FFFFFFFu; }) &&
 				differsAfter([](auto& value) { value.m_AlphaToCoverageEnable = true; }) &&
 				differsAfter([](auto& value)
-					{ value.m_AlphaVariant = DepthCoverageAlphaVariant::BaseColorMask; });
+					{
+						value.m_AlphaVariant = DepthCoverageAlphaVariant::BaseColorMask;
+					});
 			context.Check(pipelineFieldsParticipate,
 				"Every coverage pipeline field participates in signature identity");
 
@@ -3594,12 +3498,12 @@ namespace gglab
 				.m_ViewBindingId = 1,
 				.m_CurrentViewSource =
 					{
-						.m_Buffer = RHIBufferHandle{4, 5},
+						.m_Buffer = RHIBufferHandle{ 4, 5 },
 						.m_ElementIndex = 29,
 					},
 				.m_CurrentJitteredProjectionSource =
 					{
-						.m_Buffer = RHIBufferHandle{4, 5},
+						.m_Buffer = RHIBufferHandle{ 4, 5 },
 						.m_ElementIndex = 29,
 					},
 				.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
@@ -3618,46 +3522,49 @@ namespace gglab
 				.m_DepthConvention = DepthConvention::Reversed,
 			};
 			const auto rasterDomainDiffersAfter = [&rasterDomain](auto mutate) noexcept
-				{
-					DepthCoverageRasterDomain changed = rasterDomain;
-					mutate(changed);
-					return changed != rasterDomain;
-				};
+			{
+				DepthCoverageRasterDomain changed = rasterDomain;
+				mutate(changed);
+				return changed != rasterDomain;
+			};
 			context.Check(
 				rasterDomain.IsValid() &&
 				CompareDepthCoverageRasterDomains(rasterDomain, rasterDomain).m_Matches &&
 				rasterDomainDiffersAfter([](auto& value) { ++value.m_FrameSerial; }) &&
 				rasterDomainDiffersAfter([](auto& value) { ++value.m_ViewBindingId; }) &&
 				rasterDomainDiffersAfter([](auto& value)
-					{ value.m_CurrentViewSource.m_Buffer = RHIBufferHandle{ 4, 6 }; }) &&
+					{
+						value.m_CurrentViewSource.m_Buffer = RHIBufferHandle{ 4, 6 };
+					}) &&
 				rasterDomainDiffersAfter([](auto& value)
-					{ ++value.m_CurrentJitteredProjectionSource.m_ElementIndex; }) &&
+					{
+						++value.m_CurrentJitteredProjectionSource.m_ElementIndex;
+					}) &&
 				rasterDomainDiffersAfter(
 					[](auto& value)
 					{
-						value.m_ProjectionSource =
-							DepthCoverageProjectionSource::DedicatedJitteredProjection;
+						value.m_ProjectionSource = DepthCoverageProjectionSource::DedicatedJitteredProjection;
 					}) &&
 				rasterDomainDiffersAfter([](auto& value) { ++value.m_TargetWidth; }) &&
-						rasterDomainDiffersAfter([](auto& value) { ++value.m_TargetHeight; }) &&
-						rasterDomainDiffersAfter([](auto& value) { value.m_Viewport.m_X = 1.0f; }) &&
-						rasterDomainDiffersAfter([](auto& value) { value.m_Viewport.m_Y = 1.0f; }) &&
-						rasterDomainDiffersAfter(
-							[](auto& value) { value.m_Viewport.m_Width = 1920.0f; }) &&
-						rasterDomainDiffersAfter(
-							[](auto& value) { value.m_Viewport.m_Height = 1080.0f; }) &&
-						rasterDomainDiffersAfter(
-							[](auto& value) { value.m_Viewport.m_MinDepth = 0.25f; }) &&
-						rasterDomainDiffersAfter(
-							[](auto& value) { value.m_Viewport.m_MaxDepth = 0.75f; }) &&
-						rasterDomainDiffersAfter([](auto& value) { value.m_Scissor.m_Left = 1; }) &&
-						rasterDomainDiffersAfter([](auto& value) { value.m_Scissor.m_Top = 1; }) &&
-						rasterDomainDiffersAfter([](auto& value) { value.m_Scissor.m_Right = 1920; }) &&
-						rasterDomainDiffersAfter(
-							[](auto& value) { value.m_Scissor.m_Bottom = 1080; }) &&
-						rasterDomainDiffersAfter(
-							[](auto& value) { value.m_DepthConvention = DepthConvention::Standard; }),
-						"Raster-domain identity covers the complete view and raster state");
+				rasterDomainDiffersAfter([](auto& value) { ++value.m_TargetHeight; }) &&
+				rasterDomainDiffersAfter([](auto& value) { value.m_Viewport.m_X = 1.0f; }) &&
+				rasterDomainDiffersAfter([](auto& value) { value.m_Viewport.m_Y = 1.0f; }) &&
+				rasterDomainDiffersAfter(
+					[](auto& value) { value.m_Viewport.m_Width = 1920.0f; }) &&
+				rasterDomainDiffersAfter(
+					[](auto& value) { value.m_Viewport.m_Height = 1080.0f; }) &&
+				rasterDomainDiffersAfter(
+					[](auto& value) { value.m_Viewport.m_MinDepth = 0.25f; }) &&
+				rasterDomainDiffersAfter(
+					[](auto& value) { value.m_Viewport.m_MaxDepth = 0.75f; }) &&
+				rasterDomainDiffersAfter([](auto& value) { value.m_Scissor.m_Left = 1; }) &&
+				rasterDomainDiffersAfter([](auto& value) { value.m_Scissor.m_Top = 1; }) &&
+				rasterDomainDiffersAfter([](auto& value) { value.m_Scissor.m_Right = 1920; }) &&
+				rasterDomainDiffersAfter(
+					[](auto& value) { value.m_Scissor.m_Bottom = 1080; }) &&
+				rasterDomainDiffersAfter(
+					[](auto& value) { value.m_DepthConvention = DepthConvention::Standard; }),
+				"Raster-domain identity covers the complete view and raster state");
 
 			DepthCoverageRasterDomain undersizedDomain = rasterDomain;
 			undersizedDomain.m_TargetWidth = 1279;
@@ -3665,33 +3572,30 @@ namespace gglab
 			oversizedViewportDomain.m_Viewport.m_Width = 1281.0f;
 			const RHITextureDesc coverageColorDesc{
 				.m_Format = RHIFormat::R16G16B16A16Float,
-				.m_Extent = {1280, 720, 1},
+				.m_Extent = { 1280, 720, 1 },
 			};
 			const RHITextureDesc coverageDepthDesc{
 				.m_Format = RHIFormat::R32Typeless,
-				.m_Extent = {1280, 720, 1},
+				.m_Extent = { 1280, 720, 1 },
 			};
 			RHITextureDesc mismatchedCoverageDepthDesc = coverageDepthDesc;
 			mismatchedCoverageDepthDesc.m_Extent.m_Height = 719;
 			context.Check(rasterDomain.MatchesTargetExtent(1280, 720) &&
 				!rasterDomain.MatchesTargetExtent(1281, 720) &&
 				!undersizedDomain.IsValid() && !oversizedViewportDomain.IsValid() &&
-				AreDepthCoverageTargetExtentsCompatible(
-					rasterDomain, coverageColorDesc, coverageDepthDesc) &&
-				!AreDepthCoverageTargetExtentsCompatible(
-					rasterDomain, coverageColorDesc, mismatchedCoverageDepthDesc),
+				AreDepthCoverageTargetExtentsCompatible(rasterDomain, coverageColorDesc, coverageDepthDesc) &&
+				!AreDepthCoverageTargetExtentsCompatible(rasterDomain, coverageColorDesc, mismatchedCoverageDepthDesc),
 				"Raster domains and target descriptors reject color-depth extent mismatches");
-			std::array<RHITextureDesc, forward_shading::MaterialDiagnosticTargetCount> diagnostics{
-				coverageColorDesc, coverageColorDesc, coverageColorDesc };
+			std::array<RHITextureDesc, forward_shading::MaterialDiagnosticTargetCount> diagnostics
+			{
+			coverageColorDesc, coverageColorDesc, coverageColorDesc };
 			bool diagnosticExtentsChecked = forward_shading::AreSceneAttachmentExtentsCompatible(
 				rasterDomain, coverageColorDesc, coverageDepthDesc, diagnostics) &&
-				forward_shading::AreSceneAttachmentExtentsCompatible(
-					rasterDomain, coverageColorDesc, coverageDepthDesc, {}) &&
-				!forward_shading::AreSceneAttachmentExtentsCompatible(
-					rasterDomain, coverageColorDesc, mismatchedCoverageDepthDesc, diagnostics);
+				forward_shading::AreSceneAttachmentExtentsCompatible(rasterDomain, coverageColorDesc, coverageDepthDesc, {}) &&
+				!forward_shading::AreSceneAttachmentExtentsCompatible(rasterDomain, coverageColorDesc, mismatchedCoverageDepthDesc, diagnostics);
 			for (auto& diagnostic : diagnostics)
 			{
-				diagnostic.m_Extent = {853, 480, 1};
+				diagnostic.m_Extent = { 853, 480, 1 };
 				diagnosticExtentsChecked &= !forward_shading::AreSceneAttachmentExtentsCompatible(
 					rasterDomain, coverageColorDesc, coverageDepthDesc, diagnostics);
 				diagnostic = coverageColorDesc;
@@ -3703,34 +3607,27 @@ namespace gglab
 			++changedRasterDomain.m_FrameSerial;
 			changedRasterDomain.m_TargetWidth = 1920;
 			changedRasterDomain.m_Viewport.m_Width = 1920.0f;
-			const auto pipelineComparison =
-				CompareDepthCoveragePipelineSignatures(*opaque, *alphaTest);
-			const auto rasterComparison =
-				CompareDepthCoverageRasterDomains(rasterDomain, changedRasterDomain);
+			const auto pipelineComparison = CompareDepthCoveragePipelineSignatures(*opaque, *alphaTest);
+			const auto rasterComparison = CompareDepthCoverageRasterDomains(rasterDomain, changedRasterDomain);
 			context.Check(
 				!pipelineComparison.m_Matches &&
 				pipelineComparison.m_Mismatch.find("AlphaVariant") != std::string::npos &&
 				!rasterComparison.m_Matches &&
 				rasterComparison.m_Mismatch.find("FrameSerial") != std::string::npos &&
 				rasterComparison.m_Mismatch.find("Viewport") != std::string::npos &&
-				DescribeDepthCoveragePipelineSignature(*opaque).find("InputLayout") !=
-				std::string::npos &&
-				DescribeDepthCoverageRasterDomain(rasterDomain).find("Scissor") !=
-				std::string::npos,
+				DescribeDepthCoveragePipelineSignature(*opaque).find("InputLayout") != std::string::npos &&
+				DescribeDepthCoverageRasterDomain(rasterDomain).find("Scissor") != std::string::npos,
 				"Coverage diagnostics identify pipeline and raster-domain mismatches");
 
 			const auto invalidPipelineComparison = CompareDepthCoveragePipelineSignatures(
 				DepthCoveragePipelineSignature{}, DepthCoveragePipelineSignature{});
 			DepthCoverageRasterDomain invalidRhsDomain = rasterDomain;
 			invalidRhsDomain.m_FrameSerial = 0;
-			const auto invalidRasterComparison =
-				CompareDepthCoverageRasterDomains(rasterDomain, invalidRhsDomain);
+			const auto invalidRasterComparison = CompareDepthCoverageRasterDomains(rasterDomain, invalidRhsDomain);
 			context.Check(!invalidPipelineComparison.m_Matches &&
-				invalidPipelineComparison.m_Mismatch.find("Pipeline.LhsInvalid") !=
-				std::string::npos &&
+				invalidPipelineComparison.m_Mismatch.find("Pipeline.LhsInvalid") != std::string::npos &&
 				!invalidRasterComparison.m_Matches &&
-				invalidRasterComparison.m_Mismatch.find("RasterDomain.RhsInvalid") !=
-				std::string::npos,
+				invalidRasterComparison.m_Mismatch.find("RasterDomain.RhsInvalid") != std::string::npos,
 				"Coverage comparison fails closed for invalid contract domains");
 
 			const DepthCoverageDrawPacket packet{
@@ -3739,14 +3636,14 @@ namespace gglab
 						.m_MeshId = ProceduralCubeMeshID,
 						.m_VertexBuffer =
 							{
-								.m_Buffer = RHIBufferHandle{8, 9},
+								.m_Buffer = RHIBufferHandle{ 8, 9 },
 								.m_Offset = 64,
 								.m_Stride = 48,
 								.m_SizeInBytes = 480,
 							},
 						.m_IndexBuffer =
 							{
-								.m_Buffer = RHIBufferHandle{10, 11},
+								.m_Buffer = RHIBufferHandle{ 10, 11 },
 								.m_Offset = 32,
 								.m_SizeInBytes = 72,
 								.m_Format = RHIFormat::R32Uint,
@@ -3766,21 +3663,21 @@ namespace gglab
 					},
 				.m_CurrentModelSource =
 					{
-						.m_Buffer = RHIBufferHandle{2, 3},
+						.m_Buffer = RHIBufferHandle{ 2, 3 },
 						.m_ElementIndex = 17,
 					},
 				.m_MaterialAlphaSource =
 					{
-						.m_Buffer = RHIBufferHandle{6, 7},
+						.m_Buffer = RHIBufferHandle{ 6, 7 },
 						.m_ElementIndex = 31,
 					},
 			};
 			const auto packetDiffersAfter = [&packet](auto mutate) noexcept
-				{
-					DepthCoverageDrawPacket changed = packet;
-					mutate(changed);
-					return changed != packet;
-				};
+			{
+				DepthCoverageDrawPacket changed = packet;
+				mutate(changed);
+				return changed != packet;
+			};
 			RenderQueue queue{
 				.m_DrawItems =
 					{
@@ -3812,7 +3709,9 @@ namespace gglab
 				packetDiffersAfter(
 					[](auto& value) { value.m_Geometry.m_MeshId = ProceduralSphereMeshID; }) &&
 				packetDiffersAfter([](auto& value)
-					{ value.m_Geometry.m_VertexBuffer.m_Buffer = RHIBufferHandle{ 8, 10 }; }) &&
+					{
+						value.m_Geometry.m_VertexBuffer.m_Buffer = RHIBufferHandle{ 8, 10 };
+					}) &&
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_Geometry.m_VertexBuffer.m_Offset; }) &&
 				packetDiffersAfter(
@@ -3820,13 +3719,17 @@ namespace gglab
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_Geometry.m_VertexBuffer.m_SizeInBytes; }) &&
 				packetDiffersAfter([](auto& value)
-					{ value.m_Geometry.m_IndexBuffer.m_Buffer = RHIBufferHandle{ 10, 12 }; }) &&
+					{
+						value.m_Geometry.m_IndexBuffer.m_Buffer = RHIBufferHandle{ 10, 12 };
+					}) &&
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_Geometry.m_IndexBuffer.m_Offset; }) &&
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_Geometry.m_IndexBuffer.m_SizeInBytes; }) &&
 				packetDiffersAfter([](auto& value)
-					{ value.m_Geometry.m_IndexBuffer.m_Format = RHIFormat::R32Float; }) &&
+					{
+						value.m_Geometry.m_IndexBuffer.m_Format = RHIFormat::R32Float;
+					}) &&
 				packetDiffersAfter([](auto& value) { ++value.m_IndexedDraw.m_IndexCount; }) &&
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_IndexedDraw.m_InstanceCount; }) &&
@@ -3839,17 +3742,19 @@ namespace gglab
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_DrawParameters.ObjectOffset; }) &&
 				packetDiffersAfter([](auto& value)
-					{ value.m_CurrentModelSource.m_Buffer = RHIBufferHandle{ 2, 4 }; }) &&
+					{
+						value.m_CurrentModelSource.m_Buffer = RHIBufferHandle{ 2, 4 };
+					}) &&
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_CurrentModelSource.m_ElementIndex; }) &&
 				packetDiffersAfter([](auto& value)
-					{ value.m_MaterialAlphaSource.m_Buffer = RHIBufferHandle{ 6, 8 }; }) &&
+					{
+						value.m_MaterialAlphaSource.m_Buffer = RHIBufferHandle{ 6, 8 };
+					}) &&
 				packetDiffersAfter(
 					[](auto& value) { ++value.m_MaterialAlphaSource.m_ElementIndex; }) &&
-				DescribeDepthCoverageDrawPacket(packet).find("DrawIndexed") !=
-				std::string::npos &&
-				DescribeDepthCoverageDrawPacket(packet).find("MaterialAlpha") !=
-				std::string::npos,
+				DescribeDepthCoverageDrawPacket(packet).find("DrawIndexed") != std::string::npos &&
+				DescribeDepthCoverageDrawPacket(packet).find("MaterialAlpha") != std::string::npos,
 				"RenderQueue owns one complete coverage draw packet shared by both passes");
 
 			DepthCoverageFramePlanBuildInfo framePlanBuildInfo{
@@ -3861,31 +3766,26 @@ namespace gglab
 			};
 			framePlanBuildInfo.m_PrepassPipelineSignatures[opaqueVariant] = *prepassOpaque;
 			framePlanBuildInfo.m_ForwardPipelineSignatures[opaqueVariant] = *opaque;
-			const DepthCoverageFramePlan equalPlan =
-				BuildDepthCoverageFramePlan(framePlanBuildInfo);
+			const DepthCoverageFramePlan equalPlan = BuildDepthCoverageFramePlan(framePlanBuildInfo);
 
 			DepthCoverageFramePlanBuildInfo mismatchedShaderBuildInfo = framePlanBuildInfo;
 			mismatchedShaderBuildInfo.m_ForwardPipelineSignatures[opaqueVariant]
 				->m_CoverageVertexShader = ShaderID{ 18 };
-			const DepthCoverageFramePlan mismatchedPlan =
-				BuildDepthCoverageFramePlan(mismatchedShaderBuildInfo);
+			const DepthCoverageFramePlan mismatchedPlan = BuildDepthCoverageFramePlan(mismatchedShaderBuildInfo);
 
 			DepthCoverageFramePlanBuildInfo missingSignatureBuildInfo = framePlanBuildInfo;
 			missingSignatureBuildInfo.m_ForwardPipelineSignatures[opaqueVariant].reset();
-			const DepthCoverageFramePlan missingSignaturePlan =
-				BuildDepthCoverageFramePlan(missingSignatureBuildInfo);
+			const DepthCoverageFramePlan missingSignaturePlan = BuildDepthCoverageFramePlan(missingSignatureBuildInfo);
 
 			RenderQueue invalidPacketQueue = queue;
 			invalidPacketQueue.m_DrawItems.front().m_CoverageDrawPacket = {};
 			DepthCoverageFramePlanBuildInfo invalidPacketBuildInfo = framePlanBuildInfo;
 			invalidPacketBuildInfo.m_RenderQueue = std::addressof(invalidPacketQueue);
-			const DepthCoverageFramePlan rejectedPlan =
-				BuildDepthCoverageFramePlan(invalidPacketBuildInfo);
+			const DepthCoverageFramePlan rejectedPlan = BuildDepthCoverageFramePlan(invalidPacketBuildInfo);
 
 			DepthCoverageFramePlanBuildInfo standardDepthBuildInfo = framePlanBuildInfo;
 			standardDepthBuildInfo.m_DepthConvention = DepthConvention::Standard;
-			const DepthCoverageFramePlan standardDepthPlan =
-				BuildDepthCoverageFramePlan(standardDepthBuildInfo);
+			const DepthCoverageFramePlan standardDepthPlan = BuildDepthCoverageFramePlan(standardDepthBuildInfo);
 
 			RenderQueue emptyQueue{
 				.m_ViewId = RenderViewID::Main,
@@ -3893,8 +3793,7 @@ namespace gglab
 			};
 			DepthCoverageFramePlanBuildInfo emptyQueueBuildInfo = framePlanBuildInfo;
 			emptyQueueBuildInfo.m_RenderQueue = std::addressof(emptyQueue);
-			const DepthCoverageFramePlan emptyQueuePlan =
-				BuildDepthCoverageFramePlan(emptyQueueBuildInfo);
+			const DepthCoverageFramePlan emptyQueuePlan = BuildDepthCoverageFramePlan(emptyQueueBuildInfo);
 			context.Check(
 				equalPlan.IsValid() && equalPlan.m_Diagnostic.empty() &&
 				equalPlan.AddsForwardOpaquePass() && !equalPlan.AddsForwardTransparentPass() &&
@@ -3946,9 +3845,7 @@ namespace gglab
 					continue;
 				}
 
-				if (!selection.m_IsValid ||
-					screen_space::IsDepthNearer(
-						candidate.m_RawDepth, selection.m_RawDepth, convention))
+				if (!selection.m_IsValid || screen_space::IsDepthNearer(candidate.m_RawDepth, selection.m_RawDepth, convention))
 				{
 					selection = {
 						.m_SelectedIndex = candidateIndex,
@@ -3964,13 +3861,10 @@ namespace gglab
 		float GTAOInterleavedGradientNoise(uint32_t pixelX, uint32_t pixelY) noexcept
 		{
 			const auto fract = [](float value) noexcept { return value - std::floor(value); };
-			return fract(52.9829189f *
-				fract(0.06711056f * static_cast<float>(pixelX) +
-					0.00583715f * static_cast<float>(pixelY)));
+			return fract(52.9829189f * fract(0.06711056f * static_cast<float>(pixelX) + 0.00583715f * static_cast<float>(pixelY)));
 		}
 
-		[[nodiscard]] constexpr float ResolveGTAODiffuseIBLVisibility(
-			float materialAO, float gtao) noexcept
+		[[nodiscard]] constexpr float ResolveGTAODiffuseIBLVisibility(float materialAO, float gtao) noexcept
 		{
 			return std::clamp(materialAO * gtao, 0.0f, 1.0f);
 		}
@@ -4004,25 +3898,24 @@ namespace gglab
 				!MakeGTAOHalfResolutionExtent(0, 0).IsValid(),
 				"GTAO half-resolution extents use deterministic per-axis ceiling division");
 
-			const std::array<GTAOSurfaceCandidate, 4> reversedCandidates = {
-				GTAOSurfaceCandidate{.m_RawDepth = 0.0f, .m_ViewZ = 0.0f},
-				GTAOSurfaceCandidate{.m_RawDepth = 0.4f, .m_ViewZ = 3.0f},
-				GTAOSurfaceCandidate{.m_RawDepth = 0.7f, .m_ViewZ = 2.0f},
-				GTAOSurfaceCandidate{.m_RawDepth = 0.7f, .m_ViewZ = 2.0f},
+			const std::array<GTAOSurfaceCandidate, 4> reversedCandidates =
+			{
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.0f, .m_ViewZ = 0.0f },
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.4f, .m_ViewZ = 3.0f },
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.7f, .m_ViewZ = 2.0f },
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.7f, .m_ViewZ = 2.0f },
 			};
-			const GTAOSurfaceSelection reversedSelection = SelectGTAOHalfResolutionSurface(
-				reversedCandidates, DepthConvention::Reversed);
-			const std::array<GTAOSurfaceCandidate, 4> standardTieCandidates = {
-				GTAOSurfaceCandidate{.m_RawDepth = 0.25f, .m_ViewZ = 2.0f},
-				GTAOSurfaceCandidate{.m_RawDepth = 0.25f, .m_ViewZ = 2.0f},
-				GTAOSurfaceCandidate{.m_RawDepth = 0.5f, .m_ViewZ = 4.0f},
-				GTAOSurfaceCandidate{.m_RawDepth = 1.0f, .m_ViewZ = 0.0f},
+			const GTAOSurfaceSelection reversedSelection = SelectGTAOHalfResolutionSurface(reversedCandidates, DepthConvention::Reversed);
+			const std::array<GTAOSurfaceCandidate, 4> standardTieCandidates =
+			{
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.25f, .m_ViewZ = 2.0f },
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.25f, .m_ViewZ = 2.0f },
+				GTAOSurfaceCandidate{ .m_RawDepth = 0.5f, .m_ViewZ = 4.0f },
+				GTAOSurfaceCandidate{ .m_RawDepth = 1.0f, .m_ViewZ = 0.0f },
 			};
-			const GTAOSurfaceSelection standardSelection = SelectGTAOHalfResolutionSurface(
-				standardTieCandidates, DepthConvention::Standard);
+			const GTAOSurfaceSelection standardSelection = SelectGTAOHalfResolutionSurface(standardTieCandidates, DepthConvention::Standard);
 			const std::array<GTAOSurfaceCandidate, 4> backgroundCandidates{};
-			const GTAOSurfaceSelection backgroundSelection = SelectGTAOHalfResolutionSurface(
-				backgroundCandidates, DepthConvention::Reversed);
+			const GTAOSurfaceSelection backgroundSelection = SelectGTAOHalfResolutionSurface(backgroundCandidates, DepthConvention::Reversed);
 			context.Check(reversedSelection.m_IsValid &&
 				reversedSelection.m_SelectedIndex == 2 && reversedSelection.m_RawDepth == 0.7f &&
 				standardSelection.m_IsValid && standardSelection.m_SelectedIndex == 0 &&
@@ -4070,23 +3963,17 @@ namespace gglab
 				.m_ShaderResource = unsupportedShaderResource,
 				.m_TypedUavStore = supportedRequirement,
 			};
-			const GTAOFinalAOFormatResolution preferredFinalAO =
-				ResolveGTAOFinalAOFormat(supportedFormat, supportedFormat);
-			const GTAOFinalAOFormatResolution storeFallbackFinalAO =
-				ResolveGTAOFinalAOFormat(unsupportedR8Store, supportedFormat);
-			const GTAOFinalAOFormatResolution srvFallbackFinalAO =
-				ResolveGTAOFinalAOFormat(unsupportedR8Srv, supportedFormat);
-			const GTAOFinalAOFormatResolution unavailableFinalAO =
-				ResolveGTAOFinalAOFormat(unsupportedR8Store, unsupportedR8Srv);
+			const GTAOFinalAOFormatResolution preferredFinalAO = ResolveGTAOFinalAOFormat(supportedFormat, supportedFormat);
+			const GTAOFinalAOFormatResolution storeFallbackFinalAO = ResolveGTAOFinalAOFormat(unsupportedR8Store, supportedFormat);
+			const GTAOFinalAOFormatResolution srvFallbackFinalAO = ResolveGTAOFinalAOFormat(unsupportedR8Srv, supportedFormat);
+			const GTAOFinalAOFormatResolution unavailableFinalAO = ResolveGTAOFinalAOFormat(unsupportedR8Store, unsupportedR8Srv);
 			context.Check(preferredFinalAO.m_Format == RHIFormat::R8Unorm &&
 				!preferredFinalAO.UsesFallback() &&
 				storeFallbackFinalAO.m_Format == RHIFormat::R16Float &&
 				storeFallbackFinalAO.UsesFallback() &&
-				storeFallbackFinalAO.m_PreferredR8Unorm.m_TypedUavStore.m_Reason ==
-				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported &&
+				storeFallbackFinalAO.m_PreferredR8Unorm.m_TypedUavStore.m_Reason == RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported &&
 				srvFallbackFinalAO.m_Format == RHIFormat::R16Float &&
-				srvFallbackFinalAO.m_PreferredR8Unorm.m_ShaderResource.m_Reason ==
-				RHITextureSupportReason::ShaderResourceUnsupported &&
+				srvFallbackFinalAO.m_PreferredR8Unorm.m_ShaderResource.m_Reason == RHITextureSupportReason::ShaderResourceUnsupported &&
 				!unavailableFinalAO.IsAvailable(),
 				"GTAO FinalAO requires both SRV and typed UAV store support and preserves failures");
 
@@ -4096,14 +3983,10 @@ namespace gglab
 				"GTAO modulates material-occluded diffuse IBL without changing specular IBL visibility");
 
 			context.Check(
-				ResolveGTAOFrameStatus(false, false, false) ==
-				GTAOFrameStatus::Disabled &&
-				ResolveGTAOFrameStatus(true, false, false) ==
-				GTAOFrameStatus::CoreCapabilityUnavailable &&
-				ResolveGTAOFrameStatus(true, true, false) ==
-				GTAOFrameStatus::NoOpaqueDraws &&
-				ResolveGTAOFrameStatus(true, true, true) ==
-				GTAOFrameStatus::Active,
+				ResolveGTAOFrameStatus(false, false, false) == GTAOFrameStatus::Disabled &&
+				ResolveGTAOFrameStatus(true, false, false) == GTAOFrameStatus::CoreCapabilityUnavailable &&
+				ResolveGTAOFrameStatus(true, true, false) == GTAOFrameStatus::NoOpaqueDraws &&
+				ResolveGTAOFrameStatus(true, true, true) == GTAOFrameStatus::Active,
 				"GTAO frame status preserves deterministic disabled, unsupported, idle, and active causes");
 
 			ViewRenderProfile gtaoProfile{};
@@ -4117,8 +4000,7 @@ namespace gglab
 			gtaoProfile.m_Lighting.m_GTAO.m_StepCount = 99;
 			gtaoProfile.m_Lighting.m_GTAO.m_DenoiseRadius = 99;
 			const Camera gtaoCamera(Camera::CreateInfo{});
-			const GTAOSettings resolvedGTAO =
-				ResolveViewRenderSettings(gtaoProfile, gtaoCamera).m_Lighting.m_GTAO;
+			const GTAOSettings resolvedGTAO = ResolveViewRenderSettings(gtaoProfile, gtaoCamera).m_Lighting.m_GTAO;
 			context.Check(resolvedGTAO.m_Radius == 0.01f &&
 				resolvedGTAO.m_FalloffStart == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_FalloffEnd == resolvedGTAO.m_Radius &&
@@ -4139,84 +4021,59 @@ namespace gglab
 				D3D12_FORMAT_SUPPORT1_TEXTURE2D | D3D12_FORMAT_SUPPORT1_RENDER_TARGET |
 				D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE |
 				D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW);
-			const auto noTypedUavSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
-				fullSupport1 & ~D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW);
-			const auto noShaderResourceSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
-				fullSupport1 & ~D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE);
-			const auto noRenderTargetSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
-				fullSupport1 & ~D3D12_FORMAT_SUPPORT1_RENDER_TARGET);
-			constexpr auto TypedStoreSupport =
-				static_cast<D3D12_FORMAT_SUPPORT2>(D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
+			const auto noTypedUavSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(fullSupport1 & ~D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW);
+			const auto noShaderResourceSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(fullSupport1 & ~D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE);
+			const auto noRenderTargetSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(fullSupport1 & ~D3D12_FORMAT_SUPPORT1_RENDER_TARGET);
+			constexpr auto TypedStoreSupport = static_cast<D3D12_FORMAT_SUPPORT2>(D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
 
 			RHITextureViewDesc viewDesc{
 				.m_Type = RHITextureViewType::UnorderedAccess,
 				.m_Dimension = RHITextureViewDimension::Texture2D,
 				.m_Format = RHIFormat::R8Unorm,
 			};
-			context.Check(EvaluateD3D12TextureFormatSupport(desc, fullSupport1) ==
-				RHITextureSupportReason::None &&
-				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::None,
+			context.Check(EvaluateD3D12TextureFormatSupport(desc, fullSupport1) == RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(desc, viewDesc, fullSupport1, TypedStoreSupport) == RHITextureSupportReason::None,
 				"R8Unorm accepts the complete GTAO texture and typed-UAV capability set");
-			context.Check(EvaluateD3D12TextureFormatSupport(desc, noTypedUavSupport1) ==
-				RHITextureSupportReason::TypedUnorderedAccessUnsupported &&
+			context.Check(EvaluateD3D12TextureFormatSupport(desc, noTypedUavSupport1) == RHITextureSupportReason::TypedUnorderedAccessUnsupported &&
 				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, noTypedUavSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::TypedUnorderedAccessUnsupported &&
+					desc, viewDesc, noTypedUavSupport1, TypedStoreSupport) == RHITextureSupportReason::TypedUnorderedAccessUnsupported &&
 				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, fullSupport1, D3D12_FORMAT_SUPPORT2_NONE) ==
-				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported,
+					desc, viewDesc, fullSupport1, D3D12_FORMAT_SUPPORT2_NONE) == RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported,
 				"R8Unorm capability queries distinguish typed-UAV and typed-store fallback causes");
 
 			viewDesc.m_Type = RHITextureViewType::ShaderResource;
 			context.Check(EvaluateD3D12TextureViewFormatSupport(
-				desc, viewDesc, noShaderResourceSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::ShaderResourceUnsupported,
+				desc, viewDesc, noShaderResourceSupport1, TypedStoreSupport) == RHITextureSupportReason::ShaderResourceUnsupported,
 				"Single-channel SRV capability validation rejects formats without shader access");
 			viewDesc.m_Type = RHITextureViewType::RenderTarget;
 			context.Check(
+				EvaluateD3D12TextureViewFormatSupport(desc, viewDesc, fullSupport1, TypedStoreSupport) == RHITextureSupportReason::None &&
 				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::None &&
-				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, noRenderTargetSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::RenderTargetUnsupported,
+					desc, viewDesc, noRenderTargetSupport1, TypedStoreSupport) == RHITextureSupportReason::RenderTargetUnsupported,
 				"Single-channel RTV capability validation requires render-target support");
 
 			desc.m_Format = RHIFormat::R16Float;
 			viewDesc.m_Format = RHIFormat::R16Float;
 			viewDesc.m_Type = RHITextureViewType::UnorderedAccess;
-			const bool r16Supported = EvaluateD3D12TextureFormatSupport(desc, fullSupport1) ==
-				RHITextureSupportReason::None &&
-				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::None;
+			const bool r16Supported = EvaluateD3D12TextureFormatSupport(desc, fullSupport1) == RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(desc, viewDesc, fullSupport1, TypedStoreSupport) == RHITextureSupportReason::None;
 			desc.m_Format = RHIFormat::R32Float;
 			viewDesc.m_Format = RHIFormat::R32Float;
 			context.Check(r16Supported &&
-				EvaluateD3D12TextureFormatSupport(desc, fullSupport1) ==
-				RHITextureSupportReason::None &&
-				EvaluateD3D12TextureViewFormatSupport(
-					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
-				RHITextureSupportReason::None,
+				EvaluateD3D12TextureFormatSupport(desc, fullSupport1) == RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(desc, viewDesc, fullSupport1, TypedStoreSupport) == RHITextureSupportReason::None,
 				"R16Float and existing R32Float use the same typed-UAV capability contract");
-			context.Check(RHITextureSupportReasonText(
-				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported) ==
+			context.Check(RHITextureSupportReasonText(RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported) ==
 				"typed unordered-access store unsupported",
 				"Texture capability failures expose a stable diagnostic reason");
 			context.Check(
-				RHITextureSupportReasonForUsage(RHITextureUsage::Sampled) ==
-				RHITextureSupportReason::ShaderResourceUnsupported &&
-				RHITextureSupportReasonForUsage(RHITextureUsage::CopyDest) ==
-				RHITextureSupportReason::CopyDestUnsupported &&
-				RHITextureSupportReasonForUsage(RHITextureUsage::None) ==
-				RHITextureSupportReason::FormatCombinationUnsupported,
+				RHITextureSupportReasonForUsage(RHITextureUsage::Sampled) == RHITextureSupportReason::ShaderResourceUnsupported &&
+				RHITextureSupportReasonForUsage(RHITextureUsage::CopyDest) == RHITextureSupportReason::CopyDestUnsupported &&
+				RHITextureSupportReasonForUsage(RHITextureUsage::None) == RHITextureSupportReason::FormatCombinationUnsupported,
 				"Texture usage failures map to backend-neutral support reasons");
 		}
 
-		[[nodiscard]] bool HasDependencyEdge(const RGSnapshot& snapshot, uint32_t fromPass,
-			uint32_t toPass, RGDependencyReason reason) noexcept
+		[[nodiscard]] bool HasDependencyEdge(const RGSnapshot& snapshot, uint32_t fromPass, uint32_t toPass, RGDependencyReason reason) noexcept
 		{
 			return std::ranges::any_of(snapshot.m_DependencyEdges,
 				[=](const RGSnapshotDependencyEdge& edge)
@@ -4230,9 +4087,9 @@ namespace gglab
 		void RunGTAORenderGraphDataflowTests(SelfTestContext& context) noexcept
 		{
 			RenderGraph graph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			const RHITextureDesc halfAODesc{
 				.m_Format = RHIFormat::R16Float,
 				.m_Extent = { 640, 360, 1 },
@@ -4254,76 +4111,52 @@ namespace gglab
 				{
 					rawAO = builder.CreateTexture("GTAO.RawAO", halfAODesc);
 					halfDepth = builder.CreateTexture("GTAO.HalfDepthViewZ", halfDepthDesc);
-					builder.WriteInPlace(
-						rawAO, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-					builder.WriteInPlace(
-						halfDepth, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-					data.m_Views[0] =
-						builder.CreateView<RHITextureViewType::UnorderedAccess>(rawAO);
-					data.m_Views[1] =
-						builder.CreateView<RHITextureViewType::UnorderedAccess>(halfDepth);
+					builder.WriteInPlace(rawAO, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					builder.WriteInPlace(halfDepth, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] = builder.CreateView<RHITextureViewType::UnorderedAccess>(rawAO);
+					data.m_Views[1] = builder.CreateView<RHITextureViewType::UnorderedAccess>(halfDepth);
 				});
 			graph.AddPass<GTAODataflowPassData>(
 				"Lighting.GTAO.DenoiseX", RGPassEncoderType::Compute,
 				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
 				{
-					const RGTextureId rawAOSrv = builder.Read(
-						rawAO, RGTextureAccess::Sample, RHIStage::ComputeShader);
-					const RGTextureId halfDepthSrv = builder.Read(
-						halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId rawAOSrv = builder.Read(rawAO, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId halfDepthSrv = builder.Read(halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					denoiseX = builder.CreateTexture("GTAO.DenoiseX", halfAODesc);
-					builder.WriteInPlace(
-						denoiseX, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-					data.m_Views[0] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(rawAOSrv);
-					data.m_Views[1] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
-					data.m_Views[2] =
-						builder.CreateView<RHITextureViewType::UnorderedAccess>(denoiseX);
+					builder.WriteInPlace(denoiseX, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] = builder.CreateView<RHITextureViewType::ShaderResource>(rawAOSrv);
+					data.m_Views[1] = builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
+					data.m_Views[2] = builder.CreateView<RHITextureViewType::UnorderedAccess>(denoiseX);
 				});
 			graph.AddPass<GTAODataflowPassData>(
 				"Lighting.GTAO.DenoiseY", RGPassEncoderType::Compute,
 				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
 				{
-					const RGTextureId denoiseXSrv = builder.Read(
-						denoiseX, RGTextureAccess::Sample, RHIStage::ComputeShader);
-					const RGTextureId halfDepthSrv = builder.Read(
-						halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId denoiseXSrv = builder.Read(denoiseX, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId halfDepthSrv = builder.Read(halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					denoiseY = builder.CreateTexture("GTAO.DenoiseY", halfAODesc);
-					builder.WriteInPlace(
-						denoiseY, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-					data.m_Views[0] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(denoiseXSrv);
-					data.m_Views[1] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
-					data.m_Views[2] =
-						builder.CreateView<RHITextureViewType::UnorderedAccess>(denoiseY);
+					builder.WriteInPlace(denoiseY, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] = builder.CreateView<RHITextureViewType::ShaderResource>(denoiseXSrv);
+					data.m_Views[1] = builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
+					data.m_Views[2] = builder.CreateView<RHITextureViewType::UnorderedAccess>(denoiseY);
 				});
 			graph.AddPass<GTAODataflowPassData>(
 				"Lighting.GTAO.Upsample", RGPassEncoderType::Compute,
 				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
 				{
-					const RGTextureId denoiseYSrv = builder.Read(
-						denoiseY, RGTextureAccess::Sample, RHIStage::ComputeShader);
-					const RGTextureId halfDepthSrv = builder.Read(
-						halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId denoiseYSrv = builder.Read(denoiseY, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId halfDepthSrv = builder.Read(halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					finalAO = builder.CreateTexture("GTAO.FinalAO", finalAODesc);
-					builder.WriteInPlace(
-						finalAO, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-					data.m_Views[0] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(denoiseYSrv);
-					data.m_Views[1] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
-					data.m_Views[2] =
-						builder.CreateView<RHITextureViewType::UnorderedAccess>(finalAO);
+					builder.WriteInPlace(finalAO, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] = builder.CreateView<RHITextureViewType::ShaderResource>(denoiseYSrv);
+					data.m_Views[1] = builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
+					data.m_Views[2] = builder.CreateView<RHITextureViewType::UnorderedAccess>(finalAO);
 				});
 			graph.AddPass<GTAODataflowPassData>("Geometry.ForwardPBR.Opaque",
 				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
 				{
-					const RGTextureId finalAOSrv = builder.Read(
-						finalAO, RGTextureAccess::Sample, RHIStage::PixelShader);
-					data.m_Views[0] =
-						builder.CreateView<RHITextureViewType::ShaderResource>(finalAOSrv);
+					const RGTextureId finalAOSrv = builder.Read(finalAO, RGTextureAccess::Sample, RHIStage::PixelShader);
+					data.m_Views[0] = builder.CreateView<RHITextureViewType::ShaderResource>(finalAOSrv);
 					builder.SideEffect();
 				});
 
@@ -4364,15 +4197,17 @@ namespace gglab
 			struct ResourceHandleFixture : RGResourceHandle
 			{
 				ResourceHandleFixture(Handle handle, Version version) noexcept :
-					RGResourceHandle(handle, version) {}
+					RGResourceHandle(handle, version)
+				{
+				}
 			};
 			RenderGraph graph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
-				});
+			});
 			const RHITextureDesc textureDesc{
 				.m_Format = RHIFormat::R16Float, .m_Extent = { 8, 8, 1 },
-				};
+			};
 			const RHIBufferDesc bufferDesc{ .m_SizeInBytes = 64, .m_StrideInBytes = 16 };
 			RGTextureId earlierTexture;
 			RGBufferId earlierBuffer;
@@ -4391,10 +4226,8 @@ namespace gglab
 			graph.AddPass<FixturePassData>("ResourceStatus.RetainedWriters", RGPassEncoderType::Compute,
 				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
 				{
-					retainedTexture = builder.Write(earlierTexture,
-						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-					retainedBuffer = builder.Write(earlierBuffer,
-						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+					retainedTexture = builder.Write(earlierTexture, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					retainedBuffer = builder.Write(earlierBuffer, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
 					builder.SideEffect();
 				});
 			graph.AddPass<FixturePassData>("ResourceStatus.CulledWriters", RGPassEncoderType::Compute,
@@ -4425,8 +4258,7 @@ namespace gglab
 				query.GetCompiledResourceStatus(earlierBuffer) == RGCompiledResourceStatus::Referenced,
 				"Valid logical versions share underlying-resource usage even when their earlier writers are culled");
 			const ResourceHandleFixture outOfRange(RGResourceHandle::Handle{ uint16_t{ 65534 } }, 1);
-			const ResourceHandleFixture uninitializedVersion(retainedTexture.GetHandle(),
-				RGResourceHandle::UnintializedVersion);
+			const ResourceHandleFixture uninitializedVersion(retainedTexture.GetHandle(), RGResourceHandle::UnintializedVersion);
 			const ResourceHandleFixture futureVersion(retainedBuffer.GetHandle(),
 				static_cast<RGResourceHandle::Version>(retainedBuffer.GetVersion() + 1));
 			context.Check(query.GetCompiledResourceStatus(RGTextureId{}) == RGCompiledResourceStatus::Unavailable &&
@@ -4460,46 +4292,48 @@ namespace gglab
 				RGTextureAccess m_Access;
 				std::array<bool, 3> m_DependencyAccesses;
 			};
-			constexpr std::array TextureCompatibility = {
-				TextureCompatibilityRow{RGTextureAccess::None, {false, false, false}},
-				TextureCompatibilityRow{RGTextureAccess::Sample, {true, false, false}},
-				TextureCompatibilityRow{RGTextureAccess::RenderTarget, {false, true, true}},
-				TextureCompatibilityRow{RGTextureAccess::DepthStencilWrite, {false, true, true}},
-				TextureCompatibilityRow{RGTextureAccess::DepthStencilRead, {true, false, false}},
-				TextureCompatibilityRow{RGTextureAccess::StorageRead, {true, false, false}},
-				TextureCompatibilityRow{RGTextureAccess::StorageWrite, {false, true, false}},
-				TextureCompatibilityRow{RGTextureAccess::StorageReadWrite, {false, false, true}},
-				TextureCompatibilityRow{RGTextureAccess::CopySource, {true, false, false}},
-				TextureCompatibilityRow{RGTextureAccess::CopyDest, {false, true, false}},
-				TextureCompatibilityRow{RGTextureAccess::Present, {false, false, false}},
+			constexpr std::array TextureCompatibility =
+			{
+				TextureCompatibilityRow{ RGTextureAccess::None,{ false, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::Sample,{ true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::RenderTarget,{ false, true, true } },
+				TextureCompatibilityRow{ RGTextureAccess::DepthStencilWrite,{ false, true, true } },
+				TextureCompatibilityRow{ RGTextureAccess::DepthStencilRead,{ true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::StorageRead,{ true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::StorageWrite,{ false, true, false } },
+				TextureCompatibilityRow{ RGTextureAccess::StorageReadWrite,{ false, false, true } },
+				TextureCompatibilityRow{ RGTextureAccess::CopySource,{ true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::CopyDest,{ false, true, false } },
+				TextureCompatibilityRow{ RGTextureAccess::Present,{ false, false, false } },
 			};
 			struct BufferCompatibilityRow
 			{
 				RGBufferAccess m_Access;
 				std::array<bool, 3> m_DependencyAccesses;
 			};
-			constexpr std::array BufferCompatibility = {
-				BufferCompatibilityRow{RGBufferAccess::None, {false, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::Vertex, {true, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::Index, {true, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::Constant, {true, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::StructuredRead, {true, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::StorageRead, {true, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::StorageWrite, {false, true, false}},
-				BufferCompatibilityRow{RGBufferAccess::StorageReadWrite, {false, false, true}},
-				BufferCompatibilityRow{RGBufferAccess::CopySource, {true, false, false}},
-				BufferCompatibilityRow{RGBufferAccess::CopyDest, {false, true, false}},
-				BufferCompatibilityRow{RGBufferAccess::IndirectArgument, {true, false, false}},
+			constexpr std::array BufferCompatibility =
+			{
+				BufferCompatibilityRow{ RGBufferAccess::None,{ false, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::Vertex,{ true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::Index,{ true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::Constant,{ true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StructuredRead,{ true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StorageRead,{ true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StorageWrite,{ false, true, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StorageReadWrite,{ false, false, true } },
+				BufferCompatibilityRow{ RGBufferAccess::CopySource,{ true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::CopyDest,{ false, true, false } },
+				BufferCompatibilityRow{ RGBufferAccess::IndirectArgument,{ true, false, false } },
 			};
-			constexpr std::array DependencyAccesses = {
+			constexpr std::array DependencyAccesses =
+			{
 				RGDependencyAccess::Read,
 				RGDependencyAccess::Write,
 				RGDependencyAccess::ReadWrite,
 			};
 			static_assert(
 				TextureCompatibility.size() == static_cast<size_t>(RGTextureAccess::Present) + 1);
-			static_assert(BufferCompatibility.size() ==
-				static_cast<size_t>(RGBufferAccess::IndirectArgument) + 1);
+			static_assert(BufferCompatibility.size() == static_cast<size_t>(RGBufferAccess::IndirectArgument) + 1);
 
 			bool completeCompatibilityMatrixMatches = true;
 			for (const auto& row : TextureCompatibility)
@@ -4508,12 +4342,9 @@ namespace gglab
 				{
 					const auto dependencyAccess = DependencyAccesses[accessIndex];
 					completeCompatibilityMatrixMatches &=
-						IsRGAccessCompatible(
-							row.m_Access, dependencyAccess, RGOrderingRequirement::Ordered) ==
-						row.m_DependencyAccesses[accessIndex];
+						IsRGAccessCompatible(row.m_Access, dependencyAccess, RGOrderingRequirement::Ordered) == row.m_DependencyAccesses[accessIndex];
 					completeCompatibilityMatrixMatches &=
-						IsRGAccessCompatible(
-							row.m_Access, dependencyAccess, RGOrderingRequirement::Unordered) ==
+						IsRGAccessCompatible(row.m_Access, dependencyAccess, RGOrderingRequirement::Unordered) ==
 						(row.m_DependencyAccesses[accessIndex] && IsStorageAccess(row.m_Access));
 				}
 			}
@@ -4523,12 +4354,9 @@ namespace gglab
 				{
 					const auto dependencyAccess = DependencyAccesses[accessIndex];
 					completeCompatibilityMatrixMatches &=
-						IsRGAccessCompatible(
-							row.m_Access, dependencyAccess, RGOrderingRequirement::Ordered) ==
-						row.m_DependencyAccesses[accessIndex];
+						IsRGAccessCompatible(row.m_Access, dependencyAccess, RGOrderingRequirement::Ordered) == row.m_DependencyAccesses[accessIndex];
 					completeCompatibilityMatrixMatches &=
-						IsRGAccessCompatible(
-							row.m_Access, dependencyAccess, RGOrderingRequirement::Unordered) ==
+						IsRGAccessCompatible(row.m_Access, dependencyAccess, RGOrderingRequirement::Unordered) ==
 						(row.m_DependencyAccesses[accessIndex] && IsStorageAccess(row.m_Access));
 				}
 			}
@@ -4543,29 +4371,22 @@ namespace gglab
 					const bool expected = beforeAccess != RGDependencyAccess::Read ||
 						afterAccess != RGDependencyAccess::Read;
 					orderedUavMatrixMatches &=
-						NeedsOrderedUavBarrier(beforeAccess, RGOrderingRequirement::Ordered,
-							afterAccess, RGOrderingRequirement::Ordered) == expected;
+						NeedsOrderedUavBarrier(beforeAccess, RGOrderingRequirement::Ordered, afterAccess, RGOrderingRequirement::Ordered) == expected;
 					orderedUavMatrixMatches &=
-						!NeedsOrderedUavBarrier(beforeAccess, RGOrderingRequirement::Unordered,
-							afterAccess, RGOrderingRequirement::Ordered);
+						!NeedsOrderedUavBarrier(beforeAccess, RGOrderingRequirement::Unordered, afterAccess, RGOrderingRequirement::Ordered);
 					orderedUavMatrixMatches &=
-						!NeedsOrderedUavBarrier(beforeAccess, RGOrderingRequirement::Ordered,
-							afterAccess, RGOrderingRequirement::Unordered);
+						!NeedsOrderedUavBarrier(beforeAccess, RGOrderingRequirement::Ordered, afterAccess, RGOrderingRequirement::Unordered);
 				}
 			}
 			context.Check(orderedUavMatrixMatches,
 				"Ordered UAV hazards cover the complete read, write, and read-write matrix");
-			const RHIResourceState pixelReadState =
-				ToRHIResourceState(RGBufferAccess::StructuredRead, RHIStage::PixelShader);
-			const RHIResourceState computeReadState =
-				ToRHIResourceState(RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+			const RHIResourceState pixelReadState = ToRHIResourceState(RGBufferAccess::StructuredRead, RHIStage::PixelShader);
+			const RHIResourceState computeReadState = ToRHIResourceState(RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 			context.Check(!NeedsRHIResourceTransition(pixelReadState, computeReadState),
 				"Stage-only changes do not alter persistent resource state");
 
-			const RHIResourceState textureStorageState =
-				ToRHIResourceState(RGTextureAccess::StorageRead);
-			const RHIResourceState bufferStorageState =
-				ToRHIResourceState(RGBufferAccess::StorageRead);
+			const RHIResourceState textureStorageState = ToRHIResourceState(RGTextureAccess::StorageRead);
+			const RHIResourceState bufferStorageState = ToRHIResourceState(RGBufferAccess::StorageRead);
 			context.Check(
 				textureStorageState == ToRHIResourceState(RGTextureAccess::StorageWrite) &&
 				textureStorageState == ToRHIResourceState(RGTextureAccess::StorageReadWrite) &&
@@ -4573,31 +4394,24 @@ namespace gglab
 				bufferStorageState == ToRHIResourceState(RGBufferAccess::StorageReadWrite) &&
 				ToRHIUsage(RGTextureAccess::StorageRead) == RHITextureUsage::UnorderedAccess &&
 				ToRHIUsage(RGTextureAccess::StorageWrite) == RHITextureUsage::UnorderedAccess &&
-				ToRHIUsage(RGTextureAccess::StorageReadWrite) ==
-				RHITextureUsage::UnorderedAccess &&
+				ToRHIUsage(RGTextureAccess::StorageReadWrite) == RHITextureUsage::UnorderedAccess &&
 				ToRHIUsage(RGBufferAccess::StorageRead) == RHIBufferUsage::UnorderedAccess &&
 				ToRHIUsage(RGBufferAccess::StorageWrite) == RHIBufferUsage::UnorderedAccess &&
-				ToRHIUsage(RGBufferAccess::StorageReadWrite) ==
-				RHIBufferUsage::UnorderedAccess &&
+				ToRHIUsage(RGBufferAccess::StorageReadWrite) == RHIBufferUsage::UnorderedAccess &&
 				HasUavAccess(textureStorageState) && HasUavAccess(bufferStorageState),
 				"Storage read, write, and read-write accesses map to UAV resource states");
 			context.Check(
-				IsRGAccessCompatible(RGTextureAccess::StorageRead, RGDependencyAccess::Read,
-					RGOrderingRequirement::Ordered) &&
-				IsRGAccessCompatible(RGTextureAccess::StorageWrite, RGDependencyAccess::Write,
-					RGOrderingRequirement::Ordered) &&
-				IsRGAccessCompatible(RGBufferAccess::StorageReadWrite,
-					RGDependencyAccess::ReadWrite, RGOrderingRequirement::Unordered) &&
-				!IsRGAccessCompatible(RGTextureAccess::StorageRead, RGDependencyAccess::Write,
-					RGOrderingRequirement::Ordered) &&
-				!IsRGAccessCompatible(RGBufferAccess::StructuredRead, RGDependencyAccess::Read,
-					RGOrderingRequirement::Unordered),
+				IsRGAccessCompatible(RGTextureAccess::StorageRead, RGDependencyAccess::Read, RGOrderingRequirement::Ordered) &&
+				IsRGAccessCompatible(RGTextureAccess::StorageWrite, RGDependencyAccess::Write, RGOrderingRequirement::Ordered) &&
+				IsRGAccessCompatible(RGBufferAccess::StorageReadWrite, RGDependencyAccess::ReadWrite, RGOrderingRequirement::Unordered) &&
+				!IsRGAccessCompatible(RGTextureAccess::StorageRead, RGDependencyAccess::Write, RGOrderingRequirement::Ordered) &&
+				!IsRGAccessCompatible(RGBufferAccess::StructuredRead, RGDependencyAccess::Read, RGOrderingRequirement::Unordered),
 				"Storage access and ordering declarations reject incompatible semantics");
 
 			RenderGraph graph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGBufferId storageBuffer;
 			graph.AddPass<StorageAccessPassData>("InitialStorageWrite",
 				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
@@ -4609,8 +4423,7 @@ namespace gglab
 			graph.AddPass<StorageAccessPassData>("StorageRead",
 				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
-					data.m_Buffer = builder.Read(storageBuffer, RGBufferAccess::StorageRead,
-						std::nullopt, RGOrderingRequirement::Unordered);
+					data.m_Buffer = builder.Read(storageBuffer, RGBufferAccess::StorageRead, std::nullopt, RGOrderingRequirement::Unordered);
 					builder.SideEffect();
 				});
 			graph.AddPass<StorageAccessPassData>("SecondStorageWrite",
@@ -4656,15 +4469,11 @@ namespace gglab
 
 			context.Check(
 				initialWrite.m_Accesses[0].m_DependencyAccess == RGDependencyAccess::Write &&
-				initialWrite.m_Accesses[0].m_AccessValue ==
-				static_cast<uint64_t>(RGBufferAccess::StorageWrite) &&
+				initialWrite.m_Accesses[0].m_AccessValue == static_cast<uint64_t>(RGBufferAccess::StorageWrite) &&
 				storageRead.m_Accesses[0].m_DependencyAccess == RGDependencyAccess::Read &&
-				storageRead.m_Accesses[0].m_AccessValue ==
-				static_cast<uint64_t>(RGBufferAccess::StorageRead) &&
-				storageReadWrite.m_Accesses[0].m_DependencyAccess ==
-				RGDependencyAccess::ReadWrite &&
-				storageReadWrite.m_Accesses[0].m_AccessValue ==
-				static_cast<uint64_t>(RGBufferAccess::StorageReadWrite),
+				storageRead.m_Accesses[0].m_AccessValue == static_cast<uint64_t>(RGBufferAccess::StorageRead) &&
+				storageReadWrite.m_Accesses[0].m_DependencyAccess == RGDependencyAccess::ReadWrite &&
+				storageReadWrite.m_Accesses[0].m_AccessValue == static_cast<uint64_t>(RGBufferAccess::StorageReadWrite),
 				"Storage access semantics remain distinct in RenderGraph snapshots");
 			context.Check(
 				storageRead.m_Accesses[0].m_Ordering == RGOrderingRequirement::Unordered &&
@@ -4696,23 +4505,21 @@ namespace gglab
 				"Culled storage writers leave no execution or barrier work");
 
 			RenderGraph transitionGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGBufferId transitionBuffer;
 			transitionGraph.AddPass<StorageAccessPassData>("TransitionStorageWrite",
 				[&transitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
 					transitionBuffer = builder.CreateBuffer("TransitionBuffer");
-					builder.WriteInPlace(transitionBuffer, RGBufferAccess::StorageWrite,
-						RHIStage::ComputeShader);
+					builder.WriteInPlace(transitionBuffer, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Buffer = transitionBuffer;
 				});
 			transitionGraph.AddPass<StorageAccessPassData>("TransitionStructuredRead",
 				[&transitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
-					data.m_Buffer = builder.Read(transitionBuffer, RGBufferAccess::StructuredRead,
-						RHIStage::PixelShader);
+					data.m_Buffer = builder.Read(transitionBuffer, RGBufferAccess::StructuredRead, RHIStage::PixelShader);
 					builder.SideEffect();
 				});
 			const bool transitionCompiled = transitionGraph.Compile();
@@ -4737,25 +4544,21 @@ namespace gglab
 			}
 
 			RenderGraph computeTransitionGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGBufferId computeTransitionBuffer;
 			computeTransitionGraph.AddPass<StorageAccessPassData>("ComputeTransitionStorageWrite",
-				[&computeTransitionBuffer](
-					RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				[&computeTransitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
 					computeTransitionBuffer = builder.CreateBuffer("ComputeTransitionBuffer");
-					builder.WriteInPlace(computeTransitionBuffer, RGBufferAccess::StorageWrite,
-						RHIStage::ComputeShader);
+					builder.WriteInPlace(computeTransitionBuffer, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Buffer = computeTransitionBuffer;
 				});
 			computeTransitionGraph.AddPass<StorageAccessPassData>("ComputeTransitionStructuredRead",
-				[&computeTransitionBuffer](
-					RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				[&computeTransitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
-					data.m_Buffer = builder.Read(computeTransitionBuffer,
-						RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+					data.m_Buffer = builder.Read(computeTransitionBuffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 					builder.SideEffect();
 				});
 			const bool computeTransitionCompiled = computeTransitionGraph.Compile();
@@ -4781,9 +4584,9 @@ namespace gglab
 			}
 
 			RenderGraph resourceSpecificGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGBufferId firstBuffer;
 			RGBufferId secondBuffer;
 			resourceSpecificGraph.AddPass<DualStorageAccessPassData>("WriteTwoStorageBuffers",
@@ -4821,13 +4624,13 @@ namespace gglab
 			}
 
 			RenderGraph multiSubresourceGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGTextureId mipTexture;
 			const RHITextureDesc mipTextureDesc = {
 				.m_Format = RHIFormat::R8G8B8A8Unorm,
-				.m_Extent = {.m_Width = 4, .m_Height = 4, .m_Depth = 1},
+				.m_Extent = { .m_Width = 4, .m_Height = 4, .m_Depth = 1 },
 				.m_MipLevels = 3,
 			};
 			const RHISubresourceRange firstMip = {
@@ -4873,15 +4676,13 @@ namespace gglab
 			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>("SampleThirdMip",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
-					data.m_Texture = builder.Read(
-						mipTexture, RGTextureAccess::Sample, RHIStage::PixelShader, thirdMip);
+					data.m_Texture = builder.Read(mipTexture, RGTextureAccess::Sample, RHIStage::PixelShader, thirdMip);
 					builder.SideEffect();
 				});
 			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>("ReadWriteFirstTwoMips",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
-					builder.ReadWriteInPlace(
-						mipTexture, RGTextureAccess::StorageReadWrite, firstTwoMips);
+					builder.ReadWriteInPlace(mipTexture, RGTextureAccess::StorageReadWrite, firstTwoMips);
 					data.m_Texture = mipTexture;
 					builder.SideEffect();
 				});
@@ -4900,10 +4701,8 @@ namespace gglab
 				RGSnapshot multiSubresourceSnapshot;
 				BuildRenderGraphSnapshot(multiSubresourceGraph, multiSubresourceSnapshot);
 				const auto& barriers = multiSubresourceSnapshot.m_Passes[2].m_PreBarriers;
-				const auto transition = std::ranges::find(
-					barriers, RGBarrierKind::Transition, &RGSnapshotBarrierInfo::m_Kind);
-				const auto uav =
-					std::ranges::find(barriers, RGBarrierKind::Uav, &RGSnapshotBarrierInfo::m_Kind);
+				const auto transition = std::ranges::find(barriers, RGBarrierKind::Transition, &RGSnapshotBarrierInfo::m_Kind);
+				const auto uav = std::ranges::find(barriers, RGBarrierKind::Uav, &RGSnapshotBarrierInfo::m_Kind);
 				context.Check(barriers.size() == 2 && transition != barriers.end() &&
 					transition->m_Subresources &&
 					transition->m_Subresources->m_BaseMip == 1 &&
@@ -4921,9 +4720,9 @@ namespace gglab
 			}
 
 			RenderGraph stageScopeGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGBufferId stageScopeBuffer;
 			stageScopeGraph.AddPass<StorageAccessPassData>("InitializeStageScopeBuffer",
 				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
@@ -4935,15 +4734,13 @@ namespace gglab
 			stageScopeGraph.AddPass<StorageAccessPassData>("PixelRead",
 				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
-					data.m_Buffer = builder.Read(
-						stageScopeBuffer, RGBufferAccess::StructuredRead, RHIStage::PixelShader);
+					data.m_Buffer = builder.Read(stageScopeBuffer, RGBufferAccess::StructuredRead, RHIStage::PixelShader);
 					builder.SideEffect();
 				});
 			stageScopeGraph.AddPass<StorageAccessPassData>("ComputeRead",
 				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
-					data.m_Buffer = builder.Read(
-						stageScopeBuffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+					data.m_Buffer = builder.Read(stageScopeBuffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 					builder.SideEffect();
 				});
 			stageScopeGraph.AddPass<StorageAccessPassData>("CopyAfterReads",
@@ -4963,18 +4760,16 @@ namespace gglab
 				const auto& copyAfterReads = stageScopeSnapshot.m_Passes[3];
 				context.Check(computeRead.m_PreBarriers.empty() &&
 					copyAfterReads.m_PreBarriers.size() == 1 &&
-					Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages,
-						RHIStage::PixelShader) &&
-					Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages,
-						RHIStage::ComputeShader),
+					Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages, RHIStage::PixelShader) &&
+					Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages, RHIStage::ComputeShader),
 					"Read-only stage scopes accumulate until a persistent state transition");
 			}
 
 			RenderGraph temporalResolvedInitializationGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 				.m_TransientResourcePool =
-					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGTextureId temporalResolvedColor;
 			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
 				"TAA.InitializeResolvedColor",
@@ -4984,10 +4779,8 @@ namespace gglab
 					RHITextureDesc desc{};
 					desc.m_Format = TemporalAAResolvedColorFormat;
 					desc.m_Extent = { 1920, 1080, 1 };
-					temporalResolvedColor =
-						builder.CreateTexture("TAA.ResolvedColorInitialization", desc);
-					builder.WriteInPlace(
-						temporalResolvedColor, RGTextureAccess::RenderTarget);
+					temporalResolvedColor = builder.CreateTexture("TAA.ResolvedColorInitialization", desc);
+					builder.WriteInPlace(temporalResolvedColor, RGTextureAccess::RenderTarget);
 					data.m_Texture = temporalResolvedColor;
 				});
 			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
@@ -4996,32 +4789,27 @@ namespace gglab
 				{
 					// Production TAA stays live through its exported history writes.
 					builder.SideEffect();
-					builder.WriteInPlace(
-						temporalResolvedColor, RGTextureAccess::StorageWrite);
+					builder.WriteInPlace(temporalResolvedColor, RGTextureAccess::StorageWrite);
 					data.m_Texture = temporalResolvedColor;
 				});
 			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
 				"Forward.TransparentLoad",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
-					builder.ReadWriteInPlace(
-						temporalResolvedColor, RGTextureAccess::RenderTarget);
+					builder.ReadWriteInPlace(temporalResolvedColor, RGTextureAccess::RenderTarget);
 					data.m_Texture = temporalResolvedColor;
 					builder.SideEffect();
 				});
-			const bool temporalResolvedInitializationCompiled =
-				temporalResolvedInitializationGraph.Compile();
+			const bool temporalResolvedInitializationCompiled = temporalResolvedInitializationGraph.Compile();
 			context.Check(temporalResolvedInitializationCompiled,
 				"TAA resolved-color initialization fixture compiles");
 			if (temporalResolvedInitializationCompiled)
 			{
 				RGSnapshot temporalResolvedSnapshot;
-				BuildRenderGraphSnapshot(
-					temporalResolvedInitializationGraph, temporalResolvedSnapshot);
+				BuildRenderGraphSnapshot(temporalResolvedInitializationGraph, temporalResolvedSnapshot);
 				const auto resource = std::ranges::find(temporalResolvedSnapshot.m_Resources,
 					"TAA.ResolvedColorInitialization", &RGSnapshotResourceInfo::m_Name);
-				const auto isTransition = [](const RGSnapshotPassInfo& pass,
-					RHILayout before, RHILayout after) noexcept
+				const auto isTransition = [](const RGSnapshotPassInfo& pass, RHILayout before, RHILayout after) noexcept
 				{
 					return std::ranges::any_of(pass.m_PreBarriers,
 						[before, after](const RGSnapshotBarrierInfo& barrier) noexcept
@@ -5034,22 +4822,17 @@ namespace gglab
 						});
 				};
 				context.Check(resource != temporalResolvedSnapshot.m_Resources.end() &&
-					Test(static_cast<RHITextureUsage>(resource->m_UsageBits),
-						RHITextureUsage::RenderTarget) &&
-					Test(static_cast<RHITextureUsage>(resource->m_UsageBits),
-						RHITextureUsage::UnorderedAccess),
+					Test(static_cast<RHITextureUsage>(resource->m_UsageBits), RHITextureUsage::RenderTarget) &&
+					Test(static_cast<RHITextureUsage>(resource->m_UsageBits), RHITextureUsage::UnorderedAccess),
 					"TAA resolved color preserves its mixed RTV/UAV usage contract");
 				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
-					isTransition(temporalResolvedSnapshot.m_Passes[0], RHILayout::Undefined,
-						RHILayout::RenderTarget),
+					isTransition(temporalResolvedSnapshot.m_Passes[0], RHILayout::Undefined, RHILayout::RenderTarget),
 					"TAA resolved color initializes through a first-use render-target transition");
 				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
-					isTransition(temporalResolvedSnapshot.m_Passes[1], RHILayout::RenderTarget,
-						RHILayout::UnorderedAccess),
+					isTransition(temporalResolvedSnapshot.m_Passes[1], RHILayout::RenderTarget, RHILayout::UnorderedAccess),
 					"TAA resolve transitions initialized color from RTV to UAV");
 				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
-					isTransition(temporalResolvedSnapshot.m_Passes[2], RHILayout::UnorderedAccess,
-						RHILayout::RenderTarget),
+					isTransition(temporalResolvedSnapshot.m_Passes[2], RHILayout::UnorderedAccess, RHILayout::RenderTarget),
 					"Transparent load transitions resolved color back from UAV to RTV");
 			}
 
@@ -5067,8 +4850,8 @@ namespace gglab
 			RecordingDevice encoderDevice;
 			RenderGraph encoderGraph({
 				.m_Device = &encoderDevice,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			encoderGraph.AddTrivialSideEffectPass("GraphicsEncoder",
 				[&](RGExecuteContext& executeContext)
 				{
@@ -5079,17 +4862,14 @@ namespace gglab
 						.m_View = RHITextureViewHandle{ 31, 1 },
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					};
-					selectedContext->BeginRendering({ .m_ColorAttachments =
-						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+					selectedContext->BeginRendering({ .m_ColorAttachments = std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				});
 			encoderGraph.AddTrivialSideEffectPass("ComputeEncoder", RGPassEncoderType::Compute,
 				[&](RGExecuteContext& executeContext)
 				{
 					++computeExecutions;
-					directComputeContextSelected =
-						executeContext.GetDirectComputeCommandContext() == &directComputeContext;
-					asyncComputeRemainsUnavailable =
-						executeContext.GetAsyncComputeCommandContext() == nullptr;
+					directComputeContextSelected = executeContext.GetDirectComputeCommandContext() == &directComputeContext;
+					asyncComputeRemainsUnavailable = executeContext.GetAsyncComputeCommandContext() == nullptr;
 				});
 			encoderGraph.AddPass<DualStorageAccessPassData>(
 				"CopyEncoder", RGPassEncoderType::Copy,
@@ -5104,10 +4884,8 @@ namespace gglab
 					data.m_SecondBuffer = builder.ImportBuffer("CopyDestination",
 						RHIBufferHandle{ 22, 1 }, copyBufferDesc, RGBufferAccess::CopyDest,
 						RGContentValidity::Undefined);
-					data.m_FirstBuffer = builder.Read(
-						data.m_FirstBuffer, RGBufferAccess::CopySource, RHIStage::Copy);
-					builder.WriteInPlace(
-						data.m_SecondBuffer, RGBufferAccess::CopyDest, RHIStage::Copy);
+					data.m_FirstBuffer = builder.Read(data.m_FirstBuffer, RGBufferAccess::CopySource, RHIStage::Copy);
+					builder.WriteInPlace(data.m_SecondBuffer, RGBufferAccess::CopyDest, RHIStage::Copy);
 					builder.SideEffect();
 				},
 				[&](RGExecuteContext& executeContext, DualStorageAccessPassData& data)
@@ -5115,10 +4893,8 @@ namespace gglab
 					++copyExecutions;
 					auto* copyContext = executeContext.GetCopyCommandContext();
 					copyContextSelected = copyContext == &graphicsContext;
-					const RHIBufferHandle source =
-						executeContext.GetBufferHandle(data.m_FirstBuffer);
-					const RHIBufferHandle destination =
-						executeContext.GetBufferHandle(data.m_SecondBuffer);
+					const RHIBufferHandle source = executeContext.GetBufferHandle(data.m_FirstBuffer);
+					const RHIBufferHandle destination = executeContext.GetBufferHandle(data.m_SecondBuffer);
 					copyResourcesResolved =
 						source == RHIBufferHandle{ 21, 1 } && destination == RHIBufferHandle{ 22, 1 };
 					if (copyContext)
@@ -5149,7 +4925,7 @@ namespace gglab
 					.m_GraphicsCommandContext = &graphicsContext,
 					.m_DirectComputeCommandContext = &directComputeContext,
 					.m_AsyncComputeCommandContext = nullptr,
-					});
+				});
 				encoderGraph.Execute(executeContext);
 				context.Check(graphicsExecutions == 1 && computeExecutions == 1 &&
 					copyExecutions == 1 && culledComputeExecutions == 0 &&
@@ -5173,15 +4949,15 @@ namespace gglab
 			RecordingDevice batchingDevice;
 			RenderGraph barrierBatchingGraph({
 				.m_Device = &batchingDevice,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			barrierBatchingGraph.AddPass<BarrierBatchingPassData>(
 				"BatchTextureAndBufferBarriers", RGPassEncoderType::Compute,
 				[](RenderGraph::RGBuilder& builder, BarrierBatchingPassData& data)
 				{
 					const RHITextureDesc textureDesc = {
 						.m_Format = RHIFormat::R8G8B8A8Unorm,
-						.m_Extent = {.m_Width = 4, .m_Height = 4, .m_Depth = 1},
+						.m_Extent = { .m_Width = 4, .m_Height = 4, .m_Depth = 1 },
 					};
 					const RHIBufferDesc bufferDesc = {
 						.m_SizeInBytes = 64,
@@ -5192,14 +4968,10 @@ namespace gglab
 						RGContentValidity::Defined);
 					data.m_Buffer = builder.ImportBuffer("BatchingBuffer", RHIBufferHandle{ 1, 1 },
 						bufferDesc, RGBufferAccess::CopyDest, RGContentValidity::Defined);
-					data.m_Texture = builder.Read(
-						data.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
-					data.m_Buffer = builder.Read(
-						data.m_Buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
-					builder.Export(
-						data.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
-					builder.Export(
-						data.m_Buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+					data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					data.m_Buffer = builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+					builder.Export(data.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					builder.Export(data.m_Buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 					builder.SideEffect();
 				},
 				[](RGExecuteContext&, BarrierBatchingPassData&) {});
@@ -5211,7 +4983,7 @@ namespace gglab
 					.m_GraphicsCommandContext = &batchingGraphicsContext,
 					.m_DirectComputeCommandContext = &batchingComputeContext,
 					.m_AsyncComputeCommandContext = nullptr,
-					});
+				});
 				barrierBatchingGraph.Execute(batchingExecuteContext);
 				context.Check(batchingComputeContext.m_TextureBarrierCount == 1 &&
 					batchingComputeContext.m_BufferBarrierCount == 1 &&
@@ -5243,15 +5015,13 @@ namespace gglab
 			};
 			auto acquireHistorySet = [&](uint32_t width, uint32_t height)
 			{
-				const RHIOwnedTextureCreateInfo colorInfo =
-					makeCreateInfo(RHIFormat::R16G16B16A16Float, width, height);
-				const RHIOwnedTextureCreateInfo depthInfo =
-					makeCreateInfo(RHIFormat::R32Float, width, height);
+				const RHIOwnedTextureCreateInfo colorInfo = makeCreateInfo(RHIFormat::R16G16B16A16Float, width, height);
+				const RHIOwnedTextureCreateInfo depthInfo = makeCreateInfo(RHIFormat::R32Float, width, height);
 				return std::array<PersistentTextureAllocation, 4>{
 					pool.AcquireTexture(colorInfo, "TAA.HistoryColor0"),
-					pool.AcquireTexture(colorInfo, "TAA.HistoryColor1"),
-					pool.AcquireTexture(depthInfo, "TAA.HistoryDepth0"),
-					pool.AcquireTexture(depthInfo, "TAA.HistoryDepth1"),
+						pool.AcquireTexture(colorInfo, "TAA.HistoryColor1"),
+						pool.AcquireTexture(depthInfo, "TAA.HistoryDepth0"),
+						pool.AcquireTexture(depthInfo, "TAA.HistoryDepth1"),
 				};
 			};
 			auto releaseHistorySet = [&](auto& allocations, const RHIFencePoint& fencePoint)
@@ -5263,8 +5033,7 @@ namespace gglab
 				}
 				return released;
 			};
-			auto allPendingAtFence = [](const PersistentTexturePoolDiagnostics& diagnostics,
-				uint64_t fenceValue) noexcept
+			auto allPendingAtFence = [](const PersistentTexturePoolDiagnostics& diagnostics, uint64_t fenceValue) noexcept
 			{
 				return std::ranges::all_of(diagnostics.m_PendingRetirements,
 					[fenceValue](const PersistentTexturePendingRetirementDiagnostics& pending)
@@ -5281,8 +5050,7 @@ namespace gglab
 				2 * EstimatePersistentTextureBytes(firstGeneration[0].GetCreateInfo().m_Desc) +
 				2 * EstimatePersistentTextureBytes(firstGeneration[2].GetCreateInfo().m_Desc);
 			PersistentTextureAllocation movedAllocation = std::move(firstGeneration[0]);
-			const bool moveTransferredOwnership =
-				!firstGeneration[0].IsValid() && movedAllocation.IsValid();
+			const bool moveTransferredOwnership = !firstGeneration[0].IsValid() && movedAllocation.IsValid();
 			firstGeneration[0] = std::move(movedAllocation);
 			const PersistentTexturePoolDiagnostics initialDiagnostics = pool.GetDiagnostics();
 			context.Check(!invalidAllocation.IsValid() && moveTransferredOwnership &&
@@ -5293,8 +5061,7 @@ namespace gglab
 				device.m_CreateTextureCount == 4,
 				"Persistent texture allocations are explicit, move-only, and byte-accounted");
 
-			const bool invalidFenceRejected =
-				!pool.ReleaseTexture(std::move(firstGeneration[0]), {});
+			const bool invalidFenceRejected = !pool.ReleaseTexture(std::move(firstGeneration[0]), {});
 			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
 			const bool firstReleased = releaseHistorySet(firstGeneration, firstFence);
 			const PersistentTexturePoolDiagnostics firstPending = pool.GetDiagnostics();
@@ -5333,8 +5100,7 @@ namespace gglab
 			const uint32_t partiallyDestroyedTextureCount = device.m_DestroyTextureCount;
 			const RHIFencePoint reenabledFence{ RHIFenceHandle{ 1, 1 }, 30 };
 			const bool reenabledReleased = releaseHistorySet(reenabledGeneration, reenabledFence);
-			const bool doubleReleaseRejected =
-				!pool.ReleaseTexture(std::move(reenabledGeneration[0]), reenabledFence);
+			const bool doubleReleaseRejected = !pool.ReleaseTexture(std::move(reenabledGeneration[0]), reenabledFence);
 			device.m_CompletedFenceValue = 30;
 			pool.Tick();
 			const PersistentTexturePoolDiagnostics fullyRetired = pool.GetDiagnostics();
@@ -5365,16 +5131,13 @@ namespace gglab
 			const std::array gtaoStatuses{ GTAOFrameStatus::Disabled, GTAOFrameStatus::Active,
 				GTAOFrameStatus::CoreCapabilityUnavailable, GTAOFrameStatus::NoOpaqueDraws };
 			context.Check(RenderPassTemporalReference::GetSourceEligibility(
-				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Active) ==
-					TemporalReferenceSourceEligibility::Eligible &&
+				TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::Active) == TemporalReferenceSourceEligibility::Eligible &&
 				RenderPassTemporalReference::GetSourceEligibility(
-					TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::NoOpaqueDraws) ==
-					TemporalReferenceSourceEligibility::Eligible &&
+					TemporalReferenceSignal::AmbientOcclusion, GTAOFrameStatus::NoOpaqueDraws) == TemporalReferenceSourceEligibility::Eligible &&
 				std::ranges::all_of(gtaoStatuses, [](GTAOFrameStatus status)
 					{
 						return RenderPassTemporalReference::GetSourceEligibility(
-							TemporalReferenceSignal::SceneColor, status) ==
-							TemporalReferenceSourceEligibility::Eligible;
+							TemporalReferenceSignal::SceneColor, status) == TemporalReferenceSourceEligibility::Eligible;
 					}),
 				"AO references accept active and empty input; scene-color references do not require GTAO");
 
@@ -5418,8 +5181,8 @@ namespace gglab
 				RenderGraph graph({
 					.m_Device = &device,
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				bool imported = false;
 				bool exported = false;
 				graph.AddPass<TemporalReferenceContractPassData>("TemporalReference.Contract",
@@ -5429,8 +5192,7 @@ namespace gglab
 						outPreviousValid = data.m_Sums.m_PreviousValid;
 						if (data.m_Sums.m_PreviousValid)
 						{
-							data.m_Sums.m_PreviousSum = builder.Read(
-								data.m_Sums.m_PreviousSum, RGTextureAccess::Sample);
+							data.m_Sums.m_PreviousSum = builder.Read(data.m_Sums.m_PreviousSum, RGTextureAccess::Sample);
 						}
 						builder.WriteInPlace(data.m_Sums.m_NextSum, RGTextureAccess::StorageWrite);
 						exported = accumulator.ExportRenderGraphResources(builder, data.m_Sums);
@@ -5484,8 +5246,7 @@ namespace gglab
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
 			TemporalFrameTransaction transaction;
-			const ResolvedTemporalFramePlan referencePlan =
-				ResolveTemporalFramePlan({ .m_ReferenceRequested = true });
+			const ResolvedTemporalFramePlan referencePlan = ResolveTemporalFramePlan({ .m_ReferenceRequested = true });
 			transaction.Begin(viewHistory, objectHistory, referencePlan, ResolveNativeViewResolution({ 8, 4 }),
 				nullptr, 1.0f, TemporalReferenceSample{ .m_Index = 5, .m_Count = 16 }, nullptr);
 			const Vector2 expected = GetTemporalReferenceJitterPixels(5);
@@ -5526,8 +5287,7 @@ namespace gglab
 				graph.AddPass<TemporalReferenceContractPassData>("TemporalReference.Input",
 					[empty](RenderGraph::RGBuilder& builder, TemporalReferenceContractPassData&)
 					{
-						auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(
-							ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+						auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
 						targets.m_DisplayWidth = 8;
 						targets.m_DisplayHeight = 4;
 						targets.m_RenderWidth = 8;
@@ -5554,17 +5314,14 @@ namespace gglab
 				const auto frameContext = frame.MakeRenderFrameContext();
 				pass.AddPass(graph, frameContext, services);
 				auto& blackboard = graph.GetBlackboard();
-				const auto* reference = blackboard.TryGet<RGTemporalReferenceResources>(
-					TemporalReferenceResourcesName);
+				const auto* reference = blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName);
 				bool valid = reference && reference->m_MeanAmbientOcclusion.IsValid() &&
 					blackboard.Get<RGGTAOResources>(GTAOResourcesName).IsComplete() != empty &&
 					graph.Compile();
 				RGSnapshot snapshot;
 				BuildRenderGraphSnapshot(graph, snapshot);
-				const auto clear = std::ranges::find(snapshot.m_Passes,
-					"TemporalReference.UnoccludedAO", &RGSnapshotPassInfo::m_Name);
-				const auto accumulate = std::ranges::find(snapshot.m_Passes,
-					"PostProcess.TemporalReference", &RGSnapshotPassInfo::m_Name);
+				const auto clear = std::ranges::find(snapshot.m_Passes, "TemporalReference.UnoccludedAO", &RGSnapshotPassInfo::m_Name);
+				const auto accumulate = std::ranges::find(snapshot.m_Passes, "PostProcess.TemporalReference", &RGSnapshotPassInfo::m_Name);
 				valid = valid && accumulate != snapshot.m_Passes.end() && !accumulate->m_Culled;
 				if (empty)
 				{
@@ -5624,45 +5381,39 @@ namespace gglab
 			// Records one active temporal GTAO frame. A frame that does not fully write the
 			// next pair cannot export it.
 			const auto recordFrame = [&](bool continuesPreviousView, bool writesNext) noexcept
-				{
-					HistoryFrame frame{ .m_Begun = history.BeginFrame(true, halfExtent, fence) };
-					frame.m_PreviousFrameCompatible = history.HasCompatiblePreviousFrame(continuesPreviousView);
-					RenderGraph graph({
-						.m_Device = &device,
-						.m_TransientResourcePool =
-							reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-						});
-					graph.AddPass<GTAOTemporalHistoryContractPassData>("GTAO.TemporalHistory.Contract",
-						[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+			{
+				HistoryFrame frame{ .m_Begun = history.BeginFrame(true, halfExtent, fence) };
+				frame.m_PreviousFrameCompatible = history.HasCompatiblePreviousFrame(continuesPreviousView);
+				RenderGraph graph({
+					.m_Device = &device,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+				graph.AddPass<GTAOTemporalHistoryContractPassData>("GTAO.TemporalHistory.Contract",
+					[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+					{
+						frame.m_Imported = history.ImportRenderGraphResources(builder, continuesPreviousView, data.m_History);
+						frame.m_PreviousValid = data.m_History.m_PreviousValid;
+						if (data.m_History.m_PreviousValid)
 						{
-							frame.m_Imported = history.ImportRenderGraphResources(
-								builder, continuesPreviousView, data.m_History);
-							frame.m_PreviousValid = data.m_History.m_PreviousValid;
-							if (data.m_History.m_PreviousValid)
-							{
-								data.m_History.m_PreviousVisibility = builder.Read(
-									data.m_History.m_PreviousVisibility, RGTextureAccess::Sample);
-								data.m_History.m_PreviousViewZ = builder.Read(
-									data.m_History.m_PreviousViewZ, RGTextureAccess::Sample);
-							}
-							if (writesNext)
-							{
-								builder.WriteInPlace(
-									data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
-								builder.WriteInPlace(
-									data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
-							}
-							frame.m_Exported =
-								history.ExportRenderGraphResources(builder, data.m_History);
-						});
-					frame.m_Compiled = graph.Compile();
-					return frame;
-				};
+							data.m_History.m_PreviousVisibility = builder.Read(data.m_History.m_PreviousVisibility, RGTextureAccess::Sample);
+							data.m_History.m_PreviousViewZ = builder.Read(data.m_History.m_PreviousViewZ, RGTextureAccess::Sample);
+						}
+						if (writesNext)
+						{
+							builder.WriteInPlace(data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
+							builder.WriteInPlace(data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
+						}
+						frame.m_Exported = history.ExportRenderGraphResources(builder, data.m_History);
+					});
+				frame.m_Compiled = graph.Compile();
+				return frame;
+			};
 			const auto recorded = [](const HistoryFrame& frame, bool exported) noexcept
-				{
-					return frame.m_Begun && frame.m_Imported && frame.m_Exported == exported &&
-						frame.m_Compiled;
-				};
+			{
+				return frame.m_Begun && frame.m_Imported && frame.m_Exported == exported &&
+					frame.m_Compiled;
+			};
 
 			const HistoryFrame unsubmitted = recordFrame(true, true);
 			history.AbortFrame();
@@ -5680,9 +5431,9 @@ namespace gglab
 				"the next frame that continues the view reads it");
 
 			const auto stageEmptyFrame = [&]() noexcept
-				{
-					return history.BeginFrame(true, halfExtent, fence) && history.StageEmptyFrame();
-				};
+			{
+				return history.BeginFrame(true, halfExtent, fence) && history.StageEmptyFrame();
+			};
 			const bool abortedEmptyStaged = stageEmptyFrame();
 			history.AbortFrame();
 			const HistoryFrame afterEmptyAbort = recordFrame(true, true);
@@ -5696,7 +5447,7 @@ namespace gglab
 			const bool emptyStaged = stageEmptyFrame();
 			bool importedAfterEmpty = true;
 			RenderGraph emptyGraph({ .m_Device = &device,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
 			emptyGraph.AddPass<GTAOTemporalHistoryContractPassData>("GTAO.TemporalHistory.Empty",
 				[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
 				{
@@ -5744,8 +5495,8 @@ namespace gglab
 			bool inactiveImported = true;
 			RenderGraph inactiveGraph({
 				.m_Device = &device,
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			inactiveGraph.AddPass<GTAOTemporalHistoryContractPassData>(
 				"GTAO.TemporalHistory.Inactive",
 				[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
@@ -5758,8 +5509,7 @@ namespace gglab
 			history.CommitFrame();
 			context.Check(inactiveBegun && activePool.m_ActiveTextureCount == 4 &&
 				inactivePool.m_ActiveTextureCount == 0 &&
-				inactivePool.m_PendingRetirementTextureCount ==
-					activePool.m_PendingRetirementTextureCount + 4 &&
+				inactivePool.m_PendingRetirementTextureCount == activePool.m_PendingRetirementTextureCount + 4 &&
 				!inactiveImported && inactiveCompiled && recorded(reacquired, true) &&
 				!reacquired.m_PreviousValid && pool.GetDiagnostics().m_ActiveTextureCount == 4,
 				"An inactive frame retires the temporal GTAO pairs through the fence, and a later "
@@ -5789,8 +5539,7 @@ namespace gglab
 				transaction.GetState() == TemporalFrameTransactionState::Invalidated &&
 				!history.HasCommittedHistory() && beforeFatal.m_ActiveTextureCount == 4 &&
 				afterFatal.m_ActiveTextureCount == 0 &&
-				afterFatal.m_PendingRetirementTextureCount ==
-					beforeFatal.m_PendingRetirementTextureCount + 4,
+				afterFatal.m_PendingRetirementTextureCount == beforeFatal.m_PendingRetirementTextureCount + 4,
 				"A fatal submission releases the temporal GTAO history through the fence instead "
 				"of committing or keeping it");
 			device.m_CompletedFenceValue = fence.m_Value;
@@ -5825,71 +5574,69 @@ namespace gglab
 			uint64_t fenceValue = 1;
 			const auto record = [&](bool submit = true, float preExposure = 1.0f,
 				bool hasOpaqueDraws = true)
+			{
+				const ResolvedTemporalFramePlan plan = ResolveTemporalFramePlan(info);
+				const ViewResolution resolution = ResolveTemporalAAViewResolution({ 64, 32 }, plan.m_TemporalAA.m_ResolutionPreset);
+				const bool aoReady = ambientOcclusionHistory.BeginFrame(plan.UsesAmbientOcclusionHistory(),
+					MakeGTAOHalfResolutionExtent(resolution.m_Render.m_Width, resolution.m_Render.m_Height), {});
+				TemporalFrameTransaction transaction;
+				transaction.Begin(viewHistory, objectHistory, plan, resolution, &colorHistory,
+					preExposure, std::nullopt, nullptr, aoReady ? &ambientOcclusionHistory : nullptr);
+				const TemporalFrameContinuity continuity = transaction.GetContinuity();
+				RenderView view{ .m_ViewId = RenderViewID::Main };
+				view.m_Width = resolution.m_Render.m_Width;
+				view.m_Height = resolution.m_Render.m_Height;
+				view.m_IsValid = true;
+				transaction.PrepareDisplayView(view);
+				RenderGraph graph({ .m_Device = &device,
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
+				bool recorded = !plan.HasService(TemporalService::FrameContinuity);
+				if (plan.HasService(TemporalService::ColorDepthHistory))
 				{
-					const ResolvedTemporalFramePlan plan = ResolveTemporalFramePlan(info);
-					const ViewResolution resolution = ResolveTemporalAAViewResolution(
-						{ 64, 32 }, plan.m_TemporalAA.m_ResolutionPreset);
-					const bool aoReady = ambientOcclusionHistory.BeginFrame(plan.UsesAmbientOcclusionHistory(),
-						MakeGTAOHalfResolutionExtent(resolution.m_Render.m_Width, resolution.m_Render.m_Height), {});
-					TemporalFrameTransaction transaction;
-					transaction.Begin(viewHistory, objectHistory, plan, resolution, &colorHistory,
-						preExposure, std::nullopt, nullptr, aoReady ? &ambientOcclusionHistory : nullptr);
-					const TemporalFrameContinuity continuity = transaction.GetContinuity();
-					RenderView view{ .m_ViewId = RenderViewID::Main };
-					view.m_Width = resolution.m_Render.m_Width;
-					view.m_Height = resolution.m_Render.m_Height;
-					view.m_IsValid = true;
-					transaction.PrepareDisplayView(view);
-					RenderGraph graph({ .m_Device = &device,
-						.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
-					bool recorded = !plan.HasService(TemporalService::FrameContinuity);
-					if (plan.HasService(TemporalService::ColorDepthHistory))
-					{
-						graph.AddPass<TemporalHistoryContractPassData>("Continuity.Color",
-							[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					graph.AddPass<TemporalHistoryContractPassData>("Continuity.Color",
+						[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+						{
+							if (!transaction.ImportHistoryResources(builder, data.m_History))
 							{
-								if (!transaction.ImportHistoryResources(builder, data.m_History))
-								{
-									return;
-								}
-								builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
-								builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
-								builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
-								recorded = transaction.ExportHistoryResources(builder, data.m_History);
-							});
-					}
-					else if (plan.UsesAmbientOcclusionHistory() && !hasOpaqueDraws)
-					{
-						recorded = transaction.StageEmptyAmbientOcclusionFrame();
-					}
-					else if (plan.UsesAmbientOcclusionHistory())
-					{
-						graph.AddPass<GTAOTemporalHistoryContractPassData>("Continuity.AmbientOcclusion",
-							[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+								return;
+							}
+							builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+							builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+							builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
+							recorded = transaction.ExportHistoryResources(builder, data.m_History);
+						});
+				}
+				else if (plan.UsesAmbientOcclusionHistory() && !hasOpaqueDraws)
+				{
+					recorded = transaction.StageEmptyAmbientOcclusionFrame();
+				}
+				else if (plan.UsesAmbientOcclusionHistory())
+				{
+					graph.AddPass<GTAOTemporalHistoryContractPassData>("Continuity.AmbientOcclusion",
+						[&](RenderGraph::RGBuilder& builder, GTAOTemporalHistoryContractPassData& data)
+						{
+							if (!transaction.ImportAmbientOcclusionHistory(builder, data.m_History))
 							{
-								if (!transaction.ImportAmbientOcclusionHistory(builder, data.m_History))
-								{
-									return;
-								}
-								builder.WriteInPlace(data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
-								builder.WriteInPlace(data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
-								recorded = transaction.ExportAmbientOcclusionHistory(builder, data.m_History);
-							});
-					}
-					context.Check(recorded && graph.Compile(), "Continuity fixture records its active history outcome");
-					if (submit)
-					{
-						transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, fenceValue++ });
-					}
-					else
-					{
-						transaction.Abort();
-					}
-					context.Check(transaction.GetContinuity().m_HasCompatiblePreviousHistory ==
-						continuity.m_HasCompatiblePreviousHistory,
-						"Continuity remains the Begin-time observation after commit or abort");
-					return continuity;
-				};
+								return;
+							}
+							builder.WriteInPlace(data.m_History.m_NextVisibility, RGTextureAccess::StorageWrite);
+							builder.WriteInPlace(data.m_History.m_NextViewZ, RGTextureAccess::StorageWrite);
+							recorded = transaction.ExportAmbientOcclusionHistory(builder, data.m_History);
+						});
+				}
+				context.Check(recorded && graph.Compile(), "Continuity fixture records its active history outcome");
+				if (submit)
+				{
+					transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, fenceValue++ });
+				}
+				else
+				{
+					transaction.Abort();
+				}
+				context.Check(transaction.GetContinuity().m_HasCompatiblePreviousHistory == continuity.m_HasCompatiblePreviousHistory,
+					"Continuity remains the Begin-time observation after commit or abort");
+				return continuity;
+			};
 
 			const auto cold = record();
 			const auto native = record();
@@ -5980,8 +5727,8 @@ namespace gglab
 			RenderGraph writeProofGraph({
 				.m_Device = &writeProofDevice,
 				.m_TransientResourcePool =
-					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			bool initiallyDefinedCountsAsCurrentWrite = true;
 			bool fullCurrentWriteRecognized = false;
 			writeProofGraph.AddPass<RGTextureId>("TemporalHistory.WriteProof",
@@ -5990,11 +5737,9 @@ namespace gglab
 					texture = builder.ImportTexture("TemporalHistory.WriteProof.Texture",
 						writeProofTexture, writeProofDesc, CommonRHIResourceState(),
 						RGContentValidity::Defined);
-					initiallyDefinedCountsAsCurrentWrite =
-						builder.IsTextureFullyWrittenByCurrentPass(texture);
+					initiallyDefinedCountsAsCurrentWrite = builder.IsTextureFullyWrittenByCurrentPass(texture);
 					builder.WriteInPlace(texture, RGTextureAccess::StorageWrite);
-					fullCurrentWriteRecognized =
-						builder.IsTextureFullyWrittenByCurrentPass(texture);
+					fullCurrentWriteRecognized = builder.IsTextureFullyWrittenByCurrentPass(texture);
 					builder.Export(texture, RGTextureAccess::None);
 				});
 			context.Check(!initiallyDefinedCountsAsCurrentWrite && fullCurrentWriteRecognized &&
@@ -6004,8 +5749,8 @@ namespace gglab
 			RenderGraph historyColorPreviewGraph({
 				.m_Device = &writeProofDevice,
 				.m_TransientResourcePool =
-					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RHITextureDesc historyColorPreviewPayloadDesc = writeProofDesc;
 			historyColorPreviewPayloadDesc.m_Usage = RHITextureUsage::None;
 			RGTemporalAAResources historyColorPreviewResources{};
@@ -6021,23 +5766,16 @@ namespace gglab
 					historyColorPreviewResources.m_History.m_PreviousColor = builder.Read(
 						historyColorPreviewResources.m_History.m_PreviousColor,
 						RGTextureAccess::Sample);
-					builder.Export(
-						historyColorPreviewResources.m_History.m_PreviousColor,
-						RGTextureAccess::None);
+					builder.Export(historyColorPreviewResources.m_History.m_PreviousColor, RGTextureAccess::None);
 					historyColorPreviewResources.m_History.m_NextColor =
 						builder.ImportTexture("TAA.Preview.NextColor", writeProofNextTexture,
 							writeProofDesc, CommonRHIResourceState(), RGContentValidity::Defined);
-					builder.WriteInPlace(historyColorPreviewResources.m_History.m_NextColor,
-						RGTextureAccess::StorageWrite);
-					builder.Export(historyColorPreviewResources.m_History.m_NextColor,
-						RGTextureAccess::None);
+					builder.WriteInPlace(historyColorPreviewResources.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+					builder.Export(historyColorPreviewResources.m_History.m_NextColor, RGTextureAccess::None);
 
 					historyColorPreviewResources.m_ReprojectionDiagnostics =
-						builder.CreateTexture(
-							"TAA.Preview.AccumulatedHistory", historyColorPreviewPayloadDesc);
-					builder.WriteInPlace(
-						historyColorPreviewResources.m_ReprojectionDiagnostics,
-						RGTextureAccess::StorageWrite);
+						builder.CreateTexture("TAA.Preview.AccumulatedHistory", historyColorPreviewPayloadDesc);
+					builder.WriteInPlace(historyColorPreviewResources.m_ReprojectionDiagnostics, RGTextureAccess::StorageWrite);
 					data.m_Texture =
 						historyColorPreviewResources.m_ReprojectionDiagnostics;
 				});
@@ -6049,12 +5787,9 @@ namespace gglab
 						historyColorPreviewResources,
 						PostProcessDebugTap::TemporalHistoryColor);
 					historyColorPreviewUsesTransientPayload =
-						previewSource ==
-							historyColorPreviewResources.m_ReprojectionDiagnostics &&
-						previewSource !=
-							historyColorPreviewResources.m_History.m_PreviousColor &&
-						previewSource !=
-							historyColorPreviewResources.m_History.m_NextColor;
+						previewSource == historyColorPreviewResources.m_ReprojectionDiagnostics &&
+						previewSource != historyColorPreviewResources.m_History.m_PreviousColor &&
+						previewSource != historyColorPreviewResources.m_History.m_NextColor;
 					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
 					builder.SideEffect();
 				});
@@ -6066,34 +5801,23 @@ namespace gglab
 						historyColorPreviewResources,
 						PostProcessDebugTap::TemporalHistorySamples);
 					historySamplesPreviewUsesTransientPayload =
-						previewSource ==
-							historyColorPreviewResources.m_ReprojectionDiagnostics &&
-						previewSource !=
-							historyColorPreviewResources.m_History.m_PreviousColor &&
-						previewSource !=
-							historyColorPreviewResources.m_History.m_NextColor;
+						previewSource == historyColorPreviewResources.m_ReprojectionDiagnostics &&
+						previewSource != historyColorPreviewResources.m_History.m_PreviousColor &&
+						previewSource != historyColorPreviewResources.m_History.m_NextColor;
 					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
 					builder.SideEffect();
 				});
 			context.Check(historyColorPreviewUsesTransientPayload &&
 				historySamplesPreviewUsesTransientPayload &&
-				UsesTemporalAAHistoryColorPreviewPayload(
-					PostProcessDebugTap::TemporalHistoryColor) &&
-				!UsesTemporalAAHistoryColorPreviewPayload(
-					PostProcessDebugTap::TemporalHistorySamples) &&
-				UsesTemporalAAHistorySamplesPreviewPayload(
-					PostProcessDebugTap::TemporalHistorySamples) &&
-				!UsesTemporalAAHistorySamplesPreviewPayload(
-					PostProcessDebugTap::TemporalHistoryColor) &&
-				UsesTemporalAAClipDistancePreviewPayload(
-					PostProcessDebugTap::TemporalClipDistance) &&
-				!UsesTemporalAAClipDistancePreviewPayload(
-					PostProcessDebugTap::TemporalHistorySamples) &&
+				UsesTemporalAAHistoryColorPreviewPayload(PostProcessDebugTap::TemporalHistoryColor) &&
+				!UsesTemporalAAHistoryColorPreviewPayload(PostProcessDebugTap::TemporalHistorySamples) &&
+				UsesTemporalAAHistorySamplesPreviewPayload(PostProcessDebugTap::TemporalHistorySamples) &&
+				!UsesTemporalAAHistorySamplesPreviewPayload(PostProcessDebugTap::TemporalHistoryColor) &&
+				UsesTemporalAAClipDistancePreviewPayload(PostProcessDebugTap::TemporalClipDistance) &&
+				!UsesTemporalAAClipDistancePreviewPayload(PostProcessDebugTap::TemporalHistorySamples) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalClipDistance) &&
-				UsesTemporalAAHistoryRelaxationPreviewPayload(
-					PostProcessDebugTap::TemporalHistoryRelaxation) &&
-				!UsesTemporalAAHistoryRelaxationPreviewPayload(
-					PostProcessDebugTap::TemporalClipDistance) &&
+				UsesTemporalAAHistoryRelaxationPreviewPayload(PostProcessDebugTap::TemporalHistoryRelaxation) &&
+				!UsesTemporalAAHistoryRelaxationPreviewPayload(PostProcessDebugTap::TemporalClipDistance) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalHistoryRelaxation) &&
 				IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalHistoryWeight) &&
 				!IsTemporalAADiagnosticsTap(PostProcessDebugTap::TemporalMotionMagnitude) &&
@@ -6102,15 +5826,12 @@ namespace gglab
 
 			RecordingDevice device;
 			device.m_TextureViewsSupported = true;
-			const TemporalHistoryFormatSupport formatSupport =
-				QueryTemporalHistoryFormatSupport(device);
+			const TemporalHistoryFormatSupport formatSupport = QueryTemporalHistoryFormatSupport(device);
 			context.Check(formatSupport.IsSupported() &&
 				device.m_TextureViewQueryCount == 6 &&
-				device.m_LastTextureViewQueryTextureDesc.m_Format ==
-					TemporalHistoryReliabilityFormat &&
+				device.m_LastTextureViewQueryTextureDesc.m_Format == TemporalHistoryReliabilityFormat &&
 				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::Sampled) &&
-				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage,
-					RHITextureUsage::UnorderedAccess) &&
+				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::UnorderedAccess) &&
 				device.m_LastTextureViewQueryDesc.m_Type == RHITextureViewType::UnorderedAccess,
 				"Temporal history capability requires SRV and typed-UAV support for the color, depth and reliability formats");
 			device.m_UseControlledFenceCompletion = true;
@@ -6140,8 +5861,7 @@ namespace gglab
 					},
 				},
 				.m_DisplayViewId = RenderViewID::Main,
-				.m_SceneExtensionParticipation =
-					SceneExtensionTemporalParticipation::TemporalIntegrated,
+				.m_SceneExtensionParticipation = SceneExtensionTemporalParticipation::TemporalIntegrated,
 				.m_ResetIdentity = 7,
 				.m_SessionIdentity = 11,
 				.m_DisplayViewEligible = true,
@@ -6160,14 +5880,14 @@ namespace gglab
 				transaction.PrepareDisplayView(view);
 				return view;
 			};
-			auto buildHistoryGraph = [&](TemporalFrameTransaction& transaction,
-				bool expectPrevious, bool inspectColdStartContract)
+			auto buildHistoryGraph = [&]
+			(TemporalFrameTransaction& transaction, bool expectPrevious, bool inspectColdStartContract)
 			{
 				RenderGraph graph({
 					.m_Device = &device,
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				bool imported = false;
 				bool exported = false;
 				bool previousMatched = false;
@@ -6178,21 +5898,14 @@ namespace gglab
 						previousMatched = data.m_History.m_PreviousValid == expectPrevious;
 						if (data.m_History.m_PreviousValid)
 						{
-							data.m_History.m_PreviousColor = builder.Read(
-								data.m_History.m_PreviousColor, RGTextureAccess::Sample);
-							data.m_History.m_PreviousDepth = builder.Read(
-								data.m_History.m_PreviousDepth, RGTextureAccess::Sample);
-							data.m_History.m_PreviousReliability = builder.Read(
-								data.m_History.m_PreviousReliability, RGTextureAccess::Sample);
+							data.m_History.m_PreviousColor = builder.Read(data.m_History.m_PreviousColor, RGTextureAccess::Sample);
+							data.m_History.m_PreviousDepth = builder.Read(data.m_History.m_PreviousDepth, RGTextureAccess::Sample);
+							data.m_History.m_PreviousReliability = builder.Read(data.m_History.m_PreviousReliability, RGTextureAccess::Sample);
 						}
-						builder.WriteInPlace(
-							data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
-						builder.WriteInPlace(
-							data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
-						builder.WriteInPlace(
-							data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
-						exported =
-							transaction.ExportHistoryResources(builder, data.m_History);
+						builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
+						exported = transaction.ExportHistoryResources(builder, data.m_History);
 					});
 				const bool compiled = graph.Compile();
 				RGSnapshot snapshot;
@@ -6214,7 +5927,9 @@ namespace gglab
 				const bool importedSix = snapshot.m_Resources.size() == 6 &&
 					std::ranges::all_of(snapshot.m_Resources,
 						[](const RGSnapshotResourceInfo& resource) noexcept
-						{ return resource.m_Imported; });
+						{
+							return resource.m_Imported;
+						});
 				const bool nextExportsCommon = std::ranges::count_if(snapshot.m_Resources,
 					[](const RGSnapshotResourceInfo& resource) noexcept
 					{
@@ -6231,8 +5946,8 @@ namespace gglab
 				RenderGraph graph({
 					.m_Device = &device,
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				bool imported = false;
 				bool exported = true;
 				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.NoWrite",
@@ -6246,13 +5961,11 @@ namespace gglab
 			};
 
 			TemporalFrameTransaction noWriteTransaction;
-			noWriteTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			noWriteTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(noWriteTransaction));
 			const bool noWriteGraphValid = buildNoWriteHistoryGraph(noWriteTransaction);
 			noWriteTransaction.CommitCompleted(RHIFencePoint{ RHIFenceHandle{ 1, 1 }, 5 });
-			const TemporalHistoryManagerDiagnostics afterNoWrite =
-				historyManager.GetDiagnostics();
+			const TemporalHistoryManagerDiagnostics afterNoWrite = historyManager.GetDiagnostics();
 			context.Check(noWriteGraphValid &&
 				noWriteTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				!afterNoWrite.m_HistoryValid && afterNoWrite.m_ReadIndex == 0 &&
@@ -6260,14 +5973,12 @@ namespace gglab
 				"Export without full current-frame history writes cannot participate or commit");
 
 			TemporalFrameTransaction firstTransaction;
-			firstTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager, 0.25f);
+			firstTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager, 0.25f);
 			const RenderView firstView = prepareDisplayView(firstTransaction);
 			const bool coldStartGraphValid = buildHistoryGraph(firstTransaction, false, true);
 			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
 			firstTransaction.CommitCompleted(firstFence);
-			const TemporalHistoryManagerDiagnostics firstCommitted =
-				historyManager.GetDiagnostics();
+			const TemporalHistoryManagerDiagnostics firstCommitted = historyManager.GetDiagnostics();
 			const uint64_t firstGeneration = firstCommitted.m_AllocationGeneration;
 			const auto committedHistorySummary = historyManager.GetSummary();
 			context.Check(committedHistorySummary.m_HasActiveHistory && committedHistorySummary.m_HistoryValid &&
@@ -6292,18 +6003,15 @@ namespace gglab
 			incompatibleViewTransaction.Begin(incompatibleViewHistory,
 				incompatibleObjectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			const RenderView incompatibleView = prepareDisplayView(incompatibleViewTransaction);
-			const bool managerHistoryStillValid =
-				buildHistoryGraph(incompatibleViewTransaction, true, false);
-			const bool finalHistoryCompatibility =
-				incompatibleViewTransaction.HasCompatiblePreviousHistory();
+			const bool managerHistoryStillValid = buildHistoryGraph(incompatibleViewTransaction, true, false);
+			const bool finalHistoryCompatibility = incompatibleViewTransaction.HasCompatiblePreviousHistory();
 			incompatibleViewTransaction.Abort();
 			context.Check(managerHistoryStillValid && !finalHistoryCompatibility &&
 				!incompatibleView.m_HasPreviousTemporalState,
 				"Temporal resolve gates imported history with the transaction's final view-and-history compatibility");
 
 			TemporalFrameTransaction abortedTransaction;
-			abortedTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager, 8.0f);
+			abortedTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager, 8.0f);
 			const RenderView abortedView = prepareDisplayView(abortedTransaction);
 			const bool abortGraphValid = buildHistoryGraph(abortedTransaction, true, false);
 			const RHIFencePoint vulkanAbortFence{ RHIFenceHandle{ 1, 1 }, 20 };
@@ -6314,20 +6022,17 @@ namespace gglab
 				abortedTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				afterAbort.m_HistoryValid && afterAbort.m_ReadIndex == 1 &&
 				afterAbort.m_AllocationGeneration == firstGeneration &&
-				afterAbort.m_LastCommitted.m_PreExposure ==
-					firstCommitted.m_LastCommitted.m_PreExposure &&
+				afterAbort.m_LastCommitted.m_PreExposure == firstCommitted.m_LastCommitted.m_PreExposure &&
 				afterAbort.m_LastCommitted.m_GraphicsFence == firstFence &&
 				viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 1,
 				"Vulkan abort fences gate lifetime without advancing logical temporal history");
 
 			TemporalFrameTransaction noResolveTransaction;
-			noResolveTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			noResolveTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			const RenderView noResolveView = prepareDisplayView(noResolveTransaction);
 			const RHIFencePoint noResolveFence{ RHIFenceHandle{ 1, 1 }, 30 };
 			noResolveTransaction.CommitCompleted(noResolveFence);
-			const TemporalHistoryManagerDiagnostics afterNoResolve =
-				historyManager.GetDiagnostics();
+			const TemporalHistoryManagerDiagnostics afterNoResolve = historyManager.GetDiagnostics();
 			context.Check(noResolveView.m_HasPreviousTemporalState &&
 				noResolveTransaction.GetJitterIndex() == 1 &&
 				noResolveTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
@@ -6340,14 +6045,11 @@ namespace gglab
 				"History age remains on the committed color/depth ping-pong read index across abort and non-resolve paths");
 
 			TemporalFrameTransaction invalidFenceTransaction;
-			invalidFenceTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			invalidFenceTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(invalidFenceTransaction));
-			const bool invalidFenceGraphValid =
-				buildHistoryGraph(invalidFenceTransaction, true, false);
+			const bool invalidFenceGraphValid = buildHistoryGraph(invalidFenceTransaction, true, false);
 			invalidFenceTransaction.CommitCompleted();
-			const TemporalHistoryManagerDiagnostics afterInvalidFence =
-				historyManager.GetDiagnostics();
+			const TemporalHistoryManagerDiagnostics afterInvalidFence = historyManager.GetDiagnostics();
 			context.Check(invalidFenceGraphValid &&
 				invalidFenceTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				afterInvalidFence.m_HistoryValid && afterInvalidFence.m_ReadIndex == 1 &&
@@ -6356,8 +6058,7 @@ namespace gglab
 				"A completed transaction without a valid submitted fence cannot commit history");
 
 			TemporalFrameTransaction fatalTransaction;
-			fatalTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			fatalTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(fatalTransaction));
 			const bool fatalGraphValid = buildHistoryGraph(fatalTransaction, true, false);
 			const RHIFencePoint fatalFence{ RHIFenceHandle{ 1, 1 }, 40 };
@@ -6381,8 +6082,7 @@ namespace gglab
 				"Fatal-after-submit invalidates history and uses its fence only for retirement");
 
 			TemporalFrameTransaction reenabledTransaction;
-			reenabledTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			reenabledTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			const TemporalHistoryManagerDiagnostics reenabled = historyManager.GetDiagnostics();
 			reenabledTransaction.Abort();
 			context.Check(
@@ -6392,8 +6092,7 @@ namespace gglab
 			disabledPlanInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledPlanInfo);
 			TemporalFrameTransaction disabledTransaction;
-			disabledTransaction.Begin(
-				viewHistory, objectHistory, disabledPlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			disabledTransaction.Begin(viewHistory, objectHistory, disabledPlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			disabledTransaction.Abort();
 			const TemporalHistoryManagerDiagnostics disabled = historyManager.GetDiagnostics();
 			context.Check(reenabled.m_HasActiveHistory && !reenabled.m_HistoryValid &&
@@ -6404,18 +6103,14 @@ namespace gglab
 				"Disabled history releases immediately and re-enable never revives retired allocations");
 
 			TemporalFrameTransaction preResizeTransaction;
-			preResizeTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
+			preResizeTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 64, 64 }), &historyManager);
 			GGLAB_UNUSED(prepareDisplayView(preResizeTransaction));
-			const bool preResizeGraphValid =
-				buildHistoryGraph(preResizeTransaction, false, false);
+			const bool preResizeGraphValid = buildHistoryGraph(preResizeTransaction, false, false);
 			const RHIFencePoint preResizeFence{ RHIFenceHandle{ 1, 1 }, 50 };
 			preResizeTransaction.CommitCompleted(preResizeFence);
-			const uint64_t preResizeGeneration =
-				historyManager.GetDiagnostics().m_AllocationGeneration;
+			const uint64_t preResizeGeneration = historyManager.GetDiagnostics().m_AllocationGeneration;
 			TemporalFrameTransaction resizedTransaction;
-			resizedTransaction.Begin(
-				viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 128, 72 }), &historyManager);
+			resizedTransaction.Begin(viewHistory, objectHistory, activePlan, ResolveNativeViewResolution({ 128, 72 }), &historyManager);
 			const TemporalHistoryManagerDiagnostics resized = historyManager.GetDiagnostics();
 			resizedTransaction.Abort();
 			context.Check(preResizeGraphValid && resized.m_HasActiveHistory &&
@@ -6429,11 +6124,9 @@ namespace gglab
 
 			TemporalFramePlanResolveInfo unavailablePlanInfo = activePlanInfo;
 			unavailablePlanInfo.m_TemporalAA.m_Capabilities = {};
-			const ResolvedTemporalFramePlan unavailablePlan =
-				ResolveTemporalFramePlan(unavailablePlanInfo);
+			const ResolvedTemporalFramePlan unavailablePlan = ResolveTemporalFramePlan(unavailablePlanInfo);
 			TemporalFrameTransaction unavailableTransaction;
-			unavailableTransaction.Begin(
-				viewHistory, objectHistory, unavailablePlan, ResolveNativeViewResolution({ 128, 72 }), &historyManager);
+			unavailableTransaction.Begin(viewHistory, objectHistory, unavailablePlan, ResolveNativeViewResolution({ 128, 72 }), &historyManager);
 			unavailableTransaction.Abort();
 			const TemporalHistoryManagerDiagnostics unavailable = historyManager.GetDiagnostics();
 			context.Check(!unavailable.m_HasActiveHistory &&
@@ -6473,7 +6166,7 @@ namespace gglab
 			auto writeManagerFrame = [&](TemporalHistoryFrameState& frame)
 			{
 				RenderGraph graph({ .m_Device = &device,
-					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
 				bool written = false;
 				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.ExposureMetadata",
 					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
@@ -6501,8 +6194,7 @@ namespace gglab
 				"V1 history is retired rather than sampled after migration to active V2");
 			exposureManager.AbortFrame(migratedFrame, {});
 			bool invalidScalesRejected = true;
-			for (const float invalidScale : { 0.0f, -1.0f, std::numeric_limits<float>::infinity(),
-				std::numeric_limits<float>::quiet_NaN() })
+			for (const float invalidScale : { 0.0f, -1.0f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN() })
 			{
 				auto frame = exposureManager.BeginFrame(activePlan, ResolveNativeViewResolution({ 64, 64 }));
 				invalidScalesRejected &= writeManagerFrame(frame);
@@ -6524,8 +6216,7 @@ namespace gglab
 			ViewResolution renderChanged = upscaled;
 			renderChanged.m_Render = { 48, 30 };
 			auto renderChangedFrame = domainManager.BeginFrame(activePlan, renderChanged);
-			const TemporalHistoryManagerDiagnostics renderChangedHistory =
-				domainManager.GetDiagnostics();
+			const TemporalHistoryManagerDiagnostics renderChangedHistory = domainManager.GetDiagnostics();
 			domainManager.AbortFrame(renderChangedFrame, {});
 			context.Check(upscaledHistory.m_HasActiveHistory &&
 				upscaledHistory.m_Compatibility.m_ColorExtent == ViewExtent{ 96, 60 } &&
@@ -6541,12 +6232,10 @@ namespace gglab
 			auto ageFrame = domainManager.BeginFrame(agePlan, renderChanged);
 			const TemporalHistoryManagerDiagnostics ageHistory = domainManager.GetDiagnostics();
 			domainManager.AbortFrame(ageFrame, {});
-			context.Check(renderChangedHistory.m_Compatibility.m_Accumulation ==
-					TemporalAAHistoryAccumulation::EffectiveSamples &&
+			context.Check(renderChangedHistory.m_Compatibility.m_Accumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
 				!ageFrame.m_PreviousValid &&
 				ageHistory.m_LastResetReason == TemporalHistoryResetReason::AccumulationChanged &&
-				ageHistory.m_Compatibility.m_Accumulation ==
-					TemporalAAHistoryAccumulation::CompatibilityAge,
+				ageHistory.m_Compatibility.m_Accumulation == TemporalAAHistoryAccumulation::CompatibilityAge,
 				"Switching the history accumulation model resets the color and depth history");
 			domainManager.Shutdown();
 			exposureManager.Shutdown();
@@ -6559,14 +6248,10 @@ namespace gglab
 
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
 		{
-			const RGPersistentTextureImportContract pendingTexture =
-				ResolveRGPersistentTextureImportContract(false);
-			const RGPersistentTextureImportContract initializedTexture =
-				ResolveRGPersistentTextureImportContract(true);
-			const RHIResourceState sampledState =
-				ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader);
-			const RGPersistentTextureImportContract sampledTexture =
-				ResolveRGPersistentTextureImportContract(true, sampledState);
+			const RGPersistentTextureImportContract pendingTexture = ResolveRGPersistentTextureImportContract(false);
+			const RGPersistentTextureImportContract initializedTexture = ResolveRGPersistentTextureImportContract(true);
+			const RHIResourceState sampledState = ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader);
+			const RGPersistentTextureImportContract sampledTexture = ResolveRGPersistentTextureImportContract(true, sampledState);
 			context.Check(pendingTexture.m_InitialState == UndefinedRHITextureState() &&
 				pendingTexture.m_InitialContentValidity == RGContentValidity::Undefined &&
 				initializedTexture.m_InitialState == CommonRHIResourceState() &&
@@ -6578,28 +6263,21 @@ namespace gglab
 			const RHIOwnedTextureCreateInfo ownedCreateInfo{};
 			context.Check(ownedCreateInfo.m_InitialState == UndefinedRHITextureState(),
 				"Owned texture create info defaults to Undefined");
-			context.Check(IsRHIResourceStateValid(
-				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureInitial),
+			context.Check(IsRHIResourceStateValid(ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureInitial),
 				"Undefined is a valid owned texture initial state");
-			context.Check(IsRHIResourceStateValid(
-				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierBefore),
+			context.Check(IsRHIResourceStateValid(ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierBefore),
 				"Undefined is a valid texture barrier source state");
-			context.Check(!IsRHIResourceStateValid(
-				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierAfter),
+			context.Check(!IsRHIResourceStateValid(ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierAfter),
 				"Undefined is rejected as a texture barrier destination state");
 			context.Check(!IsRHIResourceStateValid(
 				RHIResourceState{ .m_Layout = RHILayout::Unknown },
 				RHIResourceStateUsage::TextureInitial),
 				"Owned textures default to initial-only Undefined while Unknown remains invalid");
-			context.Check(IsRHIResourceStateValid(
-				PresentRHITextureState(), RHIResourceStateUsage::TextureBarrierAfter) &&
-				!IsRHIResourceStateValid(
-					PresentRHITextureState(), RHIResourceStateUsage::Buffer),
+			context.Check(IsRHIResourceStateValid(PresentRHITextureState(), RHIResourceStateUsage::TextureBarrierAfter) &&
+				!IsRHIResourceStateValid(PresentRHITextureState(), RHIResourceStateUsage::Buffer),
 				"Present is an exact texture-only special state");
-			context.Check(ToD3D12BarrierLayout(RHILayout::Undefined) ==
-				D3D12_BARRIER_LAYOUT_UNDEFINED &&
-				ToD3D12TextureInitialLayout(RHILayout::Undefined) ==
-				D3D12_BARRIER_LAYOUT_COMMON &&
+			context.Check(ToD3D12BarrierLayout(RHILayout::Undefined) == D3D12_BARRIER_LAYOUT_UNDEFINED &&
+				ToD3D12TextureInitialLayout(RHILayout::Undefined) == D3D12_BARRIER_LAYOUT_COMMON &&
 				ToD3D12ResourceStates(UndefinedRHITextureState()) == D3D12_RESOURCE_STATE_COMMON,
 				"DX12 preserves Undefined for discard barriers while owned textures start in COMMON");
 
@@ -6631,9 +6309,9 @@ namespace gglab
 				.m_Extent = { 8, 8, 1 },
 			};
 			RenderGraph initializedGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			initializedGraph.AddPass<TextureStorageAccessPassData>("InitializeTexture",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
@@ -6648,13 +6326,11 @@ namespace gglab
 				initializedSnapshot.m_Resources[0].m_InitialBarrierState == UndefinedRHITextureState(),
 				"RenderGraph-created textures begin in Undefined state and Write defines contents");
 			const auto* initializedPlan = initializedGraph.GetExecutionPlan();
-			const RHIResourceState initializedWriteState =
-				ToRHIResourceState(RGTextureAccess::StorageWrite);
+			const RHIResourceState initializedWriteState = ToRHIResourceState(RGTextureAccess::StorageWrite);
 			context.Check(initializedCompiled && initializedPlan &&
 				initializedPlan->GetPasses().size() == 1 &&
 				initializedPlan->GetPasses()[0].m_PreBarriers.size() == 1 &&
-				initializedPlan->GetPasses()[0].m_PreBarriers[0].m_Before ==
-				UndefinedRHITextureState() &&
+				initializedPlan->GetPasses()[0].m_PreBarriers[0].m_Before == UndefinedRHITextureState() &&
 				initializedPlan->GetPasses()[0].m_PreBarriers[0].m_After ==
 				initializedWriteState && initializedPlan->GetPasses()[0].m_PostBarriers.empty(),
 				"Discardable graph textures keep their terminal layout for the next Undefined acquire");
@@ -6721,8 +6397,7 @@ namespace gglab
 				context.Check(first && first->m_Barriers.size() == 2 &&
 					std::ranges::all_of(first->m_Barriers, [](const auto& b) { return b.m_Barrier.m_HasPhysicalHandle; }),
 					"Live imported barriers resolve before the failed-resolution retry");
-				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(
-					barrierGraph.GetExecutionPlan()->GetResources()[0].m_Resource);
+				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(barrierGraph.GetExecutionPlan()->GetResources()[0].m_Resource);
 				resource->m_ImportedHandle = {};
 				commands.m_TextureBarrierCount = 0;
 				barrierGraph.EnableExecutionRecord();
@@ -6753,24 +6428,23 @@ namespace gglab
 			const TransientResourcePoolSlot commonSlot = commonAllocation.m_PoolSlot;
 			reusePool.RetireTexture(std::move(commonAllocation), {});
 			reusePool.Tick();
-			auto reusedDiscardAllocation =
-				reusePool.AcquireTexture(graphTextureDesc, "DiscardableAgain");
+			auto reusedDiscardAllocation = reusePool.AcquireTexture(graphTextureDesc, "DiscardableAgain");
 			context.Check(discardSlot.IsValid() && commonSlot.IsValid() &&
 				discardSlot != commonSlot && reusedDiscardAllocation.m_PoolSlot == discardSlot,
 				"Transient texture reuse keeps discardable and Common-preserving contracts isolated");
 
 			auto hasUndefinedRead = [](const RenderGraph& graph) noexcept
-				{
-					return std::ranges::any_of(graph.GetCompileDiagnostics(),
-						[](const RGCompileDiagnostic& diagnostic) noexcept
-						{
-							return diagnostic.m_Code == RGCompileDiagnosticCode::UndefinedContentRead;
-						});
-				};
+			{
+				return std::ranges::any_of(graph.GetCompileDiagnostics(),
+					[](const RGCompileDiagnostic& diagnostic) noexcept
+					{
+						return diagnostic.m_Code == RGCompileDiagnosticCode::UndefinedContentRead;
+					});
+			};
 			RenderGraph transientReadGraph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			transientReadGraph.AddPass<StorageAccessPassData>("ReadUndefinedBuffer",
 				[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
@@ -6789,22 +6463,22 @@ namespace gglab
 					.m_Extent = { 8, 8, 1 },
 				};
 				auto buildImportedRead = [&](RGContentValidity validity)
-					{
-						auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
-							.m_Device = &recordingDevice,
-							.m_TransientResourcePool =
-								reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-							});
-						graph->AddPass<TextureStorageAccessPassData>("ReadImportedTexture",
-							[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
-							{
-								data.m_Texture = builder.ImportTexture("ImportedTexture",
-									RHITextureHandle{ 9, 1 }, importedDesc, UndefinedRHITextureState(), validity);
-								data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample);
-								builder.SideEffect();
-							});
-						return graph;
-					};
+				{
+					auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
+						.m_Device = &recordingDevice,
+						.m_TransientResourcePool =
+							reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+					});
+					graph->AddPass<TextureStorageAccessPassData>("ReadImportedTexture",
+						[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+						{
+							data.m_Texture = builder.ImportTexture("ImportedTexture",
+								RHITextureHandle{ 9, 1 }, importedDesc, UndefinedRHITextureState(), validity);
+							data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample);
+							builder.SideEffect();
+						});
+					return graph;
+				};
 				auto undefinedImportGraph = buildImportedRead(RGContentValidity::Undefined);
 				auto definedImportGraph = buildImportedRead(RGContentValidity::Defined);
 				context.Check(!undefinedImportGraph->Compile() && hasUndefinedRead(*undefinedImportGraph) &&
@@ -6821,10 +6495,9 @@ namespace gglab
 			const RHITextureViewDesc cubeView{
 				.m_Type = RHITextureViewType::ShaderResource,
 				.m_Dimension = RHITextureViewDimension::TextureCube,
-				.m_Subresources = {.m_ArraySliceCount = 6 },
+				.m_Subresources = { .m_ArraySliceCount = 6 },
 			};
-			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).m_Error ==
-				RHITextureValidationError::MissingCubeCompatible,
+			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).m_Error == RHITextureValidationError::MissingCubeCompatible,
 				"Cube views require an explicit CubeCompatible resource flag");
 			cubeDesc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
 			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).IsValid(),
@@ -6838,12 +6511,9 @@ namespace gglab
 			customBorderSampler.m_BorderColor[0] = 0.5f;
 			RHIGraphicsPipelineDesc pipelineDesc{};
 			context.Check(
-				IsRHIPrimitiveTopologyCompatible(
-					RHIPrimitiveTopologyType::Triangle, RHIPrimitiveTopology::TriangleList) &&
-				!IsRHIPrimitiveTopologyCompatible(
-					RHIPrimitiveTopologyType::Line, RHIPrimitiveTopology::TriangleList) &&
-				!IsRHIPrimitiveTopologyCompatible(
-					RHIPrimitiveTopologyType::Patch, RHIPrimitiveTopology::TriangleList),
+				IsRHIPrimitiveTopologyCompatible(RHIPrimitiveTopologyType::Triangle, RHIPrimitiveTopology::TriangleList) &&
+				!IsRHIPrimitiveTopologyCompatible(RHIPrimitiveTopologyType::Line, RHIPrimitiveTopology::TriangleList) &&
+				!IsRHIPrimitiveTopologyCompatible(RHIPrimitiveTopologyType::Patch, RHIPrimitiveTopology::TriangleList),
 				"Primitive topology compatibility is a backend-neutral pipeline contract");
 			const RHIIndexBufferBinding indexBinding{
 				.m_Offset = 16,
@@ -6869,8 +6539,7 @@ namespace gglab
 				!IsRHIIndexBufferDrawRangeValid(indexBinding, 1, UINT32_MAX),
 				"Index buffer bindings and indexed draws stay within the declared RHI range");
 			pipelineDesc.m_VertexInput.m_VertexBufferCount = 1;
-			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InputRate =
-				RHIVertexInputRate::PerInstance;
+			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InputRate = RHIVertexInputRate::PerInstance;
 			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InstanceStepRate = 2;
 			context.Check(
 				ValidateRHITextureViewPortability(minLodView, vulkanCapabilities).m_Error ==
@@ -6923,11 +6592,9 @@ namespace gglab
 				const RHITextureHandle uploadedTexture{ 3, 1 };
 				const RHIBufferHandle uploadedBuffer{ 4, 1 };
 				const uint32_t bufferData = 17;
-				const bool transferRecorded = batch.UploadTexture(uploadedTexture, {},
-					UndefinedRHITextureState(), shaderReadState) &&
+				const bool transferRecorded = batch.UploadTexture(uploadedTexture, {}, UndefinedRHITextureState(), shaderReadState) &&
 					batch.UploadBuffer(uploadedBuffer, 0, &bufferData, sizeof(bufferData)) &&
-					batch.UploadBuffer(uploadedBuffer, sizeof(bufferData), &bufferData,
-						sizeof(bufferData));
+					batch.UploadBuffer(uploadedBuffer, sizeof(bufferData), &bufferData, sizeof(bufferData));
 				const RHITransferSubmission submission = batch.Submit(false);
 				context.Check(transferRecorded && transferContext.m_TextureBarriers.size() == 2 &&
 					transferContext.m_BufferBarriers.size() == 4 &&
@@ -6961,24 +6628,22 @@ namespace gglab
 
 			{
 				RenderGraph mipReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId mipTextureId{};
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
 						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
-						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, colorMip0);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, colorMip0);
 						builder.SideEffect();
 					});
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip0",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(
-							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
+						builder.Read(mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
 						builder.SideEffect();
 					});
 				context.Check(mipReadGraph.Compile(),
@@ -6986,24 +6651,22 @@ namespace gglab
 			}
 			{
 				RenderGraph mipReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId mipTextureId{};
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
 						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
-						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, colorMip0);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, colorMip0);
 						builder.SideEffect();
 					});
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(
-							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.Read(mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
 						builder.SideEffect();
 					});
 				context.Check(!mipReadGraph.Compile() && hasUndefinedRead(mipReadGraph),
@@ -7011,31 +6674,28 @@ namespace gglab
 			}
 			{
 				RenderGraph mipReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId mipTextureId{};
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
 						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
-						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, colorMip0);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, colorMip0);
 						builder.SideEffect();
 					});
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, colorMip1);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, colorMip1);
 						builder.SideEffect();
 					});
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip0AfterMip1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(
-							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
+						builder.Read(mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
 						builder.SideEffect();
 					});
 				context.Check(mipReadGraph.Compile(),
@@ -7043,24 +6703,22 @@ namespace gglab
 			}
 			{
 				RenderGraph mipReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId mipTextureId{};
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
 						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
-						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, colorMip1);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, colorMip1);
 						builder.SideEffect();
 					});
 				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(
-							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.Read(mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
 						builder.SideEffect();
 					});
 				context.Check(mipReadGraph.Compile(),
@@ -7084,24 +6742,22 @@ namespace gglab
 			};
 			{
 				RenderGraph sliceReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId sliceTextureId{};
 				sliceReadGraph.AddPass<TextureStorageAccessPassData>("WriteSlice0",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
 						sliceTextureId = builder.CreateTexture("SliceValidityTexture", arrayTextureDesc);
-						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, slice0Range);
+						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, slice0Range);
 						builder.SideEffect();
 					});
 				sliceReadGraph.AddPass<TextureStorageAccessPassData>("ReadSlice1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(sliceTextureId, RGTextureAccess::Sample,
-							RHIStage::PixelShader, slice1Range);
+						builder.Read(sliceTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, slice1Range);
 						builder.SideEffect();
 					});
 				context.Check(!sliceReadGraph.Compile() && hasUndefinedRead(sliceReadGraph),
@@ -7109,28 +6765,25 @@ namespace gglab
 			}
 			{
 				RenderGraph sliceReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId sliceTextureId{};
 				sliceReadGraph.AddPass<TextureStorageAccessPassData>("WriteSlice1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
 						sliceTextureId = builder.CreateTexture("SliceValidityTexture", arrayTextureDesc);
-						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget,
-							RHIStage::RenderTarget, slice1Range);
+						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget, RHIStage::RenderTarget, slice1Range);
 						builder.SideEffect();
 					});
 				sliceReadGraph.AddPass<TextureStorageAccessPassData>("ReadSlice1",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(sliceTextureId, RGTextureAccess::Sample,
-							RHIStage::PixelShader, slice1Range);
+						builder.Read(sliceTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, slice1Range);
 						builder.SideEffect();
 					});
-				context.Check(sliceReadGraph.Compile(),
-					"Array slice writes define their own slice");
+				context.Check(sliceReadGraph.Compile(), "Array slice writes define their own slice");
 			}
 
 			// Depth/stencil aspect granularity.
@@ -7142,32 +6795,28 @@ namespace gglab
 			const RHISubresourceRange stencilAspectRange{ .m_Aspects = RHITextureAspect::Stencil };
 			{
 				RenderGraph aspectReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId aspectTextureId{};
 				aspectReadGraph.AddPass<TextureStorageAccessPassData>("WriteDepthAspect",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						aspectTextureId =
-							builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
-						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
-							RHIStage::DepthStencil, depthAspectRange);
+						aspectTextureId = builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite, RHIStage::DepthStencil, depthAspectRange);
 						builder.SideEffect();
 					});
 				aspectReadGraph.AddPass<TextureStorageAccessPassData>("ReadDepthAspect",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
-							RHIStage::DepthStencil, depthAspectRange);
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead, RHIStage::DepthStencil, depthAspectRange);
 						builder.SideEffect();
 					});
 				aspectReadGraph.AddPass<TextureStorageAccessPassData>("ReadStencilAspect",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
-							RHIStage::DepthStencil, stencilAspectRange);
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead, RHIStage::DepthStencil, stencilAspectRange);
 						builder.SideEffect();
 					});
 				context.Check(!aspectReadGraph.Compile() && hasUndefinedRead(aspectReadGraph),
@@ -7175,32 +6824,28 @@ namespace gglab
 			}
 			{
 				RenderGraph aspectWriteGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				RGTextureId aspectTextureId{};
 				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("WriteBothAspects",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						aspectTextureId =
-							builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
-						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
-							RHIStage::DepthStencil, depthAspectRange);
+						aspectTextureId = builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite, RHIStage::DepthStencil, depthAspectRange);
 						builder.SideEffect();
 					});
 				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("WriteStencilAspect",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
-							RHIStage::DepthStencil, stencilAspectRange);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite, RHIStage::DepthStencil, stencilAspectRange);
 						builder.SideEffect();
 					});
 				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("ReadStencilAspect",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
 					{
-						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
-							RHIStage::DepthStencil, stencilAspectRange);
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead, RHIStage::DepthStencil, stencilAspectRange);
 						builder.SideEffect();
 					});
 				context.Check(aspectWriteGraph.Compile(),
@@ -7213,16 +6858,15 @@ namespace gglab
 				RenderGraph importedPartialGraph({
 					.m_Device = &recordingDevice,
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				importedPartialGraph.AddPass<TextureStorageAccessPassData>("ReadImportedPartial",
 					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 					{
 						data.m_Texture =
 							builder.ImportTexture("PartialImportedTexture", RHITextureHandle{ 10, 1 },
 								mipTextureDesc, UndefinedRHITextureState(), RGContentValidity::Defined);
-						data.m_Texture = builder.Read(
-							data.m_Texture, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
 						builder.SideEffect();
 					});
 				context.Check(importedPartialGraph.Compile(),
@@ -7233,16 +6877,15 @@ namespace gglab
 			// reading pass can be culled.
 			{
 				RenderGraph cullableReadGraph({
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
 					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-					});
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
 				cullableReadGraph.AddPass<StorageAccessPassData>("CullableUndefinedRead",
 					[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 					{
 						data.m_Buffer = builder.CreateBuffer("CullableBuffer");
-						data.m_Buffer =
-							builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead);
+						data.m_Buffer = builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead);
 					});
 				context.Check(!cullableReadGraph.Compile() && hasUndefinedRead(cullableReadGraph),
 					"Cullable passes still report read-before-write declarations");
@@ -7250,38 +6893,31 @@ namespace gglab
 
 			// --- Portability fixed-array boundaries ---
 			RHIGraphicsPipelineDesc maxCountPipeline{};
-			maxCountPipeline.m_VertexInput.m_VertexBufferCount =
-				RHIVertexInputLayoutDesc::MaxVertexBuffers;
+			maxCountPipeline.m_VertexInput.m_VertexBufferCount = RHIVertexInputLayoutDesc::MaxVertexBuffers;
 			maxCountPipeline.m_RenderTargetCount = RHIGraphicsPipelineDesc::MaxRenderTargets;
-			context.Check(ValidateRHIGraphicsPipelinePortability(
-				maxCountPipeline, vulkanCapabilities).IsValid(),
+			context.Check(ValidateRHIGraphicsPipelinePortability(maxCountPipeline, vulkanCapabilities).IsValid(),
 				"Pipeline portability accepts maximum vertex buffer and render target counts");
 			RHIGraphicsPipelineDesc vertexOverflowPipeline{};
 			vertexOverflowPipeline.m_VertexInput.m_VertexBufferCount =
 				RHIVertexInputLayoutDesc::MaxVertexBuffers + 1;
 			context.Check(ValidateRHIGraphicsPipelinePortability(
-				vertexOverflowPipeline, vulkanCapabilities).m_Error ==
-				RHIPortabilityValidationError::VertexBufferCountExceedsLimit,
+				vertexOverflowPipeline, vulkanCapabilities).m_Error == RHIPortabilityValidationError::VertexBufferCountExceedsLimit,
 				"Pipeline portability rejects vertex buffer counts above the input layout limit");
 			RHIGraphicsPipelineDesc targetOverflowPipeline{};
 			targetOverflowPipeline.m_RenderTargetCount =
 				RHIGraphicsPipelineDesc::MaxRenderTargets + 1;
 			context.Check(ValidateRHIGraphicsPipelinePortability(
-				targetOverflowPipeline, vulkanCapabilities).m_Error ==
-				RHIPortabilityValidationError::RenderTargetCountExceedsLimit,
+				targetOverflowPipeline, vulkanCapabilities).m_Error == RHIPortabilityValidationError::RenderTargetCountExceedsLimit,
 				"Pipeline portability rejects render target counts above the pipeline limit");
 
 			// --- Portability rejection reason text ---
 			context.Check(
-				GetRHIPortabilityValidationErrorText(
-					RHIPortabilityValidationError::ImageViewMinLodUnsupported) ==
+				GetRHIPortabilityValidationErrorText(RHIPortabilityValidationError::ImageViewMinLodUnsupported) ==
 				"image view min LOD clamp is not supported" &&
-				!GetRHIPortabilityValidationErrorText(
-					RHIPortabilityValidationError::None).empty() &&
+				!GetRHIPortabilityValidationErrorText(RHIPortabilityValidationError::None).empty() &&
 				GetRHIPortabilityValidationErrorText(
-					RHIPortabilityValidationError::ImageViewMinLodUnsupported) !=
-				GetRHIPortabilityValidationErrorText(
-					RHIPortabilityValidationError::None),
+					RHIPortabilityValidationError::ImageViewMinLodUnsupported) != GetRHIPortabilityValidationErrorText(
+						RHIPortabilityValidationError::None),
 				"Portability rejection reasons expose stable, distinct text");
 
 			// --- TransferBatch poisoned state ---
@@ -7289,11 +6925,9 @@ namespace gglab
 				RecordingTransferContext failingContext;
 				TransferBatch failingBatch(failingContext);
 				const RHITextureHandle failTexture{ 5, 1 };
-				const bool firstUpload = failingBatch.UploadTexture(
-					failTexture, {}, UndefinedRHITextureState(), shaderReadState);
+				const bool firstUpload = failingBatch.UploadTexture(failTexture, {}, UndefinedRHITextureState(), shaderReadState);
 				failingContext.m_FailUploads = true;
-				const bool failedUpload = failingBatch.UploadTexture(
-					failTexture, {}, UndefinedRHITextureState(), shaderReadState);
+				const bool failedUpload = failingBatch.UploadTexture(failTexture, {}, UndefinedRHITextureState(), shaderReadState);
 				context.Check(firstUpload && !failedUpload && failingBatch.IsFailed() &&
 					failingContext.m_TextureBarriers.size() == 3,
 					"UploadTexture failure after recorded barriers poisons the batch");
@@ -7350,8 +6984,7 @@ namespace gglab
 				RecordingTransferContext submitFailureContext;
 				TransferBatch submitFailureBatch(submitFailureContext);
 				const uint32_t payload = 23;
-				const bool uploadRecorded = submitFailureBatch.UploadBuffer(
-					RHIBufferHandle{ 8, 1 }, 0, &payload, sizeof(payload));
+				const bool uploadRecorded = submitFailureBatch.UploadBuffer(RHIBufferHandle{ 8, 1 }, 0, &payload, sizeof(payload));
 				submitFailureContext.m_FailSubmit = true;
 				const RHITransferSubmission submission = submitFailureBatch.Submit(false);
 				context.Check(uploadRecorded && submitFailureBatch.IsFailed() &&
@@ -7363,11 +6996,9 @@ namespace gglab
 				RecordingTransferContext moveContext;
 				TransferBatch moveSource(moveContext);
 				const RHITextureHandle moveTexture{ 7, 1 };
-				GGLAB_UNUSED(moveSource.UploadTexture(
-					moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
+				GGLAB_UNUSED(moveSource.UploadTexture(moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
 				moveContext.m_FailUploads = true;
-				GGLAB_UNUSED(moveSource.UploadTexture(
-					moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
+				GGLAB_UNUSED(moveSource.UploadTexture(moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
 				TransferBatch moveTarget(std::move(moveSource));
 				context.Check(moveTarget.IsFailed(),
 					"Move construction preserves the poisoned state");
@@ -7395,10 +7026,8 @@ namespace gglab
 					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0) &&
 					overlapBatch.PublishTexture(overlapTexture, copyDestState, colorMip0) &&
 					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0);
-				const bool disjointAccepted =
-					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip1);
-				const bool sameStateOverlapAccepted =
-					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips);
+				const bool disjointAccepted = overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip1);
+				const bool sameStateOverlapAccepted = overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips);
 				context.Check(sameRangeAccepted && disjointAccepted && sameStateOverlapAccepted &&
 					!overlapBatch.IsFailed(),
 					"Exact, disjoint, and same-state overlapping texture publications are accepted");
@@ -7410,18 +7039,15 @@ namespace gglab
 				RecordingTransferContext conflictContext;
 				TransferBatch conflictBatch(conflictContext);
 				GGLAB_UNUSED(conflictBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				const bool conflictRejected =
-					!conflictBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
+				const bool conflictRejected = !conflictBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
 				context.Check(conflictRejected && conflictBatch.IsFailed(),
 					"Overlapping publications with conflicting terminal states poison the batch");
 			}
 			{
 				RecordingTransferContext wholeContext;
 				TransferBatch wholeBatch(wholeContext);
-				GGLAB_UNUSED(
-					wholeBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
-				const bool wholeConflictRejected =
-					!wholeBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				GGLAB_UNUSED(wholeBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				const bool wholeConflictRejected = !wholeBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
 				context.Check(wholeConflictRejected && wholeBatch.IsFailed(),
 					"Whole-resource publications overlap every partial range");
 			}
@@ -7430,8 +7056,7 @@ namespace gglab
 				TransferBatch remainingBatch(remainingContext);
 				const RHISubresourceRange remainingRange{ .m_Aspects = RHITextureAspect::Color };
 				GGLAB_UNUSED(remainingBatch.PublishTexture(overlapTexture, shaderReadState, remainingRange));
-				const bool remainingConflictRejected =
-					!remainingBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				const bool remainingConflictRejected = !remainingBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
 				context.Check(remainingConflictRejected && remainingBatch.IsFailed(),
 					"Remaining-count ranges overlap explicit partial ranges");
 			}
@@ -7451,27 +7076,21 @@ namespace gglab
 				// A narrow exact-range update must be rejected when a broader
 				// overlapping publication keeps a different terminal state.
 				RecordingTransferContext narrowUpdateContext;
-				TransferBatch narrowUpdateBatch(narrowUpdateContext);
-				GGLAB_UNUSED(
-					narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				GGLAB_UNUSED(
-					narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
-				const bool narrowUpdateRejected =
-					!narrowUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
-				context.Check(narrowUpdateRejected && narrowUpdateBatch.IsFailed(),
-					"Exact-range updates cannot contradict a broader overlapping publication");
+			TransferBatch narrowUpdateBatch(narrowUpdateContext);
+			GGLAB_UNUSED(narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+			GGLAB_UNUSED(narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+			const bool narrowUpdateRejected = !narrowUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+			context.Check(narrowUpdateRejected && narrowUpdateBatch.IsFailed(),
+				"Exact-range updates cannot contradict a broader overlapping publication");
 			}
 			{
 				// A broader exact-range update must be rejected when a narrower
 				// overlapping publication keeps a different terminal state.
 				RecordingTransferContext broadUpdateContext;
 				TransferBatch broadUpdateBatch(broadUpdateContext);
-				GGLAB_UNUSED(
-					broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
-				GGLAB_UNUSED(
-					broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				const bool broadUpdateRejected =
-					!broadUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
+				GGLAB_UNUSED(broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				GGLAB_UNUSED(broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool broadUpdateRejected = !broadUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
 				context.Check(broadUpdateRejected && broadUpdateBatch.IsFailed(),
 					"Broader exact-range updates cannot contradict a narrower overlapping publication");
 			}
@@ -7479,12 +7098,9 @@ namespace gglab
 				// A disjoint exact-range update must succeed without poisoning.
 				RecordingTransferContext disjointUpdateContext;
 				TransferBatch disjointUpdateBatch(disjointUpdateContext);
-				GGLAB_UNUSED(
-					disjointUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				GGLAB_UNUSED(
-					disjointUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip1));
-				const bool disjointUpdateSucceeded =
-					disjointUpdateBatch.PublishTexture(overlapTexture, copySourceState, colorMip0);
+				GGLAB_UNUSED(disjointUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(disjointUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip1));
+				const bool disjointUpdateSucceeded = disjointUpdateBatch.PublishTexture(overlapTexture, copySourceState, colorMip0);
 				context.Check(disjointUpdateSucceeded && !disjointUpdateBatch.IsFailed(),
 					"Disjoint exact-range updates succeed without poisoning the batch");
 			}
@@ -7493,12 +7109,9 @@ namespace gglab
 				// publication agrees with the updated terminal state.
 				RecordingTransferContext agreeingOverlapContext;
 				TransferBatch agreeingOverlapBatch(agreeingOverlapContext);
-				GGLAB_UNUSED(
-					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				GGLAB_UNUSED(
-					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
-				const bool agreeingOverlapAccepted =
-					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips3);
+				GGLAB_UNUSED(agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				const bool agreeingOverlapAccepted = agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips3);
 				context.Check(agreeingOverlapAccepted && !agreeingOverlapBatch.IsFailed(),
 					"Exact-range updates succeed when all overlapping entries agree on the state");
 			}
@@ -7507,12 +7120,9 @@ namespace gglab
 				// whole-resource publication keeps a different terminal state.
 				RecordingTransferContext partialUpdateContext;
 				TransferBatch partialUpdateBatch(partialUpdateContext);
-				GGLAB_UNUSED(
-					partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
-				GGLAB_UNUSED(
-					partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				const bool partialUpdateRejected =
-					!partialUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				GGLAB_UNUSED(partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				GGLAB_UNUSED(partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool partialUpdateRejected = !partialUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
 				context.Check(partialUpdateRejected && partialUpdateBatch.IsFailed(),
 					"Partial exact-range updates cannot contradict a whole-resource publication");
 			}
@@ -7521,12 +7131,9 @@ namespace gglab
 				// partial publication keeps a different terminal state.
 				RecordingTransferContext wholeUpdateContext;
 				TransferBatch wholeUpdateBatch(wholeUpdateContext);
-				GGLAB_UNUSED(
-					wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
-				GGLAB_UNUSED(
-					wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
-				const bool wholeUpdateRejected =
-					!wholeUpdateBatch.PublishTexture(overlapTexture, copyDestState, std::nullopt);
+				GGLAB_UNUSED(wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				const bool wholeUpdateRejected = !wholeUpdateBatch.PublishTexture(overlapTexture, copyDestState, std::nullopt);
 				context.Check(wholeUpdateRejected && wholeUpdateBatch.IsFailed(),
 					"Whole-resource exact-range updates cannot contradict a partial publication");
 			}
@@ -7536,13 +7143,9 @@ namespace gglab
 				RecordingTransferContext remainingUpdateContext;
 				TransferBatch remainingUpdateBatch(remainingUpdateContext);
 				const RHISubresourceRange remainingRange{ .m_Aspects = RHITextureAspect::Color };
-				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(
-					overlapTexture, shaderReadState, colorMip0));
-				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(
-					overlapTexture, shaderReadState, remainingRange));
-				const bool remainingUpdateRejected =
-					!remainingUpdateBatch.PublishTexture(
-						overlapTexture, copyDestState, remainingRange);
+				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(overlapTexture, shaderReadState, remainingRange));
+				const bool remainingUpdateRejected = !remainingUpdateBatch.PublishTexture(overlapTexture, copyDestState, remainingRange);
 				context.Check(remainingUpdateRejected && remainingUpdateBatch.IsFailed(),
 					"Remaining-count exact-range updates cannot contradict a narrower overlapping publication");
 			}
@@ -7565,12 +7168,10 @@ namespace gglab
 				return Vector2::Zero;
 			}
 			const float inverseW = 1.0f / clipPosition.m_W;
-			return Vector2(clipPosition.m_X * inverseW * 0.5f + 0.5f,
-				-clipPosition.m_Y * inverseW * 0.5f + 0.5f);
+			return Vector2(clipPosition.m_X * inverseW * 0.5f + 0.5f, -clipPosition.m_Y * inverseW * 0.5f + 0.5f);
 		}
 
-		[[nodiscard]] inline Vector2 ComputeTemporalMotionUV(
-			const Vector4& currentClip, const Vector4& previousClip) noexcept
+		[[nodiscard]] inline Vector2 ComputeTemporalMotionUV(const Vector4& currentClip, const Vector4& previousClip) noexcept
 		{
 			return TemporalClipPositionToUV(currentClip) - TemporalClipPositionToUV(previousClip);
 		}
@@ -7582,13 +7183,11 @@ namespace gglab
 			{
 				return {};
 			}
-			const Vector2 motionPixels(
-				motionUV.m_X * static_cast<float>(width), motionUV.m_Y * static_cast<float>(height));
+			const Vector2 motionPixels(motionUV.m_X * static_cast<float>(width), motionUV.m_Y * static_cast<float>(height));
 			return {
 				.m_MotionUV = motionUV,
 				.m_MotionPixels = motionPixels,
-				.m_MagnitudePixels = std::sqrt(
-					motionPixels.m_X * motionPixels.m_X + motionPixels.m_Y * motionPixels.m_Y),
+				.m_MagnitudePixels = std::sqrt(motionPixels.m_X * motionPixels.m_X + motionPixels.m_Y * motionPixels.m_Y),
 				.m_Valid = true,
 			};
 		}
@@ -7600,20 +7199,18 @@ namespace gglab
 				accumulation <= TemporalHistoryMaxAccumulation;
 		}
 
-		[[nodiscard]] inline float ResolveTemporalHistoryNextAge(
-			bool historyAccepted, float previousHistoryAge) noexcept
+		[[nodiscard]] inline float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryAge) noexcept
 		{
-			return historyAccepted && IsTemporalHistoryAccumulationValid(previousHistoryAge)
-				? std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAccumulation)
-				: TemporalHistoryInitialAccumulation;
+			return historyAccepted && IsTemporalHistoryAccumulationValid(previousHistoryAge) ?
+				std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAccumulation) :
+				TemporalHistoryInitialAccumulation;
 		}
 
 		[[nodiscard]] inline float ResolveTemporalHistoryNextSamples(bool historyAccepted,
 			float previousSamples, float historyConfidence, float maxSamples,
 			float currentSampleWeight = 1.0f) noexcept
 		{
-			if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) ||
-				!std::isfinite(historyConfidence))
+			if (!historyAccepted || !IsTemporalHistoryAccumulationValid(previousSamples) || !std::isfinite(historyConfidence))
 			{
 				return TemporalHistoryInitialAccumulation;
 			}
@@ -7625,42 +7222,35 @@ namespace gglab
 		inline constexpr float TemporalUpscaledStaticMotionPixels = 0.5f;
 		inline constexpr float TemporalUpscaledMinSampleWeight = 1.0e-3f;
 
-		[[nodiscard]] inline float ResolveTemporalUpscaledStaticFraction(
-			float motionMagnitudePixels) noexcept
+		[[nodiscard]] inline float ResolveTemporalUpscaledStaticFraction(float motionMagnitudePixels) noexcept
 		{
-			return std::isfinite(motionMagnitudePixels)
-				? 1.0f - std::clamp(motionMagnitudePixels / TemporalUpscaledStaticMotionPixels,
-					0.0f, 1.0f)
-				: 0.0f;
+			return std::isfinite(motionMagnitudePixels) ?
+				1.0f - std::clamp(motionMagnitudePixels / TemporalUpscaledStaticMotionPixels, 0.0f, 1.0f) :
+				0.0f;
 		}
 
-		[[nodiscard]] inline float ResolveTemporalUpscaledStaticClampExpansion(
-			float motionMagnitudePixels, float consistency) noexcept
+		[[nodiscard]] inline float ResolveTemporalUpscaledStaticClampExpansion(float motionMagnitudePixels, float consistency) noexcept
 		{
 			return ResolveTemporalUpscaledStaticFraction(motionMagnitudePixels) *
 				std::clamp((0.95f - consistency) / 0.15f, 0.0f, 1.0f);
 		}
 
-		[[nodiscard]] inline float ResolveTemporalNearestSampleWeight(
-			Vector2 offsetPixels, Vector2 displayPerRender, float kernelScale) noexcept
+		[[nodiscard]] inline float ResolveTemporalNearestSampleWeight(Vector2 offsetPixels, Vector2 displayPerRender, float kernelScale) noexcept
 		{
 			const float x = (std::round(offsetPixels.m_X) - offsetPixels.m_X) * displayPerRender.m_X;
 			const float y = (std::round(offsetPixels.m_Y) - offsetPixels.m_Y) * displayPerRender.m_Y;
 			return std::exp(-kernelScale * (x * x + y * y));
 		}
 
-		[[nodiscard]] inline float ResolveTemporalUpscaledSampleWeight(
-			float nearestSampleWeight) noexcept
+		[[nodiscard]] inline float ResolveTemporalUpscaledSampleWeight(float nearestSampleWeight) noexcept
 		{
-			return std::max(std::clamp(nearestSampleWeight, 0.0f, 1.0f),
-				TemporalUpscaledMinSampleWeight);
+			return std::max(std::clamp(nearestSampleWeight, 0.0f, 1.0f), TemporalUpscaledMinSampleWeight);
 		}
 
 		[[nodiscard]] inline float ComputeTemporalWeightedHistoryWeight(float previousSamples,
 			float historyConfidence, float maxSamples, float currentSampleWeight) noexcept
 		{
-			if (!IsTemporalHistoryAccumulationValid(previousSamples) ||
-				!std::isfinite(historyConfidence))
+			if (!IsTemporalHistoryAccumulationValid(previousSamples) || !std::isfinite(historyConfidence))
 			{
 				return 0.0f;
 			}
@@ -7669,11 +7259,9 @@ namespace gglab
 				(samples + std::max(currentSampleWeight, TemporalUpscaledMinSampleWeight));
 		}
 
-		[[nodiscard]] inline float ResolveTemporalDisagreementConsistency(
-			float signedDifference, float absoluteDifference) noexcept
+		[[nodiscard]] inline float ResolveTemporalDisagreementConsistency(float signedDifference, float absoluteDifference) noexcept
 		{
-			return std::clamp(std::abs(signedDifference) / std::max(absoluteDifference, 1.0e-4f),
-				0.0f, 1.0f);
+			return std::clamp(std::abs(signedDifference) / std::max(absoluteDifference, 1.0e-4f), 0.0f, 1.0f);
 		}
 
 		[[nodiscard]] inline float ResolveTemporalHistoryRelaxation(float historyRelaxation,
@@ -7686,8 +7274,7 @@ namespace gglab
 				std::clamp((0.5f - consistency) / 0.3f, 0.0f, 1.0f);
 		}
 
-		[[nodiscard]] inline float ResolveTemporalAAHistorySamplesPreview(
-			float nextSamples, float maxSamples) noexcept
+		[[nodiscard]] inline float ResolveTemporalAAHistorySamplesPreview(float nextSamples, float maxSamples) noexcept
 		{
 			if (!IsTemporalHistoryAccumulationValid(nextSamples))
 			{
@@ -7703,14 +7290,13 @@ namespace gglab
 			float m_HistoryAlpha = TemporalHistoryInitialAccumulation;
 		};
 
-		[[nodiscard]] inline TemporalAAOutputAlphaContract ResolveTemporalAAOutputAlphas(
-			float nextHistoryAge) noexcept
+		[[nodiscard]] inline TemporalAAOutputAlphaContract ResolveTemporalAAOutputAlphas(float nextHistoryAge) noexcept
 		{
 			return {
 				.m_ResolvedAlpha = 1.0f,
-				.m_HistoryAlpha = IsTemporalHistoryAccumulationValid(nextHistoryAge)
-					? nextHistoryAge
-					: TemporalHistoryInitialAccumulation,
+				.m_HistoryAlpha = IsTemporalHistoryAccumulationValid(nextHistoryAge) ?
+					nextHistoryAge :
+					TemporalHistoryInitialAccumulation,
 			};
 		}
 
@@ -7728,23 +7314,20 @@ namespace gglab
 				uv.m_Y >= 0.0f && uv.m_Y <= 1.0f;
 		}
 
-		[[nodiscard]] inline bool AreTemporalAAReprojectionUVsValid(
-			const Vector2& previousHistoryUV, const Vector2& previousRasterUV) noexcept
+		[[nodiscard]] inline bool AreTemporalAAReprojectionUVsValid(const Vector2& previousHistoryUV, const Vector2& previousRasterUV) noexcept
 		{
 			return IsTemporalAAUVInBounds(previousHistoryUV) &&
 				IsTemporalAAUVInBounds(previousRasterUV);
 		}
 
-		[[nodiscard]] inline float ResolveTemporalAAHistoryAgePreview(
-			float nextHistoryAge, float maxHistoryFeedback) noexcept
+		[[nodiscard]] inline float ResolveTemporalAAHistoryAgePreview(float nextHistoryAge, float maxHistoryFeedback) noexcept
 		{
 			if (!IsTemporalHistoryAccumulationValid(nextHistoryAge))
 			{
 				return 0.0f;
 			}
 
-			const float feedbackSaturationAge =
-				ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
+			const float feedbackSaturationAge = ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
 			// Feedback uses PreviousAge while this preview displays stored NextAge.
 			// Keep the saturation-age denominator intact; there is intentionally no -1.
 			return std::clamp((nextHistoryAge - TemporalHistoryInitialAccumulation) /
@@ -7764,21 +7347,15 @@ namespace gglab
 
 			const TemporalAASettings resolved = ResolveTemporalAASettings(settings);
 			const float ageWeight = previousHistoryAge / (previousHistoryAge + 1.0f);
-			const float baseHistoryWeight =
-				std::min(ageWeight, resolved.m_MaxHistoryFeedback);
-			const float velocityConfidence = 1.0f - std::clamp(
-				motionMagnitudePixels * resolved.m_VelocityWeightScale, 0.0f, 1.0f);
-			const float luminanceDenominator =
-				std::max({ std::abs(currentLuminance), std::abs(historyLuminance), 1.0e-4f });
-			const float relativeLuminanceDifference =
-				std::abs(currentLuminance - historyLuminance) / luminanceDenominator;
-			const float luminanceConfidence = 1.0f - std::clamp(
-				relativeLuminanceDifference * resolved.m_LuminanceWeightScale, 0.0f, 1.0f);
+			const float baseHistoryWeight = std::min(ageWeight, resolved.m_MaxHistoryFeedback);
+			const float velocityConfidence = 1.0f - std::clamp(motionMagnitudePixels * resolved.m_VelocityWeightScale, 0.0f, 1.0f);
+			const float luminanceDenominator = std::max({ std::abs(currentLuminance), std::abs(historyLuminance), 1.0e-4f });
+			const float relativeLuminanceDifference = std::abs(currentLuminance - historyLuminance) / luminanceDenominator;
+			const float luminanceConfidence = 1.0f - std::clamp(relativeLuminanceDifference * resolved.m_LuminanceWeightScale, 0.0f, 1.0f);
 			return baseHistoryWeight * velocityConfidence * luminanceConfidence;
 		}
 
-		[[nodiscard]] inline bool IsTemporalSkyHistoryCompatible(
-			float previousRawDepth, DepthConvention previousDepthConvention) noexcept
+		[[nodiscard]] inline bool IsTemporalSkyHistoryCompatible(float previousRawDepth, DepthConvention previousDepthConvention) noexcept
 		{
 			return std::isfinite(previousRawDepth) &&
 				screen_space::IsDepthBackground(previousRawDepth, previousDepthConvention);
@@ -7797,8 +7374,7 @@ namespace gglab
 				return false;
 			}
 
-			const float tolerance =
-				std::max(absoluteThreshold, relativeThreshold * expectedPreviousViewZ);
+			const float tolerance = std::max(absoluteThreshold, relativeThreshold * expectedPreviousViewZ);
 			return std::abs(expectedPreviousViewZ - storedPreviousViewZ) <= tolerance;
 		}
 
@@ -7838,43 +7414,52 @@ namespace gglab
 			AtmosphereSettings settings{};
 			const auto sun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
 			const auto a = ResolveAtmosphere(settings, sun, Vector3(0.0f, 1000.0f, 0.0f));
-			context.Check(std::abs(a.m_Observer.m_X-a.m_Radii.m_X-1.0f)<0.001f &&
-				std::abs(a.m_Rayleigh.m_X-0.005802f)<1e-7f && a.m_Rayleigh.m_W==8.0f,
+			context.Check(std::abs(a.m_Observer.m_X - a.m_Radii.m_X - 1.0f) < 0.001f &&
+				std::abs(a.m_Rayleigh.m_X - 0.005802f) < 1e-7f && a.m_Rayleigh.m_W == 8.0f,
 				"Atmosphere boundary converts meters and inverse meters to kilometers and resolves radial altitude");
-			const auto shortPath = EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,1000.0f);
-			const auto longPath = EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,50000.0f);
-			context.Check(shortPath.m_X<=1.0f && longPath.m_X>0.0f && longPath.m_X<shortPath.m_X &&
-				longPath.m_Y<shortPath.m_Y && longPath.m_Z<shortPath.m_Z &&
-				EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,0.0f).m_X==1.0f &&
-				EvaluateAtmosphereTransmittance(a,1000.0f,-1.0f,2000.0f).m_X==0.0f,
+			const auto shortPath = EvaluateAtmosphereTransmittance(a, 1000.0f, 1.0f, 1000.0f);
+			const auto longPath = EvaluateAtmosphereTransmittance(a, 1000.0f, 1.0f, 50000.0f);
+			context.Check(shortPath.m_X <= 1.0f && longPath.m_X > 0.0f && longPath.m_X < shortPath.m_X &&
+				longPath.m_Y < shortPath.m_Y && longPath.m_Z < shortPath.m_Z &&
+				EvaluateAtmosphereTransmittance(a, 1000.0f, 1.0f, 0.0f).m_X == 1.0f &&
+				EvaluateAtmosphereTransmittance(a, 1000.0f, -1.0f, 2000.0f).m_X == 0.0f,
 				"Earth transmittance is finite, bounded, decreases with path length, and rejects planet-occluded sun paths");
-			settings.m_WorldUnitsToMeters=1000.0f;
-			const auto scaled = ResolveAtmosphere(settings,sun,Vector3(0.0f,1.0f,0.0f));
-			context.Check(scaled.m_Observer.m_X==a.m_Observer.m_X && AtmosphereDirtyMask(a,scaled)==0,
+			settings.m_WorldUnitsToMeters = 1000.0f;
+			const auto scaled = ResolveAtmosphere(settings, sun, Vector3(0.0f, 1.0f, 0.0f));
+			context.Check(scaled.m_Observer.m_X == a.m_Observer.m_X && AtmosphereDirtyMask(a, scaled) == 0,
 				"Equivalent meter and kilometer worlds resolve identical atmosphere transport");
 			context.Check(a.m_World.m_W == 0.001f && scaled.m_World.m_W == 1.0f &&
 				std::abs(a.m_World.m_Y + 6360.0f) < 0.001f,
 				"Physical sky and direct sunlight use the same resolved world-to-atmosphere transform");
-			auto changed=a; changed.m_Sun.m_X*=2.0f;
-			bool invalidation=AtmosphereDirtyMask(a,changed)==4;
-			changed=a; changed.m_Observer.m_X+=1.0f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
-			changed=a; changed.m_Ground.m_X+=0.1f; invalidation &= AtmosphereDirtyMask(a,changed)==6;
-			changed=a; changed.m_Mie.m_W=0.5f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
-			changed=a; changed.m_Rayleigh.m_X*=2.0f; invalidation &= AtmosphereDirtyMask(a,changed)==7;
-			context.Check(invalidation,"Atmosphere dirty masks preserve transmittance and unit-sun scattering when only the sun or observer changes");
-			settings.m_MieExtinction=-1.0f;
-			settings.m_MieAnisotropy=std::numeric_limits<float>::quiet_NaN();
-			settings.m_RayleighScaleHeightMeters=0.0f;
-			const auto sanitized=ResolveAtmosphere(settings,sun,Vector3::Zero);
-			context.Check(sanitized.m_Mie.m_Y>=sanitized.m_Mie.m_X && std::isfinite(sanitized.m_Mie.m_W) &&
-				sanitized.m_Rayleigh.m_W>0.0f,"Atmosphere sanitization preserves nonnegative absorption and finite density scales");
+			auto changed = a;
+			changed.m_Sun.m_X *= 2.0f;
+			bool invalidation = AtmosphereDirtyMask(a, changed) == 4;
+			changed = a;
+			changed.m_Observer.m_X += 1.0f;
+			invalidation &= AtmosphereDirtyMask(a, changed) == 4;
+			changed = a;
+			changed.m_Ground.m_X += 0.1f;
+			invalidation &= AtmosphereDirtyMask(a, changed) == 6;
+			changed = a;
+			changed.m_Mie.m_W = 0.5f;
+			invalidation &= AtmosphereDirtyMask(a, changed) == 4;
+			changed = a;
+			changed.m_Rayleigh.m_X *= 2.0f;
+			invalidation &= AtmosphereDirtyMask(a, changed) == 7;
+			context.Check(invalidation, "Atmosphere dirty masks preserve transmittance and unit-sun scattering when only the sun or observer changes");
+			settings.m_MieExtinction = -1.0f;
+			settings.m_MieAnisotropy = std::numeric_limits<float>::quiet_NaN();
+			settings.m_RayleighScaleHeightMeters = 0.0f;
+			const auto sanitized = ResolveAtmosphere(settings, sun, Vector3::Zero);
+			context.Check(sanitized.m_Mie.m_Y >= sanitized.m_Mie.m_X && std::isfinite(sanitized.m_Mie.m_W) &&
+				sanitized.m_Rayleigh.m_W > 0.0f, "Atmosphere sanitization preserves nonnegative absorption and finite density scales");
 
 			RecordingDevice device;
-			device.m_AtmosphereBuffersEnabled=true;
-			device.m_TextureViewsSupported=true;
-			device.m_UseControlledFenceCompletion=true;
+			device.m_AtmosphereBuffersEnabled = true;
+			device.m_TextureViewsSupported = true;
+			device.m_UseControlledFenceCompletion = true;
 			PersistentTexturePool pool(&device);
-			AtmosphereSystem system(&device,&pool);
+			AtmosphereSystem system(&device, &pool);
 			class ShaderAccess final : public RenderShaderProgramAccess
 			{
 			public:
@@ -7890,10 +7475,14 @@ namespace gglab
 			class PipelineAccess final : public RenderPipelineResolver
 			{
 			public:
-				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&,
-					const RenderPassInfo&) noexcept override { return {}; }
-				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
-					const RenderPassInfo&) noexcept override { return RHIPipelineHandle{ 1, 1 }; }
+				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&, const RenderPassInfo&) noexcept override
+				{
+					return {};
+				}
+				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&, const RenderPassInfo&) noexcept override
+				{
+					return RHIPipelineHandle{ 1, 1 };
+				}
 				void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
 			} pipelines;
 			class SamplerAccess final : public RenderSamplerAccess
@@ -7928,39 +7517,48 @@ namespace gglab
 			context.Check(dependencies, "Production atmosphere graph retains ordered transmittance, multiple scattering, sky and export dependencies");
 			system.EndFrame(false, {});
 			device.m_AtmosphereDestroyedBufferCount = 0;
-			const bool first=system.Begin(a,{1,1,1});
-			context.Check(first && system.GetDiagnostics().m_DirtyMask==7,"Cold atmosphere allocation requires all three LUT producers");
-			if (first) { for (uint32_t i=0;i<3;++i) system.NotifyExecuted(i); }
-			system.EndFrame(true,{RHIFenceHandle{1,1},10});
-			const bool cached=system.Begin(a,{1,1,1},true);
-			context.Check(cached && system.GetDiagnostics().m_DirtyMask==0 && system.GetDiagnostics().m_Generations[0]==1 &&
+			const bool first = system.Begin(a, { 1,1,1 });
+			context.Check(first && system.GetDiagnostics().m_DirtyMask == 7, "Cold atmosphere allocation requires all three LUT producers");
+			if (first)
+			{
+				for (uint32_t i = 0; i < 3; ++i)
+				{
+					system.NotifyExecuted(i);
+				}
+			}
+			system.EndFrame(true, { RHIFenceHandle{ 1,1 },10 });
+			const bool cached = system.Begin(a, { 1,1,1 }, true);
+			context.Check(cached && system.GetDiagnostics().m_DirtyMask == 0 && system.GetDiagnostics().m_Generations[0] == 1 &&
 				system.GetConstants().IsValid(),
 				"Physical sky preview retains frame constants without recomputing cached atmosphere LUTs");
-			system.EndFrame(true,{RHIFenceHandle{1,1},11});
-			changed=a; changed.m_Observer.m_X+=1.0f;
-			const bool updated=system.Begin(changed,{1,1,1});
-			context.Check(updated && system.GetDiagnostics().m_DirtyMask==4,"Observer edits schedule only the sky-view producer");
+			system.EndFrame(true, { RHIFenceHandle{ 1,1 },11 });
+			changed = a;
+			changed.m_Observer.m_X += 1.0f;
+			const bool updated = system.Begin(changed, { 1,1,1 });
+			context.Check(updated && system.GetDiagnostics().m_DirtyMask == 4, "Observer edits schedule only the sky-view producer");
 			if (updated)
 			{
 				system.NotifyExecuted(2);
 			}
-			system.EndFrame(false,{RHIFenceHandle{1,1},12});
-			context.Check(!system.GetDiagnostics().m_Available && system.GetDiagnostics().m_Generations[2]==1 &&
-				pool.GetDiagnostics().m_PendingRetirementTextureCount==3 && device.m_AtmosphereDestroyedBufferCount==0,
+			system.EndFrame(false, { RHIFenceHandle{ 1,1 },12 });
+			context.Check(!system.GetDiagnostics().m_Available && system.GetDiagnostics().m_Generations[2] == 1 &&
+				pool.GetDiagnostics().m_PendingRetirementTextureCount == 3 && device.m_AtmosphereDestroyedBufferCount == 0,
 				"Cancelled submitted atmosphere work publishes no generation and retains textures and constants until its fence");
-			device.m_CompletedFenceValue=12;
-			system.Tick(); pool.Tick();
-			context.Check(device.m_AtmosphereDestroyedBufferCount==3 && pool.GetDiagnostics().m_PendingRetirementTextureCount==0,
+			device.m_CompletedFenceValue = 12;
+			system.Tick();
+			pool.Tick();
+			context.Check(device.m_AtmosphereDestroyedBufferCount == 3 && pool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
 				"Atmosphere constants and textures retire after GPU completion");
-			const bool retry=system.Begin(a,{1,1,1});
+			const bool retry = system.Begin(a, { 1,1,1 });
 			if (retry)
 			{
 				system.NotifyExecuted(0);
 			}
-			system.EndFrame(false,{});
-			device.m_CompletedFenceValue=12;
-			system.Shutdown(); pool.Tick();
-			context.Check(pool.GetDiagnostics().m_ActiveTextureCount==0 && device.m_AtmosphereDestroyedBufferCount==4,
+			system.EndFrame(false, {});
+			device.m_CompletedFenceValue = 12;
+			system.Shutdown();
+			pool.Tick();
+			context.Check(pool.GetDiagnostics().m_ActiveTextureCount == 0 && device.m_AtmosphereDestroyedBufferCount == 4,
 				"Unsubmitted atmosphere cancellation destroys its upload and leaves no active resources");
 
 			// Exercise the actual inspector consumer between LUT production and final export.
@@ -8005,8 +7603,7 @@ namespace gglab
 					pass.AddPass(previewGraph, previewContext, previewServices);
 					const uint32_t expectedMask = phase == 0 ? 7u : phase == 1 ? 0u : 4u;
 					const bool expectedUpdate = previewAtmosphere.GetDiagnostics().m_DirtyMask == expectedMask;
-					registry.SetPostProcessPreviewSelection({ previewTaps[tap], 0 },
-						PostProcessPreviewChannel::Atmosphere);
+					registry.SetPostProcessPreviewSelection({ previewTaps[tap], 0 }, PostProcessPreviewChannel::Atmosphere);
 					registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 					RenderPassPostProcessPreview preview;
 					preview.AddPass(previewGraph, previewContext, previewServices);
@@ -8014,10 +7611,8 @@ namespace gglab
 					const bool previewCompiled = previewGraph.Compile();
 					RGSnapshot previewSnapshot;
 					BuildRenderGraphSnapshot(previewGraph, previewSnapshot);
-					const auto consumer = std::ranges::find(previewSnapshot.m_Passes,
-						"Atmosphere.Preview", &RGSnapshotPassInfo::m_Name);
-					const auto finish = std::ranges::find(previewSnapshot.m_Passes,
-						"Atmosphere.Export", &RGSnapshotPassInfo::m_Name);
+					const auto consumer = std::ranges::find(previewSnapshot.m_Passes, "Atmosphere.Preview", &RGSnapshotPassInfo::m_Name);
+					const auto finish = std::ranges::find(previewSnapshot.m_Passes, "Atmosphere.Export", &RGSnapshotPassInfo::m_Name);
 					bool valid = previewCompiled && expectedUpdate && consumer != previewSnapshot.m_Passes.end() &&
 						finish != previewSnapshot.m_Passes.end() && !consumer->m_Culled && !finish->m_Culled &&
 						consumer->m_ExecutionOrder < finish->m_ExecutionOrder;
@@ -8060,10 +7655,8 @@ namespace gglab
 			RenderGraph disabledGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
 			const auto disabledContext = frame.MakeRenderFrameContext();
 			pass.AddPass(disabledGraph, disabledContext, previewServices);
-			registry.PublishPostProcessPreview({ previewTaps[0], 0 },
-				PostProcessPreviewChannel::Atmosphere, 42);
-			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 },
-				PostProcessPreviewChannel::Atmosphere);
+			registry.PublishPostProcessPreview({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere, 42);
+			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere);
 			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 			RenderPassPostProcessPreview unavailablePreview;
 			unavailablePreview.AddPass(disabledGraph, disabledContext, previewServices);
@@ -8135,17 +7728,19 @@ namespace gglab
 				const std::string to = std::format("IBL.PrefilteredSpecular.Importance.{}", mip);
 				importanceDependenciesMatch &= std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
 					[&from, &to](const RGSnapshotDependencyEdge& edge)
-					{ return edge.m_FromPassName == from && edge.m_ToPassName == to; });
+					{
+						return edge.m_FromPassName == from && edge.m_ToPassName == to;
+					});
 			}
 			importanceDependenciesMatch &= std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
 				[](const RGSnapshotDependencyEdge& edge)
-				{ return edge.m_FromPassName == "IBL.PrefilteredSpecular.Importance.6" && edge.m_ToPassName == "IBL.PrefilteredSpecular"; });
+				{
+					return edge.m_FromPassName == "IBL.PrefilteredSpecular.Importance.6" && edge.m_ToPassName == "IBL.PrefilteredSpecular";
+				});
 			context.Check(importanceDependenciesMatch,
 				"Production specular importance mips depend on the baked environment and preceding mip before convolution");
-			const auto importanceResource = std::ranges::find(bakeSnapshot.m_Resources,
-				"IBL.SpecularImportance", &RGSnapshotResourceInfo::m_Name);
-			const auto specularConsumer = std::ranges::find(bakeSnapshot.m_Passes,
-				"IBL.PrefilteredSpecular", &RGSnapshotPassInfo::m_Name);
+			const auto importanceResource = std::ranges::find(bakeSnapshot.m_Resources, "IBL.SpecularImportance", &RGSnapshotResourceInfo::m_Name);
+			const auto specularConsumer = std::ranges::find(bakeSnapshot.m_Passes, "IBL.PrefilteredSpecular", &RGSnapshotPassInfo::m_Name);
 			context.Check(importanceResource != bakeSnapshot.m_Resources.end() &&
 				specularConsumer != bakeSnapshot.m_Passes.end() && !importanceResource->m_Imported &&
 				importanceResource->m_TextureFormat == RHIFormat::R32Float &&
@@ -8163,7 +7758,10 @@ namespace gglab
 					return edge.m_FromPassName == "IBL.Environment" && edge.m_ToPassName == "IBL.Atmosphere.Export" &&
 						edge.m_Reason == RGDependencyReason::ExportReaderToExport;
 				}), "Pending atmosphere export follows its IBL consumer and restores the persistent state contract");
-			for (uint32_t i = 0; i < 3; ++i) bakeAtmosphere.NotifyExecuted(i);
+			for (uint32_t i = 0; i < 3; ++i)
+			{
+				bakeAtmosphere.NotifyExecuted(i);
+			}
 			bakeAtmosphere.EndFrame(bakeCompiled, { RHIFenceHandle{ 1, 1 }, 100 });
 			device.m_CompletedFenceValue = 99;
 			context.Check(!bakeAtmosphere.CanPublish(), "A submitted physical sky remains unpublished until its GPU fence completes");
@@ -8195,44 +7793,37 @@ namespace gglab
 			frame.m_RenderViews[0].m_Aspect = 2.0f;
 			frame.m_RenderViews[0].m_Far = 10000.0f;
 			bakeEnvironment.m_Settings.m_EnableSkybox = true;
-			bakeEnvironment.m_Settings.m_BackgroundMode =
-				EnvironmentBackgroundMode::PhysicalAtmospherePreview;
+			bakeEnvironment.m_Settings.m_BackgroundMode = EnvironmentBackgroundMode::PhysicalAtmospherePreview;
 			auto aerialServices = previewServices;
 			aerialServices.m_Atmosphere = &activeAtmosphere;
 			aerialServices.m_Environment = &bakeEnvironment;
 			RenderGraph aerialGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
 			struct AerialTargetData {};
-			aerialGraph.AddPass<AerialTargetData>("AerialTest.Opaque", [](
-				RenderGraph::RGBuilder& builder, AerialTargetData&)
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.Opaque", [](RenderGraph::RGBuilder& builder, AerialTargetData&)
 				{
-				builder.SideEffect();
-				const RHIExtent3D extent{ 1024, 512, 1 };
-				RHITextureDesc colorDesc{};
-				colorDesc.m_Format = RHIFormat::R16G16B16A16Float;
-				colorDesc.m_Extent = extent;
-				auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(
-					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
-				targets.m_RenderWidth = extent.m_Width;
-				targets.m_RenderHeight = extent.m_Height;
-				targets.m_DisplayWidth = extent.m_Width;
-				targets.m_DisplayHeight = extent.m_Height;
-				targets.m_SceneColor = builder.CreateTexture("AerialTest.SceneColor", colorDesc);
-				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
-				RHITextureDesc depthDesc{};
-				depthDesc.m_Format = RHIFormat::R32Typeless;
-				depthDesc.m_Extent = extent;
-				auto& depth = builder.GetBlackboard().Create<RGSceneDepthResources>(
-					SceneDepthResourcesName);
-				depth.m_Texture = builder.CreateTexture("AerialTest.Depth", depthDesc);
-				depth.m_SrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float,
-					0, 1, RHITextureAspect::Depth);
-				builder.WriteInPlace(depth.m_Texture, RGTextureAccess::DepthStencilWrite);
-			});
+					builder.SideEffect();
+					const RHIExtent3D extent{ 1024, 512, 1 };
+					RHITextureDesc colorDesc{};
+					colorDesc.m_Format = RHIFormat::R16G16B16A16Float;
+					colorDesc.m_Extent = extent;
+					auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+					targets.m_RenderWidth = extent.m_Width;
+					targets.m_RenderHeight = extent.m_Height;
+					targets.m_DisplayWidth = extent.m_Width;
+					targets.m_DisplayHeight = extent.m_Height;
+					targets.m_SceneColor = builder.CreateTexture("AerialTest.SceneColor", colorDesc);
+					builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+					RHITextureDesc depthDesc{};
+					depthDesc.m_Format = RHIFormat::R32Typeless;
+					depthDesc.m_Extent = extent;
+					auto& depth = builder.GetBlackboard().Create<RGSceneDepthResources>(SceneDepthResourcesName);
+					depth.m_Texture = builder.CreateTexture("AerialTest.Depth", depthDesc);
+					depth.m_SrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
+					builder.WriteInPlace(depth.m_Texture, RGTextureAccess::DepthStencilWrite);
+				});
 			const auto aerialContext = frame.MakeRenderFrameContext();
 			pass.AddPass(aerialGraph, aerialContext, aerialServices);
-			registry.SetPostProcessPreviewSelection(
-				{ PostProcessDebugTap::AtmosphereAerialTransmittance, 0 },
-				PostProcessPreviewChannel::Atmosphere);
+			registry.SetPostProcessPreviewSelection({ PostProcessDebugTap::AtmosphereAerialTransmittance, 0 }, PostProcessPreviewChannel::Atmosphere);
 			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 			RenderPassAerialPerspective aerialPass;
 			const auto baselineColor = aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(
@@ -8248,38 +7839,32 @@ namespace gglab
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
 			RenderPassPostProcessPreview aerialPreview;
 			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
-			aerialGraph.AddPass<AerialTargetData>("AerialTest.TransparentLoad", [](
-				RenderGraph::RGBuilder& builder, AerialTargetData&)
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.TransparentLoad", [](RenderGraph::RGBuilder& builder, AerialTargetData&)
 				{
-				builder.SideEffect();
-				auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(
-					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
-				builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+					builder.SideEffect();
+					auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 				});
-			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](
-				RenderGraph::RGBuilder& builder, AerialTargetData&)
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](RenderGraph::RGBuilder& builder, AerialTargetData&)
 				{
-				builder.SideEffect();
-				const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(
-					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
-				builder.Read(targets.m_SceneColor, RGTextureAccess::Sample);
-			});
+					builder.SideEffect();
+					const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+					builder.Read(targets.m_SceneColor, RGTextureAccess::Sample);
+				});
 			pass.AddFinishPass(aerialGraph);
 			const bool aerialCompiled = aerialGraph.Compile();
 			RGSnapshot aerialSnapshot;
 			BuildRenderGraphSnapshot(aerialGraph, aerialSnapshot);
-			const auto aerialEdge = [&aerialSnapshot](std::string_view from,
-				std::string_view to) noexcept
-				{
-					return std::ranges::any_of(aerialSnapshot.m_DependencyEdges,
-						[from, to](const RGSnapshotDependencyEdge& edge)
-						{
-							return edge.m_FromPassName == from && edge.m_ToPassName == to;
-						});
-				};
+			const auto aerialEdge = [&aerialSnapshot](std::string_view from, std::string_view to) noexcept
+			{
+				return std::ranges::any_of(aerialSnapshot.m_DependencyEdges,
+					[from, to](const RGSnapshotDependencyEdge& edge)
+					{
+						return edge.m_FromPassName == from && edge.m_ToPassName == to;
+					});
+			};
 			context.Check(aerialCompiled, "Aerial opaque graph compiles with sampled depth and LUT inputs");
-			const auto aerialBuild = std::ranges::find(aerialSnapshot.m_Passes,
-				"Atmosphere.AerialPerspective.Build", &RGSnapshotPassInfo::m_Name);
+			const auto aerialBuild = std::ranges::find(aerialSnapshot.m_Passes, "Atmosphere.AerialPerspective.Build", &RGSnapshotPassInfo::m_Name);
 			context.Check(aerialBuild != aerialSnapshot.m_Passes.end() && !aerialBuild->m_Culled &&
 				std::ranges::any_of(aerialBuild->m_Accesses,
 					[](const RGSnapshotAccessInfo& access)
@@ -8304,10 +7889,8 @@ namespace gglab
 				"Atmosphere.AerialPerspective.InitializeSceneColor", &RGSnapshotPassInfo::m_Name);
 			const auto aerialComposite = std::ranges::find(aerialSnapshot.m_Passes,
 				"Atmosphere.AerialPerspective.Composite", &RGSnapshotPassInfo::m_Name);
-			const auto aerialTransparent = std::ranges::find(aerialSnapshot.m_Passes,
-				"AerialTest.TransparentLoad", &RGSnapshotPassInfo::m_Name);
-			const auto aerialColor = std::ranges::find(aerialSnapshot.m_Resources,
-				"Atmosphere.AerialSceneColor", &RGSnapshotResourceInfo::m_Name);
+			const auto aerialTransparent = std::ranges::find(aerialSnapshot.m_Passes, "AerialTest.TransparentLoad", &RGSnapshotPassInfo::m_Name);
+			const auto aerialColor = std::ranges::find(aerialSnapshot.m_Resources, "Atmosphere.AerialSceneColor", &RGSnapshotResourceInfo::m_Name);
 			context.Check(aerialInitialize != aerialSnapshot.m_Passes.end() &&
 				aerialComposite != aerialSnapshot.m_Passes.end() &&
 				aerialTransparent != aerialSnapshot.m_Passes.end() &&
@@ -8328,30 +7911,28 @@ namespace gglab
 				"Aerial scene color is allocated at its clear pass with combined RTV, UAV and SRV usage");
 			const auto aerialColorTransition = [&aerialSnapshot](std::string_view passName,
 				const RHIResourceState& before, const RHIResourceState& after) noexcept
-				{
-					const auto passInfo = std::ranges::find(aerialSnapshot.m_Passes,
-						passName, &RGSnapshotPassInfo::m_Name);
-					return passInfo != aerialSnapshot.m_Passes.end() &&
-						std::ranges::any_of(passInfo->m_PreBarriers,
-							[&](const RGSnapshotBarrierInfo& barrier)
-							{
-								return barrier.m_ResourceName == "Atmosphere.AerialSceneColor" &&
-									barrier.m_Kind == RGBarrierKind::Transition &&
-									barrier.m_Before == before && barrier.m_After == after;
-							});
-				};
+			{
+				const auto passInfo = std::ranges::find(aerialSnapshot.m_Passes, passName, &RGSnapshotPassInfo::m_Name);
+				return passInfo != aerialSnapshot.m_Passes.end() &&
+					std::ranges::any_of(passInfo->m_PreBarriers,
+						[&](const RGSnapshotBarrierInfo& barrier)
+						{
+							return barrier.m_ResourceName == "Atmosphere.AerialSceneColor" &&
+								barrier.m_Kind == RGBarrierKind::Transition &&
+								barrier.m_Before == before && barrier.m_After == after;
+						});
+			};
 			const auto aerialRenderTargetState = ToRHIResourceState(RGTextureAccess::RenderTarget);
-			const auto aerialStorageState =
-				ToRHIResourceState(RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+			const auto aerialStorageState = ToRHIResourceState(RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 			context.Check(aerialColorTransition("Atmosphere.AerialPerspective.InitializeSceneColor",
 				UndefinedRHITextureState(), aerialRenderTargetState) &&
-				aerialColorTransition("Atmosphere.AerialPerspective.Composite",
-					aerialRenderTargetState, aerialStorageState) &&
+				aerialColorTransition("Atmosphere.AerialPerspective.Composite", aerialRenderTargetState, aerialStorageState) &&
 				aerialColorTransition("AerialTest.TransparentLoad", aerialStorageState, aerialRenderTargetState),
 				"RenderGraph orders aerial initialization, compute writes and render target loads with exact transitions");
 			activeAtmosphere.EndFrame(false, {});
 			device.m_CompletedFenceValue = 200;
-			activeAtmosphere.Shutdown(); bakeAtmosphere.Shutdown();
+			activeAtmosphere.Shutdown();
+			bakeAtmosphere.Shutdown();
 			device.m_CompletedFenceValue = std::max(fenceValue, uint64_t{ 200 });
 			registry.ReleaseAll({ RHIFenceHandle{ 1, 1 }, fenceValue });
 			previewAtmosphere.Shutdown();
@@ -8426,10 +8007,8 @@ namespace gglab
 		void RunExposureContractTests(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{});
-			const ResolvedExposureSettings defaultExposure =
-				ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
-			context.Check(NearlyEqual(defaultExposure.m_ExposureScale,
-				1.0f / ManualExposureSaturationNormalization, 0.000001f) &&
+			const ResolvedExposureSettings defaultExposure = ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
+			context.Check(NearlyEqual(defaultExposure.m_ExposureScale, 1.0f / ManualExposureSaturationNormalization, 0.000001f) &&
 				defaultExposure.m_ManualEV100 == 0.0f &&
 				defaultExposure.m_CompensationEV == 0.0f &&
 				defaultExposure.m_PreExposure == defaultExposure.m_ExposureScale,
@@ -8439,11 +8018,8 @@ namespace gglab
 			for (float compensation : { -10.0f, -2.0f, 0.0f, 2.0f, 10.0f })
 			{
 				camera.SetExposureCompensationEV(compensation);
-				const float exposureScale =
-					ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure.m_ExposureScale;
-				compensationResponseMatches &= NearlyEqual(
-					exposureScale / std::exp2(compensation),
-					defaultExposure.m_ExposureScale, 0.000001f);
+				const float exposureScale = ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure.m_ExposureScale;
+				compensationResponseMatches &= NearlyEqual(exposureScale / std::exp2(compensation), defaultExposure.m_ExposureScale, 0.000001f);
 			}
 			context.Check(compensationResponseMatches,
 				"Exposure compensation retains its stop response at zero manual EV100");
@@ -8455,12 +8031,10 @@ namespace gglab
 			const auto preExposedSettings = ResolveViewRenderSettings(preExposedProfile, camera);
 			preExposedProfile.m_TemporalAA.m_Enabled = true;
 			const auto temporalSettings = ResolveViewRenderSettings(preExposedProfile, camera);
-			context.Check(preExposedSettings.m_Exposure.m_PreExposure ==
-				preExposedSettings.m_Exposure.m_ExposureScale &&
+			context.Check(preExposedSettings.m_Exposure.m_PreExposure == preExposedSettings.m_Exposure.m_ExposureScale &&
 				preExposedSettings.m_Exposure.m_PreExposure < 0.0001f &&
 				temporalSettings.m_Exposure.m_PreExposure == temporalSettings.m_Exposure.m_ExposureScale &&
-				temporalSettings.m_Exposure.m_ExposureScale ==
-				preExposedSettings.m_Exposure.m_ExposureScale,
+				temporalSettings.m_Exposure.m_ExposureScale == preExposedSettings.m_Exposure.m_ExposureScale,
 				"Scene pre-exposure remains enabled with a TAA request under the V2 ABI");
 			const ResolvedTemporalFramePlan noTemporalFrame{};
 			const RenderView preExposedView = RenderViewBuildTraits<RenderViewID::Main>::Build({
@@ -8469,8 +8043,7 @@ namespace gglab
 				.m_TemporalFramePlan = noTemporalFrame,
 				.m_Resolution = ResolveNativeViewResolution({ 64, 64 }),
 			});
-			const auto upload = RenderSceneBuilder::BuildViewData(
-				std::span<const RenderView>(&preExposedView, 1), {});
+			const auto upload = RenderSceneBuilder::BuildViewData(std::span<const RenderView>(&preExposedView, 1), {});
 			context.Check(upload.m_Views.size() == 1 &&
 				preExposedView.m_ScenePreExposure == preExposedSettings.m_Exposure.m_PreExposure &&
 				upload.m_Views[0].ScenePreExposure == preExposedView.m_ScenePreExposure &&
@@ -8480,8 +8053,7 @@ namespace gglab
 			const ResolvedExposureSettings base = ResolveManualExposureSettings(12.0f, 0.0f);
 			const ResolvedExposureSettings plusStop = ResolveManualExposureSettings(13.0f, 0.0f);
 			const ResolvedExposureSettings minusStop = ResolveManualExposureSettings(11.0f, 0.0f);
-			const ResolvedExposureSettings plusCompensation =
-				ResolveManualExposureSettings(12.0f, 1.0f);
+			const ResolvedExposureSettings plusCompensation = ResolveManualExposureSettings(12.0f, 1.0f);
 			context.Check(NearlyEqual(plusStop.m_ExposureScale / base.m_ExposureScale, 0.5f) &&
 				NearlyEqual(minusStop.m_ExposureScale / base.m_ExposureScale, 2.0f) &&
 				NearlyEqual(plusCompensation.m_ExposureScale / base.m_ExposureScale, 2.0f) &&
@@ -8490,10 +8062,8 @@ namespace gglab
 				"Manual exposure and compensation move exposed-linear brightness by exact stops");
 
 			const float nan = std::numeric_limits<float>::quiet_NaN();
-			const ResolvedExposureSettings sanitized =
-				ResolveManualExposureSettings(nan, std::numeric_limits<float>::infinity());
-			const ResolvedExposureSettings clamped =
-				ResolveManualExposureSettings(1000.0f, -1000.0f);
+			const ResolvedExposureSettings sanitized = ResolveManualExposureSettings(nan, std::numeric_limits<float>::infinity());
+			const ResolvedExposureSettings clamped = ResolveManualExposureSettings(1000.0f, -1000.0f);
 			camera.SetManualEV100(nan);
 			context.Check(sanitized.m_ManualEV100 == 0.0f &&
 				sanitized.m_CompensationEV == 0.0f &&
@@ -8508,8 +8078,7 @@ namespace gglab
 			TemporalObjectHistory objectHistory;
 			TemporalFrameTransaction disabledTransaction;
 			disabledTransaction.Begin(viewHistory, objectHistory, {}, ResolveNativeViewResolution({ 64, 64 }), nullptr, 0.5f);
-			const bool retainedDisabledScale =
-				disabledTransaction.GetScenePreExposure() == 0.5f;
+			const bool retainedDisabledScale = disabledTransaction.GetScenePreExposure() == 0.5f;
 			disabledTransaction.Abort();
 			context.Check(retainedDisabledScale &&
 				disabledTransaction.GetState() == TemporalFrameTransactionState::Aborted,
@@ -8526,14 +8095,10 @@ namespace gglab
 			static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
 			static_assert(offsetof(ViewGPU, PreviousScenePreExposure) == 472);
 
-			const Vector2 staticMotion = ComputeTemporalMotionUV(
-				Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
-			const Vector2 cameraMotion = ComputeTemporalMotionUV(
-				Vector4(-0.2f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
-			const Vector2 objectMotion = ComputeTemporalMotionUV(
-				Vector4(0.4f, 0.2f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
-			const TemporalMotionReadbackSample objectMotionReadback =
-				ResolveTemporalMotionReadbackSample(objectMotion, 100, 50);
+			const Vector2 staticMotion = ComputeTemporalMotionUV(Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const Vector2 cameraMotion = ComputeTemporalMotionUV(Vector4(-0.2f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const Vector2 objectMotion = ComputeTemporalMotionUV(Vector4(0.4f, 0.2f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const TemporalMotionReadbackSample objectMotionReadback = ResolveTemporalMotionReadbackSample(objectMotion, 100, 50);
 			context.Check(NearlyEqual(staticMotion, Vector2::Zero) &&
 				NearlyEqual(cameraMotion, Vector2(-0.1f, 0.0f)) &&
 				NearlyEqual(objectMotion, Vector2(0.2f, -0.1f)) &&
@@ -8543,10 +8108,8 @@ namespace gglab
 				!ResolveTemporalMotionReadbackSample(objectMotion, 0, 50).m_Valid,
 				"Temporal motion uses current-minus-previous top-left UV delta and deterministic pixel magnitude");
 
-			const Vector2 currentJitterUV =
-				temporal::JitterPixelsToUV(Vector2(0.25f, -0.25f), 100, 50);
-			const Vector2 previousJitterUV =
-				temporal::JitterPixelsToUV(Vector2(-0.25f, 0.25f), 100, 50);
+			const Vector2 currentJitterUV = temporal::JitterPixelsToUV(Vector2(0.25f, -0.25f), 100, 50);
+			const Vector2 previousJitterUV = temporal::JitterPixelsToUV(Vector2(-0.25f, 0.25f), 100, 50);
 			const Vector4 staticUnjitteredClip(0.2f, -0.1f, 0.5f, 1.0f);
 			const Vector4 currentRasterClip = temporal::ApplyJitterToClipPosition(
 				staticUnjitteredClip,
@@ -8554,17 +8117,12 @@ namespace gglab
 			const Vector4 previousRasterClip = temporal::ApplyJitterToClipPosition(
 				staticUnjitteredClip,
 				temporal::JitterPixelsToNDC(Vector2(-0.25f, 0.25f), 100, 50));
-			const Vector2 jitterOnlyRasterMotion =
-				ComputeTemporalMotionUV(currentRasterClip, previousRasterClip);
+			const Vector2 jitterOnlyRasterMotion = ComputeTemporalMotionUV(currentRasterClip, previousRasterClip);
 			const Vector2 currentUV(0.5f, 0.5f);
-			const Vector2 previousRasterUV =
-				temporal::ReprojectToPreviousUV(currentUV, jitterOnlyRasterMotion);
-			const Vector2 staticHistoryMotion = ResolveTemporalHistoryMotionUV(
-				jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
-			const Vector2 previousAccumulatedUV =
-				temporal::ReprojectToPreviousUV(currentUV, staticHistoryMotion);
-			context.Check(NearlyEqual(jitterOnlyRasterMotion,
-					currentJitterUV - previousJitterUV) &&
+			const Vector2 previousRasterUV = temporal::ReprojectToPreviousUV(currentUV, jitterOnlyRasterMotion);
+			const Vector2 staticHistoryMotion = ResolveTemporalHistoryMotionUV(jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
+			const Vector2 previousAccumulatedUV = temporal::ReprojectToPreviousUV(currentUV, staticHistoryMotion);
+			context.Check(NearlyEqual(jitterOnlyRasterMotion, currentJitterUV - previousJitterUV) &&
 				!NearlyEqual(previousRasterUV, currentUV) &&
 				NearlyEqual(staticHistoryMotion, Vector2::Zero) &&
 				NearlyEqual(previousAccumulatedUV, currentUV),
@@ -8573,37 +8131,28 @@ namespace gglab
 			const Vector2 unjitteredMotionUV(0.03f, -0.02f);
 			const Vector2 movingRasterMotionUV =
 				unjitteredMotionUV + currentJitterUV - previousJitterUV;
-			const Vector2 movingHistoryMotionUV = ResolveTemporalHistoryMotionUV(
-				movingRasterMotionUV, currentJitterUV, previousJitterUV);
-			const Vector2 movingPreviousHistoryUV =
-				temporal::ReprojectToPreviousUV(currentUV, movingHistoryMotionUV);
+			const Vector2 movingHistoryMotionUV = ResolveTemporalHistoryMotionUV(movingRasterMotionUV, currentJitterUV, previousJitterUV);
+			const Vector2 movingPreviousHistoryUV = temporal::ReprojectToPreviousUV(currentUV, movingHistoryMotionUV);
 			context.Check(NearlyEqual(movingHistoryMotionUV, unjitteredMotionUV) &&
 				NearlyEqual(movingPreviousHistoryUV, currentUV - unjitteredMotionUV),
 				"TAA preserves real temporal motion while removing raster jitter displacement");
 
 			const Vector2 currentSkyUV(0.15f, 0.08f);
-			const Vector2 previousSkyRasterUV =
-				temporal::ReprojectToPreviousUV(currentSkyUV, jitterOnlyRasterMotion);
+			const Vector2 previousSkyRasterUV = temporal::ReprojectToPreviousUV(currentSkyUV, jitterOnlyRasterMotion);
 			const Vector2 skyRasterMotionUV = currentSkyUV - previousSkyRasterUV;
-			const Vector2 skyHistoryMotionUV = ResolveTemporalHistoryMotionUV(
-				skyRasterMotionUV, currentJitterUV, previousJitterUV);
-			const Vector2 previousSkyHistoryUV =
-				temporal::ReprojectToPreviousUV(currentSkyUV, skyHistoryMotionUV);
+			const Vector2 skyHistoryMotionUV = ResolveTemporalHistoryMotionUV(skyRasterMotionUV, currentJitterUV, previousJitterUV);
+			const Vector2 previousSkyHistoryUV = temporal::ReprojectToPreviousUV(currentSkyUV, skyHistoryMotionUV);
 			context.Check(NearlyEqual(skyHistoryMotionUV, Vector2::Zero) &&
 				NearlyEqual(previousSkyHistoryUV, currentSkyUV),
 				"Static sky reprojection removes jitter after resolving its previous raster UV");
 
 			const Vector2 edgeCurrentUV(0.002f, 0.5f);
-			const Vector2 edgePreviousRasterUV =
-				temporal::ReprojectToPreviousUV(edgeCurrentUV, jitterOnlyRasterMotion);
-			const Vector2 edgeHistoryMotionUV = ResolveTemporalHistoryMotionUV(
-				jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
-			const Vector2 edgePreviousHistoryUV =
-				temporal::ReprojectToPreviousUV(edgeCurrentUV, edgeHistoryMotionUV);
+			const Vector2 edgePreviousRasterUV = temporal::ReprojectToPreviousUV(edgeCurrentUV, jitterOnlyRasterMotion);
+			const Vector2 edgeHistoryMotionUV = ResolveTemporalHistoryMotionUV(jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
+			const Vector2 edgePreviousHistoryUV = temporal::ReprojectToPreviousUV(edgeCurrentUV, edgeHistoryMotionUV);
 			context.Check(IsTemporalAAUVInBounds(edgePreviousHistoryUV) &&
 				!IsTemporalAAUVInBounds(edgePreviousRasterUV) &&
-				!AreTemporalAAReprojectionUVsValid(
-					edgePreviousHistoryUV, edgePreviousRasterUV),
+				!AreTemporalAAReprojectionUVsValid(edgePreviousHistoryUV, edgePreviousRasterUV),
 				"TAA rejects history when raw-depth raster UV is out of bounds even if accumulated-history UV is valid");
 
 			context.Check(IsTemporalHistoryDepthCompatible(10.0f, 10.04f) &&
@@ -8611,8 +8160,7 @@ namespace gglab
 				!IsTemporalHistoryDepthCompatible(10.0f, 10.21f) &&
 				!IsTemporalHistoryDepthCompatible(100.0f, 102.1f) &&
 				!IsTemporalHistoryDepthCompatible(0.0f, 0.0f) &&
-				!IsTemporalHistoryDepthCompatible(
-					std::numeric_limits<float>::quiet_NaN(), 1.0f),
+				!IsTemporalHistoryDepthCompatible(std::numeric_limits<float>::quiet_NaN(), 1.0f),
 				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance");
 
 			std::array<TemporalAAGeometryDepthSample, 9> geometryEdgeNeighborhood{};
@@ -8622,20 +8170,16 @@ namespace gglab
 			backgroundOnlyNeighborhood[4] = { 10.0f, false };
 			std::array<TemporalAAGeometryDepthSample, 9> mismatchedGeometryNeighborhood{};
 			mismatchedGeometryNeighborhood[4] = { 10.21f, true };
-			context.Check(HasCompatibleTemporalGeometryDepthSample(
-					10.0f, geometryEdgeNeighborhood) &&
-				!HasCompatibleTemporalGeometryDepthSample(
-					10.0f, backgroundOnlyNeighborhood) &&
-				!HasCompatibleTemporalGeometryDepthSample(
-					10.0f, mismatchedGeometryNeighborhood),
+			context.Check(HasCompatibleTemporalGeometryDepthSample(10.0f, geometryEdgeNeighborhood) &&
+				!HasCompatibleTemporalGeometryDepthSample(10.0f, backgroundOnlyNeighborhood) &&
+				!HasCompatibleTemporalGeometryDepthSample(10.0f, mismatchedGeometryNeighborhood),
 				"TAA geometry depth validation accepts a matching 3x3 geometry neighbor and rejects background or mismatched candidates");
 
 			context.Check(IsTemporalSkyHistoryCompatible(0.0f, DepthConvention::Reversed) &&
 				IsTemporalSkyHistoryCompatible(1.0f, DepthConvention::Standard) &&
 				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Reversed) &&
 				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Standard) &&
-				!IsTemporalSkyHistoryCompatible(
-					std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
+				!IsTemporalSkyHistoryCompatible(std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
 				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
 
 			context.Check(TemporalHistoryInitialAccumulation == 1.0f &&
@@ -8648,70 +8192,51 @@ namespace gglab
 				ResolveTemporalHistoryNextAge(false, 37.0f) == TemporalHistoryInitialAccumulation &&
 				ResolveTemporalHistoryNextAge(true, 0.0f) == TemporalHistoryInitialAccumulation &&
 				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAccumulation) == 2.0f &&
-				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAccumulation) ==
-					TemporalHistoryMaxAccumulation,
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAccumulation) == TemporalHistoryMaxAccumulation,
 				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at the frozen R16Float-exact bound");
 
-			const TemporalAAOutputAlphaContract accumulatedOutputAlphas =
-				ResolveTemporalAAOutputAlphas(37.0f);
-			const TemporalAAOutputAlphaContract resetOutputAlphas =
-				ResolveTemporalAAOutputAlphas(
-					std::numeric_limits<float>::quiet_NaN());
+			const TemporalAAOutputAlphaContract accumulatedOutputAlphas = ResolveTemporalAAOutputAlphas(37.0f);
+			const TemporalAAOutputAlphaContract resetOutputAlphas = ResolveTemporalAAOutputAlphas(std::numeric_limits<float>::quiet_NaN());
 			context.Check(accumulatedOutputAlphas.m_ResolvedAlpha == 1.0f &&
 				accumulatedOutputAlphas.m_HistoryAlpha == 37.0f &&
 				resetOutputAlphas.m_ResolvedAlpha == 1.0f &&
 				resetOutputAlphas.m_HistoryAlpha == TemporalHistoryInitialAccumulation,
 				"TAA output alpha contract keeps resolved color opaque while history carries a finite bounded age");
 
-			const float previewFeedbackSaturationAge =
-				ResolveTemporalAAFeedbackSaturationAge(0.75f);
+			const float previewFeedbackSaturationAge = ResolveTemporalAAFeedbackSaturationAge(0.75f);
 			context.Check(previewFeedbackSaturationAge == 3.0f &&
 				ResolveTemporalAAFeedbackSaturationAge(0.0f) == 1.0f &&
-				ResolveTemporalAAFeedbackSaturationAge(
-					TemporalAADefaultMaxHistoryFeedback) == 33.0f &&
-				ResolveTemporalAAFeedbackSaturationAge(
-					TemporalAAMaxHistoryFeedbackCeiling) == 99.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(TemporalAADefaultMaxHistoryFeedback) == 33.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(TemporalAAMaxHistoryFeedbackCeiling) == 99.0f &&
 				ResolveTemporalAAHistoryAgePreview(1.0f, 0.75f) == 0.0f &&
-				NearlyEqual(ResolveTemporalAAHistoryAgePreview(3.0f, 0.75f),
-					2.0f / 3.0f) &&
+				NearlyEqual(ResolveTemporalAAHistoryAgePreview(3.0f, 0.75f), 2.0f / 3.0f) &&
 				ResolveTemporalAAHistoryAgePreview(4.0f, 0.75f) == 1.0f &&
 				ResolveTemporalAAHistoryAgePreview(2.0f, 0.0f) == 1.0f &&
-				ResolveTemporalAAHistoryAgePreview(
-					std::numeric_limits<float>::quiet_NaN(), 0.75f) == 0.0f,
+				ResolveTemporalAAHistoryAgePreview(std::numeric_limits<float>::quiet_NaN(), 0.75f) == 0.0f,
 				"TAA history-age preview maps reset NextAge to black and first cap-affected NextAge to white with the intentional off-by-one convention");
 
 			const TemporalAASettings defaultTemporalAA{};
 			static_assert(PackTemporalAAUnitRangePair(0.0f, 1.0f) == 0xffff0000u);
 			static_assert(PackTemporalAAUnitRangePair(1.0f, 0.0f) == 0x0000ffffu);
 			static_assert(PackTemporalAAUnitRangePair(0.5f, 0.25f) == 0x40008000u);
-			static_assert(PackTemporalAAUnitRangePair(
-				TemporalAADepthAbsoluteThreshold,
-				TemporalAADepthRelativeThreshold) == 0x051f0ccdu);
+			static_assert(PackTemporalAAUnitRangePair(TemporalAADepthAbsoluteThreshold, TemporalAADepthRelativeThreshold) == 0x051f0ccdu);
 			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
 				TemporalAADefaultMaxHistoryFeedback,
 				TemporalAADefaultNeighborhoodClampExpansion) == 0x0000f851u);
-			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-				TemporalAAMaxHistoryFeedbackCeiling, 0.0f) == 0x0000fd70u);
-			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-				1.0f, 0.0f) == 0x0000fffeu);
-			constexpr std::array<float, 2> packingGolden =
-				UnpackTemporalAAUnitRangePair(0x40008000u);
+			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(TemporalAAMaxHistoryFeedbackCeiling, 0.0f) == 0x0000fd70u);
+			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(1.0f, 0.0f) == 0x0000fffeu);
+			constexpr std::array<float, 2> packingGolden = UnpackTemporalAAUnitRangePair(0x40008000u);
 			constexpr std::array<float, 2> feedbackPackingGolden =
-				UnpackTemporalAAUnitRangePair(
-					PackTemporalAAMaxHistoryFeedbackAndClampExpansion(1.0f, 0.0f));
+				UnpackTemporalAAUnitRangePair(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(1.0f, 0.0f));
 			constexpr std::array<float, 2> feedbackCeilingPackingGolden =
-				UnpackTemporalAAUnitRangePair(
-					PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-						TemporalAAMaxHistoryFeedbackCeiling, 0.0f));
+				UnpackTemporalAAUnitRangePair(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(TemporalAAMaxHistoryFeedbackCeiling, 0.0f));
 			context.Check(NearlyEqual(packingGolden[0], 32768.0f / 65535.0f) &&
 				NearlyEqual(packingGolden[1], 16384.0f / 65535.0f) &&
 				feedbackPackingGolden[0] < 1.0f &&
 				(feedbackPackingGolden[0] * 65535.0f) == 65534.0f &&
 				feedbackCeilingPackingGolden[0] < 1.0f &&
-				ResolveTemporalAAFeedbackSaturationAge(
-					feedbackCeilingPackingGolden[0]) == 100.0f &&
-				std::ceil(feedbackCeilingPackingGolden[0] /
-					(1.0f - feedbackCeilingPackingGolden[0])) <= TemporalHistoryMaxAccumulation,
+				ResolveTemporalAAFeedbackSaturationAge(feedbackCeilingPackingGolden[0]) == 100.0f &&
+				std::ceil(feedbackCeilingPackingGolden[0] / (1.0f - feedbackCeilingPackingGolden[0])) <= TemporalHistoryMaxAccumulation,
 				"Temporal AA CPU packing matches the HLSL low/high UNORM16 ABI, feedback can never encode one, and the frozen cap remains reachable before age saturation");
 
 			constexpr std::array<float, 7> historyAges{ 1.0f, 2.0f, 3.0f, 7.0f, 15.0f,
@@ -8723,84 +8248,61 @@ namespace gglab
 			for (size_t index = 0; index < historyAges.size(); ++index)
 			{
 				ageWeightGoldenMatches &= NearlyEqual(
-					ResolveTemporalAAHistoryWeight(
-						historyAges[index], 0.0f, 1.0f, 1.0f, defaultTemporalAA),
+					ResolveTemporalAAHistoryWeight(historyAges[index], 0.0f, 1.0f, 1.0f, defaultTemporalAA),
 					expectedHistoryWeights[index]);
 			}
-			const float staticHistoryWeight = ResolveTemporalAAHistoryWeight(
-				63.0f, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
-			const float movingHistoryWeight =
-				ResolveTemporalAAHistoryWeight(63.0f, 5.0f, 1.0f, 1.0f, defaultTemporalAA);
-			const float defaultChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
-				63.0f, 0.0f, 1.0f, 0.9f, defaultTemporalAA);
+			const float staticHistoryWeight = ResolveTemporalAAHistoryWeight(63.0f, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float movingHistoryWeight = ResolveTemporalAAHistoryWeight(63.0f, 5.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float defaultChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(63.0f, 0.0f, 1.0f, 0.9f, defaultTemporalAA);
 			TemporalAASettings luminanceResearchSettings = defaultTemporalAA;
 			luminanceResearchSettings.m_LuminanceWeightScale = 4.0f;
-			const float researchChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
-				63.0f, 0.0f, 1.0f, 0.9f, luminanceResearchSettings);
+			const float researchChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(63.0f, 0.0f, 1.0f, 0.9f, luminanceResearchSettings);
 			TemporalAASettings packedCeilingSettings = defaultTemporalAA;
 			packedCeilingSettings.m_MaxHistoryFeedback = feedbackCeilingPackingGolden[0];
 			const float saturatedCeilingWeight = ResolveTemporalAAHistoryWeight(
 				TemporalHistoryMaxAccumulation, 0.0f, 1.0f, 1.0f, packedCeilingSettings);
 			context.Check(ageWeightGoldenMatches &&
 				TemporalAADefaultLuminanceWeightScale == 0.0f &&
-				NearlyEqual(staticHistoryWeight,
-					TemporalAADefaultMaxHistoryFeedback) &&
+				NearlyEqual(staticHistoryWeight, TemporalAADefaultMaxHistoryFeedback) &&
 				NearlyEqual(saturatedCeilingWeight, feedbackCeilingPackingGolden[0]) &&
 				movingHistoryWeight > 0.0f && movingHistoryWeight < staticHistoryWeight &&
 				NearlyEqual(defaultChangedLuminanceWeight, staticHistoryWeight) &&
 				researchChangedLuminanceWeight > 0.0f &&
 				researchChangedLuminanceWeight < staticHistoryWeight &&
-				ResolveTemporalAAHistoryWeight(std::numeric_limits<float>::quiet_NaN(),
-					0.0f, 1.0f, 1.0f, defaultTemporalAA) == 0.0f &&
-				ResolveTemporalAAHistoryWeight(1.0f,
-					std::numeric_limits<float>::quiet_NaN(),
-					1.0f, 1.0f, defaultTemporalAA) == 0.0f,
+				ResolveTemporalAAHistoryWeight(std::numeric_limits<float>::quiet_NaN(), 0.0f, 1.0f, 1.0f, defaultTemporalAA) == 0.0f &&
+				ResolveTemporalAAHistoryWeight(1.0f, std::numeric_limits<float>::quiet_NaN(), 1.0f, 1.0f, defaultTemporalAA) == 0.0f,
 				"Temporal blend follows the age golden sequence, caps at the frozen maximum, retains velocity attenuation, and keeps luminance attenuation research-only by default");
 
-			const float maxHistorySamples =
-				ResolveTemporalAAMaxHistorySamples(TemporalAADefaultMaxHistoryFeedback);
-			context.Check(NearlyEqual(maxHistorySamples, TemporalAADefaultMaxHistoryFeedback /
-					(1.0f - TemporalAADefaultMaxHistoryFeedback)) &&
-				NearlyEqual(maxHistorySamples / (maxHistorySamples + 1.0f),
-					TemporalAADefaultMaxHistoryFeedback) &&
+			const float maxHistorySamples = ResolveTemporalAAMaxHistorySamples(TemporalAADefaultMaxHistoryFeedback);
+			context.Check(NearlyEqual(maxHistorySamples, TemporalAADefaultMaxHistoryFeedback / (1.0f - TemporalAADefaultMaxHistoryFeedback)) &&
+				NearlyEqual(maxHistorySamples / (maxHistorySamples + 1.0f), TemporalAADefaultMaxHistoryFeedback) &&
 				ResolveTemporalAAMaxHistorySamples(0.0f) == 0.0f &&
-				ResolveTemporalAAMaxHistorySamples(std::numeric_limits<float>::quiet_NaN()) ==
-					0.0f &&
+				ResolveTemporalAAMaxHistorySamples(std::numeric_limits<float>::quiet_NaN()) == 0.0f &&
 				ResolveTemporalAAMaxHistorySamples(feedbackCeilingPackingGolden[0]) <
-					TemporalHistoryMaxAccumulation &&
+				TemporalHistoryMaxAccumulation &&
 				ResolveTemporalAAMaxHistorySamples(1.0f) == TemporalHistoryMaxAccumulation &&
-				ResolveTemporalHistoryNextSamples(false, 20.0f, 1.0f, maxHistorySamples) ==
-					TemporalHistoryInitialAccumulation &&
-				ResolveTemporalHistoryNextSamples(true, 0.0f, 1.0f, maxHistorySamples) ==
-					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(false, 20.0f, 1.0f, maxHistorySamples) == TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 0.0f, 1.0f, maxHistorySamples) == TemporalHistoryInitialAccumulation &&
 				ResolveTemporalHistoryNextSamples(true, 20.0f,
-					std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) ==
-					TemporalHistoryInitialAccumulation &&
+					std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) == TemporalHistoryInitialAccumulation &&
 				ResolveTemporalHistoryNextSamples(true, 1.0f, 1.0f, maxHistorySamples) == 2.0f &&
-				ResolveTemporalHistoryNextSamples(true, 20.0f, 0.0f, maxHistorySamples) ==
-					TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 0.0f, maxHistorySamples) == TemporalHistoryInitialAccumulation &&
 				ResolveTemporalHistoryNextSamples(true, 20.0f, 0.5f, maxHistorySamples) == 11.0f &&
-				ResolveTemporalHistoryNextSamples(true, maxHistorySamples, 1.0f,
-					maxHistorySamples) == maxHistorySamples &&
-				ResolveTemporalHistoryNextSamples(true, TemporalHistoryMaxAccumulation, 1.0f,
-					maxHistorySamples) == maxHistorySamples &&
+				ResolveTemporalHistoryNextSamples(true, maxHistorySamples, 1.0f, maxHistorySamples) == maxHistorySamples &&
+				ResolveTemporalHistoryNextSamples(true, TemporalHistoryMaxAccumulation, 1.0f, maxHistorySamples) == maxHistorySamples &&
 				ResolveTemporalAAHistorySamplesPreview(1.0f, maxHistorySamples) == 0.0f &&
 				ResolveTemporalAAHistorySamplesPreview(maxHistorySamples, maxHistorySamples) == 1.0f &&
-				ResolveTemporalAAHistorySamplesPreview(
-					std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) == 0.0f &&
+				ResolveTemporalAAHistorySamplesPreview(std::numeric_limits<float>::quiet_NaN(), maxHistorySamples) == 0.0f &&
 				ResolveTemporalAAHistorySamplesPreview(1.0f, 1.0f) == 0.0f,
 				"Effective samples start or reset at one, discount the carried samples by the history confidence, add one per accepted frame and saturate where their weight meets the feedback ceiling");
 
-			constexpr auto packedLowFeedback = UnpackTemporalAAUnitRangePair(
-				PackTemporalAAMaxHistoryFeedbackAndClampExpansion(0.25f, 0.0f));
+			constexpr auto packedLowFeedback = UnpackTemporalAAUnitRangePair(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(0.25f, 0.0f));
 			const float lowCapacity = ResolveTemporalAAMaxHistorySamples(packedLowFeedback[0]);
 			context.Check(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(0.0f, 0.0f) == 0u &&
 				lowCapacity > 0.0f && lowCapacity < TemporalHistoryInitialAccumulation &&
 				NearlyEqual(lowCapacity / (lowCapacity + 1.0f), packedLowFeedback[0]) &&
-				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, lowCapacity, 0.25f) ==
-					TemporalHistoryInitialAccumulation &&
-				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, 0.0f, 0.25f) ==
-					TemporalHistoryInitialAccumulation,
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, lowCapacity, 0.25f) == TemporalHistoryInitialAccumulation &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, 0.0f, 0.25f) == TemporalHistoryInitialAccumulation,
 				"Packed zero and low feedback retain zero or fractional usable capacity without invalidating stored history alpha");
 
 			// After a stretch of half-confidence frames the age keeps counting, so the next
@@ -8812,13 +8314,10 @@ namespace gglab
 			{
 				const float confidence = frame < 60 ? 1.0f : 0.5f;
 				compatibilityAge = ResolveTemporalHistoryNextAge(true, compatibilityAge);
-				effectiveSamples = ResolveTemporalHistoryNextSamples(
-					true, effectiveSamples, confidence, maxHistorySamples);
+				effectiveSamples = ResolveTemporalHistoryNextSamples(true, effectiveSamples, confidence, maxHistorySamples);
 			}
-			const float ageWeightAfterMotion = ResolveTemporalAAHistoryWeight(
-				compatibilityAge, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
-			const float samplesWeightAfterMotion = ResolveTemporalAAHistoryWeight(
-				effectiveSamples, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float ageWeightAfterMotion = ResolveTemporalAAHistoryWeight(compatibilityAge, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float samplesWeightAfterMotion = ResolveTemporalAAHistoryWeight(effectiveSamples, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
 			context.Check(compatibilityAge == 81.0f &&
 				NearlyEqual(ageWeightAfterMotion, TemporalAADefaultMaxHistoryFeedback) &&
 				effectiveSamples > 1.9f && effectiveSamples <= 2.0f + 1.0e-4f &&
@@ -8831,20 +8330,16 @@ namespace gglab
 			// keeps its sign, as through a gradual lighting change.
 			constexpr float gaussianKernelScale = 2.29f / (0.75f * 0.75f);
 			const Vector2 qualityDisplayPerRender(1.5f, 1.5f);
-			const float centredWeight = ResolveTemporalNearestSampleWeight(
-				Vector2(0.0f, 0.0f), qualityDisplayPerRender, gaussianKernelScale);
-			const float farWeight = ResolveTemporalNearestSampleWeight(
-				Vector2(0.5f, 0.5f), qualityDisplayPerRender, gaussianKernelScale);
-			const float wrappedWeight = ResolveTemporalNearestSampleWeight(
-				Vector2(0.9f, -0.1f), qualityDisplayPerRender, gaussianKernelScale);
+			const float centredWeight = ResolveTemporalNearestSampleWeight(Vector2(0.0f, 0.0f), qualityDisplayPerRender, gaussianKernelScale);
+			const float farWeight = ResolveTemporalNearestSampleWeight(Vector2(0.5f, 0.5f), qualityDisplayPerRender, gaussianKernelScale);
+			const float wrappedWeight = ResolveTemporalNearestSampleWeight(Vector2(0.9f, -0.1f), qualityDisplayPerRender, gaussianKernelScale);
 			const float farSamples = ResolveTemporalUpscaledSampleWeight(farWeight);
 			context.Check(centredWeight == 1.0f && farWeight < 0.02f &&
 				NearlyEqual(wrappedWeight, std::exp(-gaussianKernelScale * 0.045f)) &&
 				ResolveTemporalUpscaledStaticFraction(0.0f) == 1.0f &&
 				ResolveTemporalUpscaledStaticFraction(0.25f) == 0.5f &&
 				ResolveTemporalUpscaledStaticFraction(2.0f) == 0.0f &&
-				ResolveTemporalUpscaledStaticFraction(
-					std::numeric_limits<float>::quiet_NaN()) == 0.0f &&
+				ResolveTemporalUpscaledStaticFraction(std::numeric_limits<float>::quiet_NaN()) == 0.0f &&
 				ResolveTemporalUpscaledStaticClampExpansion(0.0f, 0.5f) == 1.0f &&
 				ResolveTemporalUpscaledStaticClampExpansion(0.25f, 0.5f) == 0.5f &&
 				ResolveTemporalUpscaledStaticClampExpansion(1.0f, 0.5f) == 0.0f &&
@@ -8853,15 +8348,12 @@ namespace gglab
 				farSamples == farWeight && ResolveTemporalUpscaledSampleWeight(1.0f) == 1.0f &&
 				ResolveTemporalUpscaledSampleWeight(0.0f) == TemporalUpscaledMinSampleWeight &&
 				NearlyEqual(ComputeTemporalWeightedHistoryWeight(maxHistorySamples, 1.0f,
-					maxHistorySamples, 1.0f), ResolveTemporalAAHistoryWeight(maxHistorySamples,
-						0.0f, 1.0f, 1.0f, defaultTemporalAA)) &&
-				ComputeTemporalWeightedHistoryWeight(maxHistorySamples, 1.0f, maxHistorySamples,
-					farSamples) > 0.999f &&
+					maxHistorySamples, 1.0f), ResolveTemporalAAHistoryWeight(maxHistorySamples, 0.0f, 1.0f, 1.0f, defaultTemporalAA)) &&
+				ComputeTemporalWeightedHistoryWeight(maxHistorySamples, 1.0f, maxHistorySamples, farSamples) > 0.999f &&
 				ComputeTemporalWeightedHistoryWeight(0.0f, 1.0f, maxHistorySamples, 1.0f) == 0.0f &&
-				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples,
-					0.25f) == 20.25f &&
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples, 0.25f) == 20.25f &&
 				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples, 1.0f) ==
-					ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples),
+				ResolveTemporalHistoryNextSamples(true, 20.0f, 1.0f, maxHistorySamples),
 				"Upscaled frames count by their nearest render sample's display-pixel kernel weight, the static clamp expansion withdraws with motion and with a consistent disagreement, and a full sample matches the native weights");
 
 			// A disagreement that alternates in sign relaxes rectification of fully
@@ -8877,19 +8369,13 @@ namespace gglab
 			context.Check(NearlyEqual(alternatingConsistency, 0.1f) &&
 				persistentConsistency == 1.0f &&
 				ResolveTemporalDisagreementConsistency(0.0f, 0.0f) == 0.0f &&
-				ResolveTemporalHistoryRelaxation(1.0f, maxHistorySamples, maxHistorySamples,
-					alternatingConsistency) == 1.0f &&
-				ResolveTemporalHistoryRelaxation(1.0f, maxHistorySamples, maxHistorySamples,
-					persistentConsistency) == 0.0f &&
-				ResolveTemporalHistoryRelaxation(1.0f, TemporalHistoryInitialAccumulation,
-					maxHistorySamples, alternatingConsistency) == 0.0f &&
-				ResolveTemporalHistoryRelaxation(0.0f, maxHistorySamples, maxHistorySamples,
-					alternatingConsistency) == 0.0f &&
+				ResolveTemporalHistoryRelaxation(1.0f, maxHistorySamples, maxHistorySamples, alternatingConsistency) == 1.0f &&
+				ResolveTemporalHistoryRelaxation(1.0f, maxHistorySamples, maxHistorySamples, persistentConsistency) == 0.0f &&
+				ResolveTemporalHistoryRelaxation(1.0f, TemporalHistoryInitialAccumulation, maxHistorySamples, alternatingConsistency) == 0.0f &&
+				ResolveTemporalHistoryRelaxation(0.0f, maxHistorySamples, maxHistorySamples, alternatingConsistency) == 0.0f &&
 				TemporalAASettings{}.m_HistoryRelaxation == TemporalAADefaultHistoryRelaxation &&
-				ResolveTemporalAASettings(relaxationOutOfRange).m_HistoryRelaxation ==
-					TemporalAAMaxHistoryRelaxation &&
-				ResolveTemporalAASettings(relaxationInvalid).m_HistoryRelaxation ==
-					TemporalAADefaultHistoryRelaxation &&
+				ResolveTemporalAASettings(relaxationOutOfRange).m_HistoryRelaxation == TemporalAAMaxHistoryRelaxation &&
+				ResolveTemporalAASettings(relaxationInvalid).m_HistoryRelaxation == TemporalAADefaultHistoryRelaxation &&
 				relaxationPackingGolden[0] == 0.0f &&
 				NearlyEqual(relaxationPackingGolden[1] * TemporalAAMaxHistoryRelaxation, 2.0f, 1.0e-3f) &&
 				TemporalHistoryReliabilityFormat == RHIFormat::R16G16Float,
@@ -8897,15 +8383,12 @@ namespace gglab
 
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;
-			const TemporalMotionFormatSupport motionSupport =
-				QueryTemporalMotionFormatSupport(motionCapabilityDevice);
+			const TemporalMotionFormatSupport motionSupport = QueryTemporalMotionFormatSupport(motionCapabilityDevice);
 			const RHITextureDesc motionDesc = MakeTemporalMotionTextureDesc(1280, 720);
 			context.Check(motionSupport.IsSupported() &&
 				motionCapabilityDevice.m_TextureViewQueryCount == 2 &&
-				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format ==
-					TemporalMotionFormat &&
-				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
-					RHITextureUsage::RenderTarget) &&
+				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format == TemporalMotionFormat &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::RenderTarget) &&
 				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
 					RHITextureUsage::Sampled) && motionDesc.m_Usage == RHITextureUsage::None &&
 				motionDesc.m_Extent.m_Width == 1280 &&
@@ -8915,18 +8398,13 @@ namespace gglab
 				"Temporal motion capability requires the combined R16G16Float render-target and SRV contract");
 
 			motionCapabilityDevice.m_TextureViewQueryCount = 0;
-			const TemporalAAResolvedColorFormatSupport resolvedColorSupport =
-				QueryTemporalAAResolvedColorFormatSupport(motionCapabilityDevice);
+			const TemporalAAResolvedColorFormatSupport resolvedColorSupport = QueryTemporalAAResolvedColorFormatSupport(motionCapabilityDevice);
 			context.Check(resolvedColorSupport.IsSupported() &&
 				motionCapabilityDevice.m_TextureViewQueryCount == 3 &&
-				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format ==
-					TemporalAAResolvedColorFormat &&
-				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
-					RHITextureUsage::RenderTarget) &&
-				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
-					RHITextureUsage::Sampled) &&
-				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
-					RHITextureUsage::UnorderedAccess),
+				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format == TemporalAAResolvedColorFormat &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::RenderTarget) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::Sampled) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::UnorderedAccess),
 				"Temporal resolved color capability requires the combined HDR RTV, SRV, and typed-UAV contract");
 
 			GraphicsPhysicalPipelineKey depthOnlyMotionCoverage{};
@@ -8943,18 +8421,14 @@ namespace gglab
 			velocityMotionCoverage.m_Formats.m_RenderTargetCount = 1;
 			velocityMotionCoverage.m_Formats.m_RenderTargetFormats[0] = TemporalMotionFormat;
 			velocityMotionCoverage.m_BlendPreset = BlendPreset::Default;
-			const uint64_t opaqueMotionVariant =
-				RenderQueueBuilder::EncodeVariantBits(RenderBucket::Opaque, false);
-			const uint64_t alphaMotionVariant =
-				RenderQueueBuilder::EncodeVariantBits(RenderBucket::AlphaTest, false);
+			const uint64_t opaqueMotionVariant = RenderQueueBuilder::EncodeVariantBits(RenderBucket::Opaque, false);
+			const uint64_t alphaMotionVariant = RenderQueueBuilder::EncodeVariantBits(RenderBucket::AlphaTest, false);
 			context.Check(
 				RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
-					depthOnlyMotionCoverage, opaqueMotionVariant) ==
-					RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+					depthOnlyMotionCoverage, opaqueMotionVariant) == RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
 						velocityMotionCoverage, opaqueMotionVariant) &&
 				RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
-					depthOnlyMotionCoverage, alphaMotionVariant) ==
-					RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+					depthOnlyMotionCoverage, alphaMotionVariant) == RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
 						velocityMotionCoverage, alphaMotionVariant),
 				"Velocity MRT preserves opaque and alpha-test depth coverage signatures");
 
@@ -8965,10 +8439,9 @@ namespace gglab
 			RenderGraph motionGraph({
 				.m_Device = &motionCapabilityDevice,
 				.m_TransientResourcePool =
-					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
 			});
-			motionGraph.GetBlackboard().Create<RGTemporalGeometryResources>(
-				TemporalGeometryResourcesName);
+			motionGraph.GetBlackboard().Create<RGTemporalGeometryResources>(TemporalGeometryResourcesName);
 			motionGraph.AddPass<TemporalMotionFixturePassData>(
 				"RenderingContract.TemporalMotionSetup",
 				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
@@ -8976,10 +8449,8 @@ namespace gglab
 					builder.SideEffect();
 					auto& resources = builder.GetBlackboard().Get<
 						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
-					resources.m_MotionVectors = builder.CreateTexture(
-						"Temporal.MotionVectors", MakeTemporalMotionTextureDesc(1280, 720));
-					resources.m_MotionSrvDesc =
-						MakeRHITexture2DViewDesc(TemporalMotionFormat);
+					resources.m_MotionVectors = builder.CreateTexture("Temporal.MotionVectors", MakeTemporalMotionTextureDesc(1280, 720));
+					resources.m_MotionSrvDesc = MakeRHITexture2DViewDesc(TemporalMotionFormat);
 					resources.m_Width = 1280;
 					resources.m_Height = 720;
 					data.m_Motion = resources.m_MotionVectors;
@@ -9000,8 +8471,7 @@ namespace gglab
 				{
 					auto& resources = builder.GetBlackboard().Get<
 						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
-					builder.ReadWriteInPlace(
-						resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					builder.ReadWriteInPlace(resources.m_MotionVectors, RGTextureAccess::RenderTarget);
 					data.m_Motion = resources.m_MotionVectors;
 				});
 			motionGraph.AddPass<TemporalMotionFixturePassData>(
@@ -9010,8 +8480,7 @@ namespace gglab
 				{
 					auto& resources = builder.GetBlackboard().Get<
 						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
-					data.m_Motion = builder.Read(
-						resources.m_MotionVectors, RGTextureAccess::Sample);
+					data.m_Motion = builder.Read(resources.m_MotionVectors, RGTextureAccess::Sample);
 					builder.SideEffect();
 				});
 			const bool motionGraphCompiled = motionGraph.Compile();
@@ -9020,31 +8489,27 @@ namespace gglab
 			{
 				BuildRenderGraphSnapshot(motionGraph, motionSnapshot);
 			}
-			const auto motionResource = std::ranges::find(
-				motionSnapshot.m_Resources, "Temporal.MotionVectors", &RGSnapshotResourceInfo::m_Name);
+			const auto motionResource = std::ranges::find(motionSnapshot.m_Resources, "Temporal.MotionVectors", &RGSnapshotResourceInfo::m_Name);
 			context.Check(motionGraphCompiled && motionSnapshot.m_Passes.size() == 4 &&
 				motionSnapshot.m_Passes[1].m_Name == "View.ClearMotionVectors" &&
 				motionSnapshot.m_Passes[1].m_ExecutionOrder <
-					motionSnapshot.m_Passes[2].m_ExecutionOrder &&
+				motionSnapshot.m_Passes[2].m_ExecutionOrder &&
 				motionSnapshot.m_Passes[2].m_ExecutionOrder <
-					motionSnapshot.m_Passes[3].m_ExecutionOrder &&
+				motionSnapshot.m_Passes[3].m_ExecutionOrder &&
 				motionResource != motionSnapshot.m_Resources.end() &&
 				motionResource->m_TextureFormat == TemporalMotionFormat &&
 				motionResource->m_TextureExtent.m_Width == 1280 &&
 				motionResource->m_TextureExtent.m_Height == 720 &&
-				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits),
-					RHITextureUsage::RenderTarget) &&
-				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits),
-					RHITextureUsage::Sampled),
+				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits), RHITextureUsage::RenderTarget) &&
+				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits), RHITextureUsage::Sampled),
 				"Active temporal geometry clears motion before velocity coverage and exposes an explicit sampled debug tap");
 
 			RenderGraph skyOnlyGraph({
 				.m_Device = &motionCapabilityDevice,
 				.m_TransientResourcePool =
-					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
 			});
-			skyOnlyGraph.GetBlackboard().Create<RGTemporalGeometryResources>(
-				TemporalGeometryResourcesName);
+			skyOnlyGraph.GetBlackboard().Create<RGTemporalGeometryResources>(TemporalGeometryResourcesName);
 			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
 				"RenderingContract.SkyOnlyTemporalSetup",
 				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
@@ -9052,8 +8517,7 @@ namespace gglab
 					builder.SideEffect();
 					auto& resources = builder.GetBlackboard().Get<
 						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
-					resources.m_MotionVectors = builder.CreateTexture(
-						"Temporal.SkyOnly.MotionVectors", MakeTemporalMotionTextureDesc(320, 180));
+					resources.m_MotionVectors = builder.CreateTexture("Temporal.SkyOnly.MotionVectors", MakeTemporalMotionTextureDesc(320, 180));
 					resources.m_MotionSrvDesc = MakeRHITexture2DViewDesc(TemporalMotionFormat);
 					resources.m_Width = 320;
 					resources.m_Height = 180;
@@ -9074,8 +8538,7 @@ namespace gglab
 				{
 					auto& resources = builder.GetBlackboard().Get<
 						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
-					data.m_Motion = builder.Read(
-						resources.m_MotionVectors, RGTextureAccess::Sample);
+					data.m_Motion = builder.Read(resources.m_MotionVectors, RGTextureAccess::Sample);
 					builder.SideEffect();
 				});
 			const bool skyOnlyGraphCompiled = skyOnlyGraph.Compile();
@@ -9088,48 +8551,37 @@ namespace gglab
 				skyOnlySnapshot.m_Passes[1].m_Name == "View.ClearMotionVectors" &&
 				!skyOnlySnapshot.m_Passes[1].m_Culled &&
 				skyOnlySnapshot.m_Passes[1].m_ExecutionOrder <
-					skyOnlySnapshot.m_Passes[2].m_ExecutionOrder,
+				skyOnlySnapshot.m_Passes[2].m_ExecutionOrder,
 				"Zero-draw sky-only temporal frames retain motion clear before reprojection resolve");
 
-			context.Check(IsTemporalColorCompatible(
-				TemporalColorAbi::LinearRec709SceneReferredV1,
-				PostProcessColorState::SceneLinearRec709, 1.0f) &&
-				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
-					PostProcessColorState::DisplayLinearRec709, 1.0f) &&
-				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
-					PostProcessColorState::SceneLinearRec709, 0.5f) &&
-				IsTemporalColorCompatible(TemporalColorAbi::LinearRec709PreExposedV2,
-					PostProcessColorState::SceneLinearRec709, 0.5f),
+			context.Check(IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1, PostProcessColorState::SceneLinearRec709, 1.0f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1, PostProcessColorState::DisplayLinearRec709, 1.0f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1, PostProcessColorState::SceneLinearRec709, 0.5f) &&
+				IsTemporalColorCompatible(TemporalColorAbi::LinearRec709PreExposedV2, PostProcessColorState::SceneLinearRec709, 0.5f),
 				"V1 remains unit-only while V2 accepts pre-exposed scene-linear Rec.709");
 
 			Camera rigCamera(Camera::CreateInfo{});
 			CameraController rigController(CameraController::CreateInfo{});
 			CameraRig cameraRig;
 			cameraRig.AttachMainCamera(rigCamera, rigController);
-			const CameraRig::EffectiveDisplayView mainDisplayView =
-				cameraRig.ResolveEffectiveDisplayView();
+			const CameraRig::EffectiveDisplayView mainDisplayView = cameraRig.ResolveEffectiveDisplayView();
 			const size_t debugCameraIndex = cameraRig.AddDebugCameraFromActive();
-			const CameraRig::CameraSlot* debugCameraSlot =
-				cameraRig.GetCameraSlot(debugCameraIndex);
-			const bool selectedDebugView =
-				debugCameraSlot && cameraRig.SetDisplayViewId(debugCameraSlot->m_RenderViewId);
-			const CameraRig::EffectiveDisplayView debugDisplayView =
-				cameraRig.ResolveEffectiveDisplayView();
+			const CameraRig::CameraSlot* debugCameraSlot = cameraRig.GetCameraSlot(debugCameraIndex);
+			const bool selectedDebugView = debugCameraSlot && cameraRig.SetDisplayViewId(debugCameraSlot->m_RenderViewId);
+			const CameraRig::EffectiveDisplayView debugDisplayView = cameraRig.ResolveEffectiveDisplayView();
 			const CameraRenderViewQueryBase& routingQuery = cameraRig;
 			const auto copiedVisibility = routingQuery.GetRenderViewVisibilityMode(debugDisplayView.m_ViewId);
 			context.Check(routingQuery.GetDisplayViewId() == debugDisplayView.m_ViewId &&
 				copiedVisibility.has_value() &&
 				!routingQuery.GetRenderViewVisibilityMode(RenderViewID::Unknown).has_value(),
 				"Camera routing query observes selected views and distinguishes missing slots");
-			CameraRig::CameraSlot* mutableDebugCameraSlot =
-				cameraRig.GetCameraSlot(debugCameraIndex);
+			CameraRig::CameraSlot* mutableDebugCameraSlot = cameraRig.GetCameraSlot(debugCameraIndex);
 			if (mutableDebugCameraSlot)
 			{
 				mutableDebugCameraSlot->m_EnableRenderView = false;
 				mutableDebugCameraSlot->m_VisibilityMode = RenderViewVisibilityMode::None;
 			}
-			const CameraRig::EffectiveDisplayView fallbackDisplayView =
-				cameraRig.ResolveEffectiveDisplayView();
+			const CameraRig::EffectiveDisplayView fallbackDisplayView = cameraRig.ResolveEffectiveDisplayView();
 			context.Check(mainDisplayView.IsValid() &&
 				mainDisplayView.m_ViewId == RenderViewID::Main && selectedDebugView &&
 				debugDisplayView.IsValid() &&
@@ -9146,8 +8598,7 @@ namespace gglab
 			const uint64_t initialResetSerial = rigCamera.GetTemporalResetSerial();
 			rigCamera.SetPosition(Vector3(1.0f, 2.0f, 3.0f));
 			rigCamera.SetFov(55.0f);
-			const bool continuousChangesPreserveSerial =
-				rigCamera.GetTemporalResetSerial() == initialResetSerial;
+			const bool continuousChangesPreserveSerial = rigCamera.GetTemporalResetSerial() == initialResetSerial;
 			rigCamera.RequestTemporalReset();
 			const uint64_t explicitResetSerial = rigCamera.GetTemporalResetSerial();
 			rigCamera.LookAt(Vector3(2.0f, 3.0f, 4.0f), Vector3::Zero);
@@ -9158,8 +8609,7 @@ namespace gglab
 
 			ViewRenderProfile profile{};
 			const Camera camera(Camera::CreateInfo{});
-			const ResolvedViewRenderSettings defaultSettings =
-				ResolveViewRenderSettings(profile, camera);
+			const ResolvedViewRenderSettings defaultSettings = ResolveViewRenderSettings(profile, camera);
 			profile.m_Lighting.m_EnableAerialPerspective = false;
 			const auto baselineSettings = ResolveViewRenderSettings(profile, camera);
 			context.Check(defaultSettings.m_Lighting.m_EnableAerialPerspective &&
@@ -9169,40 +8619,28 @@ namespace gglab
 				baselineSettings.m_TemporalAA.m_Enabled == defaultSettings.m_TemporalAA.m_Enabled,
 				"Aerial baseline switch resolves independently of exposure, AO and TAA");
 			profile.m_TemporalAA.m_Enabled = true;
-			const ResolvedViewRenderSettings enabledSettings =
-				ResolveViewRenderSettings(profile, camera);
+			const ResolvedViewRenderSettings enabledSettings = ResolveViewRenderSettings(profile, camera);
 			profile.m_TemporalAA.m_DepthAbsoluteThreshold = -1.0f;
 			profile.m_TemporalAA.m_DepthRelativeThreshold = 2.0f;
 			profile.m_TemporalAA.m_MaxHistoryFeedback = 2.0f;
 			profile.m_TemporalAA.m_VelocityWeightScale = -1.0f;
 			profile.m_TemporalAA.m_LuminanceWeightScale = 32.0f;
-			profile.m_TemporalAA.m_NeighborhoodClampExpansion =
-				std::numeric_limits<float>::quiet_NaN();
-			const ResolvedViewRenderSettings clampedSettings =
-				ResolveViewRenderSettings(profile, camera);
+			profile.m_TemporalAA.m_NeighborhoodClampExpansion = std::numeric_limits<float>::quiet_NaN();
+			const ResolvedViewRenderSettings clampedSettings = ResolveViewRenderSettings(profile, camera);
 			context.Check(!defaultSettings.m_TemporalAA.m_Enabled &&
 				enabledSettings.m_TemporalAA.m_Enabled &&
-				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthAbsoluteThreshold,
-					TemporalAADepthAbsoluteThreshold) &&
-				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthRelativeThreshold,
-					TemporalAADepthRelativeThreshold) &&
-				NearlyEqual(enabledSettings.m_TemporalAA.m_MaxHistoryFeedback,
-					TemporalAADefaultMaxHistoryFeedback) &&
-				NearlyEqual(enabledSettings.m_TemporalAA.m_VelocityWeightScale,
-					TemporalAADefaultVelocityWeightScale) &&
-				NearlyEqual(enabledSettings.m_TemporalAA.m_LuminanceWeightScale,
-					TemporalAADefaultLuminanceWeightScale) &&
-				NearlyEqual(enabledSettings.m_TemporalAA.m_NeighborhoodClampExpansion,
-					TemporalAADefaultNeighborhoodClampExpansion) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthAbsoluteThreshold, TemporalAADepthAbsoluteThreshold) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthRelativeThreshold, TemporalAADepthRelativeThreshold) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_MaxHistoryFeedback, TemporalAADefaultMaxHistoryFeedback) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_VelocityWeightScale, TemporalAADefaultVelocityWeightScale) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_LuminanceWeightScale, TemporalAADefaultLuminanceWeightScale) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_NeighborhoodClampExpansion, TemporalAADefaultNeighborhoodClampExpansion) &&
 				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthAbsoluteThreshold, 0.0f) &&
-				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthRelativeThreshold,
-					TemporalAAMaxDepthThreshold) &&
-				NearlyEqual(clampedSettings.m_TemporalAA.m_MaxHistoryFeedback,
-					TemporalAAMaxHistoryFeedbackCeiling) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthRelativeThreshold, TemporalAAMaxDepthThreshold) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_MaxHistoryFeedback, TemporalAAMaxHistoryFeedbackCeiling) &&
 				clampedSettings.m_TemporalAA.m_MaxHistoryFeedback < 1.0f &&
 				NearlyEqual(clampedSettings.m_TemporalAA.m_VelocityWeightScale, 0.0f) &&
-				NearlyEqual(clampedSettings.m_TemporalAA.m_LuminanceWeightScale,
-					TemporalAAMaxLuminanceWeightScale) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_LuminanceWeightScale, TemporalAAMaxLuminanceWeightScale) &&
 				NearlyEqual(clampedSettings.m_TemporalAA.m_NeighborhoodClampExpansion, 0.0f),
 				"Temporal AA authoring defaults off, feedback resolves strictly below one, and quality controls resolve to finite bounded frame settings");
 
@@ -9225,12 +8663,11 @@ namespace gglab
 
 			TemporalFramePlanResolveInfo resolveInfo{
 				.m_TemporalAA = {
-					.m_Settings = {.m_Enabled = true},
+					.m_Settings = { .m_Enabled = true },
 					.m_Capabilities = fullCapabilities,
 				},
 				.m_DisplayViewId = RenderViewID::Main,
-				.m_SceneExtensionParticipation =
-					SceneExtensionTemporalParticipation::PostTAA,
+				.m_SceneExtensionParticipation = SceneExtensionTemporalParticipation::PostTAA,
 				.m_ResetIdentity = 17,
 				.m_SessionIdentity = 23,
 				.m_DisplayViewEligible = true,
@@ -9242,49 +8679,39 @@ namespace gglab
 			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledInfo);
 			TemporalFramePlanResolveInfo missingCoreInfo = resolveInfo;
 			missingCoreInfo.m_TemporalAA.m_Capabilities = {};
-			const ResolvedTemporalFramePlan missingCorePlan =
-				ResolveTemporalFramePlan(missingCoreInfo);
+			const ResolvedTemporalFramePlan missingCorePlan = ResolveTemporalFramePlan(missingCoreInfo);
 			TemporalFramePlanResolveInfo ineligibleInfo = resolveInfo;
 			ineligibleInfo.m_DisplayViewEligible = false;
-			const ResolvedTemporalFramePlan ineligiblePlan =
-				ResolveTemporalFramePlan(ineligibleInfo);
+			const ResolvedTemporalFramePlan ineligiblePlan = ResolveTemporalFramePlan(ineligibleInfo);
 			TemporalFramePlanResolveInfo missingDepthVelocityInfo = resolveInfo;
 			missingDepthVelocityInfo.m_DepthVelocityPathAvailable = false;
-			const ResolvedTemporalFramePlan missingDepthVelocityPlan =
-				ResolveTemporalFramePlan(missingDepthVelocityInfo);
+			const ResolvedTemporalFramePlan missingDepthVelocityPlan = ResolveTemporalFramePlan(missingDepthVelocityInfo);
 			TemporalFramePlanResolveInfo unsupportedExtensionInfo = resolveInfo;
-			unsupportedExtensionInfo.m_SceneExtensionParticipation =
-				SceneExtensionTemporalParticipation::TemporalUnsupported;
-			const ResolvedTemporalFramePlan unsupportedExtensionPlan =
-				ResolveTemporalFramePlan(unsupportedExtensionInfo);
+			unsupportedExtensionInfo.m_SceneExtensionParticipation = SceneExtensionTemporalParticipation::TemporalUnsupported;
+			const ResolvedTemporalFramePlan unsupportedExtensionPlan = ResolveTemporalFramePlan(unsupportedExtensionInfo);
 			const auto temporalAAOf = [](const ResolvedTemporalFramePlan& plan) noexcept
-				{
-					return plan.GetConsumer(TemporalConsumer::TemporalAA);
-				};
-			const auto unavailableBecause = [&](const ResolvedTemporalFramePlan& plan,
-				TemporalConsumerDisableReason reason) noexcept
-				{
-					return temporalAAOf(plan).m_Requested &&
-						temporalAAOf(plan).m_Status == TemporalConsumerStatus::Unavailable &&
-						temporalAAOf(plan).m_DisableReason == reason &&
-						plan.m_Services == TemporalService::None;
-				};
+			{
+				return plan.GetConsumer(TemporalConsumer::TemporalAA);
+			};
+			const auto unavailableBecause = [&]
+			(const ResolvedTemporalFramePlan& plan, TemporalConsumerDisableReason reason) noexcept
+			{
+				return temporalAAOf(plan).m_Requested &&
+					temporalAAOf(plan).m_Status == TemporalConsumerStatus::Unavailable &&
+					temporalAAOf(plan).m_DisableReason == reason &&
+					plan.m_Services == TemporalService::None;
+			};
 			context.Check(temporalAAOf(activePlan).IsActive() && activePlan.m_TemporalAA.m_CoreAvailable &&
 				temporalAAOf(activePlan).m_DisableReason == TemporalConsumerDisableReason::None &&
 				activePlan.m_ResetIdentity == 17 && activePlan.m_SessionIdentity == 23 &&
 				!temporalAAOf(disabledPlan).IsActive() &&
 				!temporalAAOf(disabledPlan).m_Requested &&
 				temporalAAOf(disabledPlan).m_Status == TemporalConsumerStatus::Disabled &&
-				temporalAAOf(disabledPlan).m_DisableReason ==
-					TemporalConsumerDisableReason::NotRequested &&
-				unavailableBecause(missingCorePlan,
-					TemporalConsumerDisableReason::CoreCapabilityUnavailable) &&
-				unavailableBecause(ineligiblePlan,
-					TemporalConsumerDisableReason::DisplayViewIneligible) &&
-				unavailableBecause(missingDepthVelocityPlan,
-					TemporalConsumerDisableReason::DepthVelocityPathUnavailable) &&
-				unavailableBecause(unsupportedExtensionPlan,
-					TemporalConsumerDisableReason::SceneExtensionUnsupported),
+				temporalAAOf(disabledPlan).m_DisableReason == TemporalConsumerDisableReason::NotRequested &&
+				unavailableBecause(missingCorePlan, TemporalConsumerDisableReason::CoreCapabilityUnavailable) &&
+				unavailableBecause(ineligiblePlan, TemporalConsumerDisableReason::DisplayViewIneligible) &&
+				unavailableBecause(missingDepthVelocityPlan, TemporalConsumerDisableReason::DepthVelocityPathUnavailable) &&
+				unavailableBecause(unsupportedExtensionPlan, TemporalConsumerDisableReason::SceneExtensionUnsupported),
 				"Temporal AA consumer resolves one atomic active state and preserves every disable cause");
 
 			constexpr TemporalService allServices = TemporalService::ProjectionJitter |
@@ -9293,8 +8720,7 @@ namespace gglab
 			TemporalFramePlanResolveInfo referenceInfo = disabledInfo;
 			referenceInfo.m_ReferenceRequested = true;
 			const ResolvedTemporalFramePlan referencePlan = ResolveTemporalFramePlan(referenceInfo);
-			const TemporalConsumerPlan& reference =
-				referencePlan.GetConsumer(TemporalConsumer::Reference);
+			const TemporalConsumerPlan& reference = referencePlan.GetConsumer(TemporalConsumer::Reference);
 			context.Check(activePlan.m_Services == allServices &&
 				temporalAAOf(activePlan).m_Services == allServices &&
 				activePlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
@@ -9315,24 +8741,21 @@ namespace gglab
 			TemporalFramePlanResolveInfo ambientOcclusionInfo = disabledInfo;
 			ambientOcclusionInfo.m_AmbientOcclusionRequested = true;
 			ambientOcclusionInfo.m_AmbientOcclusionAvailable = true;
-			const ResolvedTemporalFramePlan ambientOcclusionPlan =
-				ResolveTemporalFramePlan(ambientOcclusionInfo);
+			const ResolvedTemporalFramePlan ambientOcclusionPlan = ResolveTemporalFramePlan(ambientOcclusionInfo);
 			TemporalFramePlanResolveInfo combinedInfo = resolveInfo;
 			combinedInfo.m_AmbientOcclusionRequested = true;
 			combinedInfo.m_AmbientOcclusionAvailable = true;
 			const ResolvedTemporalFramePlan combinedPlan = ResolveTemporalFramePlan(combinedInfo);
 			TemporalFramePlanResolveInfo unsupportedAmbientOcclusionInfo = ambientOcclusionInfo;
 			unsupportedAmbientOcclusionInfo.m_AmbientOcclusionAvailable = false;
-			const ResolvedTemporalFramePlan unsupportedAmbientOcclusionPlan =
-				ResolveTemporalFramePlan(unsupportedAmbientOcclusionInfo);
+			const ResolvedTemporalFramePlan unsupportedAmbientOcclusionPlan = ResolveTemporalFramePlan(unsupportedAmbientOcclusionInfo);
 			TemporalFramePlanResolveInfo ineligibleAmbientOcclusionInfo = ambientOcclusionInfo;
 			ineligibleAmbientOcclusionInfo.m_DisplayViewEligible = false;
-			const ResolvedTemporalFramePlan ineligibleAmbientOcclusionPlan =
-				ResolveTemporalFramePlan(ineligibleAmbientOcclusionInfo);
+			const ResolvedTemporalFramePlan ineligibleAmbientOcclusionPlan = ResolveTemporalFramePlan(ineligibleAmbientOcclusionInfo);
 			const auto ambientOcclusionOf = [](const ResolvedTemporalFramePlan& plan) noexcept
-				{
-					return plan.GetConsumer(TemporalConsumer::AmbientOcclusion);
-				};
+			{
+				return plan.GetConsumer(TemporalConsumer::AmbientOcclusion);
+			};
 			constexpr TemporalService ambientOcclusionServices =
 				TemporalService::GeometryMotion | TemporalService::FrameContinuity;
 			context.Check(ambientOcclusionOf(ambientOcclusionPlan).IsActive() &&
@@ -9343,16 +8766,12 @@ namespace gglab
 				combinedPlan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA &&
 				ambientOcclusionOf(combinedPlan).IsActive() &&
 				temporalAAOf(combinedPlan).IsActive() &&
-				ambientOcclusionOf(unsupportedAmbientOcclusionPlan).m_Status ==
-					TemporalConsumerStatus::Unavailable &&
-				ambientOcclusionOf(unsupportedAmbientOcclusionPlan).m_DisableReason ==
-					TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
+				ambientOcclusionOf(unsupportedAmbientOcclusionPlan).m_Status == TemporalConsumerStatus::Unavailable &&
+				ambientOcclusionOf(unsupportedAmbientOcclusionPlan).m_DisableReason == TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
 				unsupportedAmbientOcclusionPlan.m_Services == TemporalService::None &&
-				ambientOcclusionOf(ineligibleAmbientOcclusionPlan).m_DisableReason ==
-					TemporalConsumerDisableReason::DisplayViewIneligible &&
+				ambientOcclusionOf(ineligibleAmbientOcclusionPlan).m_DisableReason == TemporalConsumerDisableReason::DisplayViewIneligible &&
 				!ambientOcclusionOf(disabledPlan).m_Requested &&
-				ambientOcclusionOf(disabledPlan).m_DisableReason ==
-					TemporalConsumerDisableReason::NotRequested &&
+				ambientOcclusionOf(disabledPlan).m_DisableReason == TemporalConsumerDisableReason::NotRequested &&
 				ambientOcclusionPlan.UsesAmbientOcclusionHistory() &&
 				!combinedPlan.UsesAmbientOcclusionHistory() &&
 				!unsupportedAmbientOcclusionPlan.UsesAmbientOcclusionHistory(),
@@ -9370,15 +8789,12 @@ namespace gglab
 			referenceUpscalingInfo.m_ReferenceRequested = true;
 			const ResolvedTemporalFramePlan upscalingPlan = ResolveTemporalFramePlan(upscalingInfo);
 			context.Check(
-				ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Native &&
+				ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
 				upscalingPlan.m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
 				upscalingPlan.m_TemporalAA.GetJitterSequenceLength() == 18 &&
 				activePlan.m_TemporalAA.GetJitterSequenceLength() == 8 &&
-				ResolveTemporalFramePlan(disabledUpscalingInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Native &&
-				ResolveTemporalFramePlan(referenceUpscalingInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Native,
+				ResolveTemporalFramePlan(disabledUpscalingInfo).m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+				ResolveTemporalFramePlan(referenceUpscalingInfo).m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native,
 				"A render scale below native applies only to an active Temporal AA consumer "
 				"whose pipeline resolve can upscale");
 
@@ -9388,40 +8804,29 @@ namespace gglab
 			disabledAgeInfo.m_TemporalAA.m_Settings.m_Enabled = false;
 			TemporalAASettings invalidAccumulation{};
 			invalidAccumulation.m_HistoryAccumulation = static_cast<TemporalAAHistoryAccumulation>(7);
-			context.Check(TemporalAASettings{}.m_HistoryAccumulation ==
-					TemporalAAHistoryAccumulation::EffectiveSamples &&
+			context.Check(TemporalAASettings{}.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
 				activePlan.m_TemporalAA.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
-				ResolveTemporalFramePlan(ageInfo).m_TemporalAA.m_HistoryAccumulation ==
-					TemporalAAHistoryAccumulation::CompatibilityAge &&
-				ResolveTemporalFramePlan(disabledAgeInfo).m_TemporalAA.m_HistoryAccumulation ==
-					TemporalAAHistoryAccumulation::EffectiveSamples &&
-				ResolveTemporalAASettings(invalidAccumulation).m_HistoryAccumulation ==
-					TemporalAAHistoryAccumulation::EffectiveSamples &&
-				GetTemporalAAHistoryAccumulationName(
-					TemporalAAHistoryAccumulation::CompatibilityAge) == "compatibility-age" &&
-				GetTemporalAAHistoryAccumulationName(
-					TemporalAAHistoryAccumulation::EffectiveSamples) == "effective-samples",
+				ResolveTemporalFramePlan(ageInfo).m_TemporalAA.m_HistoryAccumulation == TemporalAAHistoryAccumulation::CompatibilityAge &&
+				ResolveTemporalFramePlan(disabledAgeInfo).m_TemporalAA.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
+				ResolveTemporalAASettings(invalidAccumulation).m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
+				GetTemporalAAHistoryAccumulationName(TemporalAAHistoryAccumulation::CompatibilityAge) == "compatibility-age" &&
+				GetTemporalAAHistoryAccumulationName(TemporalAAHistoryAccumulation::EffectiveSamples) == "effective-samples",
 				"The frame plan carries the requested accumulation model of an active Temporal AA consumer");
 
-			const ViewResolution quality720 = ResolveTemporalAAViewResolution(
-				{ 1280, 720 }, TemporalAAResolutionPreset::Quality);
-			const ViewResolution quality1080 = ResolveTemporalAAViewResolution(
-				{ 1920, 1080 }, TemporalAAResolutionPreset::Quality);
+			const ViewResolution quality720 = ResolveTemporalAAViewResolution({ 1280, 720 }, TemporalAAResolutionPreset::Quality);
+			const ViewResolution quality1080 = ResolveTemporalAAViewResolution({ 1920, 1080 }, TemporalAAResolutionPreset::Quality);
 			context.Check(
-				ResolveTemporalAAViewResolution({ 1280, 720 }, TemporalAAResolutionPreset::Native) ==
-					ResolveNativeViewResolution({ 1280, 720 }) &&
+				ResolveTemporalAAViewResolution({ 1280, 720 }, TemporalAAResolutionPreset::Native) == ResolveNativeViewResolution({ 1280, 720 }) &&
 				quality720.m_Render == ViewExtent{ 853, 480 } &&
 				quality720.m_Display == ViewExtent{ 1280, 720 } && !quality720.IsNative() &&
 				quality1080.m_Render == ViewExtent{ 1280, 720 } &&
-				ResolveTemporalAAViewResolution({ 1, 1 }, TemporalAAResolutionPreset::Quality)
-					.m_Render == ViewExtent{ 1, 1 },
+				ResolveTemporalAAViewResolution({ 1, 1 }, TemporalAAResolutionPreset::Quality).m_Render == ViewExtent{ 1, 1 },
 				"Quality renders at the nearest 2/3 of each display dimension, never below a pixel");
 
 			bool qualityJitterExtendsNative = true;
 			bool qualityJitterInsidePixel = true;
 			bool qualityJitterDistinct = true;
-			constexpr uint32_t qualityLength =
-				GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Quality);
+			constexpr uint32_t qualityLength = GetTemporalAAJitterSequenceLength(TemporalAAResolutionPreset::Quality);
 			for (uint32_t index = 0; index < qualityLength; ++index)
 			{
 				const Vector2 sample = temporal::GetJitterSamplePixels(index, qualityLength);
@@ -9454,51 +8859,42 @@ namespace gglab
 				"Temporal AA eligibility is restricted to non-empty perspective display views");
 
 			RenderPipelineForwardPlus forwardPipeline;
-			const ResolvedTemporalFramePlan forwardPlan =
-				forwardPipeline.ResolveTemporalFramePlan(resolveInfo);
+			const ResolvedTemporalFramePlan forwardPlan = forwardPipeline.ResolveTemporalFramePlan(resolveInfo);
 			RenderPipelineForwardPlus integratedExtensionPipeline({
 				.m_SceneExtension = std::make_unique<IntegratedTemporalSceneExtension>(),
 			});
 			TemporalFramePlanResolveInfo noDepthVelocityClaimInfo = resolveInfo;
 			noDepthVelocityClaimInfo.m_DepthVelocityPathAvailable = false;
-			const ResolvedTemporalFramePlan forwardWithoutClaimPlan =
-				forwardPipeline.ResolveTemporalFramePlan(noDepthVelocityClaimInfo);
+			const ResolvedTemporalFramePlan forwardWithoutClaimPlan = forwardPipeline.ResolveTemporalFramePlan(noDepthVelocityClaimInfo);
 			TemporalFramePlanResolveInfo integratedExtensionInfo = resolveInfo;
 			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
-			const ResolvedTemporalFramePlan integratedExtensionPlan =
-				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
+			const ResolvedTemporalFramePlan integratedExtensionPlan = integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
 			context.Check(temporalAAOf(forwardPlan).IsActive() &&
 				forwardPlan.m_DepthVelocityPathAvailable &&
 				temporalAAOf(forwardWithoutClaimPlan).IsActive() &&
-				forwardPlan.m_SceneExtensionParticipation ==
-					SceneExtensionTemporalParticipation::PostTAA &&
+				forwardPlan.m_SceneExtensionParticipation == SceneExtensionTemporalParticipation::PostTAA &&
 				temporalAAOf(forwardPlan).m_DisableReason == TemporalConsumerDisableReason::None &&
 				!temporalAAOf(integratedExtensionPlan).IsActive() &&
-				integratedExtensionPlan.m_SceneExtensionParticipation ==
-					SceneExtensionTemporalParticipation::TemporalUnsupported,
+				integratedExtensionPlan.m_SceneExtensionParticipation == SceneExtensionTemporalParticipation::TemporalUnsupported,
 				"The Forward+ pipeline exposes its velocity path and rejects unsupported integrated extensions");
 			context.Check(forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Quality &&
-				ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Native,
+				TemporalAAResolutionPreset::Quality &&
+				ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native,
 				"The Forward+ resolve upscales a requested Quality preset; a pipeline without an "
 				"upscaling resolve renders native");
 			TemporalFramePlanResolveInfo diagnosticInfo = qualityInfo;
 			diagnosticInfo.m_NativeResolutionRequired = true;
-			const ResolvedTemporalFramePlan diagnosticPlan =
-				forwardPipeline.ResolveTemporalFramePlan(diagnosticInfo);
+			const ResolvedTemporalFramePlan diagnosticPlan = forwardPipeline.ResolveTemporalFramePlan(diagnosticInfo);
 			TemporalFramePlanResolveInfo nativeDiagnosticInfo = diagnosticInfo;
 			nativeDiagnosticInfo.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Native;
 			context.Check(diagnosticPlan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
 				diagnosticPlan.m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
 				forwardPipeline.ResolveTemporalFramePlan(nativeDiagnosticInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Native &&
-				forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset ==
-					TemporalAAResolutionPreset::Quality,
+				TemporalAAResolutionPreset::Native &&
+				forwardPipeline.ResolveTemporalFramePlan(qualityInfo).m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Quality,
 				"Current-frame diagnostic demand enters Native immediately and returns to Quality without a stale-frame latch");
 			diagnosticInfo.m_TemporalAA.m_UpscalingAvailable = true;
-			context.Check(ResolveTemporalFramePlan(diagnosticInfo).m_TemporalAA.m_ResolutionPreset ==
-				TemporalAAResolutionPreset::Native,
+			context.Check(ResolveTemporalFramePlan(diagnosticInfo).m_TemporalAA.m_ResolutionPreset == TemporalAAResolutionPreset::Native,
 				"The shared planner honors Native composition requirements even when upscaling is available");
 
 			Renderer renderer;
@@ -9511,8 +8907,7 @@ namespace gglab
 					.m_Capabilities = {},
 				},
 				.m_DisplayViewId = RenderViewID::Main,
-				.m_SceneExtensionParticipation =
-					SceneExtensionTemporalParticipation::PostTAA,
+				.m_SceneExtensionParticipation = SceneExtensionTemporalParticipation::PostTAA,
 				.m_DisplayViewEligible = true,
 			});
 			RenderViewBuilder viewBuilder;
@@ -9525,19 +8920,15 @@ namespace gglab
 			TemporalViewHistory unavailableViewHistory{};
 			TemporalObjectHistory unavailableObjectHistory{};
 			TemporalFrameTransaction unavailableTransaction;
-			unavailableTransaction.Begin(unavailableViewHistory, unavailableObjectHistory,
-				viewPlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			unavailableTransaction.Begin(unavailableViewHistory, unavailableObjectHistory, viewPlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			unavailableTransaction.PrepareDisplayView(view);
 			unavailableTransaction.CommitCompleted();
-			const float nearRawDepth = ProjectPosition(
-				Vector3(0.0f, 0.0f, view.m_Near), view.m_RasterProj).m_RawDepth;
-			const float farRawDepth = ProjectPosition(
-				Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
+			const float nearRawDepth = ProjectPosition(Vector3(0.0f, 0.0f, view.m_Near), view.m_RasterProj).m_RawDepth;
+			const float farRawDepth = ProjectPosition(Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
 			context.Check(viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_Requested &&
 				!viewPlan.m_TemporalAA.m_CoreAvailable &&
 				!viewPlan.IsConsumerActive(TemporalConsumer::TemporalAA) &&
-				viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_DisableReason ==
-					TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
+				viewPlan.GetConsumer(TemporalConsumer::TemporalAA).m_DisableReason == TemporalConsumerDisableReason::CoreCapabilityUnavailable &&
 				viewPlan.m_Services == TemporalService::None &&
 				unavailableTransaction.GetState() == TemporalFrameTransactionState::Committed &&
 				NearlyEqual(unavailableTransaction.GetJitterPixels(), Vector2::Zero) &&
@@ -9551,25 +8942,23 @@ namespace gglab
 				!view.m_HasPreviousTemporalState &&
 				NearlyEqual(screen_space::RawDepthToPositiveViewZ(nearRawDepth,
 					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Near) &&
-				NearlyEqual(screen_space::RawDepthToPositiveViewZ(farRawDepth,
-					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Far,
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(farRawDepth, view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Far,
 					PositionTolerance * view.m_Far),
 				"Core-unavailable temporal frames disable jitter, history participation, and resolve atomically");
 
 			const Vector2 jitterPixels(0.5f, -0.25f);
 			const Vector2 jitterUV = temporal::JitterPixelsToUV(jitterPixels, 100, 50);
 			const Vector2 jitterNDC = temporal::JitterPixelsToNDC(jitterPixels, 100, 50);
-			const Vector4 jitteredClip = temporal::ApplyJitterToClipPosition(
-				Vector4(1.0f, 2.0f, 3.0f, 2.0f), jitterNDC);
+			const Vector4 jitteredClip = temporal::ApplyJitterToClipPosition(Vector4(1.0f, 2.0f, 3.0f, 2.0f), jitterNDC);
 			context.Check(NearlyEqual(jitterUV, Vector2(0.005f, -0.005f)) &&
 				NearlyEqual(jitterNDC, Vector2(0.01f, 0.01f)) &&
 				NearlyEqual(jitteredClip.m_X, 1.02f) &&
 				NearlyEqual(jitteredClip.m_Y, 2.02f) &&
-				NearlyEqual(temporal::ReprojectToPreviousUV(Vector2(0.5f, 0.5f),
-					Vector2(0.1f, -0.2f)), Vector2(0.4f, 0.7f)),
+				NearlyEqual(temporal::ReprojectToPreviousUV(Vector2(0.5f, 0.5f), Vector2(0.1f, -0.2f)), Vector2(0.4f, 0.7f)),
 				"CPU temporal math fixes pixel, NDC, clip, and motion reprojection signs");
 
-			constexpr std::array<Vector2, temporal::JitterSampleCount> expectedJitterSamples = {
+			constexpr std::array<Vector2, temporal::JitterSampleCount> expectedJitterSamples =
+			{
 				Vector2(0.0f, -1.0f / 6.0f),
 				Vector2(-1.0f / 4.0f, 1.0f / 6.0f),
 				Vector2(1.0f / 4.0f, -7.0f / 18.0f),
@@ -9583,8 +8972,7 @@ namespace gglab
 			for (uint32_t index = 0; index < temporal::JitterSampleCount; ++index)
 			{
 				jitterGoldenTableMatches = jitterGoldenTableMatches &&
-					NearlyEqual(temporal::GetJitterSamplePixels(index),
-						expectedJitterSamples[index]);
+					NearlyEqual(temporal::GetJitterSamplePixels(index), expectedJitterSamples[index]);
 			}
 			context.Check(jitterGoldenTableMatches,
 				"Temporal jitter sequence matches the exact Halton(2,3) eight-sample table");
@@ -9592,8 +8980,7 @@ namespace gglab
 			TemporalViewHistory temporalViewHistory{};
 			TemporalObjectHistory temporalObjectHistory{};
 			TemporalFrameTransaction abortedTransaction;
-			abortedTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			abortedTransaction.Begin(temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView abortedView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -9601,18 +8988,15 @@ namespace gglab
 				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			abortedTransaction.PrepareDisplayView(abortedView);
-			const Vector4 unjitteredClip = math::Transform(
-				Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_UnjitteredProj);
-			const Vector4 rasterClip = math::Transform(
-				Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_RasterProj);
+			const Vector4 unjitteredClip = math::Transform(Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_UnjitteredProj);
+			const Vector4 rasterClip = math::Transform(Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_RasterProj);
 			const Vector4 expectedRasterClip = temporal::ApplyJitterToClipPosition(
 				unjitteredClip,
 				temporal::JitterPixelsToNDC(abortedTransaction.GetJitterPixels(), 1920, 1080));
 			abortedTransaction.Abort();
 
 			TemporalFrameTransaction committedTransaction;
-			committedTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			committedTransaction.Begin(temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView committedView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -9624,8 +9008,7 @@ namespace gglab
 			committedTransaction.CommitCompleted();
 
 			TemporalFrameTransaction noResolveTransaction;
-			noResolveTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			noResolveTransaction.Begin(temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView noResolveView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -9654,8 +9037,7 @@ namespace gglab
 				});
 
 			TemporalFrameTransaction fatalTransaction;
-			fatalTransaction.Begin(
-				temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			fatalTransaction.Begin(temporalViewHistory, temporalObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView fatalView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -9674,8 +9056,7 @@ namespace gglab
 				noResolveTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				changedSessionTransaction.GetJitterIndex() == 0 &&
 				!changedSessionView.m_HasPreviousTemporalState &&
-				temporalShadowView.m_RasterProj.ToArray() ==
-					temporalShadowView.m_UnjitteredProj.ToArray() &&
+				temporalShadowView.m_RasterProj.ToArray() == temporalShadowView.m_UnjitteredProj.ToArray() &&
 				fatalTransaction.GetState() == TemporalFrameTransactionState::Invalidated &&
 				!temporalViewHistory.m_Valid && temporalViewHistory.m_NextJitterIndex == 0 &&
 				NearlyEqual(rasterClip.m_X, expectedRasterClip.m_X) &&
@@ -9700,29 +9081,28 @@ namespace gglab
 			TemporalViewHistory ambientOcclusionViewHistory{};
 			TemporalObjectHistory ambientOcclusionObjectHistory{};
 			const auto runAmbientOcclusionFrame = [&](bool submitted) noexcept
+			{
+				TemporalFrameTransaction transaction;
+				transaction.Begin(ambientOcclusionViewHistory, ambientOcclusionObjectHistory,
+					ambientOcclusionPlan, ResolveNativeViewResolution({ 1920, 1080 }));
+				RenderView view = viewBuilder.Build<RenderViewID::Main>({
+					.m_Camera = camera,
+					.m_RenderSettings = ambientOcclusionSettings,
+					.m_TemporalFramePlan = ambientOcclusionPlan,
+					.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
+				});
+				transaction.PrepareDisplayView(view);
+				const bool unjittered = view.m_RasterProj.ToArray() == view.m_UnjitteredProj.ToArray();
+				if (submitted)
 				{
-					TemporalFrameTransaction transaction;
-					transaction.Begin(ambientOcclusionViewHistory, ambientOcclusionObjectHistory,
-						ambientOcclusionPlan, ResolveNativeViewResolution({ 1920, 1080 }));
-					RenderView view = viewBuilder.Build<RenderViewID::Main>({
-						.m_Camera = camera,
-						.m_RenderSettings = ambientOcclusionSettings,
-						.m_TemporalFramePlan = ambientOcclusionPlan,
-						.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
-					});
-					transaction.PrepareDisplayView(view);
-					const bool unjittered =
-						view.m_RasterProj.ToArray() == view.m_UnjitteredProj.ToArray();
-					if (submitted)
-					{
-						transaction.CommitCompleted();
-					}
-					else
-					{
-						transaction.Abort();
-					}
-					return std::pair{ view.m_TemporalFrameIndex, unjittered };
-				};
+					transaction.CommitCompleted();
+				}
+				else
+				{
+					transaction.Abort();
+				}
+				return std::pair{ view.m_TemporalFrameIndex, unjittered };
+			};
 			const auto firstAmbientOcclusionFrame = runAmbientOcclusionFrame(true);
 			const auto abortedAmbientOcclusionFrame = runAmbientOcclusionFrame(false);
 			const auto repeatedAmbientOcclusionFrame = runAmbientOcclusionFrame(true);
@@ -9740,12 +9120,10 @@ namespace gglab
 			TemporalFramePlanResolveInfo biasedQualityInfo = biasedInfo;
 			biasedQualityInfo.m_TemporalAA.m_Settings.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
 			biasedQualityInfo.m_TemporalAA.m_UpscalingAvailable = true;
-			const ResolvedTemporalFramePlan biasedQualityPlan =
-				ResolveTemporalFramePlan(biasedQualityInfo);
+			const ResolvedTemporalFramePlan biasedQualityPlan = ResolveTemporalFramePlan(biasedQualityInfo);
 			TemporalFramePlanResolveInfo biasedInactiveInfo = biasedInfo;
 			biasedInactiveInfo.m_TemporalAA.m_Settings.m_Enabled = false;
-			const ResolvedTemporalFramePlan biasedInactivePlan =
-				ResolveTemporalFramePlan(biasedInactiveInfo);
+			const ResolvedTemporalFramePlan biasedInactivePlan = ResolveTemporalFramePlan(biasedInactiveInfo);
 			struct DisplayViewSampling
 			{
 				float m_BuiltViewBias = 0.0f;
@@ -9755,43 +9133,37 @@ namespace gglab
 			};
 			const auto resolveDisplayViewSampling = [&](const ResolvedTemporalFramePlan& plan,
 				std::optional<TemporalReferenceSample> referenceSample = std::nullopt) noexcept
-				{
-					const ViewResolution resolution =
-						ResolveTemporalAAViewResolution({ 1920, 1080 }, plan.m_TemporalAA.m_ResolutionPreset);
-					TemporalViewHistory viewHistory{};
-					TemporalObjectHistory objectHistory{};
-					TemporalFrameTransaction transaction;
-					transaction.Begin(viewHistory, objectHistory, plan, resolution, nullptr,
-						SceneColorStoragePreExposureV1, referenceSample);
-					RenderView view = viewBuilder.Build<RenderViewID::Main>({
-						.m_Camera = camera,
-						.m_RenderSettings = enabledSettings,
-						.m_TemporalFramePlan = plan,
-						.m_Resolution = resolution,
-					});
-					DisplayViewSampling sampling{ .m_BuiltViewBias = view.m_TextureLodBias };
-					transaction.PrepareDisplayView(view);
-					sampling.m_PreparedViewBias = view.m_TextureLodBias;
-					sampling.m_TransactionBias = transaction.GetTextureLodBias();
-					sampling.m_JitterSequenceLength = transaction.GetJitterSequenceLength();
-					transaction.Abort();
-					return sampling;
-				};
+			{
+				const ViewResolution resolution = ResolveTemporalAAViewResolution({ 1920, 1080 }, plan.m_TemporalAA.m_ResolutionPreset);
+				TemporalViewHistory viewHistory{};
+				TemporalObjectHistory objectHistory{};
+				TemporalFrameTransaction transaction;
+				transaction.Begin(viewHistory, objectHistory, plan, resolution, nullptr, SceneColorStoragePreExposureV1, referenceSample);
+				RenderView view = viewBuilder.Build<RenderViewID::Main>({
+					.m_Camera = camera,
+					.m_RenderSettings = enabledSettings,
+					.m_TemporalFramePlan = plan,
+					.m_Resolution = resolution,
+				});
+				DisplayViewSampling sampling{ .m_BuiltViewBias = view.m_TextureLodBias };
+				transaction.PrepareDisplayView(view);
+				sampling.m_PreparedViewBias = view.m_TextureLodBias;
+				sampling.m_TransactionBias = transaction.GetTextureLodBias();
+				sampling.m_JitterSequenceLength = transaction.GetJitterSequenceLength();
+				transaction.Abort();
+				return sampling;
+			};
 			const DisplayViewSampling nativeSampling = resolveDisplayViewSampling(biasedPlan);
-			const DisplayViewSampling qualitySampling =
-				resolveDisplayViewSampling(biasedQualityPlan);
-			const DisplayViewSampling inactiveSampling =
-				resolveDisplayViewSampling(biasedInactivePlan);
-			const DisplayViewSampling ambientOcclusionSampling =
-				resolveDisplayViewSampling(ambientOcclusionPlan);
+			const DisplayViewSampling qualitySampling = resolveDisplayViewSampling(biasedQualityPlan);
+			const DisplayViewSampling inactiveSampling = resolveDisplayViewSampling(biasedInactivePlan);
+			const DisplayViewSampling ambientOcclusionSampling = resolveDisplayViewSampling(ambientOcclusionPlan);
 			const DisplayViewSampling referenceSampling = resolveDisplayViewSampling(referencePlan,
 				TemporalReferenceSample{ .m_Index = 2, .m_Count = 16, .m_TextureLodBias = -2.0f });
 			TemporalAASettings outOfRangeBias{};
 			outOfRangeBias.m_TextureLodBiasOffset = -5.0f;
 			context.Check(biasedPlan.m_TemporalAA.m_TextureLodBiasOffset == -0.75f &&
 				biasedInactivePlan.m_TemporalAA.m_TextureLodBiasOffset == 0.0f &&
-				NearlyEqual(qualitySampling.m_TransactionBias,
-					std::log2(1280.0f / 1920.0f) - 0.75f) &&
+				NearlyEqual(qualitySampling.m_TransactionBias, std::log2(1280.0f / 1920.0f) - 0.75f) &&
 				qualitySampling.m_PreparedViewBias == qualitySampling.m_TransactionBias &&
 				qualitySampling.m_JitterSequenceLength == 18,
 				"The texture LOD bias adds log2(render / display) to the temporal offset");
@@ -9807,8 +9179,7 @@ namespace gglab
 				ambientOcclusionSampling.m_JitterSequenceLength == 0 &&
 				nativeSampling.m_BuiltViewBias == 0.0f && referenceSampling.m_BuiltViewBias == 0.0f &&
 				temporalShadowView.m_TextureLodBias == 0.0f &&
-				ResolveTemporalAASettings(outOfRangeBias).m_TextureLodBiasOffset ==
-				TemporalAAMinTextureLodBiasOffset,
+				ResolveTemporalAASettings(outOfRangeBias).m_TextureLodBiasOffset == TemporalAAMinTextureLodBiasOffset,
 				"The jitter owner selects the display view's texture LOD bias and jitter sequence "
 				"length once in the temporal frame transaction; other frames and views carry none");
 
@@ -9832,59 +9203,40 @@ namespace gglab
 				.m_MeshContentGeneration = 5,
 				.m_SessionIdentity = activePlan.m_SessionIdentity,
 			};
-			const Matrix initialObjectModel =
-				math::CreateTranslation(Vector3(1.0f, 2.0f, 3.0f));
-			const Matrix movedObjectModel =
-				math::CreateTranslation(Vector3(4.0f, 5.0f, 6.0f));
+			const Matrix initialObjectModel = math::CreateTranslation(Vector3(1.0f, 2.0f, 3.0f));
+			const Matrix movedObjectModel = math::CreateTranslation(Vector3(4.0f, 5.0f, 6.0f));
 
 			TemporalFrameTransaction initialObjectTransaction;
-			initialObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			initialObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView initialObjectView = buildSubmittedHistoryView();
 			initialObjectTransaction.PrepareDisplayView(initialObjectView);
-			const Matrix initialPreviousModel =
-				initialObjectTransaction.ResolvePreviousObjectModel(
-					objectHistoryKey, initialObjectModel);
-			const bool initialObjectStaged =
-				initialObjectTransaction.StageSubmittedObject(
-					objectHistoryKey, initialObjectModel);
+			const Matrix initialPreviousModel = initialObjectTransaction.ResolvePreviousObjectModel(objectHistoryKey, initialObjectModel);
+			const bool initialObjectStaged = initialObjectTransaction.StageSubmittedObject(objectHistoryKey, initialObjectModel);
 			initialObjectTransaction.MarkResolveParticipated();
 			initialObjectTransaction.CommitCompleted();
-			const TemporalCommittedObjectState* initialCommittedObject =
-				submittedObjectHistory.Find(objectHistoryKey);
+			const TemporalCommittedObjectState* initialCommittedObject = submittedObjectHistory.Find(objectHistoryKey);
 			const bool initialObjectCommitted = initialCommittedObject &&
 				initialCommittedObject->m_Model.ToArray() == initialObjectModel.ToArray() &&
 				initialCommittedObject->m_LastSeenCommittedFrame == 1;
 
 			TemporalFrameTransaction abortedObjectTransaction;
-			abortedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			abortedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView abortedObjectView = buildSubmittedHistoryView();
 			abortedObjectTransaction.PrepareDisplayView(abortedObjectView);
-			const Matrix abortedPreviousModel =
-				abortedObjectTransaction.ResolvePreviousObjectModel(
-					objectHistoryKey, movedObjectModel);
-			const bool abortedObjectStaged =
-				abortedObjectTransaction.StageSubmittedObject(
-					objectHistoryKey, movedObjectModel);
+			const Matrix abortedPreviousModel = abortedObjectTransaction.ResolvePreviousObjectModel(objectHistoryKey, movedObjectModel);
+			const bool abortedObjectStaged = abortedObjectTransaction.StageSubmittedObject(objectHistoryKey, movedObjectModel);
 			abortedObjectTransaction.CommitCompleted();
-			const TemporalCommittedObjectState* committedAfterAbort =
-				submittedObjectHistory.Find(objectHistoryKey);
+			const TemporalCommittedObjectState* committedAfterAbort = submittedObjectHistory.Find(objectHistoryKey);
 			const bool objectAbortPreserved = committedAfterAbort &&
 				committedAfterAbort->m_Model.ToArray() == initialObjectModel.ToArray() &&
 				committedAfterAbort->m_LastSeenCommittedFrame == 1;
 
 			TemporalFrameTransaction movedObjectTransaction;
-			movedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			movedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView movedObjectView = buildSubmittedHistoryView();
 			movedObjectTransaction.PrepareDisplayView(movedObjectView);
-			const Matrix movedPreviousModel =
-				movedObjectTransaction.ResolvePreviousObjectModel(
-					objectHistoryKey, movedObjectModel);
-			const bool movedObjectStaged =
-				movedObjectTransaction.StageSubmittedObject(
-					objectHistoryKey, movedObjectModel);
+			const Matrix movedPreviousModel = movedObjectTransaction.ResolvePreviousObjectModel(objectHistoryKey, movedObjectModel);
+			const bool movedObjectStaged = movedObjectTransaction.StageSubmittedObject(objectHistoryKey, movedObjectModel);
 			movedObjectTransaction.MarkResolveParticipated();
 			movedObjectTransaction.CommitCompleted();
 
@@ -9894,12 +9246,10 @@ namespace gglab
 			RenderView abortedDisappearanceView = buildSubmittedHistoryView();
 			abortedDisappearanceTransaction.PrepareDisplayView(abortedDisappearanceView);
 			abortedDisappearanceTransaction.Abort();
-			const TemporalCommittedObjectState* committedAfterAbortedDisappearance =
-				submittedObjectHistory.Find(objectHistoryKey);
+			const TemporalCommittedObjectState* committedAfterAbortedDisappearance = submittedObjectHistory.Find(objectHistoryKey);
 			const bool abortedDisappearancePreserved =
 				committedAfterAbortedDisappearance &&
-				committedAfterAbortedDisappearance->m_Model.ToArray() ==
-					movedObjectModel.ToArray() &&
+				committedAfterAbortedDisappearance->m_Model.ToArray() == movedObjectModel.ToArray() &&
 				committedAfterAbortedDisappearance->m_LastSeenCommittedFrame == 2;
 
 			RenderObjectHistoryKey replacementKey = objectHistoryKey;
@@ -9907,32 +9257,22 @@ namespace gglab
 			replacementKey.m_ModelContentGeneration = 1;
 			RenderObjectHistoryKey republishedGeometryKey = objectHistoryKey;
 			++republishedGeometryKey.m_MeshContentGeneration;
-			const Matrix replacementModel =
-				math::CreateTranslation(Vector3(8.0f, 9.0f, 10.0f));
+			const Matrix replacementModel = math::CreateTranslation(Vector3(8.0f, 9.0f, 10.0f));
 			RenderObjectHistoryKey reusedEntityKey = objectHistoryKey;
 			++reusedEntityKey.m_EntityIdentity;
 			TemporalFrameTransaction replacementTransaction;
-			replacementTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			replacementTransaction.Begin(submittedViewHistory, submittedObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView replacementView = buildSubmittedHistoryView();
 			replacementTransaction.PrepareDisplayView(replacementView);
-			const Matrix replacementPreviousModel =
-				replacementTransaction.ResolvePreviousObjectModel(
-					replacementKey, replacementModel);
-			const Matrix reusedEntityPreviousModel =
-				replacementTransaction.ResolvePreviousObjectModel(
-					reusedEntityKey, replacementModel);
+			const Matrix replacementPreviousModel = replacementTransaction.ResolvePreviousObjectModel(replacementKey, replacementModel);
+			const Matrix reusedEntityPreviousModel = replacementTransaction.ResolvePreviousObjectModel(reusedEntityKey, replacementModel);
 			const Matrix republishedGeometryPreviousModel =
-				replacementTransaction.ResolvePreviousObjectModel(
-					republishedGeometryKey, replacementModel);
-			const bool replacementStaged = replacementTransaction.StageSubmittedObject(
-				replacementKey, replacementModel);
+				replacementTransaction.ResolvePreviousObjectModel(republishedGeometryKey, replacementModel);
+			const bool replacementStaged = replacementTransaction.StageSubmittedObject(replacementKey, replacementModel);
 			replacementTransaction.MarkResolveParticipated();
 			replacementTransaction.CommitCompleted();
-			const TemporalObjectHistoryDiagnostics replacementDiagnostics =
-				submittedObjectHistory.GetDiagnostics();
-			const TemporalCommittedObjectState* committedReplacement =
-				submittedObjectHistory.Find(replacementKey);
+			const TemporalObjectHistoryDiagnostics replacementDiagnostics = submittedObjectHistory.GetDiagnostics();
+			const TemporalCommittedObjectState* committedReplacement = submittedObjectHistory.Find(replacementKey);
 			const bool replacementRetiredOldIdentity =
 				!submittedObjectHistory.Find(objectHistoryKey) && committedReplacement &&
 				committedReplacement->m_Model.ToArray() == replacementModel.ToArray();
@@ -9952,15 +9292,13 @@ namespace gglab
 			});
 			replacementSessionTransaction.PrepareDisplayView(replacementSessionView);
 			const Matrix replacementSessionPrevious =
-				replacementSessionTransaction.ResolvePreviousObjectModel(
-					replacementSessionKey, initialObjectModel);
+				replacementSessionTransaction.ResolvePreviousObjectModel(replacementSessionKey, initialObjectModel);
 			replacementSessionTransaction.Abort();
 
 			ResolvedTemporalFramePlan resetObjectPlan = activePlan;
 			++resetObjectPlan.m_ResetIdentity;
 			TemporalFrameTransaction resetObjectTransaction;
-			resetObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				resetObjectPlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			resetObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory, resetObjectPlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView resetObjectView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -9968,19 +9306,15 @@ namespace gglab
 				.m_Resolution = ResolveNativeViewResolution({ 1920, 1080 }),
 			});
 			resetObjectTransaction.PrepareDisplayView(resetObjectView);
-			const Matrix resetPreviousModel =
-				resetObjectTransaction.ResolvePreviousObjectModel(
-					replacementKey, initialObjectModel);
+			const Matrix resetPreviousModel = resetObjectTransaction.ResolvePreviousObjectModel(replacementKey, initialObjectModel);
 			resetObjectTransaction.Abort();
 
 			TemporalFrameTransaction fatalObjectTransaction;
-			fatalObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
-				activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
+			fatalObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory, activePlan, ResolveNativeViewResolution({ 1920, 1080 }));
 			RenderView fatalObjectView = buildSubmittedHistoryView();
 			fatalObjectTransaction.PrepareDisplayView(fatalObjectView);
 			fatalObjectTransaction.InvalidateAfterFatal();
-			const TemporalObjectHistoryDiagnostics fatalObjectDiagnostics =
-				submittedObjectHistory.GetDiagnostics();
+			const TemporalObjectHistoryDiagnostics fatalObjectDiagnostics = submittedObjectHistory.GetDiagnostics();
 			context.Check(objectHistoryKey.IsValid() && initialObjectStaged &&
 				abortedObjectStaged && movedObjectStaged && replacementStaged &&
 				abortedObjectTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
@@ -10029,8 +9363,8 @@ namespace gglab
 		meshOwner->m_Name = StringID("DiagnosticDemand.Mesh");
 		Mesh* mesh = meshOwner.get();
 		AssetManager::MeshUploadData upload{};
-		upload.m_VerticesData = {Vertex{}, Vertex{}, Vertex{}};
-		upload.m_IndicesData = {0, 1, 2};
+		upload.m_VerticesData = { Vertex{}, Vertex{}, Vertex{} };
+		upload.m_IndicesData = { 0, 1, 2 };
 		const MeshID meshId = assets.AddProceduralMesh(std::move(meshOwner), upload);
 		auto modelOwner = std::make_unique<Model>();
 		modelOwner->m_Name = StringID("DiagnosticDemand.Model");
@@ -10109,14 +9443,17 @@ namespace gglab
 		{
 		public:
 			TextureContentRef GetTextureContentRef(TextureID) const noexcept override { return {}; }
-			std::optional<ResidentTextureResource> GetResidentTextureResource(
-				TextureContentRef) const noexcept override { return std::nullopt; }
+			std::optional<ResidentTextureResource> GetResidentTextureResource(TextureContentRef) const noexcept override
+			{
+				return std::nullopt;
+			}
 			void MarkTextureUsed(TextureID) noexcept override { ++m_UsageCount; }
 			uint32_t ResolveSrvIndex(TextureID id, ReservedTextureIDIndex fallback) const noexcept override
 			{
 				++m_ResolveCount;
-				return id.IsValid() && m_Resident ? m_DescriptorBase + id.Value()
-					: static_cast<uint32_t>(fallback);
+				return id.IsValid() && m_Resident ?
+					m_DescriptorBase + id.Value() :
+					static_cast<uint32_t>(fallback);
 			}
 
 			uint32_t m_UsageCount = 0;
@@ -10263,8 +9600,7 @@ namespace gglab
 				edited.m_Flags == MaterialFlags::DoubleSided && edited.m_AlphaMode == AlphaMode::Mask &&
 				gpu.RoughnessFactor == 0.2f && gpu.ClearcoatFactor == 0.8f &&
 				gpu.NormalBinding.UVTransformU.m_Z == 0.25f && gpu.NormalBinding.UVTransformV.m_Z == 0.5f &&
-				gpu.NormalBinding.TextureSamplerBinding.TextureIndex ==
-					static_cast<uint32_t>(ReservedTextureIDIndex::NormalFlat) &&
+				gpu.NormalBinding.TextureSamplerBinding.TextureIndex == static_cast<uint32_t>(ReservedTextureIDIndex::NormalFlat) &&
 				textures.m_UsageCount == previousUsage + TextureSlotCount &&
 				textures.m_ResolveCount == previousResolves + TextureSlotCount,
 				"The next scene build refreshes edited factors, transforms, draw metadata and evicted texture bindings");
@@ -10326,8 +9662,7 @@ namespace gglab
 		bool diagnosticIds = true;
 		for (uint32_t id = 0; id < 25; ++id)
 		{
-			diagnosticIds &= IsMaterialDiagnosticView(static_cast<MaterialDebugView>(id)) ==
-				((id >= 1 && id <= 15) || (id >= 19 && id <= 22));
+			diagnosticIds &= IsMaterialDiagnosticView(static_cast<MaterialDebugView>(id)) == ((id >= 1 && id <= 15) || (id >= 19 && id <= 22));
 		}
 		context.Check(diagnosticIds && !IsMaterialDiagnosticView(static_cast<MaterialDebugView>(255)),
 			"Only parameter diagnostic IDs request attachments; Lit, UnfilteredLit and reserved IDs do not");
@@ -10368,14 +9703,13 @@ namespace gglab
 		{
 			struct FixturePassData {};
 			RenderGraph graph({
-				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
-				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-				});
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			graph.AddPass<FixturePassData>("MaterialDiagnostics.Setup",
 				[diagnostics](RenderGraph::RGBuilder& builder, FixturePassData&)
 				{
-					auto& targets = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
-						.GetViewTargets(RenderViewID::Main);
+					auto& targets = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
 					RHITextureDesc desc{};
 					desc.m_Extent = { 16, 16, 1 };
 					desc.m_Format = RHIFormat::R16G16B16A16Float;
@@ -10393,18 +9727,15 @@ namespace gglab
 					// Seed a prior writer so the production clear must publish a new version.
 					builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 				});
-			const auto original = graph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
-				.GetViewTargets(RenderViewID::Main);
+			const auto original = graph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
 			const RenderScene scene{};
 			const RenderFrameContext frame{ .m_RenderScene = scene };
 			RenderPassClearViewTargets{}.AddPass(graph, frame, RenderServices{});
-			const auto cleared = graph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
-				.GetViewTargets(RenderViewID::Main);
+			const auto cleared = graph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
 			graph.AddPass<FixturePassData>("MaterialDiagnostics.DisplayRead",
 				[diagnostics](RenderGraph::RGBuilder& builder, FixturePassData&)
 				{
-					const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
-						.GetViewTargets(RenderViewID::Main);
+					const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
 					builder.Read(targets.m_SceneColor, RGTextureAccess::Sample);
 					if (diagnostics)
 					{
@@ -10418,9 +9749,9 @@ namespace gglab
 				(!diagnostics || (cleared.m_MaterialDiagnosticColor.GetVersion() > original.m_MaterialDiagnosticColor.GetVersion() &&
 					cleared.m_MaterialDiagnosticCoverage.GetVersion() > original.m_MaterialDiagnosticCoverage.GetVersion() &&
 					cleared.m_MaterialDiagnosticLighting.GetVersion() > original.m_MaterialDiagnosticLighting.GetVersion()));
-			context.Check(versionsPublished && graph.Compile(), diagnostics
-				? "Production clear publishes defined diagnostic color, coverage and lighting versions to display consumers"
-				: "Production clear preserves the original scene-only graph when diagnostics are absent");
+			context.Check(versionsPublished && graph.Compile(), diagnostics ?
+				"Production clear publishes defined diagnostic color, coverage and lighting versions to display consumers" :
+				"Production clear preserves the original scene-only graph when diagnostics are absent");
 		}
 	}
 
@@ -10615,8 +9946,7 @@ namespace gglab
 		context.Check(!CreateVulkanWin32Context(nativeContextDesc, nullptr, nullptr, true),
 			"Vulkan Win32 composition rejects missing native handles before bootstrap");
 		// Sentinel handles must never reach WSI when host ABI suitability is false.
-		context.Check(!CreateVulkanWin32Context(nativeContextDesc,
-			reinterpret_cast<HINSTANCE>(1), reinterpret_cast<HWND>(1), false),
+		context.Check(!CreateVulkanWin32Context(nativeContextDesc, reinterpret_cast<HINSTANCE>(1), reinterpret_cast<HWND>(1), false),
 			"Vulkan Win32 composition preserves the host ABI rejection before loader or WSI access");
 #endif
 		RunIBLPreviewContractTests(context);

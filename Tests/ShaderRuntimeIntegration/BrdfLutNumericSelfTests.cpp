@@ -73,8 +73,7 @@ namespace gglab
 		// the analytic azimuth interval where NoL>0, using midpoint grids. This
 		// avoids undersampling smooth GGX peaks with a uniform light grid. Use
 		// u=1-t^2, du=2*t*dt to remove the grazing endpoint singularity at u=1.
-		[[nodiscard]] BrdfIntegral IntegrateReference(
-			double noV, double roughness, uint32_t radialSamples, uint32_t azimuthSamples) noexcept
+		[[nodiscard]] BrdfIntegral IntegrateReference(double noV, double roughness, uint32_t radialSamples, uint32_t azimuthSamples) noexcept
 		{
 			const double alphaSquared = std::pow(roughness, 4.0);
 			const double viewX = std::sqrt(1.0 - noV * noV);
@@ -125,8 +124,7 @@ namespace gglab
 			return std::max(std::abs(actual.m_A - expected.m_A), std::abs(actual.m_B - expected.m_B));
 		}
 
-		[[nodiscard]] BrdfIntegral ConvergedReference(
-			SelfTestContext& context, double noV, double roughness) noexcept
+		[[nodiscard]] BrdfIntegral ConvergedReference(SelfTestContext& context, double noV, double roughness) noexcept
 		{
 			const BrdfIntegral coarse = IntegrateReference(noV, roughness, 512, 128);
 			const BrdfIntegral fine = IntegrateReference(noV, roughness, 1024, 256);
@@ -157,10 +155,8 @@ namespace gglab
 			HWND m_Window = nullptr;
 		};
 
-		constexpr RHIResourceState RenderTargetState{
-			RHIStage::RenderTarget, RHIAccess::RenderTarget, RHILayout::RenderTarget };
-		constexpr RHIResourceState SampleState{
-			RHIStage::PixelShader, RHIAccess::ShaderResource, RHILayout::ShaderResource };
+		constexpr RHIResourceState RenderTargetState{ RHIStage::RenderTarget, RHIAccess::RenderTarget, RHILayout::RenderTarget };
+		constexpr RHIResourceState SampleState{ RHIStage::PixelShader, RHIAccess::ShaderResource, RHILayout::ShaderResource };
 
 		[[nodiscard]] ShaderBytecode Bytecode(const ShaderCompileResult& result, std::string_view entry) noexcept
 		{
@@ -186,8 +182,7 @@ namespace gglab
 			return pipelines.CreateGraphicsPipeline(info);
 		}
 
-		void Transition(RHIGraphicsCommandContext& commands, RHITextureHandle texture,
-			RHIResourceState before, RHIResourceState after) noexcept
+		void Transition(RHIGraphicsCommandContext& commands, RHITextureHandle texture, RHIResourceState before, RHIResourceState after) noexcept
 		{
 			// These test-owned RHI textures are outside RenderGraph. The harness
 			// owns their complete state path, with graphics idle before transfer.
@@ -240,8 +235,7 @@ namespace gglab
 			return data;
 		}
 
-		[[nodiscard]] double ReadChannel(const TextureAssetData& data,
-			uint32_t x, uint32_t y, uint32_t channel) noexcept
+		[[nodiscard]] double ReadChannel(const TextureAssetData& data, uint32_t x, uint32_t y, uint32_t channel) noexcept
 		{
 			const auto& subresource = data.m_Subresources.front();
 			const uint32_t channelBytes = data.m_ResourceFormat == RHIFormat::R16G16Float ? 2 : 4;
@@ -258,9 +252,11 @@ namespace gglab
 			std::memcpy(&half, source, sizeof(half));
 			const uint32_t exponent = (half >> 10) & 31;
 			const uint32_t mantissa = half & 1023;
-			const double magnitude = exponent == 0 ? std::ldexp(static_cast<double>(mantissa), -24)
-				: exponent == 31 ? (mantissa == 0 ? std::numeric_limits<double>::infinity() : std::numeric_limits<double>::quiet_NaN())
-				: std::ldexp(1.0 + mantissa / 1024.0, static_cast<int>(exponent) - 15);
+			const double magnitude = exponent == 0 ?
+				std::ldexp(static_cast<double>(mantissa), -24) :
+				exponent == 31 ?
+					(mantissa == 0 ? std::numeric_limits<double>::infinity() : std::numeric_limits<double>::quiet_NaN()) :
+					std::ldexp(1.0 + mantissa / 1024.0, static_cast<int>(exponent) - 15);
 			return (half & 0x8000) ? -magnitude : magnitude;
 		}
 
@@ -274,15 +270,14 @@ namespace gglab
 			const uint32_t x1 = std::min(x0 + 1, size - 1);
 			const uint32_t y1 = std::min(y0 + 1, size - 1);
 			const auto sample = [&](uint32_t channel)
-				{
-					return std::lerp(std::lerp(ReadChannel(data, x0, y0, channel), ReadChannel(data, x1, y0, channel), x - x0),
-						std::lerp(ReadChannel(data, x0, y1, channel), ReadChannel(data, x1, y1, channel), x - x0), y - y0);
-				};
+			{
+				return std::lerp(std::lerp(ReadChannel(data, x0, y0, channel), ReadChannel(data, x1, y0, channel), x - x0),
+					std::lerp(ReadChannel(data, x0, y1, channel), ReadChannel(data, x1, y1, channel), x - x0), y - y0);
+			};
 			return { sample(0), sample(1) };
 		}
 
-		void ValidateNumbers(SelfTestContext& context, const TextureAssetData& lut,
-			const TextureAssetData& furnace) noexcept
+		void ValidateNumbers(SelfTestContext& context, const TextureAssetData& lut, const TextureAssetData& furnace) noexcept
 		{
 			const uint32_t size = lut.m_Extent.m_Width;
 			bool finite = true;
@@ -412,8 +407,7 @@ namespace gglab
 					const ProbeParameters parameters{ device.GetTextureViewDescriptor(lutSrv).m_Index,
 						device.GetSamplerDescriptor(sampler).m_Index };
 					commands.TrackTextureUse(lut.Get());
-					Draw(commands, furnaceRtv, furnacePipeline,
-						furnaceDesc.m_Extent.m_Width, furnaceDesc.m_Extent.m_Height, &parameters);
+					Draw(commands, furnaceRtv, furnacePipeline, furnaceDesc.m_Extent.m_Width, furnaceDesc.m_Extent.m_Height, &parameters);
 					// TransferBatch::ReadbackTexture borrows textures in Common and
 					// restores Common after its own CopySource transition.
 					Transition(commands, lut.Get(), SampleState, CommonRHIResourceState());
@@ -456,11 +450,11 @@ namespace gglab
 			const auto runtimeRoot = win32::GetExecutableDirectory();
 			ShaderCompiler compiler(ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			const auto compile = [&](const wchar_t* source, ShaderStage stage, const wchar_t* entry)
-				{
-					ShaderDesc desc{ .m_SourcePath = source, .m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
-					desc.m_Target = backend == RHIBackendType::DX12 ? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
-					return compiler.Compile(desc);
-				};
+			{
+				ShaderDesc desc{ .m_SourcePath = source, .m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
+				desc.m_Target = backend == RHIBackendType::DX12 ? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
+				return compiler.Compile(desc);
+			};
 			const auto vertex = compile(L"Passes/PassIBLBrdfLUT.hlsl", ShaderStage::Vertex, L"VSMain");
 			const auto pixel = compile(L"Passes/PassIBLBrdfLUT.hlsl", ShaderStage::Pixel, L"PSMain");
 			const auto furnacePixel = compile(L"Tests/BrdfLutWhiteFurnace.hlsl", ShaderStage::Pixel, L"PSWhiteFurnace");

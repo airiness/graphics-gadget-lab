@@ -200,7 +200,8 @@ namespace gglab
 			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Production = false,
 				.m_Targets = { NonFiniteScanTarget{ .m_Address = { .m_Resource = "Motion" } } } }, error), "Deferred-frame watch configures");
 			watch.PrepareFrame(104);
-			auto deferred = control.Complete(); deferred.m_Status = FrameCaptureStatus::Busy;
+			auto deferred = control.Complete();
+			deferred.m_Status = FrameCaptureStatus::Busy;
 			context.Check(control.m_DeferFrame && watch.OnScanResult(deferred) && watch.GetFailModeFailure().empty(),
 				"An admission-deferred unsubmitted frame contributes no missing-coverage failure history");
 		}
@@ -238,14 +239,15 @@ namespace gglab
 				"A sanitized production anomaly fails the waiting capture before any image publication");
 			const auto pending = capture.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
 			capture.Update();
-			results.clear(); capture.ConsumeResults(results);
+			results.clear();
+			capture.ConsumeResults(results);
 			context.Check(results.size() == 1 && results[0].m_RequestId == pending && results[0].m_Status == FrameCaptureRequestStatus::Failed,
 				"Fail mode also fails an after-ready capture still waiting for readiness");
 
 			FrameSequenceCoordinator sequence(capture);
 			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error), "Sequence range starts with fresh diagnostic history");
 			const CameraPath path{ .m_Id = "SEQ_Watch", .m_Name = "Watch", .m_Version = 1,
-				.m_Keys = { { .m_Frame = 0, .m_Target = { 0, 0, 1 } }, { .m_Frame = 1, .m_Target = { 0, 0, 1 } } } };
+				.m_Keys = { { .m_Frame = 0, .m_Target = { 0, 0, 1 } },{ .m_Frame = 1, .m_Target = { 0, 0, 1 } } } };
 			context.Check(sequence.Start({ .m_CameraPathId = path.m_Id }, error) != 0, "Watch sequence starts");
 			for (uint64_t serial = 2; serial <= 3; ++serial)
 			{
@@ -312,10 +314,13 @@ namespace gglab
 			context.Check(watch.Configure({ .m_Boundary = false }, error), "Transport failure reporting configures");
 			const auto transport = capture.Submit({});
 			capture.BeginFrame({ .m_FrameSerial = 11 });
-			watch.OnFrameSubmitted(11); capture.OnFrameSubmitted();
+			watch.OnFrameSubmitted(11);
+			capture.OnFrameSubmitted();
 			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
 				.m_Status = FrameCaptureStatus::Failed, .m_FrameSerial = 11, .m_Failure = "Readback mapping failed" });
-			capture.Update(); results.clear(); capture.ConsumeResults(results);
+			capture.Update();
+			results.clear();
+			capture.ConsumeResults(results);
 			context.Check(results.size() == 1 && results[0].m_RequestId == transport && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
 				results[0].m_Metadata->m_WatchCoverage && results[0].m_Metadata->m_WatchCoverage->m_Production.m_Status == NonFiniteClaimStatus::Incomplete,
 				"A capture transport failure retains the unresolved watch claims in its response metadata");
@@ -323,16 +328,21 @@ namespace gglab
 				"Watch can fail an issued capture independently of image completion");
 			const auto early = capture.Submit({});
 			capture.BeginFrame({ .m_FrameSerial = 12 });
-			watch.OnFrameSubmitted(12); capture.OnFrameSubmitted();
+			watch.OnFrameSubmitted(12);
+			capture.OnFrameSubmitted();
 			production.m_FrameSerial = 12;
 			watch.OnProductionFrame(production);
-			capture.Update(); results.clear(); capture.ConsumeResults(results);
+			capture.Update();
+			results.clear();
+			capture.ConsumeResults(results);
 			context.Check(results.size() == 1 && results[0].m_RequestId == early && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
 				results[0].m_Failure.starts_with("NonFiniteReplaced"),
 				"An issued capture fails promptly when its watch fails before any image result");
 			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = 12, .m_Image = std::make_shared<FrameCaptureImage>() });
-			capture.Update(); results.clear(); capture.ConsumeResults(results);
+			capture.Update();
+			results.clear();
+			capture.ConsumeResults(results);
 			context.Check(results.empty(), "Late payloads of a watch-failed capture drain without a second result or publication");
 		}
 
@@ -398,11 +408,11 @@ namespace gglab
 			context.Check(watch.Configure({ .m_Targets = { NonFiniteScanTarget{ .m_Address = { .m_Resource = "Motion" } } } }, error),
 				"Totals configuration accepts both claims");
 			const auto clamp = [](uint64_t negative, float mostNegative, NonFiniteClaimStatus status)
-				{
-					return NonFiniteProductionSite{ .m_ProgramIndex = 1, .m_SiteIndex = 2,
-						.m_Counters = { .m_NegativeClamps = negative, .m_MostNegative = mostNegative },
-						.m_Claim = { status, status == NonFiniteClaimStatus::Failed ? NonFiniteWatchFailure::ClampPolicyExceeded : NonFiniteWatchFailure::None } };
-				};
+			{
+				return NonFiniteProductionSite{ .m_ProgramIndex = 1, .m_SiteIndex = 2,
+					.m_Counters = { .m_NegativeClamps = negative, .m_MostNegative = mostNegative },
+					.m_Claim = { status, status == NonFiniteClaimStatus::Failed ? NonFiniteWatchFailure::ClampPolicyExceeded : NonFiniteWatchFailure::None } };
+			};
 			watch.OnProductionFrame({ .m_FrameSerial = 3, .m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None },
 				.m_Sites = { clamp(2, -0.5f, NonFiniteClaimStatus::Passed), NonFiniteProductionSite{ .m_SiteIndex = 4 } } });
 			watch.OnProductionFrame({ .m_FrameSerial = 2, .m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::ClampPolicyExceeded },

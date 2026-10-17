@@ -54,8 +54,7 @@ namespace napa::voxel::testing
 			};
 		}
 
-		[[nodiscard]] napa::voxel::VoxelSampleChange MakeDensityChange(
-			napa::voxel::SampleCoord coordinate) noexcept
+		[[nodiscard]] napa::voxel::VoxelSampleChange MakeDensityChange(napa::voxel::SampleCoord coordinate) noexcept
 		{
 			using namespace napa::voxel;
 			return {
@@ -83,7 +82,8 @@ namespace napa::voxel::testing
 			return config;
 		}
 
-		inline constexpr std::array MutationChunkDomain{
+		inline constexpr std::array MutationChunkDomain
+		{
 			napa::voxel::ChunkCoord{ -1, -1, -1 },
 			napa::voxel::ChunkCoord{ 0, -1, -1 },
 			napa::voxel::ChunkCoord{ -1, 0, -1 },
@@ -115,8 +115,7 @@ namespace napa::voxel::testing
 		{
 			using namespace napa::voxel;
 			std::unique_ptr<PreparedCpuMeshPublication> publication;
-			const ValidationResult prepareResult =
-				PrepareCpuMeshBatchPublication(pending, visible, publication);
+			const ValidationResult prepareResult = PrepareCpuMeshBatchPublication(pending, visible, publication);
 			if (prepareResult.Succeeded())
 			{
 				CommitCpuMeshBatchPublication(publication, visible);
@@ -124,8 +123,7 @@ namespace napa::voxel::testing
 			return prepareResult;
 		}
 
-		[[nodiscard]] bool CreateSoilWorld(
-			std::unique_ptr<napa::voxel::VoxelWorld>& world)
+		[[nodiscard]] bool CreateSoilWorld(std::unique_ptr<napa::voxel::VoxelWorld>& world)
 		{
 			using namespace napa::voxel;
 			const PrimitiveDesc primitive{
@@ -141,18 +139,15 @@ namespace napa::voxel::testing
 				},
 			};
 			PrimitiveWorldGenerationResult generation{};
-			return GeneratePrimitiveVoxelWorld(
-				MakeMutationConfig(), std::span{ &primitive, 1 }, world, generation).Succeeded();
+			return GeneratePrimitiveVoxelWorld(MakeMutationConfig(), std::span{ &primitive, 1 }, world, generation).Succeeded();
 		}
 
-		[[nodiscard]] bool HashWorld(
-			const napa::voxel::VoxelWorld& world, std::uint64_t& hash) noexcept
+		[[nodiscard]] bool HashWorld(const napa::voxel::VoxelWorld& world, std::uint64_t& hash) noexcept
 		{
 			return napa::voxel::ComputeLogicalVoxelWorldHash(world, hash).Succeeded();
 		}
 
-		[[nodiscard]] bool CompareWorldSamples(
-			const napa::voxel::VoxelWorld& lhs, const napa::voxel::VoxelWorld& rhs) noexcept
+		[[nodiscard]] bool CompareWorldSamples(const napa::voxel::VoxelWorld& lhs, const napa::voxel::VoxelWorld& rhs) noexcept
 		{
 			using namespace napa::voxel;
 			const SampleAabb bounds = lhs.GetLogicalSampleBounds();
@@ -194,10 +189,8 @@ namespace napa::voxel::testing
 			};
 			SphereEditContext midpointContext{};
 			SphereEditContext fullContext{};
-			const bool contextsPrepared = PrepareSphereEditContext(
-				MakeMutationConfig(), MakeSoilEdit({}, 1.0, 0.5), midpointContext).Succeeded() &&
-				PrepareSphereEditContext(
-					MakeMutationConfig(), MakeSoilEdit({}, 1.0, 1.0), fullContext).Succeeded();
+			const bool contextsPrepared = PrepareSphereEditContext(MakeMutationConfig(), MakeSoilEdit({}, 1.0, 0.5), midpointContext).Succeeded() &&
+				PrepareSphereEditContext(MakeMutationConfig(), MakeSoilEdit({}, 1.0, 1.0), fullContext).Succeeded();
 			VoxelSample midpoint{};
 			VoxelSample full{};
 			const bool transitionsEvaluated = contextsPrepared &&
@@ -214,8 +207,7 @@ namespace napa::voxel::testing
 				}, "Soil subtract honors midpoint strength and canonicalizes a full cut");
 
 			SphereEditContext tieContext{};
-			const bool tiePrepared = PrepareSphereEditContext(MakeMutationConfig(127.0f),
-				MakeSoilEdit({}, 1.0, 0.5), tieContext).Succeeded();
+			const bool tiePrepared = PrepareSphereEditContext(MakeMutationConfig(127.0f), MakeSoilEdit({}, 1.0, 0.5), tieContext).Succeeded();
 			VoxelSample positiveTie{};
 			VoxelSample negativeTie{};
 			const bool tiesEvaluated = tiePrepared &&
@@ -224,32 +216,32 @@ namespace napa::voxel::testing
 					.m_Material = VoxelMaterial::Soil,
 					.m_Damage = 0,
 					}, positiveTie).Succeeded() &&
-					EvaluateSphereEditSampleTransition(tieContext, {}, {
-						.m_Density = 128,
-						.m_Material = VoxelMaterial::Soil,
-						.m_Damage = 0,
-						}, negativeTie).Succeeded();
-					context.Check(tiesEvaluated && positiveTie.m_Density == 129 &&
-						positiveTie.m_Material == VoxelMaterial::Soil &&
-						negativeTie.m_Density == 127 &&
-						negativeTie.m_Material == VoxelMaterial::Empty,
-						"Soil subtract rounds positive and negative half ties away from zero");
+				EvaluateSphereEditSampleTransition(tieContext, {}, {
+					.m_Density = 128,
+					.m_Material = VoxelMaterial::Soil,
+					.m_Damage = 0,
+					}, negativeTie).Succeeded();
+			context.Check(tiesEvaluated && positiveTie.m_Density == 129 &&
+				positiveTie.m_Material == VoxelMaterial::Soil &&
+				negativeTie.m_Density == 127 &&
+				negativeTie.m_Material == VoxelMaterial::Empty,
+				"Soil subtract rounds positive and negative half ties away from zero");
 
-					VoxelSample preserved{
-						.m_Density = 77,
-						.m_Material = VoxelMaterial::Empty,
-						.m_Damage = 0,
-					};
-					const VoxelSample expectedPreserved = preserved;
-					const ValidationResult invalidResult = EvaluateSphereEditSampleTransition(
-						fullContext, {}, {
-							.m_Density = 255,
-							.m_Material = static_cast<VoxelMaterial>(255),
-							.m_Damage = 0,
-						}, preserved);
-						context.Check(invalidResult.m_Error == ValidationError::InvalidVoxelMaterial &&
-							preserved == expectedPreserved,
-							"Soil transition rejects an unknown Material without changing output");
+			VoxelSample preserved{
+				.m_Density = 77,
+				.m_Material = VoxelMaterial::Empty,
+				.m_Damage = 0,
+			};
+			const VoxelSample expectedPreserved = preserved;
+			const ValidationResult invalidResult = EvaluateSphereEditSampleTransition(
+				fullContext, {}, {
+					.m_Density = 255,
+					.m_Material = static_cast<VoxelMaterial>(255),
+					.m_Damage = 0,
+				}, preserved);
+			context.Check(invalidResult.m_Error == ValidationError::InvalidVoxelMaterial &&
+				preserved == expectedPreserved,
+				"Soil transition rejects an unknown Material without changing output");
 		}
 
 		void RunAtomicSoilMutationTests(TestContext& context) noexcept
@@ -264,8 +256,7 @@ namespace napa::voxel::testing
 
 			const std::uint64_t baseRevision = world->GetWorldVoxelRevision();
 			VoxelMutationResult mutation{};
-			const ValidationResult mutationResult = ApplySphereEdit(
-				*world, MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0), mutation);
+			const ValidationResult mutationResult = ApplySphereEdit(*world, MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0), mutation);
 			std::uint64_t editedHash = 0;
 			const bool hashesComputed = HashWorld(*world, editedHash);
 
@@ -291,8 +282,7 @@ namespace napa::voxel::testing
 					ValidateVoxelSample(change.m_After).Succeeded() &&
 					world->ReadCurrentSample(change.m_Coordinate, current).Succeeded() &&
 					world->ReadOriginalSample(change.m_Coordinate, original).Succeeded() &&
-					ResolveSampleOwner(change.m_Coordinate,
-						world->GetConfig().m_ChunkCellCount, address).Succeeded() &&
+					ResolveSampleOwner(change.m_Coordinate, world->GetConfig().m_ChunkCellCount, address).Succeeded() &&
 					current == change.m_After && original == change.m_Before;
 				changedOwners[address.m_Owner] = true;
 			}
@@ -325,8 +315,7 @@ namespace napa::voxel::testing
 				.m_DataDirtyChunks = { { 2, 3, 4 } },
 				.m_MeshDirtyChunks = { { -2, -3, -4 } },
 			};
-			const ValidationResult repeatedResult = ApplySphereEdit(
-				*world, MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0), repeated);
+			const ValidationResult repeatedResult = ApplySphereEdit(*world, MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0), repeated);
 			context.Check(repeatedResult.Succeeded() && !repeated.Changed() &&
 				repeated.m_DataDirtyChunks.empty() && repeated.m_MeshDirtyChunks.empty() &&
 				repeated.m_BaseWorldVoxelRevision == settledRevision &&
@@ -368,8 +357,7 @@ namespace napa::voxel::testing
 				"Sphere mutation preserves Original in a Current-first resident Chunk");
 
 			std::unique_ptr<VoxelWorld> revisionWorld;
-			const bool revisionWorldCreated =
-				VoxelWorld::Create(MakeMutationConfig(), revisionWorld).Succeeded();
+			const bool revisionWorldCreated = VoxelWorld::Create(MakeMutationConfig(), revisionWorld).Succeeded();
 			bool changedA = false;
 			bool changedB = false;
 			bool changedAAgain = false;
@@ -381,14 +369,13 @@ namespace napa::voxel::testing
 					.m_Material = VoxelMaterial::Soil,
 					.m_Damage = 0,
 					}, changedAAgain).Succeeded();
-				const VoxelChunk* chunkA = revisionWorldCreated ? revisionWorld->FindChunk({}) : nullptr;
-				const VoxelChunk* chunkB =
-					revisionWorldCreated ? revisionWorld->FindChunk({ -1, 0, 0 }) : nullptr;
-				context.Check(writesSucceeded && changedA && changedB && changedAAgain &&
-					revisionWorld->GetWorldVoxelRevision() == 3 && chunkA != nullptr &&
-					chunkB != nullptr && chunkA->GetVoxelRevision() == 3 &&
-					chunkB->GetVoxelRevision() == 2,
-					"Chunk revisions record the last World revision that changed their Samples");
+			const VoxelChunk* chunkA = revisionWorldCreated ? revisionWorld->FindChunk({}) : nullptr;
+			const VoxelChunk* chunkB = revisionWorldCreated ? revisionWorld->FindChunk({ -1, 0, 0 }) : nullptr;
+			context.Check(writesSucceeded && changedA && changedB && changedAAgain &&
+				revisionWorld->GetWorldVoxelRevision() == 3 && chunkA != nullptr &&
+				chunkB != nullptr && chunkA->GetVoxelRevision() == 3 &&
+				chunkB->GetVoxelRevision() == 2,
+				"Chunk revisions record the last World revision that changed their Samples");
 		}
 
 		void RunExactDirtyChunkTests(TestContext& context) noexcept
@@ -400,10 +387,9 @@ namespace napa::voxel::testing
 			const VoxelSampleChange interiorChange = MakeDensityChange({ 2, 2, 2 });
 			std::vector<ChunkCoord> dataDirty;
 			std::vector<ChunkCoord> meshDirty;
-			const ValidationResult interiorResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &interiorChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult interiorResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &interiorChange, 1 }, dataDirty, meshDirty);
 			context.Check(interiorResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin }&&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
 				meshDirty == std::vector<ChunkCoord>{ origin },
 				"An interior Sample change dirties one Data owner and one Mesh owner");
 
@@ -411,49 +397,46 @@ namespace napa::voxel::testing
 			const ValidationResult gradientCornerResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &gradientCornerChange, 1 }, dataDirty, meshDirty);
 			context.Check(gradientCornerResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin }&&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
 				meshDirty == std::vector<ChunkCoord>{
 					{ 0, 0, -1 }, { 0, -1, 0 }, { -1, 0, 0 }, origin,
 			}, "A Density change one Cell from a Chunk corner includes its Gradient consumers");
 
 			const VoxelSampleChange faceChange = MakeDensityChange({ 8, 2, 2 });
-			const ValidationResult faceResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &faceChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult faceResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &faceChange, 1 }, dataDirty, meshDirty);
 			context.Check(faceResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { 1, 0, 0 } }&&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 0, 0 } } &&
 				meshDirty == std::vector<ChunkCoord>{ origin, { 1, 0, 0 } },
 				"A Chunk-face Sample change dirties both adjacent Mesh owners");
 
 			const VoxelSampleChange edgeChange = MakeDensityChange({ 8, 8, 2 });
-			const ValidationResult edgeResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &edgeChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult edgeResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &edgeChange, 1 }, dataDirty, meshDirty);
 			context.Check(edgeResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 0 } }&&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 0 } } &&
 				meshDirty == std::vector<ChunkCoord>{
 				origin, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
 			}, "A Chunk-edge Sample change dirties all four adjacent Mesh owners");
 
 			const VoxelSampleChange cornerChange = MakeDensityChange({ 8, 8, 8 });
 			const std::vector<ChunkCoord> expectedCornerMesh{
-				origin, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
-				{ 0, 0, 1 }, { 1, 0, 1 }, { 0, 1, 1 }, { 1, 1, 1 },
+				origin,{ 1, 0, 0 },{ 0, 1, 0 },{ 1, 1, 0 },
+				{ 0, 0, 1 },{ 1, 0, 1 },{ 0, 1, 1 },{ 1, 1, 1 },
 			};
-			const ValidationResult cornerResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &cornerChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult cornerResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &cornerChange, 1 }, dataDirty, meshDirty);
 			context.Check(cornerResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 1 } }&&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 1 } } &&
 				meshDirty == expectedCornerMesh,
 				"A Chunk-corner Sample change dirties all eight adjacent Mesh owners");
 
 			const VoxelSampleChange negativeCornerChange = MakeDensityChange({ 0, 0, 0 });
 			const std::vector<ChunkCoord> expectedNegativeCornerMesh{
-				{ -1, -1, -1 }, { 0, -1, -1 }, { -1, 0, -1 }, { 0, 0, -1 },
-				{ -1, -1, 0 }, { 0, -1, 0 }, { -1, 0, 0 }, origin,
+				{ -1, -1, -1 },{ 0, -1, -1 },{ -1, 0, -1 },{ 0, 0, -1 },
+				{ -1, -1, 0 },{ 0, -1, 0 },{ -1, 0, 0 }, origin,
 			};
 			const ValidationResult negativeResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &negativeCornerChange, 1 }, dataDirty, meshDirty);
 			context.Check(negativeResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin }&&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
 				meshDirty == expectedNegativeCornerMesh,
 				"Negative Chunk owners use the same exact corner-dirty contract");
 
@@ -470,10 +453,9 @@ namespace napa::voxel::testing
 					.m_Damage = 11,
 				},
 			};
-			const ValidationResult damageResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &damageOnlyChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult damageResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &damageOnlyChange, 1 }, dataDirty, meshDirty);
 			context.Check(damageResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { -1, -1, -1 } }&& meshDirty.empty(),
+				dataDirty == std::vector<ChunkCoord>{ { -1, -1, -1 } } && meshDirty.empty(),
 				"A Damage-only Sample change dirties Data without invalidating Mesh");
 
 			const VoxelSampleChange materialOnlyChange{
@@ -489,17 +471,15 @@ namespace napa::voxel::testing
 					.m_Damage = 7,
 				},
 			};
-			const ValidationResult materialResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &materialOnlyChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult materialResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &materialOnlyChange, 1 }, dataDirty, meshDirty);
 			context.Check(materialResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin }&&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
 				meshDirty == std::vector<ChunkCoord>{ origin },
 				"A Material-only Sample change invalidates both Data and Mesh owners");
 
 			dataDirty = { { 3, 4, 5 } };
 			meshDirty = { { -3, -4, -5 } };
-			const ValidationResult emptyResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span<const VoxelSampleChange>{}, dataDirty, meshDirty);
+			const ValidationResult emptyResult = DeriveVoxelMutationDirtyChunks(config, std::span<const VoxelSampleChange>{}, dataDirty, meshDirty);
 			context.Check(emptyResult.Succeeded() && dataDirty.empty() && meshDirty.empty(),
 				"The public Dirty helper maps an empty Change Set to empty outputs");
 
@@ -508,33 +488,33 @@ namespace napa::voxel::testing
 				.m_Min = {},
 				.m_MaxExclusive = { 8, 8, 8 },
 			};
-			const std::array clippedChanges{
+			const std::array clippedChanges
+			{
 				MakeDensityChange({ 0, 0, 0 }),
 				MakeDensityChange({ 8, 8, 8 }),
 			};
-			const ValidationResult clippedResult = DeriveVoxelMutationDirtyChunks(
-				clippedConfig, clippedChanges, dataDirty, meshDirty);
+			const ValidationResult clippedResult = DeriveVoxelMutationDirtyChunks(clippedConfig, clippedChanges, dataDirty, meshDirty);
 			context.Check(clippedResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } }&&
+				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } } &&
 				meshDirty == std::vector<ChunkCoord>{ origin },
 				"Mesh Dirty cells are clipped exactly to Logical Cell Bounds");
 
-			const std::array repeatedChanges{
+			const std::array repeatedChanges
+			{
 				cornerChange,
 				MakeDensityChange({ 7, 7, 7 }),
 			};
-			const ValidationResult repeatedResult = DeriveVoxelMutationDirtyChunks(
-				config, repeatedChanges, dataDirty, meshDirty);
-			const std::array reversedChanges{
+			const ValidationResult repeatedResult = DeriveVoxelMutationDirtyChunks(config, repeatedChanges, dataDirty, meshDirty);
+			const std::array reversedChanges
+			{
 				repeatedChanges[1],
 				repeatedChanges[0],
 			};
 			std::vector<ChunkCoord> reversedDataDirty;
 			std::vector<ChunkCoord> reversedMeshDirty;
-			const ValidationResult reversedResult = DeriveVoxelMutationDirtyChunks(
-				config, reversedChanges, reversedDataDirty, reversedMeshDirty);
+			const ValidationResult reversedResult = DeriveVoxelMutationDirtyChunks(config, reversedChanges, reversedDataDirty, reversedMeshDirty);
 			context.Check(repeatedResult.Succeeded() && reversedResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } }&&
+				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } } &&
 				meshDirty == expectedCornerMesh && dataDirty == reversedDataDirty &&
 				meshDirty == reversedMeshDirty,
 				"Dirty Chunk sets are sorted, unique, and independent of change order");
@@ -548,8 +528,7 @@ namespace napa::voxel::testing
 			const std::vector<ChunkCoord> sentinelMesh{ { -7, -8, -9 } };
 			dataDirty = sentinelData;
 			meshDirty = sentinelMesh;
-			const ValidationResult invalidResult = DeriveVoxelMutationDirtyChunks(
-				config, std::span{ &invalidChange, 1 }, dataDirty, meshDirty);
+			const ValidationResult invalidResult = DeriveVoxelMutationDirtyChunks(config, std::span{ &invalidChange, 1 }, dataDirty, meshDirty);
 			context.Check(invalidResult.m_Error == ValidationError::InvalidVoxelSampleChange &&
 				dataDirty == sentinelData && meshDirty == sentinelMesh,
 				"Invalid Sample changes leave Dirty outputs unchanged");
@@ -603,8 +582,7 @@ namespace napa::voxel::testing
 		{
 			using namespace napa::voxel;
 			using namespace napa::voxel::testing;
-			const SphereEditRequest request =
-				MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0);
+			const SphereEditRequest request = MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0);
 
 			std::unique_ptr<VoxelWorld> revisionWorld;
 			if (!CreateSoilWorld(revisionWorld))
@@ -623,11 +601,8 @@ namespace napa::voxel::testing
 				.m_MeshDirtyChunks = { { -2, -3, -4 } },
 			};
 			const VoxelMutationResult expectedRevisionOutput = revisionOutput;
-			const bool revisionHashBeforeComputed =
-				HashWorld(*revisionWorld, revisionHashBefore);
-			const ValidationResult revisionResult =
-				ApplySphereEditWithExhaustedRevision(
-					*revisionWorld, request, revisionOutput);
+			const bool revisionHashBeforeComputed = HashWorld(*revisionWorld, revisionHashBefore);
+			const ValidationResult revisionResult = ApplySphereEditWithExhaustedRevision(*revisionWorld, request, revisionOutput);
 			const bool revisionHashAfterComputed = HashWorld(*revisionWorld, revisionHashAfter);
 			context.Check(revisionHashBeforeComputed && revisionHashAfterComputed &&
 				revisionResult.m_Error == ValidationError::ArithmeticOverflow &&
@@ -646,8 +621,7 @@ namespace napa::voxel::testing
 			VoxelMutationResult successfulOutput{};
 			VoxelMutationAllocationProbe successfulProbe{};
 			const ValidationResult successfulResult =
-				ApplySphereEditWithAllocationProbe(
-					*successfulWorld, request, successfulOutput, successfulProbe);
+				ApplySphereEditWithAllocationProbe(*successfulWorld, request, successfulOutput, successfulProbe);
 			const std::size_t prepareAllocationCount =
 				successfulProbe.m_PrepareAllocationCount;
 			context.Check(successfulResult.Succeeded() && successfulOutput.Changed() &&
@@ -656,8 +630,7 @@ namespace napa::voxel::testing
 
 			bool everyFailureWasAtomic = successfulResult.Succeeded() &&
 				prepareAllocationCount > 0 && successfulProbe.m_CommitAllocationCount == 0;
-			for (std::size_t allocation = 1;
-				everyFailureWasAtomic && allocation <= prepareAllocationCount; ++allocation)
+			for (std::size_t allocation = 1; everyFailureWasAtomic && allocation <= prepareAllocationCount; ++allocation)
 			{
 				std::unique_ptr<VoxelWorld> faultWorld;
 				if (!CreateSoilWorld(faultWorld))
@@ -693,16 +666,11 @@ namespace napa::voxel::testing
 					.m_FailAtPrepareAllocation = allocation,
 				};
 				const bool hashBeforeComputed = HashWorld(*faultWorld, hashBefore);
-				const ValidationResult faultResult =
-					ApplySphereEditWithAllocationProbe(
-						*faultWorld, request, faultOutput, faultProbe);
+				const ValidationResult faultResult = ApplySphereEditWithAllocationProbe(*faultWorld, request, faultOutput, faultProbe);
 				const bool hashAfterComputed = HashWorld(*faultWorld, hashAfter);
-				for (std::size_t index = 0;
-					chunkRevisionsPreserved && index < successfulOutput.m_DataDirtyChunks.size();
-					++index)
+				for (std::size_t index = 0; chunkRevisionsPreserved && index < successfulOutput.m_DataDirtyChunks.size(); ++index)
 				{
-					const VoxelChunk* chunk =
-						faultWorld->FindChunk(successfulOutput.m_DataDirtyChunks[index]);
+					const VoxelChunk* chunk = faultWorld->FindChunk(successfulOutput.m_DataDirtyChunks[index]);
 					chunkRevisionsPreserved = chunk != nullptr &&
 						chunk->GetVoxelRevision() == chunkRevisionsBefore[index];
 				}
@@ -732,36 +700,31 @@ namespace napa::voxel::testing
 			VisibleMeshSet visible;
 			CpuMeshBatch initialBatch{};
 			std::unique_ptr<PendingCpuMeshBatch> initialPending;
-			const bool initialPublished = BuildCpuMeshBatch(
-				*world, world->GetWorldVoxelRevision(), MutationChunkDomain, initialBatch).Succeeded() &&
+			const bool initialPublished = BuildCpuMeshBatch(*world, world->GetWorldVoxelRevision(), MutationChunkDomain, initialBatch).Succeeded() &&
 				ValidateCpuMeshBatch(initialBatch, visible, initialPending).Succeeded() &&
 				PrepareAndCommitMutationMeshBatch(initialPending, visible).Succeeded();
 			WorldMeshValidationResult initialValidation{};
-			if (!initialPublished || ComputeVisibleWorldMeshHash(
-				visible, initialValidation).Failed())
+			if (!initialPublished || ComputeVisibleWorldMeshHash(visible, initialValidation).Failed())
 			{
 				context.Check(false, "Soil replacement fixture publishes its initial complete mesh");
 				return;
 			}
 
 			VoxelMutationResult mutation{};
-			const ValidationResult mutationResult = ApplySphereEdit(
-				*world, MakeSoilEdit({ 3.0, 0.0, 0.0 }, 0.5, 1.0), mutation);
+			const ValidationResult mutationResult = ApplySphereEdit(*world, MakeSoilEdit({ 3.0, 0.0, 0.0 }, 0.5, 1.0), mutation);
 			CpuMeshBatch dirtyBatch{};
 			const ValidationResult buildResult = mutationResult.Succeeded() ?
-				BuildCpuMeshBatch(*world, mutation, dirtyBatch) : mutationResult;
+				BuildCpuMeshBatch(*world, mutation, dirtyBatch) :
+				mutationResult;
 			bool exactBatch = buildResult.Succeeded() && mutation.Changed() &&
 				dirtyBatch.m_TargetWorldVoxelRevision == mutation.m_TargetWorldVoxelRevision &&
 				dirtyBatch.m_RequestedChunks == mutation.m_MeshDirtyChunks &&
 				dirtyBatch.m_Candidates.size() == mutation.m_MeshDirtyChunks.size() &&
 				mutation.m_MeshDirtyChunks.size() == MutationChunkDomain.size();
-			for (std::size_t index = 0;
-				exactBatch && index < dirtyBatch.m_Candidates.size(); ++index)
+			for (std::size_t index = 0; exactBatch && index < dirtyBatch.m_Candidates.size(); ++index)
 			{
-				exactBatch = dirtyBatch.m_Candidates[index].m_Chunk ==
-					mutation.m_MeshDirtyChunks[index] &&
-					dirtyBatch.m_Candidates[index].m_SourceWorldVoxelRevision ==
-					mutation.m_TargetWorldVoxelRevision;
+				exactBatch = dirtyBatch.m_Candidates[index].m_Chunk == mutation.m_MeshDirtyChunks[index] &&
+					dirtyBatch.m_Candidates[index].m_SourceWorldVoxelRevision == mutation.m_TargetWorldVoxelRevision;
 			}
 			context.Check(exactBatch,
 				"A Soil mutation builds its exact Gradient-aware Mesh Dirty replacements");
@@ -774,9 +737,7 @@ namespace napa::voxel::testing
 			mismatchedDirtyMutation.m_MeshDirtyChunks.pop_back();
 			CpuMeshBatch unchangedBatch = dirtyBatch;
 			const ChunkMeshRecord* unchangedCandidateData = unchangedBatch.m_Candidates.data();
-			context.Check(BuildCpuMeshBatch(
-				*world, mismatchedDirtyMutation, unchangedBatch).m_Error ==
-				ValidationError::InvalidVoxelMutation &&
+			context.Check(BuildCpuMeshBatch(*world, mismatchedDirtyMutation, unchangedBatch).m_Error == ValidationError::InvalidVoxelMutation &&
 				unchangedBatch.m_RequestedChunks == dirtyBatch.m_RequestedChunks &&
 				unchangedBatch.m_Candidates.data() == unchangedCandidateData,
 				"Mutation-bound batch construction rejects a mismatched Dirty Set atomically");
@@ -784,12 +745,10 @@ namespace napa::voxel::testing
 			CpuMeshBatch missingCandidate = dirtyBatch;
 			missingCandidate.m_Candidates.pop_back();
 			std::unique_ptr<PendingCpuMeshBatch> rejectedPending;
-			const ValidationResult missingResult =
-				ValidateCpuMeshBatch(missingCandidate, visible, rejectedPending);
+			const ValidationResult missingResult = ValidateCpuMeshBatch(missingCandidate, visible, rejectedPending);
 			CpuMeshBatch extraCandidate = dirtyBatch;
 			extraCandidate.m_Candidates.push_back(dirtyBatch.m_Candidates.back());
-			const ValidationResult extraResult =
-				ValidateCpuMeshBatch(extraCandidate, visible, rejectedPending);
+			const ValidationResult extraResult = ValidateCpuMeshBatch(extraCandidate, visible, rejectedPending);
 			context.Check(
 				missingResult.m_Error == ValidationError::MismatchedCpuMeshCandidateSet &&
 				extraResult.m_Error == ValidationError::MismatchedCpuMeshCandidateSet &&
@@ -797,18 +756,15 @@ namespace napa::voxel::testing
 				"Exact Dirty Pending rejects missing and extra replacement Candidates atomically");
 
 			std::unique_ptr<PendingCpuMeshBatch> pending;
-			const bool validated =
-				ValidateCpuMeshBatch(dirtyBatch, visible, pending).Succeeded() && pending != nullptr;
+			const bool validated = ValidateCpuMeshBatch(dirtyBatch, visible, pending).Succeeded() && pending != nullptr;
 			bool replacementViewMatches = validated &&
 				pending->GetChunks().size() == MutationChunkDomain.size() &&
 				pending->GetReplacementChunks().size() == mutation.m_MeshDirtyChunks.size();
-			for (std::size_t index = 0;
-				replacementViewMatches && index < pending->GetReplacementChunks().size(); ++index)
+			for (std::size_t index = 0; replacementViewMatches && index < pending->GetReplacementChunks().size(); ++index)
 			{
 				const ChunkMeshRecord& replacement = pending->GetReplacementChunks()[index];
 				replacementViewMatches = replacement.m_Chunk == mutation.m_MeshDirtyChunks[index] &&
-					FindMutationMeshRecord(pending->GetChunks(), replacement.m_Chunk) ==
-					std::addressof(replacement);
+					FindMutationMeshRecord(pending->GetChunks(), replacement.m_Chunk) == std::addressof(replacement);
 			}
 			context.Check(replacementViewMatches &&
 				visible.GetVisibleWorldRevision() == mutation.m_BaseWorldVoxelRevision &&
@@ -823,8 +779,7 @@ namespace napa::voxel::testing
 			const bool competingValidated =
 				ValidateCpuMeshBatch(dirtyBatch, visible, competingPending).Succeeded() &&
 				competingPending != nullptr;
-			const bool published =
-				PrepareAndCommitMutationMeshBatch(pending, visible).Succeeded();
+			const bool published = PrepareAndCommitMutationMeshBatch(pending, visible).Succeeded();
 			WorldMeshValidationResult editedValidation{};
 			context.Check(published && !pending &&
 				visible.GetVisibleWorldRevision() == mutation.m_TargetWorldVoxelRevision &&
@@ -845,11 +800,9 @@ namespace napa::voxel::testing
 			std::unique_ptr<PreparedCpuMeshPublication> stalePublication;
 			std::unique_ptr<PendingCpuMeshBatch> sameRevisionPending;
 			context.Check(competingValidated &&
-				PrepareCpuMeshBatchPublication(competingPending, visible, stalePublication).m_Error ==
-				ValidationError::StaleCpuMeshBatch &&
+				PrepareCpuMeshBatchPublication(competingPending, visible, stalePublication).m_Error == ValidationError::StaleCpuMeshBatch &&
 				competingPending.get() == competingIdentity && !stalePublication &&
-				ValidateCpuMeshBatch(dirtyBatch, visible, sameRevisionPending).m_Error ==
-				ValidationError::StaleCpuMeshBatch && !sameRevisionPending,
+				ValidateCpuMeshBatch(dirtyBatch, visible, sameRevisionPending).m_Error == ValidationError::StaleCpuMeshBatch && !sameRevisionPending,
 				"Published and competing same-revision Soil batches cannot overwrite newer Visible state");
 
 			std::unique_ptr<VoxelWorld> skippedWorld;
@@ -861,24 +814,18 @@ namespace napa::voxel::testing
 			CpuMeshBatch skippedBatch{};
 			std::unique_ptr<PendingCpuMeshBatch> skippedPending;
 			const bool skippedBatchBuilt = CreateSoilWorld(skippedWorld) &&
-				BuildCpuMeshBatch(*skippedWorld, skippedWorld->GetWorldVoxelRevision(),
-					MutationChunkDomain, skippedInitialBatch).Succeeded() &&
-				ValidateCpuMeshBatch(
-					skippedInitialBatch, skippedVisible, skippedInitialPending).Succeeded() &&
-				PrepareAndCommitMutationMeshBatch(
-					skippedInitialPending, skippedVisible).Succeeded() &&
-				ApplySphereEdit(*skippedWorld,
-					MakeSoilEdit({ 3.0, 0.0, 0.0 }, 0.5, 1.0), skippedMutationA).Succeeded() &&
+				BuildCpuMeshBatch(*skippedWorld, skippedWorld->GetWorldVoxelRevision(), MutationChunkDomain, skippedInitialBatch).Succeeded() &&
+				ValidateCpuMeshBatch(skippedInitialBatch, skippedVisible, skippedInitialPending).Succeeded() &&
+				PrepareAndCommitMutationMeshBatch(skippedInitialPending, skippedVisible).Succeeded() &&
+				ApplySphereEdit(*skippedWorld, MakeSoilEdit({ 3.0, 0.0, 0.0 }, 0.5, 1.0), skippedMutationA).Succeeded() &&
 				skippedMutationA.Changed() &&
-				ApplySphereEdit(*skippedWorld,
-					MakeSoilEdit({ -3.0, 0.0, 0.0 }, 0.5, 1.0), skippedMutationB).Succeeded() &&
+				ApplySphereEdit(*skippedWorld, MakeSoilEdit({ -3.0, 0.0, 0.0 }, 0.5, 1.0), skippedMutationB).Succeeded() &&
 				skippedMutationB.Changed() &&
 				BuildCpuMeshBatch(*skippedWorld, skippedMutationB, skippedBatch).Succeeded();
 			context.Check(skippedBatchBuilt &&
 				skippedBatch.m_BaseWorldVoxelRevision == 2 &&
 				skippedBatch.m_TargetWorldVoxelRevision == 3 &&
-				ValidateCpuMeshBatch(skippedBatch, skippedVisible, skippedPending).m_Error ==
-				ValidationError::StaleCpuMeshBatch &&
+				ValidateCpuMeshBatch(skippedBatch, skippedVisible, skippedPending).m_Error == ValidationError::StaleCpuMeshBatch &&
 				!skippedPending && skippedVisible.GetVisibleWorldRevision() == 1,
 				"A replacement Batch cannot skip an unpublished intermediate World revision");
 		}
@@ -886,7 +833,8 @@ namespace napa::voxel::testing
 		void RunFullDomainMutationOracleTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
-			const std::array requests{
+			const std::array requests
+			{
 				MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 0.0),
 				MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 0.5),
 				MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0),
@@ -906,8 +854,7 @@ namespace napa::voxel::testing
 				VoxelMutationResult boundedMutation{};
 				SphereEditContext editContext{};
 				if (ApplySphereEdit(*boundedWorld, request, boundedMutation).Failed() ||
-					PrepareSphereEditContext(
-						oracleWorld->GetConfig(), request, editContext).Failed())
+					PrepareSphereEditContext(oracleWorld->GetConfig(), request, editContext).Failed())
 				{
 					allCasesMatched = false;
 					break;
@@ -926,8 +873,7 @@ namespace napa::voxel::testing
 							VoxelSample after{};
 							bool changed = false;
 							if (oracleWorld->ReadCurrentSample(coordinate, before).Failed() ||
-								EvaluateSphereEditSampleTransition(
-									editContext, coordinate, before, after).Failed())
+								EvaluateSphereEditSampleTransition(editContext, coordinate, before, after).Failed())
 							{
 								allCasesMatched = false;
 								break;
@@ -935,8 +881,7 @@ namespace napa::voxel::testing
 							if (before != after)
 							{
 								oracleChanges.push_back({ coordinate, before, after });
-								if (oracleWorld->WriteCurrentSample(
-									coordinate, after, changed).Failed() || !changed)
+								if (oracleWorld->WriteCurrentSample(coordinate, after, changed).Failed() || !changed)
 								{
 									allCasesMatched = false;
 									break;

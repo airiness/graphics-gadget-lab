@@ -32,8 +32,7 @@ namespace gglab
 			{
 				return RenderFrame(RHIFrameBeginStatus::Fatal);
 			}
-			[[nodiscard]] RenderFrameBuildResult BuildFrame(
-				const RenderFrameBuildRequest&) noexcept override
+			[[nodiscard]] RenderFrameBuildResult BuildFrame(const RenderFrameBuildRequest&) noexcept override
 			{
 				return {};
 			}
@@ -66,9 +65,15 @@ namespace gglab
 				return RHIFrameEndResult::Fatal();
 			}
 			[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView()
-				const noexcept override { return nullptr; }
+				const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] EnvironmentLightingControlBase* GetEnvironmentLightingControl()
-				const noexcept override { return nullptr; }
+				const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] IBLCacheControlBase* GetIBLCacheControl() const noexcept override
 			{
 				return nullptr;
@@ -82,9 +87,15 @@ namespace gglab
 				return nullptr;
 			}
 			[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView()
-				const noexcept override { return nullptr; }
+				const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] PostProcessPreviewControlBase* GetPostProcessPreviewControl()
-				const noexcept override { return nullptr; }
+				const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept override
 			{
 				return nullptr;
@@ -109,8 +120,7 @@ namespace gglab
 			GTAOCapabilityStatus m_GTAOCapabilities{};
 		};
 
-		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabStartupSelection&,
-			std::span<const LabRegistration>) noexcept
+		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabStartupSelection&, std::span<const LabRegistration>) noexcept
 		{
 			return nullptr;
 		}
@@ -213,11 +223,11 @@ namespace gglab
 		void RunLabParameterParseSelfTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](const LabParameterDesc& desc, std::string_view text)
-				{
-					std::string error;
-					std::optional<LabValue> value = ParseLabParameterValue(desc, text, error);
-					return std::pair{ std::move(value), std::move(error) };
-				};
+			{
+				std::string error;
+				std::optional<LabValue> value = ParseLabParameterValue(desc, text, error);
+				return std::pair{ std::move(value), std::move(error) };
+			};
 			const LabParameterDesc count{ .m_Id = LabParameterId("test.count"), .m_Name = "Count",
 				.m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(2),
 				.m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(8)) };
@@ -268,14 +278,12 @@ namespace gglab
 
 		ApplicationContentRegistration minimal;
 		minimal.m_Demos.push_back(MakeDemoRegistration("test.demo.minimal"));
-		const ApplicationContentSelection minimalSelection =
-			ResolveApplicationContentSelection(minimal, "test.demo.minimal", std::nullopt);
+		const ApplicationContentSelection minimalSelection = ResolveApplicationContentSelection(minimal, "test.demo.minimal", std::nullopt);
 		context.Check(minimal.IsValid() && minimal.m_Labs.empty() &&
 			minimalSelection.Succeeded(),
 			"A minimal host can register one supported Demo and omit optional Lab content");
 		ShaderProgramDemandSet minimalDemands;
-		context.Check(AppendSelectedContentShaderProgramDemand(
-			minimalSelection, minimalDemands) && minimalDemands.GetPrograms().empty(),
+		context.Check(AppendSelectedContentShaderProgramDemand(minimalSelection, minimalDemands) && minimalDemands.GetPrograms().empty(),
 			"Content without shader demand contributes an empty stable snapshot");
 
 		ApplicationContentRegistration invalidShaderDemand = minimal;
@@ -284,14 +292,12 @@ namespace gglab
 			"Content registration rejects invalid shader program identities");
 
 		context.Check(ResolveApplicationContentSelection(
-			minimal, "test.demo.unknown", std::nullopt).m_Status ==
-			ApplicationContentSelectionStatus::StartupDemoUnavailable,
+			minimal, "test.demo.unknown", std::nullopt).m_Status == ApplicationContentSelectionStatus::StartupDemoUnavailable,
 			"An unavailable startup Demo ID is rejected before runtime startup");
 
 		ApplicationContentRegistration duplicateDemo = minimal;
 		duplicateDemo.m_Demos.push_back(MakeDemoRegistration("test.demo.minimal"));
-		context.Check(!duplicateDemo.IsValid(),
-			"Duplicate Demo registration IDs are rejected");
+		context.Check(!duplicateDemo.IsValid(), "Duplicate Demo registration IDs are rejected");
 
 		ApplicationContentRegistration duplicateLab = minimal;
 		duplicateLab.m_Labs.push_back(MakeLabRegistration("test.lab.duplicate"));
@@ -302,28 +308,24 @@ namespace gglab
 		ApplicationContentRegistration labSubset;
 		labSubset.m_Demos.push_back(MakeDemoRegistration("test.demo.lab", true));
 		labSubset.m_Labs.push_back(MakeLabRegistration("test.lab.supported"));
-		context.Check(ResolveApplicationContentSelection(
-			labSubset, "test.demo.lab", "test.lab.supported").Succeeded(),
+		context.Check(ResolveApplicationContentSelection(labSubset, "test.demo.lab", "test.lab.supported").Succeeded(),
 			"A host-selected Lab subset resolves its supported startup Lab");
 		labSubset.m_Labs.front().m_ShaderPrograms.push_back({
 			.m_ProgramId = "gglab.shader.test",
 			.m_VariantId = "compute",
 			.m_Stage = ShaderStage::Compute,
-			});
-		const ApplicationContentSelection shaderSelection = ResolveApplicationContentSelection(
-			labSubset, "test.demo.lab", "test.lab.supported");
+		});
+		const ApplicationContentSelection shaderSelection = ResolveApplicationContentSelection(labSubset, "test.demo.lab", "test.lab.supported");
 		ShaderProgramDemandSet selectedDemands;
 		context.Check(shaderSelection.Succeeded() &&
 			AppendSelectedContentShaderProgramDemand(shaderSelection, selectedDemands) &&
 			selectedDemands.GetPrograms().size() == 1,
 			"Only the selected content contributes its stable shader program demand");
 		context.Check(ResolveApplicationContentSelection(
-			labSubset, "test.demo.lab", "test.lab.unavailable").m_Status ==
-			ApplicationContentSelectionStatus::StartupLabUnavailable,
+			labSubset, "test.demo.lab", "test.lab.unavailable").m_Status == ApplicationContentSelectionStatus::StartupLabUnavailable,
 			"An unavailable startup Lab ID is rejected before Demo transition");
 		context.Check(ResolveApplicationContentSelection(
-			labSubset, "test.demo.lab", std::nullopt).m_Status ==
-			ApplicationContentSelectionStatus::StartupLabUnavailable,
+			labSubset, "test.demo.lab", std::nullopt).m_Status == ApplicationContentSelectionStatus::StartupLabUnavailable,
 			"A Lab-hosting Demo requires an explicit host-selected startup Lab");
 	}
 }

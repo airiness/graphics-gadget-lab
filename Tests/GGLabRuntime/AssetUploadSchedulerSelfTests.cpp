@@ -34,8 +34,7 @@ namespace gglab
 			uint32_t m_Steps = 0;
 			uint64_t m_ProgressToken = 0;
 			uint32_t m_AbortCount = 0;
-			AssetResourcePublicationAbortReason m_AbortReason =
-				AssetResourcePublicationAbortReason::Shutdown;
+			AssetResourcePublicationAbortReason m_AbortReason = AssetResourcePublicationAbortReason::Shutdown;
 			bool m_Completed = false;
 		};
 
@@ -43,27 +42,25 @@ namespace gglab
 		class SyntheticPublicationJob final : public IResourcePublicationJob
 		{
 		public:
-			explicit SyntheticPublicationJob(
-				std::shared_ptr<SyntheticPublicationState> state) noexcept :
+			explicit SyntheticPublicationJob(std::shared_ptr<SyntheticPublicationState> state) noexcept :
 				m_State(std::move(state))
 			{
 			}
 
-			[[nodiscard]] AssetResourcePublicationStepResult Step(
-				AssetResourcePublicationContext&) noexcept override
+			[[nodiscard]] AssetResourcePublicationStepResult Step(AssetResourcePublicationContext&) noexcept override
 			{
 				++m_State->m_Steps;
 				++m_State->m_ProgressToken;
 				m_State->m_Completed = m_State->m_Steps >= m_State->m_TargetSteps;
 				return {
-					.m_Status = m_State->m_Completed ? AssetResourcePublicationStepStatus::Completed
-						: AssetResourcePublicationStepStatus::Continue,
+					.m_Status = m_State->m_Completed ?
+						AssetResourcePublicationStepStatus::Completed :
+						AssetResourcePublicationStepStatus::Continue,
 					.m_Usage = { .m_Stage = AssetResourcePublicationStage::Textures },
 				};
 			}
 
-			void Abort(AssetResourcePublicationContext&,
-				AssetResourcePublicationAbortReason reason) noexcept override
+			void Abort(AssetResourcePublicationContext&, AssetResourcePublicationAbortReason reason) noexcept override
 			{
 				++m_State->m_AbortCount;
 				m_State->m_AbortReason = reason;
@@ -111,8 +108,7 @@ namespace gglab
 				return *m_Scheduler.m_Scheduling;
 			}
 
-			void Enqueue(const char* name, const AssetStreamingIdentity& identity,
-				std::shared_ptr<SyntheticPublicationState> state) const noexcept
+			void Enqueue(const char* name, const AssetStreamingIdentity& identity, std::shared_ptr<SyntheticPublicationState> state) const noexcept
 			{
 				Scheduling().EnqueueResourcePublication(
 					{ .m_Name = name, .m_Identity = identity, .m_Priority = TaskPriority::Normal },
@@ -124,8 +120,7 @@ namespace gglab
 			AssetUploadSchedulerInstance m_Scheduler;
 		};
 
-		[[nodiscard]] bool HasPendingPublication(
-			const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
+		[[nodiscard]] bool HasPendingPublication(const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
 		{
 			return std::ranges::any_of(statistics.m_ResourcePublicationQueue.m_PendingWork,
 				[&identity](const AssetStreamingWorkActivity& work) noexcept
@@ -173,7 +168,7 @@ namespace gglab
 				"The current generation of the same asset completes independently of the cancelled one");
 			context.Check(publication.m_NoProgressContinueCount == 0 &&
 				publication.m_EnqueuedCount == publication.m_CompletedCount + publication.m_FailedCount +
-					publication.m_CancelledCount + publication.m_PendingCount &&
+				publication.m_CancelledCount + publication.m_PendingCount &&
 				publication.m_QueueSampleCount == publication.m_EnqueuedCount,
 				"Yielded publication jobs keep queue conservation and their first-queued timestamp");
 		}
@@ -206,7 +201,7 @@ namespace gglab
 			AssetUploadSchedulerInstance scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
-				});
+			});
 			const std::thread::id ownerThreadId = std::this_thread::get_id();
 			std::thread::id cpuCallbackThreadId;
 			std::thread::id uploadCallbackThreadId;

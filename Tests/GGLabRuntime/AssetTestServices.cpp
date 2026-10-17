@@ -26,15 +26,14 @@ namespace gglab::asset_test
 		void RetainMultithreadedApartment() noexcept
 		{
 			static const bool retained = []() noexcept
-				{
-					CO_MTA_USAGE_COOKIE cookie{};
-					return SUCCEEDED(CoIncrementMTAUsage(&cookie));
-				}();
+			{
+				CO_MTA_USAGE_COOKIE cookie{};
+				return SUCCEEDED(CoIncrementMTAUsage(&cookie));
+			}();
 			GGLAB_ASSERT_MSG(retained, "Asset test services require a process-lifetime MTA.");
 		}
 
-		[[nodiscard]] std::unique_ptr<RHITransferContext> MakeTransferContext(
-			TestTransferContext*& observer) noexcept
+		[[nodiscard]] std::unique_ptr<RHITransferContext> MakeTransferContext(TestTransferContext*& observer) noexcept
 		{
 			auto context = std::make_unique<TestTransferContext>();
 			observer = context.get();
@@ -63,8 +62,7 @@ namespace gglab::asset_test
 			return ~crc;
 		}
 
-		void AppendPngChunk(std::vector<uint8_t>& png, const char (&type)[5],
-			std::span<const uint8_t> data)
+		void AppendPngChunk(std::vector<uint8_t>& png, const char(&type)[5], std::span<const uint8_t> data)
 		{
 			AppendBigEndian32(png, static_cast<uint32_t>(data.size()));
 			const size_t typeOffset = png.size();
@@ -74,16 +72,14 @@ namespace gglab::asset_test
 		}
 	}
 
-	RHITextureHandle TestRHIDevice::CreateTexture(
-		const RHIOwnedTextureCreateInfo&, const RHIResourceDebugIdentityDesc&) noexcept
+	RHITextureHandle TestRHIDevice::CreateTexture(const RHIOwnedTextureCreateInfo&, const RHIResourceDebugIdentityDesc&) noexcept
 	{
 		const RHITextureHandle handle{ m_NextTextureIndex++, 1 };
 		m_LiveTextures.insert(handle);
 		return handle;
 	}
 
-	RHIBufferHandle TestRHIDevice::CreateBuffer(
-		const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept
+	RHIBufferHandle TestRHIDevice::CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept
 	{
 		const RHIBufferHandle handle{ m_NextBufferIndex++, 1 };
 		m_LiveBuffers.emplace(handle, desc.m_SizeInBytes);
@@ -105,8 +101,7 @@ namespace gglab::asset_test
 		static std::atomic<uint32_t> sequence = 0;
 		std::error_code errorCode;
 		const std::filesystem::path path = std::filesystem::temp_directory_path(errorCode) /
-			std::format("gglab-{}-{}-{}", name,
-				std::chrono::steady_clock::now().time_since_epoch().count(), sequence++);
+			std::format("gglab-{}-{}-{}", name, std::chrono::steady_clock::now().time_since_epoch().count(), sequence++);
 		if (!errorCode && std::filesystem::create_directories(path, errorCode) && !errorCode)
 		{
 			m_Path = path;
@@ -122,8 +117,7 @@ namespace gglab::asset_test
 		}
 	}
 
-	bool WritePng(const std::filesystem::path& path, uint32_t width, uint32_t height,
-		std::span<const uint8_t> rgba) noexcept
+	bool WritePng(const std::filesystem::path& path, uint32_t width, uint32_t height, std::span<const uint8_t> rgba) noexcept
 	{
 		const size_t rowBytes = static_cast<size_t>(width) * 4;
 		if (width == 0 || height == 0 || rgba.size() != rowBytes * height)
@@ -153,7 +147,8 @@ namespace gglab::asset_test
 			zlib.push_back(static_cast<uint8_t>(~blockSize >> 8));
 			zlib.insert(zlib.end(), scanlines.begin() + offset, scanlines.begin() + offset + blockSize);
 			offset += blockSize;
-		} while (offset < scanlines.size());
+		}
+		while (offset < scanlines.size());
 		uint32_t adlerA = 1;
 		uint32_t adlerB = 0;
 		for (const uint8_t byte : scanlines)
@@ -178,8 +173,7 @@ namespace gglab::asset_test
 		return static_cast<bool>(file);
 	}
 
-	bool WriteSolidPng(const std::filesystem::path& path,
-		uint8_t red, uint8_t green, uint8_t blue) noexcept
+	bool WriteSolidPng(const std::filesystem::path& path, uint8_t red, uint8_t green, uint8_t blue) noexcept
 	{
 		std::array<uint8_t, 16> pixels{};
 		for (size_t pixel = 0; pixel < 4; ++pixel)
@@ -204,21 +198,20 @@ namespace gglab::asset_test
 		return WritePng(path, size, size, pixels);
 	}
 
-	bool WriteTexturedModel(const std::filesystem::path& gltfPath,
-		std::span<const std::string> baseColorImages) noexcept
+	bool WriteTexturedModel(const std::filesystem::path& gltfPath, std::span<const std::string> baseColorImages) noexcept
 	{
 		if (baseColorImages.empty())
 		{
 			return false;
 		}
 		// Position, normal and UV streams of one triangle shared by every mesh.
-		constexpr std::array<float, 24> attributes{
+		constexpr std::array<float, 24> attributes
+		{
 			0, 0, 0, 1, 0, 0, 0, 1, 0,
 			0, 0, 1, 0, 0, 1, 0, 0, 1,
 			0, 0, 1, 0, 0, 1,
 		};
-		const std::filesystem::path bufferPath =
-			std::filesystem::path(gltfPath).replace_extension(".bin");
+		const std::filesystem::path bufferPath = std::filesystem::path(gltfPath).replace_extension(".bin");
 		{
 			std::ofstream buffer(bufferPath, std::ios::binary | std::ios::trunc);
 			buffer.write(reinterpret_cast<const char*>(attributes.data()), sizeof(attributes));
@@ -264,20 +257,19 @@ namespace gglab::asset_test
 		return static_cast<bool>(gltf);
 	}
 
-	AssetManagerHarness::AssetManagerHarness(
-		std::string_view name, const CreateInfo& createInfo) noexcept :
+	AssetManagerHarness::AssetManagerHarness(std::string_view name, const CreateInfo& createInfo) noexcept :
 		m_Root(name),
 		m_TransferManager((RetainMultithreadedApartment(), MakeTransferContext(m_TransferContext))),
 		// Workers initialize COM like the application host so WIC can decode textures.
 		m_TaskSystem(TaskSystem::CreateInfo{
 			.m_WorkerCount = 2,
 			.m_WorkerLifecycle = std::make_shared<win32::Win32TaskWorkerLifecycle>(),
-			}),
-		m_Scheduler(CreateAssetUploadScheduler({
-			.m_Device = &m_Device,
-			.m_TransferManager = &m_TransferManager,
-			.m_FrameBudget = createInfo.m_FrameBudget,
-			}))
+		}),
+			m_Scheduler(CreateAssetUploadScheduler({
+				.m_Device = &m_Device,
+				.m_TransferManager = &m_TransferManager,
+				.m_FrameBudget = createInfo.m_FrameBudget,
+				}))
 	{
 		// AssetManager loads its reserved debug textures from the asset root.
 		std::error_code errorCode;
@@ -364,17 +356,17 @@ namespace gglab::asset_test
 
 	const AssetSnapshot::Texture* FindTexture(const AssetSnapshot& snapshot, TextureID textureId) noexcept
 	{
-		const auto texture =
-			std::ranges::find(snapshot.m_Textures, textureId, &AssetSnapshot::Texture::m_Id);
+		const auto texture = std::ranges::find(snapshot.m_Textures, textureId, &AssetSnapshot::Texture::m_Id);
 		return texture != snapshot.m_Textures.end() ? &*texture : nullptr;
 	}
 
-	const AssetInterestActivity* FindInterest(
-		const AssetOwnershipStatistics& ownership, AssetKind kind, uint64_t stableId) noexcept
+	const AssetInterestActivity* FindInterest(const AssetOwnershipStatistics& ownership, AssetKind kind, uint64_t stableId) noexcept
 	{
 		const auto interest = std::ranges::find_if(ownership.m_ActiveInterests,
 			[kind, stableId](const AssetInterestActivity& activity) noexcept
-			{ return activity.m_Kind == kind && activity.m_StableId == stableId; });
+			{
+				return activity.m_Kind == kind && activity.m_StableId == stableId;
+			});
 		return interest != ownership.m_ActiveInterests.end() ? &*interest : nullptr;
 	}
 
@@ -394,24 +386,25 @@ namespace gglab::asset_test
 			statistics.m_InFlightBytes == 0;
 	}
 
-	bool HasPendingPublication(
-		const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
+	bool HasPendingPublication(const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
 	{
 		return std::ranges::any_of(statistics.m_ResourcePublicationQueue.m_PendingWork,
 			[&identity](const AssetStreamingWorkActivity& work) noexcept
-			{ return work.m_Identity == identity; });
+			{
+				return work.m_Identity == identity;
+			});
 	}
 
-	bool HasPendingUpload(
-		const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
+	bool HasPendingUpload(const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
 	{
 		return std::ranges::any_of(statistics.m_PendingUploads,
 			[&identity](const AssetUploadActivity& upload) noexcept
-			{ return upload.m_Identity == identity; });
+			{
+				return upload.m_Identity == identity;
+			});
 	}
 
-	void CheckQuiescent(SelfTestContext& context, AssetManagerHarness& harness,
-		std::string_view scenario) noexcept
+	void CheckQuiescent(SelfTestContext& context, AssetManagerHarness& harness, std::string_view scenario) noexcept
 	{
 		const bool drained = harness.PumpUntil([&]()
 			{
@@ -429,7 +422,7 @@ namespace gglab::asset_test
 				ownership.m_LeaseCount, ownership.m_PublicationRetainCount));
 		context.Check(IsStreamingIdle(upload) && publication.m_NoProgressContinueCount == 0 &&
 			publication.m_EnqueuedCount == publication.m_CompletedCount + publication.m_FailedCount +
-				publication.m_CancelledCount + publication.m_PendingCount &&
+			publication.m_CancelledCount + publication.m_PendingCount &&
 			publication.m_QueueSampleCount == publication.m_EnqueuedCount,
 			std::format("{}: publication work is conserved and every queue settles", scenario));
 		context.Check(upload.m_SubmittedCount == upload.m_SucceededCount + upload.m_FailedCount &&

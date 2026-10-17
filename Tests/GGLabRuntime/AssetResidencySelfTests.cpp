@@ -61,8 +61,7 @@ namespace gglab
 			return {};
 		}
 
-		[[nodiscard]] AssetSnapshot::Texture SnapshotTexture(
-			AssetManagerHarness& harness, TextureID textureId) noexcept
+		[[nodiscard]] AssetSnapshot::Texture SnapshotTexture(AssetManagerHarness& harness, TextureID textureId) noexcept
 		{
 			const AssetSnapshot snapshot = BuildAssetSnapshot(harness.GetAssets());
 			const AssetSnapshot::Texture* texture = FindTexture(snapshot, textureId);
@@ -78,8 +77,7 @@ namespace gglab
 
 		// Waits for a released texture to leave Evicting and checks it kept its content
 		// while dropping GPU residency.
-		[[nodiscard]] bool WaitForNonResidentTexture(
-			AssetManagerHarness& harness, TextureID textureId, uint64_t generation) noexcept
+		[[nodiscard]] bool WaitForNonResidentTexture(AssetManagerHarness& harness, TextureID textureId, uint64_t generation) noexcept
 		{
 			const bool settled = harness.PumpUntil([&]()
 				{
@@ -129,8 +127,7 @@ namespace gglab
 
 			ResidencyIdentity id{};
 			auto owner = std::make_unique<AssetOwnerScope>(assets.CreateOwnerScope());
-			const AssetManager::ModelLoadRequest request =
-				owner->LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
+			const AssetManager::ModelLoadRequest request = owner->LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
 			id.m_ModelId = request.m_ModelId;
 			const bool loaded = request.IsValid() && harness.PumpUntil([&]()
 				{
@@ -195,8 +192,7 @@ namespace gglab
 				assets.SetTextureResidencyPolicy(id.m_TextureId, AssetResidencyPolicy::Cacheable),
 				"Cacheable assets accept valid residency policy transitions");
 			const TextureID reservedTexture = ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
-			const bool reservedRejected =
-				!assets.SetTextureResidencyPolicy(reservedTexture, AssetResidencyPolicy::Cacheable);
+			const bool reservedRejected = !assets.SetTextureResidencyPolicy(reservedTexture, AssetResidencyPolicy::Cacheable);
 			const AssetSnapshot::Texture reserved = SnapshotTexture(harness, reservedTexture);
 			context.Check(reservedRejected && reserved.m_ResidencyPolicy == AssetResidencyPolicy::Pinned,
 				"Reserved textures stay pinned and reject cacheable residency");
@@ -271,11 +267,10 @@ namespace gglab
 			const AssetSnapshot::Texture* candidateTexture = FindTexture(candidates, id.m_TextureId);
 			const AssetOwnershipStatistics cachedOwnership = assets.GetOwnershipStatistics();
 			const auto hasDependencyInterest = [&](AssetKind kind, uint64_t stableId, uint64_t generation)
-				{
-					const AssetInterestActivity* interest =
-						asset_test::FindInterest(cachedOwnership, kind, stableId);
-					return interest && interest->m_Generation == generation;
-				};
+			{
+				const AssetInterestActivity* interest = asset_test::FindInterest(cachedOwnership, kind, stableId);
+				return interest && interest->m_Generation == generation;
+			};
 			context.Check(candidateModel && candidateMesh && candidateTexture &&
 				candidateModel->m_IsEvictionCandidate && candidateMesh->m_IsEvictionCandidate &&
 				candidateTexture->m_IsEvictionCandidate && candidateModel->m_HasDependencyState &&
@@ -298,8 +293,7 @@ namespace gglab
 			context.Check(evicting && IsUnchanged(harness, id),
 				"Eviction of unowned cacheable dependencies starts without replacing stable entries");
 			owner = std::make_unique<AssetOwnerScope>(assets.CreateOwnerScope());
-			const AssetManager::ModelLoadRequest revived =
-				owner->LoadModelAsync(ResidencyModelPath, TaskPriority::Critical);
+			const AssetManager::ModelLoadRequest revived = owner->LoadModelAsync(ResidencyModelPath, TaskPriority::Critical);
 			context.Check(revived.IsValid() && revived.m_ModelId == id.m_ModelId &&
 				revived.m_Generation == id.m_ModelGeneration,
 				"Reacquiring an evicting model preserves its content version");
@@ -427,8 +421,7 @@ namespace gglab
 				harness.PumpUntil([&]()
 					{
 						const TaskSystemStatistics tasks = harness.GetTaskSystem().GetStatistics();
-						const auto activity = std::ranges::find(
-							tasks.m_ActiveTasks, staleReload.m_Task, &TaskActivity::m_Handle);
+						const auto activity = std::ranges::find(tasks.m_ActiveTasks, staleReload.m_Task, &TaskActivity::m_Handle);
 						return activity != tasks.m_ActiveTasks.end() &&
 							activity->m_Status == TaskStatus::Running;
 					});
@@ -466,8 +459,7 @@ namespace gglab
 				"The replacement texture decode completes the residency reload");
 
 			// Source-backed model reload restores residency through validated events.
-			const AssetManager::ModelLoadRequest reloaded =
-				owner->LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
+			const AssetManager::ModelLoadRequest reloaded = owner->LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
 			context.Check(reloaded.IsValid() && reloaded.m_ModelId == id.m_ModelId &&
 				reloaded.m_Generation == id.m_ModelGeneration,
 				"Reload preserves the model ID and content generation");
@@ -537,8 +529,7 @@ namespace gglab
 			// A direct load without an owner retires once its retention window elapses.
 			config.m_RuntimeEntryRetentionFrames = 1'000'000;
 			assets.SetResidencyConfig(config);
-			const AssetManager::ModelLoadRequest direct =
-				assets.LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
+			const AssetManager::ModelLoadRequest direct = assets.LoadModelAsync(ResidencyModelPath, TaskPriority::Normal);
 			const bool directReady = direct.IsValid() && harness.PumpUntil([&]()
 				{
 					const Model* directModel = assets.GetModel(direct.m_ModelId);
@@ -554,8 +545,7 @@ namespace gglab
 			{
 				const ModelMesh instance = directModel->m_MeshInstance.front();
 				const Material* directMaterial = assets.GetMaterial(instance.m_MaterialId);
-				const TextureID directTexture =
-					directMaterial ? FindFirstRuntimeTexture(*directMaterial) : TextureID{};
+				const TextureID directTexture = directMaterial ? FindFirstRuntimeTexture(*directMaterial) : TextureID{};
 				const uint64_t directRetirements = assets.GetOwnershipStatistics().m_RuntimeRetirementCount;
 				config.m_RuntimeEntryRetentionFrames = 0;
 				assets.SetResidencyConfig(config);

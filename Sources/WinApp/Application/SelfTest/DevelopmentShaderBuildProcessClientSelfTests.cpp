@@ -8,8 +8,7 @@
 
 namespace gglab
 {
-	void RunDevelopmentShaderBuildProcessClientSelfTests(
-		SelfTestContext& context) noexcept
+	void RunDevelopmentShaderBuildProcessClientSelfTests(SelfTestContext& context) noexcept
 	{
 		const std::string toolIdentity(ShaderCompilerToolIdentity);
 		const std::string toolVersion = utils::ToString(ShaderCompilerToolVersion);
@@ -17,8 +16,7 @@ namespace gglab
 			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"compilePolicyRevision":{},"toolIdentity":"{}","toolVersion":"{}","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12","gglab-vulkan13"],"diagnostics":[]}})",
 			ShaderProcessContractVersion, ShaderCompilePolicyRevision,
 			toolIdentity, toolVersion);
-		const ShaderCompilerDescribeDocumentResult parsedDescribe =
-			ParseShaderCompilerDescribeDocument(describe, 0, "gglab-vulkan13");
+		const ShaderCompilerDescribeDocumentResult parsedDescribe = ParseShaderCompilerDescribeDocument(describe, 0, "gglab-vulkan13");
 		context.Check(
 			parsedDescribe.m_ProtocolValid && parsedDescribe.m_Succeeded &&
 			parsedDescribe.m_Compatible,
@@ -29,8 +27,7 @@ namespace gglab
 			ShaderProcessContractVersion, ShaderCompilePolicyRevision,
 			toolIdentity, toolVersion);
 		const ShaderCompilerDescribeDocumentResult parsedDescribeWithInformationalFields =
-			ParseShaderCompilerDescribeDocument(
-				describeWithInformationalFields, 0, "gglab-dx12");
+			ParseShaderCompilerDescribeDocument(describeWithInformationalFields, 0, "gglab-dx12");
 		context.Check(
 			parsedDescribeWithInformationalFields.m_ProtocolValid &&
 			parsedDescribeWithInformationalFields.m_Succeeded &&
@@ -45,10 +42,8 @@ namespace gglab
 			ShaderProcessContractVersion, ShaderCompilePolicyRevision,
 			toolIdentity, toolVersion);
 		context.Check(
-			!ParseShaderCompilerDescribeDocument(
-				missingRequiredField, 0, "gglab-dx12").m_ProtocolValid &&
-			!ParseShaderCompilerDescribeDocument(
-				invalidRequiredFieldType, 0, "gglab-dx12").m_ProtocolValid,
+			!ParseShaderCompilerDescribeDocument(missingRequiredField, 0, "gglab-dx12").m_ProtocolValid &&
+			!ParseShaderCompilerDescribeDocument(invalidRequiredFieldType, 0, "gglab-dx12").m_ProtocolValid,
 			"Development shader client keeps required describe fields strict");
 
 		const std::string wrongContract = std::format(
@@ -73,14 +68,12 @@ namespace gglab
 		const std::string describeFailure = std::format(
 			R"({{"command":"describe","success":false,"status":"compiler-unavailable","exitCode":4,"processContractVersion":{},"diagnostics":[{{"message":"DXC unavailable","category":"environment"}}],"futureInfo":true}})",
 			ShaderProcessContractVersion);
-		const ShaderCompilerDescribeDocumentResult parsedDescribeFailure =
-			ParseShaderCompilerDescribeDocument(describeFailure, 4, "gglab-dx12");
+		const ShaderCompilerDescribeDocumentResult parsedDescribeFailure = ParseShaderCompilerDescribeDocument(describeFailure, 4, "gglab-dx12");
 		context.Check(
 			parsedDescribeFailure.m_ProtocolValid && !parsedDescribeFailure.m_Succeeded &&
 			!parsedDescribeFailure.m_Compatible &&
 			parsedDescribeFailure.m_Diagnostics == "DXC unavailable" &&
-			!ParseShaderCompilerDescribeDocument(
-				describeFailure, 7, "gglab-dx12").m_ProtocolValid,
+			!ParseShaderCompilerDescribeDocument(describeFailure, 7, "gglab-dx12").m_ProtocolValid,
 			"Development shader client accepts informational failure fields and rejects exit mismatch");
 
 		const DevelopmentShaderBuildRequest unknownBackendRequest{
@@ -90,8 +83,7 @@ namespace gglab
 			.m_ShaderCacheRoot = L"C:\\ShaderCache",
 			.m_ArtifactRoot = L"C:\\ShaderArtifacts",
 		};
-		const DevelopmentShaderBuildResult unknownBackend =
-			RunDevelopmentShaderBuildProcess(unknownBackendRequest);
+		const DevelopmentShaderBuildResult unknownBackend = RunDevelopmentShaderBuildProcess(unknownBackendRequest);
 		context.Check(
 			!unknownBackendRequest.IsValid() &&
 			unknownBackend.m_Status == DevelopmentShaderBuildStatus::InvalidInput,
@@ -101,16 +93,14 @@ namespace gglab
 		const std::string build = std::format(
 			R"({{"command":"build-runtime","success":true,"status":"ok","exitCode":0,"programCount":53,"diagnostics":[],"registryId":"{}"}})",
 			registryId);
-		const ShaderCompilerBuildDocumentResult parsed =
-			ParseShaderCompilerBuildDocument(build, 0);
+		const ShaderCompilerBuildDocumentResult parsed = ParseShaderCompilerBuildDocument(build, 0);
 		context.Check(parsed.m_ProtocolValid && parsed.m_Succeeded &&
 			parsed.m_RegistryRef.IsValid(),
 			"Development shader client parses the exact successful build-runtime document");
 
 		const std::string failure =
 			R"({"command":"build-runtime","success":false,"status":"failed","exitCode":4,"programCount":0,"diagnostics":[{"message":"compiler unavailable"}]})";
-		const ShaderCompilerBuildDocumentResult parsedFailure =
-			ParseShaderCompilerBuildDocument(failure, 4);
+		const ShaderCompilerBuildDocumentResult parsedFailure = ParseShaderCompilerBuildDocument(failure, 4);
 		context.Check(parsedFailure.m_ProtocolValid && !parsedFailure.m_Succeeded &&
 			parsedFailure.m_Diagnostics == "compiler unavailable" &&
 			!ParseShaderCompilerBuildDocument(build, 4).m_ProtocolValid &&

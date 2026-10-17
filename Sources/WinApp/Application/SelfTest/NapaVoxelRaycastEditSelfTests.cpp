@@ -25,8 +25,7 @@ namespace gglab
 		{
 			using namespace napa::voxel;
 			std::unique_ptr<PreparedCpuMeshPublication> publication;
-			const ValidationResult prepareResult =
-				PrepareCpuMeshBatchPublication(pending, visible, publication);
+			const ValidationResult prepareResult = PrepareCpuMeshBatchPublication(pending, visible, publication);
 			if (prepareResult.Succeeded())
 			{
 				CommitCpuMeshBatchPublication(publication, visible);
@@ -46,14 +45,11 @@ namespace gglab
 			}
 			std::vector<ChunkCoord> chunks;
 			chunks.reserve(static_cast<std::size_t>(metrics.m_CellOwnerChunkCount));
-			for (std::int32_t z = metrics.m_CellOwnerChunkBounds.m_Min.m_Z;
-				z < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Z; ++z)
+			for (std::int32_t z = metrics.m_CellOwnerChunkBounds.m_Min.m_Z; z < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Z; ++z)
 			{
-				for (std::int32_t y = metrics.m_CellOwnerChunkBounds.m_Min.m_Y;
-					y < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Y; ++y)
+				for (std::int32_t y = metrics.m_CellOwnerChunkBounds.m_Min.m_Y; y < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Y; ++y)
 				{
-					for (std::int32_t x = metrics.m_CellOwnerChunkBounds.m_Min.m_X;
-						x < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_X; ++x)
+					for (std::int32_t x = metrics.m_CellOwnerChunkBounds.m_Min.m_X; x < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_X; ++x)
 					{
 						chunks.push_back({ x, y, z });
 					}
@@ -65,16 +61,14 @@ namespace gglab
 			VisibleMeshSet visible;
 			CpuMeshBatch initialBatch{};
 			std::unique_ptr<PendingCpuMeshBatch> initialPending;
-			bool completed = GeneratePrimitiveVoxelWorld(
-				config, std::span{ &primitive, 1 }, world, generation).Succeeded() && world &&
+			bool completed = GeneratePrimitiveVoxelWorld(config, std::span{ &primitive, 1 }, world, generation).Succeeded() && world &&
 				BuildCpuMeshBatch(*world, 1, chunks, initialBatch).Succeeded() &&
 				ValidateCpuMeshBatch(initialBatch, visible, initialPending).Succeeded() &&
 				PrepareAndCommitMutationMeshBatch(initialPending, visible).Succeeded();
 			for (std::uint32_t hit = 1; completed && hit <= 3; ++hit)
 			{
 				NapaVoxelRaycastHit raycastHit{};
-				const NapaVoxelRaycastResult raycast =
-					RaycastNapaVoxelVisibleMesh(visible, ray, raycastHit);
+				const NapaVoxelRaycastResult raycast = RaycastNapaVoxelVisibleMesh(visible, ray, raycastHit);
 				if (raycast.Failed() || !raycast.m_Hit)
 				{
 					completed = false;
@@ -138,19 +132,19 @@ namespace gglab
 		{
 			using namespace napa::voxel;
 			const auto makeStone = [](Double3 center) noexcept
-				{
-					return PrimitiveDesc{
-						.m_StableId = { 1 },
-						.m_Material = VoxelMaterial::Stone,
-						.m_Shape = PrimitiveShape::Sphere,
-						.m_Parameters = {
-							.m_Sphere = {
-								.m_Center = center,
-								.m_Radius = 0.96,
-							},
+			{
+				return PrimitiveDesc{
+					.m_StableId = { 1 },
+					.m_Material = VoxelMaterial::Stone,
+					.m_Shape = PrimitiveShape::Sphere,
+					.m_Parameters = {
+						.m_Sphere = {
+							.m_Center = center,
+							.m_Radius = 0.96,
 						},
-					};
+					},
 				};
+			};
 			const VoxelWorldConfig boundaryConfig{
 				.m_ChunkCellCount = 16,
 				.m_VoxelSize = 0.25f,
@@ -169,9 +163,7 @@ namespace gglab
 					.m_MaxExclusive = { 0, 16, 32 },
 				},
 			};
-			constexpr Double3 rayDirection{
-				0.0, -0.1375683712746877, 0.9904922731777516,
-			};
+			constexpr Double3 rayDirection{ 0.0, -0.1375683712746877, 0.9904922731777516, };
 			context.Check(RunRepeatedStoneRaycastEditScenario(boundaryConfig,
 				makeStone({ 4.0, 4.0, 4.0 }), {
 					.m_Origin = { 4.0, 6.0, -10.4 },

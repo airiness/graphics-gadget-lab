@@ -66,12 +66,9 @@ namespace gglab
 		{
 			return m_Error.empty() && !m_EntryPoints.empty();
 		}
-		[[nodiscard]] const SpirVEntryPointReflection* FindEntryPoint(
-			std::string_view name) const noexcept;
-		[[nodiscard]] const SpirVStructLayoutReflection* FindStructLayout(
-			std::string_view name) const noexcept;
+		[[nodiscard]] const SpirVEntryPointReflection* FindEntryPoint(std::string_view name) const noexcept;
+		[[nodiscard]] const SpirVStructLayoutReflection* FindStructLayout(std::string_view name) const noexcept;
 	};
 
-	[[nodiscard]] bool ReadSpirVDecorations(
-		const ShaderBinary& binary, SpirVDecorationReflection& outReflection) noexcept;
+	[[nodiscard]] bool ReadSpirVDecorations(const ShaderBinary& binary, SpirVDecorationReflection& outReflection) noexcept;
 }
