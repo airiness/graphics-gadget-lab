@@ -35,8 +35,9 @@ namespace gglab::forward_shading
 		const RenderServices& services, bool forwardPlusLightLists) noexcept
 	{
 		RHIBindingLayoutDesc desc = services.m_BindingLayout->GetCommonBindingLayoutDesc();
-		desc.m_DebugName = forwardPlusLightLists
-			? "ForwardPBR.ForwardPlusBindingLayout" : "ForwardPBR.BindingLayout";
+		desc.m_DebugName = forwardPlusLightLists ?
+			"ForwardPBR.ForwardPlusBindingLayout" :
+			"ForwardPBR.BindingLayout";
 		GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
 		desc.m_Slots[desc.m_SlotCount++] = {
 			.m_Type = RHIBindingType::ConstantBuffer,
@@ -91,8 +92,9 @@ namespace gglab::forward_shading
 
 	RasterizerPreset GetRasterizerPreset(uint64_t variantBits) noexcept
 	{
-		return RenderQueueBuilder::DecodeVariantDoubleSided(variantBits)
-			? RasterizerPreset::TwoSided : RasterizerPreset::Default;
+		return RenderQueueBuilder::DecodeVariantDoubleSided(variantBits) ?
+			RasterizerPreset::TwoSided :
+			RasterizerPreset::Default;
 	}
 
 	bool AreSceneAttachmentExtentsCompatible(const DepthCoverageRasterDomain& domain,
@@ -175,9 +177,9 @@ namespace gglab::forward_shading
 		}
 		inputs.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(inputs.m_SceneColor);
 
-		inputs.m_RasterDomain = postTemporal
-			? std::addressof(renderQueue.m_PostTemporalRasterDomain)
-			: std::addressof(renderQueue.m_CoverageRasterDomain);
+		inputs.m_RasterDomain = postTemporal ?
+			std::addressof(renderQueue.m_PostTemporalRasterDomain) :
+			std::addressof(renderQueue.m_CoverageRasterDomain);
 		inputs.m_ExpectedRenderQueue = framePlan.m_SourceRenderQueue;
 		inputs.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 		if (!renderQueue.m_DrawItems.empty())
@@ -188,8 +190,9 @@ namespace gglab::forward_shading
 				"Forward raster and resource depth conventions must match.");
 			GGLAB_ASSERT_MSG(AreSceneAttachmentExtentsCompatible(*inputs.m_RasterDomain,
 				builder.GetTextureDesc(color), builder.GetTextureDesc(depth),
-				inputs.m_MaterialDiagnostics ? std::span<const RHITextureDesc>(diagnosticDescs)
-				: std::span<const RHITextureDesc>{}),
+				inputs.m_MaterialDiagnostics ?
+					std::span<const RHITextureDesc>(diagnosticDescs) :
+					std::span<const RHITextureDesc>{}),
 				"Every Forward color, diagnostic and depth attachment must match the raster domain.");
 			GGLAB_ASSERT_MSG(postTemporal || framePlan.m_RasterDomain == inputs.m_RasterDomain,
 				"Pre-temporal Forward must consume the frame-plan raster domain.");
@@ -242,8 +245,9 @@ namespace gglab::forward_shading
 	PassParameters ResolveScenePassParameters(RGExecuteContext& executeContext,
 		const SceneInputs& inputs, const RenderServices& services, RenderViewID viewId) noexcept
 	{
-		const auto shadowSrv = inputs.m_ShadowSrv.IsValid()
-			? executeContext.GetViewDescriptor(inputs.m_ShadowSrv) : RHIDescriptorHandle{};
+		const auto shadowSrv = inputs.m_ShadowSrv.IsValid() ?
+			executeContext.GetViewDescriptor(inputs.m_ShadowSrv) :
+			RHIDescriptorHandle{};
 		GGLAB_ASSERT_MSG((inputs.m_ShadowFlags & 1u) == 0 || shadowSrv.IsValid(),
 			"Enabled shadow sampling requires a valid shadow descriptor.");
 
@@ -260,8 +264,9 @@ namespace gglab::forward_shading
 		// unjittered display view.
 		const bool domainBound = inputs.m_RasterDomain && inputs.m_RasterDomain->IsValid();
 		return {
-			.m_ViewIndex = domainBound ? inputs.m_RasterDomain->m_ViewBindingId
-				: static_cast<uint32_t>(utils::ToIndex(viewId)),
+			.m_ViewIndex = domainBound ?
+				inputs.m_RasterDomain->m_ViewBindingId :
+				static_cast<uint32_t>(utils::ToIndex(viewId)),
 			.m_ShadowMapTextureIndex = shadowSrv.IsValid() ? shadowSrv.m_Index : 0u,
 			.m_ShadowMapSamplerIndex = inputs.m_ShadowSamplerIndex,
 			.m_ShadowMapSize = inputs.m_ShadowMapSize,

@@ -81,18 +81,20 @@ namespace gglab
 				{ "resourceNodeIndex", access.m_ResourceNodeIndex },
 				{ "resourceSlot", access.m_ResourceSlot },
 				{ "version", access.m_ResourceVersion },
-				{ "writtenResourceNodeIndex", access.m_WrittenResourceNodeIndex
-					? Json(*access.m_WrittenResourceNodeIndex) : Json(nullptr) },
-				{ "writtenVersion", access.m_WrittenResourceVersion
-					? Json(*access.m_WrittenResourceVersion) : Json(nullptr) },
+				{ "writtenResourceNodeIndex", access.m_WrittenResourceNodeIndex ?
+					Json(*access.m_WrittenResourceNodeIndex) :
+					Json(nullptr) },
+				{ "writtenVersion", access.m_WrittenResourceVersion ?
+					Json(*access.m_WrittenResourceVersion) :
+					Json(nullptr) },
 				{ "resourceIndex", access.m_VirtualResourceIndex },
 				{ "resource", access.m_ResourceName },
 				{ "type", RGEnumId(access.m_ResourceType) },
 				{ "dependencyAccess", RGEnumId(access.m_DependencyAccess) },
 				{ "ordering", RGEnumId(access.m_Ordering) },
-				{ "access", access.m_ResourceType == RGResourceType::RGTexture
-					? RGEnumId(static_cast<RGTextureAccess>(access.m_AccessValue))
-					: RGEnumId(static_cast<RGBufferAccess>(access.m_AccessValue)) },
+				{ "access", access.m_ResourceType == RGResourceType::RGTexture ?
+					RGEnumId(static_cast<RGTextureAccess>(access.m_AccessValue)) :
+					RGEnumId(static_cast<RGBufferAccess>(access.m_AccessValue)) },
 				{ "accessBits", access.m_AccessValue },
 				{ "stages", RGFlagsId(access.m_Stages) },
 				{ "stageBits", static_cast<uint64_t>(access.m_Stages) },
@@ -176,10 +178,12 @@ namespace gglab
 					if (access.m_DependencyAccess != RGDependencyAccess::Read)
 					{
 						// ReadWrite reads the incoming node but writes the version produced by this pass.
-						value["version"] = access.m_WrittenResourceVersion
-							? Json(*access.m_WrittenResourceVersion) : Json(nullptr);
-						value["resourceNodeIndex"] = access.m_WrittenResourceNodeIndex
-							? Json(*access.m_WrittenResourceNodeIndex) : Json(nullptr);
+						value["version"] = access.m_WrittenResourceVersion ?
+							Json(*access.m_WrittenResourceVersion) :
+							Json(nullptr);
+						value["resourceNodeIndex"] = access.m_WrittenResourceNodeIndex ?
+							Json(*access.m_WrittenResourceNodeIndex) :
+							Json(nullptr);
 						value["address"] = Address(pass, access, true);
 						item["writes"].push_back(value);
 					}
@@ -226,9 +230,9 @@ namespace gglab
 					{ "firstUser", resource.m_FirstUserPassIndex },
 					{ "lastUser", resource.m_LastUserPassIndex },
 					{ "usageBits", resource.m_UsageBits },
-					{ "usage", resource.m_ResourceType == RGResourceType::RGTexture
-						? RGFlagsId(static_cast<RHITextureUsage>(resource.m_UsageBits))
-						: RGFlagsId(static_cast<RHIBufferUsage>(resource.m_UsageBits)) },
+					{ "usage", resource.m_ResourceType == RGResourceType::RGTexture ?
+						RGFlagsId(static_cast<RHITextureUsage>(resource.m_UsageBits)) :
+						RGFlagsId(static_cast<RHIBufferUsage>(resource.m_UsageBits)) },
 					{ "initialState", State(resource.m_InitialBarrierState) },
 					{ "finalState", resource.m_HasFinalBarrierState ? State(resource.m_FinalBarrierState) : Json(nullptr) },
 					{ "finalSubresources", Subresources(resource.m_FinalBarrierSubresources) },

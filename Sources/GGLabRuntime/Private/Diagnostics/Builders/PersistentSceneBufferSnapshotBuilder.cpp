@@ -26,9 +26,9 @@ namespace gglab
 			outSnapshot.m_BufferVersions.reserve(table.GetBufferCount());
 			for (uint32_t bufferIndex = 0; bufferIndex < table.GetBufferCount(); ++bufferIndex)
 			{
-				const auto dirtyRanges = includeFreeDirtySlots
-					? table.BuildDirtyRangesIncludingFreeSlots(bufferIndex)
-					: table.BuildDirtyRanges(bufferIndex);
+				const auto dirtyRanges = includeFreeDirtySlots ?
+					table.BuildDirtyRangesIncludingFreeSlots(bufferIndex) :
+					table.BuildDirtyRanges(bufferIndex);
 				uint32_t pendingSlots = 0;
 				for (const auto& range : dirtyRanges)
 				{
@@ -103,17 +103,18 @@ namespace gglab
 				}
 
 				const std::string_view name = StringID::LookupName(key.m_Value);
-				return name.empty() ? std::format("Runtime MaterialKey 0x{:016X}", key.m_Value)
-					: std::format("Runtime MaterialKey {}", name);
+				return name.empty() ?
+					std::format("Runtime MaterialKey 0x{:016X}", key.m_Value) :
+					std::format("Runtime MaterialKey {}", name);
 			},
 			false, outSnapshot.m_Materials);
 		BuildTableSnapshot(
 			"Lights", *lightBuffer, *lightTable,
 			[](uint64_t key)
 			{
-				return key == std::numeric_limits<uint64_t>::max()
-					? std::string("DefaultDirectionalLight")
-					: std::format("entity={}", key);
+				return key == std::numeric_limits<uint64_t>::max() ?
+					std::string("DefaultDirectionalLight") :
+					std::format("entity={}", key);
 			},
 			true, outSnapshot.m_Lights);
 	}

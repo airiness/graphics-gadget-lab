@@ -173,9 +173,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		if (!AreTemporalReprojectionUVsValid(previousHistoryUV, validationPreviousRasterUV))
 		{
 			rejectionReason = all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, previousHistoryUV))) &&
-				all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, validationPreviousRasterUV)))
-				? TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS
-				: TAA_REJECTION_NON_FINITE;
+				all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, validationPreviousRasterUV))) ?
+					TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS :
+					TAA_REJECTION_NON_FINITE;
 		}
 		else
 		{
@@ -185,10 +185,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				GetSamplerState(g_Pass.PackedClampSamplerIndices & 0xffffu);
 			SamplerState pointClampSampler =
 				GetSamplerState(g_Pass.PackedClampSamplerIndices >> 16);
-			historyColor = catmullRomHistory
-				? SampleTemporalHistoryCatmullRomClamped(previousColorTexture,
-					linearClampSampler, previousHistoryUV)
-				: previousColorTexture.SampleLevel(
+			historyColor = catmullRomHistory ?
+				SampleTemporalHistoryCatmullRomClamped(previousColorTexture,
+					linearClampSampler, previousHistoryUV) :
+				previousColorTexture.SampleLevel(
 					linearClampSampler, previousHistoryUV, 0.0).rgb;
 			historyColor = float3(
 				RescaleHistoryColorChannel(historyColor.r, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
@@ -226,9 +226,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				{
 					accepted = IsDepthBackground(
 						previousRawDepth, viewData.PreviousDepthConvention);
-					rejectionReason = accepted
-						? TAA_REJECTION_NONE
-						: TAA_REJECTION_BACKGROUND_MISMATCH;
+					rejectionReason = accepted ?
+						TAA_REJECTION_NONE :
+						TAA_REJECTION_BACKGROUND_MISMATCH;
 				}
 			}
 			else
@@ -344,10 +344,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	const float maxHistorySamples =
 		ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x);
-	const float nextAccumulation = effectiveSamples
-		? ResolveTemporalHistoryNextSamples(accepted, previousAccumulation,
-			historyConfidence, maxHistorySamples, currentSampleWeight)
-		: ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
+	const float nextAccumulation = effectiveSamples ?
+		ResolveTemporalHistoryNextSamples(accepted, previousAccumulation,
+			historyConfidence, maxHistorySamples, currentSampleWeight) :
+		ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
 	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextAccumulation);
 	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor, NF_SITE_PASS_TEMPORAL_AA_CSMAIN_SANITIZE_HDRCOLOR), outputAlphas.x);
 	// Half precision stores a compatibility age exactly and an effective sample count
@@ -366,9 +366,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 	else if (writeHistorySamplesPreview)
 	{
-		const float normalizedAccumulation = effectiveSamples
-			? ResolveTemporalAAHistorySamplesPreview(nextAccumulation, maxHistorySamples)
-			: ResolveTemporalAAHistoryAgePreview(
+		const float normalizedAccumulation = effectiveSamples ?
+			ResolveTemporalAAHistorySamplesPreview(nextAccumulation, maxHistorySamples) :
+			ResolveTemporalAAHistoryAgePreview(
 				nextAccumulation, maxHistoryFeedbackAndClampExpansion.x);
 		diagnosticsOutput = float4(normalizedAccumulation.xxx, 1.0);
 	}
@@ -378,9 +378,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 	else if (writeHistoryRelaxationPreview)
 	{
-		const float relaxationFraction = accepted && luminanceWeightAndHistoryRelaxation.y > 0.0
-			? saturate(historyRelaxation / luminanceWeightAndHistoryRelaxation.y)
-			: 0.0;
+		const float relaxationFraction = accepted && luminanceWeightAndHistoryRelaxation.y > 0.0 ?
+			saturate(historyRelaxation / luminanceWeightAndHistoryRelaxation.y) :
+			0.0;
 		diagnosticsOutput = float4(relaxationFraction.xxx, 1.0);
 	}
 	reprojectionDiagnostics[pixel] = diagnosticsOutput;

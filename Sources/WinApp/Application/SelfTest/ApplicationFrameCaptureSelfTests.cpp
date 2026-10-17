@@ -610,8 +610,9 @@ namespace gglab
 								return false;
 							}
 							ImGuiWindow* popup = gui->OpenPopupStack.back().Window;
-							const ImGuiID choiceId = choiceIndex < 0 ? popup->GetID(choice)
-								: ImHashStr(choice, 0, popup->GetID(choiceIndex));
+							const ImGuiID choiceId = choiceIndex < 0 ?
+								popup->GetID(choice) :
+								ImHashStr(choice, 0, popup->GetID(choiceIndex));
 							ImGui::ActivateItemByID(choiceId);
 							draw();
 							return gui->OpenPopupStack.empty();

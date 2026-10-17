@@ -58,10 +58,10 @@ namespace gglab::utils
 		}
 
 		const auto time = std::filesystem::last_write_time(path, errorCode);
-		return errorCode
-			? 0
-			: std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
-			.count();
+		return errorCode ?
+			0 :
+			std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
+				.count();
 	}
 
 	bool WriteFileBinary(

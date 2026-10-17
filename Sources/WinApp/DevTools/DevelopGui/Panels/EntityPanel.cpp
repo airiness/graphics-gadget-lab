@@ -638,9 +638,9 @@ namespace gglab
 			DrawEntityList(entities, state, entityAnchors);
 
 			ImGui::TableSetColumnIndex(1);
-			const auto* assetSnapshot = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<AssetSnapshot>()
-				: nullptr;
+			const auto* assetSnapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<AssetSnapshot>() :
+				nullptr;
 			DrawSelectedEntity(view, context.m_WorldControl, state, assetSnapshot);
 
 			ImGui::EndTable();
@@ -649,8 +649,9 @@ namespace gglab
 		snapshot = view.GetEntities();
 		DrawDeleteConfirmation(snapshot, context.m_WorldControl, state);
 
-		const auto* views = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
+		const auto* views = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() :
+			nullptr;
 		snapshot = view.GetEntities();
 		DrawEntityWorldLinks(snapshot, state, std::span<const EntityListItemAnchor>(entityAnchors),
 			views ? views->FindView(RenderViewID::Main) : nullptr);

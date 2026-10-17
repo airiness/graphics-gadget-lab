@@ -86,9 +86,9 @@ namespace gglab
 					{
 						continue;
 					}
-					const bool released = gate.IsValid()
-						? pool.ReleaseTexture(std::move(allocation), gate)
-						: pool.ReleaseTextureWithoutSubmission(std::move(allocation));
+					const bool released = gate.IsValid() ?
+						pool.ReleaseTexture(std::move(allocation), gate) :
+						pool.ReleaseTextureWithoutSubmission(std::move(allocation));
 					GGLAB_ASSERT_MSG(released, "Temporal history textures must retire through their pool.");
 					GGLAB_UNUSED(released);
 				}
@@ -128,9 +128,9 @@ namespace gglab
 				.m_Next = builder.ImportTexture(nextName, next.GetTexture(),
 					next.GetCreateInfo().m_Desc,
 					m_Initialized[writeIndex] ? CommonRHIResourceState() : UndefinedRHITextureState(),
-					nextDefinedWhenInitialized && m_Initialized[writeIndex]
-						? RGContentValidity::Defined
-						: RGContentValidity::Undefined),
+					nextDefinedWhenInitialized && m_Initialized[writeIndex] ?
+						RGContentValidity::Defined :
+						RGContentValidity::Undefined),
 			};
 		}
 

@@ -105,7 +105,8 @@ namespace napa::voxel::testing
 					return ChunkCoordZYXLess{}(record.m_Chunk, coordinate);
 				});
 			return iterator != records.end() && iterator->m_Chunk == chunk ?
-				std::addressof(*iterator) : nullptr;
+				std::addressof(*iterator) :
+				nullptr;
 		}
 
 		[[nodiscard]] napa::voxel::ValidationResult PrepareAndCommitMutationMeshBatch(

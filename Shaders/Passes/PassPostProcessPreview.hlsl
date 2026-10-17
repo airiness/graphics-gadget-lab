@@ -83,9 +83,9 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 		{
 			return float4(saturate(magnitudePixels / 8.0).xxx, 1.0);
 		}
-		const float2 direction = magnitudePixels > 1.0e-6
-			? motionPixels / magnitudePixels
-			: float2(0.0, 0.0);
+		const float2 direction = magnitudePixels > 1.0e-6 ?
+			motionPixels / magnitudePixels :
+			float2(0.0, 0.0);
 		return float4(direction * 0.5 + 0.5, saturate(magnitudePixels / 8.0), 1.0);
 	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_REPROJECTION_UV ||
@@ -142,17 +142,17 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	{
 		Texture2D<float4> normalTexture = GetTexture2DFloat4(g_Pass.SourceTextureIndex);
 		const float4 normalAndValidity = normalTexture.SampleLevel(pointSampler, input.UV, 0.0);
-		return normalAndValidity.w > 0.0
-			? float4(normalAndValidity.xyz * 0.5 + 0.5, 1.0)
-			: float4(0.0, 0.0, 0.0, 1.0);
+		return normalAndValidity.w > 0.0 ?
+			float4(normalAndValidity.xyz * 0.5 + 0.5, 1.0) :
+			float4(0.0, 0.0, 0.0, 1.0);
 	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_SELECTED_SURFACE_OFFSET)
 	{
 		Texture2D<float2> offsetTexture = GetTexture2DFloat2(g_Pass.SourceTextureIndex);
 		const float2 offset = offsetTexture.SampleLevel(pointSampler, input.UV, 0.0);
-		return any(offset < 0.0)
-			? float4(0.0, 0.0, 0.0, 1.0)
-			: float4(offset, 1.0 - 0.5 * (offset.x + offset.y), 1.0);
+		return any(offset < 0.0) ?
+			float4(0.0, 0.0, 0.0, 1.0) :
+			float4(offset, 1.0 - 0.5 * (offset.x + offset.y), 1.0);
 	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_RAW ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_LINEAR_VIEW_Z)

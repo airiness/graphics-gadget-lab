@@ -27,12 +27,12 @@ namespace gglab
 		}
 
 		const uint32_t activeIndex = m_DemoManager->GetActiveIndex();
-		const uint32_t selectedIndex = m_DemoManager->HasPendingActiveDemo()
-			? m_DemoManager->GetPendingActiveIndex()
-			: activeIndex;
-		const std::string preview = selectedIndex < m_DemoManager->GetDemoCount()
-			? std::string(m_DemoManager->GetDemoName(selectedIndex))
-			: std::string("None");
+		const uint32_t selectedIndex = m_DemoManager->HasPendingActiveDemo() ?
+			m_DemoManager->GetPendingActiveIndex() :
+			activeIndex;
+		const std::string preview = selectedIndex < m_DemoManager->GetDemoCount() ?
+			std::string(m_DemoManager->GetDemoName(selectedIndex)) :
+			std::string("None");
 
 		ImGui::TextUnformatted("Active Demo");
 		ImGui::SetNextItemWidth(-FLT_MIN);

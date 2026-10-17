@@ -737,21 +737,27 @@ namespace gglab
 		}
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Graphics / direct-compute / graphics chain",
-			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending
-						: chainBalanced ? LabDiagnosticCheckStatus::Passed
-										: LabDiagnosticCheckStatus::Failed,
-			.m_Detail = !hasExecuted ? "Waiting for the first rendered frame."
-						: chainBalanced
-							? "All live passes executed exactly once per rendered frame."
-							: "Live pass execution counts diverged.",
+			.m_Status = !hasExecuted ?
+				LabDiagnosticCheckStatus::Pending :
+				chainBalanced ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
+			.m_Detail = !hasExecuted ?
+				"Waiting for the first rendered frame." :
+				chainBalanced ?
+					"All live passes executed exactly once per rendered frame." :
+					"Live pass execution counts diverged.",
 			});
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Unused compute pass culling",
-			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending
-						: culledExecutions == 0 ? LabDiagnosticCheckStatus::Passed
-												: LabDiagnosticCheckStatus::Failed,
-			.m_Detail = culledExecutions == 0 ? "The unconsumed UAV writer produced no dispatch."
-											  : "An unconsumed UAV writer reached execution.",
+			.m_Status = !hasExecuted ?
+				LabDiagnosticCheckStatus::Pending :
+				culledExecutions == 0 ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
+			.m_Detail = culledExecutions == 0 ?
+				"The unconsumed UAV writer produced no dispatch." :
+				"An unconsumed UAV writer reached execution.",
 			});
 	}
 

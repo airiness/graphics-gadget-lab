@@ -334,10 +334,10 @@ namespace gglab
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ShaderManager.get());
 		const ShaderPreloadStatus status = m_ShaderManager->GetPreloadStatus();
-		const float fraction = status.m_TotalCount > 0
-			? static_cast<float>(status.m_CompletedCount) /
-			static_cast<float>(status.m_TotalCount)
-			: 0.0f;
+		const float fraction = status.m_TotalCount > 0 ?
+			static_cast<float>(status.m_CompletedCount) /
+				static_cast<float>(status.m_TotalCount) :
+			0.0f;
 		if (status.HasFailed())
 		{
 			return {
@@ -345,8 +345,9 @@ namespace gglab
 				.m_Fraction = fraction,
 				.m_Title = "Starting Graphics Gadget Lab",
 				.m_Stage = "Shader preload failed",
-				.m_Detail = status.m_Error.empty() ? "The shader preload task was cancelled."
-											   : status.m_Error,
+				.m_Detail = status.m_Error.empty() ?
+					"The shader preload task was cancelled." :
+					status.m_Error,
 			};
 		}
 
@@ -355,8 +356,9 @@ namespace gglab
 			.m_Fraction = status.IsReady() ? 1.0f : fraction,
 			.m_Title = "Starting Graphics Gadget Lab",
 			.m_Stage = status.IsReady() ? "Shaders ready" : "Preloading shaders",
-			.m_Detail = status.m_CurrentShader.empty() ? "Waiting for a shader worker."
-											   : status.m_CurrentShader,
+			.m_Detail = status.m_CurrentShader.empty() ?
+				"Waiting for a shader worker." :
+				status.m_CurrentShader,
 		};
 	}
 
@@ -465,8 +467,8 @@ namespace gglab
 		m_ResizePending = false;
 
 		m_ShutdownComplete = true;
-		m_LifecycleState = preserveFailure
-			? AppRuntimeLifecycleState::Failed
-			: AppRuntimeLifecycleState::Stopped;
+		m_LifecycleState = preserveFailure ?
+			AppRuntimeLifecycleState::Failed :
+			AppRuntimeLifecycleState::Stopped;
 	}
 }

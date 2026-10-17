@@ -565,13 +565,14 @@ namespace gglab
 		};
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Coordinate draw sequence",
-			.m_Status = rendered ? LabDiagnosticCheckStatus::Passed
-				: LabDiagnosticCheckStatus::Pending,
-			.m_Detail = rendered
-				? "Top-left shows both winding colors; bottom-right overlays back-face culling on "
+			.m_Status = rendered ?
+				LabDiagnosticCheckStatus::Passed :
+				LabDiagnosticCheckStatus::Pending,
+			.m_Detail = rendered ?
+				"Top-left shows both winding colors; bottom-right overlays back-face culling on "
 					"the position gradient so only the front-facing triangle remains. Indexed "
-					"sampling and reversed-Z probes also executed."
-				: "Waiting for the first complete marker and conformance frame.",
+					"sampling and reversed-Z probes also executed." :
+				"Waiting for the first complete marker and conformance frame.",
 			});
 	}
 

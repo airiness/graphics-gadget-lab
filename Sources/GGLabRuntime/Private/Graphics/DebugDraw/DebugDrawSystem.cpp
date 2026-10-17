@@ -349,8 +349,9 @@ namespace gglab
 		std::scoped_lock lock(m_Mutex);
 		++m_PendingStatistics.m_SubmittedCommandCount;
 		m_KnownChannels.insert(style.m_Channel);
-		const bool topologyValid = topology == PrimitiveTopology::Lines ? positions.size() % 2 == 0
-			: positions.size() % 3 == 0;
+		const bool topologyValid = topology == PrimitiveTopology::Lines ?
+			positions.size() % 2 == 0 :
+			positions.size() % 3 == 0;
 		if (positions.empty() || !topologyValid ||
 			!math::IsFinite(style.m_Color) ||
 			!std::isfinite(style.m_DurationSeconds) || style.m_DurationSeconds < 0.0f ||

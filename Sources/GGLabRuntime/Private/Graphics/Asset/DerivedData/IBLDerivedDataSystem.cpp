@@ -50,8 +50,9 @@ namespace gglab
 
 	std::string_view GetIBLStageArtifactType(IBLArtifactStage stage) noexcept
 	{
-		return stage < IBLArtifactStage::Count ? ArtifactTypes[static_cast<size_t>(stage)]
-			: std::string_view{};
+		return stage < IBLArtifactStage::Count ?
+			ArtifactTypes[static_cast<size_t>(stage)] :
+			std::string_view{};
 	}
 
 	IBLDerivedDataSystem::IBLDerivedDataSystem(const CreateInfo& createInfo) noexcept :
@@ -111,15 +112,16 @@ namespace gglab
 					IBLStageArtifactSchemaVersion, read.m_ArtifactContentDigest,
 					read.m_PayloadDigest, readOptions);
 				stageResult.m_Error =
-					decoded.m_Error.empty()
-					? "IBL stage DDC artifact does not match its bake configuration."
-					: std::move(decoded.m_Error);
+					decoded.m_Error.empty() ?
+						"IBL stage DDC artifact does not match its bake configuration." :
+						std::move(decoded.m_Error);
 				continue;
 			}
 			stageResult.m_Artifact = Admit(stageResult.m_Key,
 				std::make_shared<const IBLStageArtifact>(std::move(decoded.m_Artifact)));
-			stageResult.m_Source = stageResult.m_Artifact ? IBLDerivedDataSource::LocalDdc
-				: IBLDerivedDataSource::Miss;
+			stageResult.m_Source = stageResult.m_Artifact ?
+				IBLDerivedDataSource::LocalDdc :
+				IBLDerivedDataSource::Miss;
 		}
 		return result;
 	}

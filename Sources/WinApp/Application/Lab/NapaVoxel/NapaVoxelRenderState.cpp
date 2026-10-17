@@ -255,13 +255,13 @@ namespace gglab
 			while (baseIndex < m_BaseGpuMeshes->m_Chunks.size() ||
 				replacementIndex < m_Replacements.size())
 			{
-				const auto& base = baseIndex < m_BaseGpuMeshes->m_Chunks.size()
-					? m_BaseGpuMeshes->m_Chunks[baseIndex]
-					: std::shared_ptr<const NapaVoxelGpuChunkMesh>{};
+				const auto& base = baseIndex < m_BaseGpuMeshes->m_Chunks.size() ?
+					m_BaseGpuMeshes->m_Chunks[baseIndex] :
+					std::shared_ptr<const NapaVoxelGpuChunkMesh>{};
 				const NapaVoxelGpuChunkReplacement* replacement =
-					replacementIndex < m_Replacements.size()
-					? &m_Replacements[replacementIndex]
-					: nullptr;
+					replacementIndex < m_Replacements.size() ?
+						&m_Replacements[replacementIndex] :
+						nullptr;
 				if (!base && baseIndex < m_BaseGpuMeshes->m_Chunks.size())
 				{
 					m_Status = GGLabMeshPublicationStatus::Failed;
@@ -1135,9 +1135,9 @@ namespace gglab
 		m_HasFailed = true;
 		if (m_CommandQueue)
 		{
-			m_CommandQueue->Freeze(publicationSerialExhausted
-				? NapaVoxelCommandQueueError::PublicationSerialExhausted
-				: NapaVoxelCommandQueueError::HostPreparationFailed);
+			m_CommandQueue->Freeze(publicationSerialExhausted ?
+				NapaVoxelCommandQueueError::PublicationSerialExhausted :
+				NapaVoxelCommandQueueError::HostPreparationFailed);
 		}
 	}
 
@@ -1420,9 +1420,9 @@ namespace gglab
 			{
 				return false;
 			}
-			const uint64_t next = current == std::numeric_limits<uint64_t>::max()
-				? 0
-				: current + 1;
+			const uint64_t next = current == std::numeric_limits<uint64_t>::max() ?
+				0 :
+				current + 1;
 			if (NextNapaVoxelPublicationStableId.compare_exchange_weak(
 				current, next, std::memory_order_relaxed, std::memory_order_relaxed))
 			{

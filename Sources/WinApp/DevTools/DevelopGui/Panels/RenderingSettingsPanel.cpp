@@ -174,8 +174,11 @@ namespace gglab
 			DevelopGuiContext& context, std::string_view inspector, const char* detail = nullptr) noexcept
 		{
 			BeginRow(label);
-			bool enabled = override ? (override->m_IsActive
-				? override->m_Settings.m_Enabled : authoring.m_Enabled) : published.m_Enabled;
+			bool enabled = override ?
+				(override->m_IsActive ?
+					override->m_Settings.m_Enabled :
+					authoring.m_Enabled) :
+				published.m_Enabled;
 			ImGui::BeginDisabled(!override);
 			if (ImGui::Checkbox("##Enabled", &enabled))
 			{
@@ -189,8 +192,11 @@ namespace gglab
 			DrawIntentTooltip(authoring.m_Enabled, resolved);
 			ImGui::EndDisabled();
 			DrawOverride(override && override->m_IsActive, [&]() { override->Reset(); });
-			const bool requested = override ? (override->m_IsActive
-				? override->m_Settings.m_Enabled : authoring.m_Enabled) : published.m_Enabled;
+			const bool requested = override ?
+				(override->m_IsActive ?
+					override->m_Settings.m_Enabled :
+					authoring.m_Enabled) :
+				published.m_Enabled;
 			DrawRuntime(status, requested != published.m_Enabled, detail);
 			DrawInspect(context, inspector);
 		}
@@ -229,8 +235,9 @@ namespace gglab
 	{
 		ImGui::SetWindowSize(ImVec2(800.0f, 680.0f), ImGuiCond_FirstUseEver);
 		ImGui::SeparatorText("Profile");
-		const std::string_view profileName = context.m_ActiveProfileName.empty()
-			? "Unavailable" : context.m_ActiveProfileName;
+		const std::string_view profileName = context.m_ActiveProfileName.empty() ?
+			"Unavailable" :
+			context.m_ActiveProfileName;
 		ImGui::Text("Active Profile: %.*s", static_cast<int>(profileName.size()), profileName.data());
 		auto* overrides = context.m_ViewRenderSettingsOverrides;
 		const uint32_t activeOverrides = overrides ? overrides->GetActiveCount() : 0;
@@ -244,8 +251,9 @@ namespace gglab
 		}
 		ImGui::EndDisabled();
 
-		const auto* snapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<RenderingSettingsDiagnosticsSnapshot>() : nullptr;
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RenderingSettingsDiagnosticsSnapshot>() :
+			nullptr;
 		if (!snapshot || !snapshot->m_SettingsAvailable)
 		{
 			ImGui::TextWrapped("Rendering settings are unavailable for the current frame.");
@@ -265,11 +273,13 @@ namespace gglab
 		}
 		if (ImGui::CollapsingHeader("Shadows", ImGuiTreeNodeFlags_DefaultOpen) && BeginSettingsTable("ShadowSettings"))
 		{
-			DrawReadOnly("Shadows", snapshot->m_RuntimeAvailable ? (snapshot->m_ShadowSettings.m_Enable ? "ON" : "OFF")
-				: "Unavailable", snapshot->m_Shadows, context, ShadowInspector);
+			DrawReadOnly("Shadows", snapshot->m_RuntimeAvailable ?
+				(snapshot->m_ShadowSettings.m_Enable ? "ON" : "OFF") :
+				"Unavailable", snapshot->m_Shadows, context, ShadowInspector);
 			BeginRow("Shadow Method");
-			ImGui::TextWrapped("%s", snapshot->m_RuntimeAvailable
-				? (snapshot->m_ShadowSettings.m_EnablePCF ? "CSM + PCF" : "CSM") : "Unavailable");
+			ImGui::TextWrapped("%s", snapshot->m_RuntimeAvailable ?
+				(snapshot->m_ShadowSettings.m_EnablePCF ? "CSM + PCF" : "CSM") :
+				"Unavailable");
 			ImGui::TableSetColumnIndex(3);
 			ImGui::TextDisabled("Read only");
 			DrawInspect(context, ShadowInspector);
@@ -281,9 +291,11 @@ namespace gglab
 				authoring.m_TemporalAA, requested.m_TemporalAA, resolved.m_TemporalAA.m_Enabled,
 				snapshot->m_TemporalAA, context, TemporalInspector);
 			ImGui::EndTable();
-			ImGui::Text("History: %s", !snapshot->m_HistoryAvailable ? "Unavailable"
-				: !snapshot->m_History.m_HasActiveHistory ? "No history"
-				: snapshot->m_History.m_HistoryValid ? "Valid" : "Invalid");
+			ImGui::Text("History: %s", !snapshot->m_HistoryAvailable ?
+				"Unavailable" :
+				!snapshot->m_History.m_HasActiveHistory ?
+					"No history" :
+					snapshot->m_History.m_HistoryValid ? "Valid" : "Invalid");
 		}
 		if (ImGui::CollapsingHeader("Post Processing", ImGuiTreeNodeFlags_DefaultOpen) && BeginSettingsTable("PostProcessSettings"))
 		{

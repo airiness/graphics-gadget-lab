@@ -247,10 +247,10 @@ namespace gglab
 			ImGui::TableHeadersRow();
 			for (const auto& resource : snapshot->m_Resources)
 			{
-				const std::string usage = resource.m_ResourceType == RGResourceType::RGTexture
-					? devtools::EnumFlagsText<RHITextureUsage>(
-						static_cast<uint32_t>(resource.m_UsageBits))
-					: devtools::EnumFlagsText<RHIBufferUsage>(
+				const std::string usage = resource.m_ResourceType == RGResourceType::RGTexture ?
+					devtools::EnumFlagsText<RHITextureUsage>(
+						static_cast<uint32_t>(resource.m_UsageBits)) :
+					devtools::EnumFlagsText<RHIBufferUsage>(
 						static_cast<uint32_t>(resource.m_UsageBits));
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -285,9 +285,9 @@ namespace gglab
 	{
 		auto& state = context.PanelState<TransientResourcePoolPanelState>();
 		const auto* snapshot =
-			context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<TransientResourcePoolSnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<TransientResourcePoolSnapshot>() :
+				nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Transient pool snapshot provider is not available.");

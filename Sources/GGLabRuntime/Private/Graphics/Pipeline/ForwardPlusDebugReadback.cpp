@@ -256,12 +256,12 @@ namespace gglab
 					.m_Height = pendingHdrDiff.m_Height,
 					.m_MaxAbsoluteError = std::bit_cast<float>(packed[0]),
 					.m_MaxRelativeLuminanceError = std::bit_cast<float>(packed[1]),
-					.m_MaxErrorPixelX = pendingHdrDiff.m_Width > 0
-						? packed[2] % pendingHdrDiff.m_Width
-						: 0,
-					.m_MaxErrorPixelY = pendingHdrDiff.m_Width > 0
-						? packed[2] / pendingHdrDiff.m_Width
-						: 0,
+					.m_MaxErrorPixelX = pendingHdrDiff.m_Width > 0 ?
+						packed[2] % pendingHdrDiff.m_Width :
+						0,
+					.m_MaxErrorPixelY = pendingHdrDiff.m_Width > 0 ?
+						packed[2] / pendingHdrDiff.m_Width :
+						0,
 					.m_ComparedPixelCount = packed[3],
 					.m_IsValid = pendingHdrDiff.m_Width > 0 && pendingHdrDiff.m_Height > 0 &&
 						static_cast<uint64_t>(packed[2]) <
@@ -413,14 +413,16 @@ namespace gglab
 
 	RHIBufferHandle ForwardPlusDebugReadback::GetHdrDiffBuffer(uint32_t bufferIndex) const noexcept
 	{
-		return bufferIndex < m_HdrDiffBuffers.size() ? m_HdrDiffBuffers[bufferIndex]
-			: RHIBufferHandle{};
+		return bufferIndex < m_HdrDiffBuffers.size() ?
+			m_HdrDiffBuffers[bufferIndex] :
+			RHIBufferHandle{};
 	}
 
 	RHIBufferHandle ForwardPlusDebugReadback::GetGridBuffer(uint32_t bufferIndex) const noexcept
 	{
-		return bufferIndex < m_GridBuffers.size() ? m_GridBuffers[bufferIndex]
-			: RHIBufferHandle{};
+		return bufferIndex < m_GridBuffers.size() ?
+			m_GridBuffers[bufferIndex] :
+			RHIBufferHandle{};
 	}
 
 	uint32_t ForwardPlusDebugReadback::GetSelectedTileX() const noexcept

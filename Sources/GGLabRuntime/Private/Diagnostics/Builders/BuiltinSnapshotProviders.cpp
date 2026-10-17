@@ -96,8 +96,9 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<AssetSnapshot>();
-				snapshot = context.m_AssetManager ? BuildAssetSnapshot(*context.m_AssetManager)
-					: AssetSnapshot{};
+				snapshot = context.m_AssetManager ?
+					BuildAssetSnapshot(*context.m_AssetManager) :
+					AssetSnapshot{};
 			}
 		};
 
@@ -164,10 +165,10 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
-				snapshot = (context.m_RenderHost && m_Renderer)
-					? BuildIBLDiagnosticsSnapshot(
-						*m_Renderer, context.m_EnvironmentAssetController)
-					: IBLDiagnosticsSnapshot{};
+				snapshot = (context.m_RenderHost && m_Renderer) ?
+					BuildIBLDiagnosticsSnapshot(
+						*m_Renderer, context.m_EnvironmentAssetController) :
+					IBLDiagnosticsSnapshot{};
 			}
 
 		private:
@@ -206,11 +207,11 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<ShadowDiagnosticsSnapshot>();
-				snapshot = context.m_RenderGraph
-					? BuildShadowDiagnosticsSnapshot(*context.m_RenderGraph,
+				snapshot = context.m_RenderGraph ?
+					BuildShadowDiagnosticsSnapshot(*context.m_RenderGraph,
 						context.m_DirectionalShadowFramePlan, context.m_MainRenderView,
-						context.m_FrameSerial)
-					: ShadowDiagnosticsSnapshot{};
+						context.m_FrameSerial) :
+					ShadowDiagnosticsSnapshot{};
 			}
 		};
 
@@ -225,9 +226,9 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<SceneDepthDiagnosticsSnapshot>();
-				snapshot = context.m_RenderGraph
-					? BuildSceneDepthDiagnosticsSnapshot(*context.m_RenderGraph)
-					: SceneDepthDiagnosticsSnapshot{};
+				snapshot = context.m_RenderGraph ?
+					BuildSceneDepthDiagnosticsSnapshot(*context.m_RenderGraph) :
+					SceneDepthDiagnosticsSnapshot{};
 			}
 		};
 
@@ -246,9 +247,9 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<AtmosphereDiagnosticsSnapshot>();
-				snapshot = context.m_RenderHost && m_Renderer && context.m_RenderGraph
-					? BuildAtmosphereDiagnosticsSnapshot(*m_Renderer, *context.m_RenderGraph)
-					: AtmosphereDiagnosticsSnapshot{};
+				snapshot = context.m_RenderHost && m_Renderer && context.m_RenderGraph ?
+					BuildAtmosphereDiagnosticsSnapshot(*m_Renderer, *context.m_RenderGraph) :
+					AtmosphereDiagnosticsSnapshot{};
 			}
 
 		private:
@@ -335,12 +336,12 @@ namespace gglab
 					snapshot = {};
 					return;
 				}
-				const GTAOSettings* authoringSettings = context.m_AuthoringViewRenderProfile
-					? &context.m_AuthoringViewRenderProfile->m_Lighting.m_GTAO
-					: nullptr;
-				const GTAOSettings* requestedSettings = context.m_EffectiveViewRenderProfile
-					? &context.m_EffectiveViewRenderProfile->m_Lighting.m_GTAO
-					: nullptr;
+				const GTAOSettings* authoringSettings = context.m_AuthoringViewRenderProfile ?
+					&context.m_AuthoringViewRenderProfile->m_Lighting.m_GTAO :
+					nullptr;
+				const GTAOSettings* requestedSettings = context.m_EffectiveViewRenderProfile ?
+					&context.m_EffectiveViewRenderProfile->m_Lighting.m_GTAO :
+					nullptr;
 				snapshot = BuildGTAODiagnosticsSnapshot(*m_Renderer,
 					*context.m_RenderGraph, authoringSettings, requestedSettings,
 					context.m_GTAOOverrideActive);
@@ -381,13 +382,13 @@ namespace gglab
 					}
 				}
 				const TemporalAASettings* authoringSettings =
-					context.m_AuthoringViewRenderProfile
-					? &context.m_AuthoringViewRenderProfile->m_TemporalAA
-					: nullptr;
+					context.m_AuthoringViewRenderProfile ?
+						&context.m_AuthoringViewRenderProfile->m_TemporalAA :
+						nullptr;
 				const TemporalAASettings* requestedSettings =
-					context.m_DisplayViewSettings
-					? &context.m_DisplayViewSettings->m_TemporalAA
-					: nullptr;
+					context.m_DisplayViewSettings ?
+						&context.m_DisplayViewSettings->m_TemporalAA :
+						nullptr;
 				snapshot = BuildTemporalAADiagnosticsSnapshot(*m_Renderer,
 					*context.m_RenderGraph, context.m_TemporalFramePlan, displayView,
 					authoringSettings, requestedSettings);

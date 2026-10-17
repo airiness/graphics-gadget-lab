@@ -56,8 +56,9 @@ namespace gglab
 		[[nodiscard]] RHIBufferHandle GetBufferHandle(uint32_t bufferIndex = 0) const noexcept
 		{
 			GGLAB_ASSERT(bufferIndex < m_Buffers.size());
-			return bufferIndex < m_Buffers.size() ? m_Buffers[bufferIndex].Get()
-				: RHIBufferHandle{};
+			return bufferIndex < m_Buffers.size() ?
+				m_Buffers[bufferIndex].Get() :
+				RHIBufferHandle{};
 		}
 		[[nodiscard]] uint32_t GetElementCapacity() const noexcept { return m_ElementCapacity; }
 		[[nodiscard]] uint32_t GetBufferCount() const noexcept

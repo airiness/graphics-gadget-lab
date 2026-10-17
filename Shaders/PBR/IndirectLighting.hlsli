@@ -19,10 +19,10 @@ float3 GetMaterialIBLReflection(PreparedMaterialShading material)
 {
 	// One bent reflection retains the existing anisotropic approximation and
 	// avoids duplicating sharp environment landmarks with offset texture taps.
-	return material.Anisotropy.Strength > 0.0
-		? GetAnisotropicIBLReflection(material.Base.NormalWS, material.ViewDirectionWS,
-			material.Anisotropy.BitangentWS, material.Anisotropy.AlphaT, material.Anisotropy.AlphaB)
-		: reflect(-material.ViewDirectionWS, material.Base.NormalWS);
+	return material.Anisotropy.Strength > 0.0 ?
+		GetAnisotropicIBLReflection(material.Base.NormalWS, material.ViewDirectionWS,
+			material.Anisotropy.BitangentWS, material.Anisotropy.AlphaT, material.Anisotropy.AlphaB) :
+		reflect(-material.ViewDirectionWS, material.Base.NormalWS);
 }
 
 MaterialIBLResponse EvaluateBaseMaterialIBL(PreparedMaterialShading material,

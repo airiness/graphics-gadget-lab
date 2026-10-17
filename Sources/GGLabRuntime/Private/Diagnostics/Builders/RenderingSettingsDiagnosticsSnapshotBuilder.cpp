@@ -41,8 +41,9 @@ namespace gglab
 			snapshot.m_SettingsAvailable = context.m_AuthoringViewRenderProfile &&
 				context.m_EffectiveViewRenderProfile && context.m_DisplayViewSettings;
 			const size_t viewIndex = static_cast<size_t>(context.m_DisplayViewId);
-			const RenderView* view = viewIndex < context.m_RenderViews.size()
-				? &context.m_RenderViews[viewIndex] : nullptr;
+			const RenderView* view = viewIndex < context.m_RenderViews.size() ?
+				&context.m_RenderViews[viewIndex] :
+				nullptr;
 			if (view && view->m_ViewId == context.m_DisplayViewId && view->m_IsValid)
 			{
 				snapshot.m_Width = view->m_Width;
@@ -91,9 +92,9 @@ namespace gglab
 				if (temporalAA.IsActive())
 				{
 					const auto* temporal = blackboard.TryGet<RGTemporalAAResources>(TemporalAAResourcesName);
-					snapshot.m_TemporalAA = temporal
-						? CheckResourceActivity(graph, temporal->m_ResolvedSceneColor)
-						: ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
+					snapshot.m_TemporalAA = temporal ?
+						CheckResourceActivity(graph, temporal->m_ResolvedSceneColor) :
+						ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
 				}
 				if (history && (!history->m_HasActiveHistory ||
 					(history->m_DisplayViewId == plan.m_DisplayViewId &&
@@ -128,8 +129,9 @@ namespace gglab
 					const auto* targets = blackboard.TryGet<RGViewTargetsTable>(ViewTargetsTableName);
 					const bool materialDiagnostics = targets && targets->GetViewTargets(context.m_DisplayViewId)
 						.m_MaterialDiagnosticColor.IsValid();
-					snapshot.m_Bloom = { ViewRenderFeatureState::Inactive, materialDiagnostics
-						? ViewRenderFeatureReason::MaterialDiagnosticsActive : ViewRenderFeatureReason::ResourcesUnavailable };
+					snapshot.m_Bloom = { ViewRenderFeatureState::Inactive, materialDiagnostics ?
+						ViewRenderFeatureReason::MaterialDiagnosticsActive :
+						ViewRenderFeatureReason::ResourcesUnavailable };
 				}
 				else
 				{
@@ -140,10 +142,11 @@ namespace gglab
 			{
 				snapshot.m_ShadowSettings = context.m_DirectionalShadowFramePlan->m_Settings;
 				const auto* shadows = blackboard.TryGet<RGShadowResources>(ShadowResourcesName);
-				snapshot.m_Shadows = !context.m_DirectionalShadowFramePlan->m_ShadingEnabled
-					? DisabledStatus() : shadows
-					? CheckResourceActivity(graph, shadows->m_DirectionalShadowMap)
-					: ViewRenderFeatureStatus{ ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::ResourcesUnavailable };
+				snapshot.m_Shadows = !context.m_DirectionalShadowFramePlan->m_ShadingEnabled ?
+					DisabledStatus() :
+					shadows ?
+						CheckResourceActivity(graph, shadows->m_DirectionalShadowMap) :
+						ViewRenderFeatureStatus{ ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::ResourcesUnavailable };
 			}
 			return snapshot;
 		}

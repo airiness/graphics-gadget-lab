@@ -80,9 +80,9 @@ namespace gglab
 				.m_Name = desc.m_Name,
 				.m_Group = desc.m_Group,
 				.m_Type = ToSnapshotParameterType(desc.m_Type),
-				.m_EditPolicy = desc.m_EditPolicy == LabParameterEditPolicy::CommitOnEditEnd
-					? LabSnapshotParameterEditPolicy::CommitOnEditEnd
-					: LabSnapshotParameterEditPolicy::Continuous,
+				.m_EditPolicy = desc.m_EditPolicy == LabParameterEditPolicy::CommitOnEditEnd ?
+					LabSnapshotParameterEditPolicy::CommitOnEditEnd :
+					LabSnapshotParameterEditPolicy::Continuous,
 				.m_DefaultValue = desc.m_DefaultValue,
 				.m_MinValue = desc.m_MinValue,
 				.m_MaxValue = desc.m_MaxValue,
@@ -204,9 +204,9 @@ namespace gglab
 		{
 			const LabRunConfig& config = m_CreateInfo.m_RunConfig;
 			m_EffectiveDeltaTime =
-				config.m_UseFixedDeltaTime
-				? config.m_FixedDeltaTime
-				: static_cast<float>(m_CreateInfo.m_Services.m_Time->GetDeltaTime());
+				config.m_UseFixedDeltaTime ?
+					config.m_FixedDeltaTime :
+					static_cast<float>(m_CreateInfo.m_Services.m_Time->GetDeltaTime());
 			m_ActiveSession->Update(m_EffectiveDeltaTime);
 		}
 	}
@@ -518,9 +518,9 @@ namespace gglab
 			std::string error = "the Lab declares no such parameter";
 			const LabParameter* parameter =
 				m_PendingSession->GetParameters().Find(LabParameterId(assignment.m_Id));
-			const std::optional<LabValue> value = parameter
-				? ParseLabParameterValue(parameter->m_Desc, assignment.m_Value, error)
-				: std::nullopt;
+			const std::optional<LabValue> value = parameter ?
+				ParseLabParameterValue(parameter->m_Desc, assignment.m_Value, error) :
+				std::nullopt;
 			LabChangeImpact valueImpact = LabChangeImpact::Immediate;
 			if (!value || !m_PendingSession->SetParameter(
 				parameter->m_Desc.m_Id, *value, &valueImpact))

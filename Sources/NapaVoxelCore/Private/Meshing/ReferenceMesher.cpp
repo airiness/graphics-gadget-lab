@@ -685,8 +685,9 @@ namespace napa::voxel
 					selected = true;
 				}
 			}
-			return selected ? cubeCorners[selectedCornerId].m_Sample.m_Material
-				: VoxelMaterial::Empty;
+			return selected ?
+				cubeCorners[selectedCornerId].m_Sample.m_Material :
+				VoxelMaterial::Empty;
 		}
 
 		[[nodiscard]] DensityGradient ComputeSolidToEmptyDirection(
@@ -937,8 +938,9 @@ namespace napa::voxel
 			const std::optional<std::uint64_t> triangleCount =
 				cellCount ? CheckedMul(*cellCount, static_cast<std::uint64_t>(12)) : std::nullopt;
 			const std::optional<std::uint64_t> vertexCount =
-				triangleCount ? CheckedMul(*triangleCount, static_cast<std::uint64_t>(3))
-				: std::nullopt;
+				triangleCount ?
+					CheckedMul(*triangleCount, static_cast<std::uint64_t>(3)) :
+					std::nullopt;
 			if (!cellCount || !triangleCount || !vertexCount)
 			{
 				return { ValidationError::ArithmeticOverflow };

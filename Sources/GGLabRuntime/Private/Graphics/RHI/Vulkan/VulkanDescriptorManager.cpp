@@ -257,9 +257,9 @@ namespace gglab
 	VulkanDescriptorPublicationState VulkanDescriptorPublicationArena::GetState(
 		uint32_t index) const noexcept
 	{
-		return IsIndexInRange(index)
-			? m_Slots[index].m_State
-			: VulkanDescriptorPublicationState::Free;
+		return IsIndexInRange(index) ?
+			m_Slots[index].m_State :
+			VulkanDescriptorPublicationState::Free;
 	}
 
 	uint64_t VulkanDescriptorPublicationArena::GetLastReachableGeneration(
@@ -548,16 +548,16 @@ namespace gglab
 
 	std::optional<uint32_t> VulkanDescriptorManager::AllocateResourceDescriptor() noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::AllocateResourceDescriptor")
-			? m_Resources.Allocate()
-			: std::nullopt;
+		return CheckOwnerThread("VulkanDescriptorManager::AllocateResourceDescriptor") ?
+			m_Resources.Allocate() :
+			std::nullopt;
 	}
 
 	std::optional<uint32_t> VulkanDescriptorManager::AllocateSamplerDescriptor() noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::AllocateSamplerDescriptor")
-			? m_Samplers.Allocate()
-			: std::nullopt;
+		return CheckOwnerThread("VulkanDescriptorManager::AllocateSamplerDescriptor") ?
+			m_Samplers.Allocate() :
+			std::nullopt;
 	}
 
 	bool VulkanDescriptorManager::WriteSampledImage(uint32_t index,
@@ -794,17 +794,17 @@ namespace gglab
 	VulkanDescriptorPublicationState VulkanDescriptorManager::GetResourceState(
 		uint32_t index) const noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::GetResourceState")
-			? m_Resources.GetState(index)
-			: VulkanDescriptorPublicationState::Free;
+		return CheckOwnerThread("VulkanDescriptorManager::GetResourceState") ?
+			m_Resources.GetState(index) :
+			VulkanDescriptorPublicationState::Free;
 	}
 
 	VulkanDescriptorPublicationState VulkanDescriptorManager::GetSamplerState(
 		uint32_t index) const noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::GetSamplerState")
-			? m_Samplers.GetState(index)
-			: VulkanDescriptorPublicationState::Free;
+		return CheckOwnerThread("VulkanDescriptorManager::GetSamplerState") ?
+			m_Samplers.GetState(index) :
+			VulkanDescriptorPublicationState::Free;
 	}
 
 	std::shared_ptr<const VulkanDescriptorBacking>
@@ -816,9 +816,9 @@ namespace gglab
 			return {};
 		}
 		const std::shared_ptr<void>& backing = m_Resources.GetBacking(index);
-		return backing
-			? std::static_pointer_cast<const VulkanDescriptorBacking>(backing)
-			: std::shared_ptr<const VulkanDescriptorBacking>{};
+		return backing ?
+			std::static_pointer_cast<const VulkanDescriptorBacking>(backing) :
+			std::shared_ptr<const VulkanDescriptorBacking>{};
 	}
 
 	VulkanDescriptorPublicationDiagnostics VulkanDescriptorManager::GetResourceDiagnostics()
@@ -851,23 +851,23 @@ namespace gglab
 	VulkanDescriptorPublicationDiagnostics VulkanDescriptorManager::GetSamplerDiagnostics()
 		const noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::GetSamplerDiagnostics")
-			? m_Samplers.GetDiagnostics()
-			: VulkanDescriptorPublicationDiagnostics{};
+		return CheckOwnerThread("VulkanDescriptorManager::GetSamplerDiagnostics") ?
+			m_Samplers.GetDiagnostics() :
+			VulkanDescriptorPublicationDiagnostics{};
 	}
 
 	VkDescriptorSetLayout VulkanDescriptorManager::GetGlobalSetLayout() const noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::GetGlobalSetLayout")
-			? m_GlobalSetLayout
-			: VK_NULL_HANDLE;
+		return CheckOwnerThread("VulkanDescriptorManager::GetGlobalSetLayout") ?
+			m_GlobalSetLayout :
+			VK_NULL_HANDLE;
 	}
 
 	VkDescriptorSet VulkanDescriptorManager::GetGlobalSet() const noexcept
 	{
-		return CheckOwnerThread("VulkanDescriptorManager::GetGlobalSet")
-			? m_GlobalSet
-			: VK_NULL_HANDLE;
+		return CheckOwnerThread("VulkanDescriptorManager::GetGlobalSet") ?
+			m_GlobalSet :
+			VK_NULL_HANDLE;
 	}
 
 	bool VulkanDescriptorManager::IsLayoutSupported() const noexcept

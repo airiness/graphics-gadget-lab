@@ -69,9 +69,9 @@ namespace gglab::win32
 		{
 			return {};
 		}
-		const DWORD timeout = timeoutMilliseconds == std::numeric_limits<std::uint32_t>::max()
-			? INFINITE
-			: timeoutMilliseconds;
+		const DWORD timeout = timeoutMilliseconds == std::numeric_limits<std::uint32_t>::max() ?
+			INFINITE :
+			timeoutMilliseconds;
 		switch (::WaitForSingleObject(static_cast<HANDLE>(m_Handle), timeout))
 		{
 		case WAIT_OBJECT_0:

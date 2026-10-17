@@ -70,8 +70,9 @@ namespace gglab
 		{
 			return RGCompiledResourceStatus::Unavailable;
 		}
-		return resources[slot.m_VirtualResourceIndex.Value()].m_RefCount > 0
-			? RGCompiledResourceStatus::Referenced : RGCompiledResourceStatus::Culled;
+		return resources[slot.m_VirtualResourceIndex.Value()].m_RefCount > 0 ?
+			RGCompiledResourceStatus::Referenced :
+			RGCompiledResourceStatus::Culled;
 	}
 
 	void RenderGraph::EnableExecutionRecord() noexcept

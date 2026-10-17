@@ -91,9 +91,9 @@ namespace gglab
 	[[nodiscard]] constexpr inline const RHIFormatInfo& GetRHIFormatInfo(RHIFormat format) noexcept
 	{
 		const size_t index = static_cast<size_t>(format);
-		return index < detail::RHIFormatInfos.size()
-			? detail::RHIFormatInfos[index]
-			: detail::RHIFormatInfos[static_cast<size_t>(RHIFormat::Unknown)];
+		return index < detail::RHIFormatInfos.size() ?
+			detail::RHIFormatInfos[index] :
+			detail::RHIFormatInfos[static_cast<size_t>(RHIFormat::Unknown)];
 	}
 
 	[[nodiscard]] constexpr inline bool AreRHIFormatsInSameFamily(

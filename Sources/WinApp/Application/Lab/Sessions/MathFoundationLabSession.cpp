@@ -140,8 +140,9 @@ namespace gglab
 		case MathTopic::Quaternion:
 		{
 			const bool animate = GetParameters().Get(AnimateId, true);
-			const float t = animate ? 0.5f + 0.5f * std::sin(m_ElapsedTime)
-				: GetParameters().Get(InterpolationId, 0.5f);
+			const float t = animate ?
+				0.5f + 0.5f * std::sin(m_ElapsedTime) :
+				GetParameters().Get(InterpolationId, 0.5f);
 			DrawQuaternionValidation(debugDraw, t);
 			break;
 		}

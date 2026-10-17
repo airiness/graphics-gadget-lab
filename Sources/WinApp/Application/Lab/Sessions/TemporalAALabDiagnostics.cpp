@@ -70,12 +70,14 @@ namespace gglab
 					ResolveTemporalAAFeedbackSaturationAge(requested.m_MaxHistoryFeedback),
 					ResolveTemporalAAMaxHistorySamples(requested.m_MaxHistoryFeedback),
 					TemporalHistoryMaxAccumulation) });
-			allocation.m_Status = consumer.IsActive() && history.m_HasActiveHistory
-				? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending;
-			allocation.m_Detail = consumer.IsActive()
-				? (history.m_HasActiveHistory ? "The current TAA plan has an active history allocation."
-					: "The current TAA plan is active; history allocation is pending.")
-				: std::format("TAA is {} ({}); retained history alone does not establish activity.",
+			allocation.m_Status = consumer.IsActive() && history.m_HasActiveHistory ?
+				LabDiagnosticCheckStatus::Passed :
+				LabDiagnosticCheckStatus::Pending;
+			allocation.m_Detail = consumer.IsActive() ?
+				(history.m_HasActiveHistory ?
+					"The current TAA plan has an active history allocation." :
+					"The current TAA plan is active; history allocation is pending.") :
+				std::format("TAA is {} ({}); retained history alone does not establish activity.",
 					GetTemporalConsumerStatusName(consumer.m_Status),
 					GetTemporalConsumerDisableReasonName(consumer.m_DisableReason));
 		}

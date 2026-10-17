@@ -215,8 +215,9 @@ namespace gglab
 		const auto& value = *record;
 		const uint64_t anomalies = uint64_t{ value.m_NanCount } + value.m_PositiveInfCount + value.m_NegativeInfCount;
 		if (anomalies + value.m_FiniteCount != expectedScalarCount ||
-			(anomalies == 0 ? value.m_FirstNonFiniteIndex != NonFiniteNoIndex
-				: value.m_FirstNonFiniteIndex >= expectedScalarCount))
+			(anomalies == 0 ?
+				value.m_FirstNonFiniteIndex != NonFiniteNoIndex :
+				value.m_FirstNonFiniteIndex >= expectedScalarCount))
 		{
 			return result;
 		}
@@ -377,7 +378,8 @@ namespace gglab
 			frame.m_Sites.reserve(nonfinite::SiteCount * nonfinite::ProgramCount);
 			const auto policy = [](std::string_view kind)
 				{
-					return NonFiniteClampPolicy{ kind == "error" ? NonFiniteClampPolicyKind::Error :
+					return NonFiniteClampPolicy{ kind == "error" ?
+						NonFiniteClampPolicyKind::Error :
 						kind == "expected" ? NonFiniteClampPolicyKind::Expected : NonFiniteClampPolicyKind::Report };
 				};
 			for (uint32_t program = 0; program < nonfinite::ProgramCount; ++program)

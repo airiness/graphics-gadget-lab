@@ -121,14 +121,14 @@ namespace gglab
 			for (uint32_t lightOffset = 0; lightOffset < selectedLightCount; ++lightOffset)
 			{
 				const uint32_t globalLightIndex = selected.m_LightIndices[lightOffset];
-				const uint32_t lightTableIndex = globalLightIndex >= resources->m_LightBaseIndex
-					? globalLightIndex - resources->m_LightBaseIndex
-					: ForwardPlusTileLightCapacity;
+				const uint32_t lightTableIndex = globalLightIndex >= resources->m_LightBaseIndex ?
+					globalLightIndex - resources->m_LightBaseIndex :
+					ForwardPlusTileLightCapacity;
 				snapshot.m_SelectedLights.push_back({
 					.m_GlobalLightIndex = globalLightIndex,
-					.m_LightType = lightTableIndex < resources->m_LightTypesByIndex.size()
-						? resources->m_LightTypesByIndex[lightTableIndex]
-						: std::numeric_limits<uint32_t>::max(),
+					.m_LightType = lightTableIndex < resources->m_LightTypesByIndex.size() ?
+						resources->m_LightTypesByIndex[lightTableIndex] :
+						std::numeric_limits<uint32_t>::max(),
 					});
 			}
 		}

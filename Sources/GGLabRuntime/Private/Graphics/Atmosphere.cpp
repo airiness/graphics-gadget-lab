@@ -50,10 +50,14 @@ namespace gglab
 		const double z = static_cast<double>(camera.m_Z) * scale - centerZ;
 		const double radius = std::sqrt(x * x + y * y + z * z);
 		const bool valid = std::isfinite(radius) && radius > 1.0;
-		const float mu = valid ? static_cast<float>(-(x * sun.m_Direction.m_X + y * sun.m_Direction.m_Y +
-			z * sun.m_Direction.m_Z) / radius) : -sun.m_Direction.m_Y;
-		a.m_Observer = Vector4(valid ? std::clamp(static_cast<float>(radius * 0.001), bottom + 0.001f,
-			bottom + height - 0.001f) : bottom + 0.001f, std::clamp(mu, -1.0f, 1.0f), 0.0f, 0.0f);
+		const float mu = valid ?
+			static_cast<float>(-(x * sun.m_Direction.m_X + y * sun.m_Direction.m_Y +
+				z * sun.m_Direction.m_Z) / radius) :
+			-sun.m_Direction.m_Y;
+		a.m_Observer = Vector4(valid ?
+			std::clamp(static_cast<float>(radius * 0.001), bottom + 0.001f,
+				bottom + height - 0.001f) :
+			bottom + 0.001f, std::clamp(mu, -1.0f, 1.0f), 0.0f, 0.0f);
 		return a;
 	}
 	uint32_t AtmosphereDirtyMask(const AtmosphereGPU& previous, const AtmosphereGPU& current) noexcept
@@ -71,8 +75,11 @@ namespace gglab
 		auto skyPrevious = previous;
 		auto skyCurrent = current;
 		skyPrevious.m_World = skyCurrent.m_World = Vector4::Zero;
-		return transmittance ? 7u : multiple ? 6u :
-			std::memcmp(&skyPrevious, &skyCurrent, sizeof(current)) != 0 ? 4u : 0u;
+		return transmittance ?
+			7u :
+			multiple ?
+				6u :
+				std::memcmp(&skyPrevious, &skyCurrent, sizeof(current)) != 0 ? 4u : 0u;
 	}
 	Vector3 EvaluateAtmosphereTransmittance(const AtmosphereGPU& a, float altitudeMeters,
 		float mu, float distanceMeters) noexcept

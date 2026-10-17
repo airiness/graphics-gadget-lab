@@ -299,9 +299,10 @@ namespace gglab
 		const float farMarkerRatio =
 			m_FarPlane > 0.0f ? m_InitialFarMarkerViewDistance / m_FarPlane : 0.0f;
 		const Camera& camera = GetCamera();
-		const float expectedAspect = m_ViewportHeight > 0 ? static_cast<float>(m_ViewportWidth) /
-			static_cast<float>(m_ViewportHeight)
-			: 0.0f;
+		const float expectedAspect = m_ViewportHeight > 0 ?
+			static_cast<float>(m_ViewportWidth) /
+				static_cast<float>(m_ViewportHeight) :
+			0.0f;
 		const bool cameraContractMatches = std::abs(camera.GetNear() - m_NearPlane) <= 1.0e-6f &&
 			std::abs(camera.GetFar() - m_FarPlane) <= 1.0e-3f &&
 			m_ViewportWidth > 0 && m_ViewportHeight > 0 &&
@@ -327,12 +328,13 @@ namespace gglab
 		}
 		else if (m_LoadingProgress.IsReady())
 		{
-			fixtureStatus = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-				: LabDiagnosticCheckStatus::Failed;
+			fixtureStatus = m_FixtureConfigured ?
+				LabDiagnosticCheckStatus::Passed :
+				LabDiagnosticCheckStatus::Failed;
 			fixtureDetail =
-				m_FixtureConfigured
-				? "Required alpha, intersection, floor, and far-marker entities have the expected components; pixel correctness remains a visual check."
-				: "Scene preparation completed, but one or more required fixture components are missing.";
+				m_FixtureConfigured ?
+					"Required alpha, intersection, floor, and far-marker entities have the expected components; pixel correctness remains a visual check." :
+					"Scene preparation completed, but one or more required fixture components are missing.";
 		}
 		diagnostics.m_Title = "Sampleable Reversed-Z Depth";
 		diagnostics.m_Metrics = {
@@ -347,21 +349,24 @@ namespace gglab
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "Configured near/far ratio",
-				.m_Status = ratio >= 10000.0f ? LabDiagnosticCheckStatus::Passed
-											  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = ratio >= 10000.0f ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "The configured camera range is at least 10,000:1.",
 			},
 			{
 				.m_Name = "Current camera contract",
-				.m_Status = cameraContractMatches ? LabDiagnosticCheckStatus::Passed
-												  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = cameraContractMatches ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"Camera near/far and aspect match the current Lab parameters and viewport.",
 			},
 			{
 				.m_Name = "Depth preview executed",
-				.m_Status = depthPreviewExecuted ? LabDiagnosticCheckStatus::Passed
-												 : LabDiagnosticCheckStatus::Pending,
+				.m_Status = depthPreviewExecuted ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "A depth preview was published after this Lab entered.",
 			},
 			{

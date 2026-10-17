@@ -78,8 +78,9 @@ namespace gglab
 			{
 				return "-";
 			}
-			return shader.m_DebugName.empty() ? devtools::RHIHandleText(shader.m_Handle)
-				: shader.m_DebugName;
+			return shader.m_DebugName.empty() ?
+				devtools::RHIHandleText(shader.m_Handle) :
+				shader.m_DebugName;
 		}
 
 		std::string RenderTargetFormatsText(const RHIPipelineSnapshot& pipeline)
@@ -246,9 +247,9 @@ namespace gglab
 			};
 			const StageEntry computeStages[] = { { "CS", &pipeline.m_ComputeShader } };
 			const std::span<const StageEntry> stages =
-				pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-				? std::span<const StageEntry>(graphicsStages)
-				: std::span<const StageEntry>(computeStages);
+				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+					std::span<const StageEntry>(graphicsStages) :
+					std::span<const StageEntry>(computeStages);
 			if (ImGui::BeginTable("PipelineShaders", 4,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
@@ -271,9 +272,9 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(handle.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(stage.m_Shader->m_DebugName.empty()
-						? "-"
-						: stage.m_Shader->m_DebugName.c_str());
+					ImGui::TextUnformatted(stage.m_Shader->m_DebugName.empty() ?
+						"-" :
+						stage.m_Shader->m_DebugName.c_str());
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(hash.c_str());
 				}
@@ -379,9 +380,9 @@ namespace gglab
 				ImGui::TableHeadersRow();
 				for (const auto& pass : pipeline.m_RenderPasses)
 				{
-					const std::string category = pass.m_CategoryName.empty()
-						? devtools::EnumText(pass.m_Category)
-						: pass.m_CategoryName;
+					const std::string category = pass.m_CategoryName.empty() ?
+						devtools::EnumText(pass.m_Category) :
+						pass.m_CategoryName;
 					const std::string type = devtools::EnumText(pass.m_Type);
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -453,14 +454,14 @@ namespace gglab
 					const std::string handle = devtools::RHIHandleText(pipeline.m_Handle);
 					const std::string layout = devtools::RHIHandleText(pipeline.m_BindingLayout);
 					const std::string primaryShader =
-						ShaderSummary(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-							? pipeline.m_VertexShader
-							: pipeline.m_ComputeShader);
+						ShaderSummary(pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+							pipeline.m_VertexShader :
+							pipeline.m_ComputeShader);
 					const std::string pixelShader = ShaderSummary(pipeline.m_PixelShader);
 					const std::string usages = PipelineUsagesText(pipeline);
-					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-						? RenderTargetFormatsText(pipeline)
-						: "-";
+					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+						RenderTargetFormatsText(pipeline) :
+						"-";
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
 					if (ImGui::Selectable(handle.c_str(),
@@ -470,9 +471,9 @@ namespace gglab
 						state.m_SelectedPipeline = pipeline.m_Handle.Index();
 					}
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-						? "Graphics"
-						: "Compute");
+					ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+						"Graphics" :
+						"Compute");
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(pipeline.m_Alive ? "Yes" : "No");
 					ImGui::TableSetColumnIndex(3);
@@ -525,8 +526,9 @@ namespace gglab
 	void PipelineSystemPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		const auto* snapshotPtr =
-			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>() :
+				nullptr;
 		if (!snapshotPtr)
 		{
 			ImGui::TextDisabled("Pipeline snapshot provider is not available.");

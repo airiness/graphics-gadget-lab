@@ -110,8 +110,9 @@ namespace gglab
 			sceneSource == SceneSource::MaterialReferences);
 		const bool registered = GetCameraRig().SetReferenceViews({ references.begin(), references.end() });
 		GGLAB_ASSERT_MSG(registered, "Lighting contract scene reference views must be valid.");
-		m_PendingModelPath = sceneSource == SceneSource::MaterialReferences
-			? MaterialReferenceModelPath : LightingContractModelPath;
+		m_PendingModelPath = sceneSource == SceneSource::MaterialReferences ?
+			MaterialReferenceModelPath :
+			LightingContractModelPath;
 		m_PendingModelId = GetAssetOwnerScope().LoadModelAsync(m_PendingModelPath).m_ModelId;
 		m_LoadingProgress = {
 			.m_Status = m_PendingModelId.IsValid() ? LoadingStatus::Preparing : LoadingStatus::Failed,

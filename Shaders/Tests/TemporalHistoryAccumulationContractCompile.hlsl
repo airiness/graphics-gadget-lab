@@ -29,8 +29,9 @@ float4 TestFractionalHistoryCapacity() : SV_Target0
 {
 	return NearAccumulation(ResolveTemporalAAMaxHistorySamples(0.2), 0.25) &&
 		NearAccumulation(ResolveTemporalAAMaxHistorySamples(0.25), 1.0 / 3.0) &&
-		ResolveTemporalAAMaxHistorySamples(0.5) == 1.0
-		? 0.0.xxxx : 1.0.xxxx;
+		ResolveTemporalAAMaxHistorySamples(0.5) == 1.0 ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 float4 TestUnitSampleMatchesNativeFeedback() : SV_Target0
@@ -59,8 +60,9 @@ float4 TestLowFeedbackWeightedGoldens() : SV_Target0
 	return NearAccumulation(ComputeTemporalWeightedHistoryWeight(32.0, 1.0, capacity, 1.0), 0.2) &&
 		NearAccumulation(ComputeTemporalWeightedHistoryWeight(32.0, 1.0, capacity, 0.25), 0.5) &&
 		NearAccumulation(ComputeTemporalWeightedHistoryWeight(32.0, 0.5, capacity, 0.25), 0.25) &&
-		ComputeTemporalWeightedHistoryWeight(32.0, 0.0, capacity, 0.25) == 0.0
-		? 0.0.xxxx : 1.0.xxxx;
+		ComputeTemporalWeightedHistoryWeight(32.0, 0.0, capacity, 0.25) == 0.0 ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 float4 TestLowCapacityStorageRemainsValid() : SV_Target0
@@ -87,8 +89,9 @@ float4 TestRejectedAccumulationRestarts() : SV_Target0
 		ResolveTemporalHistoryNextSamples(true, 32.0, nan, capacity, 0.25) == 1.0 &&
 		ComputeTemporalWeightedHistoryWeight(0.0, 1.0, capacity, 0.25) == 0.0 &&
 		ComputeTemporalWeightedHistoryWeight(256.0, 1.0, capacity, 0.25) == 0.0 &&
-		ComputeTemporalWeightedHistoryWeight(32.0, nan, capacity, 0.25) == 0.0
-		? 0.0.xxxx : 1.0.xxxx;
+		ComputeTemporalWeightedHistoryWeight(32.0, nan, capacity, 0.25) == 0.0 ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 float4 TestFeedbackMonotonicity() : SV_Target0
@@ -133,8 +136,9 @@ float4 TestDefaultFeedbackCompatibility() : SV_Target0
 		ResolveTemporalHistoryNextSamples(true, 20.0, 1.0, capacity, 0.25) == 20.25 &&
 		ResolveTemporalHistoryNextSamples(true, 20.0, 0.5, capacity, 1.0) == 11.0 &&
 		NearAccumulation(ComputeTemporalWeightedHistoryWeight(255.0, 1.0, capacity, 1.0), feedback) &&
-		ComputeTemporalWeightedHistoryWeight(255.0, 1.0, capacity, 0.001) > 0.999
-		? 0.0.xxxx : 1.0.xxxx;
+		ComputeTemporalWeightedHistoryWeight(255.0, 1.0, capacity, 0.001) > 0.999 ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 float4 TestFeedbackCapacityTransition() : SV_Target0
@@ -144,16 +148,18 @@ float4 TestFeedbackCapacityTransition() : SV_Target0
 	const float enabled = ResolveTemporalAAMaxHistorySamples(0.97);
 	return next == 1.0 &&
 		NearAccumulation(ComputeTemporalWeightedHistoryWeight(next, 1.0, enabled, 0.25), 0.8) &&
-		ResolveTemporalHistoryNextSamples(true, next, 1.0, enabled, 0.25) == 1.25
-		? 0.0.xxxx : 1.0.xxxx;
+		ResolveTemporalHistoryNextSamples(true, next, 1.0, enabled, 0.25) == 1.25 ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 float4 TestInvalidFeedbackHasNoCapacity() : SV_Target0
 {
 	return ResolveTemporalAAMaxHistorySamples(asfloat(0x7fc00000u)) == 0.0 &&
 		ResolveTemporalAAMaxHistorySamples(asfloat(0x7f800000u)) == 0.0 &&
-		ResolveTemporalAAMaxHistorySamples(-1.0) == 0.0
-		? 0.0.xxxx : 1.0.xxxx;
+		ResolveTemporalAAMaxHistorySamples(-1.0) == 0.0 ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)

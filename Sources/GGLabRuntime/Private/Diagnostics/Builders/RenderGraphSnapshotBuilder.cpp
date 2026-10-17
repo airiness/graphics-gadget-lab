@@ -55,9 +55,9 @@ namespace gglab
 			{
 				const auto* texture =
 					static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
-				const RHITextureHandle handle = texture->m_Imported
-					? texture->m_ImportedHandle
-					: texture->m_PhysicalAllocation.m_Texture;
+				const RHITextureHandle handle = texture->m_Imported ?
+					texture->m_ImportedHandle :
+					texture->m_PhysicalAllocation.m_Texture;
 				info.m_HasPhysicalHandle = handle.IsValid();
 				info.m_PhysicalHandleIndex = handle.Index();
 				info.m_PhysicalHandleGeneration = handle.Generation();
@@ -66,9 +66,9 @@ namespace gglab
 
 			const auto* buffer =
 				static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
-			const RHIBufferHandle handle = buffer->m_Imported
-				? buffer->m_ImportedHandle
-				: buffer->m_PhysicalAllocation.m_Buffer;
+			const RHIBufferHandle handle = buffer->m_Imported ?
+				buffer->m_ImportedHandle :
+				buffer->m_PhysicalAllocation.m_Buffer;
 			info.m_HasPhysicalHandle = handle.IsValid();
 			info.m_PhysicalHandleIndex = handle.Index();
 			info.m_PhysicalHandleGeneration = handle.Generation();
@@ -130,9 +130,9 @@ namespace gglab
 				{
 					const auto& declaration = m_PassNodes[passIndex];
 					const RGCompiledPass* compiledPass =
-						m_ExecutionPlan && passIndex < m_ExecutionPlan->GetPasses().size()
-						? &m_ExecutionPlan->GetPasses()[passIndex]
-						: nullptr;
+						m_ExecutionPlan && passIndex < m_ExecutionPlan->GetPasses().size() ?
+							&m_ExecutionPlan->GetPasses()[passIndex] :
+							nullptr;
 
 					RGSnapshotPassInfo passInfo = {};
 					passInfo.m_Index = passIndex;
@@ -199,9 +199,9 @@ namespace gglab
 				{
 					const auto* virtualResource = m_VirtualResources[resourceIndex];
 					const RGCompiledResource* compiledResource =
-						m_ExecutionPlan && resourceIndex < m_ExecutionPlan->GetResources().size()
-						? &m_ExecutionPlan->GetResources()[resourceIndex]
-						: nullptr;
+						m_ExecutionPlan && resourceIndex < m_ExecutionPlan->GetResources().size() ?
+							&m_ExecutionPlan->GetResources()[resourceIndex] :
+							nullptr;
 					GGLAB_ASSERT_NOT_NULL(virtualResource);
 
 					RGSnapshotResourceInfo resourceInfo = {};
@@ -236,23 +236,27 @@ namespace gglab
 						resourceInfo.m_BufferSizeInBytes = buffer->m_Desc.m_SizeInBytes;
 						resourceInfo.m_BufferStrideInBytes = buffer->m_Desc.m_StrideInBytes;
 					}
-					resourceInfo.m_ExportPassIndex = compiledResource
-						? ToSnapshotPassIndex(compiledResource->m_ExportPass) : -1;
+					resourceInfo.m_ExportPassIndex = compiledResource ?
+						ToSnapshotPassIndex(compiledResource->m_ExportPass) :
+						-1;
 					resourceInfo.m_PoolSlot = GetVirtualResourcePoolSlot(virtualResource);
 					resourceInfo.m_InitialBarrierState =
-						compiledResource ? compiledResource->m_InitialState
-						: virtualResource->m_InitialBarrierState;
+						compiledResource ?
+							compiledResource->m_InitialState :
+							virtualResource->m_InitialBarrierState;
 					resourceInfo.m_HasFinalBarrierState =
-						compiledResource ? compiledResource->m_FinalState.has_value()
-						: virtualResource->m_FinalBarrierState.has_value();
+						compiledResource ?
+							compiledResource->m_FinalState.has_value() :
+							virtualResource->m_FinalBarrierState.has_value();
 					resourceInfo.m_FinalBarrierState =
-						compiledResource
-						? compiledResource->m_FinalState.value_or(CommonRHIResourceState())
-						: virtualResource->m_FinalBarrierState.value_or(
-							CommonRHIResourceState());
+						compiledResource ?
+							compiledResource->m_FinalState.value_or(CommonRHIResourceState()) :
+							virtualResource->m_FinalBarrierState.value_or(
+								CommonRHIResourceState());
 					resourceInfo.m_FinalBarrierSubresources =
-						compiledResource ? compiledResource->m_FinalSubresources
-						: virtualResource->m_FinalBarrierSubresources;
+						compiledResource ?
+							compiledResource->m_FinalSubresources :
+							virtualResource->m_FinalBarrierSubresources;
 					if (virtualResource->m_NameId.Name().empty())
 					{
 						resourceInfo.m_ResourceExportSupport = RGObservationFailure::UnknownResource;
@@ -277,14 +281,14 @@ namespace gglab
 						LookupVirtualResourceIndex(resourceNode.m_VirtualResource);
 					resourceNodeInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());
 					resourceNodeInfo.m_ResourceType =
-						resourceNode.m_VirtualResource
-						? resourceNode.m_VirtualResource->m_ResourceType
-						: RGResourceType::RGTexture;
+						resourceNode.m_VirtualResource ?
+							resourceNode.m_VirtualResource->m_ResourceType :
+							RGResourceType::RGTexture;
 					resourceNodeInfo.m_WriterPassIndex = ToSnapshotPassIndex(resourceNode.m_Writer);
 					resourceNodeInfo.m_PreviousResourceNodeIndex =
-						resourceNode.m_Previous.IsValid()
-						? static_cast<int32_t>(resourceNode.m_Previous.Value())
-						: -1;
+						resourceNode.m_Previous.IsValid() ?
+							static_cast<int32_t>(resourceNode.m_Previous.Value()) :
+							-1;
 					resourceNodeInfo.m_ReaderPassIndices.reserve(resourceNode.m_Readers.size());
 					for (const auto readerPassIndex : resourceNode.m_Readers)
 					{
@@ -387,8 +391,9 @@ namespace gglab
 				}
 
 				auto iter = m_VirtualResourceIndices.find(virtualResource);
-				return iter != m_VirtualResourceIndices.end() ? iter->second
-					: InvalidSnapshotResourceIndex;
+				return iter != m_VirtualResourceIndices.end() ?
+					iter->second :
+					InvalidSnapshotResourceIndex;
 			}
 
 		private:

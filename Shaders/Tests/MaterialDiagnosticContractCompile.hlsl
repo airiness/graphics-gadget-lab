@@ -81,7 +81,8 @@ float4 PSMain() : SV_Target0
 			const float3 stored = EncodeSceneColor(float3(4.0, 8.0, 16.0), preExposure);
 			const float3 actual = ResolveDisplayColor(stored, exposure / preExposure,
 				color, diagnostic ? 1.0 : 0.0);
-			const float3 expected = diagnostic ? LinearToSRGB(expectedColors[testCase]) :
+			const float3 expected = diagnostic ?
+				LinearToSRGB(expectedColors[testCase]) :
 				LinearToSRGB(ACESFitted(stored * (exposure / preExposure)));
 			matches = matches && CloseDisplayColor(actual, expected);
 		}

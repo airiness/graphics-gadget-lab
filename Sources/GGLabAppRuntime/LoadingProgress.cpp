@@ -58,9 +58,9 @@ namespace gglab
 		std::string combinedDetail(detail);
 		if (!progress.m_Detail.empty())
 		{
-			combinedDetail = combinedDetail.empty()
-				? progress.m_Detail
-				: std::format("{} | {}", combinedDetail, progress.m_Detail);
+			combinedDetail = combinedDetail.empty() ?
+				progress.m_Detail :
+				std::format("{} | {}", combinedDetail, progress.m_Detail);
 		}
 
 		AddStep(weight,
@@ -84,14 +84,14 @@ namespace gglab
 	LoadingProgress LoadingProgressBuilder::Build() const noexcept
 	{
 		const LoadingStatus status =
-			m_HasFailedStep
-			? LoadingStatus::Failed
-			: (m_HasPreparingStep ? LoadingStatus::Preparing : LoadingStatus::Ready);
+			m_HasFailedStep ?
+				LoadingStatus::Failed :
+				(m_HasPreparingStep ? LoadingStatus::Preparing : LoadingStatus::Ready);
 		return {
 			.m_Status = status,
-			.m_Fraction = status == LoadingStatus::Ready
-				? 1.0f
-				: (m_TotalWeight > 0.0f ? m_WeightedFraction / m_TotalWeight : 0.0f),
+			.m_Fraction = status == LoadingStatus::Ready ?
+				1.0f :
+				(m_TotalWeight > 0.0f ? m_WeightedFraction / m_TotalWeight : 0.0f),
 			.m_Title = m_Title,
 			.m_Stage = m_CurrentStage,
 			.m_Detail = m_CurrentDetail,

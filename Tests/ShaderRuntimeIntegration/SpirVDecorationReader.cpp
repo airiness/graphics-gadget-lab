@@ -226,7 +226,7 @@ namespace gglab
 				{
 					uint16_t nextWord = 0;
 					if (!ReadLiteralString(operands, wordCount, 3,
-							memberNames[MemberKey(operands[1], operands[2])], nextWord))
+						memberNames[MemberKey(operands[1], operands[2])], nextWord))
 					{
 						outReflection.m_Error = "SPIR-V member name is not terminated";
 						return false;
@@ -366,7 +366,7 @@ namespace gglab
 				layout.m_Members.push_back({
 					.m_Name = memberNameIterator->second,
 					.m_Offset = *decorationIterator->second.m_Offset,
-				});
+					});
 				const auto typeSize = typeSizes.find(memberTypes[member]);
 				if (typeSize == typeSizes.end())
 				{
@@ -401,7 +401,8 @@ namespace gglab
 			}
 		}
 		std::ranges::sort(
-			outReflection.m_StructLayouts, [](const auto& lhs, const auto& rhs) noexcept {
+			outReflection.m_StructLayouts, [](const auto& lhs, const auto& rhs) noexcept
+			{
 				return std::tie(lhs.m_Name, lhs.m_TypeId) < std::tie(rhs.m_Name, rhs.m_TypeId);
 			});
 

@@ -132,9 +132,9 @@ namespace gglab
 		{
 			return {};
 		}
-		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid()
-			? RHIShaderHandle{ recipe.m_CSId.Value(), 1u }
-		: RHIShaderHandle{};
+		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid() ?
+			RHIShaderHandle{ recipe.m_CSId.Value(), 1u } :
+			RHIShaderHandle{};
 		createInfo.m_ComputeShader = shaderSnapshots[0].m_Bytecode;
 		slot.m_Pipeline = m_PipelineSystem->CreateComputePipeline(createInfo);
 		slot.m_Recipe = recipe;

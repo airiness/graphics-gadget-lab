@@ -151,8 +151,9 @@ namespace gglab
 
 	VulkanBeginGateOutcome ClassifyVulkanBeginGateResult(const VkResult waitResult) noexcept
 	{
-		return waitResult == VK_SUCCESS ? VulkanBeginGateOutcome::Ready
-			: VulkanBeginGateOutcome::Fatal;
+		return waitResult == VK_SUCCESS ?
+			VulkanBeginGateOutcome::Ready :
+			VulkanBeginGateOutcome::Fatal;
 	}
 
 	VulkanFrameIndexModel::VulkanFrameIndexModel(uint32_t frameSlotCount) noexcept
@@ -189,9 +190,9 @@ namespace gglab
 
 	VulkanPresentImageLayout VulkanImageLayoutTracker::Get(uint32_t image) const noexcept
 	{
-		return image < m_Layouts.size()
-			? m_Layouts[image]
-			: VulkanPresentImageLayout::Undefined;
+		return image < m_Layouts.size() ?
+			m_Layouts[image] :
+			VulkanPresentImageLayout::Undefined;
 	}
 
 	void VulkanImageLayoutTracker::Set(uint32_t image, VulkanPresentImageLayout layout) noexcept
@@ -580,9 +581,9 @@ namespace gglab
 		if (transitionOwnership == VulkanPresentTransitionOwnership::FrameRuntime)
 		{
 			const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(active.m_BackBufferIndex);
-			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present
-				? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-				: VK_IMAGE_LAYOUT_UNDEFINED;
+			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present ?
+				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR :
+				VK_IMAGE_LAYOUT_UNDEFINED;
 			const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
 				oldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true, true);
 			VkDependencyInfo dependencyInfo{};
@@ -662,10 +663,10 @@ namespace gglab
 		VulkanSubmitPresentResult submitPresent =
 			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
 				slot.m_NormalCommandBuffer);
-		const bool snapshotAccepted = submitPresent.m_Submitted
-			? m_Device->GetDescriptorManager().SubmitFrameSnapshot(
-				active.m_FrameSlotIndex, submitPresent.m_SubmittedFencePoint)
-			: m_Device->GetDescriptorManager().AbortFrameSnapshot(active.m_FrameSlotIndex);
+		const bool snapshotAccepted = submitPresent.m_Submitted ?
+			m_Device->GetDescriptorManager().SubmitFrameSnapshot(
+				active.m_FrameSlotIndex, submitPresent.m_SubmittedFencePoint) :
+			m_Device->GetDescriptorManager().AbortFrameSnapshot(active.m_FrameSlotIndex);
 		if (!snapshotAccepted)
 		{
 			MarkFatal(VK_ERROR_INITIALIZATION_FAILED,
@@ -744,9 +745,9 @@ namespace gglab
 	{
 		if (m_Fatal || m_SwapChain == nullptr)
 		{
-			outError = m_Fatal
-				? "Cannot recreate the swapchain after a fatal runtime error."
-				: "No swapchain to recreate.";
+			outError = m_Fatal ?
+				"Cannot recreate the swapchain after a fatal runtime error." :
+				"No swapchain to recreate.";
 			return false;
 		}
 		// Swapchain recreation is a safe point: no frame may be active and no
@@ -772,9 +773,9 @@ namespace gglab
 	{
 		if (m_Fatal || m_SwapChain == nullptr)
 		{
-			outError = m_Fatal
-				? "Cannot recreate the swapchain after a fatal runtime error."
-				: "No swapchain to recreate.";
+			outError = m_Fatal ?
+				"Cannot recreate the swapchain after a fatal runtime error." :
+				"No swapchain to recreate.";
 			return false;
 		}
 		if (width == 0 || height == 0)
@@ -854,9 +855,9 @@ namespace gglab
 		const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(backBufferIndex);
 		if (tracked != VulkanPresentImageLayout::Present)
 		{
-			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::ColorAttachment
-				? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-				: VK_IMAGE_LAYOUT_UNDEFINED;
+			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::ColorAttachment ?
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL :
+				VK_IMAGE_LAYOUT_UNDEFINED;
 			const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
 				oldLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, tracked == VulkanPresentImageLayout::ColorAttachment,
 				false);
@@ -991,9 +992,9 @@ namespace gglab
 
 	VkSemaphore VulkanFrameRuntime::GetImageAvailableSemaphore(uint32_t frameSlotIndex) const noexcept
 	{
-		return frameSlotIndex < m_FrameSlots.size()
-			? m_FrameSlots[frameSlotIndex].m_ImageAvailable
-			: VK_NULL_HANDLE;
+		return frameSlotIndex < m_FrameSlots.size() ?
+			m_FrameSlots[frameSlotIndex].m_ImageAvailable :
+			VK_NULL_HANDLE;
 	}
 
 	VkSemaphore VulkanFrameRuntime::GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept

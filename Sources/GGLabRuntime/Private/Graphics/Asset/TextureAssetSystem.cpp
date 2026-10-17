@@ -101,9 +101,11 @@ namespace gglab
 		[[nodiscard]] constexpr AssetStateEventOperationPhase ResidencyStateEventPhase(
 			const AssetResidencyOperation& operation, bool completes = false) noexcept
 		{
-			return !operation.IsValid() ? AssetStateEventOperationPhase::None
-				: completes ? AssetStateEventOperationPhase::Completes
-				: AssetStateEventOperationPhase::InProgress;
+			return !operation.IsValid() ?
+				AssetStateEventOperationPhase::None :
+				completes ?
+					AssetStateEventOperationPhase::Completes :
+					AssetStateEventOperationPhase::InProgress;
 		}
 
 	}
@@ -261,10 +263,10 @@ namespace gglab
 				texture->m_State != AssetState::Cancelled)
 			{
 				const TaskHandle task =
-					texture->m_State == AssetState::CpuReady && !texture->m_Load.m_IsReloading
-					? TaskHandle{}
-					: m_LoadCoordinator->GetTextureDecodeTask(
-						MakeAssetContentVersion(existing, texture->m_ContentGeneration));
+					texture->m_State == AssetState::CpuReady && !texture->m_Load.m_IsReloading ?
+						TaskHandle{} :
+						m_LoadCoordinator->GetTextureDecodeTask(
+							MakeAssetContentVersion(existing, texture->m_ContentGeneration));
 				return {
 					.m_TextureId = existing,
 					.m_Generation = texture->m_ContentGeneration,
@@ -333,9 +335,9 @@ namespace gglab
 				residencyReload ? texture->m_Source.m_SourceDigest : SourceDigest{},
 			.m_ExpectedDerivedDataKey =
 				residencyReload ? texture->m_Source.m_DerivedDataKey : DerivedDataKey{},
-			.m_ExpectedArtifactContentDigest = residencyReload
-												   ? texture->m_Source.m_ArtifactContentDigest
-												   : ArtifactContentDigest{},
+			.m_ExpectedArtifactContentDigest = residencyReload ?
+				texture->m_Source.m_ArtifactContentDigest :
+				ArtifactContentDigest{},
 			.m_ResidencyReload = residencyReload,
 			.m_ResidencyOperation = residencyOperation,
 			});
@@ -571,10 +573,12 @@ namespace gglab
 	TextureContentRef TextureAssetSystem::GetTextureContentRef(TextureID textureId) const noexcept
 	{
 		const Texture* texture = GetTexture(textureId);
-		return texture ? TextureContentRef{
-			.m_Id = textureId,
-			.m_Generation = texture->m_ContentGeneration,
-		} : TextureContentRef{};
+		return texture ?
+			TextureContentRef{
+				.m_Id = textureId,
+				.m_Generation = texture->m_ContentGeneration,
+			} :
+			TextureContentRef{};
 	}
 
 	std::optional<AssetContentFingerprint> TextureAssetSystem::GetTextureContentFingerprint(
@@ -652,8 +656,9 @@ namespace gglab
 				.m_Name = texture->m_Name,
 				.m_Texture = texture->m_Gpu.m_Texture,
 				.m_DebugName =
-					m_Device ? std::string(m_Device->GetTextureDebugName(texture->m_Gpu.m_Texture))
-							 : std::string{},
+					m_Device ?
+						std::string(m_Device->GetTextureDebugName(texture->m_Gpu.m_Texture)) :
+						std::string{},
 				.m_ArtifactContentDigest = texture->m_Source.m_ArtifactContentDigest,
 				.m_SourceDigest = texture->m_Source.m_SourceDigest,
 				.m_DerivedDataKey = texture->m_Source.m_DerivedDataKey,
@@ -960,16 +965,17 @@ namespace gglab
 		}
 		const bool residencyReload = texture->m_Load.m_IsReloading;
 		SetTextureState(*texture,
-			cancelled ? (residencyReload ? AssetState::CpuReady : AssetState::Cancelled)
-			: (publishSucceeded
-				? AssetState::Ready
-				: (residencyReload ? AssetState::CpuReady : AssetState::Failed)),
+			cancelled ?
+				(residencyReload ? AssetState::CpuReady : AssetState::Cancelled) :
+				(publishSucceeded ?
+					AssetState::Ready :
+					(residencyReload ? AssetState::CpuReady : AssetState::Failed)),
 			residencyOperation, ResidencyStateEventPhase(residencyOperation, residencyReload));
 		ProgressReporter(texture->m_Load.m_Progress)
 			.Report(publishSucceeded ? 1.0f : 0.96f,
-				publishSucceeded
-				? "Texture ready"
-				: (cancelled ? "Texture upload cancelled" : "Texture GPU upload failed"),
+				publishSucceeded ?
+					"Texture ready" :
+					(cancelled ? "Texture upload cancelled" : "Texture GPU upload failed"),
 				texture->m_DebugLabel);
 		texture->m_Gpu.m_IsUploaded = publishSucceeded;
 		texture->m_Load.m_IsReloading = false;
@@ -1341,8 +1347,9 @@ namespace gglab
 			texture->m_Gpu.m_Texture.IsValid() ? AssetState::GpuProcessing : AssetState::Cancelled);
 		ProgressReporter(texture->m_Load.m_Progress)
 			.Report(0.96f,
-				texture->m_Gpu.m_Texture.IsValid() ? "Texture cancellation pending GPU completion"
-				: "Texture loading cancelled",
+				texture->m_Gpu.m_Texture.IsValid() ?
+					"Texture cancellation pending GPU completion" :
+					"Texture loading cancelled",
 				texture->m_DebugLabel);
 	}
 
@@ -1500,8 +1507,9 @@ namespace gglab
 			{
 				insertedTexture->m_Id = id;
 				BeginAssetContentGeneration(*insertedTexture, 1, AssetState::CpuReady,
-					IsReservedTextureId(id) ? AssetResidencyPolicy::Pinned
-					: AssetResidencyPolicy::Cacheable);
+					IsReservedTextureId(id) ?
+						AssetResidencyPolicy::Pinned :
+						AssetResidencyPolicy::Cacheable);
 				insertedTexture->m_Name = StringID(textureName);
 				insertedTexture->m_Source = {
 					.m_CanonicalPath = sourcePath,

@@ -68,9 +68,9 @@ namespace gglab
 		[[nodiscard]] constexpr ShaderTargetProfile GetTargetProfile(
 			RHIBackendType backend) noexcept
 		{
-			return backend == RHIBackendType::Vulkan
-				? ShaderTargetProfile::GGLabVulkan13
-				: ShaderTargetProfile::GGLabDX12;
+			return backend == RHIBackendType::Vulkan ?
+				ShaderTargetProfile::GGLabVulkan13 :
+				ShaderTargetProfile::GGLabDX12;
 		}
 
 		[[nodiscard]] constexpr std::string_view GetTargetProfileName(

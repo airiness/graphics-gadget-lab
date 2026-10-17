@@ -46,9 +46,9 @@ namespace gglab
 		[[nodiscard]] const void* Get(SnapshotId id) const noexcept
 		{
 			const auto iterator = m_Snapshots.find(id);
-			return iterator == m_Snapshots.end()
-				? nullptr
-				: iterator->second->GetValue();
+			return iterator == m_Snapshots.end() ?
+				nullptr :
+				iterator->second->GetValue();
 		}
 
 		[[nodiscard]] bool Contains(SnapshotId id) const noexcept

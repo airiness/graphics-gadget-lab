@@ -26,9 +26,9 @@ namespace gglab
 		m_Config.m_Alignment = std::max(m_Config.m_Alignment, 1u);
 		const uint64_t alignedPageSize = utils::AlignUp<uint64_t>(
 			m_Config.m_PageSizeInBytes, m_Config.m_Alignment);
-		m_Config.m_PageSizeInBytes = alignedPageSize <= UINT32_MAX
-			? static_cast<uint32_t>(alignedPageSize)
-			: 0;
+		m_Config.m_PageSizeInBytes = alignedPageSize <= UINT32_MAX ?
+			static_cast<uint32_t>(alignedPageSize) :
+			0;
 	}
 
 	VulkanDynamicUniformArenaAllocation VulkanDynamicUniformArena::Allocate(
@@ -262,15 +262,15 @@ namespace gglab
 			.m_End = allocation.m_OffsetInBytes + allocation.m_SizeInBytes,
 			});
 		const VulkanBuffer* native = m_Device->GetResourceManager().ResolveBuffer(slot.m_Buffer);
-		return native
-			? VulkanDynamicUniformAllocation{
+		return native ?
+			VulkanDynamicUniformAllocation{
 				.m_Buffer = slot.m_Buffer,
 				.m_NativeBuffer = native->Get(),
 				.m_DynamicOffset = allocation.m_OffsetInBytes,
 				.m_SizeInBytes = allocation.m_SizeInBytes,
 				.m_PageIndex = allocation.m_PageIndex,
-		}
-		: VulkanDynamicUniformAllocation{};
+			} :
+			VulkanDynamicUniformAllocation{};
 	}
 
 	VkBuffer VulkanDynamicUniformBuffer::GetNativeBuffer(uint32_t frameSlotIndex) const noexcept
@@ -291,17 +291,17 @@ namespace gglab
 
 	uint64_t VulkanDynamicUniformBuffer::GetFrameGeneration(uint32_t frameSlotIndex) const noexcept
 	{
-		return frameSlotIndex < m_FrameSlots.size()
-			? m_FrameSlots[frameSlotIndex].m_FrameGeneration
-			: 0;
+		return frameSlotIndex < m_FrameSlots.size() ?
+			m_FrameSlots[frameSlotIndex].m_FrameGeneration :
+			0;
 	}
 
 	const VulkanDynamicUniformDiagnostics* VulkanDynamicUniformBuffer::GetDiagnostics(
 		uint32_t frameSlotIndex) const noexcept
 	{
-		return frameSlotIndex < m_FrameSlots.size()
-			? &m_FrameSlots[frameSlotIndex].m_Arena->GetDiagnostics()
-			: nullptr;
+		return frameSlotIndex < m_FrameSlots.size() ?
+			&m_FrameSlots[frameSlotIndex].m_Arena->GetDiagnostics() :
+			nullptr;
 	}
 
 	bool VulkanDynamicUniformState::Initialize(const VulkanBindingLayoutPlan& plan) noexcept
@@ -367,9 +367,9 @@ namespace gglab
 	std::span<const std::byte> VulkanDynamicUniformState::GetShadow(
 		uint32_t logicalParameterIndex) const noexcept
 	{
-		return logicalParameterIndex < m_Slots.size()
-			? std::span<const std::byte>(m_Slots[logicalParameterIndex].m_Bytes)
-			: std::span<const std::byte>{};
+		return logicalParameterIndex < m_Slots.size() ?
+			std::span<const std::byte>(m_Slots[logicalParameterIndex].m_Bytes) :
+			std::span<const std::byte>{};
 	}
 
 	VulkanSet0DynamicUniformFrames::~VulkanSet0DynamicUniformFrames() noexcept

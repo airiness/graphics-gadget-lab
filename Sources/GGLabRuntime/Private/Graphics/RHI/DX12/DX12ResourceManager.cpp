@@ -178,9 +178,9 @@ namespace gglab
 			return {};
 		}
 
-		const char* debugNameText = desc.m_RHI.m_External.m_DebugName
-			? desc.m_RHI.m_External.m_DebugName
-			: desc.m_RHI.m_Desc.m_DebugName;
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
 			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
@@ -213,9 +213,9 @@ namespace gglab
 			return {};
 		}
 
-		const char* debugNameText = desc.m_RHI.m_External.m_DebugName
-			? desc.m_RHI.m_External.m_DebugName
-			: desc.m_RHI.m_Desc.m_DebugName;
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
 			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);

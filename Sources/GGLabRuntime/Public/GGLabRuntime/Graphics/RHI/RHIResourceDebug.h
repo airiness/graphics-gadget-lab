@@ -158,8 +158,9 @@ namespace gglab
 	{
 		std::string result(RHIResourceDebugDomainText(identity.m_Domain));
 		result.push_back('.');
-		result.append(identity.m_Category.empty() ? RHIResourceTypeDebugText(type)
-			: std::string_view(identity.m_Category));
+		result.append(identity.m_Category.empty() ?
+			RHIResourceTypeDebugText(type) :
+			std::string_view(identity.m_Category));
 		result.append("[");
 		if (identity.m_StableId)
 		{

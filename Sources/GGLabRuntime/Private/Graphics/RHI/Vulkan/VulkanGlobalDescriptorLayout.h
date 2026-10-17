@@ -52,8 +52,9 @@ namespace gglab
 			VkDescriptorBindingFlags flags = 0;
 			flags |= abi.m_PartiallyBound ? VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT : 0;
 			flags |= abi.m_UpdateAfterBind ? VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT : 0;
-			flags |= abi.m_UpdateUnusedWhilePending
-				? VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT : 0;
+			flags |= abi.m_UpdateUnusedWhilePending ?
+				VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT :
+				0;
 			m_BindingFlags.fill(flags);
 			m_BindingFlagsInfo = {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
@@ -79,8 +80,9 @@ namespace gglab
 			m_LayoutInfo = {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 				.pNext = &m_BindingFlagsInfo,
-				.flags = static_cast<VkDescriptorSetLayoutCreateFlags>(abi.m_UpdateAfterBind
-					? VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT : 0),
+				.flags = static_cast<VkDescriptorSetLayoutCreateFlags>(abi.m_UpdateAfterBind ?
+					VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT :
+					0),
 				.bindingCount = static_cast<uint32_t>(m_Bindings.size()),
 				.pBindings = m_Bindings.data(),
 			};
@@ -94,8 +96,9 @@ namespace gglab
 					.descriptorCount = abi.m_DescriptorCapacity.m_SamplerDescriptorCount,
 				},
 			};
-			m_PoolCreateFlags = static_cast<VkDescriptorPoolCreateFlags>(abi.m_UpdateAfterBind
-				? VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT : 0);
+			m_PoolCreateFlags = static_cast<VkDescriptorPoolCreateFlags>(abi.m_UpdateAfterBind ?
+				VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT :
+				0);
 		}
 
 		VulkanGlobalDescriptorLayoutPlan(const VulkanGlobalDescriptorLayoutPlan&) = delete;

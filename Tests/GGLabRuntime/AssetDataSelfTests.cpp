@@ -128,8 +128,7 @@ namespace gglab
 			{
 				return m_State != nullptr;
 			}
-			[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockGuardBase>
-				Acquire() const noexcept override
+			[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockGuardBase> Acquire() const noexcept override
 			{
 				if (!m_State)
 				{
@@ -161,8 +160,7 @@ namespace gglab
 					return {};
 				}
 				std::error_code errorCode;
-				std::filesystem::path canonicalRoot =
-					std::filesystem::absolute(rootDirectory, errorCode);
+				std::filesystem::path canonicalRoot = std::filesystem::absolute(rootDirectory, errorCode);
 				if (errorCode || canonicalRoot.empty())
 				{
 					return {};
@@ -174,13 +172,12 @@ namespace gglab
 				};
 			}
 
-			[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockBase>
-				CreateMaintenanceLock(
-					const LocalDerivedDataRootIdentity& identity) const noexcept override
+			[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockBase> CreateMaintenanceLock(
+				const LocalDerivedDataRootIdentity& identity) const noexcept override
 			{
-				return identity.IsValid()
-					? std::make_unique<FakeLocalDerivedDataMaintenanceLock>(m_State)
-					: nullptr;
+				return identity.IsValid() ?
+					std::make_unique<FakeLocalDerivedDataMaintenanceLock>(m_State) :
+					nullptr;
 			}
 
 			[[nodiscard]] std::string CreateUniquePathToken() noexcept override
@@ -294,10 +291,7 @@ namespace gglab
 		[[nodiscard]] TextureAssetData MakeNonCanonicalTextureFixture()
 		{
 			TextureAssetData texture = MakeTwoMipTextureFixture();
-			std::rotate(
-				texture.m_Pixels.begin(),
-				texture.m_Pixels.begin() + 8,
-				texture.m_Pixels.end());
+			std::rotate(texture.m_Pixels.begin(), texture.m_Pixels.begin() + 8, texture.m_Pixels.end());
 			std::swap(texture.m_Subresources[0], texture.m_Subresources[1]);
 			texture.m_Subresources[0].m_DataOffset = 0;
 			texture.m_Subresources[1].m_DataOffset = 4;
@@ -358,9 +352,9 @@ namespace gglab
 			sourceDigest.m_Value.front() = sourceMarker;
 			return {
 				{
-					.m_Artifact = built.Succeeded() ? std::make_shared<const TextureArtifact>(
-														  std::move(built.m_Artifact))
-													: TextureArtifactHandle{},
+					.m_Artifact = built.Succeeded() ?
+						std::make_shared<const TextureArtifact>(std::move(built.m_Artifact)) :
+						TextureArtifactHandle{},
 					.m_ContentFingerprint = contentFingerprint,
 					.m_SourceDigest = sourceDigest,
 					.m_DerivedDataKey = BuildTextureDerivedDataKey(
@@ -393,8 +387,7 @@ namespace gglab
 				.m_Semantic = TextureSemantic::BaseColor,
 				.m_MipPolicy = TextureMipPolicy::Preserve,
 			};
-			const DerivedDataKey key =
-				BuildTextureDerivedDataKey(sourceDigest, "Textures/Fixture.PNG", settings);
+			const DerivedDataKey key = BuildTextureDerivedDataKey(sourceDigest, "Textures/Fixture.PNG", settings);
 			context.Check(MatchesHex(key.m_Value,
 				"3786494b84c757cd25945c194278de557c02f62786494fb40b21b8e22e262dcd"),
 				"Texture derived-data key matches the stable golden vector");

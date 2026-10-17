@@ -240,9 +240,10 @@ namespace gglab
 		else if (IsGTAOPreview(tap))
 		{
 			const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
-			source.m_Texture = gtao ? ResolveGTAOPreviewSource(*gtao,
-				blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName), tap)
-				: RGTextureId{};
+			source.m_Texture = gtao ?
+				ResolveGTAOPreviewSource(*gtao,
+					blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName), tap) :
+				RGTextureId{};
 		}
 		else if (IsDepthPreview(tap))
 		{
@@ -276,10 +277,10 @@ namespace gglab
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source.m_Texture, RGTextureAccess::Sample);
-				data.m_SourceSrv = source.m_ViewDesc
-					? builder.CreateView<RHITextureViewType::ShaderResource>(
-						data.m_Source, *source.m_ViewDesc)
-					: builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+				data.m_SourceSrv = source.m_ViewDesc ?
+					builder.CreateView<RHITextureViewType::ShaderResource>(
+						data.m_Source, *source.m_ViewDesc) :
+					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
 				data.m_Output = builder.CreateTexture("Capture.DiagnosticTap", outputDesc);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
 				data.m_OutputRtv =
@@ -339,8 +340,9 @@ namespace gglab
 				return;
 			}
 			AddResolvedPass(rg, context, services, aerial->m_Diagnostic,
-				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering
-				? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
+				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering ?
+					context.GetDisplayRenderView().m_ScenePreExposure :
+					1.0f,
 				std::nullopt, selection, channel);
 			return;
 		}
@@ -364,9 +366,9 @@ namespace gglab
 		{
 			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(
 				TemporalAAResourcesName);
-			const RGTextureId source = temporalAA
-				? ResolveTemporalAAPreviewSource(*temporalAA, selection.m_Tap)
-				: RGTextureId{};
+			const RGTextureId source = temporalAA ?
+				ResolveTemporalAAPreviewSource(*temporalAA, selection.m_Tap) :
+				RGTextureId{};
 			if (!temporalAA || !source.IsValid())
 			{
 				registry->InvalidatePostProcessPreview(selection, channel);

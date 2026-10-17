@@ -148,9 +148,9 @@ namespace gglab
 				{
 					return;
 				}
-				const size_t remaining = output.size() < MaximumCapturedProcessStreamSize
-					? MaximumCapturedProcessStreamSize - output.size()
-					: 0;
+				const size_t remaining = output.size() < MaximumCapturedProcessStreamSize ?
+					MaximumCapturedProcessStreamSize - output.size() :
+					0;
 				output.append(buffer.data(), (std::min)(remaining,
 					static_cast<size_t>(bytesRead)));
 				outputTruncated |= static_cast<size_t>(bytesRead) > remaining;
@@ -378,9 +378,9 @@ namespace gglab
 			outCount = found->size();
 			for (const nlohmann::json& diagnostic : *found)
 			{
-				const bool fieldsValid = allowUnknownFields
-					? HasRequiredFields(diagnostic, { "message" })
-					: HasExactFields(diagnostic, { "message" });
+				const bool fieldsValid = allowUnknownFields ?
+					HasRequiredFields(diagnostic, { "message" }) :
+					HasExactFields(diagnostic, { "message" });
 				if (!fieldsValid)
 				{
 					return false;
@@ -434,9 +434,9 @@ namespace gglab
 				registryRef.m_RegistryId.m_DurableDigest.m_Value[index] =
 					static_cast<std::byte>((high << 4) | low);
 			}
-			return registryRef.IsValid()
-				? std::optional(registryRef)
-				: std::nullopt;
+			return registryRef.IsValid() ?
+				std::optional(registryRef) :
+				std::nullopt;
 		}
 
 		[[nodiscard]] DevelopmentShaderBuildResult MakeExecutionFailure(
@@ -485,12 +485,12 @@ namespace gglab
 		std::string diagnostics;
 		size_t diagnosticsCount = 0;
 		if (!ReadBoolean(*document, "success", success) ||
-			!HasRequiredFields(*document, success
-				? std::initializer_list<std::string_view>{ "command", "success", "status",
+			!HasRequiredFields(*document, success ?
+				std::initializer_list<std::string_view>{ "command", "success", "status",
 					"exitCode", "processContractVersion", "compilePolicyRevision",
 					"toolIdentity", "toolVersion", "producerKind", "producerIdentity",
-					"supportedTargets", "diagnostics" }
-				: std::initializer_list<std::string_view>{ "command", "success", "status",
+					"supportedTargets", "diagnostics" } :
+				std::initializer_list<std::string_view>{ "command", "success", "status",
 					"exitCode", "processContractVersion", "diagnostics" }) ||
 			!ReadString(*document, "command", command) || command != "describe" ||
 			!ReadString(*document, "status", status) || status.empty() ||
@@ -588,10 +588,10 @@ namespace gglab
 		std::string diagnostics;
 		size_t diagnosticsCount = 0;
 		if (!ReadBoolean(*document, "success", success) ||
-			!HasExactFields(*document, success
-				? std::initializer_list<std::string_view>{ "command", "success", "status",
-					"exitCode", "programCount", "diagnostics", "registryId" }
-				: std::initializer_list<std::string_view>{ "command", "success", "status",
+			!HasExactFields(*document, success ?
+				std::initializer_list<std::string_view>{ "command", "success", "status",
+					"exitCode", "programCount", "diagnostics", "registryId" } :
+				std::initializer_list<std::string_view>{ "command", "success", "status",
 					"exitCode", "programCount", "diagnostics" }) ||
 			!ReadString(*document, "command", command) || command != "build-runtime" ||
 			!ReadString(*document, "status", status) ||
@@ -618,9 +618,9 @@ namespace gglab
 
 		std::string registryId;
 		const std::optional<ShaderProgramRegistryArtifactRef> registryRef =
-			ReadString(*document, "registryId", registryId)
-				? ParseRegistryId(registryId)
-				: std::nullopt;
+			ReadString(*document, "registryId", registryId) ?
+				ParseRegistryId(registryId) :
+				std::nullopt;
 		if (processExitCode != 0 || status != "ok" || programCount == 0 ||
 			diagnosticsCount != 0 || !registryRef)
 		{

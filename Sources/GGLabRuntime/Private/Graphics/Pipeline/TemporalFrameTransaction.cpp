@@ -73,8 +73,9 @@ namespace gglab
 		m_PendingView = {};
 		m_State = TemporalFrameTransactionState::Pending;
 		m_Resolution = resolution;
-		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, resolution, m_ColorAbi)
-			: TemporalHistoryFrameState{};
+		m_HistoryFrame = historyManager ?
+			historyManager->BeginFrame(plan, resolution, m_ColorAbi) :
+			TemporalHistoryFrameState{};
 		m_HasCompatiblePreviousView =
 			plan.HasService(TemporalService::FrameContinuity) && IsCompatible(viewHistory) &&
 			(!historyManager || !plan.HasService(TemporalService::ColorDepthHistory) ||
@@ -135,8 +136,9 @@ namespace gglab
 		view.m_TemporalSessionIdentity = m_Plan.m_SessionIdentity;
 		view.m_TemporalFrameIndex = m_FrameIndex;
 		view.m_TextureLodBias = m_TextureLodBias;
-		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
-			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
+		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView ?
+			m_ViewHistory->m_Committed.m_PreExposure :
+			m_ScenePreExposure;
 		if (m_Plan.HasService(TemporalService::ProjectionJitter))
 		{
 			const Vector2 jitterNDC =

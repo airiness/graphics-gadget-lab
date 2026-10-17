@@ -579,10 +579,10 @@ namespace gglab
 		if (registry.valid(m_SilhouetteSphere))
 		{
 			registry.get<components::TransformComponent>(m_SilhouetteSphere).m_Position =
-				path.m_Id == MovingOccluderPathId
-				? ResolveMovingOccluderPosition(static_cast<float>(frame) /
-					MovingOccluderFramesPerSecond)
-				: SilhouetteSpherePosition;
+				path.m_Id == MovingOccluderPathId ?
+					ResolveMovingOccluderPosition(static_cast<float>(frame) /
+						MovingOccluderFramesPerSecond) :
+					SilhouetteSpherePosition;
 		}
 		if (registry.valid(m_StepOccluder))
 		{
@@ -638,29 +638,32 @@ namespace gglab
 				.m_Value = std::format("separable bilateral, radius {}", settings.m_DenoiseRadius) },
 			{ .m_Name = "Performance target", .m_Value = "~1.5 ms at default 1440p (informational)" },
 			{ .m_Name = "PBR integration",
-				.m_Value = GetViewRenderProfile().m_Lighting.m_GTAO.m_Enabled
-					? "indirect diffuse"
-					: "neutral disabled path" },
+				.m_Value = GetViewRenderProfile().m_Lighting.m_GTAO.m_Enabled ?
+					"indirect diffuse" :
+					"neutral disabled path" },
 		};
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "Deterministic fixture",
-				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+				.m_Status = m_FixtureConfigured ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail =
 					"Plane, corner, thin and screen-edge slabs, silhouette, radius-gap and halo "
 					"fixtures, emissive/specular controls, background, and coplanar ties are configured.",
 			},
 			{
 				.m_Name = "Half-resolution contract",
-				.m_Status = halfExtent.IsValid() ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Failed,
+				.m_Status = halfExtent.IsValid() ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "The evaluate extent uses ceil(full extent / 2) on each axis.",
 			},
 			{
 				.m_Name = "Selected preview published",
-				.m_Status = previewExecuted ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+				.m_Status = previewExecuted ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "The selected GTAO pipeline surface was published after Lab entry.",
 			},
 		};

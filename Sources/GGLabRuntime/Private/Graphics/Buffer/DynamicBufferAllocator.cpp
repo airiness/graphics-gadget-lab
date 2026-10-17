@@ -34,8 +34,9 @@ namespace gglab
 		const RHIResourceDebugIdentityDesc debugIdentity{
 			.m_Domain = RHIResourceDebugDomain::Renderer,
 			.m_Category = "DynamicBuffer",
-			.m_Label = createInfo.m_DebugName ? std::string_view(createInfo.m_DebugName)
-											  : std::string_view("Unspecified"),
+			.m_Label = createInfo.m_DebugName ?
+				std::string_view(createInfo.m_DebugName) :
+				std::string_view("Unspecified"),
 		};
 		m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 		GGLAB_ASSERT_MSG(m_Buffer, "DynamicBufferAllocator failed to create its RHI buffer.");
@@ -43,7 +44,8 @@ namespace gglab
 		if (m_Buffer)
 		{
 			const RHIMappedBufferRange readRange = m_MemoryUsage == RHIMemoryUsage::GpuToCpu ?
-				RHIMappedBufferRange{ 0, m_CapacityInBytes } : RHIMappedBufferRange{};
+				RHIMappedBufferRange{ 0, m_CapacityInBytes } :
+				RHIMappedBufferRange{};
 			m_MappedData = static_cast<std::byte*>(m_Device->MapBuffer(m_Buffer.Get(), readRange));
 		}
 		GGLAB_ASSERT_MSG(
@@ -59,8 +61,8 @@ namespace gglab
 		{
 			const RHIMappedBufferRange writtenRange =
 				m_MemoryUsage == RHIMemoryUsage::CpuToGpu ?
-				RHIMappedBufferRange{ 0, m_CapacityInBytes } :
-				RHIMappedBufferRange{};
+					RHIMappedBufferRange{ 0, m_CapacityInBytes } :
+					RHIMappedBufferRange{};
 			m_Device->UnmapBuffer(m_Buffer.Get(), writtenRange);
 			m_MappedData = nullptr;
 		}

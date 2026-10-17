@@ -603,9 +603,9 @@ namespace gglab
 			GGLAB_ASSERT_MSG(stagingBytes <= m_InFlightBytes,
 				"Asset upload in-flight byte accounting underflow.");
 			m_InFlightBytes = stagingBytes <= m_InFlightBytes ? m_InFlightBytes - stagingBytes : 0;
-			const AssetUploadStatus status = upload.m_RecordingSucceeded
-				? AssetUploadStatus::Succeeded
-				: AssetUploadStatus::Failed;
+			const AssetUploadStatus status = upload.m_RecordingSucceeded ?
+				AssetUploadStatus::Succeeded :
+				AssetUploadStatus::Failed;
 			EnqueueGpuFinalize(std::move(upload), status);
 		}
 		return static_cast<uint32_t>(completed.size());
@@ -732,9 +732,9 @@ namespace gglab
 		statistics.m_PendingUploads.reserve(m_PendingUploads.size());
 		for (const PendingUpload& upload : m_PendingUploads)
 		{
-			const ProgressSnapshot progress = upload.m_Desc.m_Progress
-				? upload.m_Desc.m_Progress->GetSnapshot()
-				: ProgressSnapshot{};
+			const ProgressSnapshot progress = upload.m_Desc.m_Progress ?
+				upload.m_Desc.m_Progress->GetSnapshot() :
+				ProgressSnapshot{};
 			statistics.m_PendingUploads.push_back({
 				.m_Handle = upload.m_Handle,
 				.m_Name = upload.m_Desc.m_Name,
@@ -907,9 +907,9 @@ namespace gglab
 		}
 
 		const AssetResourcePublicationFaultAction action = m_PublicationFault.m_Action;
-		result.m_Status = action == AssetResourcePublicationFaultAction::Fail
-			? AssetResourcePublicationStepStatus::Failed
-			: AssetResourcePublicationStepStatus::Cancelled;
+		result.m_Status = action == AssetResourcePublicationFaultAction::Fail ?
+			AssetResourcePublicationStepStatus::Failed :
+			AssetResourcePublicationStepStatus::Cancelled;
 		result.m_Usage.m_Stage = stage;
 		result.m_Error = std::format("Injected publication {} {} stage {} occurrence {}",
 			action == AssetResourcePublicationFaultAction::Fail ? "failure" : "cancellation",
@@ -1183,17 +1183,17 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(estimate.m_SourceBytes <= m_ReadyPayloadBytes,
 			"Asset ready payload byte accounting underflow.");
-		m_ReadyPayloadBytes = estimate.m_SourceBytes <= m_ReadyPayloadBytes
-			? m_ReadyPayloadBytes - estimate.m_SourceBytes
-			: 0;
+		m_ReadyPayloadBytes = estimate.m_SourceBytes <= m_ReadyPayloadBytes ?
+			m_ReadyPayloadBytes - estimate.m_SourceBytes :
+			0;
 		if (uploadRecording)
 		{
 			GGLAB_ASSERT_MSG(estimate.m_SourceBytes <= m_UploadRecordingBacklogBytes,
 				"Asset upload-recording payload byte accounting underflow.");
 			m_UploadRecordingBacklogBytes =
-				estimate.m_SourceBytes <= m_UploadRecordingBacklogBytes
-				? m_UploadRecordingBacklogBytes - estimate.m_SourceBytes
-				: 0;
+				estimate.m_SourceBytes <= m_UploadRecordingBacklogBytes ?
+					m_UploadRecordingBacklogBytes - estimate.m_SourceBytes :
+					0;
 		}
 	}
 
@@ -1350,8 +1350,9 @@ namespace gglab
 				.m_Estimate = work.m_Desc.m_Estimate,
 				.m_Priority = work.m_Desc.m_Priority,
 				.m_QueueMilliseconds = Milliseconds(now - work.m_QueuedAt),
-				.m_Progress = work.m_Desc.m_Progress ? work.m_Desc.m_Progress->GetSnapshot()
-													 : ProgressSnapshot{},
+				.m_Progress = work.m_Desc.m_Progress ?
+					work.m_Desc.m_Progress->GetSnapshot() :
+					ProgressSnapshot{},
 				});
 		}
 		return statistics;
@@ -1414,9 +1415,9 @@ namespace gglab
 				.m_Estimate = publication.m_Desc.m_Estimate,
 				.m_Priority = publication.m_Desc.m_Priority,
 				.m_QueueMilliseconds = Milliseconds(now - publication.m_QueuedAt),
-				.m_Progress = publication.m_Desc.m_Progress
-								  ? publication.m_Desc.m_Progress->GetSnapshot()
-								  : ProgressSnapshot{},
+				.m_Progress = publication.m_Desc.m_Progress ?
+					publication.m_Desc.m_Progress->GetSnapshot() :
+					ProgressSnapshot{},
 				});
 		}
 		return statistics;
@@ -1452,9 +1453,9 @@ namespace gglab
 				.m_Estimate = publication.m_Upload.m_Desc.m_Estimate,
 				.m_Priority = publication.m_Upload.m_Desc.m_Priority,
 				.m_QueueMilliseconds = Milliseconds(now - publication.m_QueuedAt),
-				.m_Progress = publication.m_Upload.m_Desc.m_Progress
-								  ? publication.m_Upload.m_Desc.m_Progress->GetSnapshot()
-								  : ProgressSnapshot{},
+				.m_Progress = publication.m_Upload.m_Desc.m_Progress ?
+					publication.m_Upload.m_Desc.m_Progress->GetSnapshot() :
+					ProgressSnapshot{},
 				});
 		}
 		return statistics;
@@ -1465,8 +1466,9 @@ namespace gglab
 	{
 		ProgressReporter(upload.m_Desc.m_Progress)
 			.Report(status == AssetUploadStatus::Succeeded ? 0.96f : 0.82f,
-				status == AssetUploadStatus::Succeeded ? "Publishing GPU resource"
-				: "GPU upload failed",
+				status == AssetUploadStatus::Succeeded ?
+					"Publishing GPU resource" :
+					"GPU upload failed",
 				upload.m_Desc.m_Name);
 
 		AssetUploadCompletionInfo info{};
@@ -1510,9 +1512,9 @@ namespace gglab
 
 		if (m_RecentUploadCapacity > 0)
 		{
-			const ProgressSnapshot progress = upload.m_Desc.m_Progress
-				? upload.m_Desc.m_Progress->GetSnapshot()
-				: ProgressSnapshot{};
+			const ProgressSnapshot progress = upload.m_Desc.m_Progress ?
+				upload.m_Desc.m_Progress->GetSnapshot() :
+				ProgressSnapshot{};
 			m_RecentUploads.push_front({
 				.m_Handle = info.m_Handle,
 				.m_Name = std::move(info.m_Name),

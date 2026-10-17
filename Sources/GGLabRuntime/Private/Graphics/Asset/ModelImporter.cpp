@@ -286,9 +286,11 @@ namespace gglab
 				{
 					if (const Json* coat = FindObjectField(*extensions, "KHR_materials_clearcoat"))
 					{
-						const char* name = slot == MaterialTextureSlot::Clearcoat
-							? "clearcoatTexture" : slot == MaterialTextureSlot::ClearcoatRoughness
-							? "clearcoatRoughnessTexture" : "clearcoatNormalTexture";
+						const char* name = slot == MaterialTextureSlot::Clearcoat ?
+							"clearcoatTexture" :
+							slot == MaterialTextureSlot::ClearcoatRoughness ?
+								"clearcoatRoughnessTexture" :
+								"clearcoatNormalTexture";
 						return FindObjectField(*coat, name);
 					}
 				}
@@ -616,9 +618,9 @@ namespace gglab
 			const bool promoteToAnisotropic = settings.m_EnableAnisotropicFiltering &&
 				minFilter == GltfLinearMipmapLinear && magLinear;
 
-			key.m_Filter = promoteToAnisotropic
-				? RHISamplerFilter::Anisotropic
-				: MakeRHISamplerFilter(minLinear, magLinear, mipLinear);
+			key.m_Filter = promoteToAnisotropic ?
+				RHISamplerFilter::Anisotropic :
+				MakeRHISamplerFilter(minLinear, magLinear, mipLinear);
 			key.m_AddressU = ToRHITextureAddressMode(mapMode[0]);
 			key.m_AddressV = ToRHITextureAddressMode(mapMode[1]);
 			key.m_AddressW = ToRHITextureAddressMode(mapMode[2]);
@@ -710,7 +712,8 @@ namespace gglab
 			}
 			const auto mapMode = [](int wrap) noexcept
 				{
-					return wrap == GltfClampToEdge ? aiTextureMapMode_Clamp :
+					return wrap == GltfClampToEdge ?
+						aiTextureMapMode_Clamp :
 						wrap == GltfMirroredRepeat ? aiTextureMapMode_Mirror : aiTextureMapMode_Wrap;
 				};
 			destination.m_MapMode[0] = mapMode(wrapS);
@@ -948,8 +951,9 @@ namespace gglab
 			{
 				continue;
 			}
-			const Json* source = sourceMaterials && sourceIndex < sourceMaterials->size()
-				? &(*sourceMaterials)[sourceIndex] : nullptr;
+			const Json* source = sourceMaterials && sourceIndex < sourceMaterials->size() ?
+				&(*sourceMaterials)[sourceIndex] :
+				nullptr;
 			materialSources[index] = source;
 			const aiString name(source && source->contains("name") ? (*source)["name"].get<std::string>() : "");
 			GGLAB_UNUSED(scene->mMaterials[index]->AddProperty(&name, AI_MATKEY_NAME));

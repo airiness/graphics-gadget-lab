@@ -278,9 +278,9 @@ namespace gglab
 				bufferStates.emplace(virtualResource,
 					TrackedResourceState{
 						.m_State = resource.m_InitialState,
-						.m_LastOrderedUavAccess = HasUavAccess(resource.m_InitialState)
-							? std::optional{ RGDependencyAccess::ReadWrite }
-							: std::nullopt,
+						.m_LastOrderedUavAccess = HasUavAccess(resource.m_InitialState) ?
+							std::optional{ RGDependencyAccess::ReadWrite } :
+							std::nullopt,
 					});
 			}
 		}
@@ -321,9 +321,9 @@ namespace gglab
 									TrackedResourceState{
 										.m_State = stateTracker.m_InitialState,
 										.m_LastOrderedUavAccess =
-											HasUavAccess(stateTracker.m_InitialState)
-												? std::optional{ RGDependencyAccess::ReadWrite }
-												: std::nullopt,
+											HasUavAccess(stateTracker.m_InitialState) ?
+												std::optional{ RGDependencyAccess::ReadWrite } :
+												std::nullopt,
 									})
 								.first;
 							auto& trackedState = stateIter->second;
@@ -467,9 +467,9 @@ namespace gglab
 								TrackedResourceState{
 									.m_State = stateTracker.m_InitialState,
 									.m_LastOrderedUavAccess =
-										HasUavAccess(stateTracker.m_InitialState)
-											? std::optional{ RGDependencyAccess::ReadWrite }
-											: std::nullopt,
+										HasUavAccess(stateTracker.m_InitialState) ?
+											std::optional{ RGDependencyAccess::ReadWrite } :
+											std::nullopt,
 								});
 						});
 				}
@@ -479,9 +479,9 @@ namespace gglab
 				{
 					const TextureSubresource subresource =
 						DecodeSubresource(textureDesc, subresourceIndex);
-					RHIResourceState requiredFinalState = resource.m_Imported
-						? resource.m_InitialState
-						: trackedState.m_State;
+					RHIResourceState requiredFinalState = resource.m_Imported ?
+						resource.m_InitialState :
+						trackedState.m_State;
 
 					if (normalizedFinalRange)
 					{
@@ -522,8 +522,9 @@ namespace gglab
 			}
 
 			const RHIResourceState requiredFinalState =
-				resource.m_Imported ? resource.m_FinalState.value_or(resource.m_InitialState)
-				: CommonRHIResourceState();
+				resource.m_Imported ?
+					resource.m_FinalState.value_or(resource.m_InitialState) :
+					CommonRHIResourceState();
 			auto& trackedState = bufferStates.at(virtualResource);
 			if (!NeedsRHIResourceTransition(trackedState.m_State, requiredFinalState))
 			{

@@ -38,8 +38,9 @@ namespace gglab
 		}
 		Json Address(const RGResourceAddress& address)
 		{
-			Json at = address.m_Position == RGObservationPosition::Final ? Json("final")
-				: Json{ { address.m_Position == RGObservationPosition::Before ? "before" : "after", address.m_Pass } };
+			Json at = address.m_Position == RGObservationPosition::Final ?
+				Json("final") :
+				Json{ { address.m_Position == RGObservationPosition::Before ? "before" : "after", address.m_Pass } };
 			return {
 				{ "resource", address.m_Resource },
 				{ "at", at },

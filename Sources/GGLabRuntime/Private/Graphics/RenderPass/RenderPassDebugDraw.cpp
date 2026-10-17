@@ -61,8 +61,9 @@ namespace gglab
 			.m_TypeName = scene ? "Debug.DebugDrawScene" : "Debug.DebugDrawOverlay",
 			.m_DisplayName = scene ? "Debug Draw Scene" : "Debug Draw Overlay",
 			.m_CategoryName = "Debug",
-			.m_Description = scene ? "Draws depth-tested debug geometry into scene color."
-								   : "Draws always-visible world and screen-space debug geometry.",
+			.m_Description = scene ?
+				"Draws depth-tested debug geometry into scene color." :
+				"Draws always-visible world and screen-space debug geometry.",
 			.m_Category = RenderPassCategory::Debug,
 			.m_Type = RenderPassType::Graphics,
 		};
@@ -89,9 +90,9 @@ namespace gglab
 		// view of post-temporal composition.
 		const DepthCoverageRasterDomain& postTemporalDomain =
 			context.GetRenderQueue(displayViewId).m_PostTemporalRasterDomain;
-		const uint32_t viewIndex = postTemporalDomain.IsValid()
-			? postTemporalDomain.m_ViewBindingId
-			: static_cast<uint32_t>(utils::ToIndex(displayViewId));
+		const uint32_t viewIndex = postTemporalDomain.IsValid() ?
+			postTemporalDomain.m_ViewBindingId :
+			static_cast<uint32_t>(utils::ToIndex(displayViewId));
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
 			[frame, scene, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
@@ -140,10 +141,10 @@ namespace gglab
 				commandContext->BeginRendering({
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
-					.m_DepthAttachment = dsv.IsValid()
-						? std::optional<RHIRenderingAttachment>(
-							RHIRenderingAttachment{ .m_View = dsv })
-						: std::nullopt,
+					.m_DepthAttachment = dsv.IsValid() ?
+						std::optional<RHIRenderingAttachment>(
+							RHIRenderingAttachment{ .m_View = dsv }) :
+						std::nullopt,
 					});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
@@ -181,9 +182,9 @@ namespace gglab
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 							services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-						commandContext->SetPrimitiveTopology(triangles
-							? RHIPrimitiveTopology::TriangleList
-							: RHIPrimitiveTopology::LineList);
+						commandContext->SetPrimitiveTopology(triangles ?
+							RHIPrimitiveTopology::TriangleList :
+							RHIPrimitiveTopology::LineList);
 						const DebugDrawPassParameters parameters{
 							.ViewIndex = viewIndex,
 							.Flags = flags,
@@ -225,17 +226,17 @@ namespace gglab
 			recipe.m_PrimitiveTopology =
 				triangles ? RHIPrimitiveTopology::TriangleList : RHIPrimitiveTopology::LineList;
 			recipe.m_Formats.m_RenderTargetFormats[0] =
-				m_Mode == DebugDrawPassMode::Scene
-				? RHIFormat::R16G16B16A16Float
-				: services.m_Presentation->GetSwapChain()->GetFormat();
+				m_Mode == DebugDrawPassMode::Scene ?
+					RHIFormat::R16G16B16A16Float :
+					services.m_Presentation->GetSwapChain()->GetFormat();
 			recipe.m_Formats.m_RenderTargetCount = 1;
 			recipe.m_Formats.m_DepthStencilFormat =
 				m_Mode == DebugDrawPassMode::Scene ? RHIFormat::D32Float : RHIFormat::Unknown;
 			recipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
 			recipe.m_BlendPreset = BlendPreset::AlphaBlend;
-			recipe.m_DepthPreset = m_Mode == DebugDrawPassMode::Scene
-				? DepthPreset::ReversedZReadOnly
-				: DepthPreset::DepthDisabled;
+			recipe.m_DepthPreset = m_Mode == DebugDrawPassMode::Scene ?
+				DepthPreset::ReversedZReadOnly :
+				DepthPreset::DepthDisabled;
 		}
 		m_IsInitialized = true;
 	}

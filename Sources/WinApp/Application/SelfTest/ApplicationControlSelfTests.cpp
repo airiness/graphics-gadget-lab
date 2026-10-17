@@ -110,9 +110,9 @@ namespace gglab
 				R"("historyRectification":"variance-clip","varianceClipGamma":1.25,)"
 				R"("historyAccumulation":"compatibility-age","historyRelaxation":2,)"
 				R"("textureLodBiasOffset":-1.5,"enabled":false}})");
-			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
-				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
-				: nullptr;
+			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request ?
+				&evaluation.m_Request->m_Sequence.m_TemporalAAOverrides :
+				nullptr;
 			context.Check(overrides && evaluation.m_Request->m_Sequence.m_GpuTiming &&
 				overrides->m_NeighborhoodClampExpansion == 1.0f &&
 				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale &&
@@ -131,9 +131,9 @@ namespace gglab
 				R"({"protocol":2,"id":16,"command":"sequence","path":"SEQ_A",)"
 				R"("gtao":{"temporal":true,"temporalMaxSamples":24,"directionCount":1,)"
 				R"("stepCount":8}})");
-			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request
-				? &gtaoEvaluation.m_Request->m_Sequence.m_GTAOOverrides
-				: nullptr;
+			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request ?
+				&gtaoEvaluation.m_Request->m_Sequence.m_GTAOOverrides :
+				nullptr;
 			context.Check(gtaoOverrides && gtaoOverrides->m_TemporalAccumulation == true &&
 				gtaoOverrides->m_TemporalMaxSamples == 24u && gtaoOverrides->m_DirectionCount == 1u &&
 				gtaoOverrides->m_StepCount == 8u,

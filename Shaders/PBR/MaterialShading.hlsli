@@ -84,9 +84,9 @@ float3x3 BuildNormalTextureFrame(MaterialTextureBindingData binding,
 {
 	// Imported generated tangents use UV0. Normal mapping and anisotropy must
 	// share the frame derived from the actual normal coordinates when these differ.
-	const float3x3 frame = RequiresDerivedNormalFrame(binding)
-		? BuildTBN(geometricNormalWS, positionWS, uv)
-		: BuildTBNFromTangent(geometricNormalWS, tangentWS, positionWS, uv);
+	const float3x3 frame = RequiresDerivedNormalFrame(binding) ?
+		BuildTBN(geometricNormalWS, positionWS, uv) :
+		BuildTBNFromTangent(geometricNormalWS, tangentWS, positionWS, uv);
 	return OrientNormalTextureFrame(frame, flipNormal);
 }
 

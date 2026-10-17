@@ -278,8 +278,9 @@ namespace gglab
 					return;
 				}
 				const OutputVariant output{
-					.m_Lighting = data.m_HdrDiffValidation
-						? LightingRecipe::ForwardPlusValidation : LightingRecipe::ForwardPlus,
+					.m_Lighting = data.m_HdrDiffValidation ?
+						LightingRecipe::ForwardPlusValidation :
+						LightingRecipe::ForwardPlus,
 					.m_GTAOContribution = data.m_GTAOContributionOutputEnabled,
 					.m_MaterialDiagnostics = data.m_Scene.m_MaterialDiagnostics,
 				};
@@ -359,8 +360,9 @@ namespace gglab
 		GraphicsPhysicalPipelineKey coverageKey = physicalKey;
 		coverageKey.m_RasterizerPreset = forward_shading::GetRasterizerPreset(variantBits);
 		const DepthCoverageAlphaVariant alphaVariant =
-			bucket == RenderBucket::AlphaTest ? DepthCoverageAlphaVariant::BaseColorMask
-			: DepthCoverageAlphaVariant::Opaque;
+			bucket == RenderBucket::AlphaTest ?
+				DepthCoverageAlphaVariant::BaseColorMask :
+				DepthCoverageAlphaVariant::Opaque;
 		return gglab::BuildDepthCoveragePipelineSignature(coverageKey,
 			DepthCoverageVertexProgram::RigidMesh, DepthCoverageDeformationVariant::Rigid,
 			DepthCoveragePositionPrecision::Float32, RHIFormat::R32G32B32Float, doubleSided,

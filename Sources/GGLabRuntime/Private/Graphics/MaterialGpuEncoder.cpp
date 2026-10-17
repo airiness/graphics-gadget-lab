@@ -87,16 +87,21 @@ namespace gglab
 		gpu.Flags = static_cast<uint32_t>(material.m_Flags);
 		gpu.DebugView = static_cast<uint32_t>(material.m_DebugView);
 		gpu.Ior = SanitizeMaterialIor(material.m_Ior);
-		gpu.ClearcoatFactor = std::isfinite(material.m_ClearcoatFactor)
-			? std::clamp(material.m_ClearcoatFactor, 0.0f, 1.0f) : 0.0f;
-		gpu.ClearcoatRoughness = std::isfinite(material.m_ClearcoatRoughness)
-			? std::clamp(material.m_ClearcoatRoughness, 0.0f, 1.0f) : 0.0f;
-		gpu.ClearcoatNormalScale = std::isfinite(material.m_ClearcoatNormalScale)
-			? material.m_ClearcoatNormalScale : 1.0f;
-		gpu.AnisotropyStrength = std::isfinite(material.m_AnisotropyStrength)
-			? std::clamp(material.m_AnisotropyStrength, 0.0f, 1.0f) : 0.0f;
-		gpu.AnisotropyRotation = std::isfinite(material.m_AnisotropyRotation)
-			? material.m_AnisotropyRotation : 0.0f;
+		gpu.ClearcoatFactor = std::isfinite(material.m_ClearcoatFactor) ?
+			std::clamp(material.m_ClearcoatFactor, 0.0f, 1.0f) :
+			0.0f;
+		gpu.ClearcoatRoughness = std::isfinite(material.m_ClearcoatRoughness) ?
+			std::clamp(material.m_ClearcoatRoughness, 0.0f, 1.0f) :
+			0.0f;
+		gpu.ClearcoatNormalScale = std::isfinite(material.m_ClearcoatNormalScale) ?
+			material.m_ClearcoatNormalScale :
+			1.0f;
+		gpu.AnisotropyStrength = std::isfinite(material.m_AnisotropyStrength) ?
+			std::clamp(material.m_AnisotropyStrength, 0.0f, 1.0f) :
+			0.0f;
+		gpu.AnisotropyRotation = std::isfinite(material.m_AnisotropyRotation) ?
+			material.m_AnisotropyRotation :
+			0.0f;
 		return gpu;
 	}
 }

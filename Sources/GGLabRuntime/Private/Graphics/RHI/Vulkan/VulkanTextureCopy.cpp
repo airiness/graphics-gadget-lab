@@ -34,12 +34,12 @@ namespace gglab
 			for (uint32_t mipLevel = 0; mipLevel < mipLevels; ++mipLevel)
 			{
 				const uint32_t width = std::max(1u, desc.m_Extent.m_Width >> mipLevel);
-				const uint32_t height = desc.m_Dimension == RHITextureDimension::Texture1D
-					? 1u
-					: std::max(1u, desc.m_Extent.m_Height >> mipLevel);
-				const uint32_t depth = desc.m_Dimension == RHITextureDimension::Texture3D
-					? std::max(1u, desc.m_Extent.m_Depth >> mipLevel)
-					: 1u;
+				const uint32_t height = desc.m_Dimension == RHITextureDimension::Texture1D ?
+					1u :
+					std::max(1u, desc.m_Extent.m_Height >> mipLevel);
+				const uint32_t depth = desc.m_Dimension == RHITextureDimension::Texture3D ?
+					std::max(1u, desc.m_Extent.m_Depth >> mipLevel) :
+					1u;
 				const uint64_t blockColumns =
 					(width + formatInfo.m_BlockWidth - 1) / formatInfo.m_BlockWidth;
 				const uint64_t blockRows =

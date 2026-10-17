@@ -80,13 +80,15 @@ namespace napa::voxel
 						CheckedMul(static_cast<std::int64_t>(chunkAxis),
 							static_cast<std::int64_t>(chunkCellCount));
 					const std::optional<std::int64_t> maximumVoxel =
-						origin ? CheckedAdd(*origin, static_cast<std::int64_t>(chunkCellCount))
-						: std::nullopt;
+						origin ?
+							CheckedAdd(*origin, static_cast<std::int64_t>(chunkCellCount)) :
+							std::nullopt;
 					const std::optional<std::int64_t> preparedMinimum =
 						origin ? CheckedMul(*origin, BoundaryContourPositionScale) : std::nullopt;
 					const std::optional<std::int64_t> preparedMaximum =
-						maximumVoxel ? CheckedMul(*maximumVoxel, BoundaryContourPositionScale)
-						: std::nullopt;
+						maximumVoxel ?
+							CheckedMul(*maximumVoxel, BoundaryContourPositionScale) :
+							std::nullopt;
 					if (!preparedMinimum || !preparedMaximum)
 					{
 						return false;

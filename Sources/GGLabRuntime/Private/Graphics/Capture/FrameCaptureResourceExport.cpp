@@ -202,11 +202,14 @@ namespace gglab
 			array.m_Shape = { target.m_Subresources.m_ArraySliceCount,
 				std::max(1u, target.m_TextureDesc.m_Extent.m_Height >> target.m_Subresources.m_BaseMip),
 				std::max(1u, target.m_TextureDesc.m_Extent.m_Width >> target.m_Subresources.m_BaseMip), channels };
-			array.m_ChannelOrder = channels == 4 ? ((format == RHIFormat::B8G8R8A8Unorm || format == RHIFormat::B8G8R8A8UnormSrgb) ? "BGRA" : "RGBA")
-				: channels == 3 ? "RGB" : channels == 2 ? "RG" : "R";
-			array.m_Encoding = format == RHIFormat::D24UnormS8Uint && aspect == RHITextureAspect::Depth ? "normalized-depth"
-				: (format == RHIFormat::R8G8B8A8UnormSrgb || format == RHIFormat::B8G8R8A8UnormSrgb) ? "srgb"
-				: array.m_Scalar == ResourceExportScalar::Uint8 && aspect == RHITextureAspect::Color ? "unorm" : "raw";
+			array.m_ChannelOrder = channels == 4 ?
+				((format == RHIFormat::B8G8R8A8Unorm || format == RHIFormat::B8G8R8A8UnormSrgb) ? "BGRA" : "RGBA") :
+				channels == 3 ? "RGB" : channels == 2 ? "RG" : "R";
+			array.m_Encoding = format == RHIFormat::D24UnormS8Uint && aspect == RHITextureAspect::Depth ?
+				"normalized-depth" :
+				(format == RHIFormat::R8G8B8A8UnormSrgb || format == RHIFormat::B8G8R8A8UnormSrgb) ?
+					"srgb" :
+					array.m_Scalar == ResourceExportScalar::Uint8 && aspect == RHITextureAspect::Color ? "unorm" : "raw";
 			return true;
 		}
 	}
@@ -228,8 +231,9 @@ namespace gglab
 		const auto aspect = Test(aspects, RHITextureAspect::Depth) ? RHITextureAspect::Depth : RHITextureAspect::Color;
 		ResourceExportScalar scalar;
 		uint32_t channels;
-		return DescribeTextureFormat(desc.m_Format, aspect, info.m_IsTypeless, scalar, channels)
-			? RGObservationFailure::None : RGObservationFailure::UnsupportedFormat;
+		return DescribeTextureFormat(desc.m_Format, aspect, info.m_IsTypeless, scalar, channels) ?
+			RGObservationFailure::None :
+			RGObservationFailure::UnsupportedFormat;
 	}
 
 	RGObservationFailure GetResourceExportSupport(const RHIBufferDesc& desc, bool imported) noexcept

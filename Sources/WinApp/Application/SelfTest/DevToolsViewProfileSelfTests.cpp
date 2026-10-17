@@ -215,7 +215,7 @@ namespace gglab
 				widget("LightingSettings", "Lighting Path", "Inspect"), widget("LightingSettings", "GTAO", "Inspect"),
 				widget("TemporalSettings", "TAA", "Inspect"), widget("PostProcessSettings", "Bloom", "Inspect"),
 				widget("ShadowSettings", "Shadows", "Inspect"),
-				};
+			};
 			for (size_t index = 0; index < paths.size(); ++index)
 			{
 				GGLAB_UNUSED(draw(inspectIds[index]));

@@ -94,32 +94,33 @@ namespace gglab
 		}
 		uint32_t GetBufferWidth() const noexcept override
 		{
-			return IsValid()
-				? m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetWidth()
-				: 0;
+			return IsValid() ?
+				m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetWidth() :
+				0;
 		}
 		uint32_t GetBufferHeight() const noexcept override
 		{
-			return IsValid()
-				? m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetHeight()
-				: 0;
+			return IsValid() ?
+				m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetHeight() :
+				0;
 		}
 		RHIFormat GetFormat() const noexcept override
 		{
-			return IsValid()
-				? m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetFormat()
-				: RHIFormat::Unknown;
+			return IsValid() ?
+				m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetFormat() :
+				RHIFormat::Unknown;
 		}
 		RHITextureUsage GetBackBufferUsage() const noexcept override
 		{
-			return IsValid()
-				? GetBackBufferUsage(m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain())
-				: RHITextureUsage::None;
+			return IsValid() ?
+				GetBackBufferUsage(m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain()) :
+				RHITextureUsage::None;
 		}
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override
 		{
-			return bufferIndex < m_BackBuffers.size() ? m_BackBuffers[bufferIndex]
-				: RHITextureHandle{};
+			return bufferIndex < m_BackBuffers.size() ?
+				m_BackBuffers[bufferIndex] :
+				RHITextureHandle{};
 		}
 		RHIResourceState GetBackBufferInitialState(uint32_t bufferIndex) const noexcept override
 		{
@@ -135,8 +136,9 @@ namespace gglab
 			const VulkanSwapChain& swapChain) noexcept
 		{
 			return RHITextureUsage::RenderTarget | RHITextureUsage::Present |
-				(swapChain.SupportsCopySource() ? RHITextureUsage::CopySource
-					: RHITextureUsage::None);
+				(swapChain.SupportsCopySource() ?
+					RHITextureUsage::CopySource :
+					RHITextureUsage::None);
 		}
 
 		VulkanContext* m_Context = nullptr;
@@ -217,8 +219,9 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 				"Vulkan RHI initialization failed: {} (VkResult {}).",
-				bootstrap.m_Error.empty() ? "bootstrap did not create a frame runtime"
-				: bootstrap.m_Error,
+				bootstrap.m_Error.empty() ?
+					"bootstrap did not create a frame runtime" :
+					bootstrap.m_Error,
 				static_cast<int32_t>(bootstrap.m_Result)));
 			return false;
 		}
@@ -444,9 +447,9 @@ namespace gglab
 			m_CompletedProductionFrame = true;
 		}
 		FinishFrame(*frame);
-		return result.IsComplete() && descriptorFrameClosed
-			? RHIFrameEndResult::Completed(result.m_SubmittedFencePoint)
-			: RHIFrameEndResult::Fatal(result.m_SubmittedFencePoint);
+		return result.IsComplete() && descriptorFrameClosed ?
+			RHIFrameEndResult::Completed(result.m_SubmittedFencePoint) :
+			RHIFrameEndResult::Fatal(result.m_SubmittedFencePoint);
 	}
 
 	RHIFencePoint VulkanContext::AbortFrame(RHIFrameContext& rhiFrame) noexcept
@@ -548,9 +551,9 @@ namespace gglab
 
 	uint64_t VulkanContext::GetSubmittedTimelineValue() const noexcept
 	{
-		return m_Bootstrap && m_Bootstrap->m_FrameRuntime
-			? m_Bootstrap->m_FrameRuntime->GetTimelineSignalValue()
-			: 0;
+		return m_Bootstrap && m_Bootstrap->m_FrameRuntime ?
+			m_Bootstrap->m_FrameRuntime->GetTimelineSignalValue() :
+			0;
 	}
 
 	bool VulkanContext::TryGetCompletedTimelineValue(uint64_t& outValue) const noexcept

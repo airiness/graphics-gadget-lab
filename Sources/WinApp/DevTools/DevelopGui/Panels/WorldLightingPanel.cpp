@@ -20,8 +20,9 @@ namespace gglab
 	{
 		void DrawSun(DevelopGuiContext& context) noexcept
 		{
-			const auto light = context.m_DirectionalLight
-				? context.m_DirectionalLight->GetLight() : std::nullopt;
+			const auto light = context.m_DirectionalLight ?
+				context.m_DirectionalLight->GetLight() :
+				std::nullopt;
 			if (!light)
 			{
 				ImGui::TextDisabled("No directional light.");
@@ -39,8 +40,9 @@ namespace gglab
 			bool physical = light->m_WorldSun.has_value();
 			if (ImGui::Checkbox("Physical Sun", &physical) && control)
 			{
-				control->SetWorldSun(light->m_Id, physical
-					? std::optional<WorldSunSettings>(WorldSunSettings{}) : std::nullopt);
+				control->SetWorldSun(light->m_Id, physical ?
+					std::optional<WorldSunSettings>(WorldSunSettings{}) :
+					std::nullopt);
 			}
 			if (light->m_WorldSun)
 			{
@@ -86,8 +88,9 @@ namespace gglab
 
 		void DrawAtmosphere(DevelopGuiContext& context) noexcept
 		{
-			const auto light = context.m_DirectionalLight
-				? context.m_DirectionalLight->GetLight() : std::nullopt;
+			const auto light = context.m_DirectionalLight ?
+				context.m_DirectionalLight->GetLight() :
+				std::nullopt;
 			if (!light)
 			{
 				ImGui::TextDisabled("No directional light.");
@@ -100,8 +103,9 @@ namespace gglab
 			bool enabled = light->m_Atmosphere.has_value();
 			if (ImGui::Checkbox("Enabled", &enabled) && control)
 			{
-				control->SetAtmosphere(enabled
-					? std::optional<AtmosphereSettings>(AtmosphereSettings{}) : std::nullopt);
+				control->SetAtmosphere(enabled ?
+					std::optional<AtmosphereSettings>(AtmosphereSettings{}) :
+					std::nullopt);
 			}
 			if (light->m_Atmosphere)
 			{
@@ -168,8 +172,9 @@ namespace gglab
 				}
 			}
 
-			const auto* snapshot = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<AtmosphereDiagnosticsSnapshot>() : nullptr;
+			const auto* snapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<AtmosphereDiagnosticsSnapshot>() :
+				nullptr;
 			if (snapshot)
 			{
 				ImGui::Text("Active source: %s", snapshot->m_PhysicalSkyActive ? "Physical Sky" : "HDR Texture");

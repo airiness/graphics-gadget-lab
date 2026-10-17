@@ -135,9 +135,9 @@ namespace gglab
 				CreateMaintenanceLock(
 					const LocalDerivedDataRootIdentity& identity) const noexcept override
 			{
-				return identity.IsValid()
-					? std::make_unique<Win32LocalDerivedDataMaintenanceLock>(identity)
-					: nullptr;
+				return identity.IsValid() ?
+					std::make_unique<Win32LocalDerivedDataMaintenanceLock>(identity) :
+					nullptr;
 			}
 
 			[[nodiscard]] std::string CreateUniquePathToken() noexcept override

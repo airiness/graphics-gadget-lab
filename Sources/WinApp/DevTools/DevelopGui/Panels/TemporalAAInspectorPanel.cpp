@@ -310,8 +310,9 @@ namespace gglab
 			else
 			{
 				ImGui::TextDisabled(snapshot.m_FramePlan.IsConsumerActive(
-					TemporalConsumer::TemporalAA) ? "Preview update pending..."
-					: "The selected preview requires an active TAA frame.");
+					TemporalConsumer::TemporalAA) ?
+					"Preview update pending..." :
+					"The selected preview requires an active TAA frame.");
 			}
 		}
 	}
@@ -407,8 +408,9 @@ namespace gglab
 			ImGui::Text("Last committed fence: %llu",
 				static_cast<unsigned long long>(history.m_LastCommitted.m_GraphicsFence.m_Value));
 			ImGui::Text("History color: %s | committed pre-exposure: %.6g",
-				history.m_Compatibility.m_ColorAbi == TemporalColorAbi::LinearRec709PreExposedV2
-				? "Pre-exposed scene linear" : "Scene linear",
+				history.m_Compatibility.m_ColorAbi == TemporalColorAbi::LinearRec709PreExposedV2 ?
+					"Pre-exposed scene linear" :
+					"Scene linear",
 				history.m_LastCommitted.m_PreExposure);
 			ImGui::Text("History accumulation: %s",
 				GetTemporalAAHistoryAccumulationName(history.m_Compatibility.m_Accumulation).data());

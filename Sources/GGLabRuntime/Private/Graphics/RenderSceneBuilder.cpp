@@ -155,8 +155,9 @@ namespace gglab
 		{
 			appendView(view);
 		}
-		result.m_ShadowViewBaseOffset = cascades.m_Cascades.empty()
-			? DirectionalShadowFramePlan::UnassignedViewBaseOffset : static_cast<uint32_t>(viewData.size());
+		result.m_ShadowViewBaseOffset = cascades.m_Cascades.empty() ?
+			DirectionalShadowFramePlan::UnassignedViewBaseOffset :
+			static_cast<uint32_t>(viewData.size());
 		for (const DirectionalShadowCascade& cascade : cascades.m_Cascades)
 		{
 			appendView(cascade.m_View);

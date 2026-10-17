@@ -53,8 +53,9 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 				{
 					float3 radiance = SampleTextureCubeLevel(
 						environmentBinding, directionWS, (float)(sourceMip)).rgb;
-					radiance = g_Pass.PhysicalSky
-						? SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_HDRCOLOR);
+					radiance = g_Pass.PhysicalSky ?
+						SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_SCENE_RADIANCE) :
+						SanitizeHDRColor(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_HDRCOLOR);
 					irradiance += radiance * weight;
 					cosineIntegral += weight;
 				}

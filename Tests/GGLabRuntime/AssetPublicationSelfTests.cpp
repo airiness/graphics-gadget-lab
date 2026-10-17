@@ -328,7 +328,9 @@ namespace gglab
 				const AssetStreamingIdentity identity = MakeIdentity(request);
 				harness.GetControl().ArmGpuCompletionHold(identity);
 				const bool submitted = request.IsValid() && harness.PumpUntil([&]()
-					{ return HasPendingUpload(harness.GetScheduling().GetStatistics(), identity); });
+					{
+						return HasPendingUpload(harness.GetScheduling().GetStatistics(), identity);
+					});
 
 				const AssetSnapshot held = BuildAssetSnapshot(harness.GetAssets());
 				const AssetSnapshot::Texture* heldTexture = FindTexture(held, request.m_TextureId);
@@ -433,7 +435,9 @@ namespace gglab
 			const auto drain = [&]() noexcept
 				{
 					return harness.PumpUntil([&]()
-						{ return harness.GetAssets().GetInFlightLoadCount() == 0 && !hasPendingUploads(); });
+						{
+							return harness.GetAssets().GetInFlightLoadCount() == 0 && !hasPendingUploads();
+						});
 				};
 			struct Observation
 			{

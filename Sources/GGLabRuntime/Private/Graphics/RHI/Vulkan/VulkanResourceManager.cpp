@@ -319,9 +319,9 @@ namespace gglab
 		imageCreateInfo.extent = {
 			.width = desc.m_Extent.m_Width,
 			.height = desc.m_Extent.m_Height,
-			.depth = desc.m_Dimension == RHITextureDimension::Texture3D
-				? desc.m_Extent.m_Depth
-				: 1u,
+			.depth = desc.m_Dimension == RHITextureDimension::Texture3D ?
+				desc.m_Extent.m_Depth :
+				1u,
 		};
 		imageCreateInfo.mipLevels = desc.m_MipLevels;
 		imageCreateInfo.arrayLayers = desc.m_ArraySize;
@@ -459,9 +459,9 @@ namespace gglab
 			return {};
 		}
 
-		const char* debugNameText = desc.m_RHI.m_External.m_DebugName
-			? desc.m_RHI.m_External.m_DebugName
-			: desc.m_RHI.m_Desc.m_DebugName;
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
 			ResolveRHIResourceDebugIdentity(
@@ -505,9 +505,9 @@ namespace gglab
 			return {};
 		}
 
-		const char* debugNameText = desc.m_RHI.m_External.m_DebugName
-			? desc.m_RHI.m_External.m_DebugName
-			: desc.m_RHI.m_Desc.m_DebugName;
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
 			ResolveRHIResourceDebugIdentity(
@@ -910,9 +910,9 @@ namespace gglab
 			slot->m_Resource->GetAllocationSizeInBytes());
 		if (descriptorIndex)
 		{
-			const bool written = desc.m_Type == RHITextureViewType::ShaderResource
-				? m_Device->GetDescriptorManager().WriteSampledImage(*descriptorIndex, backing)
-				: m_Device->GetDescriptorManager().WriteStorageImage(*descriptorIndex, backing);
+			const bool written = desc.m_Type == RHITextureViewType::ShaderResource ?
+				m_Device->GetDescriptorManager().WriteSampledImage(*descriptorIndex, backing) :
+				m_Device->GetDescriptorManager().WriteStorageImage(*descriptorIndex, backing);
 			if (!written)
 			{
 				if (!m_Device->GetDescriptorManager().RetireResource(*descriptorIndex, {}))
@@ -957,9 +957,9 @@ namespace gglab
 				"VulkanResourceManager::CreateBufferView rejected an out-of-range view.");
 			return {};
 		}
-		const uint64_t resolvedSize = desc.m_SizeInBytes == 0
-			? bufferSize - desc.m_OffsetInBytes
-			: desc.m_SizeInBytes;
+		const uint64_t resolvedSize = desc.m_SizeInBytes == 0 ?
+			bufferSize - desc.m_OffsetInBytes :
+			desc.m_SizeInBytes;
 		if (resolvedSize == 0)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -1008,9 +1008,9 @@ namespace gglab
 			formatProperties2.pNext = &formatProperties3;
 			vkGetPhysicalDeviceFormatProperties2(m_Device->GetPhysicalDevice(),
 				formatInfo.m_ResourceFormat, &formatProperties2);
-			const VkFormatFeatureFlags2 requiredFeature = shaderResource
-				? VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT
-				: VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT;
+			const VkFormatFeatureFlags2 requiredFeature = shaderResource ?
+				VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT :
+				VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT;
 			if ((formatProperties3.bufferFeatures & requiredFeature) != requiredFeature)
 			{
 				GGLAB_LOG_GRAPHICS_WARN(
@@ -1414,9 +1414,9 @@ namespace gglab
 		createInfo.mipLodBias = desc.m_MipLODBias;
 		const bool anisotropic = IsAnisotropicSamplerFilter(desc.m_Filter);
 		createInfo.anisotropyEnable = anisotropic ? VK_TRUE : VK_FALSE;
-		createInfo.maxAnisotropy = anisotropic
-			? static_cast<float>(std::max(desc.m_MaxAnisotropy, 1u))
-			: 1.0f;
+		createInfo.maxAnisotropy = anisotropic ?
+			static_cast<float>(std::max(desc.m_MaxAnisotropy, 1u)) :
+			1.0f;
 		createInfo.compareEnable = IsComparisonSamplerFilter(desc.m_Filter) ? VK_TRUE : VK_FALSE;
 		createInfo.compareOp = ToVulkanCompareOp(desc.m_CompareOp);
 		createInfo.minLod = desc.m_MinLOD;

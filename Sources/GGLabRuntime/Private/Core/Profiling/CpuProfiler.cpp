@@ -140,9 +140,9 @@ namespace gglab
 			m_Parent->m_ChildDuration += duration;
 		}
 
-		const auto selfDuration = duration >= m_ChildDuration
-			? duration - m_ChildDuration
-			: CpuProfiler::Clock::duration::zero();
+		const auto selfDuration = duration >= m_ChildDuration ?
+			duration - m_ChildDuration :
+			CpuProfiler::Clock::duration::zero();
 		m_Profiler->RecordSample(m_Name, duration, selfDuration);
 	}
 

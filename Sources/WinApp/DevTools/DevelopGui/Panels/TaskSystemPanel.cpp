@@ -121,9 +121,9 @@ namespace gglab
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(125.0f);
 			const char* priorityPreview =
-				state.m_PriorityFilter < 0
-				? "All priorities"
-				: PriorityText(static_cast<TaskPriority>(state.m_PriorityFilter));
+				state.m_PriorityFilter < 0 ?
+					"All priorities" :
+					PriorityText(static_cast<TaskPriority>(state.m_PriorityFilter));
 			if (ImGui::BeginCombo("##TaskPriorityFilter", priorityPreview))
 			{
 				if (ImGui::Selectable("All priorities", state.m_PriorityFilter < 0))
@@ -143,9 +143,9 @@ namespace gglab
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(125.0f);
 			const char* statusPreview =
-				state.m_StatusFilter < 0
-				? "All statuses"
-				: StatusText(static_cast<TaskStatus>(state.m_StatusFilter));
+				state.m_StatusFilter < 0 ?
+					"All statuses" :
+					StatusText(static_cast<TaskStatus>(state.m_StatusFilter));
 			if (ImGui::BeginCombo("##TaskStatusFilter", statusPreview))
 			{
 				if (ImGui::Selectable("All statuses", state.m_StatusFilter < 0))
@@ -247,9 +247,11 @@ namespace gglab
 						switch (spec.ColumnIndex)
 						{
 						case 0:
-							comparison = lhs->m_Handle < rhs->m_Handle ? -1
-								: lhs->m_Handle > rhs->m_Handle ? 1
-								: 0;
+							comparison = lhs->m_Handle < rhs->m_Handle ?
+								-1 :
+								lhs->m_Handle > rhs->m_Handle ?
+									1 :
+									0;
 							break;
 						case 1:
 							comparison = lhs->m_Name.compare(rhs->m_Name);
@@ -264,34 +266,43 @@ namespace gglab
 							break;
 						case 4:
 							comparison =
-								lhs->m_Progress.m_Fraction < rhs->m_Progress.m_Fraction ? -1
-								: lhs->m_Progress.m_Fraction > rhs->m_Progress.m_Fraction ? 1
-								: 0;
+								lhs->m_Progress.m_Fraction < rhs->m_Progress.m_Fraction ?
+									-1 :
+									lhs->m_Progress.m_Fraction > rhs->m_Progress.m_Fraction ?
+										1 :
+										0;
 							break;
 						case 5:
 							comparison = lhs->m_Progress.m_Stage.compare(rhs->m_Progress.m_Stage);
 							break;
 						case 6:
-							comparison = lhs->m_WorkerIndex < rhs->m_WorkerIndex ? -1
-								: lhs->m_WorkerIndex > rhs->m_WorkerIndex ? 1
-								: 0;
+							comparison = lhs->m_WorkerIndex < rhs->m_WorkerIndex ?
+								-1 :
+								lhs->m_WorkerIndex > rhs->m_WorkerIndex ?
+									1 :
+									0;
 							break;
 						case 7:
-							comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1
-								: lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1
-								: 0;
+							comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ?
+								-1 :
+								lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ?
+									1 :
+									0;
 							break;
 						case 8:
 							comparison =
-								lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1
-								: lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1
-								: 0;
+								lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ?
+									-1 :
+									lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ?
+										1 :
+										0;
 							break;
 						default:
 							break;
 						}
-						return spec.SortDirection == ImGuiSortDirection_Ascending ? comparison < 0
-							: comparison > 0;
+						return spec.SortDirection == ImGuiSortDirection_Ascending ?
+							comparison < 0 :
+							comparison > 0;
 					});
 			}
 			for (const TaskActivity* task : tasks)
@@ -375,9 +386,11 @@ namespace gglab
 						switch (spec.ColumnIndex)
 						{
 						case 0:
-							comparison = lhs->m_Handle < rhs->m_Handle ? -1
-								: lhs->m_Handle > rhs->m_Handle ? 1
-								: 0;
+							comparison = lhs->m_Handle < rhs->m_Handle ?
+								-1 :
+								lhs->m_Handle > rhs->m_Handle ?
+									1 :
+									0;
 							break;
 						case 1:
 							comparison = lhs->m_Name.compare(rhs->m_Name);
@@ -391,15 +404,19 @@ namespace gglab
 								static_cast<int>(lhs->m_Status) - static_cast<int>(rhs->m_Status);
 							break;
 						case 4:
-							comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1
-								: lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1
-								: 0;
+							comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ?
+								-1 :
+								lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ?
+									1 :
+									0;
 							break;
 						case 5:
 							comparison =
-								lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1
-								: lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1
-								: 0;
+								lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ?
+									-1 :
+									lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ?
+										1 :
+										0;
 							break;
 						case 6:
 							comparison = lhs->m_Error.compare(rhs->m_Error);
@@ -407,8 +424,9 @@ namespace gglab
 						default:
 							break;
 						}
-						return spec.SortDirection == ImGuiSortDirection_Ascending ? comparison < 0
-							: comparison > 0;
+						return spec.SortDirection == ImGuiSortDirection_Ascending ?
+							comparison < 0 :
+							comparison > 0;
 					});
 			}
 			for (const TaskCompletionInfo* task : tasks)
@@ -435,9 +453,9 @@ namespace gglab
 
 	void TaskSystemPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		const auto* snapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<TaskSystemSnapshot>()
-			: nullptr;
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<TaskSystemSnapshot>() :
+			nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("TaskSystem snapshot provider is not available.");
@@ -452,8 +470,9 @@ namespace gglab
 		AppendHistory(
 			state.m_CompletionHistory, static_cast<float>(snapshot->m_PendingCompletionCount));
 
-		ImGui::TextColored(snapshot->m_AcceptingTasks ? ImVec4(0.25f, 0.85f, 0.35f, 1.0f)
-			: ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
+		ImGui::TextColored(snapshot->m_AcceptingTasks ?
+			ImVec4(0.25f, 0.85f, 0.35f, 1.0f) :
+			ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
 			snapshot->m_AcceptingTasks ? "Accepting tasks" : "Not accepting tasks");
 		DrawOverview(*snapshot);
 

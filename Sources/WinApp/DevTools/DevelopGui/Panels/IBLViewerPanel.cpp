@@ -169,9 +169,11 @@ namespace gglab
 			const IBLDiagnosticsSnapshot& snapshot, IBLCacheControlBase* cacheControl) noexcept
 		{
 			const auto& bake = snapshot.m_BakeStatus;
-			const char* cacheCoverage = bake.m_CacheHit ? "full hit"
-				: bake.m_PartialCacheHit ? "partial hit"
-				: "miss";
+			const char* cacheCoverage = bake.m_CacheHit ?
+				"full hit" :
+				bake.m_PartialCacheHit ?
+					"partial hit" :
+					"miss";
 			ImGui::Text("Stage: %s", GetIBLBakeStageName(bake.m_Stage).data());
 			ImGui::ProgressBar(bake.m_Progress, ImVec2(-1.0f, 0.0f));
 			ImGui::Text("Generation: requested %llu | baking %llu | active %llu",
@@ -220,9 +222,9 @@ namespace gglab
 						std::chrono::system_clock::now().time_since_epoch())
 						.count());
 				const uint64_t catalogAgeMilliseconds =
-					catalogNowMilliseconds >= ddc.m_CatalogLastReconciledAtUnixMilliseconds
-					? catalogNowMilliseconds - ddc.m_CatalogLastReconciledAtUnixMilliseconds
-					: 0;
+					catalogNowMilliseconds >= ddc.m_CatalogLastReconciledAtUnixMilliseconds ?
+						catalogNowMilliseconds - ddc.m_CatalogLastReconciledAtUnixMilliseconds :
+						0;
 				ImGui::TextDisabled(
 					"DDC catalog: %s | reconciled %.1f s ago | refreshes %llu | failures %llu",
 					ddc.m_IsCatalogApproximate ? "approximate" : "exact",
@@ -374,8 +376,9 @@ namespace gglab
 
 		auto* environmentSelection = context.m_EnvironmentSelectionControl;
 		const auto* diagnosticsSnapshot =
-			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>() :
+				nullptr;
 
 		if (diagnosticsSnapshot &&
 			ImGui::CollapsingHeader("Environment Source", ImGuiTreeNodeFlags_DefaultOpen))
@@ -383,9 +386,9 @@ namespace gglab
 			const auto activeIndex = diagnosticsSnapshot->m_ActiveEnvironmentIndex;
 			const bool hasActiveEnvironment =
 				activeIndex < diagnosticsSnapshot->m_Environments.size();
-			const char* activeLabel = hasActiveEnvironment
-				? diagnosticsSnapshot->m_Environments[activeIndex].m_DisplayName.c_str()
-				: "<Procedural Fallback>";
+			const char* activeLabel = hasActiveEnvironment ?
+				diagnosticsSnapshot->m_Environments[activeIndex].m_DisplayName.c_str() :
+				"<Procedural Fallback>";
 
 			ImGui::BeginDisabled(!environmentSelection);
 			if (ImGui::BeginCombo("HDR Environment", activeLabel))
@@ -676,9 +679,9 @@ namespace gglab
 				}
 				else
 				{
-					ImGui::TextDisabled(previewControl
-						? "Preview requested; it will be available next frame."
-						: "Preview has not been generated; preview control is unavailable.");
+					ImGui::TextDisabled(previewControl ?
+						"Preview requested; it will be available next frame." :
+						"Preview has not been generated; preview control is unavailable.");
 				}
 				{
 					const auto& preview = resources.m_EnvironmentPreview;
@@ -762,9 +765,9 @@ namespace gglab
 				}
 				else
 				{
-					ImGui::TextDisabled(previewControl
-						? "Preview requested; it will be available next frame."
-						: "Preview has not been generated; preview control is unavailable.");
+					ImGui::TextDisabled(previewControl ?
+						"Preview requested; it will be available next frame." :
+						"Preview has not been generated; preview control is unavailable.");
 				}
 				{
 					const auto& preview = resources.m_IrradiancePreview;
@@ -902,9 +905,9 @@ namespace gglab
 				}
 				else
 				{
-					ImGui::TextDisabled(previewControl
-						? "Preview requested; it will be available next frame."
-						: "Preview has not been generated; preview control is unavailable.");
+					ImGui::TextDisabled(previewControl ?
+						"Preview requested; it will be available next frame." :
+						"Preview has not been generated; preview control is unavailable.");
 				}
 				{
 					const auto& preview = resources.m_PrefilteredSpecularPreview;

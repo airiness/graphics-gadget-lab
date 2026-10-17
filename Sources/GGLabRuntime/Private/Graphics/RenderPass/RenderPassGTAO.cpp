@@ -309,9 +309,9 @@ namespace gglab
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
 		// A pending diagnostic capture of a GTAO tap selects the diagnostic outputs; otherwise
 		// the interactive preview does.
-		std::optional<PostProcessDebugTap> diagnosticTap = services.m_FrameCapture
-			? services.m_FrameCapture->GetPendingDiagnosticTap()
-			: std::nullopt;
+		std::optional<PostProcessDebugTap> diagnosticTap = services.m_FrameCapture ?
+			services.m_FrameCapture->GetPendingDiagnosticTap() :
+			std::nullopt;
 		if (!diagnosticTap &&
 			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion))
 		{
@@ -321,9 +321,9 @@ namespace gglab
 		const bool diagnosticOutputsEnabled = m_DiagnosticPipelineAvailable && diagnosticTap &&
 			RequiresGTAODiagnosticOutputs(*diagnosticTap);
 		const RHIFormat finalAOFormat =
-			settings.m_FinalAOFormatPreference == GTAOFinalAOFormatPreference::ForceR16Float
-			? RHIFormat::R16Float
-			: m_Capabilities.m_FinalAO.m_Format;
+			settings.m_FinalAOFormatPreference == GTAOFinalAOFormatPreference::ForceR16Float ?
+				RHIFormat::R16Float :
+				m_Capabilities.m_FinalAO.m_Format;
 
 		// Accumulating consumers advance the sampling sequence with every sample they
 		// average: a supersampled reference with its sample index, temporal GTAO with the
@@ -451,8 +451,9 @@ namespace gglab
 					parameters.m_SelectedOffsetUavIndex = selectedOffsetUav.m_Index;
 				}
 				commandContext->SetPipeline(GetOrCreatePipeline(services,
-					data.m_DiagnosticOutputsEnabled ? PipelineVariant::EvaluateDiagnostics
-					: PipelineVariant::Evaluate));
+					data.m_DiagnosticOutputsEnabled ?
+						PipelineVariant::EvaluateDiagnostics :
+						PipelineVariant::Evaluate));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
@@ -476,8 +477,9 @@ namespace gglab
 					{
 						auto& resources =
 							builder.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
-						const RGTextureId sourceAO = builder.Read(horizontal ? resources.m_RawAO
-							: resources.m_DenoiseX, RGTextureAccess::Sample, RHIStage::ComputeShader);
+						const RGTextureId sourceAO = builder.Read(horizontal ?
+							resources.m_RawAO :
+							resources.m_DenoiseX, RGTextureAccess::Sample, RHIStage::ComputeShader);
 						const RGTextureId halfDepth = builder.Read(resources.m_HalfDepthViewZ,
 							RGTextureAccess::Sample, RHIStage::ComputeShader);
 						RHITextureDesc outputDesc{};
@@ -725,8 +727,9 @@ namespace gglab
 				{
 					parameters.m_SamplesUavIndex = descriptorIndex(data.m_SamplesUav);
 				}
-				commandContext->SetPipeline(GetOrCreatePipeline(services, data.m_Diagnostics
-					? PipelineVariant::TemporalDiagnostics : PipelineVariant::Temporal));
+				commandContext->SetPipeline(GetOrCreatePipeline(services, data.m_Diagnostics ?
+					PipelineVariant::TemporalDiagnostics :
+					PipelineVariant::Temporal));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),

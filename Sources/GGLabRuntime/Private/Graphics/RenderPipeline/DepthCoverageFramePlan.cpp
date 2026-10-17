@@ -21,9 +21,9 @@ namespace gglab
 	{
 		DepthCoverageFramePlan plan{
 			.m_SourceRenderQueue = buildInfo.m_RenderQueue,
-			.m_RasterDomain = buildInfo.m_RenderQueue
-								  ? std::addressof(buildInfo.m_RenderQueue->m_CoverageRasterDomain)
-								  : nullptr,
+			.m_RasterDomain = buildInfo.m_RenderQueue ?
+				std::addressof(buildInfo.m_RenderQueue->m_CoverageRasterDomain) :
+				nullptr,
 		};
 
 		if (!buildInfo.m_RenderQueue)

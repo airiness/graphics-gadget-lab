@@ -124,9 +124,9 @@ namespace gglab
 		{
 			if (m_Textures[i].IsValid())
 			{
-				const bool released = m_LastFence.IsValid()
-					? m_Pool->ReleaseTexture(std::move(m_Textures[i]), m_LastFence)
-					: m_Pool->ReleaseTextureWithoutSubmission(std::move(m_Textures[i]));
+				const bool released = m_LastFence.IsValid() ?
+					m_Pool->ReleaseTexture(std::move(m_Textures[i]), m_LastFence) :
+					m_Pool->ReleaseTextureWithoutSubmission(std::move(m_Textures[i]));
 				GGLAB_ASSERT(released);
 			}
 			m_Initialized[i] = false;

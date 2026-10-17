@@ -50,9 +50,9 @@ namespace napa::voxel
 		{
 			return { ValidationError::StaleDataOnlyPublication };
 		}
-		const std::uint64_t authoritativeRevision = detail::SimulatedAuthoritativeRevision != 0
-			? detail::SimulatedAuthoritativeRevision
-			: authoritativeWorld.GetWorldVoxelRevision();
+		const std::uint64_t authoritativeRevision = detail::SimulatedAuthoritativeRevision != 0 ?
+			detail::SimulatedAuthoritativeRevision :
+			authoritativeWorld.GetWorldVoxelRevision();
 		if (mutation.m_TargetWorldVoxelRevision != authoritativeRevision ||
 			!mutation.m_MeshDirtyChunks.empty() ||
 			authoritativeWorld.GetSurfaceStateRevision() !=

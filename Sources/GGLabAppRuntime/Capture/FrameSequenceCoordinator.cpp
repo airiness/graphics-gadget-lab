@@ -237,9 +237,9 @@ namespace gglab
 			.m_State = FrameSequenceState::Waiting,
 			.m_CameraPathId = m_Request.m_CameraPathId,
 			.m_ReferenceSamples = m_Request.m_ReferenceSamples,
-			.m_GpuTiming = m_Request.m_GpuTiming
-				? std::optional<FrameSequenceGpuTiming>(std::in_place)
-				: std::nullopt,
+			.m_GpuTiming = m_Request.m_GpuTiming ?
+				std::optional<FrameSequenceGpuTiming>(std::in_place) :
+				std::nullopt,
 		};
 		m_Frame = 0;
 		m_Sample = 0;
@@ -411,15 +411,15 @@ namespace gglab
 		return FrameSequencePoseRequest{
 			.m_CameraPathId = m_Request.m_CameraPathId,
 			.m_Frame = m_Frame,
-			.m_ReferenceSample = m_Request.m_ReferenceSamples == 0
-				? std::nullopt
-				: std::optional(TemporalReferenceSample{
+			.m_ReferenceSample = m_Request.m_ReferenceSamples == 0 ?
+				std::nullopt :
+				std::optional(TemporalReferenceSample{
 					.m_Index = m_Sample,
 					.m_Count = m_Request.m_ReferenceSamples,
 					.m_TextureLodBias = m_Request.m_ReferenceTextureLodBias,
-					.m_Signal = m_Request.m_DiagnosticTap
-						? TemporalReferenceSignal::AmbientOcclusion
-						: TemporalReferenceSignal::SceneColor,
+					.m_Signal = m_Request.m_DiagnosticTap ?
+						TemporalReferenceSignal::AmbientOcclusion :
+						TemporalReferenceSignal::SceneColor,
 				}),
 			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
 			.m_GTAOOverrides = m_Request.m_GTAOOverrides,
@@ -652,8 +652,9 @@ namespace gglab
 			const uint32_t frame =
 				m_CaptureRequestFrames[static_cast<size_t>(std::distance(ids.begin(), id))];
 			Fail(std::format("Capture of sequence frame {} {}: {}", frame,
-				result.m_Status == FrameCaptureRequestStatus::Cancelled ? "was cancelled"
-				: "failed",
+				result.m_Status == FrameCaptureRequestStatus::Cancelled ?
+					"was cancelled" :
+					"failed",
 				result.m_Failure));
 		}
 		CompleteIfFinished();

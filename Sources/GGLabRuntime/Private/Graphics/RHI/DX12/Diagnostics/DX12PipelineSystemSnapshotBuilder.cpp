@@ -98,9 +98,9 @@ namespace gglab
 				if (IsBindlessBindingType(source.m_Type))
 				{
 					slot.m_BackendMapping = RHIBindingBackendMapping::BindlessTable;
-					slot.m_BackendBindingType = source.m_Type == RHIBindingType::BindlessResourceTable
-						? "Global resource table"
-						: "Global sampler table";
+					slot.m_BackendBindingType = source.m_Type == RHIBindingType::BindlessResourceTable ?
+						"Global resource table" :
+						"Global sampler table";
 					layout.m_BindlessResources |=
 						source.m_Type == RHIBindingType::BindlessResourceTable;
 					layout.m_BindlessSamplers |=
@@ -132,9 +132,9 @@ namespace gglab
 			}
 			pipeline.m_BackendPipelineId = pipeline.m_Handle.Index();
 			pipeline.m_BackendLayoutId =
-				binding.m_Type == DX12PipelineSystem::PipelineType::Graphics
-				? binding.m_GraphicsDesc.m_BindingLayout.Index()
-				: binding.m_ComputeDesc.m_BindingLayout.Index();
+				binding.m_Type == DX12PipelineSystem::PipelineType::Graphics ?
+					binding.m_GraphicsDesc.m_BindingLayout.Index() :
+					binding.m_ComputeDesc.m_BindingLayout.Index();
 
 			if (binding.m_Type == DX12PipelineSystem::PipelineType::Graphics)
 			{

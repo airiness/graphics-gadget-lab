@@ -73,8 +73,9 @@ namespace gglab
 
 	[[nodiscard]] inline float SanitizeMaterialIor(float ior) noexcept
 	{
-		return std::isfinite(ior) && (ior == 0.0f || ior >= 1.0f)
-			? ior : DefaultDielectricIor;
+		return std::isfinite(ior) && (ior == 0.0f || ior >= 1.0f) ?
+			ior :
+			DefaultDielectricIor;
 	}
 
 	enum class MaterialTextureSlot : uint32_t
@@ -160,8 +161,9 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Domain == RenderMaterialDomain::Asset ? m_Value != MaterialID::InvalidValue
-				: m_Value != 0;
+			return m_Domain == RenderMaterialDomain::Asset ?
+				m_Value != MaterialID::InvalidValue :
+				m_Value != 0;
 		}
 
 		[[nodiscard]] constexpr auto AsTuple() const noexcept

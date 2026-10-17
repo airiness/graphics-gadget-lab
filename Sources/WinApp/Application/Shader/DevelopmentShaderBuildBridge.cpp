@@ -247,9 +247,9 @@ namespace gglab
 			[request, job](std::stop_token stopToken) noexcept
 			{
 				job->m_Result = RunDevelopmentShaderBuild(request, stopToken);
-				return job->m_Result.IsSuccess()
-					? TaskResult::Success()
-					: TaskResult::Failure(job->m_Result.m_Diagnostics);
+				return job->m_Result.IsSuccess() ?
+					TaskResult::Success() :
+					TaskResult::Failure(job->m_Result.m_Diagnostics);
 			},
 			[this, job](const TaskCompletionInfo& completion) noexcept
 			{

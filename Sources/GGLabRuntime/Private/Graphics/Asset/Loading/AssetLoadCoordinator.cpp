@@ -48,8 +48,9 @@ namespace gglab
 						return {};
 					}
 					const ArtifactContentDigest actualDigest =
-						artifact.m_Artifact ? artifact.m_Artifact->m_ContentDigest
-						: ArtifactContentDigest{};
+						artifact.m_Artifact ?
+							artifact.m_Artifact->m_ContentDigest :
+							ArtifactContentDigest{};
 					return std::format(
 						"Texture artifact changed for immutable generation (expected {}, resolved {}).",
 						ArtifactContentDigestText(expectedArtifactContentDigest),
@@ -118,9 +119,9 @@ namespace gglab
 				}
 				progress.Report(0.60f, "Shared texture artifact resolved",
 					DerivedDataKeyText(job.m_DerivedDataKey));
-				return job.m_Artifact.IsValid()
-					? TaskResult::Success()
-					: TaskResult::Failure("Shared texture artifact result was invalid.");
+				return job.m_Artifact.IsValid() ?
+					TaskResult::Success() :
+					TaskResult::Failure("Shared texture artifact result was invalid.");
 			}
 
 			TextureArtifactWaiterHandle participant = std::move(requestResult.m_Waiter);
@@ -427,9 +428,10 @@ namespace gglab
 			request.m_ExpectedArtifactContentDigest;
 		TextureArtifactCache* const textureArtifactCache = m_TextureArtifactCache;
 		const bool cacheHit = static_cast<bool>(job->m_Artifact);
-		const std::string taskName = cacheHit ? std::format("Asset.ModelResidencyCacheHit: {}",
-			sourcePath.filename().generic_string())
-			: std::format("Asset.ModelResidencyReload: {}",
+		const std::string taskName = cacheHit ?
+			std::format("Asset.ModelResidencyCacheHit: {}",
+				sourcePath.filename().generic_string()) :
+			std::format("Asset.ModelResidencyReload: {}",
 				sourcePath.filename().generic_string());
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
@@ -624,9 +626,9 @@ namespace gglab
 	{
 		const auto operation = m_ModelImports.find(contentVersion.m_Key);
 		return operation != m_ModelImports.end() &&
-			operation->second.m_Operation.m_ContentVersion == contentVersion
-			? operation->second.m_Task
-			: TaskHandle{};
+			operation->second.m_Operation.m_ContentVersion == contentVersion ?
+				operation->second.m_Task :
+				TaskHandle{};
 	}
 
 	bool AssetLoadCoordinator::HasMeshReload(AssetContentVersion sourceModelVersion) const noexcept
@@ -641,9 +643,9 @@ namespace gglab
 	{
 		const auto operation = m_TextureDecodes.find(contentVersion.m_Key);
 		return operation != m_TextureDecodes.end() &&
-			operation->second.m_Operation.m_ContentVersion == contentVersion
-			? operation->second.m_Task
-			: TaskHandle{};
+			operation->second.m_Operation.m_ContentVersion == contentVersion ?
+				operation->second.m_Task :
+				TaskHandle{};
 	}
 
 	bool AssetLoadCoordinator::CancelModelImport(AssetContentVersion contentVersion) noexcept

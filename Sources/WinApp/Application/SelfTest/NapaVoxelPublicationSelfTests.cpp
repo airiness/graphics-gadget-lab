@@ -471,9 +471,9 @@ namespace gglab
 						},
 					},
 			};
-			const std::span<const PrimitiveDesc> primitives = renderable
-				? std::span<const PrimitiveDesc>(&sphere, 1)
-				: std::span<const PrimitiveDesc>{};
+			const std::span<const PrimitiveDesc> primitives = renderable ?
+				std::span<const PrimitiveDesc>(&sphere, 1) :
+				std::span<const PrimitiveDesc>{};
 			std::unique_ptr<VoxelWorld> world;
 			PrimitiveWorldGenerationResult generation{};
 			if (GeneratePrimitiveVoxelWorld(config, primitives, world, generation).Failed() || !world)
@@ -511,9 +511,9 @@ namespace gglab
 					},
 				},
 			};
-			const std::span<const PrimitiveDesc> primitives = renderable
-				? std::span<const PrimitiveDesc>(&sphere, 1)
-				: std::span<const PrimitiveDesc>{};
+			const std::span<const PrimitiveDesc> primitives = renderable ?
+				std::span<const PrimitiveDesc>(&sphere, 1) :
+				std::span<const PrimitiveDesc>{};
 			std::unique_ptr<VoxelWorld> world;
 			PrimitiveWorldGenerationResult generation{};
 			constexpr std::array chunks{ ChunkCoord{} };
@@ -1031,9 +1031,9 @@ namespace gglab
 			const bool queuedForRecording = builtQueued && queued &&
 				queued->PrepareGpuResources(nullptr) &&
 				queued->MarkQueued();
-			const AssetStreamingIdentity queuedIdentity = queued
-				? queued->GetUploadIdentity()
-				: AssetStreamingIdentity{};
+			const AssetStreamingIdentity queuedIdentity = queued ?
+				queued->GetUploadIdentity() :
+				AssetStreamingIdentity{};
 			if (queued)
 			{
 				queued->Cancel();
@@ -1095,9 +1095,9 @@ namespace gglab
 			std::shared_ptr<NapaVoxelInitialPublicationOwner> exhausted;
 			const bool builtExhausted = BuildPublicationOwner(false, 2003,
 				std::numeric_limits<uint64_t>::max(), exhausted);
-			const AssetStreamingIdentity oldIdentity = exhausted
-				? exhausted->GetUploadIdentity()
-				: AssetStreamingIdentity{};
+			const AssetStreamingIdentity oldIdentity = exhausted ?
+				exhausted->GetUploadIdentity() :
+				AssetStreamingIdentity{};
 			if (exhausted)
 			{
 				exhausted->Cancel();
@@ -1212,9 +1212,9 @@ namespace gglab
 			const bool surfaceApplied = damaged &&
 				ApplySphereEdit(*world, edit, surfaceMutation).Succeeded() &&
 				surfaceMutation.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged;
-			const ValidationResult buildResult = surfaceApplied
-				? BuildCpuMeshBatch(*world, surfaceMutation, replacementBatch)
-				: ValidationResult{ ValidationError::InvalidVoxelMutation };
+			const ValidationResult buildResult = surfaceApplied ?
+				BuildCpuMeshBatch(*world, surfaceMutation, replacementBatch) :
+				ValidationResult{ ValidationError::InvalidVoxelMutation };
 			const bool batchBuilt = buildResult.Succeeded();
 			const bool batchValidated = batchBuilt &&
 				ValidateCpuMeshBatch(replacementBatch, session.GetVisibleCoreMeshes(),
@@ -1282,9 +1282,9 @@ namespace gglab
 				AssetStreamingWorkKind::RuntimeMesh,
 				"Replacement conversion consumes the exact Core replacement view and preserves identity");
 
-			const std::shared_ptr<const NapaVoxelGpuMeshSet> prospective = prepared
-				? publication->GetProspectiveGpuMeshes()
-				: nullptr;
+			const std::shared_ptr<const NapaVoxelGpuMeshSet> prospective = prepared ?
+				publication->GetProspectiveGpuMeshes() :
+				nullptr;
 			bool reusedUntouchedChunk = false;
 			if (baseMeshes && prospective)
 			{
@@ -1317,9 +1317,9 @@ namespace gglab
 						.m_PublicationSerial = 2,
 						.m_OwnerGeneration = std::numeric_limits<uint64_t>::max(),
 					}, 8002, exhausted);
-			const AssetStreamingIdentity exhaustedIdentity = exhaustedPrepared
-				? exhausted->GetUploadIdentity()
-				: AssetStreamingIdentity{};
+			const AssetStreamingIdentity exhaustedIdentity = exhaustedPrepared ?
+				exhausted->GetUploadIdentity() :
+				AssetStreamingIdentity{};
 			if (exhausted)
 			{
 				exhausted->Cancel();
@@ -1540,9 +1540,9 @@ namespace gglab
 				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.m_Scheduling.get(), &commandQueue);
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, renderState.GetVisibleGpuMeshes(), 41, 1);
-				std::weak_ptr<const NapaVoxelGpuMeshSet> prospective = began
-					? session.GetPublication()->GetProspectiveGpuMeshes()
-					: std::shared_ptr<const NapaVoxelGpuMeshSet>{};
+				std::weak_ptr<const NapaVoxelGpuMeshSet> prospective = began ?
+					session.GetPublication()->GetProspectiveGpuMeshes() :
+					std::shared_ptr<const NapaVoxelGpuMeshSet>{};
 				const uint32_t destroyedBefore = device.GetDestroyedBufferCount();
 				session.CancelPrepare();
 				context.Check(began && prospective.expired() &&
@@ -1573,9 +1573,9 @@ namespace gglab
 				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.m_Scheduling.get(), &commandQueue);
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, visibleBefore, 42, 7);
-				std::weak_ptr<const NapaVoxelGpuMeshSet> prospective = began
-					? session.GetPublication()->GetProspectiveGpuMeshes()
-					: std::shared_ptr<const NapaVoxelGpuMeshSet>{};
+				std::weak_ptr<const NapaVoxelGpuMeshSet> prospective = began ?
+					session.GetPublication()->GetProspectiveGpuMeshes() :
+					std::shared_ptr<const NapaVoxelGpuMeshSet>{};
 				scheduler.m_Scheduling->DrainReadyWork();
 				const uint32_t destroyedBeforeCancel = device.GetDestroyedBufferCount();
 				session.CancelPrepare();
@@ -1697,13 +1697,13 @@ namespace gglab
 					.m_FencePoint = { RHIFenceHandle{ 9, 1 }, 2 },
 					});
 			const auto oldFrameView = renderState.CaptureFrameView();
-			const auto prospective = publication
-				? publication->GetProspectiveGpuMeshes()
-				: nullptr;
+			const auto prospective = publication ?
+				publication->GetProspectiveGpuMeshes() :
+				nullptr;
 			auto damageSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
-			damageSnapshot->m_SourceWorldVoxelRevision = publication
-				? publication->GetTargetWorldRevision()
-				: 0;
+			damageSnapshot->m_SourceWorldVoxelRevision = publication ?
+				publication->GetTargetWorldRevision() :
+				0;
 			renderState.OnFrameSubmitted({ RHIFenceHandle{ 10, 1 }, 6 });
 			std::unique_ptr<NapaVoxelPreparedMeshCommit> preparedCommit;
 			const uint32_t createdBeforeCommit = device.GetCreatedBufferCount();
@@ -1961,9 +1961,9 @@ namespace gglab
 				publicationIndex < publicationCount && lifecycleValid; ++publicationIndex)
 			{
 				VoxelMutationResult mutation{};
-				const ValidationResult mutationResult = publicationIndex % 2 == 0
-					? ApplySphereEdit(*world, edit, mutation)
-					: RestoreAll(*world, mutation);
+				const ValidationResult mutationResult = publicationIndex % 2 == 0 ?
+					ApplySphereEdit(*world, edit, mutation) :
+					RestoreAll(*world, mutation);
 				CpuMeshBatch batch{};
 				std::unique_ptr<PendingCpuMeshBatch> pending;
 				auto damageSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();

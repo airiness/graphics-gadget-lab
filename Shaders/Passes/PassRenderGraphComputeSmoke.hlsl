@@ -109,9 +109,9 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 	Texture2D<uint> workB = GetTexture2DUint(g_Pass.WorkBIndex);
 
 	const bool showWorkA = input.UV.x < 0.68;
-	const float2 localUv = showWorkA
-		? float2(input.UV.x / 0.68, input.UV.y)
-		: float2((input.UV.x - 0.68) / 0.32, input.UV.y);
+	const float2 localUv = showWorkA ?
+		float2(input.UV.x / 0.68, input.UV.y) :
+		float2((input.UV.x - 0.68) / 0.32, input.UV.y);
 	const uint2 texel = min((uint2)(localUv * float2(g_Pass.Width, g_Pass.Height)),
 		uint2(g_Pass.Width - 1, g_Pass.Height - 1));
 	float3 color =

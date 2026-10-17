@@ -183,10 +183,10 @@ namespace gglab
 			LoadingProgress progress = m_PendingDemo->GetPreparationProgress();
 			const std::string nestedTitle = std::move(progress.m_Title);
 			progress.m_Title =
-				nestedTitle.empty()
-				? std::format("Loading Demo: {}", GetDemoName(m_PendingDemoIndex))
-				: std::format(
-					"Loading Demo: {} / {}", GetDemoName(m_PendingDemoIndex), nestedTitle);
+				nestedTitle.empty() ?
+					std::format("Loading Demo: {}", GetDemoName(m_PendingDemoIndex)) :
+					std::format(
+						"Loading Demo: {} / {}", GetDemoName(m_PendingDemoIndex), nestedTitle);
 			return progress;
 		}
 		if (m_RequestedDemoIndex != InvalidDemoIndex)

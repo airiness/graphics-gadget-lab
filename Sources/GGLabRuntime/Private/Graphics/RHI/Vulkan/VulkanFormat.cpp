@@ -69,9 +69,9 @@ namespace gglab
 	const VulkanFormatInfo& GetVulkanFormatInfo(RHIFormat format) noexcept
 	{
 		const size_t index = static_cast<size_t>(format);
-		return index < VulkanFormatInfos.size()
-			? VulkanFormatInfos[index]
-			: VulkanFormatInfos[static_cast<size_t>(RHIFormat::Unknown)];
+		return index < VulkanFormatInfos.size() ?
+			VulkanFormatInfos[index] :
+			VulkanFormatInfos[static_cast<size_t>(RHIFormat::Unknown)];
 	}
 
 	VkFormat ToVulkanFormat(RHIFormat format) noexcept
@@ -256,20 +256,20 @@ namespace gglab
 			switch (resource.m_Dimension)
 			{
 			case RHITextureDimension::Texture1D:
-				effectiveDimension = resource.m_ArraySize > 1
-					? RHITextureViewDimension::Texture1DArray
-					: RHITextureViewDimension::Texture1D;
-				viewType = resource.m_ArraySize > 1
-					? VK_IMAGE_VIEW_TYPE_1D_ARRAY
-					: VK_IMAGE_VIEW_TYPE_1D;
+				effectiveDimension = resource.m_ArraySize > 1 ?
+					RHITextureViewDimension::Texture1DArray :
+					RHITextureViewDimension::Texture1D;
+				viewType = resource.m_ArraySize > 1 ?
+					VK_IMAGE_VIEW_TYPE_1D_ARRAY :
+					VK_IMAGE_VIEW_TYPE_1D;
 				break;
 			case RHITextureDimension::Texture2D:
-				effectiveDimension = resource.m_ArraySize > 1
-					? RHITextureViewDimension::Texture2DArray
-					: RHITextureViewDimension::Texture2D;
-				viewType = resource.m_ArraySize > 1
-					? VK_IMAGE_VIEW_TYPE_2D_ARRAY
-					: VK_IMAGE_VIEW_TYPE_2D;
+				effectiveDimension = resource.m_ArraySize > 1 ?
+					RHITextureViewDimension::Texture2DArray :
+					RHITextureViewDimension::Texture2D;
+				viewType = resource.m_ArraySize > 1 ?
+					VK_IMAGE_VIEW_TYPE_2D_ARRAY :
+					VK_IMAGE_VIEW_TYPE_2D;
 				break;
 			case RHITextureDimension::Texture3D:
 				effectiveDimension = RHITextureViewDimension::Texture3D;
@@ -288,9 +288,9 @@ namespace gglab
 		// and never to color.
 		const RHIFormatInfo& resourceInfo = GetRHIFormatInfo(resource.m_Format);
 		const RHITextureAspect effectiveResourceAspects =
-			resourceInfo.m_DepthStencilAspects != RHITextureAspect::None
-			? resourceInfo.m_DepthStencilAspects
-			: resourceInfo.m_Aspects;
+			resourceInfo.m_DepthStencilAspects != RHITextureAspect::None ?
+				resourceInfo.m_DepthStencilAspects :
+				resourceInfo.m_Aspects;
 
 		// Aspect: All (the default) resolves to the resource's effective
 		// aspects; any other explicit aspect must be a non-empty subset of

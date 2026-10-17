@@ -239,9 +239,9 @@ namespace gglab
 			uint32_t bufferIndex, uint32_t slot) const noexcept
 		{
 			GGLAB_ASSERT(bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size());
-			return bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size()
-				? m_UploadedRevisions[bufferIndex][slot]
-				: 0;
+			return bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size() ?
+				m_UploadedRevisions[bufferIndex][slot] :
+				0;
 		}
 		[[nodiscard]] const BufferVersionStats& GetBufferVersionStats(
 			uint32_t bufferIndex) const noexcept

@@ -36,8 +36,9 @@ namespace gglab
 
 		void DrawCullingLabStatistics(const DevelopGuiContext& context) noexcept
 		{
-			const auto* snapshot = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() : nullptr;
+			const auto* snapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() :
+				nullptr;
 			if (!snapshot || snapshot->m_Queues.empty())
 			{
 				ImGui::TextDisabled("Render queue statistics are not available yet.");
@@ -120,15 +121,16 @@ namespace gglab
 
 			for (const LabDiagnosticCheck& check : diagnostics.m_Checks)
 			{
-				const ImVec4 color = check.m_Status == LabDiagnosticCheckStatus::Passed
-					? ImVec4(0.25f, 0.85f, 0.35f, 1.0f)
-					: check.m_Status == LabDiagnosticCheckStatus::Failed
-					? ImVec4(1.0f, 0.3f, 0.25f, 1.0f)
-					: ImVec4(0.95f, 0.75f, 0.2f, 1.0f);
-				const char* status = check.m_Status == LabDiagnosticCheckStatus::Passed ? "PASS"
-					: check.m_Status == LabDiagnosticCheckStatus::Failed
-					? "FAIL"
-					: "PENDING";
+				const ImVec4 color = check.m_Status == LabDiagnosticCheckStatus::Passed ?
+					ImVec4(0.25f, 0.85f, 0.35f, 1.0f) :
+					check.m_Status == LabDiagnosticCheckStatus::Failed ?
+						ImVec4(1.0f, 0.3f, 0.25f, 1.0f) :
+						ImVec4(0.95f, 0.75f, 0.2f, 1.0f);
+				const char* status = check.m_Status == LabDiagnosticCheckStatus::Passed ?
+					"PASS" :
+					check.m_Status == LabDiagnosticCheckStatus::Failed ?
+						"FAIL" :
+						"PENDING";
 				ImGui::TextColored(color, "[%s]", status);
 				ImGui::SameLine();
 				ImGui::TextUnformatted(check.m_Name.c_str());
@@ -337,9 +339,9 @@ namespace gglab
 			{
 				return edit.m_LabId == activeLabId && edit.m_ParameterId == desc.m_Id;
 			});
-		LabSnapshotValue value = draft != m_DeferredParameterEdits.end()
-			? draft->m_Value
-			: parameter.m_Value;
+		LabSnapshotValue value = draft != m_DeferredParameterEdits.end() ?
+			draft->m_Value :
+			parameter.m_Value;
 		bool changed = false;
 
 		switch (desc.m_Type)

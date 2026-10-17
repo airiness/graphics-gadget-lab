@@ -128,8 +128,11 @@ namespace gglab
 		const auto* contextPtr = &context;
 
 		rg.AddPass<PassData>(
-			physicalPreview ? (environmentSettings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky
-				? "Background.PhysicalSky" : "Background.PhysicalSkyPreview") : GetRenderGraphPassName(),
+			physicalPreview ?
+				(environmentSettings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky ?
+					"Background.PhysicalSky" :
+					"Background.PhysicalSkyPreview") :
+				GetRenderGraphPassName(),
 			[displayViewId, physicalPreview, useFallback, fallbackTextureHandle, fallbackTextureDesc,
 			environmentTextureIndex,
 			environmentSamplerIndex,
@@ -296,8 +299,8 @@ namespace gglab
 	{
 		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
-		return physicalPreview
-			? pipelineCache->Resolve(m_PhysicalPreviewPipelineSlot, m_PhysicalPreviewRecipe, GetInfo())
-			: pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
+		return physicalPreview ?
+			pipelineCache->Resolve(m_PhysicalPreviewPipelineSlot, m_PhysicalPreviewRecipe, GetInfo()) :
+			pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}
 }

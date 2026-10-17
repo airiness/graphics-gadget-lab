@@ -235,9 +235,9 @@ namespace gglab
 		// The diagnostics texture carries one payload per frame. A pending diagnostic capture
 		// of a Temporal AA tap selects it; otherwise the interactive preview does.
 		std::optional<PostProcessDebugTap> payloadTap;
-		const std::optional<PostProcessDebugTap> captureTap = services.m_FrameCapture
-			? services.m_FrameCapture->GetPendingDiagnosticTap()
-			: std::nullopt;
+		const std::optional<PostProcessDebugTap> captureTap = services.m_FrameCapture ?
+			services.m_FrameCapture->GetPendingDiagnosticTap() :
+			std::nullopt;
 		if (captureTap && IsTemporalAADiagnosticsTap(*captureTap))
 		{
 			payloadTap = captureTap;

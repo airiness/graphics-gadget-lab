@@ -15,8 +15,9 @@ namespace gglab
 {
 	void SceneDepthPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		const auto* snapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<SceneDepthDiagnosticsSnapshot>() : nullptr;
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<SceneDepthDiagnosticsSnapshot>() :
+			nullptr;
 		if (!snapshot || !snapshot->m_Available)
 		{
 			ImGui::TextDisabled("Scene depth is unavailable.");
@@ -35,8 +36,9 @@ namespace gglab
 			ImGui::BeginDisabled(!control);
 			if (ImGui::Checkbox("Linear View Z", &linear) && control)
 			{
-				selection.m_Tap = linear ? PostProcessDebugTap::SceneDepthLinearViewZ
-					: PostProcessDebugTap::SceneDepthRaw;
+				selection.m_Tap = linear ?
+					PostProcessDebugTap::SceneDepthLinearViewZ :
+					PostProcessDebugTap::SceneDepthRaw;
 				control->SetPostProcessPreviewSelection(selection, Channel);
 			}
 			ImGui::EndDisabled();

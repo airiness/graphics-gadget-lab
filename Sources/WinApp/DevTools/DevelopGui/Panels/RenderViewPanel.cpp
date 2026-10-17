@@ -51,8 +51,9 @@ namespace gglab
 				return devtools::EnumText(RenderViewID::Unknown);
 			}
 			const auto visibility = context.m_CameraRenderViewQuery->GetRenderViewVisibilityMode(viewId);
-			return visibility ? devtools::EnumText(*visibility)
-				: devtools::EnumText(RenderViewVisibilityMode::None);
+			return visibility ?
+				devtools::EnumText(*visibility) :
+				devtools::EnumText(RenderViewVisibilityMode::None);
 		}
 
 		std::string RenderViewName(const RenderView& view)
@@ -103,8 +104,9 @@ namespace gglab
 
 		RenderViewID ResolveDisplayViewId(const DevelopGuiContext& context) noexcept
 		{
-			return context.m_CameraRenderViewQuery ? context.m_CameraRenderViewQuery->GetDisplayViewId()
-				: RenderViewID::Main;
+			return context.m_CameraRenderViewQuery ?
+				context.m_CameraRenderViewQuery->GetDisplayViewId() :
+				RenderViewID::Main;
 		}
 
 		RenderViewID ResolveSelectedViewId(
@@ -443,14 +445,18 @@ namespace gglab
 	void RenderViewPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<RenderViewPanelState>();
-		const auto* viewSnapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
-		const auto views = viewSnapshot ? std::span<const RenderView>(viewSnapshot->m_Views)
-			: std::span<const RenderView>{};
-		const auto* snapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() : nullptr;
-		const auto queues = snapshot ? std::span<const RenderQueueEntrySnapshot>(snapshot->m_Queues)
-			: std::span<const RenderQueueEntrySnapshot>{};
+		const auto* viewSnapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() :
+			nullptr;
+		const auto views = viewSnapshot ?
+			std::span<const RenderView>(viewSnapshot->m_Views) :
+			std::span<const RenderView>{};
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() :
+			nullptr;
+		const auto queues = snapshot ?
+			std::span<const RenderQueueEntrySnapshot>(snapshot->m_Queues) :
+			std::span<const RenderQueueEntrySnapshot>{};
 		DrawOverview(state, context, queues, views);
 		ImGui::Spacing();
 		DrawSelectedRenderView(state, context, views);

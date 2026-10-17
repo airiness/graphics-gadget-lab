@@ -168,8 +168,9 @@ namespace gglab
 			const auto& stageResult = result.Get(stage);
 			auto& stageStatus = status.m_Artifacts[static_cast<size_t>(stage)];
 			stageStatus.m_DerivedDataKey = stageResult.m_Key;
-			stageStatus.m_ContentDigest = stageResult.m_Artifact
-				? stageResult.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+			stageStatus.m_ContentDigest = stageResult.m_Artifact ?
+				stageResult.m_Artifact->m_ContentDigest :
+				ArtifactContentDigest{};
 			switch (stageResult.m_Source)
 			{
 			case IBLDerivedDataSource::CpuCache:
@@ -242,8 +243,9 @@ namespace gglab
 			.m_ArtifactCache = createInfo.m_ArtifactCache,
 			.m_Compatibility = IBLArtifactCompatibility::AdapterScoped,
 			.m_AdapterScopeIdentity = std::string(
-				createInfo.m_Device ? createInfo.m_Device->GetAdapterCompatibilityIdentity()
-									: std::string_view{}),
+				createInfo.m_Device ?
+					createInfo.m_Device->GetAdapterCompatibilityIdentity() :
+					std::string_view{}),
 			})
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
@@ -709,9 +711,9 @@ namespace gglab
 		const bool shaderRegistryChanged = detail::HasIBLBakeShaderRegistryChanged(
 			m_BakingRequest.m_ShaderRegistry, m_ShaderManager->GetActiveRegistryRef());
 		return !shaderRegistryChanged && !m_InFlightFence.IsValid() &&
-			IsGpuStage(m_Status.m_Stage)
-			? m_Status.m_Stage
-			: IBLBakeStage::Idle;
+			IsGpuStage(m_Status.m_Stage) ?
+				m_Status.m_Stage :
+				IBLBakeStage::Idle;
 	}
 
 	void IBLBakeScheduler::AdvanceCompletedStage() noexcept
@@ -945,8 +947,9 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN(
 				"IBL stage artifacts for generation {} were not fully persisted: {}",
 				work->m_Generation,
-				completion.m_Status == TaskStatus::Cancelled ? "task cancelled"
-				: completion.m_Error);
+				completion.m_Status == TaskStatus::Cancelled ?
+					"task cancelled" :
+					completion.m_Error);
 		}
 		m_Status.m_CacheWritePending = m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
 	}

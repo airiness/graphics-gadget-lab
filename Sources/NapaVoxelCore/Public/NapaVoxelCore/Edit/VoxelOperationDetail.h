@@ -47,7 +47,8 @@ namespace napa::voxel::detail
 		{
 			const auto doubled = CheckedMul(values.capacity(), std::size_t{ 2 });
 			nextCapacity = doubled.has_value() ?
-				std::min(*doubled, values.max_size()) : values.max_size();
+				std::min(*doubled, values.max_size()) :
+				values.max_size();
 		}
 		values.reserve(nextCapacity);
 		return {};

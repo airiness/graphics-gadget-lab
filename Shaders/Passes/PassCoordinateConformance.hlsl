@@ -81,9 +81,9 @@ float4 PSConformance(CoordinateConformanceVSOutput input, bool isFrontFace : SV_
 {
 	if (g_Pass.Mode == CoordinateModeWinding)
 	{
-		return isFrontFace
-			? float4(0.1, 0.9, 0.2, 1.0)
-			: float4(0.9, 0.1, 0.8, 1.0);
+		return isFrontFace ?
+			float4(0.1, 0.9, 0.2, 1.0) :
+			float4(0.9, 0.1, 0.8, 1.0);
 	}
 	if (g_Pass.Mode == CoordinateModeMarkerSampling)
 	{
@@ -93,18 +93,18 @@ float4 PSConformance(CoordinateConformanceVSOutput input, bool isFrontFace : SV_
 	}
 	if (g_Pass.Mode == CoordinateModeDepthVisualization)
 	{
-		return g_Pass.Depth > 0.5
-			? float4(0.1, 0.9, 0.2, 1.0)
-			: float4(0.9, 0.1, 0.15, 1.0);
+		return g_Pass.Depth > 0.5 ?
+			float4(0.1, 0.9, 0.2, 1.0) :
+			float4(0.9, 0.1, 0.15, 1.0);
 	}
 	if (g_Pass.Mode == CoordinateModeDepthProbe)
 	{
 		Texture2D<float> depthProbe = GetTexture2DFloat(g_Pass.TextureIndex);
 		SamplerState depthSampler = GetSamplerState(g_Pass.SamplerIndex);
 		const float depth = depthProbe.SampleLevel(depthSampler, input.UV, 0.0);
-		return abs(depth - g_Pass.DepthOverride) < CoordinateDepthProbeTolerance
-			? float4(0.1, 0.9, 0.2, 1.0)
-			: float4(0.9, 0.1, 0.15, 1.0);
+		return abs(depth - g_Pass.DepthOverride) < CoordinateDepthProbeTolerance ?
+			float4(0.1, 0.9, 0.2, 1.0) :
+			float4(0.9, 0.1, 0.15, 1.0);
 	}
 	if (g_Pass.Mode == CoordinateModePosition)
 	{

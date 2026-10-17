@@ -27,15 +27,16 @@ namespace gglab
 			options.m_StartupLabId.value_or(std::string(DesktopDefaultLabId));
 		config.m_StartupLabParameters = options.m_StartupLabParameters;
 		config.m_InitialExtent = initialExtent;
-		config.m_InitialPointerMode = options.m_StartWithRelativeMouse
-			? AppRuntimePointerMode::Relative
-			: AppRuntimePointerMode::Absolute;
+		config.m_InitialPointerMode = options.m_StartWithRelativeMouse ?
+			AppRuntimePointerMode::Relative :
+			AppRuntimePointerMode::Absolute;
 		if (!options.m_DisableDevelopmentTools)
 		{
 			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;
 		}
-		config.m_RequestRuntimeValidation = options.m_ValidationMode
-			? *options.m_ValidationMode != ApplicationValidationMode::Off : requestRuntimeValidation;
+		config.m_RequestRuntimeValidation = options.m_ValidationMode ?
+			*options.m_ValidationMode != ApplicationValidationMode::Off :
+			requestRuntimeValidation;
 		config.m_RequestGpuBasedValidation =
 			options.m_ValidationMode == ApplicationValidationMode::Gpu;
 #if defined(BUILD_DEBUG)
@@ -45,10 +46,11 @@ namespace gglab
 		}
 #endif
 		config.m_NonFiniteCounters = options.m_WatchNonFinite;
-		config.m_FixedDeltaTimeSeconds = options.m_FixedDeltaTimeSeconds
-			? options.m_FixedDeltaTimeSeconds
-			: options.m_Hidden ? std::optional<double>(HiddenLaunchFixedDeltaTimeSeconds)
-			: std::nullopt;
+		config.m_FixedDeltaTimeSeconds = options.m_FixedDeltaTimeSeconds ?
+			options.m_FixedDeltaTimeSeconds :
+			options.m_Hidden ?
+				std::optional<double>(HiddenLaunchFixedDeltaTimeSeconds) :
+				std::nullopt;
 
 		switch (options.m_StartupDemo)
 		{
@@ -98,8 +100,9 @@ namespace gglab
 		}
 
 		const std::filesystem::path runtimeRoot = utils::Canonical(executableDirectory);
-		const std::filesystem::path stateRoot = stateDirectory.empty()
-			? runtimeRoot : utils::Canonical(stateDirectory);
+		const std::filesystem::path stateRoot = stateDirectory.empty() ?
+			runtimeRoot :
+			utils::Canonical(stateDirectory);
 		if (!stateDirectory.empty())
 		{
 			const auto isWithin = [](const std::filesystem::path& child,

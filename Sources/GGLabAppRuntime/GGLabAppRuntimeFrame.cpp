@@ -135,13 +135,17 @@ namespace gglab
 			FrameCaptureReadiness readiness;
 			const ShaderPreloadStatus& shaders = inputs.m_ShaderPreload;
 			readiness.Add("shaders",
-				shaders.IsReady() ? FrameCaptureGateState::Ready
-				: shaders.HasFailed() ? FrameCaptureGateState::Failed
-				: FrameCaptureGateState::Pending,
-				shaders.HasFailed() ? shaders.m_Error
-				: shaders.IsReady() ? std::string{}
-				: std::format("{} of {} shaders preloaded.", shaders.m_CompletedCount,
-					shaders.m_TotalCount));
+				shaders.IsReady() ?
+					FrameCaptureGateState::Ready :
+					shaders.HasFailed() ?
+						FrameCaptureGateState::Failed :
+						FrameCaptureGateState::Pending,
+				shaders.HasFailed() ?
+					shaders.m_Error :
+					shaders.IsReady() ?
+						std::string{} :
+						std::format("{} of {} shaders preloaded.", shaders.m_CompletedCount,
+							shaders.m_TotalCount));
 
 			if (inputs.m_DemoManager.HasPendingActiveDemo())
 			{
@@ -172,17 +176,19 @@ namespace gglab
 			const bool iblPending = environment.GetBakeRequestGeneration() != bake.m_ActiveGeneration;
 			readiness.Add("ibl",
 				iblPending ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
-				iblPending ? std::format("Baking {} ({:.0f}%).", GetIBLBakeStageName(bake.m_Stage),
-					bake.m_Progress * 100.0f)
-				: std::string{});
+				iblPending ?
+					std::format("Baking {} ({:.0f}%).", GetIBLBakeStageName(bake.m_Stage),
+						bake.m_Progress * 100.0f) :
+					std::string{});
 
 			// A load reaches the upload queues only once its CPU work completes, so
 			// asset uploads alone would report Ready while a decode is in flight.
 			const uint32_t pendingLoads = inputs.m_AssetManager.GetInFlightLoadCount();
 			readiness.Add("asset-loads",
 				pendingLoads > 0 ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
-				pendingLoads > 0 ? std::format("{} asset loads in flight.", pendingLoads)
-				: std::string{});
+				pendingLoads > 0 ?
+					std::format("{} asset loads in flight.", pendingLoads) :
+					std::string{});
 
 			const AssetUploadStatistics uploads =
 				inputs.m_RenderServices.m_AssetUpload->GetStatistics();
@@ -193,8 +199,9 @@ namespace gglab
 				uploads.m_GpuFinalizeQueue.m_PendingCount;
 			readiness.Add("asset-uploads",
 				pendingUploads > 0 ? FrameCaptureGateState::Pending : FrameCaptureGateState::Ready,
-				pendingUploads > 0 ? std::format("{} uploads pending.", pendingUploads)
-				: std::string{});
+				pendingUploads > 0 ?
+					std::format("{} uploads pending.", pendingUploads) :
+					std::string{});
 			return readiness;
 		}
 
@@ -286,10 +293,10 @@ namespace gglab
 				.m_TextureLodBias = transaction.GetTextureLodBias(),
 				.m_RenderExtent = { resolution.m_Render.m_Width, resolution.m_Render.m_Height },
 				.m_DisplayExtent = { resolution.m_Display.m_Width, resolution.m_Display.m_Height },
-				.m_RenderScale = resolution.m_Display.m_Width > 0
-					? static_cast<float>(resolution.m_Render.m_Width) /
-						static_cast<float>(resolution.m_Display.m_Width)
-					: 0.0f,
+				.m_RenderScale = resolution.m_Display.m_Width > 0 ?
+					static_cast<float>(resolution.m_Render.m_Width) /
+						static_cast<float>(resolution.m_Display.m_Width) :
+					0.0f,
 			};
 		}
 
@@ -311,9 +318,9 @@ namespace gglab
 			return FrameCaptureFrameState{
 				.m_Backend = std::string(GetBackendName(inputs.m_Backend)),
 				// The bootstrap loading Demo has no registered index.
-				.m_DemoId = std::string(demoIndex < inputs.m_DemoManager.GetDemoCount()
-					? inputs.m_DemoManager.GetDemoName(demoIndex)
-					: inputs.m_Demo.GetName()),
+				.m_DemoId = std::string(demoIndex < inputs.m_DemoManager.GetDemoCount() ?
+					inputs.m_DemoManager.GetDemoName(demoIndex) :
+					inputs.m_Demo.GetName()),
 				.m_LabId = inputs.m_Demo.GetCaptureContentId(),
 				.m_AssetBundle = inputs.m_Demo.GetCaptureAssetBundle(),
 				.m_Readiness = BuildCaptureReadiness(inputs),
@@ -413,9 +420,9 @@ namespace gglab
 
 		if (m_Input->IsKeyPressed(AppInputKey::T))
 		{
-			m_Input->SetPointerMode(m_Input->GetPointerMode() == AppPointerMode::Absolute
-				? AppPointerMode::Relative
-				: AppPointerMode::Absolute);
+			m_Input->SetPointerMode(m_Input->GetPointerMode() == AppPointerMode::Absolute ?
+				AppPointerMode::Relative :
+				AppPointerMode::Absolute);
 		}
 
 		if (m_Input->IsKeyPressed(AppInputKey::Escape))
@@ -449,9 +456,9 @@ namespace gglab
 		// Input routing uses the previous optional tooling frame's capture decision. The
 		// new UI frame starts only after the RHI transaction is Ready so a
 		// backend can synchronize a swapchain-dependent render contract first.
-		const ApplicationToolingInputCapture toolingInputCapture = applicationTooling
-			? applicationTooling->GetPreviousFrameInputCapture()
-			: ApplicationToolingInputCapture{};
+		const ApplicationToolingInputCapture toolingInputCapture = applicationTooling ?
+			applicationTooling->GetPreviousFrameInputCapture() :
+			ApplicationToolingInputCapture{};
 		m_Input->SetUICaptureState(
 			toolingInputCapture.m_Keyboard, toolingInputCapture.m_Pointer);
 
@@ -465,9 +472,9 @@ namespace gglab
 		RenderFrame rendererFrame = m_RenderHost->BeginFrame();
 		if (!rendererFrame.IsReady())
 		{
-			return rendererFrame.IsUnavailable()
-				? AppRuntimeTickResult::Continue
-				: FailRuntime("The render host failed to begin a frame.");
+			return rendererFrame.IsUnavailable() ?
+				AppRuntimeTickResult::Continue :
+				FailRuntime("The render host failed to begin a frame.");
 		}
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
@@ -511,8 +518,9 @@ namespace gglab
 			const std::optional<CameraPathPose> pose = cameraRig.ApplyCameraPathFrame(
 				sequencePose->m_CameraPathId, sequencePose->m_Frame);
 			m_FrameSequence->OnPoseApplied(pose);
-			if (const CameraPath* path = pose
-				? cameraRig.FindCameraPath(sequencePose->m_CameraPathId) : nullptr)
+			if (const CameraPath* path = pose ?
+				cameraRig.FindCameraPath(sequencePose->m_CameraPathId) :
+				nullptr)
 			{
 				demo->OnCameraPathFrameApplied(*path, sequencePose->m_Frame);
 			}
@@ -678,8 +686,9 @@ namespace gglab
 		{
 			return FailRuntime("RenderGraph compilation failed.");
 		}
-		const auto defaults = m_NonFiniteWatch->UsesDefaultTargets()
-			? ResolveNonFiniteWatchDefaults(renderGraph) : NonFiniteWatchDefaults{};
+		const auto defaults = m_NonFiniteWatch->UsesDefaultTargets() ?
+			ResolveNonFiniteWatchDefaults(renderGraph) :
+			NonFiniteWatchDefaults{};
 		m_NonFiniteWatch->PrepareFrame(frame.m_FrameSerial, m_FrameCapture->HasFrameResourceExports(), defaults);
 		const auto& exportView = frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)];
 		if (!m_FrameCapture->PrepareResourceExports(frame.m_FrameSerial, renderGraph,
@@ -695,9 +704,9 @@ namespace gglab
 		if (toolingFrame.IsOpen())
 		{
 			GGLAB_CPU_PROFILE_SCOPE("ApplicationTooling");
-			const LabRuntime* labRuntime = tickInfo.m_LabRuntimeLocator
-				? tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated()
-				: nullptr;
+			const LabRuntime* labRuntime = tickInfo.m_LabRuntimeLocator ?
+				tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated() :
+				nullptr;
 			const DiagnosticsFrameContext diagnosticsContext{
 				.m_RenderHost = m_RenderHost.get(),
 				.m_AssetManager = m_AssetManager.get(),

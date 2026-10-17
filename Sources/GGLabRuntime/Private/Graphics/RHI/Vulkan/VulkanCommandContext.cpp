@@ -16,9 +16,9 @@ namespace gglab
 	{
 		[[nodiscard]] VkAttachmentLoadOp ToVulkanAttachmentLoadOp(RHIContentLoadOp op) noexcept
 		{
-			return op == RHIContentLoadOp::DontCare
-				? VK_ATTACHMENT_LOAD_OP_DONT_CARE
-				: VK_ATTACHMENT_LOAD_OP_LOAD;
+			return op == RHIContentLoadOp::DontCare ?
+				VK_ATTACHMENT_LOAD_OP_DONT_CARE :
+				VK_ATTACHMENT_LOAD_OP_LOAD;
 		}
 
 		[[nodiscard]] bool Contains(std::span<const RHIBufferHandle> handles,
@@ -65,9 +65,9 @@ namespace gglab
 			}
 
 			const VkPhysicalDeviceLimits& limits = device.GetPhysicalDeviceLimits();
-			const VkDeviceSize alignment = descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-				? limits.minUniformBufferOffsetAlignment
-				: limits.minStorageBufferOffsetAlignment;
+			const VkDeviceSize alignment = descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ?
+				limits.minUniformBufferOffsetAlignment :
+				limits.minStorageBufferOffsetAlignment;
 			if (alignment != 0 && offset % alignment != 0)
 			{
 				return false;
@@ -239,8 +239,9 @@ namespace gglab
 		}
 		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
 		{
-			Reject("TextureBarrier", m_IsRendering ? "barriers are invalid inside rendering"
-				: "no command buffer is active");
+			Reject("TextureBarrier", m_IsRendering ?
+				"barriers are invalid inside rendering" :
+				"no command buffer is active");
 			return;
 		}
 
@@ -251,9 +252,9 @@ namespace gglab
 			VulkanResourceManager& resources = m_Device->GetResourceManager();
 			VulkanTexture* texture = resources.ResolveTexture(barrier.m_Texture);
 			const RHITextureDesc* desc = resources.ResolveTextureDesc(barrier.m_Texture);
-			const auto native = texture && desc
-				? BuildVulkanTextureBarrier(barrier, texture->Get(), *desc)
-				: std::nullopt;
+			const auto native = texture && desc ?
+				BuildVulkanTextureBarrier(barrier, texture->Get(), *desc) :
+				std::nullopt;
 			if (!native)
 			{
 				const RHISubresourceRange range = barrier.m_Subresources.value_or(
@@ -292,8 +293,9 @@ namespace gglab
 		}
 		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
 		{
-			Reject("BufferBarrier", m_IsRendering ? "barriers are invalid inside rendering"
-				: "no command buffer is active");
+			Reject("BufferBarrier", m_IsRendering ?
+				"barriers are invalid inside rendering" :
+				"no command buffer is active");
 			return;
 		}
 
@@ -302,9 +304,9 @@ namespace gglab
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
 			VulkanBuffer* buffer = m_Device->GetResourceManager().ResolveBuffer(barrier.m_Buffer);
-			const auto native = buffer
-				? BuildVulkanBufferBarrier(barrier, buffer->Get())
-				: std::nullopt;
+			const auto native = buffer ?
+				BuildVulkanBufferBarrier(barrier, buffer->Get()) :
+				std::nullopt;
 			if (!native)
 			{
 				Reject("BufferBarrier", "a barrier state or buffer is invalid");
@@ -328,8 +330,9 @@ namespace gglab
 		}
 		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
 		{
-			Reject("FlushBarriers", m_IsRendering ? "barriers are invalid inside rendering"
-				: "no command buffer is active");
+			Reject("FlushBarriers", m_IsRendering ?
+				"barriers are invalid inside rendering" :
+				"no command buffer is active");
 			return;
 		}
 		const VkDependencyInfo dependencyInfo{
@@ -350,8 +353,9 @@ namespace gglab
 	{
 		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
 		{
-			Reject("CopyBuffer", m_IsRendering ? "copies are invalid inside rendering"
-				: "no command buffer is active");
+			Reject("CopyBuffer", m_IsRendering ?
+				"copies are invalid inside rendering" :
+				"no command buffer is active");
 			return;
 		}
 		VulkanResourceManager& resources = m_Device->GetResourceManager();
@@ -401,8 +405,9 @@ namespace gglab
 	{
 		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
 		{
-			Reject("CopyTextureToBuffer", m_IsRendering ? "copies are invalid inside rendering"
-				: "no command buffer is active");
+			Reject("CopyTextureToBuffer", m_IsRendering ?
+				"copies are invalid inside rendering" :
+				"no command buffer is active");
 			return;
 		}
 		VulkanResourceManager& resources = m_Device->GetResourceManager();
@@ -411,9 +416,9 @@ namespace gglab
 		const RHITextureDesc* sourceDesc = resources.ResolveTextureDesc(copy.m_Source);
 		const RHIBufferDesc* destinationDesc = resources.ResolveBufferDesc(copy.m_Destination);
 		const std::optional<VkBufferImageCopy2> region =
-			sourceTexture && destinationBuffer && sourceDesc && destinationDesc
-			? BuildVulkanTextureToBufferCopyRegion(*sourceDesc, *destinationDesc, copy)
-			: std::nullopt;
+			sourceTexture && destinationBuffer && sourceDesc && destinationDesc ?
+				BuildVulkanTextureToBufferCopyRegion(*sourceDesc, *destinationDesc, copy) :
+				std::nullopt;
 		if (!region)
 		{
 			Reject("CopyTextureToBuffer", "a texture, buffer, usage or footprint is invalid");
@@ -511,8 +516,9 @@ namespace gglab
 	{
 		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
 		{
-			Reject("BeginRendering", m_IsRendering ? "nested rendering scopes are invalid"
-				: "no command buffer is active");
+			Reject("BeginRendering", m_IsRendering ?
+				"nested rendering scopes are invalid" :
+				"no command buffer is active");
 			return;
 		}
 		if (info.m_ColorAttachments.empty() && !info.m_DepthAttachment)
@@ -611,8 +617,9 @@ namespace gglab
 			depthAttachment = {
 				.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 				.imageView = binding.m_ImageView,
-				.imageLayout = readOnly ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-					: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.imageLayout = readOnly ?
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 				.loadOp = ToVulkanAttachmentLoadOp(info.m_DepthAttachment->m_LoadOp),
 				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 			};
@@ -889,14 +896,14 @@ namespace gglab
 			!BuildSet0BufferBinding(*m_Device, *m_CurrentBindingLayout, parameterIndex,
 				buffer, offset, descriptorType, requiredUsage, next))
 		{
-			const VulkanSet0BindingPlan* binding = m_CurrentBindingLayout
-				? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex)
-				: nullptr;
+			const VulkanSet0BindingPlan* binding = m_CurrentBindingLayout ?
+				FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) :
+				nullptr;
 			const RHIBufferDesc* bufferDesc =
 				m_Device->GetResourceManager().ResolveBufferDesc(buffer);
-			const RHIBindingLayoutHandle layoutHandle = m_CurrentPipelineDesc
-				? m_CurrentPipelineDesc->m_BindingLayout
-				: RHIBindingLayoutHandle{};
+			const RHIBindingLayoutHandle layoutHandle = m_CurrentPipelineDesc ?
+				m_CurrentPipelineDesc->m_BindingLayout :
+				RHIBindingLayoutHandle{};
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Vulkan fixed-buffer rejection: parameter={} buffer={}:{} offset={} "
 				"layout={}:{} expectedType={} expectedUsage={} bindingFound={} "
@@ -1138,9 +1145,9 @@ namespace gglab
 			m_GraphicsContext->m_IsRendering || m_CurrentPipeline == nullptr ||
 			groupCountX == 0 || groupCountY == 0 || groupCountZ == 0)
 		{
-			Reject("Dispatch", m_GraphicsContext->m_IsRendering
-				? "dispatch is invalid inside rendering"
-				: "the command buffer, pipeline or group counts are invalid");
+			Reject("Dispatch", m_GraphicsContext->m_IsRendering ?
+				"dispatch is invalid inside rendering" :
+				"the command buffer, pipeline or group counts are invalid");
 			return;
 		}
 		if (!BindDescriptorSets())

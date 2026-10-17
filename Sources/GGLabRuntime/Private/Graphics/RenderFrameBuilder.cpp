@@ -68,9 +68,10 @@ namespace gglab
 			FrustumList list{};
 			const bool hasSelfFrustum = IsValidBuiltView(renderViews, viewId);
 			const math::Frustum selfFrustum =
-				hasSelfFrustum ? math::CreateFrustumFromViewProjection(
-					renderViews[utils::ToIndex(viewId)].m_UnjitteredViewProj)
-				: math::Frustum{};
+				hasSelfFrustum ?
+					math::CreateFrustumFromViewProjection(
+						renderViews[utils::ToIndex(viewId)].m_UnjitteredViewProj) :
+					math::Frustum{};
 
 			switch (mode)
 			{
@@ -179,8 +180,9 @@ namespace gglab
 					mainLight.m_EntityKey = active->m_SunEntityKey;
 					mainLight.m_Transform = &registry.get<components::TransformComponent>(entity);
 					mainLight.m_Light = &light;
-					mainLight.m_ShadowSettings = light.m_DirectionalShadowSettings
-						? &*light.m_DirectionalShadowSettings : nullptr;
+					mainLight.m_ShadowSettings = light.m_DirectionalShadowSettings ?
+						&*light.m_DirectionalShadowSettings :
+						nullptr;
 				}
 			}
 			mainLight.m_WorldSun = active->m_Sun;
@@ -197,9 +199,9 @@ namespace gglab
 		const ViewResolution& viewResolution = info.m_ViewResolution;
 		const Camera& mainCamera = info.m_CameraRig.GetMainCamera();
 		auto& mainViewSettings = result.m_ViewRenderSettings[utils::ToIndex(RenderViewID::Main)];
-		mainViewSettings = info.m_DisplayViewId == RenderViewID::Main
-			? info.m_DisplayViewSettings
-			: ResolveViewRenderSettings(info.m_ViewRenderProfile, mainCamera);
+		mainViewSettings = info.m_DisplayViewId == RenderViewID::Main ?
+			info.m_DisplayViewSettings :
+			ResolveViewRenderSettings(info.m_ViewRenderProfile, mainCamera);
 		const RenderViewBuildInfo<RenderViewID::Main> mainViewBuildInfo{
 			.m_Camera = mainCamera,
 			.m_RenderSettings = mainViewSettings,
@@ -221,9 +223,9 @@ namespace gglab
 
 			const RenderViewID viewId = slot->m_RenderViewId;
 			auto& viewSettings = result.m_ViewRenderSettings[utils::ToIndex(viewId)];
-			viewSettings = viewId == info.m_DisplayViewId
-				? info.m_DisplayViewSettings
-				: ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
+			viewSettings = viewId == info.m_DisplayViewId ?
+				info.m_DisplayViewSettings :
+				ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
 			result.m_RenderViews[utils::ToIndex(viewId)] = m_ViewBuilder.BuildDebugCameraView(
 				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan, viewResolution,
 				StringID(std::string_view(slot->m_Name)));
@@ -270,10 +272,10 @@ namespace gglab
 
 		const bool hasMainFrustum = IsValidBuiltView(result.m_RenderViews, RenderViewID::Main);
 		const math::Frustum mainFrustum =
-			hasMainFrustum
-			? math::CreateFrustumFromViewProjection(
-				result.m_RenderViews[utils::ToIndex(RenderViewID::Main)].m_UnjitteredViewProj)
-			: math::Frustum{};
+			hasMainFrustum ?
+				math::CreateFrustumFromViewProjection(
+					result.m_RenderViews[utils::ToIndex(RenderViewID::Main)].m_UnjitteredViewProj) :
+				math::Frustum{};
 		const RenderViewVisibilityMode displayVisibilityMode =
 			GetVisibilityModeForView(info.m_CameraRig, result.m_DisplayViewId);
 		FillDebugDrawCullContext(result.m_DebugDrawCullContext, result.m_RenderViews,
@@ -297,8 +299,9 @@ namespace gglab
 			.m_LightTable = *info.m_Renderer.GetLightStructuredBufferTable(),
 			.m_TemporalFrameTransaction = info.m_TemporalFrameTransaction,
 			.m_DirectionalShadowLightKey =
-				shadowSettings.m_Enable ? result.m_WorldData.m_MainDirectionalLight.m_EntityKey
-										: std::nullopt,
+				shadowSettings.m_Enable ?
+					result.m_WorldData.m_MainDirectionalLight.m_EntityKey :
+					std::nullopt,
 			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
@@ -383,10 +386,10 @@ namespace gglab
 					// its unjittered post-temporal view. Views that are never displayed, such as
 					// shadow views, have none.
 					.m_PostTemporalRasterDomain =
-						renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0
-							? makeRasterDomain(postTemporalViewBindingId,
-								renderView.m_DisplayWidth, renderView.m_DisplayHeight)
-							: DepthCoverageRasterDomain{},
+						renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0 ?
+							makeRasterDomain(postTemporalViewBindingId,
+								renderView.m_DisplayWidth, renderView.m_DisplayHeight) :
+							DepthCoverageRasterDomain{},
 					.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
 					.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
 					.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_FrameSlotIndex),

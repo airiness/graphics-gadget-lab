@@ -44,11 +44,11 @@ namespace gglab
 			// Messages keep their severity: validation errors/warnings are
 			// investigation items, loader and info messages stay informational.
 			const LogLevel level =
-				severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
-				? LogLevel::Error
-				: severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-				? LogLevel::Warning
-				: LogLevel::Info;
+				severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ?
+					LogLevel::Error :
+					severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ?
+						LogLevel::Warning :
+						LogLevel::Info;
 			GGLAB_LOG_GRAPHICS_ALWAYS(level, "{}", text);
 			return VK_FALSE;
 		}

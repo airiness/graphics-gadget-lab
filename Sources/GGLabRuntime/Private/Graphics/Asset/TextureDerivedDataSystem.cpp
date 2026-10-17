@@ -296,8 +296,9 @@ namespace gglab
 		}
 		result.m_Artifact = state->m_Artifact;
 		result.m_Error = state->m_Error;
-		result.m_Disposition = state->m_Published ? ArtifactWaitDisposition::Succeeded
-			: ArtifactWaitDisposition::Failed;
+		result.m_Disposition = state->m_Published ?
+			ArtifactWaitDisposition::Succeeded :
+			ArtifactWaitDisposition::Failed;
 		return result;
 	}
 

@@ -62,7 +62,8 @@ namespace gglab
 					result.m_Options.m_StartupLabId == "gglab.lab.texture_contract" &&
 					result.m_Options.m_StartWithRelativeMouse &&
 					result.m_Options.m_RhiBackend == (std::string_view(backend) == "dx12" ?
-						RHIBackendType::DX12 : RHIBackendType::Vulkan),
+						RHIBackendType::DX12 :
+						RHIBackendType::Vulkan),
 					"Texture contract starts through LabHost on the requested backend with relative mouse input");
 			}
 		}

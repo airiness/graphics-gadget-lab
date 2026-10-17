@@ -211,12 +211,12 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		return;
 	}
 
-	rawAO[halfPixel] = surface.HasValidNormal
-		? EvaluateGTAO(depthTexture, surface, halfPixel,
+	rawAO[halfPixel] = surface.HasValidNormal ?
+		EvaluateGTAO(depthTexture, surface, halfPixel,
 			uint2(g_Pass.FullWidth, g_Pass.FullHeight), viewData, g_Pass.Radius,
 			g_Pass.FalloffStart, g_Pass.FalloffEnd,
-			g_Pass.DirectionCount, g_Pass.StepCount, g_Pass.SampleIndex)
-		: 1.0;
+			g_Pass.DirectionCount, g_Pass.StepCount, g_Pass.SampleIndex) :
+		1.0;
 	halfDepth[halfPixel] = surface.ViewZ;
 #if defined(GGLAB_GTAO_DIAGNOSTICS)
 	reconstructedNormal[halfPixel] =

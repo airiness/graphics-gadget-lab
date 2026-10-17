@@ -314,8 +314,9 @@ namespace napa::voxel
 			return {};
 		}
 
-		return original ? iterator->second->ReadOriginalSample(address.m_Local, sample)
-			: iterator->second->ReadCurrentSample(address.m_Local, sample);
+		return original ?
+			iterator->second->ReadOriginalSample(address.m_Local, sample) :
+			iterator->second->ReadCurrentSample(address.m_Local, sample);
 	}
 
 	ValidationResult VoxelWorld::FindOrCreateChunk(

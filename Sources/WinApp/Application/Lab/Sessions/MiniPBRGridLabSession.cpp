@@ -390,30 +390,41 @@ namespace gglab
 			.m_Stage = m_LoadingProgress.m_Stage,
 			.m_Detail = m_LoadingProgress.m_Detail,
 			});
-		const std::string shaderDetail = shaders.HasFailed() ? shaders.m_Error
-			: std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
+		const std::string shaderDetail = shaders.HasFailed() ?
+			shaders.m_Error :
+			std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
 		progress.AddStep(0.15f, {
-			.m_Status = shaders.HasFailed() ? LoadingStatus::Failed
-				: shaders.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
-			.m_Fraction = shaders.IsReady() ? 1.0f : shaders.m_TotalCount == 0 ? 0.0f
-				: static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
+			.m_Status = shaders.HasFailed() ?
+				LoadingStatus::Failed :
+				shaders.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = shaders.IsReady() ?
+				1.0f :
+				shaders.m_TotalCount == 0 ?
+					0.0f :
+					static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
 			.m_Stage = shaders.HasFailed() ? "Diagnostic shader preload failed" : "Preloading diagnostic shaders",
 			.m_Detail = shaderDetail,
 			});
 		const bool pipelinesReady = m_DiagnosticVariantsCollected && m_DiagnosticPrewarmProgress.IsReady();
-		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed
-			? "A material diagnostic pipeline could not be created."
-			: !m_DiagnosticVariantsCollected ? "Waiting for scene and shader artifacts."
-			: std::format("{} / {} diagnostic pipelines ready.", m_DiagnosticPrewarmProgress.m_CompletedCount,
-				m_DiagnosticPrewarmProgress.m_TotalCount);
+		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed ?
+			"A material diagnostic pipeline could not be created." :
+			!m_DiagnosticVariantsCollected ?
+				"Waiting for scene and shader artifacts." :
+				std::format("{} / {} diagnostic pipelines ready.", m_DiagnosticPrewarmProgress.m_CompletedCount,
+					m_DiagnosticPrewarmProgress.m_TotalCount);
 		progress.AddStep(0.15f, {
-			.m_Status = m_DiagnosticPrewarmProgress.m_Failed ? LoadingStatus::Failed
-				: pipelinesReady ? LoadingStatus::Ready : LoadingStatus::Preparing,
-			.m_Fraction = pipelinesReady ? 1.0f : m_DiagnosticPrewarmProgress.m_TotalCount == 0 ? 0.0f
-				: static_cast<float>(m_DiagnosticPrewarmProgress.m_CompletedCount) /
-					static_cast<float>(m_DiagnosticPrewarmProgress.m_TotalCount),
-			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed
-				? "Diagnostic pipeline preparation failed" : "Prewarming diagnostic pipelines",
+			.m_Status = m_DiagnosticPrewarmProgress.m_Failed ?
+				LoadingStatus::Failed :
+				pipelinesReady ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = pipelinesReady ?
+				1.0f :
+				m_DiagnosticPrewarmProgress.m_TotalCount == 0 ?
+					0.0f :
+					static_cast<float>(m_DiagnosticPrewarmProgress.m_CompletedCount) /
+						static_cast<float>(m_DiagnosticPrewarmProgress.m_TotalCount),
+			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed ?
+				"Diagnostic pipeline preparation failed" :
+				"Prewarming diagnostic pipelines",
 			.m_Detail = pipelineDetail,
 			});
 		return progress.Build();
@@ -477,9 +488,10 @@ namespace gglab
 						m_NextGridRow == GridSize ? LoadingStatus::Ready : LoadingStatus::Preparing,
 					.m_Fraction = gridFraction,
 					.m_Stage = "Building procedural material grid",
-					.m_Detail = m_NextGridRow < GridSize ? std::format("Preparing row {} of {}.",
-															   m_NextGridRow + 1, GridSize)
-														 : "Procedural grid complete.",
+					.m_Detail = m_NextGridRow < GridSize ?
+						std::format("Preparing row {} of {}.",
+							m_NextGridRow + 1, GridSize) :
+						"Procedural grid complete.",
 				});
 			if (m_NextGridRow == GridSize)
 			{
@@ -820,8 +832,9 @@ namespace gglab
 		const auto sceneSource = static_cast<SceneSource>(
 			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
 		// Ground-oriented references need an elevated view to show their surface detail.
-		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest
-			? Vector3(0.0f, 16.0f, -20.0f) : Vector3(0.0f, 1.8f, -20.0f);
+		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest ?
+			Vector3(0.0f, 16.0f, -20.0f) :
+			Vector3(0.0f, 1.8f, -20.0f);
 		GetCamera().LookAt(position, Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
 	}

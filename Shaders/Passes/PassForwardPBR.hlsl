@@ -357,8 +357,9 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
 	}
 
 	const float NoL = saturate(dot(material.Base.NormalWS, L));
-	const float coatNoL = material.Clearcoat.Factor > 0.0
-		? saturate(dot(material.Clearcoat.NormalWS, L)) : 0.0;
+	const float coatNoL = material.Clearcoat.Factor > 0.0 ?
+		saturate(dot(material.Clearcoat.NormalWS, L)) :
+		0.0;
 	if (NoL <= 0.0 && coatNoL <= 0.0)
 	{
 		return result;
@@ -399,8 +400,9 @@ float3 EvaluateAllDirectLights(float3 positionWS,
 #if defined(GGLAB_FORWARD_PLUS)
 uint GetForwardPlusGlobalLightIndex(uint listIndex)
 {
-	return listIndex < 2u ? g_Pass.ForwardPlusGlobalLightIndices01[listIndex]
-		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
+	return listIndex < 2u ?
+		g_Pass.ForwardPlusGlobalLightIndices01[listIndex] :
+		g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
 float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS,

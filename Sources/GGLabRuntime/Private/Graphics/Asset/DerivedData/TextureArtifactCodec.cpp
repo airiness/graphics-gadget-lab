@@ -239,10 +239,10 @@ namespace gglab
 			result = {};
 			result.m_StructureError = built.m_StructureError;
 			result.m_Error =
-				built.m_Error == TextureArtifactBuildError::InvalidStructure
-				? std::format("Texture DDC artifact failed structural validation: {}.",
-					TextureStructureValidationErrorText(built.m_StructureError))
-				: "Texture DDC artifact digest computation failed.";
+				built.m_Error == TextureArtifactBuildError::InvalidStructure ?
+					std::format("Texture DDC artifact failed structural validation: {}.",
+						TextureStructureValidationErrorText(built.m_StructureError)) :
+					"Texture DDC artifact digest computation failed.";
 			return result;
 		}
 		if (built.m_Artifact.m_ContentDigest != expectedContentDigest)

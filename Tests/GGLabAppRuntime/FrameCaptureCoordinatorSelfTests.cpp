@@ -177,8 +177,10 @@ namespace gglab
 					for (const auto& target : issued->m_Targets)
 					{
 						ResourceExportArray array{ .m_Address = target, .m_Scalar = ResourceExportScalar::Float32,
-							.m_Shape = {1, 1, 2, 1} };
-						const float values[] = {1.25f, -2.0f}; array.m_Data.resize(sizeof(values)); std::memcpy(array.m_Data.data(), values, sizeof(values));
+							.m_Shape = { 1, 1, 2, 1 } };
+						const float values[] = { 1.25f, -2.0f };
+						array.m_Data.resize(sizeof(values));
+						std::memcpy(array.m_Data.data(), values, sizeof(values));
 						resources->m_Arrays.push_back(std::move(array));
 					}
 				}
@@ -484,10 +486,17 @@ namespace gglab
 				TemporalFrameContinuity& continuity = state.m_SettleKey.m_Temporal;
 				switch (change)
 				{
-				case 0: continuity.m_Identity.m_DepthExtent = { 43, 22 }; break;
-				case 1: continuity.m_Identity.m_Accumulation = TemporalAAHistoryAccumulation::CompatibilityAge; break;
-				case 2: break; // Same identity, but the Runtime owner lost its history.
-				case 3: continuity.m_Services = TemporalService::None; break;
+				case 0:
+					continuity.m_Identity.m_DepthExtent = { 43, 22 };
+					break;
+				case 1:
+					continuity.m_Identity.m_Accumulation = TemporalAAHistoryAccumulation::CompatibilityAge;
+					break;
+				case 2:
+					break; // Same identity, but the Runtime owner lost its history.
+				case 3:
+					continuity.m_Services = TemporalService::None;
+					break;
 				}
 				continuity.m_HasCompatiblePreviousHistory = false;
 				coordinator.BeginFrame(state);
@@ -870,7 +879,8 @@ namespace gglab
 						results[0].m_Metadata->m_WatchCoverage->m_CompletedFrames == 1 &&
 						results[0].m_Metadata->m_WatchCoverage->m_Production.m_Status == claim &&
 						results[0].m_Status == (publishes ? FrameCaptureRequestStatus::Completed : FrameCaptureRequestStatus::Failed) &&
-						(publishes ? std::filesystem::exists(results[0].m_ImagePath) :
+						(publishes ?
+							std::filesystem::exists(results[0].m_ImagePath) :
 							results[0].m_ImagePath.empty() && results[0].m_Failure.starts_with(
 								claim == NonFiniteClaimStatus::Failed ? "NonFiniteReplaced" : "MissingCoverage")) &&
 						coordinator.GetUnfinishedRequestCount() == 0,
@@ -1453,7 +1463,7 @@ namespace gglab
 					.m_ImageEncoder = &EncodeTestPng,
 					.m_WriteOnCallingThread = true,
 					}),
-				m_Sequence(m_Capture)
+					m_Sequence(m_Capture)
 			{
 				m_Paths.push_back(MakeSequenceTestPath());
 			}
@@ -1473,9 +1483,9 @@ namespace gglab
 				const std::optional<FrameSequencePoseRequest> pose =
 					m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
 				m_LastSample = pose ? pose->m_ReferenceSample : std::nullopt;
-				m_LastTemporalAAOverrides = pose
-					? std::optional(pose->m_TemporalAAOverrides)
-					: std::nullopt;
+				m_LastTemporalAAOverrides = pose ?
+					std::optional(pose->m_TemporalAAOverrides) :
+					std::nullopt;
 				m_LastGTAOOverrides = pose ? std::optional(pose->m_GTAOOverrides) : std::nullopt;
 				if (pose)
 				{
@@ -1790,10 +1800,11 @@ namespace gglab
 			coordinator.BeginFrame(state);
 			coordinator.OnFrameSubmitted();
 			context.Check(control.m_Issued.size() == 4 &&
-				std::ranges::all_of(control.m_Issued, [&](const auto& issued) {
-					return issued.m_FrameSerial == 100 &&
-						(!issued.m_DiagnosticTap || issued.m_DiagnosticTap == weight);
-				}), "One frame coalesces matching diagnostics alongside scene and composited captures");
+				std::ranges::all_of(control.m_Issued, [&](const auto& issued)
+					{
+						return issued.m_FrameSerial == 100 &&
+							(!issued.m_DiagnosticTap || issued.m_DiagnosticTap == weight);
+					}), "One frame coalesces matching diagnostics alongside scene and composited captures");
 			context.Check(coordinator.Cancel(cancel), "A conflicting tap stays cancellable before issue");
 			state.m_FrameSerial = 101;
 			state.m_FrameIndex = 43;
@@ -1806,7 +1817,10 @@ namespace gglab
 				control.m_Issued.back().m_DiagnosticTap == rejection &&
 				control.m_Issued.back().m_FrameSerial == 101,
 				"A different diagnostic tap is issued with the next frame's identity");
-			for (const auto& issued : control.m_Issued) control.Complete(issued.m_Id);
+			for (const auto& issued : control.m_Issued)
+			{
+				control.Complete(issued.m_Id);
+			}
 			coordinator.Update();
 			const auto results = Consume(coordinator);
 			const auto a = std::ranges::find(results, first, &FrameCaptureRequestResult::m_RequestId);
@@ -1878,9 +1892,10 @@ namespace gglab
 			noFrame.m_FrameSerial = 0;
 			coordinator.BeginFrame(noFrame);
 			const auto failed = Consume(coordinator);
-			context.Check(control.m_Issued.empty() && std::ranges::any_of(failed, [](const auto& result) {
-				return result.m_Status == FrameCaptureRequestStatus::Failed;
-			}), "The coordinator cannot accidentally issue a flexible request without a render serial");
+			context.Check(control.m_Issued.empty() && std::ranges::any_of(failed, [](const auto& result)
+				{
+					return result.m_Status == FrameCaptureRequestStatus::Failed;
+				}), "The coordinator cannot accidentally issue a flexible request without a render serial");
 		}
 
 		void RunReferenceSequenceTests(SelfTestContext& context) noexcept
@@ -2104,7 +2119,7 @@ namespace gglab
 				context.Check(id != 0 && everyFrameOverridden && overridden.m_TemporalAccumulation &&
 					overridden.m_TemporalMaxSamples == GTAOMaxTemporalSamples &&
 					ApplyFrameSequenceGTAOOverrides({}, GTAOSettings{}).m_TemporalMaxSamples ==
-						GTAOSettings{}.m_TemporalMaxSamples,
+					GTAOSettings{}.m_TemporalMaxSamples,
 					"Every sequence frame carries the requested GTAO overrides, resolved to the "
 					"settings' ranges");
 			}
@@ -2134,8 +2149,9 @@ namespace gglab
 				{
 					harness.Frame();
 					sawFinishing |= harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing;
-					const auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial > delay
-						? harness.m_RenderSerial - delay : 0);
+					const auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial > delay ?
+						harness.m_RenderSerial - delay :
+						0);
 					harness.m_Sequence.UpdateGpuTiming(profile, true);
 					harness.m_Sequence.UpdateGpuTiming(profile, true);
 				}
@@ -2308,8 +2324,14 @@ namespace gglab
 				const uint64_t missing = harness.m_RenderSerial;
 				harness.Frame();
 				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
-				for (uint32_t poll = 0; poll < 100; ++poll) harness.m_Sequence.UpdateGpuTiming({}, true);
-				for (uint32_t abort = 0; abort < 10; ++abort) harness.Frame(false);
+				for (uint32_t poll = 0; poll < 100; ++poll)
+				{
+					harness.m_Sequence.UpdateGpuTiming({}, true);
+				}
+				for (uint32_t abort = 0; abort < 10; ++abort)
+				{
+					harness.Frame(false);
+				}
 				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
 					"Polling and aborted work do not consume the successful-submission drain budget");
 				for (uint32_t drain = 1; drain + 1 < FrameSequenceCoordinator::MaxPendingGpuTimingSubmissions; ++drain)

@@ -33,9 +33,9 @@ namespace gglab
 
 		const DirectionalShadowSettings& GetMainDirectionalShadowSettings() const noexcept
 		{
-			return m_MainDirectionalLight.m_ShadowSettings
-				? *m_MainDirectionalLight.m_ShadowSettings
-				: DisabledDirectionalShadowSettings();
+			return m_MainDirectionalLight.m_ShadowSettings ?
+				*m_MainDirectionalLight.m_ShadowSettings :
+				DisabledDirectionalShadowSettings();
 		}
 	};
 

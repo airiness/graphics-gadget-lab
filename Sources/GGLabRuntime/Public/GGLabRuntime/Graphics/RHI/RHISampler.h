@@ -79,9 +79,9 @@ namespace gglab
 		const bool opaqueWhite = desc.m_BorderColor[0] == 1.0f &&
 			desc.m_BorderColor[1] == 1.0f && desc.m_BorderColor[2] == 1.0f &&
 			desc.m_BorderColor[3] == 1.0f;
-		return transparentBlack || opaqueBlack || opaqueWhite
-			? RHIPortabilityValidationResult{}
-			: RHIPortabilityValidationResult{
+		return transparentBlack || opaqueBlack || opaqueWhite ?
+			RHIPortabilityValidationResult{} :
+			RHIPortabilityValidationResult{
 				.m_Error = RHIPortabilityValidationError::CustomBorderColorUnsupported };
 	}
 }

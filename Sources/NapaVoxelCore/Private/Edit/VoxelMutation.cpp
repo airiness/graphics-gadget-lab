@@ -231,9 +231,9 @@ namespace napa::voxel
 				// Samples. Every Cell consuming those gradients must rebuild its normals and
 				// Boundary Contours even when its own corner densities remain unchanged.
 				const std::span<const std::array<std::int64_t, 3>> dependencyOffsets{
-					DensityDependencyOffsets.data(), densityChanged
-						? DensityDependencyOffsets.size()
-						: std::size_t{ 1 },
+					DensityDependencyOffsets.data(), densityChanged ?
+						DensityDependencyOffsets.size() :
+						std::size_t{ 1 },
 				};
 				for (const auto& dependencyOffset : dependencyOffsets)
 				{
@@ -439,7 +439,8 @@ namespace napa::voxel
 					}
 
 					const VoxelSample before = chunk != nullptr ?
-						chunk->m_CurrentSamples[flatIndex] : DefaultVoxelSample;
+						chunk->m_CurrentSamples[flatIndex] :
+						DefaultVoxelSample;
 					VoxelSample after{};
 					const ValidationResult transitionResult = EvaluateSampleTransition(
 						editContext.m_Request, evaluation, before, after);
@@ -528,7 +529,8 @@ namespace napa::voxel
 		}
 
 		const std::uint64_t revisionForTarget = detail::SimulateExhaustedWorldRevision ?
-			std::numeric_limits<std::uint64_t>::max() : world.m_WorldVoxelRevision;
+			std::numeric_limits<std::uint64_t>::max() :
+			world.m_WorldVoxelRevision;
 		const auto targetRevision = CheckedAdd(revisionForTarget, std::uint64_t{ 1 });
 		if (!targetRevision.has_value())
 		{

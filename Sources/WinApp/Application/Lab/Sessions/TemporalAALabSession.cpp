@@ -280,8 +280,9 @@ namespace gglab
 		// the path frame on the moving-object path.
 		if (registry.valid(m_MovingEntity))
 		{
-			const Vector2 position = ResolveMovingObjectPosition(lightChange ? 0.0f
-				: static_cast<float>(frame) / MovingObjectPathFramesPerSecond);
+			const Vector2 position = ResolveMovingObjectPosition(lightChange ?
+				0.0f :
+				static_cast<float>(frame) / MovingObjectPathFramesPerSecond);
 			auto& transform = registry.get<components::TransformComponent>(m_MovingEntity);
 			transform.m_Position.m_X = position.m_X;
 			transform.m_Position.m_Y = position.m_Y;
@@ -570,8 +571,9 @@ namespace gglab
 		const auto& timing = m_GpuTiming.GetSnapshot();
 		const auto& domain = *timing.m_Domain;
 		const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
-		const std::string_view cameraMode = m_EnableCameraInput ? "input"
-			: (m_OrbitCamera ? "pan/rotation" : (m_ContinuousFovZoom ? "continuous-fov" : "static"));
+		const std::string_view cameraMode = m_EnableCameraInput ?
+			"input" :
+			(m_OrbitCamera ? "pan/rotation" : (m_ContinuousFovZoom ? "continuous-fov" : "static"));
 		GGLAB_LOG_INFO(
 			"Temporal AA timing window complete: adapter='{}', render={}x{}, display={}x{}, "
 			"settings='{}', lab_animate_object={}, lab_camera_mode='{}', jitter_phases={}, "
@@ -620,19 +622,21 @@ namespace gglab
 			packedCeilingSaturationAge <= TemporalHistoryMaxAccumulation && packedCeiling < 1.0f &&
 			ResolveTemporalAAMaxHistorySamples(packedCeiling) < TemporalHistoryMaxAccumulation;
 		const auto& timing = m_GpuTiming.GetSnapshot();
-		const std::string gpuTiming = timing.m_SampleCount > 0
-			? std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
+		const std::string gpuTiming = timing.m_SampleCount > 0 ?
+			std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
 				timing.m_SumMilliseconds / static_cast<double>(timing.m_SampleCount),
 				timing.m_MinMilliseconds, timing.m_MaxMilliseconds,
-				timing.m_SampleCount, TemporalAALabGpuTimingSampleTarget)
-			: timing.m_Domain ? std::format("warmup remaining {}/{} submitted frames; 0/{} samples",
-				timing.m_WarmupFramesRemaining, timing.m_WarmupFrameCount, TemporalAALabGpuTimingSampleTarget)
-			: "waiting for an active submitted TAA frame with profiling";
+				timing.m_SampleCount, TemporalAALabGpuTimingSampleTarget) :
+			timing.m_Domain ?
+				std::format("warmup remaining {}/{} submitted frames; 0/{} samples",
+					timing.m_WarmupFramesRemaining, timing.m_WarmupFrameCount, TemporalAALabGpuTimingSampleTarget) :
+				"waiting for an active submitted TAA frame with profiling";
 		diagnostics.m_Title = "Temporal AA Evidence Domain";
 		diagnostics.m_Metrics = {
 			{ .m_Name = "Adapter/driver domain",
-				.m_Value = device ? std::string(device->GetAdapterCompatibilityIdentity())
-					: "unavailable" },
+				.m_Value = device ?
+					std::string(device->GetAdapterCompatibilityIdentity()) :
+					"unavailable" },
 			{ .m_Name = "Extent", .m_Value = std::format("{} x {}",
 				m_ViewportWidth, m_ViewportHeight) },
 			{ .m_Name = "Camera transform", .m_Value = std::format(
@@ -650,8 +654,9 @@ namespace gglab
 				"{} committed after reset; last jitter {}", m_CommittedFrameCount,
 				history.m_LastCommitted.m_JitterIndex) },
 			{ .m_Name = "PostProcess.TemporalAA (submitted domain)", .m_Value = gpuTiming },
-			{ .m_Name = "GPU timing settings", .m_Value = timing.m_Domain
-				? FormatTemporalAALabSettings(timing.m_Domain->m_Settings) : "unavailable" },
+			{ .m_Name = "GPU timing settings", .m_Value = timing.m_Domain ?
+				FormatTemporalAALabSettings(timing.m_Domain->m_Settings) :
+				"unavailable" },
 			{ .m_Name = "GPU timing frame range", .m_Value = std::format(
 				"domain from {}; first eligible {}; samples {}-{}",
 				timing.m_FirstDomainFrameSerial, timing.m_FirstEligibleFrameSerial,
@@ -662,21 +667,25 @@ namespace gglab
 			{ .m_Name = "History pressure",
 				.m_Value = std::format("{} active / {} pending bytes", history.m_ActiveBytes,
 					history.m_PendingRetirementBytes) },
-			{ .m_Name = "Camera mode", .m_Value = m_OrbitCamera ? "pan/rotation"
-				: (m_ContinuousFovZoom ? "continuous FOV zoom" : "static") },
+			{ .m_Name = "Camera mode", .m_Value = m_OrbitCamera ?
+				"pan/rotation" :
+				(m_ContinuousFovZoom ? "continuous FOV zoom" : "static") },
 		};
 		diagnostics.m_Checks = {
 			{ .m_Name = "Deterministic fixture",
-				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+				.m_Status = m_FixtureConfigured ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, curved/straight references, and controlled matched-world-size and matched-projected-footprint pairs are present." },
 			{ .m_Name = "Coupled accumulation bound",
-				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Failed,
+				.m_Status = coupledBoundValid ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "The selected feedback ceiling must saturate both accumulation models below the stored accumulation bound and its UNORM16 representation must remain below one." },
 			{ .m_Name = "Submitted-domain GPU timing capture",
-				.m_Status = timing.m_SampleCount >= TemporalAALabGpuTimingSampleTarget
-					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
+				.m_Status = timing.m_SampleCount >= TemporalAALabGpuTimingSampleTarget ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "The shown submitted domain needs 120 distinct completed profiles after two effective jitter cycles (16 Native or 36 Quality frames), at least the RHI frame-slot count. Effective settings, extents, view/session/cut identity and submission gaps reset it; older or unbound profiles are excluded." },
 			{ .m_Name = "Sampling-footprint review",
 				.m_Status = LabDiagnosticCheckStatus::Pending,

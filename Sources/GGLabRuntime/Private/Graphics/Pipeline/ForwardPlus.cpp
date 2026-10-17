@@ -54,9 +54,9 @@ namespace gglab
 			metrics.m_MaxLightsPerTile = std::max(metrics.m_MaxLightsPerTile, lightCount);
 			metrics.m_OverflowTileCount +=
 				lightCount > ForwardPlusTileLightCapacity ||
-				(header.m_CountAndFlags & ~ForwardPlusTileCountMask) != 0
-				? 1u
-				: 0u;
+				(header.m_CountAndFlags & ~ForwardPlusTileCountMask) != 0 ?
+					1u :
+					0u;
 
 			const ForwardPlusTileDepthRange& depthRange = depthRanges[tileIndex];
 			if (depthRange.IsValid())
@@ -70,9 +70,9 @@ namespace gglab
 			tileGrid.m_TileCount - metrics.m_NonEmptyLightListTileCount;
 		metrics.m_AverageLightsPerTile =
 			static_cast<double>(metrics.m_TotalLightReferences) / tileGrid.m_TileCount;
-		metrics.m_MinViewZ = minimumViewZ == std::numeric_limits<float>::max()
-			? 0.0f
-			: minimumViewZ;
+		metrics.m_MinViewZ = minimumViewZ == std::numeric_limits<float>::max() ?
+			0.0f :
+			minimumViewZ;
 		metrics.m_IsValid = true;
 		return metrics;
 	}

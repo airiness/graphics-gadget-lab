@@ -129,7 +129,8 @@ namespace gglab
 			}
 			// Never reuse samples from before a submitted empty frame. The empty outcome
 			// itself is compatible; an unexplained missing export remains a history loss.
-			m_CommittedFrame = m_Exported ? CommittedFrame::Samples :
+			m_CommittedFrame = m_Exported ?
+				CommittedFrame::Samples :
 				(m_EmptyFrameStaged ? CommittedFrame::Empty : CommittedFrame::None);
 		}
 		AbortFrame();

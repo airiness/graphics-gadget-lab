@@ -320,9 +320,9 @@ namespace gglab
 	[[nodiscard]] constexpr TemporalAARenderScale GetTemporalAARenderScale(
 		TemporalAAResolutionPreset preset) noexcept
 	{
-		return preset == TemporalAAResolutionPreset::Quality
-			? TemporalAARenderScale{ .m_Numerator = 2, .m_Denominator = 3 }
-		: TemporalAARenderScale{};
+		return preset == TemporalAAResolutionPreset::Quality ?
+			TemporalAARenderScale{ .m_Numerator = 2, .m_Denominator = 3 } :
+			TemporalAARenderScale{};
 	}
 
 	// Render extent of one display dimension: rounded to the nearest pixel, at least one.
@@ -425,34 +425,34 @@ namespace gglab
 		TemporalAASettings settings) noexcept
 	{
 		const TemporalAASettings defaults{};
-		settings.m_DepthAbsoluteThreshold = std::isfinite(settings.m_DepthAbsoluteThreshold)
-			? std::clamp(settings.m_DepthAbsoluteThreshold, 0.0f,
-				TemporalAAMaxDepthThreshold)
-			: defaults.m_DepthAbsoluteThreshold;
-		settings.m_DepthRelativeThreshold = std::isfinite(settings.m_DepthRelativeThreshold)
-			? std::clamp(settings.m_DepthRelativeThreshold, 0.0f,
-				TemporalAAMaxDepthThreshold)
-			: defaults.m_DepthRelativeThreshold;
-		settings.m_MaxHistoryFeedback = std::isfinite(settings.m_MaxHistoryFeedback)
-			? std::clamp(settings.m_MaxHistoryFeedback, 0.0f,
-				TemporalAAMaxHistoryFeedbackCeiling)
-			: defaults.m_MaxHistoryFeedback;
-		settings.m_VelocityWeightScale = std::isfinite(settings.m_VelocityWeightScale)
-			? std::clamp(settings.m_VelocityWeightScale, 0.0f,
-				TemporalAAMaxVelocityWeightScale)
-			: defaults.m_VelocityWeightScale;
-		settings.m_LuminanceWeightScale = std::isfinite(settings.m_LuminanceWeightScale)
-			? std::clamp(settings.m_LuminanceWeightScale, 0.0f,
-				TemporalAAMaxLuminanceWeightScale)
-			: defaults.m_LuminanceWeightScale;
+		settings.m_DepthAbsoluteThreshold = std::isfinite(settings.m_DepthAbsoluteThreshold) ?
+			std::clamp(settings.m_DepthAbsoluteThreshold, 0.0f,
+				TemporalAAMaxDepthThreshold) :
+			defaults.m_DepthAbsoluteThreshold;
+		settings.m_DepthRelativeThreshold = std::isfinite(settings.m_DepthRelativeThreshold) ?
+			std::clamp(settings.m_DepthRelativeThreshold, 0.0f,
+				TemporalAAMaxDepthThreshold) :
+			defaults.m_DepthRelativeThreshold;
+		settings.m_MaxHistoryFeedback = std::isfinite(settings.m_MaxHistoryFeedback) ?
+			std::clamp(settings.m_MaxHistoryFeedback, 0.0f,
+				TemporalAAMaxHistoryFeedbackCeiling) :
+			defaults.m_MaxHistoryFeedback;
+		settings.m_VelocityWeightScale = std::isfinite(settings.m_VelocityWeightScale) ?
+			std::clamp(settings.m_VelocityWeightScale, 0.0f,
+				TemporalAAMaxVelocityWeightScale) :
+			defaults.m_VelocityWeightScale;
+		settings.m_LuminanceWeightScale = std::isfinite(settings.m_LuminanceWeightScale) ?
+			std::clamp(settings.m_LuminanceWeightScale, 0.0f,
+				TemporalAAMaxLuminanceWeightScale) :
+			defaults.m_LuminanceWeightScale;
 		settings.m_NeighborhoodClampExpansion =
-			std::isfinite(settings.m_NeighborhoodClampExpansion)
-			? std::clamp(settings.m_NeighborhoodClampExpansion, 0.0f,
-				TemporalAAMaxNeighborhoodClampExpansion)
-			: defaults.m_NeighborhoodClampExpansion;
-		settings.m_HistoryRelaxation = std::isfinite(settings.m_HistoryRelaxation)
-			? std::clamp(settings.m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation)
-			: defaults.m_HistoryRelaxation;
+			std::isfinite(settings.m_NeighborhoodClampExpansion) ?
+				std::clamp(settings.m_NeighborhoodClampExpansion, 0.0f,
+					TemporalAAMaxNeighborhoodClampExpansion) :
+				defaults.m_NeighborhoodClampExpansion;
+		settings.m_HistoryRelaxation = std::isfinite(settings.m_HistoryRelaxation) ?
+			std::clamp(settings.m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation) :
+			defaults.m_HistoryRelaxation;
 		if (settings.m_HistoryFilter != TemporalAAHistoryFilter::Bilinear &&
 			settings.m_HistoryFilter != TemporalAAHistoryFilter::CatmullRomClamped)
 		{
@@ -489,14 +489,14 @@ namespace gglab
 		{
 			settings.m_HistoryRectification = defaults.m_HistoryRectification;
 		}
-		settings.m_VarianceClipGamma = std::isfinite(settings.m_VarianceClipGamma)
-			? std::clamp(settings.m_VarianceClipGamma, TemporalAAMinVarianceClipGamma,
-				TemporalAAMaxVarianceClipGamma)
-			: defaults.m_VarianceClipGamma;
-		settings.m_TextureLodBiasOffset = std::isfinite(settings.m_TextureLodBiasOffset)
-			? std::clamp(settings.m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset,
-				TemporalAAMaxTextureLodBiasOffset)
-			: defaults.m_TextureLodBiasOffset;
+		settings.m_VarianceClipGamma = std::isfinite(settings.m_VarianceClipGamma) ?
+			std::clamp(settings.m_VarianceClipGamma, TemporalAAMinVarianceClipGamma,
+				TemporalAAMaxVarianceClipGamma) :
+			defaults.m_VarianceClipGamma;
+		settings.m_TextureLodBiasOffset = std::isfinite(settings.m_TextureLodBiasOffset) ?
+			std::clamp(settings.m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset,
+				TemporalAAMaxTextureLodBiasOffset) :
+			defaults.m_TextureLodBiasOffset;
 		return settings;
 	}
 

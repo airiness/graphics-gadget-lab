@@ -158,12 +158,15 @@ namespace gglab
 					"FinalColor bloom SRV must expose a descriptor heap index.");
 
 				const bool materialDiagnostics = data.m_MaterialDiagnosticColorSrv.IsValid();
-				const auto diagnosticColorSrv = materialDiagnostics
-					? executeContext.GetViewDescriptor(data.m_MaterialDiagnosticColorSrv) : sceneColorSrv;
-				const auto diagnosticCoverageSrv = materialDiagnostics
-					? executeContext.GetViewDescriptor(data.m_MaterialDiagnosticCoverageSrv) : sceneColorSrv;
-				const auto diagnosticLightingSrv = materialDiagnostics
-					? executeContext.GetViewDescriptor(data.m_MaterialDiagnosticLightingSrv) : sceneColorSrv;
+				const auto diagnosticColorSrv = materialDiagnostics ?
+					executeContext.GetViewDescriptor(data.m_MaterialDiagnosticColorSrv) :
+					sceneColorSrv;
+				const auto diagnosticCoverageSrv = materialDiagnostics ?
+					executeContext.GetViewDescriptor(data.m_MaterialDiagnosticCoverageSrv) :
+					sceneColorSrv;
+				const auto diagnosticLightingSrv = materialDiagnostics ?
+					executeContext.GetViewDescriptor(data.m_MaterialDiagnosticLightingSrv) :
+					sceneColorSrv;
 				GGLAB_ASSERT_MSG(diagnosticColorSrv.IsValid() && diagnosticCoverageSrv.IsValid() && diagnosticLightingSrv.IsValid(),
 					"Material diagnostic composition requires valid descriptor indices.");
 				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);

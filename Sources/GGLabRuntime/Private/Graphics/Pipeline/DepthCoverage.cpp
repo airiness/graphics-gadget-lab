@@ -310,9 +310,9 @@ namespace gglab
 
 	std::string DescribeDepthCoverageDrawPacket(const DepthCoverageDrawPacket& packet)
 	{
-		const uint32_t meshId = packet.m_Geometry.m_MeshId.IsValid()
-			? packet.m_Geometry.m_MeshId.Value()
-			: std::numeric_limits<uint32_t>::max();
+		const uint32_t meshId = packet.m_Geometry.m_MeshId.IsValid() ?
+			packet.m_Geometry.m_MeshId.Value() :
+			std::numeric_limits<uint32_t>::max();
 		return std::format("Mesh={} VertexBuffer={}:{}+{} stride={} size={} "
 			"IndexBuffer={}:{}+{} format={} size={} "
 			"DrawIndexed={},{},{},{},{} Draw.ObjectOffset={} "

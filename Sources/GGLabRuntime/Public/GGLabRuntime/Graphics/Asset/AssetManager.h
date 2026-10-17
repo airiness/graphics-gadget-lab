@@ -121,14 +121,16 @@ namespace gglab
 
 			[[nodiscard]] std::span<const Vertex> GetVertices() const noexcept
 			{
-				return m_ModelSource.m_Owner ? m_ModelSource.GetVertices()
-					: std::span<const Vertex>(m_VerticesData);
+				return m_ModelSource.m_Owner ?
+					m_ModelSource.GetVertices() :
+					std::span<const Vertex>(m_VerticesData);
 			}
 
 			[[nodiscard]] std::span<const uint32_t> GetIndices() const noexcept
 			{
-				return m_ModelSource.m_Owner ? m_ModelSource.GetIndices()
-					: std::span<const uint32_t>(m_IndicesData);
+				return m_ModelSource.m_Owner ?
+					m_ModelSource.GetIndices() :
+					std::span<const uint32_t>(m_IndicesData);
 			}
 
 			void ReleaseBorrowedSource() noexcept { m_ModelSource.Reset(); }

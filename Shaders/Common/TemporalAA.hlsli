@@ -101,9 +101,9 @@ float ResolveTemporalHistoryRelaxation(float historyRelaxation, float accumulati
 // Compatibility age: consecutive accepted frames, whatever their confidence.
 float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryAge)
 {
-	return historyAccepted && IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_HISTORY_NEXT_AGE_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousHistoryAge))
-		? min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_ACCUMULATION)
-		: TAA_HISTORY_INITIAL_ACCUMULATION;
+	return historyAccepted && IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_HISTORY_NEXT_AGE_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, previousHistoryAge)) ?
+		min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_ACCUMULATION) :
+		TAA_HISTORY_INITIAL_ACCUMULATION;
 }
 
 // Usable history capacity whose unit-current-sample weight N / (N + 1) equals
@@ -143,9 +143,9 @@ float ResolveTemporalHistoryNextSamples(bool historyAccepted, float previousSamp
 // TAA_UPSCALED_STATIC_MOTION_PIXELS of motion.
 float ResolveTemporalUpscaledStaticFraction(float motionMagnitudePixels)
 {
-	return isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_UPSCALED_STATIC_FRACTION_ISFINITE, motionMagnitudePixels))
-		? 1.0 - saturate(motionMagnitudePixels / TAA_UPSCALED_STATIC_MOTION_PIXELS)
-		: 0.0;
+	return isfinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_UPSCALED_STATIC_FRACTION_ISFINITE, motionMagnitudePixels)) ?
+		1.0 - saturate(motionMagnitudePixels / TAA_UPSCALED_STATIC_MOTION_PIXELS) :
+		0.0;
 }
 
 // Min/max box expansion, in box extents per side, for static history below the display
@@ -321,9 +321,9 @@ float3 QuantizeTemporalHistoryColor(float3 color, uint2 pixel, uint temporalFram
 
 float2 ResolveTemporalAAOutputAlphas(float nextAccumulation)
 {
-	return float2(1.0, IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAOUTPUT_ALPHAS_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, nextAccumulation))
-		? nextAccumulation
-		: TAA_HISTORY_INITIAL_ACCUMULATION);
+	return float2(1.0, IsTemporalHistoryAccumulationValid(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RESOLVE_TEMPORAL_AAOUTPUT_ALPHAS_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID, nextAccumulation)) ?
+		nextAccumulation :
+		TAA_HISTORY_INITIAL_ACCUMULATION);
 }
 
 float ResolveTemporalAAFeedbackSaturationAge(float maxHistoryFeedback)

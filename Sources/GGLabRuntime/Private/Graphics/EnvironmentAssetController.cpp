@@ -234,9 +234,9 @@ namespace gglab
 		}
 		m_Entries.push_back({
 			.m_Path = resolvedPath,
-			.m_DisplayName = displayName.empty()
-				? resolvedPath.stem().string()
-				: std::string(displayName),
+			.m_DisplayName = displayName.empty() ?
+				resolvedPath.stem().string() :
+				std::string(displayName),
 			});
 		return SelectEnvironment(m_Entries.size() - 1);
 	}

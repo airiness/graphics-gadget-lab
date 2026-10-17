@@ -194,15 +194,15 @@ namespace napa::voxel::testing
 			const float sharedZ =
 				record.m_Chunk.m_Z < 0 ? 8.0f : 0.0f;
 			const bool touchesPlanes =
-				(record.m_Chunk.m_X < 0
-					? bounds.m_Max.m_X == sharedX
-					: bounds.m_Min.m_X == sharedX) &&
-				(record.m_Chunk.m_Y < 0
-					? bounds.m_Max.m_Y == sharedY
-					: bounds.m_Min.m_Y == sharedY) &&
-				(record.m_Chunk.m_Z < 0
-					? bounds.m_Max.m_Z == sharedZ
-					: bounds.m_Min.m_Z == sharedZ);
+				(record.m_Chunk.m_X < 0 ?
+					bounds.m_Max.m_X == sharedX :
+					bounds.m_Min.m_X == sharedX) &&
+				(record.m_Chunk.m_Y < 0 ?
+					bounds.m_Max.m_Y == sharedY :
+					bounds.m_Min.m_Y == sharedY) &&
+				(record.m_Chunk.m_Z < 0 ?
+					bounds.m_Max.m_Z == sharedZ :
+					bounds.m_Min.m_Z == sharedZ);
 			if (!touchesPlanes)
 			{
 				return false;
@@ -249,10 +249,10 @@ namespace napa::voxel::testing
 		{
 			const napa::voxel::ChunkMeshRecord* const record =
 				FindChunkMeshRecord(records, chunk);
-			return record
-				? &record->m_BoundaryContours[
-					napa::voxel::GetChunkBoundaryFaceIndex(face)]
-				: nullptr;
+			return record ?
+				&record->m_BoundaryContours[
+					napa::voxel::GetChunkBoundaryFaceIndex(face)] :
+				nullptr;
 		}
 
 		[[nodiscard]] bool ContainsBoundaryEndpoint(
@@ -502,7 +502,7 @@ namespace napa::voxel::testing
 			const VoxelWorldConfig config =
 				MakeEightChunkConfig();
 			const std::array primitives{
-				MakeSphere(1, {}, 3.0),
+				MakeSphere(1,{}, 3.0),
 			};
 			std::unique_ptr<VoxelWorld> world;
 			const bool generated = GenerateWorld(
@@ -845,12 +845,12 @@ namespace napa::voxel::testing
 				"Exact-iso face vertices discard zero-length contours before normal validation");
 
 			const BoundaryContourRecord* const fullIsoFace =
-				meshed
-				? FindBoundaryContour(
-					meshing.m_Chunks,
-					{},
-					ChunkBoundaryFace::NegativeX)
-				: nullptr;
+				meshed ?
+					FindBoundaryContour(
+						meshing.m_Chunks,
+						{},
+						ChunkBoundaryFace::NegativeX) :
+					nullptr;
 			bool hasInteriorSegment = false;
 			if (fullIsoFace)
 			{
@@ -941,7 +941,7 @@ namespace napa::voxel::testing
 
 			const VoxelWorldConfig config = MakeEightChunkConfig();
 			const std::array primitives{
-				MakeSphere(1, {}, 3.0),
+				MakeSphere(1,{}, 3.0),
 			};
 			std::unique_ptr<VoxelWorld> world;
 			const bool generated = GenerateWorld(config, primitives, world);
@@ -1351,7 +1351,7 @@ namespace napa::voxel::testing
 			const VoxelWorldConfig config =
 				MakeGuardChunkConfig();
 			const std::array primitives{
-				MakeSphere(1, { 4.0, 4.0, 4.0 }, 1.5),
+				MakeSphere(1,{ 4.0, 4.0, 4.0 }, 1.5),
 			};
 			std::unique_ptr<VoxelWorld> baselineWorld;
 			std::unique_ptr<VoxelWorld> guardWorld;
@@ -1365,9 +1365,9 @@ namespace napa::voxel::testing
 					primitives,
 					guardWorld);
 			const std::size_t baselineResidentCount =
-				generated
-				? guardWorld->GetResidentChunkCount()
-				: 0;
+				generated ?
+					guardWorld->GetResidentChunkCount() :
+					0;
 			bool allocated = false;
 			ReferenceWorldMeshingResult baselineMeshing{};
 			ReferenceWorldMeshingResult guardMeshing{};

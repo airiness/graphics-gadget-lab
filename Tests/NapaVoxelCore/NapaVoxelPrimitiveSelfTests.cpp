@@ -749,9 +749,9 @@ namespace napa::voxel::testing
 					generatedWorld,
 					generatedResult).Succeeded() &&
 				generatedWorld;
-			const VoxelChunk* generatedChunk = generated
-				? generatedWorld->FindChunk({ 0, 0, 0 })
-				: nullptr;
+			const VoxelChunk* generatedChunk = generated ?
+				generatedWorld->FindChunk({ 0, 0, 0 }) :
+				nullptr;
 			context.Check(
 				generated &&
 				generatedWorld->IsOriginalStateSealed() &&

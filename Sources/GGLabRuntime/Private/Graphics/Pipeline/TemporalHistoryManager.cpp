@@ -87,9 +87,9 @@ namespace gglab
 			const TemporalConsumerPlan& temporalAA =
 				plan.GetConsumer(TemporalConsumer::TemporalAA);
 			Invalidate(temporalAA.m_Requested &&
-				temporalAA.m_Status == TemporalConsumerStatus::Unavailable
-				? TemporalHistoryResetReason::AvailabilityChanged
-				: TemporalHistoryResetReason::Disabled);
+				temporalAA.m_Status == TemporalConsumerStatus::Unavailable ?
+					TemporalHistoryResetReason::AvailabilityChanged :
+					TemporalHistoryResetReason::Disabled);
 			return {};
 		}
 
@@ -375,9 +375,9 @@ namespace gglab
 		}
 		return current.m_ColorFormat != compatibility.m_ColorFormat ||
 			current.m_DepthFormat != compatibility.m_DepthFormat ||
-			current.m_ReliabilityFormat != compatibility.m_ReliabilityFormat
-			? TemporalHistoryResetReason::FormatChanged
-			: TemporalHistoryResetReason::None;
+			current.m_ReliabilityFormat != compatibility.m_ReliabilityFormat ?
+				TemporalHistoryResetReason::FormatChanged :
+				TemporalHistoryResetReason::None;
 	}
 
 	bool TemporalHistoryManager::CreateHistorySet(

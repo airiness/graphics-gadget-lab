@@ -230,12 +230,13 @@ namespace gglab
 	LocalDerivedDataStore::LocalDerivedDataStore(std::filesystem::path rootDirectory,
 		std::unique_ptr<LocalDerivedDataPlatformBase> platform) noexcept :
 		m_Platform(std::move(platform)),
-		m_RootIdentity(m_Platform ? m_Platform->ResolveRootIdentity(rootDirectory)
-			: LocalDerivedDataRootIdentity{}),
+		m_RootIdentity(m_Platform ?
+			m_Platform->ResolveRootIdentity(rootDirectory) :
+			LocalDerivedDataRootIdentity{}),
 		m_RootDirectory(m_RootIdentity.m_CanonicalRoot), m_Catalog(m_RootDirectory),
-		m_MaintenanceLock(m_Platform && m_RootIdentity.IsValid()
-			? m_Platform->CreateMaintenanceLock(m_RootIdentity)
-			: nullptr)
+		m_MaintenanceLock(m_Platform && m_RootIdentity.IsValid() ?
+			m_Platform->CreateMaintenanceLock(m_RootIdentity) :
+			nullptr)
 	{
 		if (IsEnabled())
 		{
@@ -460,8 +461,9 @@ namespace gglab
 		{
 			return DerivedDataPresence::Inaccessible;
 		}
-		return std::filesystem::exists(status) ? DerivedDataPresence::Present
-			: DerivedDataPresence::Missing;
+		return std::filesystem::exists(status) ?
+			DerivedDataPresence::Present :
+			DerivedDataPresence::Missing;
 	}
 
 	void LocalDerivedDataStore::DiscardObservedCorrupt(const DerivedDataKey& key,

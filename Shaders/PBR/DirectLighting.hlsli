@@ -18,7 +18,8 @@ SunDiskSampling BuildSunDiskSampling(float3 centerDirection, float angularRadius
 	SunDiskSampling sampling;
 	sampling.CenterDirection = centerDirection;
 	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
-		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+		float3(0.0, 1.0, 0.0) :
+		float3(1.0, 0.0, 0.0);
 	sampling.Tangent = normalize(cross(referenceAxis, centerDirection));
 	sampling.Bitangent = cross(centerDirection, sampling.Tangent);
 	const float sineRadius = sin(angularRadius);

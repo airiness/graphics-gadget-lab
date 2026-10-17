@@ -113,9 +113,9 @@ namespace gglab
 
 	void VulkanBackendSummaryPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		const auto* snapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<VulkanBackendSnapshot>()
-			: nullptr;
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<VulkanBackendSnapshot>() :
+			nullptr;
 		if (!snapshot || !snapshot->m_Available)
 		{
 			ImGui::TextDisabled("The active RHI backend is not Vulkan.");
@@ -241,8 +241,9 @@ namespace gglab
 		if (snapshot->m_RuntimeFatal)
 		{
 			ImGui::Text("Failure: %s -> %s (%d) | last submitted timeline %llu",
-				snapshot->m_FailingOperation.empty() ? "unknown operation"
-				: snapshot->m_FailingOperation.c_str(),
+				snapshot->m_FailingOperation.empty() ?
+					"unknown operation" :
+					snapshot->m_FailingOperation.c_str(),
 				snapshot->m_FailingResult.c_str(), snapshot->m_FailingResultCode,
 				static_cast<unsigned long long>(snapshot->m_LastSubmissionBeforeFailure));
 		}

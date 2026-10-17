@@ -112,8 +112,9 @@ namespace gglab
 			{
 				constexpr uint32_t tileSize = 8;
 				const bool isPurple = ((x / tileSize) + (y / tileSize)) & 1;
-				return isPurple ? std::array<uint8_t, 4>{255, 0, 255, 255}
-				: std::array<uint8_t, 4>{ 0, 0, 0, 255 };
+				return isPurple ?
+					std::array<uint8_t, 4>{255, 0, 255, 255} :
+					std::array<uint8_t, 4>{ 0, 0, 0, 255 };
 			});
 
 		addGeneratedTexture(ReservedTextureIDIndex::NormalFlat, "NormalFlat",

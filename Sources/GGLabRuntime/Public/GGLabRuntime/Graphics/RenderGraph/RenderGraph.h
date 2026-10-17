@@ -722,9 +722,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(importedHandle.IsValid(), "Import RHI resource handle must be valid.");
 		GGLAB_ASSERT_MSG(
 			m_Device->IsAlive(importedHandle), "Import RHI resource handle must be live.");
-		constexpr RHIResourceStateUsage StateUsage = std::is_same_v<RESOURCE, RGTextureResource>
-			? RHIResourceStateUsage::TextureInitial
-			: RHIResourceStateUsage::Buffer;
+		constexpr RHIResourceStateUsage StateUsage = std::is_same_v<RESOURCE, RGTextureResource> ?
+			RHIResourceStateUsage::TextureInitial :
+			RHIResourceStateUsage::Buffer;
 		if (!IsRHIResourceStateValid(initialState, StateUsage))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(

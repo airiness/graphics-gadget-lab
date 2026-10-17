@@ -133,9 +133,9 @@ namespace gglab
 	{
 		auto& state = context.PanelState<PersistentSceneBuffersPanelState>();
 		const auto* snapshot =
-			context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<PersistentSceneBufferSnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<PersistentSceneBufferSnapshot>() :
+				nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Persistent buffer snapshot provider is not available.");

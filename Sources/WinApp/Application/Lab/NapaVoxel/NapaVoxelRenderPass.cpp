@@ -237,9 +237,9 @@ namespace gglab
 			key.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
 			key.m_Formats.m_RenderTargetCount = 1;
 			key.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
-			key.m_RasterizerPreset = index == static_cast<size_t>(NapaVoxelSurfaceMode::Wireframe)
-				? RasterizerPreset::Wireframe
-				: RasterizerPreset::Default;
+			key.m_RasterizerPreset = index == static_cast<size_t>(NapaVoxelSurfaceMode::Wireframe) ?
+				RasterizerPreset::Wireframe :
+				RasterizerPreset::Default;
 			key.m_DepthPreset = DepthPreset::ReversedZWrite;
 			key.m_BlendPreset = BlendPreset::Default;
 		}

@@ -48,8 +48,8 @@ namespace gglab
 			return ModelDependencyOutcome::Cancelled;
 		}
 		return status.m_ContentState == AssetContentState::Ready &&
-			status.m_ResidencyState == AssetResidencyState::Resident
-			? ModelDependencyOutcome::Ready
-			: ModelDependencyOutcome::Pending;
+			status.m_ResidencyState == AssetResidencyState::Resident ?
+				ModelDependencyOutcome::Ready :
+				ModelDependencyOutcome::Pending;
 	}
 }

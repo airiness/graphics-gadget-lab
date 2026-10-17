@@ -287,40 +287,40 @@ namespace gglab
 	RHITextureHandle VulkanDevice::CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
 		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::CreateTexture")
-			? m_ResourceManager.CreateTexture(createInfo, debugIdentity)
-			: RHITextureHandle{};
+		return RequireOwnerThread("VulkanDevice::CreateTexture") ?
+			m_ResourceManager.CreateTexture(createInfo, debugIdentity) :
+			RHITextureHandle{};
 	}
 
 	RHIBufferHandle VulkanDevice::CreateBuffer(
 		const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::CreateBuffer")
-			? m_ResourceManager.CreateBuffer(desc, debugIdentity)
-			: RHIBufferHandle{};
+		return RequireOwnerThread("VulkanDevice::CreateBuffer") ?
+			m_ResourceManager.CreateBuffer(desc, debugIdentity) :
+			RHIBufferHandle{};
 	}
 
 	RHITextureViewHandle VulkanDevice::CreateTextureView(
 		RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::CreateTextureView")
-			? m_ResourceManager.CreateTextureView(texture, desc)
-			: RHITextureViewHandle{};
+		return RequireOwnerThread("VulkanDevice::CreateTextureView") ?
+			m_ResourceManager.CreateTextureView(texture, desc) :
+			RHITextureViewHandle{};
 	}
 
 	RHIBufferViewHandle VulkanDevice::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::CreateBufferView")
-			? m_ResourceManager.CreateBufferView(buffer, desc)
-			: RHIBufferViewHandle{};
+		return RequireOwnerThread("VulkanDevice::CreateBufferView") ?
+			m_ResourceManager.CreateBufferView(buffer, desc) :
+			RHIBufferViewHandle{};
 	}
 
 	RHISamplerHandle VulkanDevice::CreateSampler(const RHISamplerDesc& desc) noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::CreateSampler")
-			? m_ResourceManager.CreateSampler(desc)
-			: RHISamplerHandle{};
+		return RequireOwnerThread("VulkanDevice::CreateSampler") ?
+			m_ResourceManager.CreateSampler(desc) :
+			RHISamplerHandle{};
 	}
 
 	void VulkanDevice::DestroyTexture(RHITextureHandle texture) noexcept
@@ -383,24 +383,24 @@ namespace gglab
 
 	std::string_view VulkanDevice::GetTextureDebugName(RHITextureHandle texture) const noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::GetTextureDebugName")
-			? m_ResourceManager.GetTextureDebugName(texture)
-			: std::string_view{};
+		return RequireOwnerThread("VulkanDevice::GetTextureDebugName") ?
+			m_ResourceManager.GetTextureDebugName(texture) :
+			std::string_view{};
 	}
 
 	std::string_view VulkanDevice::GetBufferDebugName(RHIBufferHandle buffer) const noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::GetBufferDebugName")
-			? m_ResourceManager.GetBufferDebugName(buffer)
-			: std::string_view{};
+		return RequireOwnerThread("VulkanDevice::GetBufferDebugName") ?
+			m_ResourceManager.GetBufferDebugName(buffer) :
+			std::string_view{};
 	}
 
 	void* VulkanDevice::MapBuffer(
 		RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::MapBuffer")
-			? m_ResourceManager.MapBuffer(buffer, readRange)
-			: nullptr;
+		return RequireOwnerThread("VulkanDevice::MapBuffer") ?
+			m_ResourceManager.MapBuffer(buffer, readRange) :
+			nullptr;
 	}
 
 	void VulkanDevice::UnmapBuffer(
@@ -450,25 +450,25 @@ namespace gglab
 	RHIDescriptorHandle VulkanDevice::GetTextureViewDescriptor(
 		RHITextureViewHandle view) const noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::GetTextureViewDescriptor")
-			? m_ResourceManager.GetTextureViewDescriptor(view)
-			: RHIDescriptorHandle{};
+		return RequireOwnerThread("VulkanDevice::GetTextureViewDescriptor") ?
+			m_ResourceManager.GetTextureViewDescriptor(view) :
+			RHIDescriptorHandle{};
 	}
 
 	RHIDescriptorHandle VulkanDevice::GetBufferViewDescriptor(
 		RHIBufferViewHandle view) const noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::GetBufferViewDescriptor")
-			? m_ResourceManager.GetBufferViewDescriptor(view)
-			: RHIDescriptorHandle{};
+		return RequireOwnerThread("VulkanDevice::GetBufferViewDescriptor") ?
+			m_ResourceManager.GetBufferViewDescriptor(view) :
+			RHIDescriptorHandle{};
 	}
 
 	RHIDescriptorHandle VulkanDevice::GetSamplerDescriptor(
 		RHISamplerHandle sampler) const noexcept
 	{
-		return RequireOwnerThread("VulkanDevice::GetSamplerDescriptor")
-			? m_ResourceManager.GetSamplerDescriptor(sampler)
-			: RHIDescriptorHandle{};
+		return RequireOwnerThread("VulkanDevice::GetSamplerDescriptor") ?
+			m_ResourceManager.GetSamplerDescriptor(sampler) :
+			RHIDescriptorHandle{};
 	}
 
 	bool VulkanDevice::PublishTextureViewDescriptor(RHITextureViewHandle view) noexcept

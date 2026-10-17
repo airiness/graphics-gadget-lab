@@ -123,9 +123,9 @@ namespace gglab
 				[&](const RGSnapshotAccessInfo& access)
 				{
 					return access.m_ResourceName == address.m_Resource &&
-						(address.m_Position == RGObservationPosition::Before
-							? access.m_DependencyAccess != RGDependencyAccess::Write
-							: access.m_WrittenResourceNodeIndex.has_value());
+						(address.m_Position == RGObservationPosition::Before ?
+							access.m_DependencyAccess != RGDependencyAccess::Write :
+							access.m_WrittenResourceNodeIndex.has_value());
 				});
 		}
 
@@ -212,20 +212,23 @@ namespace gglab
 			{
 				SetupSettingsColumns();
 				NextSetting("At");
-				int position = address.m_Position == RGObservationPosition::Final ? 0
-					: address.m_Position == RGObservationPosition::Before ? 1 : 2;
+				int position = address.m_Position == RGObservationPosition::Final ?
+					0 :
+					address.m_Position == RGObservationPosition::Before ? 1 : 2;
 				if (ImGui::Combo("##Position", &position, "Final\0Before pass\0After pass\0"))
 				{
-					address.m_Position = position == 0 ? RGObservationPosition::Final
-						: position == 1 ? RGObservationPosition::Before : RGObservationPosition::After;
+					address.m_Position = position == 0 ?
+						RGObservationPosition::Final :
+						position == 1 ? RGObservationPosition::Before : RGObservationPosition::After;
 					address.m_Pass.clear();
 					address.m_Occurrence.reset();
 				}
 				if (address.m_Position != RGObservationPosition::Final)
 				{
 					NextSetting("Pass");
-					const std::string selectedPass = address.m_Pass.empty() ? "Select pass"
-						: std::format("{} [#{}]", address.m_Pass, address.m_Occurrence.value_or(1));
+					const std::string selectedPass = address.m_Pass.empty() ?
+						"Select pass" :
+						std::format("{} [#{}]", address.m_Pass, address.m_Occurrence.value_or(1));
 					if (ImGui::BeginCombo("##Pass", selectedPass.c_str()))
 					{
 						if (snapshot)
@@ -273,14 +276,18 @@ namespace gglab
 						ImGui::DragScalar("##SliceCount", ImGuiDataType_U32, &*address.m_SliceCount, 1.0f, &one);
 					}
 					NextSetting("Plane");
-					int aspect = address.m_Aspect == RHITextureAspect::Color ? 1
-						: address.m_Aspect == RHITextureAspect::Depth ? 2
-						: address.m_Aspect == RHITextureAspect::Stencil ? 3 : 0;
+					int aspect = address.m_Aspect == RHITextureAspect::Color ?
+						1 :
+						address.m_Aspect == RHITextureAspect::Depth ?
+							2 :
+							address.m_Aspect == RHITextureAspect::Stencil ? 3 : 0;
 					if (ImGui::Combo("##Plane", &aspect, "Automatic\0Color\0Depth\0Stencil\0"))
 					{
-						address.m_Aspect = aspect == 1 ? RHITextureAspect::Color
-							: aspect == 2 ? RHITextureAspect::Depth
-							: aspect == 3 ? RHITextureAspect::Stencil : RHITextureAspect::None;
+						address.m_Aspect = aspect == 1 ?
+							RHITextureAspect::Color :
+							aspect == 2 ?
+								RHITextureAspect::Depth :
+								aspect == 3 ? RHITextureAspect::Stencil : RHITextureAspect::None;
 					}
 					ImGui::SetItemTooltip("Automatic selects color, or depth for a depth/stencil texture.");
 				}
@@ -398,8 +405,9 @@ namespace gglab
 					ImGui::DragScalar("##SettleFrames", ImGuiDataType_U32, &settings.m_SettleFrames, 1.0f, &minimum, &maximum);
 				}
 				NextSetting("Reference view");
-				if (ImGui::BeginCombo("##ReferenceView", settings.m_ReferenceViewId.empty()
-					? "Current camera" : settings.m_ReferenceViewId.c_str()))
+				if (ImGui::BeginCombo("##ReferenceView", settings.m_ReferenceViewId.empty() ?
+					"Current camera" :
+					settings.m_ReferenceViewId.c_str()))
 				{
 					if (ImGui::Selectable("Current camera", settings.m_ReferenceViewId.empty()))
 					{
@@ -502,15 +510,17 @@ namespace gglab
 				frameState->m_Camera.m_Name.c_str(), frameState->m_Camera.m_Position[0],
 				frameState->m_Camera.m_Position[1], frameState->m_Camera.m_Position[2],
 				frameState->m_Camera.m_VerticalFovDegrees);
-			const std::string timeStep = frameState->m_FixedDeltaTime
-				? std::format("fixed {:.4f} s", *frameState->m_FixedDeltaTime)
-				: std::string("wall clock");
+			const std::string timeStep = frameState->m_FixedDeltaTime ?
+				std::format("fixed {:.4f} s", *frameState->m_FixedDeltaTime) :
+				std::string("wall clock");
 			ImGui::Text("Time step: %s", timeStep.c_str());
 
 			const bool ready = frameState->m_Readiness.IsReady();
-			ImGui::TextColored(GetGateColor(ready ? FrameCaptureGateState::Ready
-				: frameState->m_Readiness.HasFailed() ? FrameCaptureGateState::Failed
-				: FrameCaptureGateState::Pending),
+			ImGui::TextColored(GetGateColor(ready ?
+				FrameCaptureGateState::Ready :
+				frameState->m_Readiness.HasFailed() ?
+					FrameCaptureGateState::Failed :
+					FrameCaptureGateState::Pending),
 				"Readiness: %s, %u settled frames", ready ? "ready" : "not ready",
 				frameCapture.GetSettledFrameCount());
 
@@ -567,12 +577,15 @@ namespace gglab
 				const FrameCaptureRequestResult& result = entry->m_Result;
 				ImGui::PushID(static_cast<int>(result.m_RequestId));
 				const bool completed = result.m_Status == FrameCaptureRequestStatus::Completed;
-				const std::string source = result.m_Metadata
-					? std::string(GetFrameCaptureSourceName(result.m_Metadata->m_Source)) : "Request";
-				const std::string frame = result.m_Metadata
-					? std::format(" / frame {}", result.m_Metadata->m_FrameSerial) : "";
-				ImGui::PushStyleColor(ImGuiCol_Text, GetGateColor(completed ? FrameCaptureGateState::Ready
-					: FrameCaptureGateState::Failed));
+				const std::string source = result.m_Metadata ?
+					std::string(GetFrameCaptureSourceName(result.m_Metadata->m_Source)) :
+					"Request";
+				const std::string frame = result.m_Metadata ?
+					std::format(" / frame {}", result.m_Metadata->m_FrameSerial) :
+					"";
+				ImGui::PushStyleColor(ImGuiCol_Text, GetGateColor(completed ?
+					FrameCaptureGateState::Ready :
+					FrameCaptureGateState::Failed));
 				const ImGuiTreeNodeFlags flags = entry == history.rbegin() ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 				const bool open = ImGui::TreeNodeEx("##Result", flags, "#%llu %s / %s%s",
 					static_cast<unsigned long long>(result.m_RequestId), source.c_str(),
@@ -667,16 +680,21 @@ namespace gglab
 			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
 		if (ImGui::Begin("##FrameCaptureNotification", nullptr, flags))
 		{
-			ImGui::TextColored(GetGateColor(completed ? FrameCaptureGateState::Ready
-				: FrameCaptureGateState::Failed),
-				"%s #%llu %s", result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::ResourceExport
-				? "Resource export" : result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph
-				? "Graph export" : "Capture",
+			ImGui::TextColored(GetGateColor(completed ?
+				FrameCaptureGateState::Ready :
+				FrameCaptureGateState::Failed),
+				"%s #%llu %s", result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::ResourceExport ?
+					"Resource export" :
+					result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph ?
+						"Graph export" :
+						"Capture",
 				static_cast<unsigned long long>(result.m_RequestId),
 				GetStatusName(result.m_Status).data());
 			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
-			ImGui::TextUnformatted(completed ? ApplicationFrameCapture::GetPathText(
-				ApplicationFrameCapture::GetOutputPath(result)).c_str() : result.m_Failure.c_str());
+			ImGui::TextUnformatted(completed ?
+				ApplicationFrameCapture::GetPathText(
+					ApplicationFrameCapture::GetOutputPath(result)).c_str() :
+				result.m_Failure.c_str());
 			ImGui::PopTextWrapPos();
 		}
 		ImGui::End();

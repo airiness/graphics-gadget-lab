@@ -30,9 +30,9 @@ namespace gglab
 				return false;
 			}
 			basis.m_Axis = axis.Normalized();
-			const Vector3 reference = std::abs(basis.m_Axis.Dot(Vector3::UnitY)) < 0.95f
-				? Vector3::UnitY
-				: Vector3::UnitX;
+			const Vector3 reference = std::abs(basis.m_Axis.Dot(Vector3::UnitY)) < 0.95f ?
+				Vector3::UnitY :
+				Vector3::UnitX;
 			basis.m_U = reference.Cross(basis.m_Axis).Normalized();
 			basis.m_V = basis.m_Axis.Cross(basis.m_U).Normalized();
 			return true;
@@ -139,9 +139,9 @@ namespace gglab
 		const auto corners = BuildBoxCorners(center, extents);
 		std::vector<Vector3> positions;
 		BuildBoxGeometry(corners, style.m_FillMode, positions);
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -164,9 +164,9 @@ namespace gglab
 		}
 		std::vector<Vector3> positions;
 		BuildBoxGeometry(corners, style.m_FillMode, positions);
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -314,9 +314,9 @@ namespace gglab
 				AppendTriangle(positions, baseCenter, p1, p0);
 			}
 		}
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -360,9 +360,9 @@ namespace gglab
 				AppendTriangle(positions, topCenter, t0, t1);
 			}
 		}
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -470,9 +470,9 @@ namespace gglab
 		}
 		std::vector<Vector3> positions;
 		BuildBoxGeometry(corners, style.m_FillMode, positions);
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 

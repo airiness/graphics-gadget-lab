@@ -113,13 +113,13 @@ namespace gglab
 			const auto runtimeRoot = win32::GetExecutableDirectory();
 			ShaderCompiler compiler(ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			const auto compile = [&](ShaderStage stage, const wchar_t* entry)
-			{
-				ShaderDesc desc{ .m_SourcePath = L"Tests/TemporalHistoryAccumulationContractCompile.hlsl",
-					.m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
-				desc.m_Target = backend == RHIBackendType::DX12
-					? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
-				return compiler.Compile(desc);
-			};
+				{
+					ShaderDesc desc{ .m_SourcePath = L"Tests/TemporalHistoryAccumulationContractCompile.hlsl",
+						.m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
+					desc.m_Target = backend == RHIBackendType::DX12
+						? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
+					return compiler.Compile(desc);
+				};
 			const auto vertex = compile(ShaderStage::Vertex, L"VSMain");
 			const auto pixel = compile(ShaderStage::Pixel, L"PSMain");
 			context.Check(vertex.IsSuccess() && pixel.IsSuccess(), "Temporal numeric probe shaders compile");
@@ -172,11 +172,11 @@ namespace gglab
 			pipelineInfo.m_Desc.m_RenderTargetFormats[0] = targetDesc.m_Format;
 			pipelineInfo.m_Desc.m_RenderTargetCount = 1;
 			const auto bytecode = [](const ShaderCompileResult& result, std::string_view entry)
-			{
-				const auto& artifact = result.m_Artifact;
-				return ShaderBytecode{ artifact.m_Binary.Data(), artifact.m_Binary.SizeInBytes(),
-					artifact.GetBinaryFormat(), ComputeShaderBinaryHash(artifact.m_Binary, artifact.GetBinaryFormat()), entry };
-			};
+				{
+					const auto& artifact = result.m_Artifact;
+					return ShaderBytecode{ artifact.m_Binary.Data(), artifact.m_Binary.SizeInBytes(),
+						artifact.GetBinaryFormat(), ComputeShaderBinaryHash(artifact.m_Binary, artifact.GetBinaryFormat()), entry };
+				};
 			pipelineInfo.m_VertexShader = bytecode(vertex, "VSMain");
 			pipelineInfo.m_PixelShader = bytecode(pixel, "PSMain");
 			const auto pipeline = layout.IsValid() ? pipelines.CreateGraphicsPipeline(pipelineInfo) : RHIPipelineHandle{};

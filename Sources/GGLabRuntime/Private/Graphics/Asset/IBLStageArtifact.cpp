@@ -125,9 +125,9 @@ namespace gglab
 		if (stage == IBLArtifactStage::Environment || stage == IBLArtifactStage::Irradiance ||
 			stage == IBLArtifactStage::PrefilteredSpecular)
 		{
-			texture.m_SrvDimension = texture.m_ArraySize == CubemapFaceCount
-				? RHITextureViewDimension::TextureCube
-				: RHITextureViewDimension::TextureCubeArray;
+			texture.m_SrvDimension = texture.m_ArraySize == CubemapFaceCount ?
+				RHITextureViewDimension::TextureCube :
+				RHITextureViewDimension::TextureCubeArray;
 		}
 		else if (stage == IBLArtifactStage::BrdfLut)
 		{
@@ -139,7 +139,8 @@ namespace gglab
 			.m_Texture = std::move(texture),
 		};
 		artifact.m_ContentDigest = ComputeIBLStageArtifactContentDigest(artifact);
-		return artifact.IsValid() ? std::make_shared<const IBLStageArtifact>(std::move(artifact))
-			: nullptr;
+		return artifact.IsValid() ?
+			std::make_shared<const IBLStageArtifact>(std::move(artifact)) :
+			nullptr;
 	}
 }

@@ -123,8 +123,9 @@ namespace gglab
 				target.m_BufferDesc.m_SizeInBytes, layout.m_ValidElementCount);
 			if (boundary.m_BufferLayout.m_Failure != NonFiniteScanLayoutFailure::None)
 			{
-				return boundary.m_BufferLayout.m_Failure == NonFiniteScanLayoutFailure::TooLarge
-					? RGObservationFailure::TooLarge : RGObservationFailure::UnsupportedResource;
+				return boundary.m_BufferLayout.m_Failure == NonFiniteScanLayoutFailure::TooLarge ?
+					RGObservationFailure::TooLarge :
+					RGObservationFailure::UnsupportedResource;
 			}
 			parameters.m_BufferStride = layout.m_Stride;
 			parameters.m_ComponentCount = static_cast<uint32_t>(boundary.m_BufferLayout.m_Components.size());
