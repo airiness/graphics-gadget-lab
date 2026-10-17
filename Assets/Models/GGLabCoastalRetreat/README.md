@@ -72,4 +72,6 @@ must also hold before treating requested bake settings as the active profile.
 `CompareCaptures.ps1 -RequireMatchingInputs` rejects incompatible recorded
 inputs. Total elapsed time and IBL publication serials may differ between
 static captures; moving comparisons still require aligned sequence frames.
-The retained historical Atrium Baseline1 describes its original asset revision.
+The [Physical Daylight reference](../../Media/GGLabCoastalRetreat/PhysicalDaylight/CAPTURE.md)
+pins the installed bundle, actual frame inputs and renderer snapshot. The retained
+historical Atrium Baseline1 describes its original asset revision.

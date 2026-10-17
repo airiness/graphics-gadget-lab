@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "requireMatchingInputs": true,
+  "channelUnits": "8-bit RGB",
+  "differingPixelThreshold": 8,
+  "interpretation": "Observed backend differences, not an image-quality acceptance threshold.",
+  "crossRhi": [
+    {
+      "key": "Demo.Playground.CoastalAtrium|GI_InteriorExterior|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.1664,
+      "maxDifference": 14,
+      "differingPercent": 0.0006,
+      "psnr": 55.82,
+      "reference": "dx12/reference/daylight-GI_InteriorExterior-scene-dx12-20261016-153822-r15.png",
+      "candidate": "vulkan/reference/daylight-GI_InteriorExterior-scene-vulkan-20261016-153900-r15.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Landing_Damp|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.1665,
+      "maxDifference": 18,
+      "differingPercent": 0.0007,
+      "psnr": 55.89,
+      "reference": "dx12/reference/daylight-Landing_Damp-scene-dx12-20261016-153824-r17.png",
+      "candidate": "vulkan/reference/daylight-Landing_Damp-scene-vulkan-20261016-153902-r17.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Landing_Dock|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.2959,
+      "maxDifference": 32,
+      "differingPercent": 0.035,
+      "psnr": 52.73,
+      "reference": "dx12/reference/daylight-Landing_Dock-scene-dx12-20261016-153823-r16.png",
+      "candidate": "vulkan/reference/daylight-Landing_Dock-scene-vulkan-20261016-153901-r16.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Retreat_Courtyard|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.2123,
+      "maxDifference": 15,
+      "differingPercent": 0.0005,
+      "psnr": 54.78,
+      "reference": "dx12/reference/daylight-Retreat_Courtyard-scene-dx12-20261016-153816-r10.png",
+      "candidate": "vulkan/reference/daylight-Retreat_Courtyard-scene-vulkan-20261016-153854-r10.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Retreat_Hero|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.2734,
+      "maxDifference": 24,
+      "differingPercent": 0.0003,
+      "psnr": 53.59,
+      "reference": "dx12/reference/daylight-Retreat_Hero-scene-dx12-20261016-153815-r9.png",
+      "candidate": "vulkan/reference/daylight-Retreat_Hero-scene-vulkan-20261016-153853-r9.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Retreat_Lounge|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.2407,
+      "maxDifference": 36,
+      "differingPercent": 0.0032,
+      "psnr": 54.11,
+      "reference": "dx12/reference/daylight-Retreat_Lounge-scene-dx12-20261016-153817-r11.png",
+      "candidate": "vulkan/reference/daylight-Retreat_Lounge-scene-vulkan-20261016-153855-r11.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Retreat_Overview|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.3291,
+      "maxDifference": 20,
+      "differingPercent": 0.0009,
+      "psnr": 52.84,
+      "reference": "dx12/reference/daylight-Retreat_Overview-scene-dx12-20261016-153820-r13.png",
+      "candidate": "vulkan/reference/daylight-Retreat_Overview-scene-vulkan-20261016-153858-r13.png"
+    },
+    {
+      "key": "Demo.Playground.CoastalAtrium|Retreat_SeaPassage|scene|daylight",
+      "width": 1280,
+      "height": 800,
+      "sizeMatches": true,
+      "inputDifferences": [],
+      "meanAbsoluteError": 0.155,
+      "maxDifference": 14,
+      "differingPercent": 0.0006,
+      "psnr": 56.07,
+      "reference": "dx12/reference/daylight-Retreat_SeaPassage-scene-dx12-20261016-153821-r14.png",
+      "candidate": "vulkan/reference/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153859-r14.png"
+    }
+  ],
+  "repeat": {
+    "dx12": [
+      {
+        "key": "daylight-Retreat_SeaPassage-scene-dx12-20261016-153827-r19",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "dx12/reference/daylight-Retreat_SeaPassage-scene-dx12-20261016-153821-r14.png",
+        "candidate": "dx12/repeat/daylight-Retreat_SeaPassage-scene-dx12-20261016-153827-r19.png"
+      },
+      {
+        "key": "daylight-Retreat_Courtyard-scene-dx12-20261016-153828-r20",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "dx12/reference/daylight-Retreat_Courtyard-scene-dx12-20261016-153816-r10.png",
+        "candidate": "dx12/repeat/daylight-Retreat_Courtyard-scene-dx12-20261016-153828-r20.png"
+      },
+      {
+        "key": "daylight-GI_InteriorExterior-scene-dx12-20261016-153830-r21",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "dx12/reference/daylight-GI_InteriorExterior-scene-dx12-20261016-153822-r15.png",
+        "candidate": "dx12/repeat/daylight-GI_InteriorExterior-scene-dx12-20261016-153830-r21.png"
+      },
+      {
+        "key": "daylight-Retreat_Lounge-scene-dx12-20261016-153831-r22",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "dx12/reference/daylight-Retreat_Lounge-scene-dx12-20261016-153817-r11.png",
+        "candidate": "dx12/repeat/daylight-Retreat_Lounge-scene-dx12-20261016-153831-r22.png"
+      }
+    ],
+    "vulkan": [
+      {
+        "key": "daylight-Retreat_SeaPassage-scene-vulkan-20261016-153905-r19",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "vulkan/reference/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153859-r14.png",
+        "candidate": "vulkan/repeat/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153905-r19.png"
+      },
+      {
+        "key": "daylight-Retreat_Courtyard-scene-vulkan-20261016-153906-r20",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "vulkan/reference/daylight-Retreat_Courtyard-scene-vulkan-20261016-153854-r10.png",
+        "candidate": "vulkan/repeat/daylight-Retreat_Courtyard-scene-vulkan-20261016-153906-r20.png"
+      },
+      {
+        "key": "daylight-GI_InteriorExterior-scene-vulkan-20261016-153907-r21",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "vulkan/reference/daylight-GI_InteriorExterior-scene-vulkan-20261016-153900-r15.png",
+        "candidate": "vulkan/repeat/daylight-GI_InteriorExterior-scene-vulkan-20261016-153907-r21.png"
+      },
+      {
+        "key": "daylight-Retreat_Lounge-scene-vulkan-20261016-153908-r22",
+        "width": 1280,
+        "height": 800,
+        "sizeMatches": true,
+        "inputDifferences": [],
+        "meanAbsoluteError": 0,
+        "maxDifference": 0,
+        "differingPercent": 0,
+        "psnr": null,
+        "reference": "vulkan/reference/daylight-Retreat_Lounge-scene-vulkan-20261016-153855-r11.png",
+        "candidate": "vulkan/repeat/daylight-Retreat_Lounge-scene-vulkan-20261016-153908-r22.png"
+      }
+    ]
+  }
+}
