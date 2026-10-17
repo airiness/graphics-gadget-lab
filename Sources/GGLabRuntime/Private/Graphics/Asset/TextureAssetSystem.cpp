@@ -1199,8 +1199,8 @@ namespace gglab
 				.m_Priority = completion.m_Priority,
 				.m_Progress = texture->m_Load.m_Progress,
 			},
-			[this, operation, semantic, completion, payload, contentFingerprint, sourceDigest,
-			derivedDataKey, residencyReload, residencyOperation]() mutable noexcept
+			[this, operation, semantic, completion, payload, contentFingerprint, sourceDigest, derivedDataKey, residencyReload, residencyOperation]
+			() mutable noexcept
 			{
 				CompleteTextureLoad(operation, semantic, completion, std::move(payload),
 					contentFingerprint, sourceDigest, derivedDataKey, residencyReload,

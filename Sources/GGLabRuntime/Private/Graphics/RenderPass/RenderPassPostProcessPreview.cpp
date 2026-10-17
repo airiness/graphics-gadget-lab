@@ -523,15 +523,15 @@ namespace gglab
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV(channel));
 		const auto* contextPtr = &context;
 
-		static constexpr const char* PassNames[] = {
+		static constexpr const char* PassNames[] =
+		{
 			"PostProcess.Preview", "AmbientOcclusion.Preview", "TemporalAA.Preview",
 			"Atmosphere.Preview", "SceneDepth.Preview"
 		};
 		rg.AddPass<PassData>(
 			PassNames[static_cast<uint32_t>(channel)],
-			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, outputImport,
-			samplerIndex, previewExposureScale,
-			registry, PreviewIndex, channel](RenderGraph::RGBuilder& builder, PassData& data)
+			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, outputImport, samplerIndex, previewExposureScale, registry, PreviewIndex, channel]
+			(RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
 				if (selection.m_Tap == PostProcessDebugTap::SceneColor)
@@ -540,7 +540,8 @@ namespace gglab
 						NonFiniteWatchSemantic::PostProcessInput, data.m_Source,
 						builder.GetObservationAddress(data.m_Source, RGObservationPosition::Before));
 				}
-				constexpr const char* PreviewNames[] = {
+				constexpr const char* PreviewNames[] =
+				{
 					"Preview.PostProcessing", "Preview.AmbientOcclusion", "Preview.TemporalAA",
 					"Preview.Atmosphere", "Preview.SceneDepth"
 				};

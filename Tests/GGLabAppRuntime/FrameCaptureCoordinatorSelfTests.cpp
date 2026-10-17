@@ -1941,60 +1941,60 @@ namespace gglab
 			TemporaryDirectory directory("frame-sequence-evaluation");
 			{
 				TemporalAASettings content{};
-			content.m_Enabled = true;
-			content.m_DepthAbsoluteThreshold = 0.25f;
-			const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
-				.m_Enabled = false,
-				.m_MaxHistoryFeedback = 0.9f,
-				.m_NeighborhoodClampExpansion = 4.0f,
-				.m_HistoryRelaxation = 0.0f,
-				.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge,
-				.m_HistoryRectification = TemporalAAHistoryRectification::BoundedVarianceClip,
-				.m_VarianceClipGamma = 9.0f,
-				.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
-				.m_CurrentFilter = TemporalAACurrentFilter::Point,
-				.m_MotionSelection = TemporalAAMotionSelection::Center,
-				.m_PostTemporalView = TemporalAAPostTemporalView::Jittered,
-				.m_ResolutionPreset = TemporalAAResolutionPreset::Quality,
-				}, content);
-			TemporalAASettings invalidFilter = content;
-			invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
-			invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
-			invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
-			invalidFilter.m_PostTemporalView = static_cast<TemporalAAPostTemporalView>(7);
-			invalidFilter.m_ResolutionPreset = static_cast<TemporalAAResolutionPreset>(7);
-			invalidFilter.m_HistoryRectification = static_cast<TemporalAAHistoryRectification>(7);
-			invalidFilter.m_VarianceClipGamma = std::numeric_limits<float>::quiet_NaN();
-			context.Check(!overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
-				overridden.m_DepthAbsoluteThreshold == 0.25f &&
-				overridden.m_NeighborhoodClampExpansion == TemporalAAMaxNeighborhoodClampExpansion &&
-				overridden.m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
-				content.m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
-				ResolveTemporalAASettings(invalidFilter).m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
-				overridden.m_CurrentFilter == TemporalAACurrentFilter::Point &&
-				content.m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
-				ResolveTemporalAASettings(invalidFilter).m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
-				overridden.m_MotionSelection == TemporalAAMotionSelection::Center &&
-				content.m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
-				ResolveTemporalAASettings(invalidFilter).m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
-				overridden.m_PostTemporalView == TemporalAAPostTemporalView::Jittered &&
-				content.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered &&
-				ResolveTemporalAASettings(invalidFilter).m_PostTemporalView == TemporalAAPostTemporalView::Unjittered &&
-				overridden.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
-				content.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
-				ResolveTemporalAASettings(invalidFilter).m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
-				overridden.m_HistoryAccumulation == TemporalAAHistoryAccumulation::CompatibilityAge &&
-				overridden.m_HistoryRelaxation == 0.0f &&
-				content.m_HistoryRelaxation == TemporalAADefaultHistoryRelaxation &&
-				content.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
-				overridden.m_HistoryRectification == TemporalAAHistoryRectification::BoundedVarianceClip &&
-				overridden.m_VarianceClipGamma == TemporalAAMaxVarianceClipGamma &&
-				content.m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
-				ResolveTemporalAASettings(invalidFilter).m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
-				ResolveTemporalAASettings(invalidFilter).m_VarianceClipGamma == TemporalAADefaultVarianceClipGamma &&
-				ApplyFrameSequenceTemporalAAOverrides({}, content) == ResolveTemporalAASettings(content),
-				"Sequence Temporal AA overrides replace only set fields and stay within the "
-				"settings ranges");
+				content.m_Enabled = true;
+				content.m_DepthAbsoluteThreshold = 0.25f;
+				const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
+					.m_Enabled = false,
+					.m_MaxHistoryFeedback = 0.9f,
+					.m_NeighborhoodClampExpansion = 4.0f,
+					.m_HistoryRelaxation = 0.0f,
+					.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge,
+					.m_HistoryRectification = TemporalAAHistoryRectification::BoundedVarianceClip,
+					.m_VarianceClipGamma = 9.0f,
+					.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
+					.m_CurrentFilter = TemporalAACurrentFilter::Point,
+					.m_MotionSelection = TemporalAAMotionSelection::Center,
+					.m_PostTemporalView = TemporalAAPostTemporalView::Jittered,
+					.m_ResolutionPreset = TemporalAAResolutionPreset::Quality,
+					}, content);
+				TemporalAASettings invalidFilter = content;
+				invalidFilter.m_HistoryFilter = static_cast<TemporalAAHistoryFilter>(7);
+				invalidFilter.m_CurrentFilter = static_cast<TemporalAACurrentFilter>(7);
+				invalidFilter.m_MotionSelection = static_cast<TemporalAAMotionSelection>(7);
+				invalidFilter.m_PostTemporalView = static_cast<TemporalAAPostTemporalView>(7);
+				invalidFilter.m_ResolutionPreset = static_cast<TemporalAAResolutionPreset>(7);
+				invalidFilter.m_HistoryRectification = static_cast<TemporalAAHistoryRectification>(7);
+				invalidFilter.m_VarianceClipGamma = std::numeric_limits<float>::quiet_NaN();
+				context.Check(!overridden.m_Enabled && overridden.m_MaxHistoryFeedback == 0.9f &&
+					overridden.m_DepthAbsoluteThreshold == 0.25f &&
+					overridden.m_NeighborhoodClampExpansion == TemporalAAMaxNeighborhoodClampExpansion &&
+					overridden.m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
+					content.m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
+					ResolveTemporalAASettings(invalidFilter).m_HistoryFilter == TemporalAAHistoryFilter::CatmullRomClamped &&
+					overridden.m_CurrentFilter == TemporalAACurrentFilter::Point &&
+					content.m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
+					ResolveTemporalAASettings(invalidFilter).m_CurrentFilter == TemporalAACurrentFilter::Gaussian &&
+					overridden.m_MotionSelection == TemporalAAMotionSelection::Center &&
+					content.m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
+					ResolveTemporalAASettings(invalidFilter).m_MotionSelection == TemporalAAMotionSelection::ClosestDepth &&
+					overridden.m_PostTemporalView == TemporalAAPostTemporalView::Jittered &&
+					content.m_PostTemporalView == TemporalAAPostTemporalView::Unjittered &&
+					ResolveTemporalAASettings(invalidFilter).m_PostTemporalView == TemporalAAPostTemporalView::Unjittered &&
+					overridden.m_ResolutionPreset == TemporalAAResolutionPreset::Quality &&
+					content.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+					ResolveTemporalAASettings(invalidFilter).m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+					overridden.m_HistoryAccumulation == TemporalAAHistoryAccumulation::CompatibilityAge &&
+					overridden.m_HistoryRelaxation == 0.0f &&
+					content.m_HistoryRelaxation == TemporalAADefaultHistoryRelaxation &&
+					content.m_HistoryAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples &&
+					overridden.m_HistoryRectification == TemporalAAHistoryRectification::BoundedVarianceClip &&
+					overridden.m_VarianceClipGamma == TemporalAAMaxVarianceClipGamma &&
+					content.m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
+					ResolveTemporalAASettings(invalidFilter).m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
+					ResolveTemporalAASettings(invalidFilter).m_VarianceClipGamma == TemporalAADefaultVarianceClipGamma &&
+					ApplyFrameSequenceTemporalAAOverrides({}, content) == ResolveTemporalAASettings(content),
+					"Sequence Temporal AA overrides replace only set fields and stay within the "
+					"settings ranges");
 			}
 			{
 				const std::array<double, 5> samples{ 4.0, 1.0, 3.0, 2.0, 5.0 };
@@ -2129,47 +2129,47 @@ namespace gglab
 			}
 			{
 				SequenceHarness harness(directory.GetPath());
-			harness.m_Paths.front().m_Keys.resize(2);
-			harness.m_Paths.front().m_Keys.back().m_Frame = 1;
-			std::string error;
-			GGLAB_UNUSED(harness.m_Sequence.Start(
-				{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
-			harness.Frame();
-			harness.Frame();
-			const uint64_t first = harness.m_RenderSerial;
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first + 1), true);
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first - 1), true);
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(0), true);
-			context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
-				"Future, stale and unbound profiles are excluded even with valid profiler counters");
-			harness.Frame(false);
-			const uint64_t aborted = harness.m_RenderSerial;
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(aborted), true);
-			context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
-				"A begun but unsubmitted render never becomes eligible for sequence GPU timing");
-			harness.Frame();
-			const uint64_t last = harness.m_RenderSerial;
-			context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
-				harness.m_Sequence.WantsGpuTiming(),
-				"A short sequence keeps profiling enabled while its tail is pending");
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
-			context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
-				harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 2,
-				"Distinct bound profiles can complete out of publication order without counting duplicates");
-			GGLAB_UNUSED(harness.m_Sequence.Start(
-				{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
-			harness.Frame();
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
-			context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
-				"A consecutive sequence rejects a retained profile from the preceding sequence");
-			context.Check(harness.m_Sequence.Cancel() && !harness.m_Sequence.WantsGpuTiming(),
-				"Cancellation releases pending timing work and profiling ownership");
-			harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
-			context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
-				harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
-				"A cancelled sequence cannot be revived by a late GPU profile");
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.Frame();
+				const uint64_t first = harness.m_RenderSerial;
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first + 1), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first - 1), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(0), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"Future, stale and unbound profiles are excluded even with valid profiler counters");
+				harness.Frame(false);
+				const uint64_t aborted = harness.m_RenderSerial;
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(aborted), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"A begun but unsubmitted render never becomes eligible for sequence GPU timing");
+				harness.Frame();
+				const uint64_t last = harness.m_RenderSerial;
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
+					harness.m_Sequence.WantsGpuTiming(),
+					"A short sequence keeps profiling enabled while its tail is pending");
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(first), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.size() == 2,
+					"Distinct bound profiles can complete out of publication order without counting duplicates");
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"A consecutive sequence rejects a retained profile from the preceding sequence");
+				context.Check(harness.m_Sequence.Cancel() && !harness.m_Sequence.WantsGpuTiming(),
+					"Cancellation releases pending timing work and profiling ownership");
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
+					harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
+					"A cancelled sequence cannot be revived by a late GPU profile");
 			}
 			{
 				SequenceHarness harness(directory.GetPath());
@@ -2268,13 +2268,13 @@ namespace gglab
 			}
 			{
 				SequenceHarness harness(directory.GetPath());
-			std::string error;
-			GGLAB_UNUSED(harness.m_Sequence.Start(
-				{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
-			harness.m_Sequence.UpdateGpuTiming({}, false);
-			context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
-				harness.m_Sequence.GetStatus()->m_Failure.find("unavailable or disabled") != std::string::npos,
-				"Unavailable profiling fails a timing request explicitly instead of completing with zero samples");
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.m_Sequence.UpdateGpuTiming({}, false);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					harness.m_Sequence.GetStatus()->m_Failure.find("unavailable or disabled") != std::string::npos,
+					"Unavailable profiling fails a timing request explicitly instead of completing with zero samples");
 			}
 			{
 				SequenceHarness harness(directory.GetPath());
@@ -2469,53 +2469,53 @@ namespace gglab
 			TemporaryDirectory directory("sequence-group-admission");
 			{
 				FakeCaptureControl control;
-			FrameCaptureCoordinator coordinator({ .m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
-				.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
-			for (uint32_t index = 0; index < 8; ++index)
-			{
-				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph, .m_WaitForCapacity = true }));
-			}
-			const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 77, .m_Frame = 4 };
-			const auto image = coordinator.Submit({ .m_Sequence = sequence });
-			const auto resources = coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
-				.m_ResourceTargets = { { .m_Resource = "A" } }, .m_IncludeGraph = true, .m_Sequence = sequence });
-			auto state = MakeFrameState(true);
-			state.m_FrameSerial = 100;
-			coordinator.BeginFrame(state);
-			context.Check(control.m_Issued.size() == 9 && control.m_Issued[0].m_Source == FrameCaptureSource::Scene &&
-				control.m_Issued[1].m_Source == FrameCaptureSource::ResourceExport && control.m_Issued[0].m_GroupId != 0 &&
-				control.m_Issued[0].m_GroupId == control.m_Issued[1].m_GroupId && control.m_Issued[1].m_IncludeGraph &&
-				Consume(coordinator).empty(),
-				"PNG and resource output claim both writer slots before eight earlier ordinary graphs can block the group");
-			for (const auto& issued : control.m_Issued)
-			{
-				control.Complete(issued.m_Id);
-			}
-			coordinator.OnFrameSubmitted();
-			coordinator.Update();
-			const auto completed = Consume(coordinator);
-			const auto png = std::ranges::find(completed, image, &FrameCaptureRequestResult::m_RequestId);
-			const auto arrays = std::ranges::find(completed, resources, &FrameCaptureRequestResult::m_RequestId);
-			context.Check(completed.size() == 9 && png != completed.end() && arrays != completed.end() &&
-				png->m_Status == FrameCaptureRequestStatus::Completed && arrays->m_Status == FrameCaptureRequestStatus::Completed &&
-				png->m_Metadata && arrays->m_Metadata && png->m_Metadata->m_FrameSerial == 100 && arrays->m_Metadata->m_FrameSerial == 100 &&
-				png->m_Metadata->m_Sequence && arrays->m_Metadata->m_Sequence &&
-				png->m_Metadata->m_Sequence->m_Frame == 4 && arrays->m_Metadata->m_Sequence->m_Frame == 4,
-				"The sequence PNG and arrays publish on the same admitted frame instead of entering rollback/re-admission livelock");
-			state.m_FrameSerial = 101;
-			coordinator.BeginFrame(state);
-			context.Check(control.m_Issued.size() == 10 && control.m_Issued.back().m_Source == FrameCaptureSource::RenderGraph &&
-				control.m_Issued.back().m_GroupId == 0,
-				"The ninth writer reservation stays bounded and the remaining flexible graph resumes after completion");
-			if (control.m_Issued.size() == 10)
-			{
-				control.Complete(control.m_Issued.back().m_Id);
-			}
-			coordinator.Update();
-			const auto remaining = Consume(coordinator);
-			context.Check(remaining.size() == 1 && remaining[0].m_Metadata && remaining[0].m_Metadata->m_FrameSerial == 101 &&
-				coordinator.GetUnfinishedRequestCount() == 0,
-				"Every request in the eight-graph/PNG/export burst completes without exceeding writer capacity");
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
+					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
+				for (uint32_t index = 0; index < 8; ++index)
+				{
+					GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph, .m_WaitForCapacity = true }));
+				}
+				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 77, .m_Frame = 4 };
+				const auto image = coordinator.Submit({ .m_Sequence = sequence });
+				const auto resources = coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
+					.m_ResourceTargets = { { .m_Resource = "A" } }, .m_IncludeGraph = true, .m_Sequence = sequence });
+				auto state = MakeFrameState(true);
+				state.m_FrameSerial = 100;
+				coordinator.BeginFrame(state);
+				context.Check(control.m_Issued.size() == 9 && control.m_Issued[0].m_Source == FrameCaptureSource::Scene &&
+					control.m_Issued[1].m_Source == FrameCaptureSource::ResourceExport && control.m_Issued[0].m_GroupId != 0 &&
+					control.m_Issued[0].m_GroupId == control.m_Issued[1].m_GroupId && control.m_Issued[1].m_IncludeGraph &&
+					Consume(coordinator).empty(),
+					"PNG and resource output claim both writer slots before eight earlier ordinary graphs can block the group");
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.OnFrameSubmitted();
+				coordinator.Update();
+				const auto completed = Consume(coordinator);
+				const auto png = std::ranges::find(completed, image, &FrameCaptureRequestResult::m_RequestId);
+				const auto arrays = std::ranges::find(completed, resources, &FrameCaptureRequestResult::m_RequestId);
+				context.Check(completed.size() == 9 && png != completed.end() && arrays != completed.end() &&
+					png->m_Status == FrameCaptureRequestStatus::Completed && arrays->m_Status == FrameCaptureRequestStatus::Completed &&
+					png->m_Metadata && arrays->m_Metadata && png->m_Metadata->m_FrameSerial == 100 && arrays->m_Metadata->m_FrameSerial == 100 &&
+					png->m_Metadata->m_Sequence && arrays->m_Metadata->m_Sequence &&
+					png->m_Metadata->m_Sequence->m_Frame == 4 && arrays->m_Metadata->m_Sequence->m_Frame == 4,
+					"The sequence PNG and arrays publish on the same admitted frame instead of entering rollback/re-admission livelock");
+				state.m_FrameSerial = 101;
+				coordinator.BeginFrame(state);
+				context.Check(control.m_Issued.size() == 10 && control.m_Issued.back().m_Source == FrameCaptureSource::RenderGraph &&
+					control.m_Issued.back().m_GroupId == 0,
+					"The ninth writer reservation stays bounded and the remaining flexible graph resumes after completion");
+				if (control.m_Issued.size() == 10)
+				{
+					control.Complete(control.m_Issued.back().m_Id);
+				}
+				coordinator.Update();
+				const auto remaining = Consume(coordinator);
+				context.Check(remaining.size() == 1 && remaining[0].m_Metadata && remaining[0].m_Metadata->m_FrameSerial == 101 &&
+					coordinator.GetUnfinishedRequestCount() == 0,
+					"Every request in the eight-graph/PNG/export burst completes without exceeding writer capacity");
 			}
 			{
 				FakeCaptureControl control;
@@ -2578,20 +2578,20 @@ namespace gglab
 			}
 			{
 				SequenceHarness harness(directory.GetPath());
-			harness.m_Control.m_RequestLimit = 1;
-			GGLAB_UNUSED(harness.Frame());
-			std::string error;
-			GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 },
-				.m_Exports = { { .m_Frame = 0, .m_Targets = { { .m_Resource = "A" } } } } }, error));
-			GGLAB_UNUSED(harness.Frame());
-			const auto resource = std::ranges::find_if(harness.m_Results, [](const auto& result)
-				{
-					return result.m_ResourceFailure == RGObservationFailure::TooLarge;
-				});
-			context.Check(!harness.m_Deferred && harness.m_Control.m_Issued.empty() &&
-				harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed && resource != harness.m_Results.end() &&
-				harness.m_Capture.GetUnfinishedRequestCount() == 0,
-				"A two-output group that can never fit the Runtime request limit fails explicitly instead of deferring forever");
+				harness.m_Control.m_RequestLimit = 1;
+				GGLAB_UNUSED(harness.Frame());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 },
+					.m_Exports = { { .m_Frame = 0, .m_Targets = { { .m_Resource = "A" } } } } }, error));
+				GGLAB_UNUSED(harness.Frame());
+				const auto resource = std::ranges::find_if(harness.m_Results, [](const auto& result)
+					{
+						return result.m_ResourceFailure == RGObservationFailure::TooLarge;
+					});
+				context.Check(!harness.m_Deferred && harness.m_Control.m_Issued.empty() &&
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed && resource != harness.m_Results.end() &&
+					harness.m_Capture.GetUnfinishedRequestCount() == 0,
+					"A two-output group that can never fit the Runtime request limit fails explicitly instead of deferring forever");
 			}
 			{
 				FakeCaptureControl control;
@@ -2723,7 +2723,7 @@ namespace gglab
 			const auto blocker = directory.GetPath() / std::filesystem::path(u8"\u4e2d\u6587 \U0001F9EA blocker");
 			{
 				std::ofstream file(blocker, std::ios::binary);
-			file << "not a directory";
+				file << "not a directory";
 			}
 			for (const auto source : { FrameCaptureSource::Scene, FrameCaptureSource::RenderGraph })
 			{
@@ -2749,14 +2749,14 @@ namespace gglab
 			TemporaryDirectory directory("frame-sequence-failure");
 			{
 				SequenceHarness harness(directory.GetPath());
-			std::string error;
-			GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Missing" }, error));
-			harness.Frame();
-			harness.Frame();
-			const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
-			context.Check(status.m_State == FrameSequenceState::Failed &&
-				status.m_Failure.find("SEQ_Test") != std::string::npos,
-				"An unknown path fails and lists the available paths");
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Missing" }, error));
+				harness.Frame();
+				harness.Frame();
+				const FrameSequenceStatus& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Failed &&
+					status.m_Failure.find("SEQ_Test") != std::string::npos,
+					"An unknown path fails and lists the available paths");
 			}
 			{
 				SequenceHarness harness(directory.GetPath());

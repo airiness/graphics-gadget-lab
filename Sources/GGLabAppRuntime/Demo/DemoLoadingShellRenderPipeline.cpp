@@ -61,9 +61,8 @@ namespace gglab
 				const RenderViewID displayViewId = context.GetDisplayViewId();
 				rg.AddPass<LoadingShellSetupPassData>(
 					"LoadingShell.Setup",
-					[swapChain, resourceRegistry, backBufferIndex, displayViewId, shadowIndex,
-					shadowPreviewInitialized](
-						RenderGraph::RGBuilder& builder, LoadingShellSetupPassData& data)
+					[swapChain, resourceRegistry, backBufferIndex, displayViewId, shadowIndex, shadowPreviewInitialized]
+					(RenderGraph::RGBuilder& builder, LoadingShellSetupPassData& data)
 					{
 						builder.SideEffect();
 						auto& targets = builder.GetBlackboard()

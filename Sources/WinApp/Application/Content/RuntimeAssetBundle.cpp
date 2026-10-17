@@ -41,7 +41,8 @@ namespace gglab
 	std::optional<RuntimeAssetBundle> LoadRuntimeAssetBundle(
 		const std::filesystem::path& manifestPath, std::string& failure) noexcept
 	{
-		const auto fail = [&](std::string message) -> std::optional<RuntimeAssetBundle>
+		const auto fail =
+			[&](std::string message) -> std::optional<RuntimeAssetBundle>
 			{
 				failure = std::move(message);
 				return std::nullopt;

@@ -170,7 +170,8 @@ namespace gglab
 	{
 		void WriteSceneInputs(JsonWriter& writer, const FrameCaptureSceneInputs& inputs)
 		{
-			const auto vector = [&](std::string_view name, const Vector3& value)
+			const auto vector =
+				[&](std::string_view name, const Vector3& value)
 				{
 					writer.Vector(name, { value.m_X, value.m_Y, value.m_Z });
 				};

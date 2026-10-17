@@ -2570,8 +2570,7 @@ namespace gglab
 				.m_Priority = priority,
 				.m_Progress = mesh->m_LoadProgress,
 			},
-			[this, meshId, generation, estimate, priority, residencyOperation,
-			payload]() mutable noexcept
+			[this, meshId, generation, estimate, priority, residencyOperation, payload]() mutable noexcept
 			{
 				Mesh* currentMesh = EditMesh(meshId);
 				if (!currentMesh || currentMesh->m_ContentGeneration != generation)

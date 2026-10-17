@@ -115,9 +115,8 @@ namespace gglab
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[renderResRegistry, sourceTextureHandle, sourceTextureDesc, sourceTextureIndex,
-			sourceSamplerIndex, sourceMode,
-			hasSource](RenderGraph::RGBuilder& builder, PassData& data)
+			[renderResRegistry, sourceTextureHandle, sourceTextureDesc, sourceTextureIndex, sourceSamplerIndex, sourceMode, hasSource]
+			(RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 				if (sourceMode == EnvironmentSourceMode::PhysicalSky)

@@ -97,9 +97,12 @@ namespace gglab
 				"Models/GGLabCoastalRetreat/bundle.json", failure);
 			if (!bundle)
 			{
-				m_LoadingProgress = { .m_Status = LoadingStatus::Failed,
-					.m_Fraction = 0.0f, .m_Stage = "Installed asset validation failed",
-					.m_Detail = std::move(failure) };
+				m_LoadingProgress = {
+					.m_Status = LoadingStatus::Failed,
+					.m_Fraction = 0.0f,
+					.m_Stage = "Installed asset validation failed",
+					.m_Detail = std::move(failure)
+				};
 				return;
 			}
 			m_CaptureAssetBundle = FrameCaptureAssetBundle{ bundle->m_Id, bundle->m_Revision };

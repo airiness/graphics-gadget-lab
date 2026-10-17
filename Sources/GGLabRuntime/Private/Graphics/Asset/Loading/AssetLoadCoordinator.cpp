@@ -438,8 +438,8 @@ namespace gglab
 				.m_Name = taskName,
 				.m_Priority = request.m_Priority,
 			},
-			[this, sourcePath, importSettings, expectedArtifactContentDigest, job, cacheHit,
-			textureArtifactCache](std::stop_token stopToken) noexcept
+			[this, sourcePath, importSettings, expectedArtifactContentDigest, job, cacheHit, textureArtifactCache]
+			(std::stop_token stopToken) noexcept
 			{
 				if (cacheHit)
 				{
@@ -567,8 +567,8 @@ namespace gglab
 				.m_Priority = request.m_Priority,
 				.m_Progress = progress,
 			},
-			[this, sourcePath, importSettings, expectedSourceDigest, expectedDerivedDataKey,
-			expectedArtifactContentDigest, job, progress](std::stop_token stopToken) noexcept
+			[this, sourcePath, importSettings, expectedSourceDigest, expectedDerivedDataKey, expectedArtifactContentDigest, job, progress]
+			(std::stop_token stopToken) noexcept
 			{
 				return ResolveTextureArtifact(m_TextureDerivedDataSystem, sourcePath,
 					importSettings, expectedSourceDigest, expectedDerivedDataKey,

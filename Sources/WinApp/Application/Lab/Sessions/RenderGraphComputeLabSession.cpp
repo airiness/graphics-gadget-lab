@@ -225,8 +225,8 @@ namespace gglab
 				const bool boundaryProbe = RequestsNonFiniteProbe(services);
 
 				rg.AddPass<SetupPassData>("Lab.RenderGraphCompute.Setup",
-					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId,
-					boundaryProbe](RenderGraph::RGBuilder& builder, SetupPassData&)
+					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId, boundaryProbe]
+					(RenderGraph::RGBuilder& builder, SetupPassData&)
 					{
 						builder.SideEffect();
 

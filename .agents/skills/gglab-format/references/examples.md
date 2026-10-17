@@ -80,13 +80,26 @@ const auto outcome = succeeded ?
 
 ## Lambdas
 
-An ordinary assigned lambda's braces align with its declaration.
+An ordinary assigned lambda retains the native initializer-continuation
+indentation: its braces are one level beyond the declaration, and its body is
+one further level.
 
 ```cpp
 const auto matches = [&expected](const Result& actual) noexcept
-{
-	return actual == expected;
-};
+	{
+		return actual == expected;
+	};
+```
+
+If the assignment breaks before the capture, the capture and braces share that
+continuation level; the line break does not add another indentation level.
+
+```cpp
+const auto matches =
+	[&expected](const Result& actual) noexcept
+	{
+		return actual == expected;
+	};
 ```
 
 For a long argument-lambda header, keep the complete capture list together and

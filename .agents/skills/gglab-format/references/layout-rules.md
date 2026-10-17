@@ -78,14 +78,20 @@ parameter list. Split complex capture lists when that improves readability.
 For a lambda passed as a call argument, align a separately written capture line
 and parameter-list line at the same indentation level.
 
-For an ordinary lambda assigned to a variable, align its scope braces with the
-declaration/capture line and indent its body one level. A lambda passed as an
-argument follows the call's argument nesting. A control-flow body inside either
-lambda follows the normal control-body rules.
+Treat an ordinary assigned lambda as an initializer continuation. When its
+capture starts on the declaration line, indent its separately written scope
+braces one level beyond the declaration and its body one further level. When
+the assignment breaks before the capture, align the capture and scope braces at
+that continuation level; do not add another level just because the header wraps.
 
-Visual Studio can apply `cpp_indent_lambda_braces_when_parameter` to ordinary
-assigned lambdas too. Correct that extra level locally. Changing the setting
-globally can instead outdent argument lambdas, so it is not a general repair.
+A lambda passed as an argument follows the call's argument nesting, with its
+scope braces aligned with the capture. A control-flow body inside either lambda
+follows the normal control-body rules.
+
+Keep the native indentation produced by
+`cpp_indent_lambda_braces_when_parameter = true`, including for ordinary
+assigned lambdas. Do not manually outdent their braces or bodies to align with
+the variable declaration.
 
 See [Lambdas](examples.md#lambdas).
 

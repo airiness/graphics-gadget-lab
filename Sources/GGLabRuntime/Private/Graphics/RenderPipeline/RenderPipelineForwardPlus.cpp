@@ -230,10 +230,8 @@ namespace gglab
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
 			resolution = context.GetDisplayRenderView().GetResolution(),
 			depthCoverageFramePlan,
-			geometryMotion =
-			context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
-			temporalAAActive =
-			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
+			geometryMotion = context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
+			temporalAAActive = context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{

@@ -479,8 +479,8 @@ namespace gglab
 				.m_Name = std::format("IBL.StageCacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config,
-			shaderArtifacts, ignoreCache, work](std::stop_token stopToken) noexcept
+			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config, shaderArtifacts, ignoreCache, work]
+			(std::stop_token stopToken) noexcept
 			{
 				work->m_Result = m_DerivedDataSystem.Lookup(
 					contentFingerprint, sourceType, config, shaderArtifacts, ignoreCache, stopToken);

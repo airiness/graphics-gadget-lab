@@ -348,9 +348,8 @@ namespace gglab
 
 		rg.AddPass<EvaluatePassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
-			[viewIndex, settings, diagnosticOutputsEnabled, capabilities = m_Capabilities,
-			finalAOFormat, sampleIndex](
-				RenderGraph::RGBuilder& builder, EvaluatePassData& data)
+			[viewIndex, settings, diagnosticOutputsEnabled, capabilities = m_Capabilities, finalAOFormat, sampleIndex]
+			(RenderGraph::RGBuilder& builder, EvaluatePassData& data)
 			{
 				auto& blackboard = builder.GetBlackboard();
 				const auto& sceneDepth =

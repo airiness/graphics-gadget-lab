@@ -238,7 +238,7 @@ namespace gglab
 					.m_DisableReason = std::string(
 						GetTemporalConsumerDisableReasonName(consumerPlan.m_DisableReason)),
 					.m_Services = GetTemporalServiceNames(consumerPlan.m_Services),
-					});
+				});
 			}
 			const TemporalAASettings& settings = inputs.m_TemporalSettings;
 			const TemporalFrameTransaction& transaction = inputs.m_TemporalFrameTransaction;
@@ -415,7 +415,7 @@ namespace gglab
 		m_TaskSystem->PumpCompletions({
 			.m_MaxCallbacks = 64,
 			.m_MaxMilliseconds = 1.0,
-			});
+		});
 		m_AssetManager->DrainLoadCompletions();
 
 		if (m_Input->IsKeyPressed(AppInputKey::T))
@@ -585,7 +585,7 @@ namespace gglab
 					displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation,
 				.m_AmbientOcclusionAvailable =
 					m_RenderHost->GetGTAOCapabilityStatus().IsTemporalAvailable(),
-				});
+			});
 		// The window client extent is the display extent; the plan's effective preset
 		// derives the render extent from it.
 		const ViewResolution viewResolution = ResolveTemporalAAViewResolution(
@@ -627,7 +627,7 @@ namespace gglab
 			.m_FrameSerial = rendererFrame.GetSerial(),
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
-			});
+		});
 		m_FrameSequence->BeginFrame(captureFrameState);
 		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		RenderFrameBuildResult frame;
@@ -647,7 +647,7 @@ namespace gglab
 			.m_Sun = frame.m_RenderScene.m_WorldSun,
 			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
 			.m_AerialPerspective = capturedView.m_Lighting.m_EnableAerialPerspective,
-			});
+		});
 		const RenderFrameValidationResult validation =
 			renderPipeline.ValidateRenderFrame(validationContext, services);
 		if (!validation.IsReady())
@@ -802,7 +802,7 @@ namespace gglab
 				utils::ToIndex(frame.m_DisplayViewId)].m_TemporalAA,
 			.m_TemporalFramePlan = frame.m_TemporalFramePlan,
 			.m_ViewResolution = viewResolution,
-			});
+		});
 
 		// Pipelines without an overlay pass still complete the optional tooling frame.
 		toolingFrame.Complete();

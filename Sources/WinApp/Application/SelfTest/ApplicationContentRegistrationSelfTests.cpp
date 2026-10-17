@@ -1189,8 +1189,7 @@ namespace gglab
 			const auto& model = imported.m_Model;
 			CheckImportedTextures(context, model);
 			constexpr std::array<std::pair<std::string_view, size_t>, 28> expectedTriangles =
-			{
-			{
+			{ {
 				{ "MAT_RetreatStone", 220 },
 				{ "MAT_RetreatLime", 4754 },
 				{ "MAT_RetreatMetal", 19480 },

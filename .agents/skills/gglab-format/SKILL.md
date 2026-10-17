@@ -51,7 +51,7 @@ rules, particularly:
 
 - Control bodies, scoped `case` branches and macro call-site semicolons.
 - Continuation levels, nested ternaries and their branch initializers.
-- Ordinary lambdas versus lambdas passed as call arguments.
+- Lambda initializer continuations versus lambdas passed as call arguments.
 - Complete declarations, readable calls, arrays, repeated records and JSON fields.
 - HLSL attributes and casts, comments inside conditional compilation, and code
   following multiline raw strings.

@@ -362,8 +362,7 @@ namespace napa::voxel
 		};
 		ChunkMap scratchChunks;
 		std::vector<PreparedSampleWrite> preparedWrites;
-		const auto commitMutation = [&scratchChunks, &preparedWrites, &preparedResult,
-			&world, &result]() noexcept
+		const auto commitMutation = [&scratchChunks, &preparedWrites, &preparedResult, &world, &result]() noexcept
 			{
 				world.m_Chunks.merge(scratchChunks);
 				for (const PreparedSampleWrite& write : preparedWrites)

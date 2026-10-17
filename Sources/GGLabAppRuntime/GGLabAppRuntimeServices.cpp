@@ -145,13 +145,13 @@ namespace gglab
 		m_Time->SetFixedDeltaTime(m_Config.m_FixedDeltaTimeSeconds);
 		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
 			.m_WorkerLifecycle = m_HostServices.m_TaskWorkerLifecycle,
-			});
+		});
 		m_ShaderManager = std::make_unique<ShaderManager>(ShaderManagerCreateInfo{
 			.m_ActiveBackend = activeBackend,
 			.m_ArtifactRoot = std::move(createInfo.m_ShaderArtifactRoot),
 			.m_ActiveRegistry = createInfo.m_ActiveShaderRegistry,
 			.m_NonFiniteCounters = m_Config.m_NonFiniteCounters,
-			});
+		});
 		if (!m_ShaderManager->IsReady())
 		{
 			GGLAB_LOG_ERROR("Failed to initialize ShaderManager (status={}).",
@@ -175,7 +175,7 @@ namespace gglab
 			.m_AdapterSelector = m_Config.m_AdapterSelector,
 			.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation,
 			.m_EnableGpuBasedValidation = m_Config.m_RequestGpuBasedValidation,
-			});
+		});
 		if (!renderHostInstance.m_Host)
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the render host.");
@@ -203,7 +203,7 @@ namespace gglab
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
-			});
+		});
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_Device = &m_RenderHost->GetRHIContext()->GetDevice();
@@ -222,7 +222,7 @@ namespace gglab
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_RenderComposition->GetEnvironmentSourceControl(),
 				.m_AssetRoot = m_Paths.m_AssetRoot,
-				});
+			});
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
 
 		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost->GetRHIContext());

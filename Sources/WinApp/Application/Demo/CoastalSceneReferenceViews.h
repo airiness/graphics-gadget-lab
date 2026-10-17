@@ -11,7 +11,8 @@ namespace gglab
 
 	// Blender (X, Y, Z) -> runtime (X, Z, Y), meters. Perspective, vertical FOV.
 	// Profile 2 pairs all retained poses with physical daylight and the distant coastal range.
-	inline const std::array<CameraReferenceView, 18> CoastalSceneReferenceViews = { {
+	inline const std::array<CameraReferenceView, 18> CoastalSceneReferenceViews =
+	{ {
 		{
 			.m_Id = "CAM_Courtyard",
 			.m_Name = "Courtyard",

@@ -66,8 +66,8 @@ namespace gglab
 				const std::string passName = MakeRenderGraphPassName(suffix);
 				rg.AddPass<CubemapPreviewPassData>(
 					passName.c_str(),
-					[services, renderResRegistry, previewType, sourceIndex, previewIndex, layout,
-					sampleMip](RenderGraph::RGBuilder& builder, CubemapPreviewPassData& data)
+					[services, renderResRegistry, previewType, sourceIndex, previewIndex, layout, sampleMip]
+					(RenderGraph::RGBuilder& builder, CubemapPreviewPassData& data)
 					{
 						builder.SideEffect();
 						auto& blackboard = builder.GetBlackboard();
