@@ -220,7 +220,7 @@ float3 SampleTemporalHistoryCatmullRomClamped(Texture2D<float4> history,
 	const float weightSum =
 		weightTop + weightLeft + weightCenter + weightRight + weightBottom;
 	const int2 maxTexel = int2(width, height) - 1;
-	const int2 texel = int2(center1 - 0.5);
+	const int2 texel = (int2)(center1 - 0.5);
 	const float3 c00 = history.Load(int3(clamp(texel, 0, maxTexel), 0)).rgb;
 	const float3 c10 = history.Load(int3(clamp(texel + int2(1, 0), 0, maxTexel), 0)).rgb;
 	const float3 c01 = history.Load(int3(clamp(texel + int2(0, 1), 0, maxTexel), 0)).rgb;
@@ -241,7 +241,7 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 	uint2 pixel, uint2 extent, float2 jitterPixels, float2 outputOffset,
 	float2 displayPerRender, float kernelScale, float3 centerColor)
 {
-	const int2 maxPixel = int2(extent) - 1;
+	const int2 maxPixel = (int2)(extent) - 1;
 	// Keep reconstruction rounding stable when diagnostic observers change optimization.
 	precise float3 sum = 0.0.xxx;
 	precise float weightSum = 0.0;
@@ -251,7 +251,7 @@ float3 ReconstructTemporalCurrentColor(Texture2D<float4> currentColorTexture,
 		[unroll]
 		for (int x = -1; x <= 1; ++x)
 		{
-			const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
+			const int2 samplePixel = clamp((int2)(pixel) + int2(x, y), 0, maxPixel);
 			float3 sampleColor = currentColorTexture.Load(int3(samplePixel, 0)).rgb;
 			if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_RECONSTRUCT_TEMPORAL_CURRENT_COLOR_IS_TEMPORAL_COLOR_FINITE, sampleColor)))
 			{
@@ -312,7 +312,7 @@ float RoundTemporalHistoryToHalfStochastic(float value, float uniformSample)
 float3 QuantizeTemporalHistoryColor(float3 color, uint2 pixel, uint temporalFrameIndex)
 {
 	const uint3 hash = HashTemporalPcg3d(uint3(pixel, temporalFrameIndex));
-	const float3 uniformSamples = float3(hash >> 8u) * (1.0 / 16777216.0);
+	const float3 uniformSamples = (float3)(hash >> 8u) * (1.0 / 16777216.0);
 	return float3(
 		RoundTemporalHistoryToHalfStochastic(color.r, uniformSamples.x),
 		RoundTemporalHistoryToHalfStochastic(color.g, uniformSamples.y),
@@ -404,14 +404,14 @@ void GetTemporalNeighborhoodRange(Texture2D<float4> currentColorTexture,
 	neighborhoodMax = -neighborhoodMin;
 	float3 sum = 0.0.xxx;
 	float3 sumOfSquares = 0.0.xxx;
-	const int2 maxPixel = int2(extent) - 1;
+	const int2 maxPixel = (int2)(extent) - 1;
 	[unroll]
 	for (int y = -1; y <= 1; ++y)
 	{
 		[unroll]
 		for (int x = -1; x <= 1; ++x)
 		{
-			const int2 samplePixel = clamp(int2(pixel) + int2(x, y), 0, maxPixel);
+			const int2 samplePixel = clamp((int2)(pixel) + int2(x, y), 0, maxPixel);
 			float3 sampleColor = currentColorTexture.Load(int3(samplePixel, 0)).rgb;
 			if (!IsTemporalColorFinite(NonFiniteObserveValue(NF_SITE_TEMPORAL_AA_GET_TEMPORAL_NEIGHBORHOOD_RANGE_IS_TEMPORAL_COLOR_FINITE, sampleColor)))
 			{

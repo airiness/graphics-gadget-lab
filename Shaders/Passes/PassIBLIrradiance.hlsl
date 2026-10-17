@@ -42,7 +42,7 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 		[loop]
 		for (uint x = 0u; x < resolution; ++x)
 		{
-			const float2 uv = (float2(x, y) + 0.5) / (float)resolution;
+			const float2 uv = (float2(x, y) + 0.5) / (float)(resolution);
 			const float solidAngle = GetIrradianceTexelSolidAngle(x, y, resolution);
 			[unroll]
 			for (uint face = 0u; face < CUBEMAP_FACE_COUNT; ++face)
@@ -52,7 +52,7 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 				if (weight > 0.0)
 				{
 					float3 radiance = SampleTextureCubeLevel(
-						environmentBinding, directionWS, (float)sourceMip).rgb;
+						environmentBinding, directionWS, (float)(sourceMip)).rgb;
 					radiance = g_Pass.PhysicalSky
 						? SanitizeSceneRadiance(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_SCENE_RADIANCE) : SanitizeHDRColor(radiance, NF_SITE_PASS_IBLIRRADIANCE_INTEGRATE_IRRADIANCE_SANITIZE_HDRCOLOR);
 					irradiance += radiance * weight;

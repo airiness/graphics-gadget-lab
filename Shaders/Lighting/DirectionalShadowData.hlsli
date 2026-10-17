@@ -17,8 +17,7 @@ struct DirectionalShadowData
 	float2 ShadowMetadataPadding;
 };
 
-float EvaluateDirectionalShadowReceiverBias(uint cascadeIndex, float receiverNoL,
-	DirectionalShadowData shadow)
+float EvaluateDirectionalShadowReceiverBias(uint cascadeIndex, float receiverNoL, DirectionalShadowData shadow)
 {
 	// Use the geometric receiver normal; authored and normal-map normals do not define depth.
 	// The bounded tangent avoids an unbounded offset at grazing incidence.

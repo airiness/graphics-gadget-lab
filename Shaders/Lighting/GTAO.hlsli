@@ -26,7 +26,7 @@ struct GTAOSurface
 
 float GTAOInterleavedGradientNoise(uint2 pixel)
 {
-	return frac(52.9829189 * frac(0.06711056 * float(pixel.x) + 0.00583715 * float(pixel.y)));
+	return frac(52.9829189 * frac(0.06711056 * (float)(pixel.x) + 0.00583715 * (float)(pixel.y)));
 }
 
 // Per-pixel sampling offset of one sample of a sequence. Sample 0 is the spatial pattern
@@ -34,7 +34,7 @@ float GTAOInterleavedGradientNoise(uint2 pixel)
 // sequence stratified over the direction and step offsets.
 float GTAOSampleNoise(uint2 pixel, uint sampleIndex)
 {
-	return frac(GTAOInterleavedGradientNoise(pixel) + 0.61803399 * float(sampleIndex));
+	return frac(GTAOInterleavedGradientNoise(pixel) + 0.61803399 * (float)(sampleIndex));
 }
 
 bool LoadGTAOPosition(Texture2D<float> depthTexture, uint2 fullPixel, uint2 fullExtent,
@@ -152,7 +152,7 @@ bool ReconstructGTAONormal(Texture2D<float> depthTexture, uint2 centerPixel, uin
 GTAOSurface SelectHalfResolutionSurface(Texture2D<float> depthTexture, uint2 halfPixel,
 	uint2 fullExtent, ViewData viewData)
 {
-	GTAOSurface surface = (GTAOSurface) 0;
+	GTAOSurface surface = (GTAOSurface)(0);
 	const uint2 basePixel = halfPixel * 2;
 	static const uint2 offsets[4] =
 	{
@@ -209,7 +209,7 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 	static const float halfPi = 1.57079633;
 	const float noise = GTAOSampleNoise(halfPixel, sampleIndex);
 	const float projectedRadius = max(
-		radius * abs(viewData.ProjMat._22) * float(fullExtent.y) * 0.5 / surface.ViewZ, 1.0);
+		radius * abs(viewData.ProjMat._22) * (float)(fullExtent.y) * 0.5 / surface.ViewZ, 1.0);
 	directionCount = clamp(directionCount, 1u, GTAO_MAX_DIRECTION_COUNT);
 	stepCount = clamp(stepCount, 1u, GTAO_MAX_STEP_COUNT);
 	const float3 viewVector = normalize(-surface.PositionVS);
@@ -220,7 +220,7 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 	[loop]
 	for (uint directionIndex = 0; directionIndex < directionCount; ++directionIndex)
 	{
-		const float angle = pi * (float(directionIndex) + noise) / float(directionCount);
+		const float angle = pi * ((float)(directionIndex) + noise) / (float)(directionCount);
 		// Screen rows grow downward while view-space Y grows upward.
 		const float2 direction = float2(cos(angle), sin(angle));
 		const float3 directionVS = float3(direction.x, -direction.y, 0.0);
@@ -246,18 +246,18 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 		[loop]
 		for (uint stepIndex = 1; stepIndex <= stepCount; ++stepIndex)
 		{
-			const float stepFraction = (float(stepIndex) - 0.5 + noise * 0.5) / float(stepCount);
+			const float stepFraction = ((float)(stepIndex) - 0.5 + noise * 0.5) / (float)(stepCount);
 			const float2 pixelOffset = direction * projectedRadius * stepFraction;
 			[unroll]
 			for (uint side = 0; side < 2; ++side)
 			{
 				const float sideSign = side == 0 ? 1.0 : -1.0;
-				const int2 candidatePixel = clamp(int2(round(float2(surface.FullPixel) +
-					pixelOffset * sideSign)), int2(0, 0), int2(fullExtent) - 1);
+				const int2 candidatePixel = clamp((int2)(round((float2)(surface.FullPixel) +
+					pixelOffset * sideSign)), int2(0, 0), (int2)(fullExtent) - 1);
 				float rawDepth;
 				float viewZ;
 				float3 positionVS;
-				if (!LoadGTAOPosition(depthTexture, uint2(candidatePixel), fullExtent,
+				if (!LoadGTAOPosition(depthTexture, (uint2)(candidatePixel), fullExtent,
 					viewData, rawDepth, viewZ, positionVS))
 				{
 					continue;
@@ -296,7 +296,7 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 		visibility += projectedNormalLength * (arc0 + arc1);
 	}
 
-	return visibility / float(directionCount);
+	return visibility / (float)(directionCount);
 }
 
 static const float GTAO_TEMPORAL_DEPTH_ABSOLUTE_THRESHOLD = 0.05;
@@ -327,7 +327,7 @@ float2 ResolveGTAOVisibilityRange(Texture2D<float> currentVisibility,
 		[unroll]
 		for (int x = -1; x <= 1; ++x)
 		{
-			const int2 neighbor = clamp(int2(pixel) + int2(x, y), int2(0, 0), int2(extent) - 1);
+			const int2 neighbor = clamp((int2)(pixel) + int2(x, y), int2(0, 0), (int2)(extent) - 1);
 			if (halfDepth.Load(int3(neighbor, 0)) > 0.0)
 			{
 				const float value = currentVisibility.Load(int3(neighbor, 0));
@@ -365,8 +365,8 @@ GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface su
 	const float expectedViewZ = ResolveExpectedPreviousViewZ(
 		surface.PositionVS, viewData.InvViewMat, viewData.PreviousViewMat);
 
-	const int2 footprintPixel = clamp(int2(floor(previousUV * float2(fullExtent) * 0.5)),
-		int2(0, 0), int2(halfExtent) - 1);
+	const int2 footprintPixel = clamp((int2)(floor(previousUV * (float2)(fullExtent) * 0.5)),
+		int2(0, 0), (int2)(halfExtent) - 1);
 	int2 historyPixel = int2(-1, -1);
 	float closestDelta = 1.0e30;
 	[unroll]
@@ -376,7 +376,7 @@ GTAOTemporalResult AccumulateGTAOHistory(float currentVisibility, GTAOSurface su
 		for (int x = -1; x <= 1; ++x)
 		{
 			const int2 candidate = clamp(footprintPixel + int2(x, y), int2(0, 0),
-				int2(halfExtent) - 1);
+				(int2)(halfExtent) - 1);
 			const float storedViewZ = previousViewZ.Load(int3(candidate, 0));
 			if (!IsGTAOHistoryDepthCompatible(expectedViewZ, storedViewZ))
 			{
@@ -420,17 +420,17 @@ float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,
 	const float centerAO = sourceAO.Load(int3(pixel, 0));
 	float weightedAO = centerAO;
 	float weightSum = 1.0;
-	const float spatialSigma = max(float(radius) * 0.5, 1.0);
+	const float spatialSigma = max((float)(radius) * 0.5, 1.0);
 	const float discontinuityLimit = max(0.05, centerDepth * 0.02);
 	[loop]
-	for (int tap = -int(radius); tap <= int(radius); ++tap)
+	for (int tap = -(int)(radius); tap <= (int)(radius); ++tap)
 	{
 		if (tap == 0)
 		{
 			continue;
 		}
-		const int2 neighborPixel = int2(pixel) + axis * tap;
-		if (any(neighborPixel < 0) || any(neighborPixel >= int2(extent)))
+		const int2 neighborPixel = (int2)(pixel) + axis * tap;
+		if (any(neighborPixel < 0) || any(neighborPixel >= (int2)(extent)))
 		{
 			continue;
 		}
@@ -444,7 +444,7 @@ float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,
 		{
 			continue;
 		}
-		const float spatialWeight = exp(-0.5 * float(tap * tap) /
+		const float spatialWeight = exp(-0.5 * (float)(tap * tap) /
 			(spatialSigma * spatialSigma));
 		const float depthWeight = exp2(-32.0 * depthDelta / max(centerDepth, 1.0e-4));
 		const float weight = spatialWeight * depthWeight;
@@ -467,8 +467,8 @@ float UpsampleGTAO(Texture2D<float> denoisedAO, Texture2D<float> halfDepth,
 		return 1.0;
 	}
 
-	const float2 halfPosition = (float2(fullPixel) + 0.5) * 0.5 - 0.5;
-	const int2 basePixel = int2(floor(halfPosition));
+	const float2 halfPosition = ((float2)(fullPixel) + 0.5) * 0.5 - 0.5;
+	const int2 basePixel = (int2)(floor(halfPosition));
 	float weightedAO = 0.0;
 	float weightSum = 0.0;
 	const float discontinuityLimit = max(0.05, fullViewZ * 0.02);
@@ -477,14 +477,14 @@ float UpsampleGTAO(Texture2D<float> denoisedAO, Texture2D<float> halfDepth,
 	{
 		const int2 candidateOffset = int2(candidateIndex & 1, candidateIndex >> 1);
 		const int2 candidatePixel = clamp(basePixel + candidateOffset, int2(0, 0),
-			int2(halfExtent) - 1);
+			(int2)(halfExtent) - 1);
 		const float candidateDepth = halfDepth.Load(int3(candidatePixel, 0));
 		if (!isfinite(candidateDepth) || candidateDepth <= 0.0 ||
 			abs(candidateDepth - fullViewZ) > discontinuityLimit)
 		{
 			continue;
 		}
-		const float2 distanceToCandidate = abs(halfPosition - float2(candidatePixel));
+		const float2 distanceToCandidate = abs(halfPosition - (float2)(candidatePixel));
 		const float spatialWeight =
 			max(1.0 - distanceToCandidate.x, 0.0) * max(1.0 - distanceToCandidate.y, 0.0);
 		const float depthWeight = exp2(

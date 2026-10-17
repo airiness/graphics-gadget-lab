@@ -219,7 +219,7 @@ float4 PSMain() : SV_Target
 	const float3 compensation = float3(1.1, 1.3, 1.8);
 	const float3 reference = ReferenceDirectMaterialResponse(L, V, N, NoV, NoL,
 		coatNoL, F0, brdfAlpha, diffuse, compensation, anisotropy, coat, worldSun, angularRadius);
-	PreparedMaterialShading material = (PreparedMaterialShading)0;
+	PreparedMaterialShading material = (PreparedMaterialShading)(0);
 	material.Base.NormalWS = N;
 	material.Base.F0 = F0;
 	material.Base.BRDFAlpha = brdfAlpha;

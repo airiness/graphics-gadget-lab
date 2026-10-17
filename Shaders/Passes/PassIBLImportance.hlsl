@@ -26,7 +26,7 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 
 float PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	const uint2 texel = (uint2)IN.PositionCS.xy;
+	const uint2 texel = (uint2)(IN.PositionCS.xy);
 	if (g_Pass.MipLevel == 0u)
 	{
 		const float3 direction = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);

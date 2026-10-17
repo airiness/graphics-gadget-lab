@@ -29,7 +29,7 @@ SunDiskSampling BuildSunDiskSampling(float3 centerDirection, float angularRadius
 
 float3 SampleSunDiskDirection(SunDiskSampling sampling, uint sampleIndex)
 {
-	const float radial = sqrt((sampleIndex + 0.5) / (float) WorldSunDiskSampleCount *
+	const float radial = sqrt((sampleIndex + 0.5) / (float)(WorldSunDiskSampleCount) *
 		sampling.SineRadiusSquared);
 	const float phase = sampleIndex * 2.39996322973;
 	return sampling.CenterDirection * sqrt(1.0 - radial * radial) +
@@ -97,8 +97,8 @@ DirectSpecularLobes IntegrateSunDiskSpecular(SunDiskSampling sampling,
 	}
 	// Preserve the existing perpendicular-illuminance normalization and
 	// accumulation order separately for each lobe.
-	integrated.Base = integrated.Base * sampling.IlluminanceNormalization / (float) WorldSunDiskSampleCount;
-	integrated.Clearcoat = integrated.Clearcoat * sampling.IlluminanceNormalization / (float) WorldSunDiskSampleCount;
+	integrated.Base = integrated.Base * sampling.IlluminanceNormalization / (float)(WorldSunDiskSampleCount);
+	integrated.Clearcoat = integrated.Clearcoat * sampling.IlluminanceNormalization / (float)(WorldSunDiskSampleCount);
 	return integrated;
 }
 

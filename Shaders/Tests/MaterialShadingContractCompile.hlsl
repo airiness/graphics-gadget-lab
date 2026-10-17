@@ -11,7 +11,7 @@ bool MatchesMaterialValue(float3 actual, float3 expected)
 
 SurfaceData MakeContractSurface()
 {
-	SurfaceData surface = (SurfaceData)0;
+	SurfaceData surface = (SurfaceData)(0);
 	surface.BaseColor = float3(0.2, 0.4, 0.8);
 	surface.Emissive = float3(0.5, 1.0, 2.0);
 	surface.Metallic = 0.25;
@@ -21,7 +21,7 @@ SurfaceData MakeContractSurface()
 
 MaterialShadingFrame MakeContractFrame()
 {
-	MaterialShadingFrame frame = (MaterialShadingFrame)0;
+	MaterialShadingFrame frame = (MaterialShadingFrame)(0);
 	frame.Base.NormalWS = float3(0.0, 0.0, 1.0);
 	frame.Base.F0 = float3(0.04, 0.15, 0.7);
 	frame.Base.AuthoredPerceptualRoughness = 0.25;
@@ -211,9 +211,9 @@ float4 TestEmissionCrossesClearcoatOnce() : SV_Target0
 
 float4 TestDisabledClearcoatSkipsFootprint(float3 normalWS : NORMAL) : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewLit;
-	SurfaceData surface = (SurfaceData)0;
+	SurfaceData surface = (SurfaceData)(0);
 	surface.ClearcoatRoughness = 0.25;
 	const SpecularAAResult result = PrepareClearcoatSpecularAA(material, surface, normalWS);
 	// A varying normal must not generate a footprint for an unused coat.
@@ -224,9 +224,9 @@ float4 TestDisabledClearcoatSkipsFootprint(float3 normalWS : NORMAL) : SV_Target
 
 float4 TestClearcoatNormalDiagnosticSkipsFootprint(float3 normalWS : NORMAL) : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewClearcoatNormal;
-	SurfaceData surface = (SurfaceData)0;
+	SurfaceData surface = (SurfaceData)(0);
 	surface.ClearcoatRoughness = 0.5;
 	const SpecularAAResult result = PrepareClearcoatSpecularAA(material, surface, normalWS);
 	// Normal color diagnostics need the normal, but do not consume its AA footprint.
@@ -237,7 +237,7 @@ float4 TestClearcoatNormalDiagnosticSkipsFootprint(float3 normalWS : NORMAL) : S
 
 float4 TestClearcoatFootprintUsesUniformRequirements() : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewNormalVariance;
 	const bool inactiveVariance = !NeedsClearcoatSpecularAA(material);
 	material.DebugView = MaterialDebugViewSpecularAAContribution;
@@ -256,7 +256,7 @@ float4 TestClearcoatFootprintUsesUniformRequirements() : SV_Target0
 
 float4 TestDisabledAnisotropySkipsRotation(float rotation : TEXCOORD0) : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewLit;
 	material.AnisotropyRotation = rotation;
 	// Retained bindings on a disabled layer must not cause sampling or direction work.
@@ -269,7 +269,7 @@ float4 TestDisabledAnisotropySkipsRotation(float rotation : TEXCOORD0) : SV_Targ
 
 float4 TestZeroAnisotropyRetainsTangentDiagnostic() : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewAnisotropyDirectionTangent;
 	material.AnisotropyRotation = PI * 0.5;
 	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
@@ -281,7 +281,7 @@ float4 TestZeroAnisotropyRetainsTangentDiagnostic() : SV_Target0
 
 float4 TestZeroAnisotropyRetainsWorldDiagnostic() : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewAnisotropyDirectionWorld;
 	material.AnisotropyRotation = -PI * 0.5;
 	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
@@ -296,7 +296,7 @@ float4 TestZeroAnisotropyRetainsWorldDiagnostic() : SV_Target0
 
 float4 TestActiveAnisotropyUsesBindingFlag() : SV_Target0
 {
-	MaterialData material = (MaterialData)0;
+	MaterialData material = (MaterialData)(0);
 	material.DebugView = MaterialDebugViewLit;
 	material.AnisotropyStrength = 0.7;
 	material.AnisotropyRotation = PI * 0.25;
@@ -311,7 +311,7 @@ float4 TestActiveAnisotropyUsesBindingFlag() : SV_Target0
 
 float4 TestNormalTextureFrameSelection() : SV_Target0
 {
-	MaterialTextureBindingData binding = (MaterialTextureBindingData)0;
+	MaterialTextureBindingData binding = (MaterialTextureBindingData)(0);
 	binding.UVTransformU = float4(1.0, 0.0, 0.25, 0.0);
 	binding.UVTransformV = float4(0.0, 1.0, -0.5, 0.0);
 	bool matches = !RequiresDerivedNormalFrame(binding); // Translation alone keeps UV0's basis.
@@ -329,7 +329,7 @@ float4 TestNormalTextureFrameSelection() : SV_Target0
 
 float4 TestAnisotropyUsesNormalTextureFrame() : SV_Target0
 {
-	SurfaceData surface = (SurfaceData)0;
+	SurfaceData surface = (SurfaceData)(0);
 	surface.AnisotropyStrength = 0.8;
 	surface.AnisotropyDirectionTS = float2(1.0, 0.0);
 	// UV1 rotated relative to UV0 yields -Y as the normal-map tangent, not +X.

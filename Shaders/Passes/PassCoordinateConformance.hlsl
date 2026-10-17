@@ -64,7 +64,7 @@ CoordinateConformanceVSOutput VSFullscreen(uint vertexId : SV_VertexID)
 
 float4 PSMarker(CoordinateConformanceVSOutput input) : SV_Target0
 {
-	const uint2 texel = uint2(input.PositionCS.xy);
+	const uint2 texel = (uint2)(input.PositionCS.xy);
 	if (texel.y == 0)
 	{
 		return texel.x == 0 ? float4(1.0, 0.0, 0.0, 1.0) : float4(0.0, 1.0, 0.0, 1.0);

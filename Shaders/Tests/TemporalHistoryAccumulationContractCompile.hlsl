@@ -13,7 +13,8 @@ float4 TestZeroFeedbackWeight() : SV_Target0
 {
 	const float capacity = ResolveTemporalAAMaxHistorySamples(0.0);
 	bool matches = capacity == 0.0;
-	[unroll] for (uint i = 0; i < 3; ++i)
+	[unroll]
+	for (uint i = 0; i < 3; ++i)
 	{
 		const float samples = i == 0 ? 1.0 : (i == 1 ? 32.0 : 255.0);
 		matches = matches && ComputeTemporalWeightedHistoryWeight(samples, 1.0, capacity, 1.0) == 0.0;
@@ -36,9 +37,11 @@ float4 TestUnitSampleMatchesNativeFeedback() : SV_Target0
 {
 	const float feedbacks[7] = { 0.0, 1.0 / 65535.0, 0.01, 0.25, 0.5, 0.97, 0.99 };
 	bool matches = true;
-	[unroll] for (uint i = 0; i < 7; ++i)
+	[unroll]
+	for (uint i = 0; i < 7; ++i)
 	{
-		[unroll] for (uint j = 0; j < 3; ++j)
+		[unroll]
+		for (uint j = 0; j < 3; ++j)
 		{
 			const float samples = j == 0 ? 1.0 : (j == 1 ? 20.0 : 255.0);
 			const float capacity = ResolveTemporalAAMaxHistorySamples(feedbacks[i]);
@@ -64,7 +67,8 @@ float4 TestLowCapacityStorageRemainsValid() : SV_Target0
 {
 	const float capacities[4] = { 0.0, 0.25, 0.75, 1.0 };
 	bool matches = true;
-	[unroll] for (uint i = 0; i < 4; ++i)
+	[unroll]
+	for (uint i = 0; i < 4; ++i)
 	{
 		const float next = ResolveTemporalHistoryNextSamples(true, 32.0, 1.0, capacities[i], 0.25);
 		matches = matches && next == 1.0 && IsTemporalHistoryAccumulationValid(next);
@@ -91,11 +95,13 @@ float4 TestFeedbackMonotonicity() : SV_Target0
 {
 	const float feedbacks[8] = { 0.0, 1.0 / 65535.0, 0.01, 0.25, 0.499, 0.5, 0.501, 0.97 };
 	bool matches = true;
-	[unroll] for (uint j = 0; j < 3; ++j)
+	[unroll]
+	for (uint j = 0; j < 3; ++j)
 	{
 		const float sampleWeight = j == 0 ? 0.001 : (j == 1 ? 0.25 : 1.0);
 		float previous = -1.0;
-		[unroll] for (uint i = 0; i < 8; ++i)
+		[unroll]
+		for (uint i = 0; i < 8; ++i)
 		{
 			const float weight = ComputeTemporalWeightedHistoryWeight(255.0, 1.0,
 				ResolveTemporalAAMaxHistorySamples(feedbacks[i]), sampleWeight);
@@ -157,7 +163,7 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 {
-	switch (uint(input.PositionCS.x))
+	switch ((uint)(input.PositionCS.x))
 	{
 	case 0:
 		return TestZeroFeedbackWeight();

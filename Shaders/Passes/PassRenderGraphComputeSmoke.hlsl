@@ -20,7 +20,7 @@ ConstantBuffer<ComputeLabPassParameters> g_Pass : register(b2);
 
 uint PackColor(float4 color)
 {
-	const uint4 unormColor = uint4(round(saturate(color) * 255.0));
+	const uint4 unormColor = (uint4)(round(saturate(color) * 255.0));
 	return unormColor.x | (unormColor.y << 8) | (unormColor.z << 16) | (unormColor.w << 24);
 }
 
@@ -44,7 +44,7 @@ void CSWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 	RWTexture2D<uint> workA = GetRWTexture2DUint(g_Pass.WorkAIndex);
 	RWTexture2D<uint> workB = GetRWTexture2DUint(g_Pass.WorkBIndex);
 
-	const float2 uv = (float2(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
+	const float2 uv = ((float2)(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
 	const float3 initialized = UnpackColor(workA[dispatchThreadId.xy]).rgb;
 	const float wave = 0.5 + 0.5 * sin(uv.x * g_Pass.PatternFrequency + g_Pass.Phase * 2.0) *
 		cos(uv.y * g_Pass.PatternFrequency * 0.78 - g_Pass.Phase);
@@ -52,7 +52,7 @@ void CSWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 	workA[dispatchThreadId.xy] = PackColor(float4(gradient + initialized * 0.35, 1.0));
 
 	const uint2 checkerCoord = dispatchThreadId.xy / max(g_Pass.CheckerCellSize, 1);
-	const float checker = float((checkerCoord.x ^ checkerCoord.y) & 1);
+	const float checker = (float)((checkerCoord.x ^ checkerCoord.y) & 1);
 	const float pulse = 0.5 + 0.5 * sin(g_Pass.Phase * 1.7);
 	const float3 checkerColor =
 		lerp(float3(0.02, 0.08, 0.15), float3(0.18 + 0.35 * pulse, 0.75, 0.92), checker);
@@ -68,12 +68,12 @@ void CSReadWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 
 	RWTexture2D<uint> workA = GetRWTexture2DUint(g_Pass.WorkAIndex);
-	const float2 uv = (float2(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
+	const float2 uv = ((float2)(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
 	const float2 centered = uv * 2.0 - 1.0;
 	const float radius = length(centered);
 	const float ring =
 		smoothstep(0.055, 0.0, abs(radius - (g_Pass.RingRadius + 0.08 * sin(g_Pass.Phase))));
-	const float scanline = 0.94 + 0.06 * sin(float(dispatchThreadId.y) * 0.35 + g_Pass.Phase * 3.0);
+	const float scanline = 0.94 + 0.06 * sin((float)(dispatchThreadId.y) * 0.35 + g_Pass.Phase * 3.0);
 
 	float4 color = UnpackColor(workA[dispatchThreadId.xy]);
 	color.rgb *= scanline;
@@ -92,7 +92,7 @@ void CSNonFiniteProbe(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 
 	RWTexture2D<float4> probe = GetRWTexture2DFloat4(g_Pass.ProbeIndex);
-	const float2 uv = (float2(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
+	const float2 uv = ((float2)(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
 	probe[dispatchThreadId.xy] = NonFiniteInject(
 		NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_CSNONFINITEPROBE_PROBE, dispatchThreadId.xy,
 		float4(uv, 0.5, 1.0));
@@ -112,7 +112,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 	const float2 localUv = showWorkA
 		? float2(input.UV.x / 0.68, input.UV.y)
 		: float2((input.UV.x - 0.68) / 0.32, input.UV.y);
-	const uint2 texel = min(uint2(localUv * float2(g_Pass.Width, g_Pass.Height)),
+	const uint2 texel = min((uint2)(localUv * float2(g_Pass.Width, g_Pass.Height)),
 		uint2(g_Pass.Width - 1, g_Pass.Height - 1));
 	float3 color =
 		UnpackColor(showWorkA ? workA.Load(int3(texel, 0)) : workB.Load(int3(texel, 0))).rgb;
@@ -125,7 +125,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 	// sanitizing write replaces non-finite and negative values with zero, so only the
 	// production counter of this site can observe them; other components add zero.
 	const float4 injected = NonFiniteInject(NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_PSMAIN_PREVIEW,
-		uint2(input.PositionCS.xy), float4(0.0, 0.0, 0.0, 0.0));
+		(uint2)(input.PositionCS.xy), float4(0.0, 0.0, 0.0, 0.0));
 	[unroll]
 	for (uint channel = 0; channel < 4u; ++channel)
 	{

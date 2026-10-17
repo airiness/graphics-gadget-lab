@@ -4,7 +4,7 @@
 // The budget controls grid density; only the visible hemisphere needs texture reads.
 uint GetIrradianceSourceMip(uint sampleBudget, uint environmentResolution, uint environmentMipLevels)
 {
-	const uint targetSide = max(1u, (uint)ceil(sqrt((float)max(sampleBudget, 1u) / 6.0f)));
+	const uint targetSide = max(1u, (uint)(ceil(sqrt((float)(max(sampleBudget, 1u)) / 6.0f))));
 	uint sourceMip = 0u;
 	while (sourceMip + 1u < environmentMipLevels &&
 		(environmentResolution >> (sourceMip + 1u)) >= targetSide)
@@ -23,9 +23,9 @@ float CubemapSolidAnglePrimitive(float x, float y)
 // Equal UV areas cover different solid angles near face centers and corners.
 float GetIrradianceTexelSolidAngle(uint x, uint y, uint resolution)
 {
-	const float width = 2.0f / (float)resolution;
-	const float minX = (float)x * width - 1.0f;
-	const float minY = (float)y * width - 1.0f;
+	const float width = 2.0f / (float)(resolution);
+	const float minX = (float)(x) * width - 1.0f;
+	const float minY = (float)(y) * width - 1.0f;
 	const float maxX = minX + width;
 	const float maxY = minY + width;
 	return CubemapSolidAnglePrimitive(maxX, maxY) - CubemapSolidAnglePrimitive(minX, maxY) -

@@ -40,13 +40,13 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	float2 uv = IN.UV;
 	if (g_Pass.PreviewAllCascades != 0u)
 	{
-		const uint2 tile = min(uint2(IN.UV * 2.0), uint2(1u, 1u));
+		const uint2 tile = min((uint2)(IN.UV * 2.0), uint2(1u, 1u));
 		cascadeIndex = tile.y * 2u + tile.x;
 		if (cascadeIndex >= g_Pass.PreviewCascadeCount)
 		{
 			return float4(0.0, 0.0, 0.0, 1.0);
 		}
-		uv = IN.UV * 2.0 - float2(tile);
+		uv = IN.UV * 2.0 - (float2)(tile);
 	}
 	const float rawDepth = SampleShadowMapDepth(uv, cascadeIndex);
 	const float minDepth = saturate(g_Pass.PreviewMinDepth);

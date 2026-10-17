@@ -89,7 +89,7 @@ float SampleShadowPCF3x3(Texture2DArray<float> shadowMap, SamplerComparisonState
 		[unroll]
 		for (int x = -1; x <= 1; ++x)
 		{
-			const float2 offset = float2((float) x, (float) y) * texelSize;
+			const float2 offset = float2((float)(x), (float)(y)) * texelSize;
 			visibility += SampleShadowHard(shadowMap, shadowSampler, uv + offset, layer,
 				saturate(OffsetShadowReceiverDepth(compareDepth, receiverDepthGradient.x,
 					receiverDepthGradient.y, offset.x, offset.y)));

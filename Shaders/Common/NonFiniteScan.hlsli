@@ -16,7 +16,7 @@ struct NonFiniteScanRecord
 
 NonFiniteScanRecord EmptyNonFiniteScanRecord()
 {
-	NonFiniteScanRecord value = (NonFiniteScanRecord)0;
+	NonFiniteScanRecord value = (NonFiniteScanRecord)(0);
 	value.MinimumOrdered = 0xffffffffu;
 	value.FirstNonFiniteIndex = 0xffffffffu;
 	return value;

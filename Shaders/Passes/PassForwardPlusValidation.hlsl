@@ -42,7 +42,7 @@ void ReduceGroup(uint groupThreadIndex)
 			const uint otherPixel = g_MaxErrorPixel[otherIndex];
 			if (otherAbsoluteError > g_MaxAbsoluteError[groupThreadIndex] ||
 				(otherAbsoluteError == g_MaxAbsoluteError[groupThreadIndex] &&
-				 otherPixel < g_MaxErrorPixel[groupThreadIndex]))
+					otherPixel < g_MaxErrorPixel[groupThreadIndex]))
 			{
 				g_MaxAbsoluteError[groupThreadIndex] = otherAbsoluteError;
 				g_MaxErrorPixel[groupThreadIndex] = otherPixel;

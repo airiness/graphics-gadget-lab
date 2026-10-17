@@ -81,7 +81,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	RWTexture2D<float> nextViewZ = GetRWTexture2DFloat(g_Pass.NextViewZUavIndex);
 	RWTexture2D<float> accumulatedAO = GetRWTexture2DFloat(g_Pass.AccumulatedAOUavIndex);
 
-	const float maxSamples = float(g_Pass.MaxSamplesAndPreviousValid & 0xffffu);
+	const float maxSamples = (float)(g_Pass.MaxSamplesAndPreviousValid & 0xffffu);
 	const bool previousValid = (g_Pass.MaxSamplesAndPreviousValid >> 16u) != 0u;
 	const float currentVisibility = currentAO.Load(int3(halfPixel, 0));
 	const float viewZ = halfDepth.Load(int3(halfPixel, 0));
@@ -221,7 +221,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 #if defined(GGLAB_GTAO_DIAGNOSTICS)
 	reconstructedNormal[halfPixel] =
 		float4(surface.NormalVS, surface.HasValidNormal ? 1.0 : 0.0);
-	selectedOffset[halfPixel] = float2(surface.SelectedOffset);
+	selectedOffset[halfPixel] = (float2)(surface.SelectedOffset);
 #endif
 }
 
