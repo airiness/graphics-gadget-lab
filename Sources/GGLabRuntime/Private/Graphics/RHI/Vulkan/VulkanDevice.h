@@ -224,6 +224,12 @@ namespace gglab
 		void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
+		uint32_t GetMaxConstantBufferRange() const noexcept override
+		{
+			return GetPhysicalDeviceLimits().maxUniformBufferRange;
+		}
+		bool PublishMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;

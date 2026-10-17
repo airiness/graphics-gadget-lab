@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
@@ -45,7 +46,7 @@ namespace gglab
 			float m_ScenePreExposure = 1.0f;
 			uint32_t m_Padding[3]{};
 		};
-		static_assert(IsPassRootConstantStruct<HdrDiffParameters>);
+		static_assert(IsShaderParameterStruct<HdrDiffParameters>);
 		static_assert(offsetof(HdrDiffParameters, m_ScenePreExposure) == 32);
 		static_assert(sizeof(HdrDiffParameters) == 48);
 
@@ -232,7 +233,7 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreateTilePipeline(services));
 				commandContext->SetReadWriteBuffer(
 					static_cast<uint32_t>(TileRootParameter::OutputMetrics), tileMetrics);
-				commandContext->SetPushConstants(
+				commandContext->SetInlineConstants(
 					static_cast<uint32_t>(TileRootParameter::PassConstants),
 					HdrDiffParameters{
 						.m_SceneColorTextureIndex = sceneColorSrv.m_Index,
@@ -287,7 +288,7 @@ namespace gglab
 					static_cast<uint32_t>(FrameRootParameter::TileMetrics), tileMetrics);
 				commandContext->SetReadWriteBuffer(
 					static_cast<uint32_t>(FrameRootParameter::OutputMetrics), frameMetrics);
-				commandContext->SetPushConstants(
+				commandContext->SetInlineConstants(
 					static_cast<uint32_t>(FrameRootParameter::PassConstants),
 					HdrDiffParameters{
 						.m_Width = data.m_TileGrid.m_Width,

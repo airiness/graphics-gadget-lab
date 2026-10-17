@@ -437,6 +437,8 @@ namespace gglab
 		{
 			m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
+			m_PushConstantSizes = m_PipelineSystem->GetPushConstantSizes(pipeline);
+			m_ConstantBufferSlots = m_PipelineSystem->GetConstantBufferSlots(pipeline);
 		}
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
@@ -674,21 +676,25 @@ namespace gglab
 		m_Backend.GetCommandList()->SetPrimitiveTopology(nativeTopology);
 	}
 
-	void DX12GraphicsCommandContext::SetConstantBuffer(
-		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	bool DX12GraphicsCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
-			"SetPipeline must bind a graphics root signature before root arguments.");
-		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
-		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		DX12Buffer* buffer = m_Backend.GetDevice()->ResolveBuffer(binding.m_Buffer);
+		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
+			parameterIndex >= m_ConstantBufferSlots.size() || !m_ConstantBufferSlots[parameterIndex] ||
+			!buffer || binding.m_OffsetInBytes >= buffer->SizeInBytes() ||
+			binding.m_SizeInBytes > buffer->SizeInBytes() - binding.m_OffsetInBytes ||
+			binding.m_SizeInBytes > m_Backend.GetDevice()->GetMaxConstantBufferRange() ||
+			binding.m_OffsetInBytes % D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT != 0)
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"DX12GraphicsCommandContext::SetConstantBuffer received an invalid buffer binding.");
-			return;
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 graphics constant buffer binding is invalid.");
+			FailRecording();
+			return false;
 		}
 		m_Backend.GetCommandList()->SetGraphicsConstantBuffer(
-			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
-		m_Backend.TrackBufferUse(buffer);
+			parameterIndex, buffer->GPUVirtualAddress() + binding.m_OffsetInBytes);
+		m_Backend.TrackBufferUse(binding.m_Buffer);
+		return true;
 	}
 
 	void DX12GraphicsCommandContext::SetReadOnlyBuffer(
@@ -713,6 +719,13 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
 			"SetPipeline must bind a graphics root signature before root arguments.");
+		if (!m_CurrentRootSignature || parameterIndex >= m_PushConstantSizes.size() ||
+			!IsValidPushConstantWrite(m_PushConstantSizes[parameterIndex], values.size(), destOffset))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Graphics push constant write does not fit the active binding layout.");
+			FailRecording();
+			return;
+		}
 		m_Backend.GetCommandList()->SetGraphicsRoot32BitConstants(
 			parameterIndex, values, destOffset);
 	}
@@ -782,6 +795,11 @@ namespace gglab
 		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
+		if (HasRecordingError())
+		{
+			return;
+		}
+
 		if (indexCount == 0 || instanceCount == 0)
 		{
 			return;
@@ -812,6 +830,11 @@ namespace gglab
 	void DX12GraphicsCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
 		uint32_t startVertexLocation, uint32_t startInstanceLocation) noexcept
 	{
+		if (HasRecordingError())
+		{
+			return;
+		}
+
 		GGLAB_ASSERT_MSG(m_Backend.IsRendering(), "Draw requires an active rendering scope.");
 		if (!m_Backend.IsRendering())
 		{
@@ -901,6 +924,8 @@ namespace gglab
 		{
 			m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
+			m_PushConstantSizes = m_PipelineSystem->GetPushConstantSizes(pipeline);
+			m_ConstantBufferSlots = m_PipelineSystem->GetConstantBufferSlots(pipeline);
 		}
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
@@ -934,19 +959,25 @@ namespace gglab
 		m_Backend->GetCommandList()->SetComputeDescriptorTable(binding.m_ParameterIndex, table);
 	}
 
-	void DX12ComputeCommandContext::SetConstantBuffer(
-		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	bool DX12ComputeCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
-		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
-		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		DX12Buffer* buffer = m_Backend->GetDevice()->ResolveBuffer(binding.m_Buffer);
+		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
+			parameterIndex >= m_ConstantBufferSlots.size() || !m_ConstantBufferSlots[parameterIndex] ||
+			!buffer || binding.m_OffsetInBytes >= buffer->SizeInBytes() ||
+			binding.m_SizeInBytes > buffer->SizeInBytes() - binding.m_OffsetInBytes ||
+			binding.m_SizeInBytes > m_Backend->GetDevice()->GetMaxConstantBufferRange() ||
+			binding.m_OffsetInBytes % D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT != 0)
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"DX12ComputeCommandContext::SetConstantBuffer received an invalid buffer binding.");
-			return;
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 compute constant buffer binding is invalid.");
+			FailRecording();
+			return false;
 		}
 		m_Backend->GetCommandList()->SetComputeConstantBuffer(
-			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
-		m_Backend->TrackBufferUse(buffer);
+			parameterIndex, buffer->GPUVirtualAddress() + binding.m_OffsetInBytes);
+		m_Backend->TrackBufferUse(binding.m_Buffer);
+		return true;
 	}
 
 	void DX12ComputeCommandContext::SetReadOnlyBuffer(
@@ -982,6 +1013,13 @@ namespace gglab
 	void DX12ComputeCommandContext::SetPushConstants(
 		uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
+		if (!m_CurrentRootSignature || parameterIndex >= m_PushConstantSizes.size() ||
+			!IsValidPushConstantWrite(m_PushConstantSizes[parameterIndex], values.size(), destOffset))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Compute push constant write does not fit the active binding layout.");
+			FailRecording();
+			return;
+		}
 		m_Backend->GetCommandList()->SetComputeRoot32BitConstants(
 			parameterIndex, values, destOffset);
 	}
@@ -989,6 +1027,11 @@ namespace gglab
 	void DX12ComputeCommandContext::Dispatch(
 		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
 	{
+		if (HasRecordingError())
+		{
+			return;
+		}
+
 		GGLAB_ASSERT_MSG(!m_Backend->IsRendering(),
 			"Dispatch cannot be encoded inside an active rendering scope.");
 		if (m_Backend->IsRendering())

@@ -1,4 +1,7 @@
 #include "Graphics/RenderPass/RenderPassSkybox.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -31,7 +34,7 @@ namespace gglab
 			uint32_t EnvironmentSamplerIndex = 0;
 			uint32_t Padding = 0;
 		};
-		static_assert(IsPassRootConstantStruct<SkyboxPassParameters>);
+		static_assert(IsPassConstantBufferStruct<SkyboxPassParameters>);
 		static_assert(sizeof(SkyboxPassParameters) == 16);
 		struct PhysicalSkyPassParameters
 		{
@@ -42,7 +45,7 @@ namespace gglab
 			Vector3 SunDirection = Vector3::UnitY;
 			float Padding = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<PhysicalSkyPassParameters>);
+		static_assert(IsPassConstantBufferStruct<PhysicalSkyPassParameters>);
 		static_assert(sizeof(PhysicalSkyPassParameters) == 32);
 
 		struct PassData
@@ -218,15 +221,22 @@ namespace gglab
 				{
 					commandContext->SetConstantBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						services.m_Atmosphere->GetConstants(), 0);
+						{
+							.m_Buffer = services.m_Atmosphere->GetConstants(),
+							.m_OffsetInBytes = 0,
+							.m_SizeInBytes = sizeof(AtmosphereGPU),
+						});
 				}
 				else
 				{
 					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 					commandContext->SetConstantBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						sceneBuffer->GetBufferHandle(),
-						contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+						{
+							.m_Buffer = sceneBuffer->GetBufferHandle(),
+							.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
+							.m_SizeInBytes = sizeof(SceneGPU),
+						});
 				}
 
 				const auto* viewBuffer = services.m_FrameBuffers->GetViewStructuredBuffer();
@@ -244,8 +254,11 @@ namespace gglab
 						.SamplerIndex = data.m_EnvironmentSamplerIndex,
 						.SunDirection = data.m_SunDirection,
 					};
-					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+					if (!commandContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+					{
+						return;
+					}
 				}
 				else
 				{
@@ -254,8 +267,11 @@ namespace gglab
 						.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
 						.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 					};
-					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+					if (!commandContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+					{
+						return;
+					}
 				}
 				commandContext->DrawFullscreenTriangle();
 			});

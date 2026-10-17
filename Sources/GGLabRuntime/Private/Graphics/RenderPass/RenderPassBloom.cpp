@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassBloom.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -42,7 +43,7 @@ namespace gglab
 			float Padding1 = 0.0f;
 			float Padding2 = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<BloomPassParameters>);
+		static_assert(IsPassConstantBufferStruct<BloomPassParameters>);
 		static_assert(sizeof(BloomPassParameters) == 48);
 
 		struct PassData
@@ -194,8 +195,11 @@ namespace gglab
 					.SoftKnee = data.m_SoftKnee,
 					.ExposureScaleOverPreExposure = data.m_ExposureScaleOverPreExposure,
 				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->DrawFullscreenTriangle();
 			});
 		postProcess.m_Bloom.m_Prefilter = {
@@ -269,8 +273,11 @@ namespace gglab
 						.SourceTexelSizeX = 1.0f / static_cast<float>(data.m_SourceWidth),
 						.SourceTexelSizeY = 1.0f / static_cast<float>(data.m_SourceHeight),
 					};
-					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+					if (!commandContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+					{
+						return;
+					}
 					commandContext->DrawFullscreenTriangle();
 				});
 			postProcess.m_Bloom.m_DownsampledPyramid[level] = {
@@ -342,8 +349,11 @@ namespace gglab
 						.SourceTexelSizeY = 1.0f / static_cast<float>(data.m_SourceHeight),
 						.Scatter = data.m_Scatter,
 					};
-					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+					if (!commandContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+					{
+						return;
+					}
 					commandContext->DrawFullscreenTriangle();
 				});
 		}

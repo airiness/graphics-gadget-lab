@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
 
 #include <Windows.h>
 
@@ -44,6 +45,7 @@ namespace gglab
 		DX12CommandAllocator* m_GraphicsAllocator = nullptr;
 		DX12CommandAllocator* m_ComputeAllocator = nullptr;
 		RHIFencePoint m_SubmittedFence{};
+		std::unique_ptr<RHIConstantUploadBatch> m_ConstantUploads;
 		bool m_Active = false;
 	};
 
@@ -91,6 +93,7 @@ namespace gglab
 		void Finalize() noexcept;
 
 		std::unique_ptr<DX12Device> m_Device;
+		std::unique_ptr<RHIConstantUploadPool> m_ConstantUploadPool;
 		std::unique_ptr<DX12QueueSystem> m_QueueSystem;
 		std::unique_ptr<RHIPipelineSystem> m_PipelineSystem;
 		std::unique_ptr<DX12SwapChain> m_SwapChain;

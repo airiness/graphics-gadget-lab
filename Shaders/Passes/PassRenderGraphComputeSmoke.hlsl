@@ -8,15 +8,27 @@ struct ComputeLabPassParameters
 	uint WorkBIndex;
 	uint Width;
 	uint Height;
-	float Phase;
+	uint Padding0;
 	float PatternFrequency;
 	float RingRadius;
 	float RingIntensity;
 	uint CheckerCellSize;
 	uint ProbeIndex;
+	uint2 Padding1;
+	float4 CheckerDarkColor;
+	float4 CheckerLightColor;
+	float4 RingColor;
 };
 
 ConstantBuffer<ComputeLabPassParameters> g_Pass : register(b2);
+
+struct ComputeLabInlineParameters
+{
+	float Phase;
+	float PreviewSplit;
+};
+
+ConstantBuffer<ComputeLabInlineParameters> g_Inline : register(b4);
 
 uint PackColor(float4 color)
 {
@@ -46,16 +58,16 @@ void CSWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	const float2 uv = ((float2)(dispatchThreadId.xy) + 0.5) / float2(g_Pass.Width, g_Pass.Height);
 	const float3 initialized = UnpackColor(workA[dispatchThreadId.xy]).rgb;
-	const float wave = 0.5 + 0.5 * sin(uv.x * g_Pass.PatternFrequency + g_Pass.Phase * 2.0) *
-		cos(uv.y * g_Pass.PatternFrequency * 0.78 - g_Pass.Phase);
+	const float wave = 0.5 + 0.5 * sin(uv.x * g_Pass.PatternFrequency + g_Inline.Phase * 2.0) *
+		cos(uv.y * g_Pass.PatternFrequency * 0.78 - g_Inline.Phase);
 	const float3 gradient = float3(0.08 + 0.75 * uv.x, 0.12 + 0.68 * uv.y, 0.25 + 0.55 * wave);
 	workA[dispatchThreadId.xy] = PackColor(float4(gradient + initialized * 0.35, 1.0));
 
 	const uint2 checkerCoord = dispatchThreadId.xy / max(g_Pass.CheckerCellSize, 1);
 	const float checker = (float)((checkerCoord.x ^ checkerCoord.y) & 1);
-	const float pulse = 0.5 + 0.5 * sin(g_Pass.Phase * 1.7);
+	const float pulse = 0.5 + 0.5 * sin(g_Inline.Phase * 1.7);
 	const float3 checkerColor =
-		lerp(float3(0.02, 0.08, 0.15), float3(0.18 + 0.35 * pulse, 0.75, 0.92), checker);
+		lerp(g_Pass.CheckerDarkColor.rgb, g_Pass.CheckerLightColor.rgb + float3(0.35 * pulse, 0.0, 0.0), checker);
 	workB[dispatchThreadId.xy] = PackColor(float4(checkerColor, 1.0));
 }
 
@@ -72,12 +84,12 @@ void CSReadWrite(uint3 dispatchThreadId : SV_DispatchThreadID)
 	const float2 centered = uv * 2.0 - 1.0;
 	const float radius = length(centered);
 	const float ring =
-		smoothstep(0.055, 0.0, abs(radius - (g_Pass.RingRadius + 0.08 * sin(g_Pass.Phase))));
-	const float scanline = 0.94 + 0.06 * sin((float)(dispatchThreadId.y) * 0.35 + g_Pass.Phase * 3.0);
+		smoothstep(0.055, 0.0, abs(radius - (g_Pass.RingRadius + 0.08 * sin(g_Inline.Phase))));
+	const float scanline = 0.94 + 0.06 * sin((float)(dispatchThreadId.y) * 0.35 + g_Inline.Phase * 3.0);
 
 	float4 color = UnpackColor(workA[dispatchThreadId.xy]);
 	color.rgb *= scanline;
-	color.rgb = lerp(color.rgb, float3(1.0, 0.28, 0.08), ring * g_Pass.RingIntensity);
+	color.rgb = lerp(color.rgb, g_Pass.RingColor.rgb, ring * g_Pass.RingIntensity);
 	workA[dispatchThreadId.xy] = PackColor(color);
 }
 
@@ -108,16 +120,16 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 	Texture2D<uint> workA = GetTexture2DUint(g_Pass.WorkAIndex);
 	Texture2D<uint> workB = GetTexture2DUint(g_Pass.WorkBIndex);
 
-	const bool showWorkA = input.UV.x < 0.68;
+	const bool showWorkA = input.UV.x < g_Inline.PreviewSplit;
 	const float2 localUv = showWorkA ?
-		float2(input.UV.x / 0.68, input.UV.y) :
-		float2((input.UV.x - 0.68) / 0.32, input.UV.y);
+		float2(input.UV.x / g_Inline.PreviewSplit, input.UV.y) :
+		float2((input.UV.x - g_Inline.PreviewSplit) / (1.0 - g_Inline.PreviewSplit), input.UV.y);
 	const uint2 texel = min((uint2)(localUv * float2(g_Pass.Width, g_Pass.Height)),
 		uint2(g_Pass.Width - 1, g_Pass.Height - 1));
 	float3 color =
 		UnpackColor(showWorkA ? workA.Load(int3(texel, 0)) : workB.Load(int3(texel, 0))).rgb;
 
-	const float divider = 1.0 - smoothstep(0.0, 0.0035, abs(input.UV.x - 0.68));
+	const float divider = 1.0 - smoothstep(0.0, 0.0035, abs(input.UV.x - g_Inline.PreviewSplit));
 	color = lerp(color, float3(1.0, 1.0, 1.0), divider);
 	float4 output = float4(color, 1.0);
 #if defined(GGLAB_NONFINITE_COUNTERS)

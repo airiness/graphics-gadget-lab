@@ -37,6 +37,7 @@ namespace gglab
 		VkShaderStageFlags m_StageFlags = 0;
 		uint32_t m_SizeInBytes = 0;
 		uint32_t m_DynamicOffsetSlot = UINT32_MAX;
+		bool m_IsInlineConstants = false;
 	};
 
 	struct VulkanBindingLayoutPlan

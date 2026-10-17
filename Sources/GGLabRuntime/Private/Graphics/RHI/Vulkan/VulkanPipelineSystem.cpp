@@ -146,7 +146,10 @@ namespace gglab
 			VulkanSet0BindingPlan& binding = plan.m_Set0Bindings[plan.m_Set0BindingCount++];
 			binding.m_LogicalParameterIndex = logicalParameterIndex++;
 			binding.m_Binding = location.m_Location.m_Binding;
-			binding.m_DescriptorType = ToVulkanDescriptorType(slot.m_Type);
+			binding.m_DescriptorType = slot.m_Type == RHIBindingType::ConstantBuffer &&
+				slot.m_BufferBindingMode == RHIBufferBindingMode::Dynamic
+				? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : ToVulkanDescriptorType(slot.m_Type);
+			binding.m_IsInlineConstants = slot.m_Type == RHIBindingType::PushConstants;
 			binding.m_DescriptorCount = slot.m_Count;
 			binding.m_StageFlags = ToVulkanShaderStages(slot.m_Visibility);
 			binding.m_SizeInBytes = slot.m_SizeInBytes;

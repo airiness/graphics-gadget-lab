@@ -412,6 +412,13 @@ namespace gglab
 		}
 	}
 
+	bool VulkanDevice::PublishMappedBufferWrites(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::PublishMappedBufferWrites") &&
+			m_ResourceManager.UnmapBuffer(buffer, writtenRange);
+	}
+
 	uint32_t VulkanDevice::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
 		VkDeviceSize alignment = 1;

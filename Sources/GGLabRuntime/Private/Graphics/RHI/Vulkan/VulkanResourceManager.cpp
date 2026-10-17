@@ -691,20 +691,20 @@ namespace gglab
 		return nativeBuffer->Map(readRange);
 	}
 
-	void VulkanResourceManager::UnmapBuffer(
+	bool VulkanResourceManager::UnmapBuffer(
 		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
 	{
 		if (!CheckOwnerThread("VulkanResourceManager::UnmapBuffer"))
 		{
-			return;
+			return false;
 		}
 		VulkanBuffer* nativeBuffer = ResolveBuffer(buffer);
 		if (nativeBuffer == nullptr)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("VulkanResourceManager::UnmapBuffer received a non-live handle.");
-			return;
+			return false;
 		}
-		nativeBuffer->Unmap(writtenRange);
+		return nativeBuffer->Unmap(writtenRange);
 	}
 
 	VulkanTexture* VulkanResourceManager::ResolveTexture(RHITextureHandle texture) noexcept

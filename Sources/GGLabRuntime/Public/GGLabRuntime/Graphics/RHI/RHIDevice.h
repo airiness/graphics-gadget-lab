@@ -68,7 +68,16 @@ namespace gglab
 			RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept = 0;
 		virtual void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
+		// Ends this CPU write scope and publishes the range before queue submission.
+		// The pointer must no longer be used. Persistent mapping is a backend detail.
+		virtual bool PublishMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+		{
+			UnmapBuffer(buffer, writtenRange);
+			return IsAlive(buffer);
+		}
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
+		virtual uint32_t GetMaxConstantBufferRange() const noexcept { return 64 * 1024; }
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;

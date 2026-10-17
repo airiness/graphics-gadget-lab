@@ -74,6 +74,7 @@ namespace gglab
 			.m_EnableDebugValidation = desc.m_EnableDebugValidation,
 			.m_EnableGpuBasedValidation = desc.m_EnableGpuBasedValidation,
 			});
+		m_ConstantUploadPool = std::make_unique<RHIConstantUploadPool>(*m_Device);
 		m_PipelineSystem = std::make_unique<DX12PipelineSystem>(m_Device.get());
 		DX12QueueSystem::CreateInfo queueSystemInfo{};
 		queueSystemInfo.m_Device = m_Device.get();
@@ -230,6 +231,7 @@ namespace gglab
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
 		m_NextFrameSlotIndex = (m_NextFrameSlotIndex + 1) % GetFrameSlotCount();
+		frame.m_ConstantUploads = m_ConstantUploadPool->BeginBatch();
 		BeginGraphicsRecording(frame);
 		m_GpuProfiler->BeginFrame(frame.m_FrameSlotIndex,
 			m_QueueSystem->GetGraphicsCommandList(frame.m_FrameSlotIndex));
@@ -244,6 +246,15 @@ namespace gglab
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
 			return RHIFrameEndResult::Fatal();
+		}
+
+		if (m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex).HasRecordingError() ||
+			m_DirectComputeContexts[frame->m_FrameSlotIndex]->HasRecordingError() ||
+			(frame->m_ComputeAllocator && m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex).HasRecordingError()) ||
+			!frame->m_ConstantUploads->PublishWrites())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 discarded a frame with failed constant recording.");
+			return RHIFrameEndResult::Fatal(AbortFrame(rhiFrame));
 		}
 
 		DX12FencePoint computeFence{};
@@ -290,6 +301,8 @@ namespace gglab
 
 		m_DescriptorManager->EndFrame(graphicsFence);
 		const RHIFencePoint submittedFence = graphicsFence.ToRHI();
+		const bool uploadsSubmitted = frame->m_ConstantUploads->Submitted(submittedFence);
+		GGLAB_ASSERT_MSG(uploadsSubmitted, "A submitted frame must retain its constant upload pages.");
 		GGLAB_ASSERT(frame->m_BackBufferIndex < m_BackBufferCompletionFences.size());
 		if (frame->m_BackBufferIndex < m_BackBufferCompletionFences.size())
 		{
@@ -303,7 +316,7 @@ namespace gglab
 			m_CompletedProductionFrame = true;
 		}
 		FinishFrame(*frame, submittedFence);
-		return presented ?
+		return presented && uploadsSubmitted ?
 			RHIFrameEndResult::Completed(submittedFence) :
 			RHIFrameEndResult::Fatal(submittedFence);
 	}
@@ -331,6 +344,10 @@ namespace gglab
 
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameSlotIndex);
 		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex);
+		if (graphicsContext->IsRendering())
+		{
+			graphicsContext->EndRendering();
+		}
 		m_GpuProfiler->AbortFrame(frame->m_FrameSlotIndex);
 		graphicsList->End();
 		graphicsContext->ClearTrackedResourceUses();
@@ -338,6 +355,7 @@ namespace gglab
 		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
 			.RecycleCommandAllocator(frame->m_GraphicsAllocator, fence);
 		m_DescriptorManager->EndFrame(fence);
+		frame->m_ConstantUploads->Cancel();
 		const RHIFencePoint submittedFence = fence.ToRHI();
 		FinishFrame(*frame, submittedFence);
 		return submittedFence;
@@ -374,6 +392,7 @@ namespace gglab
 	{
 		m_TransferManager->Reclaim();
 		m_DescriptorManager->Tick();
+		m_ConstantUploadPool->ReclaimCompleted();
 		m_Device->RetireCompletedWork();
 	}
 
@@ -394,6 +413,7 @@ namespace gglab
 			auto* commandList = &m_QueueSystem->GetComputeCommandList(frame.m_FrameSlotIndex);
 			commandList->Begin(frame.m_ComputeAllocator);
 			context->ClearTrackedResourceUses();
+			context->BeginConstantRecording(frame.m_ConstantUploads.get());
 			BindGlobalDescriptorHeaps(*commandList);
 		}
 		return context;
@@ -416,6 +436,8 @@ namespace gglab
 		commandList->Begin(frame.m_GraphicsAllocator);
 		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).ClearTrackedResourceUses();
 		m_DirectComputeContexts[frame.m_FrameSlotIndex]->ResetEncoderState();
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).BeginConstantRecording(frame.m_ConstantUploads.get());
+		m_DirectComputeContexts[frame.m_FrameSlotIndex]->BeginConstantRecording(frame.m_ConstantUploads.get());
 		BindGlobalDescriptorHeaps(*commandList);
 	}
 
@@ -430,6 +452,13 @@ namespace gglab
 
 	void DX12Context::FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept
 	{
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).EndConstantRecording();
+		m_DirectComputeContexts[frame.m_FrameSlotIndex]->EndConstantRecording();
+		if (frame.m_ComputeAllocator)
+		{
+			m_QueueSystem->GetComputeContext(frame.m_FrameSlotIndex).EndConstantRecording();
+		}
+		frame.m_ConstantUploads.reset();
 		frame.m_SubmittedFence = fencePoint;
 		frame.m_GraphicsAllocator = nullptr;
 		frame.m_ComputeAllocator = nullptr;
@@ -450,6 +479,7 @@ namespace gglab
 		WaitIdle();
 		m_BackBufferCompletionFences.clear();
 		m_Frames.clear();
+		m_ConstantUploadPool.reset();
 		m_DirectComputeContexts.clear();
 		m_TransferManager.reset();
 		m_GpuProfiler.reset();

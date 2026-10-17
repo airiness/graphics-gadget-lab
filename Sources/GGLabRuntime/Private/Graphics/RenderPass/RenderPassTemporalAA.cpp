@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
@@ -75,7 +76,7 @@ namespace gglab
 			uint32_t m_PackedLuminanceWeightAndHistoryRelaxation = 0;
 			uint32_t m_DisplayDepthUavIndex = 0;
 		};
-		static_assert(IsPassRootConstantStruct<TemporalAAPassParameters>);
+		static_assert(IsPassConstantBufferStruct<TemporalAAPassParameters>);
 		static_assert(sizeof(TemporalAAPassParameters) == 64);
 		// Resource descriptor indices fit the 16-bit halves of the packed index pairs.
 		static_assert(GGLabDescriptorCapacityContract.m_ResourceDescriptorCount <= 0x10000u);
@@ -93,7 +94,7 @@ namespace gglab
 			uint32_t m_NextHistoryDepthUavIndex = 0;
 			uint32_t m_Padding[2]{};
 		};
-		static_assert(IsPassRootConstantStruct<TemporalAADepthHistoryPassParameters>);
+		static_assert(IsPassConstantBufferStruct<TemporalAADepthHistoryPassParameters>);
 
 		struct TemporalAAPassData
 		{
@@ -122,7 +123,7 @@ namespace gglab
 			uint32_t m_SourceDepthIndex = 0;
 			uint32_t m_Padding[3]{};
 		};
-		static_assert(IsPassRootConstantStruct<TemporalAADisplayDepthPassParameters>);
+		static_assert(IsPassConstantBufferStruct<TemporalAADisplayDepthPassParameters>);
 
 		struct TemporalAADisplayDepthPassData
 		{
@@ -582,14 +583,19 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreateDepthHistoryPipeline(services));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					context.m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					depthHistoryParameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), depthHistoryParameters))
+				{
+					return;
+				}
 				commandContext->Dispatch(
 					(data.m_DepthWidth + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
 					(data.m_DepthHeight + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
@@ -600,13 +606,19 @@ namespace gglab
 				// the depth copy. Frame-buffer bindings cannot survive that layout switch.
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					context.m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->Dispatch(
 					(data.m_Width + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
 					(data.m_Height + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
@@ -672,8 +684,11 @@ namespace gglab
 				const TemporalAADisplayDepthPassParameters parameters{
 					.m_SourceDepthIndex = source.m_Index,
 				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->DrawFullscreenTriangle();
 			});
 	}

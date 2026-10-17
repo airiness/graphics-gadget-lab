@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -38,7 +39,7 @@ namespace gglab
 			uint32_t PhysicalSky = 0;
 			uint32_t Padding[2]{};
 		};
-		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLPrefilteredSpecularPassParameters>);
 		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 48);
 		static_assert(offsetof(IBLPrefilteredSpecularPassParameters, PhysicalSky) == 36);
 		static_assert(offsetof(IBLPrefilteredSpecularPassParameters, ImportanceTextureIndex) == 20);
@@ -55,7 +56,7 @@ namespace gglab
 			uint32_t PhysicalSky = 0;
 			uint32_t Padding = 0;
 		};
-		static_assert(IsPassRootConstantStruct<IBLImportancePassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLImportancePassParameters>);
 		static_assert(sizeof(IBLImportancePassParameters) == 32);
 		static_assert(offsetof(IBLImportancePassParameters, EnvironmentSourceMip) == 20);
 		static_assert(offsetof(IBLImportancePassParameters, PhysicalSky) == 24);
@@ -201,9 +202,11 @@ namespace gglab
 							.MaxSampleLuminance = data.m_MaxSampleLuminance,
 							.PhysicalSky = bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u,
 						};
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							passParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+						{
+							return;
+						}
 
 						commandContext->DrawFullscreenTriangle();
 						commandContext->EndRendering();
@@ -289,8 +292,7 @@ namespace gglab
 						};
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&attachment, 1) });
-						commandContext->SetPushConstants(static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							IBLImportancePassParameters{
+						if (!commandContext->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), IBLImportancePassParameters{
 								.CubemapFaceIndex = face,
 								.MipLevel = mip,
 								.SourceTextureIndex = sourceIndex,
@@ -298,7 +300,10 @@ namespace gglab
 								.ImportanceResolution = resolution,
 								.EnvironmentSourceMip = sourceMip,
 								.PhysicalSky = physicalSky,
-							});
+							}))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
 						commandContext->EndRendering();
 					}

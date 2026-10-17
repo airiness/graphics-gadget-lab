@@ -1,4 +1,5 @@
 #include "VulkanContractSelfTests.h"
+#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32AdapterInspection.h"
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanImageViewLease.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
@@ -11,7 +12,7 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
-#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
@@ -1510,6 +1511,29 @@ namespace gglab
 
 	void RunVulkanBindingLayoutTests(SelfTestContext& context) noexcept
 	{
+		const auto commonPlan = BuildVulkanBindingLayoutPlan(
+			Renderer::BuildCommonRHIBindingLayoutDesc(), 16 * 1024);
+		bool passBufferFound = false;
+		bool inlineConstantsFound = false;
+		for (uint32_t index = 0; index < commonPlan.m_Set0BindingCount; ++index)
+		{
+			const auto& binding = commonPlan.m_Set0Bindings[index];
+			passBufferFound |= binding.m_Binding == 2 &&
+				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC && !binding.m_IsInlineConstants;
+			inlineConstantsFound |= binding.m_Binding == 4 &&
+				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC &&
+				binding.m_SizeInBytes == MaxInlineConstantDWORDs * sizeof(uint32_t);
+		}
+		context.Check(commonPlan.IsValid() && commonPlan.m_DynamicOffsetCount == 3 &&
+			passBufferFound && inlineConstantsFound,
+			"Vulkan common layout distinguishes dynamic b2 CB from dynamic b1 and b4 inline constants");
+
+		VulkanDynamicUniformState commonShadow;
+		const std::array<uint32_t, 1> word{ 1 };
+		context.Check(commonShadow.Initialize(commonPlan) &&
+			!commonShadow.UpdateShadow(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), word, 0),
+			"A dynamic CB remains distinct from emulated inline constants");
+
 		RHIBindingLayoutDesc desc{};
 		desc.m_Slots[desc.m_SlotCount++] = {
 			.m_Type = RHIBindingType::PushConstants,
@@ -1580,52 +1604,6 @@ namespace gglab
 		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];
 		context.Check(BuildVulkanBindingLayoutPlan(duplicate, 64 * 1024).m_Error == VulkanBindingLayoutError::DuplicateNativeBinding,
 			"Vulkan binding layout rejects duplicate native set-0 bindings");
-	}
-
-	void RunVulkanDynamicUniformArenaTests(SelfTestContext& context) noexcept
-	{
-		VulkanDynamicUniformArena arena({
-			.m_PageSizeInBytes = 64,
-			.m_MaxPageCount = 2,
-			.m_Alignment = 16,
-		});
-		const VulkanDynamicUniformArenaAllocation first = arena.Allocate(12);
-		const VulkanDynamicUniformArenaAllocation second = arena.Allocate(48);
-		const VulkanDynamicUniformArenaAllocation third = arena.Allocate(16);
-		const VulkanDynamicUniformArenaAllocation overflow = arena.Allocate(64);
-		context.Check(first.m_OffsetInBytes == 0 && second.m_OffsetInBytes == 16 &&
-			third.m_OffsetInBytes == 64 && third.m_PageIndex == 1,
-			"Dynamic uniform allocation honors alignment and advances to the next page");
-		context.Check(!overflow.IsValid() && arena.GetDiagnostics().m_OverflowCount == 1 &&
-			arena.GetDiagnostics().m_PageCount == 2,
-			"Dynamic uniform allocation reports hard-cap overflow without wrapping");
-		const uint32_t highWater = arena.GetDiagnostics().m_HighWaterMarkInBytes;
-		arena.Reset();
-		const VulkanDynamicUniformArenaAllocation reused = arena.Allocate(16);
-		context.Check(reused.m_OffsetInBytes == 0 && reused.m_PageIndex == 0 &&
-			arena.GetDiagnostics().m_HighWaterMarkInBytes == highWater,
-			"Dynamic uniform pages reset for frame-slot reuse while preserving high-water diagnostics");
-
-		VulkanDynamicUniformArena normalizedPages({
-			.m_PageSizeInBytes = 48,
-			.m_MaxPageCount = 2,
-			.m_Alignment = 32,
-		});
-		const VulkanDynamicUniformArenaAllocation normalizedFirst = normalizedPages.Allocate(48);
-		const VulkanDynamicUniformArenaAllocation normalizedSecond = normalizedPages.Allocate(16);
-		context.Check(normalizedFirst.m_OffsetInBytes == 0 &&
-			normalizedSecond.m_OffsetInBytes == 64 && normalizedSecond.m_PageIndex == 1,
-			"Dynamic uniform page starts remain aligned when page size is not an alignment multiple");
-
-		VulkanDynamicUniformArena overflowingConfig({
-			.m_PageSizeInBytes = UINT32_MAX,
-			.m_MaxPageCount = 2,
-			.m_Alignment = UINT32_MAX,
-		});
-		context.Check(overflowingConfig.GetCapacityInBytes() == 0 &&
-			!overflowingConfig.Allocate(16).IsValid() &&
-			overflowingConfig.GetDiagnostics().m_OverflowCount == 1,
-			"Dynamic uniform configuration rejects address-space overflow without wrapping");
 	}
 
 	void RunVulkanViewNormalizationTests(SelfTestContext& context) noexcept
@@ -1776,7 +1754,6 @@ namespace gglab
 		RunVulkanDescriptorPublicationTests(context);
 		RunVulkanDescriptorGenerationTests(context);
 		RunVulkanBindingLayoutTests(context);
-		RunVulkanDynamicUniformArenaTests(context);
 		RunVulkanViewNormalizationTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);

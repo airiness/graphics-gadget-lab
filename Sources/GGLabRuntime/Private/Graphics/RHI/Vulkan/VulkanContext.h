@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
 
 #include <cstdint>
 #include <memory>
@@ -13,7 +14,6 @@ namespace gglab
 	class VulkanComputeCommandContext;
 	class VulkanContext;
 	class VulkanContextSwapChain;
-	class VulkanDynamicUniformBuffer;
 	class VulkanGraphicsCommandContext;
 	class VulkanGpuProfiler;
 	class VulkanPipelineSystem;
@@ -41,6 +41,7 @@ namespace gglab
 		VulkanContext* m_Context = nullptr;
 		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
+		std::unique_ptr<RHIConstantUploadBatch> m_ConstantUploads;
 		bool m_Active = false;
 	};
 
@@ -108,7 +109,7 @@ namespace gglab
 		std::unique_ptr<VulkanBootstrapRuntimeResult> m_Bootstrap;
 		std::unique_ptr<VulkanPipelineSystem> m_PipelineSystem;
 		std::unique_ptr<TransferManager> m_TransferManager;
-		std::unique_ptr<VulkanDynamicUniformBuffer> m_DynamicUniformBuffer;
+		std::unique_ptr<RHIConstantUploadPool> m_ConstantUploadPool;
 		std::unique_ptr<VulkanSet0DynamicUniformFrames> m_Set0Frames;
 		std::unique_ptr<VulkanGpuProfiler> m_GpuProfiler;
 		std::unique_ptr<VulkanGraphicsCommandContext> m_GraphicsContext;

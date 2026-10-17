@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
@@ -94,7 +95,7 @@ namespace gglab
 			float m_DepthOverride = 0.0f;
 			float m_Padding = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<CoordinateConformanceParameters>);
+		static_assert(IsPassConstantBufferStruct<CoordinateConformanceParameters>);
 		static_assert(sizeof(CoordinateConformanceParameters) == 32);
 
 		struct CoordinateVertex
@@ -202,9 +203,11 @@ namespace gglab
 						commandContext->SetPipeline(GetOrCreateMarkerPipeline());
 						commandContext->SetViewport({ 0.0f, 0.0f, 2.0f, 2.0f });
 						commandContext->SetScissorRect({ 0, 0, 2, 2 });
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							CoordinateConformanceParameters{});
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), CoordinateConformanceParameters{}))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
 						commandContext->EndRendering();
 						m_State->m_MarkerExecutions.fetch_add(1, std::memory_order_relaxed);
@@ -297,9 +300,11 @@ namespace gglab
 							static_cast<float>(halfWidth), static_cast<float>(halfHeight) });
 						commandContext->SetScissorRect({ 0, 0,
 							static_cast<int32_t>(halfWidth), static_cast<int32_t>(halfHeight) });
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(CoordinateConformanceMode::Winding));
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::Winding)))
+						{
+							return;
+						}
 						commandContext->Draw(6);
 
 						const RHIIndexBufferBinding indexBinding{
@@ -313,9 +318,11 @@ namespace gglab
 							static_cast<float>(halfHeight) });
 						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth), 0,
 							static_cast<int32_t>(data.m_Width), static_cast<int32_t>(halfHeight) });
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(CoordinateConformanceMode::MarkerSampling));
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::MarkerSampling)))
+						{
+							return;
+						}
 						commandContext->DrawIndexed(6, 1, 0, 6, 0);
 
 						commandContext->SetPipeline(GetOrCreateDepthPipeline());
@@ -323,15 +330,17 @@ namespace gglab
 							static_cast<float>(halfWidth), static_cast<float>(data.m_Height - halfHeight) });
 						commandContext->SetScissorRect({ 0, static_cast<int32_t>(halfHeight),
 							static_cast<int32_t>(halfWidth), static_cast<int32_t>(data.m_Height) });
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(CoordinateConformanceMode::DepthVisualization,
-								ReversedZFarProbeDepth));
+						if (!commandContext->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::DepthVisualization,
+								ReversedZFarProbeDepth)))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(CoordinateConformanceMode::DepthVisualization,
-								ReversedZNearProbeDepth));
+						if (!commandContext->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::DepthVisualization,
+								ReversedZNearProbeDepth)))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
 
 						commandContext->SetPipeline(GetOrCreatePositionPipeline());
@@ -341,9 +350,11 @@ namespace gglab
 						commandContext->SetScissorRect({ static_cast<int32_t>(panelLeft),
 							static_cast<int32_t>(panelTop), static_cast<int32_t>(panelRight),
 							static_cast<int32_t>(panelBottom) });
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(CoordinateConformanceMode::Position));
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::Position)))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
 
 						// Overlay the same two-sided winding pair on the position gradient. With
@@ -356,9 +367,11 @@ namespace gglab
 						commandContext->SetScissorRect({ static_cast<int32_t>(panelLeft),
 							static_cast<int32_t>(panelTop), static_cast<int32_t>(panelRight),
 							static_cast<int32_t>(panelBottom) });
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(CoordinateConformanceMode::Winding));
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::Winding)))
+						{
+							return;
+						}
 						commandContext->Draw(6);
 						commandContext->EndRendering();
 						m_State->m_ConformanceExecutions.fetch_add(1, std::memory_order_relaxed);

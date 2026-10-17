@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
@@ -49,7 +51,7 @@ namespace gglab
 			float m_FalloffEnd = 0.0f;
 			uint32_t m_SampleIndex = 0;
 		};
-		static_assert(IsPassRootConstantStruct<GTAOEvaluatePassParameters>);
+		static_assert(IsPassConstantBufferStruct<GTAOEvaluatePassParameters>);
 		static_assert(sizeof(GTAOEvaluatePassParameters) == 64);
 
 		struct GTAOTemporalPassParameters
@@ -79,7 +81,7 @@ namespace gglab
 		{
 			return (maxSamples & 0xffffu) | (previousValid ? 1u << 16u : 0u);
 		}
-		static_assert(IsPassRootConstantStruct<GTAOTemporalPassParameters>);
+		static_assert(IsPassConstantBufferStruct<GTAOTemporalPassParameters>);
 		static_assert(sizeof(GTAOTemporalPassParameters) == 64);
 
 		struct GTAODenoisePassParameters
@@ -93,7 +95,7 @@ namespace gglab
 			uint32_t m_Padding0 = 0;
 			uint32_t m_Padding1 = 0;
 		};
-		static_assert(IsPassRootConstantStruct<GTAODenoisePassParameters>);
+		static_assert(IsPassConstantBufferStruct<GTAODenoisePassParameters>);
 		static_assert(sizeof(GTAODenoisePassParameters) == 32);
 
 		struct GTAOUpsamplePassParameters
@@ -111,7 +113,7 @@ namespace gglab
 			uint32_t m_Padding1 = 0;
 			uint32_t m_Padding2 = 0;
 		};
-		static_assert(IsPassRootConstantStruct<GTAOUpsamplePassParameters>);
+		static_assert(IsPassConstantBufferStruct<GTAOUpsamplePassParameters>);
 		static_assert(sizeof(GTAOUpsamplePassParameters) == 48);
 
 		struct EvaluatePassData
@@ -455,13 +457,19 @@ namespace gglab
 						PipelineVariant::Evaluate));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					context.m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->Dispatch(
 					(parameters.m_HalfWidth + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize,
 					(parameters.m_HalfHeight + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize, 1);
@@ -515,8 +523,11 @@ namespace gglab
 						parameters.m_HalfDepthIndex = halfDepth.m_Index;
 						parameters.m_OutputAOIndex = outputAO.m_Index;
 						commandContext->SetPipeline(GetOrCreatePipeline(services, variant));
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						commandContext->Dispatch(
 							(parameters.m_Width + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize,
 							(parameters.m_Height + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize, 1);
@@ -594,13 +605,19 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreatePipeline(services, PipelineVariant::Upsample));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					context.m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->Dispatch(
 					(parameters.m_FullWidth + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize,
 					(parameters.m_FullHeight + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize, 1);
@@ -731,13 +748,19 @@ namespace gglab
 					PipelineVariant::Temporal));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					context.m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->Dispatch(
 					(parameters.m_HalfWidth + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize,
 					(parameters.m_HalfHeight + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize, 1);

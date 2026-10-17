@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassAerialPerspective.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
@@ -44,7 +46,7 @@ namespace gglab
 			Vector3 m_SunDirection = Vector3::UnitY;
 			uint32_t m_Padding = 0;
 		};
-		static_assert(sizeof(AerialBuildParameters) == 64 && IsPassRootConstantStruct<AerialBuildParameters>);
+		static_assert(sizeof(AerialBuildParameters) == 64 && IsPassConstantBufferStruct<AerialBuildParameters>);
 
 		struct AerialCompositeParameters
 		{
@@ -65,7 +67,7 @@ namespace gglab
 			uint32_t m_DiagnosticMode = 0;
 			uint32_t m_Padding = 0;
 		};
-		static_assert(sizeof(AerialCompositeParameters) == 64 && IsPassRootConstantStruct<AerialCompositeParameters>);
+		static_assert(sizeof(AerialCompositeParameters) == 64 && IsPassConstantBufferStruct<AerialCompositeParameters>);
 
 		struct BuildPassData
 		{
@@ -219,12 +221,20 @@ namespace gglab
 				parameters.m_MaxDistanceKm = maxDistanceKm;
 				parameters.m_SunDirection = sunDirection;
 				command->SetPipeline(buildPipeline);
-				command->SetConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_Atmosphere->GetConstants(), 0);
+				command->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+					{
+						.m_Buffer = services.m_Atmosphere->GetConstants(),
+						.m_OffsetInBytes = 0,
+						.m_SizeInBytes = sizeof(AtmosphereGPU),
+					});
 				command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				command->SetPushConstants(static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					parameters);
+				if (!command->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				command->Dispatch((gridWidth + AerialThreadGroupSize - 1) / AerialThreadGroupSize,
 					(gridHeight + AerialThreadGroupSize - 1) / AerialThreadGroupSize, 1);
 			});
@@ -325,12 +335,20 @@ namespace gglab
 				parameters.m_Height = context.GetDisplayRenderView().m_Height;
 				parameters.m_DiagnosticMode = diagnosticMode;
 				command->SetPipeline(compositePipeline);
-				command->SetConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_Atmosphere->GetConstants(), 0);
+				command->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+					{
+						.m_Buffer = services.m_Atmosphere->GetConstants(),
+						.m_OffsetInBytes = 0,
+						.m_SizeInBytes = sizeof(AtmosphereGPU),
+					});
 				command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				command->SetPushConstants(static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					parameters);
+				if (!command->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				command->Dispatch((parameters.m_Width + AerialThreadGroupSize - 1) /
 					AerialThreadGroupSize, (parameters.m_Height + AerialThreadGroupSize - 1) /
 					AerialThreadGroupSize, 1);

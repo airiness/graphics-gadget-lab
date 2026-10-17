@@ -67,6 +67,7 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
+#include <cstring>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -90,6 +91,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
@@ -397,6 +399,13 @@ namespace gglab
 		class RecordingDevice final : public RHIDevice
 		{
 		public:
+			bool m_PassConstantsEnabled = false;
+			bool m_ConstantMapFails = false;
+			bool m_ConstantCreateFails = false;
+			bool m_ConstantPublishFails = false;
+			std::vector<std::vector<std::byte>> m_PassConstantStorage;
+			uint32_t m_PassConstantMapCount = 0;
+			uint32_t m_PassConstantPublishCount = 0;
 			bool m_AtmosphereBuffersEnabled = false;
 			uint32_t m_AtmosphereBufferCount = 0;
 			uint32_t m_AtmosphereDestroyedBufferCount = 0;
@@ -432,8 +441,18 @@ namespace gglab
 				++m_CreateTextureCount;
 				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
-			RHIBufferHandle CreateBuffer(const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			RHIBufferHandle CreateBuffer(
+				const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
+				if (m_PassConstantsEnabled)
+				{
+					if (m_ConstantCreateFails)
+					{
+						return {};
+					}
+					m_PassConstantStorage.emplace_back(desc.m_SizeInBytes);
+					return { static_cast<uint32_t>(m_PassConstantStorage.size()), 1 };
+				}
 				return m_AtmosphereBuffersEnabled ? RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } : RHIBufferHandle{};
 			}
 			RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
@@ -474,12 +493,31 @@ namespace gglab
 			{
 				return {};
 			}
-			void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			void* MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange) noexcept override
 			{
+				if (m_PassConstantsEnabled)
+				{
+					++m_PassConstantMapCount;
+					return m_ConstantMapFails ? nullptr : m_PassConstantStorage[buffer.Index() - 1].data();
+				}
 				return m_AtmosphereBuffersEnabled ? m_AtmosphereUpload.data() : nullptr;
 			}
-			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
-			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange range) noexcept override
+			{
+				if (m_PassConstantsEnabled && range.m_End > range.m_Begin)
+				{
+					++m_PassConstantPublishCount;
+				}
+			}
+			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override
+			{
+				return m_PassConstantsEnabled ? 256 : 1;
+			}
+			bool PublishMappedBufferWrites(RHIBufferHandle buffer, RHIMappedBufferRange range) noexcept override
+			{
+				UnmapBuffer(buffer, range);
+				return !m_ConstantPublishFails;
+			}
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{
 				return texture.IsValid();
@@ -494,8 +532,8 @@ namespace gglab
 			}
 			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				return !m_UseControlledFenceCompletion ||
-					(fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue);
+				return !fencePoint.IsValid() || !m_UseControlledFenceCompletion ||
+					fencePoint.m_Value <= m_CompletedFenceValue;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
 			{
@@ -1028,6 +1066,13 @@ namespace gglab
 				"Feature previews keep independent selections, exposure and requests");
 		}
 
+		struct RecordedConstantBinding
+		{
+			uint32_t m_ParameterIndex = 0;
+			RHIBufferHandle m_Buffer{};
+			uint64_t m_Offset = 0;
+		};
+
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
 		public:
@@ -1084,10 +1129,21 @@ namespace gglab
 			void SetViewport(const RHIViewport&) noexcept override {}
 			void SetScissorRect(const RHIScissorRect&) noexcept override {}
 			void SetPrimitiveTopology(RHIPrimitiveTopology) noexcept override {}
-			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override
+			bool SetConstantBuffer(uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override
 			{
+				if (!ValidateConstantBinding(binding))
+				{
+					return false;
+				}
+				m_ConstantBindings.push_back({ parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes });
+				return true;
+			}
+			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
+			{
+				m_LastInlineParameter = parameterIndex;
+				m_LastInlineOffset = offset;
+				m_LastInlineWords.assign(words.begin(), words.end());
 			}
 			void SetVertexBuffers(uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override
 			{
@@ -1096,6 +1152,10 @@ namespace gglab
 			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
 			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override {}
 
+			std::vector<RecordedConstantBinding> m_ConstantBindings;
+			std::vector<uint32_t> m_LastInlineWords;
+			uint32_t m_LastInlineParameter = 0;
+			uint32_t m_LastInlineOffset = 0;
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
 			uint32_t m_FlushBarrierCount = 0;
@@ -1132,14 +1192,29 @@ namespace gglab
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
-			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			bool SetConstantBuffer(uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override
+			{
+				if (!ValidateConstantBinding(binding))
+				{
+					return false;
+				}
+				m_ConstantBindings.push_back({ parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes });
+				return true;
+			}
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override
+			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
 			{
+				m_LastInlineParameter = parameterIndex;
+				m_LastInlineOffset = offset;
+				m_LastInlineWords.assign(words.begin(), words.end());
 			}
 			void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override {}
 
+			std::vector<RecordedConstantBinding> m_ConstantBindings;
+			std::vector<uint32_t> m_LastInlineWords;
+			uint32_t m_LastInlineParameter = 0;
+			uint32_t m_LastInlineOffset = 0;
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
 			uint32_t m_FlushBarrierCount = 0;
@@ -1563,6 +1638,179 @@ namespace gglab
 			}
 			context.Check(barrierContractMatches,
 				"Napa voxel mesh buffers transition from Common for draw and return to Common");
+		}
+
+		void RunPassParameterContractTests(SelfTestContext& context) noexcept
+		{
+			const auto layout = Renderer::BuildCommonRHIBindingLayoutDesc();
+			const auto passIndex = static_cast<uint32_t>(CommonRSRootParamIndex::PassCB);
+			const auto inlineIndex = static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants);
+			context.Check(layout.m_Slots[passIndex].m_Type == RHIBindingType::ConstantBuffer &&
+				layout.m_Slots[passIndex].m_Binding == 2 &&
+				layout.m_Slots[inlineIndex].m_Type == RHIBindingType::PushConstants &&
+				layout.m_Slots[inlineIndex].m_Binding == 4,
+				"Common binding layout separates b2 pass buffers from b4 inline constants");
+			DX12BindingLayoutBuildResult lowered{};
+			BuildDX12RootSignatureDesc(layout, lowered);
+			context.Check(lowered.m_RootParameters[passIndex].ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV &&
+				lowered.m_RootParameters[inlineIndex].ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS &&
+				lowered.m_RootParameters[inlineIndex].Constants.Num32BitValues == MaxInlineConstantDWORDs,
+				"DX12 lowers pass buffers to root CBVs while retaining immediate constants");
+			context.Check(IsValidPushConstantWrite(32, 8, 0) && IsValidPushConstantWrite(32, 2, 6) &&
+				!IsValidPushConstantWrite(32, 2, 7) && !IsValidPushConstantWrite(32, 1, UINT32_MAX) &&
+				!IsValidPushConstantWrite(0, 1, 0) && !IsValidPushConstantWrite(32, 0, 0),
+				"Inline writes reject non-inline bindings, empty payloads and overflowing partial writes");
+
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_CompletedFenceValue = 0;
+			RHIConstantUploadPool uploads(device);
+			auto batch = uploads.BeginBatch();
+			TransientResourcePool graphResources(&device);
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext compute;
+			graphics.BeginConstantRecording(batch.get());
+			compute.BeginConstantRecording(batch.get());
+			RGExecuteContext execution({ &graphics, &compute, nullptr });
+			std::array<uint32_t, 24> payload{};
+			payload.fill(0x12345678u);
+			bool uploaded = true;
+			RenderGraph graph({ &device, &graphResources });
+			graph.AddTrivialSideEffectPass("Constants.Graphics", [&](RGExecuteContext&)
+				{
+					uploaded &= graphics.SetConstantBufferData(passIndex, payload);
+					payload.fill(0);
+					const std::array<uint32_t, 2> words{ 17, 3 };
+					graphics.SetInlineConstants(inlineIndex, std::span(words), 1);
+				});
+			graph.AddTrivialSideEffectPass("Constants.Compute", RGPassEncoderType::Compute,
+				[&](RGExecuteContext&)
+				{
+					payload.fill(0xabcdef01u);
+					uploaded &= compute.SetConstantBufferData(passIndex, payload);
+					const std::array<uint32_t, 2> words{ 23, 5 };
+					compute.SetInlineConstants(inlineIndex, std::span(words), 2);
+					std::array<uint32_t, MaxPassConstantBufferBytes / sizeof(uint32_t)> large{};
+					for (uint32_t index = 0; index < 5; ++index)
+					{
+						large.back() = index + 1;
+						uploaded &= compute.SetConstantBufferData(passIndex, large);
+					}
+				});
+			context.Check(graph.Compile(), "Constant upload graph compiles");
+			graph.Execute(execution);
+			context.Check(uploaded && graphics.m_ConstantBindings.size() == 1 && compute.m_ConstantBindings.size() == 6,
+				"Graphics and compute upload typed parameters larger than root constants");
+			const auto first = graphics.m_ConstantBindings.front();
+			const auto second = compute.m_ConstantBindings.front();
+			uint32_t firstWord = 0;
+			uint32_t secondWord = 0;
+			std::memcpy(&firstWord, device.m_PassConstantStorage[first.m_Buffer.Index() - 1].data() + first.m_Offset, sizeof(firstWord));
+			std::memcpy(&secondWord, device.m_PassConstantStorage[second.m_Buffer.Index() - 1].data() + second.m_Offset, sizeof(secondWord));
+			context.Check(first.m_Buffer == second.m_Buffer && first.m_Offset != second.m_Offset &&
+				first.m_Offset % 256 == 0 && second.m_Offset % 256 == 0 &&
+				firstWord == 0x12345678u && secondWord == 0xabcdef01u,
+				"Aligned slices retain immutable CPU snapshots");
+			context.Check(device.m_PassConstantPublishCount == 0,
+				"Executing a graph does not publish or seal submission-owned uploads");
+			RenderGraph secondGraph({ &device, &graphResources });
+			secondGraph.AddTrivialSideEffectPass("Constants.SecondGraph", [&](RGExecuteContext&)
+				{ uploaded &= graphics.SetConstantBufferData(passIndex, payload); });
+			context.Check(secondGraph.Compile(), "A second graph shares the recording batch");
+			secondGraph.Execute(execution);
+			const auto reusable = graphics.UploadConstants(std::span(payload));
+			context.Check(uploaded && reusable.m_SizeInBytes == sizeof(payload) &&
+				graphics.SetConstantBuffer(passIndex, reusable) && compute.SetConstantBuffer(passIndex, reusable),
+				"Non-graph uploads can be bound repeatedly by graphics and compute in the same batch");
+			context.Check(compute.SetConstantBufferData(passIndex, std::span(payload)),
+				"Span parameter overloads upload their elements rather than the span object");
+			context.Check(batch->GetPageCount() == 2 && batch->PublishWrites() &&
+				device.m_PassConstantPublishCount == 2 &&
+				graphics.m_LastInlineWords == std::vector<uint32_t>({ 17, 3 }) && graphics.m_LastInlineOffset == 1 &&
+				compute.m_LastInlineWords == std::vector<uint32_t>({ 23, 5 }) && compute.m_LastInlineOffset == 2,
+				"Submission publishes all pages once while inline partial updates retain word offsets");
+			const RHIFencePoint submittedFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const auto presentFailed = RHIFrameEndResult::Fatal(submittedFence);
+			context.Check(batch->Submitted(presentFailed.GetSubmittedFence()),
+				"Submitted uploads remain fence-gated even when presentation fails");
+			graphics.EndConstantRecording();
+			compute.EndConstantRecording();
+			graph.Retire(submittedFence);
+			secondGraph.Retire(submittedFence);
+			uploads.ReclaimCompleted();
+			context.Check(uploads.GetPendingPageCount() == 2, "In-flight upload pages are retained independently of graph lifetime");
+
+			auto cancelled = uploads.BeginBatch();
+			graphics.BeginConstantRecording(cancelled.get());
+			const auto later = graphics.UploadConstants(payload);
+			context.Check(later.IsValid() && later.m_Buffer != first.m_Buffer && uploads.GetPageCount() == 3,
+				"A later submission cannot overwrite an in-flight page");
+			context.Check(!graphics.SetConstantBuffer(passIndex, reusable) && graphics.HasRecordingError() &&
+				cancelled->HasFailed() && !cancelled->PublishWrites() && !cancelled->Submitted(submittedFence),
+				"Cross-batch binding fails the recording transaction and prevents normal submission");
+			graphics.EndConstantRecording();
+			cancelled->Cancel();
+			auto reuse = uploads.BeginBatch();
+			graphics.BeginConstantRecording(reuse.get());
+			const auto afterCancel = graphics.UploadConstants(payload);
+			context.Check(afterCancel.m_Buffer == later.m_Buffer && afterCancel.m_UploadBatchId != later.m_UploadBatchId,
+				"Cancellation immediately recovers discarded storage with a new batch identity");
+			graphics.EndConstantRecording();
+			reuse->Cancel();
+			device.m_CompletedFenceValue = 5;
+			uploads.ReclaimCompleted();
+			context.Check(uploads.GetPendingPageCount() == 0, "Submitted pages become reusable only after GPU completion");
+
+			RHIConstantUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
+			auto exhausted = limited.BeginBatch();
+			graphics.BeginConstantRecording(exhausted.get());
+			compute.BeginConstantRecording(exhausted.get());
+			context.Check(graphics.SetConstantBufferData(passIndex, payload) &&
+				!compute.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError() &&
+				compute.HasRecordingError() && !exhausted->PublishWrites(),
+				"Page exhaustion poisons every encoder sharing the submission batch");
+			graphics.EndConstantRecording();
+			compute.EndConstantRecording();
+			exhausted->Cancel();
+
+			for (uint32_t failure = 0; failure < 2; ++failure)
+			{
+				RecordingDevice failingDevice;
+				failingDevice.m_PassConstantsEnabled = true;
+				failingDevice.m_ConstantCreateFails = failure == 0;
+				failingDevice.m_ConstantMapFails = failure == 1;
+				RHIConstantUploadPool failingPool(failingDevice);
+				auto failed = failingPool.BeginBatch();
+				graphics.BeginConstantRecording(failed.get());
+				context.Check(!graphics.SetConstantBufferData(passIndex, payload) && failed->HasFailed(),
+					"Buffer creation and mapping failures fail the recording transaction");
+				graphics.EndConstantRecording();
+				failed->Cancel();
+			}
+			auto sealed = uploads.BeginBatch();
+			context.Check(sealed->PublishWrites() && !sealed->Upload(std::as_bytes(std::span(payload))).IsValid(),
+				"Publication freezes upload allocation before submission");
+			sealed->Cancel();
+			auto publicationFailure = uploads.BeginBatch();
+			graphics.BeginConstantRecording(publicationFailure.get());
+			device.m_ConstantPublishFails = true;
+			context.Check(graphics.UploadConstants(payload).IsValid() &&
+				!publicationFailure->PublishWrites() && graphics.HasRecordingError() &&
+				!publicationFailure->Submitted(submittedFence),
+				"Host write publication failures prevent normal submission");
+			device.m_ConstantPublishFails = false;
+			graphics.EndConstantRecording();
+			publicationFailure->Cancel();
+			auto oversized = uploads.BeginBatch();
+			std::vector<std::byte> tooLarge(device.GetMaxConstantBufferRange() + 4);
+			context.Check(!oversized->Upload(tooLarge).IsValid() && oversized->HasFailed(),
+				"Constant uploads reject ranges beyond device capabilities");
+			oversized->Cancel();
+			graphics.BeginConstantRecording(nullptr);
+			context.Check(!graphics.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError(),
+				"Data uploads require an explicit recording scope outside the RenderGraph too");
+			graphics.EndConstantRecording();
 		}
 
 		void RunRHIFrameAndGraphicsScopeContractTests(SelfTestContext& context) noexcept
@@ -9958,6 +10206,7 @@ namespace gglab
 		RunRuntimePathConfigurationContractTests(context);
 		RunRenderHostContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
+		RunPassParameterContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);

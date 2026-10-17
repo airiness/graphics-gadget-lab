@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
@@ -11,6 +12,7 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
+#include <array>
 #include <cstddef>
 #include <optional>
 
@@ -151,16 +153,31 @@ namespace gglab
 			uint32_t m_WorkBIndex = 0;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
-			float m_Phase = 0.0f;
+			uint32_t m_Padding0 = 0;
 			float m_PatternFrequency = 18.0f;
 			float m_RingRadius = 0.46f;
 			float m_RingIntensity = 0.82f;
 			uint32_t m_CheckerCellSize = 32;
 			uint32_t m_ProbeIndex = 0;
+			std::array<uint32_t, 2> m_Padding1{};
+			std::array<float, 4> m_CheckerDarkColor{ 0.02f, 0.08f, 0.15f, 1.0f };
+			std::array<float, 4> m_CheckerLightColor{ 0.18f, 0.75f, 0.92f, 1.0f };
+			std::array<float, 4> m_RingColor{ 1.0f, 0.28f, 0.08f, 1.0f };
 		};
-		static_assert(IsPassRootConstantStruct<ComputeLabPassParameters>);
-		static_assert(sizeof(ComputeLabPassParameters) == 40);
+		static_assert(IsPassConstantBufferStruct<ComputeLabPassParameters>);
+		static_assert(sizeof(ComputeLabPassParameters) == 96);
+		static_assert(offsetof(ComputeLabPassParameters, m_CheckerDarkColor) == 48);
+		static_assert(offsetof(ComputeLabPassParameters, m_CheckerLightColor) == 64);
+		static_assert(offsetof(ComputeLabPassParameters, m_RingColor) == 80);
 		static_assert(offsetof(ComputeLabPassParameters, m_ProbeIndex) == 36);
+
+		struct ComputeLabInlineParameters
+		{
+			float m_Phase = 0.0f;
+			float m_PreviewSplit = 0.68f;
+		};
+		static_assert(IsInlineConstantStruct<ComputeLabInlineParameters>);
+		static_assert(sizeof(ComputeLabInlineParameters) == 8);
 
 		RHITextureDesc MakeWorkTextureDesc() noexcept
 		{
@@ -214,13 +231,15 @@ namespace gglab
 				const ComputeLabPassParameters frameParameters{
 					.m_Width = WorkTextureWidth,
 					.m_Height = WorkTextureHeight,
-					.m_Phase = std::fmod(
-						m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
-						6.28318530718f),
 					.m_PatternFrequency = m_State->m_PatternFrequency.load(std::memory_order_relaxed),
 					.m_RingRadius = m_State->m_RingRadius.load(std::memory_order_relaxed),
 					.m_RingIntensity = m_State->m_RingIntensity.load(std::memory_order_relaxed),
 					.m_CheckerCellSize = m_State->m_CheckerCellSize.load(std::memory_order_relaxed),
+				};
+				const ComputeLabInlineParameters inlineParameters{
+					.m_Phase = std::fmod(
+						m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
+						6.28318530718f),
 				};
 				const bool boundaryProbe = RequestsNonFiniteProbe(services);
 
@@ -300,7 +319,7 @@ namespace gglab
 						data.m_WorkBUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 							resources.m_WorkB);
 					},
-					[this, frameParameters](
+					[this, frameParameters, inlineParameters](
 						RGExecuteContext& executeContext, ComputeWritePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -313,9 +332,13 @@ namespace gglab
 						parameters.m_WorkAIndex = workAUav.m_Index;
 						parameters.m_WorkBIndex = workBUav.m_Index;
 						commandContext->SetPipeline(GetOrCreateComputeWritePSO());
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							parameters);
+						commandContext->SetInlineConstants(
+							static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants), inlineParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						DispatchWorkTexture(*commandContext);
 						m_State->m_WriteExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
@@ -331,7 +354,7 @@ namespace gglab
 						data.m_WorkAUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 							resources.m_WorkA);
 					},
-					[this, frameParameters](
+					[this, frameParameters, inlineParameters](
 						RGExecuteContext& executeContext, ComputeReadWritePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -342,9 +365,13 @@ namespace gglab
 						ComputeLabPassParameters parameters = frameParameters;
 						parameters.m_WorkAIndex = workAUav.m_Index;
 						commandContext->SetPipeline(GetOrCreateComputeReadWritePSO());
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							parameters);
+						commandContext->SetInlineConstants(
+							static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants), inlineParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						DispatchWorkTexture(*commandContext);
 						m_State->m_ReadWriteExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
@@ -362,7 +389,7 @@ namespace gglab
 							data.m_ProbeUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 								resources.m_NonFiniteProbe);
 						},
-						[this, frameParameters](
+						[this, frameParameters, inlineParameters](
 							RGExecuteContext& executeContext, NonFiniteProbePassData& data)
 						{
 							auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -373,9 +400,13 @@ namespace gglab
 							ComputeLabPassParameters parameters = frameParameters;
 							parameters.m_ProbeIndex = probeUav.m_Index;
 							commandContext->SetPipeline(GetOrCreateNonFiniteProbePSO());
-							commandContext->SetPushConstants(
-								static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-								parameters);
+							commandContext->SetInlineConstants(
+								static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants), inlineParameters);
+							if (!commandContext->SetConstantBufferData(
+								static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+							{
+								return;
+							}
 							DispatchWorkTexture(*commandContext);
 							m_State->m_ProbeExecutions.fetch_add(1, std::memory_order_relaxed);
 						});
@@ -392,7 +423,7 @@ namespace gglab
 						data.m_OutputUav =
 							builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
 					},
-					[this, frameParameters](
+					[this, frameParameters, inlineParameters](
 						RGExecuteContext& executeContext, CulledComputePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -401,9 +432,13 @@ namespace gglab
 						parameters.m_WorkAIndex = outputUav.m_Index;
 						parameters.m_WorkBIndex = outputUav.m_Index;
 						commandContext->SetPipeline(GetOrCreateComputeWritePSO());
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							parameters);
+						commandContext->SetInlineConstants(
+							static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants), inlineParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						DispatchWorkTexture(*commandContext);
 						m_State->m_CulledExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
@@ -439,7 +474,7 @@ namespace gglab
 						data.m_Width = displayWidth;
 						data.m_Height = displayHeight;
 					},
-					[this, frameParameters](RGExecuteContext& executeContext, PreviewPassData& data)
+					[this, frameParameters, inlineParameters](RGExecuteContext& executeContext, PreviewPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
 						const auto workASrv = executeContext.GetViewDescriptor(data.m_WorkASrv);
@@ -458,6 +493,8 @@ namespace gglab
 						commandContext->ClearColorAttachment(
 							0, { 0.005f, 0.008f, 0.015f, 1.0f });
 						commandContext->SetPipeline(GetOrCreatePreviewPSO());
+						commandContext->SetInlineConstants(
+							static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants), inlineParameters);
 						commandContext->SetViewport({
 							0.0f,
 							0.0f,
@@ -473,9 +510,11 @@ namespace gglab
 						ComputeLabPassParameters parameters = frameParameters;
 						parameters.m_WorkAIndex = workASrv.m_Index;
 						parameters.m_WorkBIndex = workBSrv.m_Index;
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							parameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
 						m_State->m_PreviewExecutions.fetch_add(1, std::memory_order_relaxed);
 					});

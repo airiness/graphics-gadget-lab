@@ -1,4 +1,6 @@
 #include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -531,8 +533,8 @@ namespace gglab
 			GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 			RetireSceneGpuAllocations(
 				&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
-			m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 		}
+		m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 
 		EndFrameLifetime();
 		return result;
@@ -577,11 +579,10 @@ namespace gglab
 					RetireSceneGpuAllocations(
 						&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
 				}
-
-				if (m_ActiveFrame.m_RenderGraph)
-				{
-					m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
-				}
+			}
+			if (m_ActiveFrame.m_RenderGraph)
+			{
+				m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 			}
 			// Release capture readbacks only after the RHI abort recorded their uses.
 			m_FrameCapture->OnFrameAborted(frameSerial);
@@ -742,8 +743,9 @@ namespace gglab
 			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
 		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 1, 0, 1,
 			MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 2, 0, 1,
-			MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
+		AddBindingSlot(
+			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 2, 0, 1, 0, "PassCB");
+		desc.m_Slots[desc.m_SlotCount - 1].m_BufferBindingMode = RHIBufferBindingMode::Dynamic;
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 1, 0, 1, 0,
 			"ObjectSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 2, 0, 1, 0,
@@ -752,6 +754,8 @@ namespace gglab
 			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
 			"LightSB");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 4, 0, 1,
+			MaxInlineConstantDWORDs * sizeof(uint32_t), "InlineConstants");
 		AddBindingSlot(desc, RHIBindingType::BindlessResourceTable, RHIShaderStage::All, 0, 0, 0, 0,
 			"BindlessResources");
 		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0,

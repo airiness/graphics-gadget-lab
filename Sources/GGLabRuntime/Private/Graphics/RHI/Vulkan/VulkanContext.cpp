@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
-#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
@@ -232,17 +232,10 @@ namespace gglab
 		m_PipelineSystem = std::make_unique<VulkanPipelineSystem>(&device);
 		m_TransferManager = std::make_unique<TransferManager>(
 			std::make_unique<VulkanTransferContext>(&device));
-		m_DynamicUniformBuffer = std::make_unique<VulkanDynamicUniformBuffer>();
-		if (!m_DynamicUniformBuffer->Initialize(&device, runtime.GetFrameSlotCount()))
-		{
-			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"VulkanContext failed to initialize its dynamic uniform arena.");
-			Finalize();
-			return false;
-		}
+		m_ConstantUploadPool = std::make_unique<RHIConstantUploadPool>(device);
 		m_Set0Frames = std::make_unique<VulkanSet0DynamicUniformFrames>();
 		if (!m_Set0Frames->Initialize(
-			&device, m_DynamicUniformBuffer.get(), runtime.GetFrameSlotCount()))
+			&device, runtime.GetFrameSlotCount()))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"VulkanContext failed to initialize its frame-local set-0 arenas.");
@@ -252,7 +245,7 @@ namespace gglab
 		m_GpuProfiler =
 			std::make_unique<VulkanGpuProfiler>(&device, runtime.GetFrameSlotCount());
 		m_GraphicsContext = std::make_unique<VulkanGraphicsCommandContext>(&device,
-			m_PipelineSystem.get(), m_DynamicUniformBuffer.get(), m_Set0Frames.get(),
+			m_PipelineSystem.get(), m_Set0Frames.get(),
 			m_GpuProfiler.get());
 		m_DirectComputeContext =
 			std::make_unique<VulkanComputeCommandContext>(*m_GraphicsContext);
@@ -388,6 +381,9 @@ namespace gglab
 		}
 
 		auto& frame = *m_Frames[begin.m_FrameSlotIndex];
+		frame.m_ConstantUploads = m_ConstantUploadPool->BeginBatch();
+		m_GraphicsContext->BeginConstantRecording(frame.m_ConstantUploads.get());
+		m_DirectComputeContext->BeginConstantRecording(frame.m_ConstantUploads.get());
 		frame.m_BackBufferIndex = begin.m_BackBufferIndex;
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
@@ -409,7 +405,8 @@ namespace gglab
 			m_GraphicsContext->GetUsedTextures().begin(), m_GraphicsContext->GetUsedTextures().end());
 		const std::vector usedBuffers(
 			m_GraphicsContext->GetUsedBuffers().begin(), m_GraphicsContext->GetUsedBuffers().end());
-		if (!m_GraphicsContext->FinishEncoding() ||
+		if (m_GraphicsContext->HasRecordingError() || m_DirectComputeContext->HasRecordingError() ||
+			!frame->m_ConstantUploads->PublishWrites() || !m_GraphicsContext->FinishEncoding() ||
 			!m_Bootstrap->m_FrameRuntime->EndFrameRecording())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -421,9 +418,12 @@ namespace gglab
 		if (!result.m_Submitted || !result.m_SubmittedFencePoint.IsValid())
 		{
 			GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
+			frame->m_ConstantUploads->Cancel();
 			FinishFrame(*frame);
 			return RHIFrameEndResult::Fatal();
 		}
+		const bool uploadsSubmitted = frame->m_ConstantUploads->Submitted(result.m_SubmittedFencePoint);
+		GGLAB_ASSERT_MSG(uploadsSubmitted, "Submitted Vulkan constants require fence retirement.");
 		const bool descriptorFrameClosed =
 			m_Set0Frames->EndFrame(frame->m_FrameSlotIndex, result.m_SubmittedFencePoint);
 		if (!descriptorFrameClosed)
@@ -447,7 +447,7 @@ namespace gglab
 			m_CompletedProductionFrame = true;
 		}
 		FinishFrame(*frame);
-		return result.IsComplete() && descriptorFrameClosed ?
+		return result.IsComplete() && descriptorFrameClosed && uploadsSubmitted ?
 			RHIFrameEndResult::Completed(result.m_SubmittedFencePoint) :
 			RHIFrameEndResult::Fatal(result.m_SubmittedFencePoint);
 	}
@@ -465,6 +465,7 @@ namespace gglab
 		m_GraphicsContext->AbortEncoding();
 		GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->AbortFrame();
+		frame->m_ConstantUploads->Cancel();
 		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
 		FinishFrame(*frame);
 		return result.m_SubmittedFencePoint;
@@ -513,6 +514,10 @@ namespace gglab
 
 	void VulkanContext::RetireCompletedWork() noexcept
 	{
+		if (m_ConstantUploadPool)
+		{
+			m_ConstantUploadPool->ReclaimCompleted();
+		}
 		if (m_TransferManager)
 		{
 			m_TransferManager->Reclaim();
@@ -602,6 +607,9 @@ namespace gglab
 
 	void VulkanContext::FinishFrame(VulkanFrameContext& frame) noexcept
 	{
+		m_GraphicsContext->EndConstantRecording();
+		m_DirectComputeContext->EndConstantRecording();
+		frame.m_ConstantUploads.reset();
 		frame.m_Active = false;
 		m_ActiveFrame = nullptr;
 	}
@@ -627,7 +635,7 @@ namespace gglab
 		m_GraphicsContext.reset();
 		m_GpuProfiler.reset();
 		m_Set0Frames.reset();
-		m_DynamicUniformBuffer.reset();
+		m_ConstantUploadPool.reset();
 		m_TransferManager.reset();
 		m_PipelineSystem.reset();
 		m_Bootstrap.reset();

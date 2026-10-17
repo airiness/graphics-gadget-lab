@@ -50,7 +50,7 @@ namespace gglab
 		[[nodiscard]] bool BuildSet0BufferBinding(VulkanDevice& device,
 			const VulkanBindingLayout& layout, uint32_t parameterIndex, RHIBufferHandle buffer,
 			uint64_t offset, VkDescriptorType descriptorType, RHIBufferUsage requiredUsage,
-			VulkanSet0BufferBinding& outBinding) noexcept
+			VulkanSet0BufferBinding& outBinding, uint64_t sizeInBytes) noexcept
 		{
 			const VulkanSet0BindingPlan* binding = FindSet0Binding(layout, parameterIndex);
 			VulkanResourceManager& resources = device.GetResourceManager();
@@ -65,7 +65,9 @@ namespace gglab
 			}
 
 			const VkPhysicalDeviceLimits& limits = device.GetPhysicalDeviceLimits();
-			const VkDeviceSize alignment = descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ?
+			const bool isUniform = descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+				descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			const VkDeviceSize alignment = isUniform ?
 				limits.minUniformBufferOffsetAlignment :
 				limits.minStorageBufferOffsetAlignment;
 			if (alignment != 0 && offset % alignment != 0)
@@ -74,9 +76,13 @@ namespace gglab
 			}
 			const VkDeviceSize remaining = desc->m_SizeInBytes - offset;
 			VkDeviceSize range = remaining;
-			if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			if (isUniform)
 			{
-				range = std::min<VkDeviceSize>(remaining, limits.maxUniformBufferRange);
+				if (sizeInBytes == 0 || sizeInBytes > remaining || sizeInBytes > limits.maxUniformBufferRange)
+				{
+					return false;
+				}
+				range = sizeInBytes;
 			}
 			else if (remaining > limits.maxStorageBufferRange)
 			{
@@ -110,14 +116,13 @@ namespace gglab
 	}
 
 	VulkanGraphicsCommandContext::VulkanGraphicsCommandContext(VulkanDevice* device,
-		VulkanPipelineSystem* pipelineSystem, VulkanDynamicUniformBuffer* uniformBuffer,
+		VulkanPipelineSystem* pipelineSystem,
 		VulkanSet0DynamicUniformFrames* set0Frames, VulkanGpuProfiler* gpuProfiler) noexcept :
-		m_Device(device), m_PipelineSystem(pipelineSystem), m_UniformBuffer(uniformBuffer),
+		m_Device(device), m_PipelineSystem(pipelineSystem),
 		m_Set0Frames(set0Frames), m_GpuProfiler(gpuProfiler)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		GGLAB_ASSERT_NOT_NULL(m_PipelineSystem);
-		GGLAB_ASSERT_NOT_NULL(m_UniformBuffer);
 		GGLAB_ASSERT_NOT_NULL(m_Set0Frames);
 	}
 
@@ -126,7 +131,6 @@ namespace gglab
 	{
 		if (m_CommandBuffer != VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE ||
 			!m_Device->RequireOwnerThread("VulkanGraphicsCommandContext::BeginEncoding") ||
-			!m_UniformBuffer->IsFrameActive(frameSlotIndex) ||
 			!m_Set0Frames->IsFrameActive(frameSlotIndex))
 		{
 			return false;
@@ -176,7 +180,7 @@ namespace gglab
 			}
 			return false;
 		}
-		const bool succeeded = !m_HasEncodingError;
+		const bool succeeded = !m_HasEncodingError && !HasRecordingError();
 		if (m_GpuProfiler)
 		{
 			m_GpuProfiler->EndFrame(m_FrameSlotIndex, m_CommandBuffer);
@@ -756,11 +760,19 @@ namespace gglab
 		m_PrimitiveTopology = topology;
 	}
 
-	void VulkanGraphicsCommandContext::SetConstantBuffer(
-		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	bool VulkanGraphicsCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
-		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
-			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RHIBufferUsage::Constant, "SetConstantBuffer");
+		const auto* slot = m_CurrentBindingLayout ? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) : nullptr;
+		if (!ValidateConstantBinding(binding) || !slot || slot->m_IsInlineConstants ||
+			(slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER &&
+				slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC))
+		{
+			Reject("SetConstantBuffer", "the constant binding or layout is invalid");
+			return false;
+		}
+		return SetBufferDescriptor(parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes,
+			slot->m_DescriptorType, RHIBufferUsage::Constant, "SetConstantBuffer", binding.m_SizeInBytes);
 	}
 
 	void VulkanGraphicsCommandContext::SetReadOnlyBuffer(
@@ -778,15 +790,19 @@ namespace gglab
 			Reject("SetPushConstants", "no pipeline binding layout is active");
 			return;
 		}
-		const VulkanDynamicUniformUpdate update = m_DynamicUniformState.SetPushConstants(
-			parameterIndex, values, destOffset, *m_UniformBuffer, m_FrameSlotIndex);
-		if (!update.IsValid() || update.m_DynamicOffsetSlot >= m_DynamicOffsets.size())
+		if (!m_DynamicUniformState.UpdateShadow(parameterIndex, values, destOffset))
 		{
-			Reject("SetPushConstants", "the immutable dynamic-uniform allocation failed");
+			Reject("SetPushConstants", "the inline write exceeds its declared layout");
 			return;
 		}
-		m_DynamicOffsets[update.m_DynamicOffsetSlot] = update.m_Allocation.m_DynamicOffset;
-		TrackBufferUse(update.m_Allocation.m_Buffer);
+		const auto binding = UploadConstants(m_DynamicUniformState.GetShadow(parameterIndex));
+		if (!binding.IsValid() || !SetBufferDescriptor(parameterIndex, binding.m_Buffer,
+			binding.m_OffsetInBytes, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+			RHIBufferUsage::Constant, "SetPushConstants", binding.m_SizeInBytes))
+		{
+			Reject("SetPushConstants", "the immutable inline allocation failed");
+		}
+
 	}
 
 	void VulkanGraphicsCommandContext::SetVertexBuffers(uint32_t startSlot,
@@ -883,18 +899,19 @@ namespace gglab
 		std::string_view operation, std::string_view reason) noexcept
 	{
 		m_HasEncodingError = true;
+		FailRecording();
 		GGLAB_LOG_GRAPHICS_ERROR("VulkanGraphicsCommandContext::{} rejected the command: {}.",
 			operation, reason);
 	}
 
 	bool VulkanGraphicsCommandContext::SetBufferDescriptor(uint32_t parameterIndex,
 		RHIBufferHandle buffer, uint64_t offset, VkDescriptorType descriptorType,
-		RHIBufferUsage requiredUsage, std::string_view operation) noexcept
+		RHIBufferUsage requiredUsage, std::string_view operation, uint64_t sizeInBytes) noexcept
 	{
 		VulkanSet0BufferBinding next{};
 		if (m_CurrentBindingLayout == nullptr || parameterIndex >= m_FixedBufferBindings.size() ||
 			!BuildSet0BufferBinding(*m_Device, *m_CurrentBindingLayout, parameterIndex,
-				buffer, offset, descriptorType, requiredUsage, next))
+				buffer, offset, descriptorType, requiredUsage, next, sizeInBytes))
 		{
 			const VulkanSet0BindingPlan* binding = m_CurrentBindingLayout ?
 				FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) :
@@ -923,6 +940,18 @@ namespace gglab
 			Reject(operation, "the fixed-buffer binding is invalid for the active layout");
 			return false;
 		}
+		if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+		{
+			const auto* binding = FindSet0Binding(*m_CurrentBindingLayout, parameterIndex);
+			if (!binding || binding->m_DynamicOffsetSlot >= m_DynamicOffsets.size() || offset > UINT32_MAX)
+			{
+				Reject(operation, "the dynamic buffer offset is invalid");
+				return false;
+			}
+			m_DynamicOffsets[binding->m_DynamicOffsetSlot] = static_cast<uint32_t>(offset);
+			// Offset changes alone reuse the immutable descriptor snapshot.
+			next.m_Offset = 0;
+		}
 		if (m_FixedBufferBindings[parameterIndex] != next)
 		{
 			m_FixedBufferBindings[parameterIndex] = next;
@@ -934,6 +963,11 @@ namespace gglab
 
 	bool VulkanGraphicsCommandContext::BindDescriptorSets() noexcept
 	{
+		if (HasRecordingError())
+		{
+			return false;
+		}
+
 		if (m_CurrentBindingLayout == nullptr)
 		{
 			Reject("Draw", "no pipeline binding layout is active");
@@ -1096,11 +1130,19 @@ namespace gglab
 		}
 	}
 
-	void VulkanComputeCommandContext::SetConstantBuffer(
-		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	bool VulkanComputeCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
-		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
-			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RHIBufferUsage::Constant, "SetConstantBuffer");
+		const auto* slot = m_CurrentBindingLayout ? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) : nullptr;
+		if (!ValidateConstantBinding(binding) || !slot || slot->m_IsInlineConstants ||
+			(slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER &&
+				slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC))
+		{
+			Reject("SetConstantBuffer", "the constant binding or layout is invalid");
+			return false;
+		}
+		return SetBufferDescriptor(parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes,
+			slot->m_DescriptorType, RHIBufferUsage::Constant, "SetConstantBuffer", binding.m_SizeInBytes);
 	}
 
 	void VulkanComputeCommandContext::SetReadOnlyBuffer(
@@ -1126,16 +1168,19 @@ namespace gglab
 			Reject("SetPushConstants", "no pipeline binding layout is active");
 			return;
 		}
-		const VulkanDynamicUniformUpdate update = m_DynamicUniformState.SetPushConstants(
-			parameterIndex, values, destOffset, *m_GraphicsContext->m_UniformBuffer,
-			m_GraphicsContext->m_FrameSlotIndex);
-		if (!update.IsValid() || update.m_DynamicOffsetSlot >= m_DynamicOffsets.size())
+		if (!m_DynamicUniformState.UpdateShadow(parameterIndex, values, destOffset))
 		{
-			Reject("SetPushConstants", "the immutable dynamic-uniform allocation failed");
+			Reject("SetPushConstants", "the inline write exceeds its declared layout");
 			return;
 		}
-		m_DynamicOffsets[update.m_DynamicOffsetSlot] = update.m_Allocation.m_DynamicOffset;
-		TrackBufferUse(update.m_Allocation.m_Buffer);
+		const auto binding = UploadConstants(m_DynamicUniformState.GetShadow(parameterIndex));
+		if (!binding.IsValid() || !SetBufferDescriptor(parameterIndex, binding.m_Buffer,
+			binding.m_OffsetInBytes, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+			RHIBufferUsage::Constant, "SetPushConstants", binding.m_SizeInBytes))
+		{
+			Reject("SetPushConstants", "the immutable inline allocation failed");
+		}
+
 	}
 
 	void VulkanComputeCommandContext::Dispatch(
@@ -1165,12 +1210,12 @@ namespace gglab
 
 	bool VulkanComputeCommandContext::SetBufferDescriptor(uint32_t parameterIndex,
 		RHIBufferHandle buffer, uint64_t offset, VkDescriptorType descriptorType,
-		RHIBufferUsage requiredUsage, std::string_view operation) noexcept
+		RHIBufferUsage requiredUsage, std::string_view operation, uint64_t sizeInBytes) noexcept
 	{
 		VulkanSet0BufferBinding next{};
 		if (m_CurrentBindingLayout == nullptr || parameterIndex >= m_FixedBufferBindings.size() ||
 			!BuildSet0BufferBinding(*m_GraphicsContext->m_Device, *m_CurrentBindingLayout,
-				parameterIndex, buffer, offset, descriptorType, requiredUsage, next))
+				parameterIndex, buffer, offset, descriptorType, requiredUsage, next, sizeInBytes))
 		{
 			if (parameterIndex < m_FixedBufferBindings.size())
 			{
@@ -1179,6 +1224,18 @@ namespace gglab
 			}
 			Reject(operation, "the fixed-buffer binding is invalid for the active layout");
 			return false;
+		}
+		if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+		{
+			const auto* binding = FindSet0Binding(*m_CurrentBindingLayout, parameterIndex);
+			if (!binding || binding->m_DynamicOffsetSlot >= m_DynamicOffsets.size() || offset > UINT32_MAX)
+			{
+				Reject(operation, "the dynamic buffer offset is invalid");
+				return false;
+			}
+			m_DynamicOffsets[binding->m_DynamicOffsetSlot] = static_cast<uint32_t>(offset);
+			// Offset changes alone reuse the immutable descriptor snapshot.
+			next.m_Offset = 0;
 		}
 		if (m_FixedBufferBindings[parameterIndex] != next)
 		{
@@ -1191,6 +1248,11 @@ namespace gglab
 
 	bool VulkanComputeCommandContext::BindDescriptorSets() noexcept
 	{
+		if (HasRecordingError())
+		{
+			return false;
+		}
+
 		if (m_CurrentBindingLayout == nullptr)
 		{
 			Reject("Dispatch", "no pipeline binding layout is active");

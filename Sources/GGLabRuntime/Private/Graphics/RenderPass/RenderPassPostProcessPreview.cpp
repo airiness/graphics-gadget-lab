@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
@@ -39,7 +41,7 @@ namespace gglab
 			float Padding1 = 0.0f;
 			float Padding2 = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<PostProcessPreviewPassParameters>);
+		static_assert(IsPassConstantBufferStruct<PostProcessPreviewPassParameters>);
 		static_assert(sizeof(PostProcessPreviewPassParameters) == 32);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthRaw) == 4);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthLinearViewZ) == 5);
@@ -155,8 +157,11 @@ namespace gglab
 			const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 			commandContext->SetConstantBuffer(
 				static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-				sceneBuffer->GetBufferHandle(),
-				context.m_RenderScene.m_SceneConstantBufferOffset);
+				{
+					.m_Buffer = sceneBuffer->GetBufferHandle(),
+					.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+					.m_SizeInBytes = sizeof(SceneGPU),
+				});
 			commandContext->SetReadOnlyBuffer(
 				static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 				services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
@@ -169,8 +174,11 @@ namespace gglab
 				.SourcePreExposure = data.m_SourcePreExposure,
 				.PreviewExposureScale = data.m_PreviewExposureScale,
 			};
-			commandContext->SetPushConstants(
-				static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+			if (!commandContext->SetConstantBufferData(
+				static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+			{
+				return;
+			}
 			commandContext->DrawFullscreenTriangle();
 		}
 

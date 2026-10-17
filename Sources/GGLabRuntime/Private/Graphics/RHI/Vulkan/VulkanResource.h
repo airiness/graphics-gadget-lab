@@ -109,7 +109,7 @@ namespace gglab
 		// return their VMA-owned pointer directly. The read/written ranges
 		// must satisfy Begin <= End <= size.
 		[[nodiscard]] void* Map(RHIMappedBufferRange readRange) noexcept;
-		void Unmap(RHIMappedBufferRange writtenRange) noexcept;
+		bool Unmap(RHIMappedBufferRange writtenRange) noexcept;
 		[[nodiscard]] VulkanBufferMapping GetMapping() const noexcept { return m_Mapping; }
 
 	private:

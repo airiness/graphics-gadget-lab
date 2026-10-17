@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
@@ -37,7 +38,7 @@ namespace gglab
 			Vector3 SunDirection = Vector3::UnitY;
 			float Padding = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<IBLEnvironmentPassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLEnvironmentPassParameters>);
 		static_assert(sizeof(IBLEnvironmentPassParameters) == 32);
 		static_assert(offsetof(IBLEnvironmentPassParameters, SunDirection) == 16);
 
@@ -197,9 +198,11 @@ namespace gglab
 						.SourceMode = data.m_SourceMode,
 						.SunDirection = bakeScheduler->GetBakingSunDirection(),
 					};
-					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-						passParameters);
+					if (!commandContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+					{
+						return;
+					}
 
 					commandContext->DrawFullscreenTriangle();
 					commandContext->EndRendering();

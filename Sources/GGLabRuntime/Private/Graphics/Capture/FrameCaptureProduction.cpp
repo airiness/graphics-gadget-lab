@@ -81,7 +81,7 @@ namespace gglab
 					auto* commands = context.GetDirectComputeCommandContext();
 					commands->SetPipeline(pipeline);
 					commands->SetReadWriteBuffer(0, context.GetBufferHandle(record));
-					commands->SetPushConstants(1, constants);
+					commands->SetInlineConstants(1, constants);
 					commands->Dispatch((nonfinite::SiteCount * nonfinite::ProgramCount + 63) / 64, 1, 1);
 				} };
 		return true;

@@ -246,7 +246,7 @@ namespace gglab
 			void SetViewport(const RHIViewport&) noexcept override {}
 			void SetScissorRect(const RHIScissorRect&) noexcept override {}
 			void SetPrimitiveTopology(RHIPrimitiveTopology) noexcept override {}
-			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			bool SetConstantBuffer(uint32_t, const RHIConstantBufferBinding& binding) noexcept override { return ValidateConstantBinding(binding); }
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
 			void SetVertexBuffers(uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override {}
@@ -308,7 +308,7 @@ namespace gglab
 			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
 			void SetPipeline(RHIPipelineHandle pipeline) noexcept override { m_Pipeline = pipeline; }
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
-			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			bool SetConstantBuffer(uint32_t, const RHIConstantBufferBinding& binding) noexcept override { return ValidateConstantBinding(binding); }
 			void SetReadOnlyBuffer(uint32_t slot, RHIBufferHandle buffer, uint64_t) noexcept override
 			{
 				if (slot == 1)
