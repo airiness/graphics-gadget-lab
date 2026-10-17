@@ -193,7 +193,7 @@ $SupportedSchemaVersions = @(1)
 # Frame settings that change what a capture shows. Backend, request id, frame
 # serial, capture time and file names are expected to differ between captures.
 $ComparedMetadataFields = @(
-    'source', 'timing.mode', 'timing.settleFrames', 'content.demoId', 'content.labId',
+    'source', 'diagnosticTap', 'timing.mode', 'timing.settleFrames', 'content.demoId', 'content.labId',
     'image.width', 'image.height', 'image.displayFormat', 'camera.referenceView',
     'camera.position', 'camera.forward', 'camera.up', 'camera.verticalFovDegrees',
     'camera.nearPlane', 'camera.farPlane', 'time.fixedDeltaTime', 'time.totalTime',

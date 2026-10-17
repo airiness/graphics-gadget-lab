@@ -48,7 +48,7 @@ function New-Case([string]$Name) {
 
 function Check-Comparison([string]$Name, [string]$Reference, [string]$Candidate,
     [int]$ExitCode, [int]$Compared, [int]$Rejected, [int]$Failed = 0, [int]$Unmatched = 0,
-    [switch]$RequireMatchingInputs) {
+    [switch]$RequireMatchingInputs, [string]$ExpectedInputDifference) {
     $extra = @()
     if ($RequireMatchingInputs) { $extra += '-RequireMatchingInputs' }
     $text = & powershell -NoProfile -ExecutionPolicy Bypass -File $comparisonScript `
@@ -62,6 +62,11 @@ function Check-Comparison([string]$Name, [string]$Reference, [string]$Candidate,
         $actualCompared -ne $Compared -or @($receipt.rejected).Count -ne $Rejected -or
         $actualFailed -ne $Failed -or @($receipt.unmatched).Count -ne $Unmatched) {
         throw "Unexpected comparison result for ${Name}: $($text -join '')"
+    }
+    if ($ExpectedInputDifference -and ($receipt.pairs[0].inputDifferences.Count -ne 1 -or
+        $receipt.pairs[0].inputDifferences[0] -cne $ExpectedInputDifference -or
+        $receipt.pairs[0].PSObject.Properties['meanAbsoluteError'])) {
+        throw "Expected only input difference '$ExpectedInputDifference' without pixel metrics for ${Name}."
     }
     $script:checks += $Name
 }
@@ -141,6 +146,27 @@ try {
     $metadata.temporal.status = 'disabled'
     Write-VerificationJson -Depth 12 $path $metadata
     Check-Comparison 'different-effective-temporal-inputs' "$case/off" "$case/on" 1 1 0 1 -RequireMatchingInputs
+
+    foreach ($arm in @('off', 'on')) {
+        $path = "$case/$arm/capture.json"
+        $metadata = Get-Content -Raw $path | ConvertFrom-Json
+        $metadata.temporal.status = 'active'
+        $metadata.source = 'diagnostic'
+        $metadata | Add-Member -NotePropertyName diagnosticTap -NotePropertyValue 'temporal-motion-direction'
+        Write-VerificationJson -Depth 12 $path $metadata
+    }
+    Check-Comparison 'matching-diagnostic-inputs' "$case/off" "$case/on" 0 1 0 -RequireMatchingInputs
+    $path = "$case/on/capture.json"
+    $metadata = Get-Content -Raw $path | ConvertFrom-Json
+    $metadata.diagnosticTap = 'temporal-rejection'
+    Write-VerificationJson -Depth 12 $path $metadata
+    Check-Comparison 'different-diagnostic-inputs' "$case/off" "$case/on" 1 1 0 1 `
+        -RequireMatchingInputs -ExpectedInputDifference 'diagnosticTap'
+    Check-Comparison 'different-diagnostic-inputs-without-strict-matching' "$case/off" "$case/on" 0 1 0
+    $metadata.PSObject.Properties.Remove('diagnosticTap')
+    Write-VerificationJson -Depth 12 $path $metadata
+    Check-Comparison 'missing-diagnostic-input' "$case/off" "$case/on" 1 1 0 1 `
+        -RequireMatchingInputs -ExpectedInputDifference 'diagnosticTap'
 
     $result = @{ ok = $true; checks = $checks; directory = $output }
     Write-VerificationJson -Depth 12 (Join-Path $output 'result.json') $result
