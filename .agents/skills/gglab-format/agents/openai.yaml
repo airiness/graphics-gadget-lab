@@ -1,0 +1,3 @@
+interface:
+  display_name: "GGLab Format"
+  short_description: "Review GGLab C++ and HLSL layout before verification"
