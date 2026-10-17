@@ -252,6 +252,77 @@ namespace gglab
 		return outPipelineState != nullptr && outRootSignature != nullptr;
 	}
 
+	std::array<uint32_t, RHIBindingLayoutDesc::MaxSlots> DX12PipelineSystem::GetPushConstantSizes(
+		RHIPipelineHandle pipeline) const noexcept
+	{
+		std::array<uint32_t, RHIBindingLayoutDesc::MaxSlots> sizes{};
+		std::shared_lock lock(m_Mutex);
+		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration ||
+			pipeline.Index() >= m_Pipelines.size())
+		{
+			return sizes;
+		}
+		const auto& pipelineBinding = m_Pipelines[pipeline.Index()];
+		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics ?
+			pipelineBinding.m_GraphicsDesc.m_BindingLayout :
+			pipelineBinding.m_ComputeDesc.m_BindingLayout;
+		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration ||
+			layout.Index() >= m_BindingLayouts.size())
+		{
+			return sizes;
+		}
+		const auto& binding = m_BindingLayouts[layout.Index()];
+		uint32_t parameterIndex = 0;
+		for (uint32_t index = 0; index < binding.m_SlotCount; ++index)
+		{
+			const auto& slot = binding.m_Slots[index];
+			if (slot.m_Type == RHIBindingType::Unknown || IsBindlessBindingType(slot.m_Type))
+			{
+				continue;
+			}
+			if (slot.m_Type == RHIBindingType::PushConstants)
+			{
+				sizes[parameterIndex] = slot.m_SizeInBytes;
+			}
+			++parameterIndex;
+		}
+		return sizes;
+	}
+
+	std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> DX12PipelineSystem::GetBufferBindingTypes(
+		RHIPipelineHandle pipeline) const noexcept
+	{
+		std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> types{};
+		std::shared_lock lock(m_Mutex);
+		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration ||
+			pipeline.Index() >= m_Pipelines.size())
+		{
+			return types;
+		}
+		const auto& pipelineBinding = m_Pipelines[pipeline.Index()];
+		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics ?
+			pipelineBinding.m_GraphicsDesc.m_BindingLayout :
+			pipelineBinding.m_ComputeDesc.m_BindingLayout;
+		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration ||
+			layout.Index() >= m_BindingLayouts.size())
+		{
+			return types;
+		}
+		const auto& binding = m_BindingLayouts[layout.Index()];
+		uint32_t parameterIndex = 0;
+		for (uint32_t index = 0; index < binding.m_SlotCount; ++index)
+		{
+			const auto& slot = binding.m_Slots[index];
+			if (slot.m_Type == RHIBindingType::Unknown || IsBindlessBindingType(slot.m_Type))
+			{
+				continue;
+			}
+			types[parameterIndex] = slot.m_Type;
+			++parameterIndex;
+		}
+		return types;
+	}
+
 	bool DX12PipelineSystem::ResolveComputePipeline(RHIPipelineHandle pipeline,
 		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature) const noexcept
 	{

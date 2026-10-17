@@ -81,6 +81,10 @@ namespace gglab::asset_test
 
 	RHIBufferHandle TestRHIDevice::CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept
 	{
+		if (Test(desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage))
+		{
+			return {};
+		}
 		const RHIBufferHandle handle{ m_NextBufferIndex++, 1 };
 		m_LiveBuffers.emplace(handle, desc.m_SizeInBytes);
 		return handle;
@@ -94,6 +98,15 @@ namespace gglab::asset_test
 	bool TestRHIDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
 		return fencePoint.IsValid() && m_AllFencesCompleted;
+	}
+
+	RHIFenceQueryResult TestRHIDevice::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		return m_AllFencesCompleted ? RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending;
 	}
 
 	TemporaryDirectory::TemporaryDirectory(std::string_view name) noexcept

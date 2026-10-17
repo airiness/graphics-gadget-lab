@@ -16,12 +16,14 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "LoadingProgress.h"
 #include "GGLabRuntime/Core/Time.h"
 
+#include <cstdlib>
 #include <iterator>
 #include <optional>
 #include <span>
@@ -87,6 +89,16 @@ namespace gglab
 			}
 		}
 
+		// Destroying runtime, tooling or host objects could free memory the GPU still reads.
+		// Ending the process without destructors leaves that memory to the operating system.
+		[[noreturn]] void AbandonProcessAfterUnverifiedGpuTeardown() noexcept
+		{
+			GGLAB_LOG_CRITICAL_ALWAYS(
+				"App runtime shutdown could not verify GPU idle; the process exits without "
+				"destroying GPU-visible resources.");
+			FlushLogs();
+			std::_Exit(EXIT_FAILURE);
+		}
 	}
 
 	AppRuntimeServiceInitializeResult GGLabAppRuntime::InitializeServices(
@@ -418,7 +430,12 @@ namespace gglab
 			if (m_RenderHost && m_RenderHost->IsInitialized())
 			{
 				m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
-				m_RenderHost->GetRHIContext()->WaitIdle();
+				// Verified idle, or confirmed device loss, lets every owner below release.
+				if (QuiesceRHIForTeardown(*m_RenderHost->GetRHIContext()) ==
+					RHITeardownState::Unverified)
+				{
+					AbandonProcessAfterUnverifiedGpuTeardown();
+				}
 				// Host-owned tooling may retain backend pipelines, descriptors and user
 				// textures referenced by the last submitted frame. Retire them only at
 				// this quiescent point, while all borrowed runtime services remain alive.

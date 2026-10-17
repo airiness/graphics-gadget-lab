@@ -7,7 +7,9 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <utility>
 

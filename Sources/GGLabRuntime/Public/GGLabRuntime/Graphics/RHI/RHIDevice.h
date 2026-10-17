@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
@@ -64,16 +65,33 @@ namespace gglab
 			RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept = 0;
 		virtual std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept = 0;
 		virtual std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept = 0;
+		// A CpuToGpu pointer stays valid until UnmapBuffer or buffer destruction. The caller
+		// must not rewrite a range that an unfinished submission reads.
 		virtual void* MapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept = 0;
+		// Ends a mapping. For CpuToGpu buffers it also publishes the written range.
 		virtual void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
+		// Makes host writes in the range of a mapped CpuToGpu buffer available to GPU work
+		// submitted afterwards; the mapping stays valid. On failure, work that reads the
+		// range must not be submitted. Every device states this behavior explicitly.
+		[[nodiscard]] virtual bool FlushMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
+		virtual uint32_t GetMaxConstantBufferRange() const noexcept { return 64 * 1024; }
+		[[nodiscard]] virtual RHIUploadLimits GetUploadLimits() const noexcept = 0;
+		[[nodiscard]] virtual bool IsUploadStorage(RHIBufferHandle buffer) const noexcept = 0;
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
+		// Routine release query: true when the GPU no longer uses work up to the point.
+		// An invalid point records no use. It must not accept GPU-written contents or
+		// verify quiescence; use QueryFencePoint for those decisions.
 		virtual bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept = 0;
+		// Checked completion query. An invalid or unknown point is never Completed.
+		[[nodiscard]] virtual RHIFenceQueryResult QueryFencePoint(
+			const RHIFencePoint& fencePoint) const noexcept = 0;
 		virtual void RecordTextureUse(
 			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept = 0;
 		virtual void RecordBufferUse(

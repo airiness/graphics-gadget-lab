@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -18,7 +20,7 @@ namespace gglab
 			uint32_t m_Output = 0, m_Transmittance = 0, m_Multiple = 0, m_Sampler = 0;
 			uint32_t m_Stage = 0, m_Width = 0, m_Height = 0, m_Padding = 0;
 		};
-		static_assert(sizeof(Parameters) == 32 && IsPassRootConstantStruct<Parameters>);
+		static_assert(sizeof(Parameters) == 32 && IsPassConstantBufferStruct<Parameters>);
 		struct PassData { RGTextureViewId m_Output, m_Transmittance, m_Multiple; };
 		struct SetupData {};
 	}
@@ -138,8 +140,18 @@ namespace gglab
 					parameters.m_Height = AtmosphereLutHeights[stage];
 					command->SetPipeline(pipeline);
 					// CPU-uploaded, immutable for the frame, retained by AtmosphereSystem until submission completes.
-					command->SetConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), atmosphere->GetConstants(), 0);
-					command->SetPushConstants(static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+					command->SetConstantBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+						{
+							.m_Buffer = atmosphere->GetConstants(),
+							.m_OffsetInBytes = 0,
+							.m_SizeInBytes = sizeof(AtmosphereGPU),
+						});
+					if (!command->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+					{
+						return;
+					}
 					command->Dispatch((parameters.m_Width + 7) / 8, (parameters.m_Height + 7) / 8, 1);
 					atmosphere->NotifyExecuted(stage);
 				});

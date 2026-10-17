@@ -67,6 +67,7 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
+#include <cstring>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -89,7 +90,11 @@
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
+#include "Graphics/RHI/RHIUploadPool.h"
+#include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
@@ -397,6 +402,16 @@ namespace gglab
 		class RecordingDevice final : public RHIDevice
 		{
 		public:
+			bool m_PassConstantsEnabled = false;
+			bool m_ConstantMapFails = false;
+			bool m_ConstantCreateFails = false;
+			bool m_ConstantPublishFails = false;
+			std::vector<std::vector<std::byte>> m_PassConstantStorage;
+			std::vector<RHIBufferDesc> m_UploadBufferDescs;
+			RHIUploadLimits m_UploadLimits{ 256, 64 * 1024, 16, 128 * 1024 * 1024 };
+			uint32_t m_PassConstantMapCount = 0;
+			uint32_t m_PassConstantPublishCount = 0;
+			uint32_t m_PassConstantUnmapCount = 0;
 			bool m_AtmosphereBuffersEnabled = false;
 			uint32_t m_AtmosphereBufferCount = 0;
 			uint32_t m_AtmosphereDestroyedBufferCount = 0;
@@ -432,9 +447,22 @@ namespace gglab
 				++m_CreateTextureCount;
 				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
-			RHIBufferHandle CreateBuffer(const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			RHIBufferHandle CreateBuffer(
+				const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				return m_AtmosphereBuffersEnabled ? RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } : RHIBufferHandle{};
+				if (m_PassConstantsEnabled)
+				{
+					if (m_ConstantCreateFails)
+					{
+						return {};
+					}
+					m_PassConstantStorage.emplace_back(desc.m_SizeInBytes);
+					m_UploadBufferDescs.push_back(desc);
+					return { static_cast<uint32_t>(m_PassConstantStorage.size()), 1 };
+				}
+				return m_AtmosphereBuffersEnabled ?
+					RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } :
+					RHIBufferHandle{};
 			}
 			RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
@@ -474,12 +502,41 @@ namespace gglab
 			{
 				return {};
 			}
-			void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			void* MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange) noexcept override
 			{
+				if (m_PassConstantsEnabled)
+				{
+					++m_PassConstantMapCount;
+					return m_ConstantMapFails ? nullptr : m_PassConstantStorage[buffer.Index() - 1].data();
+				}
 				return m_AtmosphereBuffersEnabled ? m_AtmosphereUpload.data() : nullptr;
 			}
-			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
-			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			{
+				if (m_PassConstantsEnabled)
+				{
+					++m_PassConstantUnmapCount;
+				}
+			}
+			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override
+			{
+				return m_PassConstantsEnabled ? 256 : 1;
+			}
+			RHIUploadLimits GetUploadLimits() const noexcept override { return m_UploadLimits; }
+			bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override
+			{
+				return buffer.IsValid() && buffer.Index() > 0 && buffer.Index() <= m_UploadBufferDescs.size() &&
+					Test(m_UploadBufferDescs[buffer.Index() - 1].m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
+			}
+			bool FlushMappedBufferWrites(RHIBufferHandle buffer, RHIMappedBufferRange range) noexcept override
+			{
+				if (m_PassConstantsEnabled && buffer.IsValid() && range.m_End > range.m_Begin)
+				{
+					++m_PassConstantPublishCount;
+				}
+				// Host memory is coherent here; the flag injects a native publication failure.
+				return buffer.IsValid() && !m_ConstantPublishFails;
+			}
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{
 				return texture.IsValid();
@@ -494,8 +551,18 @@ namespace gglab
 			}
 			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				return !m_UseControlledFenceCompletion ||
-					(fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue);
+				return !fencePoint.IsValid() || !m_UseControlledFenceCompletion ||
+					fencePoint.m_Value <= m_CompletedFenceValue;
+			}
+			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
+			{
+				if (!fencePoint.IsValid())
+				{
+					return RHIFenceQueryResult::Failed;
+				}
+				return IsFencePointCompleted(fencePoint) ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
 			{
@@ -1028,9 +1095,18 @@ namespace gglab
 				"Feature previews keep independent selections, exposure and requests");
 		}
 
+		struct RecordedConstantBinding
+		{
+			uint32_t m_ParameterIndex = 0;
+			RHIBufferHandle m_Buffer{};
+			uint64_t m_Offset = 0;
+		};
+
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
 		public:
+			void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+			void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
 			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
 			void TrackTextureUse(RHITextureHandle) noexcept override {}
@@ -1084,10 +1160,28 @@ namespace gglab
 			void SetViewport(const RHIViewport&) noexcept override {}
 			void SetScissorRect(const RHIScissorRect&) noexcept override {}
 			void SetPrimitiveTopology(RHIPrimitiveTopology) noexcept override {}
-			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override
+			bool SetConstantBuffer(uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override
 			{
+				if (!ValidateConstantBinding(binding))
+				{
+					return false;
+				}
+				m_ConstantBindings.push_back({ parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes });
+				return true;
+			}
+			using RHIGraphicsCommandContext::SetReadOnlyBuffer;
+			bool SetReadOnlyBufferBinding(uint32_t, const RHIReadOnlyBufferBinding& binding) noexcept override
+			{
+				m_ReadOnlyBindings.push_back(binding);
+				return true;
+			}
+			std::vector<RHIReadOnlyBufferBinding> m_ReadOnlyBindings;
+			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
+			{
+				m_LastInlineParameter = parameterIndex;
+				m_LastInlineOffset = offset;
+				m_LastInlineWords.assign(words.begin(), words.end());
 			}
 			void SetVertexBuffers(uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override
 			{
@@ -1096,6 +1190,10 @@ namespace gglab
 			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
 			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override {}
 
+			std::vector<RecordedConstantBinding> m_ConstantBindings;
+			std::vector<uint32_t> m_LastInlineWords;
+			uint32_t m_LastInlineParameter = 0;
+			uint32_t m_LastInlineOffset = 0;
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
 			uint32_t m_FlushBarrierCount = 0;
@@ -1111,6 +1209,8 @@ namespace gglab
 		class RecordingComputeCommandContext final : public RHIComputeCommandContext
 		{
 		public:
+			void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+			void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
 			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
 			void TrackTextureUse(RHITextureHandle) noexcept override {}
@@ -1132,14 +1232,36 @@ namespace gglab
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
-			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			bool SetConstantBuffer(uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override
+			{
+				if (!ValidateConstantBinding(binding))
+				{
+					return false;
+				}
+				m_ConstantBindings.push_back({ parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes });
+				return true;
+			}
+			using RHIComputeCommandContext::SetReadOnlyBuffer;
+			bool SetReadOnlyBufferBinding(uint32_t, const RHIReadOnlyBufferBinding& binding) noexcept override
+			{
+				m_ReadOnlyBindings.push_back(binding);
+				return true;
+			}
+			std::vector<RHIReadOnlyBufferBinding> m_ReadOnlyBindings;
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override
+			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
 			{
+				m_LastInlineParameter = parameterIndex;
+				m_LastInlineOffset = offset;
+				m_LastInlineWords.assign(words.begin(), words.end());
 			}
 			void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override {}
 
+			std::vector<RecordedConstantBinding> m_ConstantBindings;
+			std::vector<uint32_t> m_LastInlineWords;
+			uint32_t m_LastInlineParameter = 0;
+			uint32_t m_LastInlineOffset = 0;
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
 			uint32_t m_FlushBarrierCount = 0;
@@ -1563,6 +1685,859 @@ namespace gglab
 			}
 			context.Check(barrierContractMatches,
 				"Napa voxel mesh buffers transition from Common for draw and return to Common");
+		}
+
+		void RunPassParameterContractTests(SelfTestContext& context) noexcept
+		{
+			const auto layout = Renderer::BuildCommonRHIBindingLayoutDesc();
+			const auto passIndex = static_cast<uint32_t>(CommonRSRootParamIndex::PassCB);
+			const auto inlineIndex = static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants);
+			context.Check(layout.m_Slots[passIndex].m_Type == RHIBindingType::ConstantBuffer &&
+				layout.m_Slots[passIndex].m_Binding == 2 &&
+				layout.m_Slots[inlineIndex].m_Type == RHIBindingType::PushConstants &&
+				layout.m_Slots[inlineIndex].m_Binding == 4,
+				"Common binding layout separates b2 pass buffers from b4 inline constants");
+			DX12BindingLayoutBuildResult lowered{};
+			BuildDX12RootSignatureDesc(layout, lowered);
+			context.Check(lowered.m_RootParameters[passIndex].ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV &&
+				lowered.m_RootParameters[inlineIndex].ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS &&
+				lowered.m_RootParameters[inlineIndex].Constants.Num32BitValues == MaxInlineConstantDWORDs,
+				"DX12 lowers pass buffers to root CBVs while retaining immediate constants");
+			context.Check(IsValidPushConstantWrite(32, 8, 0) && IsValidPushConstantWrite(32, 2, 6) &&
+				!IsValidPushConstantWrite(32, 2, 7) && !IsValidPushConstantWrite(32, 1, UINT32_MAX) &&
+				!IsValidPushConstantWrite(0, 1, 0) && !IsValidPushConstantWrite(32, 0, 0),
+				"Inline writes reject non-inline bindings, empty payloads and overflowing partial writes");
+
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_CompletedFenceValue = 0;
+			RHIUploadPool uploads(device);
+			RHIUploadWriter writer;
+			auto batch = uploads.BeginBatch();
+			TransientResourcePool graphResources(&device);
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext compute;
+			// Both encoders share the frame writer, as in the backend submission owners.
+			const auto beginRecording = [&](RHIUploadBatch& uploadBatch) noexcept
+				{
+					uploadBatch.Attach(writer);
+					graphics.BeginRecordingScope(writer);
+					compute.BeginRecordingScope(writer);
+				};
+			const auto endRecording = [&](RHIUploadBatch& uploadBatch) noexcept
+				{
+					graphics.EndRecordingScope();
+					compute.EndRecordingScope();
+					uploadBatch.Detach(writer);
+				};
+			beginRecording(*batch);
+			RGExecuteContext execution({ &graphics, &compute, nullptr });
+			std::array<uint32_t, 24> payload{};
+			payload.fill(0x12345678u);
+			bool uploaded = true;
+			RenderGraph graph({ &device, &graphResources });
+			graph.AddTrivialSideEffectPass("Constants.Graphics", [&](RGExecuteContext&)
+				{
+					uploaded &= graphics.SetConstantBufferData(passIndex, payload);
+					payload.fill(0);
+					const std::array<uint32_t, 2> words{ 17, 3 };
+					graphics.SetInlineConstants(inlineIndex, std::span(words), 1);
+				});
+			graph.AddTrivialSideEffectPass("Constants.Compute", RGPassEncoderType::Compute,
+				[&](RGExecuteContext&)
+				{
+					payload.fill(0xabcdef01u);
+					uploaded &= compute.SetConstantBufferData(passIndex, payload);
+					const std::array<uint32_t, 2> words{ 23, 5 };
+					compute.SetInlineConstants(inlineIndex, std::span(words), 2);
+					std::array<uint32_t, MaxPassConstantBufferBytes / sizeof(uint32_t)> large{};
+					for (uint32_t index = 0; index < 5; ++index)
+					{
+						large.back() = index + 1;
+						uploaded &= compute.SetConstantBufferData(passIndex, large);
+					}
+				});
+			context.Check(graph.Compile(), "Constant upload graph compiles");
+			graph.Execute(execution);
+			context.Check(uploaded && graphics.m_ConstantBindings.size() == 1 &&
+				compute.m_ConstantBindings.size() == 6,
+				"Graphics and compute upload typed parameters larger than root constants");
+			const auto first = graphics.m_ConstantBindings.front();
+			const auto second = compute.m_ConstantBindings.front();
+			uint32_t firstWord = 0;
+			uint32_t secondWord = 0;
+			std::memcpy(&firstWord,
+				device.m_PassConstantStorage[first.m_Buffer.Index() - 1].data() + first.m_Offset,
+				sizeof(firstWord));
+			std::memcpy(&secondWord,
+				device.m_PassConstantStorage[second.m_Buffer.Index() - 1].data() + second.m_Offset,
+				sizeof(secondWord));
+			context.Check(first.m_Buffer == second.m_Buffer && first.m_Offset != second.m_Offset &&
+				first.m_Offset % 256 == 0 && second.m_Offset % 256 == 0 &&
+				firstWord == 0x12345678u && secondWord == 0xabcdef01u,
+				"Aligned slices retain immutable CPU snapshots");
+			context.Check(device.m_PassConstantPublishCount == 0,
+				"Executing a graph does not publish or seal submission-owned uploads");
+			RenderGraph secondGraph({ &device, &graphResources });
+			secondGraph.AddTrivialSideEffectPass("Constants.SecondGraph", [&](RGExecuteContext&)
+				{
+					uploaded &= graphics.SetConstantBufferData(passIndex, payload);
+				});
+			context.Check(secondGraph.Compile(), "A second graph shares the recording batch");
+			secondGraph.Execute(execution);
+			const auto reusable = graphics.UploadConstants(std::span(payload));
+			context.Check(uploaded && reusable.m_SizeInBytes == sizeof(payload) &&
+				graphics.SetConstantBuffer(passIndex, reusable) && compute.SetConstantBuffer(passIndex, reusable),
+				"Non-graph uploads can be bound repeatedly by graphics and compute in the same batch");
+			context.Check(compute.SetConstantBufferData(passIndex, std::span(payload)),
+				"Span parameter overloads upload their elements rather than the span object");
+			context.Check(batch->GetPageCount() == 2 && batch->Publish() &&
+				device.m_PassConstantPublishCount == 2 &&
+				graphics.m_LastInlineWords == std::vector<uint32_t>({ 17, 3 }) && graphics.m_LastInlineOffset == 1 &&
+				compute.m_LastInlineWords == std::vector<uint32_t>({ 23, 5 }) && compute.m_LastInlineOffset == 2,
+				"Submission publishes all pages once while inline partial updates retain word offsets");
+			context.Check(device.m_PassConstantMapCount == 2 && device.m_PassConstantUnmapCount == 0,
+				"Pages are mapped once at creation and publication flushes without ending the mapping");
+			const RHIFencePoint submittedFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const auto presentFailed = RHIFrameEndResult::Fatal(submittedFence);
+			context.Check(batch->Submitted(presentFailed.GetSubmittedFence()),
+				"Submitted uploads remain fence-gated even when presentation fails");
+			endRecording(*batch);
+			graph.Retire(submittedFence);
+			secondGraph.Retire(submittedFence);
+			uploads.ReclaimCompleted();
+			context.Check(uploads.GetPendingPageCount() == 2,
+				"In-flight upload pages are retained independently of graph lifetime");
+
+			auto cancelled = uploads.BeginBatch();
+			beginRecording(*cancelled);
+			const auto later = graphics.UploadConstants(payload);
+			context.Check(later.IsValid() && later.m_Buffer != first.m_Buffer && uploads.GetPageCount() == 3,
+				"A later submission cannot overwrite an in-flight page");
+			context.Check(!graphics.SetConstantBuffer(passIndex, reusable) && graphics.HasRecordingError() &&
+				cancelled->HasFailed() && !cancelled->Publish() && !cancelled->Submitted(submittedFence),
+				"Cross-batch binding fails the recording transaction and prevents normal submission");
+			endRecording(*cancelled);
+			cancelled->Cancel();
+			auto reuse = uploads.BeginBatch();
+			beginRecording(*reuse);
+			const auto afterCancel = graphics.UploadConstants(payload);
+			context.Check(afterCancel.m_Buffer == later.m_Buffer &&
+				afterCancel.m_UploadBatchId != later.m_UploadBatchId,
+				"Cancellation immediately recovers discarded storage with a new batch identity");
+			context.Check(device.m_PassConstantMapCount == 3 && device.m_PassConstantUnmapCount == 0,
+				"Cancellation keeps pages mapped and a reused page is not mapped again");
+			endRecording(*reuse);
+			reuse->Cancel();
+			device.m_CompletedFenceValue = 5;
+			uploads.ReclaimCompleted();
+			context.Check(uploads.GetPendingPageCount() == 0,
+				"Submitted pages become reusable only after GPU completion");
+
+			const uint32_t unmapsBeforeLimitedPool = device.m_PassConstantUnmapCount;
+			{
+				RHIUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
+				auto exhausted = limited.BeginBatch();
+				beginRecording(*exhausted);
+				context.Check(graphics.SetConstantBufferData(passIndex, payload) &&
+					!compute.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError() &&
+					compute.HasRecordingError() && !exhausted->Publish(),
+					"Page exhaustion poisons every encoder sharing the submission batch");
+				endRecording(*exhausted);
+				exhausted->Cancel();
+				context.Check(device.m_PassConstantUnmapCount == unmapsBeforeLimitedPool,
+					"A failed publication and its cancellation leave the page mapped");
+			}
+			context.Check(device.m_PassConstantUnmapCount == unmapsBeforeLimitedPool + 1,
+				"Pool destruction ends each page mapping exactly once");
+
+			for (uint32_t failure = 0; failure < 2; ++failure)
+			{
+				RecordingDevice failingDevice;
+				failingDevice.m_PassConstantsEnabled = true;
+				failingDevice.m_ConstantCreateFails = failure == 0;
+				failingDevice.m_ConstantMapFails = failure == 1;
+				RHIUploadPool failingPool(failingDevice);
+				auto failed = failingPool.BeginBatch();
+				beginRecording(*failed);
+				context.Check(!graphics.SetConstantBufferData(passIndex, payload) && failed->HasFailed(),
+					"Buffer creation and mapping failures fail the recording transaction");
+				endRecording(*failed);
+				failed->Cancel();
+			}
+			auto sealed = uploads.BeginBatch();
+			context.Check(sealed->Publish() && !sealed->Upload(std::as_bytes(std::span(payload))).IsValid(),
+				"Publication freezes upload allocation before submission");
+			sealed->Cancel();
+			auto publicationFailure = uploads.BeginBatch();
+			beginRecording(*publicationFailure);
+			device.m_ConstantPublishFails = true;
+			context.Check(graphics.UploadConstants(payload).IsValid() &&
+				!publicationFailure->Publish() && graphics.HasRecordingError() &&
+				compute.HasRecordingError() &&
+				!publicationFailure->Submitted(submittedFence),
+				"Host write publication failures fail every encoder and prevent normal submission");
+			device.m_ConstantPublishFails = false;
+			endRecording(*publicationFailure);
+			publicationFailure->Cancel();
+			auto oversized = uploads.BeginBatch();
+			std::vector<std::byte> tooLarge(device.GetMaxConstantBufferRange() + 4);
+			context.Check(!oversized->Upload(tooLarge).IsValid() && oversized->HasFailed(),
+				"Constant uploads reject ranges beyond device capabilities");
+			oversized->Cancel();
+			RecordingGraphicsCommandContext unscoped;
+			context.Check(!unscoped.SetConstantBufferData(passIndex, payload) && unscoped.HasRecordingError(),
+				"Data uploads require an explicit recording scope outside the RenderGraph too");
+		}
+
+		void RunUploadStorageContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_UploadLimits = { 256, 4096, 512, 8192 };
+			RHIUploadPool pool(device, { .m_PageSizeInBytes = 2048 });
+			RHIUploadWriter writer;
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext compute;
+			const std::array<uint32_t, 2> constants{ 7, 11 };
+			const std::array<std::array<uint32_t, 3>, 2> elements{ { { 1, 2, 3 }, { 4, 5, 6 } } };
+			auto batch = pool.BeginBatch();
+			batch->Attach(writer);
+			graphics.BeginRecordingScope(writer);
+			compute.BeginRecordingScope(writer);
+			const auto frameUploads = writer.GetFrameUploads();
+			const auto first = frameUploads.UploadConstants(constants);
+			std::fill(device.m_PassConstantStorage[0].begin() + 256,
+				device.m_PassConstantStorage[0].end(), std::byte{ 0xcd });
+			const auto structured = frameUploads.UploadStructured(std::span(elements));
+			const auto last = frameUploads.UploadConstants(constants);
+			const auto& bytes = device.m_PassConstantStorage[0];
+			const auto paddingIsZero = [&](size_t begin, size_t end)
+				{
+					return std::all_of(bytes.begin() + begin, bytes.begin() + end,
+						[](std::byte value) { return value == std::byte{}; });
+				};
+			context.Check(first.IsValid() && structured.IsValid() && last.IsValid() &&
+				structured.m_Buffer == first.m_Buffer && structured.m_OffsetInBytes == 512 &&
+				structured.m_StrideInBytes == 12 && structured.m_SizeInBytes == sizeof(elements) &&
+				last.m_OffsetInBytes == 1024 && paddingIsZero(256, 512) && paddingIsZero(536, 1024) &&
+				std::memcmp(bytes.data() + 512, elements.data(), sizeof(elements)) == 0,
+				"Mixed uploads align each slice independently and zero both alignment gaps and padding");
+			context.Check(graphics.SetReadOnlyBuffer(3, structured) && compute.SetReadOnlyBuffer(3, structured) &&
+				writer.Owns(structured) && device.IsUploadStorage(first.m_Buffer) &&
+				Test(device.m_UploadBufferDescs[0].m_Usage, RHIBufferUsage::Constant | RHIBufferUsage::Structured),
+				"Graphics and compute share one identity-carrying structured slice on marked mixed-use storage");
+			context.Check(IsConstantBufferBindingInRange(first, 2048, device.m_UploadLimits) &&
+				IsReadOnlyBufferBindingInRange(structured, 2048, device.m_UploadLimits) &&
+				!IsReadOnlyBufferBindingInRange({ structured.m_Buffer, UINT64_MAX - 511, 1024, 4 },
+					UINT64_MAX, device.m_UploadLimits) &&
+				!IsReadOnlyBufferBindingInRange({ structured.m_Buffer, 1, 24, 12 }, 2048, device.m_UploadLimits) &&
+				!IsReadOnlyBufferBindingInRange({ structured.m_Buffer, 512, 25, 12 }, 2048, device.m_UploadLimits) &&
+				!IsConstantBufferBindingInRange({ first.m_Buffer, 2048, 4 }, 2048, device.m_UploadLimits),
+				"Shared range checks reject overflow, misalignment, fractional elements and end-of-buffer slices");
+			const auto leased = pool.GetStatistics();
+			context.Check(leased.m_Total.m_CapacityInBytes == 2048 && leased.m_Leased.m_PageCount == 1 &&
+				leased.m_Leased.m_CapacityInBytes == 2048 && leased.m_Idle.m_PageCount == 0,
+				"Live page statistics measure leased capacity rather than payload bytes");
+			const RHIFencePoint completion{ RHIFenceHandle{ 1, 1 }, 9 };
+			context.Check(batch->Publish() && batch->Submitted(completion), "The mixed upload batch submits");
+			graphics.EndRecordingScope();
+			compute.EndRecordingScope();
+			batch->Detach(writer);
+			const auto pending = pool.GetStatistics();
+			context.Check(pending.m_Pending.m_PageCount == 1 && pending.m_SubmittedBatchCount == 1 &&
+				pending.m_LastBatch.m_UploadCount == 3 && pending.m_LastBatch.m_RequestedBytes == 40 &&
+				pending.m_LastBatch.m_ReservedBytes == 1280 && pending.m_LastBatch.m_PageCount == 1 &&
+				pending.m_HighWaterReservedBytesPerBatch == 1280 && device.IsUploadStorage(first.m_Buffer),
+				"Completed batch statistics retain payload, reservation, capacity state and submission counts");
+			device.m_CompletedFenceValue = 9;
+			pool.ReclaimCompleted();
+			context.Check(pool.GetStatistics().m_Idle.m_CapacityInBytes == 2048 &&
+				device.IsUploadStorage(first.m_Buffer), "Completed idle pages keep their upload-storage marker");
+
+			for (uint32_t scenario = 0; scenario < 5; ++scenario)
+			{
+				auto invalid = pool.BeginBatch();
+				invalid->Attach(writer);
+				graphics.BeginRecordingScope(writer);
+				compute.BeginRecordingScope(writer);
+				const auto value = writer.UploadStructured(std::span(elements));
+				auto rejected = value;
+				bool accepted = false;
+				if (scenario == 0)
+				{
+					rejected.m_UploadBatchId = 0;
+					accepted = graphics.SetReadOnlyBuffer(3, rejected);
+				}
+				else if (scenario == 1)
+				{
+					accepted = graphics.SetConstantBuffer(0, { value.m_Buffer, value.m_OffsetInBytes, 4, 0 });
+				}
+				else if (scenario == 2)
+				{
+					accepted = graphics.SetReadOnlyBuffer(3, structured);
+				}
+				else if (scenario == 3)
+				{
+					rejected.m_SizeInBytes = 4092;
+					accepted = graphics.SetReadOnlyBuffer(3, rejected);
+				}
+				else
+				{
+					accepted = frameUploads.UploadStructured(std::span(elements)).IsValid();
+				}
+				context.Check(!accepted && invalid->HasFailed() && graphics.HasRecordingError() &&
+					compute.HasRecordingError() && !invalid->Publish(),
+					"Stripped ids, stale structured bindings, forged ranges and stale capabilities poison the shared batch");
+				graphics.EndRecordingScope();
+				compute.EndRecordingScope();
+				invalid->Detach(writer);
+				invalid->Cancel();
+			}
+			auto quarantined = pool.BeginBatch();
+			const auto held = quarantined->Upload(std::as_bytes(std::span(constants)));
+			context.Check(held.IsValid() && quarantined->Publish(), "A mixed page can be quarantined");
+			quarantined->RecordAcceptedSubmission();
+			quarantined->SubmittedWithoutCompletionFence();
+			const auto quarantine = pool.GetStatistics();
+			context.Check(quarantine.m_Quarantined.m_PageCount == 1 &&
+				quarantine.m_Quarantined.m_CapacityInBytes == 2048 && device.IsUploadStorage(held.m_Buffer),
+				"Quarantined page capacity and its marker remain visible independently of fence completion");
+			pool.ReleaseQuarantinedAfterVerifiedIdle();
+			context.Check(pool.GetStatistics().m_Idle.m_PageCount == 1 &&
+				pool.GetStatistics().m_SubmittedBatchCount == 2 && pool.GetStatistics().m_CancelledBatchCount == 5,
+				"Verified idle changes page state without losing batch outcome statistics");
+		}
+
+		void RunUploadBudgetTests(SelfTestContext& context) noexcept
+		{
+			const std::array<uint32_t, 1> payload{ 7 };
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 256, .m_MaxPoolBytes = 256 });
+				auto held = pool.BeginBatch();
+				context.Check(held->Upload(std::as_bytes(std::span(payload))).IsValid() && held->Publish(),
+					"A quarantine budget probe publishes its payload");
+				held->RecordAcceptedSubmission();
+				held->SubmittedWithoutCompletionFence();
+				auto next = pool.BeginBatch();
+				const bool uploaded = next->Upload(std::as_bytes(std::span(payload))).IsValid();
+				next->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(!uploaded && statistics.m_Quarantined.m_CapacityInBytes == 256 &&
+					statistics.m_PoolByteBudgetFailures == 1 && statistics.m_Total.m_PageCount == 1,
+					"Quarantined pages consume pool byte budget and cannot be reused or excluded from accounting");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+			}
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 256, .m_MaxBytesPerBatch = 256 });
+				auto batch = pool.BeginBatch();
+				const bool first = batch->Upload(std::as_bytes(std::span(payload))).IsValid();
+				const bool second = batch->Upload(std::as_bytes(std::span(payload))).IsValid();
+				batch->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(first && !second && statistics.m_BatchByteBudgetFailures == 1 &&
+					statistics.m_PageCountFailures == 0 && statistics.m_LastBatch.m_ReservedBytes == 256,
+					"A batch byte budget fails before the independent page-count cap");
+			}
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 256, .m_MaxUploadSizeInBytes = 1024,
+					.m_MaxPoolBytes = 1024 });
+				const std::array<uint32_t, 128> large{};
+				const std::array<uint32_t, 192> larger{};
+				auto batch = pool.BeginBatch();
+				const auto dedicated = batch->UploadStructured(std::as_bytes(std::span(large)), 4);
+				batch->Cancel();
+				auto next = pool.BeginBatch();
+				const bool overflow = next->UploadStructured(std::as_bytes(std::span(larger)), 4).IsValid();
+				next->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(dedicated.IsValid() && !overflow && statistics.m_Total.m_PageCount == 1 &&
+					statistics.m_Idle.m_CapacityInBytes == 512 && statistics.m_PoolByteBudgetFailures == 1 &&
+					statistics.m_PageCountFailures == 0,
+					"Idle dedicated pages still consume pool byte budget when another page cannot reuse them");
+				auto reuse = pool.BeginBatch();
+				const auto reused = reuse->Upload(std::as_bytes(std::span(payload)));
+				context.Check(reused.m_Buffer == dedicated.m_Buffer &&
+					pool.GetStatistics().m_Leased.m_CapacityInBytes == 512,
+					"A free large page serves a small upload while charging its full capacity");
+				reuse->Cancel();
+			}
+			for (uint32_t scenario = 0; scenario < 6; ++scenario)
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_ConstantCreateFails = scenario == 0;
+				device.m_ConstantMapFails = scenario == 1;
+				device.m_ConstantPublishFails = scenario == 2;
+				if (scenario == 3)
+				{
+					device.m_UploadLimits.m_MaxConstantRangeInBytes = 2;
+				}
+				if (scenario == 5)
+				{
+					device.m_UploadLimits.m_MaxStorageRangeInBytes = 2;
+				}
+				RHIUploadPool pool(device, { .m_MaxUploadSizeInBytes = scenario == 4 ? 2u : 64u * 1024u });
+				auto batch = pool.BeginBatch();
+				const bool uploaded = scenario == 5 ?
+					batch->UploadStructured(std::as_bytes(std::span(payload)), 4).IsValid() :
+					batch->Upload(std::as_bytes(std::span(payload))).IsValid();
+				const bool published = batch->Publish();
+				batch->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(!published && batch->HasFailed() && statistics.m_CancelledBatchCount == 1 &&
+					statistics.m_PageCreationFailures == (scenario == 0 ? 1u : 0u) &&
+					statistics.m_PageMappingFailures == (scenario == 1 ? 1u : 0u) &&
+					statistics.m_PublicationFailures == (scenario == 2 ? 1u : 0u) &&
+					statistics.m_OversizedUploadFailures == (scenario >= 3 ? 1u : 0u) &&
+					uploaded == (scenario == 2),
+					"Upload failures retain their distinct cause counters and never publish a successful batch");
+			}
+		}
+
+		void RunUploadWriterContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(!std::is_copy_constructible_v<RHIUploadWriter> &&
+				!std::is_copy_assignable_v<RHIUploadWriter> &&
+				!std::is_move_constructible_v<RHIUploadWriter> &&
+				!std::is_move_assignable_v<RHIUploadWriter>);
+			static_assert(std::is_copy_constructible_v<RHIFrameUploads> &&
+				std::is_copy_assignable_v<RHIFrameUploads>);
+
+			const auto passIndex = static_cast<uint32_t>(CommonRSRootParamIndex::PassCB);
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_CompletedFenceValue = 0;
+			RHIUploadPool pool(device);
+			RHIUploadWriter writer;
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext compute;
+			const std::array<uint32_t, 4> frameData{ 1, 2, 3, 4 };
+
+			const RHIFrameUploads unattached = writer.GetFrameUploads();
+			context.Check(writer.GetBatchId() == 0 && !writer.IsRecording() &&
+				!unattached.IsCurrent() && !unattached.UploadConstants(frameData).IsValid(),
+				"Frame uploads issued without an attached batch never upload");
+
+			auto aborted = pool.BeginBatch();
+			aborted->Attach(writer);
+			const RHIFrameUploads abortedUploads = writer.GetFrameUploads();
+			const RHIConstantBufferBinding abortedBinding = abortedUploads.UploadConstants(frameData);
+			const bool abortPublished = aborted->Publish();
+			aborted->Cancel();
+			aborted->Detach(writer);
+			context.Check(abortedBinding.IsValid() && abortPublished && !abortedUploads.IsCurrent() &&
+				pool.GetPendingPageCount() == 0 && device.m_PassConstantUnmapCount == 0,
+				"A first-frame published abort invalidates its capability without a fence or unmap");
+
+			auto first = pool.BeginBatch();
+			first->Attach(writer);
+			const RHIFrameUploads frameUploads = writer.GetFrameUploads();
+			const RHIConstantBufferBinding prepared = frameUploads.UploadConstants(frameData);
+			graphics.BeginRecordingScope(writer);
+			compute.BeginRecordingScope(writer);
+			context.Check(frameUploads.IsCurrent() && frameUploads.GetBatchId() == first->GetId() &&
+				prepared.IsValid() && prepared.m_Buffer == abortedBinding.m_Buffer &&
+				prepared.m_UploadBatchId == first->GetId() &&
+				writer.Owns(prepared) && graphics.SetConstantBuffer(passIndex, prepared) &&
+				compute.SetConstantBuffer(passIndex, prepared) && !graphics.HasRecordingError() &&
+				!compute.HasRecordingError(),
+				"A frame-preparation upload binds on the graphics and direct-compute encoders of its batch");
+			graphics.EndRecordingScope();
+			compute.EndRecordingScope();
+			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 1 };
+			const bool firstSubmitted = first->Publish() && first->Submitted(firstFence);
+			first->Detach(writer);
+			context.Check(firstSubmitted && !frameUploads.IsCurrent() &&
+				!frameUploads.UploadConstants(frameData).IsValid(),
+				"Frame uploads kept past their frame fail while the writer is detached");
+
+			auto inFlight = pool.BeginBatch();
+			inFlight->Attach(writer);
+			const RHIConstantBufferBinding fresh = writer.GetFrameUploads().UploadConstants(frameData);
+			const bool staleUploadRejected = !frameUploads.UploadConstants(frameData).IsValid();
+			graphics.BeginRecordingScope(writer);
+			context.Check(fresh.IsValid() && fresh.m_Buffer != prepared.m_Buffer &&
+				staleUploadRejected && inFlight->HasFailed() && inFlight->GetPageCount() == 1,
+				"Frame uploads from an earlier batch fail the later batch on the same writer");
+			context.Check(!graphics.SetConstantBuffer(passIndex, prepared) && graphics.HasRecordingError(),
+				"A binding kept from an earlier batch fails the recording of a later one");
+			graphics.EndRecordingScope();
+			inFlight->Detach(writer);
+			inFlight->Cancel();
+
+			pool.ReclaimCompleted();
+			const bool heldUntilCompletion = pool.GetPendingPageCount() == 1;
+			device.m_CompletedFenceValue = firstFence.m_Value;
+			auto reuse = pool.BeginBatch();
+			reuse->Attach(writer);
+			const RHIConstantBufferBinding reused = writer.GetFrameUploads().UploadConstants(frameData);
+			context.Check(heldUntilCompletion && reused.m_Buffer == prepared.m_Buffer &&
+				reused.m_UploadBatchId != prepared.m_UploadBatchId && !writer.Owns(prepared),
+				"A submitted page is reused only after its fence completes, under a new batch identity");
+			reuse->Detach(writer);
+			reuse->Cancel();
+		}
+
+		class TeardownTestContext final : public RHIContext
+		{
+		public:
+			RHIDevice& GetDevice() noexcept override { std::terminate(); }
+			const RHIDevice& GetDevice() const noexcept override { std::terminate(); }
+			RHISwapChain& GetSwapChain() noexcept override { std::terminate(); }
+			const RHISwapChain& GetSwapChain() const noexcept override { std::terminate(); }
+			TransferManager& GetTransferManager() noexcept override { std::terminate(); }
+			RHIPipelineSystem& GetPipelineSystem() noexcept override { std::terminate(); }
+			GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
+			RHIFrameBeginResult BeginFrame() noexcept override { return RHIFrameBeginResult::Fatal(); }
+			RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+			RHIFrameEndResult AbortFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+			bool WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override { return true; }
+			void Resize(uint32_t, uint32_t) noexcept override {}
+			RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept override
+			{
+				const size_t attempt = m_WaitTimeouts.size();
+				m_WaitTimeouts.push_back(timeoutMilliseconds);
+				const RHIGpuWaitResult result = attempt < m_WaitResults.size() ?
+					m_WaitResults[attempt] :
+					RHIGpuWaitResult::Completed;
+				m_DeviceLost = m_DeviceLost || attempt == m_LoseDeviceAtAttempt ||
+					result == RHIGpuWaitResult::DeviceLost;
+				return result;
+			}
+			void RetireCompletedWork() noexcept override {}
+			bool IsPoisoned() const noexcept override { return true; }
+			bool IsDeviceLost() const noexcept override { return m_DeviceLost; }
+			uint32_t GetFrameSlotCount() const noexcept override { return 2; }
+
+			std::vector<RHIGpuWaitResult> m_WaitResults;
+			std::vector<uint32_t> m_WaitTimeouts;
+			size_t m_LoseDeviceAtAttempt = std::numeric_limits<size_t>::max();
+			bool m_DeviceLost = false;
+		};
+
+		void RunCheckedCompletionContractTests(SelfTestContext& context) noexcept
+		{
+			using enum RHIFenceQueryResult;
+			context.Check(ClassifyDX12FenceQuery(DX12DeviceRemovedFenceValue, 5, false) == Failed &&
+				ClassifyDX12FenceQuery(DX12DeviceRemovedFenceValue, 5, true) == DeviceLost,
+				"The DX12 removal sentinel is device loss only with native confirmation, never completion");
+			context.Check(ClassifyDX12FenceQuery(3, 5, false) == Pending &&
+				ClassifyDX12FenceQuery(5, 5, false) == Completed &&
+				ClassifyDX12FenceQuery(9, 0, false) == Failed,
+				"A DX12 in-flight value is Pending and an invalid point is never Completed");
+			context.Check(!ClassifyDX12FenceWaitStep(DX12FenceEventWait::Signaled, Pending).has_value() &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::Signaled, DeviceLost) ==
+					RHIGpuWaitResult::DeviceLost &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::Signaled, Failed) ==
+					RHIGpuWaitResult::Failed &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::TimedOut, Pending) ==
+					RHIGpuWaitResult::Timeout &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::TimedOut, Completed) ==
+					RHIGpuWaitResult::Completed &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::Failed, Pending) ==
+					RHIGpuWaitResult::Failed,
+				"A woken DX12 fence event proves nothing; the following query decides the wait");
+			context.Check(ToRHIGpuWaitResult(Pending) == RHIGpuWaitResult::Timeout &&
+				ToRHIGpuWaitResult(Failed) == RHIGpuWaitResult::Failed,
+				"A pending query is a timeout, never device loss");
+
+			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			context.Check(RHIFrameEndResult::Fatal().GetSubmissionState() ==
+					RHIFrameSubmissionState::NoOutstandingWork &&
+				RHIFrameEndResult::Fatal(graphicsFence).GetSubmissionState() ==
+					RHIFrameSubmissionState::Fenced &&
+				RHIFrameEndResult::Completed(graphicsFence).GetSubmissionState() ==
+					RHIFrameSubmissionState::Fenced &&
+				RHIFrameEndResult::FatalCompletionUnknown().IsCompletionUnknown() &&
+				!RHIFrameEndResult::FatalCompletionUnknown().HasSubmission(),
+				"Frame results state whether frame work may still execute");
+
+			const auto quiesce = [](TeardownTestContext& rhi) noexcept
+				{
+					return QuiesceRHIForTeardown(
+						rhi, { .m_AttemptCount = 3, .m_AttemptTimeoutMilliseconds = 7 });
+				};
+			TeardownTestContext retried;
+			retried.m_WaitResults = { RHIGpuWaitResult::Timeout, RHIGpuWaitResult::Timeout };
+			context.Check(quiesce(retried) == RHITeardownState::Quiesced &&
+				retried.m_WaitTimeouts == std::vector<uint32_t>({ 7, 7, 7 }) && !retried.m_DeviceLost,
+				"Timed-out teardown waits on a live device release nothing until a later wait completes");
+			TeardownTestContext exhausted;
+			exhausted.m_WaitResults.assign(3, RHIGpuWaitResult::Timeout);
+			TeardownTestContext failed;
+			failed.m_WaitResults.assign(3, RHIGpuWaitResult::Failed);
+			context.Check(quiesce(exhausted) == RHITeardownState::Unverified &&
+				quiesce(failed) == RHITeardownState::Unverified && exhausted.m_WaitTimeouts.size() == 3 &&
+				!exhausted.m_DeviceLost && !failed.m_DeviceLost,
+				"An exhausted bound leaks on a live device; timeouts and failures never imply loss");
+			TeardownTestContext lost;
+			lost.m_WaitResults = { RHIGpuWaitResult::Timeout };
+			lost.m_LoseDeviceAtAttempt = 0;
+			TeardownTestContext alreadyLost;
+			alreadyLost.m_DeviceLost = true;
+			context.Check(quiesce(lost) == RHITeardownState::DeviceLost && lost.m_WaitTimeouts.size() == 1 &&
+				quiesce(alreadyLost) == RHITeardownState::DeviceLost && alreadyLost.m_WaitTimeouts.empty(),
+				"Teardown reads the device state after every wait and never waits after confirmed loss");
+		}
+
+		void RunDependentFrameSubmissionTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			RHIUploadPool pool(device);
+			const RHIFencePoint computeFence{ RHIFenceHandle{ 2, 1 }, 4 };
+			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+			for (uint32_t scenario = 0; scenario < 3; ++scenario)
+			{
+				device.m_CompletedFenceValue = 0;
+				auto batch = pool.BeginBatch();
+				context.Check(batch->Upload(std::as_bytes(std::span(payload))).IsValid() && batch->Publish(),
+					"A dependent-stream fault case has published upload data");
+				std::vector<uint32_t> events;
+				std::array<RHISubmittedStream, 2> streams{};
+				streams[0] = { RHISubmitEffect::Accepted, scenario == 2 ? RHIFencePoint{} : computeFence };
+				streams[1] = SubmitDependentFrameStream(streams[0],
+					[&](const RHIFencePoint& fence)
+					{
+						events.push_back(fence == computeFence ? 1u : 0u);
+						return scenario == 0;
+					},
+					[&]() -> RHISubmittedStream
+					{
+						events.push_back(2);
+						return { RHISubmitEffect::Accepted, graphicsFence };
+					});
+				uint32_t cpuWaits = 0;
+				const RHISubmissionVerification verification{
+					.m_WaitForFence = [&](const RHIFencePoint&)
+						{
+							++cpuWaits;
+							return RHIGpuWaitResult::Completed;
+						},
+					.m_WaitIdle = []() { return RHIGpuWaitResult::Timeout; },
+				};
+				const auto resolution = ResolveFrameSubmission(streams, *batch, verification);
+				if (scenario == 0)
+				{
+					device.m_CompletedFenceValue = computeFence.m_Value;
+					pool.ReclaimCompleted();
+					context.Check(events == std::vector<uint32_t>({ 1, 2 }) &&
+						streams[0].m_JoinedByNextStream && resolution.m_Fence == graphicsFence &&
+						pool.GetPendingPageCount() == 1 && cpuWaits == 0,
+						"Graphics submits only after the confirmed GPU join and retires after graphics");
+					device.m_CompletedFenceValue = graphicsFence.m_Value;
+				}
+				else if (scenario == 1)
+				{
+					device.m_CompletedFenceValue = computeFence.m_Value - 1;
+					pool.ReclaimCompleted();
+					context.Check(events == std::vector<uint32_t>({ 1 }) &&
+						streams[1].m_Effect == RHISubmitEffect::NoEffect &&
+						resolution.m_State == RHIFrameSubmissionState::Fenced &&
+						resolution.m_Fence == computeFence && pool.GetPendingPageCount() == 1 && cpuWaits == 0,
+						"A failed queue join never submits graphics or performs a late CPU repair");
+					device.m_CompletedFenceValue = computeFence.m_Value;
+				}
+				else
+				{
+					device.m_CompletedFenceValue = graphicsFence.m_Value;
+					pool.ReclaimCompleted();
+					context.Check(events.empty() && streams[1].m_Effect == RHISubmitEffect::NoEffect &&
+						resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+						!resolution.m_DeviceLost && pool.GetQuarantinedPageCount() == 1 && cpuWaits == 0,
+						"A failed compute signal submits no graphics and retains uploads until verified idle");
+					pool.ReleaseQuarantinedAfterVerifiedIdle();
+				}
+				pool.ReclaimCompleted();
+				context.Check(pool.GetPendingPageCount() == 0 && pool.GetQuarantinedPageCount() == 0,
+					"Dependent-stream uploads retire only through the selected completion path");
+			}
+		}
+
+		void RunFrameSubmissionContractTests(SelfTestContext& context) noexcept
+		{
+			RunDependentFrameSubmissionTests(context);
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_CompletedFenceValue = 0;
+			RHIUploadPool pool(device);
+			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+			bool batchesReady = true;
+			const auto beginPublishedBatch = [&]()
+				{
+					auto batch = pool.BeginBatch();
+					batchesReady &= batch->Upload(std::as_bytes(std::span(payload))).IsValid() &&
+						batch->Publish();
+					return batch;
+				};
+			RHIGpuWaitResult fenceWaitResult = RHIGpuWaitResult::Completed;
+			RHIGpuWaitResult idleWaitResult = RHIGpuWaitResult::Completed;
+			uint32_t fenceWaits = 0;
+			uint32_t idleWaits = 0;
+			const RHISubmissionVerification verification{
+				.m_WaitForFence = [&](const RHIFencePoint&)
+					{
+						++fenceWaits;
+						return fenceWaitResult;
+					},
+				.m_WaitIdle = [&]()
+					{
+						++idleWaits;
+						if (idleWaitResult == RHIGpuWaitResult::Completed)
+						{
+							pool.ReleaseQuarantinedAfterVerifiedIdle();
+						}
+						return idleWaitResult;
+					},
+			};
+			const RHIFencePoint computeFence{ RHIFenceHandle{ 2, 1 }, 4 };
+			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const auto resolve = [&](RHIUploadBatch& batch,
+				std::initializer_list<RHISubmittedStream> streams)
+				{
+					return ResolveFrameSubmission(
+						std::span(streams.begin(), streams.size()), batch, verification);
+				};
+			using enum RHISubmitEffect;
+
+			{
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch, { { NoEffect, {}, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::NoOutstandingWork &&
+					!batch->HasAcceptedSubmission() && pool.GetPendingPageCount() == 0 &&
+					pool.GetQuarantinedPageCount() == 0 && idleWaits == 0,
+					"A submit without effect cancels the batch and reports no outstanding work");
+			}
+			{
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, true }, { Accepted, graphicsFence, false } });
+				device.m_CompletedFenceValue = computeFence.m_Value;
+				pool.ReclaimCompleted();
+				const bool heldPastCompute = pool.GetPendingPageCount() == 1;
+				device.m_CompletedFenceValue = graphicsFence.m_Value;
+				pool.ReclaimCompleted();
+				context.Check(resolution.m_State == RHIFrameSubmissionState::Fenced &&
+					resolution.m_Fence == graphicsFence && fenceWaits == 0 && heldPastCompute &&
+					pool.GetPendingPageCount() == 0,
+					"A confirmed join retires the batch on the graphics fence, not the compute fence");
+			}
+			{
+				device.m_CompletedFenceValue = 0;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, false }, { NoEffect, {}, false } });
+				device.m_CompletedFenceValue = computeFence.m_Value - 1;
+				pool.ReclaimCompleted();
+				const bool heldBeforeCompute = pool.GetPendingPageCount() == 1;
+				device.m_CompletedFenceValue = computeFence.m_Value;
+				pool.ReclaimCompleted();
+				context.Check(resolution.m_State == RHIFrameSubmissionState::Fenced &&
+					resolution.m_Fence == computeFence && batch->HasAcceptedSubmission() &&
+					heldBeforeCompute && pool.GetPendingPageCount() == 0,
+					"Compute accepted before a graphics list without effect retires on the compute fence");
+			}
+			{
+				device.m_CompletedFenceValue = 0;
+				idleWaitResult = RHIGpuWaitResult::Timeout;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, true }, { Accepted, {}, false } });
+				device.m_CompletedFenceValue = 100;
+				pool.ReclaimCompleted();
+				const size_t pagesBefore = pool.GetPageCount();
+				auto next = pool.BeginBatch();
+				const bool nextUploaded = next->Upload(std::as_bytes(std::span(payload))).IsValid();
+				const bool quarantineSkipped = pool.GetPageCount() == pagesBefore + 1;
+				next->Cancel();
+				context.Check(resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+					!resolution.m_DeviceLost && pool.GetQuarantinedPageCount() == 1 && nextUploaded &&
+					quarantineSkipped,
+					"A graphics stream without a fence quarantines pages past the compute fence");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+				context.Check(pool.GetQuarantinedPageCount() == 0,
+					"Only verified idle releases quarantined pages");
+			}
+			{
+				idleWaitResult = RHIGpuWaitResult::Completed;
+				const uint32_t idleWaitsBefore = idleWaits;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, true }, { Accepted, {}, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::NoOutstandingWork &&
+					idleWaits == idleWaitsBefore + 1 && pool.GetQuarantinedPageCount() == 0,
+					"A verified idle wait resolves an unfenced stream to no outstanding work");
+			}
+			{
+				fenceWaitResult = RHIGpuWaitResult::Timeout;
+				idleWaitResult = RHIGpuWaitResult::Timeout;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, false }, { Accepted, graphicsFence, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+					!resolution.m_DeviceLost && fenceWaits == 1 && pool.GetQuarantinedPageCount() == 1,
+					"A failed queue wait is no join, and a timed-out verification leaves the device live");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+				fenceWaitResult = RHIGpuWaitResult::Completed;
+				device.m_CompletedFenceValue = 0;
+				auto verified = beginPublishedBatch();
+				const auto joined = resolve(*verified,
+					{ { Accepted, computeFence, false }, { Accepted, graphicsFence, false } });
+				context.Check(joined.m_State == RHIFrameSubmissionState::Fenced &&
+					joined.m_Fence == graphicsFence && fenceWaits == 2,
+					"A completed CPU wait covers an unjoined earlier stream");
+				device.m_CompletedFenceValue = graphicsFence.m_Value;
+				pool.ReclaimCompleted();
+			}
+			{
+				idleWaitResult = RHIGpuWaitResult::DeviceLost;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch, { { Accepted, {}, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+					resolution.m_DeviceLost && batch->HasAcceptedSubmission() &&
+					pool.GetQuarantinedPageCount() == 1,
+					"An accepted submit lost with the device stays quarantined for device-loss teardown");
+			}
+			context.Check(batchesReady, "Every fault-injection batch uploaded and published its payload");
+
+			RecordingDevice atmosphereDevice;
+			atmosphereDevice.m_AtmosphereBuffersEnabled = true;
+			atmosphereDevice.m_TextureViewsSupported = true;
+			atmosphereDevice.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool texturePool(&atmosphereDevice);
+			AtmosphereSystem atmosphere(&atmosphereDevice, &texturePool);
+			const bool begun = atmosphere.Begin(AtmosphereGPU{}, { 1, 1, 1 });
+			for (uint32_t index = 0; begun && index < 3; ++index)
+			{
+				atmosphere.NotifyExecuted(index);
+			}
+			atmosphere.RetainAfterUnknownCompletion();
+			atmosphereDevice.m_CompletedFenceValue = 100;
+			atmosphere.Tick();
+			texturePool.Tick();
+			context.Check(begun && texturePool.GetDiagnostics().m_ActiveTextureCount == 3 &&
+				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0 &&
+				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 0 &&
+				!atmosphere.GetDiagnostics().m_Available && !atmosphere.IsInitialized(0),
+				"An unknown completion releases no atmosphere LUT or constants and certifies nothing");
+			atmosphere.Shutdown();
+			texturePool.Tick();
+			context.Check(texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 1,
+				"Teardown releases the retained atmosphere set through its owners");
 		}
 
 		void RunRHIFrameAndGraphicsScopeContractTests(SelfTestContext& context) noexcept
@@ -2952,11 +3927,13 @@ namespace gglab
 				GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
 				RHIFrameBeginResult BeginFrame() noexcept override { return RHIFrameBeginResult::Unavailable(); }
 				RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
-				RHIFencePoint AbortFrame(RHIFrameContext&) noexcept override { return {}; }
-				void WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override {}
+				RHIFrameEndResult AbortFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+				bool WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override { return true; }
 				void Resize(uint32_t, uint32_t) noexcept override {}
-				void WaitIdle() noexcept override {}
+				RHIGpuWaitResult WaitIdleFor(uint32_t) noexcept override { return RHIGpuWaitResult::Completed; }
 				void RetireCompletedWork() noexcept override {}
+				bool IsPoisoned() const noexcept override { return false; }
+				bool IsDeviceLost() const noexcept override { return false; }
 				uint32_t GetFrameSlotCount() const noexcept override { return 2; }
 			private:
 				RHIPipelineSystem& m_Pipelines;
@@ -9958,6 +10935,12 @@ namespace gglab
 		RunRuntimePathConfigurationContractTests(context);
 		RunRenderHostContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
+		RunPassParameterContractTests(context);
+		RunUploadWriterContractTests(context);
+		RunUploadStorageContractTests(context);
+		RunUploadBudgetTests(context);
+		RunCheckedCompletionContractTests(context);
+		RunFrameSubmissionContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);

@@ -7,6 +7,7 @@
 namespace gglab
 {
 	class RHIGraphicsCommandContext;
+	struct RGExecuteContext;
 
 	class RenderPassDepthPrepass final : public RenderPassBase
 	{
@@ -39,11 +40,13 @@ namespace gglab
 			uint64_t variantBits, bool outputMotion = false) const noexcept;
 
 	private:
-		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
+		void DrawRenderQueue(
+			RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services,
 			RenderViewID viewId, bool outputMotion) noexcept;
 
-		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
+		void DrawRange(
+			RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 			const RenderQueue& renderQueue, const DrawItemsRange& range,
 			bool outputMotion) noexcept;

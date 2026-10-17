@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassTemporalReference.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
@@ -33,7 +34,7 @@ namespace gglab
 			uint32_t m_MeanColorUavIndex = 0;
 			uint32_t m_SampleIndex = 0;
 		};
-		static_assert(IsPassRootConstantStruct<TemporalReferencePassParameters>);
+		static_assert(IsPassConstantBufferStruct<TemporalReferencePassParameters>);
 		static_assert(sizeof(TemporalReferencePassParameters) == 20);
 
 		struct TemporalReferencePassData
@@ -261,13 +262,19 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreatePipeline(services));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					context.m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					return;
+				}
 				commandContext->Dispatch(
 					(data.m_Width + TemporalReferenceThreadGroupSize - 1) /
 					TemporalReferenceThreadGroupSize,

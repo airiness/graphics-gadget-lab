@@ -325,7 +325,11 @@ namespace gglab
 		void CreateCommonBindingLayout() noexcept;
 		void InitializeGpuBuffers() noexcept;
 		void AbortFrame(uint64_t frameSerial) noexcept override;
-		[[nodiscard]] RHIFencePoint AbortActiveFrame(uint64_t frameSerial) noexcept;
+		[[nodiscard]] RHIFrameEndResult AbortActiveFrame(uint64_t frameSerial) noexcept;
+		// Ends a frame whose work may still execute without releasing anything it can read.
+		void RetainCompletionUnknownFrame() noexcept;
+		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
+		void AbandonGpuOwners() noexcept;
 		void EndFrameLifetime() noexcept;
 		void RetireSceneGpuAllocations(
 			RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept;
@@ -375,5 +379,7 @@ namespace gglab
 		ActiveFrameState m_ActiveFrame{};
 		AssetManager* m_AttachedAssetManager = nullptr;
 		bool m_HasActiveFrame = false;
+		// Set once a frame's GPU completion became unknown; no further frame begins.
+		bool m_Poisoned = false;
 	};
 }

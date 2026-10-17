@@ -12,9 +12,13 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 
+#include <cstddef>
 #include <memory>
 #include <span>
+#include <type_traits>
+#include <vector>
 
 namespace gglab
 {
@@ -432,6 +436,9 @@ namespace gglab
 		// Opt-in CPU-only recording; does not change graph compilation or GPU work.
 		void EnableExecutionRecord() noexcept;
 		[[nodiscard]] std::unique_ptr<RGSnapshotExecutionRecord> TakeExecutionRecord() noexcept;
+		// Retires graph-managed transient textures and buffers. Use the consuming
+		// submission fence, or an invalid fence after discarding the unsubmitted stream.
+		// RHI constant upload batches are retired by their submission owner.
 		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
 		[[nodiscard]] const RGExecutionPlan* GetExecutionPlan() const noexcept
@@ -540,6 +547,7 @@ namespace gglab
 
 		friend class RGBuilder;
 		friend class RGCompiler;
+		friend struct RGExecuteContext;
 
 		friend void BuildRenderGraphSnapshot(
 			const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;

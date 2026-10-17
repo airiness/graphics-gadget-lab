@@ -1423,7 +1423,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRChannel",
       "count": 1,
-      "bodySha256": "c5bf3329b8d1d7bf6fb596f84ac5e6cf507ad3b96cb3a145fea9c890a05f6057",
+      "bodySha256": "e2a211f89cda7f01f01446ebe470b7185e4700a8459c919c3913bd67ba4937e5",
       "programs": [
         "gglab.shader.render-graph-compute"
       ],

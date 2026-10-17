@@ -6,7 +6,9 @@
 namespace gglab
 {
 	inline constexpr uint32_t MaxDrawConstantDWORDs = 4;
-	inline constexpr uint32_t MaxPassConstantDWORDs = 16;
+	inline constexpr uint32_t MaxInlineConstantDWORDs = 8;
+	// Fits the minimum Vulkan uniform-buffer range and the DX12 CBV range.
+	inline constexpr uint32_t MaxPassConstantBufferBytes = 16 * 1024;
 
 	// CPU semantic object for data that changes at draw-call frequency.
 	// The common root signature binds this object as DrawConstants.
@@ -23,8 +25,12 @@ namespace gglab
 		(sizeof(T) % sizeof(uint32_t) == 0);
 
 	template <typename T>
-	inline constexpr bool IsPassRootConstantStruct =
-		IsShaderParameterStruct<T> && (sizeof(T) <= MaxPassConstantDWORDs * sizeof(uint32_t));
+	inline constexpr bool IsInlineConstantStruct =
+		IsShaderParameterStruct<T> && (sizeof(T) <= MaxInlineConstantDWORDs * sizeof(uint32_t));
+
+	template <typename T>
+	inline constexpr bool IsPassConstantBufferStruct =
+		IsShaderParameterStruct<T> && (sizeof(T) <= MaxPassConstantBufferBytes);
 
 	static_assert(IsShaderParameterStruct<DrawParameters>);
 	static_assert(sizeof(DrawParameters) == 4);

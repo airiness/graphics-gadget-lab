@@ -188,6 +188,10 @@ namespace gglab
 			}
 			RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
+				if (Test(desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage))
+				{
+					return {};
+				}
 				if (m_FailNextBufferCreation)
 				{
 					m_FailNextBufferCreation = false;
@@ -244,7 +248,15 @@ namespace gglab
 				return nullptr;
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
+			bool FlushMappedBufferWrites(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			{
+				// This device never maps buffers, so there is never a write to publish.
+				return false;
+			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			RHIUploadLimits GetUploadLimits() const noexcept override { return { 1, 64 * 1024, 1, UINT32_MAX }; }
+			// This publication fixture cannot create mapped upload storage.
+			bool IsUploadStorage(RHIBufferHandle) const noexcept override { return false; }
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{
 				return texture.IsValid();
@@ -276,6 +288,16 @@ namespace gglab
 					}
 				}
 				return false;
+			}
+			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
+			{
+				if (!fencePoint.IsValid())
+				{
+					return RHIFenceQueryResult::Failed;
+				}
+				return IsFencePointCompleted(fencePoint) ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}

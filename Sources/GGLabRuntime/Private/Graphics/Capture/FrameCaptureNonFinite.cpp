@@ -244,7 +244,7 @@ namespace gglab
 				}
 				const auto dispatch = GetNonFiniteScanDispatch(parameters.m_ScalarCount);
 				parameters.m_DispatchGroupsX = dispatch.m_X;
-				commands->SetPushConstants(0, parameters);
+				commands->SetInlineConstants(0, parameters);
 				commands->Dispatch(dispatch.m_X, dispatch.m_Y, 1);
 			};
 		return true;

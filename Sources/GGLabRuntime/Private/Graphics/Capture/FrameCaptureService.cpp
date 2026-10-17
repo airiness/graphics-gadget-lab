@@ -466,16 +466,51 @@ namespace gglab
 		FailQueuedFrameRequests(frameSerial, "The requested capture frame failed to submit.");
 	}
 
+	void FrameCaptureService::OnFrameCompletionUnknown(uint64_t frameSerial) noexcept
+	{
+		for (Tap& tap : m_Taps)
+		{
+			if (tap.m_FrameSerial == frameSerial && !tap.m_Submitted && !tap.m_CompletionUnknown)
+			{
+				PublishTapFailure(tap, frameSerial,
+					"The GPU completion of the frame that recorded the capture is unknown.");
+				tap.m_CompletionUnknown = true;
+			}
+		}
+		FailQueuedFrameRequests(
+			frameSerial, "The GPU completion of the requested capture frame is unknown.");
+	}
+
 	void FrameCaptureService::CollectCompleted() noexcept
 	{
 		std::erase_if(m_Taps, [this](Tap& tap)
 			{
-				if (!tap.m_Submitted || !m_Device->IsFencePointCompleted(tap.m_Fence))
+				if (!tap.m_Submitted || tap.m_CompletionUnknown)
 				{
 					return false;
 				}
-				PublishTap(tap);
-				return true;
+				// Only a completed fence certifies the readback contents. A lost device allows
+				// releasing the readbacks, never reading them.
+				switch (m_Device->QueryFencePoint(tap.m_Fence))
+				{
+				case RHIFenceQueryResult::Pending:
+					return false;
+				case RHIFenceQueryResult::Completed:
+					PublishTap(tap);
+					return true;
+				case RHIFenceQueryResult::DeviceLost:
+					FailTap(tap, tap.m_FrameSerial,
+						"The device was lost before the capture completed.");
+					return true;
+				case RHIFenceQueryResult::Failed:
+					break;
+				}
+				// A failed query proves nothing about the copy, so the readbacks stay unread
+				// until teardown.
+				PublishTapFailure(tap, tap.m_FrameSerial,
+					"The completion of the frame that recorded the capture could not be queried.");
+				tap.m_CompletionUnknown = true;
+				return false;
 			});
 	}
 
@@ -488,14 +523,42 @@ namespace gglab
 		CollectCompleted();
 		for (Tap& tap : m_Taps)
 		{
-			FailTap(tap, tap.m_FrameSerial,
-				"The render host was finalized before the capture completed.");
+			if (!tap.m_CompletionUnknown)
+			{
+				FailTap(tap, tap.m_FrameSerial,
+					"The render host was finalized before the capture completed.");
+			}
 		}
 		m_Taps.clear();
 		for (const QueuedRequest& request : m_Queued)
 		{
 			PublishFailure(request.m_Id, request.m_Source, 0,
 				"The render host was finalized before a frame recorded the capture.");
+		}
+		m_Queued.clear();
+		m_IsShutdown = true;
+	}
+
+	void FrameCaptureService::Abandon(std::string_view failure) noexcept
+	{
+		if (m_IsShutdown)
+		{
+			return;
+		}
+		for (Tap& tap : m_Taps)
+		{
+			if (!tap.m_CompletionUnknown)
+			{
+				PublishTapFailure(tap, tap.m_FrameSerial, failure);
+			}
+		}
+		// The GPU may still write the readbacks, so their owners are leaked, never destroyed.
+		auto* abandonedTaps = new std::vector<Tap>(std::move(m_Taps));
+		GGLAB_UNUSED(abandonedTaps);
+		m_Taps.clear();
+		for (const QueuedRequest& request : m_Queued)
+		{
+			PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure));
 		}
 		m_Queued.clear();
 		m_IsShutdown = true;
@@ -535,6 +598,13 @@ namespace gglab
 	void FrameCaptureService::FailTap(
 		Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept
 	{
+		PublishTapFailure(tap, frameSerial, failure);
+		tap.m_Buffer.Reset();
+	}
+
+	void FrameCaptureService::PublishTapFailure(
+		Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept
+	{
 		if (tap.m_ProductionCounters)
 		{
 			auto frame = std::make_shared<NonFiniteProductionFrame>();
@@ -550,7 +620,6 @@ namespace gglab
 					std::nullopt);
 		}
 		tap.m_Requests.clear();
-		tap.m_Buffer.Reset();
 	}
 
 	void FrameCaptureService::PublishTap(Tap& tap) noexcept

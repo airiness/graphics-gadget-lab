@@ -1,5 +1,6 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "GGLabFoundation/String/StringUtils.h"
@@ -311,6 +312,11 @@ namespace gglab
 	RHIBufferViewHandle VulkanDevice::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
+		if (IsUploadStorage(buffer))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Upload storage cannot create a persistent buffer view.");
+			return {};
+		}
 		return RequireOwnerThread("VulkanDevice::CreateBufferView") ?
 			m_ResourceManager.CreateBufferView(buffer, desc) :
 			RHIBufferViewHandle{};
@@ -412,6 +418,13 @@ namespace gglab
 		}
 	}
 
+	bool VulkanDevice::FlushMappedBufferWrites(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::FlushMappedBufferWrites") &&
+			m_ResourceManager.FlushBuffer(buffer, writtenRange);
+	}
+
 	uint32_t VulkanDevice::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
 		VkDeviceSize alignment = 1;
@@ -427,6 +440,26 @@ namespace gglab
 			break;
 		}
 		return static_cast<uint32_t>(std::max<VkDeviceSize>(alignment, 1));
+	}
+
+	RHIUploadLimits VulkanDevice::GetUploadLimits() const noexcept
+	{
+		return {
+			static_cast<uint32_t>(std::max<VkDeviceSize>(m_PhysicalDeviceLimits.minUniformBufferOffsetAlignment, 1)),
+			m_PhysicalDeviceLimits.maxUniformBufferRange,
+			static_cast<uint32_t>(std::max<VkDeviceSize>(m_PhysicalDeviceLimits.minStorageBufferOffsetAlignment, 1)),
+			m_PhysicalDeviceLimits.maxStorageBufferRange,
+		};
+	}
+
+	bool VulkanDevice::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::IsUploadStorage"))
+		{
+			return false;
+		}
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 	}
 
 	bool VulkanDevice::IsAlive(RHITextureHandle texture) const noexcept
@@ -535,11 +568,63 @@ namespace gglab
 			return false;
 		}
 		uint64_t completedValue = 0;
-		if (timeline->GetCompletedValue(completedValue) != VK_SUCCESS)
+		const VkResult result = timeline->GetCompletedValue(completedValue);
+		if (result == VK_ERROR_DEVICE_LOST)
+		{
+			// Release query: a lost device executes no more work, so destruction is allowed.
+			// Consumers of GPU-written contents query with QueryFencePoint instead.
+			return true;
+		}
+		if (result != VK_SUCCESS)
 		{
 			return false;
 		}
 		return completedValue >= fencePoint.m_Value;
+	}
+
+	RHIGpuWaitResult VulkanDevice::WaitFencePoint(
+		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::WaitFencePoint") || !fencePoint.IsValid())
+		{
+			return RHIGpuWaitResult::Failed;
+		}
+		const VulkanTimelineFence* timeline = FindTimeline(fencePoint.m_Fence);
+		if (!timeline)
+		{
+			return RHIGpuWaitResult::Failed;
+		}
+		return ClassifyVulkanWaitResult(
+			timeline->Wait(fencePoint.m_Value, ToVulkanTimeoutNanoseconds(timeoutMilliseconds)));
+	}
+
+	RHIFenceQueryResult VulkanDevice::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryFencePoint") || !fencePoint.IsValid())
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		const VulkanTimelineFence* timeline = FindTimeline(fencePoint.m_Fence);
+		if (!timeline)
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		uint64_t completedValue = 0;
+		const VkResult result = timeline->GetCompletedValue(completedValue);
+		return ClassifyVulkanFenceQuery(result, completedValue, fencePoint.m_Value);
+	}
+
+	const VulkanTimelineFence* VulkanDevice::FindTimeline(RHIFenceHandle fence) const noexcept
+	{
+		if (m_GraphicsTimeline && fence == m_GraphicsTimeline->GetRHIHandle())
+		{
+			return m_GraphicsTimeline;
+		}
+		if (m_TransferTimeline && fence == m_TransferTimeline->GetRHIHandle())
+		{
+			return m_TransferTimeline.get();
+		}
+		return nullptr;
 	}
 
 	void VulkanDevice::Destroy() noexcept

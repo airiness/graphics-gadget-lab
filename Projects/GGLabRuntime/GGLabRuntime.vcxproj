@@ -157,6 +157,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUpload.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIFrameSubmission.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.cpp" />
@@ -314,7 +317,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBarrier.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanParameterBindings.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCommandContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanConversions.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -390,6 +393,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICoordinatePolicy.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICommandContext.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIUpload.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDescriptor.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDescriptorCapacityContract.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDevice.h" />
@@ -402,6 +406,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32AdapterInspection.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFence.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHISwapChain.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIFrameSubmission.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIHandleTable.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipeline.h" />
@@ -433,7 +439,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBarrier.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanParameterBindings.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCommandContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanConversions.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />

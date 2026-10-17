@@ -1,4 +1,5 @@
 #include "VulkanContractSelfTests.h"
+#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32AdapterInspection.h"
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanImageViewLease.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
@@ -11,7 +12,7 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
-#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
@@ -23,6 +24,8 @@
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #endif
@@ -52,6 +55,114 @@ namespace gglab
 {
 	namespace
 	{
+		struct QueueIdleProbe
+		{
+			std::vector<VkQueue> m_Queues;
+			std::vector<VkSemaphoreSubmitInfo> m_Signals;
+			std::vector<VkSemaphore> m_WaitSemaphores;
+			std::vector<uint64_t> m_WaitValues;
+			uint64_t m_Timeout = 0;
+			uint32_t m_Waits = 0;
+			uint32_t m_FailSubmit = 0;
+			VkResult m_SubmitFailure = VK_ERROR_OUT_OF_HOST_MEMORY;
+			VkResult m_WaitResult = VK_TIMEOUT;
+			bool m_ValidShape = true;
+		};
+
+		thread_local QueueIdleProbe* g_QueueIdleProbe = nullptr;
+
+		VKAPI_ATTR VkResult VKAPI_CALL ProbeQueueIdleSubmit(VkQueue queue, uint32_t count,
+			const VkSubmitInfo2* submits, VkFence fence)
+		{
+			auto& probe = *g_QueueIdleProbe;
+			probe.m_Queues.push_back(queue);
+			if (count != 1 || !submits || submits->commandBufferInfoCount != 0 ||
+				submits->waitSemaphoreInfoCount != 0 || submits->signalSemaphoreInfoCount != 1 ||
+				!submits->pSignalSemaphoreInfos || fence != VK_NULL_HANDLE)
+			{
+				probe.m_ValidShape = false;
+				return VK_ERROR_INITIALIZATION_FAILED;
+			}
+			probe.m_Signals.push_back(*submits->pSignalSemaphoreInfos);
+			probe.m_ValidShape &= submits->pSignalSemaphoreInfos->stageMask ==
+				VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+			return probe.m_Queues.size() == probe.m_FailSubmit ? probe.m_SubmitFailure : VK_SUCCESS;
+		}
+
+		VKAPI_ATTR VkResult VKAPI_CALL ProbeQueueIdleWait(VkDevice,
+			const VkSemaphoreWaitInfo* wait, uint64_t timeout)
+		{
+			auto& probe = *g_QueueIdleProbe;
+			++probe.m_Waits;
+			probe.m_Timeout = timeout;
+			probe.m_ValidShape &= wait->flags == 0 && wait->semaphoreCount == probe.m_Signals.size();
+			probe.m_WaitSemaphores.assign(wait->pSemaphores, wait->pSemaphores + wait->semaphoreCount);
+			probe.m_WaitValues.assign(wait->pValues, wait->pValues + wait->semaphoreCount);
+			return probe.m_WaitResult;
+		}
+
+		void RunVulkanQueueIdleTests(SelfTestContext& context) noexcept
+		{
+			const auto device = reinterpret_cast<VkDevice>(uintptr_t{ 1 });
+			const auto graphics = reinterpret_cast<VkQueue>(uintptr_t{ 2 });
+			const auto transfer = reinterpret_cast<VkQueue>(uintptr_t{ 3 });
+			const auto graphicsTimeline = reinterpret_cast<VkSemaphore>(uintptr_t{ 4 });
+			const auto transferTimeline = reinterpret_cast<VkSemaphore>(uintptr_t{ 5 });
+			const VulkanQueueIdleDispatch dispatch{ ProbeQueueIdleSubmit, ProbeQueueIdleWait };
+			QueueIdleProbe probe;
+			g_QueueIdleProbe = &probe;
+			std::array<VulkanQueueIdleSignal, 2> signals
+			{
+				VulkanQueueIdleSignal{ graphics, graphicsTimeline, 11 },
+				VulkanQueueIdleSignal{ transfer, transferTimeline, 21 },
+			};
+			const VkResult timeout = WaitVulkanQueuesIdle(device, signals, 7, dispatch);
+			context.Check(timeout == VK_TIMEOUT && probe.m_ValidShape && probe.m_Waits == 1 &&
+				probe.m_Timeout <= 7'000'000 && signals[0].m_Submitted && signals[1].m_Submitted &&
+				probe.m_Queues == std::vector<VkQueue>({ graphics, transfer }) &&
+				probe.m_WaitSemaphores == std::vector<VkSemaphore>({ graphicsTimeline, transferTimeline }) &&
+				probe.m_WaitValues == std::vector<uint64_t>({ 11, 21 }),
+				"Bounded idle waits on fresh ALL_COMMANDS signals from both queues and returns Timeout");
+
+			probe = {};
+			probe.m_FailSubmit = 2;
+			const VkResult partial = WaitVulkanQueuesIdle(device, signals, 7, dispatch);
+			context.Check(partial == VK_ERROR_OUT_OF_HOST_MEMORY && probe.m_Waits == 0 &&
+				signals[0].m_Submitted && !signals[1].m_Submitted,
+				"A failed idle marker is never waited on; earlier successful markers remain tracked");
+			probe = {};
+			probe.m_FailSubmit = 1;
+			probe.m_SubmitFailure = VK_ERROR_DEVICE_LOST;
+			context.Check(WaitVulkanQueuesIdle(device, signals, 7, dispatch) == VK_ERROR_DEVICE_LOST &&
+				probe.m_Waits == 0 && !signals[0].m_Submitted && !signals[1].m_Submitted,
+				"Device loss while submitting an idle marker propagates without any fence wait");
+
+			probe = {};
+			probe.m_WaitResult = VK_ERROR_DEVICE_LOST;
+			context.Check(WaitVulkanQueuesIdle(device, signals, 7, dispatch) == VK_ERROR_DEVICE_LOST &&
+				signals[0].m_Submitted && signals[1].m_Submitted && probe.m_Waits == 1,
+				"Device loss from the bounded native wait preserves submitted marker identities");
+
+			probe = {};
+			probe.m_WaitResult = VK_SUCCESS;
+			signals[0].m_Value = 12;
+			signals[1].m_Value = 22;
+			context.Check(WaitVulkanQueuesIdle(device, signals, 7, dispatch) == VK_SUCCESS &&
+				probe.m_WaitValues == std::vector<uint64_t>({ 12, 22 }),
+				"A later successful idle marker covers work retained after the previous timeout");
+			probe = {};
+			context.Check(WaitVulkanQueuesIdle(device, signals, 0, dispatch) == VK_TIMEOUT &&
+				probe.m_Timeout == 0 && probe.m_Waits == 1,
+				"A zero timeout polls the fresh signals without entering an unbounded native idle");
+			probe = {};
+			probe.m_WaitResult = VK_SUCCESS;
+			signals[1].m_Queue = graphics;
+			context.Check(WaitVulkanQueuesIdle(device, signals, RHIInfiniteWaitMilliseconds, dispatch) ==
+				VK_SUCCESS && probe.m_Timeout == UINT64_MAX && probe.m_ValidShape &&
+				probe.m_Queues == std::vector<VkQueue>({ graphics, graphics }),
+				"Shared native queues retain both logical timeline markers; only explicit infinite waits are infinite");
+			g_QueueIdleProbe = nullptr;
+		}
 
 		VulkanDeviceProfileCapabilities MakeSupportedCapabilities() noexcept
 		{
@@ -1091,6 +1202,60 @@ namespace gglab
 				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_SURFACE_LOST_KHR) == VulkanBeginGateOutcome::Fatal,
 					"any failed wait stops BeginFrame before reset/acquire");
 			}
+
+			// Checked submit, wait and query results. Only the out-of-memory submit results
+			// prove that a submit had no effect, and only DEVICE_LOST confirms device loss.
+			{
+				context.Check(ClassifyVulkanSubmitEffect(false, VK_SUCCESS) == RHISubmitEffect::NoEffect &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_OUT_OF_HOST_MEMORY) == RHISubmitEffect::NoEffect &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_OUT_OF_DEVICE_MEMORY) == RHISubmitEffect::NoEffect,
+					"an unissued or out-of-memory submit has no effect");
+				context.Check(ClassifyVulkanSubmitEffect(true, VK_SUCCESS) == RHISubmitEffect::Accepted &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_DEVICE_LOST) == RHISubmitEffect::Accepted &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_UNKNOWN) == RHISubmitEffect::Accepted,
+					"device loss and unclassified submit errors are accepted streams");
+				context.Check(ClassifyVulkanWaitResult(VK_SUCCESS) == RHIGpuWaitResult::Completed &&
+					ClassifyVulkanWaitResult(VK_TIMEOUT) == RHIGpuWaitResult::Timeout &&
+					ClassifyVulkanWaitResult(VK_ERROR_DEVICE_LOST) == RHIGpuWaitResult::DeviceLost &&
+					ClassifyVulkanWaitResult(VK_ERROR_OUT_OF_HOST_MEMORY) == RHIGpuWaitResult::Failed,
+					"a timed-out or failed wait never reports device loss");
+				context.Check(ClassifyVulkanFenceQuery(VK_SUCCESS, 3, 5) == RHIFenceQueryResult::Pending &&
+					ClassifyVulkanFenceQuery(VK_SUCCESS, 5, 5) == RHIFenceQueryResult::Completed &&
+					ClassifyVulkanFenceQuery(VK_ERROR_DEVICE_LOST, 0, 5) == RHIFenceQueryResult::DeviceLost &&
+					ClassifyVulkanFenceQuery(VK_ERROR_OUT_OF_HOST_MEMORY, 9, 5) == RHIFenceQueryResult::Failed &&
+					ClassifyVulkanFenceQuery(VK_SUCCESS, 9, 0) == RHIFenceQueryResult::Failed,
+					"an in-flight value is Pending and an invalid point is never Completed");
+				context.Check(ToVulkanTimeoutNanoseconds(RHIInfiniteWaitMilliseconds) == UINT64_MAX &&
+					ToVulkanTimeoutNanoseconds(10) == 10'000'000,
+					"bounded waits convert milliseconds while the infinite wait stays unbounded");
+
+				const RHIFencePoint committed{ RHIFenceHandle{ 4, 1 }, 6 };
+				const RHIFencePoint reserved{ RHIFenceHandle{ 4, 1 }, 7 };
+				VulkanSubmitPresentResult presentFailed{};
+				presentFailed.m_SubmitIssued = true;
+				presentFailed.m_Submitted = true;
+				presentFailed.m_Fatal = true;
+				presentFailed.m_SubmittedFencePoint = committed;
+				presentFailed.m_ReservedFencePoint = committed;
+				presentFailed.m_Result = VK_ERROR_OUT_OF_HOST_MEMORY;
+				context.Check(presentFailed.GetSubmitEffect() == RHISubmitEffect::Accepted &&
+					presentFailed.GetRetentionFencePoint() == committed,
+					"a present failure after a committed submit keeps the submission accepted and fenced");
+				VulkanSubmitPresentResult lost{};
+				lost.m_SubmitIssued = true;
+				lost.m_Fatal = true;
+				lost.m_ReservedFencePoint = reserved;
+				lost.m_SubmitResult = VK_ERROR_DEVICE_LOST;
+				lost.m_Result = VK_ERROR_DEVICE_LOST;
+				context.Check(lost.GetSubmitEffect() == RHISubmitEffect::Accepted &&
+					!lost.m_SubmittedFencePoint.IsValid() && lost.GetRetentionFencePoint() == reserved,
+					"an accepted submit without a committed signal retains on its reserved point");
+				VulkanSubmitPresentResult outOfMemory = lost;
+				outOfMemory.m_SubmitResult = VK_ERROR_OUT_OF_DEVICE_MEMORY;
+				context.Check(outOfMemory.GetSubmitEffect() == RHISubmitEffect::NoEffect &&
+					!outOfMemory.GetRetentionFencePoint().IsValid(),
+					"an out-of-memory submit retains nothing");
+			}
 		}
 #endif
 
@@ -1510,6 +1675,30 @@ namespace gglab
 
 	void RunVulkanBindingLayoutTests(SelfTestContext& context) noexcept
 	{
+		const auto commonPlan = BuildVulkanBindingLayoutPlan(
+			Renderer::BuildCommonRHIBindingLayoutDesc(), 16 * 1024);
+		bool passBufferFound = false;
+		bool inlineConstantsFound = false;
+		for (uint32_t index = 0; index < commonPlan.m_Set0BindingCount; ++index)
+		{
+			const auto& binding = commonPlan.m_Set0Bindings[index];
+			passBufferFound |= binding.m_Binding == 2 &&
+				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC &&
+				!binding.m_IsInlineConstants;
+			inlineConstantsFound |= binding.m_Binding == 4 &&
+				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC &&
+				binding.m_SizeInBytes == MaxInlineConstantDWORDs * sizeof(uint32_t);
+		}
+		context.Check(commonPlan.IsValid() && commonPlan.m_DynamicOffsetCount == 3 &&
+			passBufferFound && inlineConstantsFound,
+			"Vulkan common layout distinguishes dynamic b2 CB from dynamic b1 and b4 inline constants");
+
+		VulkanDynamicUniformState commonShadow;
+		const std::array<uint32_t, 1> word{ 1 };
+		context.Check(commonShadow.Initialize(commonPlan) &&
+			!commonShadow.UpdateShadow(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), word, 0),
+			"A dynamic CB remains distinct from emulated inline constants");
+
 		RHIBindingLayoutDesc desc{};
 		desc.m_Slots[desc.m_SlotCount++] = {
 			.m_Type = RHIBindingType::PushConstants,
@@ -1580,52 +1769,6 @@ namespace gglab
 		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];
 		context.Check(BuildVulkanBindingLayoutPlan(duplicate, 64 * 1024).m_Error == VulkanBindingLayoutError::DuplicateNativeBinding,
 			"Vulkan binding layout rejects duplicate native set-0 bindings");
-	}
-
-	void RunVulkanDynamicUniformArenaTests(SelfTestContext& context) noexcept
-	{
-		VulkanDynamicUniformArena arena({
-			.m_PageSizeInBytes = 64,
-			.m_MaxPageCount = 2,
-			.m_Alignment = 16,
-		});
-		const VulkanDynamicUniformArenaAllocation first = arena.Allocate(12);
-		const VulkanDynamicUniformArenaAllocation second = arena.Allocate(48);
-		const VulkanDynamicUniformArenaAllocation third = arena.Allocate(16);
-		const VulkanDynamicUniformArenaAllocation overflow = arena.Allocate(64);
-		context.Check(first.m_OffsetInBytes == 0 && second.m_OffsetInBytes == 16 &&
-			third.m_OffsetInBytes == 64 && third.m_PageIndex == 1,
-			"Dynamic uniform allocation honors alignment and advances to the next page");
-		context.Check(!overflow.IsValid() && arena.GetDiagnostics().m_OverflowCount == 1 &&
-			arena.GetDiagnostics().m_PageCount == 2,
-			"Dynamic uniform allocation reports hard-cap overflow without wrapping");
-		const uint32_t highWater = arena.GetDiagnostics().m_HighWaterMarkInBytes;
-		arena.Reset();
-		const VulkanDynamicUniformArenaAllocation reused = arena.Allocate(16);
-		context.Check(reused.m_OffsetInBytes == 0 && reused.m_PageIndex == 0 &&
-			arena.GetDiagnostics().m_HighWaterMarkInBytes == highWater,
-			"Dynamic uniform pages reset for frame-slot reuse while preserving high-water diagnostics");
-
-		VulkanDynamicUniformArena normalizedPages({
-			.m_PageSizeInBytes = 48,
-			.m_MaxPageCount = 2,
-			.m_Alignment = 32,
-		});
-		const VulkanDynamicUniformArenaAllocation normalizedFirst = normalizedPages.Allocate(48);
-		const VulkanDynamicUniformArenaAllocation normalizedSecond = normalizedPages.Allocate(16);
-		context.Check(normalizedFirst.m_OffsetInBytes == 0 &&
-			normalizedSecond.m_OffsetInBytes == 64 && normalizedSecond.m_PageIndex == 1,
-			"Dynamic uniform page starts remain aligned when page size is not an alignment multiple");
-
-		VulkanDynamicUniformArena overflowingConfig({
-			.m_PageSizeInBytes = UINT32_MAX,
-			.m_MaxPageCount = 2,
-			.m_Alignment = UINT32_MAX,
-		});
-		context.Check(overflowingConfig.GetCapacityInBytes() == 0 &&
-			!overflowingConfig.Allocate(16).IsValid() &&
-			overflowingConfig.GetDiagnostics().m_OverflowCount == 1,
-			"Dynamic uniform configuration rejects address-space overflow without wrapping");
 	}
 
 	void RunVulkanViewNormalizationTests(SelfTestContext& context) noexcept
@@ -1767,6 +1910,7 @@ namespace gglab
 		RunDescriptorCapacityTests(context);
 		RunDeviceProfileTests(context);
 		RunVulkanQueueSelectionTests(context);
+		RunVulkanQueueIdleTests(context);
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunVulkanFormatContractTests(context);
@@ -1776,7 +1920,6 @@ namespace gglab
 		RunVulkanDescriptorPublicationTests(context);
 		RunVulkanDescriptorGenerationTests(context);
 		RunVulkanBindingLayoutTests(context);
-		RunVulkanDynamicUniformArenaTests(context);
 		RunVulkanViewNormalizationTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);

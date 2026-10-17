@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 
 #include <cstdint>
 #include <memory>
@@ -38,6 +39,10 @@ namespace gglab
 		[[nodiscard]] virtual RHIGraphicsCommandContext& GetGraphicsContext() noexcept = 0;
 		[[nodiscard]] virtual RHIComputeCommandContext& GetDirectComputeContext() noexcept = 0;
 		[[nodiscard]] virtual RHIComputeCommandContext* GetComputeContext() noexcept = 0;
+		// Uploads into this frame's submission batch. The value is valid from the Ready
+		// result of BeginFrame until this frame's EndFrame or AbortFrame returns and must not
+		// be stored across frames.
+		[[nodiscard]] virtual RHIFrameUploads GetUploads() noexcept = 0;
 	};
 
 	enum class RHIFrameBeginStatus : uint8_t
@@ -94,6 +99,18 @@ namespace gglab
 		Fatal,
 	};
 
+	// What the frame's own work may still be doing on the GPU when the transaction ends.
+	enum class RHIFrameSubmissionState : uint8_t
+	{
+		// No stream had an effect, or every possibly executed stream was verified idle.
+		NoOutstandingWork,
+		// The submitted fence completes after every stream that may read frame resources.
+		Fenced,
+		// Work may still execute and its completion could not be verified. Consumers must
+		// not run their unsubmitted cleanup; the context is poisoned.
+		CompletionUnknown,
+	};
+
 	class RHIFrameEndResult
 	{
 	public:
@@ -102,15 +119,33 @@ namespace gglab
 		{
 			GGLAB_ASSERT_MSG(submittedFence.IsValid(),
 				"A completed RHI frame transaction requires a submitted fence.");
-			return RHIFrameEndResult(RHIFrameEndStatus::Completed, submittedFence);
+			return RHIFrameEndResult(RHIFrameEndStatus::Completed, submittedFence,
+				RHIFrameSubmissionState::Fenced);
 		}
+		// A fatal result with a fence is Fenced; without one, nothing may still execute.
 		[[nodiscard]] static RHIFrameEndResult Fatal(
 			const RHIFencePoint& submittedFence = {}) noexcept
 		{
-			return RHIFrameEndResult(RHIFrameEndStatus::Fatal, submittedFence);
+			return RHIFrameEndResult(RHIFrameEndStatus::Fatal, submittedFence,
+				submittedFence.IsValid() ?
+					RHIFrameSubmissionState::Fenced :
+					RHIFrameSubmissionState::NoOutstandingWork);
+		}
+		[[nodiscard]] static RHIFrameEndResult FatalCompletionUnknown() noexcept
+		{
+			return RHIFrameEndResult(
+				RHIFrameEndStatus::Fatal, {}, RHIFrameSubmissionState::CompletionUnknown);
 		}
 
 		[[nodiscard]] RHIFrameEndStatus GetStatus() const noexcept { return m_Status; }
+		[[nodiscard]] RHIFrameSubmissionState GetSubmissionState() const noexcept
+		{
+			return m_SubmissionState;
+		}
+		[[nodiscard]] bool IsCompletionUnknown() const noexcept
+		{
+			return m_SubmissionState == RHIFrameSubmissionState::CompletionUnknown;
+		}
 		[[nodiscard]] bool IsCompleted() const noexcept
 		{
 			return m_Status == RHIFrameEndStatus::Completed;
@@ -129,13 +164,15 @@ namespace gglab
 		}
 
 	private:
-		RHIFrameEndResult(RHIFrameEndStatus status, const RHIFencePoint& submittedFence) noexcept :
-			m_Status(status), m_SubmittedFence(submittedFence)
+		RHIFrameEndResult(RHIFrameEndStatus status, const RHIFencePoint& submittedFence,
+			RHIFrameSubmissionState submissionState) noexcept :
+			m_Status(status), m_SubmittedFence(submittedFence), m_SubmissionState(submissionState)
 		{
 		}
 
 		RHIFrameEndStatus m_Status = RHIFrameEndStatus::Fatal;
 		RHIFencePoint m_SubmittedFence{};
+		RHIFrameSubmissionState m_SubmissionState = RHIFrameSubmissionState::NoOutstandingWork;
 	};
 
 	class RHIContext
@@ -153,16 +190,53 @@ namespace gglab
 
 		[[nodiscard]] virtual RHIFrameBeginResult BeginFrame() noexcept = 0;
 		[[nodiscard]] virtual RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept = 0;
-		[[nodiscard]] virtual RHIFencePoint AbortFrame(RHIFrameContext& frame) noexcept = 0;
-		virtual void WaitForFence(
+		// Discards the frame's own streams. The result still reports any backend work the
+		// abort itself submitted.
+		[[nodiscard]] virtual RHIFrameEndResult AbortFrame(RHIFrameContext& frame) noexcept = 0;
+		// GPU-side queue wait. False when the wait could not be issued; work submitted
+		// afterwards on the waiting queue is then not ordered after the fence.
+		[[nodiscard]] virtual bool WaitForFence(
 			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept = 0;
 
 		virtual void Resize(uint32_t width, uint32_t height) noexcept = 0;
-		virtual void WaitIdle() noexcept = 0;
+		// Waits until every queue is idle. Completed is verified idle; it also releases
+		// work retained after an unknown frame completion.
+		RHIGpuWaitResult WaitIdle() noexcept { return WaitIdleFor(RHIInfiniteWaitMilliseconds); }
+		virtual RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept = 0;
 		virtual void RetireCompletedWork() noexcept = 0;
+		// Run state: a poisoned context accepts no further frames. Poisoning is not device
+		// loss; it does not stop GPU work that was already submitted.
+		[[nodiscard]] virtual bool IsPoisoned() const noexcept = 0;
+		// Device state: lost only when the native API confirms removal or loss.
+		[[nodiscard]] virtual bool IsDeviceLost() const noexcept = 0;
 
 		[[nodiscard]] virtual uint32_t GetFrameSlotCount() const noexcept = 0;
+		[[nodiscard]] virtual RHIUploadStatistics GetUploadStatistics() const noexcept { return {}; }
 	};
+
+	// What teardown may do with GPU-visible resources once no further frames are produced.
+	enum class RHITeardownState : uint8_t
+	{
+		// Every queue was verified idle: owners release through their normal paths.
+		Quiesced,
+		// Loss is natively confirmed: owners may destroy without fence waits, but never read
+		// GPU-written contents.
+		DeviceLost,
+		// The device is live and idle could not be verified within the bound. GPU-visible
+		// memory must be leaked, never destroyed.
+		Unverified,
+	};
+
+	struct RHITeardownWaitPolicy
+	{
+		uint32_t m_AttemptCount = 3;
+		uint32_t m_AttemptTimeoutMilliseconds = 10'000;
+	};
+
+	// Bounded checked idle waits for teardown. The device state is read again after every
+	// attempt; a timeout or a failed wait never implies device loss.
+	[[nodiscard]] RHITeardownState QuiesceRHIForTeardown(
+		RHIContext& context, const RHITeardownWaitPolicy& policy = {}) noexcept;
 
 	// Host-owned composition seam for one selected backend/platform pair. Renderer
 	// borrows the factory only while CreateContext runs and owns the returned context.

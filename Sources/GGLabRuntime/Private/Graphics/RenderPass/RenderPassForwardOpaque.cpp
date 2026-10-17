@@ -301,8 +301,11 @@ namespace gglab
 					static_cast<uint32_t>(forward_shading::RootParameter::TileHeaders), tileHeaders);
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(forward_shading::RootParameter::TileIndices), tileIndices);
-				graphicsContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (!graphicsContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+				{
+					return;
+				}
 
 				forward_shading::DrawBuckets(*graphicsContext, renderQueue, OpaqueBuckets,
 					data.m_Scene.m_ExpectedRenderQueue, resolvePipeline);

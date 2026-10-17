@@ -173,25 +173,41 @@ namespace gglab
 		return nullptr;
 	}
 
-	void VulkanBuffer::Unmap(RHIMappedBufferRange writtenRange) noexcept
+	bool VulkanBuffer::Flush(RHIMappedBufferRange writtenRange) noexcept
 	{
 		if (m_MappedData == nullptr)
 		{
-			return;
+			return false;
 		}
 		// The RHI range contract mirrors DX12: Begin <= End <= size.
 		GGLAB_ASSERT(writtenRange.m_Begin <= writtenRange.m_End);
 		GGLAB_ASSERT(writtenRange.m_End <= m_SizeInBytes);
+		if (writtenRange.m_Begin > writtenRange.m_End || writtenRange.m_End > m_SizeInBytes)
+		{
+			return false;
+		}
 
-		// Upload buffers flush the written range so the GPU sees the host
-		// writes. Persistent mappings never carry an unmap obligation;
-		// their teardown belongs to vmaDestroyBuffer.
+		// Host-visible memory need not be coherent. VMA aligns the range to
+		// nonCoherentAtomSize and skips coherent memory types.
 		if (m_MemoryUsage == RHIMemoryUsage::CpuToGpu &&
 			writtenRange.m_End > writtenRange.m_Begin)
 		{
-			vmaFlushAllocation(m_Allocator, m_Allocation,
+			const VkResult result = vmaFlushAllocation(m_Allocator, m_Allocation,
 				writtenRange.m_Begin, writtenRange.m_End - writtenRange.m_Begin);
+			if (result != VK_SUCCESS)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("Vulkan buffer write publication failed ({}).", ToString(result));
+				return false;
+			}
 		}
+		return true;
+	}
+
+	bool VulkanBuffer::Unmap(RHIMappedBufferRange writtenRange) noexcept
+	{
+		// Persistent mappings never carry an unmap obligation; their teardown
+		// belongs to vmaDestroyBuffer. Unmapping only publishes the written range.
+		return Flush(writtenRange);
 	}
 
 	void VulkanTexture::Create(const CreateInfo& createInfo) noexcept

@@ -7,11 +7,12 @@
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
-#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
@@ -1439,63 +1440,61 @@ namespace gglab
 
 			const uint32_t uniformAlignment = static_cast<uint32_t>(std::max<VkDeviceSize>(
 				device.GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1));
-			VulkanDynamicUniformBuffer uniformBuffer;
-			if (!uniformBuffer.Initialize(&device, runtime.GetFrameSlotCount(), {
+			RHIUploadPool constantPool(device, {
 				.m_PageSizeInBytes = uniformAlignment * 2,
-				.m_MaxPageCount = 2,
-				.m_Alignment = 1,
-				}))
-			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify dynamic uniform: buffer initialization failed.");
-				return 1;
-			}
-			VulkanSet0DynamicUniformFrames set0Frames;
-			const bool set0Initialized = set0Frames.Initialize(
-				&device, &uniformBuffer, runtime.GetFrameSlotCount());
-			if (!set0Initialized || !set0Frames.BeginFrame(0) ||
-				set0Frames.BeginFrame(0) || uniformBuffer.GetAlignmentInBytes() != uniformAlignment)
-			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-					"qualify dynamic uniform: set-0 frame-slot gating failed.");
-				return 1;
-			}
-
+				.m_MaxPagesPerBatch = 2,
+			});
+			auto constants = constantPool.BeginBatch();
 			VulkanDynamicUniformState uniformState;
 			const std::array<uint32_t, 2> firstValues{ 3, 5 };
 			const std::array<uint32_t, 1> secondValues{ 8 };
-			const bool stateInitialized = uniformState.Initialize(layout->GetPlan());
-			const VulkanDynamicUniformUpdate first = uniformState.SetPushConstants(
-				1, firstValues, 0, uniformBuffer, 0);
-			const VulkanDynamicUniformUpdate second = uniformState.SetPushConstants(
-				1, secondValues, 1, uniformBuffer, 0);
-			VulkanDynamicUniformUpdate overflow = second;
-			for (uint32_t allocationIndex = 0; allocationIndex < 16 && overflow.IsValid();
-				++allocationIndex)
+			bool valid = uniformState.Initialize(layout->GetPlan()) &&
+				uniformState.UpdateShadow(1, firstValues, 0);
+			const auto first = constants->Upload(uniformState.GetShadow(1));
+			valid = valid && uniformState.UpdateShadow(1, secondValues, 1);
+			const auto second = constants->Upload(uniformState.GetShadow(1));
+			auto overflow = second;
+			for (uint32_t index = 0; index < 16 && overflow.IsValid(); ++index)
 			{
-				overflow = uniformState.SetPushConstants(
-					1, secondValues, 1, uniformBuffer, 0);
+				overflow = constants->Upload(uniformState.GetShadow(1));
 			}
-			const VulkanDynamicUniformDiagnostics* diagnostics = uniformBuffer.GetDiagnostics(0);
-			if (!stateInitialized || !first.IsValid() || !second.IsValid() ||
-				first.m_Allocation.m_DynamicOffset == second.m_Allocation.m_DynamicOffset ||
-				first.m_Allocation.m_DynamicOffset % uniformAlignment != 0 ||
-				second.m_Allocation.m_DynamicOffset % uniformAlignment != 0 || overflow.IsValid() ||
-				!diagnostics || diagnostics->m_OverflowCount == 0 ||
-				set0Frames.AllocateDescriptorSet(0, *layout, {}) == VK_NULL_HANDLE)
+			valid = valid && first.IsValid() && second.IsValid() &&
+				first.m_OffsetInBytes != second.m_OffsetInBytes &&
+				first.m_OffsetInBytes % uniformAlignment == 0 && second.m_OffsetInBytes % uniformAlignment == 0 &&
+				!overflow.IsValid() && constants->HasFailed() && !constants->Publish();
+			// These allocation probes have no recorded GPU consumers.
+			constants->Cancel();
+			const RHIUploadStatistics uploadStatistics = constantPool.GetStatistics();
+			valid = valid && uploadStatistics.m_CancelledBatchCount == 1 &&
+				uploadStatistics.m_PageCountFailures == 1 &&
+				uploadStatistics.m_LastBatch.m_UploadCount >= 2 &&
+				uploadStatistics.m_LastBatch.m_RequestedBytes > 0 &&
+				uploadStatistics.m_Idle.m_PageCount == uploadStatistics.m_Total.m_PageCount &&
+				uploadStatistics.m_HighWaterReservedBytesPerBatch == uploadStatistics.m_LastBatch.m_ReservedBytes;
+			valid = valid && device.IsUploadStorage(first.m_Buffer) &&
+				!device.CreateBufferView(first.m_Buffer, {
+					.m_SizeInBytes = sizeof(firstValues), .m_StrideInBytes = sizeof(uint32_t),
+					}).IsValid();
+			VulkanSet0DynamicUniformFrames set0Frames;
+			valid = valid && set0Frames.Initialize(&device, runtime.GetFrameSlotCount()) &&
+				set0Frames.BeginFrame(0) && !set0Frames.BeginFrame(0);
+			for (uint32_t index = 0; valid && index < 600; ++index)
 			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-					"qualify dynamic uniform: immutable allocation, alignment or overflow failed.");
-				return 1;
+				valid = set0Frames.AllocateDescriptorSet(0, *layout, {}) != VK_NULL_HANDLE;
 			}
-
 			const RHIFencePoint completedFrame(
 				runtime.GetTimeline().GetRHIHandle(), runtime.GetTimelineSignalValue());
-			if (!completedFrame.IsValid() || !set0Frames.EndFrame(0, completedFrame) ||
-				!set0Frames.BeginFrame(0) || !set0Frames.EndFrame(0, completedFrame) ||
-				!set0Frames.BeginFrame(0) || !set0Frames.AbortFrame(0))
+			valid = valid && completedFrame.IsValid() && set0Frames.EndFrame(0, completedFrame) &&
+				set0Frames.BeginFrame(0) && set0Frames.EndFrame(0, completedFrame) &&
+				set0Frames.BeginFrame(0) && set0Frames.AbortFrame(0);
+			if (!valid)
 			{
+				if (set0Frames.IsFrameActive(0))
+				{
+					GGLAB_UNUSED(set0Frames.AbortFrame(0));
+				}
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-					"qualify dynamic uniform: completed frame-slot reuse failed.");
+					"qualify constants: allocation, frame gating or descriptor growth failed.");
 				return 1;
 			}
 
@@ -1534,15 +1533,11 @@ namespace gglab
 				return 1;
 			}
 			pipelineSystem.DestroyShaderModule(shaderModule);
-			const uint32_t highWater = diagnostics->m_HighWaterMarkInBytes;
-			const uint64_t overflowCount = diagnostics->m_OverflowCount;
 			set0Frames.Finalize();
-			uniformBuffer.Finalize();
 			device.RetireCompletedWork();
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
-				"qualify descriptors: global layout, pipeline layout, shader module and dynamic "
-				"uniform storage passed (alignment={}, highWater={}, overflow={}).",
-				uniformAlignment, highWater, overflowCount));
+				"qualify descriptors: global layout, pipeline layout, shader module, constant "
+				"upload batches and descriptor growth passed (alignment={}).", uniformAlignment));
 			return 0;
 		}
 
@@ -1791,10 +1786,15 @@ namespace gglab
 				.m_Desc = { .m_BindingLayout = layoutHandle },
 				.m_ComputeShader = computeShader,
 				});
+			const auto alternateLayout = pipelineSystem.CreateBindingLayout(layoutDesc);
+			const auto alternateComputePipeline = pipelineSystem.CreateComputePipeline({
+				.m_Desc = { .m_BindingLayout = alternateLayout },
+				.m_ComputeShader = computeShader,
+				});
 			if (!geometryPipeline.IsValid() || !depthPipeline.IsValid() ||
 				!positionPipeline.IsValid() || !backCullPipeline.IsValid() ||
 				!depthWithoutPixelPipeline.IsValid() || !depthOverridePipeline.IsValid() ||
-				!computePipeline.IsValid())
+				!computePipeline.IsValid() || !alternateComputePipeline.IsValid())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: native pipeline creation failed.");
 				return 1;
@@ -2009,7 +2009,7 @@ namespace gglab
 			constexpr uint32_t computeInputValue = 7;
 			constexpr uint32_t computeInitialValue = 1;
 			constexpr uint32_t computeExpectedValue =
-				computeInitialValue + computeInputValue * 2;
+				computeInitialValue + computeInputValue * 7;
 			const RHIBufferDesc computeInputDesc{
 				.m_SizeInBytes = sizeof(uint32_t),
 				.m_StrideInBytes = sizeof(uint32_t),
@@ -2052,21 +2052,10 @@ namespace gglab
 				}
 			}
 
-			const uint32_t uniformAlignment = static_cast<uint32_t>(std::max<VkDeviceSize>(
-				device.GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1));
-			VulkanDynamicUniformBuffer uniformBuffer;
-			if (!uniformBuffer.Initialize(&device, runtime.GetFrameSlotCount(), {
-				.m_PageSizeInBytes = std::max(4096u, uniformAlignment * 8),
-				.m_MaxPageCount = 2,
-				.m_Alignment = 1,
-				}))
-			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: dynamic uniform initialization failed.");
-				return 1;
-			}
+			RHIUploadPool constantPool(device);
 			VulkanSet0DynamicUniformFrames set0Frames;
 			if (!set0Frames.Initialize(
-				&device, &uniformBuffer, runtime.GetFrameSlotCount()))
+				&device, runtime.GetFrameSlotCount()))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: set-0 frame initialization failed.");
 				return 1;
@@ -2156,7 +2145,7 @@ namespace gglab
 			vkCmdPipelineBarrier2(recording.m_CommandBuffer, &beginDependency);
 
 			VulkanGraphicsCommandContext commandContext(
-				&device, &pipelineSystem, &uniformBuffer, &set0Frames);
+				&device, &pipelineSystem, &set0Frames);
 			VulkanComputeCommandContext computeContext(commandContext);
 			if (!commandContext.BeginEncoding(recording.m_CommandBuffer, begin.m_FrameSlotIndex))
 			{
@@ -2165,6 +2154,17 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics encoder did not begin.");
 				return 1;
 			}
+			RHIUploadWriter uploadWriter;
+			auto constantBatch = constantPool.BeginBatch();
+			constantBatch->Attach(uploadWriter);
+			commandContext.BeginRecordingScope(uploadWriter);
+			computeContext.BeginRecordingScope(uploadWriter);
+			const auto endUploadRecording = [&]() noexcept
+				{
+					commandContext.EndRecordingScope();
+					computeContext.EndRecordingScope();
+					constantBatch->Detach(uploadWriter);
+				};
 			constexpr RHIResourceState commonBufferState{
 				.m_Stages = RHIStage::All,
 				.m_Access = RHIAccess::Common,
@@ -2205,7 +2205,10 @@ namespace gglab
 			computeContext.SetPipeline(computePipeline);
 			computeContext.SetReadOnlyBuffer(1, computeInput.Get());
 			computeContext.SetReadWriteBuffer(2, computeOutput.Get());
+			const CoordinateConformanceParameters inlineParameters{};
+			computeContext.SetInlineConstants(0, inlineParameters);
 			computeContext.Dispatch(1, 1, 1);
+			bool snapshotsValid = set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 1;
 			const RHIBufferBarrier orderedStorageBarrier{
 				computeOutput.Get(), computeReadWriteState, computeReadWriteState
 			};
@@ -2221,7 +2224,57 @@ namespace gglab
 			};
 			computeContext.BufferBarrier(std::span(&graphicsToComputeBarrier, 1));
 			computeContext.FlushBarriers();
+			// Read the second input from a nonzero, explicitly sized slice of a mixed-use page.
+			const std::array<uint32_t, 2> prefix{ UINT32_MAX, UINT32_MAX };
+			const auto prefixBinding = uploadWriter.UploadStructured(std::span(prefix));
+			const std::array<uint32_t, 2> structuredValues{ computeInputValue, computeInputValue };
+			const auto structuredInput = uploadWriter.UploadStructured(std::span(structuredValues));
+			auto narrowInput = structuredInput;
+			narrowInput.m_SizeInBytes = sizeof(uint32_t);
+			const bool structuredBound = prefixBinding.IsValid() && structuredInput.IsValid() &&
+				structuredInput.m_OffsetInBytes != 0 && structuredInput.m_SizeInBytes == sizeof(structuredValues) &&
+				device.IsUploadStorage(structuredInput.m_Buffer) &&
+				computeContext.SetReadOnlyBuffer(1, narrowInput);
+			if (!structuredBound)
+			{
+				uploadWriter.Fail();
+			}
 			computeContext.Dispatch(1, 1, 1);
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 2;
+			const auto dispatchOrdered = [&]()
+				{
+					computeContext.BufferBarrier(std::span(&orderedStorageBarrier, 1));
+					computeContext.FlushBarriers();
+					computeContext.Dispatch(1, 1, 1);
+				};
+			computeContext.SetInlineConstants(0, inlineParameters);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 2;
+			snapshotsValid &= computeContext.SetReadOnlyBuffer(1, structuredInput);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 3;
+			const auto movedInput = uploadWriter.UploadStructured(std::span(structuredValues));
+			snapshotsValid &= computeContext.SetReadOnlyBuffer(1, movedInput);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 4;
+			const std::vector<uint32_t> pageFiller(64 * 1024 / sizeof(uint32_t));
+			const auto fullPage = uploadWriter.UploadConstants(std::span(pageFiller));
+			const auto anotherPageInput = uploadWriter.UploadStructured(std::span(structuredValues));
+			snapshotsValid &= fullPage.IsValid() && anotherPageInput.m_Buffer != movedInput.m_Buffer &&
+				computeContext.SetReadOnlyBuffer(1, anotherPageInput);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 5;
+			computeContext.SetPipeline(alternateComputePipeline);
+			computeContext.SetInlineConstants(0, inlineParameters);
+			snapshotsValid &= computeContext.SetReadOnlyBuffer(1, anotherPageInput);
+			computeContext.SetReadWriteBuffer(2, computeOutput.Get());
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 6;
+			if (!snapshotsValid)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify uploads: descriptor snapshot reuse or invalidation failed.");
+				uploadWriter.Fail();
+			}
 			const RHIBufferBarrier computeToCopyBarrier{
 				computeOutput.Get(), computeReadWriteState, copySourceState
 			};
@@ -2229,6 +2282,107 @@ namespace gglab
 			computeContext.FlushBarriers();
 			computeContext.CopyBuffer(computeReadback.Get(), 0, computeOutput.Get(), 0,
 				sizeof(uint32_t));
+			// Separate encoders have no writer attached: storage identity must still reject
+			// handle entries and stripped ids, including pages outside the leased state.
+			RHIUploadPool rejectionPool(device);
+			bool storageRejected = true;
+			const RHIFencePoint previousCompletion(runtime.GetTimeline().GetRHIHandle(),
+				runtime.GetTimelineSignalValue());
+			storageRejected &= runtime.GetTimeline().Wait(previousCompletion.m_Value, 5'000'000'000) == VK_SUCCESS;
+			for (uint32_t state = 0; state < 4; ++state)
+			{
+				auto probeBatch = rejectionPool.BeginBatch();
+				const auto page = probeBatch->Upload(std::as_bytes(std::span(prefix)));
+				if (state == 1)
+				{
+					const bool submitted = probeBatch->Publish() && probeBatch->Submitted(previousCompletion);
+					storageRejected &= submitted;
+					if (!submitted)
+					{
+						probeBatch->Cancel();
+					}
+				}
+				else if (state == 2)
+				{
+					probeBatch->Cancel();
+				}
+				else if (state == 3)
+				{
+					storageRejected &= probeBatch->Publish();
+					probeBatch->RecordAcceptedSubmission();
+					probeBatch->SubmittedWithoutCompletionFence();
+				}
+				const auto rejects = [&](auto operation)
+					{
+						VulkanGraphicsCommandContext graphics(&device, &pipelineSystem, &set0Frames);
+						VulkanComputeCommandContext compute(graphics);
+						if (!graphics.BeginEncoding(recording.m_CommandBuffer, begin.m_FrameSlotIndex))
+						{
+							return false;
+						}
+						graphics.SetPipeline(geometryPipeline);
+						compute.SetPipeline(computePipeline);
+						operation(graphics, compute);
+						const bool rejected = graphics.HasEncodingError();
+						graphics.AbortEncoding();
+						return rejected;
+					};
+				storageRejected &= page.IsValid() && device.IsUploadStorage(page.m_Buffer);
+				const auto states = rejectionPool.GetStatistics();
+				const std::array statePages{ states.m_Leased.m_PageCount, states.m_Pending.m_PageCount,
+					states.m_Idle.m_PageCount, states.m_Quarantined.m_PageCount };
+				storageRejected &= statePages[state] == 1;
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						graphics.SetReadOnlyBuffer(1, page.m_Buffer);
+					});
+				storageRejected &= rejects([&](auto&, auto& compute)
+					{
+						compute.SetReadOnlyBuffer(1, page.m_Buffer);
+					});
+				storageRejected &= rejects([&](auto&, auto& compute)
+					{
+						compute.SetReadWriteBuffer(2, page.m_Buffer);
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						const RHIVertexBufferBinding vertex{ page.m_Buffer, 0, 4, 4 };
+						graphics.SetVertexBuffers(0, std::span(&vertex, 1));
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						graphics.SetIndexBuffer({ .m_Buffer = page.m_Buffer, .m_SizeInBytes = 4,
+							.m_Format = RHIFormat::R32Uint });
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						graphics.CopyBuffer(computeReadback.Get(), 0, page.m_Buffer, 0, 4);
+					});
+				storageRejected &= rejects([&](auto&, auto& compute)
+					{
+						compute.CopyBuffer(page.m_Buffer, 0, computeOutput.Get(), 0, 4);
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						GGLAB_UNUSED(graphics.SetReadOnlyBuffer(1,
+							RHIReadOnlyBufferBinding{ page.m_Buffer, 0, 4, 4 }));
+					});
+				storageRejected &= !device.CreateBufferView(page.m_Buffer, {
+					.m_SizeInBytes = 4, .m_StrideInBytes = 4,
+					}).IsValid();
+				if (state == 0)
+				{
+					probeBatch->Cancel();
+				}
+				rejectionPool.ReclaimCompleted();
+				// These negative probes record no GPU consumers of their pages.
+				rejectionPool.ReleaseQuarantinedAfterVerifiedIdle();
+			}
+			if (!storageRejected)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify uploads: a handle entry bypassed upload storage identity.");
+				uploadWriter.Fail();
+			}
 			const auto makeParameters = [&](CoordinateConformanceMode mode, float depth = 0.0f,
 				uint32_t textureIndex = UINT32_MAX, float depthOverride = 0.0f)
 				{
@@ -2257,7 +2411,7 @@ namespace gglab
 				static_cast<float>(targetWidth), static_cast<float>(targetHeight) });
 			commandContext.SetScissorRect({ 0, 0,
 				static_cast<int32_t>(targetWidth), static_cast<int32_t>(targetHeight) });
-			commandContext.SetPushConstants(0, makeParameters(
+			commandContext.SetInlineConstants(0, makeParameters(
 				CoordinateConformanceMode::Winding, DepthOnlyExpectedDepth));
 			commandContext.DrawFullscreenTriangle();
 			commandContext.EndRendering();
@@ -2273,7 +2427,7 @@ namespace gglab
 				static_cast<float>(targetWidth), static_cast<float>(targetHeight) });
 			commandContext.SetScissorRect({ 0, 0,
 				static_cast<int32_t>(targetWidth), static_cast<int32_t>(targetHeight) });
-			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Winding,
+			commandContext.SetInlineConstants(0, makeParameters(CoordinateConformanceMode::Winding,
 				DepthOnlyVertexDepth, UINT32_MAX, DepthOnlyExpectedDepth));
 			commandContext.DrawFullscreenTriangle();
 			commandContext.EndRendering();
@@ -2326,13 +2480,13 @@ namespace gglab
 			commandContext.SetPipeline(geometryPipeline);
 			commandContext.SetViewport({ 0.0f, 0.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 0, 0, 32, 32 });
-			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Winding));
+			commandContext.SetInlineConstants(0, makeParameters(CoordinateConformanceMode::Winding));
 			commandContext.Draw(6);
 
 			commandContext.SetPipeline(backCullPipeline);
 			commandContext.SetViewport({ 32.0f, 32.0f, 8.0f, 16.0f });
 			commandContext.SetScissorRect({ 32, 32, 40, 48 });
-			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Winding));
+			commandContext.SetInlineConstants(0, makeParameters(CoordinateConformanceMode::Winding));
 			commandContext.Draw(3, 1, 3);
 			commandContext.SetViewport({ 32.0f, 48.0f, 8.0f, 16.0f });
 			commandContext.SetScissorRect({ 32, 48, 40, 64 });
@@ -2346,40 +2500,40 @@ namespace gglab
 			commandContext.SetIndexBuffer(indexBinding);
 			commandContext.SetViewport({ 32.0f, 0.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 32, 0, 64, 32 });
-			commandContext.SetPushConstants(
+			commandContext.SetInlineConstants(
 				0, makeParameters(CoordinateConformanceMode::MarkerSampling));
 			commandContext.DrawIndexed(6, 1, 0, 6, 0);
 
 			commandContext.SetPipeline(depthPipeline);
 			commandContext.SetViewport({ 0.0f, 32.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 0, 32, 32, 64 });
-			commandContext.SetPushConstants(0, makeParameters(
+			commandContext.SetInlineConstants(0, makeParameters(
 				CoordinateConformanceMode::DepthVisualization, ReversedZFarProbeDepth));
 			commandContext.DrawFullscreenTriangle();
-			commandContext.SetPushConstants(0, makeParameters(
+			commandContext.SetInlineConstants(0, makeParameters(
 				CoordinateConformanceMode::DepthVisualization, ReversedZNearProbeDepth));
 			commandContext.DrawFullscreenTriangle();
 
 			commandContext.SetPipeline(positionPipeline);
 			commandContext.SetViewport({ 0.0f, 56.0f, 8.0f, 8.0f });
 			commandContext.SetScissorRect({ 0, 56, 8, 64 });
-			commandContext.SetPushConstants(
+			commandContext.SetInlineConstants(
 				0, makeParameters(CoordinateConformanceMode::DepthProbe, 0.0f,
 					depthWriteProbeDescriptor.m_Index, DepthOnlyExpectedDepth));
 			commandContext.DrawFullscreenTriangle();
 			commandContext.SetViewport({ 8.0f, 56.0f, 8.0f, 8.0f });
 			commandContext.SetScissorRect({ 8, 56, 16, 64 });
-			commandContext.SetPushConstants(
+			commandContext.SetInlineConstants(
 				0, makeParameters(CoordinateConformanceMode::DepthProbe, 0.0f,
 					depthOverrideProbeDescriptor.m_Index, DepthOnlyExpectedDepth));
 			commandContext.DrawFullscreenTriangle();
 
 			commandContext.SetViewport({ 32.0f, 32.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 40, 40, 56, 56 });
-			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Position));
+			commandContext.SetInlineConstants(0, makeParameters(CoordinateConformanceMode::Position));
 			commandContext.DrawFullscreenTriangle();
 			commandContext.EndRendering();
-			const bool encodingSucceeded = commandContext.FinishEncoding();
+			const bool encodingSucceeded = constantBatch->Publish() && commandContext.FinishEncoding();
 			std::vector<RHITextureHandle> usedTextures(
 				commandContext.GetUsedTextures().begin(), commandContext.GetUsedTextures().end());
 			std::vector<RHIBufferHandle> usedBuffers(
@@ -2388,6 +2542,8 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
+				endUploadRecording();
+				constantBatch->Cancel();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics command validation failed.");
 				return 1;
 			}
@@ -2406,6 +2562,8 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
+				endUploadRecording();
+				constantBatch->Cancel();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: command recording did not finalize.");
 				return 1;
 			}
@@ -2413,9 +2571,13 @@ namespace gglab
 			if (!frame.m_Submitted || !frame.m_SubmittedFencePoint.IsValid())
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				endUploadRecording();
+				constantBatch->Cancel();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics submission failed.");
 				return 1;
 			}
+			endUploadRecording();
+			const bool constantsSubmitted = constantBatch->Submitted(frame.m_SubmittedFencePoint);
 			const bool uniformFrameEnded =
 				set0Frames.EndFrame(begin.m_FrameSlotIndex, frame.m_SubmittedFencePoint);
 			for (const RHITextureHandle texture : usedTextures)
@@ -2431,8 +2593,9 @@ namespace gglab
 				!pipelineSystem.IsAlive(geometryPipeline) &&
 				!pipelineSystem.IsAlive(depthWithoutPixelPipeline) &&
 				!pipelineSystem.IsAlive(depthOverridePipeline) &&
-				!pipelineSystem.IsAlive(computePipeline);
-			if (!uniformFrameEnded || !pipelineCacheCleared ||
+				!pipelineSystem.IsAlive(computePipeline) &&
+				!pipelineSystem.IsAlive(alternateComputePipeline);
+			if (!constantsSubmitted || !uniformFrameEnded || !pipelineCacheCleared ||
 				runtime.WaitGraphicsIdle() != VK_SUCCESS)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -2539,7 +2702,6 @@ namespace gglab
 			}
 
 			set0Frames.Finalize();
-			uniformBuffer.Finalize();
 			transferManager.Reclaim();
 			device.RetireCompletedWork();
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(

@@ -1,4 +1,5 @@
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 

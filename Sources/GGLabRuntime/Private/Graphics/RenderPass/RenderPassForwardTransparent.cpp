@@ -101,8 +101,11 @@ namespace gglab
 					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
 				forward_shading::BindSceneResources(
 					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue);
-				graphicsContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (!graphicsContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+				{
+					return;
+				}
 
 				forward_shading::DrawBuckets(*graphicsContext, renderQueue, TransparentBuckets,
 					data.m_Scene.m_ExpectedRenderQueue, resolvePipeline);

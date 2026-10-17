@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -43,7 +44,7 @@ namespace gglab
 			uint32_t m_TileCountX = 0;
 			uint32_t m_TileCountY = 0;
 		};
-		static_assert(IsPassRootConstantStruct<ForwardPlusCullParameters>);
+		static_assert(IsInlineConstantStruct<ForwardPlusCullParameters>);
 		static_assert(sizeof(ForwardPlusCullParameters) == 32);
 
 		struct PassData
@@ -283,7 +284,7 @@ namespace gglab
 					commandContext->SetReadWriteBuffer(
 						static_cast<uint32_t>(ForwardPlusRootParameter::TileDepthRanges), depthRanges);
 				}
-				commandContext->SetPushConstants(
+				commandContext->SetInlineConstants(
 					static_cast<uint32_t>(ForwardPlusRootParameter::PassConstants),
 					ForwardPlusCullParameters{
 						.m_DepthTextureIndex = depthSrv.m_Index,

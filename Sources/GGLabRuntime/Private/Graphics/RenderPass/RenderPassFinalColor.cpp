@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassFinalColor.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
@@ -34,7 +36,7 @@ namespace gglab
 			uint32_t MaterialDiagnosticsEnabled = 0;
 			uint32_t MaterialDiagnosticLightingIndex = 0;
 		};
-		static_assert(IsPassRootConstantStruct<FinalColorPassParameters>);
+		static_assert(IsPassConstantBufferStruct<FinalColorPassParameters>);
 		static_assert(sizeof(FinalColorPassParameters) == 48);
 
 		struct PassData
@@ -187,8 +189,11 @@ namespace gglab
 				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+					{
+						.m_Buffer = sceneBuffer->GetBufferHandle(),
+						.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
+						.m_SizeInBytes = sizeof(SceneGPU),
+					});
 
 				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
 				commandContext->SetReadOnlyBuffer(
@@ -209,8 +214,11 @@ namespace gglab
 					.MaterialDiagnosticsEnabled = materialDiagnostics ? 1u : 0u,
 					.MaterialDiagnosticLightingIndex = diagnosticLightingSrv.m_Index,
 				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+				{
+					return;
+				}
 
 				commandContext->DrawFullscreenTriangle();
 			});

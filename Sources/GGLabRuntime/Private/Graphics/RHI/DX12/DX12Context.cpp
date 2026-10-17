@@ -7,6 +7,7 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
@@ -17,7 +18,9 @@
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
 
+#include <array>
 #include <memory>
+#include <span>
 #include <utility>
 
 namespace gglab
@@ -62,6 +65,12 @@ namespace gglab
 		return m_Context->AcquireComputeContext(*this);
 	}
 
+	RHIFrameUploads DX12FrameContext::GetUploads() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_Active, "DX12FrameContext::GetUploads requires an active frame.");
+		return m_UploadWriter.GetFrameUploads();
+	}
+
 	DX12Context::DX12Context(const RHIContextDesc& desc, HWND window) noexcept
 	{
 		GGLAB_ASSERT_MSG(window != nullptr, "DX12Context requires a window handle.");
@@ -74,6 +83,7 @@ namespace gglab
 			.m_EnableDebugValidation = desc.m_EnableDebugValidation,
 			.m_EnableGpuBasedValidation = desc.m_EnableGpuBasedValidation,
 			});
+		m_UploadPool = std::make_unique<RHIUploadPool>(*m_Device);
 		m_PipelineSystem = std::make_unique<DX12PipelineSystem>(m_Device.get());
 		DX12QueueSystem::CreateInfo queueSystemInfo{};
 		queueSystemInfo.m_Device = m_Device.get();
@@ -201,6 +211,12 @@ namespace gglab
 		{
 			return RHIFrameBeginResult::Fatal();
 		}
+		if (m_Poisoned)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DX12Context refuses new frames after an unknown frame completion.");
+			return RHIFrameBeginResult::Fatal();
+		}
 
 		const uint32_t backBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 		GGLAB_ASSERT(backBufferIndex < m_BackBufferCompletionFences.size());
@@ -209,17 +225,22 @@ namespace gglab
 			return RHIFrameBeginResult::Fatal();
 		}
 		const RHIFencePoint& backBufferFence = m_BackBufferCompletionFences[backBufferIndex];
-		if (backBufferFence.IsValid())
+		if (backBufferFence.IsValid() &&
+			m_QueueSystem->WaitForFenceCompletion(backBufferFence) != RHIGpuWaitResult::Completed)
 		{
-			m_QueueSystem->WaitForFenceCompletion(backBufferFence);
+			GGLAB_LOG_GRAPHICS_ERROR("DX12Context could not verify back-buffer completion.");
+			return RHIFrameBeginResult::Fatal();
 		}
 
 		GGLAB_ASSERT(m_NextFrameSlotIndex < m_Frames.size());
 		auto& frame = *m_Frames[m_NextFrameSlotIndex];
 		GGLAB_ASSERT_MSG(!frame.m_Active, "DX12 frame slot is already active.");
-		if (frame.m_SubmittedFence.IsValid())
+		if (frame.m_SubmittedFence.IsValid() &&
+			m_QueueSystem->WaitForFenceCompletion(frame.m_SubmittedFence) !=
+				RHIGpuWaitResult::Completed)
 		{
-			m_QueueSystem->WaitForFenceCompletion(frame.m_SubmittedFence);
+			GGLAB_LOG_GRAPHICS_ERROR("DX12Context could not verify frame-slot completion.");
+			return RHIFrameBeginResult::Fatal();
 		}
 		RetireCompletedWork();
 
@@ -230,6 +251,8 @@ namespace gglab
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
 		m_NextFrameSlotIndex = (m_NextFrameSlotIndex + 1) % GetFrameSlotCount();
+		frame.m_Uploads = m_UploadPool->BeginBatch();
+		frame.m_Uploads->Attach(frame.m_UploadWriter);
 		BeginGraphicsRecording(frame);
 		m_GpuProfiler->BeginFrame(frame.m_FrameSlotIndex,
 			m_QueueSystem->GetGraphicsCommandList(frame.m_FrameSlotIndex));
@@ -246,7 +269,22 @@ namespace gglab
 			return RHIFrameEndResult::Fatal();
 		}
 
-		DX12FencePoint computeFence{};
+		if (m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex).HasRecordingError() ||
+			m_DirectComputeContexts[frame->m_FrameSlotIndex]->HasRecordingError() ||
+			(frame->m_ComputeAllocator &&
+				m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex).HasRecordingError()) ||
+			!frame->m_Uploads->Publish())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 discarded a frame with failed constant recording.");
+			return AbortFrame(rhiFrame);
+		}
+
+		// Allocator, descriptor and resource retirement follows each queue's requested point.
+		// It completes only after a native signal reached it or the device was removed, so a
+		// failed signal retains them instead of releasing them early.
+		std::array<RHISubmittedStream, 2> streams{};
+		size_t streamCount = 0;
+		DX12FencePoint computeRetentionFence{};
 		if (frame->m_ComputeAllocator)
 		{
 			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameSlotIndex);
@@ -254,49 +292,108 @@ namespace gglab
 			auto* computeQueue = &m_QueueSystem->GetQueue(DX12QueueType::Compute);
 			computeList->End();
 			const DX12CommandList* lists[] = { computeList };
-			computeFence = computeQueue->Execute(lists);
+			const DX12SignalResult compute = computeQueue->ExecuteChecked(lists);
+			computeRetentionFence = compute.m_FencePoint;
 			for (RHIBufferHandle buffer : computeContext->GetUsedBuffers())
 			{
-				m_Device->RecordBufferUse(buffer, computeFence);
+				m_Device->RecordBufferUse(buffer, compute.m_FencePoint);
 			}
 			for (RHITextureHandle texture : computeContext->GetUsedTextures())
 			{
-				m_Device->RecordTextureUse(texture, computeFence);
+				m_Device->RecordTextureUse(texture, compute.m_FencePoint);
 			}
 			computeContext->ClearTrackedResourceUses();
 			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute)
-				.RecycleCommandAllocator(frame->m_ComputeAllocator, computeFence);
-			m_QueueSystem->WaitForFence(RHIQueueType::Graphics, computeFence.ToRHI());
+				.RecycleCommandAllocator(frame->m_ComputeAllocator, compute.m_FencePoint);
+			streams[streamCount++] = {
+				RHISubmitEffect::Accepted, compute.GetCheckedFencePoint().ToRHI(), false
+			};
 		}
 
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameSlotIndex);
 		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex);
 		auto* graphicsQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
-		m_GpuProfiler->EndFrame(frame->m_FrameSlotIndex, *graphicsList);
-		graphicsList->End();
-		const DX12CommandList* lists[] = { graphicsList };
-		const DX12FencePoint graphicsFence = graphicsQueue->Execute(lists);
+		DX12SignalResult graphics{};
+		const auto submitGraphics = [&]() -> RHISubmittedStream
+			{
+				m_GpuProfiler->EndFrame(frame->m_FrameSlotIndex, *graphicsList);
+				graphicsList->End();
+				const DX12CommandList* lists[] = { graphicsList };
+				graphics = graphicsQueue->ExecuteChecked(lists);
+				// ExecuteCommandLists reports no failure, so an executed stream is accepted.
+				return { RHISubmitEffect::Accepted, graphics.GetCheckedFencePoint().ToRHI(), false };
+			};
+		const RHISubmittedStream graphicsStream = streamCount == 0 ?
+			submitGraphics() :
+			SubmitDependentFrameStream(streams[0],
+				[this](const RHIFencePoint& fence)
+				{
+					return m_QueueSystem->WaitForFence(RHIQueueType::Graphics, fence);
+				}, submitGraphics);
+		if (graphicsStream.m_Effect == RHISubmitEffect::NoEffect)
+		{
+			// No later CPU wait can repair a missing GPU dependency. Discard graphics before
+			// ExecuteCommandLists, but retain everything the already accepted compute can read.
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 discarded graphics after an unverified compute join.");
+			if (graphicsContext->IsRendering())
+			{
+				graphicsContext->EndRendering();
+			}
+			m_GpuProfiler->AbortFrame(frame->m_FrameSlotIndex);
+			graphicsList->End();
+			graphicsContext->ClearTrackedResourceUses();
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
+				.RecycleCommandAllocator(frame->m_GraphicsAllocator, computeRetentionFence);
+			// Keep descriptor frees pending until verified teardown. A compute fence does not
+			// cover earlier graphics users, and this poisoned context cannot submit another frame.
+			const RHISubmissionResolution resolution = ResolveFrameSubmission(
+				std::span(streams.data(), streamCount), *frame->m_Uploads,
+				MakeSubmissionVerification());
+			m_Poisoned = true;
+			FinishFrame(*frame, resolution.m_Fence);
+			return resolution.m_State == RHIFrameSubmissionState::CompletionUnknown ?
+				RHIFrameEndResult::FatalCompletionUnknown() :
+				RHIFrameEndResult::Fatal(resolution.m_Fence);
+		}
 		for (RHIBufferHandle buffer : graphicsContext->GetUsedBuffers())
 		{
-			m_Device->RecordBufferUse(buffer, graphicsFence);
+			m_Device->RecordBufferUse(buffer, graphics.m_FencePoint);
 		}
 		for (RHITextureHandle texture : graphicsContext->GetUsedTextures())
 		{
-			m_Device->RecordTextureUse(texture, graphicsFence);
+			m_Device->RecordTextureUse(texture, graphics.m_FencePoint);
 		}
 		graphicsContext->ClearTrackedResourceUses();
 		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
-			.RecycleCommandAllocator(frame->m_GraphicsAllocator, graphicsFence);
+			.RecycleCommandAllocator(frame->m_GraphicsAllocator, graphics.m_FencePoint);
+		m_DescriptorManager->EndFrame(graphics.m_FencePoint);
+		streams[streamCount++] = graphicsStream;
 
-		m_DescriptorManager->EndFrame(graphicsFence);
-		const RHIFencePoint submittedFence = graphicsFence.ToRHI();
+		const RHISubmissionResolution resolution = ResolveFrameSubmission(
+			std::span(streams.data(), streamCount), *frame->m_Uploads,
+			MakeSubmissionVerification());
+		const RHIFencePoint retentionFence = graphics.m_FencePoint.ToRHI();
 		GGLAB_ASSERT(frame->m_BackBufferIndex < m_BackBufferCompletionFences.size());
 		if (frame->m_BackBufferIndex < m_BackBufferCompletionFences.size())
 		{
-			m_BackBufferCompletionFences[frame->m_BackBufferIndex] = submittedFence;
+			m_BackBufferCompletionFences[frame->m_BackBufferIndex] = retentionFence;
 		}
+		switch (resolution.m_State)
+		{
+		case RHIFrameSubmissionState::Fenced:
+			break;
+		case RHIFrameSubmissionState::NoOutstandingWork:
+			FinishFrame(*frame, {});
+			return RHIFrameEndResult::Fatal();
+		case RHIFrameSubmissionState::CompletionUnknown:
+			m_Poisoned = true;
+			FinishFrame(*frame, retentionFence);
+			return RHIFrameEndResult::FatalCompletionUnknown();
+		}
+
+		const RHIFencePoint submittedFence = resolution.m_Fence;
 		const bool presented = m_SwapChain->Present();
-		if (presented && submittedFence.IsValid() && !m_CompletedProductionFrame)
+		if (presented && !m_CompletedProductionFrame)
 		{
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 				"DX12 completed its first production submit/present frame transaction.");
@@ -308,45 +405,54 @@ namespace gglab
 			RHIFrameEndResult::Fatal(submittedFence);
 	}
 
-	RHIFencePoint DX12Context::AbortFrame(RHIFrameContext& rhiFrame) noexcept
+	RHIFrameEndResult DX12Context::AbortFrame(RHIFrameContext& rhiFrame) noexcept
 	{
 		auto* frame = dynamic_cast<DX12FrameContext*>(&rhiFrame);
 		GGLAB_ASSERT_MSG(frame && frame == m_ActiveFrame && frame->m_Active,
 			"DX12Context::AbortFrame received a foreign or inactive frame.");
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
-			return {};
+			return RHIFrameEndResult::Fatal();
 		}
 
+		// The frame's lists are closed but never executed. Signals only give the allocator
+		// pools a retirement point; a failed signal leaves nothing outstanding either.
 		if (frame->m_ComputeAllocator)
 		{
 			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameSlotIndex);
 			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex);
 			computeList->End();
 			computeContext->ClearTrackedResourceUses();
-			const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Compute).Signal();
+			const DX12SignalResult fence =
+				m_QueueSystem->GetQueue(DX12QueueType::Compute).SignalChecked();
 			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute)
-				.RecycleCommandAllocator(frame->m_ComputeAllocator, fence);
+				.RecycleCommandAllocator(frame->m_ComputeAllocator, fence.m_FencePoint);
 		}
 
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameSlotIndex);
 		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex);
+		if (graphicsContext->IsRendering())
+		{
+			graphicsContext->EndRendering();
+		}
 		m_GpuProfiler->AbortFrame(frame->m_FrameSlotIndex);
 		graphicsList->End();
 		graphicsContext->ClearTrackedResourceUses();
-		const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Graphics).Signal();
+		const DX12SignalResult fence =
+			m_QueueSystem->GetQueue(DX12QueueType::Graphics).SignalChecked();
 		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
-			.RecycleCommandAllocator(frame->m_GraphicsAllocator, fence);
-		m_DescriptorManager->EndFrame(fence);
-		const RHIFencePoint submittedFence = fence.ToRHI();
+			.RecycleCommandAllocator(frame->m_GraphicsAllocator, fence.m_FencePoint);
+		m_DescriptorManager->EndFrame(fence.m_FencePoint);
+		frame->m_Uploads->Cancel();
+		const RHIFencePoint submittedFence = fence.GetCheckedFencePoint().ToRHI();
 		FinishFrame(*frame, submittedFence);
-		return submittedFence;
+		return RHIFrameEndResult::Fatal(submittedFence);
 	}
 
-	void DX12Context::WaitForFence(
+	bool DX12Context::WaitForFence(
 		RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept
 	{
-		m_QueueSystem->WaitForFence(waitingQueue, fencePoint);
+		return m_QueueSystem->WaitForFence(waitingQueue, fencePoint);
 	}
 
 	void DX12Context::Resize(uint32_t width, uint32_t height) noexcept
@@ -357,23 +463,64 @@ namespace gglab
 		{
 			return;
 		}
-		WaitIdle();
+		if (m_Poisoned)
+		{
+			return;
+		}
+		const RHIGpuWaitResult idle = WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
+		if (idle != RHIGpuWaitResult::Completed)
+		{
+			m_Poisoned = true;
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"DX12 skipped swapchain resize because idle was not verified: {}.",
+				GetRHIGpuWaitResultName(idle));
+			return;
+		}
 		m_SwapChain->Resize(width, height);
 		m_BackBufferCompletionFences.assign(m_SwapChain->GetBufferCount(), {});
 	}
 
-	void DX12Context::WaitIdle() noexcept
+	RHIGpuWaitResult DX12Context::WaitIdleFor(uint32_t timeoutMilliseconds) noexcept
 	{
-		if (m_QueueSystem)
+		if (!m_QueueSystem)
 		{
-			m_QueueSystem->WaitIdle();
+			return RHIGpuWaitResult::Failed;
 		}
+		const RHIGpuWaitResult result = m_QueueSystem->WaitIdle(timeoutMilliseconds);
+		if (result == RHIGpuWaitResult::Completed && m_UploadPool)
+		{
+			// Verified idle: no queue can still read pages quarantined after an unknown
+			// completion. Retained allocators and descriptors complete through their points.
+			m_UploadPool->ReleaseQuarantinedAfterVerifiedIdle();
+		}
+		return result;
+	}
+
+	bool DX12Context::IsDeviceLost() const noexcept
+	{
+		return m_Device && m_Device->IsDeviceRemoved();
+	}
+
+	RHISubmissionVerification DX12Context::MakeSubmissionVerification() noexcept
+	{
+		return {
+			.m_WaitForFence = [this](const RHIFencePoint& fence)
+				{
+					return m_QueueSystem->WaitForFenceCompletion(
+						fence, RHIFrameVerificationTimeoutMilliseconds);
+				},
+			.m_WaitIdle = [this]()
+				{
+					return WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
+				},
+		};
 	}
 
 	void DX12Context::RetireCompletedWork() noexcept
 	{
 		m_TransferManager->Reclaim();
 		m_DescriptorManager->Tick();
+		m_UploadPool->ReclaimCompleted();
 		m_Device->RetireCompletedWork();
 	}
 
@@ -394,6 +541,7 @@ namespace gglab
 			auto* commandList = &m_QueueSystem->GetComputeCommandList(frame.m_FrameSlotIndex);
 			commandList->Begin(frame.m_ComputeAllocator);
 			context->ClearTrackedResourceUses();
+			context->BeginRecordingScope(frame.m_UploadWriter);
 			BindGlobalDescriptorHeaps(*commandList);
 		}
 		return context;
@@ -416,6 +564,9 @@ namespace gglab
 		commandList->Begin(frame.m_GraphicsAllocator);
 		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).ClearTrackedResourceUses();
 		m_DirectComputeContexts[frame.m_FrameSlotIndex]->ResetEncoderState();
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).BeginRecordingScope(
+			frame.m_UploadWriter);
+		m_DirectComputeContexts[frame.m_FrameSlotIndex]->BeginRecordingScope(frame.m_UploadWriter);
 		BindGlobalDescriptorHeaps(*commandList);
 	}
 
@@ -430,6 +581,17 @@ namespace gglab
 
 	void DX12Context::FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept
 	{
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).EndRecordingScope();
+		m_DirectComputeContexts[frame.m_FrameSlotIndex]->EndRecordingScope();
+		if (frame.m_ComputeAllocator)
+		{
+			m_QueueSystem->GetComputeContext(frame.m_FrameSlotIndex).EndRecordingScope();
+		}
+		if (frame.m_Uploads)
+		{
+			frame.m_Uploads->Detach(frame.m_UploadWriter);
+			frame.m_Uploads.reset();
+		}
 		frame.m_SubmittedFence = fencePoint;
 		frame.m_GraphicsAllocator = nullptr;
 		frame.m_ComputeAllocator = nullptr;
@@ -447,9 +609,13 @@ namespace gglab
 		{
 			GGLAB_UNUSED(AbortFrame(*m_ActiveFrame));
 		}
-		WaitIdle();
+		if (!IsDeviceLost())
+		{
+			GGLAB_UNUSED(WaitIdle());
+		}
 		m_BackBufferCompletionFences.clear();
 		m_Frames.clear();
+		m_UploadPool.reset();
 		m_DirectComputeContexts.clear();
 		m_TransferManager.reset();
 		m_GpuProfiler.reset();

@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -27,7 +29,7 @@ namespace gglab
 			uint32_t Flags = 0;
 			uint32_t Padding[2]{};
 		};
-		static_assert(IsPassRootConstantStruct<DebugDrawPassParameters>);
+		static_assert(IsPassConstantBufferStruct<DebugDrawPassParameters>);
 
 		struct PassData
 		{
@@ -177,8 +179,11 @@ namespace gglab
 						commandContext->SetPipeline(GetPipeline(services, triangles));
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-							services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-							contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+							{
+								.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
+								.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
+								.m_SizeInBytes = sizeof(SceneGPU),
+							});
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 							services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
@@ -189,8 +194,11 @@ namespace gglab
 							.ViewIndex = viewIndex,
 							.Flags = flags,
 						};
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						commandContext->Draw(range.m_VertexCount, 1, range.m_FirstVertex);
 					};
 				const uint32_t worldFlags = scene ? 0u : DebugDrawFlagOutputSRGB;

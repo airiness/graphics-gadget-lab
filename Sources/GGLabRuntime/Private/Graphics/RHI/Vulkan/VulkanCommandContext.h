@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 
 #include <vulkan/vulkan.h>
@@ -23,7 +23,6 @@ namespace gglab
 	{
 	public:
 		VulkanGraphicsCommandContext(VulkanDevice* device, VulkanPipelineSystem* pipelineSystem,
-			VulkanDynamicUniformBuffer* uniformBuffer,
 			VulkanSet0DynamicUniformFrames* set0Frames,
 			VulkanGpuProfiler* gpuProfiler = nullptr) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanGraphicsCommandContext);
@@ -34,7 +33,10 @@ namespace gglab
 			VkCommandBuffer commandBuffer, uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool FinishEncoding() noexcept;
 		void AbortEncoding() noexcept;
-		[[nodiscard]] bool HasEncodingError() const noexcept { return m_HasEncodingError; }
+		[[nodiscard]] bool HasEncodingError() const noexcept { return m_HasEncodingError || HasRecordingError(); }
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 		// Borrowed native command buffer for backend adapters such as the
 		// official ImGui Vulkan renderer. Valid only while encoding.
 		[[nodiscard]] VkCommandBuffer Get() const noexcept { return m_CommandBuffer; }
@@ -63,8 +65,14 @@ namespace gglab
 		void SetViewport(const RHIViewport& viewport) noexcept override;
 		void SetScissorRect(const RHIScissorRect& rect) noexcept override;
 		void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept override;
-		void SetConstantBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		bool SetConstantBuffer(
+			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
+	protected:
+		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept override;
+
+	public:
+		using RHIGraphicsCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
@@ -92,14 +100,13 @@ namespace gglab
 		void Reject(std::string_view operation, std::string_view reason) noexcept;
 		[[nodiscard]] bool SetBufferDescriptor(uint32_t parameterIndex, RHIBufferHandle buffer,
 			uint64_t offset, VkDescriptorType descriptorType,
-			RHIBufferUsage requiredUsage, std::string_view operation) noexcept;
+			RHIBufferUsage requiredUsage, std::string_view operation, uint64_t sizeInBytes = 0) noexcept;
 		[[nodiscard]] bool BindDescriptorSets() noexcept;
 		[[nodiscard]] bool ValidateDraw(std::string_view operation, bool indexed) noexcept;
 
 		RHICommandContextHandle m_Handle = AllocateRHICommandContextHandle();
 		VulkanDevice* m_Device = nullptr;
 		VulkanPipelineSystem* m_PipelineSystem = nullptr;
-		VulkanDynamicUniformBuffer* m_UniformBuffer = nullptr;
 		VulkanSet0DynamicUniformFrames* m_Set0Frames = nullptr;
 		VulkanGpuProfiler* m_GpuProfiler = nullptr;
 		VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
@@ -137,6 +144,9 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanComputeCommandContext);
 		~VulkanComputeCommandContext() override;
 		using RHIComputeCommandContext::SetPushConstants;
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 
 		RHICommandContextHandle GetHandle() const noexcept override
 		{
@@ -155,8 +165,14 @@ namespace gglab
 		void EndGpuProfileScope() noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
-		void SetConstantBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		bool SetConstantBuffer(
+			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
+	protected:
+		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept override;
+
+	public:
+		using RHIComputeCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetReadWriteBuffer(
@@ -172,7 +188,7 @@ namespace gglab
 		void Reject(std::string_view operation, std::string_view reason) noexcept;
 		[[nodiscard]] bool SetBufferDescriptor(uint32_t parameterIndex, RHIBufferHandle buffer,
 			uint64_t offset, VkDescriptorType descriptorType,
-			RHIBufferUsage requiredUsage, std::string_view operation) noexcept;
+			RHIBufferUsage requiredUsage, std::string_view operation, uint64_t sizeInBytes = 0) noexcept;
 		[[nodiscard]] bool BindDescriptorSets() noexcept;
 
 		VulkanGraphicsCommandContext* m_GraphicsContext = nullptr;

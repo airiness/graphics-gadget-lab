@@ -852,10 +852,19 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIFrameSubmission.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUpload.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.cpp">
@@ -891,9 +900,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDevice.cpp">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp">
-      <Filter>Private\Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.cpp">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
@@ -907,6 +913,9 @@
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanParameterBindings.cpp">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineState.cpp">
@@ -1529,10 +1538,16 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h">
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIFrameSubmission.h">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIHandleTable.h">
       <Filter>Private\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHISubresourceUtils.h">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.h">
       <Filter>Private\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.h">
@@ -1574,9 +1589,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDeviceProfile.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h">
-      <Filter>Private\Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
@@ -1590,6 +1602,9 @@
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanParameterBindings.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineState.h">
@@ -2253,6 +2268,9 @@
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIUpload.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGuiInterop.h">

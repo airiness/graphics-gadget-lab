@@ -198,7 +198,8 @@ namespace gglab
 		bool IsAlive(RHIBufferHandle buffer) const noexcept;
 
 		void* MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept;
-		void UnmapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept;
+		bool UnmapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept;
+		[[nodiscard]] bool FlushBuffer(RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept;
 
 		VulkanTexture* ResolveTexture(RHITextureHandle texture) noexcept;
 		const VulkanTexture* ResolveTexture(RHITextureHandle texture) const noexcept;

@@ -663,10 +663,23 @@ namespace gglab
 		VulkanSubmitPresentResult submitPresent =
 			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
 				slot.m_NormalCommandBuffer);
-		const bool snapshotAccepted = submitPresent.m_Submitted ?
-			m_Device->GetDescriptorManager().SubmitFrameSnapshot(
-				active.m_FrameSlotIndex, submitPresent.m_SubmittedFencePoint) :
-			m_Device->GetDescriptorManager().AbortFrameSnapshot(active.m_FrameSlotIndex);
+		// An accepted submission may read the snapshot even without a committed signal.
+		bool snapshotAccepted = false;
+		if (submitPresent.m_Submitted)
+		{
+			snapshotAccepted = m_Device->GetDescriptorManager().SubmitFrameSnapshot(
+				active.m_FrameSlotIndex, submitPresent.m_SubmittedFencePoint);
+		}
+		else if (submitPresent.GetSubmitEffect() == RHISubmitEffect::Accepted)
+		{
+			snapshotAccepted = m_Device->GetDescriptorManager().RetainFrameSnapshot(
+				active.m_FrameSlotIndex, submitPresent.m_ReservedFencePoint);
+		}
+		else
+		{
+			snapshotAccepted =
+				m_Device->GetDescriptorManager().AbortFrameSnapshot(active.m_FrameSlotIndex);
+		}
 		if (!snapshotAccepted)
 		{
 			MarkFatal(VK_ERROR_INITIALIZATION_FAILED,
@@ -930,8 +943,11 @@ namespace gglab
 		submitInfo.signalSemaphoreInfoCount = 2;
 		submitInfo.pSignalSemaphoreInfos = signalInfos.data();
 
+		result.m_SubmitIssued = true;
+		result.m_ReservedFencePoint = RHIFencePoint(m_Timeline->GetRHIHandle(), timelineValue);
 		const VkResult submitResult =
 			vkQueueSubmit2(m_Device->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+		result.m_SubmitResult = submitResult;
 		result.m_Result = submitResult;
 		if (submitResult != VK_SUCCESS)
 		{

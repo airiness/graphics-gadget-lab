@@ -2,14 +2,17 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
-#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
 
+#include <array>
 #include <format>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -172,6 +175,12 @@ namespace gglab
 		return *m_Context->m_DirectComputeContext;
 	}
 
+	RHIFrameUploads VulkanFrameContext::GetUploads() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_Active, "VulkanFrameContext::GetUploads requires an active frame.");
+		return m_UploadWriter.GetFrameUploads();
+	}
+
 	std::unique_ptr<VulkanContext> VulkanContext::Create(const RHIContextDesc& desc,
 		const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept
 	{
@@ -232,17 +241,10 @@ namespace gglab
 		m_PipelineSystem = std::make_unique<VulkanPipelineSystem>(&device);
 		m_TransferManager = std::make_unique<TransferManager>(
 			std::make_unique<VulkanTransferContext>(&device));
-		m_DynamicUniformBuffer = std::make_unique<VulkanDynamicUniformBuffer>();
-		if (!m_DynamicUniformBuffer->Initialize(&device, runtime.GetFrameSlotCount()))
-		{
-			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"VulkanContext failed to initialize its dynamic uniform arena.");
-			Finalize();
-			return false;
-		}
+		m_UploadPool = std::make_unique<RHIUploadPool>(device);
 		m_Set0Frames = std::make_unique<VulkanSet0DynamicUniformFrames>();
 		if (!m_Set0Frames->Initialize(
-			&device, m_DynamicUniformBuffer.get(), runtime.GetFrameSlotCount()))
+			&device, runtime.GetFrameSlotCount()))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"VulkanContext failed to initialize its frame-local set-0 arenas.");
@@ -252,7 +254,7 @@ namespace gglab
 		m_GpuProfiler =
 			std::make_unique<VulkanGpuProfiler>(&device, runtime.GetFrameSlotCount());
 		m_GraphicsContext = std::make_unique<VulkanGraphicsCommandContext>(&device,
-			m_PipelineSystem.get(), m_DynamicUniformBuffer.get(), m_Set0Frames.get(),
+			m_PipelineSystem.get(), m_Set0Frames.get(),
 			m_GpuProfiler.get());
 		m_DirectComputeContext =
 			std::make_unique<VulkanComputeCommandContext>(*m_GraphicsContext);
@@ -326,6 +328,12 @@ namespace gglab
 		{
 			return RHIFrameBeginResult::Fatal();
 		}
+		if (m_Poisoned)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"VulkanContext refuses new frames after an unknown frame completion.");
+			return RHIFrameBeginResult::Fatal();
+		}
 
 		if (m_RecreatePending && !RecreateSwapChain(m_Width, m_Height))
 		{
@@ -388,6 +396,10 @@ namespace gglab
 		}
 
 		auto& frame = *m_Frames[begin.m_FrameSlotIndex];
+		frame.m_Uploads = m_UploadPool->BeginBatch();
+		frame.m_Uploads->Attach(frame.m_UploadWriter);
+		m_GraphicsContext->BeginRecordingScope(frame.m_UploadWriter);
+		m_DirectComputeContext->BeginRecordingScope(frame.m_UploadWriter);
 		frame.m_BackBufferIndex = begin.m_BackBufferIndex;
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
@@ -409,23 +421,53 @@ namespace gglab
 			m_GraphicsContext->GetUsedTextures().begin(), m_GraphicsContext->GetUsedTextures().end());
 		const std::vector usedBuffers(
 			m_GraphicsContext->GetUsedBuffers().begin(), m_GraphicsContext->GetUsedBuffers().end());
-		if (!m_GraphicsContext->FinishEncoding() ||
+		if (m_GraphicsContext->HasRecordingError() || m_DirectComputeContext->HasRecordingError() ||
+			!frame->m_Uploads->Publish() || !m_GraphicsContext->FinishEncoding() ||
 			!m_Bootstrap->m_FrameRuntime->EndFrameRecording())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"VulkanContext aborted a frame whose command stream did not finalize.");
-			return RHIFrameEndResult::Fatal(AbortFrame(rhiFrame));
+			return AbortFrame(rhiFrame);
 		}
 
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->EndFrame();
-		if (!result.m_Submitted || !result.m_SubmittedFencePoint.IsValid())
+		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
+		const std::array streams = {
+			RHISubmittedStream{ result.GetSubmitEffect(), result.m_SubmittedFencePoint, false },
+		};
+		const RHISubmissionResolution resolution = ResolveFrameSubmission(
+			streams, *frame->m_Uploads, MakeSubmissionVerification());
+		switch (resolution.m_State)
 		{
+		case RHIFrameSubmissionState::Fenced:
+			break;
+		case RHIFrameSubmissionState::NoOutstandingWork:
 			GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
 			FinishFrame(*frame);
 			return RHIFrameEndResult::Fatal();
+		case RHIFrameSubmissionState::CompletionUnknown:
+		{
+			// The set-0 arena and every resource the frame used stay retained on the reserved
+			// timeline point. Only verified idle or device-loss teardown ends the retention.
+			const RHIFencePoint retentionFence = result.GetRetentionFencePoint();
+			m_Poisoned = true;
+			GGLAB_UNUSED(m_Set0Frames->RetainFrame(frame->m_FrameSlotIndex, retentionFence));
+			for (const RHITextureHandle texture : usedTextures)
+			{
+				m_Bootstrap->m_Device->RecordTextureUse(texture, retentionFence);
+			}
+			for (const RHIBufferHandle buffer : usedBuffers)
+			{
+				m_Bootstrap->m_Device->RecordBufferUse(buffer, retentionFence);
+			}
+			FinishFrame(*frame);
+			return RHIFrameEndResult::FatalCompletionUnknown();
 		}
+		}
+
+		const RHIFencePoint submittedFence = resolution.m_Fence;
 		const bool descriptorFrameClosed =
-			m_Set0Frames->EndFrame(frame->m_FrameSlotIndex, result.m_SubmittedFencePoint);
+			m_Set0Frames->EndFrame(frame->m_FrameSlotIndex, submittedFence);
 		if (!descriptorFrameClosed)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -433,13 +475,12 @@ namespace gglab
 		}
 		for (const RHITextureHandle texture : usedTextures)
 		{
-			m_Bootstrap->m_Device->RecordTextureUse(texture, result.m_SubmittedFencePoint);
+			m_Bootstrap->m_Device->RecordTextureUse(texture, submittedFence);
 		}
 		for (const RHIBufferHandle buffer : usedBuffers)
 		{
-			m_Bootstrap->m_Device->RecordBufferUse(buffer, result.m_SubmittedFencePoint);
+			m_Bootstrap->m_Device->RecordBufferUse(buffer, submittedFence);
 		}
-		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
 		if (result.IsComplete() && !m_CompletedProductionFrame)
 		{
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
@@ -448,34 +489,54 @@ namespace gglab
 		}
 		FinishFrame(*frame);
 		return result.IsComplete() && descriptorFrameClosed ?
-			RHIFrameEndResult::Completed(result.m_SubmittedFencePoint) :
-			RHIFrameEndResult::Fatal(result.m_SubmittedFencePoint);
+			RHIFrameEndResult::Completed(submittedFence) :
+			RHIFrameEndResult::Fatal(submittedFence);
 	}
 
-	RHIFencePoint VulkanContext::AbortFrame(RHIFrameContext& rhiFrame) noexcept
+	RHIFrameEndResult VulkanContext::AbortFrame(RHIFrameContext& rhiFrame) noexcept
 	{
 		auto* frame = dynamic_cast<VulkanFrameContext*>(&rhiFrame);
 		GGLAB_ASSERT_MSG(frame && frame == m_ActiveFrame && frame->m_Active,
 			"VulkanContext::AbortFrame received a foreign or inactive frame.");
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
-			return {};
+			return RHIFrameEndResult::Fatal();
 		}
 
 		m_GraphicsContext->AbortEncoding();
 		GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->AbortFrame();
+		// The frame's own command buffer is never submitted, so no accepted stream reads the
+		// upload batch, whatever the abort submission returned.
+		frame->m_Uploads->Cancel();
 		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
 		FinishFrame(*frame);
-		return result.m_SubmittedFencePoint;
+		if (result.m_Submitted)
+		{
+			return RHIFrameEndResult::Fatal(result.m_SubmittedFencePoint);
+		}
+		if (result.GetSubmitEffect() == RHISubmitEffect::NoEffect)
+		{
+			return RHIFrameEndResult::Fatal();
+		}
+		// The accepted abort submission may still use the slot's command pool, the swapchain
+		// image and its semaphores. The fatal runtime never reuses them before teardown.
+		if (WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds) == RHIGpuWaitResult::Completed)
+		{
+			return RHIFrameEndResult::Fatal();
+		}
+		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+			"VulkanContext could not verify the completion of an accepted abort submission.");
+		m_Poisoned = true;
+		return RHIFrameEndResult::FatalCompletionUnknown();
 	}
 
-	void VulkanContext::WaitForFence(
+	bool VulkanContext::WaitForFence(
 		RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!fencePoint.IsValid())
 		{
-			return;
+			return true;
 		}
 		if (waitingQueue != RHIQueueType::Graphics || !m_Bootstrap ||
 			!m_Bootstrap->m_FrameRuntime ||
@@ -483,7 +544,9 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"VulkanContext::WaitForFence rejected an unsupported queue, fence, or frame state.");
+			return false;
 		}
+		return true;
 	}
 
 	void VulkanContext::Resize(uint32_t width, uint32_t height) noexcept
@@ -497,22 +560,68 @@ namespace gglab
 		GGLAB_UNUSED(RecreateSwapChain(width, height));
 	}
 
-	void VulkanContext::WaitIdle() noexcept
+	RHIGpuWaitResult VulkanContext::WaitIdleFor(uint32_t timeoutMilliseconds) noexcept
 	{
-		if (!m_Bootstrap || !m_Bootstrap->m_Device)
+		if (!m_Bootstrap || !m_Bootstrap->m_Device || !m_Bootstrap->m_FrameRuntime)
 		{
-			return;
+			return RHIGpuWaitResult::Failed;
 		}
-		const VkResult result = vkDeviceWaitIdle(m_Bootstrap->m_Device->Get());
-		if (result != VK_SUCCESS)
+		if (IsDeviceLost())
+		{
+			return RHIGpuWaitResult::DeviceLost;
+		}
+		VulkanDevice& device = *m_Bootstrap->m_Device;
+		if (!device.RequireOwnerThread("VulkanContext::WaitIdleFor"))
+		{
+			return RHIGpuWaitResult::Failed;
+		}
+		const std::array<VulkanTimelineFence*, 2> timelines = {
+			device.GetGraphicsTimeline(), device.GetTransferTimeline()
+		};
+		if (!timelines[0] || !timelines[1])
+		{
+			return RHIGpuWaitResult::Failed;
+		}
+		// Fresh ALL_COMMANDS signals cover every earlier submission, including accepted work
+		// without a committed signal. Their later values also retire retention on those gaps.
+		std::array<VulkanQueueIdleSignal, 2> signals
+		{
+			VulkanQueueIdleSignal{ device.GetGraphicsQueue(), timelines[0]->Get(),
+				timelines[0]->ReserveSignalValue() },
+			VulkanQueueIdleSignal{ device.GetTransferQueue(), timelines[1]->Get(),
+				timelines[1]->ReserveSignalValue() },
+		};
+		const RHIGpuWaitResult result = ClassifyVulkanWaitResult(
+			WaitVulkanQueuesIdle(device.Get(), signals, timeoutMilliseconds));
+		for (size_t index = 0; index < signals.size(); ++index)
+		{
+			if (signals[index].m_Submitted)
+			{
+				timelines[index]->CommitSubmittedValue(signals[index].m_Value);
+			}
+		}
+		ObserveWaitResult(result, "VulkanContext::WaitIdleFor");
+		if (result != RHIGpuWaitResult::Completed)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
-				"VulkanContext::WaitIdle failed with VkResult {}.", static_cast<int32_t>(result)));
+				"VulkanContext::WaitIdleFor did not verify idle: {}.",
+				GetRHIGpuWaitResultName(result)));
+			return result;
 		}
+		if (m_UploadPool)
+		{
+			// No queue can still read pages quarantined after an unknown completion.
+			m_UploadPool->ReleaseQuarantinedAfterVerifiedIdle();
+		}
+		return result;
 	}
 
 	void VulkanContext::RetireCompletedWork() noexcept
 	{
+		if (m_UploadPool)
+		{
+			m_UploadPool->ReclaimCompleted();
+		}
 		if (m_TransferManager)
 		{
 			m_TransferManager->Reclaim();
@@ -547,6 +656,32 @@ namespace gglab
 	{
 		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&
 			m_Bootstrap->m_FrameRuntime->IsDeviceLost();
+	}
+
+	RHISubmissionVerification VulkanContext::MakeSubmissionVerification() noexcept
+	{
+		return {
+			.m_WaitForFence = [this](const RHIFencePoint& fence)
+				{
+					const RHIGpuWaitResult result = m_Bootstrap->m_Device->WaitFencePoint(
+						fence, RHIFrameVerificationTimeoutMilliseconds);
+					ObserveWaitResult(result, "VulkanContext::WaitForFence(verification)");
+					return result;
+				},
+			.m_WaitIdle = [this]()
+				{
+					return WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
+				},
+		};
+	}
+
+	void VulkanContext::ObserveWaitResult(
+		RHIGpuWaitResult result, std::string_view operation) noexcept
+	{
+		if (result == RHIGpuWaitResult::DeviceLost && m_Bootstrap && m_Bootstrap->m_FrameRuntime)
+		{
+			m_Bootstrap->m_FrameRuntime->MarkFatal(VK_ERROR_DEVICE_LOST, operation);
+		}
 	}
 
 	uint64_t VulkanContext::GetSubmittedTimelineValue() const noexcept
@@ -602,6 +737,13 @@ namespace gglab
 
 	void VulkanContext::FinishFrame(VulkanFrameContext& frame) noexcept
 	{
+		m_GraphicsContext->EndRecordingScope();
+		m_DirectComputeContext->EndRecordingScope();
+		if (frame.m_Uploads)
+		{
+			frame.m_Uploads->Detach(frame.m_UploadWriter);
+			frame.m_Uploads.reset();
+		}
 		frame.m_Active = false;
 		m_ActiveFrame = nullptr;
 	}
@@ -612,9 +754,9 @@ namespace gglab
 		{
 			GGLAB_UNUSED(AbortFrame(*m_ActiveFrame));
 		}
-		if (m_Bootstrap && m_Bootstrap->m_FrameRuntime)
+		if (m_Bootstrap && m_Bootstrap->m_FrameRuntime && !IsDeviceLost())
 		{
-			WaitIdle();
+			GGLAB_UNUSED(WaitIdle());
 		}
 		if (m_SwapChain)
 		{
@@ -627,7 +769,7 @@ namespace gglab
 		m_GraphicsContext.reset();
 		m_GpuProfiler.reset();
 		m_Set0Frames.reset();
-		m_DynamicUniformBuffer.reset();
+		m_UploadPool.reset();
 		m_TransferManager.reset();
 		m_PipelineSystem.reset();
 		m_Bootstrap.reset();

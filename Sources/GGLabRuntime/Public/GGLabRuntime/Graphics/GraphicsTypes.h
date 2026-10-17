@@ -34,11 +34,12 @@ namespace gglab
 	{
 		SceneCB = 0,   // b0
 		DrawConstants, // DrawParameters root constants, b1
-		PassConstants, // Pass-specific root constants, b2
+		PassCB,        // Pass-specific constant buffer, b2
 		ObjectSB,	   // g_Objects, t1
 		MaterialSB,	   // g_Materials, t2
 		ViewSB,		   // g_Views, t3
 		LightSB,	   // g_Lights, t4
+		InlineConstants, // Small immediate parameters, b4 (b3 is pass-specific)
 
 		Count
 	};

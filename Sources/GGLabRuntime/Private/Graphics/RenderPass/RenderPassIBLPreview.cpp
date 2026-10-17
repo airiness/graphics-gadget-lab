@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -27,7 +29,7 @@ namespace gglab
 			uint32_t CubemapSamplerIndex = 0;
 			uint32_t SampleMip = 0;
 		};
-		static_assert(IsPassRootConstantStruct<IBLCubemapPreviewPassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLCubemapPreviewPassParameters>);
 		static_assert(sizeof(IBLCubemapPreviewPassParameters) == 16);
 
 		struct CubemapPreviewPassData
@@ -133,8 +135,11 @@ namespace gglab
 						const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-							sceneBuffer->GetBufferHandle(),
-							contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+							{
+								.m_Buffer = sceneBuffer->GetBufferHandle(),
+								.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
+								.m_SizeInBytes = sizeof(SceneGPU),
+							});
 
 						const IBLCubemapPreviewPassParameters passParameters{
 							.DisplayLayout = data.m_DisplayLayout,
@@ -142,9 +147,11 @@ namespace gglab
 							.CubemapSamplerIndex = data.m_CubemapSamplerIndex,
 							.SampleMip = data.m_SampleMip,
 						};
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							passParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+						{
+							return;
+						}
 
 						commandContext->DrawFullscreenTriangle();
 						renderResRegistry->ClearIBLPreviewDirty(previewType);

@@ -1,4 +1,6 @@
 #include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -227,8 +229,14 @@ namespace gglab
 
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
-		m_RHIContext->WaitIdle();
-		// The device is idle, so every submitted capture can publish its rows.
+		if (QuiesceRHIForTeardown(*m_RHIContext) == RHITeardownState::Unverified)
+		{
+			AbandonGpuOwners();
+			m_IsInitialized = false;
+			return;
+		}
+		// No queue still runs work: every owner below may release. Captures publish their
+		// rows only after verified idle; after device loss they fail without reading.
 		m_FrameCapture->Shutdown();
 		m_AssetUploadScheduler->Finalize();
 
@@ -276,6 +284,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			!m_HasActiveFrame, "Renderer::BeginFrame called without ending the previous frame.");
 		GGLAB_ASSERT_NOT_NULL(m_RHIContext.get());
+		if (m_Poisoned)
+		{
+			return RenderFrame(RHIFrameBeginStatus::Fatal);
+		}
 		m_FrameCapture->CollectCompleted();
 		const RHIFrameBeginResult beginResult = m_RHIContext->BeginFrame();
 		if (!beginResult.IsReady())
@@ -450,11 +462,14 @@ namespace gglab
 			return;
 		}
 
-		// Wait Structured Buffer upload
-		if (m_FrameGpuResources->m_UploadFencePoint.IsValid())
+		// Wait Structured Buffer upload. Without the queue wait the graph could read uploads
+		// that have not landed, so the frame stays unrecorded and EndFrame aborts it.
+		if (m_FrameGpuResources->m_UploadFencePoint.IsValid() &&
+			!m_RHIContext->WaitForFence(
+				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint))
 		{
-			m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint);
+			GGLAB_LOG_GRAPHICS_ERROR("Renderer could not order the frame after its uploads.");
+			return;
 		}
 
 		RGExecuteContext executeContext{ RGBackendExecuteContext{
@@ -477,13 +492,20 @@ namespace gglab
 
 		if (m_ActiveFrame.m_Phase != FramePhase::Recorded)
 		{
-			return RHIFrameEndResult::Fatal(AbortActiveFrame(frame.GetSerial()));
+			return AbortActiveFrame(frame.GetSerial());
 		}
 
 		GGLAB_ASSERT_NOT_NULL(m_ActiveFrame.m_RHIFrame);
 		GGLAB_ASSERT_NOT_NULL(m_ActiveFrame.m_RenderGraph);
 
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
+		if (result.IsCompletionUnknown())
+		{
+			RetainCompletionUnknownFrame();
+			return result;
+		}
+		// Fenced, or no outstanding work: the cleanup below cannot release anything the GPU
+		// may still read.
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
 		if (result.IsCompleted() && submittedFence.IsValid())
 		{
@@ -531,8 +553,8 @@ namespace gglab
 			GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 			RetireSceneGpuAllocations(
 				&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
-			m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 		}
+		m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 
 		EndFrameLifetime();
 		return result;
@@ -543,23 +565,28 @@ namespace gglab
 		GGLAB_UNUSED(AbortActiveFrame(frameSerial));
 	}
 
-	RHIFencePoint Renderer::AbortActiveFrame(uint64_t frameSerial) noexcept
+	RHIFrameEndResult Renderer::AbortActiveFrame(uint64_t frameSerial) noexcept
 	{
 		if (!m_HasActiveFrame || m_ActiveFrame.m_Serial != frameSerial)
 		{
-			return {};
+			return RHIFrameEndResult::Fatal();
 		}
 		if (m_RHIContext && m_FrameGpuResources &&
 			m_FrameGpuResources->m_UploadFencePoint.IsValid())
 		{
-			m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint);
+			GGLAB_UNUSED(m_RHIContext->WaitForFence(
+				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint));
 		}
 
 		if (m_RHIContext && m_ActiveFrame.m_RHIFrame)
 		{
-			const RHIFencePoint submittedFence =
-				m_RHIContext->AbortFrame(*m_ActiveFrame.m_RHIFrame);
+			const RHIFrameEndResult result = m_RHIContext->AbortFrame(*m_ActiveFrame.m_RHIFrame);
+			if (result.IsCompletionUnknown())
+			{
+				RetainCompletionUnknownFrame();
+				return result;
+			}
+			const RHIFencePoint submittedFence = result.GetSubmittedFence();
 			m_Atmosphere->EndFrame(false, submittedFence);
 			m_BakeAtmosphere->EndFrame(false, submittedFence);
 			m_IBLBakeScheduler->OnFrameAborted(submittedFence);
@@ -577,16 +604,15 @@ namespace gglab
 					RetireSceneGpuAllocations(
 						&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
 				}
-
-				if (m_ActiveFrame.m_RenderGraph)
-				{
-					m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
-				}
+			}
+			if (m_ActiveFrame.m_RenderGraph)
+			{
+				m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 			}
 			// Release capture readbacks only after the RHI abort recorded their uses.
 			m_FrameCapture->OnFrameAborted(frameSerial);
 			EndFrameLifetime();
-			return submittedFence;
+			return result;
 		}
 
 		m_Atmosphere->EndFrame(false, {});
@@ -595,7 +621,55 @@ namespace gglab
 		m_ActiveFrame.m_TemporalTransaction.Abort();
 		m_FrameCapture->OnFrameAborted(frameSerial);
 		EndFrameLifetime();
-		return {};
+		return RHIFrameEndResult::Fatal();
+	}
+
+	void Renderer::RetainCompletionUnknownFrame() noexcept
+	{
+		// Nothing the frame can read is released: graph transients stay out of the pool's
+		// free lists, scene ring spans stay leased, capture readbacks stay unread, and the
+		// Atmosphere, temporal and IBL resources keep their owners. Finalize releases them
+		// once quiescence or device loss is confirmed.
+		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+			"Renderer retained a frame whose GPU completion is unknown; no further frame begins.");
+		m_Poisoned = true;
+		m_FrameCapture->OnFrameCompletionUnknown(m_ActiveFrame.m_Serial);
+		m_Atmosphere->RetainAfterUnknownCompletion();
+		m_BakeAtmosphere->RetainAfterUnknownCompletion();
+		m_IBLBakeScheduler->OnFrameAborted();
+		m_ActiveFrame.m_TemporalTransaction.Abort();
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
+		EndFrameLifetime();
+	}
+
+	void Renderer::AbandonGpuOwners() noexcept
+	{
+		// Destroying an owner could free memory the GPU still reads. Process exit reclaims the
+		// abandoned owners; the capture service stays to publish its failures.
+		m_FrameCapture->Abandon("The render host finalized before GPU idle could be verified.");
+		GGLAB_UNUSED(m_IBLBakeScheduler.release());
+		GGLAB_UNUSED(m_EnvironmentLightingSystem.release());
+		GGLAB_UNUSED(m_RenderResRegistry.release());
+		GGLAB_UNUSED(m_SamplerRegistry.release());
+		GGLAB_UNUSED(m_PipelineCache.release());
+		GGLAB_UNUSED(m_Atmosphere.release());
+		GGLAB_UNUSED(m_BakeAtmosphere.release());
+		GGLAB_UNUSED(m_TemporalHistoryManager.release());
+		GGLAB_UNUSED(m_TemporalReferenceAccumulator.release());
+		GGLAB_UNUSED(m_GTAOTemporalHistory.release());
+		GGLAB_UNUSED(m_PersistentTexturePool.release());
+		GGLAB_UNUSED(m_TransientResourcePool.release());
+		GGLAB_UNUSED(m_AssetUploadScheduler.release());
+		GGLAB_UNUSED(m_SceneCB.release());
+		GGLAB_UNUSED(m_ObjectTable.release());
+		GGLAB_UNUSED(m_MaterialTable.release());
+		GGLAB_UNUSED(m_LightTable.release());
+		GGLAB_UNUSED(m_ObjectSB.release());
+		GGLAB_UNUSED(m_MaterialSB.release());
+		GGLAB_UNUSED(m_LightSB.release());
+		GGLAB_UNUSED(m_ViewSB.release());
+		GGLAB_UNUSED(m_RHIContext.release());
 	}
 
 	void Renderer::EndFrameLifetime() noexcept
@@ -742,8 +816,9 @@ namespace gglab
 			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
 		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 1, 0, 1,
 			MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 2, 0, 1,
-			MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
+		AddBindingSlot(
+			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 2, 0, 1, 0, "PassCB");
+		desc.m_Slots[desc.m_SlotCount - 1].m_BufferBindingMode = RHIBufferBindingMode::Dynamic;
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 1, 0, 1, 0,
 			"ObjectSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 2, 0, 1, 0,
@@ -752,6 +827,8 @@ namespace gglab
 			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
 			"LightSB");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 4, 0, 1,
+			MaxInlineConstantDWORDs * sizeof(uint32_t), "InlineConstants");
 		AddBindingSlot(desc, RHIBindingType::BindlessResourceTable, RHIShaderStage::All, 0, 0, 0, 0,
 			"BindlessResources");
 		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0,

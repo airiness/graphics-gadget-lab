@@ -1,4 +1,6 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
@@ -26,7 +28,7 @@ namespace gglab
 			uint32_t ViewIndex = 0;
 			uint32_t Padding[3]{};
 		};
-		static_assert(IsPassRootConstantStruct<DirectionalShadowPassParameters>);
+		static_assert(IsPassConstantBufferStruct<DirectionalShadowPassParameters>);
 		static_assert(sizeof(DirectionalShadowPassParameters) == 16);
 
 		struct PassData
@@ -156,8 +158,11 @@ namespace gglab
 					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 					graphicsContext->SetConstantBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						sceneBuffer->GetBufferHandle(),
-						contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+						{
+							.m_Buffer = sceneBuffer->GetBufferHandle(),
+							.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
+							.m_SizeInBytes = sizeof(SceneGPU),
+						});
 
 					const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 					graphicsContext->SetReadOnlyBuffer(
@@ -177,8 +182,11 @@ namespace gglab
 					const DirectionalShadowPassParameters passParameters{
 						.ViewIndex = viewIndex,
 					};
-					graphicsContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+					if (!graphicsContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+					{
+						return;
+					}
 
 					DrawRenderQueue(graphicsContext, services, renderQueue);
 				});
@@ -281,7 +289,7 @@ namespace gglab
 				hasBoundMesh = true;
 			}
 
-			graphicsContext->SetPushConstants(
+			graphicsContext->SetInlineConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawPacket.m_DrawParameters);
 

@@ -13,9 +13,9 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x438994bc;
-	inline constexpr uint32_t InventoryHigh = 0x03ebf395;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.438994bc03ebf395da2cad4ae6655282d7d51e20bd4955085ae978d445e78f07";
+	inline constexpr uint32_t InventoryLow = 0x9954bbd2;
+	inline constexpr uint32_t InventoryHigh = 0x0aae78c8;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.9954bbd20aae78c8b9eb4f12de04c987b9f4b798ec487a6af3078b803f302c1b";
 	inline constexpr uint32_t SiteCount = 76;
 	inline constexpr uint32_t ProgramCount = 27;
 	// The frame injection block follows the site records: point + 1 (zero is none),

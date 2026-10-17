@@ -1031,8 +1031,17 @@ namespace gglab
 			SpirVDecorationReflection storageReflection;
 			const bool storageReflected = ReadSpirVDecorations(storageResult.m_Artifact.m_Binary, storageReflection);
 			context.Check(storageReflected && HasDescriptorBinding(storageReflection, 0, 2) &&
+				HasDescriptorBinding(storageReflection, 0, 4) &&
 				HasDescriptorBinding(storageReflection, 1, 0),
-				"RenderGraph storage-write SPIR-V maps fixed constants and the mutable resource heap");
+				"RenderGraph storage-write SPIR-V maps b2 pass data, b4 inline data and the mutable resource heap");
+			const auto* storageLayout = storageReflection.FindStructLayout(
+				"type.ConstantBuffer.ComputeLabPassParameters");
+			context.Check(storageLayout && storageLayout->m_Size == 96u &&
+				storageLayout->m_Members.size() == 14u &&
+				storageLayout->m_Members[11].m_Offset == 48u &&
+				storageLayout->m_Members[12].m_Offset == 64u &&
+				storageLayout->m_Members[13].m_Offset == 80u,
+				"Compute smoke SPIR-V preserves the 96-byte pass buffer and explicit CPU color offsets");
 
 			ShaderDesc fullscreenDesc = storageDesc;
 			fullscreenDesc.m_Stage = ShaderStage::Vertex;
