@@ -1,6 +1,7 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Content/RuntimeAssetBundle.h"
 #include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
@@ -1086,9 +1087,8 @@ namespace gglab
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
 				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
-			context.Check(registered && CoastalSceneReferenceViews.size() == 14,
-				"Eight retained atrium views, five coastal retreat views and one temporal "
-				"evaluation view register in runtime coordinates");
+			context.Check(registered && CoastalSceneReferenceViews.size() == 18,
+				"Retained coastal views and four new GI/landing observations register in runtime coordinates");
 			if (!registered)
 			{
 				return;
@@ -1104,7 +1104,10 @@ namespace gglab
 					std::format("{} looks at its authored target with the intended perspective projection", reference.m_Id));
 				const auto exposure = ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
 				const float daylightScale = 1.0f / (1.2f * 32768.0f);
-				context.Check(reference.m_ProfileVersion == 2 && camera.GetFar() == 6000.0f &&
+				const bool newObservation = reference.m_Id == "Retreat_SeaPassage" ||
+					reference.m_Id == "GI_InteriorExterior" || reference.m_Id.starts_with("Landing_");
+				context.Check(reference.m_ProfileVersion == (newObservation ? 1u : 2u) &&
+					camera.GetFar() == (reference.m_Id == "GI_InteriorExterior" ? 150.0f : 6000.0f) &&
 					camera.GetManualEV100() == 15.0f &&
 					exposure.m_EffectiveEV100 == 15.0f && exposure.m_ExposureScale == daylightScale &&
 					exposure.m_PreExposure == daylightScale,
@@ -1133,21 +1136,30 @@ namespace gglab
 
 		void CheckCoastalRetreatContent(SelfTestContext& context) noexcept
 		{
+			std::string bundleFailure;
+			const auto bundle = LoadRuntimeAssetBundle(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabCoastalRetreat/bundle.json"), bundleFailure);
+			context.Check(bundle && bundle->m_Id == "gglab.coastal-retreat",
+				std::format("Installed coastal bundle validates independently of authoring sources: {}", bundleFailure));
 			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
 				"Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf"), {});
-			context.Check(imported.Succeeded() && imported.m_Model.m_TextureSources.size() == 24,
-				std::format("Coastal retreat geometry and twenty-four surface textures import: {}", imported.m_Error));
+			context.Check(imported.Succeeded() && imported.m_Model.m_TextureSources.size() == 26,
+				std::format("Coastal retreat geometry and twenty-six surface textures import: {}", imported.m_Error));
 			if (!imported.Succeeded())
 			{
 				return;
 			}
 			const auto& model = imported.m_Model;
 			CheckImportedTextures(context, model);
-			constexpr std::array<std::pair<std::string_view, size_t>, 24> expectedTriangles = { {
+			constexpr std::array<std::pair<std::string_view, size_t>, 28> expectedTriangles = { {
 				{ "MAT_RetreatStone", 220 },
 				{ "MAT_RetreatLime", 4754 },
-				{ "MAT_RetreatMetal", 10268 },
-				{ "MAT_RetreatTimber", 75472 },
+				{ "MAT_RetreatMetal", 19480 },
+				{ "MAT_RetreatTimber", 76012 },
+				{ "MAT_LandingDampTimber", 24 },
+				{ "MAT_LandingWarmDiffuser", 1316 },
+				{ "MAT_LandingBrushedHardware", 1440 },
+				{ "MAT_LandingMarinePaint", 376 },
 				{ "MAT_CoastalRock", 6048 },
 				{ "MAT_LoungeCoatedShell", 1460 },
 				{ "MAT_LoungeUpholstery", 752 },

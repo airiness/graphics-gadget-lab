@@ -13,6 +13,8 @@
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
+#include <filesystem>
+
 namespace gglab
 {
 	class AssetManager;
@@ -42,6 +44,7 @@ namespace gglab
 		Time* m_Time = nullptr;
 		DebugDrawContext* m_DebugDraw = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
+		std::filesystem::path m_AssetRoot;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{

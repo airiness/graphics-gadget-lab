@@ -1,6 +1,11 @@
 #pragma once
 #include "Capture/FrameCaptureReadiness.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/WorldSun.h"
 
 #include <array>
 #include <cstdint>
@@ -44,6 +49,26 @@ namespace gglab
 		float m_VerticalFovDegrees = 0.0f;
 		float m_NearPlane = 0.0f;
 		float m_FarPlane = 0.0f;
+	};
+
+	struct FrameCaptureAssetBundle
+	{
+		std::string m_Id;
+		std::string m_Revision;
+	};
+
+	// Owned values from the built frame, before submission. No authoring inputs.
+	struct FrameCaptureSceneInputs
+	{
+		ResolvedExposureSettings m_Exposure{};
+		ResolvedPostProcessSettings m_PostProcess{};
+		DirectionalShadowSettings m_Shadows{};
+		EnvironmentLightingSettings m_Environment{};
+		uint64_t m_ActiveIBLGeneration = 0;
+		std::optional<AtmosphereSettings> m_Atmosphere;
+		std::optional<ResolvedWorldSun> m_Sun;
+		uint32_t m_LocalLightCount = 0;
+		bool m_AerialPerspective = false;
 	};
 
 	// One temporal consumer of the frame's plan and the services it contributed.
@@ -140,6 +165,8 @@ namespace gglab
 		std::string m_Backend;
 		std::string m_DemoId;
 		std::string m_LabId;
+		std::optional<FrameCaptureAssetBundle> m_AssetBundle;
+		std::optional<FrameCaptureSceneInputs> m_SceneInputs;
 		uint64_t m_FrameSerial = 0;
 		uint64_t m_FrameIndex = 0;
 		uint32_t m_Width = 0;

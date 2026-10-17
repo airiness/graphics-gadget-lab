@@ -341,6 +341,11 @@ namespace gglab
 				"Requests wait for the next frame before reaching the Runtime");
 
 			coordinator.BeginFrame(MakeFrameState(false));
+			FrameCaptureSceneInputs sceneInputs;
+			sceneInputs.m_Exposure.m_ManualEV100 = 15.0f;
+			coordinator.SetFrameSceneInputs(17, sceneInputs);
+			sceneInputs.m_Exposure.m_ManualEV100 = 3.0f;
+			coordinator.SetFrameSceneInputs(18, sceneInputs);
 			context.Check(control.m_Issued.size() == 1 &&
 				control.m_Issued[0].m_Source == FrameCaptureSource::Composited,
 				"A next-frame capture is issued even while content is still loading");
@@ -365,6 +370,8 @@ namespace gglab
 
 			const FrameCaptureRequestResult& result = results[0];
 			const FrameCaptureMetadata& metadata = *result.m_Metadata;
+			context.Check(metadata.m_SceneInputs && metadata.m_SceneInputs->m_Exposure.m_ManualEV100 == 15.0f,
+				"Only the issued frame's built scene inputs reach its capture metadata");
 			context.Check(std::filesystem::exists(result.m_ImagePath) &&
 				std::filesystem::exists(result.m_MetadataPath) &&
 				HasPngSignature(result.m_ImagePath) &&

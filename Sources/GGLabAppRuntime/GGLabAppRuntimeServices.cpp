@@ -244,6 +244,7 @@ namespace gglab
 					.m_Time = m_Time.get(),
 					.m_DebugDraw = &m_DebugDrawService->GetContext(),
 					.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+					.m_AssetRoot = m_Paths.m_AssetRoot,
 				},
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,

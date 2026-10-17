@@ -11,7 +11,7 @@ namespace gglab
 
 	// Blender (X, Y, Z) -> runtime (X, Z, Y), meters. Perspective, vertical FOV.
 	// Profile 2 pairs all retained poses with physical daylight and the distant coastal range.
-	inline const std::array<CameraReferenceView, 14> CoastalSceneReferenceViews = { {
+	inline const std::array<CameraReferenceView, 18> CoastalSceneReferenceViews = { {
 		{
 			.m_Id = "CAM_Courtyard",
 			.m_Name = "Courtyard",
@@ -163,6 +163,58 @@ namespace gglab
 			.m_Position = { 23.0f, 23.0f, -31.0f },
 			.m_Target = { -1.4f, 2.0f, -2.8f },
 			.m_VerticalFovDegrees = math::ToDegrees(0.6057697296f),
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ManualEV100 = CoastalSceneManualEV100,
+			.m_ReferenceAspect = 1.6f,
+		},
+		// GI and landing observations retain independent projection profiles.
+		{
+			.m_Id = "Retreat_SeaPassage",
+			.m_Name = "Retreat Sea Passage",
+			.m_Purpose = "Deep shade beneath the continuous roof, including ceiling and pier faces.",
+			.m_ProfileVersion = 1,
+			.m_Position = { 4.4f, 4.05f, 2.8f },
+			.m_Target = { 4.4f, 4.0335549f, 3.7998648f },
+			.m_VerticalFovDegrees = 50.2296698f,
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ManualEV100 = CoastalSceneManualEV100,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "GI_InteriorExterior",
+			.m_Name = "GI Interior / Exterior",
+			.m_Purpose = "Frozen 16:10 doorway projection for indirect-light comparisons.",
+			.m_ProfileVersion = 1,
+			.m_Position = { -12.0f, 4.0f, -2.9f },
+			.m_Target = { -11.0165687f, 3.8946324f, -3.0475147f },
+			.m_VerticalFovDegrees = 50.2296698f,
+			.m_FarPlane = 150.0f,
+			.m_ManualEV100 = CoastalSceneManualEV100,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "Landing_Dock",
+			.m_Name = "Landing Dock",
+			.m_Purpose = "Dock fixtures, equal mounting pitch and the stair approach.",
+			.m_ProfileVersion = 1,
+			.m_Position = { 17.0f, 7.7f, -28.0f },
+			.m_Target = { 16.4056089f, 7.2174944f, -27.3566591f },
+			.m_VerticalFovDegrees = 35.6377778f,
+			.m_NearPlane = 0.05f,
+			.m_FarPlane = 6000.0f,
+			.m_ManualEV100 = CoastalSceneManualEV100,
+			.m_ReferenceAspect = 1.6f,
+		},
+		{
+			.m_Id = "Landing_Damp",
+			.m_Name = "Landing Damp Timber",
+			.m_Purpose = "Local damp timber albedo and roughness with the retained normal map.",
+			.m_ProfileVersion = 1,
+			.m_Position = { 10.8f, 2.6f, -20.7f },
+			.m_Target = { 10.0881897f, 2.0499648f, -21.1367922f },
+			.m_VerticalFovDegrees = 28.0724869f,
 			.m_NearPlane = 0.05f,
 			.m_FarPlane = 6000.0f,
 			.m_ManualEV100 = CoastalSceneManualEV100,

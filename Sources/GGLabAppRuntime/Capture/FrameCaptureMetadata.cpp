@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 
@@ -165,6 +166,123 @@ namespace gglab
 		};
 	}
 
+	namespace
+	{
+		void WriteSceneInputs(JsonWriter& writer, const FrameCaptureSceneInputs& inputs)
+		{
+			const auto vector = [&](std::string_view name, const Vector3& value)
+				{
+					writer.Vector(name, { value.m_X, value.m_Y, value.m_Z });
+				};
+			writer.BeginObject("sceneInputs");
+			writer.Unsigned("schemaVersion", 1);
+			writer.BeginObject("exposure");
+			writer.Number("manualEV100", inputs.m_Exposure.m_ManualEV100);
+			writer.Number("compensationEV", inputs.m_Exposure.m_CompensationEV);
+			writer.Number("effectiveEV100", inputs.m_Exposure.m_EffectiveEV100);
+			writer.Number("scale", inputs.m_Exposure.m_ExposureScale);
+			writer.Number("preExposure", inputs.m_Exposure.m_PreExposure);
+			writer.EndObject();
+			writer.BeginObject("postProcess");
+			writer.Unsigned("toneMapping", static_cast<uint32_t>(inputs.m_PostProcess.m_ToneMapping.m_Operator));
+			const auto& bloom = inputs.m_PostProcess.m_Bloom;
+			writer.Bool("bloomEnabled", bloom.m_Enabled);
+			writer.Number("bloomThreshold", bloom.m_Threshold);
+			writer.Number("bloomSoftKnee", bloom.m_SoftKnee);
+			writer.Number("bloomIntensity", bloom.m_Intensity);
+			writer.Number("bloomScatter", bloom.m_Scatter);
+			writer.Unsigned("bloomMaxLevels", bloom.m_MaxLevels);
+			writer.EndObject();
+			writer.BeginObject("environment");
+			const auto& environment = inputs.m_Environment;
+			writer.Number("intensity", environment.m_Intensity);
+			writer.Number("rotationRadians", environment.m_RotationRadians);
+			writer.Bool("skybox", environment.m_EnableSkybox);
+			writer.Unsigned("backgroundMode", static_cast<uint32_t>(environment.m_BackgroundMode));
+			writer.String("iblQuality", GetIBLQualityPresetName(environment.m_QualityPreset));
+			writer.Unsigned("activeIBLGeneration", inputs.m_ActiveIBLGeneration);
+			const auto& config = environment.m_BakeConfig;
+			writer.BeginObject("iblConfig");
+			writer.Unsigned("environmentSize", config.m_EnvironmentCubemapSize);
+			writer.Unsigned("environmentFormat", static_cast<uint32_t>(config.m_EnvironmentCubemapFormat));
+			writer.Unsigned("irradianceSize", config.m_IrradianceCubemapSize);
+			writer.Unsigned("irradianceFormat", static_cast<uint32_t>(config.m_IrradianceCubemapFormat));
+			writer.Unsigned("irradianceSamples", config.m_IrradianceSampleCount);
+			writer.Unsigned("specularSize", config.m_PrefilteredSpecularCubemapSize);
+			writer.Unsigned("specularMipLevels", config.m_PrefilteredSpecularMipLevels);
+			writer.Unsigned("specularFormat", static_cast<uint32_t>(config.m_PrefilteredSpecularCubemapFormat));
+			writer.Unsigned("specularSamples", config.m_PrefilteredSpecularSampleCount);
+			writer.Number("specularMaxSampleLuminance", config.m_PrefilteredSpecularMaxSampleLuminance);
+			writer.Unsigned("brdfLutSize", config.m_BrdfLutSize);
+			writer.Unsigned("brdfLutFormat", static_cast<uint32_t>(config.m_BrdfLutFormat));
+			writer.EndObject();
+			writer.EndObject();
+			writer.BeginObject("shadows");
+			const auto& shadows = inputs.m_Shadows;
+			writer.Bool("enabled", shadows.m_Enable);
+			writer.Bool("pcf", shadows.m_EnablePCF);
+			writer.Unsigned("mapSize", shadows.m_ShadowMapSize);
+			writer.Unsigned("cascadeCount", shadows.m_CascadeCount);
+			writer.Number("splitLambda", shadows.m_SplitLambda);
+			writer.Number("cascadeBlendFraction", shadows.m_CascadeBlendFraction);
+			writer.Number("distanceFadeFraction", shadows.m_DistanceFadeFraction);
+			writer.Unsigned("fitMode", static_cast<uint32_t>(shadows.m_FitMode));
+			writer.Bool("texelSnapping", shadows.m_EnableTexelSnapping);
+			writer.Number("maxDistance", shadows.m_MaxShadowDistance);
+			writer.Number("casterExtrusion", shadows.m_CasterExtrusionDistance);
+			writer.Number("orthoPadding", shadows.m_OrthoPadding);
+			writer.Number("depthPadding", shadows.m_DepthPadding);
+			writer.Number("receiverBiasTexels", shadows.m_ReceiverBiasTexels);
+			writer.Number("receiverSlopeBiasTexels", shadows.m_ReceiverSlopeBiasTexels);
+			writer.Number("receiverMaxSlope", shadows.m_ReceiverMaxSlope);
+			writer.EndObject();
+			if (inputs.m_Sun)
+			{
+				const auto& sun = *inputs.m_Sun;
+				writer.BeginObject("sun");
+				vector("photonDirection", sun.m_Direction);
+				vector("chromaticity", sun.m_Chromaticity);
+				vector("directIlluminance", sun.m_DirectIlluminance);
+				vector("diskRadiance", sun.m_DiskRadiance);
+				writer.Number("toaIlluminanceLux", sun.m_PerpendicularIlluminanceLux);
+				writer.Number("angularRadiusRadians", sun.m_AngularRadiusRadians);
+				writer.Number("projectedSolidAngle", sun.m_ProjectedSolidAngle);
+				writer.EndObject();
+			}
+			else
+			{
+				writer.Null("sun");
+			}
+			if (inputs.m_Atmosphere)
+			{
+				const auto& atmosphere = *inputs.m_Atmosphere;
+				writer.BeginObject("atmosphere");
+				writer.Number("planetRadiusMeters", atmosphere.m_PlanetRadiusMeters);
+				writer.Number("heightMeters", atmosphere.m_HeightMeters);
+				vector("planetCenterMeters", atmosphere.m_PlanetCenterMeters);
+				writer.Number("worldUnitsToMeters", atmosphere.m_WorldUnitsToMeters);
+				vector("rayleighScattering", atmosphere.m_RayleighScattering);
+				writer.Number("rayleighScaleHeightMeters", atmosphere.m_RayleighScaleHeightMeters);
+				writer.Number("mieScattering", atmosphere.m_MieScattering);
+				writer.Number("mieExtinction", atmosphere.m_MieExtinction);
+				writer.Number("mieScaleHeightMeters", atmosphere.m_MieScaleHeightMeters);
+				writer.Number("mieAnisotropy", atmosphere.m_MieAnisotropy);
+				vector("absorption", atmosphere.m_Absorption);
+				writer.Number("absorptionCenterMeters", atmosphere.m_AbsorptionCenterMeters);
+				writer.Number("absorptionHalfWidthMeters", atmosphere.m_AbsorptionHalfWidthMeters);
+				vector("groundAlbedo", atmosphere.m_GroundAlbedo);
+				writer.EndObject();
+			}
+			else
+			{
+				writer.Null("atmosphere");
+			}
+			writer.Unsigned("localLightCount", inputs.m_LocalLightCount);
+			writer.Bool("aerialPerspective", inputs.m_AerialPerspective);
+			writer.EndObject();
+		}
+	}
+
 	std::string GetFrameCapturePathText(const std::filesystem::path& path) noexcept
 	{
 		const std::u8string text = path.u8string();
@@ -272,7 +390,26 @@ namespace gglab
 		writer.BeginObject("content");
 		writer.String("demoId", metadata.m_DemoId);
 		writer.String("labId", metadata.m_LabId);
+		if (metadata.m_AssetBundle)
+		{
+			writer.BeginObject("assetBundle");
+			writer.String("id", metadata.m_AssetBundle->m_Id);
+			writer.String("revision", metadata.m_AssetBundle->m_Revision);
+			writer.EndObject();
+		}
+		else
+		{
+			writer.Null("assetBundle");
+		}
 		writer.EndObject();
+		if (metadata.m_SceneInputs)
+		{
+			WriteSceneInputs(writer, *metadata.m_SceneInputs);
+		}
+		else
+		{
+			writer.Null("sceneInputs");
+		}
 
 		writer.BeginObject("frame");
 		writer.Unsigned("serial", metadata.m_FrameSerial);

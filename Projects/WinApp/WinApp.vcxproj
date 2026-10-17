@@ -165,6 +165,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Content\RuntimeAssetBundle.cpp" />
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
@@ -331,6 +332,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Content\RuntimeAssetBundle.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />

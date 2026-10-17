@@ -315,6 +315,7 @@ namespace gglab
 					? inputs.m_DemoManager.GetDemoName(demoIndex)
 					: inputs.m_Demo.GetName()),
 				.m_LabId = inputs.m_Demo.GetCaptureContentId(),
+				.m_AssetBundle = inputs.m_Demo.GetCaptureAssetBundle(),
 				.m_Readiness = BuildCaptureReadiness(inputs),
 				.m_SettleKey = {
 					.m_Temporal = inputs.m_TemporalFrameTransaction.GetContinuity(),
@@ -627,6 +628,18 @@ namespace gglab
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
+		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
+		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
+			.m_Exposure = capturedView.m_Exposure,
+			.m_PostProcess = capturedView.m_PostProcess,
+			.m_Shadows = frame.m_DirectionalShadowSettings,
+			.m_Environment = m_RenderServices.m_Environment->GetEnvironmentLightingSettings(),
+			.m_ActiveIBLGeneration = m_RenderServices.m_Environment->GetBakingStatus().m_ActiveGeneration,
+			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
+			.m_Sun = frame.m_RenderScene.m_WorldSun,
+			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
+			.m_AerialPerspective = capturedView.m_Lighting.m_EnableAerialPerspective,
+			});
 		const RenderFrameValidationResult validation =
 			renderPipeline.ValidateRenderFrame(validationContext, services);
 		if (!validation.IsReady())

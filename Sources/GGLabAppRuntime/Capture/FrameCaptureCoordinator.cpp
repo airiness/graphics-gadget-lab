@@ -687,6 +687,18 @@ namespace gglab
 				available.empty() ? "none" : available));
 	}
 
+	void FrameCaptureCoordinator::SetFrameSceneInputs(
+		uint64_t frameSerial, const FrameCaptureSceneInputs& inputs) noexcept
+	{
+		for (Entry& entry : m_Entries)
+		{
+			if (entry.m_Phase == Phase::Issued && entry.m_Metadata.m_FrameSerial == frameSerial)
+			{
+				entry.m_Metadata.m_SceneInputs = inputs;
+			}
+		}
+	}
+
 	void FrameCaptureCoordinator::OnFrameSubmitted() noexcept
 	{
 		if (m_NonFiniteWatch && m_LastFrameState)
@@ -884,6 +896,7 @@ namespace gglab
 		metadata.m_Backend = state.m_Backend;
 		metadata.m_DemoId = state.m_DemoId;
 		metadata.m_LabId = state.m_LabId;
+		metadata.m_AssetBundle = state.m_AssetBundle;
 		metadata.m_FrameSerial = state.m_FrameSerial;
 		metadata.m_FrameIndex = state.m_FrameIndex;
 		metadata.m_Camera = state.m_Camera;

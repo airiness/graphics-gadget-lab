@@ -100,6 +100,7 @@ namespace gglab
 		std::string m_Backend;
 		std::string m_DemoId;
 		std::string m_LabId;
+		std::optional<FrameCaptureAssetBundle> m_AssetBundle;
 		FrameCaptureReadiness m_Readiness{};
 		FrameCaptureSettleKey m_SettleKey{};
 		// Actual presentation format; Diagnostic captures use RGBA8 instead.
@@ -200,6 +201,7 @@ namespace gglab
 		// before metadata is fixed, or fail if they require an exact sequence frame.
 		// Fails waiting after-ready requests for content with a failed gate.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
+		void SetFrameSceneInputs(uint64_t frameSerial, const FrameCaptureSceneInputs& inputs) noexcept;
 		// Busy is handled before submission so a sequence keeps the same sample/frame.
 		[[nodiscard]] bool PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
 			ResourceExportFrameContext context) noexcept;

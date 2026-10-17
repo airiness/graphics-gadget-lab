@@ -21,6 +21,9 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
 $catalog = @(
+    @{ name = 'coastal-assets'; group = 'contracts'; steps = @(
+        @{ path = 'Scripts/Verification/ValidateAssetBundle.py'; arguments = @('--self-test') },
+        @{ path = 'Scripts/Verification/ValidateAssetBundle.py'; arguments = @() }) },
     @{ name = 'verification-support'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestVerificationSupport.ps1' }) },
     @{ name = 'nonfinite-sites'; group = 'contracts'; steps = @(
         @{ path = 'Scripts/GenerateNonFiniteSites.py'; arguments = @('--check') },

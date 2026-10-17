@@ -32,6 +32,10 @@ namespace gglab
 		~DemoPlayground() override = default;
 
 		std::string_view GetName() const noexcept override;
+		std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept override
+		{
+			return m_CaptureAssetBundle;
+		}
 		void BeginPrepare() noexcept override;
 		void TickPrepare() noexcept override;
 		LoadingProgress GetPreparationProgress() const noexcept override
@@ -85,6 +89,7 @@ namespace gglab
 		ViewRenderProfile m_ViewRenderProfile{};
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 		std::vector<PendingModel> m_PendingModels;
+		std::optional<FrameCaptureAssetBundle> m_CaptureAssetBundle;
 		LoadingProgress m_LoadingProgress{};
 	};
 }

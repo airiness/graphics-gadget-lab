@@ -11,6 +11,7 @@ function New-VerificationRunDirectory {
         $path = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $RunId
     }
     # Refuse an existing run directory so independent runs cannot share writable state.
+    if (Test-Path -LiteralPath $path) { throw "Run directory already exists: $path" }
     $null = New-Item -ItemType Directory -Path $path -ErrorAction Stop
     return $path
 }

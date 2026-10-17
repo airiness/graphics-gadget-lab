@@ -128,7 +128,9 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
-    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 10 -and -not (Test-Path $unused) -and @($items.suites | Where-Object { $_.group -eq 'contracts' })[0].configurations.Count -eq 0) 'list-without-launch-or-output'
+    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 11 -and
+        @($items.suites | Where-Object name -eq 'coastal-assets').Count -eq 1 -and
+        -not (Test-Path $unused) -and @($items.suites | Where-Object { $_.group -eq 'contracts' })[0].configurations.Count -eq 0) 'list-without-launch-or-output'
     foreach ($case in @(
         @{ name='unknown-suite'; options=@{Suite='unknown'}; message='Unknown suites' },
         @{ name='release-injection'; options=@{Suite='nonfinite-injection';Configuration='Release'}; message='does not support Release' },
