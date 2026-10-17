@@ -250,7 +250,8 @@ namespace gglab
 
 		if (m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex).HasRecordingError() ||
 			m_DirectComputeContexts[frame->m_FrameSlotIndex]->HasRecordingError() ||
-			(frame->m_ComputeAllocator && m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex).HasRecordingError()) ||
+			(frame->m_ComputeAllocator &&
+				m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex).HasRecordingError()) ||
 			!frame->m_ConstantUploads->PublishWrites())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("DX12 discarded a frame with failed constant recording.");
@@ -436,7 +437,8 @@ namespace gglab
 		commandList->Begin(frame.m_GraphicsAllocator);
 		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).ClearTrackedResourceUses();
 		m_DirectComputeContexts[frame.m_FrameSlotIndex]->ResetEncoderState();
-		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).BeginConstantRecording(frame.m_ConstantUploads.get());
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).BeginConstantRecording(
+			frame.m_ConstantUploads.get());
 		m_DirectComputeContexts[frame.m_FrameSlotIndex]->BeginConstantRecording(frame.m_ConstantUploads.get());
 		BindGlobalDescriptorHeaps(*commandList);
 	}

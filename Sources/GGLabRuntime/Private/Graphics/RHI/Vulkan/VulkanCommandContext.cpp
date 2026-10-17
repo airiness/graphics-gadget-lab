@@ -763,7 +763,9 @@ namespace gglab
 	bool VulkanGraphicsCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
-		const auto* slot = m_CurrentBindingLayout ? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) : nullptr;
+		const auto* slot = m_CurrentBindingLayout ?
+			FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) :
+			nullptr;
 		if (!ValidateConstantBinding(binding) || !slot || slot->m_IsInlineConstants ||
 			(slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER &&
 				slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC))
@@ -802,7 +804,6 @@ namespace gglab
 		{
 			Reject("SetPushConstants", "the immutable inline allocation failed");
 		}
-
 	}
 
 	void VulkanGraphicsCommandContext::SetVertexBuffers(uint32_t startSlot,
@@ -1133,7 +1134,9 @@ namespace gglab
 	bool VulkanComputeCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
-		const auto* slot = m_CurrentBindingLayout ? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) : nullptr;
+		const auto* slot = m_CurrentBindingLayout ?
+			FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) :
+			nullptr;
 		if (!ValidateConstantBinding(binding) || !slot || slot->m_IsInlineConstants ||
 			(slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER &&
 				slot->m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC))
@@ -1180,7 +1183,6 @@ namespace gglab
 		{
 			Reject("SetPushConstants", "the immutable inline allocation failed");
 		}
-
 	}
 
 	void VulkanComputeCommandContext::Dispatch(

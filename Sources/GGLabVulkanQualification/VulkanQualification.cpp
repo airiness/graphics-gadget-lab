@@ -1448,7 +1448,8 @@ namespace gglab
 			VulkanDynamicUniformState uniformState;
 			const std::array<uint32_t, 2> firstValues{ 3, 5 };
 			const std::array<uint32_t, 1> secondValues{ 8 };
-			bool valid = uniformState.Initialize(layout->GetPlan()) && uniformState.UpdateShadow(1, firstValues, 0);
+			bool valid = uniformState.Initialize(layout->GetPlan()) &&
+				uniformState.UpdateShadow(1, firstValues, 0);
 			const auto first = constants->Upload(uniformState.GetShadow(1));
 			valid = valid && uniformState.UpdateShadow(1, secondValues, 1);
 			const auto second = constants->Upload(uniformState.GetShadow(1));
@@ -1470,7 +1471,8 @@ namespace gglab
 			{
 				valid = set0Frames.AllocateDescriptorSet(0, *layout, {}) != VK_NULL_HANDLE;
 			}
-			const RHIFencePoint completedFrame(runtime.GetTimeline().GetRHIHandle(), runtime.GetTimelineSignalValue());
+			const RHIFencePoint completedFrame(
+				runtime.GetTimeline().GetRHIHandle(), runtime.GetTimelineSignalValue());
 			valid = valid && completedFrame.IsValid() && set0Frames.EndFrame(0, completedFrame) &&
 				set0Frames.BeginFrame(0) && set0Frames.EndFrame(0, completedFrame) &&
 				set0Frames.BeginFrame(0) && set0Frames.AbortFrame(0);
@@ -1480,7 +1482,8 @@ namespace gglab
 				{
 					GGLAB_UNUSED(set0Frames.AbortFrame(0));
 				}
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify constants: allocation, frame gating or descriptor growth failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"qualify constants: allocation, frame gating or descriptor growth failed.");
 				return 1;
 			}
 

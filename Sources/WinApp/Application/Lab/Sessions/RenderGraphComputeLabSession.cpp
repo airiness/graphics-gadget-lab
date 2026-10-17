@@ -474,7 +474,8 @@ namespace gglab
 						data.m_Width = displayWidth;
 						data.m_Height = displayHeight;
 					},
-					[this, frameParameters, inlineParameters](RGExecuteContext& executeContext, PreviewPassData& data)
+					[this, frameParameters, inlineParameters]
+					(RGExecuteContext& executeContext, PreviewPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
 						const auto workASrv = executeContext.GetViewDescriptor(data.m_WorkASrv);

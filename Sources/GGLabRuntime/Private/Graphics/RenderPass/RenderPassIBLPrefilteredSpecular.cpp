@@ -292,7 +292,9 @@ namespace gglab
 						};
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&attachment, 1) });
-						if (!commandContext->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), IBLImportancePassParameters{
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							IBLImportancePassParameters{
 								.CubemapFaceIndex = face,
 								.MipLevel = mip,
 								.SourceTextureIndex = sourceIndex,

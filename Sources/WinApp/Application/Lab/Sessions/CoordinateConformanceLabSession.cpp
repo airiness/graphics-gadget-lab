@@ -301,7 +301,8 @@ namespace gglab
 						commandContext->SetScissorRect({ 0, 0,
 							static_cast<int32_t>(halfWidth), static_cast<int32_t>(halfHeight) });
 						if (!commandContext->SetConstantBufferData(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::Winding)))
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							makeParameters(CoordinateConformanceMode::Winding)))
 						{
 							return;
 						}
@@ -319,7 +320,8 @@ namespace gglab
 						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth), 0,
 							static_cast<int32_t>(data.m_Width), static_cast<int32_t>(halfHeight) });
 						if (!commandContext->SetConstantBufferData(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::MarkerSampling)))
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							makeParameters(CoordinateConformanceMode::MarkerSampling)))
 						{
 							return;
 						}
@@ -330,13 +332,17 @@ namespace gglab
 							static_cast<float>(halfWidth), static_cast<float>(data.m_Height - halfHeight) });
 						commandContext->SetScissorRect({ 0, static_cast<int32_t>(halfHeight),
 							static_cast<int32_t>(halfWidth), static_cast<int32_t>(data.m_Height) });
-						if (!commandContext->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::DepthVisualization,
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							makeParameters(CoordinateConformanceMode::DepthVisualization,
 								ReversedZFarProbeDepth)))
 						{
 							return;
 						}
 						commandContext->DrawFullscreenTriangle();
-						if (!commandContext->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::DepthVisualization,
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							makeParameters(CoordinateConformanceMode::DepthVisualization,
 								ReversedZNearProbeDepth)))
 						{
 							return;
@@ -351,7 +357,8 @@ namespace gglab
 							static_cast<int32_t>(panelTop), static_cast<int32_t>(panelRight),
 							static_cast<int32_t>(panelBottom) });
 						if (!commandContext->SetConstantBufferData(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::Position)))
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							makeParameters(CoordinateConformanceMode::Position)))
 						{
 							return;
 						}
@@ -368,7 +375,8 @@ namespace gglab
 							static_cast<int32_t>(panelTop), static_cast<int32_t>(panelRight),
 							static_cast<int32_t>(panelBottom) });
 						if (!commandContext->SetConstantBufferData(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), makeParameters(CoordinateConformanceMode::Winding)))
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB),
+							makeParameters(CoordinateConformanceMode::Winding)))
 						{
 							return;
 						}

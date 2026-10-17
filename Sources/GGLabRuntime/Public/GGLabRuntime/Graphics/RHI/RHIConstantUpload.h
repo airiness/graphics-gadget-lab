@@ -88,7 +88,13 @@ namespace gglab
 	private:
 		friend class RHIConstantUploadPool;
 		explicit RHIConstantUploadBatch(RHIConstantUploadPool& pool) noexcept;
-		enum class State : uint8_t { Recording, Published, Submitted, Cancelled };
+		enum class State : uint8_t
+		{
+			Recording,
+			Published,
+			Submitted,
+			Cancelled
+		};
 		struct PageLease
 		{
 			size_t m_PageIndex = 0;

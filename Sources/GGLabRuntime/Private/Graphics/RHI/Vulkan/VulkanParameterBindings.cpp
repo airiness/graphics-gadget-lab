@@ -56,9 +56,9 @@ namespace gglab
 	std::span<const std::byte> VulkanDynamicUniformState::GetShadow(
 		uint32_t logicalParameterIndex) const noexcept
 	{
-		return logicalParameterIndex < m_Slots.size()
-			? std::span<const std::byte>(m_Slots[logicalParameterIndex].m_Bytes)
-			: std::span<const std::byte>{};
+		return logicalParameterIndex < m_Slots.size() ?
+			std::span<const std::byte>(m_Slots[logicalParameterIndex].m_Bytes) :
+			std::span<const std::byte>{};
 	}
 
 	VulkanSet0DynamicUniformFrames::~VulkanSet0DynamicUniformFrames() noexcept
@@ -70,7 +70,8 @@ namespace gglab
 	{
 		constexpr uint32_t SetsPerPool = 256;
 		constexpr uint32_t DescriptorsPerPool = SetsPerPool * RHIBindingLayoutDesc::MaxSlots;
-		const std::array sizes{
+		const std::array sizes
+		{
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, DescriptorsPerPool },
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, DescriptorsPerPool },
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, DescriptorsPerPool },
@@ -91,7 +92,8 @@ namespace gglab
 		return pool;
 	}
 
-	bool VulkanSet0DynamicUniformFrames::Initialize(VulkanDevice* device, uint32_t frameSlotCount) noexcept
+	bool VulkanSet0DynamicUniformFrames::Initialize(
+		VulkanDevice* device, uint32_t frameSlotCount) noexcept
 	{
 		if (m_Device || !device || frameSlotCount == 0 ||
 			!device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::Initialize"))
@@ -115,13 +117,16 @@ namespace gglab
 		}
 		for (const auto& slot : m_FrameSlots)
 		{
-			GGLAB_ASSERT_MSG(!slot.m_Active, "Discard or submit descriptor command streams before finalization.");
-			if (slot.m_LastSubmittedFence.IsValid() && !m_Device->IsFencePointCompleted(slot.m_LastSubmittedFence))
+			GGLAB_ASSERT_MSG(!slot.m_Active,
+				"Discard or submit descriptor command streams before finalization.");
+			if (slot.m_LastSubmittedFence.IsValid() &&
+				!m_Device->IsFencePointCompleted(slot.m_LastSubmittedFence))
 			{
 				const VkResult result = vkQueueWaitIdle(m_Device->GetGraphicsQueue());
 				if (result != VK_SUCCESS)
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("Waiting to destroy Vulkan descriptor pools failed with {}.", ToString(result));
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"Waiting to destroy Vulkan descriptor pools failed with {}.", ToString(result));
 				}
 				break;
 			}
@@ -165,7 +170,8 @@ namespace gglab
 		return true;
 	}
 
-	bool VulkanSet0DynamicUniformFrames::EndFrame(uint32_t frameSlotIndex, const RHIFencePoint& fence) noexcept
+	bool VulkanSet0DynamicUniformFrames::EndFrame(
+		uint32_t frameSlotIndex, const RHIFencePoint& fence) noexcept
 	{
 		const auto* timeline = m_Device ? m_Device->GetGraphicsTimeline() : nullptr;
 		if (!timeline || frameSlotIndex >= m_FrameSlots.size() || !m_FrameSlots[frameSlotIndex].m_Active ||
@@ -218,7 +224,8 @@ namespace gglab
 				const auto pool = slot.m_Pools.size() < MaxPoolsPerFrame ? CreatePool() : VK_NULL_HANDLE;
 				if (pool == VK_NULL_HANDLE)
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("Vulkan descriptor snapshot pool growth failed or exceeded its budget.");
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"Vulkan descriptor snapshot pool growth failed or exceeded its budget.");
 					return VK_NULL_HANDLE;
 				}
 				slot.m_Pools.push_back(pool);

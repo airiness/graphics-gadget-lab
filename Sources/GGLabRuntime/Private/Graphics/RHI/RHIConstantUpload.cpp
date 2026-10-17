@@ -25,7 +25,8 @@ namespace gglab
 	{
 		for (const auto& page : m_Pages)
 		{
-			GGLAB_ASSERT_MSG(!page.m_Leased, "Constant upload batches must be submitted or cancelled before pool destruction.");
+			GGLAB_ASSERT_MSG(!page.m_Leased,
+				"Constant upload batches must be submitted or cancelled before pool destruction.");
 			m_Device->DestroyBuffer(page.m_Buffer);
 		}
 	}
@@ -49,7 +50,9 @@ namespace gglab
 	size_t RHIConstantUploadPool::GetPendingPageCount() const noexcept
 	{
 		return std::ranges::count_if(m_Pages, [](const Page& page)
-			{ return page.m_Fence.IsValid(); });
+			{
+				return page.m_Fence.IsValid();
+			});
 	}
 
 	size_t RHIConstantUploadPool::AcquirePage(uint64_t minimumSize) noexcept
@@ -69,11 +72,13 @@ namespace gglab
 			return InvalidPage;
 		}
 		const uint64_t capacity = std::max<uint64_t>(minimumSize, m_Config.m_PageSizeInBytes);
-		const auto buffer = m_Device->CreateBuffer({
-			.m_SizeInBytes = capacity,
-			.m_Usage = RHIBufferUsage::Constant,
-			.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
-			}, {
+		const auto buffer = m_Device->CreateBuffer(
+			{
+				.m_SizeInBytes = capacity,
+				.m_Usage = RHIBufferUsage::Constant,
+				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
+			},
+			{
 				.m_Domain = RHIResourceDebugDomain::Renderer,
 				.m_Label = "RHI.ConstantUpload",
 			});
@@ -105,13 +110,15 @@ namespace gglab
 			Fail();
 			return {};
 		}
-		const uint64_t alignment = std::max(1u, device.GetBufferViewAlignment(RHIBufferViewType::ConstantBuffer));
+		const uint64_t alignment =
+			std::max(1u, device.GetBufferViewAlignment(RHIBufferViewType::ConstantBuffer));
 		const uint64_t reservedSize = (bytes.size() + alignment - 1) / alignment * alignment;
 		if (m_Leases.empty() || m_Leases.back().m_CursorInBytes + reservedSize >
 			m_Pool->m_Pages[m_Leases.back().m_PageIndex].m_CapacityInBytes)
 		{
-			const size_t index = m_Leases.size() < m_Pool->m_Config.m_MaxPagesPerBatch
-				? m_Pool->AcquirePage(reservedSize) : InvalidPage;
+			const size_t index = m_Leases.size() < m_Pool->m_Config.m_MaxPagesPerBatch ?
+				m_Pool->AcquirePage(reservedSize) :
+				InvalidPage;
 			if (index == InvalidPage)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR("Constant upload page allocation exhausted its budget.");

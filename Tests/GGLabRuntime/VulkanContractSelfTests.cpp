@@ -1519,7 +1519,8 @@ namespace gglab
 		{
 			const auto& binding = commonPlan.m_Set0Bindings[index];
 			passBufferFound |= binding.m_Binding == 2 &&
-				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC && !binding.m_IsInlineConstants;
+				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC &&
+				!binding.m_IsInlineConstants;
 			inlineConstantsFound |= binding.m_Binding == 4 &&
 				binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC &&
 				binding.m_SizeInBytes == MaxInlineConstantDWORDs * sizeof(uint32_t);

@@ -28,7 +28,7 @@ namespace gglab
 			type == RHIBindingType::BindlessSamplerTable;
 	}
 
-enum class RHIBufferBindingMode : uint8_t
+	enum class RHIBufferBindingMode : uint8_t
 	{
 		Fixed,
 		Dynamic,

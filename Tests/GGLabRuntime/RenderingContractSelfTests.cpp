@@ -453,7 +453,9 @@ namespace gglab
 					m_PassConstantStorage.emplace_back(desc.m_SizeInBytes);
 					return { static_cast<uint32_t>(m_PassConstantStorage.size()), 1 };
 				}
-				return m_AtmosphereBuffersEnabled ? RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } : RHIBufferHandle{};
+				return m_AtmosphereBuffersEnabled ?
+					RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } :
+					RHIBufferHandle{};
 			}
 			RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
@@ -1700,14 +1702,19 @@ namespace gglab
 				});
 			context.Check(graph.Compile(), "Constant upload graph compiles");
 			graph.Execute(execution);
-			context.Check(uploaded && graphics.m_ConstantBindings.size() == 1 && compute.m_ConstantBindings.size() == 6,
+			context.Check(uploaded && graphics.m_ConstantBindings.size() == 1 &&
+				compute.m_ConstantBindings.size() == 6,
 				"Graphics and compute upload typed parameters larger than root constants");
 			const auto first = graphics.m_ConstantBindings.front();
 			const auto second = compute.m_ConstantBindings.front();
 			uint32_t firstWord = 0;
 			uint32_t secondWord = 0;
-			std::memcpy(&firstWord, device.m_PassConstantStorage[first.m_Buffer.Index() - 1].data() + first.m_Offset, sizeof(firstWord));
-			std::memcpy(&secondWord, device.m_PassConstantStorage[second.m_Buffer.Index() - 1].data() + second.m_Offset, sizeof(secondWord));
+			std::memcpy(&firstWord,
+				device.m_PassConstantStorage[first.m_Buffer.Index() - 1].data() + first.m_Offset,
+				sizeof(firstWord));
+			std::memcpy(&secondWord,
+				device.m_PassConstantStorage[second.m_Buffer.Index() - 1].data() + second.m_Offset,
+				sizeof(secondWord));
 			context.Check(first.m_Buffer == second.m_Buffer && first.m_Offset != second.m_Offset &&
 				first.m_Offset % 256 == 0 && second.m_Offset % 256 == 0 &&
 				firstWord == 0x12345678u && secondWord == 0xabcdef01u,
@@ -1716,7 +1723,9 @@ namespace gglab
 				"Executing a graph does not publish or seal submission-owned uploads");
 			RenderGraph secondGraph({ &device, &graphResources });
 			secondGraph.AddTrivialSideEffectPass("Constants.SecondGraph", [&](RGExecuteContext&)
-				{ uploaded &= graphics.SetConstantBufferData(passIndex, payload); });
+				{
+					uploaded &= graphics.SetConstantBufferData(passIndex, payload);
+				});
 			context.Check(secondGraph.Compile(), "A second graph shares the recording batch");
 			secondGraph.Execute(execution);
 			const auto reusable = graphics.UploadConstants(std::span(payload));
@@ -1739,7 +1748,8 @@ namespace gglab
 			graph.Retire(submittedFence);
 			secondGraph.Retire(submittedFence);
 			uploads.ReclaimCompleted();
-			context.Check(uploads.GetPendingPageCount() == 2, "In-flight upload pages are retained independently of graph lifetime");
+			context.Check(uploads.GetPendingPageCount() == 2,
+				"In-flight upload pages are retained independently of graph lifetime");
 
 			auto cancelled = uploads.BeginBatch();
 			graphics.BeginConstantRecording(cancelled.get());
@@ -1754,13 +1764,15 @@ namespace gglab
 			auto reuse = uploads.BeginBatch();
 			graphics.BeginConstantRecording(reuse.get());
 			const auto afterCancel = graphics.UploadConstants(payload);
-			context.Check(afterCancel.m_Buffer == later.m_Buffer && afterCancel.m_UploadBatchId != later.m_UploadBatchId,
+			context.Check(afterCancel.m_Buffer == later.m_Buffer &&
+				afterCancel.m_UploadBatchId != later.m_UploadBatchId,
 				"Cancellation immediately recovers discarded storage with a new batch identity");
 			graphics.EndConstantRecording();
 			reuse->Cancel();
 			device.m_CompletedFenceValue = 5;
 			uploads.ReclaimCompleted();
-			context.Check(uploads.GetPendingPageCount() == 0, "Submitted pages become reusable only after GPU completion");
+			context.Check(uploads.GetPendingPageCount() == 0,
+				"Submitted pages become reusable only after GPU completion");
 
 			RHIConstantUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
 			auto exhausted = limited.BeginBatch();

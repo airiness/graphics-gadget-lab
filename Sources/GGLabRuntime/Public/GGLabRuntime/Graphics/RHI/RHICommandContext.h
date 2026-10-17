@@ -223,7 +223,9 @@ namespace gglab
 		}
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<const std::byte> bytes) noexcept
 		{
-			const auto binding = m_ConstantUploads ? m_ConstantUploads->Upload(bytes) : RHIConstantBufferBinding{};
+			const auto binding = m_ConstantUploads ?
+				m_ConstantUploads->Upload(bytes) :
+				RHIConstantBufferBinding{};
 			if (!binding.IsValid())
 			{
 				FailRecording();
@@ -255,8 +257,14 @@ namespace gglab
 		}
 		// A declared pass storage buffer is rebound after every compatible pipeline
 		// switch. Clearing it at the pass boundary prevents cross-pass inheritance.
-		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept { m_PassStorageBuffer = binding; }
-		[[nodiscard]] const std::optional<RHIPassStorageBufferBinding>& GetPassStorageBuffer() const noexcept { return m_PassStorageBuffer; }
+		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept
+		{
+			m_PassStorageBuffer = binding;
+		}
+		[[nodiscard]] const std::optional<RHIPassStorageBufferBinding>& GetPassStorageBuffer() const noexcept
+		{
+			return m_PassStorageBuffer;
+		}
 
 	private:
 		std::optional<RHIPassStorageBufferBinding> m_PassStorageBuffer;

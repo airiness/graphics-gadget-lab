@@ -263,9 +263,9 @@ namespace gglab
 			return sizes;
 		}
 		const auto& pipelineBinding = m_Pipelines[pipeline.Index()];
-		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics
-			? pipelineBinding.m_GraphicsDesc.m_BindingLayout
-			: pipelineBinding.m_ComputeDesc.m_BindingLayout;
+		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics ?
+			pipelineBinding.m_GraphicsDesc.m_BindingLayout :
+			pipelineBinding.m_ComputeDesc.m_BindingLayout;
 		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration ||
 			layout.Index() >= m_BindingLayouts.size())
 		{
@@ -300,9 +300,9 @@ namespace gglab
 			return sizes;
 		}
 		const auto& pipelineBinding = m_Pipelines[pipeline.Index()];
-		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics
-			? pipelineBinding.m_GraphicsDesc.m_BindingLayout
-			: pipelineBinding.m_ComputeDesc.m_BindingLayout;
+		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics ?
+			pipelineBinding.m_GraphicsDesc.m_BindingLayout :
+			pipelineBinding.m_ComputeDesc.m_BindingLayout;
 		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration ||
 			layout.Index() >= m_BindingLayouts.size())
 		{
