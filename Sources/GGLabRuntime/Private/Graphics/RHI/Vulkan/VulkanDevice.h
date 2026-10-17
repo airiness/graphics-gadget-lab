@@ -224,6 +224,8 @@ namespace gglab
 		void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
+		RHIUploadLimits GetUploadLimits() const noexcept override;
+		bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override;
 		uint32_t GetMaxConstantBufferRange() const noexcept override
 		{
 			return GetPhysicalDeviceLimits().maxUniformBufferRange;

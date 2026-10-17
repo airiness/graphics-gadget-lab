@@ -165,6 +165,7 @@ namespace gglab
 			}
 		}
 		slot.m_PoolIndex = 0;
+		slot.m_AllocationCount = 0;
 		slot.m_LastSubmittedFence = {};
 		slot.m_Active = true;
 		return true;
@@ -305,6 +306,7 @@ namespace gglab
 			vkUpdateDescriptorSets(m_Device->Get(),
 				static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 		}
+		++slot.m_AllocationCount;
 		return descriptorSet;
 	}
 }

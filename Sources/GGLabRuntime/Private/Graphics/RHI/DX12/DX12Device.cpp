@@ -244,6 +244,11 @@ namespace gglab
 	RHIBufferViewHandle DX12Device::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
+		if (IsUploadStorage(buffer))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Upload storage cannot create a persistent buffer view.");
+			return {};
+		}
 		if (!m_DescriptorCache)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -396,6 +401,17 @@ namespace gglab
 		return viewType == RHIBufferViewType::ConstantBuffer ?
 			D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT :
 			1u;
+	}
+
+	RHIUploadLimits DX12Device::GetUploadLimits() const noexcept
+	{
+		return { D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, 64 * 1024, 4, UINT32_MAX };
+	}
+
+	bool DX12Device::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 	}
 
 	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept

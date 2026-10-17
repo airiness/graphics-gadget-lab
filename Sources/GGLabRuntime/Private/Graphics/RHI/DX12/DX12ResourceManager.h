@@ -98,6 +98,7 @@ namespace gglab
 		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;
 		DX12Buffer* ResolveBuffer(RHIBufferHandle buffer) noexcept;
 		const DX12Buffer* ResolveBuffer(RHIBufferHandle buffer) const noexcept;
+		const RHIBufferDesc* ResolveBufferDesc(RHIBufferHandle buffer) const noexcept;
 
 		void RetireCompletedResources() noexcept;
 
@@ -117,7 +118,10 @@ namespace gglab
 		};
 
 		using TextureSlot = ResourceSlot<RHITextureHandle, DX12Texture>;
-		using BufferSlot = ResourceSlot<RHIBufferHandle, DX12Buffer>;
+		struct BufferSlot : ResourceSlot<RHIBufferHandle, DX12Buffer>
+		{
+			RHIBufferDesc m_RHIDesc{};
+		};
 
 	private:
 		RHITextureHandle AllocateTextureSlot(std::unique_ptr<DX12Texture> texture,

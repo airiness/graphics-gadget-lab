@@ -17,6 +17,9 @@ namespace gglab
 	struct RHIUploadConfig
 	{
 		uint32_t m_PageSizeInBytes = 64 * 1024;
+		uint32_t m_MaxUploadSizeInBytes = 64 * 1024;
+		uint64_t m_MaxBytesPerBatch = 16ull * 1024 * 1024;
+		uint64_t m_MaxPoolBytes = 64ull * 1024 * 1024;
 		uint32_t m_MaxPagesPerBatch = 256;
 		uint32_t m_MaxPoolPages = 1024;
 	};
@@ -37,6 +40,7 @@ namespace gglab
 		[[nodiscard]] size_t GetPageCount() const noexcept { return m_Pages.size(); }
 		[[nodiscard]] size_t GetPendingPageCount() const noexcept;
 		[[nodiscard]] size_t GetQuarantinedPageCount() const noexcept;
+		[[nodiscard]] RHIUploadStatistics GetStatistics() const noexcept;
 
 	private:
 		friend class RHIUploadBatch;
@@ -50,11 +54,13 @@ namespace gglab
 			// Possibly read by work without a reliable completion fence.
 			bool m_Quarantined = false;
 		};
-		[[nodiscard]] size_t AcquirePage(uint64_t minimumSize) noexcept;
+		[[nodiscard]] size_t AcquirePage(uint64_t minimumSize, uint64_t remainingBatchBytes) noexcept;
 
 		RHIDevice* m_Device = nullptr;
 		RHIUploadConfig m_Config{};
 		std::vector<Page> m_Pages;
+		uint64_t m_CapacityInBytes = 0;
+		RHIUploadStatistics m_Statistics{};
 	};
 
 	// The pages one submission writes. Only its submission owner drives the transitions; a
@@ -70,6 +76,8 @@ namespace gglab
 		void Attach(RHIUploadWriter& writer) noexcept;
 		void Detach(RHIUploadWriter& writer) noexcept;
 		[[nodiscard]] RHIConstantBufferBinding Upload(std::span<const std::byte> bytes) noexcept;
+		[[nodiscard]] RHIReadOnlyBufferBinding UploadStructured(
+			std::span<const std::byte> bytes, uint32_t strideInBytes) noexcept;
 		// Freezes allocation and flushes all leased writes before queue submission.
 		[[nodiscard]] bool Publish() noexcept;
 		// Called once the native submit of a stream that may read the batch was issued.
@@ -87,6 +95,8 @@ namespace gglab
 		[[nodiscard]] bool HasFailed() const noexcept { return m_Failed; }
 		[[nodiscard]] bool IsRecording() const noexcept { return m_State == State::Recording; }
 		[[nodiscard]] bool Owns(const RHIConstantBufferBinding& binding) const noexcept;
+		[[nodiscard]] bool Owns(const RHIReadOnlyBufferBinding& binding) const noexcept;
+		[[nodiscard]] bool IsUploadStorage(RHIBufferHandle buffer) const noexcept;
 		[[nodiscard]] RHIUploadBatchId GetId() const noexcept { return m_Id; }
 		[[nodiscard]] size_t GetPageCount() const noexcept { return m_Leases.size(); }
 
@@ -106,10 +116,15 @@ namespace gglab
 			size_t m_PageIndex = 0;
 			uint64_t m_CursorInBytes = 0;
 		};
+		[[nodiscard]] RHIConstantBufferBinding UploadBytes(std::span<const std::byte> bytes,
+			uint32_t alignment, uint32_t maximumRange) noexcept;
+		void FinishStatistics() noexcept;
 
 		RHIUploadPool* m_Pool = nullptr;
 		RHIUploadWriter* m_Writer = nullptr;
 		std::vector<PageLease> m_Leases;
+		uint64_t m_LeasedCapacityInBytes = 0;
+		RHIUploadBatchStatistics m_Statistics{};
 		RHIUploadBatchId m_Id = 0;
 		State m_State = State::Recording;
 		bool m_Failed = false;

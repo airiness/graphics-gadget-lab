@@ -73,6 +73,9 @@ namespace gglab::asset_test
 		// This device never maps buffers, so there is never a write to publish.
 		bool FlushMappedBufferWrites(RHIBufferHandle, RHIMappedBufferRange) noexcept override { return false; }
 		uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+		RHIUploadLimits GetUploadLimits() const noexcept override { return { 1, 64 * 1024, 1, UINT32_MAX }; }
+		// This fixture cannot create mapped upload storage.
+		bool IsUploadStorage(RHIBufferHandle) const noexcept override { return false; }
 		bool IsAlive(RHITextureHandle texture) const noexcept override { return m_LiveTextures.contains(texture); }
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override { return m_LiveBuffers.contains(buffer); }
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override { return sampler.IsValid(); }

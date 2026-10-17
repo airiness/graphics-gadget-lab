@@ -75,6 +75,10 @@ namespace gglab
 
 		void Resize(uint32_t width, uint32_t height) noexcept override;
 		RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept override;
+		RHIUploadStatistics GetUploadStatistics() const noexcept override
+		{
+			return m_UploadPool ? m_UploadPool->GetStatistics() : RHIUploadStatistics{};
+		}
 		void RetireCompletedWork() noexcept override;
 		bool IsPoisoned() const noexcept override { return m_Poisoned; }
 		uint32_t GetFrameSlotCount() const noexcept override;

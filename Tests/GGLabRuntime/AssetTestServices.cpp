@@ -81,6 +81,10 @@ namespace gglab::asset_test
 
 	RHIBufferHandle TestRHIDevice::CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept
 	{
+		if (Test(desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage))
+		{
+			return {};
+		}
 		const RHIBufferHandle handle{ m_NextBufferIndex++, 1 };
 		m_LiveBuffers.emplace(handle, desc.m_SizeInBytes);
 		return handle;

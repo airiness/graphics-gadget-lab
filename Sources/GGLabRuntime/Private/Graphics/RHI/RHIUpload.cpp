@@ -25,6 +25,27 @@ namespace gglab
 		return m_Batch && m_Batch->Owns(binding);
 	}
 
+	RHIReadOnlyBufferBinding RHIUploadWriter::UploadStructured(
+		std::span<const std::byte> bytes, uint32_t strideInBytes) noexcept
+	{
+		if (!m_Batch)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Structured uploads require a writer attached to a frame batch.");
+			return {};
+		}
+		return m_Batch->UploadStructured(bytes, strideInBytes);
+	}
+
+	bool RHIUploadWriter::Owns(const RHIReadOnlyBufferBinding& binding) const noexcept
+	{
+		return m_Batch && m_Batch->Owns(binding);
+	}
+
+	bool RHIUploadWriter::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		return m_Batch && m_Batch->IsUploadStorage(buffer);
+	}
+
 	bool RHIUploadWriter::IsRecording() const noexcept
 	{
 		return m_Batch && m_Batch->IsRecording();
@@ -73,5 +94,20 @@ namespace gglab
 	bool RHIFrameUploads::IsCurrent() const noexcept
 	{
 		return m_Writer && m_BatchId != 0 && m_Writer->GetBatchId() == m_BatchId;
+	}
+
+	RHIReadOnlyBufferBinding RHIFrameUploads::UploadStructured(
+		std::span<const std::byte> bytes, uint32_t strideInBytes) const noexcept
+	{
+		if (!IsCurrent())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Structured uploads were used outside the frame of batch {}.", m_BatchId);
+			if (m_Writer)
+			{
+				m_Writer->Fail();
+			}
+			return {};
+		}
+		return m_Writer->UploadStructured(bytes, strideInBytes);
 	}
 }

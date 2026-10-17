@@ -1464,6 +1464,17 @@ namespace gglab
 				!overflow.IsValid() && constants->HasFailed() && !constants->Publish();
 			// These allocation probes have no recorded GPU consumers.
 			constants->Cancel();
+			const RHIUploadStatistics uploadStatistics = constantPool.GetStatistics();
+			valid = valid && uploadStatistics.m_CancelledBatchCount == 1 &&
+				uploadStatistics.m_PageCountFailures == 1 &&
+				uploadStatistics.m_LastBatch.m_UploadCount >= 2 &&
+				uploadStatistics.m_LastBatch.m_RequestedBytes > 0 &&
+				uploadStatistics.m_Idle.m_PageCount == uploadStatistics.m_Total.m_PageCount &&
+				uploadStatistics.m_HighWaterReservedBytesPerBatch == uploadStatistics.m_LastBatch.m_ReservedBytes;
+			valid = valid && device.IsUploadStorage(first.m_Buffer) &&
+				!device.CreateBufferView(first.m_Buffer, {
+					.m_SizeInBytes = sizeof(firstValues), .m_StrideInBytes = sizeof(uint32_t),
+					}).IsValid();
 			VulkanSet0DynamicUniformFrames set0Frames;
 			valid = valid && set0Frames.Initialize(&device, runtime.GetFrameSlotCount()) &&
 				set0Frames.BeginFrame(0) && !set0Frames.BeginFrame(0);
@@ -1775,10 +1786,15 @@ namespace gglab
 				.m_Desc = { .m_BindingLayout = layoutHandle },
 				.m_ComputeShader = computeShader,
 				});
+			const auto alternateLayout = pipelineSystem.CreateBindingLayout(layoutDesc);
+			const auto alternateComputePipeline = pipelineSystem.CreateComputePipeline({
+				.m_Desc = { .m_BindingLayout = alternateLayout },
+				.m_ComputeShader = computeShader,
+				});
 			if (!geometryPipeline.IsValid() || !depthPipeline.IsValid() ||
 				!positionPipeline.IsValid() || !backCullPipeline.IsValid() ||
 				!depthWithoutPixelPipeline.IsValid() || !depthOverridePipeline.IsValid() ||
-				!computePipeline.IsValid())
+				!computePipeline.IsValid() || !alternateComputePipeline.IsValid())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: native pipeline creation failed.");
 				return 1;
@@ -1993,7 +2009,7 @@ namespace gglab
 			constexpr uint32_t computeInputValue = 7;
 			constexpr uint32_t computeInitialValue = 1;
 			constexpr uint32_t computeExpectedValue =
-				computeInitialValue + computeInputValue * 2;
+				computeInitialValue + computeInputValue * 7;
 			const RHIBufferDesc computeInputDesc{
 				.m_SizeInBytes = sizeof(uint32_t),
 				.m_StrideInBytes = sizeof(uint32_t),
@@ -2189,7 +2205,10 @@ namespace gglab
 			computeContext.SetPipeline(computePipeline);
 			computeContext.SetReadOnlyBuffer(1, computeInput.Get());
 			computeContext.SetReadWriteBuffer(2, computeOutput.Get());
+			const CoordinateConformanceParameters inlineParameters{};
+			computeContext.SetInlineConstants(0, inlineParameters);
 			computeContext.Dispatch(1, 1, 1);
+			bool snapshotsValid = set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 1;
 			const RHIBufferBarrier orderedStorageBarrier{
 				computeOutput.Get(), computeReadWriteState, computeReadWriteState
 			};
@@ -2205,7 +2224,57 @@ namespace gglab
 			};
 			computeContext.BufferBarrier(std::span(&graphicsToComputeBarrier, 1));
 			computeContext.FlushBarriers();
+			// Read the second input from a nonzero, explicitly sized slice of a mixed-use page.
+			const std::array<uint32_t, 2> prefix{ UINT32_MAX, UINT32_MAX };
+			const auto prefixBinding = uploadWriter.UploadStructured(std::span(prefix));
+			const std::array<uint32_t, 2> structuredValues{ computeInputValue, computeInputValue };
+			const auto structuredInput = uploadWriter.UploadStructured(std::span(structuredValues));
+			auto narrowInput = structuredInput;
+			narrowInput.m_SizeInBytes = sizeof(uint32_t);
+			const bool structuredBound = prefixBinding.IsValid() && structuredInput.IsValid() &&
+				structuredInput.m_OffsetInBytes != 0 && structuredInput.m_SizeInBytes == sizeof(structuredValues) &&
+				device.IsUploadStorage(structuredInput.m_Buffer) &&
+				computeContext.SetReadOnlyBuffer(1, narrowInput);
+			if (!structuredBound)
+			{
+				uploadWriter.Fail();
+			}
 			computeContext.Dispatch(1, 1, 1);
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 2;
+			const auto dispatchOrdered = [&]()
+				{
+					computeContext.BufferBarrier(std::span(&orderedStorageBarrier, 1));
+					computeContext.FlushBarriers();
+					computeContext.Dispatch(1, 1, 1);
+				};
+			computeContext.SetInlineConstants(0, inlineParameters);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 2;
+			snapshotsValid &= computeContext.SetReadOnlyBuffer(1, structuredInput);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 3;
+			const auto movedInput = uploadWriter.UploadStructured(std::span(structuredValues));
+			snapshotsValid &= computeContext.SetReadOnlyBuffer(1, movedInput);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 4;
+			const std::vector<uint32_t> pageFiller(64 * 1024 / sizeof(uint32_t));
+			const auto fullPage = uploadWriter.UploadConstants(std::span(pageFiller));
+			const auto anotherPageInput = uploadWriter.UploadStructured(std::span(structuredValues));
+			snapshotsValid &= fullPage.IsValid() && anotherPageInput.m_Buffer != movedInput.m_Buffer &&
+				computeContext.SetReadOnlyBuffer(1, anotherPageInput);
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 5;
+			computeContext.SetPipeline(alternateComputePipeline);
+			computeContext.SetInlineConstants(0, inlineParameters);
+			snapshotsValid &= computeContext.SetReadOnlyBuffer(1, anotherPageInput);
+			computeContext.SetReadWriteBuffer(2, computeOutput.Get());
+			dispatchOrdered();
+			snapshotsValid &= set0Frames.GetDescriptorAllocationCount(begin.m_FrameSlotIndex) == 6;
+			if (!snapshotsValid)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify uploads: descriptor snapshot reuse or invalidation failed.");
+				uploadWriter.Fail();
+			}
 			const RHIBufferBarrier computeToCopyBarrier{
 				computeOutput.Get(), computeReadWriteState, copySourceState
 			};
@@ -2213,6 +2282,107 @@ namespace gglab
 			computeContext.FlushBarriers();
 			computeContext.CopyBuffer(computeReadback.Get(), 0, computeOutput.Get(), 0,
 				sizeof(uint32_t));
+			// Separate encoders have no writer attached: storage identity must still reject
+			// handle entries and stripped ids, including pages outside the leased state.
+			RHIUploadPool rejectionPool(device);
+			bool storageRejected = true;
+			const RHIFencePoint previousCompletion(runtime.GetTimeline().GetRHIHandle(),
+				runtime.GetTimelineSignalValue());
+			storageRejected &= runtime.GetTimeline().Wait(previousCompletion.m_Value, 5'000'000'000) == VK_SUCCESS;
+			for (uint32_t state = 0; state < 4; ++state)
+			{
+				auto probeBatch = rejectionPool.BeginBatch();
+				const auto page = probeBatch->Upload(std::as_bytes(std::span(prefix)));
+				if (state == 1)
+				{
+					const bool submitted = probeBatch->Publish() && probeBatch->Submitted(previousCompletion);
+					storageRejected &= submitted;
+					if (!submitted)
+					{
+						probeBatch->Cancel();
+					}
+				}
+				else if (state == 2)
+				{
+					probeBatch->Cancel();
+				}
+				else if (state == 3)
+				{
+					storageRejected &= probeBatch->Publish();
+					probeBatch->RecordAcceptedSubmission();
+					probeBatch->SubmittedWithoutCompletionFence();
+				}
+				const auto rejects = [&](auto operation)
+					{
+						VulkanGraphicsCommandContext graphics(&device, &pipelineSystem, &set0Frames);
+						VulkanComputeCommandContext compute(graphics);
+						if (!graphics.BeginEncoding(recording.m_CommandBuffer, begin.m_FrameSlotIndex))
+						{
+							return false;
+						}
+						graphics.SetPipeline(geometryPipeline);
+						compute.SetPipeline(computePipeline);
+						operation(graphics, compute);
+						const bool rejected = graphics.HasEncodingError();
+						graphics.AbortEncoding();
+						return rejected;
+					};
+				storageRejected &= page.IsValid() && device.IsUploadStorage(page.m_Buffer);
+				const auto states = rejectionPool.GetStatistics();
+				const std::array statePages{ states.m_Leased.m_PageCount, states.m_Pending.m_PageCount,
+					states.m_Idle.m_PageCount, states.m_Quarantined.m_PageCount };
+				storageRejected &= statePages[state] == 1;
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						graphics.SetReadOnlyBuffer(1, page.m_Buffer);
+					});
+				storageRejected &= rejects([&](auto&, auto& compute)
+					{
+						compute.SetReadOnlyBuffer(1, page.m_Buffer);
+					});
+				storageRejected &= rejects([&](auto&, auto& compute)
+					{
+						compute.SetReadWriteBuffer(2, page.m_Buffer);
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						const RHIVertexBufferBinding vertex{ page.m_Buffer, 0, 4, 4 };
+						graphics.SetVertexBuffers(0, std::span(&vertex, 1));
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						graphics.SetIndexBuffer({ .m_Buffer = page.m_Buffer, .m_SizeInBytes = 4,
+							.m_Format = RHIFormat::R32Uint });
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						graphics.CopyBuffer(computeReadback.Get(), 0, page.m_Buffer, 0, 4);
+					});
+				storageRejected &= rejects([&](auto&, auto& compute)
+					{
+						compute.CopyBuffer(page.m_Buffer, 0, computeOutput.Get(), 0, 4);
+					});
+				storageRejected &= rejects([&](auto& graphics, auto&)
+					{
+						GGLAB_UNUSED(graphics.SetReadOnlyBuffer(1,
+							RHIReadOnlyBufferBinding{ page.m_Buffer, 0, 4, 4 }));
+					});
+				storageRejected &= !device.CreateBufferView(page.m_Buffer, {
+					.m_SizeInBytes = 4, .m_StrideInBytes = 4,
+					}).IsValid();
+				if (state == 0)
+				{
+					probeBatch->Cancel();
+				}
+				rejectionPool.ReclaimCompleted();
+				// These negative probes record no GPU consumers of their pages.
+				rejectionPool.ReleaseQuarantinedAfterVerifiedIdle();
+			}
+			if (!storageRejected)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify uploads: a handle entry bypassed upload storage identity.");
+				uploadWriter.Fail();
+			}
 			const auto makeParameters = [&](CoordinateConformanceMode mode, float depth = 0.0f,
 				uint32_t textureIndex = UINT32_MAX, float depthOverride = 0.0f)
 				{
@@ -2423,7 +2593,8 @@ namespace gglab
 				!pipelineSystem.IsAlive(geometryPipeline) &&
 				!pipelineSystem.IsAlive(depthWithoutPixelPipeline) &&
 				!pipelineSystem.IsAlive(depthOverridePipeline) &&
-				!pipelineSystem.IsAlive(computePipeline);
+				!pipelineSystem.IsAlive(computePipeline) &&
+				!pipelineSystem.IsAlive(alternateComputePipeline);
 			if (!constantsSubmitted || !uniformFrameEnded || !pipelineCacheCleared ||
 				runtime.WaitGraphicsIdle() != VK_SUCCESS)
 			{

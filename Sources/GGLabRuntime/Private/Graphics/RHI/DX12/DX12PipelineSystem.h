@@ -46,7 +46,7 @@ namespace gglab
 		std::optional<uint32_t> GetStorageBufferParameterIndex(RHIPipelineHandle pipeline, uint32_t binding, uint32_t space) const noexcept;
 		std::array<uint32_t, RHIBindingLayoutDesc::MaxSlots> GetPushConstantSizes(
 			RHIPipelineHandle pipeline) const noexcept;
-		std::array<bool, RHIBindingLayoutDesc::MaxSlots> GetConstantBufferSlots(
+		std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> GetBufferBindingTypes(
 			RHIPipelineHandle pipeline) const noexcept;
 		bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,

@@ -312,6 +312,11 @@ namespace gglab
 	RHIBufferViewHandle VulkanDevice::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
+		if (IsUploadStorage(buffer))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Upload storage cannot create a persistent buffer view.");
+			return {};
+		}
 		return RequireOwnerThread("VulkanDevice::CreateBufferView") ?
 			m_ResourceManager.CreateBufferView(buffer, desc) :
 			RHIBufferViewHandle{};
@@ -435,6 +440,26 @@ namespace gglab
 			break;
 		}
 		return static_cast<uint32_t>(std::max<VkDeviceSize>(alignment, 1));
+	}
+
+	RHIUploadLimits VulkanDevice::GetUploadLimits() const noexcept
+	{
+		return {
+			static_cast<uint32_t>(std::max<VkDeviceSize>(m_PhysicalDeviceLimits.minUniformBufferOffsetAlignment, 1)),
+			m_PhysicalDeviceLimits.maxUniformBufferRange,
+			static_cast<uint32_t>(std::max<VkDeviceSize>(m_PhysicalDeviceLimits.minStorageBufferOffsetAlignment, 1)),
+			m_PhysicalDeviceLimits.maxStorageBufferRange,
+		};
+	}
+
+	bool VulkanDevice::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::IsUploadStorage"))
+		{
+			return false;
+		}
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 	}
 
 	bool VulkanDevice::IsAlive(RHITextureHandle texture) const noexcept

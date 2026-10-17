@@ -234,6 +234,11 @@ namespace gglab
 		// switch. Clearing it at the pass boundary prevents cross-pass inheritance.
 		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept
 		{
+			if (binding && m_UploadWriter && m_UploadWriter->IsUploadStorage(binding->m_Buffer))
+			{
+				FailRecording();
+				return;
+			}
 			m_PassStorageBuffer = binding;
 		}
 		[[nodiscard]] const std::optional<RHIPassStorageBufferBinding>& GetPassStorageBuffer() const noexcept
@@ -264,7 +269,20 @@ namespace gglab
 		[[nodiscard]] bool ValidateConstantBinding(const RHIConstantBufferBinding& binding) noexcept
 		{
 			if (HasRecordingError() || !binding.IsValid() || binding.m_SizeInBytes % sizeof(uint32_t) != 0 ||
-				(binding.m_UploadBatchId != 0 && (!m_UploadWriter || !m_UploadWriter->Owns(binding))))
+				(binding.m_UploadBatchId != 0 && (!m_UploadWriter || !m_UploadWriter->Owns(binding))) ||
+				(binding.m_UploadBatchId == 0 && m_UploadWriter && m_UploadWriter->IsUploadStorage(binding.m_Buffer)))
+			{
+				FailRecording();
+				return false;
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool ValidateReadOnlyBinding(const RHIReadOnlyBufferBinding& binding) noexcept
+		{
+			if (HasRecordingError() || !binding.IsValid() ||
+				(binding.m_UploadBatchId != 0 && (!m_UploadWriter || !m_UploadWriter->Owns(binding))) ||
+				(binding.m_UploadBatchId == 0 && m_UploadWriter && m_UploadWriter->IsUploadStorage(binding.m_Buffer)))
 			{
 				FailRecording();
 				return false;
@@ -345,6 +363,21 @@ namespace gglab
 			static_assert(std::is_same_v<std::remove_const_t<T>, uint32_t>);
 			SetPushConstants(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
 		}
+		[[nodiscard]] bool SetReadOnlyBuffer(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept
+		{
+			return ValidateReadOnlyBinding(binding) && SetReadOnlyBufferBinding(parameterIndex, binding);
+		}
+
+	protected:
+		virtual bool SetReadOnlyBufferBinding(uint32_t,
+			const RHIReadOnlyBufferBinding&) noexcept
+		{
+			FailRecording();
+			return false;
+		}
+
+	public:
 		virtual void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
@@ -417,6 +450,21 @@ namespace gglab
 			static_assert(std::is_same_v<std::remove_const_t<T>, uint32_t>);
 			SetPushConstants(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
 		}
+		[[nodiscard]] bool SetReadOnlyBuffer(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept
+		{
+			return ValidateReadOnlyBinding(binding) && SetReadOnlyBufferBinding(parameterIndex, binding);
+		}
+
+	protected:
+		virtual bool SetReadOnlyBufferBinding(uint32_t,
+			const RHIReadOnlyBufferBinding&) noexcept
+		{
+			FailRecording();
+			return false;
+		}
+
+	public:
 		virtual void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetReadWriteBuffer(

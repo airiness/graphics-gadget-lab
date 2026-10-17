@@ -211,6 +211,7 @@ namespace gglab
 		[[nodiscard]] virtual bool IsDeviceLost() const noexcept = 0;
 
 		[[nodiscard]] virtual uint32_t GetFrameSlotCount() const noexcept = 0;
+		[[nodiscard]] virtual RHIUploadStatistics GetUploadStatistics() const noexcept { return {}; }
 	};
 
 	// What teardown may do with GPU-visible resources once no further frames are produced.

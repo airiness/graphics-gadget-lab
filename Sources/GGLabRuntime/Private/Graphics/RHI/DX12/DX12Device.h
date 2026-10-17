@@ -113,6 +113,8 @@ namespace gglab
 		bool FlushMappedBufferWrites(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
+		RHIUploadLimits GetUploadLimits() const noexcept override;
+		bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
 		RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;

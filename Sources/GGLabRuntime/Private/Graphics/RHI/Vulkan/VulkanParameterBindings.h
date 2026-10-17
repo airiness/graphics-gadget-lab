@@ -69,6 +69,10 @@ namespace gglab
 			uint32_t frameSlotIndex, const RHIFencePoint& reservedFence) noexcept;
 		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool IsFrameActive(uint32_t frameSlotIndex) const noexcept;
+		[[nodiscard]] uint64_t GetDescriptorAllocationCount(uint32_t frameSlotIndex) const noexcept
+		{
+			return frameSlotIndex < m_FrameSlots.size() ? m_FrameSlots[frameSlotIndex].m_AllocationCount : 0;
+		}
 		[[nodiscard]] VkDescriptorSet AllocateDescriptorSet(uint32_t frameSlotIndex,
 			const VulkanBindingLayout& layout,
 			std::span<const VulkanSet0BufferBinding> bufferBindings) noexcept;
@@ -78,6 +82,7 @@ namespace gglab
 		{
 			std::vector<VkDescriptorPool> m_Pools;
 			size_t m_PoolIndex = 0;
+			uint64_t m_AllocationCount = 0;
 			RHIFencePoint m_LastSubmittedFence{};
 			bool m_Active = false;
 		};

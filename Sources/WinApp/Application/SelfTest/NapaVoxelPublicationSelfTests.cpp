@@ -188,6 +188,10 @@ namespace gglab
 			}
 			RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
+				if (Test(desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage))
+				{
+					return {};
+				}
 				if (m_FailNextBufferCreation)
 				{
 					m_FailNextBufferCreation = false;
@@ -250,6 +254,9 @@ namespace gglab
 				return false;
 			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			RHIUploadLimits GetUploadLimits() const noexcept override { return { 1, 64 * 1024, 1, UINT32_MAX }; }
+			// This publication fixture cannot create mapped upload storage.
+			bool IsUploadStorage(RHIBufferHandle) const noexcept override { return false; }
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{
 				return texture.IsValid();

@@ -407,6 +407,8 @@ namespace gglab
 			bool m_ConstantCreateFails = false;
 			bool m_ConstantPublishFails = false;
 			std::vector<std::vector<std::byte>> m_PassConstantStorage;
+			std::vector<RHIBufferDesc> m_UploadBufferDescs;
+			RHIUploadLimits m_UploadLimits{ 256, 64 * 1024, 16, 128 * 1024 * 1024 };
 			uint32_t m_PassConstantMapCount = 0;
 			uint32_t m_PassConstantPublishCount = 0;
 			uint32_t m_PassConstantUnmapCount = 0;
@@ -455,6 +457,7 @@ namespace gglab
 						return {};
 					}
 					m_PassConstantStorage.emplace_back(desc.m_SizeInBytes);
+					m_UploadBufferDescs.push_back(desc);
 					return { static_cast<uint32_t>(m_PassConstantStorage.size()), 1 };
 				}
 				return m_AtmosphereBuffersEnabled ?
@@ -518,6 +521,12 @@ namespace gglab
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override
 			{
 				return m_PassConstantsEnabled ? 256 : 1;
+			}
+			RHIUploadLimits GetUploadLimits() const noexcept override { return m_UploadLimits; }
+			bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override
+			{
+				return buffer.IsValid() && buffer.Index() > 0 && buffer.Index() <= m_UploadBufferDescs.size() &&
+					Test(m_UploadBufferDescs[buffer.Index() - 1].m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 			}
 			bool FlushMappedBufferWrites(RHIBufferHandle buffer, RHIMappedBufferRange range) noexcept override
 			{
@@ -1160,6 +1169,13 @@ namespace gglab
 				m_ConstantBindings.push_back({ parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes });
 				return true;
 			}
+			using RHIGraphicsCommandContext::SetReadOnlyBuffer;
+			bool SetReadOnlyBufferBinding(uint32_t, const RHIReadOnlyBufferBinding& binding) noexcept override
+			{
+				m_ReadOnlyBindings.push_back(binding);
+				return true;
+			}
+			std::vector<RHIReadOnlyBufferBinding> m_ReadOnlyBindings;
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
 			{
@@ -1225,6 +1241,13 @@ namespace gglab
 				m_ConstantBindings.push_back({ parameterIndex, binding.m_Buffer, binding.m_OffsetInBytes });
 				return true;
 			}
+			using RHIComputeCommandContext::SetReadOnlyBuffer;
+			bool SetReadOnlyBufferBinding(uint32_t, const RHIReadOnlyBufferBinding& binding) noexcept override
+			{
+				m_ReadOnlyBindings.push_back(binding);
+				return true;
+			}
+			std::vector<RHIReadOnlyBufferBinding> m_ReadOnlyBindings;
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
@@ -1866,6 +1889,218 @@ namespace gglab
 			RecordingGraphicsCommandContext unscoped;
 			context.Check(!unscoped.SetConstantBufferData(passIndex, payload) && unscoped.HasRecordingError(),
 				"Data uploads require an explicit recording scope outside the RenderGraph too");
+		}
+
+		void RunUploadStorageContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_UploadLimits = { 256, 4096, 512, 8192 };
+			RHIUploadPool pool(device, { .m_PageSizeInBytes = 2048 });
+			RHIUploadWriter writer;
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext compute;
+			const std::array<uint32_t, 2> constants{ 7, 11 };
+			const std::array<std::array<uint32_t, 3>, 2> elements{ { { 1, 2, 3 }, { 4, 5, 6 } } };
+			auto batch = pool.BeginBatch();
+			batch->Attach(writer);
+			graphics.BeginRecordingScope(writer);
+			compute.BeginRecordingScope(writer);
+			const auto frameUploads = writer.GetFrameUploads();
+			const auto first = frameUploads.UploadConstants(constants);
+			std::fill(device.m_PassConstantStorage[0].begin() + 256,
+				device.m_PassConstantStorage[0].end(), std::byte{ 0xcd });
+			const auto structured = frameUploads.UploadStructured(std::span(elements));
+			const auto last = frameUploads.UploadConstants(constants);
+			const auto& bytes = device.m_PassConstantStorage[0];
+			const auto paddingIsZero = [&](size_t begin, size_t end)
+				{
+					return std::all_of(bytes.begin() + begin, bytes.begin() + end,
+						[](std::byte value) { return value == std::byte{}; });
+				};
+			context.Check(first.IsValid() && structured.IsValid() && last.IsValid() &&
+				structured.m_Buffer == first.m_Buffer && structured.m_OffsetInBytes == 512 &&
+				structured.m_StrideInBytes == 12 && structured.m_SizeInBytes == sizeof(elements) &&
+				last.m_OffsetInBytes == 1024 && paddingIsZero(256, 512) && paddingIsZero(536, 1024) &&
+				std::memcmp(bytes.data() + 512, elements.data(), sizeof(elements)) == 0,
+				"Mixed uploads align each slice independently and zero both alignment gaps and padding");
+			context.Check(graphics.SetReadOnlyBuffer(3, structured) && compute.SetReadOnlyBuffer(3, structured) &&
+				writer.Owns(structured) && device.IsUploadStorage(first.m_Buffer) &&
+				Test(device.m_UploadBufferDescs[0].m_Usage, RHIBufferUsage::Constant | RHIBufferUsage::Structured),
+				"Graphics and compute share one identity-carrying structured slice on marked mixed-use storage");
+			context.Check(IsConstantBufferBindingInRange(first, 2048, device.m_UploadLimits) &&
+				IsReadOnlyBufferBindingInRange(structured, 2048, device.m_UploadLimits) &&
+				!IsReadOnlyBufferBindingInRange({ structured.m_Buffer, UINT64_MAX - 511, 1024, 4 },
+					UINT64_MAX, device.m_UploadLimits) &&
+				!IsReadOnlyBufferBindingInRange({ structured.m_Buffer, 1, 24, 12 }, 2048, device.m_UploadLimits) &&
+				!IsReadOnlyBufferBindingInRange({ structured.m_Buffer, 512, 25, 12 }, 2048, device.m_UploadLimits) &&
+				!IsConstantBufferBindingInRange({ first.m_Buffer, 2048, 4 }, 2048, device.m_UploadLimits),
+				"Shared range checks reject overflow, misalignment, fractional elements and end-of-buffer slices");
+			const auto leased = pool.GetStatistics();
+			context.Check(leased.m_Total.m_CapacityInBytes == 2048 && leased.m_Leased.m_PageCount == 1 &&
+				leased.m_Leased.m_CapacityInBytes == 2048 && leased.m_Idle.m_PageCount == 0,
+				"Live page statistics measure leased capacity rather than payload bytes");
+			const RHIFencePoint completion{ RHIFenceHandle{ 1, 1 }, 9 };
+			context.Check(batch->Publish() && batch->Submitted(completion), "The mixed upload batch submits");
+			graphics.EndRecordingScope();
+			compute.EndRecordingScope();
+			batch->Detach(writer);
+			const auto pending = pool.GetStatistics();
+			context.Check(pending.m_Pending.m_PageCount == 1 && pending.m_SubmittedBatchCount == 1 &&
+				pending.m_LastBatch.m_UploadCount == 3 && pending.m_LastBatch.m_RequestedBytes == 40 &&
+				pending.m_LastBatch.m_ReservedBytes == 1280 && pending.m_LastBatch.m_PageCount == 1 &&
+				pending.m_HighWaterReservedBytesPerBatch == 1280 && device.IsUploadStorage(first.m_Buffer),
+				"Completed batch statistics retain payload, reservation, capacity state and submission counts");
+			device.m_CompletedFenceValue = 9;
+			pool.ReclaimCompleted();
+			context.Check(pool.GetStatistics().m_Idle.m_CapacityInBytes == 2048 &&
+				device.IsUploadStorage(first.m_Buffer), "Completed idle pages keep their upload-storage marker");
+
+			for (uint32_t scenario = 0; scenario < 5; ++scenario)
+			{
+				auto invalid = pool.BeginBatch();
+				invalid->Attach(writer);
+				graphics.BeginRecordingScope(writer);
+				compute.BeginRecordingScope(writer);
+				const auto value = writer.UploadStructured(std::span(elements));
+				auto rejected = value;
+				bool accepted = false;
+				if (scenario == 0)
+				{
+					rejected.m_UploadBatchId = 0;
+					accepted = graphics.SetReadOnlyBuffer(3, rejected);
+				}
+				else if (scenario == 1)
+				{
+					accepted = graphics.SetConstantBuffer(0, { value.m_Buffer, value.m_OffsetInBytes, 4, 0 });
+				}
+				else if (scenario == 2)
+				{
+					accepted = graphics.SetReadOnlyBuffer(3, structured);
+				}
+				else if (scenario == 3)
+				{
+					rejected.m_SizeInBytes = 4092;
+					accepted = graphics.SetReadOnlyBuffer(3, rejected);
+				}
+				else
+				{
+					accepted = frameUploads.UploadStructured(std::span(elements)).IsValid();
+				}
+				context.Check(!accepted && invalid->HasFailed() && graphics.HasRecordingError() &&
+					compute.HasRecordingError() && !invalid->Publish(),
+					"Stripped ids, stale structured bindings, forged ranges and stale capabilities poison the shared batch");
+				graphics.EndRecordingScope();
+				compute.EndRecordingScope();
+				invalid->Detach(writer);
+				invalid->Cancel();
+			}
+			auto quarantined = pool.BeginBatch();
+			const auto held = quarantined->Upload(std::as_bytes(std::span(constants)));
+			context.Check(held.IsValid() && quarantined->Publish(), "A mixed page can be quarantined");
+			quarantined->RecordAcceptedSubmission();
+			quarantined->SubmittedWithoutCompletionFence();
+			const auto quarantine = pool.GetStatistics();
+			context.Check(quarantine.m_Quarantined.m_PageCount == 1 &&
+				quarantine.m_Quarantined.m_CapacityInBytes == 2048 && device.IsUploadStorage(held.m_Buffer),
+				"Quarantined page capacity and its marker remain visible independently of fence completion");
+			pool.ReleaseQuarantinedAfterVerifiedIdle();
+			context.Check(pool.GetStatistics().m_Idle.m_PageCount == 1 &&
+				pool.GetStatistics().m_SubmittedBatchCount == 2 && pool.GetStatistics().m_CancelledBatchCount == 5,
+				"Verified idle changes page state without losing batch outcome statistics");
+		}
+
+		void RunUploadBudgetTests(SelfTestContext& context) noexcept
+		{
+			const std::array<uint32_t, 1> payload{ 7 };
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 256, .m_MaxPoolBytes = 256 });
+				auto held = pool.BeginBatch();
+				context.Check(held->Upload(std::as_bytes(std::span(payload))).IsValid() && held->Publish(),
+					"A quarantine budget probe publishes its payload");
+				held->RecordAcceptedSubmission();
+				held->SubmittedWithoutCompletionFence();
+				auto next = pool.BeginBatch();
+				const bool uploaded = next->Upload(std::as_bytes(std::span(payload))).IsValid();
+				next->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(!uploaded && statistics.m_Quarantined.m_CapacityInBytes == 256 &&
+					statistics.m_PoolByteBudgetFailures == 1 && statistics.m_Total.m_PageCount == 1,
+					"Quarantined pages consume pool byte budget and cannot be reused or excluded from accounting");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+			}
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 256, .m_MaxBytesPerBatch = 256 });
+				auto batch = pool.BeginBatch();
+				const bool first = batch->Upload(std::as_bytes(std::span(payload))).IsValid();
+				const bool second = batch->Upload(std::as_bytes(std::span(payload))).IsValid();
+				batch->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(first && !second && statistics.m_BatchByteBudgetFailures == 1 &&
+					statistics.m_PageCountFailures == 0 && statistics.m_LastBatch.m_ReservedBytes == 256,
+					"A batch byte budget fails before the independent page-count cap");
+			}
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 256, .m_MaxUploadSizeInBytes = 1024,
+					.m_MaxPoolBytes = 1024 });
+				const std::array<uint32_t, 128> large{};
+				const std::array<uint32_t, 192> larger{};
+				auto batch = pool.BeginBatch();
+				const auto dedicated = batch->UploadStructured(std::as_bytes(std::span(large)), 4);
+				batch->Cancel();
+				auto next = pool.BeginBatch();
+				const bool overflow = next->UploadStructured(std::as_bytes(std::span(larger)), 4).IsValid();
+				next->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(dedicated.IsValid() && !overflow && statistics.m_Total.m_PageCount == 1 &&
+					statistics.m_Idle.m_CapacityInBytes == 512 && statistics.m_PoolByteBudgetFailures == 1 &&
+					statistics.m_PageCountFailures == 0,
+					"Idle dedicated pages still consume pool byte budget when another page cannot reuse them");
+				auto reuse = pool.BeginBatch();
+				const auto reused = reuse->Upload(std::as_bytes(std::span(payload)));
+				context.Check(reused.m_Buffer == dedicated.m_Buffer &&
+					pool.GetStatistics().m_Leased.m_CapacityInBytes == 512,
+					"A free large page serves a small upload while charging its full capacity");
+				reuse->Cancel();
+			}
+			for (uint32_t scenario = 0; scenario < 6; ++scenario)
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_ConstantCreateFails = scenario == 0;
+				device.m_ConstantMapFails = scenario == 1;
+				device.m_ConstantPublishFails = scenario == 2;
+				if (scenario == 3)
+				{
+					device.m_UploadLimits.m_MaxConstantRangeInBytes = 2;
+				}
+				if (scenario == 5)
+				{
+					device.m_UploadLimits.m_MaxStorageRangeInBytes = 2;
+				}
+				RHIUploadPool pool(device, { .m_MaxUploadSizeInBytes = scenario == 4 ? 2u : 64u * 1024u });
+				auto batch = pool.BeginBatch();
+				const bool uploaded = scenario == 5 ?
+					batch->UploadStructured(std::as_bytes(std::span(payload)), 4).IsValid() :
+					batch->Upload(std::as_bytes(std::span(payload))).IsValid();
+				const bool published = batch->Publish();
+				batch->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(!published && batch->HasFailed() && statistics.m_CancelledBatchCount == 1 &&
+					statistics.m_PageCreationFailures == (scenario == 0 ? 1u : 0u) &&
+					statistics.m_PageMappingFailures == (scenario == 1 ? 1u : 0u) &&
+					statistics.m_PublicationFailures == (scenario == 2 ? 1u : 0u) &&
+					statistics.m_OversizedUploadFailures == (scenario >= 3 ? 1u : 0u) &&
+					uploaded == (scenario == 2),
+					"Upload failures retain their distinct cause counters and never publish a successful batch");
+			}
 		}
 
 		void RunUploadWriterContractTests(SelfTestContext& context) noexcept
@@ -10702,6 +10937,8 @@ namespace gglab
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunPassParameterContractTests(context);
 		RunUploadWriterContractTests(context);
+		RunUploadStorageContractTests(context);
+		RunUploadBudgetTests(context);
 		RunCheckedCompletionContractTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);

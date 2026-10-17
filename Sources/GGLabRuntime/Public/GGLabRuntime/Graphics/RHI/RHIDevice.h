@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
@@ -78,6 +79,8 @@ namespace gglab
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
 		virtual uint32_t GetMaxConstantBufferRange() const noexcept { return 64 * 1024; }
+		[[nodiscard]] virtual RHIUploadLimits GetUploadLimits() const noexcept = 0;
+		[[nodiscard]] virtual bool IsUploadStorage(RHIBufferHandle buffer) const noexcept = 0;
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;

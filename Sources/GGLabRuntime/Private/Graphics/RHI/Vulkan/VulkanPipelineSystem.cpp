@@ -144,6 +144,7 @@ namespace gglab
 				return plan;
 			}
 			VulkanSet0BindingPlan& binding = plan.m_Set0Bindings[plan.m_Set0BindingCount++];
+			binding.m_BindingType = slot.m_Type;
 			binding.m_LogicalParameterIndex = logicalParameterIndex++;
 			binding.m_Binding = location.m_Location.m_Binding;
 			binding.m_DescriptorType = slot.m_Type == RHIBindingType::ConstantBuffer &&

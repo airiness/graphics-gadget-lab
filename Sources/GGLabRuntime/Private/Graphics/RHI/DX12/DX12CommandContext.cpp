@@ -228,6 +228,11 @@ namespace gglab
 		}
 	}
 
+	bool DX12CommandContext::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		return m_Device && m_Device->IsUploadStorage(buffer);
+	}
+
 	void DX12CommandContext::CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 		RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept
 	{
@@ -438,11 +443,16 @@ namespace gglab
 			m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
 			m_PushConstantSizes = m_PipelineSystem->GetPushConstantSizes(pipeline);
-			m_ConstantBufferSlots = m_PipelineSystem->GetConstantBufferSlots(pipeline);
+			m_BufferBindingTypes = m_PipelineSystem->GetBufferBindingTypes(pipeline);
 		}
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
 		{
+			if (m_Backend.GetDevice()->IsUploadStorage(binding->m_Buffer))
+			{
+				FailRecording();
+				return;
+			}
 			// Use the pipeline system's owned layout, not the native creation description's borrowed pointers.
 			if (const auto parameter = m_PipelineSystem->GetStorageBufferParameterIndex(pipeline, binding->m_Binding, binding->m_Space); parameter)
 			{
@@ -680,12 +690,12 @@ namespace gglab
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
 		DX12Buffer* buffer = m_Backend.GetDevice()->ResolveBuffer(binding.m_Buffer);
+		const auto* desc = m_Backend.GetDevice()->GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
-			parameterIndex >= m_ConstantBufferSlots.size() || !m_ConstantBufferSlots[parameterIndex] ||
-			!buffer || binding.m_OffsetInBytes >= buffer->SizeInBytes() ||
-			binding.m_SizeInBytes > buffer->SizeInBytes() - binding.m_OffsetInBytes ||
-			binding.m_SizeInBytes > m_Backend.GetDevice()->GetMaxConstantBufferRange() ||
-			binding.m_OffsetInBytes % D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT != 0)
+			parameterIndex >= m_BufferBindingTypes.size() || m_BufferBindingTypes[parameterIndex] != RHIBindingType::ConstantBuffer ||
+			!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Constant) ||
+			!IsConstantBufferBindingInRange(binding, desc->m_SizeInBytes, m_Backend.GetDevice()->GetUploadLimits()) ||
+			(binding.m_UploadBatchId == 0 && m_Backend.GetDevice()->IsUploadStorage(binding.m_Buffer)))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("DX12 graphics constant buffer binding is invalid.");
 			FailRecording();
@@ -700,6 +710,11 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetReadOnlyBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		if (m_Backend.GetDevice()->IsUploadStorage(buffer))
+		{
+			FailRecording();
+			return;
+		}
 		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
 			"SetPipeline must bind a graphics root signature before root arguments.");
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
@@ -712,6 +727,27 @@ namespace gglab
 		m_Backend.Get()->SetGraphicsRootShaderResourceView(
 			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
 		m_Backend.TrackBufferUse(buffer);
+	}
+
+	bool DX12GraphicsCommandContext::SetReadOnlyBufferBinding(uint32_t parameterIndex,
+		const RHIReadOnlyBufferBinding& binding) noexcept
+	{
+		auto& device = *m_Backend.GetDevice();
+		const auto* desc = device.GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
+		DX12Buffer* buffer = device.ResolveBuffer(binding.m_Buffer);
+		if (!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Structured) ||
+			!IsReadOnlyBufferBindingInRange(binding, desc->m_SizeInBytes, device.GetUploadLimits()) ||
+			(binding.m_UploadBatchId == 0 && device.IsUploadStorage(binding.m_Buffer)) ||
+			!m_CurrentRootSignature || parameterIndex >= m_BufferBindingTypes.size() ||
+			m_BufferBindingTypes[parameterIndex] != RHIBindingType::ReadOnlyStorageBuffer)
+		{
+			FailRecording();
+			return false;
+		}
+		m_Backend.Get()->SetGraphicsRootShaderResourceView(
+			parameterIndex, buffer->GPUVirtualAddress() + binding.m_OffsetInBytes);
+		m_Backend.TrackBufferUse(binding.m_Buffer);
+		return true;
 	}
 
 	void DX12GraphicsCommandContext::SetPushConstants(
@@ -745,6 +781,11 @@ namespace gglab
 		nativeBindings.reserve(bindings.size());
 		for (const RHIVertexBufferBinding& binding : bindings)
 		{
+			if (device->IsUploadStorage(binding.m_Buffer))
+			{
+				FailRecording();
+				return;
+			}
 			DX12Buffer* buffer = device->ResolveBuffer(binding.m_Buffer);
 			if (!buffer)
 			{
@@ -775,6 +816,11 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(device);
 
 		DX12Buffer* buffer = device->ResolveBuffer(binding.m_Buffer);
+		if (device->IsUploadStorage(binding.m_Buffer))
+		{
+			FailRecording();
+			return;
+		}
 		if (!buffer || !IsRHIIndexBufferBindingRangeValid(binding, buffer->SizeInBytes()))
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -925,11 +971,16 @@ namespace gglab
 			m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
 			m_PushConstantSizes = m_PipelineSystem->GetPushConstantSizes(pipeline);
-			m_ConstantBufferSlots = m_PipelineSystem->GetConstantBufferSlots(pipeline);
+			m_BufferBindingTypes = m_PipelineSystem->GetBufferBindingTypes(pipeline);
 		}
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
 		{
+			if (m_Backend->GetDevice()->IsUploadStorage(binding->m_Buffer))
+			{
+				FailRecording();
+				return;
+			}
 			// Use the pipeline system's owned layout, not the native creation description's borrowed pointers.
 			if (const auto parameter = m_PipelineSystem->GetStorageBufferParameterIndex(pipeline, binding->m_Binding, binding->m_Space); parameter)
 			{
@@ -963,12 +1014,12 @@ namespace gglab
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
 		DX12Buffer* buffer = m_Backend->GetDevice()->ResolveBuffer(binding.m_Buffer);
+		const auto* desc = m_Backend->GetDevice()->GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
-			parameterIndex >= m_ConstantBufferSlots.size() || !m_ConstantBufferSlots[parameterIndex] ||
-			!buffer || binding.m_OffsetInBytes >= buffer->SizeInBytes() ||
-			binding.m_SizeInBytes > buffer->SizeInBytes() - binding.m_OffsetInBytes ||
-			binding.m_SizeInBytes > m_Backend->GetDevice()->GetMaxConstantBufferRange() ||
-			binding.m_OffsetInBytes % D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT != 0)
+			parameterIndex >= m_BufferBindingTypes.size() || m_BufferBindingTypes[parameterIndex] != RHIBindingType::ConstantBuffer ||
+			!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Constant) ||
+			!IsConstantBufferBindingInRange(binding, desc->m_SizeInBytes, m_Backend->GetDevice()->GetUploadLimits()) ||
+			(binding.m_UploadBatchId == 0 && m_Backend->GetDevice()->IsUploadStorage(binding.m_Buffer)))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("DX12 compute constant buffer binding is invalid.");
 			FailRecording();
@@ -983,6 +1034,11 @@ namespace gglab
 	void DX12ComputeCommandContext::SetReadOnlyBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		if (m_Backend->GetDevice()->IsUploadStorage(buffer))
+		{
+			FailRecording();
+			return;
+		}
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
@@ -995,9 +1051,35 @@ namespace gglab
 		m_Backend->TrackBufferUse(buffer);
 	}
 
+	bool DX12ComputeCommandContext::SetReadOnlyBufferBinding(uint32_t parameterIndex,
+		const RHIReadOnlyBufferBinding& binding) noexcept
+	{
+		auto& device = *m_Backend->GetDevice();
+		const auto* desc = device.GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
+		DX12Buffer* buffer = device.ResolveBuffer(binding.m_Buffer);
+		if (!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Structured) ||
+			!IsReadOnlyBufferBindingInRange(binding, desc->m_SizeInBytes, device.GetUploadLimits()) ||
+			(binding.m_UploadBatchId == 0 && device.IsUploadStorage(binding.m_Buffer)) ||
+			!m_CurrentRootSignature || parameterIndex >= m_BufferBindingTypes.size() ||
+			m_BufferBindingTypes[parameterIndex] != RHIBindingType::ReadOnlyStorageBuffer)
+		{
+			FailRecording();
+			return false;
+		}
+		m_Backend->GetCommandList()->SetComputeReadOnlyBuffer(
+			parameterIndex, buffer->GPUVirtualAddress() + binding.m_OffsetInBytes);
+		m_Backend->TrackBufferUse(binding.m_Buffer);
+		return true;
+	}
+
 	void DX12ComputeCommandContext::SetReadWriteBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		if (m_Backend->GetDevice()->IsUploadStorage(buffer))
+		{
+			FailRecording();
+			return;
+		}
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{

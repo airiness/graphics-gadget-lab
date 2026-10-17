@@ -289,15 +289,15 @@ namespace gglab
 		return sizes;
 	}
 
-	std::array<bool, RHIBindingLayoutDesc::MaxSlots> DX12PipelineSystem::GetConstantBufferSlots(
+	std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> DX12PipelineSystem::GetBufferBindingTypes(
 		RHIPipelineHandle pipeline) const noexcept
 	{
-		std::array<bool, RHIBindingLayoutDesc::MaxSlots> sizes{};
+		std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> types{};
 		std::shared_lock lock(m_Mutex);
 		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration ||
 			pipeline.Index() >= m_Pipelines.size())
 		{
-			return sizes;
+			return types;
 		}
 		const auto& pipelineBinding = m_Pipelines[pipeline.Index()];
 		const auto layout = pipelineBinding.m_Type == PipelineType::Graphics ?
@@ -306,7 +306,7 @@ namespace gglab
 		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration ||
 			layout.Index() >= m_BindingLayouts.size())
 		{
-			return sizes;
+			return types;
 		}
 		const auto& binding = m_BindingLayouts[layout.Index()];
 		uint32_t parameterIndex = 0;
@@ -317,13 +317,10 @@ namespace gglab
 			{
 				continue;
 			}
-			if (slot.m_Type == RHIBindingType::ConstantBuffer)
-			{
-				sizes[parameterIndex] = true;
-			}
+			types[parameterIndex] = slot.m_Type;
 			++parameterIndex;
 		}
-		return sizes;
+		return types;
 	}
 
 	bool DX12PipelineSystem::ResolveComputePipeline(RHIPipelineHandle pipeline,

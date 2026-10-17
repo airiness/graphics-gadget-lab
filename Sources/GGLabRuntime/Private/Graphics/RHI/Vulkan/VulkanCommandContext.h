@@ -67,6 +67,12 @@ namespace gglab
 		void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept override;
 		bool SetConstantBuffer(
 			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
+	protected:
+		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept override;
+
+	public:
+		using RHIGraphicsCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
@@ -161,6 +167,12 @@ namespace gglab
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		bool SetConstantBuffer(
 			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
+	protected:
+		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept override;
+
+	public:
+		using RHIComputeCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetReadWriteBuffer(

@@ -126,6 +126,13 @@ namespace gglab
 				return m_Buffers.contains(buffer);
 			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			RHIUploadLimits GetUploadLimits() const noexcept override { return { 1, 64 * 1024, 1, UINT32_MAX }; }
+			bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override
+			{
+				const auto found = m_Buffers.find(buffer);
+				return found != m_Buffers.end() &&
+					Test(found->second.m_Desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
+			}
 			bool IsAlive(RHITextureHandle texture) const noexcept override { return texture.IsValid(); }
 			bool IsAlive(RHIBufferHandle buffer) const noexcept override
 			{

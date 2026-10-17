@@ -73,30 +73,66 @@ namespace gglab
 			});
 	}
 
-	size_t RHIUploadPool::AcquirePage(uint64_t minimumSize) noexcept
+	RHIUploadStatistics RHIUploadPool::GetStatistics() const noexcept
+	{
+		auto statistics = m_Statistics;
+		for (const Page& page : m_Pages)
+		{
+			++statistics.m_Total.m_PageCount;
+			statistics.m_Total.m_CapacityInBytes += page.m_CapacityInBytes;
+			auto& state = page.m_Quarantined ? statistics.m_Quarantined :
+				page.m_Leased ? statistics.m_Leased :
+				page.m_Fence.IsValid() ? statistics.m_Pending : statistics.m_Idle;
+			++state.m_PageCount;
+			state.m_CapacityInBytes += page.m_CapacityInBytes;
+		}
+		return statistics;
+	}
+
+	size_t RHIUploadPool::AcquirePage(uint64_t minimumSize, uint64_t remainingBatchBytes) noexcept
 	{
 		ReclaimCompleted();
+		size_t best = InvalidPage;
 		for (size_t index = 0; index < m_Pages.size(); ++index)
 		{
 			auto& page = m_Pages[index];
 			if (!page.m_Leased && !page.m_Quarantined && !page.m_Fence.IsValid() &&
-				page.m_CapacityInBytes >= minimumSize)
+				page.m_CapacityInBytes >= minimumSize && page.m_CapacityInBytes <= remainingBatchBytes &&
+				(best == InvalidPage || page.m_CapacityInBytes < m_Pages[best].m_CapacityInBytes))
 			{
-				page.m_Leased = true;
-				return index;
+				best = index;
 			}
+		}
+		if (best != InvalidPage)
+		{
+			m_Pages[best].m_Leased = true;
+			return best;
+		}
+		const uint64_t capacity = std::max<uint64_t>(minimumSize, m_Config.m_PageSizeInBytes);
+		if (capacity > remainingBatchBytes)
+		{
+			++m_Statistics.m_BatchByteBudgetFailures;
+			GGLAB_LOG_GRAPHICS_ERROR("Upload allocation exhausted its batch byte budget.");
+			return InvalidPage;
+		}
+		if (capacity > m_Config.m_MaxPoolBytes || m_CapacityInBytes > m_Config.m_MaxPoolBytes - capacity)
+		{
+			++m_Statistics.m_PoolByteBudgetFailures;
+			GGLAB_LOG_GRAPHICS_ERROR("Upload allocation exhausted its pool byte budget.");
+			return InvalidPage;
 		}
 		if (m_Pages.size() >= m_Config.m_MaxPoolPages || m_Config.m_PageSizeInBytes == 0)
 		{
+			++m_Statistics.m_PageCountFailures;
 			GGLAB_LOG_GRAPHICS_ERROR("Upload page allocation exhausted its budget.");
 			return InvalidPage;
 		}
-		const uint64_t capacity = std::max<uint64_t>(minimumSize, m_Config.m_PageSizeInBytes);
 		const auto buffer = m_Device->CreateBuffer(
 			{
 				.m_SizeInBytes = capacity,
-				.m_Usage = RHIBufferUsage::Constant,
+				.m_Usage = RHIBufferUsage::Constant | RHIBufferUsage::Structured,
 				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
+				.m_CreateFlags = RHIBufferCreateFlags::UploadStorage,
 			},
 			{
 				.m_Domain = RHIResourceDebugDomain::Renderer,
@@ -104,6 +140,7 @@ namespace gglab
 			});
 		if (!buffer.IsValid())
 		{
+			++m_Statistics.m_PageCreationFailures;
 			GGLAB_LOG_GRAPHICS_ERROR("Upload page creation failed.");
 			return InvalidPage;
 		}
@@ -111,11 +148,13 @@ namespace gglab
 		auto* mapped = static_cast<std::byte*>(m_Device->MapBuffer(buffer, {}));
 		if (!mapped)
 		{
+			++m_Statistics.m_PageMappingFailures;
 			GGLAB_LOG_GRAPHICS_ERROR("Upload page mapping failed.");
 			m_Device->DestroyBuffer(buffer);
 			return InvalidPage;
 		}
 		m_Pages.push_back({ buffer, mapped, capacity, {}, true, false });
+		m_CapacityInBytes += capacity;
 		return m_Pages.size() - 1;
 	}
 
@@ -159,26 +198,61 @@ namespace gglab
 
 	RHIConstantBufferBinding RHIUploadBatch::Upload(std::span<const std::byte> bytes) noexcept
 	{
-		auto& device = *m_Pool->m_Device;
-		if (m_State != State::Recording || m_Failed || bytes.empty() ||
-			bytes.size() % sizeof(uint32_t) != 0 || bytes.size() > device.GetMaxConstantBufferRange())
+		const auto limits = m_Pool->m_Device->GetUploadLimits();
+		return UploadBytes(bytes, limits.m_ConstantOffsetAlignment, limits.m_MaxConstantRangeInBytes);
+	}
+
+	RHIReadOnlyBufferBinding RHIUploadBatch::UploadStructured(
+		std::span<const std::byte> bytes, uint32_t strideInBytes) noexcept
+	{
+		if (strideInBytes == 0 || strideInBytes % sizeof(uint32_t) != 0 || bytes.size() % strideInBytes != 0)
 		{
 			Fail();
 			return {};
 		}
-		const uint64_t alignment =
-			std::max(1u, device.GetBufferViewAlignment(RHIBufferViewType::ConstantBuffer));
+		const auto limits = m_Pool->m_Device->GetUploadLimits();
+		if (limits.m_StorageOffsetAlignment == 0 || limits.m_ConstantOffsetAlignment == 0)
+		{
+			Fail();
+			return {};
+		}
+		const auto binding = UploadBytes(bytes,
+			std::max(limits.m_ConstantOffsetAlignment, limits.m_StorageOffsetAlignment),
+			limits.m_MaxStorageRangeInBytes);
+		return { binding.m_Buffer, binding.m_OffsetInBytes, binding.m_SizeInBytes, strideInBytes,
+			binding.m_UploadBatchId };
+	}
+
+	RHIConstantBufferBinding RHIUploadBatch::UploadBytes(std::span<const std::byte> bytes,
+		uint32_t alignment, uint32_t maximumRange) noexcept
+	{
+		if (m_State != State::Recording || m_Failed || bytes.empty() ||
+			bytes.size() % sizeof(uint32_t) != 0 || alignment == 0)
+		{
+			Fail();
+			return {};
+		}
+		if (bytes.size() > maximumRange || bytes.size() > m_Pool->m_Config.m_MaxUploadSizeInBytes)
+		{
+			++m_Pool->m_Statistics.m_OversizedUploadFailures;
+			Fail();
+			return {};
+		}
 		const uint64_t reservedSize = (bytes.size() + alignment - 1) / alignment * alignment;
-		if (m_Leases.empty() || m_Leases.back().m_CursorInBytes + reservedSize >
+		uint64_t offset = m_Leases.empty() ? 0 :
+			(m_Leases.back().m_CursorInBytes + alignment - 1) / alignment * alignment;
+		if (m_Leases.empty() || offset + reservedSize >
 			m_Pool->m_Pages[m_Leases.back().m_PageIndex].m_CapacityInBytes)
 		{
 			if (m_Leases.size() >= m_Pool->m_Config.m_MaxPagesPerBatch)
 			{
+				++m_Pool->m_Statistics.m_PageCountFailures;
 				GGLAB_LOG_GRAPHICS_ERROR("Upload page allocation exhausted its budget.");
 				Fail();
 				return {};
 			}
-			const size_t index = m_Pool->AcquirePage(reservedSize);
+			const size_t index = m_Pool->AcquirePage(reservedSize,
+				m_Pool->m_Config.m_MaxBytesPerBatch - m_LeasedCapacityInBytes);
 			if (index == InvalidPage)
 			{
 				// AcquirePage logged the budget, creation or mapping failure.
@@ -186,13 +260,21 @@ namespace gglab
 				return {};
 			}
 			m_Leases.push_back({ index, 0 });
+			m_LeasedCapacityInBytes += m_Pool->m_Pages[index].m_CapacityInBytes;
+			offset = 0;
 		}
 		auto& lease = m_Leases.back();
 		const auto& page = m_Pool->m_Pages[lease.m_PageIndex];
-		const uint64_t offset = lease.m_CursorInBytes;
-		std::memset(page.m_MappedData + offset, 0, reservedSize);
+		const uint64_t consumed = offset + reservedSize - lease.m_CursorInBytes;
+		std::memset(page.m_MappedData + lease.m_CursorInBytes, 0, consumed);
 		std::memcpy(page.m_MappedData + offset, bytes.data(), bytes.size());
-		lease.m_CursorInBytes += reservedSize;
+		lease.m_CursorInBytes = offset + reservedSize;
+		++m_Statistics.m_UploadCount;
+		m_Statistics.m_RequestedBytes += bytes.size();
+		m_Statistics.m_ReservedBytes += consumed;
+		m_Statistics.m_PageCount = m_Leases.size();
+		m_Pool->m_Statistics.m_HighWaterReservedBytesPerBatch = std::max(
+			m_Pool->m_Statistics.m_HighWaterReservedBytesPerBatch, m_Statistics.m_ReservedBytes);
 		return { page.m_Buffer, offset, static_cast<uint32_t>(bytes.size()), m_Id };
 	}
 
@@ -210,6 +292,23 @@ namespace gglab
 			});
 	}
 
+	bool RHIUploadBatch::Owns(const RHIReadOnlyBufferBinding& binding) const noexcept
+	{
+		return IsReadOnlyBufferBindingInRange(binding, UINT64_MAX, m_Pool->m_Device->GetUploadLimits()) &&
+			Owns(RHIConstantBufferBinding{ binding.m_Buffer, binding.m_OffsetInBytes,
+				binding.m_SizeInBytes, binding.m_UploadBatchId });
+	}
+
+	bool RHIUploadBatch::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		return m_Pool->m_Device->IsUploadStorage(buffer);
+	}
+
+	void RHIUploadBatch::FinishStatistics() noexcept
+	{
+		m_Pool->m_Statistics.m_LastBatch = m_Statistics;
+	}
+
 	bool RHIUploadBatch::Publish() noexcept
 	{
 		if (m_State != State::Recording)
@@ -222,6 +321,7 @@ namespace gglab
 				m_Pool->m_Pages[lease.m_PageIndex].m_Buffer, { 0, lease.m_CursorInBytes }))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR("Upload write publication failed.");
+				++m_Pool->m_Statistics.m_PublicationFailures;
 				Fail();
 			}
 		}
@@ -243,6 +343,8 @@ namespace gglab
 			page.m_Leased = false;
 		}
 		m_State = State::Submitted;
+		++m_Pool->m_Statistics.m_SubmittedBatchCount;
+		FinishStatistics();
 		return true;
 	}
 
@@ -261,6 +363,8 @@ namespace gglab
 			page.m_Leased = false;
 		}
 		m_State = State::Quarantined;
+		++m_Pool->m_Statistics.m_SubmittedBatchCount;
+		FinishStatistics();
 	}
 
 	void RHIUploadBatch::Cancel() noexcept
@@ -280,5 +384,7 @@ namespace gglab
 			m_Pool->m_Pages[lease.m_PageIndex].m_Leased = false;
 		}
 		m_State = State::Cancelled;
+		++m_Pool->m_Statistics.m_CancelledBatchCount;
+		FinishStatistics();
 	}
 }
