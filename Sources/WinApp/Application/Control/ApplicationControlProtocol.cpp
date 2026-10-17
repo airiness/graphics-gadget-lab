@@ -98,9 +98,9 @@ namespace gglab
 		[[nodiscard]] std::string ParseDiagnosticTap(
 			const Json& value, std::optional<PostProcessDebugTap>& outTap)
 		{
-			outTap = value.is_string()
-				? FindFrameCaptureDiagnosticTap(value.get<std::string>())
-				: std::nullopt;
+			outTap = value.is_string() ?
+				FindFrameCaptureDiagnosticTap(value.get<std::string>()) :
+				std::nullopt;
 			if (!outTap)
 			{
 				return "Field 'diagnosticTap' must name a diagnostic tap such as "
@@ -604,8 +604,11 @@ namespace gglab
 								{
 									return "Buffer field type/count is invalid.";
 								}
-								fields.push_back({ "field", field["offset"].get<uint32_t>(), type == "float16" ? GpuBufferScalar::Float16 : type == "float32" ? GpuBufferScalar::Float32 :
-									type == "uint32" ? GpuBufferScalar::Uint32 : GpuBufferScalar::Uint8, field.value("count", 1u) });
+								fields.push_back({ "field", field["offset"].get<uint32_t>(), type == "float16" ?
+									GpuBufferScalar::Float16 :
+									type == "float32" ?
+										GpuBufferScalar::Float32 :
+										type == "uint32" ? GpuBufferScalar::Uint32 : GpuBufferScalar::Uint8, field.value("count", 1u) });
 							}
 							uint64_t components = 0;
 							for (const auto& field : fields)
@@ -671,10 +674,13 @@ namespace gglab
 					{
 						return std::format("Field '{}' must be a string.", key);
 					}
-					std::string& target = key == "path" ? sequence.m_CameraPathId
-						: key == "requiredContentId" ? sequence.m_RequiredContentId
-						: key == "label" ? sequence.m_Label
-						: sequence.m_Note;
+					std::string& target = key == "path" ?
+						sequence.m_CameraPathId :
+						key == "requiredContentId" ?
+							sequence.m_RequiredContentId :
+							key == "label" ?
+								sequence.m_Label :
+								sequence.m_Note;
 					target = value.get<std::string>();
 				}
 				else if (key == "source")
@@ -926,10 +932,13 @@ namespace gglab
 					{
 						return std::format("Field '{}' must be a string.", key);
 					}
-					std::string& target = key == "requiredContentId" ? capture.m_RequiredContentId
-						: key == "view" ? capture.m_ReferenceViewId
-						: key == "label" ? capture.m_Label
-						: capture.m_Note;
+					std::string& target = key == "requiredContentId" ?
+						capture.m_RequiredContentId :
+						key == "view" ?
+							capture.m_ReferenceViewId :
+							key == "label" ?
+								capture.m_Label :
+								capture.m_Note;
 					target = value.get<std::string>();
 				}
 				else if (key == "outputDirectory")
@@ -1025,9 +1034,11 @@ namespace gglab
 				{ "watchTier", target.m_Semantic ? Json(GetNonFiniteWatchTier(*target.m_Semantic)) : Json() },
 				{ "failure", target.m_Failure },
 				{ "generation", target.m_Generation.IsValid() ? Json(target.m_Generation.m_Revision) : Json() },
-				{ "resourceIdentity", target.m_Generation.IsValid() ? Json{
-					{ "index", target.m_Generation.m_Texture.Index() },
-					{ "generation", target.m_Generation.m_Texture.Generation() } } : Json() },
+				{ "resourceIdentity", target.m_Generation.IsValid() ?
+					Json{
+						{ "index", target.m_Generation.m_Texture.Index() },
+						{ "generation", target.m_Generation.m_Texture.Generation() } } :
+					Json() },
 				{ "lastCheckedFrameSerial", target.m_CheckedFrameSerial },
 				{ "claim", ClaimName(target.m_Result.m_Claim.m_Status) },
 				{ "reason", WatchFailureName(target.m_Result.m_Claim.m_Failure) },
@@ -1059,8 +1070,9 @@ namespace gglab
 		[[nodiscard]] Json SerializeInjection(const NonFiniteInjection& injection)
 		{
 			return {
-				{ "point", injection.m_PointIndex < nonfinite::InjectionPoints.size()
-					? Json(nonfinite::InjectionPoints[injection.m_PointIndex].m_Id) : Json() },
+				{ "point", injection.m_PointIndex < nonfinite::InjectionPoints.size() ?
+					Json(nonfinite::InjectionPoints[injection.m_PointIndex].m_Id) :
+					Json() },
 				{ "value", GetNonFiniteInjectionValueName(injection.m_Value) },
 				{ "x", injection.m_X },
 				{ "y", injection.m_Y },
@@ -1260,9 +1272,9 @@ namespace gglab
 
 		const auto commandField = document.find("command");
 		const std::optional<ApplicationControlCommand> command =
-			commandField != document.end() && commandField->is_string()
-			? ParseCommand(commandField->get<std::string>())
-			: std::nullopt;
+			commandField != document.end() && commandField->is_string() ?
+				ParseCommand(commandField->get<std::string>()) :
+				std::nullopt;
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "

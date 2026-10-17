@@ -37,12 +37,10 @@ namespace gglab
 				"qualification exposes an explicit headless self-test mode");
 			context.Check(!parse({ "--self-test", "--adapter", "0" }).IsValid(),
 				"headless self-tests reject hardware adapter selection");
-			context.Check(parse({ "--help" }).m_ShowHelp,
-				"qualification exposes command-line help");
+			context.Check(parse({ "--help" }).m_ShowHelp, "qualification exposes command-line help");
 			context.Check(!parse({ "--vulkan-qualification" }).IsValid(),
 				"qualification executable rejects the removed WinApp dispatch option");
-			context.Check(!parse({ "--unknown" }).IsValid(),
-				"qualification rejects unknown options");
+			context.Check(!parse({ "--unknown" }).IsValid(), "qualification rejects unknown options");
 		}
 	}
 

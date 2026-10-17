@@ -128,8 +128,9 @@ namespace gglab
 			else
 			{
 				GGLAB_LOG_WARN_ALWAYS("Frame capture {} {}: {}", result.m_RequestId,
-					result.m_Status == FrameCaptureRequestStatus::Cancelled ? "cancelled"
-					: "failed",
+					result.m_Status == FrameCaptureRequestStatus::Cancelled ?
+						"cancelled" :
+						"failed",
 					result.m_Failure);
 			}
 			m_History.push_back({

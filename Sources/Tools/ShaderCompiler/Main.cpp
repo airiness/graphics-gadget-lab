@@ -217,8 +217,9 @@ namespace
 
 	int PrintFailure(const gglab::ShaderCompilerDiagnostics& diagnostics, bool jsonMode)
 	{
-		return jsonMode ? PrintJsonFailure(diagnostics)
-			: PrintTextFailure(diagnostics);
+		return jsonMode ?
+			PrintJsonFailure(diagnostics) :
+			PrintTextFailure(diagnostics);
 	}
 
 	int PrintJsonResult(const gglab::ShaderCompileResult& result,
@@ -516,9 +517,9 @@ namespace
 				{ "status", result.IsSuccess() ? "ok" : "failed" },
 				{ "exitCode", exitCode },
 				{ "programCount", result.m_ProgramCount },
-				{ "diagnostics", result.m_Error.empty()
-					? nlohmann::json::array()
-					: nlohmann::json::array({ { { "message", result.m_Error } } }) },
+				{ "diagnostics", result.m_Error.empty() ?
+					nlohmann::json::array() :
+					nlohmann::json::array({ { { "message", result.m_Error } } }) },
 			};
 			if (result.m_RegistryRef.IsValid())
 			{
@@ -585,8 +586,9 @@ int wmain(int argumentCount, wchar_t* arguments[])
 	case gglab::ShaderCompilerCommand::Help:
 	case gglab::ShaderCompilerCommand::None:
 		std::wcout << gglab::ShaderCompilerCommandLineUsage() << L"\n";
-		return commandLine.m_Command == gglab::ShaderCompilerCommand::Help
-			? ExitCodeSuccess : ExitCodeInvalidCommandLine;
+		return commandLine.m_Command == gglab::ShaderCompilerCommand::Help ?
+			ExitCodeSuccess :
+			ExitCodeInvalidCommandLine;
 	}
 	return ExitCodeInvalidCommandLine;
 }

@@ -41,9 +41,9 @@ namespace gglab
 				.pFeatureLevelsRequested = featureLevels.data(),
 			};
 			return device && SUCCEEDED(device->CheckFeatureSupport(
-				D3D12_FEATURE_FEATURE_LEVELS, &query, sizeof(query)))
-				? static_cast<uint32_t>(query.MaxSupportedFeatureLevel)
-				: 0;
+				D3D12_FEATURE_FEATURE_LEVELS, &query, sizeof(query))) ?
+				static_cast<uint32_t>(query.MaxSupportedFeatureLevel) :
+				0;
 		}
 	}
 

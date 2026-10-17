@@ -27,9 +27,9 @@ namespace gglab::utils
 
 		std::wstring result(static_cast<std::size_t>(requiredSize), L'\0');
 		return ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), inputSize,
-			result.data(), requiredSize) == requiredSize
-			? result
-			: std::wstring{};
+			result.data(), requiredSize) == requiredSize ?
+			result :
+			std::wstring{};
 	}
 
 	std::string ToString(std::wstring_view utf16) noexcept
@@ -53,9 +53,9 @@ namespace gglab::utils
 
 		std::string result(static_cast<std::size_t>(requiredSize), '\0');
 		return ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, utf16.data(), inputSize,
-			result.data(), requiredSize, nullptr, nullptr) == requiredSize
-			? result
-			: std::string{};
+			result.data(), requiredSize, nullptr, nullptr) == requiredSize ?
+			result :
+			std::string{};
 	}
 
 	std::wstring ToInvariantLowercase(std::wstring_view value) noexcept
@@ -76,8 +76,8 @@ namespace gglab::utils
 
 		std::wstring result(static_cast<std::size_t>(requiredSize), L'\0');
 		return ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(), inputSize,
-			result.data(), requiredSize, nullptr, nullptr, 0) == requiredSize
-			? result
-			: std::wstring{};
+			result.data(), requiredSize, nullptr, nullptr, 0) == requiredSize ?
+			result :
+			std::wstring{};
 	}
 }

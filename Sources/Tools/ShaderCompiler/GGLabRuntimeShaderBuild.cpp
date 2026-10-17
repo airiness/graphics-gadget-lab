@@ -176,7 +176,7 @@ namespace gglab
 			desc.m_Defines.push_back({
 				.m_Name = std::wstring(define.m_Name),
 				.m_Value = define.m_Value.empty() ? L"1" : std::wstring(define.m_Value),
-			});
+				});
 		}
 
 		[[nodiscard]] std::optional<ShaderDesc> MakeBuildDesc(
@@ -209,9 +209,9 @@ namespace gglab
 		[[nodiscard]] ShaderCompileTarget MakeTarget(
 			ShaderTargetProfile profile, ShaderStage stage) noexcept
 		{
-			return profile == ShaderTargetProfile::GGLabVulkan13
-				? MakeVulkan13CompileTarget(stage)
-				: MakeDX12CompileTarget(stage);
+			return profile == ShaderTargetProfile::GGLabVulkan13 ?
+				MakeVulkan13CompileTarget(stage) :
+				MakeDX12CompileTarget(stage);
 		}
 
 		[[nodiscard]] std::wstring MakeWriterMutexNameImpl(
@@ -303,18 +303,18 @@ namespace gglab
 					desc->m_Target = MakeTarget(targetProfile, desc->m_Stage);
 					desc->m_Target.m_Flags = ShaderCompileFlags::Optimization;
 					const ShaderResolvedRecipe recipe = compiler->Resolve(*desc);
-					const ShaderCompileResult compiled = recipe.IsSuccess()
-						? compiler->CompileOrLoad(recipe)
-						: ShaderCompileResult{
+					const ShaderCompileResult compiled = recipe.IsSuccess() ?
+						compiler->CompileOrLoad(recipe) :
+						ShaderCompileResult{
 							.m_Status = recipe.m_Diagnostics.m_Status,
 							.m_Diagnostics = recipe.m_Diagnostics,
 						};
 					if (!compiled.IsSuccess())
 					{
 						return {
-							.m_Status = compiled.m_Status == ShaderCompileStatus::CompilerUnavailable
-								? GGLabRuntimeShaderBuildStatus::CompilerUnavailable
-								: GGLabRuntimeShaderBuildStatus::CompileFailed,
+							.m_Status = compiled.m_Status == ShaderCompileStatus::CompilerUnavailable ?
+								GGLabRuntimeShaderBuildStatus::CompilerUnavailable :
+								GGLabRuntimeShaderBuildStatus::CompileFailed,
 							.m_Error = std::format("Failed to build {}::{}: {}",
 								program.m_ProgramId,
 								program.m_VariantId,
@@ -337,7 +337,7 @@ namespace gglab
 						.m_ProgramRef = program,
 						.m_TargetProfile = targetProfile,
 						.m_ArtifactRef = published.m_ArtifactRef,
-					});
+						});
 				}
 			}
 

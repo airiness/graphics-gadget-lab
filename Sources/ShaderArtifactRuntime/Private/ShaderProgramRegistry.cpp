@@ -66,9 +66,9 @@ namespace gglab
 		{
 			std::shared_lock lock(m_Mutex);
 			const auto iterator = m_Mappings.find(programRef);
-			return iterator != m_Mappings.end()
-				? std::optional<ShaderArtifactRef>(iterator->second)
-				: std::nullopt;
+			return iterator != m_Mappings.end() ?
+				std::optional<ShaderArtifactRef>(iterator->second) :
+				std::nullopt;
 		}
 		catch (...)
 		{

@@ -851,9 +851,9 @@ namespace gglab
 		// manifest digest is compared against the SHA-256 of those exact
 		// in-memory bytes, and those same bytes are returned. Validation and
 		// return content can never diverge.
-		const testing::BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr)
-			? g_BinaryReadOnceOverride
-			: &testing::ReadBinaryWithDigestOnce;
+		const testing::BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr) ?
+			g_BinaryReadOnceOverride :
+			&testing::ReadBinaryWithDigestOnce;
 		const std::optional<testing::BinaryReadWithDigest> loaded = readOnce(binaryPath);
 		if (!loaded.has_value() ||
 			loaded->m_Digest != record->m_Manifest.m_BinaryContentDigest.m_Digest)
@@ -958,9 +958,9 @@ namespace gglab
 			}
 
 			result.m_CommittedRecord = observed;
-			result.m_Outcome = (observed.m_Manifest == record.m_Manifest)
-				? ShaderPublicationOutcome::Published
-				: ShaderPublicationOutcome::CommittedByOther;
+			result.m_Outcome = (observed.m_Manifest == record.m_Manifest) ?
+				ShaderPublicationOutcome::Published :
+				ShaderPublicationOutcome::CommittedByOther;
 			return result;
 		}
 		catch (...)

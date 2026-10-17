@@ -266,8 +266,9 @@ namespace gglab
 
 	void DemoPlayground::CommitScene() noexcept
 	{
-		m_World.m_Atmosphere = m_Content == PlaygroundContent::CoastalAtrium
-			? std::optional<AtmosphereSettings>(AtmosphereSettings{}) : std::nullopt;
+		m_World.m_Atmosphere = m_Content == PlaygroundContent::CoastalAtrium ?
+			std::optional<AtmosphereSettings>(AtmosphereSettings{}) :
+			std::nullopt;
 		auto& registry = m_World.GetRegistry();
 		for (const PendingModel& pending : m_PendingModels)
 		{
@@ -292,7 +293,8 @@ namespace gglab
 			components::TransformComponent transComp{};
 			// Retreat's exported photon direction: 23 degree sun elevation, authored meters.
 			Vector3 direction = m_Content == PlaygroundContent::CoastalAtrium ?
-				Vector3(-0.6840816f, -0.3907311f, 0.6159450f) : Vector3(-0.6f, -1.6f, 0.4f);
+				Vector3(-0.6840816f, -0.3907311f, 0.6159450f) :
+				Vector3(-0.6f, -1.6f, 0.4f);
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);

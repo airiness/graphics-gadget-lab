@@ -124,8 +124,9 @@ float4 TestPackedLowFeedback() : SV_Target0
 	return UnpackTemporalAAUnitRangePair(0u).x == 0.0 &&
 		minimumWeight > 0.0 && minimumWeight < 0.016 &&
 		NearAccumulation(ComputeTemporalWeightedHistoryWeight(32.0, 1.0,
-			ResolveTemporalAAMaxHistorySamples(quarterFeedback), 1.0), quarterFeedback)
-		? 0.0.xxxx : 1.0.xxxx;
+			ResolveTemporalAAMaxHistorySamples(quarterFeedback), 1.0), quarterFeedback) ?
+			0.0.xxxx :
+			1.0.xxxx;
 }
 
 float4 TestDefaultFeedbackCompatibility() : SV_Target0

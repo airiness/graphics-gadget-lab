@@ -459,41 +459,41 @@ namespace gglab
 					.m_VarianceClipGamma = temporalAASettings.m_VarianceClipGamma,
 					.m_ViewIndexAndHistoryValid = viewIndex |
 						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u) |
-						(historyColorPreviewRequested
-							? TemporalAAHistoryColorPreviewBit
-							: 0u) |
-						(historySamplesPreviewRequested
-							? TemporalAAHistorySamplesPreviewBit
-							: 0u) |
-						(clipDistancePreviewRequested
-							? TemporalAAClipDistancePreviewBit
-							: 0u) |
-						(historyRelaxationPreviewRequested
-							? TemporalAAHistoryRelaxationPreviewBit
-							: 0u) |
+						(historyColorPreviewRequested ?
+							TemporalAAHistoryColorPreviewBit :
+							0u) |
+						(historySamplesPreviewRequested ?
+							TemporalAAHistorySamplesPreviewBit :
+							0u) |
+						(clipDistancePreviewRequested ?
+							TemporalAAClipDistancePreviewBit :
+							0u) |
+						(historyRelaxationPreviewRequested ?
+							TemporalAAHistoryRelaxationPreviewBit :
+							0u) |
 						(temporalAASettings.m_HistoryFilter ==
-							TemporalAAHistoryFilter::CatmullRomClamped
-							? TemporalAAHistoryCatmullRomBit
-							: 0u) |
-						(temporalAASettings.m_CurrentFilter == TemporalAACurrentFilter::Gaussian
-							? TemporalAACurrentGaussianBit
-							: 0u) |
+							TemporalAAHistoryFilter::CatmullRomClamped ?
+								TemporalAAHistoryCatmullRomBit :
+								0u) |
+						(temporalAASettings.m_CurrentFilter == TemporalAACurrentFilter::Gaussian ?
+							TemporalAACurrentGaussianBit :
+							0u) |
 						(temporalAASettings.m_MotionSelection ==
-							TemporalAAMotionSelection::ClosestDepth
-							? TemporalAAClosestDepthMotionBit
-							: 0u) |
+							TemporalAAMotionSelection::ClosestDepth ?
+								TemporalAAClosestDepthMotionBit :
+								0u) |
 						(resolveDisplayDepth ? TemporalAADisplayDepthBit : 0u) |
 						(temporalAASettings.m_HistoryRectification !=
-							TemporalAAHistoryRectification::MinMaxClamp
-							? TemporalAAVarianceClipBit
-							: 0u) |
+							TemporalAAHistoryRectification::MinMaxClamp ?
+								TemporalAAVarianceClipBit :
+								0u) |
 						(temporalAASettings.m_HistoryRectification ==
-							TemporalAAHistoryRectification::BoundedVarianceClip
-							? TemporalAAVarianceClipBoundedBit
-							: 0u) |
-						(historyAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples
-							? TemporalAAEffectiveSamplesBit
-							: 0u),
+							TemporalAAHistoryRectification::BoundedVarianceClip ?
+								TemporalAAVarianceClipBoundedBit :
+								0u) |
+						(historyAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples ?
+							TemporalAAEffectiveSamplesBit :
+							0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),

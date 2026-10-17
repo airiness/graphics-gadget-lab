@@ -41,9 +41,9 @@ int main(int argc, char* argv[])
 	gglab::InitializeLogging();
 	if (launchResult.m_Options.m_RunSelfTests)
 	{
-		return gglab::RunVulkanQualificationSelfTestSuites()
-			? EXIT_SUCCESS
-			: EXIT_FAILURE;
+		return gglab::RunVulkanQualificationSelfTestSuites() ?
+			EXIT_SUCCESS :
+			EXIT_FAILURE;
 	}
 
 #if GGLAB_ENABLE_VULKAN

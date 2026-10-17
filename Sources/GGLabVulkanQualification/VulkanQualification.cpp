@@ -1246,9 +1246,9 @@ namespace gglab
 			const bool publicationWithheld = privateDescriptor.IsValid() &&
 				!publishedDescriptor.IsValid();
 			VulkanTimelineFence* transferTimeline = device.GetTransferTimeline();
-			const VkResult transferWaitResult = transferTimeline
-				? transferTimeline->Wait(transferTimeline->GetCurrentSignalValue())
-				: VK_ERROR_INITIALIZATION_FAILED;
+			const VkResult transferWaitResult = transferTimeline ?
+				transferTimeline->Wait(transferTimeline->GetCurrentSignalValue()) :
+				VK_ERROR_INITIALIZATION_FAILED;
 			if (transferWaitResult != VK_SUCCESS)
 			{
 				uploadControl->ClearGpuCompletionHold();
@@ -2233,9 +2233,9 @@ namespace gglab
 				uint32_t textureIndex = UINT32_MAX, float depthOverride = 0.0f)
 				{
 					return CoordinateConformanceParameters{
-						.m_TextureIndex = textureIndex == UINT32_MAX
-							? markerDescriptor.m_Index
-							: textureIndex,
+						.m_TextureIndex = textureIndex == UINT32_MAX ?
+							markerDescriptor.m_Index :
+							textureIndex,
 						.m_SamplerIndex = samplerDescriptor.m_Index,
 						.m_Mode = mode,
 						.m_Depth = depth,

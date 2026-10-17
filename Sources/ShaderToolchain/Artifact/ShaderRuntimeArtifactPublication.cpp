@@ -157,9 +157,9 @@ namespace gglab
 			{
 				return result;
 			}
-			result.m_Status = transaction.m_PrimaryCommitted && transaction.m_MarkerCommitted
-				? ShaderRuntimeArtifactPublicationStatus::Published
-				: ShaderRuntimeArtifactPublicationStatus::AlreadyPresent;
+			result.m_Status = transaction.m_PrimaryCommitted && transaction.m_MarkerCommitted ?
+				ShaderRuntimeArtifactPublicationStatus::Published :
+				ShaderRuntimeArtifactPublicationStatus::AlreadyPresent;
 			return result;
 		}
 		catch (...)
@@ -244,9 +244,9 @@ namespace gglab
 			{
 				return result;
 			}
-			result.m_Status = transaction.m_PrimaryCommitted
-				? ShaderProgramRegistryArtifactPublicationStatus::Published
-				: ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
+			result.m_Status = transaction.m_PrimaryCommitted ?
+				ShaderProgramRegistryArtifactPublicationStatus::Published :
+				ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
 			return result;
 		}
 		catch (...)

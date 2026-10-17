@@ -632,9 +632,9 @@ namespace gglab
 		if (!binary.IsValid() ||
 			!IsShaderBinaryFormat(binary, recipe.m_Request.m_Target.m_BinaryFormat))
 		{
-			result.m_Status = compileDiagnostics.m_Status == ShaderCompileStatus::Success
-				? ShaderCompileStatus::CompileFailed
-				: compileDiagnostics.m_Status;
+			result.m_Status = compileDiagnostics.m_Status == ShaderCompileStatus::Success ?
+				ShaderCompileStatus::CompileFailed :
+				compileDiagnostics.m_Status;
 			result.m_Diagnostics = compileDiagnostics;
 			if (result.m_Diagnostics.m_Message.empty())
 			{
@@ -848,9 +848,9 @@ namespace gglab
 			recipe.m_Request.m_Stage, recipe.m_Request.m_Target.m_Model);
 		for (const ShaderDefine& define : recipe.m_Request.m_Defines)
 		{
-			manifest.m_Defines.push_back(define.m_Value.empty()
-				? define.m_Name
-				: define.m_Name + L"=" + define.m_Value);
+			manifest.m_Defines.push_back(define.m_Value.empty() ?
+				define.m_Name :
+				define.m_Name + L"=" + define.m_Value);
 		}
 		manifest.m_LogicalIncludeDirs = recipe.m_LogicalIncludeDirs;
 		manifest.m_ExtraArgs = recipe.m_Request.m_ExtraArgs;

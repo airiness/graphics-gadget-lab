@@ -25,20 +25,16 @@ namespace gglab
 
 	void ConsoleSelfTestReporter::OnSuiteStarted(std::string_view suiteName) noexcept
 	{
-		std::printf("Running headless %.*s self-tests...\n", static_cast<int>(suiteName.size()),
-			suiteName.data());
+		std::printf("Running headless %.*s self-tests...\n", static_cast<int>(suiteName.size()), suiteName.data());
 	}
 
-	void ConsoleSelfTestReporter::OnCheckCompleted(
-		std::string_view checkName, bool succeeded) noexcept
+	void ConsoleSelfTestReporter::OnCheckCompleted(std::string_view checkName, bool succeeded) noexcept
 	{
 		FILE* output = succeeded ? stdout : stderr;
-		std::fprintf(output, "[%s] %.*s\n", succeeded ? "PASS" : "FAIL",
-			static_cast<int>(checkName.size()), checkName.data());
+		std::fprintf(output, "[%s] %.*s\n", succeeded ? "PASS" : "FAIL", static_cast<int>(checkName.size()), checkName.data());
 	}
 
-	void ConsoleSelfTestReporter::OnSuiteFinished(
-		std::string_view suiteName, const SelfTestSummary& summary) noexcept
+	void ConsoleSelfTestReporter::OnSuiteFinished(std::string_view suiteName, const SelfTestSummary& summary) noexcept
 	{
 		FILE* output = summary.Succeeded() ? stdout : stderr;
 		if (summary.Succeeded())
