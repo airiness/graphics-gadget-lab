@@ -27,6 +27,8 @@ namespace gglab
 		{
 			GGLAB_ASSERT_MSG(!page.m_Leased,
 				"Constant upload batches must be submitted or cancelled before pool destruction.");
+			// Every write was published when its batch was; ending the mapping writes nothing.
+			m_Device->UnmapBuffer(page.m_Buffer, {});
 			m_Device->DestroyBuffer(page.m_Buffer);
 		}
 	}
@@ -69,6 +71,7 @@ namespace gglab
 		}
 		if (m_Pages.size() >= m_Config.m_MaxPoolPages || m_Config.m_PageSizeInBytes == 0)
 		{
+			GGLAB_LOG_GRAPHICS_ERROR("Constant upload page allocation exhausted its budget.");
 			return InvalidPage;
 		}
 		const uint64_t capacity = std::max<uint64_t>(minimumSize, m_Config.m_PageSizeInBytes);
@@ -84,9 +87,18 @@ namespace gglab
 			});
 		if (!buffer.IsValid())
 		{
+			GGLAB_LOG_GRAPHICS_ERROR("Constant upload page creation failed.");
 			return InvalidPage;
 		}
-		m_Pages.push_back({ buffer, capacity, {}, true });
+		// Pages are mapped once and stay mapped; each batch publishes its leases by flushing.
+		auto* mapped = static_cast<std::byte*>(m_Device->MapBuffer(buffer, {}));
+		if (!mapped)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Constant upload page mapping failed.");
+			m_Device->DestroyBuffer(buffer);
+			return InvalidPage;
+		}
+		m_Pages.push_back({ buffer, mapped, capacity, {}, true });
 		return m_Pages.size() - 1;
 	}
 
@@ -116,33 +128,28 @@ namespace gglab
 		if (m_Leases.empty() || m_Leases.back().m_CursorInBytes + reservedSize >
 			m_Pool->m_Pages[m_Leases.back().m_PageIndex].m_CapacityInBytes)
 		{
-			const size_t index = m_Leases.size() < m_Pool->m_Config.m_MaxPagesPerBatch ?
-				m_Pool->AcquirePage(reservedSize) :
-				InvalidPage;
-			if (index == InvalidPage)
+			if (m_Leases.size() >= m_Pool->m_Config.m_MaxPagesPerBatch)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR("Constant upload page allocation exhausted its budget.");
 				Fail();
 				return {};
 			}
-			auto& page = m_Pool->m_Pages[index];
-			auto* mapped = static_cast<std::byte*>(device.MapBuffer(page.m_Buffer, {}));
-			if (!mapped)
+			const size_t index = m_Pool->AcquirePage(reservedSize);
+			if (index == InvalidPage)
 			{
-				page.m_Leased = false;
-				GGLAB_LOG_GRAPHICS_ERROR("Constant upload page mapping failed.");
+				// AcquirePage logged the budget, creation or mapping failure.
 				Fail();
 				return {};
 			}
-			m_Leases.push_back({ index, mapped, 0 });
+			m_Leases.push_back({ index, 0 });
 		}
 		auto& lease = m_Leases.back();
+		const auto& page = m_Pool->m_Pages[lease.m_PageIndex];
 		const uint64_t offset = lease.m_CursorInBytes;
-		std::memset(lease.m_MappedData + offset, 0, reservedSize);
-		std::memcpy(lease.m_MappedData + offset, bytes.data(), bytes.size());
+		std::memset(page.m_MappedData + offset, 0, reservedSize);
+		std::memcpy(page.m_MappedData + offset, bytes.data(), bytes.size());
 		lease.m_CursorInBytes += reservedSize;
-		return { m_Pool->m_Pages[lease.m_PageIndex].m_Buffer, offset,
-			static_cast<uint32_t>(bytes.size()), m_Id };
+		return { page.m_Buffer, offset, static_cast<uint32_t>(bytes.size()), m_Id };
 	}
 
 	bool RHIConstantUploadBatch::Owns(const RHIConstantBufferBinding& binding) const noexcept
@@ -165,15 +172,14 @@ namespace gglab
 		{
 			return m_State == State::Published && !m_Failed;
 		}
-		for (auto& lease : m_Leases)
+		for (const auto& lease : m_Leases)
 		{
-			if (!m_Pool->m_Device->PublishMappedBufferWrites(m_Pool->m_Pages[lease.m_PageIndex].m_Buffer,
-				{ 0, lease.m_CursorInBytes }))
+			if (!m_Pool->m_Device->FlushMappedBufferWrites(
+				m_Pool->m_Pages[lease.m_PageIndex].m_Buffer, { 0, lease.m_CursorInBytes }))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR("Constant upload write publication failed.");
 				Fail();
 			}
-			lease.m_MappedData = nullptr;
 		}
 		m_State = State::Published;
 		return !m_Failed;
@@ -204,14 +210,10 @@ namespace gglab
 		{
 			return;
 		}
-		for (auto& lease : m_Leases)
+		// The discarded writes need no publication; the pages stay mapped for reuse.
+		for (const auto& lease : m_Leases)
 		{
-			auto& page = m_Pool->m_Pages[lease.m_PageIndex];
-			if (lease.m_MappedData)
-			{
-				m_Pool->m_Device->UnmapBuffer(page.m_Buffer, {});
-			}
-			page.m_Leased = false;
+			m_Pool->m_Pages[lease.m_PageIndex].m_Leased = false;
 		}
 		m_State = State::Cancelled;
 	}

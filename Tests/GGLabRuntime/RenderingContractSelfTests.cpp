@@ -406,6 +406,7 @@ namespace gglab
 			std::vector<std::vector<std::byte>> m_PassConstantStorage;
 			uint32_t m_PassConstantMapCount = 0;
 			uint32_t m_PassConstantPublishCount = 0;
+			uint32_t m_PassConstantUnmapCount = 0;
 			bool m_AtmosphereBuffersEnabled = false;
 			uint32_t m_AtmosphereBufferCount = 0;
 			uint32_t m_AtmosphereDestroyedBufferCount = 0;
@@ -504,21 +505,25 @@ namespace gglab
 				}
 				return m_AtmosphereBuffersEnabled ? m_AtmosphereUpload.data() : nullptr;
 			}
-			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange range) noexcept override
+			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
 			{
-				if (m_PassConstantsEnabled && range.m_End > range.m_Begin)
+				if (m_PassConstantsEnabled)
 				{
-					++m_PassConstantPublishCount;
+					++m_PassConstantUnmapCount;
 				}
 			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override
 			{
 				return m_PassConstantsEnabled ? 256 : 1;
 			}
-			bool PublishMappedBufferWrites(RHIBufferHandle buffer, RHIMappedBufferRange range) noexcept override
+			bool FlushMappedBufferWrites(RHIBufferHandle buffer, RHIMappedBufferRange range) noexcept override
 			{
-				UnmapBuffer(buffer, range);
-				return !m_ConstantPublishFails;
+				if (m_PassConstantsEnabled && buffer.IsValid() && range.m_End > range.m_Begin)
+				{
+					++m_PassConstantPublishCount;
+				}
+				// Host memory is coherent here; the flag injects a native publication failure.
+				return buffer.IsValid() && !m_ConstantPublishFails;
 			}
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{
@@ -1739,6 +1744,8 @@ namespace gglab
 				graphics.m_LastInlineWords == std::vector<uint32_t>({ 17, 3 }) && graphics.m_LastInlineOffset == 1 &&
 				compute.m_LastInlineWords == std::vector<uint32_t>({ 23, 5 }) && compute.m_LastInlineOffset == 2,
 				"Submission publishes all pages once while inline partial updates retain word offsets");
+			context.Check(device.m_PassConstantMapCount == 2 && device.m_PassConstantUnmapCount == 0,
+				"Pages are mapped once at creation and publication flushes without ending the mapping");
 			const RHIFencePoint submittedFence{ RHIFenceHandle{ 1, 1 }, 5 };
 			const auto presentFailed = RHIFrameEndResult::Fatal(submittedFence);
 			context.Check(batch->Submitted(presentFailed.GetSubmittedFence()),
@@ -1767,6 +1774,8 @@ namespace gglab
 			context.Check(afterCancel.m_Buffer == later.m_Buffer &&
 				afterCancel.m_UploadBatchId != later.m_UploadBatchId,
 				"Cancellation immediately recovers discarded storage with a new batch identity");
+			context.Check(device.m_PassConstantMapCount == 3 && device.m_PassConstantUnmapCount == 0,
+				"Cancellation keeps pages mapped and a reused page is not mapped again");
 			graphics.EndConstantRecording();
 			reuse->Cancel();
 			device.m_CompletedFenceValue = 5;
@@ -1774,17 +1783,24 @@ namespace gglab
 			context.Check(uploads.GetPendingPageCount() == 0,
 				"Submitted pages become reusable only after GPU completion");
 
-			RHIConstantUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
-			auto exhausted = limited.BeginBatch();
-			graphics.BeginConstantRecording(exhausted.get());
-			compute.BeginConstantRecording(exhausted.get());
-			context.Check(graphics.SetConstantBufferData(passIndex, payload) &&
-				!compute.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError() &&
-				compute.HasRecordingError() && !exhausted->PublishWrites(),
-				"Page exhaustion poisons every encoder sharing the submission batch");
-			graphics.EndConstantRecording();
-			compute.EndConstantRecording();
-			exhausted->Cancel();
+			const uint32_t unmapsBeforeLimitedPool = device.m_PassConstantUnmapCount;
+			{
+				RHIConstantUploadPool limited(device, { .m_PageSizeInBytes = 256, .m_MaxPagesPerBatch = 1 });
+				auto exhausted = limited.BeginBatch();
+				graphics.BeginConstantRecording(exhausted.get());
+				compute.BeginConstantRecording(exhausted.get());
+				context.Check(graphics.SetConstantBufferData(passIndex, payload) &&
+					!compute.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError() &&
+					compute.HasRecordingError() && !exhausted->PublishWrites(),
+					"Page exhaustion poisons every encoder sharing the submission batch");
+				graphics.EndConstantRecording();
+				compute.EndConstantRecording();
+				exhausted->Cancel();
+				context.Check(device.m_PassConstantUnmapCount == unmapsBeforeLimitedPool,
+					"A failed publication and its cancellation leave the page mapped");
+			}
+			context.Check(device.m_PassConstantUnmapCount == unmapsBeforeLimitedPool + 1,
+				"Pool destruction ends each page mapping exactly once");
 
 			for (uint32_t failure = 0; failure < 2; ++failure)
 			{

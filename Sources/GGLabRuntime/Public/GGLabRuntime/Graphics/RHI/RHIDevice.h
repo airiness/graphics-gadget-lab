@@ -64,18 +64,18 @@ namespace gglab
 			RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept = 0;
 		virtual std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept = 0;
 		virtual std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept = 0;
+		// A CpuToGpu pointer stays valid until UnmapBuffer or buffer destruction. The caller
+		// must not rewrite a range that an unfinished submission reads.
 		virtual void* MapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept = 0;
+		// Ends a mapping. For CpuToGpu buffers it also publishes the written range.
 		virtual void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
-		// Ends this CPU write scope and publishes the range before queue submission.
-		// The pointer must no longer be used. Persistent mapping is a backend detail.
-		virtual bool PublishMappedBufferWrites(
-			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
-		{
-			UnmapBuffer(buffer, writtenRange);
-			return IsAlive(buffer);
-		}
+		// Makes host writes in the range of a mapped CpuToGpu buffer available to GPU work
+		// submitted afterwards; the mapping stays valid. On failure, work that reads the
+		// range must not be submitted. Every device states this behavior explicitly.
+		[[nodiscard]] virtual bool FlushMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
 		virtual uint32_t GetMaxConstantBufferRange() const noexcept { return 64 * 1024; }
 

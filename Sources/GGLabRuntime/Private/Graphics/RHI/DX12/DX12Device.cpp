@@ -370,6 +370,27 @@ namespace gglab
 		}
 	}
 
+	bool DX12Device::FlushMappedBufferWrites(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		const auto* nativeBuffer = ResolveBuffer(buffer);
+		if (!nativeBuffer)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::FlushMappedBufferWrites received a non-live buffer handle.");
+			return false;
+		}
+		if (writtenRange.m_Begin > writtenRange.m_End ||
+			writtenRange.m_End > nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12Device::FlushMappedBufferWrites received an invalid range.");
+			return false;
+		}
+		// Upload-heap writes need no explicit flush, the mapping may stay persistent, and
+		// queue submission orders preceding CPU writes before the GPU reads them.
+		return true;
+	}
+
 	uint32_t DX12Device::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
 		return viewType == RHIBufferViewType::ConstantBuffer ?

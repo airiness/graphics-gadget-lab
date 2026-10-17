@@ -70,6 +70,8 @@ namespace gglab::asset_test
 		std::string_view GetBufferDebugName(RHIBufferHandle) const noexcept override { return {}; }
 		void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override { return nullptr; }
 		void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
+		// This device never maps buffers, so there is never a write to publish.
+		bool FlushMappedBufferWrites(RHIBufferHandle, RHIMappedBufferRange) noexcept override { return false; }
 		uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
 		bool IsAlive(RHITextureHandle texture) const noexcept override { return m_LiveTextures.contains(texture); }
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override { return m_LiveBuffers.contains(buffer); }

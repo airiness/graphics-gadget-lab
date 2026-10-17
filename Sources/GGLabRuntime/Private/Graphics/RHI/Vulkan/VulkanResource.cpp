@@ -173,7 +173,7 @@ namespace gglab
 		return nullptr;
 	}
 
-	bool VulkanBuffer::Unmap(RHIMappedBufferRange writtenRange) noexcept
+	bool VulkanBuffer::Flush(RHIMappedBufferRange writtenRange) noexcept
 	{
 		if (m_MappedData == nullptr)
 		{
@@ -187,9 +187,8 @@ namespace gglab
 			return false;
 		}
 
-		// Upload buffers flush the written range so the GPU sees the host
-		// writes. Persistent mappings never carry an unmap obligation;
-		// their teardown belongs to vmaDestroyBuffer.
+		// Host-visible memory need not be coherent. VMA aligns the range to
+		// nonCoherentAtomSize and skips coherent memory types.
 		if (m_MemoryUsage == RHIMemoryUsage::CpuToGpu &&
 			writtenRange.m_End > writtenRange.m_Begin)
 		{
@@ -202,6 +201,13 @@ namespace gglab
 			}
 		}
 		return true;
+	}
+
+	bool VulkanBuffer::Unmap(RHIMappedBufferRange writtenRange) noexcept
+	{
+		// Persistent mappings never carry an unmap obligation; their teardown
+		// belongs to vmaDestroyBuffer. Unmapping only publishes the written range.
+		return Flush(writtenRange);
 	}
 
 	void VulkanTexture::Create(const CreateInfo& createInfo) noexcept

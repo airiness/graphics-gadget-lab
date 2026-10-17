@@ -707,6 +707,22 @@ namespace gglab
 		return nativeBuffer->Unmap(writtenRange);
 	}
 
+	bool VulkanResourceManager::FlushBuffer(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		if (!CheckOwnerThread("VulkanResourceManager::FlushBuffer"))
+		{
+			return false;
+		}
+		VulkanBuffer* nativeBuffer = ResolveBuffer(buffer);
+		if (nativeBuffer == nullptr)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("VulkanResourceManager::FlushBuffer received a non-live handle.");
+			return false;
+		}
+		return nativeBuffer->Flush(writtenRange);
+	}
+
 	VulkanTexture* VulkanResourceManager::ResolveTexture(RHITextureHandle texture) noexcept
 	{
 		if (!CheckOwnerThread("VulkanResourceManager::ResolveTexture"))

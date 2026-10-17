@@ -244,6 +244,11 @@ namespace gglab
 				return nullptr;
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
+			bool FlushMappedBufferWrites(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			{
+				// This device never maps buffers, so there is never a write to publish.
+				return false;
+			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{

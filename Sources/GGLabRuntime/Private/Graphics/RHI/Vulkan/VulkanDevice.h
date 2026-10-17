@@ -228,7 +228,7 @@ namespace gglab
 		{
 			return GetPhysicalDeviceLimits().maxUniformBufferRange;
 		}
-		bool PublishMappedBufferWrites(
+		bool FlushMappedBufferWrites(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;

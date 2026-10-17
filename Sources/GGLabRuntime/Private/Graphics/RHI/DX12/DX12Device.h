@@ -105,6 +105,8 @@ namespace gglab
 		void* MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept override;
 		void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
+		bool FlushMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;

@@ -120,6 +120,11 @@ namespace gglab
 			{
 				--m_MapCount;
 			}
+			bool FlushMappedBufferWrites(RHIBufferHandle buffer, RHIMappedBufferRange) noexcept override
+			{
+				// Host-backed storage is coherent; only live buffers can be published.
+				return m_Buffers.contains(buffer);
+			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
 			bool IsAlive(RHITextureHandle texture) const noexcept override { return texture.IsValid(); }
 			bool IsAlive(RHIBufferHandle buffer) const noexcept override

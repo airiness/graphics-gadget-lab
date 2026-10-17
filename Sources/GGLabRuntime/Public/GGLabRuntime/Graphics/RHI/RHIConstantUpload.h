@@ -35,8 +35,9 @@ namespace gglab
 		uint32_t m_MaxPoolPages = 1024;
 	};
 
-	// Owner-thread component shared by backend implementations. Pages are never
-	// reused until every command consuming the batch has completed.
+	// Owner-thread component shared by backend implementations. Pages stay mapped for
+	// their lifetime and are never reused until every command consuming the batch has
+	// completed.
 	class RHIConstantUploadPool
 	{
 	public:
@@ -55,6 +56,7 @@ namespace gglab
 		struct Page
 		{
 			RHIBufferHandle m_Buffer{};
+			std::byte* m_MappedData = nullptr;
 			uint64_t m_CapacityInBytes = 0;
 			RHIFencePoint m_Fence{};
 			bool m_Leased = false;
@@ -73,7 +75,7 @@ namespace gglab
 		~RHIConstantUploadBatch() noexcept;
 
 		[[nodiscard]] RHIConstantBufferBinding Upload(std::span<const std::byte> bytes) noexcept;
-		// Freezes allocation and publishes all mapped writes before queue submission.
+		// Freezes allocation and flushes all leased writes before queue submission.
 		[[nodiscard]] bool PublishWrites() noexcept;
 		// The fence must cover all consumers, including any joined compute work.
 		[[nodiscard]] bool Submitted(const RHIFencePoint& fence) noexcept;
@@ -98,7 +100,6 @@ namespace gglab
 		struct PageLease
 		{
 			size_t m_PageIndex = 0;
-			std::byte* m_MappedData = nullptr;
 			uint64_t m_CursorInBytes = 0;
 		};
 
