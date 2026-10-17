@@ -48,7 +48,7 @@ namespace gglab
 			Camera::ClampManualEV100(path.m_ManualEV100) != path.m_ManualEV100 ||
 			!math::IsFinite(path.m_ExposureCompensationEV) ||
 			Camera::ClampExposureCompensationEV(path.m_ExposureCompensationEV) !=
-				path.m_ExposureCompensationEV)
+			path.m_ExposureCompensationEV)
 		{
 			return false;
 		}

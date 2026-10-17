@@ -97,13 +97,13 @@ namespace gglab
 				sourceTextureHandle = sourceResource->m_Texture;
 				sourceTextureDesc = sourceResource->m_Desc;
 				sourceTextureIndex = sourceResource->m_SrvIndex;
-				sourceMode = source.m_Type == EnvironmentTextureSourceType::Cubemap
-					? EnvironmentSourceMode::Cubemap
-					: EnvironmentSourceMode::Equirectangular;
+				sourceMode = source.m_Type == EnvironmentTextureSourceType::Cubemap ?
+					EnvironmentSourceMode::Cubemap :
+					EnvironmentSourceMode::Equirectangular;
 				sourceSamplerIndex = services.m_Samplers->GetSamplerIndex(
-					sourceMode == EnvironmentSourceMode::Cubemap
-					? SamplerPreset::LinearClamp
-					: SamplerPreset::LinearWrapUClampV);
+					sourceMode == EnvironmentSourceMode::Cubemap ?
+						SamplerPreset::LinearClamp :
+						SamplerPreset::LinearWrapUClampV);
 				hasSource = true;
 			}
 		}
@@ -115,9 +115,8 @@ namespace gglab
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[renderResRegistry, sourceTextureHandle, sourceTextureDesc, sourceTextureIndex,
-			sourceSamplerIndex, sourceMode,
-			hasSource](RenderGraph::RGBuilder& builder, PassData& data)
+			[renderResRegistry, sourceTextureHandle, sourceTextureDesc, sourceTextureIndex, sourceSamplerIndex, sourceMode, hasSource]
+			(RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 				if (sourceMode == EnvironmentSourceMode::PhysicalSky)
@@ -191,8 +190,9 @@ namespace gglab
 
 					const IBLEnvironmentPassParameters passParameters{
 						.CubemapFaceIndex = face,
-						.SourceTextureIndex = data.m_SourceSrv.IsValid()
-							? executeContext.GetViewDescriptor(data.m_SourceSrv).m_Index : data.m_SourceTextureIndex,
+						.SourceTextureIndex = data.m_SourceSrv.IsValid() ?
+							executeContext.GetViewDescriptor(data.m_SourceSrv).m_Index :
+							data.m_SourceTextureIndex,
 						.SourceSamplerIndex = data.m_SourceSamplerIndex,
 						.SourceMode = data.m_SourceMode,
 						.SunDirection = bakeScheduler->GetBakingSunDirection(),

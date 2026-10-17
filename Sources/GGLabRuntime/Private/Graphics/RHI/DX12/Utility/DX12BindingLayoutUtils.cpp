@@ -68,9 +68,9 @@ namespace gglab
 
 			if (IsBindlessBindingType(slot.m_Type))
 			{
-				flags |= slot.m_Type == RHIBindingType::BindlessResourceTable
-					? D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
-					: D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
+				flags |= slot.m_Type == RHIBindingType::BindlessResourceTable ?
+					D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED :
+					D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
 				continue;
 			}
 

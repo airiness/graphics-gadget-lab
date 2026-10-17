@@ -127,9 +127,9 @@ namespace gglab
 		if (allocation.IsValid())
 		{
 			const std::string_view resolvedName =
-				!logicalName.empty()
-				? logicalName
-				: (desc.m_DebugName ? std::string_view(desc.m_DebugName) : std::string_view{});
+				!logicalName.empty() ?
+					logicalName :
+					(desc.m_DebugName ? std::string_view(desc.m_DebugName) : std::string_view{});
 			UpdateTextureDebugIdentity(allocation.m_PoolSlot, resolvedName, true, bindingMode);
 		}
 		return allocation;
@@ -156,9 +156,9 @@ namespace gglab
 		if (allocation.IsValid())
 		{
 			const std::string_view resolvedName =
-				!logicalName.empty()
-				? logicalName
-				: (desc.m_DebugName ? std::string_view(desc.m_DebugName) : std::string_view{});
+				!logicalName.empty() ?
+					logicalName :
+					(desc.m_DebugName ? std::string_view(desc.m_DebugName) : std::string_view{});
 			UpdateBufferDebugIdentity(allocation.m_PoolSlot, resolvedName, true, bindingMode);
 		}
 		return allocation;

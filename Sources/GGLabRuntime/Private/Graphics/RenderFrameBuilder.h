@@ -44,8 +44,7 @@ namespace gglab
 		{
 			RenderWorldData m_WorldData{};
 			std::vector<RenderView> m_RenderViews;
-			std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)>
-				m_ViewRenderSettings{};
+			std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)> m_ViewRenderSettings{};
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			RenderScene m_RenderScene{};

@@ -10,11 +10,12 @@ namespace gglab
 	ResolvedExposureSettings ResolveManualExposureSettings(
 		float manualEV100, float compensationEV, bool enablePreExposure) noexcept
 	{
-		const float manual = std::isfinite(manualEV100)
-			? Camera::ClampManualEV100(manualEV100)
-			: 0.0f;
-		const float compensation = std::isfinite(compensationEV)
-			? Camera::ClampExposureCompensationEV(compensationEV) : 0.0f;
+		const float manual = std::isfinite(manualEV100) ?
+			Camera::ClampManualEV100(manualEV100) :
+			0.0f;
+		const float compensation = std::isfinite(compensationEV) ?
+			Camera::ClampExposureCompensationEV(compensationEV) :
+			0.0f;
 		const float effective = manual - compensation;
 		const float scale = 1.0f /
 			(ManualExposureSaturationNormalization * std::exp2(effective));

@@ -30,8 +30,7 @@ namespace gglab
 			};
 		}
 
-		[[nodiscard]] NapaVoxelFireParameters MakeFireParameters(
-			double radius, double strength, std::uint8_t damagePerHit) noexcept
+		[[nodiscard]] NapaVoxelFireParameters MakeFireParameters(double radius, double strength, std::uint8_t damagePerHit) noexcept
 		{
 			return {
 				.m_Radius = radius,
@@ -43,8 +42,7 @@ namespace gglab
 			};
 		}
 
-		[[nodiscard]] napa::voxel::SphereEditRequest MakeCommandEdit(
-			NapaVoxelFireParameters parameters) noexcept
+		[[nodiscard]] napa::voxel::SphereEditRequest MakeCommandEdit(NapaVoxelFireParameters parameters) noexcept
 		{
 			return {
 				.m_Brush = {
@@ -69,12 +67,12 @@ namespace gglab
 				record.m_Mesh.m_Vertices.push_back({
 					.m_Position = position,
 					.m_Normal = { 0.0f, 0.0f, 1.0f },
-					});
+				});
 			}
 			record.m_Mesh.m_Sections.push_back({
 				.m_Material = material,
 				.m_Indices = { 0, 1, 2 },
-				});
+			});
 			return record;
 		}
 
@@ -86,17 +84,16 @@ namespace gglab
 				Float3{ 8.0f, 0.0f, 1.0f },
 				Float3{ 8.0f, 1.0f, 1.0f },
 				Float3{ 7.0f, 0.0f, 1.0f },
-				}));
+			}));
 			records.push_back(MakeRaycastRecord({}, VoxelMaterial::Soil, {
 				Float3{ 0.0f, 0.0f, 1.0f },
 				Float3{ 1.0f, 0.0f, 1.0f },
 				Float3{ 0.0f, 1.0f, 1.0f },
-				}));
+			}));
 			return records;
 		}
 
-		[[nodiscard]] bool CreateVisibleRaycastFixture(
-			napa::voxel::VisibleMeshSet& visible)
+		[[nodiscard]] bool CreateVisibleRaycastFixture(napa::voxel::VisibleMeshSet& visible)
 		{
 			using namespace napa::voxel;
 			VoxelWorldConfig config = MakeRaycastConfig();
@@ -118,8 +115,7 @@ namespace gglab
 			std::unique_ptr<PendingCpuMeshBatch> pending;
 			std::unique_ptr<PreparedCpuMeshPublication> publication;
 			const std::array chunks{ ChunkCoord{} };
-			if (GeneratePrimitiveVoxelWorld(config, std::span{ &primitive, 1 },
-				world, generation).Failed() || !world ||
+			if (GeneratePrimitiveVoxelWorld(config, std::span{ &primitive, 1 }, world, generation).Failed() || !world ||
 				BuildCpuMeshBatch(*world, world->GetWorldVoxelRevision(), chunks, batch).Failed() ||
 				ValidateCpuMeshBatch(batch, visible, pending).Failed() || !pending ||
 				PrepareCpuMeshBatchPublication(pending, visible, publication).Failed() ||
@@ -144,10 +140,8 @@ namespace gglab
 			};
 			NapaVoxelRaycastHit forwardHit{};
 			NapaVoxelRaycastHit reverseHit{};
-			const NapaVoxelRaycastResult forward =
-				RaycastNapaVoxelMeshRecords(config, records, edgeRay, forwardHit);
-			const NapaVoxelRaycastResult reverse =
-				RaycastNapaVoxelMeshRecords(config, reversed, edgeRay, reverseHit);
+			const NapaVoxelRaycastResult forward = RaycastNapaVoxelMeshRecords(config, records, edgeRay, forwardHit);
+			const NapaVoxelRaycastResult reverse = RaycastNapaVoxelMeshRecords(config, reversed, edgeRay, reverseHit);
 			context.Check(forward.Succeeded() && forward.m_Hit && reverse.Succeeded() &&
 				reverse.m_Hit && forwardHit == reverseHit &&
 				forwardHit.m_Chunk == ChunkCoord{ -1, 0, 0 } &&
@@ -160,23 +154,14 @@ namespace gglab
 				.m_Direction = { 0.0, 0.0, 1.0 },
 			};
 			NapaVoxelRaycastHit vertexHit{};
-			context.Check(RaycastNapaVoxelMeshRecords(
-				config, records, vertexRay, vertexHit).m_Hit &&
+			context.Check(RaycastNapaVoxelMeshRecords(config, records, vertexRay, vertexHit).m_Hit &&
 				vertexHit.m_Chunk == ChunkCoord{ -1, 0, 0 } &&
 				vertexHit.m_WorldPosition == Double3{ 0.0, 0.0, 1.0 },
 				"Visible mesh Raycast resolves a shared vertex with the same total order");
 
 			std::vector<ChunkMeshRecord> overlappingRecords{
-				MakeRaycastRecord({}, VoxelMaterial::Stone, {
-					Float3{ 0.0f, 0.0f, 1.0f },
-					Float3{ 1.0f, 0.0f, 1.0f },
-					Float3{ 0.0f, 1.0f, 1.0f },
-					}),
-				MakeRaycastRecord({}, VoxelMaterial::Soil, {
-					Float3{ 0.0f, 0.0f, 1.0f },
-					Float3{ 1.0f, 0.0f, 1.0f },
-					Float3{ 0.0f, 1.0f, 1.0f },
-					}),
+				MakeRaycastRecord({}, VoxelMaterial::Stone,{ Float3{ 0.0f, 0.0f, 1.0f }, Float3{ 1.0f, 0.0f, 1.0f }, Float3{ 0.0f, 1.0f, 1.0f }, }),
+				MakeRaycastRecord({}, VoxelMaterial::Soil,{ Float3{ 0.0f, 0.0f, 1.0f }, Float3{ 1.0f, 0.0f, 1.0f }, Float3{ 0.0f, 1.0f, 1.0f }, }),
 			};
 			NapaVoxelRaycastHit overlappingForwardHit{};
 			NapaVoxelRaycastHit overlappingReverseHit{};
@@ -184,11 +169,9 @@ namespace gglab
 				.m_Origin = { 0.25, 0.25, 0.0 },
 				.m_Direction = { 0.0, 0.0, 1.0 },
 			};
-			const bool overlappingForward = RaycastNapaVoxelMeshRecords(
-				config, overlappingRecords, overlappingRay, overlappingForwardHit).m_Hit;
+			const bool overlappingForward = RaycastNapaVoxelMeshRecords(config, overlappingRecords, overlappingRay, overlappingForwardHit).m_Hit;
 			std::reverse(overlappingRecords.begin(), overlappingRecords.end());
-			const bool overlappingReverse = RaycastNapaVoxelMeshRecords(
-				config, overlappingRecords, overlappingRay, overlappingReverseHit).m_Hit;
+			const bool overlappingReverse = RaycastNapaVoxelMeshRecords(config, overlappingRecords, overlappingRay, overlappingReverseHit).m_Hit;
 			context.Check(overlappingForward && overlappingReverse &&
 				overlappingForwardHit == overlappingReverseHit &&
 				overlappingForwardHit.m_Material == VoxelMaterial::Soil,
@@ -208,8 +191,7 @@ namespace gglab
 				.m_Origin = { 4.0, 4.0, 0.0 },
 				.m_Direction = { 0.0, 0.0, 1.0 },
 			};
-			const NapaVoxelRaycastResult miss =
-				RaycastNapaVoxelMeshRecords(config, records, missRay, unchanged);
+			const NapaVoxelRaycastResult miss = RaycastNapaVoxelMeshRecords(config, records, missRay, unchanged);
 			context.Check(miss.Succeeded() && !miss.m_Hit && unchanged == sentinel,
 				"A visible mesh Raycast miss preserves its output");
 
@@ -218,8 +200,7 @@ namespace gglab
 				.m_Direction = {},
 			};
 			context.Check(RaycastNapaVoxelMeshRecords(
-				config, records, invalidRay, unchanged).m_Error ==
-				NapaVoxelRaycastError::InvalidRay && unchanged == sentinel,
+				config, records, invalidRay, unchanged).m_Error == NapaVoxelRaycastError::InvalidRay && unchanged == sentinel,
 				"Visible mesh Raycast rejects a zero direction without changing output");
 			const NapaVoxelRay nonFiniteRay{
 				.m_Origin = {},
@@ -228,16 +209,14 @@ namespace gglab
 				},
 			};
 			context.Check(RaycastNapaVoxelMeshRecords(
-				config, records, nonFiniteRay, unchanged).m_Error ==
-				NapaVoxelRaycastError::InvalidRay && unchanged == sentinel,
+				config, records, nonFiniteRay, unchanged).m_Error == NapaVoxelRaycastError::InvalidRay && unchanged == sentinel,
 				"Visible mesh Raycast rejects a non-finite direction atomically");
 
 			const NapaVoxelRay overflowingRay{
 				.m_Origin = { 0.0, 0.25, -1.0e30 },
 				.m_Direction = { 0.0, 0.0, 1.0 },
 			};
-			const NapaVoxelRaycastResult overflowing =
-				RaycastNapaVoxelMeshRecords(config, records, overflowingRay, unchanged);
+			const NapaVoxelRaycastResult overflowing = RaycastNapaVoxelMeshRecords(config, records, overflowingRay, unchanged);
 			context.Check(overflowing.Succeeded() && !overflowing.m_Hit && unchanged == sentinel,
 				"Raycast skips Candidates whose deterministic distance key overflows");
 
@@ -253,7 +232,7 @@ namespace gglab
 					.m_Origin = { 4.0, 4.0, 0.0 },
 					.m_Direction = { 0.0, 0.0, 2.0 },
 					}, visibleHit).m_Hit && visibleHit.m_Material == VoxelMaterial::Stone &&
-					visibleHit.m_WorldPosition.m_Z == 3.0,
+				visibleHit.m_WorldPosition.m_Z == 3.0,
 				"Raycast queries the currently published complete Visible Mesh Set");
 		}
 
@@ -276,11 +255,9 @@ namespace gglab
 				queue.EnqueueFireRay(firstRay, firstParameters) == NapaVoxelCommandQueueError::None &&
 				queue.EnqueueRestoreAll() == NapaVoxelCommandQueueError::None &&
 				queue.EnqueueFireRay(secondRay, secondParameters) == NapaVoxelCommandQueueError::None &&
-				queue.EnqueueRestoreProbeChunk({ -2, 3, -4 }) ==
-				NapaVoxelCommandQueueError::None &&
+				queue.EnqueueRestoreProbeChunk({ -2, 3, -4 }) == NapaVoxelCommandQueueError::None &&
 				queue.EnqueueMoveProbeRay(secondRay) == NapaVoxelCommandQueueError::None &&
-				queue.EnqueueScriptedBoundaryShot(boundaryEdit) ==
-				NapaVoxelCommandQueueError::None;
+				queue.EnqueueScriptedBoundaryShot(boundaryEdit) == NapaVoxelCommandQueueError::None;
 			firstRay.m_Origin = { 100.0, 100.0, 100.0 };
 			firstParameters.m_Radius = 100.0;
 
@@ -291,12 +268,9 @@ namespace gglab
 				dequeuedAll = dequeuedAll &&
 					queue.Dequeue(command) == NapaVoxelCommandQueueError::None;
 			}
-			const auto* capturedFirst =
-				std::get_if<NapaVoxelFireRayCommand>(&dequeued[0].m_Command.m_Data);
-			const auto* capturedSecond =
-				std::get_if<NapaVoxelFireRayCommand>(&dequeued[2].m_Command.m_Data);
-			const auto* capturedChunk =
-				std::get_if<NapaVoxelRestoreProbeChunkCommand>(&dequeued[3].m_Command.m_Data);
+			const auto* capturedFirst = std::get_if<NapaVoxelFireRayCommand>(&dequeued[0].m_Command.m_Data);
+			const auto* capturedSecond = std::get_if<NapaVoxelFireRayCommand>(&dequeued[2].m_Command.m_Data);
+			const auto* capturedChunk = std::get_if<NapaVoxelRestoreProbeChunkCommand>(&dequeued[3].m_Command.m_Data);
 			SphereEditRequest preparedAtVisibleHit{};
 			const bool preparedFire = capturedFirst && PrepareNapaVoxelFireEditRequest(
 				*capturedFirst, { -7.0, 8.0, 9.0 }, preparedAtVisibleHit).Succeeded();
@@ -322,8 +296,7 @@ namespace gglab
 			const SphereEditRequest requestSentinel = unchangedRequest;
 			context.Check(capturedFirst && PrepareNapaVoxelFireEditRequest(*capturedFirst, {
 				std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0,
-				}, unchangedRequest).Failed() && unchangedRequest.m_Brush.m_CenterWorld ==
-				requestSentinel.m_Brush.m_CenterWorld &&
+				}, unchangedRequest).Failed() && unchangedRequest.m_Brush.m_CenterWorld == requestSentinel.m_Brush.m_CenterWorld &&
 				unchangedRequest.m_Brush.m_Radius == requestSentinel.m_Brush.m_Radius,
 				"Fire request preparation rejects an invalid current Visible hit atomically");
 
@@ -336,8 +309,7 @@ namespace gglab
 			NapaVoxelRaycastHit noOpHit{};
 			const std::vector<ChunkMeshRecord> records = MakeEdgeTieRecords();
 			const bool noOpDequeued = noOpQueue.EnqueueFireRay(missRay, secondParameters) ==
-				NapaVoxelCommandQueueError::None && noOpQueue.Dequeue(noOpCommand) ==
-				NapaVoxelCommandQueueError::None;
+				NapaVoxelCommandQueueError::None && noOpQueue.Dequeue(noOpCommand) == NapaVoxelCommandQueueError::None;
 			const NapaVoxelRaycastResult noOpRaycast = noOpDequeued ?
 				RaycastNapaVoxelMeshRecords(MakeRaycastConfig(), records, missRay, noOpHit) :
 				NapaVoxelRaycastResult{ .m_Error = NapaVoxelRaycastError::InvalidRay };
@@ -351,10 +323,8 @@ namespace gglab
 			invalidParameters.m_Radius = 0.0;
 			SphereEditRequest invalidBoundaryEdit = boundaryEdit;
 			invalidBoundaryEdit.m_Brush.m_Radius = 0.0;
-			context.Check(validationQueue.EnqueueFireRay({}, secondParameters) ==
-				NapaVoxelCommandQueueError::InvalidRay &&
-				validationQueue.EnqueueFireRay(missRay, invalidParameters) ==
-				NapaVoxelCommandQueueError::InvalidEdit &&
+			context.Check(validationQueue.EnqueueFireRay({}, secondParameters) == NapaVoxelCommandQueueError::InvalidRay &&
+				validationQueue.EnqueueFireRay(missRay, invalidParameters) == NapaVoxelCommandQueueError::InvalidEdit &&
 				validationQueue.EnqueueScriptedBoundaryShot(invalidBoundaryEdit) ==
 				NapaVoxelCommandQueueError::InvalidEdit && validationQueue.IsEmpty() &&
 				validationQueue.GetLastEnqueueSerial() == 0,
@@ -366,20 +336,18 @@ namespace gglab
 			const std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max();
 			NapaVoxelCommandQueue enqueueQueue({
 				.m_LastEnqueueSerial = maximum - 1,
-				});
-			const bool finalEnqueue = enqueueQueue.EnqueueRestoreAll() ==
-				NapaVoxelCommandQueueError::None;
+			});
+			const bool finalEnqueue = enqueueQueue.EnqueueRestoreAll() == NapaVoxelCommandQueueError::None;
 			context.Check(finalEnqueue && enqueueQueue.GetLastEnqueueSerial() == maximum &&
 				enqueueQueue.GetSize() == 1 && enqueueQueue.EnqueueRestoreAll() ==
 				NapaVoxelCommandQueueError::EnqueueSerialExhausted && enqueueQueue.IsTerminal() &&
-				enqueueQueue.GetTerminalError() ==
-				NapaVoxelCommandQueueError::EnqueueSerialExhausted &&
+				enqueueQueue.GetTerminalError() == NapaVoxelCommandQueueError::EnqueueSerialExhausted &&
 				enqueueQueue.GetLastEnqueueSerial() == maximum && enqueueQueue.GetSize() == 1,
 				"Enqueue Serial reaches its maximum once and then fails terminally without wrap");
 
 			NapaVoxelCommandQueue operationQueue({
 				.m_LastOperationSerial = maximum - 1,
-				});
+			});
 			NapaVoxelDequeuedCommand first{};
 			const NapaVoxelDequeuedCommand sentinel{
 				.m_OperationSerial = 91,
@@ -389,15 +357,12 @@ namespace gglab
 				},
 			};
 			NapaVoxelDequeuedCommand unchanged = sentinel;
-			const bool queued = operationQueue.EnqueueRestoreAll() ==
-				NapaVoxelCommandQueueError::None && operationQueue.EnqueueRestoreAll() ==
+			const bool queued = operationQueue.EnqueueRestoreAll() == NapaVoxelCommandQueueError::None && operationQueue.EnqueueRestoreAll() ==
 				NapaVoxelCommandQueueError::None;
-			const bool finalOperation = queued && operationQueue.Dequeue(first) ==
-				NapaVoxelCommandQueueError::None;
+			const bool finalOperation = queued && operationQueue.Dequeue(first) == NapaVoxelCommandQueueError::None;
 			context.Check(finalOperation && first.m_OperationSerial == maximum &&
 				operationQueue.GetLastOperationSerial() == maximum &&
-				operationQueue.Dequeue(unchanged) ==
-				NapaVoxelCommandQueueError::OperationSerialExhausted &&
+				operationQueue.Dequeue(unchanged) == NapaVoxelCommandQueueError::OperationSerialExhausted &&
 				operationQueue.IsTerminal() && operationQueue.GetTerminalError() ==
 				NapaVoxelCommandQueueError::OperationSerialExhausted && unchanged == sentinel &&
 				operationQueue.GetSize() == 1 &&

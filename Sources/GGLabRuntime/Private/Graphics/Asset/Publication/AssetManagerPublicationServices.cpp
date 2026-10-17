@@ -129,8 +129,9 @@ namespace gglab
 			result.m_TextureId = textureId;
 			result.m_Claim = {
 				.m_ContentVersion = contentVersion,
-				.m_Origin = created ? ModelPublicationClaimOrigin::Created
-									: ModelPublicationClaimOrigin::Reused,
+				.m_Origin = created ?
+					ModelPublicationClaimOrigin::Created :
+					ModelPublicationClaimOrigin::Reused,
 				.m_Retain = retain,
 			};
 			if (!IsReservedTextureId(textureId))
@@ -313,10 +314,8 @@ namespace gglab
 			}
 
 			const ModelID modelId = ToModelId(commit.m_Model);
-			if (m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyOwner(
-					modelId) ||
-				m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(
-					modelId))
+			if (m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyOwner(modelId) ||
+				m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(modelId))
 			{
 				return "Model already owns dependency interests before publication commit";
 			}
@@ -446,14 +445,14 @@ namespace gglab
 			const ModelID modelId = ToModelId(modelVersion);
 			m_AssetManager->UnregisterModelDependencies(modelId, modelVersion.m_ContentGeneration);
 			model->m_MeshInstance.clear();
-			SetAssetState(*model, reason == AssetResourcePublicationAbortReason::Failed
-				? AssetState::Failed
-				: AssetState::Cancelled);
+			SetAssetState(*model, reason == AssetResourcePublicationAbortReason::Failed ?
+				AssetState::Failed :
+				AssetState::Cancelled);
 			m_AssetManager->m_State->m_ModelAssets.RemovePendingModel(modelId);
 			ProgressReporter(model->m_LoadProgress)
-				.Report(0.62f, reason == AssetResourcePublicationAbortReason::Failed
-					? "Model publication failed"
-					: "Model publication cancelled");
+				.Report(0.62f, reason == AssetResourcePublicationAbortReason::Failed ?
+					"Model publication failed" :
+					"Model publication cancelled");
 		}
 
 	private:
@@ -494,9 +493,9 @@ namespace gglab
 		{
 			const ModelID modelId = ToModelId(modelVersion);
 			Model* model = m_AssetManager->EditModel(modelId);
-			return model && model->m_ContentGeneration == modelVersion.m_ContentGeneration
-				? model
-				: nullptr;
+			return model && model->m_ContentGeneration == modelVersion.m_ContentGeneration ?
+				model :
+				nullptr;
 		}
 
 		AssetManager* m_AssetManager = nullptr;

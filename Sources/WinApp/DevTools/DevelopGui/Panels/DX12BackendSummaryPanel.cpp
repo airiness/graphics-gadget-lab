@@ -106,9 +106,9 @@ namespace gglab
 
 	void DX12BackendSummaryPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		const auto* snapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<DX12BackendSnapshot>()
-			: nullptr;
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<DX12BackendSnapshot>() :
+			nullptr;
 		if (!snapshot || !snapshot->m_Available)
 		{
 			ImGui::TextDisabled("The active RHI backend is not DirectX 12.");
@@ -173,15 +173,15 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		const auto* resourceSnapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>()
-			: nullptr;
+		const auto* resourceSnapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>() :
+			nullptr;
 		DrawResourceSummary(resourceSnapshot);
 
 		ImGui::SeparatorText("Pipelines");
-		const auto* pipelineSnapshot = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>()
-			: nullptr;
+		const auto* pipelineSnapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>() :
+			nullptr;
 		if (pipelineSnapshot && pipelineSnapshot->m_BackendName == "Direct3D 12")
 		{
 			ImGui::Text("Pipelines: %u graphics / %u compute | binding layouts %u",

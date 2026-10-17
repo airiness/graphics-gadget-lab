@@ -126,7 +126,7 @@ namespace gglab
 		const bool gtaoContributionRequested =
 			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion) &&
 			registry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::AmbientOcclusion).m_Tap ==
-				PostProcessDebugTap::GTAOAOOnlyLightingContribution;
+			PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
@@ -235,7 +235,7 @@ namespace gglab
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(renderTargets.data(), renderTargetCount),
 					.m_DepthAttachment = forward_shading::GetDepthAttachment(executeContext, data.m_Scene),
-				});
+					});
 				if (data.m_HdrDiffValidation)
 				{
 					graphicsContext->ClearColorAttachment(1, { 0.0f, 0.0f, 0.0f, 1.0f });
@@ -278,8 +278,9 @@ namespace gglab
 					return;
 				}
 				const OutputVariant output{
-					.m_Lighting = data.m_HdrDiffValidation
-						? LightingRecipe::ForwardPlusValidation : LightingRecipe::ForwardPlus,
+					.m_Lighting = data.m_HdrDiffValidation ?
+						LightingRecipe::ForwardPlusValidation :
+						LightingRecipe::ForwardPlus,
 					.m_GTAOContribution = data.m_GTAOContributionOutputEnabled,
 					.m_MaterialDiagnostics = data.m_Scene.m_MaterialDiagnostics,
 				};
@@ -359,8 +360,9 @@ namespace gglab
 		GraphicsPhysicalPipelineKey coverageKey = physicalKey;
 		coverageKey.m_RasterizerPreset = forward_shading::GetRasterizerPreset(variantBits);
 		const DepthCoverageAlphaVariant alphaVariant =
-			bucket == RenderBucket::AlphaTest ? DepthCoverageAlphaVariant::BaseColorMask
-			: DepthCoverageAlphaVariant::Opaque;
+			bucket == RenderBucket::AlphaTest ?
+				DepthCoverageAlphaVariant::BaseColorMask :
+				DepthCoverageAlphaVariant::Opaque;
 		return gglab::BuildDepthCoveragePipelineSignature(coverageKey,
 			DepthCoverageVertexProgram::RigidMesh, DepthCoverageDeformationVariant::Rigid,
 			DepthCoveragePositionPrecision::Float32, RHIFormat::R32G32B32Float, doubleSided,

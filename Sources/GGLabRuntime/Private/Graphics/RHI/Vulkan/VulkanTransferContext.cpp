@@ -257,9 +257,9 @@ namespace gglab
 			VulkanResourceManager& resources = m_Device->GetResourceManager();
 			VulkanTexture* texture = resources.ResolveTexture(barrier.m_Texture);
 			const RHITextureDesc* desc = resources.ResolveTextureDesc(barrier.m_Texture);
-			const auto native = texture && desc
-				? BuildVulkanTextureBarrier(barrier, texture->Get(), *desc)
-				: std::nullopt;
+			const auto native = texture && desc ?
+				BuildVulkanTextureBarrier(barrier, texture->Get(), *desc) :
+				std::nullopt;
 			if (!native)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
@@ -290,9 +290,9 @@ namespace gglab
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
 			VulkanBuffer* buffer = m_Device->GetResourceManager().ResolveBuffer(barrier.m_Buffer);
-			const auto native = buffer
-				? BuildVulkanBufferBarrier(barrier, buffer->Get())
-				: std::nullopt;
+			const auto native = buffer ?
+				BuildVulkanBufferBarrier(barrier, buffer->Get()) :
+				std::nullopt;
 			if (!native)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
@@ -364,9 +364,9 @@ namespace gglab
 		const RHITextureDesc* sourceDesc = resources.ResolveTextureDesc(copy.m_Source);
 		const RHIBufferDesc* destinationDesc = resources.ResolveBufferDesc(copy.m_Destination);
 		const std::optional<VkBufferImageCopy2> region =
-			sourceTexture && destinationBuffer && sourceDesc && destinationDesc
-			? BuildVulkanTextureToBufferCopyRegion(*sourceDesc, *destinationDesc, copy)
-			: std::nullopt;
+			sourceTexture && destinationBuffer && sourceDesc && destinationDesc ?
+				BuildVulkanTextureToBufferCopyRegion(*sourceDesc, *destinationDesc, copy) :
+				std::nullopt;
 		if (!region)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("VulkanTransferContext::CopyTextureToBuffer rejected invalid "
@@ -396,9 +396,9 @@ namespace gglab
 		desc.m_MemoryUsage = memoryUsage;
 		const RHIResourceDebugIdentityDesc debugIdentity{
 			.m_Domain = RHIResourceDebugDomain::Transfer,
-			.m_Category = memoryUsage == RHIMemoryUsage::GpuToCpu
-				? std::string_view("ReadbackBuffer")
-				: std::string_view("UploadBuffer"),
+			.m_Category = memoryUsage == RHIMemoryUsage::GpuToCpu ?
+				std::string_view("ReadbackBuffer") :
+				std::string_view("UploadBuffer"),
 			.m_Label = owner,
 			.m_StableId = m_NextDebugOperationSerial++,
 		};

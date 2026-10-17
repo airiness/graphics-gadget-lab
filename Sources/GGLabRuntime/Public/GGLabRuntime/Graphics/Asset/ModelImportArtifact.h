@@ -78,9 +78,9 @@ namespace gglab
 
 		[[nodiscard]] const ImportedMesh* GetMesh() const noexcept
 		{
-			return m_Owner && m_MeshIndex < m_Owner->m_Meshes.size()
-				? &m_Owner->m_Meshes[m_MeshIndex]
-				: nullptr;
+			return m_Owner && m_MeshIndex < m_Owner->m_Meshes.size() ?
+				&m_Owner->m_Meshes[m_MeshIndex] :
+				nullptr;
 		}
 
 		[[nodiscard]] std::span<const Vertex> GetVertices() const noexcept

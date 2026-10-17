@@ -124,7 +124,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", gglab::utils::ToString(message) },
 			} }) },
-		}, ExitCodeInvalidCommandLine);
+			}, ExitCodeInvalidCommandLine);
 	}
 
 	int PrintCommandLineFailure(gglab::ShaderCompilerCommand command,
@@ -206,7 +206,7 @@ namespace
 			{ "status", CompileStatusText(diagnostics.m_Status) },
 			{ "exitCode", exitCode },
 			{ "diagnostics", nlohmann::json::array({ std::move(diagnostic) }) },
-		}, exitCode);
+			}, exitCode);
 	}
 
 	int PrintTextFailure(const gglab::ShaderCompilerDiagnostics& diagnostics)
@@ -217,8 +217,9 @@ namespace
 
 	int PrintFailure(const gglab::ShaderCompilerDiagnostics& diagnostics, bool jsonMode)
 	{
-		return jsonMode ? PrintJsonFailure(diagnostics)
-			: PrintTextFailure(diagnostics);
+		return jsonMode ?
+			PrintJsonFailure(diagnostics) :
+			PrintTextFailure(diagnostics);
 	}
 
 	int PrintJsonResult(const gglab::ShaderCompileResult& result,
@@ -362,7 +363,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", "DXC producer runtime could not be resolved" },
 			} }) },
-		}, ExitCodeCompileFailed);
+			}, ExitCodeCompileFailed);
 	}
 
 	int PrintJsonDescribeInternalError()
@@ -378,7 +379,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", "describe internal failure" },
 			} }) },
-		}, ExitCodeInternalError);
+			}, ExitCodeInternalError);
 	}
 
 	int PrintJsonDescribeUsageFailure(std::wstring_view message)
@@ -393,7 +394,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", gglab::utils::ToString(message) },
 			} }) },
-		}, ExitCodeInvalidCommandLine);
+			}, ExitCodeInvalidCommandLine);
 	}
 
 	int RunDescribe()
@@ -516,9 +517,9 @@ namespace
 				{ "status", result.IsSuccess() ? "ok" : "failed" },
 				{ "exitCode", exitCode },
 				{ "programCount", result.m_ProgramCount },
-				{ "diagnostics", result.m_Error.empty()
-					? nlohmann::json::array()
-					: nlohmann::json::array({ { { "message", result.m_Error } } }) },
+				{ "diagnostics", result.m_Error.empty() ?
+					nlohmann::json::array() :
+					nlohmann::json::array({ { { "message", result.m_Error } } }) },
 			};
 			if (result.m_RegistryRef.IsValid())
 			{
@@ -585,8 +586,9 @@ int wmain(int argumentCount, wchar_t* arguments[])
 	case gglab::ShaderCompilerCommand::Help:
 	case gglab::ShaderCompilerCommand::None:
 		std::wcout << gglab::ShaderCompilerCommandLineUsage() << L"\n";
-		return commandLine.m_Command == gglab::ShaderCompilerCommand::Help
-			? ExitCodeSuccess : ExitCodeInvalidCommandLine;
+		return commandLine.m_Command == gglab::ShaderCompilerCommand::Help ?
+			ExitCodeSuccess :
+			ExitCodeInvalidCommandLine;
 	}
 	return ExitCodeInvalidCommandLine;
 }

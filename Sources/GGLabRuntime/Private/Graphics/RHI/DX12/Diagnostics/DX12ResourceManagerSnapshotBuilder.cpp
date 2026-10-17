@@ -87,11 +87,15 @@ namespace gglab
 				result.m_LastUseFenceCount = static_cast<uint32_t>(slot.m_LastUsePoints.size());
 				result.m_CompletedLastUseFenceCount = static_cast<uint32_t>(std::ranges::count_if(
 					slot.m_LastUsePoints, [&manager](const RHIFencePoint& point)
-					{ return manager.m_Device && manager.m_Device->IsFencePointCompleted(point); }));
+					{
+						return manager.m_Device && manager.m_Device->IsFencePointCompleted(point);
+					}));
 				result.m_PendingFenceCount = static_cast<uint32_t>(slot.m_RetirementPoints.size());
 				result.m_CompletedFenceCount = static_cast<uint32_t>(std::ranges::count_if(
 					slot.m_RetirementPoints, [&manager](const RHIFencePoint& point)
-					{ return manager.m_Device && manager.m_Device->IsFencePointCompleted(point); }));
+					{
+						return manager.m_Device && manager.m_Device->IsFencePointCompleted(point);
+					}));
 				result.m_NativeResourceValid = resource != nullptr && resource->IsValid();
 				return result;
 			};

@@ -44,7 +44,7 @@ namespace
 			if (manifest.is_discarded() || !manifest.is_object() ||
 				manifest.value("schemaVersion", 0) != 1 ||
 				manifest.value("packageKind", std::string{}) !=
-					"gglab.artifact-only-runtime")
+				"gglab.artifact-only-runtime")
 			{
 				return std::nullopt;
 			}
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
 		(*launchResult.m_Options.m_SelfTestSelection ==
 			gglab::ApplicationPathCompositionSelfTestSelection ||
 			*launchResult.m_Options.m_SelfTestSelection ==
-				gglab::ApplicationArtifactPackageClosureSelfTestSelection);
+			gglab::ApplicationArtifactPackageClosureSelfTestSelection);
 	const gglab::RuntimePaths runtimePaths =
 		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory(),
 			launchResult.m_Options.m_StateRoot);
@@ -117,9 +117,9 @@ int main(int argc, char* argv[])
 	if (launchResult.m_Options.m_SelfTestSelection && !isPathSensitiveSelfTest)
 	{
 		return gglab::RunApplicationSelfTests(
-			*launchResult.m_Options.m_SelfTestSelection, runtimePaths)
-			? EXIT_SUCCESS
-			: EXIT_FAILURE;
+			*launchResult.m_Options.m_SelfTestSelection, runtimePaths) ?
+			EXIT_SUCCESS :
+			EXIT_FAILURE;
 	}
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
@@ -146,11 +146,11 @@ int main(int argc, char* argv[])
 	if (isPathSensitiveSelfTest)
 	{
 		const bool succeeded = *launchResult.m_Options.m_SelfTestSelection ==
-			gglab::ApplicationPathCompositionSelfTestSelection
-			? gglab::RunApplicationPathCompositionSelfTest(
-				runtimePaths, launchResult.m_Options.m_RhiBackend)
-			: gglab::RunApplicationArtifactPackageClosureSelfTest(
-				runtimePaths, launchResult.m_Options.m_RhiBackend);
+			gglab::ApplicationPathCompositionSelfTestSelection ?
+				gglab::RunApplicationPathCompositionSelfTest(
+					runtimePaths, launchResult.m_Options.m_RhiBackend) :
+				gglab::RunApplicationArtifactPackageClosureSelfTest(
+					runtimePaths, launchResult.m_Options.m_RhiBackend);
 		return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
 	const gglab::AppRuntimeExtent initialExtent{
@@ -171,9 +171,9 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 #else
 		return gglab::RunRenderingStartupPath(
-			launchResult.m_Options, hInstance, launchResult.m_Options.m_ValidationMode
-				? *launchResult.m_Options.m_ValidationMode != gglab::ApplicationValidationMode::Off
-				: RequestRuntimeValidation);
+			launchResult.m_Options, hInstance, launchResult.m_Options.m_ValidationMode ?
+				*launchResult.m_Options.m_ValidationMode != gglab::ApplicationValidationMode::Off :
+				RequestRuntimeValidation);
 #endif
 	}
 

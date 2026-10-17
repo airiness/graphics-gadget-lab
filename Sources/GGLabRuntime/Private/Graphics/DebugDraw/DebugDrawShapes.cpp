@@ -30,9 +30,9 @@ namespace gglab
 				return false;
 			}
 			basis.m_Axis = axis.Normalized();
-			const Vector3 reference = std::abs(basis.m_Axis.Dot(Vector3::UnitY)) < 0.95f
-				? Vector3::UnitY
-				: Vector3::UnitX;
+			const Vector3 reference = std::abs(basis.m_Axis.Dot(Vector3::UnitY)) < 0.95f ?
+				Vector3::UnitY :
+				Vector3::UnitX;
 			basis.m_U = reference.Cross(basis.m_Axis).Normalized();
 			basis.m_V = basis.m_Axis.Cross(basis.m_U).Normalized();
 			return true;
@@ -86,18 +86,18 @@ namespace gglab
 			if (fillMode == DebugDrawFillMode::Wireframe)
 			{
 				constexpr std::array<std::array<uint8_t, 2>, 12> edges = { {
-					{0, 1},
-					{1, 2},
-					{2, 3},
-					{3, 0},
-					{4, 5},
-					{5, 6},
-					{6, 7},
-					{7, 4},
-					{0, 4},
-					{1, 5},
-					{2, 6},
-					{3, 7},
+					{ 0, 1 },
+					{ 1, 2 },
+					{ 2, 3 },
+					{ 3, 0 },
+					{ 4, 5 },
+					{ 5, 6 },
+					{ 6, 7 },
+					{ 7, 4 },
+					{ 0, 4 },
+					{ 1, 5 },
+					{ 2, 6 },
+					{ 3, 7 },
 				} };
 				positions.reserve(edges.size() * 2);
 				for (const auto& edge : edges)
@@ -108,12 +108,12 @@ namespace gglab
 			}
 
 			constexpr std::array<std::array<uint8_t, 4>, 6> faces = { {
-				{0, 3, 2, 1},
-				{4, 5, 6, 7},
-				{0, 1, 5, 4},
-				{3, 7, 6, 2},
-				{0, 4, 7, 3},
-				{1, 2, 6, 5},
+				{ 0, 3, 2, 1 },
+				{ 4, 5, 6, 7 },
+				{ 0, 1, 5, 4 },
+				{ 3, 7, 6, 2 },
+				{ 0, 4, 7, 3 },
+				{ 1, 2, 6, 5 },
 			} };
 			positions.reserve(faces.size() * 6);
 			for (const auto& face : faces)
@@ -139,9 +139,9 @@ namespace gglab
 		const auto corners = BuildBoxCorners(center, extents);
 		std::vector<Vector3> positions;
 		BuildBoxGeometry(corners, style.m_FillMode, positions);
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -164,9 +164,9 @@ namespace gglab
 		}
 		std::vector<Vector3> positions;
 		BuildBoxGeometry(corners, style.m_FillMode, positions);
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -314,9 +314,9 @@ namespace gglab
 				AppendTriangle(positions, baseCenter, p1, p0);
 			}
 		}
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -360,9 +360,9 @@ namespace gglab
 				AppendTriangle(positions, topCenter, t0, t1);
 			}
 		}
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 
@@ -470,9 +470,9 @@ namespace gglab
 		}
 		std::vector<Vector3> positions;
 		BuildBoxGeometry(corners, style.m_FillMode, positions);
-		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe
-			? DebugDrawSystem::PrimitiveTopology::Lines
-			: DebugDrawSystem::PrimitiveTopology::Triangles,
+		m_System->Submit(style.m_FillMode == DebugDrawFillMode::Wireframe ?
+			DebugDrawSystem::PrimitiveTopology::Lines :
+			DebugDrawSystem::PrimitiveTopology::Triangles,
 			positions, style);
 	}
 

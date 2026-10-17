@@ -34,7 +34,7 @@ float3 SampleEnvironmentSource(float3 dir)
 	if (g_Pass.SourceMode == 2)
 	{
 		// Only atmospheric radiance: the calibrated direct solar disk is never indirect lighting.
-		float2 skyUV = AtmosphereSkyViewUV(dir, float3(0,1,0), g_Pass.SunDirection);
+		float2 skyUV = AtmosphereSkyViewUV(dir, float3(0, 1, 0), g_Pass.SunDirection);
 		return SampleTexture2DLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, skyUV, 0).rgb;
 	}
 	if (g_Pass.SourceMode == ENVIRONMENT_SOURCE_CUBEMAP)

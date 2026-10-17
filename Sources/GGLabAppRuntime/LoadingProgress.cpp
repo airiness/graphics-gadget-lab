@@ -58,38 +58,40 @@ namespace gglab
 		std::string combinedDetail(detail);
 		if (!progress.m_Detail.empty())
 		{
-			combinedDetail = combinedDetail.empty()
-				? progress.m_Detail
-				: std::format("{} | {}", combinedDetail, progress.m_Detail);
+			combinedDetail = combinedDetail.empty() ?
+				progress.m_Detail :
+				std::format("{} | {}", combinedDetail, progress.m_Detail);
 		}
 
-		AddStep(weight, {
-							.m_Status = status,
-							.m_Fraction = progress.m_Fraction,
-							.m_Stage = progress.m_Stage,
-							.m_Detail = combinedDetail,
+		AddStep(weight,
+			{
+				.m_Status = status,
+				.m_Fraction = progress.m_Fraction,
+				.m_Stage = progress.m_Stage,
+				.m_Detail = combinedDetail,
 			});
 	}
 
 	void LoadingProgressBuilder::AddCompletedStep(float weight) noexcept
 	{
-		AddStep(weight, {
-							.m_Status = LoadingStatus::Ready,
-							.m_Fraction = 1.0f,
+		AddStep(weight,
+			{
+				.m_Status = LoadingStatus::Ready,
+				.m_Fraction = 1.0f,
 			});
 	}
 
 	LoadingProgress LoadingProgressBuilder::Build() const noexcept
 	{
 		const LoadingStatus status =
-			m_HasFailedStep
-			? LoadingStatus::Failed
-			: (m_HasPreparingStep ? LoadingStatus::Preparing : LoadingStatus::Ready);
+			m_HasFailedStep ?
+				LoadingStatus::Failed :
+				(m_HasPreparingStep ? LoadingStatus::Preparing : LoadingStatus::Ready);
 		return {
 			.m_Status = status,
-			.m_Fraction = status == LoadingStatus::Ready
-							  ? 1.0f
-							  : (m_TotalWeight > 0.0f ? m_WeightedFraction / m_TotalWeight : 0.0f),
+			.m_Fraction = status == LoadingStatus::Ready ?
+				1.0f :
+				(m_TotalWeight > 0.0f ? m_WeightedFraction / m_TotalWeight : 0.0f),
 			.m_Title = m_Title,
 			.m_Stage = m_CurrentStage,
 			.m_Detail = m_CurrentDetail,

@@ -61,8 +61,9 @@ float4 TestClipPreservesTinyInsideDirection() : SV_Target0
 	const float extent = 1.0 / 67108864.0; // 2^-26, a normal float.
 	const float3 history = float3(extent * 0.5, 0, 0);
 	const float3 actual = ClipTemporalHistoryTowardMean(history, 0.0.xxx, -extent.xxx, extent.xxx);
-	return all(abs((actual - history) / extent) <= 1.0e-6.xxx)
-		? 0.0.xxxx : 1.0.xxxx;
+	return all(abs((actual - history) / extent) <= 1.0e-6.xxx) ?
+		0.0.xxxx :
+		1.0.xxxx;
 }
 
 float4 TestClipTinyOutsideDirection() : SV_Target0
@@ -70,8 +71,9 @@ float4 TestClipTinyOutsideDirection() : SV_Target0
 	const float extent = 1.0 / 67108864.0;
 	const float3 actual = ClipTemporalHistoryTowardMean(float3(extent * 2, 0, 0),
 		0.0.xxx, float3(-extent, 0, 0), float3(extent, 0, 0));
-	return all(abs(actual / extent - float3(1, 0, 0)) <= 1.0e-6.xxx)
-		? 0.0.xxxx : 1.0.xxxx;
+	return all(abs(actual / extent - float3(1, 0, 0)) <= 1.0e-6.xxx) ?
+		0.0.xxxx :
+		1.0.xxxx;
 }
 
 float4 TestClipPlanarAxisPermutations() : SV_Target0

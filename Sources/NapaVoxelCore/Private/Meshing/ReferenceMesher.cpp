@@ -237,7 +237,7 @@ namespace napa::voxel
 				-gradient.m_X,
 				-gradient.m_Y,
 				-gradient.m_Z,
-			}, normal);
+				}, normal);
 		}
 
 		[[nodiscard]] ValidationResult ComputeReferenceEdgeOutwardNormal(
@@ -261,7 +261,7 @@ namespace napa::voxel
 				static_cast<double>(empty.m_Coordinate.m_X) - solid.m_Coordinate.m_X,
 				static_cast<double>(empty.m_Coordinate.m_Y) - solid.m_Coordinate.m_Y,
 				static_cast<double>(empty.m_Coordinate.m_Z) - solid.m_Coordinate.m_Z,
-			}, normal);
+				}, normal);
 		}
 
 		[[nodiscard]] ValidationResult InterpolatePreparedEdgeCandidate(
@@ -685,8 +685,9 @@ namespace napa::voxel
 					selected = true;
 				}
 			}
-			return selected ? cubeCorners[selectedCornerId].m_Sample.m_Material
-				: VoxelMaterial::Empty;
+			return selected ?
+				cubeCorners[selectedCornerId].m_Sample.m_Material :
+				VoxelMaterial::Empty;
 		}
 
 		[[nodiscard]] DensityGradient ComputeSolidToEmptyDirection(
@@ -937,8 +938,9 @@ namespace napa::voxel
 			const std::optional<std::uint64_t> triangleCount =
 				cellCount ? CheckedMul(*cellCount, static_cast<std::uint64_t>(12)) : std::nullopt;
 			const std::optional<std::uint64_t> vertexCount =
-				triangleCount ? CheckedMul(*triangleCount, static_cast<std::uint64_t>(3))
-				: std::nullopt;
+				triangleCount ?
+					CheckedMul(*triangleCount, static_cast<std::uint64_t>(3)) :
+					std::nullopt;
 			if (!cellCount || !triangleCount || !vertexCount)
 			{
 				return { ValidationError::ArithmeticOverflow };
@@ -1175,7 +1177,9 @@ namespace napa::voxel
 			};
 			const auto readDensity = [&voxelSamples](
 				SampleCoord coordinate, std::uint8_t& density) noexcept
-				{ return ReadPreparedDensity(voxelSamples, coordinate, density); };
+				{
+					return ReadPreparedDensity(voxelSamples, coordinate, density);
+				};
 			for (std::size_t z = 0; z < sizeZ; ++z)
 			{
 				for (std::size_t y = 0; y < sizeY; ++y)
@@ -1319,7 +1323,9 @@ namespace napa::voxel
 
 		DensityGradient prepared{};
 		const auto readDensity = [this](SampleCoord sample, std::uint8_t& density) noexcept
-			{ return ReadDensity(m_World, sample, density); };
+			{
+				return ReadDensity(m_World, sample, density);
+			};
 		const ValidationResult xResult = ComputeAxisDensityGradient(
 			bounds, coordinate, CoordinateAxis::X, centerDensity, readDensity, prepared.m_X);
 		if (xResult.Failed())

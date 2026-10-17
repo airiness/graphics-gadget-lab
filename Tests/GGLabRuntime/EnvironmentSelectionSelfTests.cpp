@@ -75,7 +75,9 @@ namespace gglab
 			const TextureContentRef fallback = harness.GetAssets().GetTextureContentRef(
 				ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap));
 			const bool fallbackResident = harness.PumpUntil([&]()
-				{ return harness.GetAssets().GetResidentTextureResource(fallback).has_value(); });
+				{
+					return harness.GetAssets().GetResidentTextureResource(fallback).has_value();
+				});
 			context.Check(fallbackResident, "The reserved fallback environment cubemap becomes resident");
 			if (!fallbackResident)
 			{
@@ -88,17 +90,19 @@ namespace gglab
 					.m_AssetManager = &harness.GetAssets(),
 					.m_EnvironmentLighting = &source,
 					.m_AssetRoot = root,
-					});
+				});
 				const auto settle = [&](auto&& condition)
-					{
-						return harness.PumpUntil([&]()
-							{
-								controller.Tick();
-								return condition();
-							});
-					};
+				{
+					return harness.PumpUntil([&]()
+						{
+							controller.Tick();
+							return condition();
+						});
+				};
 				const auto noPending = [&]()
-					{ return controller.GetPendingEnvironmentIndex() == EnvironmentAssetController::InvalidEntryIndex; };
+				{
+					return controller.GetPendingEnvironmentIndex() == EnvironmentAssetController::InvalidEntryIndex;
+				};
 
 				controller.Initialize("Skybox");
 				const bool initial = settle(noPending);
@@ -133,8 +137,7 @@ namespace gglab
 				const size_t target = (third + 1) % entries.size();
 				const uint64_t serial = controller.GetSelectionSerial();
 				const bool targetSelected = controller.SelectEnvironment(target);
-				const bool missingRejected =
-					!controller.SelectEnvironmentFile("Skybox/__gglab_missing_environment__.hdr", "Missing");
+				const bool missingRejected = !controller.SelectEnvironmentFile("Skybox/__gglab_missing_environment__.hdr", "Missing");
 				const auto afterFailure = controller.GetEntries();
 				context.Check(targetSelected && missingRejected &&
 					controller.GetActiveEnvironmentIndex() == third && noPending() &&
@@ -157,22 +160,22 @@ namespace gglab
 
 				// Rejected candidates never replace the active environment.
 				const auto probe = [&](const char* path, EnvironmentAssetEntryState expected)
+				{
+					if (!controller.SelectEnvironmentFile(path))
 					{
-						if (!controller.SelectEnvironmentFile(path))
+						return false;
+					}
+					const size_t probeIndex = controller.GetPendingEnvironmentIndex();
+					bool kept = true;
+					const bool settled = settle([&]()
 						{
-							return false;
-						}
-						const size_t probeIndex = controller.GetPendingEnvironmentIndex();
-						bool kept = true;
-						const bool settled = settle([&]()
-							{
-								kept &= controller.GetActiveEnvironmentIndex() == target;
-								return noPending();
-							});
-						const auto probed = controller.GetEntries();
-						return settled && kept && probeIndex < probed.size() &&
-							probed[probeIndex].m_State == expected;
-					};
+							kept &= controller.GetActiveEnvironmentIndex() == target;
+							return noPending();
+						});
+					const auto probed = controller.GetEntries();
+					return settled && kept && probeIndex < probed.size() &&
+						probed[probeIndex].m_State == expected;
+				};
 				context.Check(probe("Probes/InvalidDecode.hdr", EnvironmentAssetEntryState::Failed),
 					"A decode failure ends Failed without replacing the active environment");
 				context.Check(probe("Probes/Square.png", EnvironmentAssetEntryState::InvalidShape),

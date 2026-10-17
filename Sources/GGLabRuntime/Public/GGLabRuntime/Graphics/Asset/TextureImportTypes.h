@@ -45,9 +45,9 @@ namespace gglab
 	{
 		return {
 			.m_Semantic = semantic,
-			.m_MipPolicy = semantic == TextureSemantic::Environment
-							   ? TextureMipPolicy::Preserve
-							   : TextureMipPolicy::GenerateIfMissing,
+			.m_MipPolicy = semantic == TextureSemantic::Environment ?
+				TextureMipPolicy::Preserve :
+				TextureMipPolicy::GenerateIfMissing,
 		};
 	}
 

@@ -123,7 +123,9 @@ namespace napa::voxel
 			{
 				const auto iterator = std::lower_bound(chunks.begin(), chunks.end(), candidate.m_Chunk,
 					[](const ChunkMeshRecord& record, ChunkCoord coordinate)
-					{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+					{
+						return ChunkCoordZYXLess{}(record.m_Chunk, coordinate);
+					});
 				if (iterator == chunks.end() || iterator->m_Chunk != candidate.m_Chunk)
 				{
 					return { ValidationError::MismatchedCpuMeshCandidateSet };
@@ -462,7 +464,9 @@ namespace napa::voxel
 			const auto iterator = std::lower_bound(
 				prepared->m_State.m_Chunks.begin(), prepared->m_State.m_Chunks.end(), chunk,
 				[](const ChunkMeshRecord& record, ChunkCoord coordinate) noexcept
-				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+				{
+					return ChunkCoordZYXLess{}(record.m_Chunk, coordinate);
+				});
 			if (iterator == prepared->m_State.m_Chunks.end() || iterator->m_Chunk != chunk)
 			{
 				return { ValidationError::MismatchedCpuMeshCandidateSet };

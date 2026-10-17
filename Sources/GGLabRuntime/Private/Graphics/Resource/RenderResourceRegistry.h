@@ -263,8 +263,7 @@ namespace gglab
 			bool m_Requested = false;
 			bool m_HasPublished = false;
 		};
-		std::array<PostProcessPreviewState, utils::EnumCount<PostProcessPreviewChannel>()>
-			m_PostProcessPreviewStates{};
+		std::array<PostProcessPreviewState, utils::EnumCount<PostProcessPreviewChannel>()> m_PostProcessPreviewStates{};
 		bool m_ShadowPreviewRequested = false;
 
 	};

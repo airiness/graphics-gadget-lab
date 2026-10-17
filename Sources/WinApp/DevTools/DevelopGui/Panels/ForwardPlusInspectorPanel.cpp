@@ -71,15 +71,15 @@ namespace gglab
 			}
 			else
 			{
-				const float value = mode == HeatmapMode::MinViewZ
-					? tile.m_MinViewZ
-					: tile.m_MaxViewZ;
+				const float value = mode == HeatmapMode::MinViewZ ?
+					tile.m_MinViewZ :
+					tile.m_MaxViewZ;
 				const float minimum = std::max(snapshot.m_MinViewZ, 1.0e-4f);
 				const float maximum = std::max(snapshot.m_MaxViewZ, minimum);
 				const float logRange = std::log(maximum) - std::log(minimum);
-				normalized = logRange > 1.0e-6f
-					? (std::log(std::max(value, minimum)) - std::log(minimum)) / logRange
-					: 0.0f;
+				normalized = logRange > 1.0e-6f ?
+					(std::log(std::max(value, minimum)) - std::log(minimum)) / logRange :
+					0.0f;
 			}
 
 			normalized = std::clamp(normalized, 0.0f, 1.0f);
@@ -283,9 +283,9 @@ namespace gglab
 					snapshot->m_MaxAbsoluteHdrError,
 					snapshot->m_MaxRelativeLuminanceError, snapshot->m_MaxErrorPixelX,
 					snapshot->m_MaxErrorPixelY, snapshot->m_ComparedPixelCount);
-				ImGui::TextColored(snapshot->m_HdrDiffWithinTolerance
-					? ImVec4(0.35f, 0.9f, 0.45f, 1.0f)
-					: ImVec4(0.95f, 0.3f, 0.25f, 1.0f),
+				ImGui::TextColored(snapshot->m_HdrDiffWithinTolerance ?
+					ImVec4(0.35f, 0.9f, 0.45f, 1.0f) :
+					ImVec4(0.95f, 0.3f, 0.25f, 1.0f),
 					snapshot->m_HdrDiffWithinTolerance ? "HDR diff passed" : "HDR diff failed");
 			}
 			else

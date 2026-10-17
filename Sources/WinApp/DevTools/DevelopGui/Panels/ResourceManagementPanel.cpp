@@ -73,8 +73,9 @@ namespace gglab
 			return std::format("{}{}{} | {} | history={}", slot.m_DebugOwner,
 				slot.m_HasDebugBindingSerial ? " #" : "",
 				slot.m_HasDebugBindingSerial ? std::to_string(slot.m_DebugBindingSerial) : "",
-				slot.m_DebugBindingMode == RHIResourceDebugBindingMode::Exclusive ? "exclusive"
-				: "aliased",
+				slot.m_DebugBindingMode == RHIResourceDebugBindingMode::Exclusive ?
+					"exclusive" :
+					"aliased",
 				slot.m_DebugBindingHistory.size());
 		}
 
@@ -92,8 +93,9 @@ namespace gglab
 					ImGui::BulletText("%s%s%s | %s", binding.m_Owner.c_str(),
 						binding.m_HasSerial ? " #" : "",
 						binding.m_HasSerial ? std::to_string(binding.m_Serial).c_str() : "",
-						binding.m_Mode == RHIResourceDebugBindingMode::Exclusive ? "exclusive"
-						: "aliased");
+						binding.m_Mode == RHIResourceDebugBindingMode::Exclusive ?
+							"exclusive" :
+							"aliased");
 				}
 				ImGui::EndTooltip();
 			}
@@ -344,9 +346,9 @@ namespace gglab
 		auto state = view->GetSnapshot();
 
 		const auto* snapshot =
-			context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>() :
+				nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("DX12 resource snapshot provider is not available.");

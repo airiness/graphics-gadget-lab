@@ -392,9 +392,9 @@ namespace gglab
 
 		VkShaderModule vertexModule =
 			CreateShaderModule(createInfo.m_VertexShader, "Vulkan.GraphicsPipeline.VS");
-		VkShaderModule pixelModule = hasPixelShader
-			? CreateShaderModule(createInfo.m_PixelShader, "Vulkan.GraphicsPipeline.PS")
-			: VK_NULL_HANDLE;
+		VkShaderModule pixelModule = hasPixelShader ?
+			CreateShaderModule(createInfo.m_PixelShader, "Vulkan.GraphicsPipeline.PS") :
+			VK_NULL_HANDLE;
 		if (vertexModule == VK_NULL_HANDLE || (hasPixelShader && pixelModule == VK_NULL_HANDLE))
 		{
 			DestroyShaderModule(pixelModule);
@@ -426,9 +426,9 @@ namespace gglab
 			attributeIndex < slot.m_GraphicsDesc.m_VertexInput.m_AttributeCount; ++attributeIndex)
 		{
 			slot.m_SemanticNames[attributeIndex] =
-				createInfo.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName
-				? createInfo.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName
-				: "";
+				createInfo.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName ?
+					createInfo.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName :
+					"";
 			slot.m_GraphicsDesc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName = nullptr;
 		}
 		slot.m_ShaderHashes = shaderHashes;

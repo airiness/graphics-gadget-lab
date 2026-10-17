@@ -141,8 +141,9 @@ namespace gglab
 					continue;
 				}
 				failure += failure.empty() ? "Readiness failed: " : "; ";
-				failure += gate.m_Detail.empty() ? gate.m_Name
-					: std::format("{} ({})", gate.m_Name, gate.m_Detail);
+				failure += gate.m_Detail.empty() ?
+					gate.m_Name :
+					std::format("{} ({})", gate.m_Name, gate.m_Detail);
 			}
 			if (!failure.empty())
 			{
@@ -391,16 +392,18 @@ namespace gglab
 		}
 		if (source == FrameCaptureSource::RenderGraph || source == FrameCaptureSource::ResourceExport)
 		{
-			return source == FrameCaptureSource::ResourceExport ? m_Capture->GetResourceExportFrameAvailability()
-				: requests;
+			return source == FrameCaptureSource::ResourceExport ?
+				m_Capture->GetResourceExportFrameAvailability() :
+				requests;
 		}
 		if (state.m_FrameSerial == 0)
 		{
 			return FrameCaptureAvailability::Available;
 		}
 		const ViewExtent extent = state.m_SettleKey.m_Temporal.m_Identity.m_ColorExtent;
-		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic
-			? RHIFormat::R8G8B8A8Unorm : state.m_DisplayFormat,
+		return m_Capture->GetAvailability(source == FrameCaptureSource::Diagnostic ?
+			RHIFormat::R8G8B8A8Unorm :
+			state.m_DisplayFormat,
 			extent.m_Width, extent.m_Height);
 	}
 
@@ -445,7 +448,9 @@ namespace gglab
 			for (Entry& entry : m_Entries)
 			{
 				const bool scheduledGroup = entry.m_GroupId != 0 && std::ranges::any_of(m_Entries, [&](const Entry& member)
-					{ return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
+					{
+						return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+					});
 				if (entry.m_Phase != Phase::Waiting || scheduledGroup)
 				{
 					continue;
@@ -510,7 +515,9 @@ namespace gglab
 				continue;
 			}
 			if (!readinessFailure.empty() && std::ranges::any_of(members, [&](const Entry* member)
-				{ return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state); }))
+				{
+					return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state);
+				}))
 			{
 				for (Entry* member : members)
 				{
@@ -552,9 +559,9 @@ namespace gglab
 			{
 				if (failure.empty())
 				{
-					failure = availability == FrameCaptureAvailability::TooLarge
-						? "The sequence capture group exceeds the capture capacity budget."
-						: "The sequence capture group is unavailable.";
+					failure = availability == FrameCaptureAvailability::TooLarge ?
+						"The sequence capture group exceeds the capture capacity budget." :
+						"The sequence capture group is unavailable.";
 				}
 				for (Entry* member : members)
 				{
@@ -678,8 +685,9 @@ namespace gglab
 			{
 				available += available.empty() ? id : ", " + id;
 			}
-			content = !m_LastFrameState->m_LabId.empty() ? m_LastFrameState->m_LabId
-				: m_LastFrameState->m_DemoId;
+			content = !m_LastFrameState->m_LabId.empty() ?
+				m_LastFrameState->m_LabId :
+				m_LastFrameState->m_DemoId;
 		}
 		Finish(*entry, FrameCaptureRequestStatus::Failed,
 			std::format("Reference view '{}' is not registered by '{}' (available: {}).",
@@ -723,7 +731,10 @@ namespace gglab
 
 	void FrameCaptureCoordinator::Update() noexcept
 	{
-		if (m_NonFiniteWatch) { m_NonFiniteWatch->UpdateCoverage(); }
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->UpdateCoverage();
+		}
 		if (m_Capture)
 		{
 			std::vector<FrameCaptureResult> results;
@@ -769,7 +780,10 @@ namespace gglab
 		// Render-host finalization publishes the last fence-completed readbacks.
 		// Drain them before closing only the coverage that still lacks evidence.
 		Update();
-		if (m_NonFiniteWatch) { m_NonFiniteWatch->FinalizeCoverage(); }
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->FinalizeCoverage();
+		}
 		Update();
 		FinishWriting();
 		for (Entry& entry : m_Entries)
@@ -814,7 +828,9 @@ namespace gglab
 	bool FrameCaptureCoordinator::HasFrameResourceExports() const noexcept
 	{
 		return std::ranges::any_of(m_Entries, [](const Entry& entry)
-			{ return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
+			{
+				return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+			});
 	}
 
 	bool FrameCaptureCoordinator::PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
@@ -827,8 +843,10 @@ namespace gglab
 		const bool strictWatch = m_NonFiniteWatch && m_NonFiniteWatch->GetStatus().m_Enabled &&
 			m_NonFiniteWatch->GetStatus().m_Mode == NonFiniteWatchMode::Fail;
 		const bool waitingExactExport = m_LastFrameState && std::ranges::any_of(m_Entries, [&](const Entry& entry)
-			{ return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
-			entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState); });
+			{
+				return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
+					entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState);
+			});
 		if (waitingExactExport)
 		{
 			m_Capture->DeferFrameCaptures(frameSerial);
@@ -908,9 +926,9 @@ namespace gglab
 		metadata.m_Temporal = state.m_Temporal;
 		metadata.m_Sequence = request.m_Sequence;
 		metadata.m_DiagnosticTap = request.m_Source == FrameCaptureSource::Diagnostic &&
-			request.m_DiagnosticTap
-			? std::string(GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap))
-			: std::string();
+			request.m_DiagnosticTap ?
+				std::string(GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap)) :
+				std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
 			std::chrono::floor<std::chrono::milliseconds>(std::chrono::system_clock::now()));
 
@@ -946,7 +964,10 @@ namespace gglab
 			});
 		if (entry == m_Entries.end())
 		{
-			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0) { return; }
+			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0)
+			{
+				return;
+			}
 			GGLAB_LOG_WARN("Frame capture result {} has no coordinator request.",
 				result.m_RequestId);
 			return;
@@ -961,7 +982,10 @@ namespace gglab
 				return;
 			}
 			entry->m_Phase = Phase::Waiting;
-			if (m_NonFiniteWatch) { m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId); }
+			if (m_NonFiniteWatch)
+			{
+				m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId);
+			}
 			entry->m_WatchCoverageId = 0;
 			entry->m_CaptureRequestId = 0;
 			entry->m_Metadata = {};
@@ -970,17 +994,21 @@ namespace gglab
 		const bool resources = entry->m_Request.m_Source == FrameCaptureSource::ResourceExport;
 		entry->m_ResourceFailure = result.m_ResourceFailure;
 		if (result.m_Status != FrameCaptureStatus::Completed ||
-			(resources ? (!result.m_Resources || result.m_Resources->m_Arrays.empty() ||
-				(entry->m_Request.m_IncludeGraph && !result.m_Graph)) : graph ? !result.m_Graph : !result.m_Image))
+			(resources ?
+				(!result.m_Resources || result.m_Resources->m_Arrays.empty() ||
+					(entry->m_Request.m_IncludeGraph && !result.m_Graph)) :
+				graph ? !result.m_Graph : !result.m_Image))
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
-				result.m_Failure.empty() ? std::string("The frame capture failed.")
-				: std::move(result.m_Failure));
+				result.m_Failure.empty() ?
+					std::string("The frame capture failed.") :
+					std::move(result.m_Failure));
 			return;
 		}
 		const std::optional<PostProcessDebugTap> expectedTap =
-			entry->m_Request.m_Source == FrameCaptureSource::Diagnostic
-			? entry->m_Request.m_DiagnosticTap : std::nullopt;
+			entry->m_Request.m_Source == FrameCaptureSource::Diagnostic ?
+				entry->m_Request.m_DiagnosticTap :
+				std::nullopt;
 		if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial ||
 			result.m_Source != entry->m_Request.m_Source || result.m_DiagnosticTap != expectedTap)
 		{
@@ -1012,7 +1040,10 @@ namespace gglab
 					continue;
 				}
 			}
-			if (entry.m_Phase != Phase::AwaitingWatch) { continue; }
+			if (entry.m_Phase != Phase::AwaitingWatch)
+			{
+				continue;
+			}
 			entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch ? m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId) : nullptr;
 			if (const auto& coverage = entry.m_Metadata.m_WatchCoverage; coverage)
 			{
@@ -1021,7 +1052,10 @@ namespace gglab
 					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
 					continue;
 				}
-				if (!coverage->m_Complete) { continue; }
+				if (!coverage->m_Complete)
+				{
+					continue;
+				}
 			}
 			StartEncoding(entry, *entry.m_PendingResult);
 			entry.m_PendingResult.reset();
@@ -1031,9 +1065,9 @@ namespace gglab
 	void FrameCaptureCoordinator::StartEncoding(
 		Entry& entry, const FrameCaptureResult& result) noexcept
 	{
-		const std::filesystem::path directory = entry.m_Request.m_OutputDirectory.empty()
-			? m_DefaultOutputDirectory
-			: entry.m_Request.m_OutputDirectory;
+		const std::filesystem::path directory = entry.m_Request.m_OutputDirectory.empty() ?
+			m_DefaultOutputDirectory :
+			entry.m_Request.m_OutputDirectory;
 		if (directory.empty())
 		{
 			Finish(entry, FrameCaptureRequestStatus::Failed,
@@ -1053,18 +1087,20 @@ namespace gglab
 			metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
 		}
 
-		const std::string_view subject = !entry.m_Request.m_Label.empty()
-			? std::string_view(entry.m_Request.m_Label)
-			: !metadata.m_LabId.empty() ? std::string_view(metadata.m_LabId)
-			: std::string_view(metadata.m_DemoId);
-		const std::string timestamp = metadata.m_CapturedAtUtc.size() >= 19
-			? std::format("{}{}{}-{}{}{}", metadata.m_CapturedAtUtc.substr(0, 4),
+		const std::string_view subject = !entry.m_Request.m_Label.empty() ?
+			std::string_view(entry.m_Request.m_Label) :
+			!metadata.m_LabId.empty() ?
+				std::string_view(metadata.m_LabId) :
+				std::string_view(metadata.m_DemoId);
+		const std::string timestamp = metadata.m_CapturedAtUtc.size() >= 19 ?
+			std::format("{}{}{}-{}{}{}", metadata.m_CapturedAtUtc.substr(0, 4),
 				metadata.m_CapturedAtUtc.substr(5, 2), metadata.m_CapturedAtUtc.substr(8, 2),
 				metadata.m_CapturedAtUtc.substr(11, 2), metadata.m_CapturedAtUtc.substr(14, 2),
-				metadata.m_CapturedAtUtc.substr(17, 2))
-			: std::string("unknown-time");
-		const std::string view = metadata.m_Camera.m_ReferenceViewId.empty()
-			? std::string{} : "-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
+				metadata.m_CapturedAtUtc.substr(17, 2)) :
+			std::string("unknown-time");
+		const std::string view = metadata.m_Camera.m_ReferenceViewId.empty() ?
+			std::string{} :
+			"-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
 		const std::string baseStem = std::format("{}{}-{}-{}-{}-r{}",
 			SanitizeFileStemComponent(subject), view,
 			GetFrameCaptureSourceName(metadata.m_Source),
@@ -1082,10 +1118,12 @@ namespace gglab
 		job->m_SubmissionFenceValue = result.m_SubmissionFenceValue;
 		job->m_AdapterCompatibilityIdentity = result.m_AdapterCompatibilityIdentity;
 		job->m_Directory = directory;
-		job->m_BaseStem = result.m_Resources
-			? std::format("{}.{}.resource-export", SanitizeFileStemComponent(subject), metadata.m_FrameSerial) : result.m_Graph
-			? std::format("{}.{}.graph{}", SanitizeFileStemComponent(subject), metadata.m_FrameSerial,
-				entry.m_Request.m_GraphSummary ? "-summary" : "") : baseStem;
+		job->m_BaseStem = result.m_Resources ?
+			std::format("{}.{}.resource-export", SanitizeFileStemComponent(subject), metadata.m_FrameSerial) :
+			result.m_Graph ?
+				std::format("{}.{}.graph{}", SanitizeFileStemComponent(subject), metadata.m_FrameSerial,
+					entry.m_Request.m_GraphSummary ? "-summary" : "") :
+				baseStem;
 		job->m_TemporaryStem = std::format("{}.{}.{}", job->m_BaseStem, m_TemporaryTag, entry.m_Id);
 		job->m_Metadata = metadata;
 		entry.m_Job = job;
@@ -1121,9 +1159,9 @@ namespace gglab
 		std::string failure = std::move(job.m_Failure);
 		// Decided before the failure moves into Finish: argument evaluation order
 		// is unspecified, so testing it in the same call could see the moved-from text.
-		const FrameCaptureRequestStatus status = failure.empty()
-			? FrameCaptureRequestStatus::Completed
-			: FrameCaptureRequestStatus::Failed;
+		const FrameCaptureRequestStatus status = failure.empty() ?
+			FrameCaptureRequestStatus::Completed :
+			FrameCaptureRequestStatus::Failed;
 		if (status == FrameCaptureRequestStatus::Completed)
 		{
 			entry.m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
@@ -1249,7 +1287,10 @@ namespace gglab
 		}
 		result.m_ResourceFailure = entry.m_ResourceFailure;
 		m_Results.push_back(std::move(result));
-		if (m_NonFiniteWatch) { m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId); }
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId);
+		}
 		entry.m_WatchCoverageId = 0;
 		entry.m_PendingResult.reset();
 		entry.m_Job.reset();
@@ -1287,9 +1328,9 @@ namespace gglab
 		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
 	{
 		// A job abandoned while it was queued is not written at all.
-		std::string failure = job.m_Claim == PublicationClaim::Abandoned
-			? std::string("The capture was abandoned at shutdown.")
-			: WriteAndPublish(job, encoder);
+		std::string failure = job.m_Claim == PublicationClaim::Abandoned ?
+			std::string("The capture was abandoned at shutdown.") :
+			WriteAndPublish(job, encoder);
 		// Release Runtime payload capacity on the writer thread before reporting
 		// completion. No frame-thread state or RHI resource is touched here.
 		job.m_Image.reset();
@@ -1321,12 +1362,17 @@ namespace gglab
 			}
 			const auto metadataTemporary = job.m_Directory / (job.m_TemporaryStem + ".json.partial");
 			const auto graphTemporary = job.m_Directory / (job.m_TemporaryStem + ".graph.json.partial");
-			const std::string graphJson = job.m_Graph ? SerializeFrameGraphExport(*job.m_Graph,
-				job.m_Metadata, submission, false, true) : std::string{};
+			const std::string graphJson = job.m_Graph ?
+				SerializeFrameGraphExport(*job.m_Graph,
+					job.m_Metadata, submission, false, true) :
+				std::string{};
 			const auto names = [&](std::string_view stem)
 				{
 					std::vector<std::filesystem::path> result;
-					for (size_t i = 0; i < temporary.size(); ++i) result.push_back(job.m_Directory / std::format("{}.{}.npy", stem, i));
+					for (size_t i = 0; i < temporary.size(); ++i)
+					{
+						result.push_back(job.m_Directory / std::format("{}.{}.npy", stem, i));
+					}
 					return result;
 				};
 			// Parse/validate metadata before producing any files, including invalid UTF-8.
@@ -1336,7 +1382,10 @@ namespace gglab
 			const auto cleanup = [&]()
 				{
 					std::error_code error;
-					for (const auto& path : temporary) std::filesystem::remove(path, error);
+					for (const auto& path : temporary)
+					{
+						std::filesystem::remove(path, error);
+					}
 					std::filesystem::remove(metadataTemporary, error);
 					std::filesystem::remove(graphTemporary, error);
 				};
@@ -1344,18 +1393,27 @@ namespace gglab
 			for (size_t i = 0; i < temporary.size(); ++i)
 			{
 				const std::string failure = WriteFileContents(temporary[i], headers[i], job.m_Resources->m_Arrays[i].m_Data);
-				if (!failure.empty()) { cleanup(); return failure; }
+				if (!failure.empty())
+				{
+					cleanup();
+					return failure;
+				}
 			}
 			if (job.m_Graph)
 			{
 				const std::string failure = WriteFileContents(graphTemporary,
 					{ reinterpret_cast<const uint8_t*>(graphJson.data()), graphJson.size() });
-				if (!failure.empty()) { cleanup(); return failure; }
+				if (!failure.empty())
+				{
+					cleanup();
+					return failure;
+				}
 			}
 			PublicationClaim expected = PublicationClaim::Open;
 			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
 			{
-				cleanup(); return "The resource export was abandoned at shutdown.";
+				cleanup();
+				return "The resource export was abandoned at shutdown.";
 			}
 			job.m_Stage = EncodeStage::Publishing;
 			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
@@ -1411,11 +1469,16 @@ namespace gglab
 					{
 						std::filesystem::rename(path, partial, error);
 					}
-					if (error) { cleanup(); return "Resource export rollback failed; publication is indeterminate."; }
+					if (error)
+					{
+						cleanup();
+						return "Resource export rollback failed; publication is indeterminate.";
+					}
 				}
 				if (outcome == PublishOutcome::Failed)
 				{
-					cleanup(); return failure.empty() ? "Publishing the resource export group failed." : failure;
+					cleanup();
+					return failure.empty() ? "Publishing the resource export group failed." : failure;
 				}
 			}
 			cleanup();
@@ -1444,8 +1507,9 @@ namespace gglab
 			job.m_Stage = EncodeStage::Publishing;
 			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
 			{
-				const auto path = job.m_Directory / ((attempt == 1 ? job.m_BaseStem
-					: std::format("{}-{}", job.m_BaseStem, attempt)) + ".json");
+				const auto path = job.m_Directory / ((attempt == 1 ?
+					job.m_BaseStem :
+					std::format("{}-{}", job.m_BaseStem, attempt)) + ".json");
 				const PublishOutcome outcome = PublishNewFile(temporary, path);
 				if (outcome == PublishOutcome::NameTaken)
 				{
@@ -1505,9 +1569,9 @@ namespace gglab
 		job.m_Stage = EncodeStage::Publishing;
 		for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
 		{
-			const std::string stem = attempt == 1
-				? job.m_BaseStem
-				: std::format("{}-{}", job.m_BaseStem, attempt);
+			const std::string stem = attempt == 1 ?
+				job.m_BaseStem :
+				std::format("{}-{}", job.m_BaseStem, attempt);
 			const std::filesystem::path imagePath = job.m_Directory / (stem + ".png");
 			const std::filesystem::path metadataPath = job.m_Directory / (stem + ".json");
 			const PublishOutcome image = PublishNewFile(temporaryImage, imagePath);
@@ -1528,9 +1592,9 @@ namespace gglab
 			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(json.data());
 			failure = WriteFileContents(
 				temporaryMetadata, std::span<const uint8_t>(jsonBytes, json.size()));
-			const PublishOutcome metadata = failure.empty()
-				? PublishNewFile(temporaryMetadata, metadataPath)
-				: PublishOutcome::Failed;
+			const PublishOutcome metadata = failure.empty() ?
+				PublishNewFile(temporaryMetadata, metadataPath) :
+				PublishOutcome::Failed;
 			if (metadata == PublishOutcome::Published)
 			{
 				removeTemporaryFiles();
@@ -1554,9 +1618,9 @@ namespace gglab
 			if (metadata == PublishOutcome::Failed)
 			{
 				removeTemporaryFiles();
-				return failure.empty()
-					? std::format("Publishing '{}' failed.", GetFrameCapturePathText(metadataPath))
-					: failure;
+				return failure.empty() ?
+					std::format("Publishing '{}' failed.", GetFrameCapturePathText(metadataPath)) :
+					failure;
 			}
 			job.m_Stage = EncodeStage::Publishing;
 		}

@@ -33,29 +33,29 @@ namespace gglab
 	namespace
 	{
 		// Persisted in capture metadata and requested by name; never rename an entry.
-		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 20>
-			DiagnosticTapNames{ {
-				{ PostProcessDebugTap::SceneDepthRaw, "scene-depth-raw" },
-				{ PostProcessDebugTap::SceneDepthLinearViewZ, "scene-depth-linear-view-z" },
-				{ PostProcessDebugTap::GTAORawAO, "gtao-raw-ao" },
-				{ PostProcessDebugTap::GTAOHalfDepthViewZ, "gtao-half-depth-view-z" },
-				{ PostProcessDebugTap::GTAOReconstructedNormal, "gtao-reconstructed-normal" },
-				{ PostProcessDebugTap::GTAOSelectedSurfaceOffset, "gtao-selected-surface-offset" },
-				{ PostProcessDebugTap::GTAODenoiseX, "gtao-denoise-x" },
-				{ PostProcessDebugTap::GTAODenoiseY, "gtao-denoise-y" },
-				{ PostProcessDebugTap::GTAOFinalAO, "gtao-final-ao" },
-				{ PostProcessDebugTap::GTAOAOOnlyLightingContribution, "gtao-ao-only-lighting" },
-				{ PostProcessDebugTap::TemporalMotionDirection, "temporal-motion-direction" },
-				{ PostProcessDebugTap::TemporalMotionMagnitude, "temporal-motion-magnitude" },
-				{ PostProcessDebugTap::TemporalHistoryColor, "temporal-history-color" },
-				{ PostProcessDebugTap::TemporalReprojectionUV, "temporal-reprojection-uv" },
-				{ PostProcessDebugTap::TemporalRejection, "temporal-rejection" },
-				{ PostProcessDebugTap::TemporalHistoryWeight, "temporal-history-weight" },
-				{ PostProcessDebugTap::TemporalHistorySamples, "temporal-history-samples" },
-				{ PostProcessDebugTap::TemporalClipDistance, "temporal-clip-distance" },
-				{ PostProcessDebugTap::TemporalHistoryRelaxation, "temporal-history-relaxation" },
-				{ PostProcessDebugTap::GTAOHistorySamples, "gtao-history-samples" },
-			} };
+		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 20> DiagnosticTapNames
+		{ {
+			{ PostProcessDebugTap::SceneDepthRaw, "scene-depth-raw" },
+			{ PostProcessDebugTap::SceneDepthLinearViewZ, "scene-depth-linear-view-z" },
+			{ PostProcessDebugTap::GTAORawAO, "gtao-raw-ao" },
+			{ PostProcessDebugTap::GTAOHalfDepthViewZ, "gtao-half-depth-view-z" },
+			{ PostProcessDebugTap::GTAOReconstructedNormal, "gtao-reconstructed-normal" },
+			{ PostProcessDebugTap::GTAOSelectedSurfaceOffset, "gtao-selected-surface-offset" },
+			{ PostProcessDebugTap::GTAODenoiseX, "gtao-denoise-x" },
+			{ PostProcessDebugTap::GTAODenoiseY, "gtao-denoise-y" },
+			{ PostProcessDebugTap::GTAOFinalAO, "gtao-final-ao" },
+			{ PostProcessDebugTap::GTAOAOOnlyLightingContribution, "gtao-ao-only-lighting" },
+			{ PostProcessDebugTap::TemporalMotionDirection, "temporal-motion-direction" },
+			{ PostProcessDebugTap::TemporalMotionMagnitude, "temporal-motion-magnitude" },
+			{ PostProcessDebugTap::TemporalHistoryColor, "temporal-history-color" },
+			{ PostProcessDebugTap::TemporalReprojectionUV, "temporal-reprojection-uv" },
+			{ PostProcessDebugTap::TemporalRejection, "temporal-rejection" },
+			{ PostProcessDebugTap::TemporalHistoryWeight, "temporal-history-weight" },
+			{ PostProcessDebugTap::TemporalHistorySamples, "temporal-history-samples" },
+			{ PostProcessDebugTap::TemporalClipDistance, "temporal-clip-distance" },
+			{ PostProcessDebugTap::TemporalHistoryRelaxation, "temporal-history-relaxation" },
+			{ PostProcessDebugTap::GTAOHistorySamples, "gtao-history-samples" },
+		} };
 	}
 
 	std::string_view GetFrameCaptureDiagnosticTapName(PostProcessDebugTap tap) noexcept

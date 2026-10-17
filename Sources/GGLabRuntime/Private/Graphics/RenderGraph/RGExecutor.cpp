@@ -21,8 +21,9 @@ namespace gglab
 				"RenderGraph texture resolution requires a texture resource.");
 			const auto* texture =
 				static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
-			return texture->m_Imported ? texture->m_ImportedHandle
-				: texture->m_PhysicalAllocation.m_Texture;
+			return texture->m_Imported ?
+				texture->m_ImportedHandle :
+				texture->m_PhysicalAllocation.m_Texture;
 		}
 
 		RHIBufferHandle ResolveBufferHandle(const RGCompiledResource& resource) noexcept
@@ -31,8 +32,9 @@ namespace gglab
 				"RenderGraph buffer resolution requires a buffer resource.");
 			const auto* buffer =
 				static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
-			return buffer->m_Imported ? buffer->m_ImportedHandle
-				: buffer->m_PhysicalAllocation.m_Buffer;
+			return buffer->m_Imported ?
+				buffer->m_ImportedHandle :
+				buffer->m_PhysicalAllocation.m_Buffer;
 		}
 
 		RHICommandContext* SelectPassCommandContext(
@@ -150,7 +152,7 @@ namespace gglab
 				}
 				if (record)
 				{
-					record->m_Barriers.push_back({ passIndex, post, {
+					record->m_Barriers.push_back({ passIndex, post,{
 						.m_VirtualResourceIndex = intent.m_Resource.Value(),
 						.m_ResourceName = std::string(resource.m_NameId.Name()),
 						.m_ResourceType = resource.m_ResourceType,
@@ -185,8 +187,9 @@ namespace gglab
 		const auto& view = m_ExecutionPlan->GetTextureViews()[viewId.Value()];
 		const auto& resource = m_ExecutionPlan->GetResources()[view.m_Resource.Value()];
 		const RHITextureHandle texture = ResolveTextureHandle(resource);
-		return texture.IsValid() ? m_Device->CreateTextureView(texture, view.m_Desc)
-			: RHITextureViewHandle{};
+		return texture.IsValid() ?
+			m_Device->CreateTextureView(texture, view.m_Desc) :
+			RHITextureViewHandle{};
 	}
 
 	RHIDescriptorHandle RGExecuteContext::GetViewDescriptor(RGTextureViewId viewId) const noexcept
@@ -200,8 +203,9 @@ namespace gglab
 		const bool descriptorPublished = m_Device->PublishTextureViewDescriptor(view);
 		GGLAB_ASSERT_MSG(
 			descriptorPublished, "RenderGraph failed to publish a texture-view descriptor.");
-		return descriptorPublished ? m_Device->GetTextureViewDescriptor(view)
-			: RHIDescriptorHandle{};
+		return descriptorPublished ?
+			m_Device->GetTextureViewDescriptor(view) :
+			RHIDescriptorHandle{};
 	}
 
 	RHIBufferHandle RGExecuteContext::GetBufferHandle(RGBufferId bufferId) const noexcept
@@ -223,8 +227,9 @@ namespace gglab
 		const auto& resource = m_ExecutionPlan->GetResources()[resourceIndex];
 		GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGBuffer,
 			"RenderGraph buffer resolution requires a buffer resource.");
-		return resource.m_ResourceType == RGResourceType::RGBuffer ? ResolveBufferHandle(resource)
-			: RHIBufferHandle{};
+		return resource.m_ResourceType == RGResourceType::RGBuffer ?
+			ResolveBufferHandle(resource) :
+			RHIBufferHandle{};
 	}
 
 	RHITextureHandle RGExecuteContext::GetTextureHandle(RGTextureId textureId) const noexcept
@@ -246,9 +251,9 @@ namespace gglab
 		const auto& resource = m_ExecutionPlan->GetResources()[resourceIndex];
 		GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGTexture,
 			"RenderGraph texture resolution requires a texture resource.");
-		return resource.m_ResourceType == RGResourceType::RGTexture
-			? ResolveTextureHandle(resource)
-			: RHITextureHandle{};
+		return resource.m_ResourceType == RGResourceType::RGTexture ?
+			ResolveTextureHandle(resource) :
+			RHITextureHandle{};
 	}
 
 	RHIGraphicsCommandContext* RGExecuteContext::GetGraphicsCommandContext() const noexcept

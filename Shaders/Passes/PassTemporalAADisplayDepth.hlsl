@@ -20,5 +20,5 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 float PSMain(FullscreenTriangleVSOutput IN) : SV_Depth
 {
 	Texture2D<float> sourceDepth = GetTexture2DFloat(g_Pass.SourceDepthIndex);
-	return sourceDepth.Load(int3(uint2(IN.PositionCS.xy), 0));
+	return sourceDepth.Load(int3((uint2)(IN.PositionCS.xy), 0));
 }

@@ -31,23 +31,24 @@ namespace gglab
 	{
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 
-		constexpr std::array<IBLArtifactStage, static_cast<size_t>(IBLArtifactStage::Count)>
-			ArtifactStages = {
-				IBLArtifactStage::Environment,
-				IBLArtifactStage::Irradiance,
-				IBLArtifactStage::PrefilteredSpecular,
-				IBLArtifactStage::BrdfLut,
+		constexpr std::array<IBLArtifactStage, static_cast<size_t>(IBLArtifactStage::Count)> ArtifactStages =
+		{
+			IBLArtifactStage::Environment,
+			IBLArtifactStage::Irradiance,
+			IBLArtifactStage::PrefilteredSpecular,
+			IBLArtifactStage::BrdfLut,
 		};
 
-		constexpr std::array<TextureIndex, static_cast<size_t>(IBLArtifactStage::Count)>
-			ArtifactTextureIndices = {
-				TextureIndex::IBL_EnvironmentCubemap,
-				TextureIndex::IBL_IrradianceCubemap,
-				TextureIndex::IBL_PrefilteredSpecularCubemap,
-				TextureIndex::IBL_BrdfLut,
-			};
+		constexpr std::array<TextureIndex, static_cast<size_t>(IBLArtifactStage::Count)> ArtifactTextureIndices =
+		{
+			TextureIndex::IBL_EnvironmentCubemap,
+			TextureIndex::IBL_IrradianceCubemap,
+			TextureIndex::IBL_PrefilteredSpecularCubemap,
+			TextureIndex::IBL_BrdfLut,
+		};
 
-		const std::array<ShaderProgramRef, 12> IBLProducerPrograms = {
+		const std::array<ShaderProgramRef, 12> IBLProducerPrograms =
+		{
 			shader_programs::IBLEnvironmentVertex,
 			shader_programs::IBLEnvironmentPixel,
 			shader_programs::IBLEnvironmentMipVertex,
@@ -75,15 +76,15 @@ namespace gglab
 
 			auto assignStage = [&outIdentities, &artifacts](IBLArtifactStage stage,
 				std::initializer_list<size_t> indices) noexcept
-			{
-				auto& identity = outIdentities[static_cast<size_t>(stage)];
-				identity.m_Count = static_cast<uint32_t>(indices.size());
-				size_t destination = 0;
-				for (const size_t index : indices)
 				{
-					identity.m_ArtifactRefs[destination++] = artifacts[index];
-				}
-			};
+					auto& identity = outIdentities[static_cast<size_t>(stage)];
+					identity.m_Count = static_cast<uint32_t>(indices.size());
+					size_t destination = 0;
+					for (const size_t index : indices)
+					{
+						identity.m_ArtifactRefs[destination++] = artifacts[index];
+					}
+				};
 
 			assignStage(IBLArtifactStage::Environment, { 0, 1, 2, 3 });
 			assignStage(IBLArtifactStage::Irradiance, { 4, 5 });
@@ -91,7 +92,9 @@ namespace gglab
 			assignStage(IBLArtifactStage::BrdfLut, { 8, 9 });
 			return std::ranges::all_of(outIdentities,
 				[](const IBLStageShaderArtifactIdentity& identity) noexcept
-				{ return identity.IsValid(); });
+				{
+					return identity.IsValid();
+				});
 		}
 
 		[[nodiscard]] consteval bool ValidateResourceInitializationAbortSupersede() noexcept
@@ -142,11 +145,16 @@ namespace gglab
 		{
 			switch (stage)
 			{
-			case IBLBakeStage::Environment: return 0.1f;
-			case IBLBakeStage::Irradiance: return 0.4f;
-			case IBLBakeStage::PrefilteredSpecular: return 0.6f;
-			case IBLBakeStage::BrdfLut: return 0.8f;
-			default: return 0.0f;
+			case IBLBakeStage::Environment:
+				return 0.1f;
+			case IBLBakeStage::Irradiance:
+				return 0.4f;
+			case IBLBakeStage::PrefilteredSpecular:
+				return 0.6f;
+			case IBLBakeStage::BrdfLut:
+				return 0.8f;
+			default:
+				return 0.0f;
 			}
 		}
 	}
@@ -160,8 +168,9 @@ namespace gglab
 			const auto& stageResult = result.Get(stage);
 			auto& stageStatus = status.m_Artifacts[static_cast<size_t>(stage)];
 			stageStatus.m_DerivedDataKey = stageResult.m_Key;
-			stageStatus.m_ContentDigest = stageResult.m_Artifact
-				? stageResult.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+			stageStatus.m_ContentDigest = stageResult.m_Artifact ?
+				stageResult.m_Artifact->m_ContentDigest :
+				ArtifactContentDigest{};
 			switch (stageResult.m_Source)
 			{
 			case IBLDerivedDataSource::CpuCache:
@@ -186,13 +195,13 @@ namespace gglab
 
 	IBLBakeStage detail::SelectNextMissingIBLBakeStage(const IBLBakeStatus& status) noexcept
 	{
-		constexpr std::array<std::pair<IBLArtifactStage, IBLBakeStage>,
-			static_cast<size_t>(IBLArtifactStage::Count)> ProducerOrder = { {
-				{ IBLArtifactStage::Environment, IBLBakeStage::Environment },
-				{ IBLArtifactStage::Irradiance, IBLBakeStage::Irradiance },
-				{ IBLArtifactStage::PrefilteredSpecular, IBLBakeStage::PrefilteredSpecular },
-				{ IBLArtifactStage::BrdfLut, IBLBakeStage::BrdfLut },
-			} };
+		constexpr std::array<std::pair<IBLArtifactStage, IBLBakeStage>, static_cast<size_t>(IBLArtifactStage::Count)> ProducerOrder =
+		{ {
+			{ IBLArtifactStage::Environment, IBLBakeStage::Environment },
+			{ IBLArtifactStage::Irradiance, IBLBakeStage::Irradiance },
+			{ IBLArtifactStage::PrefilteredSpecular, IBLBakeStage::PrefilteredSpecular },
+			{ IBLArtifactStage::BrdfLut, IBLBakeStage::BrdfLut },
+		} };
 		for (const auto& [artifactStage, bakeStage] : ProducerOrder)
 		{
 			if (status.m_Artifacts[static_cast<size_t>(artifactStage)].m_Resolution ==
@@ -234,8 +243,9 @@ namespace gglab
 			.m_ArtifactCache = createInfo.m_ArtifactCache,
 			.m_Compatibility = IBLArtifactCompatibility::AdapterScoped,
 			.m_AdapterScopeIdentity = std::string(
-				createInfo.m_Device ? createInfo.m_Device->GetAdapterCompatibilityIdentity()
-									: std::string_view{}),
+				createInfo.m_Device ?
+					createInfo.m_Device->GetAdapterCompatibilityIdentity() :
+					std::string_view{}),
 			})
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
@@ -469,15 +479,17 @@ namespace gglab
 				.m_Name = std::format("IBL.StageCacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config,
-			shaderArtifacts, ignoreCache, work](std::stop_token stopToken) noexcept
+			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config, shaderArtifacts, ignoreCache, work]
+			(std::stop_token stopToken) noexcept
 			{
 				work->m_Result = m_DerivedDataSystem.Lookup(
 					contentFingerprint, sourceType, config, shaderArtifacts, ignoreCache, stopToken);
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
-			{ CompleteCacheLookup(completion, work); });
+			{
+				CompleteCacheLookup(completion, work);
+			});
 		if (!m_CacheLookupTask.IsValid())
 		{
 			ReleaseBakingSourceLease();
@@ -699,9 +711,9 @@ namespace gglab
 		const bool shaderRegistryChanged = detail::HasIBLBakeShaderRegistryChanged(
 			m_BakingRequest.m_ShaderRegistry, m_ShaderManager->GetActiveRegistryRef());
 		return !shaderRegistryChanged && !m_InFlightFence.IsValid() &&
-			IsGpuStage(m_Status.m_Stage)
-			? m_Status.m_Stage
-			: IBLBakeStage::Idle;
+			IsGpuStage(m_Status.m_Stage) ?
+				m_Status.m_Stage :
+				IBLBakeStage::Idle;
 	}
 
 	void IBLBakeScheduler::AdvanceCompletedStage() noexcept
@@ -908,7 +920,9 @@ namespace gglab
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
-			{ CompleteCacheWrite(completion, work); });
+			{
+				CompleteCacheWrite(completion, work);
+			});
 		if (!work->m_Task.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -933,8 +947,9 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN(
 				"IBL stage artifacts for generation {} were not fully persisted: {}",
 				work->m_Generation,
-				completion.m_Status == TaskStatus::Cancelled ? "task cancelled"
-				: completion.m_Error);
+				completion.m_Status == TaskStatus::Cancelled ?
+					"task cancelled" :
+					completion.m_Error);
 		}
 		m_Status.m_CacheWritePending = m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
 	}
@@ -943,7 +958,9 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(std::ranges::none_of(m_Status.m_Artifacts,
 			[](const IBLStageArtifactStatus& artifact) noexcept
-			{ return artifact.m_Resolution == IBLArtifactResolution::Miss; }),
+			{
+				return artifact.m_Resolution == IBLArtifactResolution::Miss;
+			}),
 			"IBL staging resources must contain a complete generation before publication.");
 		if (m_BakingRequest.m_PhysicalSky && !m_BakeAtmosphere->CanPublish())
 		{

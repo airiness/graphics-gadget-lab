@@ -39,7 +39,7 @@ namespace gglab
 		const bool skyConstants = services.m_Environment &&
 			services.m_Environment->GetEnvironmentLightingSettings().m_EnableSkybox &&
 			services.m_Environment->GetEnvironmentLightingSettings().m_BackgroundMode !=
-				EnvironmentBackgroundMode::TextureEnvironment;
+			EnvironmentBackgroundMode::TextureEnvironment;
 		AddLuts(rg, services, *atmosphere, ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
 			context.GetDisplayRenderView().m_CameraPosition), skyConstants, false);
 	}
@@ -67,7 +67,11 @@ namespace gglab
 			m_Recipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 		}
 		const auto pipeline = services.m_PipelineResolver->Resolve(m_Slot, m_Recipe, GetInfo());
-		if (!pipeline.IsValid()) { atmosphere->Disable(); return; }
+		if (!pipeline.IsValid())
+		{
+			atmosphere->Disable();
+			return;
+		}
 		const uint64_t generation = services.m_ShaderPrograms->GetGeneration(m_Recipe.m_CSId);
 		if (!atmosphere->Begin(parameters, { generation, generation, generation }, skyConstants))
 		{

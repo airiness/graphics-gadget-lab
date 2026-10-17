@@ -153,12 +153,12 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 	TextureSamplerBindingData binding =
 		MakeTextureSamplerBinding(g_Scene.IBLResource.PrefilteredSpecularBinding);
 	const uint mipLevels = max(g_Scene.IBLResource.PrefilteredSpecularMipLevels, 1u);
-	const float maxMipLevel = (float) (mipLevels - 1u);
+	const float maxMipLevel = (float)(mipLevels - 1u);
 	const float lod = saturate(perceptualRoughness) * maxMipLevel;
 	float3 direction = WorldToEnvironmentDirection(SafeNormalize(reflectWS, float3(0.0, 1.0, 0.0)),
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCubeLevel(binding, direction, lod).rgb *
-		   g_Scene.IBLResource.EnvironmentIntensity;
+		g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material)
@@ -190,7 +190,7 @@ float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane rece
 	}
 	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
 	SamplerComparisonState samplerState = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
-	const float2 texelSize = 1.0.xx / max((float) g_Pass.ShadowMapSize, 1.0);
+	const float2 texelSize = 1.0.xx / max((float)(g_Pass.ShadowMapSize), 1.0);
 	const float2 gradient = ComputeShadowReceiverDepthGradient(receiver, viewIndex);
 	const float residualBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
 	// Each hardware comparison blends four texels. Account for its one-texel support,
@@ -357,8 +357,9 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
 	}
 
 	const float NoL = saturate(dot(material.Base.NormalWS, L));
-	const float coatNoL = material.Clearcoat.Factor > 0.0
-		? saturate(dot(material.Clearcoat.NormalWS, L)) : 0.0;
+	const float coatNoL = material.Clearcoat.Factor > 0.0 ?
+		saturate(dot(material.Clearcoat.NormalWS, L)) :
+		0.0;
 	if (NoL <= 0.0 && coatNoL <= 0.0)
 	{
 		return result;
@@ -399,8 +400,9 @@ float3 EvaluateAllDirectLights(float3 positionWS,
 #if defined(GGLAB_FORWARD_PLUS)
 uint GetForwardPlusGlobalLightIndex(uint listIndex)
 {
-	return listIndex < 2u ? g_Pass.ForwardPlusGlobalLightIndices01[listIndex]
-		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
+	return listIndex < 2u ?
+		g_Pass.ForwardPlusGlobalLightIndices01[listIndex] :
+		g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
 float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS,
@@ -425,7 +427,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 	{
 		return lighting;
 	}
-	const uint tileIndex = GetForwardPlusTileIndex(uint2(pixelPosition), tileCount);
+	const uint tileIndex = GetForwardPlusTileIndex((uint2)(pixelPosition), tileCount);
 	const uint2 header = g_ForwardPlusTileHeaders[tileIndex];
 	const uint localLightCount = GetForwardPlusTileLightCount(header.y);
 	const uint lightEnd = g_Scene.LightBaseIndex + g_Scene.LightCount;
@@ -530,7 +532,7 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 			occlusionUV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
-	const float gtao = LoadGTAO(uint2(IN.PositionCS.xy));
+	const float gtao = LoadGTAO((uint2)(IN.PositionCS.xy));
 	const float3 materialOccludedDiffuseIBL =
 		ibl.Diffuse * ResolveSpecularIBLVisibility(ao);
 	const float3 gtaoContribution = materialOccludedDiffuseIBL * (1.0 - gtao);

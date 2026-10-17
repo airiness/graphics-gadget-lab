@@ -28,9 +28,9 @@ namespace gglab
 
 	[[nodiscard]] constexpr uint32_t GetRHITextureArraySize(const RHITextureDesc& desc) noexcept
 	{
-		return desc.m_Dimension == RHITextureDimension::Texture3D
-			? 1u
-			: std::max<uint32_t>(desc.m_ArraySize, 1u);
+		return desc.m_Dimension == RHITextureDimension::Texture3D ?
+			1u :
+			std::max<uint32_t>(desc.m_ArraySize, 1u);
 	}
 
 	[[nodiscard]] constexpr RHISubresourceRange NormalizeTextureSubresourceRange(

@@ -145,13 +145,13 @@ namespace gglab
 		m_Time->SetFixedDeltaTime(m_Config.m_FixedDeltaTimeSeconds);
 		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
 			.m_WorkerLifecycle = m_HostServices.m_TaskWorkerLifecycle,
-			});
+		});
 		m_ShaderManager = std::make_unique<ShaderManager>(ShaderManagerCreateInfo{
 			.m_ActiveBackend = activeBackend,
 			.m_ArtifactRoot = std::move(createInfo.m_ShaderArtifactRoot),
 			.m_ActiveRegistry = createInfo.m_ActiveShaderRegistry,
 			.m_NonFiniteCounters = m_Config.m_NonFiniteCounters,
-			});
+		});
 		if (!m_ShaderManager->IsReady())
 		{
 			GGLAB_LOG_ERROR("Failed to initialize ShaderManager (status={}).",
@@ -175,7 +175,7 @@ namespace gglab
 			.m_AdapterSelector = m_Config.m_AdapterSelector,
 			.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation,
 			.m_EnableGpuBasedValidation = m_Config.m_RequestGpuBasedValidation,
-			});
+		});
 		if (!renderHostInstance.m_Host)
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the render host.");
@@ -203,7 +203,7 @@ namespace gglab
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
-			});
+		});
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_Device = &m_RenderHost->GetRHIContext()->GetDevice();
@@ -222,7 +222,7 @@ namespace gglab
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_RenderComposition->GetEnvironmentSourceControl(),
 				.m_AssetRoot = m_Paths.m_AssetRoot,
-				});
+			});
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
 
 		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost->GetRHIContext());
@@ -334,10 +334,10 @@ namespace gglab
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ShaderManager.get());
 		const ShaderPreloadStatus status = m_ShaderManager->GetPreloadStatus();
-		const float fraction = status.m_TotalCount > 0
-			? static_cast<float>(status.m_CompletedCount) /
-			static_cast<float>(status.m_TotalCount)
-			: 0.0f;
+		const float fraction = status.m_TotalCount > 0 ?
+			static_cast<float>(status.m_CompletedCount) /
+				static_cast<float>(status.m_TotalCount) :
+			0.0f;
 		if (status.HasFailed())
 		{
 			return {
@@ -345,8 +345,9 @@ namespace gglab
 				.m_Fraction = fraction,
 				.m_Title = "Starting Graphics Gadget Lab",
 				.m_Stage = "Shader preload failed",
-				.m_Detail = status.m_Error.empty() ? "The shader preload task was cancelled."
-											   : status.m_Error,
+				.m_Detail = status.m_Error.empty() ?
+					"The shader preload task was cancelled." :
+					status.m_Error,
 			};
 		}
 
@@ -355,8 +356,9 @@ namespace gglab
 			.m_Fraction = status.IsReady() ? 1.0f : fraction,
 			.m_Title = "Starting Graphics Gadget Lab",
 			.m_Stage = status.IsReady() ? "Shaders ready" : "Preloading shaders",
-			.m_Detail = status.m_CurrentShader.empty() ? "Waiting for a shader worker."
-											   : status.m_CurrentShader,
+			.m_Detail = status.m_CurrentShader.empty() ?
+				"Waiting for a shader worker." :
+				status.m_CurrentShader,
 		};
 	}
 
@@ -465,8 +467,8 @@ namespace gglab
 		m_ResizePending = false;
 
 		m_ShutdownComplete = true;
-		m_LifecycleState = preserveFailure
-			? AppRuntimeLifecycleState::Failed
-			: AppRuntimeLifecycleState::Stopped;
+		m_LifecycleState = preserveFailure ?
+			AppRuntimeLifecycleState::Failed :
+			AppRuntimeLifecycleState::Stopped;
 	}
 }

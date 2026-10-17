@@ -170,7 +170,8 @@ namespace gglab
 	{
 		void WriteSceneInputs(JsonWriter& writer, const FrameCaptureSceneInputs& inputs)
 		{
-			const auto vector = [&](std::string_view name, const Vector3& value)
+			const auto vector =
+				[&](std::string_view name, const Vector3& value)
 				{
 					writer.Vector(name, { value.m_X, value.m_Y, value.m_Z });
 				};
@@ -295,11 +296,16 @@ namespace gglab
 			{
 				switch (status)
 				{
-				case NonFiniteClaimStatus::Passed: return "Passed";
-				case NonFiniteClaimStatus::Failed: return "Failed";
-				case NonFiniteClaimStatus::NotApplicable: return "NotApplicable";
-				case NonFiniteClaimStatus::Unavailable: return "Unavailable";
-				default: return "Incomplete";
+				case NonFiniteClaimStatus::Passed:
+					return "Passed";
+				case NonFiniteClaimStatus::Failed:
+					return "Failed";
+				case NonFiniteClaimStatus::NotApplicable:
+					return "NotApplicable";
+				case NonFiniteClaimStatus::Unavailable:
+					return "Unavailable";
+				default:
+					return "Incomplete";
 				}
 			};
 		JsonWriter writer;
@@ -311,8 +317,14 @@ namespace gglab
 		writer.String("coverage", "submitted-range");
 		writer.String("instrumentation", coverage.m_InstrumentationAvailable ? "available" : "unavailable");
 		writer.BeginArray("claims");
-		if (coverage.m_BoundaryRequested) { writer.String({}, "boundary"); }
-		if (coverage.m_ProductionRequested) { writer.String({}, "production"); }
+		if (coverage.m_BoundaryRequested)
+		{
+			writer.String({}, "boundary");
+		}
+		if (coverage.m_ProductionRequested)
+		{
+			writer.String({}, "production");
+		}
 		writer.EndArray();
 		writer.Unsigned("firstFrameSerial", coverage.m_FirstFrameSerial);
 		writer.Unsigned("lastFrameSerial", coverage.m_LastFrameSerial);

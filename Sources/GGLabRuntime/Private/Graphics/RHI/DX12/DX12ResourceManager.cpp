@@ -178,9 +178,9 @@ namespace gglab
 			return {};
 		}
 
-		const char* debugNameText = desc.m_RHI.m_External.m_DebugName
-			? desc.m_RHI.m_External.m_DebugName
-			: desc.m_RHI.m_Desc.m_DebugName;
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
 			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
@@ -213,9 +213,9 @@ namespace gglab
 			return {};
 		}
 
-		const char* debugNameText = desc.m_RHI.m_External.m_DebugName
-			? desc.m_RHI.m_External.m_DebugName
-			: desc.m_RHI.m_Desc.m_DebugName;
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
 			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
@@ -487,7 +487,9 @@ namespace gglab
 
 			const bool completed =
 				std::ranges::all_of(slot.m_RetirementPoints, [this](const RHIFencePoint& point)
-					{ return m_Device && m_Device->IsFencePointCompleted(point); });
+					{
+						return m_Device && m_Device->IsFencePointCompleted(point);
+					});
 			if (!completed)
 			{
 				continue;

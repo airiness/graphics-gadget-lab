@@ -78,8 +78,9 @@ namespace gglab
 			{
 				return "-";
 			}
-			return shader.m_DebugName.empty() ? devtools::RHIHandleText(shader.m_Handle)
-				: shader.m_DebugName;
+			return shader.m_DebugName.empty() ?
+				devtools::RHIHandleText(shader.m_Handle) :
+				shader.m_DebugName;
 		}
 
 		std::string RenderTargetFormatsText(const RHIPipelineSnapshot& pipeline)
@@ -221,7 +222,9 @@ namespace gglab
 
 			const auto selected =
 				std::ranges::find_if(snapshot.m_BindingLayouts, [&state](const auto& layout)
-					{ return layout.m_Handle.Index() == state.m_SelectedLayout; });
+					{
+						return layout.m_Handle.Index() == state.m_SelectedLayout;
+					});
 			if (selected != snapshot.m_BindingLayouts.end())
 			{
 				DrawBindingLayoutDetail(*selected);
@@ -236,17 +239,17 @@ namespace gglab
 				const RHIShaderSnapshot* m_Shader;
 			};
 			const StageEntry graphicsStages[] = {
-				{"VS", &pipeline.m_VertexShader},
-				{"PS", &pipeline.m_PixelShader},
-				{"DS", &pipeline.m_DomainShader},
-				{"HS", &pipeline.m_HullShader},
-				{"GS", &pipeline.m_GeometryShader},
+				{ "VS", &pipeline.m_VertexShader },
+				{ "PS", &pipeline.m_PixelShader },
+				{ "DS", &pipeline.m_DomainShader },
+				{ "HS", &pipeline.m_HullShader },
+				{ "GS", &pipeline.m_GeometryShader },
 			};
-			const StageEntry computeStages[] = { {"CS", &pipeline.m_ComputeShader} };
+			const StageEntry computeStages[] = { { "CS", &pipeline.m_ComputeShader } };
 			const std::span<const StageEntry> stages =
-				pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-				? std::span<const StageEntry>(graphicsStages)
-				: std::span<const StageEntry>(computeStages);
+				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+					std::span<const StageEntry>(graphicsStages) :
+					std::span<const StageEntry>(computeStages);
 			if (ImGui::BeginTable("PipelineShaders", 4,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
@@ -269,9 +272,9 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(handle.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(stage.m_Shader->m_DebugName.empty()
-						? "-"
-						: stage.m_Shader->m_DebugName.c_str());
+					ImGui::TextUnformatted(stage.m_Shader->m_DebugName.empty() ?
+						"-" :
+						stage.m_Shader->m_DebugName.c_str());
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(hash.c_str());
 				}
@@ -322,7 +325,9 @@ namespace gglab
 					{
 						const auto buffer = std::ranges::find_if(pipeline.m_VertexBuffers,
 							[&attribute](const auto& value)
-							{ return value.m_InputSlot == attribute.m_InputSlot; });
+							{
+								return value.m_InputSlot == attribute.m_InputSlot;
+							});
 						ImGui::TableNextRow();
 						ImGui::TableSetColumnIndex(0);
 						ImGui::Text(
@@ -375,9 +380,9 @@ namespace gglab
 				ImGui::TableHeadersRow();
 				for (const auto& pass : pipeline.m_RenderPasses)
 				{
-					const std::string category = pass.m_CategoryName.empty()
-						? devtools::EnumText(pass.m_Category)
-						: pass.m_CategoryName;
+					const std::string category = pass.m_CategoryName.empty() ?
+						devtools::EnumText(pass.m_Category) :
+						pass.m_CategoryName;
 					const std::string type = devtools::EnumText(pass.m_Type);
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -449,14 +454,14 @@ namespace gglab
 					const std::string handle = devtools::RHIHandleText(pipeline.m_Handle);
 					const std::string layout = devtools::RHIHandleText(pipeline.m_BindingLayout);
 					const std::string primaryShader =
-						ShaderSummary(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-							? pipeline.m_VertexShader
-							: pipeline.m_ComputeShader);
+						ShaderSummary(pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+							pipeline.m_VertexShader :
+							pipeline.m_ComputeShader);
 					const std::string pixelShader = ShaderSummary(pipeline.m_PixelShader);
 					const std::string usages = PipelineUsagesText(pipeline);
-					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-						? RenderTargetFormatsText(pipeline)
-						: "-";
+					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+						RenderTargetFormatsText(pipeline) :
+						"-";
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
 					if (ImGui::Selectable(handle.c_str(),
@@ -466,9 +471,9 @@ namespace gglab
 						state.m_SelectedPipeline = pipeline.m_Handle.Index();
 					}
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
-						? "Graphics"
-						: "Compute");
+					ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
+						"Graphics" :
+						"Compute");
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(pipeline.m_Alive ? "Yes" : "No");
 					ImGui::TableSetColumnIndex(3);
@@ -489,7 +494,9 @@ namespace gglab
 			}
 			const auto selected =
 				std::ranges::find_if(snapshot.m_Pipelines, [&state](const auto& pipeline)
-					{ return pipeline.m_Handle.Index() == state.m_SelectedPipeline; });
+					{
+						return pipeline.m_Handle.Index() == state.m_SelectedPipeline;
+					});
 			if (selected != snapshot.m_Pipelines.end())
 			{
 				DrawPipelineDetail(*selected);
@@ -519,8 +526,9 @@ namespace gglab
 	void PipelineSystemPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		const auto* snapshotPtr =
-			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>() :
+				nullptr;
 		if (!snapshotPtr)
 		{
 			ImGui::TextDisabled("Pipeline snapshot provider is not available.");

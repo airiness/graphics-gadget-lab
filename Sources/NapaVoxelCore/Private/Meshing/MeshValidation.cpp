@@ -592,7 +592,7 @@ namespace napa::voxel
 					return { ValidationError::InvalidMeshWinding };
 				}
 				if (!HasOutwardFacingNormal(vertexA.m_Position, vertexB.m_Position,
-						vertexC.m_Position, vertexA.m_Normal) ||
+					vertexC.m_Position, vertexA.m_Normal) ||
 					!HasOutwardFacingNormal(vertexA.m_Position, vertexB.m_Position,
 						vertexC.m_Position, vertexB.m_Normal) ||
 					!HasOutwardFacingNormal(vertexA.m_Position, vertexB.m_Position,

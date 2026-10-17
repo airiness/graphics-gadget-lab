@@ -36,7 +36,7 @@ namespace gglab
 					artifact.m_Manifest,
 					MakeCompatibilityRequest(artifact.m_Manifest)).IsCompatible() ||
 				artifact.m_Manifest.m_ArtifactId !=
-					ComputeShaderArtifactId(artifact.m_Manifest))
+				ComputeShaderArtifactId(artifact.m_Manifest))
 			{
 				return false;
 			}
@@ -45,7 +45,7 @@ namespace gglab
 				static_cast<const std::byte*>(artifact.m_Binary.Data()),
 				artifact.m_Binary.SizeInBytes());
 			return ComputeSha256(binaryBytes) ==
-					artifact.m_Manifest.m_BinaryContentDigest.m_Digest &&
+				artifact.m_Manifest.m_BinaryContentDigest.m_Digest &&
 				IsShaderBinaryFormat(
 					artifact.m_Binary, artifact.m_Manifest.m_BinaryFormat);
 		}
@@ -157,9 +157,9 @@ namespace gglab
 			{
 				return result;
 			}
-			result.m_Status = transaction.m_PrimaryCommitted && transaction.m_MarkerCommitted
-				? ShaderRuntimeArtifactPublicationStatus::Published
-				: ShaderRuntimeArtifactPublicationStatus::AlreadyPresent;
+			result.m_Status = transaction.m_PrimaryCommitted && transaction.m_MarkerCommitted ?
+				ShaderRuntimeArtifactPublicationStatus::Published :
+				ShaderRuntimeArtifactPublicationStatus::AlreadyPresent;
 			return result;
 		}
 		catch (...)
@@ -178,7 +178,7 @@ namespace gglab
 		{
 			if (artifactRoot.empty() ||
 				ValidateShaderProgramRegistryArtifact(artifact) !=
-					ShaderProgramRegistryArtifactValidationStatus::Valid)
+				ShaderProgramRegistryArtifactValidationStatus::Valid)
 			{
 				result.m_Status =
 					ShaderProgramRegistryArtifactPublicationStatus::InvalidArtifact;
@@ -244,9 +244,9 @@ namespace gglab
 			{
 				return result;
 			}
-			result.m_Status = transaction.m_PrimaryCommitted
-				? ShaderProgramRegistryArtifactPublicationStatus::Published
-				: ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
+			result.m_Status = transaction.m_PrimaryCommitted ?
+				ShaderProgramRegistryArtifactPublicationStatus::Published :
+				ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
 			return result;
 		}
 		catch (...)

@@ -132,10 +132,11 @@ namespace gglab
 			return {};
 		}
 
-		const std::string resolvedName = !logicalName.empty()
-			? std::string(logicalName)
-			: createInfo.m_Desc.m_DebugName ? std::string(createInfo.m_Desc.m_DebugName)
-										  : std::string("Unnamed");
+		const std::string resolvedName = !logicalName.empty() ?
+			std::string(logicalName) :
+			createInfo.m_Desc.m_DebugName ?
+				std::string(createInfo.m_Desc.m_DebugName) :
+				std::string("Unnamed");
 		const RHIResourceDebugIdentityDesc debugIdentity{
 			.m_Domain = RHIResourceDebugDomain::Renderer,
 			.m_Category = "PersistentTexture",

@@ -4,7 +4,7 @@
 
 uint GetImportanceRootMip(uint resolution)
 {
-	return (uint)firstbithigh(resolution);
+	return (uint)(firstbithigh(resolution));
 }
 
 float LoadImportanceMass(Texture2DArray<float> importance, uint face, uint2 texel, uint mip)
@@ -75,7 +75,7 @@ float3 SampleEnvironmentImportance(Texture2DArray<float> importance, uint resolu
 		residual = min((target - lowerMass) / selectedMass, 0.99999994);
 		texel += uint2(selectedChild & 1u, selectedChild >> 1u);
 	}
-	const float2 uv = (float2(texel) + float2(residual, Xi.y)) / (float)resolution;
+	const float2 uv = ((float2)(texel) + float2(residual, Xi.y)) / (float)(resolution);
 	pdf = GetSpecularEnvironmentPdf(selectedMass, totalMass, resolution, uv.x, uv.y);
 	return CubemapFaceUvToDirection(selectedFace, uv);
 }
@@ -99,7 +99,7 @@ float EvaluateEnvironmentImportancePdf(Texture2DArray<float> importance, uint re
 	const float major = max(magnitude.x, max(magnitude.y, magnitude.z));
 	const float2 uv = float2(dot(direction, GetCubemapFaceRight(face)),
 		-dot(direction, GetCubemapFaceUp(face))) / major * 0.5 + 0.5;
-	const uint2 texel = min((uint2)(uv * (float)resolution), resolution - 1u);
+	const uint2 texel = min((uint2)(uv * (float)(resolution)), resolution - 1u);
 	return GetSpecularEnvironmentPdf(LoadImportanceMass(importance, face, texel, 0u),
 		totalMass, resolution, uv.x, uv.y);
 }

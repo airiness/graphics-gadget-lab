@@ -31,12 +31,12 @@ namespace gglab
 			{
 				return false;
 			}
-			const uint64_t lhsEnd = lhsCount == RHISubresourceRange::Remaining
-				? std::numeric_limits<uint64_t>::max()
-				: static_cast<uint64_t>(lhsBase) + lhsCount;
-			const uint64_t rhsEnd = rhsCount == RHISubresourceRange::Remaining
-				? std::numeric_limits<uint64_t>::max()
-				: static_cast<uint64_t>(rhsBase) + rhsCount;
+			const uint64_t lhsEnd = lhsCount == RHISubresourceRange::Remaining ?
+				std::numeric_limits<uint64_t>::max() :
+				static_cast<uint64_t>(lhsBase) + lhsCount;
+			const uint64_t rhsEnd = rhsCount == RHISubresourceRange::Remaining ?
+				std::numeric_limits<uint64_t>::max() :
+				static_cast<uint64_t>(rhsBase) + rhsCount;
 			return lhsBase < rhsEnd && rhsBase < lhsEnd;
 		}
 

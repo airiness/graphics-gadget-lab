@@ -33,7 +33,7 @@ namespace gglab
 					"Accumulates jittered scene color into a supersampled reference mean.",
 				.m_Category = RenderPassCategory::PostProcess,
 				.m_Type = RenderPassType::Compute,
-			})
+				})
 		{
 		}
 		~RenderPassTemporalReference() override = default;

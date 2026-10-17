@@ -23,55 +23,55 @@ namespace gglab
 		// Keep in sync with RHIFormatInfos in RHIFormat.h. Formats without a
 		// Vulkan equivalent (none today) map to VK_FORMAT_UNDEFINED. An empty
 		// m_RHIViewFormats means the format only views as itself.
-		inline constexpr std::array<VulkanFormatInfo, static_cast<size_t>(RHIFormat::Count)>
-			VulkanFormatInfos = {
+		inline constexpr std::array<VulkanFormatInfo, static_cast<size_t>(RHIFormat::Count)> VulkanFormatInfos =
+		{
 			// RHIFormat::Unknown
-			VulkanFormatInfo{ RHIFormat::Unknown, VK_FORMAT_UNDEFINED, 0, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::Unknown, VK_FORMAT_UNDEFINED, 0, false, false,{} },
 			// RHIFormat::R8G8B8A8Typeless
 			VulkanFormatInfo{ RHIFormat::R8G8B8A8Typeless, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, true, false, R8G8B8A8TypelessViewFormats },
 			// RHIFormat::R8G8B8A8Unorm
-			VulkanFormatInfo{ RHIFormat::R8G8B8A8Unorm, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R8G8B8A8Unorm, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R8G8B8A8UnormSrgb
-			VulkanFormatInfo{ RHIFormat::R8G8B8A8UnormSrgb, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R8G8B8A8UnormSrgb, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R16G16Float
-			VulkanFormatInfo{ RHIFormat::R16G16Float, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R16G16Float, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R16G16B16A16Typeless
 			VulkanFormatInfo{ RHIFormat::R16G16B16A16Typeless, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, true, false, R16G16B16A16TypelessViewFormats },
 			// RHIFormat::R16G16B16A16Float
-			VulkanFormatInfo{ RHIFormat::R16G16B16A16Float, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R16G16B16A16Float, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R32G32Float
-			VulkanFormatInfo{ RHIFormat::R32G32Float, VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R32G32Float, VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R32G32B32Float
-			VulkanFormatInfo{ RHIFormat::R32G32B32Float, VK_FORMAT_R32G32B32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R32G32B32Float, VK_FORMAT_R32G32B32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R32G32B32A32Float
-			VulkanFormatInfo{ RHIFormat::R32G32B32A32Float, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R32G32B32A32Float, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R32Typeless
 			VulkanFormatInfo{ RHIFormat::R32Typeless, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, false, true, R32TypelessViewFormats },
 			// RHIFormat::R32Float
-			VulkanFormatInfo{ RHIFormat::R32Float, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R32Float, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R32Uint
-			VulkanFormatInfo{ RHIFormat::R32Uint, VK_FORMAT_R32_UINT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R32Uint, VK_FORMAT_R32_UINT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::D24UnormS8Uint
-			VulkanFormatInfo{ RHIFormat::D24UnormS8Uint, VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, false, true, {} },
+			VulkanFormatInfo{ RHIFormat::D24UnormS8Uint, VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, false, true,{} },
 			// RHIFormat::D32Float
-			VulkanFormatInfo{ RHIFormat::D32Float, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, false, true, {} },
+			VulkanFormatInfo{ RHIFormat::D32Float, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, false, true,{} },
 			// RHIFormat::R8Unorm
-			VulkanFormatInfo{ RHIFormat::R8Unorm, VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R8Unorm, VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::R16Float
-			VulkanFormatInfo{ RHIFormat::R16Float, VK_FORMAT_R16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::R16Float, VK_FORMAT_R16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::B8G8R8A8Unorm
-			VulkanFormatInfo{ RHIFormat::B8G8R8A8Unorm, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::B8G8R8A8Unorm, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 			// RHIFormat::B8G8R8A8UnormSrgb
-			VulkanFormatInfo{ RHIFormat::B8G8R8A8UnormSrgb, VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, false, false, {} },
+			VulkanFormatInfo{ RHIFormat::B8G8R8A8UnormSrgb, VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, false, false,{} },
 		};
 	}
 
 	const VulkanFormatInfo& GetVulkanFormatInfo(RHIFormat format) noexcept
 	{
 		const size_t index = static_cast<size_t>(format);
-		return index < VulkanFormatInfos.size()
-			? VulkanFormatInfos[index]
-			: VulkanFormatInfos[static_cast<size_t>(RHIFormat::Unknown)];
+		return index < VulkanFormatInfos.size() ?
+			VulkanFormatInfos[index] :
+			VulkanFormatInfos[static_cast<size_t>(RHIFormat::Unknown)];
 	}
 
 	VkFormat ToVulkanFormat(RHIFormat format) noexcept
@@ -256,20 +256,20 @@ namespace gglab
 			switch (resource.m_Dimension)
 			{
 			case RHITextureDimension::Texture1D:
-				effectiveDimension = resource.m_ArraySize > 1
-					? RHITextureViewDimension::Texture1DArray
-					: RHITextureViewDimension::Texture1D;
-				viewType = resource.m_ArraySize > 1
-					? VK_IMAGE_VIEW_TYPE_1D_ARRAY
-					: VK_IMAGE_VIEW_TYPE_1D;
+				effectiveDimension = resource.m_ArraySize > 1 ?
+					RHITextureViewDimension::Texture1DArray :
+					RHITextureViewDimension::Texture1D;
+				viewType = resource.m_ArraySize > 1 ?
+					VK_IMAGE_VIEW_TYPE_1D_ARRAY :
+					VK_IMAGE_VIEW_TYPE_1D;
 				break;
 			case RHITextureDimension::Texture2D:
-				effectiveDimension = resource.m_ArraySize > 1
-					? RHITextureViewDimension::Texture2DArray
-					: RHITextureViewDimension::Texture2D;
-				viewType = resource.m_ArraySize > 1
-					? VK_IMAGE_VIEW_TYPE_2D_ARRAY
-					: VK_IMAGE_VIEW_TYPE_2D;
+				effectiveDimension = resource.m_ArraySize > 1 ?
+					RHITextureViewDimension::Texture2DArray :
+					RHITextureViewDimension::Texture2D;
+				viewType = resource.m_ArraySize > 1 ?
+					VK_IMAGE_VIEW_TYPE_2D_ARRAY :
+					VK_IMAGE_VIEW_TYPE_2D;
 				break;
 			case RHITextureDimension::Texture3D:
 				effectiveDimension = RHITextureViewDimension::Texture3D;
@@ -288,9 +288,9 @@ namespace gglab
 		// and never to color.
 		const RHIFormatInfo& resourceInfo = GetRHIFormatInfo(resource.m_Format);
 		const RHITextureAspect effectiveResourceAspects =
-			resourceInfo.m_DepthStencilAspects != RHITextureAspect::None
-			? resourceInfo.m_DepthStencilAspects
-			: resourceInfo.m_Aspects;
+			resourceInfo.m_DepthStencilAspects != RHITextureAspect::None ?
+				resourceInfo.m_DepthStencilAspects :
+				resourceInfo.m_Aspects;
 
 		// Aspect: All (the default) resolves to the resource's effective
 		// aspects; any other explicit aspect must be a non-empty subset of

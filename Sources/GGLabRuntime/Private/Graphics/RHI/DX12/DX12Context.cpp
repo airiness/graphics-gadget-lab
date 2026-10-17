@@ -303,8 +303,9 @@ namespace gglab
 			m_CompletedProductionFrame = true;
 		}
 		FinishFrame(*frame, submittedFence);
-		return presented ? RHIFrameEndResult::Completed(submittedFence)
-			: RHIFrameEndResult::Fatal(submittedFence);
+		return presented ?
+			RHIFrameEndResult::Completed(submittedFence) :
+			RHIFrameEndResult::Fatal(submittedFence);
 	}
 
 	RHIFencePoint DX12Context::AbortFrame(RHIFrameContext& rhiFrame) noexcept

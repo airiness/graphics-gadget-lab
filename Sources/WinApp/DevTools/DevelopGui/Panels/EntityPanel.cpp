@@ -57,10 +57,14 @@ namespace gglab
 		{
 			switch (filter)
 			{
-			case EntityComponentFilter::Transform: return entity.m_Transform.has_value();
-			case EntityComponentFilter::Model: return entity.m_Model.has_value();
-			case EntityComponentFilter::Light: return entity.m_Light.has_value();
-			default: return true;
+			case EntityComponentFilter::Transform:
+				return entity.m_Transform.has_value();
+			case EntityComponentFilter::Model:
+				return entity.m_Model.has_value();
+			case EntityComponentFilter::Light:
+				return entity.m_Light.has_value();
+			default:
+				return true;
 			}
 		}
 
@@ -68,11 +72,12 @@ namespace gglab
 		{
 			std::string label = std::format("Entity {}", entity.m_Target.m_EntityId);
 			bool hasAnyComponent = false;
-			auto appendComponent = [&](std::string_view name) {
-				label += hasAnyComponent ? ", " : " [";
-				label += name;
-				hasAnyComponent = true;
-			};
+			auto appendComponent = [&](std::string_view name)
+				{
+					label += hasAnyComponent ? ", " : " [";
+					label += name;
+					hasAnyComponent = true;
+				};
 			if (entity.m_Transform)
 			{
 				appendComponent("Transform");
@@ -633,9 +638,9 @@ namespace gglab
 			DrawEntityList(entities, state, entityAnchors);
 
 			ImGui::TableSetColumnIndex(1);
-			const auto* assetSnapshot = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<AssetSnapshot>()
-				: nullptr;
+			const auto* assetSnapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<AssetSnapshot>() :
+				nullptr;
 			DrawSelectedEntity(view, context.m_WorldControl, state, assetSnapshot);
 
 			ImGui::EndTable();
@@ -644,8 +649,9 @@ namespace gglab
 		snapshot = view.GetEntities();
 		DrawDeleteConfirmation(snapshot, context.m_WorldControl, state);
 
-		const auto* views = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
+		const auto* views = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() :
+			nullptr;
 		snapshot = view.GetEntities();
 		DrawEntityWorldLinks(snapshot, state, std::span<const EntityListItemAnchor>(entityAnchors),
 			views ? views->FindView(RenderViewID::Main) : nullptr);

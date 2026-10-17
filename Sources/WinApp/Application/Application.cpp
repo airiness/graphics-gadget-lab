@@ -188,9 +188,9 @@ namespace gglab
 		};
 #endif
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
-		const ShaderTargetProfile activeTargetProfile = activeBackend == RHIBackendType::Vulkan
-			? ShaderTargetProfile::GGLabVulkan13
-			: ShaderTargetProfile::GGLabDX12;
+		const ShaderTargetProfile activeTargetProfile = activeBackend == RHIBackendType::Vulkan ?
+			ShaderTargetProfile::GGLabVulkan13 :
+			ShaderTargetProfile::GGLabDX12;
 		ShaderLooseActiveProgramRegistryReader activeRegistryReader{
 			ShaderLooseActiveProgramRegistryLocator(
 				m_RuntimePaths.m_ShaderArtifactRoot, activeTargetProfile)
@@ -205,9 +205,9 @@ namespace gglab
 		}
 		activeShaderRegistry = activeRegistry.m_RegistryRef;
 		GGLAB_LOG_INFO("Artifact-only shader startup selected the packaged {} active registry.",
-			activeTargetProfile == ShaderTargetProfile::GGLabVulkan13
-			? "gglab-vulkan13"
-			: "gglab-dx12");
+			activeTargetProfile == ShaderTargetProfile::GGLabVulkan13 ?
+				"gglab-vulkan13" :
+				"gglab-dx12");
 #else
 		const DevelopmentShaderBuildResult shaderArtifacts =
 			RunDevelopmentShaderBuild(shaderBuildRequest);
@@ -433,8 +433,9 @@ namespace gglab
 			}
 			else
 			{
-				printLine("capture-status", result->m_Status == FrameCaptureRequestStatus::Cancelled
-					? "cancelled" : "failed");
+				printLine("capture-status", result->m_Status == FrameCaptureRequestStatus::Cancelled ?
+					"cancelled" :
+					"failed");
 				printLine("capture-failure", result->m_Failure);
 				m_ExitCode = 2;
 			}

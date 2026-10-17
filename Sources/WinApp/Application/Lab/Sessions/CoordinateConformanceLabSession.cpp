@@ -135,7 +135,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 				EnsureInitialized(services);
 
-auto* swapChain = services.m_Presentation->GetSwapChain();
+				auto* swapChain = services.m_Presentation->GetSwapChain();
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
@@ -151,7 +151,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 						resources.m_Marker = builder.CreateTexture("CoordinateConformance.Marker", {
 							.m_Format = MarkerFormat,
 							.m_Extent = { 2, 2, 1 },
-						});
+							});
 						resources.m_Depth = builder.CreateTexture("CoordinateConformance.Depth", {
 							.m_Format = DepthFormat,
 							.m_Extent = { width, height, 1 },
@@ -160,7 +160,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 								.m_Depth = 0.0f,
 								.m_IsDepthStencil = true,
 							},
-						});
+							});
 						RHITextureDesc backBufferDesc{};
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						backBufferDesc.m_Extent = { width, height, 1 };
@@ -250,7 +250,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 						commandContext->BeginRendering({
 							.m_ColorAttachments = attachments,
 							.m_DepthAttachment = depthAttachment,
-						});
+							});
 						commandContext->ClearColorAttachment(0, { 0.01f, 0.015f, 0.025f, 1.0f });
 						commandContext->ClearDepthAttachment(0.0f);
 
@@ -271,19 +271,19 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 						const uint32_t panelBottom = data.m_Height - panelInset;
 						const auto makeParameters = [&](CoordinateConformanceMode mode,
 							float depth = 0.0f, float depthOverride = 0.0f)
-						{
-							return CoordinateConformanceParameters{
-								.m_TextureIndex = marker.m_Index,
-								.m_SamplerIndex = m_SamplerDescriptor.m_Index,
-								.m_Mode = mode,
-								.m_Depth = depth,
-								.m_TargetExtent = {
-									static_cast<float>(data.m_Width),
-									static_cast<float>(data.m_Height),
-								},
-								.m_DepthOverride = depthOverride,
+							{
+								return CoordinateConformanceParameters{
+									.m_TextureIndex = marker.m_Index,
+									.m_SamplerIndex = m_SamplerDescriptor.m_Index,
+									.m_Mode = mode,
+									.m_Depth = depth,
+									.m_TargetExtent = {
+										static_cast<float>(data.m_Width),
+										static_cast<float>(data.m_Height),
+									},
+									.m_DepthOverride = depthOverride,
+								};
 							};
-						};
 
 						const RHIVertexBufferBinding vertexBinding{
 							.m_Buffer = m_VertexBuffer.Get(),
@@ -410,20 +410,20 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 				const auto initializeRecipe = [bindingLayout](GraphicsPhysicalPipelineKey& recipe,
 					ShaderID vertexShader, ShaderID pixelShader, InputLayoutID inputLayout,
 					RHIFormat colorFormat, RHIFormat depthFormat, DepthPreset depthPreset) noexcept
-				{
-					recipe.m_BindingLayout = bindingLayout;
-					recipe.m_VSId = vertexShader;
-					recipe.m_PSId = pixelShader;
-					recipe.m_InputLayoutId = inputLayout;
-					recipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
-					recipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-					recipe.m_Formats.m_RenderTargetFormats[0] = colorFormat;
-					recipe.m_Formats.m_RenderTargetCount = 1;
-					recipe.m_Formats.m_DepthStencilFormat = depthFormat;
-					recipe.m_RasterizerPreset = RasterizerPreset::Default;
-					recipe.m_BlendPreset = BlendPreset::Default;
-					recipe.m_DepthPreset = depthPreset;
-				};
+					{
+						recipe.m_BindingLayout = bindingLayout;
+						recipe.m_VSId = vertexShader;
+						recipe.m_PSId = pixelShader;
+						recipe.m_InputLayoutId = inputLayout;
+						recipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+						recipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+						recipe.m_Formats.m_RenderTargetFormats[0] = colorFormat;
+						recipe.m_Formats.m_RenderTargetCount = 1;
+						recipe.m_Formats.m_DepthStencilFormat = depthFormat;
+						recipe.m_RasterizerPreset = RasterizerPreset::Default;
+						recipe.m_BlendPreset = BlendPreset::Default;
+						recipe.m_DepthPreset = depthPreset;
+					};
 				initializeRecipe(m_MarkerRecipe, fullscreenVS, markerPS, InputLayoutID::None,
 					MarkerFormat, RHIFormat::Unknown, DepthPreset::DepthDisabled);
 				initializeRecipe(m_GeometryRecipe, geometryVS, conformancePS, InputLayoutID::P3T2,
@@ -437,16 +437,16 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 					backBufferFormat, DepthFormat, DepthPreset::DepthDisabled);
 
 				constexpr std::array vertices{
-					CoordinateVertex{{-0.9f, 0.75f, 0.5f}, {0.0f, 0.0f}},
-					CoordinateVertex{{-0.1f, -0.7f, 0.5f}, {1.0f, 1.0f}},
-					CoordinateVertex{{-0.75f, -0.55f, 0.5f}, {0.0f, 1.0f}},
-					CoordinateVertex{{0.1f, 0.75f, 0.5f}, {0.0f, 0.0f}},
-					CoordinateVertex{{0.25f, -0.55f, 0.5f}, {0.0f, 1.0f}},
-					CoordinateVertex{{0.9f, -0.7f, 0.5f}, {1.0f, 1.0f}},
-					CoordinateVertex{{-1.0f, 1.0f, 0.5f}, {0.0f, 0.0f}},
-					CoordinateVertex{{1.0f, 1.0f, 0.5f}, {1.0f, 0.0f}},
-					CoordinateVertex{{1.0f, -1.0f, 0.5f}, {1.0f, 1.0f}},
-					CoordinateVertex{{-1.0f, -1.0f, 0.5f}, {0.0f, 1.0f}},
+					CoordinateVertex{ { -0.9f, 0.75f, 0.5f },{ 0.0f, 0.0f } },
+					CoordinateVertex{ { -0.1f, -0.7f, 0.5f },{ 1.0f, 1.0f } },
+					CoordinateVertex{ { -0.75f, -0.55f, 0.5f },{ 0.0f, 1.0f } },
+					CoordinateVertex{ { 0.1f, 0.75f, 0.5f },{ 0.0f, 0.0f } },
+					CoordinateVertex{ { 0.25f, -0.55f, 0.5f },{ 0.0f, 1.0f } },
+					CoordinateVertex{ { 0.9f, -0.7f, 0.5f },{ 1.0f, 1.0f } },
+					CoordinateVertex{ { -1.0f, 1.0f, 0.5f },{ 0.0f, 0.0f } },
+					CoordinateVertex{ { 1.0f, 1.0f, 0.5f },{ 1.0f, 0.0f } },
+					CoordinateVertex{ { 1.0f, -1.0f, 0.5f },{ 1.0f, 1.0f } },
+					CoordinateVertex{ { -1.0f, -1.0f, 0.5f },{ 0.0f, 1.0f } },
 				};
 				constexpr std::array<uint32_t, 6> indices{ 0, 1, 2, 0, 2, 3 };
 				m_VertexBuffer = CreateUploadBuffer(vertices, RHIBufferUsage::Vertex,
@@ -471,7 +471,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 					.m_Usage = usage,
 					.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
 					.m_DebugName = debugName,
-				}));
+					}));
 				void* mapped = m_Device->MapBuffer(buffer.Get(), { 0, 0 });
 				if (mapped == nullptr)
 				{
@@ -565,14 +565,15 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 		};
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Coordinate draw sequence",
-			.m_Status = rendered ? LabDiagnosticCheckStatus::Passed
-				: LabDiagnosticCheckStatus::Pending,
-			.m_Detail = rendered
-				? "Top-left shows both winding colors; bottom-right overlays back-face culling on "
+			.m_Status = rendered ?
+				LabDiagnosticCheckStatus::Passed :
+				LabDiagnosticCheckStatus::Pending,
+			.m_Detail = rendered ?
+				"Top-left shows both winding colors; bottom-right overlays back-face culling on "
 					"the position gradient so only the front-facing triangle remains. Indexed "
-					"sampling and reversed-Z probes also executed."
-				: "Waiting for the first complete marker and conformance frame.",
-		});
+					"sampling and reversed-Z probes also executed." :
+				"Waiting for the first complete marker and conformance frame.",
+			});
 	}
 
 	LabId CoordinateConformanceLabSession::GetId() noexcept

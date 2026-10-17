@@ -40,9 +40,9 @@ namespace gglab
 	void InputManager::Update() noexcept
 	{
 		const AppPointerMode pointerMode = m_ApplicationInput.GetPointerMode();
-		m_Mouse->SetMouseMode(pointerMode == AppPointerMode::Absolute
-			? Mouse::MouseMode::Absolute
-			: Mouse::MouseMode::Relative);
+		m_Mouse->SetMouseMode(pointerMode == AppPointerMode::Absolute ?
+			Mouse::MouseMode::Absolute :
+			Mouse::MouseMode::Relative);
 		m_Keyboard->Update();
 		m_Mouse->Update();
 

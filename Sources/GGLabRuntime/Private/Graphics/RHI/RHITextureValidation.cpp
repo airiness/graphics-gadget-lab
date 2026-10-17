@@ -385,9 +385,9 @@ namespace gglab
 				static_cast<uint32_t>(subresourceIndex % textureDesc.m_MipLevels);
 			const uint64_t width = std::max<uint32_t>(1, textureDesc.m_Extent.m_Width >> mipLevel);
 			const uint64_t height =
-				textureDesc.m_Dimension == RHITextureDimension::Texture1D
-				? 1
-				: std::max<uint32_t>(1, textureDesc.m_Extent.m_Height >> mipLevel);
+				textureDesc.m_Dimension == RHITextureDimension::Texture1D ?
+					1 :
+					std::max<uint32_t>(1, textureDesc.m_Extent.m_Height >> mipLevel);
 			const uint64_t blockColumns =
 				(width + formatInfo.m_BlockWidth - 1) / formatInfo.m_BlockWidth;
 			const uint64_t blockRows =

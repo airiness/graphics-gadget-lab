@@ -96,8 +96,9 @@ namespace gglab
 
 		const ShadowVisualizationSettings& GetShadowVisualizationSettings() const noexcept
 		{
-			return m_ShadowVisualizationSettings ? *m_ShadowVisualizationSettings
-				: DefaultShadowVisualizationSettings();
+			return m_ShadowVisualizationSettings ?
+				*m_ShadowVisualizationSettings :
+				DefaultShadowVisualizationSettings();
 		}
 
 		bool IsValid() const noexcept

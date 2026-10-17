@@ -146,7 +146,9 @@ namespace gglab
 				return m_Attempt != 0 && m_Generation != 0 && (m_Source.IsValid() || m_PhysicalSky) &&
 					m_ShaderRegistry.IsValid() && std::ranges::all_of(m_ShaderArtifacts,
 						[](const IBLStageShaderArtifactIdentity& identity) noexcept
-						{ return identity.IsValid(); });
+						{
+							return identity.IsValid();
+						});
 			}
 		};
 
@@ -277,8 +279,7 @@ namespace gglab
 			IBLBakeConfig m_Config{};
 			std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> m_Keys{};
 			std::array<bool, static_cast<size_t>(IBLArtifactStage::Count)> m_BuiltStages{};
-			std::array<RHITextureReadbackRequest, static_cast<size_t>(IBLArtifactStage::Count)>
-				m_Requests{};
+			std::array<RHITextureReadbackRequest, static_cast<size_t>(IBLArtifactStage::Count)> m_Requests{};
 			IBLStageArtifactSet m_Artifacts;
 			TaskHandle m_Task{};
 		};

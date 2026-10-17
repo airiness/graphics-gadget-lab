@@ -10,7 +10,8 @@ namespace gglab
 	Win32Window::MessageSubscription::MessageSubscription(MessageSubscription&& other) noexcept :
 		m_Window(std::exchange(other.m_Window, nullptr)),
 		m_Id(std::exchange(other.m_Id, 0))
-	{}
+	{
+	}
 
 	Win32Window::MessageSubscription& Win32Window::MessageSubscription::operator=(
 		MessageSubscription&& other) noexcept
@@ -41,7 +42,8 @@ namespace gglab
 
 	Win32Window::Win32Window(HINSTANCE instance) noexcept :
 		m_Instance(instance)
-	{}
+	{
+	}
 
 	bool Win32Window::Initialize(const PlatformWindowCreateInfo& createInfo) noexcept
 	{
@@ -176,8 +178,9 @@ namespace gglab
 			SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
 		}
 
-		return window ? window->HandleMessage(hwnd, message, wParam, lParam)
-			: DefWindowProcW(hwnd, message, wParam, lParam);
+		return window ?
+			window->HandleMessage(hwnd, message, wParam, lParam) :
+			DefWindowProcW(hwnd, message, wParam, lParam);
 	}
 
 	LRESULT Win32Window::HandleMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept
@@ -283,8 +286,9 @@ namespace gglab
 			return handlerResult.m_Result;
 		}
 
-		return windowMessageHandled ? windowMessageResult
-			: DefWindowProcW(hwnd, message, wParam, lParam);
+		return windowMessageHandled ?
+			windowMessageResult :
+			DefWindowProcW(hwnd, message, wParam, lParam);
 	}
 
 	Win32MessageResult Win32Window::DispatchMessageHandlers(

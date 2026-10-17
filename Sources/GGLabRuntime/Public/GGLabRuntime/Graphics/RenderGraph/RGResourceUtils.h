@@ -14,12 +14,12 @@ namespace gglab
 		ResolveRGPersistentTextureImportContract(bool initialized,
 			RHIResourceState initializedState = CommonRHIResourceState()) noexcept
 	{
-		return initialized
-			? RGPersistentTextureImportContract{
+		return initialized ?
+			RGPersistentTextureImportContract{
 				.m_InitialState = initializedState,
 				.m_InitialContentValidity = RGContentValidity::Defined,
-			}
-			: RGPersistentTextureImportContract{};
+			} :
+			RGPersistentTextureImportContract{};
 	}
 
 	constexpr inline bool HasUavAccess(const RHIResourceState& state) noexcept

@@ -50,7 +50,7 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	float3 diagnosticLighting = 0.0.xxx;
 	if (g_Pass.MaterialDiagnosticsEnabled != 0u)
 	{
-		const int3 pixel = int3(uint2(IN.PositionCS.xy), 0);
+		const int3 pixel = int3((uint2)(IN.PositionCS.xy), 0);
 		diagnosticColor = GetTexture2DFloat4(g_Pass.MaterialDiagnosticColorIndex).Load(pixel).rgb;
 		diagnosticCoverage = GetTexture2DFloat(g_Pass.MaterialDiagnosticCoverageIndex).Load(pixel);
 		diagnosticLighting = GetTexture2DFloat4(g_Pass.MaterialDiagnosticLightingIndex).Load(pixel).rgb;

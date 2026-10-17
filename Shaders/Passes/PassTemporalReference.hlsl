@@ -44,5 +44,5 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	RWTexture2D<float4> nextSum = GetRWTexture2DFloat4(g_Pass.NextSumUavIndex);
 	RWTexture2D<float4> meanColor = GetRWTexture2DFloat4(g_Pass.MeanColorUavIndex);
 	nextSum[pixel] = float4(sum, 1.0);
-	meanColor[pixel] = float4(sum / float(g_Pass.SampleIndex + 1), 1.0);
+	meanColor[pixel] = float4(sum / (float)(g_Pass.SampleIndex + 1), 1.0);
 }

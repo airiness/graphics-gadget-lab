@@ -25,10 +25,8 @@ namespace napa::voxel::testing
 		VoxelMutationResult& result, VoxelMutationAllocationProbe& probe);
 	[[nodiscard]] ValidationResult ApplySphereEditWithExhaustedRevision(
 		VoxelWorld& world, const SphereEditRequest& request, VoxelMutationResult& result);
-	[[nodiscard]] ValidationResult RestoreAllWithAllocationProbe(
-		VoxelWorld& world, VoxelMutationResult& result, VoxelRestoreAllocationProbe& probe);
-	[[nodiscard]] ValidationResult RestoreAllWithExhaustedRevision(
-		VoxelWorld& world, VoxelMutationResult& result);
+	[[nodiscard]] ValidationResult RestoreAllWithAllocationProbe(VoxelWorld& world, VoxelMutationResult& result, VoxelRestoreAllocationProbe& probe);
+	[[nodiscard]] ValidationResult RestoreAllWithExhaustedRevision(VoxelWorld& world, VoxelMutationResult& result);
 	[[nodiscard]] ValidationResult PrepareWithAuthoritativeRevision(
 		const VoxelWorld& authoritativeWorld, const VoxelMutationResult& mutation,
 		const VisibleMeshSet& visible, std::uint64_t authoritativeRevision,

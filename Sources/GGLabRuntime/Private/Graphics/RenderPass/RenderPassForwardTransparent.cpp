@@ -80,7 +80,7 @@ namespace gglab
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(renderTargets.data(), renderTargetCount),
 					.m_DepthAttachment = forward_shading::GetDepthAttachment(executeContext, data.m_Scene),
-				});
+					});
 
 				const forward_shading::PassParameters passParameters =
 					forward_shading::ResolveScenePassParameters(

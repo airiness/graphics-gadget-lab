@@ -356,9 +356,9 @@ namespace gglab
 			.m_Format = data.m_ResourceFormat,
 			.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest,
 			.m_CreateFlags = data.m_SrvDimension == RHITextureViewDimension::TextureCube ||
-				data.m_SrvDimension == RHITextureViewDimension::TextureCubeArray
-				? RHITextureCreateFlags::CubeCompatible
-				: RHITextureCreateFlags::None,
+				data.m_SrvDimension == RHITextureViewDimension::TextureCubeArray ?
+					RHITextureCreateFlags::CubeCompatible :
+					RHITextureCreateFlags::None,
 			.m_Extent = data.m_Extent,
 			.m_ArraySize = data.m_ArraySize,
 			.m_MipLevels = data.m_MipLevels,
@@ -403,9 +403,9 @@ namespace gglab
 		{
 			return {
 				.m_Disposition =
-					uploadValidation.m_Error == RHITextureValidationError::UnsupportedUploadFormat
-						? TextureUploadValidationDisposition::Unsupported
-						: TextureUploadValidationDisposition::Corrupt,
+					uploadValidation.m_Error == RHITextureValidationError::UnsupportedUploadFormat ?
+						TextureUploadValidationDisposition::Unsupported :
+						TextureUploadValidationDisposition::Corrupt,
 				.m_RHIError = uploadValidation.m_Error,
 			};
 		}
@@ -414,9 +414,9 @@ namespace gglab
 		if (!textureSupport.IsSupported())
 		{
 			return {
-				.m_Disposition = textureSupport.IsDescriptionValid()
-					? TextureUploadValidationDisposition::Unsupported
-					: TextureUploadValidationDisposition::Corrupt,
+				.m_Disposition = textureSupport.IsDescriptionValid() ?
+					TextureUploadValidationDisposition::Unsupported :
+					TextureUploadValidationDisposition::Corrupt,
 				.m_RHIError = textureSupport.m_ValidationError,
 			};
 		}
@@ -425,9 +425,9 @@ namespace gglab
 		if (!viewSupport.IsSupported())
 		{
 			return {
-				.m_Disposition = viewSupport.IsDescriptionValid()
-					? TextureUploadValidationDisposition::Unsupported
-					: TextureUploadValidationDisposition::Corrupt,
+				.m_Disposition = viewSupport.IsDescriptionValid() ?
+					TextureUploadValidationDisposition::Unsupported :
+					TextureUploadValidationDisposition::Corrupt,
 				.m_RHIError = viewSupport.m_ValidationError,
 			};
 		}

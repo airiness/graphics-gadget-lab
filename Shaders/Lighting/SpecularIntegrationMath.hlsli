@@ -27,5 +27,5 @@ inline float GetSpecularMISWeight(float NoL, float ggxPdf, float environmentPdf,
 {
 	// Balance heuristic for the normalized integral of L * NoL * p_GGX.
 	// At least one GGX sample is retained, giving support over the visible hemisphere.
-	return NoL * ggxPdf / ((float)ggxCount * ggxPdf + (float)environmentCount * environmentPdf);
+	return NoL * ggxPdf / ((float)(ggxCount) * ggxPdf + (float)(environmentCount) * environmentPdf);
 }

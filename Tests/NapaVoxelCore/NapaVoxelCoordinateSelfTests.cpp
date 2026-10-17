@@ -54,8 +54,7 @@ namespace napa::voxel::testing
 			const Double3 sentinel{ 91.0, 92.0, 93.0 };
 			Double3 unchanged = sentinel;
 			context.Check(!TryNormalize({}, unchanged) && unchanged == sentinel &&
-				!TryNormalize({ std::numeric_limits<double>::quiet_NaN(), 0.0, 1.0 },
-					unchanged) && unchanged == sentinel,
+				!TryNormalize({ std::numeric_limits<double>::quiet_NaN(), 0.0, 1.0 }, unchanged) && unchanged == sentinel,
 				"Double3 normalization rejects invalid inputs without changing output");
 		}
 
@@ -65,8 +64,7 @@ namespace napa::voxel::testing
 			napa::voxel::ValidationError expectedError,
 			std::string_view name) noexcept
 		{
-			const napa::voxel::ValidationResult result =
-				napa::voxel::ValidateConfig(config);
+			const napa::voxel::ValidationResult result = napa::voxel::ValidateConfig(config);
 			context.Check(result.m_Error == expectedError, name);
 		}
 
@@ -74,13 +72,10 @@ namespace napa::voxel::testing
 		{
 			using namespace napa::voxel;
 
-			constexpr std::int32_t Int32Min =
-				std::numeric_limits<std::int32_t>::min();
-			constexpr std::int32_t Int32Max =
-				std::numeric_limits<std::int32_t>::max();
+			constexpr std::int32_t Int32Min = std::numeric_limits<std::int32_t>::min();
+			constexpr std::int32_t Int32Max = std::numeric_limits<std::int32_t>::max();
 
-			const std::optional<std::int32_t> add =
-				CheckedAdd(std::int32_t{ -20 }, std::int32_t{ 12 });
+			const std::optional<std::int32_t> add = CheckedAdd(std::int32_t{ -20 }, std::int32_t{ 12 });
 			context.Check(add && *add == -8, "CheckedAdd returns an exact signed sum");
 			context.Check(
 				!CheckedAdd(Int32Max, std::int32_t{ 1 }),
@@ -88,14 +83,9 @@ namespace napa::voxel::testing
 			context.Check(
 				!CheckedAdd(Int32Min, std::int32_t{ -1 }),
 				"CheckedAdd rejects negative signed overflow");
-			context.Check(
-				!CheckedAdd(
-					std::numeric_limits<std::uint32_t>::max(),
-					std::uint32_t{ 1 }),
-				"CheckedAdd rejects unsigned overflow");
+			context.Check(!CheckedAdd(std::numeric_limits<std::uint32_t>::max(), std::uint32_t{ 1 }), "CheckedAdd rejects unsigned overflow");
 
-			const std::optional<std::int32_t> multiply =
-				CheckedMul(std::int32_t{ -32 }, std::int32_t{ 16 });
+			const std::optional<std::int32_t> multiply = CheckedMul(std::int32_t{ -32 }, std::int32_t{ 16 });
 			context.Check(
 				multiply && *multiply == -512,
 				"CheckedMul returns an exact signed product");
@@ -106,22 +96,16 @@ namespace napa::voxel::testing
 				!CheckedMul(Int32Min, std::int32_t{ -1 }),
 				"CheckedMul rejects the signed minimum negation");
 			context.Check(
-				!CheckedMul(
-					std::numeric_limits<std::size_t>::max(),
-					std::size_t{ 2 }),
+				!CheckedMul(std::numeric_limits<std::size_t>::max(), std::size_t{ 2 }),
 				"CheckedMul rejects size capacity overflow");
 
-			const std::optional<std::int32_t> narrowMaximum =
-				CheckedNarrow<std::int32_t>(
-					static_cast<std::int64_t>(Int32Max));
+			const std::optional<std::int32_t> narrowMaximum = CheckedNarrow<std::int32_t>(static_cast<std::int64_t>(Int32Max));
 			context.Check(
 				narrowMaximum && *narrowMaximum == Int32Max,
 				"CheckedNarrow accepts the signed maximum");
 
-			const std::int64_t aboveInt32 =
-				static_cast<std::int64_t>(Int32Max) + 1;
-			const std::int64_t belowInt32 =
-				static_cast<std::int64_t>(Int32Min) - 1;
+			const std::int64_t aboveInt32 = static_cast<std::int64_t>(Int32Max) + 1;
+			const std::int64_t belowInt32 = static_cast<std::int64_t>(Int32Min) - 1;
 			context.Check(
 				!CheckedNarrow<std::int32_t>(aboveInt32),
 				"CheckedNarrow rejects a value above the target maximum");
@@ -132,7 +116,8 @@ namespace napa::voxel::testing
 				!CheckedNarrow<std::uint32_t>(std::int64_t{ -1 }),
 				"CheckedNarrow rejects a negative unsigned value");
 
-			constexpr std::array<std::int32_t, 9> BoundaryValues{
+			constexpr std::array<std::int32_t, 9> BoundaryValues
+			{
 				Int32Min,
 				Int32Min + 1,
 				-2,
@@ -149,22 +134,18 @@ namespace napa::voxel::testing
 			{
 				for (const std::int32_t rhs : BoundaryValues)
 				{
-					const std::int64_t wideAdd =
-						static_cast<std::int64_t>(lhs) + rhs;
+					const std::int64_t wideAdd = static_cast<std::int64_t>(lhs) + rhs;
 					const bool addIsRepresentable =
 						wideAdd >= Int32Min && wideAdd <= Int32Max;
-					const std::optional<std::int32_t> checkedAdd =
-						CheckedAdd(lhs, rhs);
+					const std::optional<std::int32_t> checkedAdd = CheckedAdd(lhs, rhs);
 					addMatrixMatches &=
 						checkedAdd.has_value() == addIsRepresentable &&
 						(!checkedAdd || *checkedAdd == wideAdd);
 
-					const std::int64_t wideMultiply =
-						static_cast<std::int64_t>(lhs) * rhs;
+					const std::int64_t wideMultiply = static_cast<std::int64_t>(lhs) * rhs;
 					const bool multiplyIsRepresentable =
 						wideMultiply >= Int32Min && wideMultiply <= Int32Max;
-					const std::optional<std::int32_t> checkedMultiply =
-						CheckedMul(lhs, rhs);
+					const std::optional<std::int32_t> checkedMultiply = CheckedMul(lhs, rhs);
 					multiplyMatrixMatches &=
 						checkedMultiply.has_value() == multiplyIsRepresentable &&
 						(!checkedMultiply || *checkedMultiply == wideMultiply);
@@ -190,7 +171,8 @@ namespace napa::voxel::testing
 				std::string_view m_Name;
 			};
 
-			constexpr std::array<DivisionCase, 9> Cases{
+			constexpr std::array<DivisionCase, 9> Cases
+			{
 				DivisionCase{ 17, 1, 1, "Floor division handles a value above a positive boundary" },
 				DivisionCase{ 16, 1, 0, "Floor division handles a positive boundary" },
 				DivisionCase{ 15, 0, 15, "Floor division handles a positive interior" },
@@ -199,20 +181,13 @@ namespace napa::voxel::testing
 				DivisionCase{ -15, -1, 1, "Floor division handles a negative interior" },
 				DivisionCase{ -16, -1, 0, "Floor division handles a negative boundary" },
 				DivisionCase{ -17, -2, 15, "Floor division handles a value below a negative boundary" },
-				DivisionCase{
-					std::numeric_limits<std::int32_t>::min(),
-					-134217728,
-					0,
-					"Floor division handles int32 minimum",
-				},
+				DivisionCase{ std::numeric_limits<std::int32_t>::min(), -134217728, 0, "Floor division handles int32 minimum", },
 			};
 
 			for (const DivisionCase& divisionCase : Cases)
 			{
-				const std::optional<std::int32_t> quotient =
-					FloorDiv(divisionCase.m_Value, 16);
-				const std::optional<std::uint32_t> remainder =
-					FloorMod(divisionCase.m_Value, 16);
+				const std::optional<std::int32_t> quotient = FloorDiv(divisionCase.m_Value, 16);
+				const std::optional<std::uint32_t> remainder = FloorMod(divisionCase.m_Value, 16);
 				context.Check(
 					quotient &&
 					remainder &&
@@ -227,21 +202,18 @@ namespace napa::voxel::testing
 			for (const std::uint32_t chunkCellCount : { 8u, 16u, 32u })
 			{
 				bool identityHolds = true;
-				const std::int32_t range =
-					static_cast<std::int32_t>(chunkCellCount * 2);
+				const std::int32_t range = static_cast<std::int32_t>(chunkCellCount * 2);
 				for (std::int32_t value = -range; value <= range; ++value)
 				{
-					const std::optional<std::int32_t> quotient =
-						FloorDiv(value, chunkCellCount);
-					const std::optional<std::uint32_t> remainder =
-						FloorMod(value, chunkCellCount);
+					const std::optional<std::int32_t> quotient = FloorDiv(value, chunkCellCount);
+					const std::optional<std::uint32_t> remainder = FloorMod(value, chunkCellCount);
 					identityHolds &=
 						quotient &&
 						remainder &&
 						*remainder < chunkCellCount &&
 						static_cast<std::int64_t>(*quotient) *
-							chunkCellCount +
-							*remainder == value;
+						chunkCellCount +
+						*remainder == value;
 				}
 				context.Check(
 					identityHolds,
@@ -259,20 +231,21 @@ namespace napa::voxel::testing
 				OwnedSampleAddress m_Expected{};
 			};
 
-			constexpr std::array<OwnerCase, 8> Cases{
-				OwnerCase{ { 15, 0, 0 }, { { 0, 0, 0 }, { 15, 0, 0 } } },
-				OwnerCase{ { 16, 0, 0 }, { { 1, 0, 0 }, { 0, 0, 0 } } },
-				OwnerCase{ { 17, 0, 0 }, { { 1, 0, 0 }, { 1, 0, 0 } } },
-				OwnerCase{ { -1, 0, 0 }, { { -1, 0, 0 }, { 15, 0, 0 } } },
-				OwnerCase{ { -16, 0, 0 }, { { -1, 0, 0 }, { 0, 0, 0 } } },
-				OwnerCase{ { -17, 0, 0 }, { { -2, 0, 0 }, { 15, 0, 0 } } },
+			constexpr std::array<OwnerCase, 8> Cases
+			{
+				OwnerCase{ { 15, 0, 0 },{ { 0, 0, 0 },{ 15, 0, 0 } } },
+				OwnerCase{ { 16, 0, 0 },{ { 1, 0, 0 },{ 0, 0, 0 } } },
+				OwnerCase{ { 17, 0, 0 },{ { 1, 0, 0 },{ 1, 0, 0 } } },
+				OwnerCase{ { -1, 0, 0 },{ { -1, 0, 0 },{ 15, 0, 0 } } },
+				OwnerCase{ { -16, 0, 0 },{ { -1, 0, 0 },{ 0, 0, 0 } } },
+				OwnerCase{ { -17, 0, 0 },{ { -2, 0, 0 },{ 15, 0, 0 } } },
 				OwnerCase{
 					{ -1, 16, 32 },
-					{ { -1, 1, 2 }, { 15, 0, 0 } },
+					{ { -1, 1, 2 },{ 15, 0, 0 } },
 				},
 				OwnerCase{
 					{ -17, -16, -15 },
-					{ { -2, -1, -1 }, { 15, 0, 1 } },
+					{ { -2, -1, -1 },{ 15, 0, 1 } },
 				},
 			};
 
@@ -281,10 +254,7 @@ namespace napa::voxel::testing
 			{
 				OwnedSampleAddress address{};
 				explicitCasesMatch &=
-					ResolveSampleOwner(
-						ownerCase.m_Global,
-						16,
-						address).Succeeded() &&
+					ResolveSampleOwner(ownerCase.m_Global, 16, address).Succeeded() &&
 					address == ownerCase.m_Expected;
 			}
 			context.Check(
@@ -294,8 +264,7 @@ namespace napa::voxel::testing
 			OwnedCellAddress cellAddress{};
 			context.Check(
 				ResolveCellOwner({ -1, 16, 32 }, 16, cellAddress).Succeeded() &&
-				cellAddress ==
-					OwnedCellAddress{ { -1, 1, 2 }, { 15, 0, 0 } },
+				cellAddress == OwnedCellAddress{ { -1, 1, 2 },{ 15, 0, 0 } },
 				"Cell owner resolution uses the same canonical ownership rule");
 
 			OwnedSampleAddress unchangedAddress{
@@ -304,16 +273,14 @@ namespace napa::voxel::testing
 			};
 			const OwnedSampleAddress expectedUnchangedAddress = unchangedAddress;
 			context.Check(
-				ResolveSampleOwner({ 0, 0, 0 }, 7, unchangedAddress).m_Error ==
-					ValidationError::InvalidChunkCellCount &&
+				ResolveSampleOwner({ 0, 0, 0 }, 7, unchangedAddress).m_Error == ValidationError::InvalidChunkCellCount &&
 				unchangedAddress == expectedUnchangedAddress,
 				"Failed owner resolution leaves the output address unchanged");
 
 			for (const std::uint32_t chunkCellCount : { 8u, 16u, 32u })
 			{
 				bool roundTripMatches = true;
-				const std::int32_t n =
-					static_cast<std::int32_t>(chunkCellCount);
+				const std::int32_t n = static_cast<std::int32_t>(chunkCellCount);
 				for (std::int32_t z = -n - 1; z <= n + 1; ++z)
 				{
 					for (std::int32_t y = -n - 1; y <= n + 1; ++y)
@@ -327,10 +294,7 @@ namespace napa::voxel::testing
 							SampleCoord reconstructedSample{};
 							CellCoord reconstructedCell{};
 							roundTripMatches &=
-								ResolveSampleOwner(
-									sample,
-									chunkCellCount,
-									sampleAddress).Succeeded() &&
+								ResolveSampleOwner(sample, chunkCellCount, sampleAddress).Succeeded() &&
 								sampleAddress.m_Local.m_X < chunkCellCount &&
 								sampleAddress.m_Local.m_Y < chunkCellCount &&
 								sampleAddress.m_Local.m_Z < chunkCellCount &&
@@ -340,18 +304,11 @@ namespace napa::voxel::testing
 									chunkCellCount,
 									reconstructedSample).Succeeded() &&
 								reconstructedSample == sample &&
-								ResolveCellOwner(
-									cell,
-									chunkCellCount,
-									cellAddress).Succeeded() &&
+								ResolveCellOwner(cell, chunkCellCount, cellAddress).Succeeded() &&
 								cellAddress.m_Local.m_X < chunkCellCount &&
 								cellAddress.m_Local.m_Y < chunkCellCount &&
 								cellAddress.m_Local.m_Z < chunkCellCount &&
-								ChunkLocalToGlobalCell(
-									cellAddress.m_Owner,
-									cellAddress.m_Local,
-									chunkCellCount,
-									reconstructedCell).Succeeded() &&
+								ChunkLocalToGlobalCell(cellAddress.m_Owner, cellAddress.m_Local, chunkCellCount, reconstructedCell).Succeeded() &&
 								reconstructedCell == cell;
 						}
 					}
@@ -366,7 +323,8 @@ namespace napa::voxel::testing
 		{
 			using namespace napa::voxel;
 
-			std::array<ChunkCoord, 7> chunks{
+			std::array<ChunkCoord, 7> chunks
+			{
 				ChunkCoord{ 1, 0, 0 },
 				ChunkCoord{ 0, 0, 1 },
 				ChunkCoord{ 0, 1, 0 },
@@ -377,7 +335,8 @@ namespace napa::voxel::testing
 			};
 			std::ranges::sort(chunks, ChunkCoordZYXLess{});
 
-			constexpr std::array<ChunkCoord, 7> Expected{
+			constexpr std::array<ChunkCoord, 7> Expected
+			{
 				ChunkCoord{ 0, 0, -1 },
 				ChunkCoord{ 0, -1, 0 },
 				ChunkCoord{ -1, 0, 0 },
@@ -408,17 +367,10 @@ namespace napa::voxel::testing
 							std::size_t flatIndex = 0;
 							LocalCoord actual{};
 							roundTripMatches &=
-								FlattenLocal(
-									expected,
-									chunkCellCount,
-									flatIndex).Succeeded() &&
-								flatIndex ==
-									x + chunkCellCount *
-										(y + chunkCellCount * z) &&
-								UnflattenLocal(
-									flatIndex,
-									chunkCellCount,
-									actual).Succeeded() &&
+								FlattenLocal(expected, chunkCellCount, flatIndex).Succeeded() &&
+								flatIndex == x + chunkCellCount *
+								(y + chunkCellCount * z) &&
+								UnflattenLocal(flatIndex, chunkCellCount, actual).Succeeded() &&
 								actual == expected;
 						}
 					}
@@ -430,22 +382,18 @@ namespace napa::voxel::testing
 
 			std::size_t flatIndex = 123;
 			context.Check(
-				FlattenLocal({ 16, 0, 0 }, 16, flatIndex).m_Error ==
-					ValidationError::InvalidLocalCoordinate &&
+				FlattenLocal({ 16, 0, 0 }, 16, flatIndex).m_Error == ValidationError::InvalidLocalCoordinate &&
 				flatIndex == 123,
 				"FlattenLocal rejects LocalCoord components equal to N");
 
 			LocalCoord local{ 1, 2, 3 };
 			context.Check(
-				UnflattenLocal(4096, 16, local).m_Error ==
-					ValidationError::FlatIndexOutOfRange &&
+				UnflattenLocal(4096, 16, local).m_Error == ValidationError::FlatIndexOutOfRange &&
 				local == LocalCoord{ 1, 2, 3 },
 				"UnflattenLocal rejects the first index beyond chunk capacity");
 			context.Check(
-				ValidateLocalCoord({ 0, 0, 0 }, 7).m_Error ==
-					ValidationError::InvalidChunkCellCount &&
-				UnflattenLocal(0, 7, local).m_Error ==
-					ValidationError::InvalidChunkCellCount,
+				ValidateLocalCoord({ 0, 0, 0 }, 7).m_Error == ValidationError::InvalidChunkCellCount &&
+				UnflattenLocal(0, 7, local).m_Error == ValidationError::InvalidChunkCellCount,
 				"Local coordinate operations reject unsupported chunk sizes");
 		}
 
@@ -462,37 +410,27 @@ namespace napa::voxel::testing
 					{
 						SampleCoord sample{};
 						cornersMatch &=
-							CellCornerToGlobalSample(
-								{ -5, 7, 11 },
-								{ x, y, z },
-								sample).Succeeded() &&
+							CellCornerToGlobalSample({ -5, 7, 11 }, { x, y, z }, sample).Succeeded() &&
 							sample == SampleCoord{
 								-5 + static_cast<std::int32_t>(x),
 								7 + static_cast<std::int32_t>(y),
 								11 + static_cast<std::int32_t>(z),
-							};
+						};
 					}
 				}
 			}
-			context.Check(
-				cornersMatch,
-				"CellCornerToGlobalSample accepts all eight cell corners");
+			context.Check(cornersMatch, "CellCornerToGlobalSample accepts all eight cell corners");
 
 			SampleCoord sample{ 1, 2, 3 };
 			context.Check(
-				CellCornerToGlobalSample(
-					{ 0, 0, 0 },
-					{ 2, 0, 0 },
-					sample).m_Error ==
-					ValidationError::InvalidCellCornerOffset &&
+				CellCornerToGlobalSample({ 0, 0, 0 }, { 2, 0, 0 }, sample).m_Error == ValidationError::InvalidCellCornerOffset &&
 				sample == SampleCoord{ 1, 2, 3 },
 				"CellCornerToGlobalSample rejects offsets outside zero and one");
 			context.Check(
 				CellCornerToGlobalSample(
 					{ std::numeric_limits<std::int32_t>::max(), 0, 0 },
 					{ 1, 0, 0 },
-					sample).m_Error ==
-					ValidationError::CoordinateOutOfRange,
+					sample).m_Error == ValidationError::CoordinateOutOfRange,
 				"CellCornerToGlobalSample rejects coordinate overflow");
 
 			struct HaloCase
@@ -501,21 +439,22 @@ namespace napa::voxel::testing
 				CellCornerOffset m_Corner{};
 				OwnedSampleAddress m_Expected{};
 			};
-			constexpr std::array<HaloCase, 3> HaloCases{
+			constexpr std::array<HaloCase, 3> HaloCases
+			{
 				HaloCase{
 					{ 15, 0, 0 },
 					{ 1, 0, 0 },
-					{ { 1, 0, 0 }, { 0, 0, 0 } },
+					{ { 1, 0, 0 },{ 0, 0, 0 } },
 				},
 				HaloCase{
 					{ 15, 15, 0 },
 					{ 1, 1, 0 },
-					{ { 1, 1, 0 }, { 0, 0, 0 } },
+					{ { 1, 1, 0 },{ 0, 0, 0 } },
 				},
 				HaloCase{
 					{ 15, 15, 15 },
 					{ 1, 1, 1 },
-					{ { 1, 1, 1 }, { 0, 0, 0 } },
+					{ { 1, 1, 1 },{ 0, 0, 0 } },
 				},
 			};
 
@@ -525,14 +464,8 @@ namespace napa::voxel::testing
 				SampleCoord globalSample{};
 				OwnedSampleAddress address{};
 				haloCasesMatch &=
-					CellCornerToGlobalSample(
-						haloCase.m_Cell,
-						haloCase.m_Corner,
-						globalSample).Succeeded() &&
-					ResolveSampleOwner(
-						globalSample,
-						16,
-						address).Succeeded() &&
+					CellCornerToGlobalSample(haloCase.m_Cell, haloCase.m_Corner, globalSample).Succeeded() &&
+					ResolveSampleOwner(globalSample, 16, address).Succeeded() &&
 					address == haloCase.m_Expected;
 			}
 			context.Check(
@@ -546,32 +479,22 @@ namespace napa::voxel::testing
 
 			SampleCoord maximumSample{};
 			context.Check(
-				ChunkLocalToGlobalSample(
-					{ 134217727, 0, 0 },
-					{ 15, 0, 0 },
-					16,
-					maximumSample).Succeeded() &&
-				maximumSample ==
-					SampleCoord{
-						std::numeric_limits<std::int32_t>::max(),
-						0,
-						0,
-					},
+				ChunkLocalToGlobalSample({ 134217727, 0, 0 }, { 15, 0, 0 }, 16, maximumSample).Succeeded() &&
+				maximumSample == SampleCoord{
+					std::numeric_limits<std::int32_t>::max(),
+					0,
+					0,
+				},
 				"ChunkLocalToGlobalSample accepts the maximum exact coordinate");
 
 			CellCoord minimumCell{};
 			context.Check(
-				ChunkLocalToGlobalCell(
-					{ -134217728, 0, 0 },
-					{ 0, 0, 0 },
-					16,
-					minimumCell).Succeeded() &&
-				minimumCell ==
-					CellCoord{
-						std::numeric_limits<std::int32_t>::min(),
-						0,
-						0,
-					},
+				ChunkLocalToGlobalCell({ -134217728, 0, 0 }, { 0, 0, 0 }, 16, minimumCell).Succeeded() &&
+				minimumCell == CellCoord{
+					std::numeric_limits<std::int32_t>::min(),
+					0,
+					0,
+				},
 				"ChunkLocalToGlobalCell accepts the minimum exact coordinate");
 
 			SampleCoord unchangedSample{ 1, 2, 3 };
@@ -580,8 +503,7 @@ namespace napa::voxel::testing
 					{ std::numeric_limits<std::int32_t>::max(), 0, 0 },
 					{ 0, 0, 0 },
 					32,
-					unchangedSample).m_Error ==
-					ValidationError::CoordinateOutOfRange &&
+					unchangedSample).m_Error == ValidationError::CoordinateOutOfRange &&
 				unchangedSample == SampleCoord{ 1, 2, 3 },
 				"ChunkLocalToGlobalSample rejects expansion beyond int32");
 
@@ -591,9 +513,7 @@ namespace napa::voxel::testing
 				.m_MaxExclusive = { 16, 8, 4 },
 			};
 			context.Check(
-				LogicalCellBoundsToSampleBounds(
-					logicalCellBounds,
-					sampleBounds).Succeeded() &&
+				LogicalCellBoundsToSampleBounds(logicalCellBounds, sampleBounds).Succeeded() &&
 				sampleBounds == SampleAabb{
 					.m_Min = { -16, -8, -4 },
 					.m_MaxExclusive = { 17, 9, 5 },
@@ -605,17 +525,13 @@ namespace napa::voxel::testing
 
 			ChunkAabb sampleOwnerBounds{};
 			context.Check(
-				SampleBoundsToOwnerChunkBounds(
-					sampleBounds,
-					16,
-					sampleOwnerBounds).Succeeded() &&
-					sampleOwnerBounds ==
-						ChunkAabb{
-							.m_Min = { -1, -1, -1 },
-							.m_MaxExclusive = { 2, 1, 1 },
-						} &&
-					sampleOwnerBounds.Contains({ 1, 0, 0 }) &&
-					!sampleOwnerBounds.Contains({ 2, 0, 0 }),
+				SampleBoundsToOwnerChunkBounds(sampleBounds, 16, sampleOwnerBounds).Succeeded() &&
+				sampleOwnerBounds == ChunkAabb{
+					.m_Min = { -1, -1, -1 },
+					.m_MaxExclusive = { 2, 1, 1 },
+				} &&
+				sampleOwnerBounds.Contains({ 1, 0, 0 }) &&
+				!sampleOwnerBounds.Contains({ 2, 0, 0 }),
 				"Sample bounds identify cell and positive guard owner chunks");
 
 			context.Check(
@@ -624,9 +540,8 @@ namespace napa::voxel::testing
 						.m_Min = { 0, 0, 0 },
 						.m_MaxExclusive = { 0, 1, 1 },
 					},
-					sampleBounds).m_Error ==
-					ValidationError::EmptyLogicalCellBounds,
-				"Logical sample bounds conversion rejects an empty cell axis");
+					sampleBounds).m_Error == ValidationError::EmptyLogicalCellBounds,
+					"Logical sample bounds conversion rejects an empty cell axis");
 			context.Check(
 				LogicalCellBoundsToSampleBounds(
 					{
@@ -637,13 +552,11 @@ namespace napa::voxel::testing
 							1,
 						},
 					},
-					sampleBounds).m_Error ==
-					ValidationError::LogicalSampleBoundsOverflow,
-				"Logical sample bounds conversion rejects positive overflow");
+					sampleBounds).m_Error == ValidationError::LogicalSampleBoundsOverflow,
+					"Logical sample bounds conversion rejects positive overflow");
 		}
 
-		void RunCellOwnerChunkIntersectionTests(
-			TestContext& context) noexcept
+		void RunCellOwnerChunkIntersectionTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -653,26 +566,16 @@ namespace napa::voxel::testing
 			};
 			CellAabb intersection{};
 			const bool positivePartialChunksMatch =
-				IntersectCellOwnerChunk(
-					{ 0, 0, 0 },
-					8,
-					positiveBounds,
-					intersection).Succeeded() &&
-				intersection ==
-					CellAabb{
-						.m_Min = { 4, 2, 1 },
-						.m_MaxExclusive = { 8, 8, 8 },
-					} &&
-				IntersectCellOwnerChunk(
-					{ 2, 1, 1 },
-					8,
-					positiveBounds,
-					intersection).Succeeded() &&
-				intersection ==
-					CellAabb{
-						.m_Min = { 16, 8, 8 },
-						.m_MaxExclusive = { 20, 14, 9 },
-					};
+				IntersectCellOwnerChunk({ 0, 0, 0 }, 8, positiveBounds, intersection).Succeeded() &&
+				intersection == CellAabb{
+					.m_Min = { 4, 2, 1 },
+					.m_MaxExclusive = { 8, 8, 8 },
+			} &&
+				IntersectCellOwnerChunk({ 2, 1, 1 }, 8, positiveBounds, intersection).Succeeded() &&
+				intersection == CellAabb{
+					.m_Min = { 16, 8, 8 },
+					.m_MaxExclusive = { 20, 14, 9 },
+			};
 			context.Check(
 				positivePartialChunksMatch,
 				"Cell-owner chunk intersection clips positive partial chunks");
@@ -683,13 +586,8 @@ namespace napa::voxel::testing
 			};
 			intersection = unchangedIntersection;
 			context.Check(
-				IntersectCellOwnerChunk(
-					{ -1, 0, 0 },
-					8,
-					positiveBounds,
-					intersection).m_Error ==
-						ValidationError::ChunkOutsideLogicalCellDomain &&
-					intersection == unchangedIntersection,
+				IntersectCellOwnerChunk({ -1, 0, 0 }, 8, positiveBounds, intersection).m_Error == ValidationError::ChunkOutsideLogicalCellDomain &&
+				intersection == unchangedIntersection,
 				"Outside cell-owner chunks leave the intersection unchanged");
 
 			const CellAabb negativeBounds{
@@ -697,26 +595,16 @@ namespace napa::voxel::testing
 				.m_MaxExclusive = { -4, -2, -1 },
 			};
 			const bool negativePartialChunksMatch =
-				IntersectCellOwnerChunk(
-					{ -3, -2, -2 },
-					8,
-					negativeBounds,
-					intersection).Succeeded() &&
-				intersection ==
-					CellAabb{
-						.m_Min = { -20, -14, -9 },
-						.m_MaxExclusive = { -16, -8, -8 },
-					} &&
-				IntersectCellOwnerChunk(
-					{ -1, -1, -1 },
-					8,
-					negativeBounds,
-					intersection).Succeeded() &&
-				intersection ==
-					CellAabb{
-						.m_Min = { -8, -8, -8 },
-						.m_MaxExclusive = { -4, -2, -1 },
-					};
+				IntersectCellOwnerChunk({ -3, -2, -2 }, 8, negativeBounds, intersection).Succeeded() &&
+				intersection == CellAabb{
+					.m_Min = { -20, -14, -9 },
+					.m_MaxExclusive = { -16, -8, -8 },
+			} &&
+				IntersectCellOwnerChunk({ -1, -1, -1 }, 8, negativeBounds, intersection).Succeeded() &&
+				intersection == CellAabb{
+					.m_Min = { -8, -8, -8 },
+					.m_MaxExclusive = { -4, -2, -1 },
+			};
 			context.Check(
 				negativePartialChunksMatch,
 				"Cell-owner chunk intersection preserves negative partial chunks");
@@ -730,26 +618,25 @@ namespace napa::voxel::testing
 			LogicalDomainMetrics metrics{};
 			context.Check(
 				ComputeLogicalDomainMetrics(config, metrics).Succeeded() &&
-				metrics ==
-					LogicalDomainMetrics{
-						.m_CellCountX = 32,
-						.m_CellCountY = 16,
-						.m_CellCountZ = 8,
-						.m_SampleCountX = 33,
-						.m_SampleCountY = 17,
-						.m_SampleCountZ = 9,
-						.m_TotalCellCount = 4096,
-						.m_TotalSampleCount = 5049,
-						.m_CellOwnerChunkBounds = {
-							.m_Min = { -1, -1, -1 },
-							.m_MaxExclusive = { 1, 1, 1 },
-						},
-						.m_SampleOwnerChunkBounds = {
-							.m_Min = { -1, -1, -1 },
-							.m_MaxExclusive = { 2, 1, 1 },
-						},
-						.m_CellOwnerChunkCount = 8,
+				metrics == LogicalDomainMetrics{
+					.m_CellCountX = 32,
+					.m_CellCountY = 16,
+					.m_CellCountZ = 8,
+					.m_SampleCountX = 33,
+					.m_SampleCountY = 17,
+					.m_SampleCountZ = 9,
+					.m_TotalCellCount = 4096,
+					.m_TotalSampleCount = 5049,
+					.m_CellOwnerChunkBounds = {
+						.m_Min = { -1, -1, -1 },
+						.m_MaxExclusive = { 1, 1, 1 },
 					},
+					.m_SampleOwnerChunkBounds = {
+						.m_Min = { -1, -1, -1 },
+						.m_MaxExclusive = { 2, 1, 1 },
+					},
+					.m_CellOwnerChunkCount = 8,
+				},
 				"Logical domain metrics describe cells, samples, and owner chunks");
 
 			VoxelWorldConfig singleCellConfig = MakeValidConfig();
@@ -758,21 +645,17 @@ namespace napa::voxel::testing
 				.m_MaxExclusive = { -16, -15, -14 },
 			};
 			context.Check(
-				ComputeLogicalDomainMetrics(
-					singleCellConfig,
-					metrics).Succeeded() &&
+				ComputeLogicalDomainMetrics(singleCellConfig, metrics).Succeeded() &&
 				metrics.m_TotalCellCount == 1 &&
 				metrics.m_TotalSampleCount == 8 &&
-				metrics.m_CellOwnerChunkBounds ==
-					ChunkAabb{
-						.m_Min = { -2, -1, -1 },
-						.m_MaxExclusive = { -1, 0, 0 },
-					} &&
-				metrics.m_SampleOwnerChunkBounds ==
-					ChunkAabb{
-						.m_Min = { -2, -1, -1 },
-						.m_MaxExclusive = { 0, 0, 0 },
-					} &&
+				metrics.m_CellOwnerChunkBounds == ChunkAabb{
+					.m_Min = { -2, -1, -1 },
+					.m_MaxExclusive = { -1, 0, 0 },
+				} &&
+				metrics.m_SampleOwnerChunkBounds == ChunkAabb{
+					.m_Min = { -2, -1, -1 },
+					.m_MaxExclusive = { 0, 0, 0 },
+				} &&
 				metrics.m_CellOwnerChunkCount == 1,
 				"Logical domain metrics preserve negative owner boundaries");
 
@@ -786,10 +669,7 @@ namespace napa::voxel::testing
 			VoxelWorldConfig invalidConfig = MakeValidConfig();
 			invalidConfig.m_ChunkCellCount = 7;
 			context.Check(
-				ComputeLogicalDomainMetrics(
-					invalidConfig,
-					metrics).m_Error ==
-					ValidationError::InvalidChunkCellCount &&
+				ComputeLogicalDomainMetrics(invalidConfig, metrics).m_Error == ValidationError::InvalidChunkCellCount &&
 				metrics == unchangedMetrics,
 				"Failed logical domain computation leaves metrics unchanged");
 
@@ -807,12 +687,8 @@ namespace napa::voxel::testing
 				},
 			};
 			context.Check(
-				ComputeLogicalDomainMetrics(
-					cellOverflowConfig,
-					metrics).m_Error ==
-					ValidationError::LogicalCellCountOverflow &&
-				ValidateConfig(cellOverflowConfig).m_Error ==
-					ValidationError::LogicalCellCountOverflow,
+				ComputeLogicalDomainMetrics(cellOverflowConfig, metrics).m_Error == ValidationError::LogicalCellCountOverflow &&
+				ValidateConfig(cellOverflowConfig).m_Error == ValidationError::LogicalCellCountOverflow,
 				"Logical domain validation rejects uint64 cell count overflow");
 
 			VoxelWorldConfig sampleOverflowConfig = MakeValidConfig();
@@ -829,12 +705,8 @@ namespace napa::voxel::testing
 				},
 			};
 			context.Check(
-				ComputeLogicalDomainMetrics(
-					sampleOverflowConfig,
-					metrics).m_Error ==
-					ValidationError::LogicalSampleCountOverflow &&
-				ValidateConfig(sampleOverflowConfig).m_Error ==
-					ValidationError::LogicalSampleCountOverflow,
+				ComputeLogicalDomainMetrics(sampleOverflowConfig, metrics).m_Error == ValidationError::LogicalSampleCountOverflow &&
+				ValidateConfig(sampleOverflowConfig).m_Error == ValidationError::LogicalSampleCountOverflow,
 				"Logical domain validation rejects uint64 sample count overflow");
 		}
 
@@ -867,11 +739,7 @@ namespace napa::voxel::testing
 
 			config = MakeValidConfig();
 			config.m_VoxelSize = 0.0f;
-			CheckValidationError(
-				context,
-				config,
-				ValidationError::NonPositiveVoxelSize,
-				"ValidateConfig rejects zero voxel size");
+			CheckValidationError(context, config, ValidationError::NonPositiveVoxelSize, "ValidateConfig rejects zero voxel size");
 
 			config.m_VoxelSize = -1.0f;
 			CheckValidationError(
@@ -888,11 +756,7 @@ namespace napa::voxel::testing
 				"ValidateConfig rejects infinite voxel size");
 
 			config.m_VoxelSize = std::numeric_limits<float>::quiet_NaN();
-			CheckValidationError(
-				context,
-				config,
-				ValidationError::NonFiniteVoxelSize,
-				"ValidateConfig rejects NaN voxel size");
+			CheckValidationError(context, config, ValidationError::NonFiniteVoxelSize, "ValidateConfig rejects NaN voxel size");
 
 			config = MakeValidConfig();
 			config.m_SurfaceBandVoxels = 0.0f;
@@ -909,16 +773,14 @@ namespace napa::voxel::testing
 				ValidationError::NonPositiveSurfaceBandVoxels,
 				"ValidateConfig rejects negative surface band");
 
-			config.m_SurfaceBandVoxels =
-				-std::numeric_limits<float>::infinity();
+			config.m_SurfaceBandVoxels = -std::numeric_limits<float>::infinity();
 			CheckValidationError(
 				context,
 				config,
 				ValidationError::NonFiniteSurfaceBandVoxels,
 				"ValidateConfig rejects infinite surface band");
 
-			config.m_SurfaceBandVoxels =
-				std::numeric_limits<float>::quiet_NaN();
+			config.m_SurfaceBandVoxels = std::numeric_limits<float>::quiet_NaN();
 			CheckValidationError(
 				context,
 				config,
@@ -944,8 +806,7 @@ namespace napa::voxel::testing
 				"ValidateConfig rejects an inverted logical axis");
 
 			config = MakeValidConfig();
-			config.m_LogicalCellBounds.m_MaxExclusive.m_Y =
-				std::numeric_limits<std::int32_t>::max();
+			config.m_LogicalCellBounds.m_MaxExclusive.m_Y = std::numeric_limits<std::int32_t>::max();
 			CheckValidationError(
 				context,
 				config,
@@ -980,23 +841,21 @@ namespace napa::voxel::testing
 				"ValidateConfig accepts negative multi-chunk domains");
 
 			config = MakeValidConfig();
-			config.m_VoxelSize =
-				std::numeric_limits<float>::max();
+			config.m_VoxelSize = std::numeric_limits<float>::max();
 			CheckValidationError(
 				context,
 				config,
 				ValidationError::
-					UnrepresentableChunkLocalPosition,
+				UnrepresentableChunkLocalPosition,
 				"ValidateConfig rejects chunk-local positions that overflow Float3");
 
 			config = MakeValidConfig();
-			config.m_VoxelSize =
-				std::numeric_limits<float>::denorm_min();
+			config.m_VoxelSize = std::numeric_limits<float>::denorm_min();
 			CheckValidationError(
 				context,
 				config,
 				ValidationError::
-					UnrepresentableChunkLocalPosition,
+				UnrepresentableChunkLocalPosition,
 				"ValidateConfig rejects voxel sizes below canonical local precision");
 		}
 	}

@@ -68,27 +68,27 @@ namespace gglab
 		switch (viewDesc.m_Type)
 		{
 		case RHITextureViewType::RenderTarget:
-			return HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_RENDER_TARGET)
-				? RHITextureSupportReason::None
-				: RHITextureSupportReason::RenderTargetUnsupported;
+			return HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_RENDER_TARGET) ?
+				RHITextureSupportReason::None :
+				RHITextureSupportReason::RenderTargetUnsupported;
 		case RHITextureViewType::DepthStencil:
-			return HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL)
-				? RHITextureSupportReason::None
-				: RHITextureSupportReason::DepthStencilUnsupported;
+			return HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL) ?
+				RHITextureSupportReason::None :
+				RHITextureSupportReason::DepthStencilUnsupported;
 		case RHITextureViewType::ShaderResource:
 			return HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_SHADER_LOAD) ||
-				HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE)
-				? RHITextureSupportReason::None
-				: RHITextureSupportReason::ShaderResourceUnsupported;
+				HasFormatSupport1(support1, D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE) ?
+					RHITextureSupportReason::None :
+					RHITextureSupportReason::ShaderResourceUnsupported;
 		case RHITextureViewType::UnorderedAccess:
 			if (!HasFormatSupport1(
 				support1, D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW))
 			{
 				return RHITextureSupportReason::TypedUnorderedAccessUnsupported;
 			}
-			return (support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE) != 0
-				? RHITextureSupportReason::None
-				: RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported;
+			return (support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE) != 0 ?
+				RHITextureSupportReason::None :
+				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported;
 		}
 		return RHITextureSupportReason::FormatSupportQueryFailed;
 	}

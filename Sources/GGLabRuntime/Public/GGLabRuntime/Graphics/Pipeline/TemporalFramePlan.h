@@ -33,10 +33,14 @@ namespace gglab
 	{
 		switch (consumer)
 		{
-		case TemporalConsumer::TemporalAA: return "temporal-aa";
-		case TemporalConsumer::Reference: return "reference";
-		case TemporalConsumer::AmbientOcclusion: return "temporal-gtao";
-		case TemporalConsumer::Count: break;
+		case TemporalConsumer::TemporalAA:
+			return "temporal-aa";
+		case TemporalConsumer::Reference:
+			return "reference";
+		case TemporalConsumer::AmbientOcclusion:
+			return "temporal-gtao";
+		case TemporalConsumer::Count:
+			break;
 		}
 		return "unknown";
 	}
@@ -70,11 +74,16 @@ namespace gglab
 	{
 		switch (service)
 		{
-		case TemporalService::ProjectionJitter: return "projection-jitter";
-		case TemporalService::GeometryMotion: return "geometry-motion";
-		case TemporalService::FrameContinuity: return "frame-continuity";
-		case TemporalService::ColorDepthHistory: return "color-depth-history";
-		default: break;
+		case TemporalService::ProjectionJitter:
+			return "projection-jitter";
+		case TemporalService::GeometryMotion:
+			return "geometry-motion";
+		case TemporalService::FrameContinuity:
+			return "frame-continuity";
+		case TemporalService::ColorDepthHistory:
+			return "color-depth-history";
+		default:
+			break;
 		}
 		return "unknown";
 	}
@@ -95,7 +104,8 @@ namespace gglab
 			// GTAO history follows the raster samples, jittered or not, and varies its
 			// sampling with the submitted frame index; it removes no jitter itself.
 			return TemporalService::GeometryMotion | TemporalService::FrameContinuity;
-		case TemporalConsumer::Count: break;
+		case TemporalConsumer::Count:
+			break;
 		}
 		return TemporalService::None;
 	}
@@ -124,9 +134,12 @@ namespace gglab
 	{
 		switch (status)
 		{
-		case TemporalConsumerStatus::Disabled: return "disabled";
-		case TemporalConsumerStatus::Unavailable: return "unavailable";
-		case TemporalConsumerStatus::Active: return "active";
+		case TemporalConsumerStatus::Disabled:
+			return "disabled";
+		case TemporalConsumerStatus::Unavailable:
+			return "unavailable";
+		case TemporalConsumerStatus::Active:
+			return "active";
 		}
 		return "unknown";
 	}
@@ -136,8 +149,10 @@ namespace gglab
 	{
 		switch (reason)
 		{
-		case TemporalConsumerDisableReason::None: return "none";
-		case TemporalConsumerDisableReason::NotRequested: return "not-requested";
+		case TemporalConsumerDisableReason::None:
+			return "none";
+		case TemporalConsumerDisableReason::NotRequested:
+			return "not-requested";
 		case TemporalConsumerDisableReason::CoreCapabilityUnavailable:
 			return "core-capability-unavailable";
 		case TemporalConsumerDisableReason::DisplayViewIneligible:

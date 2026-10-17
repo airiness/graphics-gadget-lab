@@ -240,9 +240,10 @@ namespace gglab
 		else if (IsGTAOPreview(tap))
 		{
 			const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
-			source.m_Texture = gtao ? ResolveGTAOPreviewSource(*gtao,
-				blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName), tap)
-				: RGTextureId{};
+			source.m_Texture = gtao ?
+				ResolveGTAOPreviewSource(*gtao,
+					blackboard.TryGet<RGTemporalReferenceResources>(TemporalReferenceResourcesName), tap) :
+				RGTextureId{};
 		}
 		else if (IsDepthPreview(tap))
 		{
@@ -276,10 +277,10 @@ namespace gglab
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source.m_Texture, RGTextureAccess::Sample);
-				data.m_SourceSrv = source.m_ViewDesc
-					? builder.CreateView<RHITextureViewType::ShaderResource>(
-						data.m_Source, *source.m_ViewDesc)
-					: builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+				data.m_SourceSrv = source.m_ViewDesc ?
+					builder.CreateView<RHITextureViewType::ShaderResource>(
+						data.m_Source, *source.m_ViewDesc) :
+					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
 				data.m_Output = builder.CreateTexture("Capture.DiagnosticTap", outputDesc);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
 				data.m_OutputRtv =
@@ -339,15 +340,20 @@ namespace gglab
 				return;
 			}
 			AddResolvedPass(rg, context, services, aerial->m_Diagnostic,
-				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering
-					? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
+				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering ?
+					context.GetDisplayRenderView().m_ScenePreExposure :
+					1.0f,
 				std::nullopt, selection, channel);
 			return;
 		}
 		if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
 		{
 			const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
-			if (!atmosphere) { registry->InvalidatePostProcessPreview(selection, channel); return; }
+			if (!atmosphere)
+			{
+				registry->InvalidatePostProcessPreview(selection, channel);
+				return;
+			}
 			const auto index = static_cast<uint32_t>(selection.m_Tap) - static_cast<uint32_t>(PostProcessDebugTap::AtmosphereTransmittance);
 			if (!registry->ConsumePostProcessPreviewRequest(channel))
 			{
@@ -360,9 +366,9 @@ namespace gglab
 		{
 			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(
 				TemporalAAResourcesName);
-			const RGTextureId source = temporalAA
-				? ResolveTemporalAAPreviewSource(*temporalAA, selection.m_Tap)
-				: RGTextureId{};
+			const RGTextureId source = temporalAA ?
+				ResolveTemporalAAPreviewSource(*temporalAA, selection.m_Tap) :
+				RGTextureId{};
 			if (!temporalAA || !source.IsValid())
 			{
 				registry->InvalidatePostProcessPreview(selection, channel);
@@ -517,15 +523,15 @@ namespace gglab
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV(channel));
 		const auto* contextPtr = &context;
 
-		static constexpr const char* PassNames[] = {
+		static constexpr const char* PassNames[] =
+		{
 			"PostProcess.Preview", "AmbientOcclusion.Preview", "TemporalAA.Preview",
 			"Atmosphere.Preview", "SceneDepth.Preview"
 		};
 		rg.AddPass<PassData>(
 			PassNames[static_cast<uint32_t>(channel)],
-			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, outputImport,
-			samplerIndex, previewExposureScale,
-			registry, PreviewIndex, channel](RenderGraph::RGBuilder& builder, PassData& data)
+			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, outputImport, samplerIndex, previewExposureScale, registry, PreviewIndex, channel]
+			(RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
 				if (selection.m_Tap == PostProcessDebugTap::SceneColor)
@@ -534,7 +540,8 @@ namespace gglab
 						NonFiniteWatchSemantic::PostProcessInput, data.m_Source,
 						builder.GetObservationAddress(data.m_Source, RGObservationPosition::Before));
 				}
-				constexpr const char* PreviewNames[] = {
+				constexpr const char* PreviewNames[] =
+				{
 					"Preview.PostProcessing", "Preview.AmbientOcclusion", "Preview.TemporalAA",
 					"Preview.Atmosphere", "Preview.SceneDepth"
 				};

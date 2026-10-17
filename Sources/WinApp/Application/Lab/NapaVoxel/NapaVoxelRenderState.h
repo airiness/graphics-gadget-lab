@@ -549,9 +549,9 @@ namespace gglab
 		}
 		[[nodiscard]] GGLabMeshPublicationIdentity GetPendingIdentity() const noexcept
 		{
-			return m_MeshUploadSession && m_MeshUploadSession->GetPublication()
-				? m_MeshUploadSession->GetPublication()->GetIdentity()
-				: GGLabMeshPublicationIdentity{};
+			return m_MeshUploadSession && m_MeshUploadSession->GetPublication() ?
+				m_MeshUploadSession->GetPublication()->GetIdentity() :
+				GGLabMeshPublicationIdentity{};
 		}
 		[[nodiscard]] bool HasVisibleMeshes() const noexcept
 		{
@@ -563,9 +563,9 @@ namespace gglab
 		}
 		[[nodiscard]] NapaVoxelInitialPublicationStatus GetPublicationStatus() const noexcept
 		{
-			return m_Publication
-				? m_Publication->GetStatus()
-				: NapaVoxelInitialPublicationStatus::Uninitialized;
+			return m_Publication ?
+				m_Publication->GetStatus() :
+				NapaVoxelInitialPublicationStatus::Uninitialized;
 		}
 		[[nodiscard]] std::shared_ptr<const NapaVoxelGpuMeshSet> GetFrameView() const noexcept
 		{

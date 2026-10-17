@@ -109,7 +109,7 @@ namespace napa::voxel
 	[[nodiscard]] constexpr bool IsKnownChunkBoundaryFace(ChunkBoundaryFace face) noexcept
 	{
 		return static_cast<std::uint8_t>(face) <
-			   static_cast<std::uint8_t>(ChunkBoundaryFace::Count);
+			static_cast<std::uint8_t>(ChunkBoundaryFace::Count);
 	}
 
 	[[nodiscard]] constexpr std::size_t GetChunkBoundaryFaceIndex(ChunkBoundaryFace face) noexcept
@@ -144,14 +144,14 @@ namespace napa::voxel
 		QuantizedMeshNormal lhs, QuantizedMeshNormal rhs) noexcept
 	{
 		const auto difference = [](std::int16_t a, std::int16_t b)
-		{
-			const std::int32_t wideA = a;
-			const std::int32_t wideB = b;
-			return wideA >= wideB ? wideA - wideB : wideB - wideA;
-		};
+			{
+				const std::int32_t wideA = a;
+				const std::int32_t wideB = b;
+				return wideA >= wideB ? wideA - wideB : wideB - wideA;
+			};
 		return difference(lhs.m_X, rhs.m_X) <= BoundaryContourNormalTolerance &&
-			   difference(lhs.m_Y, rhs.m_Y) <= BoundaryContourNormalTolerance &&
-			   difference(lhs.m_Z, rhs.m_Z) <= BoundaryContourNormalTolerance;
+			difference(lhs.m_Y, rhs.m_Y) <= BoundaryContourNormalTolerance &&
+			difference(lhs.m_Z, rhs.m_Z) <= BoundaryContourNormalTolerance;
 	}
 
 	[[nodiscard]] ChunkBoundaryContourSet MakeEmptyChunkBoundaryContourSet();

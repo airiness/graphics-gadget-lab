@@ -72,7 +72,9 @@ namespace gglab
 		{
 		public:
 			SettingsNavigationProbe(std::string_view path, uint32_t& draws, std::string& windowName) noexcept :
-				m_Path(path), m_Draws(draws), m_WindowName(windowName) {}
+				m_Path(path), m_Draws(draws), m_WindowName(windowName)
+			{
+			}
 			std::string_view GetPath() const noexcept override { return m_Path; }
 			std::string_view GetTitle() const noexcept override { return m_Path; }
 			void Draw(DevelopGuiContext&) noexcept override
@@ -134,7 +136,7 @@ namespace gglab
 				.m_ViewRenderSettingsOverrides = &overrides,
 				.m_PanelRegistry = &registry,
 				.m_ActiveProfileName = "Settings Fixture",
-				};
+			};
 			RenderingSettingsPanel panel;
 			const auto draw = [&](ImGuiID activation = 0)
 			{
@@ -209,11 +211,12 @@ namespace gglab
 			context.Check(overrides.GetActiveCount() == 0 &&
 				ProfilesMatch(devTools.ResolveViewRenderProfile(snapshot.m_AuthoringProfile), snapshot.m_AuthoringProfile),
 				"The cockpit Clear All button restores every current profile setting");
-			const std::array inspectIds = {
+			const std::array inspectIds =
+			{
 				widget("LightingSettings", "Lighting Path", "Inspect"), widget("LightingSettings", "GTAO", "Inspect"),
 				widget("TemporalSettings", "TAA", "Inspect"), widget("PostProcessSettings", "Bloom", "Inspect"),
 				widget("ShadowSettings", "Shadows", "Inspect"),
-				};
+			};
 			for (size_t index = 0; index < paths.size(); ++index)
 			{
 				GGLAB_UNUSED(draw(inspectIds[index]));

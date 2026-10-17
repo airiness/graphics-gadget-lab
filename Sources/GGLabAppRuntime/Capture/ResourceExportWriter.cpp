@@ -19,23 +19,35 @@ namespace gglab
 			frame.erase("image");
 			frame.erase("schemaVersion");
 			frame["adapterDriverIdentity"] = submission.m_AdapterIdentity;
-			frame["codeIdentity"] = { {"status", "unavailable"}, {"reason", "The capture metadata service has no build identity source."} };
-			frame["shaderIdentity"] = { {"status", "unavailable"}, {"reason", "The graph does not retain per-pass shader artifact identities."} };
+			frame["codeIdentity"] = {
+				{ "status", "unavailable" },
+				{ "reason", "The capture metadata service has no build identity source." } };
+			frame["shaderIdentity"] = {
+				{ "status", "unavailable" },
+				{ "reason", "The graph does not retain per-pass shader artifact identities." } };
 			frame["parameterRevision"] = nullptr;
 			return frame;
 		}
 		Json Submission(const ResourceExportSubmission& submission)
 		{
-			return { {"fenceIndex", submission.m_FenceIndex}, {"fenceGeneration", submission.m_FenceGeneration},
-				{"fenceValue", submission.m_FenceValue}, {"completed", true} };
+			return {
+				{ "fenceIndex", submission.m_FenceIndex },
+				{ "fenceGeneration", submission.m_FenceGeneration },
+				{ "fenceValue", submission.m_FenceValue },
+				{ "completed", true } };
 		}
 		Json Address(const RGResourceAddress& address)
 		{
-			Json at = address.m_Position == RGObservationPosition::Final ? Json("final")
-				: Json{{address.m_Position == RGObservationPosition::Before ? "before" : "after", address.m_Pass}};
-			return { {"resource", address.m_Resource}, {"at", at}, {"occurrence", address.m_Occurrence ? Json(*address.m_Occurrence) : Json(nullptr)},
-				{"mip", address.m_Mip}, {"slices", {address.m_FirstSlice, address.m_SliceCount.value_or(1)}},
-				{"aspect", diagnostics::RGFlagsId(address.m_Aspect)} };
+			Json at = address.m_Position == RGObservationPosition::Final ?
+				Json("final") :
+				Json{ { address.m_Position == RGObservationPosition::Before ? "before" : "after", address.m_Pass } };
+			return {
+				{ "resource", address.m_Resource },
+				{ "at", at },
+				{ "occurrence", address.m_Occurrence ? Json(*address.m_Occurrence) : Json(nullptr) },
+				{ "mip", address.m_Mip },
+				{ "slices",{ address.m_FirstSlice, address.m_SliceCount.value_or(1) } },
+				{ "aspect", diagnostics::RGFlagsId(address.m_Aspect) } };
 		}
 		uint32_t ScalarBytes(ResourceExportScalar scalar)
 		{
@@ -131,37 +143,69 @@ namespace gglab
 		{
 			throw std::runtime_error("Resource export file count disagrees with its group.");
 		}
-		Json root = { {"schema", "gglab.resource-export"}, {"schemaVersion", metadata.m_NonFiniteScanActive ? 2 : 1}, {"frameSerial", metadata.m_FrameSerial},
-			{"frame", Frame(metadata, submission)}, {"submission", Submission(submission)},
-			{"observation", {{"graph", metadata.m_GraphExportActive}, {"resourceExport", true}, {"nonFiniteWatch", metadata.m_NonFiniteScanActive}}},
-			{"graph", graphFile.empty() ? Json(nullptr) : Json(GetFrameCapturePathText(graphFile.filename()))}, {"targets", Json::array()} };
+		Json root = {
+			{ "schema", "gglab.resource-export" },
+			{ "schemaVersion", metadata.m_NonFiniteScanActive ? 2 : 1 },
+			{ "frameSerial", metadata.m_FrameSerial },
+			{ "frame", Frame(metadata, submission) },
+			{ "submission", Submission(submission) },
+			{ "observation",{
+				{ "graph", metadata.m_GraphExportActive },
+				{ "resourceExport", true },
+				{ "nonFiniteWatch", metadata.m_NonFiniteScanActive } } },
+			{ "graph", graphFile.empty() ? Json(nullptr) : Json(GetFrameCapturePathText(graphFile.filename())) },
+			{ "targets", Json::array() } };
 		for (size_t i = 0; i < payload.m_Arrays.size(); ++i)
 		{
 			const auto& array = payload.m_Arrays[i];
-			Json target = { {"address", Address(array.m_Address)}, {"resourceNodeIndex", array.m_ResourceNodeIndex},
-				{"version", array.m_Version}, {"writerPassIndex", array.m_WriterPassIndex}, {"writerPass", array.m_WriterPass},
-				{"writerOccurrence", array.m_WriterOccurrence}, {"type", diagnostics::RGEnumId(array.m_Type)},
-				{"array", GetFrameCapturePathText(files[i].filename())}, {"physicalFormat", GetRHIFormatInfo(array.m_PhysicalFormat).m_Name},
-				{"viewFormat", GetRHIFormatInfo(array.m_ViewFormat).m_Name}, {"rawTypeless", array.m_RawTypeless},
-				{"dtype", array.m_Fields.empty() ? Json(GetResourceExportDtype(array.m_Scalar)) : Json("structured")},
-				{"shape", array.m_Shape}, {"byteCount", array.m_Data.size()}, {"encoding", array.m_Encoding},
-				{"channelOrder", array.m_ChannelOrder}, {"strideBytes", array.m_Stride}, {"elementCount", array.m_ElementCount},
-				{"fields", Json::array()}, {"semantics", nullptr}, {"extendedLifetimes", Json::array()} };
-			for (const auto& field : array.m_Fields) target["fields"].push_back({ {"name", field.m_Name}, {"offset", field.m_Offset},
-				{"dtype", GetResourceExportDtype(field.m_Scalar)}, {"count", field.m_Count} });
+			Json target = {
+				{ "address", Address(array.m_Address) },
+				{ "resourceNodeIndex", array.m_ResourceNodeIndex },
+				{ "version", array.m_Version },
+				{ "writerPassIndex", array.m_WriterPassIndex },
+				{ "writerPass", array.m_WriterPass },
+				{ "writerOccurrence", array.m_WriterOccurrence },
+				{ "type", diagnostics::RGEnumId(array.m_Type) },
+				{ "array", GetFrameCapturePathText(files[i].filename()) },
+				{ "physicalFormat", GetRHIFormatInfo(array.m_PhysicalFormat).m_Name },
+				{ "viewFormat", GetRHIFormatInfo(array.m_ViewFormat).m_Name },
+				{ "rawTypeless", array.m_RawTypeless },
+				{ "dtype", array.m_Fields.empty() ? Json(GetResourceExportDtype(array.m_Scalar)) : Json("structured") },
+				{ "shape", array.m_Shape },
+				{ "byteCount", array.m_Data.size() },
+				{ "encoding", array.m_Encoding },
+				{ "channelOrder", array.m_ChannelOrder },
+				{ "strideBytes", array.m_Stride },
+				{ "elementCount", array.m_ElementCount },
+				{ "fields", Json::array() },
+				{ "semantics", nullptr },
+				{ "extendedLifetimes", Json::array() } };
+			for (const auto& field : array.m_Fields)
+			{
+				target["fields"].push_back({
+					{ "name", field.m_Name },
+					{ "offset", field.m_Offset },
+					{ "dtype", GetResourceExportDtype(field.m_Scalar) },
+					{ "count", field.m_Count } });
+			}
 			if (array.m_Semantics)
 			{
 				const auto& semantics = *array.m_Semantics;
-				target["semantics"] = { {"role", semantics.m_Role}, {"units", semantics.m_Units}, {"space", semantics.m_Space},
-					{"description", semantics.m_Description}, {"preExposure", semantics.m_PreExposure ? Json(*semantics.m_PreExposure) : Json(nullptr)},
-					{"reversedDepth", semantics.m_ReversedDepth ? Json(*semantics.m_ReversedDepth) : Json(nullptr)},
-					{"watchTier", semantics.m_WatchTier ? Json(*semantics.m_WatchTier) : Json(nullptr)} };
+				target["semantics"] = {
+					{ "role", semantics.m_Role },
+					{ "units", semantics.m_Units },
+					{ "space", semantics.m_Space },
+					{ "description", semantics.m_Description },
+					{ "preExposure", semantics.m_PreExposure ? Json(*semantics.m_PreExposure) : Json(nullptr) },
+					{ "reversedDepth", semantics.m_ReversedDepth ? Json(*semantics.m_ReversedDepth) : Json(nullptr) },
+					{ "watchTier", semantics.m_WatchTier ? Json(*semantics.m_WatchTier) : Json(nullptr) } };
 			}
 			if (array.m_ObservedLastUse != array.m_OriginalLastUse)
 			{
 				target["extendedLifetimes"].push_back({
-					{"resource", array.m_Address.m_Resource}, {"originalLastUser", array.m_OriginalLastUse == UINT32_MAX ? Json(nullptr) : Json(array.m_OriginalLastUse)},
-					{"observedLastUser", array.m_ObservedLastUse} });
+					{ "resource", array.m_Address.m_Resource },
+					{ "originalLastUser", array.m_OriginalLastUse == UINT32_MAX ? Json(nullptr) : Json(array.m_OriginalLastUse) },
+					{ "observedLastUser", array.m_ObservedLastUse } });
 			}
 			root["targets"].push_back(std::move(target));
 		}
@@ -175,7 +219,10 @@ namespace gglab
 		root["frame"] = Frame(metadata, submission);
 		root["frameSerial"] = metadata.m_FrameSerial;
 		root["submission"] = Submission(submission);
-		root["observation"] = { {"graph", true}, {"resourceExport", resourceExportActive}, {"nonFiniteWatch", metadata.m_NonFiniteScanActive} };
+		root["observation"] = {
+			{ "graph", true },
+			{ "resourceExport", resourceExportActive },
+			{ "nonFiniteWatch", metadata.m_NonFiniteScanActive } };
 		return root.dump(2, ' ', false, Json::error_handler_t::replace);
 	}
 }

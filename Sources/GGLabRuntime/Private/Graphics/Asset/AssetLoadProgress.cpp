@@ -60,28 +60,28 @@ namespace gglab
 		switch (state)
 		{
 		case AssetState::Unloaded:
-			return { state, 0.0f, "Waiting for asset request", {} };
+			return { state, 0.0f, "Waiting for asset request",{} };
 		case AssetState::Queued:
-			return { state, 0.05f, "Queued for CPU processing", {} };
+			return { state, 0.05f, "Queued for CPU processing",{} };
 		case AssetState::LoadingCpu:
-			return { state, 0.25f, std::string(GetCpuProcessingStage(kind)), {} };
+			return { state, 0.25f, std::string(GetCpuProcessingStage(kind)),{} };
 		case AssetState::CpuReady:
-			return { state, 0.55f, "CPU processing complete", {} };
+			return { state, 0.55f, "CPU processing complete",{} };
 		case AssetState::Publishing:
-			return { state, 0.62f, "Publishing asset resources", {} };
+			return { state, 0.62f, "Publishing asset resources",{} };
 		case AssetState::UploadQueued:
-			return { state, 0.65f, "Queued for GPU upload", {} };
+			return { state, 0.65f, "Queued for GPU upload",{} };
 		case AssetState::GpuProcessing:
-			return { state, 0.85f, std::string(GetGpuProcessingStage(kind)), {} };
+			return { state, 0.85f, std::string(GetGpuProcessingStage(kind)),{} };
 		case AssetState::Ready:
-			return { state, 1.0f, "Asset ready", {} };
+			return { state, 1.0f, "Asset ready",{} };
 		case AssetState::Evicting:
-			return { state, 1.0f, "Retiring GPU residency", {} };
+			return { state, 1.0f, "Retiring GPU residency",{} };
 		case AssetState::Failed:
-			return { state, 0.0f, "Asset loading failed", {} };
+			return { state, 0.0f, "Asset loading failed",{} };
 		case AssetState::Cancelled:
-			return { state, 0.0f, "Asset loading cancelled", {} };
+			return { state, 0.0f, "Asset loading cancelled",{} };
 		}
-		return { state, 0.0f, "Unknown asset state", {} };
+		return { state, 0.0f, "Unknown asset state",{} };
 	}
 }

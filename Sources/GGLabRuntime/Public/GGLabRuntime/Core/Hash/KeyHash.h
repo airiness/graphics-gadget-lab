@@ -80,7 +80,9 @@ namespace gglab
 				if constexpr (sizeof(U) == sizeof(float))
 				{
 					constexpr auto canonicalZero = [](float v) noexcept
-						{ return v == 0.0f ? 0.0f : v; };
+						{
+							return v == 0.0f ? 0.0f : v;
+						};
 					float floatValue = canonicalZero(static_cast<float>(value));
 					uint32_t intValue = std::bit_cast<uint32_t>(floatValue);
 					MixBytes(hash, std::addressof(intValue), sizeof(intValue));
@@ -88,7 +90,9 @@ namespace gglab
 				else if constexpr (sizeof(U) == sizeof(double))
 				{
 					constexpr auto canonicalZero = [](double v) noexcept
-						{ return v == 0.0 ? 0.0 : v; };
+						{
+							return v == 0.0 ? 0.0 : v;
+						};
 					double doubleValue = canonicalZero(static_cast<double>(value));
 					uint64_t intValue = std::bit_cast<uint64_t>(doubleValue);
 					MixBytes(hash, std::addressof(intValue), sizeof(intValue));

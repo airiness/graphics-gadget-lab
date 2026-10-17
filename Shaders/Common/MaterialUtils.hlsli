@@ -17,7 +17,7 @@ float4 SampleMaterialBaseColor(MaterialData matData, float2 uv0, float2 uv1)
 	const float2 baseColorUV = SelectUV(matData.BaseColorBinding, uv0, uv1);
 	return SampleMaterialTextureBinding(
 		matData.BaseColorBinding.TextureSamplerBinding, baseColorUV) *
-		   matData.BaseColorFactor;
+		matData.BaseColorFactor;
 }
 
 float SampleMaterialBaseAlpha(MaterialData matData, float2 uv0, float2 uv1)

@@ -58,12 +58,16 @@ namespace gglab
 		[[nodiscard]] bool IsReady() const noexcept
 		{
 			return std::ranges::all_of(m_Gates, [](const FrameCaptureGate& gate)
-				{ return gate.m_State == FrameCaptureGateState::Ready; });
+				{
+					return gate.m_State == FrameCaptureGateState::Ready;
+				});
 		}
 		[[nodiscard]] bool HasFailed() const noexcept
 		{
 			return std::ranges::any_of(m_Gates, [](const FrameCaptureGate& gate)
-				{ return gate.m_State == FrameCaptureGateState::Failed; });
+				{
+					return gate.m_State == FrameCaptureGateState::Failed;
+				});
 		}
 	};
 }

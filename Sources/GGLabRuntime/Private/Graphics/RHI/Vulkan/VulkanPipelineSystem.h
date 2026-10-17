@@ -53,9 +53,9 @@ namespace gglab
 		}
 		[[nodiscard]] uint32_t GetDynamicOffsetSlot(uint32_t logicalParameterIndex) const noexcept
 		{
-			return logicalParameterIndex < m_ParameterToDynamicOffsetSlot.size()
-				? m_ParameterToDynamicOffsetSlot[logicalParameterIndex]
-				: UINT32_MAX;
+			return logicalParameterIndex < m_ParameterToDynamicOffsetSlot.size() ?
+				m_ParameterToDynamicOffsetSlot[logicalParameterIndex] :
+				UINT32_MAX;
 		}
 	};
 

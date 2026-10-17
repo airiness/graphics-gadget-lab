@@ -78,8 +78,9 @@ namespace gglab
 		const auto globalIndex = globalSpan.m_Index;
 
 		return { .m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
-			.m_GpuHandle = IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex)
-											 : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
+			.m_GpuHandle = IsShaderVisible() ?
+				GpuHandleAtGlobalIndex(globalIndex) :
+				CD3DX12_GPU_DESCRIPTOR_HANDLE{},
 #if GGLAB_DEVELOPMENT_BUILD
 			.m_DebugType = GetHeap()->Type()
 #endif

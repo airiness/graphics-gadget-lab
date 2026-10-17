@@ -93,7 +93,9 @@ namespace gglab
 	bool DevelopGuiRegistry::IsPanelOpen(std::string_view fullPath) const noexcept
 	{
 		return std::ranges::any_of(m_Panels, [fullPath](const PanelRuntime& panel)
-			{ return panel.m_FullPath == fullPath && panel.m_Open; });
+			{
+				return panel.m_FullPath == fullPath && panel.m_Open;
+			});
 	}
 
 	void DevelopGuiRegistry::BuildMenuTree() noexcept

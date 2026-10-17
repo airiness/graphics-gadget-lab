@@ -26,8 +26,7 @@ namespace
 
 	[[nodiscard]] const gglab::SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept
 	{
-		const auto iterator =
-			std::ranges::find(RegisteredSuites, suiteId, &gglab::SelfTestSuiteDesc::m_Id);
+		const auto iterator = std::ranges::find(RegisteredSuites, suiteId, &gglab::SelfTestSuiteDesc::m_Id);
 		return iterator != std::ranges::end(RegisteredSuites) ? &*iterator : nullptr;
 	}
 

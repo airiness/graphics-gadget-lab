@@ -24,6 +24,6 @@ namespace gglab
 	};
 
 	[[nodiscard]] std::unique_ptr<ApplicationToolingIntegrationBase>
-	CreateApplicationToolingIntegration(
-		const ApplicationToolingCompositionCreateInfo& createInfo) noexcept;
+		CreateApplicationToolingIntegration(
+			const ApplicationToolingCompositionCreateInfo& createInfo) noexcept;
 }

@@ -20,12 +20,16 @@ namespace gglab
 			void U32(uint32_t value)
 			{
 				for (uint32_t i = 0; i < 4; ++i)
+				{
 					m_Data.push_back(static_cast<std::byte>((value >> (i * 8)) & 0xffu));
+				}
 			}
 			void U64(uint64_t value)
 			{
 				for (uint32_t i = 0; i < 8; ++i)
+				{
 					m_Data.push_back(static_cast<std::byte>((value >> (i * 8)) & 0xffu));
+				}
 			}
 			void Bytes(std::span<const std::byte> value)
 			{
@@ -70,8 +74,10 @@ namespace gglab
 				}
 				value = 0;
 				for (size_t i = 0; i < width; ++i)
+				{
 					value |= static_cast<uint64_t>(std::to_integer<uint8_t>(m_Data[m_Offset + i]))
-					<< (i * 8);
+						<< (i * 8);
+				}
 				m_Offset += width;
 				return true;
 			}
@@ -233,10 +239,10 @@ namespace gglab
 			result = {};
 			result.m_StructureError = built.m_StructureError;
 			result.m_Error =
-				built.m_Error == TextureArtifactBuildError::InvalidStructure
-				? std::format("Texture DDC artifact failed structural validation: {}.",
-					TextureStructureValidationErrorText(built.m_StructureError))
-				: "Texture DDC artifact digest computation failed.";
+				built.m_Error == TextureArtifactBuildError::InvalidStructure ?
+					std::format("Texture DDC artifact failed structural validation: {}.",
+						TextureStructureValidationErrorText(built.m_StructureError)) :
+					"Texture DDC artifact digest computation failed.";
 			return result;
 		}
 		if (built.m_Artifact.m_ContentDigest != expectedContentDigest)

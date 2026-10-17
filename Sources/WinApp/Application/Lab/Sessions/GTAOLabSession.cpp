@@ -102,23 +102,15 @@ namespace gglab
 			.m_DefaultValue = int32_t(PostProcessDebugTap::GTAOFinalAO),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(PostProcessDebugTap::GTAORawAO), .m_Name = "Raw AO"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAOHalfDepthViewZ),
-						.m_Name = "Half Depth View Z"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAOReconstructedNormal),
-						.m_Name = "Reconstructed Normal"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAOSelectedSurfaceOffset),
-						.m_Name = "Selected Surface Offset"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAODenoiseX),
-						.m_Name = "Denoise X"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAODenoiseY),
-						.m_Name = "Denoise Y"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAOFinalAO),
-						.m_Name = "Final AO"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAOAOOnlyLightingContribution),
-						.m_Name = "AO-only Lighting Contribution"},
-					{.m_Value = int32_t(PostProcessDebugTap::GTAOHistorySamples),
-						.m_Name = "History Samples"},
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAORawAO), .m_Name = "Raw AO" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAOHalfDepthViewZ), .m_Name = "Half Depth View Z" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAOReconstructedNormal), .m_Name = "Reconstructed Normal" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAOSelectedSurfaceOffset), .m_Name = "Selected Surface Offset" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAODenoiseX), .m_Name = "Denoise X" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAODenoiseY), .m_Name = "Denoise Y" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAOFinalAO), .m_Name = "Final AO" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAOAOOnlyLightingContribution), .m_Name = "AO-only Lighting Contribution" },
+					{ .m_Value = int32_t(PostProcessDebugTap::GTAOHistorySamples), .m_Name = "History Samples" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -130,10 +122,8 @@ namespace gglab
 			.m_DefaultValue = int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm),
-						.m_Name = "Prefer R8 Unorm"},
-					{.m_Value = int32_t(GTAOFinalAOFormatPreference::ForceR16Float),
-						.m_Name = "Force R16 Float"},
+					{ .m_Value = int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm), .m_Name = "Prefer R8 Unorm" },
+					{ .m_Value = int32_t(GTAOFinalAOFormatPreference::ForceR16Float), .m_Name = "Force R16 Float" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -552,15 +542,15 @@ namespace gglab
 			makePath(PanPathId, "Pan",
 				"Preset view translated 4 m to the right over 180 frames.",
 				Vector3(4.0f, 0.0f, 0.0f)),
-			// Contact occlusion that follows a moving rigid occluder.
-			makePath(MovingOccluderPathId, "Moving Occluder",
-				"Preset view; the silhouette sphere slides along the floor with the path frame.",
-				Vector3::Zero),
-			// Appearance and disappearance time of occlusion.
-			makePath(OccluderStepPathId, "Occluder Step",
-				"Preset view; a box stands in the wall corner for frames 60-119.",
-				Vector3::Zero),
-			emptyViewPath,
+				// Contact occlusion that follows a moving rigid occluder.
+				makePath(MovingOccluderPathId, "Moving Occluder",
+					"Preset view; the silhouette sphere slides along the floor with the path frame.",
+					Vector3::Zero),
+					// Appearance and disappearance time of occlusion.
+					makePath(OccluderStepPathId, "Occluder Step",
+						"Preset view; a box stands in the wall corner for frames 60-119.",
+						Vector3::Zero),
+					emptyViewPath,
 			});
 		GGLAB_ASSERT_MSG(pathsRegistered, "The GTAO Lab camera paths must be valid.");
 		GGLAB_UNUSED(pathsRegistered);
@@ -589,10 +579,10 @@ namespace gglab
 		if (registry.valid(m_SilhouetteSphere))
 		{
 			registry.get<components::TransformComponent>(m_SilhouetteSphere).m_Position =
-				path.m_Id == MovingOccluderPathId
-				? ResolveMovingOccluderPosition(static_cast<float>(frame) /
-					MovingOccluderFramesPerSecond)
-				: SilhouetteSpherePosition;
+				path.m_Id == MovingOccluderPathId ?
+					ResolveMovingOccluderPosition(static_cast<float>(frame) /
+						MovingOccluderFramesPerSecond) :
+					SilhouetteSpherePosition;
 		}
 		if (registry.valid(m_StepOccluder))
 		{
@@ -628,49 +618,52 @@ namespace gglab
 		const bool previewExecuted = registry && registry->HasPublishedPostProcessPreview(
 			PostProcessPreviewChannel::AmbientOcclusion) &&
 			registry->GetPostProcessPreviewUpdateCount(PostProcessPreviewChannel::AmbientOcclusion) >
-				m_PreviewUpdateCountOnEnter &&
+			m_PreviewUpdateCountOnEnter &&
 			registry->GetPublishedPostProcessPreviewSelection(
 				PostProcessPreviewChannel::AmbientOcclusion).m_Tap == m_SelectedTap;
 		diagnostics.m_Title = "GTAO Spatial Pipeline";
 		diagnostics.m_Metrics = {
-			{.m_Name = "Full extent",
-				.m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight)},
-			{.m_Name = "Half extent",
-				.m_Value = std::format("{} x {}", halfExtent.m_Width, halfExtent.m_Height)},
-			{.m_Name = "Evaluate kernel",
+			{ .m_Name = "Full extent",
+				.m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight) },
+			{ .m_Name = "Half extent",
+				.m_Value = std::format("{} x {}", halfExtent.m_Width, halfExtent.m_Height) },
+			{ .m_Name = "Evaluate kernel",
 				.m_Value = std::format("{} directions x {} steps", settings.m_DirectionCount,
-					settings.m_StepCount)},
-			{.m_Name = "Spatial settings",
+					settings.m_StepCount) },
+			{ .m_Name = "Spatial settings",
 				.m_Value = std::format("radius {:.2f} m, falloff {:.2f}-{:.2f} m, power {:.2f}",
 					settings.m_Radius, settings.m_FalloffStart, settings.m_FalloffEnd,
-					settings.m_Power)},
-			{.m_Name = "Denoise kernel",
-				.m_Value = std::format("separable bilateral, radius {}", settings.m_DenoiseRadius)},
-			{.m_Name = "Performance target", .m_Value = "~1.5 ms at default 1440p (informational)"},
-			{.m_Name = "PBR integration",
-				.m_Value = GetViewRenderProfile().m_Lighting.m_GTAO.m_Enabled
-					? "indirect diffuse"
-					: "neutral disabled path"},
+					settings.m_Power) },
+			{ .m_Name = "Denoise kernel",
+				.m_Value = std::format("separable bilateral, radius {}", settings.m_DenoiseRadius) },
+			{ .m_Name = "Performance target", .m_Value = "~1.5 ms at default 1440p (informational)" },
+			{ .m_Name = "PBR integration",
+				.m_Value = GetViewRenderProfile().m_Lighting.m_GTAO.m_Enabled ?
+					"indirect diffuse" :
+					"neutral disabled path" },
 		};
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "Deterministic fixture",
-				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+				.m_Status = m_FixtureConfigured ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail =
 					"Plane, corner, thin and screen-edge slabs, silhouette, radius-gap and halo "
 					"fixtures, emissive/specular controls, background, and coplanar ties are configured.",
 			},
 			{
 				.m_Name = "Half-resolution contract",
-				.m_Status = halfExtent.IsValid() ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Failed,
+				.m_Status = halfExtent.IsValid() ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "The evaluate extent uses ceil(full extent / 2) on each axis.",
 			},
 			{
 				.m_Name = "Selected preview published",
-				.m_Status = previewExecuted ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+				.m_Status = previewExecuted ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "The selected GTAO pipeline surface was published after Lab entry.",
 			},
 		};

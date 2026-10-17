@@ -42,12 +42,13 @@ namespace gglab
 {
 	namespace
 	{
-		std::vector<TextureAssetData> CheckImportedTextures(SelfTestContext& context,
-			const ImportedModel& model) noexcept
+		std::vector<TextureAssetData> CheckImportedTextures(SelfTestContext& context, const ImportedModel& model) noexcept
 		{
 			std::vector<TextureAssetData> textures;
 			for (const auto& source : model.m_TextureSources)
+			{
 				textures.push_back(TextureLoader::LoadTextureData(source.m_CanonicalPath, source.m_ImportSettings));
+			}
 			for (size_t index = 0; index < textures.size(); ++index)
 			{
 				const auto& source = model.m_TextureSources[index];
@@ -88,8 +89,9 @@ namespace gglab
 			{
 				const float depth = distances[target] / std::sqrt(1.04f + slopes[target] * slopes[target]);
 				for (size_t patch = 0; patch < 3; ++patch)
-					centers[target * 3 + patch] = Vector3(slopes[target] * depth + (float(patch) - 1.0f) * 2.0f,
-						20.0f + 0.2f * depth, depth);
+				{
+					centers[target * 3 + patch] = Vector3(slopes[target] * depth + (float(patch) - 1.0f) * 2.0f, 20.0f + 0.2f * depth, depth);
+				}
 			}
 			bool valid = true;
 			for (const auto& instance : model.m_MeshInstances)
@@ -105,7 +107,9 @@ namespace gglab
 				valid &= properties.m_AlphaMode == AlphaMode::Opaque && properties.m_BaseColor[3] == 1.0f &&
 					properties.m_MetallicFactor == 0.0f && properties.m_RoughnessFactor == 1.0f;
 				for (size_t channel = 0; channel < 3; ++channel)
+				{
 					valid &= properties.m_EmissiveColor[channel] == 0.0f;
+				}
 				const auto normalMatrix = math::CreateNormalMatrix(instance.m_LocalTransform);
 				valid &= mesh.m_Indices.size() % 3 == 0;
 				for (size_t index = 0; index + 2 < mesh.m_Indices.size(); index += 3)
@@ -115,12 +119,20 @@ namespace gglab
 					for (size_t corner = 0; corner < 3; ++corner)
 					{
 						const auto vertexIndex = mesh.m_Indices[index + corner];
-						if (vertexIndex >= mesh.m_Vertices.size()) { indicesValid = false; break; }
+						if (vertexIndex >= mesh.m_Vertices.size())
+						{
+							indicesValid = false;
+							break;
+						}
 						const auto& vertex = mesh.m_Vertices[vertexIndex];
 						points[corner] = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
 						valid &= (math::TransformDirection(vertex.m_Normal, normalMatrix) - Vector3(0, 0, -1)).Length() < 0.0001f;
 					}
-					if (!indicesValid) { valid = false; continue; }
+					if (!indicesValid)
+					{
+						valid = false;
+						continue;
+					}
 					size_t matches = 0;
 					for (size_t shape = 0; shape < centers.size(); ++shape)
 					{
@@ -137,7 +149,9 @@ namespace gglab
 						++matches;
 						++triangles[shape];
 						for (size_t channel = 0; channel < 3; ++channel)
+						{
 							valid &= std::abs(properties.m_BaseColor[channel] - reflectances[shape % 3]) < 0.00001f;
+						}
 						for (const auto& point : points)
 						{
 							lower[shape].m_X = std::min(lower[shape].m_X, point.m_X);
@@ -152,9 +166,11 @@ namespace gglab
 				}
 			}
 			for (size_t shape = 0; shape < centers.size(); ++shape)
+			{
 				valid &= triangles[shape] == 2 &&
 					((lower[shape] + upper[shape]) * 0.5f - centers[shape]).Length() < 0.0002f &&
 					(upper[shape] - lower[shape] - Vector3(2, 6, 0)).Length() < 0.0002f;
+			}
 			context.Check(valid, "All range triangles preserve meter scale, equal dimensions, placement, normals and materials");
 			Camera camera({ .m_Width = 1280, .m_Height = 720 });
 			CameraController controller(CameraController::CreateInfo{});
@@ -206,7 +222,8 @@ namespace gglab
 				float m_Metallic;
 				float m_Roughness;
 			};
-			const std::array materials{
+			const std::array materials
+			{
 				MaterialReference{ "MAT_Reflectance_02", 0.02f, 0.0f, 1.0f },
 				MaterialReference{ "MAT_Reflectance_18", 0.18f, 0.0f, 1.0f },
 				MaterialReference{ "MAT_Reflectance_50", 0.50f, 0.0f, 1.0f },
@@ -230,24 +247,30 @@ namespace gglab
 				MaterialReference{ "MAT_Sweep_Metallic_R100", 0.18f, 1.0f, 1.0f },
 			};
 			const auto matchesMaterial = [](const ImportedMaterial& material, const MaterialReference& reference) noexcept
+			{
+				const auto& properties = material.m_Properties;
+				bool valid = std::abs(properties.m_MetallicFactor - reference.m_Metallic) < 0.00001f &&
+					std::abs(properties.m_RoughnessFactor - reference.m_Roughness) < 0.00001f &&
+					properties.m_AlphaMode == AlphaMode::Opaque && properties.m_BaseColor[3] == 1.0f;
+				for (size_t channel = 0; channel < 3; ++channel)
 				{
-					const auto& properties = material.m_Properties;
-					bool valid = std::abs(properties.m_MetallicFactor - reference.m_Metallic) < 0.00001f &&
-						std::abs(properties.m_RoughnessFactor - reference.m_Roughness) < 0.00001f &&
-						properties.m_AlphaMode == AlphaMode::Opaque && properties.m_BaseColor[3] == 1.0f;
-					for (size_t channel = 0; channel < 3; ++channel)
-						valid &= std::abs(properties.m_BaseColor[channel] - reference.m_Base) < 0.00001f &&
-							properties.m_EmissiveColor[channel] == 0.0f;
-					for (const auto& binding : material.m_TextureBindings)
-						valid &= binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex;
-					return valid;
-				};
+					valid &= std::abs(properties.m_BaseColor[channel] - reference.m_Base) < 0.00001f &&
+						properties.m_EmissiveColor[channel] == 0.0f;
+				}
+				for (const auto& binding : material.m_TextureBindings)
+				{
+					valid &= binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex;
+				}
+				return valid;
+			};
 			// Assimp merges equivalent materials and meshes. Numeric inputs and spatial
 			// geometry remain authoritative; authored names/counts need not survive.
 			for (const auto& reference : materials)
 			{
 				context.Check(std::ranges::any_of(model.m_Materials, [&](const auto& material) noexcept
-					{ return matchesMaterial(material, reference); }),
+					{
+						return matchesMaterial(material, reference);
+					}),
 					std::format("{} retains an equivalent linear, opaque, untextured material", reference.m_Name));
 			}
 
@@ -261,35 +284,36 @@ namespace gglab
 				size_t m_TriangleCount;
 			};
 			const float diagonal = std::sqrt(0.5f);
-			const std::array meshes{
-				MeshReference{ "Card_Reflectance_02_Mesh", { -3.3f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 0, 2 },
-				MeshReference{ "Card_Reflectance_18_Mesh", { -1.1f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 1, 2 },
-				MeshReference{ "Card_Reflectance_50_Mesh", { 1.1f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 2, 2 },
-				MeshReference{ "Card_Reflectance_90_Mesh", { 3.3f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 3, 2 },
-				MeshReference{ "Sphere_Matte_Mesh", { 12.7f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 4, 3968 },
-				MeshReference{ "Sphere_RoughDielectric_Mesh", { 14.9f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 5, 3968 },
-				MeshReference{ "Sphere_SmoothDielectric_Mesh", { 17.1f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 6, 3968 },
-				MeshReference{ "Sphere_Metallic_Mesh", { 19.3f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 7, 3968 },
-				MeshReference{ "Receiver_Horizontal_Mesh", { 29.4f, 1.4f, 0.0f }, { 1.8f, 0.0f, 1.8f }, Vector3::UnitY, 1, 2 },
-				MeshReference{ "Receiver_Vertical_Mesh", { 32.0f, 1.4f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 1, 2 },
-				MeshReference{ "Receiver_Tilt45_Mesh", { 34.6f, 1.4f, 0.0f }, { 1.8f, 1.8f * diagonal, 1.8f * diagonal }, { 0.0f, diagonal, -diagonal }, 1, 2 },
-				MeshReference{ "Ground_Chart_Mesh", { 0.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
-				MeshReference{ "Ground_Spheres_Mesh", { 16.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
-				MeshReference{ "Ground_Angles_Mesh", { 32.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
-				MeshReference{ "Scale_OneMeter_Mesh", { 21.0f, 0.5f, 3.0f }, { 1.0f, 1.0f, 1.0f }, Vector3::Zero, 1, 12 },
-				MeshReference{ "SweepSphere_Dielectric_R000_Mesh", { 42.5f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 9, 3968 },
-				MeshReference{ "SweepSphere_Dielectric_R005_Mesh", { 44.7f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 10, 3968 },
-				MeshReference{ "SweepSphere_Dielectric_R010_Mesh", { 46.9f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 11, 3968 },
-				MeshReference{ "SweepSphere_Dielectric_R025_Mesh", { 49.1f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 12, 3968 },
-				MeshReference{ "SweepSphere_Dielectric_R050_Mesh", { 51.3f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 13, 3968 },
-				MeshReference{ "SweepSphere_Dielectric_R100_Mesh", { 53.5f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 14, 3968 },
-				MeshReference{ "SweepSphere_Metallic_R000_Mesh", { 42.5f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 15, 3968 },
-				MeshReference{ "SweepSphere_Metallic_R005_Mesh", { 44.7f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 16, 3968 },
-				MeshReference{ "SweepSphere_Metallic_R010_Mesh", { 46.9f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 17, 3968 },
-				MeshReference{ "SweepSphere_Metallic_R025_Mesh", { 49.1f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 18, 3968 },
-				MeshReference{ "SweepSphere_Metallic_R050_Mesh", { 51.3f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 19, 3968 },
-				MeshReference{ "SweepSphere_Metallic_R100_Mesh", { 53.5f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 20, 3968 },
-				MeshReference{ "Ground_RoughnessSweep_Mesh", { 48.0f, -0.05f, 1.0f }, { 16.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+			const std::array meshes
+			{
+				MeshReference{ "Card_Reflectance_02_Mesh",{ -3.3f, 2.0f, 0.0f },{ 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 0, 2 },
+				MeshReference{ "Card_Reflectance_18_Mesh",{ -1.1f, 2.0f, 0.0f },{ 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 1, 2 },
+				MeshReference{ "Card_Reflectance_50_Mesh",{ 1.1f, 2.0f, 0.0f },{ 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 2, 2 },
+				MeshReference{ "Card_Reflectance_90_Mesh",{ 3.3f, 2.0f, 0.0f },{ 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 3, 2 },
+				MeshReference{ "Sphere_Matte_Mesh",{ 12.7f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 4, 3968 },
+				MeshReference{ "Sphere_RoughDielectric_Mesh",{ 14.9f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 5, 3968 },
+				MeshReference{ "Sphere_SmoothDielectric_Mesh",{ 17.1f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 6, 3968 },
+				MeshReference{ "Sphere_Metallic_Mesh",{ 19.3f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 7, 3968 },
+				MeshReference{ "Receiver_Horizontal_Mesh",{ 29.4f, 1.4f, 0.0f },{ 1.8f, 0.0f, 1.8f }, Vector3::UnitY, 1, 2 },
+				MeshReference{ "Receiver_Vertical_Mesh",{ 32.0f, 1.4f, 0.0f },{ 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 1, 2 },
+				MeshReference{ "Receiver_Tilt45_Mesh",{ 34.6f, 1.4f, 0.0f },{ 1.8f, 1.8f * diagonal, 1.8f * diagonal },{ 0.0f, diagonal, -diagonal }, 1, 2 },
+				MeshReference{ "Ground_Chart_Mesh",{ 0.0f, -0.05f, 1.0f },{ 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+				MeshReference{ "Ground_Spheres_Mesh",{ 16.0f, -0.05f, 1.0f },{ 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+				MeshReference{ "Ground_Angles_Mesh",{ 32.0f, -0.05f, 1.0f },{ 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+				MeshReference{ "Scale_OneMeter_Mesh",{ 21.0f, 0.5f, 3.0f },{ 1.0f, 1.0f, 1.0f }, Vector3::Zero, 1, 12 },
+				MeshReference{ "SweepSphere_Dielectric_R000_Mesh",{ 42.5f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 9, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R005_Mesh",{ 44.7f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 10, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R010_Mesh",{ 46.9f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 11, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R025_Mesh",{ 49.1f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 12, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R050_Mesh",{ 51.3f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 13, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R100_Mesh",{ 53.5f, 0.8f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 14, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R000_Mesh",{ 42.5f, 3.2f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 15, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R005_Mesh",{ 44.7f, 3.2f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 16, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R010_Mesh",{ 46.9f, 3.2f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 17, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R025_Mesh",{ 49.1f, 3.2f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 18, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R050_Mesh",{ 51.3f, 3.2f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 19, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R100_Mesh",{ 53.5f, 3.2f, 0.0f },{ 1.6f, 1.6f, 1.6f }, Vector3::Zero, 20, 3968 },
+				MeshReference{ "Ground_RoughnessSweep_Mesh",{ 48.0f, -0.05f, 1.0f },{ 16.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
 			};
 			std::array<size_t, meshes.size()> triangleCounts{};
 			std::array<Vector3, meshes.size()> lower;
@@ -319,12 +343,20 @@ namespace gglab
 					for (size_t corner = 0; corner < 3; ++corner)
 					{
 						const auto vertexIndex = mesh.m_Indices[index + corner];
-						if (vertexIndex >= mesh.m_Vertices.size()) { indicesValid = false; break; }
+						if (vertexIndex >= mesh.m_Vertices.size())
+						{
+							indicesValid = false;
+							break;
+						}
 						const auto& vertex = mesh.m_Vertices[vertexIndex];
 						positions[corner] = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
 						normals[corner] = math::TransformDirection(vertex.m_Normal, normalMatrix);
 					}
-					if (!indicesValid) { allTrianglesClassified = false; continue; }
+					if (!indicesValid)
+					{
+						allTrianglesClassified = false;
+						continue;
+					}
 					size_t matchedShapes = 0;
 					for (size_t shape = 0; shape < meshes.size(); ++shape)
 					{
@@ -383,8 +415,7 @@ namespace gglab
 			CameraController controller(CameraController::CreateInfo{});
 			CameraRig rig;
 			rig.AttachMainCamera(camera, controller);
-			const bool registered = rig.SetReferenceViews(
-				{ LightingContractReferenceViews.begin(), LightingContractReferenceViews.end() });
+			const bool registered = rig.SetReferenceViews({ LightingContractReferenceViews.begin(), LightingContractReferenceViews.end() });
 			context.Check(registered, "Lighting contract reference views register");
 			if (!registered)
 			{
@@ -452,7 +483,9 @@ namespace gglab
 				const auto& model = imported.m_Model;
 				const bool hasIor = std::ranges::any_of(model.m_Materials,
 					[](const ImportedMaterial& material) noexcept
-					{ return std::abs(material.m_Properties.m_Ior - 1.33f) < 0.0001f; });
+					{
+						return std::abs(material.m_Properties.m_Ior - 1.33f) < 0.0001f;
+					});
 				const bool hasCoreInputs = std::ranges::any_of(model.m_Materials,
 					[](const ImportedMaterial& material) noexcept
 					{
@@ -462,22 +495,19 @@ namespace gglab
 				context.Check(hasIor && hasCoreInputs && !model.m_MeshInstances.empty() &&
 					!model.m_TextureSources.empty(),
 					"Blender IOR, core texture scalars, geometry and external images reach one imported model");
-				const auto coat = std::ranges::find(model.m_Materials,
-					"MAT_ClearcoatTexture", &ImportedMaterial::m_Name);
+				const auto coat = std::ranges::find(model.m_Materials, "MAT_ClearcoatTexture", &ImportedMaterial::m_Name);
 				const bool coatBindings = coat != model.m_Materials.end() &&
 					coat->m_Properties.m_ClearcoatFactor == 1.0f &&
 					coat->m_Properties.m_ClearcoatRoughness == 1.0f &&
 					std::abs(coat->m_Properties.m_ClearcoatNormalScale - 0.42f) < 0.0001f &&
 					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_TextureIndex !=
-						ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					ImportedMaterialTextureBinding::InvalidTextureIndex &&
 					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatRoughness)].m_TexCoordIndex == 1 &&
 					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TexCoordIndex == 1;
 				context.Check(coatBindings,
 					"Blender clearcoat channels, independent UV sets and normal scale survive Assimp import");
-				const auto factor = std::ranges::find(model.m_Materials,
-					"MAT_AnisotropyFactor", &ImportedMaterial::m_Name);
-				const auto textured = std::ranges::find(model.m_Materials,
-					"MAT_AnisotropyTexture", &ImportedMaterial::m_Name);
+				const auto factor = std::ranges::find(model.m_Materials, "MAT_AnisotropyFactor", &ImportedMaterial::m_Name);
+				const auto textured = std::ranges::find(model.m_Materials, "MAT_AnisotropyTexture", &ImportedMaterial::m_Name);
 				context.Check(factor != model.m_Materials.end() &&
 					textured != model.m_Materials.end() &&
 					std::abs(factor->m_Properties.m_AnisotropyStrength - 0.7f) < 0.0001f &&
@@ -485,14 +515,13 @@ namespace gglab
 					textured->m_Properties.m_AnisotropyStrength == 1.0f &&
 					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TexCoordIndex == 1 &&
 					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
-						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					ImportedMaterialTextureBinding::InvalidTextureIndex,
 					"Blender anisotropy factors and textured UV1 direction survive Assimp import");
 			}
 
 			const auto lighting = ModelImporter::Import(ResolveAssetPath(assetRoot,
 				"Models/GGLabLightingContractMaterialReferences/GGLabLightingContract.gltf"), {});
-			context.Check(lighting.Succeeded(),
-				std::format("Extended lighting contract imports: {}", lighting.m_Error));
+			context.Check(lighting.Succeeded(), std::format("Extended lighting contract imports: {}", lighting.m_Error));
 			if (lighting.Succeeded())
 			{
 				const auto& model = lighting.m_Model;
@@ -531,7 +560,7 @@ namespace gglab
 					std::abs(rough->m_Properties.m_ClearcoatRoughness - 0.32f) < 0.0001f &&
 					std::abs(normal->m_Properties.m_ClearcoatNormalScale - 0.45f) < 0.0001f &&
 					normal->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TextureIndex !=
-						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					ImportedMaterialTextureBinding::InvalidTextureIndex,
 					"Extended lighting contract preserves off, smooth, rough and coat-normal references");
 				struct AnisotropyReference
 				{
@@ -541,7 +570,9 @@ namespace gglab
 					bool m_Mirrored;
 					bool m_NormalMapped;
 				};
-				const std::array<AnisotropyReference, 6> references = { {
+				const std::array<AnisotropyReference, 6> references =
+				{
+				{
 					{ "MAT_Anisotropy_Off", 0.0f, 0.0f, false, false },
 					{ "MAT_Anisotropy_Along", 0.85f, 0.0f, false, false },
 					{ "MAT_Anisotropy_Across", 0.85f, std::numbers::pi_v<float> * 0.5f, false, false },
@@ -562,16 +593,14 @@ namespace gglab
 							std::abs(properties.m_AnisotropyRotation - reference.m_Rotation) < 0.0001f &&
 							properties.m_MetallicFactor == 1.0f && std::abs(properties.m_RoughnessFactor - 0.42f) < 0.0001f &&
 							properties.m_ClearcoatFactor == 0.0f &&
-							(normalBinding.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex) ==
-								reference.m_NormalMapped;
+							(normalBinding.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex) == reference.m_NormalMapped;
 						if (reference.m_NormalMapped)
 						{
 							valuesValid &= std::abs(properties.m_NormalScale - 0.4f) < 0.0001f && normalBinding.m_TexCoordIndex == 0;
 						}
 					}
 					context.Check(valuesValid, std::format("{} retains factors, rotation and base-normal binding", reference.m_Name));
-					const Vector3 front(80.0f + 2.2f * static_cast<float>(index % 3),
-						0.8f, 2.6f * static_cast<float>(index / 3) - 0.8f);
+					const Vector3 front(80.0f + 2.2f * static_cast<float>(index % 3), 0.8f, 2.6f * static_cast<float>(index / 3) - 0.8f);
 					bool frontFound = false;
 					bool basisValid = true;
 					for (const auto& instance : model.m_MeshInstances)
@@ -619,7 +648,9 @@ namespace gglab
 				return;
 			}
 			const auto atriumTextures = CheckImportedTextures(context, atrium.m_Model);
-			constexpr std::array<std::pair<std::string_view, size_t>, 11> atriumTriangles = { {
+			constexpr std::array<std::pair<std::string_view, size_t>, 11> atriumTriangles =
+			{
+			{
 				{ "MAT_Concrete", 3054 },
 				{ "MAT_Paving", 156 },
 				{ "MAT_Structure", 10812 },
@@ -638,7 +669,9 @@ namespace gglab
 			{
 				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
 				for (const auto index : mesh.m_Indices)
+				{
 					geometryValid &= index < mesh.m_Vertices.size();
+				}
 				for (const auto& vertex : mesh.m_Vertices)
 				{
 					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
@@ -660,17 +693,22 @@ namespace gglab
 				}
 				const auto& material = atrium.m_Model.m_Materials[instance.m_MaterialIndex];
 				geometryValid &= material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
-				const auto match = std::ranges::find(atriumTriangles, material.m_Name,
-					&std::pair<std::string_view, size_t>::first);
-				if (match == atriumTriangles.end()) { geometryValid = false; continue; }
+				const auto match = std::ranges::find(atriumTriangles, material.m_Name, &std::pair<std::string_view, size_t>::first);
+				if (match == atriumTriangles.end())
+				{
+					geometryValid = false;
+					continue;
+				}
 				importedTriangles[static_cast<size_t>(match - atriumTriangles.begin())] +=
 					atrium.m_Model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
 			}
 			context.Check(geometryValid, "Coastal atrium retains valid geometry, opaque bindings and orthonormal imported tangent frames");
 			for (size_t index = 0; index < atriumTriangles.size(); ++index)
+			{
 				context.Check(importedTriangles[index] == atriumTriangles[index].second,
 					std::format("Coastal atrium {} retains {} placed triangles (imported={})",
 						atriumTriangles[index].first, atriumTriangles[index].second, importedTriangles[index]));
+			}
 			const auto rock = std::ranges::find(atrium.m_Model.m_Materials, "MAT_CoastalRock", &ImportedMaterial::m_Name);
 			bool rockBindingsValid = rock != atrium.m_Model.m_Materials.end();
 			if (rockBindingsValid)
@@ -721,15 +759,16 @@ namespace gglab
 				std::string_view m_Prefix;
 				float m_Metallic;
 			};
-			constexpr std::array<SurfaceReference, 3> surfaces = { {
+			constexpr std::array<SurfaceReference, 3> surfaces =
+			{
+			{
 				{ "MAT_Paving", "Stone", 0.0f },
 				{ "MAT_Structure", "Metal", 1.0f },
 				{ "MAT_LoungeUpholstery", "Upholstery", 0.0f },
 			} };
 			for (const auto& surface : surfaces)
 			{
-				const auto material = std::ranges::find(atrium.m_Model.m_Materials,
-					surface.m_Name, &ImportedMaterial::m_Name);
+				const auto material = std::ranges::find(atrium.m_Model.m_Materials, surface.m_Name, &ImportedMaterial::m_Name);
 				bool valid = material != atrium.m_Model.m_Materials.end();
 				if (valid)
 				{
@@ -738,7 +777,9 @@ namespace gglab
 						properties.m_RoughnessFactor == 1.0f && properties.m_NormalScale == 1.0f &&
 						properties.m_ClearcoatFactor == 0.0f && properties.m_AnisotropyStrength == 0.0f;
 					for (size_t channel = 0; channel < 4; ++channel)
+					{
 						valid &= properties.m_BaseColor[channel] == 1.0f;
+					}
 					for (const auto& [slot, suffix] : std::array{
 						std::pair{ MaterialTextureSlot::BaseColor, "BaseColor" },
 						std::pair{ MaterialTextureSlot::Normal, "Normal" },
@@ -760,20 +801,20 @@ namespace gglab
 					for (const auto slot : { MaterialTextureSlot::Occlusion, MaterialTextureSlot::Emissive,
 						MaterialTextureSlot::Clearcoat, MaterialTextureSlot::ClearcoatRoughness,
 						MaterialTextureSlot::ClearcoatNormal, MaterialTextureSlot::Anisotropy })
+					{
 						valid &= material->m_TextureBindings[static_cast<size_t>(slot)].m_TextureIndex ==
 							ImportedMaterialTextureBinding::InvalidTextureIndex;
+					}
 				}
 				context.Check(valid, std::format("{} retains opaque isotropic UV0 factors, repeating semantic textures and complete 1024-square mip chains",
 					surface.m_Name));
 			}
-			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials,
-				"MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
+			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials, "MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
 			context.Check(coatedShell != atrium.m_Model.m_Materials.end() &&
 				std::abs(coatedShell->m_Properties.m_ClearcoatFactor - 0.82f) < 0.0001f &&
 				std::abs(coatedShell->m_Properties.m_ClearcoatRoughness - 0.11f) < 0.0001f,
 				"Research lounge coated shell retains its authored clearcoat layer");
-			const auto frame = std::ranges::find(atrium.m_Model.m_Materials,
-				"MAT_LoungeBrushedAluminum", &ImportedMaterial::m_Name);
+			const auto frame = std::ranges::find(atrium.m_Model.m_Materials, "MAT_LoungeBrushedAluminum", &ImportedMaterial::m_Name);
 			context.Check(frame != atrium.m_Model.m_Materials.end() &&
 				frame->m_Properties.m_MetallicFactor == 1.0f &&
 				std::abs(frame->m_Properties.m_RoughnessFactor - 0.28f) < 0.0001f &&
@@ -800,8 +841,7 @@ namespace gglab
 						continue;
 					}
 					found = true;
-					const auto texture = TextureLoader::LoadTextureData(
-						source.m_CanonicalPath, source.m_ImportSettings);
+					const auto texture = TextureLoader::LoadTextureData(source.m_CanonicalPath, source.m_ImportSettings);
 					valid &= texture.IsValid() && texture.m_ColorSpace == TextureColorSpace::Linear &&
 						texture.m_ViewFormat == RHIFormat::R8G8B8A8Unorm;
 				}
@@ -832,13 +872,11 @@ namespace gglab
 				std::format("Anisotropy rotation reference imports with its geometry: {}", rotation.m_Error));
 			if (rotation.Succeeded())
 			{
-				const auto rotated = std::ranges::find(rotation.m_Model.m_Materials,
-					"Aniso Tan + Rotation", &ImportedMaterial::m_Name);
-				const auto combined = std::ranges::find(rotation.m_Model.m_Materials,
-					"Aniso Tan + Rotation + Texture", &ImportedMaterial::m_Name);
+				const auto rotated = std::ranges::find(rotation.m_Model.m_Materials, "Aniso Tan + Rotation", &ImportedMaterial::m_Name);
+				const auto combined = std::ranges::find(rotation.m_Model.m_Materials, "Aniso Tan + Rotation + Texture", &ImportedMaterial::m_Name);
 				const bool hasDirectionTexture = combined != rotation.m_Model.m_Materials.end() &&
 					combined->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
-						ImportedMaterialTextureBinding::InvalidTextureIndex;
+					ImportedMaterialTextureBinding::InvalidTextureIndex;
 				context.Check(rotated != rotation.m_Model.m_Materials.end() &&
 					std::abs(rotated->m_Properties.m_AnisotropyRotation - 0.523599f) < 0.0001f &&
 					combined != rotation.m_Model.m_Materials.end() &&
@@ -880,41 +918,43 @@ namespace gglab
 			const auto textures = CheckImportedTextures(context, model);
 			context.Check(textures.size() == 5, "Texture board resolves all five external diagnostic images");
 			const auto pixel = [&](std::string_view filename, uint32_t x, uint32_t y)
+			{
+				std::array<int, 3> value{ -1, -1, -1 };
+				for (size_t i = 0; i < textures.size(); ++i)
 				{
-					std::array<int, 3> value{ -1, -1, -1 };
-					for (size_t i = 0; i < textures.size(); ++i)
+					const auto& texture = textures[i];
+					if (model.m_TextureSources[i].m_CanonicalPath.filename().string() != filename ||
+						!texture.IsValid() || texture.m_Subresources.empty())
 					{
-						const auto& texture = textures[i];
-						if (model.m_TextureSources[i].m_CanonicalPath.filename().string() != filename ||
-							!texture.IsValid() || texture.m_Subresources.empty())
-						{
-							continue;
-						}
-						const auto& subresource = texture.m_Subresources.front();
-						if (x >= subresource.m_Width || y >= subresource.m_Height)
-						{
-							continue;
-						}
-						const size_t offset = static_cast<size_t>(subresource.m_DataOffset + y * subresource.m_RowPitch + x * 4);
-						if (offset + 3 > texture.m_Pixels.size())
-						{
-							continue;
-						}
-						for (size_t channel = 0; channel < 3; ++channel)
-							value[channel] = std::to_integer<int>(texture.m_Pixels[offset + channel]);
+						continue;
 					}
-					return value;
-				};
+					const auto& subresource = texture.m_Subresources.front();
+					if (x >= subresource.m_Width || y >= subresource.m_Height)
+					{
+						continue;
+					}
+					const size_t offset = static_cast<size_t>(subresource.m_DataOffset + y * subresource.m_RowPitch + x * 4);
+					if (offset + 3 > texture.m_Pixels.size())
+					{
+						continue;
+					}
+					for (size_t channel = 0; channel < 3; ++channel)
+					{
+						value[channel] = std::to_integer<int>(texture.m_Pixels[offset + channel]);
+					}
+				}
+				return value;
+			};
 			context.Check(pixel("Direction.png", 64, 64) == std::array{ 230, 50, 40 } &&
 				pixel("Direction.png", 224, 64) == std::array{ 45, 200, 65 } &&
 				pixel("Direction.png", 64, 224) == std::array{ 45, 95, 230 } &&
 				pixel("Direction.png", 224, 224) == std::array{ 230, 200, 40 },
 				"Direction texture retains red/green top and blue/yellow bottom without pixel conversion");
 			const auto findMaterial = [&](std::string_view name) -> const ImportedMaterial*
-				{
-					const auto it = std::ranges::find(model.m_Materials, name, &ImportedMaterial::m_Name);
-					return it == model.m_Materials.end() ? nullptr : &*it;
-				};
+			{
+				const auto it = std::ranges::find(model.m_Materials, name, &ImportedMaterial::m_Name);
+				return it == model.m_Materials.end() ? nullptr : &*it;
+			};
 			const auto* grayTexture = findMaterial("PROBE_SRGB_Texture");
 			const auto* grayReference = findMaterial("PROBE_SRGB_Factor");
 			context.Check(grayTexture && grayReference && pixel("SRGB128.png", 0, 0) == std::array{ 128, 128, 128 } &&
@@ -1016,8 +1056,7 @@ namespace gglab
 			CameraRig rig;
 			rig.AttachMainCamera(camera, controller);
 			const std::vector<CameraPath> paths = MakeCoastalSceneCameraPaths();
-			const bool registered = rig.SetReferenceViews(
-				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() }) &&
+			const bool registered = rig.SetReferenceViews({ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() }) &&
 				rig.SetCameraPaths(paths);
 			context.Check(registered && paths.size() == 9,
 				"Nine coastal temporal evaluation paths register on the main camera");
@@ -1035,7 +1074,9 @@ namespace gglab
 				uint32_t m_FrameCount;
 				uint32_t m_Cuts;
 			};
-			constexpr std::array<Expected, 9> expected{ {
+			constexpr std::array<Expected, 9> expected
+			{
+			{
 				{ "SEQ_StaticRailings", "CAM_ShadowStairs", 96, 1 },
 				{ "SEQ_LateralPanRailings", "CAM_ShadowStairs", 180, 1 },
 				{ "SEQ_PanStopRailings", "CAM_ShadowStairs", 180, 1 },
@@ -1049,10 +1090,8 @@ namespace gglab
 			for (const Expected& entry : expected)
 			{
 				const CameraPath* path = rig.FindCameraPath(entry.m_PathId);
-				const auto view = std::ranges::find(
-					CoastalSceneReferenceViews, entry.m_ViewId, &CameraReferenceView::m_Id);
-				const std::optional<CameraPathPose> start =
-					path ? EvaluateCameraPath(*path, 0) : std::nullopt;
+				const auto view = std::ranges::find(CoastalSceneReferenceViews, entry.m_ViewId, &CameraReferenceView::m_Id);
+				const std::optional<CameraPathPose> start = path ? EvaluateCameraPath(*path, 0) : std::nullopt;
 				context.Check(path && view != CoastalSceneReferenceViews.end() && start &&
 					path->m_Version == 1 && GetCameraPathFrameCount(*path) == entry.m_FrameCount &&
 					(start->m_Position - view->m_Position).LengthSquared() == 0.0f &&
@@ -1060,8 +1099,7 @@ namespace gglab
 					start->m_VerticalFovDegrees == view->m_VerticalFovDegrees &&
 					path->m_NearPlane == view->m_NearPlane && path->m_FarPlane == view->m_FarPlane &&
 					path->m_ManualEV100 == view->m_ManualEV100,
-					std::format("{} starts at {} with {} frames", entry.m_PathId, entry.m_ViewId,
-						entry.m_FrameCount));
+					std::format("{} starts at {} with {} frames", entry.m_PathId, entry.m_ViewId, entry.m_FrameCount));
 				if (!path)
 				{
 					continue;
@@ -1085,8 +1123,7 @@ namespace gglab
 			CameraController controller(CameraController::CreateInfo{});
 			CameraRig rig;
 			rig.AttachMainCamera(camera, controller);
-			const bool registered = rig.SetReferenceViews(
-				{ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
+			const bool registered = rig.SetReferenceViews({ CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end() });
 			context.Check(registered && CoastalSceneReferenceViews.size() == 18,
 				"Retained coastal views and four new GI/landing observations register in runtime coordinates");
 			if (!registered)
@@ -1151,7 +1188,8 @@ namespace gglab
 			}
 			const auto& model = imported.m_Model;
 			CheckImportedTextures(context, model);
-			constexpr std::array<std::pair<std::string_view, size_t>, 28> expectedTriangles = { {
+			constexpr std::array<std::pair<std::string_view, size_t>, 28> expectedTriangles =
+			{ {
 				{ "MAT_RetreatStone", 220 },
 				{ "MAT_RetreatLime", 4754 },
 				{ "MAT_RetreatMetal", 19480 },
@@ -1189,12 +1227,16 @@ namespace gglab
 			bool materialBindingsValid = model.m_Materials.size() == expectedTriangles.size() + 1 &&
 				std::ranges::count(model.m_Materials, std::string{}, &ImportedMaterial::m_Name) == 1 &&
 				std::ranges::all_of(expectedTriangles, [&](const auto& entry)
-					{ return std::ranges::count(model.m_Materials, entry.first, &ImportedMaterial::m_Name) == 1; });
+					{
+						return std::ranges::count(model.m_Materials, entry.first, &ImportedMaterial::m_Name) == 1;
+					});
 			for (const auto& mesh : model.m_Meshes)
 			{
 				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
 				for (const auto index : mesh.m_Indices)
+				{
 					geometryValid &= index < mesh.m_Vertices.size();
+				}
 				for (const auto& vertex : mesh.m_Vertices)
 				{
 					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
@@ -1238,14 +1280,15 @@ namespace gglab
 					materialBindingsValid &= properties.m_AlphaMode == AlphaMode::Opaque &&
 						properties.m_BaseColor[3] == 1.0f;
 				}
-				const auto match = std::ranges::find(expectedTriangles, material.m_Name,
-					&std::pair<std::string_view, size_t>::first);
+				const auto match = std::ranges::find(expectedTriangles, material.m_Name, &std::pair<std::string_view, size_t>::first);
 				materialBindingsValid &= match != expectedTriangles.end();
-				if (match == expectedTriangles.end()) { geometryValid = false; continue; }
-				triangles[static_cast<size_t>(match - expectedTriangles.begin())] +=
-					model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
-				for (const auto slot : { MaterialTextureSlot::BaseColor, MaterialTextureSlot::Normal,
-					MaterialTextureSlot::MetallicRoughness })
+				if (match == expectedTriangles.end())
+				{
+					geometryValid = false;
+					continue;
+				}
+				triangles[static_cast<size_t>(match - expectedTriangles.begin())] += model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
+				for (const auto slot : { MaterialTextureSlot::BaseColor, MaterialTextureSlot::Normal, MaterialTextureSlot::MetallicRoughness })
 				{
 					const auto& binding = material.m_TextureBindings[static_cast<size_t>(slot)];
 					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex)
@@ -1272,9 +1315,11 @@ namespace gglab
 			context.Check(materialBindingsValid,
 				"Coastal retreat retains twenty-three opaque materials and the explicit glass blend approximation" + materialDetail);
 			for (size_t index = 0; index < expectedTriangles.size(); ++index)
+			{
 				context.Check(triangles[index] == expectedTriangles[index].second,
 					std::format("Coastal retreat {} retains {} placed triangles (imported={})",
 						expectedTriangles[index].first, expectedTriangles[index].second, triangles[index]));
+			}
 
 			// Probe the upper front bevel in model space, independent of Assimp mesh
 			// merging. The lowered seat moves these retained bevels down by 0.16 m.
@@ -1295,18 +1340,19 @@ namespace gglab
 				for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
 				{
 					const Vector3 position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
-					if (position.m_Y < 3.0399f || position.m_Y > 3.2741f ||
-						position.m_Z < -1.6151f || position.m_Z > -1.5249f)
+					if (position.m_Y < 3.0399f || position.m_Y > 3.2741f || position.m_Z < -1.6151f || position.m_Z > -1.5249f)
 					{
 						continue;
 					}
 					// The authored shells have rigid instance transforms.
 					const Vector3 normal = math::TransformDirection(vertex.m_Normal, instance.m_LocalTransform).Normalized();
 					for (size_t arm = 0; arm < armCentersX.size(); ++arm)
+					{
 						if (std::abs(position.m_X - armCentersX[arm]) < 0.056f)
 						{
 							frontCorners[arm].emplace_back(position, normal);
 						}
+					}
 				}
 			}
 			for (size_t arm = 0; arm < frontCorners.size(); ++arm)
@@ -1315,13 +1361,16 @@ namespace gglab
 				size_t coincidentPairs = 0;
 				float maximumNormalDelta = 0.0f;
 				for (size_t first = 0; first < corners.size(); ++first)
+				{
 					for (size_t second = first + 1; second < corners.size(); ++second)
+					{
 						if ((corners[first].first - corners[second].first).LengthSquared() < 1e-10f)
 						{
 							++coincidentPairs;
-							maximumNormalDelta = std::max(maximumNormalDelta,
-								(corners[first].second - corners[second].second).Length());
+							maximumNormalDelta = std::max(maximumNormalDelta, (corners[first].second - corners[second].second).Length());
 						}
+					}
+				}
 				// Allow four-decimal export/encoding noise, while rejecting a real
 				// smooth-bevel seam across vertices split by UVs, normals or tangents.
 				context.Check(corners.size() >= 12 && coincidentPairs > 0 && maximumNormalDelta < 0.0005f,
@@ -1390,8 +1439,7 @@ namespace gglab
 					for (size_t corner = 0; corner < 3; ++corner)
 					{
 						auto& point = triangle[corner];
-						point = math::TransformPoint(mesh.m_Vertices[mesh.m_Indices[index + corner]].m_Position,
-							instance.m_LocalTransform);
+						point = math::TransformPoint(mesh.m_Vertices[mesh.m_Indices[index + corner]].m_Position, instance.m_LocalTransform);
 						bounded &= std::abs(point.m_X) <= 36.001f &&
 							point.m_Y >= -0.801f && point.m_Y <= 6.951f &&
 							point.m_Z >= -37.001f && point.m_Z <= 27.001f;
@@ -1404,32 +1452,34 @@ namespace gglab
 					triangles.size()));
 			context.Check(texturedBasisValid, "Textured atrium preserves finite UVs and an orthonormal tangent basis");
 			const auto nearestHit = [&](const Vector3& origin, const Vector3& direction) noexcept
+			{
+				float nearest = std::numeric_limits<float>::infinity();
+				for (const auto& triangle : triangles)
 				{
-					float nearest = std::numeric_limits<float>::infinity();
-					for (const auto& triangle : triangles)
+					const Vector3 edge1 = triangle[1] - triangle[0];
+					const Vector3 edge2 = triangle[2] - triangle[0];
+					const Vector3 p = direction.Cross(edge2);
+					const float determinant = edge1.Dot(p);
+					if (std::abs(determinant) < 0.000001f)
 					{
-						const Vector3 edge1 = triangle[1] - triangle[0];
-						const Vector3 edge2 = triangle[2] - triangle[0];
-						const Vector3 p = direction.Cross(edge2);
-						const float determinant = edge1.Dot(p);
-						if (std::abs(determinant) < 0.000001f)
-						{
-							continue;
-						}
-						const Vector3 offset = origin - triangle[0];
-						const float u = offset.Dot(p) / determinant;
-						const Vector3 q = offset.Cross(edge1);
-						const float v = direction.Dot(q) / determinant;
-						const float distance = edge2.Dot(q) / determinant;
-						if (u >= -0.00001f && v >= -0.00001f && u + v <= 1.00001f && distance > 0.0001f)
-						{
-							nearest = std::min(nearest, distance);
-						}
+						continue;
 					}
-					return nearest;
-				};
+					const Vector3 offset = origin - triangle[0];
+					const float u = offset.Dot(p) / determinant;
+					const Vector3 q = offset.Cross(edge1);
+					const float v = direction.Dot(q) / determinant;
+					const float distance = edge2.Dot(q) / determinant;
+					if (u >= -0.00001f && v >= -0.00001f && u + v <= 1.00001f && distance > 0.0001f)
+					{
+						nearest = std::min(nearest, distance);
+					}
+				}
+				return nearest;
+			};
 			const auto isWithinTolerance = [](float actual, float expected) noexcept
-				{ return std::abs(actual - expected) < 0.001f; };
+			{
+				return std::abs(actual - expected) < 0.001f;
+			};
 			context.Check(isWithinTolerance(nearestHit({ 0.0f, 4.0f, 0.0f }, -Vector3::UnitY), 1.6f) &&
 				isWithinTolerance(nearestHit({ 0.0f, 4.0f, -12.0f }, -Vector3::UnitY), 3.1f) &&
 				isWithinTolerance(nearestHit({ 30.0f, 4.0f, 0.0f }, -Vector3::UnitY), 4.05f),
@@ -1485,12 +1535,12 @@ namespace gglab
 			// Independent authored world corners in runtime (X, Z, Y), in meters.
 			// Match geometry rather than mesh names: Assimp may merge equal-material meshes.
 			const ExpectedBox boxes[] = {
-				{ { 0.0f, 0.1f, 0.0f }, { 5.0f, 0.1f, 5.0f }, 0.0f, "MAT_GreyRough" },
-				{ { 0.0f, 2.2f, 4.9f }, { 5.0f, 2.0f, 0.1f }, 0.0f, "MAT_GreyRough" },
-				{ { -1.8f, 1.2f, 0.5f }, { 0.5f, 1.0f, 0.5f }, 35.0f, "MAT_RedRough" },
-				{ { -1.144678f, 1.7f, 0.958861f }, { 0.3f, 0.125f, 0.125f },
+				{ { 0.0f, 0.1f, 0.0f },{ 5.0f, 0.1f, 5.0f }, 0.0f, "MAT_GreyRough" },
+				{ { 0.0f, 2.2f, 4.9f },{ 5.0f, 2.0f, 0.1f }, 0.0f, "MAT_GreyRough" },
+				{ { -1.8f, 1.2f, 0.5f },{ 0.5f, 1.0f, 0.5f }, 35.0f, "MAT_RedRough" },
+				{ { -1.144678f, 1.7f, 0.958861f },{ 0.3f, 0.125f, 0.125f },
 					35.0f, "MAT_GreyRough" },
-				{ { 2.0f, 0.45f, -1.2f }, { 1.0f, 0.25f, 0.5f }, -25.0f, "MAT_Metallic" },
+				{ { 2.0f, 0.45f, -1.2f },{ 1.0f, 0.25f, 0.5f }, -25.0f, "MAT_Metallic" },
 			};
 			for (const auto& box : boxes)
 			{
@@ -1516,8 +1566,7 @@ namespace gglab
 				const float angle = side * std::numbers::pi_v<float> / 6.0f;
 				for (const float height : { -0.8f, 0.0f })
 				{
-					expectedPoints.push_back({ { 7.75f * std::cos(angle), height,
-						7.0f * std::sin(angle) }, "MAT_GreyRough" });
+					expectedPoints.push_back({ { 7.75f * std::cos(angle), height, 7.0f * std::sin(angle) }, "MAT_GreyRough" });
 				}
 			}
 			for (const float x : { -20.0f, 20.0f })
@@ -1536,8 +1585,7 @@ namespace gglab
 				const auto& material = model.m_Materials[instance.m_MaterialIndex];
 				for (const auto& vertex : mesh.m_Vertices)
 				{
-					actualPoints.push_back({ math::TransformPoint(vertex.m_Position,
-						instance.m_LocalTransform), material.m_Name });
+					actualPoints.push_back({ math::TransformPoint(vertex.m_Position, instance.m_LocalTransform), material.m_Name });
 				}
 				triangleCount += mesh.m_Indices.size() / 3;
 				const Matrix normalMatrix = math::CreateNormalMatrix(instance.m_LocalTransform);
@@ -1547,8 +1595,7 @@ namespace gglab
 					const auto& b = mesh.m_Vertices[mesh.m_Indices[index + 1]];
 					const auto& c = mesh.m_Vertices[mesh.m_Indices[index + 2]];
 					Vector3 geometricNormal = math::TransformDirection(b.m_Position - a.m_Position,
-						instance.m_LocalTransform).Cross(math::TransformDirection(
-							c.m_Position - a.m_Position, instance.m_LocalTransform));
+						instance.m_LocalTransform).Cross(math::TransformDirection(c.m_Position - a.m_Position, instance.m_LocalTransform));
 					geometricNormal.Normalize();
 					Vector3 normal = math::TransformDirection(a.m_Normal, normalMatrix);
 					normal.Normalize();
@@ -1556,13 +1603,13 @@ namespace gglab
 				}
 			}
 			const auto containsPoint = [](const auto& points, const ExpectedPoint& point) noexcept
-				{
-					return std::ranges::any_of(points, [&](const ExpectedPoint& candidate) noexcept
-						{
-							return candidate.m_Material == point.m_Material &&
-								(candidate.m_Position - point.m_Position).Length() < 0.001f;
-						});
-				};
+			{
+				return std::ranges::any_of(points, [&](const ExpectedPoint& candidate) noexcept
+					{
+						return candidate.m_Material == point.m_Material &&
+							(candidate.m_Position - point.m_Position).Length() < 0.001f;
+					});
+			};
 			context.Check(std::ranges::all_of(expectedPoints,
 				[&](const auto& point) noexcept { return containsPoint(actualPoints, point); }) &&
 				std::ranges::all_of(actualPoints,
@@ -1581,10 +1628,10 @@ namespace gglab
 				float m_Roughness;
 			};
 			const ExpectedMaterial expectedMaterials[] = {
-				{ "MAT_GreyRough", { 0.48f, 0.48f, 0.48f, 1.0f }, 0.0f, 0.8f },
-				{ "MAT_RedRough", { 0.65f, 0.035f, 0.025f, 1.0f }, 0.0f, 0.7f },
-				{ "MAT_Metallic", { 0.55f, 0.58f, 0.62f, 1.0f }, 1.0f, 0.23f },
-				{ "MAT_SmoothDielectric", { 0.015f, 0.055f, 0.105f, 1.0f }, 0.0f, 0.1f },
+				{ "MAT_GreyRough",{ 0.48f, 0.48f, 0.48f, 1.0f }, 0.0f, 0.8f },
+				{ "MAT_RedRough",{ 0.65f, 0.035f, 0.025f, 1.0f }, 0.0f, 0.7f },
+				{ "MAT_Metallic",{ 0.55f, 0.58f, 0.62f, 1.0f }, 1.0f, 0.23f },
+				{ "MAT_SmoothDielectric",{ 0.015f, 0.055f, 0.105f, 1.0f }, 0.0f, 0.1f },
 			};
 			for (const auto& expected : expectedMaterials)
 			{
@@ -1609,45 +1656,38 @@ namespace gglab
 	void RunApplicationContentRegistrationSelfTests(SelfTestContext& context) noexcept
 	{
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
-		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
-			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
+		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
 			desktop.m_Labs.size() == 16 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
-				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }),
+				{
+					return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa");
+				}),
 			"Windows desktop composition includes four Demo entries and sixteen Labs");
 		for (const std::string_view retiredLabId : {
 			"gglab.lab.task_system",
-			"gglab.lab.asset_publication",
-			"gglab.lab.asset_residency",
-			"gglab.lab.environment_assets" })
+				"gglab.lab.asset_publication",
+				"gglab.lab.asset_residency",
+				"gglab.lab.environment_assets" })
 		{
 			context.Check(ResolveApplicationContentSelection(
-				desktop, DesktopLabHostDemoId, retiredLabId).m_Status ==
-				ApplicationContentSelectionStatus::StartupLabUnavailable,
+				desktop, DesktopLabHostDemoId, retiredLabId).m_Status == ApplicationContentSelectionStatus::StartupLabUnavailable,
 				"Retired Lab identities are unavailable");
 		}
-		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
-			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
+		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(desktop, DesktopIslandDemoId, DesktopDefaultLabId);
 		context.Check(islandSelection.Succeeded(),
 			"Island remains selectable through its stable Demo identity");
-		context.Check(!ResolveApplicationContentSelection(
-			desktop, "Demo.Playground", DesktopDefaultLabId).Succeeded(),
+		context.Check(!ResolveApplicationContentSelection(desktop, "Demo.Playground", DesktopDefaultLabId).Succeeded(),
 			"The retired original Playground Demo identity is unavailable");
-		context.Check(ResolveApplicationContentSelection(
-			desktop, DesktopCoastalAtriumDemoId, DesktopDefaultLabId).Succeeded(),
+		context.Check(ResolveApplicationContentSelection(desktop, DesktopCoastalAtriumDemoId, DesktopDefaultLabId).Succeeded(),
 			"Coastal atrium is selectable alongside the import prototype");
-		context.Check(ResolveApplicationContentSelection(
-			desktop, DesktopLabHostDemoId, "gglab.lab.texture_contract").Succeeded(),
+		context.Check(ResolveApplicationContentSelection(desktop, DesktopLabHostDemoId, "gglab.lab.texture_contract").Succeeded(),
 			"Texture contract is selectable through LabHost");
-		context.Check(!ResolveApplicationContentSelection(
-			desktop, "Demo.Playground.TextureContract", DesktopDefaultLabId).Succeeded(),
+		context.Check(!ResolveApplicationContentSelection(desktop, "Demo.Playground.TextureContract", DesktopDefaultLabId).Succeeded(),
 			"Texture contract is not registered as a standalone Demo");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
-		context.Check(std::ranges::find(
-			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end() &&
-			std::ranges::find(rendererDemands, shader_programs::TemporalAADepthHistoryCompute) !=
-				rendererDemands.end(),
+		context.Check(std::ranges::find(rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end() &&
+			std::ranges::find(rendererDemands, shader_programs::TemporalAADepthHistoryCompute) != rendererDemands.end(),
 			"Renderer artifact demand includes the production Temporal AA compute programs");
 		context.Check(std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveBuildCompute) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveCompositeCompute) != rendererDemands.end(),
@@ -1657,17 +1697,16 @@ namespace gglab
 			std::ranges::find(rendererDemands, shader_programs::IBLImportancePixel) != rendererDemands.end(),
 			"Renderer startup demand includes both IBL importance programs in its 50-program contract");
 
-		const auto checkSelectedDemand = [&context, &desktop](
-			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
-			{
-				const ApplicationContentSelection selection = ResolveApplicationContentSelection(
-					desktop, DesktopLabHostDemoId, labId);
-				ShaderProgramDemandSet demands;
-				const bool succeeded = selection.Succeeded() &&
-					demands.AddRange(shader_programs::GetRendererInitialShaderProgramDemand()) &&
-					AppendSelectedContentShaderProgramDemand(selection, demands);
-				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
-			};
+		const auto checkSelectedDemand = [&context, &desktop]
+		(std::string_view labId, size_t expectedCount, std::string_view message) noexcept
+		{
+			const ApplicationContentSelection selection = ResolveApplicationContentSelection(desktop, DesktopLabHostDemoId, labId);
+			ShaderProgramDemandSet demands;
+			const bool succeeded = selection.Succeeded() &&
+				demands.AddRange(shader_programs::GetRendererInitialShaderProgramDemand()) &&
+				AppendSelectedContentShaderProgramDemand(selection, demands);
+			context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
+		};
 #if GGLAB_DEVELOPMENT_BUILD
 		checkSelectedDemand("gglab.lab.render_graph_compute", 55,
 			"Render-graph compute selection contributes four stable and one Debug probe shader demand");

@@ -25,7 +25,7 @@ float3 BlendDiagnosticTarget(float4 source, float3 destination)
 
 float4 PSMain() : SV_Target0
 {
-	SurfaceData surface = (SurfaceData)0;
+	SurfaceData surface = (SurfaceData)(0);
 	surface.BaseColor = float3(0.2, 0.4, 0.8);
 	surface.Metallic = 0.7;
 	surface.Roughness = 0.3;
@@ -34,7 +34,7 @@ float4 PSMain() : SV_Target0
 	surface.ClearcoatRoughness = 0.1;
 	surface.AnisotropyStrength = 0.5;
 	surface.AnisotropyDirectionTS = float2(0.6, -0.8);
-	BaseShadingState shading = (BaseShadingState)0;
+	BaseShadingState shading = (BaseShadingState)(0);
 	shading.NormalWS = float3(0.0, 0.0, 1.0);
 	shading.AuthoredPerceptualRoughness = 0.3;
 	shading.EffectivePerceptualRoughness = 0.5;
@@ -42,11 +42,11 @@ float4 PSMain() : SV_Target0
 	shading.SpecularAAKernelAlpha = 0.05;
 	shading.F0 = float3(0.04, 0.2, 0.6);
 	shading.FeatureFlags = 3u;
-	SpecularAAResult coatAA = (SpecularAAResult)0;
+	SpecularAAResult coatAA = (SpecularAAResult)(0);
 	coatAA.NormalVariance = 0.2;
 	coatAA.KernelAlpha = 0.07;
 	coatAA.EffectivePerceptualRoughness = 0.4;
-	AnisotropyShadingState anisotropy = (AnisotropyShadingState)0;
+	AnisotropyShadingState anisotropy = (AnisotropyShadingState)(0);
 	anisotropy.TangentWS = float3(1.0, 0.0, 0.0);
 	anisotropy.AlphaT = 0.2;
 	anisotropy.AlphaB = 0.05;
@@ -81,7 +81,8 @@ float4 PSMain() : SV_Target0
 			const float3 stored = EncodeSceneColor(float3(4.0, 8.0, 16.0), preExposure);
 			const float3 actual = ResolveDisplayColor(stored, exposure / preExposure,
 				color, diagnostic ? 1.0 : 0.0);
-			const float3 expected = diagnostic ? LinearToSRGB(expectedColors[testCase]) :
+			const float3 expected = diagnostic ?
+				LinearToSRGB(expectedColors[testCase]) :
 				LinearToSRGB(ACESFitted(stored * (exposure / preExposure)));
 			matches = matches && CloseDisplayColor(actual, expected);
 		}

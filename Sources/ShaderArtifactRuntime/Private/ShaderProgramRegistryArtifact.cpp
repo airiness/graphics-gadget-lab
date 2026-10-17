@@ -67,9 +67,9 @@ namespace gglab
 				builder.AddBytes(std::span(
 					entry.m_ArtifactRef.m_ArtifactId.m_DurableDigest.m_Value));
 		}
-		return succeeded
-			? ShaderProgramRegistryArtifactId{ .m_DurableDigest = builder.Finish() }
-			: ShaderProgramRegistryArtifactId{};
+		return succeeded ?
+			ShaderProgramRegistryArtifactId{ .m_DurableDigest = builder.Finish() } :
+			ShaderProgramRegistryArtifactId{};
 	}
 
 	ShaderProgramRegistryArtifactValidationStatus ValidateShaderProgramRegistryArtifact(
@@ -113,9 +113,9 @@ namespace gglab
 			}
 		}
 		return ComputeShaderProgramRegistryArtifactId(artifact.m_Entries) ==
-			artifact.m_RegistryId
-			? ShaderProgramRegistryArtifactValidationStatus::Valid
-			: ShaderProgramRegistryArtifactValidationStatus::InvalidRegistryId;
+			artifact.m_RegistryId ?
+				ShaderProgramRegistryArtifactValidationStatus::Valid :
+				ShaderProgramRegistryArtifactValidationStatus::InvalidRegistryId;
 	}
 
 	ShaderProgramRegistryArtifactBuildResult BuildShaderProgramRegistryArtifact(
@@ -144,7 +144,9 @@ namespace gglab
 			std::ranges::sort(artifact.m_Entries,
 				[](const ShaderProgramRegistryEntry& left,
 					const ShaderProgramRegistryEntry& right) noexcept
-				{ return MakeBindingKey(left) < MakeBindingKey(right); });
+				{
+					return MakeBindingKey(left) < MakeBindingKey(right);
+				});
 			for (size_t index = 1; index < artifact.m_Entries.size(); ++index)
 			{
 				if (IsSameBinding(artifact.m_Entries[index - 1], artifact.m_Entries[index]))
@@ -178,7 +180,7 @@ namespace gglab
 	{
 		if (!programRef.IsValid() || !IsKnownShaderTargetProfile(targetProfile) ||
 			ValidateShaderProgramRegistryArtifact(artifact) !=
-				ShaderProgramRegistryArtifactValidationStatus::Valid)
+			ShaderProgramRegistryArtifactValidationStatus::Valid)
 		{
 			return std::nullopt;
 		}
@@ -205,10 +207,12 @@ namespace gglab
 			requestedKey,
 			{},
 			[](const ShaderProgramRegistryEntry& entry) noexcept
-			{ return MakeBindingKey(entry); });
+			{
+				return MakeBindingKey(entry);
+			});
 		return iterator != artifact.m_Entries.end() &&
-			MakeBindingKey(*iterator) == requestedKey
-			? std::optional<ShaderArtifactRef>(iterator->m_ArtifactRef)
-			: std::nullopt;
+			MakeBindingKey(*iterator) == requestedKey ?
+				std::optional<ShaderArtifactRef>(iterator->m_ArtifactRef) :
+				std::nullopt;
 	}
 }

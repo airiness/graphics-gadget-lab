@@ -104,9 +104,9 @@ namespace gglab
 		[[nodiscard]] RHIFormat ToTextureViewFormat(
 			DXGI_FORMAT format, TextureColorSpace colorSpace) noexcept
 		{
-			DXGI_FORMAT viewFormat = colorSpace == TextureColorSpace::SRGB
-				? DirectX::MakeSRGB(format)
-				: DirectX::MakeLinear(format);
+			DXGI_FORMAT viewFormat = colorSpace == TextureColorSpace::SRGB ?
+				DirectX::MakeSRGB(format) :
+				DirectX::MakeLinear(format);
 			if (viewFormat == DXGI_FORMAT_UNKNOWN)
 			{
 				viewFormat = format;
@@ -125,12 +125,13 @@ namespace gglab
 			result.m_ResourceFormat = ToTextureResourceFormat(metadata.format);
 			result.m_ViewFormat = ToTextureViewFormat(metadata.format, colorSpace);
 			result.m_SrvDimension =
-				metadata.IsCubemap()
-				? (metadata.arraySize == CubemapFaceCount
-					? RHITextureViewDimension::TextureCube
-					: RHITextureViewDimension::TextureCubeArray)
-				: (metadata.arraySize > 1 ? RHITextureViewDimension::Texture2DArray
-					: RHITextureViewDimension::Texture2D);
+				metadata.IsCubemap() ?
+					(metadata.arraySize == CubemapFaceCount ?
+						RHITextureViewDimension::TextureCube :
+						RHITextureViewDimension::TextureCubeArray) :
+					(metadata.arraySize > 1 ?
+						RHITextureViewDimension::Texture2DArray :
+						RHITextureViewDimension::Texture2D);
 			result.m_Extent = {
 				.m_Width = static_cast<uint32_t>(metadata.width),
 				.m_Height = static_cast<uint32_t>(metadata.height),
@@ -226,9 +227,9 @@ namespace gglab
 							DirectX::XMVectorMultiplyAdd(inPixels[x], scale, bias);
 						const float lengthSquared =
 							DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(normal));
-						normal = lengthSquared > 1.0e-8f
-							? DirectX::XMVector3Normalize(normal)
-							: DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+						normal = lengthSquared > 1.0e-8f ?
+							DirectX::XMVector3Normalize(normal) :
+							DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 						DirectX::XMVECTOR encoded =
 							DirectX::XMVectorMultiplyAdd(normal, encodeScale, encodeScale);
 						outPixels[x] =
@@ -329,18 +330,18 @@ namespace gglab
 
 		if (isDds)
 		{
-			hr = decodeFromMemory
-				? DirectX::LoadFromDDSMemory(sourceBytes.data(), sourceBytes.size(),
-					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage)
-				: DirectX::LoadFromDDSFile(texPath.c_str(),
+			hr = decodeFromMemory ?
+				DirectX::LoadFromDDSMemory(sourceBytes.data(), sourceBytes.size(),
+					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage) :
+				DirectX::LoadFromDDSFile(texPath.c_str(),
 					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage);
 		}
 		else if (isHdr)
 		{
-			hr = decodeFromMemory
-				? DirectX::LoadFromHDRMemory(
-					sourceBytes.data(), sourceBytes.size(), &metadata, scratchImage)
-				: DirectX::LoadFromHDRFile(texPath.c_str(), &metadata, scratchImage);
+			hr = decodeFromMemory ?
+				DirectX::LoadFromHDRMemory(
+					sourceBytes.data(), sourceBytes.size(), &metadata, scratchImage) :
+				DirectX::LoadFromHDRFile(texPath.c_str(), &metadata, scratchImage);
 		}
 		else
 		{
@@ -354,10 +355,10 @@ namespace gglab
 				wicFlags |= DirectX::WIC_FLAGS::WIC_FLAGS_IGNORE_SRGB;
 			}
 
-			hr = decodeFromMemory
-				? DirectX::LoadFromWICMemory(sourceBytes.data(), sourceBytes.size(), wicFlags,
-					&metadata, scratchImage)
-				: DirectX::LoadFromWICFile(texPath.c_str(), wicFlags, &metadata, scratchImage);
+			hr = decodeFromMemory ?
+				DirectX::LoadFromWICMemory(sourceBytes.data(), sourceBytes.size(), wicFlags,
+					&metadata, scratchImage) :
+				DirectX::LoadFromWICFile(texPath.c_str(), wicFlags, &metadata, scratchImage);
 		}
 
 		if (FAILED(hr))
@@ -450,8 +451,9 @@ namespace gglab
 	{
 		return LoadTextureData(texPath,
 			TextureImportSettings{
-				.m_Semantic = colorSpace == TextureColorSpace::SRGB ? TextureSemantic::GenericColor
-																	: TextureSemantic::GenericData,
+				.m_Semantic = colorSpace == TextureColorSpace::SRGB ?
+					TextureSemantic::GenericColor :
+					TextureSemantic::GenericData,
 				.m_MipPolicy = TextureMipPolicy::Preserve,
 			},
 			progress);
@@ -470,8 +472,9 @@ namespace gglab
 		}
 
 		result.m_ResourceFormat = RHIFormat::R8G8B8A8Typeless;
-		result.m_ViewFormat = colorSpace == TextureColorSpace::SRGB ? RHIFormat::R8G8B8A8UnormSrgb
-			: RHIFormat::R8G8B8A8Unorm;
+		result.m_ViewFormat = colorSpace == TextureColorSpace::SRGB ?
+			RHIFormat::R8G8B8A8UnormSrgb :
+			RHIFormat::R8G8B8A8Unorm;
 		result.m_Extent = {
 			.m_Width = width,
 			.m_Height = height,

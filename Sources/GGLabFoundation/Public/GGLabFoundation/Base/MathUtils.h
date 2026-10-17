@@ -12,9 +12,9 @@ namespace gglab::utils
 	template <UnsignedInteger T>
 	[[nodiscard]] constexpr T SaturatingAdd(T lhs, T rhs) noexcept
 	{
-		return lhs > std::numeric_limits<T>::max() - rhs
-			? std::numeric_limits<T>::max()
-			: lhs + rhs;
+		return lhs > std::numeric_limits<T>::max() - rhs ?
+			std::numeric_limits<T>::max() :
+			lhs + rhs;
 	}
 
 	template <UnsignedInteger T>
@@ -24,9 +24,9 @@ namespace gglab::utils
 		{
 			return 0;
 		}
-		return lhs > std::numeric_limits<T>::max() / rhs
-			? std::numeric_limits<T>::max()
-			: lhs * rhs;
+		return lhs > std::numeric_limits<T>::max() / rhs ?
+			std::numeric_limits<T>::max() :
+			lhs * rhs;
 	}
 
 	template <UnsignedInteger T>

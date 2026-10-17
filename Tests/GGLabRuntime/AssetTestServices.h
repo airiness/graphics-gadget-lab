@@ -41,22 +41,17 @@ namespace gglab::asset_test
 		{
 			return { .m_Supported = true };
 		}
-		RHITextureSupportResult QueryTextureViewSupport(
-			const RHITextureDesc&, const RHITextureViewDesc&) const noexcept override
+		RHITextureSupportResult QueryTextureViewSupport(const RHITextureDesc&, const RHITextureViewDesc&) const noexcept override
 		{
 			return { .m_Supported = true };
 		}
-		RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
-			const RHIResourceDebugIdentityDesc&) noexcept override;
-		RHIBufferHandle CreateBuffer(
-			const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override;
-		RHITextureViewHandle CreateTextureView(
-			RHITextureHandle, const RHITextureViewDesc&) noexcept override
+		RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&, const RHIResourceDebugIdentityDesc&) noexcept override;
+		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override;
+		RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
 		{
 			return { m_NextTextureViewIndex++, 1 };
 		}
-		RHIBufferViewHandle CreateBufferView(
-			RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
+		RHIBufferViewHandle CreateBufferView(RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
 		{
 			return {};
 		}
@@ -127,8 +122,7 @@ namespace gglab::asset_test
 		}
 		void Abort() noexcept override { m_IsRecording = false; }
 		void ReclaimCompleted() noexcept override {}
-		bool UploadBuffer(const void* data, uint64_t sizeInBytes, RHIBufferHandle destination,
-			uint64_t) noexcept override
+		bool UploadBuffer(const void* data, uint64_t sizeInBytes, RHIBufferHandle destination, uint64_t) noexcept override
 		{
 			return m_IsRecording && data && sizeInBytes != 0 && destination.IsValid();
 		}
@@ -182,19 +176,16 @@ namespace gglab::asset_test
 	};
 
 	// Writes an RGBA8 PNG with uncompressed deflate blocks.
-	[[nodiscard]] bool WritePng(const std::filesystem::path& path, uint32_t width, uint32_t height,
-		std::span<const uint8_t> rgba) noexcept;
+	[[nodiscard]] bool WritePng(const std::filesystem::path& path, uint32_t width, uint32_t height, std::span<const uint8_t> rgba) noexcept;
 	// Writes a 2x2 solid-color PNG.
-	[[nodiscard]] bool WriteSolidPng(const std::filesystem::path& path,
-		uint8_t red, uint8_t green, uint8_t blue) noexcept;
+	[[nodiscard]] bool WriteSolidPng(const std::filesystem::path& path, uint8_t red, uint8_t green, uint8_t blue) noexcept;
 	// Writes a square PNG of deterministic noise; large sizes keep decode tasks
 	// running long enough to observe them mid-execution.
 	[[nodiscard]] bool WriteNoisePng(const std::filesystem::path& path, uint32_t size) noexcept;
 
 	// Writes a glTF scene with one triangle mesh, material and node per base-color
 	// image. Images are referenced relative to the glTF file.
-	[[nodiscard]] bool WriteTexturedModel(const std::filesystem::path& gltfPath,
-		std::span<const std::string> baseColorImages) noexcept;
+	[[nodiscard]] bool WriteTexturedModel(const std::filesystem::path& gltfPath, std::span<const std::string> baseColorImages) noexcept;
 
 	// AssetManager composed over the fake RHI, a real TaskSystem and the real upload
 	// scheduler. PumpFrame follows the application frame order.
@@ -261,24 +252,17 @@ namespace gglab::asset_test
 		std::unique_ptr<AssetManager> m_AssetManager;
 	};
 
-	[[nodiscard]] const AssetSnapshot::Model* FindModel(
-		const AssetSnapshot& snapshot, ModelID modelId) noexcept;
-	[[nodiscard]] const AssetSnapshot::Mesh* FindMesh(
-		const AssetSnapshot& snapshot, MeshID meshId) noexcept;
-	[[nodiscard]] const AssetSnapshot::Texture* FindTexture(
-		const AssetSnapshot& snapshot, TextureID textureId) noexcept;
-	[[nodiscard]] const AssetInterestActivity* FindInterest(
-		const AssetOwnershipStatistics& ownership, AssetKind kind, uint64_t stableId) noexcept;
+	[[nodiscard]] const AssetSnapshot::Model* FindModel(const AssetSnapshot& snapshot, ModelID modelId) noexcept;
+	[[nodiscard]] const AssetSnapshot::Mesh* FindMesh(const AssetSnapshot& snapshot, MeshID meshId) noexcept;
+	[[nodiscard]] const AssetSnapshot::Texture* FindTexture(const AssetSnapshot& snapshot, TextureID textureId) noexcept;
+	[[nodiscard]] const AssetInterestActivity* FindInterest(const AssetOwnershipStatistics& ownership, AssetKind kind, uint64_t stableId) noexcept;
 	[[nodiscard]] bool IsTerminal(AssetState state) noexcept;
 	[[nodiscard]] bool IsStreamingIdle(const AssetUploadStatistics& statistics) noexcept;
-	[[nodiscard]] bool HasPendingPublication(
-		const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept;
-	[[nodiscard]] bool HasPendingUpload(
-		const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept;
+	[[nodiscard]] bool HasPendingPublication(const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept;
+	[[nodiscard]] bool HasPendingUpload(const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept;
 
 	// After every owner scope is released and released models retire, the harness
 	// holds no ownership, and the scheduler conserves every enqueued publication
 	// and submitted upload.
-	void CheckQuiescent(SelfTestContext& context, AssetManagerHarness& harness,
-		std::string_view scenario) noexcept;
+	void CheckQuiescent(SelfTestContext& context, AssetManagerHarness& harness, std::string_view scenario) noexcept;
 }

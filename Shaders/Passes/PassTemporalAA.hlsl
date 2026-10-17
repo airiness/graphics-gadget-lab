@@ -53,11 +53,11 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	currentColorTexture.GetDimensions(renderWidth, renderHeight);
 	const uint2 renderExtent = uint2(renderWidth, renderHeight);
 	const float2 renderPosition =
-		(float2(pixel) + 0.5.xx) * (float2(renderExtent) / float2(width, height));
-	const uint2 renderPixel = min(uint2(renderPosition), renderExtent - 1u);
-	const float2 outputOffset = renderPosition - (float2(renderPixel) + 0.5.xx);
+		((float2)(pixel) + 0.5.xx) * ((float2)(renderExtent) / float2(width, height));
+	const uint2 renderPixel = min((uint2)(renderPosition), renderExtent - 1u);
+	const float2 outputOffset = renderPosition - ((float2)(renderPixel) + 0.5.xx);
 	const bool upscaled = any(renderExtent != uint2(width, height));
-	const float2 displayPerRender = float2(width, height) / float2(renderExtent);
+	const float2 displayPerRender = float2(width, height) / (float2)(renderExtent);
 
 	Texture2D<float2> motionTexture = GetTexture2DFloat2(g_Pass.MotionIndex);
 	Texture2D<float> currentDepthTexture = GetTexture2DFloat(g_Pass.CurrentDepthIndex);
@@ -66,7 +66,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	RWTexture2D<float4> reprojectionDiagnostics =
 		GetRWTexture2DFloat4(g_Pass.ReprojectionDiagnosticsUavIndex);
 
-	const float2 currentUV = (float2(pixel) + 0.5.xx) / float2(width, height);
+	const float2 currentUV = ((float2)(pixel) + 0.5.xx) / float2(width, height);
 	const float currentRawDepth = currentDepthTexture.Load(int3(renderPixel, 0));
 	const uint viewIndex = g_Pass.ViewIndexAndHistoryValid & ~TAA_VIEW_FLAG_MASK;
 	const bool previousHistoryValid =
@@ -106,7 +106,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	if (gaussianCurrent)
 	{
 		currentColor = ReconstructTemporalCurrentColor(currentColorTexture, renderPixel,
-			renderExtent, viewData.CurrentJitterUV * float2(renderExtent), outputOffset,
+			renderExtent, viewData.CurrentJitterUV * (float2)(renderExtent), outputOffset,
 			displayPerRender, TAA_CURRENT_GAUSSIAN_KERNEL_SCALE, centerColor);
 	}
 
@@ -122,11 +122,11 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	{
 		// The sample whose motion reprojects this pixel: the centre, or the front-most
 		// depth of the 3x3 neighborhood. Background is never nearer than geometry.
-		int2 correspondencePixel = int2(renderPixel);
+		int2 correspondencePixel = (int2)(renderPixel);
 		float correspondenceDepth = currentRawDepth;
 		if (closestDepthMotion)
 		{
-			const int2 maxPixel = int2(renderExtent) - 1;
+			const int2 maxPixel = (int2)(renderExtent) - 1;
 			[unroll]
 			for (int y = -1; y <= 1; ++y)
 			{
@@ -134,7 +134,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				for (int x = -1; x <= 1; ++x)
 				{
 					const int2 samplePixel =
-						clamp(int2(renderPixel) + int2(x, y), 0, maxPixel);
+						clamp((int2)(renderPixel) + int2(x, y), 0, maxPixel);
 					const float sampleDepth = currentDepthTexture.Load(int3(samplePixel, 0));
 					if (isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, sampleDepth)) && IsDepthNearer(
 						sampleDepth, correspondenceDepth, viewData.DepthConvention))
@@ -165,7 +165,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float2 validationPreviousRasterUV = previousRasterUV;
 		if (closestDepthMotion)
 		{
-			validationUV = (float2(correspondencePixel) + 0.5.xx) / float2(renderExtent);
+			validationUV = ((float2)(correspondencePixel) + 0.5.xx) / (float2)(renderExtent);
 			validationDepth = correspondenceDepth;
 			validationPreviousRasterUV = ReprojectTemporalUV(validationUV, rasterMotionUV);
 		}
@@ -173,9 +173,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		if (!AreTemporalReprojectionUVsValid(previousHistoryUV, validationPreviousRasterUV))
 		{
 			rejectionReason = all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, previousHistoryUV))) &&
-				all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, validationPreviousRasterUV)))
-				? TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS
-				: TAA_REJECTION_NON_FINITE;
+				all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, validationPreviousRasterUV))) ?
+					TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS :
+					TAA_REJECTION_NON_FINITE;
 		}
 		else
 		{
@@ -185,10 +185,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				GetSamplerState(g_Pass.PackedClampSamplerIndices & 0xffffu);
 			SamplerState pointClampSampler =
 				GetSamplerState(g_Pass.PackedClampSamplerIndices >> 16);
-			historyColor = catmullRomHistory
-				? SampleTemporalHistoryCatmullRomClamped(previousColorTexture,
-					linearClampSampler, previousHistoryUV)
-				: previousColorTexture.SampleLevel(
+			historyColor = catmullRomHistory ?
+				SampleTemporalHistoryCatmullRomClamped(previousColorTexture,
+					linearClampSampler, previousHistoryUV) :
+				previousColorTexture.SampleLevel(
 					linearClampSampler, previousHistoryUV, 0.0).rgb;
 			historyColor = float3(
 				RescaleHistoryColorChannel(historyColor.r, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
@@ -226,9 +226,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				{
 					accepted = IsDepthBackground(
 						previousRawDepth, viewData.PreviousDepthConvention);
-					rejectionReason = accepted
-						? TAA_REJECTION_NONE
-						: TAA_REJECTION_BACKGROUND_MISMATCH;
+					rejectionReason = accepted ?
+						TAA_REJECTION_NONE :
+						TAA_REJECTION_BACKGROUND_MISMATCH;
 				}
 			}
 			else
@@ -295,7 +295,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		{
 			currentSampleWeight = ResolveTemporalUpscaledSampleWeight(
 				ResolveTemporalNearestSampleWeight(
-					outputOffset + viewData.CurrentJitterUV * float2(renderExtent),
+					outputOffset + viewData.CurrentJitterUV * (float2)(renderExtent),
 					displayPerRender, TAA_CURRENT_GAUSSIAN_KERNEL_SCALE));
 			historyWeight = ComputeTemporalWeightedHistoryWeight(previousAccumulation,
 				historyConfidence,
@@ -344,10 +344,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	const float maxHistorySamples =
 		ResolveTemporalAAMaxHistorySamples(maxHistoryFeedbackAndClampExpansion.x);
-	const float nextAccumulation = effectiveSamples
-		? ResolveTemporalHistoryNextSamples(accepted, previousAccumulation,
-			historyConfidence, maxHistorySamples, currentSampleWeight)
-		: ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
+	const float nextAccumulation = effectiveSamples ?
+		ResolveTemporalHistoryNextSamples(accepted, previousAccumulation,
+			historyConfidence, maxHistorySamples, currentSampleWeight) :
+		ResolveTemporalHistoryNextAge(accepted, previousAccumulation);
 	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextAccumulation);
 	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor, NF_SITE_PASS_TEMPORAL_AA_CSMAIN_SANITIZE_HDRCOLOR), outputAlphas.x);
 	// Half precision stores a compatibility age exactly and an effective sample count
@@ -359,16 +359,16 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	GetRWTexture2DFloat2(g_Pass.PackedReliabilityIndices >> 16)[pixel] =
 		accepted && all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE, nextReliability))) ? nextReliability : 0.0.xx;
 	float4 diagnosticsOutput =
-		float4(historyWeight, float(rejectionReason), previousHistoryUV);
+		float4(historyWeight, (float)(rejectionReason), previousHistoryUV);
 	if (writeHistoryColorPreview)
 	{
 		diagnosticsOutput = resolvedOutput;
 	}
 	else if (writeHistorySamplesPreview)
 	{
-		const float normalizedAccumulation = effectiveSamples
-			? ResolveTemporalAAHistorySamplesPreview(nextAccumulation, maxHistorySamples)
-			: ResolveTemporalAAHistoryAgePreview(
+		const float normalizedAccumulation = effectiveSamples ?
+			ResolveTemporalAAHistorySamplesPreview(nextAccumulation, maxHistorySamples) :
+			ResolveTemporalAAHistoryAgePreview(
 				nextAccumulation, maxHistoryFeedbackAndClampExpansion.x);
 		diagnosticsOutput = float4(normalizedAccumulation.xxx, 1.0);
 	}
@@ -378,9 +378,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 	else if (writeHistoryRelaxationPreview)
 	{
-		const float relaxationFraction = accepted && luminanceWeightAndHistoryRelaxation.y > 0.0
-			? saturate(historyRelaxation / luminanceWeightAndHistoryRelaxation.y)
-			: 0.0;
+		const float relaxationFraction = accepted && luminanceWeightAndHistoryRelaxation.y > 0.0 ?
+			saturate(historyRelaxation / luminanceWeightAndHistoryRelaxation.y) :
+			0.0;
 		diagnosticsOutput = float4(relaxationFraction.xxx, 1.0);
 	}
 	reprojectionDiagnostics[pixel] = diagnosticsOutput;
@@ -388,8 +388,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	if (writeDisplayDepth)
 	{
 		// The render sample whose jittered position is nearest the display pixel centre.
-		const float2 jitterPixels = viewData.CurrentJitterUV * float2(renderExtent);
-		const uint2 depthPixel = min(uint2(max(renderPosition + jitterPixels, 0.0.xx)),
+		const float2 jitterPixels = viewData.CurrentJitterUV * (float2)(renderExtent);
+		const uint2 depthPixel = min((uint2)(max(renderPosition + jitterPixels, 0.0.xx)),
 			renderExtent - 1u);
 		RWTexture2D<float> displayDepth = GetRWTexture2DFloat(g_Pass.DisplayDepthUavIndex);
 		displayDepth[pixel] = currentDepthTexture.Load(int3(depthPixel, 0));

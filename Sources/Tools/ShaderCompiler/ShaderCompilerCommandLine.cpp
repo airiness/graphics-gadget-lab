@@ -118,9 +118,9 @@ namespace gglab
 		}
 		if (resultFormat.m_OccurrenceCount > 1)
 		{
-			parsed.m_Command = first == L"build-runtime"
-				? ShaderCompilerCommand::BuildRuntime
-				: ShaderCompilerCommand::Compile;
+			parsed.m_Command = first == L"build-runtime" ?
+				ShaderCompilerCommand::BuildRuntime :
+				ShaderCompilerCommand::Compile;
 			parsed.m_Error = L"--result-format specified multiple times";
 			return parsed;
 		}

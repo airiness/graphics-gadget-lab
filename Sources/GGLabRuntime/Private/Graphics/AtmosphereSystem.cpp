@@ -32,9 +32,17 @@ namespace gglab
 				view.m_Type = RHITextureViewType::ShaderResource;
 				const bool sampled = m_Device->QueryTextureViewSupport(desc, view).IsSupported();
 				view.m_Type = RHITextureViewType::UnorderedAccess;
-				if (!sampled || !m_Device->QueryTextureViewSupport(desc, view).IsSupported()) { Disable(); return false; }
+				if (!sampled || !m_Device->QueryTextureViewSupport(desc, view).IsSupported())
+				{
+					Disable();
+					return false;
+				}
 				m_Textures[i] = m_Pool->AcquireTexture({ .m_Desc = desc }, AtmosphereLutNames[i]);
-				if (!m_Textures[i].IsValid()) { Disable(); return false; }
+				if (!m_Textures[i].IsValid())
+				{
+					Disable();
+					return false;
+				}
 			}
 			if (!m_Initialized[i] || shaders[i] != m_ShaderGenerations[i])
 			{
@@ -48,9 +56,19 @@ namespace gglab
 		{
 			m_Constants = m_Device->CreateBuffer({ .m_SizeInBytes = 256, .m_Usage = RHIBufferUsage::Constant,
 				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu, .m_DebugName = "Atmosphere.Constants" });
-			if (!m_Constants.IsValid()) { Disable(); return false; }
+			if (!m_Constants.IsValid())
+			{
+				Disable();
+				return false;
+			}
 			void* mapped = m_Device->MapBuffer(m_Constants, {});
-			if (!mapped) { m_Device->DestroyBuffer(m_Constants); m_Constants = {}; Disable(); return false; }
+			if (!mapped)
+			{
+				m_Device->DestroyBuffer(m_Constants);
+				m_Constants = {};
+				Disable();
+				return false;
+			}
 			std::memcpy(mapped, &parameters, sizeof(parameters));
 			m_Device->UnmapBuffer(m_Constants, { 0, sizeof(parameters) });
 		}
@@ -106,9 +124,9 @@ namespace gglab
 		{
 			if (m_Textures[i].IsValid())
 			{
-				const bool released = m_LastFence.IsValid()
-					? m_Pool->ReleaseTexture(std::move(m_Textures[i]), m_LastFence)
-					: m_Pool->ReleaseTextureWithoutSubmission(std::move(m_Textures[i]));
+				const bool released = m_LastFence.IsValid() ?
+					m_Pool->ReleaseTexture(std::move(m_Textures[i]), m_LastFence) :
+					m_Pool->ReleaseTextureWithoutSubmission(std::move(m_Textures[i]));
 				GGLAB_ASSERT(released);
 			}
 			m_Initialized[i] = false;
@@ -119,14 +137,14 @@ namespace gglab
 	void AtmosphereSystem::Tick() noexcept
 	{
 		std::erase_if(m_PendingBuffers, [this](const PendingBuffer& buffer)
-		{
-			if (!m_Device->IsFencePointCompleted(buffer.m_Fence))
 			{
-				return false;
-			}
-			m_Device->DestroyBuffer(buffer.m_Buffer);
-			return true;
-		});
+				if (!m_Device->IsFencePointCompleted(buffer.m_Fence))
+				{
+					return false;
+				}
+				m_Device->DestroyBuffer(buffer.m_Buffer);
+				return true;
+			});
 	}
 	void AtmosphereSystem::Shutdown() noexcept
 	{

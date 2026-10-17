@@ -29,8 +29,7 @@ namespace gglab
 		class FixtureArtifactReader final : public ShaderArtifactReaderBase
 		{
 		public:
-			[[nodiscard]] ShaderArtifactReadResult ReadArtifact(
-				const ShaderArtifactRef& artifactRef) noexcept override
+			[[nodiscard]] ShaderArtifactReadResult ReadArtifact(const ShaderArtifactRef& artifactRef) noexcept override
 			{
 				++m_ReadCount;
 				m_LastRef = artifactRef;
@@ -52,7 +51,8 @@ namespace gglab
 
 		[[nodiscard]] ShaderBinary MakeSpirVBinary() noexcept
 		{
-			constexpr std::array<uint32_t, 5> Header{
+			constexpr std::array<uint32_t, 5> Header
+			{
 				0x07230203u,
 				0x00010600u,
 				0u,
@@ -66,9 +66,7 @@ namespace gglab
 
 		void RefreshArtifactIdentity(ShaderRuntimeArtifact& artifact) noexcept
 		{
-			const auto bytes = std::span(
-				static_cast<const std::byte*>(artifact.m_Binary.Data()),
-				artifact.m_Binary.SizeInBytes());
+			const auto bytes = std::span(static_cast<const std::byte*>(artifact.m_Binary.Data()), artifact.m_Binary.SizeInBytes());
 			artifact.m_Manifest.m_BinaryContentDigest.m_Digest = ComputeSha256(bytes);
 			artifact.m_Manifest.m_ArtifactId = ComputeShaderArtifactId(artifact.m_Manifest);
 		}
@@ -79,8 +77,7 @@ namespace gglab
 			ShaderRuntimeArtifact artifact{};
 			artifact.m_Manifest.m_TargetProfile = ShaderTargetProfile::GGLabDX12;
 			artifact.m_Manifest.m_BinaryFormat = ShaderBinaryFormat::Dxil;
-			artifact.m_Manifest.m_SpirVTargetEnvironment =
-				ShaderSpirVTargetEnvironment::None;
+			artifact.m_Manifest.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
 			artifact.m_Manifest.m_BindingABIRevision = 0;
 			artifact.m_Manifest.m_CoordinateOptions = ShaderCoordinateOptions::None;
 			artifact.m_Manifest.m_Stage = stage;
@@ -97,8 +94,7 @@ namespace gglab
 				break;
 			}
 			artifact.m_Binary = MakeDxilBinary();
-			static_cast<std::byte*>(artifact.m_Binary.Data())[19] =
-				static_cast<std::byte>(marker);
+			static_cast<std::byte*>(artifact.m_Binary.Data())[19] = static_cast<std::byte>(marker);
 			RefreshArtifactIdentity(artifact);
 			return artifact;
 		}
@@ -108,8 +104,7 @@ namespace gglab
 			ShaderRuntimeArtifact artifact{};
 			artifact.m_Manifest.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13;
 			artifact.m_Manifest.m_BinaryFormat = ShaderBinaryFormat::SpirV;
-			artifact.m_Manifest.m_SpirVTargetEnvironment =
-				ShaderSpirVTargetEnvironment::Vulkan1_3;
+			artifact.m_Manifest.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::Vulkan1_3;
 			artifact.m_Manifest.m_BindingABIRevision = 1;
 			artifact.m_Manifest.m_CoordinateOptions = ShaderCoordinateOptions::InvertY;
 			artifact.m_Manifest.m_Stage = ShaderStage::Vertex;
@@ -136,21 +131,18 @@ namespace gglab
 			};
 		}
 
-		[[nodiscard]] ShaderArtifactRef MakeRef(
-			const ShaderRuntimeArtifact& artifact) noexcept
+		[[nodiscard]] ShaderArtifactRef MakeRef(const ShaderRuntimeArtifact& artifact) noexcept
 		{
 			return { .m_ArtifactId = artifact.m_Manifest.m_ArtifactId };
 		}
 
-		[[nodiscard]] bool WriteBytes(
-			const std::filesystem::path& path, std::span<const std::byte> bytes) noexcept
+		[[nodiscard]] bool WriteBytes(const std::filesystem::path& path, std::span<const std::byte> bytes) noexcept
 		{
 			try
 			{
 				std::filesystem::create_directories(path.parent_path());
 				std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-				stream.write(reinterpret_cast<const char*>(bytes.data()),
-					static_cast<std::streamsize>(bytes.size()));
+				stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 				return stream.good();
 			}
 			catch (...)
@@ -159,26 +151,20 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] bool WriteArtifactFixture(const std::filesystem::path& root,
-			const ShaderRuntimeArtifact& artifact) noexcept
+		[[nodiscard]] bool WriteArtifactFixture(const std::filesystem::path& root, const ShaderRuntimeArtifact& artifact) noexcept
 		{
 			const ShaderArtifactRef artifactRef = MakeRef(artifact);
-			const ShaderLooseArtifactPaths paths =
-				ShaderLooseArtifactLocator(root).GetPaths(artifactRef);
-			const auto binaryBytes = std::span(
-				static_cast<const std::byte*>(artifact.m_Binary.Data()),
-				artifact.m_Binary.SizeInBytes());
+			const ShaderLooseArtifactPaths paths = ShaderLooseArtifactLocator(root).GetPaths(artifactRef);
+			const auto binaryBytes = std::span(static_cast<const std::byte*>(artifact.m_Binary.Data()), artifact.m_Binary.SizeInBytes());
 			return WriteBytes(paths.m_BinaryPath, binaryBytes) &&
-				WriteBytes(paths.m_ManifestPath,
-					SerializeShaderRuntimeArtifactManifest(artifact.m_Manifest));
+				WriteBytes(paths.m_ManifestPath, SerializeShaderRuntimeArtifactManifest(artifact.m_Manifest));
 		}
 
 		[[nodiscard]] std::optional<ShaderProgramRegistryArtifactRef> WriteRegistryFixture(
 			const std::filesystem::path& root,
 			std::span<const ShaderProgramRegistryEntry> entries) noexcept
 		{
-			const ShaderProgramRegistryArtifactBuildResult build =
-				BuildShaderProgramRegistryArtifact(entries);
+			const ShaderProgramRegistryArtifactBuildResult build = BuildShaderProgramRegistryArtifact(entries);
 			if (!build.IsSuccess())
 			{
 				return std::nullopt;
@@ -186,8 +172,7 @@ namespace gglab
 			const ShaderProgramRegistryArtifactRef ref{
 				.m_RegistryId = build.m_Artifact.m_RegistryId,
 			};
-			const ShaderLooseProgramRegistryArtifactPath path =
-				ShaderLooseProgramRegistryArtifactLocator(root).GetPath(ref);
+			const ShaderLooseProgramRegistryArtifactPath path = ShaderLooseProgramRegistryArtifactLocator(root).GetPath(ref);
 			if (!WriteBytes(path.m_Path, SerializeShaderProgramRegistryArtifact(build.m_Artifact)))
 			{
 				return std::nullopt;
@@ -198,21 +183,18 @@ namespace gglab
 		class CountingPipelineSystem final : public RHIPipelineSystem
 		{
 		public:
-			RHIBindingLayoutHandle CreateBindingLayout(
-				const RHIBindingLayoutDesc&) noexcept override
+			RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc&) noexcept override
 			{
 				return { 0, 1 };
 			}
 
-			RHIPipelineHandle CreateGraphicsPipeline(
-				const RHIGraphicsPipelineCreateInfo&) noexcept override
+			RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override
 			{
 				++m_GraphicsCreateCount;
 				return { m_NextPipelineIndex++, m_Generation };
 			}
 
-			RHIPipelineHandle CreateComputePipeline(
-				const RHIComputePipelineCreateInfo&) noexcept override
+			RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override
 			{
 				++m_ComputeCreateCount;
 				return { m_NextPipelineIndex++, m_Generation };
@@ -268,8 +250,7 @@ namespace gglab
 			changedEntryPoint.m_Manifest.m_EntryPoint = "VSAlternate";
 			RefreshArtifactIdentity(changedEntryPoint);
 			context.Check(
-				baseline.m_Manifest.m_ArtifactId !=
-					changedEntryPoint.m_Manifest.m_ArtifactId,
+				baseline.m_Manifest.m_ArtifactId != changedEntryPoint.m_Manifest.m_ArtifactId,
 				"Runtime ArtifactId covers executable entry-point metadata");
 		}
 
@@ -313,29 +294,26 @@ namespace gglab
 			ShaderProgramRegistry registry;
 			context.Check(
 				registry.Bind(programRef, firstArtifact) == ShaderProgramBindStatus::Bound &&
-					registry.Resolve(programRef) == firstArtifact &&
-					registry.GetMappingCount() == 1,
+				registry.Resolve(programRef) == firstArtifact &&
+				registry.GetMappingCount() == 1,
 				"Program registry resolves a stable ProgramRef to its bound ArtifactRef");
 			context.Check(
-				registry.Bind(programRef, firstArtifact) ==
-					ShaderProgramBindStatus::AlreadyBound &&
-					registry.GetMappingCount() == 1,
+				registry.Bind(programRef, firstArtifact) == ShaderProgramBindStatus::AlreadyBound &&
+				registry.GetMappingCount() == 1,
 				"Program registry treats an identical binding as idempotent");
 			context.Check(
 				registry.Bind(programRef, secondArtifact) == ShaderProgramBindStatus::Rebound &&
-					registry.Resolve(programRef) == secondArtifact,
+				registry.Resolve(programRef) == secondArtifact,
 				"Program registry explicitly replaces a program's active immutable artifact");
 			context.Check(
-				registry.Bind(sameNamesDifferentStage, secondArtifact) ==
-					ShaderProgramBindStatus::Bound &&
-					registry.Resolve(sameNamesDifferentStage) == secondArtifact &&
-					registry.GetMappingCount() == 2,
+				registry.Bind(sameNamesDifferentStage, secondArtifact) == ShaderProgramBindStatus::Bound &&
+				registry.Resolve(sameNamesDifferentStage) == secondArtifact &&
+				registry.GetMappingCount() == 2,
 				"ProgramRef stage is an explicit part of stable Runtime identity");
 			context.Check(
 				registry.Bind({}, firstArtifact) == ShaderProgramBindStatus::InvalidProgram &&
-					registry.Bind(secondProgramRef, {}) ==
-						ShaderProgramBindStatus::InvalidArtifact &&
-					!registry.Resolve(secondProgramRef).has_value(),
+				registry.Bind(secondProgramRef, {}) == ShaderProgramBindStatus::InvalidArtifact &&
+				!registry.Resolve(secondProgramRef).has_value(),
 				"Program registry rejects invalid identities without publishing a mapping");
 
 			ShaderProgramDemandSet demands;
@@ -353,14 +331,12 @@ namespace gglab
 		void RunProgramRegistryArtifactTests(SelfTestContext& context) noexcept
 		{
 			ShaderArtifactRef goldenArtifactRef{};
-			for (size_t index = 0;
-				index < goldenArtifactRef.m_ArtifactId.m_DurableDigest.m_Value.size();
-				++index)
+			for (size_t index = 0; index < goldenArtifactRef.m_ArtifactId.m_DurableDigest.m_Value.size(); ++index)
 			{
-				goldenArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[index] =
-					static_cast<std::byte>(index + 1);
+				goldenArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[index] = static_cast<std::byte>(index + 1);
 			}
-			const std::array goldenEntries{
+			const std::array goldenEntries
+			{
 				ShaderProgramRegistryEntry{
 					.m_ProgramRef = {
 						.m_ProgramId = "gglab.shader.golden",
@@ -371,12 +347,11 @@ namespace gglab
 					.m_ArtifactRef = goldenArtifactRef,
 				},
 			};
-			const ShaderProgramRegistryArtifactBuildResult goldenBuild =
-				BuildShaderProgramRegistryArtifact(goldenEntries);
+			const ShaderProgramRegistryArtifactBuildResult goldenBuild = BuildShaderProgramRegistryArtifact(goldenEntries);
 			context.Check(
 				goldenBuild.IsSuccess() &&
-					Sha256DigestToHex(goldenBuild.m_Artifact.m_RegistryId.m_DurableDigest) ==
-						"c7ee18fba789733252c38bd74ff03556fbb9ac3e36e0c96cc2bd089455455905",
+				Sha256DigestToHex(goldenBuild.m_Artifact.m_RegistryId.m_DurableDigest) ==
+				"c7ee18fba789733252c38bd74ff03556fbb9ac3e36e0c96cc2bd089455455905",
 				"Program Registry identity matches its stable golden vector");
 
 			const ShaderProgramRef vertexProgram{
@@ -391,73 +366,47 @@ namespace gglab
 			};
 			const ShaderArtifactRef dxilRef = MakeRef(MakeDxilArtifact());
 			const ShaderArtifactRef spirVRef = MakeRef(MakeVulkanArtifact());
-			const std::array entries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = pixelProgram,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = dxilRef,
-				},
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = vertexProgram,
-					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
-					.m_ArtifactRef = spirVRef,
-				},
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = vertexProgram,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = dxilRef,
-				},
+			const std::array entries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = pixelProgram, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = dxilRef, },
+				ShaderProgramRegistryEntry{ .m_ProgramRef = vertexProgram, .m_TargetProfile = ShaderTargetProfile::GGLabVulkan13, .m_ArtifactRef = spirVRef, },
+				ShaderProgramRegistryEntry{ .m_ProgramRef = vertexProgram, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = dxilRef, },
 			};
 
-			const ShaderProgramRegistryArtifactBuildResult build =
-				BuildShaderProgramRegistryArtifact(entries);
+			const ShaderProgramRegistryArtifactBuildResult build = BuildShaderProgramRegistryArtifact(entries);
 			context.Check(
 				build.IsSuccess() && build.m_Artifact.m_Entries.size() == entries.size() &&
-					ValidateShaderProgramRegistryArtifact(build.m_Artifact) ==
-						ShaderProgramRegistryArtifactValidationStatus::Valid,
+				ValidateShaderProgramRegistryArtifact(build.m_Artifact) == ShaderProgramRegistryArtifactValidationStatus::Valid,
 				"Program Registry Artifact canonicalizes a complete valid mapping snapshot");
 			context.Check(
-				ResolveShaderProgramRegistryArtifact(
-					build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabDX12) ==
-						dxilRef &&
-					ResolveShaderProgramRegistryArtifact(
-						build.m_Artifact,
-						vertexProgram,
-						ShaderTargetProfile::GGLabVulkan13) == spirVRef &&
-					!ResolveShaderProgramRegistryArtifact(
-						build.m_Artifact,
-						pixelProgram,
-						ShaderTargetProfile::GGLabVulkan13).has_value(),
+				ResolveShaderProgramRegistryArtifact(build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabDX12) == dxilRef &&
+				ResolveShaderProgramRegistryArtifact(build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabVulkan13) == spirVRef &&
+				!ResolveShaderProgramRegistryArtifact(build.m_Artifact, pixelProgram, ShaderTargetProfile::GGLabVulkan13).has_value(),
 				"Program Registry Artifact resolves one logical program per target profile");
 			context.Check(
-				ResolveValidatedShaderProgramRegistryArtifact(
-					build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabDX12) == dxilRef,
+				ResolveValidatedShaderProgramRegistryArtifact(build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabDX12) == dxilRef,
 				"A previously validated immutable Program Registry supports cheap exact lookup");
 
 			auto changedEntries = entries;
 			changedEntries[2].m_ArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[0] ^=
 				std::byte{ 1 };
-			const ShaderProgramRegistryArtifactBuildResult changedBuild =
-				BuildShaderProgramRegistryArtifact(changedEntries);
+			const ShaderProgramRegistryArtifactBuildResult changedBuild = BuildShaderProgramRegistryArtifact(changedEntries);
 			context.Check(
 				changedBuild.IsSuccess() &&
-					changedBuild.m_Artifact.m_RegistryId != build.m_Artifact.m_RegistryId,
+				changedBuild.m_Artifact.m_RegistryId != build.m_Artifact.m_RegistryId,
 				"RegistryId changes when one effective Program-to-Artifact binding changes");
 
 			const std::array duplicateEntries{ entries[0], entries[0] };
 			const std::array<ShaderProgramRegistryEntry, 0> emptyEntries{};
 			context.Check(
-				BuildShaderProgramRegistryArtifact(duplicateEntries).m_Status ==
-					ShaderProgramRegistryArtifactBuildStatus::DuplicateBinding &&
-					BuildShaderProgramRegistryArtifact(emptyEntries).m_Status ==
-						ShaderProgramRegistryArtifactBuildStatus::Empty,
+				BuildShaderProgramRegistryArtifact(duplicateEntries).m_Status == ShaderProgramRegistryArtifactBuildStatus::DuplicateBinding &&
+				BuildShaderProgramRegistryArtifact(emptyEntries).m_Status == ShaderProgramRegistryArtifactBuildStatus::Empty,
 				"Program Registry Artifact rejects duplicate and empty snapshots explicitly");
 
 			ShaderProgramRegistryArtifact nonCanonical = build.m_Artifact;
 			std::swap(nonCanonical.m_Entries[0], nonCanonical.m_Entries[1]);
 			context.Check(
-				ValidateShaderProgramRegistryArtifact(nonCanonical) ==
-					ShaderProgramRegistryArtifactValidationStatus::NonCanonicalOrder,
+				ValidateShaderProgramRegistryArtifact(nonCanonical) == ShaderProgramRegistryArtifactValidationStatus::NonCanonicalOrder,
 				"Program Registry Artifact validation rejects non-canonical entry order");
 		}
 
@@ -472,85 +421,73 @@ namespace gglab
 				ValidateShaderArtifactCompatibility(dxil.m_Manifest, dxilRequest).IsCompatible(),
 				"DXIL runtime artifact matches the DX12 compatibility contract");
 			context.Check(
-				ValidateShaderArtifactCompatibility(
-					vulkan.m_Manifest, vulkanRequest).IsCompatible(),
+				ValidateShaderArtifactCompatibility(vulkan.m_Manifest, vulkanRequest).IsCompatible(),
 				"SPIR-V runtime artifact matches the Vulkan 1.3 compatibility contract");
 
 			ShaderRuntimeArtifactManifest manifest = vulkan.m_Manifest;
 			manifest.m_SchemaVersion = ShaderRuntimeArtifactManifestSchemaVersion + 1;
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::UnsupportedManifestSchema,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::UnsupportedManifestSchema,
 				"Compatibility rejects unsupported Runtime manifest schemas explicitly");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_BindingABIRevision = 2;
 			context.Check(
 				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::BindingABIRevisionMismatch,
+				ShaderArtifactCompatibilityStatus::BindingABIRevisionMismatch,
 				"Compatibility treats Binding ABI revision as a hard boundary");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_CoordinateOptions = ShaderCoordinateOptions::UseDxPositionW;
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::CoordinateOptionsMismatch,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::CoordinateOptionsMismatch,
 				"Compatibility rejects coordinate contract mismatches");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_Stage = ShaderStage::Pixel;
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::ShaderStageMismatch,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::ShaderStageMismatch,
 				"Compatibility rejects shader stage mismatches");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_EntryPoint.clear();
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::InvalidEntryPoint,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::InvalidEntryPoint,
 				"Compatibility rejects incomplete executable shader metadata");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_TargetProfile = ShaderTargetProfile::GGLabDX12;
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::TargetProfileMismatch,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::TargetProfileMismatch,
 				"Compatibility reports target profile mismatches explicitly");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_BinaryFormat = ShaderBinaryFormat::Dxil;
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::BinaryFormatMismatch,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::BinaryFormatMismatch,
 				"Compatibility reports binary format mismatches explicitly");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::TargetEnvironmentMismatch,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::TargetEnvironmentMismatch,
 				"Compatibility reports target environment mismatches explicitly");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_Stage = static_cast<ShaderStage>(0xFFFFFFFFu);
 			context.Check(
-				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::InvalidManifestTarget,
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status == ShaderArtifactCompatibilityStatus::InvalidManifestTarget,
 				"Compatibility rejects unknown manifest target vocabulary");
 
 			ShaderArtifactCompatibilityRequest invalidRequest = vulkanRequest;
 			invalidRequest.m_BindingABIRevision = 0;
 			context.Check(
-				ValidateShaderArtifactCompatibility(
-					vulkan.m_Manifest, invalidRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::InvalidRequest,
+				ValidateShaderArtifactCompatibility(vulkan.m_Manifest, invalidRequest).m_Status == ShaderArtifactCompatibilityStatus::InvalidRequest,
 				"Compatibility rejects internally inconsistent Runtime requests");
 
 			context.Check(
 				ValidateShaderArtifactCompatibility(
-					vulkan.m_Manifest, dxilRequest).m_Status ==
-					ShaderArtifactCompatibilityStatus::TargetProfileMismatch,
+					vulkan.m_Manifest, dxilRequest).m_Status == ShaderArtifactCompatibilityStatus::TargetProfileMismatch,
 				"Compatibility rejects cross-backend artifacts before Runtime use");
 		}
 
@@ -569,7 +506,7 @@ namespace gglab
 			ShaderArtifactLoadResult result = store.LoadArtifact(validRef, request);
 			context.Check(
 				result.IsSuccess() && result.m_Compatibility.IsCompatible() &&
-					result.m_Artifact.m_Manifest.m_ArtifactId == validRef.m_ArtifactId,
+				result.m_Artifact.m_Manifest.m_ArtifactId == validRef.m_ArtifactId,
 				"Store returns only a compatible content-addressed Runtime artifact");
 			context.Check(
 				reader.m_ReadCount == 1 && reader.m_LastRef == validRef,
@@ -589,7 +526,7 @@ namespace gglab
 			result = store.LoadArtifact({}, request);
 			context.Check(
 				result.m_Status == ShaderArtifactLoadStatus::InvalidReference &&
-					reader.m_ReadCount == readsBeforeInvalidRef,
+				reader.m_ReadCount == readsBeforeInvalidRef,
 				"Store rejects invalid ArtifactRefs without consulting storage");
 
 			ShaderArtifactCompatibilityRequest invalidRequest = request;
@@ -597,29 +534,24 @@ namespace gglab
 			const uint32_t readsBeforeInvalidRequest = reader.m_ReadCount;
 			result = store.LoadArtifact(validRef, invalidRequest);
 			context.Check(
-				result.m_Status ==
-					ShaderArtifactLoadStatus::InvalidCompatibilityRequest &&
-					result.m_Compatibility.m_Status ==
-						ShaderArtifactCompatibilityStatus::InvalidRequest &&
-					reader.m_ReadCount == readsBeforeInvalidRequest,
+				result.m_Status == ShaderArtifactLoadStatus::InvalidCompatibilityRequest &&
+				result.m_Compatibility.m_Status == ShaderArtifactCompatibilityStatus::InvalidRequest &&
+				reader.m_ReadCount == readsBeforeInvalidRequest,
 				"Store rejects invalid compatibility requests without consulting storage");
 
 			reader.m_Result = { .m_Status = ShaderArtifactReadStatus::NotFound };
 			context.Check(
-				store.LoadArtifact(validRef, request).m_Status ==
-					ShaderArtifactLoadStatus::NotFound,
+				store.LoadArtifact(validRef, request).m_Status == ShaderArtifactLoadStatus::NotFound,
 				"Store reports a missing runtime artifact explicitly");
 
 			reader.m_Result = { .m_Status = ShaderArtifactReadStatus::IOFailure };
 			context.Check(
-				store.LoadArtifact(validRef, request).m_Status ==
-					ShaderArtifactLoadStatus::ReadFailure,
+				store.LoadArtifact(validRef, request).m_Status == ShaderArtifactLoadStatus::ReadFailure,
 				"Store reports runtime artifact IO failure explicitly");
 
 			reader.m_Result = { .m_Status = ShaderArtifactReadStatus::MalformedArtifact };
 			context.Check(
-				store.LoadArtifact(validRef, request).m_Status ==
-					ShaderArtifactLoadStatus::MalformedArtifact,
+				store.LoadArtifact(validRef, request).m_Status == ShaderArtifactLoadStatus::MalformedArtifact,
 				"Store reports malformed portable manifests explicitly");
 
 			ShaderRuntimeArtifact unsupportedSchema = validArtifact;
@@ -631,8 +563,7 @@ namespace gglab
 			result = store.LoadArtifact(validRef, request);
 			context.Check(
 				result.m_Status == ShaderArtifactLoadStatus::IncompatibleArtifact &&
-					result.m_Compatibility.m_Status ==
-						ShaderArtifactCompatibilityStatus::UnsupportedManifestSchema,
+				result.m_Compatibility.m_Status == ShaderArtifactCompatibilityStatus::UnsupportedManifestSchema,
 				"Store exposes unsupported schemas as structured incompatibility");
 
 			ShaderRuntimeArtifact mismatchedIdentity = validArtifact;
@@ -643,8 +574,7 @@ namespace gglab
 				.m_Artifact = mismatchedIdentity,
 			};
 			context.Check(
-				store.LoadArtifact(validRef, request).m_Status ==
-					ShaderArtifactLoadStatus::ArtifactIdentityMismatch,
+				store.LoadArtifact(validRef, request).m_Status == ShaderArtifactLoadStatus::ArtifactIdentityMismatch,
 				"Store rejects manifests that do not match the requested content address");
 
 			ShaderRuntimeArtifact corruptBytes = validArtifact;
@@ -654,8 +584,7 @@ namespace gglab
 				.m_Artifact = corruptBytes,
 			};
 			context.Check(
-				store.LoadArtifact(validRef, request).m_Status ==
-					ShaderArtifactLoadStatus::BinaryDigestMismatch,
+				store.LoadArtifact(validRef, request).m_Status == ShaderArtifactLoadStatus::BinaryDigestMismatch,
 				"Store hashes the exact returned bytes and rejects binary corruption");
 
 			ShaderRuntimeArtifact invalidDxil = validArtifact;
@@ -667,8 +596,7 @@ namespace gglab
 				.m_Artifact = invalidDxil,
 			};
 			context.Check(
-				store.LoadArtifact(invalidDxilRef, request).m_Status ==
-					ShaderArtifactLoadStatus::InvalidBinary,
+				store.LoadArtifact(invalidDxilRef, request).m_Status == ShaderArtifactLoadStatus::InvalidBinary,
 				"Store rejects digest-valid bytes that are not the declared binary format");
 		}
 
@@ -691,35 +619,21 @@ namespace gglab
 			};
 			const ShaderRuntimeArtifact artifact = MakeDxilArtifact();
 			const ShaderArtifactRef artifactRef = MakeRef(artifact);
-			const std::array entries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = programRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = artifactRef,
-				},
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = contentProgramRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = artifactRef,
-				},
+			const std::array entries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = programRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = artifactRef, },
+				ShaderProgramRegistryEntry{ .m_ProgramRef = contentProgramRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = artifactRef, },
 			};
-			const ShaderProgramRegistryArtifactBuildResult registryBuild =
-				BuildShaderProgramRegistryArtifact(entries);
+			const ShaderProgramRegistryArtifactBuildResult registryBuild = BuildShaderProgramRegistryArtifact(entries);
 			const ShaderProgramRegistryArtifactRef registryRef{
 				.m_RegistryId = registryBuild.m_Artifact.m_RegistryId,
 			};
 
-			const ShaderLooseArtifactPaths artifactPaths =
-				ShaderLooseArtifactLocator(root).GetPaths(artifactRef);
-			const SerializedShaderRuntimeArtifactManifest serializedManifest =
-				SerializeShaderRuntimeArtifactManifest(artifact.m_Manifest);
-			const auto binaryBytes = std::span(
-				static_cast<const std::byte*>(artifact.m_Binary.Data()),
-				artifact.m_Binary.SizeInBytes());
-			const ShaderLooseProgramRegistryArtifactPath registryPath =
-				ShaderLooseProgramRegistryArtifactLocator(root).GetPath(registryRef);
-			const SerializedShaderProgramRegistryArtifact serializedRegistry =
-				SerializeShaderProgramRegistryArtifact(registryBuild.m_Artifact);
+			const ShaderLooseArtifactPaths artifactPaths = ShaderLooseArtifactLocator(root).GetPaths(artifactRef);
+			const SerializedShaderRuntimeArtifactManifest serializedManifest = SerializeShaderRuntimeArtifactManifest(artifact.m_Manifest);
+			const auto binaryBytes = std::span(static_cast<const std::byte*>(artifact.m_Binary.Data()), artifact.m_Binary.SizeInBytes());
+			const ShaderLooseProgramRegistryArtifactPath registryPath = ShaderLooseProgramRegistryArtifactLocator(root).GetPath(registryRef);
+			const SerializedShaderProgramRegistryArtifact serializedRegistry = SerializeShaderProgramRegistryArtifact(registryBuild.m_Artifact);
 			const bool fixturesWritten = registryBuild.IsSuccess() &&
 				WriteBytes(artifactPaths.m_BinaryPath, binaryBytes) &&
 				WriteBytes(artifactPaths.m_ManifestPath, serializedManifest) &&
@@ -733,24 +647,25 @@ namespace gglab
 				});
 				TaskSystem tasks({ .m_WorkerCount = 1 });
 				const auto waitFor = [&tasks](const auto& ready) noexcept
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+					while (!ready() && std::chrono::steady_clock::now() < deadline)
 					{
-						const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-						while (!ready() && std::chrono::steady_clock::now() < deadline)
-						{
-							tasks.PumpCompletions();
-							std::this_thread::yield();
-						}
-						return ready();
-					};
+						tasks.PumpCompletions();
+						std::this_thread::yield();
+					}
+					return ready();
+				};
 				GGLAB_UNUSED(preloadManager.PreloadAsync(tasks, { programRef }));
 				const bool startupReady = waitFor([&]() noexcept
-					{ return !preloadManager.GetPreloadStatus().IsPreparing(); });
+					{
+						return !preloadManager.GetPreloadStatus().IsPreparing();
+					});
 				context.Check(fixturesWritten && startupReady && preloadManager.GetPreloadStatus().IsReady(),
 					"Startup shader preload publishes its artifact request on the completion owner");
 
 				auto cancelled = preloadManager.RequestPreloadAsync(tasks, { contentProgramRef });
-				const bool activationBlocked =
-					preloadManager.ActivateRegistry(registryRef).m_Status == ShaderRegistryActivationStatus::Busy;
+				const bool activationBlocked = preloadManager.ActivateRegistry(registryRef).m_Status == ShaderRegistryActivationStatus::Busy;
 				// Deliberately let the worker finish without pumping its publication callback.
 				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 				while (cancelled.GetStatus().m_CompletedCount != 1 &&
@@ -761,18 +676,21 @@ namespace gglab
 				const bool workerFinished = cancelled.GetStatus().m_CompletedCount == 1;
 				cancelled.Cancel(tasks);
 				const bool cancellationDrained = waitFor([&]() noexcept
-					{ const auto status = tasks.GetStatistics();
-						return status.m_ActiveTasks.empty() && status.m_PendingCompletionCount == 0; });
+					{
+						const auto status = tasks.GetStatistics();
+						return status.m_ActiveTasks.empty() && status.m_PendingCompletionCount == 0;
+					});
 				context.Check(activationBlocked && workerFinished && cancellationDrained &&
 					cancelled.GetStatus().m_Status == TaskStatus::Cancelled &&
 					!preloadManager.GetBytecode(ShaderID{ 1 }).IsValid() &&
 					preloadManager.GetPreloadStatus().IsReady(),
 					"Cancelled content preload never publishes finished worker results or replaces startup readiness");
 
-				auto content = preloadManager.RequestPreloadAsync(
-					tasks, { contentProgramRef, contentProgramRef, programRef });
+				auto content = preloadManager.RequestPreloadAsync(tasks, { contentProgramRef, contentProgramRef, programRef });
 				const bool contentReady = waitFor([&]() noexcept
-					{ return !content.GetStatus().IsPreparing(); });
+					{
+						return !content.GetStatus().IsPreparing();
+					});
 				context.Check(contentReady && content.GetStatus().IsReady() &&
 					content.GetStatus().m_TotalCount == 1 && content.GetStatus().m_CompletedCount == 1 &&
 					preloadManager.GetBytecode(ShaderID{ 1 }).IsValid() &&
@@ -791,7 +709,9 @@ namespace gglab
 				};
 				auto failed = preloadManager.RequestPreloadAsync(tasks, { missingProgram });
 				const bool failureReady = waitFor([&]() noexcept
-					{ return !failed.GetStatus().IsPreparing(); });
+					{
+						return !failed.GetStatus().IsPreparing();
+					});
 				context.Check(failureReady && failed.GetStatus().HasFailed() &&
 					!failed.GetStatus().m_Error.empty() && preloadManager.GetPreloadStatus().IsReady() &&
 					preloadManager.ActivateRegistry(registryRef).IsSuccess(),
@@ -802,7 +722,7 @@ namespace gglab
 				.m_ActiveBackend = RHIBackendType::DX12,
 				.m_ArtifactRoot = root,
 				.m_ActiveRegistry = registryRef,
-				});
+			});
 			const ShaderID shaderId = manager.LoadProgram(programRef);
 			context.Check(fixturesWritten && manager.IsReady() && shaderId.IsValid() &&
 				manager.GetBytecode(shaderId).m_Format == ShaderBinaryFormat::Dxil &&
@@ -810,20 +730,14 @@ namespace gglab
 				manager.ResolveArtifact(programRef) == artifactRef,
 				"ShaderManager loads a program using only an injected registry and artifact root");
 
-			const SerializedActiveShaderProgramRegistry serializedActive =
-				SerializeActiveShaderProgramRegistry(registryRef);
-			const std::optional<ShaderProgramRegistryArtifactRef> decodedActive =
-				DeserializeActiveShaderProgramRegistry(serializedActive);
-			const std::filesystem::path activePath =
-				ShaderLooseActiveProgramRegistryLocator(
-					root, ShaderTargetProfile::GGLabDX12).GetPath();
+			const SerializedActiveShaderProgramRegistry serializedActive = SerializeActiveShaderProgramRegistry(registryRef);
+			const std::optional<ShaderProgramRegistryArtifactRef> decodedActive = DeserializeActiveShaderProgramRegistry(serializedActive);
+			const std::filesystem::path activePath = ShaderLooseActiveProgramRegistryLocator(root, ShaderTargetProfile::GGLabDX12).GetPath();
 			context.Check(decodedActive == registryRef &&
 				WriteBytes(activePath, serializedActive) &&
 				ShaderLooseActiveProgramRegistryReader(
-					ShaderLooseActiveProgramRegistryLocator(
-						root, ShaderTargetProfile::GGLabDX12)).Read().m_RegistryRef == registryRef &&
-				activePath != ShaderLooseActiveProgramRegistryLocator(
-					root, ShaderTargetProfile::GGLabVulkan13).GetPath(),
+					ShaderLooseActiveProgramRegistryLocator(root, ShaderTargetProfile::GGLabDX12)).Read().m_RegistryRef == registryRef &&
+				activePath != ShaderLooseActiveProgramRegistryLocator(root, ShaderTargetProfile::GGLabVulkan13).GetPath(),
 				"Active Program Registry record round-trips one target-scoped immutable RegistryRef");
 
 			auto malformedActive = serializedActive;
@@ -835,20 +749,15 @@ namespace gglab
 			static_cast<std::byte*>(changedArtifact.m_Binary.Data())[19] = std::byte{ 7 };
 			RefreshArtifactIdentity(changedArtifact);
 			const ShaderArtifactRef changedArtifactRef = MakeRef(changedArtifact);
-			const std::array changedEntries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = programRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = changedArtifactRef,
-				},
+			const std::array changedEntries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = programRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = changedArtifactRef, },
 			};
-			const ShaderProgramRegistryArtifactBuildResult changedRegistryBuild =
-				BuildShaderProgramRegistryArtifact(changedEntries);
+			const ShaderProgramRegistryArtifactBuildResult changedRegistryBuild = BuildShaderProgramRegistryArtifact(changedEntries);
 			const ShaderProgramRegistryArtifactRef changedRegistryRef{
 				.m_RegistryId = changedRegistryBuild.m_Artifact.m_RegistryId,
 			};
-			const ShaderLooseArtifactPaths changedArtifactPaths =
-				ShaderLooseArtifactLocator(root).GetPaths(changedArtifactRef);
+			const ShaderLooseArtifactPaths changedArtifactPaths = ShaderLooseArtifactLocator(root).GetPaths(changedArtifactRef);
 			const auto changedBinaryBytes = std::span(
 				static_cast<const std::byte*>(changedArtifact.m_Binary.Data()),
 				changedArtifact.m_Binary.SizeInBytes());
@@ -856,13 +765,10 @@ namespace gglab
 				ShaderLooseProgramRegistryArtifactLocator(root).GetPath(changedRegistryRef);
 			const bool changedFixturesWritten = changedRegistryBuild.IsSuccess() &&
 				WriteBytes(changedArtifactPaths.m_BinaryPath, changedBinaryBytes) &&
-				WriteBytes(changedArtifactPaths.m_ManifestPath,
-					SerializeShaderRuntimeArtifactManifest(changedArtifact.m_Manifest)) &&
-				WriteBytes(changedRegistryPath.m_Path,
-					SerializeShaderProgramRegistryArtifact(changedRegistryBuild.m_Artifact));
+				WriteBytes(changedArtifactPaths.m_ManifestPath, SerializeShaderRuntimeArtifactManifest(changedArtifact.m_Manifest)) &&
+				WriteBytes(changedRegistryPath.m_Path, SerializeShaderProgramRegistryArtifact(changedRegistryBuild.m_Artifact));
 			const uint64_t generationBeforeActivation = manager.GetGeneration(shaderId);
-			const ShaderRegistryActivationResult activation =
-				manager.ActivateRegistry(changedRegistryRef);
+			const ShaderRegistryActivationResult activation = manager.ActivateRegistry(changedRegistryRef);
 			context.Check(changedFixturesWritten && activation.IsSuccess() &&
 				activation.m_ChangedShaderCount == 1 &&
 				manager.GetActiveRegistryRef() == changedRegistryRef &&
@@ -872,15 +778,11 @@ namespace gglab
 
 			ShaderArtifactRef missingArtifactRef = changedArtifactRef;
 			missingArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[0] ^= std::byte{ 1 };
-			const std::array missingArtifactEntries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = programRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = missingArtifactRef,
-				},
+			const std::array missingArtifactEntries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = programRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = missingArtifactRef, },
 			};
-			const ShaderProgramRegistryArtifactBuildResult missingArtifactRegistryBuild =
-				BuildShaderProgramRegistryArtifact(missingArtifactEntries);
+			const ShaderProgramRegistryArtifactBuildResult missingArtifactRegistryBuild = BuildShaderProgramRegistryArtifact(missingArtifactEntries);
 			const ShaderProgramRegistryArtifactRef missingArtifactRegistryRef{
 				.m_RegistryId = missingArtifactRegistryBuild.m_Artifact.m_RegistryId,
 			};
@@ -889,10 +791,8 @@ namespace gglab
 			const bool missingRegistryWritten = WriteBytes(missingArtifactRegistryPath.m_Path,
 				SerializeShaderProgramRegistryArtifact(missingArtifactRegistryBuild.m_Artifact));
 			const uint64_t generationBeforeFailure = manager.GetGeneration(shaderId);
-			const ShaderRegistryActivationResult rejected =
-				manager.ActivateRegistry(missingArtifactRegistryRef);
-			context.Check(missingRegistryWritten && rejected.m_Status ==
-					ShaderRegistryActivationStatus::ArtifactLoadFailure &&
+			const ShaderRegistryActivationResult rejected = manager.ActivateRegistry(missingArtifactRegistryRef);
+			context.Check(missingRegistryWritten && rejected.m_Status == ShaderRegistryActivationStatus::ArtifactLoadFailure &&
 				manager.GetActiveRegistryRef() == changedRegistryRef &&
 				manager.ResolveArtifact(programRef) == changedArtifactRef &&
 				manager.GetGeneration(shaderId) == generationBeforeFailure,
@@ -902,7 +802,7 @@ namespace gglab
 				.m_ActiveBackend = RHIBackendType::Vulkan,
 				.m_ArtifactRoot = root,
 				.m_ActiveRegistry = registryRef,
-				});
+			});
 			context.Check(wrongBackendManager.IsReady() &&
 				!wrongBackendManager.LoadProgram(programRef).IsValid() &&
 				!wrongBackendManager.ResolveArtifact(programRef).has_value(),
@@ -914,10 +814,9 @@ namespace gglab
 				.m_ActiveBackend = RHIBackendType::DX12,
 				.m_ArtifactRoot = root,
 				.m_ActiveRegistry = missingRegistryRef,
-				});
+			});
 			context.Check(!missingRegistryManager.IsReady() &&
-				missingRegistryManager.GetInitializeStatus() ==
-					ShaderManagerInitializeStatus::RegistryNotFound,
+				missingRegistryManager.GetInitializeStatus() == ShaderManagerInitializeStatus::RegistryNotFound,
 				"ShaderManager reports a missing injected registry without consulting source or compiler state");
 
 			std::filesystem::remove_all(root, errorCode);
@@ -949,27 +848,15 @@ namespace gglab
 			const ShaderRuntimeArtifact graphicsA = MakeDxilArtifact(ShaderStage::Vertex, 1);
 			const ShaderRuntimeArtifact graphicsB = MakeDxilArtifact(ShaderStage::Vertex, 2);
 			const ShaderRuntimeArtifact compute = MakeDxilArtifact(ShaderStage::Compute, 3);
-			const std::array initialEntries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = graphicsARef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = MakeRef(graphicsA),
-				},
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = graphicsBRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = MakeRef(graphicsB),
-				},
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = computeRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = MakeRef(compute),
-				},
+			const std::array initialEntries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = graphicsARef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = MakeRef(graphicsA), },
+				ShaderProgramRegistryEntry{ .m_ProgramRef = graphicsBRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = MakeRef(graphicsB), },
+				ShaderProgramRegistryEntry{ .m_ProgramRef = computeRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = MakeRef(compute), },
 			};
 			const bool initialArtifactsWritten = WriteArtifactFixture(root, graphicsA) &&
 				WriteArtifactFixture(root, graphicsB) && WriteArtifactFixture(root, compute);
-			const std::optional<ShaderProgramRegistryArtifactRef> initialRegistry =
-				WriteRegistryFixture(root, initialEntries);
+			const std::optional<ShaderProgramRegistryArtifactRef> initialRegistry = WriteRegistryFixture(root, initialEntries);
 			if (!initialArtifactsWritten || !initialRegistry)
 			{
 				context.Check(false,
@@ -1010,51 +897,38 @@ namespace gglab
 			const RenderPassInfo graphicsBUsage{ .m_TypeName = "PipelineLocal.GraphicsB" };
 			const RenderPassInfo computeUsage{ .m_TypeName = "PipelineLocal.Compute" };
 
-			const RHIPipelineHandle initialGraphicsA =
-				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage);
-			const RHIPipelineHandle initialGraphicsB =
-				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage);
-			const RHIPipelineHandle initialCompute =
-				pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage);
+			const RHIPipelineHandle initialGraphicsA = pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage);
+			const RHIPipelineHandle initialGraphicsB = pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage);
+			const RHIPipelineHandle initialCompute = pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage);
 			context.Check(manager.IsReady() && graphicsAId.IsValid() && graphicsBId.IsValid() &&
 				computeId.IsValid() && initialGraphicsA.IsValid() && initialGraphicsB.IsValid() &&
 				initialCompute.IsValid() && pipelineSystem.m_GraphicsCreateCount == 2 &&
 				pipelineSystem.m_ComputeCreateCount == 1,
 				"Pipeline slots initially resolve one physical pipeline per logical dependency set");
 			context.Check(
-				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage) ==
-					initialGraphicsA &&
-				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage) ==
-					initialGraphicsB &&
+				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage) == initialGraphicsA &&
+				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage) == initialGraphicsB &&
 				pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage) == initialCompute &&
 				pipelineSystem.m_GraphicsCreateCount == 2 &&
 				pipelineSystem.m_ComputeCreateCount == 1,
 				"Unchanged shader dependency identities preserve graphics and compute cache hits");
 
-			const ShaderRuntimeArtifact changedGraphicsA =
-				MakeDxilArtifact(ShaderStage::Vertex, 4);
-			const std::array graphicsChangedEntries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = graphicsARef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = MakeRef(changedGraphicsA),
-				},
+			const ShaderRuntimeArtifact changedGraphicsA = MakeDxilArtifact(ShaderStage::Vertex, 4);
+			const std::array graphicsChangedEntries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = graphicsARef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = MakeRef(changedGraphicsA), },
 				initialEntries[1],
 				initialEntries[2],
 			};
-			const std::optional<ShaderProgramRegistryArtifactRef> graphicsChangedRegistry =
-				WriteRegistryFixture(root, graphicsChangedEntries);
+			const std::optional<ShaderProgramRegistryArtifactRef> graphicsChangedRegistry = WriteRegistryFixture(root, graphicsChangedEntries);
 			const bool graphicsChangePublished = WriteArtifactFixture(root, changedGraphicsA) &&
 				graphicsChangedRegistry.has_value();
-			const ShaderRegistryActivationResult graphicsActivation = graphicsChangedRegistry
-				? manager.ActivateRegistry(*graphicsChangedRegistry)
-				: ShaderRegistryActivationResult{};
-			const RHIPipelineHandle unchangedGraphicsB =
-				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage);
-			const RHIPipelineHandle unchangedCompute =
-				pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage);
-			const RHIPipelineHandle rebuiltGraphicsA =
-				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage);
+			const ShaderRegistryActivationResult graphicsActivation = graphicsChangedRegistry ?
+				manager.ActivateRegistry(*graphicsChangedRegistry) :
+				ShaderRegistryActivationResult{};
+			const RHIPipelineHandle unchangedGraphicsB = pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage);
+			const RHIPipelineHandle unchangedCompute = pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage);
+			const RHIPipelineHandle rebuiltGraphicsA = pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage);
 			context.Check(graphicsChangePublished && graphicsActivation.IsSuccess() &&
 				graphicsActivation.m_ChangedShaderCount == 1 &&
 				unchangedGraphicsB == initialGraphicsB && unchangedCompute == initialCompute &&
@@ -1065,54 +939,40 @@ namespace gglab
 
 			ShaderArtifactRef missingGraphicsB = MakeRef(graphicsB);
 			missingGraphicsB.m_ArtifactId.m_DurableDigest.m_Value[0] ^= std::byte{ 1 };
-			const std::array rejectedEntries{
+			const std::array rejectedEntries
+			{
 				graphicsChangedEntries[0],
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = graphicsBRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = missingGraphicsB,
-				},
+				ShaderProgramRegistryEntry{ .m_ProgramRef = graphicsBRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = missingGraphicsB, },
 				graphicsChangedEntries[2],
 			};
-			const std::optional<ShaderProgramRegistryArtifactRef> rejectedRegistry =
-				WriteRegistryFixture(root, rejectedEntries);
-			const ShaderRegistryActivationResult rejectedActivation = rejectedRegistry
-				? manager.ActivateRegistry(*rejectedRegistry)
-				: ShaderRegistryActivationResult{};
+			const std::optional<ShaderProgramRegistryArtifactRef> rejectedRegistry = WriteRegistryFixture(root, rejectedEntries);
+			const ShaderRegistryActivationResult rejectedActivation = rejectedRegistry ?
+				manager.ActivateRegistry(*rejectedRegistry) :
+				ShaderRegistryActivationResult{};
 			context.Check(rejectedRegistry.has_value() && !rejectedActivation.IsSuccess() &&
-				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage) ==
-					rebuiltGraphicsA &&
-				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage) ==
-					initialGraphicsB &&
+				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage) == rebuiltGraphicsA &&
+				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage) == initialGraphicsB &&
 				pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage) == initialCompute &&
 				pipelineSystem.m_GraphicsCreateCount == 3 &&
 				pipelineSystem.m_ComputeCreateCount == 1,
 				"Rejected registry activation preserves every pipeline dependency cache hit");
 
-			const ShaderRuntimeArtifact changedCompute =
-				MakeDxilArtifact(ShaderStage::Compute, 5);
-			const std::array computeChangedEntries{
+			const ShaderRuntimeArtifact changedCompute = MakeDxilArtifact(ShaderStage::Compute, 5);
+			const std::array computeChangedEntries
+			{
 				graphicsChangedEntries[0],
 				graphicsChangedEntries[1],
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = computeRef,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = MakeRef(changedCompute),
-				},
+				ShaderProgramRegistryEntry{ .m_ProgramRef = computeRef, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = MakeRef(changedCompute), },
 			};
-			const std::optional<ShaderProgramRegistryArtifactRef> computeChangedRegistry =
-				WriteRegistryFixture(root, computeChangedEntries);
+			const std::optional<ShaderProgramRegistryArtifactRef> computeChangedRegistry = WriteRegistryFixture(root, computeChangedEntries);
 			const bool computeChangePublished = WriteArtifactFixture(root, changedCompute) &&
 				computeChangedRegistry.has_value();
-			const ShaderRegistryActivationResult computeActivation = computeChangedRegistry
-				? manager.ActivateRegistry(*computeChangedRegistry)
-				: ShaderRegistryActivationResult{};
-			const RHIPipelineHandle stillUnchangedGraphicsA =
-				pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage);
-			const RHIPipelineHandle stillUnchangedGraphicsB =
-				pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage);
-			const RHIPipelineHandle rebuiltCompute =
-				pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage);
+			const ShaderRegistryActivationResult computeActivation = computeChangedRegistry ?
+				manager.ActivateRegistry(*computeChangedRegistry) :
+				ShaderRegistryActivationResult{};
+			const RHIPipelineHandle stillUnchangedGraphicsA = pipelineCache.Resolve(graphicsASlot, graphicsAKey, graphicsAUsage);
+			const RHIPipelineHandle stillUnchangedGraphicsB = pipelineCache.Resolve(graphicsBSlot, graphicsBKey, graphicsBUsage);
+			const RHIPipelineHandle rebuiltCompute = pipelineCache.Resolve(computeSlot, computeRecipe, computeUsage);
 			context.Check(computeChangePublished && computeActivation.IsSuccess() &&
 				computeActivation.m_ChangedShaderCount == 1 &&
 				stillUnchangedGraphicsA == rebuiltGraphicsA &&

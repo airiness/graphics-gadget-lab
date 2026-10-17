@@ -240,16 +240,17 @@ namespace gglab
 	{
 		// Owned textures are created in the reusable COMMON layout. Logical Undefined is lowered
 		// to UNDEFINED only when a first-use barrier discards the previous pooled contents.
-		return layout == RHILayout::Undefined ? D3D12_BARRIER_LAYOUT_COMMON
-			: ToD3D12BarrierLayout(layout);
+		return layout == RHILayout::Undefined ?
+			D3D12_BARRIER_LAYOUT_COMMON :
+			ToD3D12BarrierLayout(layout);
 	}
 
 	D3D12_TEXTURE_BARRIER BuildD3D12TextureBarrier(const RHITextureBarrier& barrier,
 		ID3D12Resource* resource, const D3D12_RESOURCE_DESC& resourceDesc) noexcept
 	{
-		const D3D12_TEXTURE_BARRIER_FLAGS flags = barrier.m_Before == UndefinedRHITextureState()
-			? D3D12_TEXTURE_BARRIER_FLAG_DISCARD
-			: D3D12_TEXTURE_BARRIER_FLAG_NONE;
+		const D3D12_TEXTURE_BARRIER_FLAGS flags = barrier.m_Before == UndefinedRHITextureState() ?
+			D3D12_TEXTURE_BARRIER_FLAG_DISCARD :
+			D3D12_TEXTURE_BARRIER_FLAG_NONE;
 		return CD3DX12_TEXTURE_BARRIER(ToD3D12BarrierSync(barrier.m_Before.m_Stages),
 			ToD3D12BarrierSync(barrier.m_After.m_Stages),
 			ToD3D12BarrierAccess(barrier.m_Before.m_Access),

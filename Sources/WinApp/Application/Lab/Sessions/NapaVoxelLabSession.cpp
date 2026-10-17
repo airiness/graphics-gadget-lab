@@ -588,9 +588,9 @@ namespace gglab
 			}
 			if (input.IsKeyPressed(AppInputKey::M))
 			{
-				m_SurfaceMode = m_SurfaceMode == NapaVoxelSurfaceMode::Shaded
-					? NapaVoxelSurfaceMode::Wireframe
-					: NapaVoxelSurfaceMode::Shaded;
+				m_SurfaceMode = m_SurfaceMode == NapaVoxelSurfaceMode::Shaded ?
+					NapaVoxelSurfaceMode::Wireframe :
+					NapaVoxelSurfaceMode::Shaded;
 				GGLAB_UNUSED(GetMutableParameters().Set(
 					SurfaceModeId, static_cast<int32_t>(m_SurfaceMode)));
 				if (m_FrameSource)
@@ -883,9 +883,9 @@ namespace gglab
 		const auto& bounds = m_CurrentConfig.m_LogicalCellBounds;
 		const int32_t chunkCells = static_cast<int32_t>(m_CurrentConfig.m_ChunkCellCount);
 		const int32_t spanX = bounds.m_MaxExclusive.m_X - bounds.m_Min.m_X;
-		const double boundaryX = static_cast<double>(spanX > chunkCells
-			? bounds.m_Min.m_X + chunkCells
-			: bounds.m_Min.m_X + spanX / 2);
+		const double boundaryX = static_cast<double>(spanX > chunkCells ?
+			bounds.m_Min.m_X + chunkCells :
+			bounds.m_Min.m_X + spanX / 2);
 		const double centerY = static_cast<double>(
 			bounds.m_Min.m_Y + (bounds.m_MaxExclusive.m_Y - bounds.m_Min.m_Y) / 2);
 		const double centerZ = static_cast<double>(
@@ -911,9 +911,9 @@ namespace gglab
 	{
 		m_RuntimeState = NapaVoxelRuntimeState::Failed;
 		m_CommandQueue.Freeze(m_CommandQueue.GetTerminalError() ==
-			NapaVoxelCommandQueueError::PublicationSerialExhausted
-			? NapaVoxelCommandQueueError::PublicationSerialExhausted
-			: NapaVoxelCommandQueueError::HostPreparationFailed);
+			NapaVoxelCommandQueueError::PublicationSerialExhausted ?
+				NapaVoxelCommandQueueError::PublicationSerialExhausted :
+				NapaVoxelCommandQueueError::HostPreparationFailed);
 	}
 
 	void NapaVoxelLabSession::PublishVisibleDebugState() noexcept
@@ -1228,112 +1228,113 @@ namespace gglab
 		LogicalDomainMetrics metrics{};
 		const bool configValid = ComputeLogicalDomainMetrics(m_CurrentConfig, metrics).Succeeded();
 		const bool visible = m_PublicationSession && m_PublicationSession->HasVisibleMeshes();
-		const WorldMeshValidationResult meshValidation = visible
-			? m_PublicationSession->GetVisibleCoreMeshes().GetWorldMeshValidation()
-			: WorldMeshValidationResult{};
-		const BoundaryContourValidationResult boundaryValidation = visible
-			? m_PublicationSession->GetVisibleCoreMeshes().GetBoundaryValidation()
-			: BoundaryContourValidationResult{};
-		const GGLabMeshPublicationIdentity pendingIdentity = m_PublicationSession
-			? m_PublicationSession->GetPendingIdentity()
-			: GGLabMeshPublicationIdentity{};
-		const auto* damageSnapshot = m_PublicationSession
-			? m_PublicationSession->GetVisibleDamageSnapshot()
-			: nullptr;
+		const WorldMeshValidationResult meshValidation = visible ?
+			m_PublicationSession->GetVisibleCoreMeshes().GetWorldMeshValidation() :
+			WorldMeshValidationResult{};
+		const BoundaryContourValidationResult boundaryValidation = visible ?
+			m_PublicationSession->GetVisibleCoreMeshes().GetBoundaryValidation() :
+			BoundaryContourValidationResult{};
+		const GGLabMeshPublicationIdentity pendingIdentity = m_PublicationSession ?
+			m_PublicationSession->GetPendingIdentity() :
+			GGLabMeshPublicationIdentity{};
+		const auto* damageSnapshot = m_PublicationSession ?
+			m_PublicationSession->GetVisibleDamageSnapshot() :
+			nullptr;
 
 		diagnostics.m_Title = "Napa Voxel Interactive Destruction";
 		diagnostics.m_Metrics = {
-			{.m_Name = "Preset", .m_Value = m_PresetName },
-			{.m_Name = "Config",
+			{ .m_Name = "Preset", .m_Value = m_PresetName },
+			{ .m_Name = "Config",
 				.m_Value = std::format("{} cells/chunk, {:.3f} m voxel, {:.2f} surface band",
 					m_CurrentConfig.m_ChunkCellCount, m_CurrentConfig.m_VoxelSize,
 					m_CurrentConfig.m_SurfaceBandVoxels) },
-			{.m_Name = "Logical domain",
-				.m_Value = configValid
-					? std::format("{} cells, {} samples", metrics.m_TotalCellCount,
-						metrics.m_TotalSampleCount)
-					: "invalid" },
-			{.m_Name = "Resident / meshed chunks",
-				.m_Value = std::format("{} / {}", m_VoxelWorld
-					? m_VoxelWorld->GetResidentChunkCount()
-					: 0, meshValidation.m_ChunkCount) },
-			{.m_Name = "World / visible revision",
-				.m_Value = std::format("{} / {}", m_VoxelWorld
-					? m_VoxelWorld->GetWorldVoxelRevision()
-					: 0, m_PublicationSession
-					? m_PublicationSession->GetVisibleWorldRevision()
-					: 0) },
-			{.m_Name = "Voxel / mesh hash",
+			{ .m_Name = "Logical domain",
+				.m_Value = configValid ?
+					std::format("{} cells, {} samples", metrics.m_TotalCellCount,
+						metrics.m_TotalSampleCount) :
+					"invalid" },
+			{ .m_Name = "Resident / meshed chunks",
+				.m_Value = std::format("{} / {}", m_VoxelWorld ?
+					m_VoxelWorld->GetResidentChunkCount() :
+					0, meshValidation.m_ChunkCount) },
+			{ .m_Name = "World / visible revision",
+				.m_Value = std::format("{} / {}", m_VoxelWorld ?
+					m_VoxelWorld->GetWorldVoxelRevision() :
+					0, m_PublicationSession ?
+						m_PublicationSession->GetVisibleWorldRevision() :
+						0) },
+			{ .m_Name = "Voxel / mesh hash",
 				.m_Value = std::format("{:016X} / {:016X}", m_AuthoritativeVoxelHash,
 					meshValidation.m_ValidationHash) },
-			{.m_Name = "Geometry",
+			{ .m_Name = "Geometry",
 				.m_Value = std::format("{} vertices, {} indices, {} sections",
 					meshValidation.m_VertexCount, meshValidation.m_IndexCount,
 					meshValidation.m_SectionCount) },
-			{.m_Name = "Runtime",
+			{ .m_Name = "Runtime",
 				.m_Value = std::format("{}, queue {}, operation {}", GetRuntimeStateName(m_RuntimeState),
 					m_CommandQueue.GetSize(), m_ActiveOperationSerial) },
-			{.m_Name = "Pending publication",
-				.m_Value = pendingIdentity.m_PublicationSerial != 0
-					? std::format("base {} -> target {}, serial {}",
+			{ .m_Name = "Pending publication",
+				.m_Value = pendingIdentity.m_PublicationSerial != 0 ?
+					std::format("base {} -> target {}, serial {}",
 						m_PendingMutation.m_BaseWorldVoxelRevision,
 						m_PendingMutation.m_TargetWorldVoxelRevision,
-						pendingIdentity.m_PublicationSerial)
-					: "none" },
-			{.m_Name = "Dirty chunks",
+						pendingIdentity.m_PublicationSerial) :
+					"none" },
+			{ .m_Name = "Dirty chunks",
 				.m_Value = std::format("data {}, mesh {}",
 					m_VisibleDebugMutation.m_DataDirtyChunks.size(),
 					m_VisibleDebugMutation.m_MeshDirtyChunks.size()) },
-			{.m_Name = "Damage markers",
-				.m_Value = damageSnapshot
-					? std::format("{} visible / {} total{}", damageSnapshot->m_Markers.size(),
+			{ .m_Name = "Damage markers",
+				.m_Value = damageSnapshot ?
+					std::format("{} visible / {} total{}", damageSnapshot->m_Markers.size(),
 						damageSnapshot->m_TotalDamagedSampleCount,
-						damageSnapshot->m_Truncated ? " (truncated)" : "")
-					: "unavailable" },
-			{.m_Name = "Timing",
+						damageSnapshot->m_Truncated ? " (truncated)" : "") :
+					"unavailable" },
+			{ .m_Name = "Timing",
 				.m_Value = std::format("generation {:.3f} ms, edit {:.3f} ms, mesh {:.3f} ms",
 					m_LastGenerationMilliseconds, m_LastEditMilliseconds,
 					m_LastMeshingMilliseconds) },
-			{.m_Name = "Publication",
+			{ .m_Name = "Publication",
 				.m_Value = std::format("visible serial {}, retired sets {}",
 					m_PublicationSession ? m_PublicationSession->GetLastPublicationSerial() : 0,
-					m_PublicationSession
-						? m_PublicationSession->GetRetiredGpuMeshSetCount()
-						: 0) },
-			{.m_Name = "Surface mode", .m_Value = GetSurfaceModeName(m_SurfaceMode) },
+					m_PublicationSession ?
+						m_PublicationSession->GetRetiredGpuMeshSetCount() :
+						0) },
+			{ .m_Name = "Surface mode", .m_Value = GetSurfaceModeName(m_SurfaceMode) },
 		};
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "Atomic CPU/GPU publication",
-				.m_Status = visible ? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+				.m_Status = visible ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Core and GPU frame views become visible together after Copy Fence completion.",
 			},
 			{
 				.m_Name = "Complete chunk domain",
 				.m_Status = visible && configValid &&
-					meshValidation.m_ChunkCount == metrics.m_CellOwnerChunkCount
-					? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+					meshValidation.m_ChunkCount == metrics.m_CellOwnerChunkCount ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Visible records include every Cell-owner Chunk, including empty meshes.",
 			},
 			{
 				.m_Name = "Boundary contour validation",
 				.m_Status = visible &&
-					boundaryValidation.m_ChunkRecordCount == meshValidation.m_ChunkCount
-					? LabDiagnosticCheckStatus::Passed
-					: LabDiagnosticCheckStatus::Pending,
+					boundaryValidation.m_ChunkRecordCount == meshValidation.m_ChunkCount ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Adjacent chunk contours satisfy the deterministic seam contract.",
 			},
 			{
 				.m_Name = "Authoritative / visible coherence",
 				.m_Status = visible && m_RuntimeState == NapaVoxelRuntimeState::Ready &&
 					m_VoxelWorld->GetWorldVoxelRevision() ==
-					m_PublicationSession->GetVisibleWorldRevision()
-					? LabDiagnosticCheckStatus::Passed
-					: m_RuntimeState == NapaVoxelRuntimeState::Failed
-						? LabDiagnosticCheckStatus::Failed
-						: LabDiagnosticCheckStatus::Pending,
+					m_PublicationSession->GetVisibleWorldRevision() ?
+						LabDiagnosticCheckStatus::Passed :
+						m_RuntimeState == NapaVoxelRuntimeState::Failed ?
+							LabDiagnosticCheckStatus::Failed :
+							LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Visible CPU, GPU, and debug snapshots publish one complete revision.",
 			},
 		};

@@ -7,7 +7,7 @@
 namespace gglab
 {
 	class DevelopGuiWin32PlatformBackend final : public DevelopGuiPlatformBackend,
-												 public Win32MessageHandler
+		public Win32MessageHandler
 	{
 	public:
 		DevelopGuiWin32PlatformBackend() noexcept = default;

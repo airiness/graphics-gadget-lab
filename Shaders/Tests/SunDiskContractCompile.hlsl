@@ -9,7 +9,8 @@ float3 ReferenceSunDiskSpecular(float3 centerDirection, float3 N, float3 V, floa
 	const float sineRadius = sin(angularRadius);
 	const float sineRadiusSquared = sineRadius * sineRadius;
 	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
-		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+		float3(0.0, 1.0, 0.0) :
+		float3(1.0, 0.0, 0.0);
 	const float3 tangent = normalize(cross(referenceAxis, centerDirection));
 	const float3 bitangent = cross(centerDirection, tangent);
 	const float NoV = saturate(dot(N, V));
@@ -39,7 +40,8 @@ float3 ReferenceSunDiskAnisotropicSpecular(float3 centerDirection, float3 N, flo
 	const float sineRadius = sin(angularRadius);
 	const float sineRadiusSquared = sineRadius * sineRadius;
 	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
-		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+		float3(0.0, 1.0, 0.0) :
+		float3(1.0, 0.0, 0.0);
 	const float3 tangent = normalize(cross(referenceAxis, centerDirection));
 	const float3 bitangent = cross(centerDirection, tangent);
 	float3 integrated = 0.0.xxx;
@@ -114,9 +116,9 @@ float3 ReferenceDirectMaterialResponse(float3 L, float3 V, float3 N,
 	float3 response = (diffuse + specular) * NoL;
 	if (worldSun && (anisotropy.Strength > 0.0 ? anisotropy.AlphaB : brdfAlpha) < 0.04)
 	{
-		const float3 diskSpecular = anisotropy.Strength > 0.0
-			? ReferenceSunDiskAnisotropicSpecular(L, N, V, F0, anisotropy, angularRadius)
-			: ReferenceSunDiskSpecular(L, N, V, F0, brdfAlpha, angularRadius);
+		const float3 diskSpecular = anisotropy.Strength > 0.0 ?
+			ReferenceSunDiskAnisotropicSpecular(L, N, V, F0, anisotropy, angularRadius) :
+			ReferenceSunDiskSpecular(L, N, V, F0, brdfAlpha, angularRadius);
 		response = diffuse * NoL + diskSpecular * energyCompensation;
 	}
 	if (coat.Factor > 0.0)
@@ -219,7 +221,7 @@ float4 PSMain() : SV_Target
 	const float3 compensation = float3(1.1, 1.3, 1.8);
 	const float3 reference = ReferenceDirectMaterialResponse(L, V, N, NoV, NoL,
 		coatNoL, F0, brdfAlpha, diffuse, compensation, anisotropy, coat, worldSun, angularRadius);
-	PreparedMaterialShading material = (PreparedMaterialShading)0;
+	PreparedMaterialShading material = (PreparedMaterialShading)(0);
 	material.Base.NormalWS = N;
 	material.Base.F0 = F0;
 	material.Base.BRDFAlpha = brdfAlpha;

@@ -295,7 +295,9 @@ namespace gglab
 				frame.m_Timestamps[scope.m_BeginQuery], frame.m_Timestamps[scope.m_EndQuery]);
 			auto sample = std::ranges::find_if(snapshot.m_Samples,
 				[&scope](const GpuProfileSample& candidate)
-				{ return candidate.m_Name == scope.m_Name; });
+				{
+					return candidate.m_Name == scope.m_Name;
+				});
 			if (sample == snapshot.m_Samples.end())
 			{
 				snapshot.m_Samples.push_back({ .m_Name = scope.m_Name });

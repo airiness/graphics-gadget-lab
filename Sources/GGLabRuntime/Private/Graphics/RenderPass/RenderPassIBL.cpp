@@ -30,7 +30,7 @@ namespace gglab
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[renderResRegistry, activeResourcesInitialized, bakeResourcesInitialized,
-				activeGeneration = bakeScheduler->GetBakingStatus().m_ActiveGeneration](
+			activeGeneration = bakeScheduler->GetBakingStatus().m_ActiveGeneration](
 				RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();
@@ -178,15 +178,17 @@ namespace gglab
 		RenderResourceRegistryAccess& registry, RenderTextureIndex texIndex,
 		const char* name, bool initialized, bool bakeTarget) noexcept
 	{
-		const auto* desc = bakeTarget ? registry.GetIBLBakeTextureDesc(texIndex)
-			: registry.GetTextureDesc(texIndex);
+		const auto* desc = bakeTarget ?
+			registry.GetIBLBakeTextureDesc(texIndex) :
+			registry.GetTextureDesc(texIndex);
 		GGLAB_ASSERT_NOT_NULL(desc);
 
 		const RGPersistentTextureImportContract importContract =
 			ResolveRGPersistentTextureImportContract(initialized);
 		return builder.ImportTexture(name,
-			bakeTarget ? registry.GetIBLBakeTextureHandle(texIndex)
-			: registry.GetTextureHandle(texIndex),
+			bakeTarget ?
+				registry.GetIBLBakeTextureHandle(texIndex) :
+				registry.GetTextureHandle(texIndex),
 			*desc, importContract.m_InitialState, importContract.m_InitialContentValidity);
 	}
 

@@ -142,12 +142,18 @@ namespace gglab
 	{
 		switch (state)
 		{
-		case FrameSequenceState::Waiting: return "waiting";
-		case FrameSequenceState::Running: return "running";
-		case FrameSequenceState::Finishing: return "finishing";
-		case FrameSequenceState::Completed: return "completed";
-		case FrameSequenceState::Failed: return "failed";
-		case FrameSequenceState::Cancelled: return "cancelled";
+		case FrameSequenceState::Waiting:
+			return "waiting";
+		case FrameSequenceState::Running:
+			return "running";
+		case FrameSequenceState::Finishing:
+			return "finishing";
+		case FrameSequenceState::Completed:
+			return "completed";
+		case FrameSequenceState::Failed:
+			return "failed";
+		case FrameSequenceState::Cancelled:
+			return "cancelled";
 		}
 		return "unknown";
 	}
@@ -231,9 +237,9 @@ namespace gglab
 			.m_State = FrameSequenceState::Waiting,
 			.m_CameraPathId = m_Request.m_CameraPathId,
 			.m_ReferenceSamples = m_Request.m_ReferenceSamples,
-			.m_GpuTiming = m_Request.m_GpuTiming
-				? std::optional<FrameSequenceGpuTiming>(std::in_place)
-				: std::nullopt,
+			.m_GpuTiming = m_Request.m_GpuTiming ?
+				std::optional<FrameSequenceGpuTiming>(std::in_place) :
+				std::nullopt,
 		};
 		m_Frame = 0;
 		m_Sample = 0;
@@ -264,7 +270,10 @@ namespace gglab
 		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
-		if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->ReleaseCoverage(m_WatchCoverageId); }
+		if (auto* watch = m_Capture->GetNonFiniteWatch())
+		{
+			watch->ReleaseCoverage(m_WatchCoverageId);
+		}
 		m_WatchCoverageId = 0;
 		return true;
 	}
@@ -402,15 +411,15 @@ namespace gglab
 		return FrameSequencePoseRequest{
 			.m_CameraPathId = m_Request.m_CameraPathId,
 			.m_Frame = m_Frame,
-			.m_ReferenceSample = m_Request.m_ReferenceSamples == 0
-				? std::nullopt
-				: std::optional(TemporalReferenceSample{
+			.m_ReferenceSample = m_Request.m_ReferenceSamples == 0 ?
+				std::nullopt :
+				std::optional(TemporalReferenceSample{
 					.m_Index = m_Sample,
 					.m_Count = m_Request.m_ReferenceSamples,
 					.m_TextureLodBias = m_Request.m_ReferenceTextureLodBias,
-					.m_Signal = m_Request.m_DiagnosticTap
-						? TemporalReferenceSignal::AmbientOcclusion
-						: TemporalReferenceSignal::SceneColor,
+					.m_Signal = m_Request.m_DiagnosticTap ?
+						TemporalReferenceSignal::AmbientOcclusion :
+						TemporalReferenceSignal::SceneColor,
 				}),
 			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
 			.m_GTAOOverrides = m_Request.m_GTAOOverrides,
@@ -498,7 +507,10 @@ namespace gglab
 		if (!m_WatchStarted)
 		{
 			m_WatchStarted = true;
-			if (auto* watch = m_Capture->GetNonFiniteWatch()) { m_WatchCoverageId = watch->OpenCoverage(); }
+			if (auto* watch = m_Capture->GetNonFiniteWatch())
+			{
+				m_WatchCoverageId = watch->OpenCoverage();
+			}
 		}
 		m_BegunRenderFrameSerial = state.m_FrameSerial;
 		m_FrameBegun = true;
@@ -526,7 +538,10 @@ namespace gglab
 			Fail("Sequence submission did not match its begun RenderFrame serial.");
 			return;
 		}
-		if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->TrackCoverageFrame(m_WatchCoverageId, renderFrameSerial); }
+		if (auto* watch = m_Capture->GetNonFiniteWatch())
+		{
+			watch->TrackCoverageFrame(m_WatchCoverageId, renderFrameSerial);
+		}
 		if (WantsGpuTiming())
 		{
 			m_PendingGpuTimingFrames.push_back({ .m_RenderFrameSerial = renderFrameSerial,
@@ -544,7 +559,10 @@ namespace gglab
 		if (m_Frame >= m_Status->m_FrameCount)
 		{
 			m_Status->m_State = FrameSequenceState::Finishing;
-			if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->CloseCoverage(m_WatchCoverageId); }
+			if (auto* watch = m_Capture->GetNonFiniteWatch())
+			{
+				watch->CloseCoverage(m_WatchCoverageId);
+			}
 			UpdateWatchCoverage();
 			CompleteIfFinished();
 		}
@@ -573,7 +591,9 @@ namespace gglab
 				};
 			if (!validDuration(profile.m_FrameMilliseconds) ||
 				!std::ranges::all_of(profile.m_Samples, [&validDuration](const GpuProfileSample& sample)
-					{ return validDuration(sample.m_Milliseconds); }))
+					{
+						return validDuration(sample.m_Milliseconds);
+					}))
 			{
 				Fail(std::format("Invalid GPU timing for RenderFrame {} (sequence frame {}, reference sample {}).",
 					pending->m_RenderFrameSerial, pending->m_SequenceFrame, pending->m_ReferenceSample));
@@ -632,8 +652,9 @@ namespace gglab
 			const uint32_t frame =
 				m_CaptureRequestFrames[static_cast<size_t>(std::distance(ids.begin(), id))];
 			Fail(std::format("Capture of sequence frame {} {}: {}", frame,
-				result.m_Status == FrameCaptureRequestStatus::Cancelled ? "was cancelled"
-																		 : "failed",
+				result.m_Status == FrameCaptureRequestStatus::Cancelled ?
+					"was cancelled" :
+					"failed",
 				result.m_Failure));
 		}
 		CompleteIfFinished();
@@ -653,13 +674,19 @@ namespace gglab
 		}
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
-		if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->ReleaseCoverage(m_WatchCoverageId); }
+		if (auto* watch = m_Capture->GetNonFiniteWatch())
+		{
+			watch->ReleaseCoverage(m_WatchCoverageId);
+		}
 		m_WatchCoverageId = 0;
 	}
 
 	void FrameSequenceCoordinator::UpdateWatchCoverage() noexcept
 	{
-		if (!IsActive()) { return; }
+		if (!IsActive())
+		{
+			return;
+		}
 		if (auto* watch = m_Capture->GetNonFiniteWatch())
 		{
 			m_Status->m_WatchCoverage = watch->GetCoverage(m_WatchCoverageId);
@@ -680,7 +707,10 @@ namespace gglab
 			(!m_Status->m_WatchCoverage || m_Status->m_WatchCoverage->m_Complete))
 		{
 			m_Status->m_State = FrameSequenceState::Completed;
-			if (auto* watch = m_Capture->GetNonFiniteWatch()) { watch->ReleaseCoverage(m_WatchCoverageId); }
+			if (auto* watch = m_Capture->GetNonFiniteWatch())
+			{
+				watch->ReleaseCoverage(m_WatchCoverageId);
+			}
 			m_WatchCoverageId = 0;
 		}
 	}

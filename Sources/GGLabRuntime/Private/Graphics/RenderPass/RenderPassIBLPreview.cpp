@@ -66,8 +66,8 @@ namespace gglab
 				const std::string passName = MakeRenderGraphPassName(suffix);
 				rg.AddPass<CubemapPreviewPassData>(
 					passName.c_str(),
-					[services, renderResRegistry, previewType, sourceIndex, previewIndex, layout,
-					sampleMip](RenderGraph::RGBuilder& builder, CubemapPreviewPassData& data)
+					[services, renderResRegistry, previewType, sourceIndex, previewIndex, layout, sampleMip]
+					(RenderGraph::RGBuilder& builder, CubemapPreviewPassData& data)
 					{
 						builder.SideEffect();
 						auto& blackboard = builder.GetBlackboard();
@@ -157,9 +157,9 @@ namespace gglab
 				renderResRegistry->GetTextureDesc(TextureIndex::IBL_EnvironmentCubemap);
 			const uint32_t mipLevels = environmentDesc ? environmentDesc->m_MipLevels : 0;
 			const uint32_t sampleMip =
-				mipLevels > 0
-				? std::min(renderResRegistry->GetIBLEnvironmentPreviewMip(), mipLevels - 1u)
-				: 0u;
+				mipLevels > 0 ?
+					std::min(renderResRegistry->GetIBLEnvironmentPreviewMip(), mipLevels - 1u) :
+					0u;
 			addPreviewPass("EnvironmentCubemap", PreviewType::Environment,
 				TextureIndex::IBL_EnvironmentCubemap, TextureIndex::Preview_IBL_EnvironmentCubemap,
 				renderResRegistry->GetIBLEnvironmentPreviewLayout(), sampleMip);
@@ -178,9 +178,10 @@ namespace gglab
 				renderResRegistry->GetTextureDesc(TextureIndex::IBL_PrefilteredSpecularCubemap);
 			const uint32_t mipLevels = prefilteredDesc ? prefilteredDesc->m_MipLevels : 0;
 			const uint32_t sampleMip =
-				mipLevels > 0 ? std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(),
-					mipLevels - 1u)
-				: 0u;
+				mipLevels > 0 ?
+					std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(),
+						mipLevels - 1u) :
+					0u;
 			addPreviewPass("PrefilteredSpecularCubemap", PreviewType::PrefilteredSpecular,
 				TextureIndex::IBL_PrefilteredSpecularCubemap,
 				TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,

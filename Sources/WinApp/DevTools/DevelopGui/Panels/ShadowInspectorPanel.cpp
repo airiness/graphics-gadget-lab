@@ -172,8 +172,9 @@ namespace gglab
 		{
 			ImGui::SeparatorText("Cascade Diagnostics");
 
-			const auto* snapshot = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() : nullptr;
+			const auto* snapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() :
+				nullptr;
 			if (!snapshot || snapshot->m_Cascades.empty())
 			{
 				ImGui::TextColored(devtools::style::ErrorTextColor,
@@ -282,9 +283,9 @@ namespace gglab
 				context.m_ShadowPreviewControl->RequestShadowPreview();
 			}
 
-			const auto* snapshot = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>()
-				: nullptr;
+			const auto* snapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() :
+				nullptr;
 			if (!snapshot)
 			{
 				ImGui::TextDisabled("Shadow diagnostics snapshot provider is not available.");
@@ -404,8 +405,9 @@ namespace gglab
 	{
 		auto& state = context.PanelState<ShadowInspectorPanelState>();
 
-		const auto light = context.m_DirectionalLight
-			? context.m_DirectionalLight->GetLight() : std::nullopt;
+		const auto light = context.m_DirectionalLight ?
+			context.m_DirectionalLight->GetLight() :
+			std::nullopt;
 		ImGui::Text("Status: %s", light && light->m_ShadowSettings &&
 			light->m_ShadowSettings->m_Enable ? "Enabled" : "Disabled");
 		DrawShadowCapability(context);

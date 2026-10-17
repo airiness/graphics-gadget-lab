@@ -61,9 +61,9 @@ namespace gglab
 		[[nodiscard]] constexpr ShaderTargetProfile GetActiveTargetProfile(
 			RHIBackendType activeBackend) noexcept
 		{
-			return activeBackend == RHIBackendType::Vulkan
-				? ShaderTargetProfile::GGLabVulkan13
-				: ShaderTargetProfile::GGLabDX12;
+			return activeBackend == RHIBackendType::Vulkan ?
+				ShaderTargetProfile::GGLabVulkan13 :
+				ShaderTargetProfile::GGLabDX12;
 		}
 
 		[[nodiscard]] constexpr ShaderArtifactCompatibilityRequest

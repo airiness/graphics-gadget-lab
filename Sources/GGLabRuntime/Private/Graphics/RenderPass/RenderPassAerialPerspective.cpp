@@ -168,11 +168,12 @@ namespace gglab
 		const Vector3 sunDirection = -context.m_RenderScene.m_WorldSun->m_Direction;
 		const auto channel = PostProcessPreviewChannel::Atmosphere;
 		const bool previewRequested = services.m_Resources->IsPostProcessPreviewRequested(channel);
-		const PostProcessDebugTap selectedTap = previewRequested
-			? services.m_Resources->GetPostProcessPreviewSelection(channel).m_Tap
-			: PostProcessDebugTap::Count;
-		const uint32_t diagnosticMode = selectedTap == PostProcessDebugTap::AtmosphereAerialTransmittance
-			? 1u : selectedTap == PostProcessDebugTap::AtmosphereAerialInScattering ? 2u : 0u;
+		const PostProcessDebugTap selectedTap = previewRequested ?
+			services.m_Resources->GetPostProcessPreviewSelection(channel).m_Tap :
+			PostProcessDebugTap::Count;
+		const uint32_t diagnosticMode = selectedTap == PostProcessDebugTap::AtmosphereAerialTransmittance ?
+			1u :
+			selectedTap == PostProcessDebugTap::AtmosphereAerialInScattering ? 2u : 0u;
 		auto& aerial = rg.GetBlackboard().Create<RGAerialPerspectiveResources>(
 			AerialPerspectiveResourcesName);
 		aerial.m_DiagnosticTap = diagnosticMode ? selectedTap : PostProcessDebugTap::Count;
@@ -202,8 +203,8 @@ namespace gglab
 				data.m_ThroughputOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 					resources.m_ThroughputAtlas);
 			},
-			[services, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex,
-				samplerIndex, sunDirection](RGExecuteContext& execute, BuildPassData& data)
+			[services, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
+			(RGExecuteContext& execute, BuildPassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
 				AerialBuildParameters parameters{};
@@ -301,9 +302,8 @@ namespace gglab
 						resources.m_Diagnostic);
 				}
 			},
-			[services, &context, compositePipeline, gridWidth, gridHeight, maxDistanceKm,
-				viewIndex, samplerIndex, diagnosticMode](RGExecuteContext& execute,
-				CompositePassData& data)
+			[services, &context, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
+			(RGExecuteContext& execute, CompositePassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
 				AerialCompositeParameters parameters{};

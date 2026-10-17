@@ -25,7 +25,7 @@ namespace gglab
 			assetManager.m_State->m_AssetResidencyCoordinator.GetDependencyValidationCount();
 		snapshot.m_DependencyValidationMismatchCount =
 			assetManager.m_State->m_AssetResidencyCoordinator
-				.GetDependencyValidationMismatchCount();
+			.GetDependencyValidationMismatchCount();
 		const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
 		snapshot.m_AutomaticResidencyEvictionEnabled = residency.m_Config.m_EnableAutomaticEviction;
 		snapshot.m_ResidencyHighWatermarkBytes = residency.m_Config.m_HighWatermarkBytes;
@@ -192,7 +192,9 @@ namespace gglab
 
 		std::sort(snapshot.m_Models.begin(), snapshot.m_Models.end(),
 			[](const AssetSnapshot::Model& lhs, const AssetSnapshot::Model& rhs)
-			{ return lhs.m_Id.Value() < rhs.m_Id.Value(); });
+			{
+				return lhs.m_Id.Value() < rhs.m_Id.Value();
+			});
 
 		const MeshStore::EntryMap& meshes = assetManager.m_State->m_ModelAssets.MeshEntries();
 		snapshot.m_Meshes.reserve(meshes.size());
@@ -219,7 +221,9 @@ namespace gglab
 		}
 		std::sort(snapshot.m_Meshes.begin(), snapshot.m_Meshes.end(),
 			[](const AssetSnapshot::Mesh& lhs, const AssetSnapshot::Mesh& rhs)
-			{ return lhs.m_Id.Value() < rhs.m_Id.Value(); });
+			{
+				return lhs.m_Id.Value() < rhs.m_Id.Value();
+			});
 
 		const std::vector<TextureAssetReadInfo> textureInfos =
 			assetManager.GetTextureAssetReadInfos();
@@ -260,7 +264,9 @@ namespace gglab
 
 		std::sort(snapshot.m_Textures.begin(), snapshot.m_Textures.end(),
 			[](const AssetSnapshot::Texture& lhs, const AssetSnapshot::Texture& rhs)
-			{ return lhs.m_Id.Value() < rhs.m_Id.Value(); });
+			{
+				return lhs.m_Id.Value() < rhs.m_Id.Value();
+			});
 
 		if (assetManager.m_AssetUploadScheduler)
 		{

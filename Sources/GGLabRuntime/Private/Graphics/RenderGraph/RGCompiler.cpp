@@ -181,9 +181,9 @@ namespace gglab
 				const auto resourceIter = m_ResourceIndices.find(node.m_VirtualResource);
 				AddDiagnostic(RGCompileDiagnosticCode::UndefinedContentRead,
 					"RenderGraph pass reads undefined resource contents. Initialize with Write or import as Defined.",
-					RGPassNodeIndex{ passIndex }, resourceIter != m_ResourceIndices.end()
-					? resourceIter->second
-					: InvalidRGVirtualResourceIndex);
+					RGPassNodeIndex{ passIndex }, resourceIter != m_ResourceIndices.end() ?
+						resourceIter->second :
+						InvalidRGVirtualResourceIndex);
 			}
 		}
 	}
@@ -240,9 +240,9 @@ namespace gglab
 				}
 				compiledPass.m_Accesses.push_back({
 					.m_ResourceNodeIndex = access.m_ResourceNodeIndex,
-					.m_Resource = resourceIter != m_ResourceIndices.end()
-									  ? resourceIter->second
-									  : InvalidRGVirtualResourceIndex,
+					.m_Resource = resourceIter != m_ResourceIndices.end() ?
+						resourceIter->second :
+						InvalidRGVirtualResourceIndex,
 					.m_AccessValue = access.m_AccessValue,
 					.m_Stages = access.m_Stages,
 					.m_ResourceType = access.m_ResourceType,
@@ -270,9 +270,9 @@ namespace gglab
 			RHITextureViewDesc desc = view.m_Desc.value_or(RHITextureViewDesc{});
 			desc.m_Type = view.m_Type;
 			m_Plan->m_TextureViews.push_back({
-				.m_Resource = resourceIter != m_ResourceIndices.end()
-								  ? resourceIter->second
-								  : InvalidRGVirtualResourceIndex,
+				.m_Resource = resourceIter != m_ResourceIndices.end() ?
+					resourceIter->second :
+					InvalidRGVirtualResourceIndex,
 				.m_Desc = desc,
 				});
 		}
@@ -342,18 +342,19 @@ namespace gglab
 			}
 			const auto& desc = textureDescs[m_ResourceIndices.at(node.m_VirtualResource).Value()];
 			auto& producers = textureProducers[index];
-			producers = node.m_Previous.IsValid() ? textureProducers[node.m_Previous.Value()]
-				: std::vector<RGPassNodeIndex>(GetRHITextureSubresourceCount(desc), InvalidRGPassNodeIndex);
+			producers = node.m_Previous.IsValid() ?
+				textureProducers[node.m_Previous.Value()] :
+				std::vector<RGPassNodeIndex>(GetRHITextureSubresourceCount(desc), InvalidRGPassNodeIndex);
 			if (!node.m_Writer.IsValid())
 			{
 				continue;
 			}
 			for (const auto& access : m_Graph.m_PassNodes[node.m_Writer.Value()].m_Accesses)
 			{
-				const bool writesNode = access.m_DependencyAccess == RGDependencyAccess::Write
-					? access.m_ResourceNodeIndex == RGResourceNodeIndex{ index }
-					: access.m_DependencyAccess == RGDependencyAccess::ReadWrite &&
-					access.m_ResourceNodeIndex == node.m_Previous;
+				const bool writesNode = access.m_DependencyAccess == RGDependencyAccess::Write ?
+					access.m_ResourceNodeIndex == RGResourceNodeIndex{ index } :
+					access.m_DependencyAccess == RGDependencyAccess::ReadWrite &&
+						access.m_ResourceNodeIndex == node.m_Previous;
 				if (!writesNode)
 				{
 					continue;
@@ -408,8 +409,9 @@ namespace gglab
 							previous.m_BaseArraySlice < range.m_BaseArraySlice + range.m_ArraySliceCount)
 						{
 							addEdge(RGPassNodeIndex{ prior }, pass.m_Declaration, earlier.m_ResourceNodeIndex,
-								earlier.m_DependencyAccess == RGDependencyAccess::Read
-								? RGDependencyReason::PreviousReaderToWriter : RGDependencyReason::PreviousWriterToWriter);
+								earlier.m_DependencyAccess == RGDependencyAccess::Read ?
+									RGDependencyReason::PreviousReaderToWriter :
+									RGDependencyReason::PreviousWriterToWriter);
 						}
 					}
 				}
@@ -619,11 +621,11 @@ namespace gglab
 				auto& resource = m_Plan->m_Resources[access.m_Resource.Value()];
 				++resource.m_RefCount;
 				resource.m_UsageBits |=
-					access.m_ResourceType == RGResourceType::RGTexture
-					? static_cast<uint64_t>(
-						ToRHIUsage(static_cast<RGTextureAccess>(access.m_AccessValue)))
-					: static_cast<uint64_t>(
-						ToRHIUsage(static_cast<RGBufferAccess>(access.m_AccessValue)));
+					access.m_ResourceType == RGResourceType::RGTexture ?
+						static_cast<uint64_t>(
+							ToRHIUsage(static_cast<RGTextureAccess>(access.m_AccessValue))) :
+						static_cast<uint64_t>(
+							ToRHIUsage(static_cast<RGBufferAccess>(access.m_AccessValue)));
 				if (!resource.m_FirstUser.IsValid())
 				{
 					resource.m_FirstUser = passIndex;
@@ -660,6 +662,8 @@ namespace gglab
 	bool RGCompiler::HasErrors() const noexcept
 	{
 		return std::ranges::any_of(m_Diagnostics, [](const RGCompileDiagnostic& diagnostic)
-			{ return diagnostic.m_Severity == RGCompileDiagnosticSeverity::Error; });
+			{
+				return diagnostic.m_Severity == RGCompileDiagnosticSeverity::Error;
+			});
 	}
 }

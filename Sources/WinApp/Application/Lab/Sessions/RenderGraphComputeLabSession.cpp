@@ -52,7 +52,7 @@ namespace gglab
 				services.m_FrameCapture ? services.m_FrameCapture->GetNonFiniteInjection() : std::nullopt;
 			return injection && injection->m_PointIndex < nonfinite::InjectionPoints.size() &&
 				nonfinite::InjectionPoints[injection->m_PointIndex].m_Id ==
-					"pass-render-graph-compute-smoke.csnonfiniteprobe.probe";
+				"pass-render-graph-compute-smoke.csnonfiniteprobe.probe";
 		}
 
 		const RenderPassInfo NonFiniteProbePassInfo{
@@ -225,8 +225,8 @@ namespace gglab
 				const bool boundaryProbe = RequestsNonFiniteProbe(services);
 
 				rg.AddPass<SetupPassData>("Lab.RenderGraphCompute.Setup",
-					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId,
-						boundaryProbe](RenderGraph::RGBuilder& builder, SetupPassData&)
+					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId, boundaryProbe]
+					(RenderGraph::RGBuilder& builder, SetupPassData&)
 					{
 						builder.SideEffect();
 
@@ -723,11 +723,11 @@ namespace gglab
 			readWriteExecutions == previewExecutions;
 
 		diagnostics.m_Metrics = {
-			{.m_Name = "Graphics initialize", .m_Value = std::to_string(initializeExecutions)},
-			{.m_Name = "Compute write", .m_Value = std::to_string(writeExecutions)},
-			{.m_Name = "Compute read/write", .m_Value = std::to_string(readWriteExecutions)},
-			{.m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions)},
-			{.m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions)},
+			{ .m_Name = "Graphics initialize", .m_Value = std::to_string(initializeExecutions) },
+			{ .m_Name = "Compute write", .m_Value = std::to_string(writeExecutions) },
+			{ .m_Name = "Compute read/write", .m_Value = std::to_string(readWriteExecutions) },
+			{ .m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions) },
+			{ .m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions) },
 		};
 		if (const uint64_t probeExecutions = m_State->m_ProbeExecutions.load(std::memory_order_relaxed);
 			probeExecutions != 0)
@@ -737,21 +737,27 @@ namespace gglab
 		}
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Graphics / direct-compute / graphics chain",
-			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending
-						: chainBalanced ? LabDiagnosticCheckStatus::Passed
-										: LabDiagnosticCheckStatus::Failed,
-			.m_Detail = !hasExecuted ? "Waiting for the first rendered frame."
-						: chainBalanced
-							? "All live passes executed exactly once per rendered frame."
-							: "Live pass execution counts diverged.",
+			.m_Status = !hasExecuted ?
+				LabDiagnosticCheckStatus::Pending :
+				chainBalanced ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
+			.m_Detail = !hasExecuted ?
+				"Waiting for the first rendered frame." :
+				chainBalanced ?
+					"All live passes executed exactly once per rendered frame." :
+					"Live pass execution counts diverged.",
 			});
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Unused compute pass culling",
-			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending
-						: culledExecutions == 0 ? LabDiagnosticCheckStatus::Passed
-												: LabDiagnosticCheckStatus::Failed,
-			.m_Detail = culledExecutions == 0 ? "The unconsumed UAV writer produced no dispatch."
-											  : "An unconsumed UAV writer reached execution.",
+			.m_Status = !hasExecuted ?
+				LabDiagnosticCheckStatus::Pending :
+				culledExecutions == 0 ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
+			.m_Detail = culledExecutions == 0 ?
+				"The unconsumed UAV writer produced no dispatch." :
+				"An unconsumed UAV writer reached execution.",
 			});
 	}
 

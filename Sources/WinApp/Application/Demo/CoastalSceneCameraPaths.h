@@ -114,7 +114,7 @@ namespace gglab
 		return {
 			makePath("SEQ_StaticRailings", "Static Railings",
 				"Static convergence over near railings, stair slats and distant columns.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = stairsPosition, .m_Target = stairsTarget,
 						.m_VerticalFovDegrees = stairsFov },
 					{ .m_Frame = 95, .m_Position = stairsPosition, .m_Target = stairsTarget,
@@ -122,7 +122,7 @@ namespace gglab
 				}),
 			makePath("SEQ_LateralPanRailings", "Lateral Pan Railings",
 				"Slow 1.2 m sideways truck across railings and repeated slats.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = stairsPosition, .m_Target = stairsTarget,
 						.m_VerticalFovDegrees = stairsFov },
 					{ .m_Frame = 179, .m_Position = stairsPosition + panOffset,
@@ -131,7 +131,7 @@ namespace gglab
 			makePath("SEQ_PanStopRailings", "Pan Stop Railings",
 				"Fast 1.2 m sideways truck across the railings that stops at frame 60 and holds: "
 				"accumulation recovery after low-confidence motion.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = stairsPosition, .m_Target = stairsTarget,
 						.m_VerticalFovDegrees = stairsFov },
 					{ .m_Frame = 60, .m_Position = stairsPosition + panOffset,
@@ -141,7 +141,7 @@ namespace gglab
 				}),
 			makePath("SEQ_DollyDoorway", "Dolly Doorway",
 				"4 m forward dolly from the corridor toward the courtyard, revealing disoccluded surfaces.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = doorwayPosition, .m_Target = doorwayTarget,
 						.m_VerticalFovDegrees = doorwayFov },
 					{ .m_Frame = 179, .m_Position = doorwayPosition + dollyOffset,
@@ -156,7 +156,7 @@ namespace gglab
 			makePath("SEQ_StaticGlassTerrace", "Static Glass Terrace",
 				"Static view through the terrace guard glass toward the sea: post-temporal "
 				"transparent shimmer over sea highlights and guard posts.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = glassPosition, .m_Target = glassTarget,
 						.m_VerticalFovDegrees = glassFov },
 					{ .m_Frame = 95, .m_Position = glassPosition, .m_Target = glassTarget,
@@ -165,7 +165,7 @@ namespace gglab
 			makePath("SEQ_PanGlassTerrace", "Pan Glass Terrace",
 				"1.5 m sideways truck along the terrace guard glass: transparent panes and "
 				"frames over a moving opaque and sea background.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = glassPosition, .m_Target = glassTarget,
 						.m_VerticalFovDegrees = glassFov },
 					{ .m_Frame = 179, .m_Position = glassPosition + glassPanOffset,
@@ -173,7 +173,7 @@ namespace gglab
 				}),
 			makePath("SEQ_CutCourtyardToStairs", "Cut Courtyard To Stairs",
 				"Static courtyard shot, then a camera cut to the stairs for reset and first-frame recovery.",
-				CameraPathInterpolation::Linear, nearPlane, {
+				CameraPathInterpolation::Linear, nearPlane,{
 					{ .m_Frame = 0, .m_Position = courtyardPosition, .m_Target = courtyardTarget,
 						.m_VerticalFovDegrees = courtyardFov },
 					{ .m_Frame = 59, .m_Position = courtyardPosition, .m_Target = courtyardTarget,

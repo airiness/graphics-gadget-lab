@@ -130,9 +130,11 @@ namespace gglab
 			for (const auto& profile : profiles)
 			{
 				const char* policy =
-					profile.m_Policy == SnapshotUpdatePolicy::EveryFrame ? "Every Frame"
-					: profile.m_Policy == SnapshotUpdatePolicy::OnDemand ? "On Demand"
-					: "Manual";
+					profile.m_Policy == SnapshotUpdatePolicy::EveryFrame ?
+						"Every Frame" :
+						profile.m_Policy == SnapshotUpdatePolicy::OnDemand ?
+							"On Demand" :
+							"Manual";
 				ImGui::PushID(static_cast<int>(profile.m_Id));
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);

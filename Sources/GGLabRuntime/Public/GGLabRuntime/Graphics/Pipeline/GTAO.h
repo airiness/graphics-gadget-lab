@@ -60,8 +60,9 @@ namespace gglab
 		return {
 			.m_PreferredR8Unorm = preferredR8Unorm,
 			.m_FallbackR16Float = fallbackR16Float,
-			.m_Format = preferredR8Unorm.IsSupported() ? RHIFormat::R8Unorm
-				: fallbackR16Float.IsSupported() ? RHIFormat::R16Float : RHIFormat::Unknown,
+			.m_Format = preferredR8Unorm.IsSupported() ?
+				RHIFormat::R8Unorm :
+				fallbackR16Float.IsSupported() ? RHIFormat::R16Float : RHIFormat::Unknown,
 		};
 	}
 }

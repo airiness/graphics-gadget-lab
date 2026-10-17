@@ -3,7 +3,7 @@
 
 float2 PixelCenterToUV(uint2 pixel, uint2 extent)
 {
-	return (float2(pixel) + 0.5) / max(float2(extent), 1.0.xx);
+	return ((float2)(pixel) + 0.5) / max((float2)(extent), 1.0.xx);
 }
 
 float2 UVToNDC(float2 uv)

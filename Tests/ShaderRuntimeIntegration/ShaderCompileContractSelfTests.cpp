@@ -109,8 +109,7 @@ namespace gglab
 			std::filesystem::path m_Path;
 		};
 
-		[[nodiscard]] bool ContainsArgument(
-			const std::vector<std::wstring>& arguments, std::wstring_view expected) noexcept
+		[[nodiscard]] bool ContainsArgument(const std::vector<std::wstring>& arguments, std::wstring_view expected) noexcept
 		{
 			return std::ranges::find(arguments, expected) != arguments.end();
 		}
@@ -138,8 +137,7 @@ namespace gglab
 			return false;
 		}
 
-		[[nodiscard]] bool HasDescriptorBinding(const SpirVDecorationReflection& reflection,
-			uint32_t descriptorSet, uint32_t binding) noexcept
+		[[nodiscard]] bool HasDescriptorBinding(const SpirVDecorationReflection& reflection, uint32_t descriptorSet, uint32_t binding) noexcept
 		{
 			return std::ranges::any_of(reflection.m_DescriptorBindings,
 				[descriptorSet, binding](const SpirVDescriptorBindingReflection& descriptor) noexcept
@@ -149,8 +147,7 @@ namespace gglab
 				});
 		}
 
-		[[nodiscard]] bool DisassembleDxil(
-			const ShaderBinary& binary, std::string& outDisassembly) noexcept
+		[[nodiscard]] bool DisassembleDxil(const ShaderBinary& binary, std::string& outDisassembly) noexcept
 		{
 			outDisassembly.clear();
 			if (!binary.IsValid())
@@ -179,8 +176,7 @@ namespace gglab
 				return false;
 			}
 			ComPtr<IDxcBlobUtf8> text;
-			if (FAILED(result->GetOutput(
-				DXC_OUT_DISASSEMBLY, IID_PPV_ARGS(&text), nullptr)) || !text)
+			if (FAILED(result->GetOutput(DXC_OUT_DISASSEMBLY, IID_PPV_ARGS(&text), nullptr)) || !text)
 			{
 				return false;
 			}
@@ -207,19 +203,19 @@ namespace gglab
 			return result.ec == std::errc{} ? std::optional<size_t>(value) : std::nullopt;
 		}
 
-		[[nodiscard]] std::optional<size_t> FindDxilMemberOffset(
-			std::string_view disassembly, std::string_view memberName) noexcept
+		[[nodiscard]] std::optional<size_t> FindDxilMemberOffset(std::string_view disassembly, std::string_view memberName) noexcept
 		{
 			const std::string memberToken = std::format(" {};", memberName);
 			const size_t memberOffset = disassembly.find(memberToken);
-			return memberOffset == std::string_view::npos
-				? std::nullopt
-				: ParseUnsignedAfter(disassembly, "Offset:", memberOffset);
+			return memberOffset == std::string_view::npos ?
+				std::nullopt :
+				ParseUnsignedAfter(disassembly, "Offset:", memberOffset);
 		}
 
 		[[nodiscard]] ShaderBinary MakeExecutionModelModule(uint32_t executionModel) noexcept
 		{
-			const std::array<uint32_t, 10> words{
+			const std::array<uint32_t, 10> words
+			{
 				0x07230203u,
 				0x00010600u,
 				0u,
@@ -236,25 +232,21 @@ namespace gglab
 			return binary;
 		}
 
-		[[nodiscard]] bool OverwriteBinaryFile(
-			const std::filesystem::path& path, const ShaderBinary& binary) noexcept
+		[[nodiscard]] bool OverwriteBinaryFile(const std::filesystem::path& path, const ShaderBinary& binary) noexcept
 		{
 			std::ofstream output(path, std::ios::binary | std::ios::trunc);
-			output.write(static_cast<const char*>(binary.Data()),
-				static_cast<std::streamsize>(binary.SizeInBytes()));
+			output.write(static_cast<const char*>(binary.Data()), static_cast<std::streamsize>(binary.SizeInBytes()));
 			return output.good();
 		}
 
-		[[nodiscard]] bool OverwriteTextFile(
-			const std::filesystem::path& path, std::string_view content) noexcept
+		[[nodiscard]] bool OverwriteTextFile(const std::filesystem::path& path, std::string_view content) noexcept
 		{
 			std::ofstream output(path, std::ios::binary | std::ios::trunc);
 			output.write(content.data(), static_cast<std::streamsize>(content.size()));
 			return output.good();
 		}
 
-		[[nodiscard]] std::filesystem::path MakeCacheRecordPath(
-			const std::filesystem::path& binaryPath) noexcept
+		[[nodiscard]] std::filesystem::path MakeCacheRecordPath(const std::filesystem::path& binaryPath) noexcept
 		{
 			auto recordPath = binaryPath;
 			recordPath += L".json";
@@ -278,8 +270,7 @@ namespace gglab
 			}
 		};
 
-		[[nodiscard]] bool QuerySpirVValidatorIdentity(
-			const std::filesystem::path& validator, std::string& outIdentity) noexcept
+		[[nodiscard]] bool QuerySpirVValidatorIdentity(const std::filesystem::path& validator, std::string& outIdentity) noexcept
 		{
 			outIdentity.clear();
 			SECURITY_ATTRIBUTES securityAttributes{
@@ -326,8 +317,7 @@ namespace gglab
 
 			std::array<char, 1'024> buffer{};
 			DWORD bytesRead = 0;
-			while (ReadFile(readPipe, buffer.data(), static_cast<DWORD>(buffer.size()),
-				&bytesRead, nullptr) && bytesRead > 0)
+			while (ReadFile(readPipe, buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr) && bytesRead > 0)
 			{
 				outIdentity.append(buffer.data(), bytesRead);
 			}
@@ -344,12 +334,10 @@ namespace gglab
 		{
 			SpirVValidatorInfo info{};
 			std::array<wchar_t, 32'768> buffer{};
-			const DWORD sdkLength = GetEnvironmentVariableW(
-				L"VULKAN_SDK", buffer.data(), static_cast<DWORD>(buffer.size()));
+			const DWORD sdkLength = GetEnvironmentVariableW(L"VULKAN_SDK", buffer.data(), static_cast<DWORD>(buffer.size()));
 			if (sdkLength > 0 && sdkLength < buffer.size())
 			{
-				const std::filesystem::path sdkRoot =
-					std::filesystem::path(buffer.data()).lexically_normal();
+				const std::filesystem::path sdkRoot = std::filesystem::path(buffer.data()).lexically_normal();
 				info.m_SdkVersion = sdkRoot.filename().wstring();
 				const std::filesystem::path fromSdk = sdkRoot / L"Bin" / L"spirv-val.exe";
 				std::error_code errorCode;
@@ -363,15 +351,13 @@ namespace gglab
 			return info;
 		}
 
-		[[nodiscard]] bool ValidateSpirVBinary(
-			const std::filesystem::path& validator, const std::filesystem::path& binary) noexcept
+		[[nodiscard]] bool ValidateSpirVBinary(const std::filesystem::path& validator, const std::filesystem::path& binary) noexcept
 		{
 			if (validator.empty() || binary.empty())
 			{
 				return false;
 			}
-			std::wstring commandLine = std::format(L"\"{}\" --target-env vulkan1.3 \"{}\"",
-				validator.wstring(), binary.wstring());
+			std::wstring commandLine = std::format(L"\"{}\" --target-env vulkan1.3 \"{}\"", validator.wstring(), binary.wstring());
 			STARTUPINFOW startupInfo{
 				.cb = sizeof(STARTUPINFOW),
 			};
@@ -395,16 +381,14 @@ namespace gglab
 			return waitResult == WAIT_OBJECT_0 && exitCode == 0;
 		}
 
-		[[nodiscard]] bool ReplaceMetadataValue(const std::filesystem::path& path,
-			std::string_view target, std::string_view replacement) noexcept
+		[[nodiscard]] bool ReplaceMetadataValue(const std::filesystem::path& path, std::string_view target, std::string_view replacement) noexcept
 		{
 			std::ifstream input(path, std::ios::binary);
 			if (!input)
 			{
 				return false;
 			}
-			std::string content((std::istreambuf_iterator<char>(input)),
-				std::istreambuf_iterator<char>());
+			std::string content((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
 			const size_t begin = content.find(target);
 			if (begin == std::string::npos)
 			{
@@ -426,11 +410,12 @@ namespace gglab
 				VulkanShaderRegisterClass m_RegisterClass;
 				VulkanFixedRegisterRange m_ExpectedRange;
 			};
-			constexpr std::array FixedRegisterClassCases{
-				FixedRegisterClassCase{ VulkanShaderRegisterClass::ConstantBuffer, { 0, 32 } },
-				FixedRegisterClassCase{ VulkanShaderRegisterClass::ShaderResource, { 32, 32 } },
-				FixedRegisterClassCase{ VulkanShaderRegisterClass::UnorderedAccess, { 64, 32 } },
-				FixedRegisterClassCase{ VulkanShaderRegisterClass::Sampler, { 96, 32 } },
+			constexpr std::array FixedRegisterClassCases
+			{
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::ConstantBuffer,{ 0, 32 } },
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::ShaderResource,{ 32, 32 } },
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::UnorderedAccess,{ 64, 32 } },
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::Sampler,{ 96, 32 } },
 			};
 			bool rangesMatch = true;
 			bool allBindingsUnique = true;
@@ -438,19 +423,16 @@ namespace gglab
 			std::array<bool, 128> occupiedBindings{};
 			for (const auto& testCase : FixedRegisterClassCases)
 			{
-				const VulkanFixedRegisterRange range =
-					GetVulkanFixedRegisterRange(testCase.m_RegisterClass);
+				const VulkanFixedRegisterRange range = GetVulkanFixedRegisterRange(testCase.m_RegisterClass);
 				rangesMatch &= range.m_BindingShift == testCase.m_ExpectedRange.m_BindingShift &&
 					range.m_RegisterCount == testCase.m_ExpectedRange.m_RegisterCount;
-				for (uint32_t registerIndex = 0; registerIndex < range.m_RegisterCount;
-					++registerIndex)
+				for (uint32_t registerIndex = 0; registerIndex < range.m_RegisterCount; ++registerIndex)
 				{
 					const auto result = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
 						registerIndex, GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
 					const uint32_t expectedBinding = range.m_BindingShift + registerIndex;
 					allBindingsUnique &= result.IsSupported() &&
-						result.m_Location.m_DescriptorSet ==
-						GGLabVulkanShaderRuntimeABI.m_FixedDescriptorSet &&
+						result.m_Location.m_DescriptorSet == GGLabVulkanShaderRuntimeABI.m_FixedDescriptorSet &&
 						result.m_Location.m_Binding == expectedBinding &&
 						expectedBinding < occupiedBindings.size() && !occupiedBindings[expectedBinding];
 					if (expectedBinding < occupiedBindings.size())
@@ -461,8 +443,7 @@ namespace gglab
 				const auto outOfRange = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
 					range.m_RegisterCount, GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
 				allOutOfRangeIndicesRejected &= !outOfRange.IsSupported() &&
-					outOfRange.m_RejectionReason ==
-					VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
+					outOfRange.m_RejectionReason == VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
 			}
 			context.Check(rangesMatch,
 				"Vulkan fixed-register ranges lock 32 bindings at shifts 0, 32, 64, and 96");
@@ -486,17 +467,14 @@ namespace gglab
 				"Fixed bindings reject unsupported HLSL register spaces explicitly");
 
 			const VulkanGlobalDescriptorLayoutPlan globalLayoutPlan;
-			const VkDescriptorSetLayoutCreateInfo& globalLayoutInfo =
-				globalLayoutPlan.GetLayoutInfo();
+			const VkDescriptorSetLayoutCreateInfo& globalLayoutInfo = globalLayoutPlan.GetLayoutInfo();
 			const bool hasGlobalBindings = globalLayoutInfo.bindingCount == 2 &&
 				globalLayoutInfo.pBindings != nullptr;
 			context.Check(hasGlobalBindings &&
 				GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet == 1 &&
-				globalLayoutInfo.pBindings[0].binding ==
-					GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding &&
+				globalLayoutInfo.pBindings[0].binding == GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding &&
 				globalLayoutInfo.pBindings[0].descriptorType == VK_DESCRIPTOR_TYPE_MUTABLE_EXT &&
-				globalLayoutInfo.pBindings[1].binding ==
-					GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding &&
+				globalLayoutInfo.pBindings[1].binding == GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding &&
 				globalLayoutInfo.pBindings[1].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER,
 				"Vulkan global layout publishes the actual resource and sampler heap bindings");
 
@@ -506,13 +484,10 @@ namespace gglab
 				mutableTypes[0] == VulkanDescriptorType::SampledImage &&
 				mutableTypes[1] == VulkanDescriptorType::StorageImage,
 				"Vulkan mutable resource binding allows exactly sampled and storage images");
-			context.Check(GGLabVulkanShaderBindingABI.m_ResourceHeapDescriptorType ==
-				VulkanDescriptorType::Mutable &&
-				GGLabVulkanShaderBindingABI.m_SamplerHeapDescriptorType ==
-				VulkanDescriptorType::Sampler,
+			context.Check(GGLabVulkanShaderBindingABI.m_ResourceHeapDescriptorType == VulkanDescriptorType::Mutable &&
+				GGLabVulkanShaderBindingABI.m_SamplerHeapDescriptorType == VulkanDescriptorType::Sampler,
 				"Vulkan global heap descriptor types match binding ABI revision 1");
-			context.Check(ToVkDescriptorType(mutableTypes[0]) ==
-				VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
+			context.Check(ToVkDescriptorType(mutableTypes[0]) == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
 				ToVkDescriptorType(mutableTypes[1]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 				"Vulkan mutable resource binding converts to the exact native descriptor types");
 			context.Check(GGLabVulkanShaderBindingABI.m_PartiallyBound &&
@@ -520,17 +495,14 @@ namespace gglab
 				GGLabVulkanShaderBindingABI.m_UpdateUnusedWhilePending,
 				"Vulkan global heaps lock the descriptor publication binding flags");
 
-			const VkMutableDescriptorTypeCreateInfoEXT& mutableInfo =
-				globalLayoutPlan.GetMutableInfo();
+			const VkMutableDescriptorTypeCreateInfoEXT& mutableInfo = globalLayoutPlan.GetMutableInfo();
 			const bool hasMutableLists = mutableInfo.mutableDescriptorTypeListCount == 2 &&
 				mutableInfo.pMutableDescriptorTypeLists != nullptr;
 			const bool resourceListContainsOnlyImages = hasMutableLists &&
 				mutableInfo.pMutableDescriptorTypeLists[0].descriptorTypeCount == 2 &&
 				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes != nullptr &&
-				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes[0] ==
-					VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
-				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes[1] ==
-					VK_DESCRIPTOR_TYPE_STORAGE_IMAGE &&
+				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes[0] == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
+				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes[1] == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE &&
 				mutableInfo.pMutableDescriptorTypeLists[1].descriptorTypeCount == 0;
 			context.Check(resourceListContainsOnlyImages,
 				"Vulkan global layout allows only sampled and storage images in the resource heap");
@@ -542,8 +514,7 @@ namespace gglab
 				GGLabCoordinatePolicy.m_ViewportOrigin == RHICoordinateOrigin::UpperLeft &&
 				GGLabCoordinatePolicy.m_TextureUVOrigin == RHICoordinateOrigin::UpperLeft,
 				"RHI coordinate policy uses zero-to-one depth and upper-left origins");
-			context.Check(GGLabCoordinatePolicy.m_FrontFaceDefinition ==
-				RHIFrontFaceDefinition::AfterViewportTransform &&
+			context.Check(GGLabCoordinatePolicy.m_FrontFaceDefinition == RHIFrontFaceDefinition::AfterViewportTransform &&
 				!GGLabCoordinatePolicy.m_BackendAppliesReversedZ,
 				"RHI front face is post-viewport and reversed-Z is not backend-added");
 			context.Check(GGLabVulkanShaderRuntimeABI.m_InvertVertexProducingStageY &&
@@ -565,8 +536,7 @@ namespace gglab
 			}
 
 			ScopedTestDirectory scopedDirectory(tempRoot);
-			const std::filesystem::path shaderSourceRoot =
-				ResolveShaderSourceRoot(win32::GetExecutableDirectory());
+			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(win32::GetExecutableDirectory());
 			const std::filesystem::path shaderCacheRoot = scopedDirectory.GetPath();
 			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			const SpirVValidatorInfo validator = FindSpirVValidator();
@@ -577,7 +547,7 @@ namespace gglab
 				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
 				.m_Stage = ShaderStage::Vertex,
 				.m_Entry = L"VSMain",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderResolvedRecipe dxilRecipe = compiler.Resolve(dxilDesc);
 			const ShaderCompileResult dxilResult = compiler.CompileOrLoad(dxilRecipe);
@@ -604,8 +574,7 @@ namespace gglab
 			context.Check(!spirVResult.m_FromCache && cachedSpirVResult.m_FromCache,
 				"SPIR-V artifact cache reuses an exact resolved recipe");
 
-			const bool cacheBlobOverwritten =
-				OverwriteBinaryFile(spirVBinaryPath, dxilResult.m_Artifact.m_Binary);
+			const bool cacheBlobOverwritten = OverwriteBinaryFile(spirVBinaryPath, dxilResult.m_Artifact.m_Binary);
 			const ShaderCompileResult recoveredSpirVResult = compiler.CompileOrLoad(spirVRecipe);
 			SpirVDecorationReflection recoveredReflection;
 			context.Check(cacheBlobOverwritten && !recoveredSpirVResult.m_FromCache &&
@@ -615,45 +584,30 @@ namespace gglab
 				compiler.GetCompilerIdentity().m_CanonicalIdentity != L"unknown",
 				"Active shader compiler exposes the concrete DXC producer identity");
 
-			const std::filesystem::path runtimeArtifactRoot =
-				scopedDirectory.GetPath() / "RuntimeArtifacts";
-			const ShaderRuntimeArtifactPublicationResult dxilPublication =
-				PublishShaderRuntimeArtifact(runtimeArtifactRoot, dxilResult.m_Artifact);
-			const ShaderRuntimeArtifactPublicationResult spirVPublication =
-				PublishShaderRuntimeArtifact(runtimeArtifactRoot, spirVResult.m_Artifact);
-			const std::array registryEntries{
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = shader_programs::ForwardCoverageVertex,
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
-					.m_ArtifactRef = dxilPublication.m_ArtifactRef,
-				},
-				ShaderProgramRegistryEntry{
-					.m_ProgramRef = shader_programs::ForwardCoverageVertex,
-					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
-					.m_ArtifactRef = spirVPublication.m_ArtifactRef,
-				},
+			const std::filesystem::path runtimeArtifactRoot = scopedDirectory.GetPath() / "RuntimeArtifacts";
+			const ShaderRuntimeArtifactPublicationResult dxilPublication = PublishShaderRuntimeArtifact(runtimeArtifactRoot, dxilResult.m_Artifact);
+			const ShaderRuntimeArtifactPublicationResult spirVPublication = PublishShaderRuntimeArtifact(runtimeArtifactRoot, spirVResult.m_Artifact);
+			const std::array registryEntries
+			{
+				ShaderProgramRegistryEntry{ .m_ProgramRef = shader_programs::ForwardCoverageVertex, .m_TargetProfile = ShaderTargetProfile::GGLabDX12, .m_ArtifactRef = dxilPublication.m_ArtifactRef, },
+				ShaderProgramRegistryEntry{ .m_ProgramRef = shader_programs::ForwardCoverageVertex, .m_TargetProfile = ShaderTargetProfile::GGLabVulkan13, .m_ArtifactRef = spirVPublication.m_ArtifactRef, },
 			};
-			const ShaderProgramRegistryArtifactBuildResult registryBuild =
-				BuildShaderProgramRegistryArtifact(registryEntries);
-			const ShaderProgramRegistryArtifactPublicationResult registryPublication =
-				registryBuild.IsSuccess()
-					? PublishShaderProgramRegistryArtifact(
-						runtimeArtifactRoot, registryBuild.m_Artifact)
-					: ShaderProgramRegistryArtifactPublicationResult{};
+			const ShaderProgramRegistryArtifactBuildResult registryBuild = BuildShaderProgramRegistryArtifact(registryEntries);
+			const ShaderProgramRegistryArtifactPublicationResult registryPublication = registryBuild.IsSuccess() ?
+				PublishShaderProgramRegistryArtifact(runtimeArtifactRoot, registryBuild.m_Artifact) :
+				ShaderProgramRegistryArtifactPublicationResult{};
 			ShaderManager dxilManager({
 				.m_ActiveBackend = RHIBackendType::DX12,
 				.m_ArtifactRoot = runtimeArtifactRoot,
 				.m_ActiveRegistry = registryPublication.m_RegistryRef,
-				});
-			const ShaderID dxilManagerShader =
-				dxilManager.LoadProgram(shader_programs::ForwardCoverageVertex);
+			});
+			const ShaderID dxilManagerShader = dxilManager.LoadProgram(shader_programs::ForwardCoverageVertex);
 			ShaderManager spirVManager({
 				.m_ActiveBackend = RHIBackendType::Vulkan,
 				.m_ArtifactRoot = runtimeArtifactRoot,
 				.m_ActiveRegistry = registryPublication.m_RegistryRef,
-				});
-			const ShaderID spirVManagerShader =
-				spirVManager.LoadProgram(shader_programs::ForwardCoverageVertex);
+			});
+			const ShaderID spirVManagerShader = spirVManager.LoadProgram(shader_programs::ForwardCoverageVertex);
 			context.Check(dxilPublication.IsSuccess() && spirVPublication.IsSuccess() &&
 				registryPublication.IsSuccess() && dxilManager.IsReady() &&
 				spirVManager.IsReady() &&
@@ -668,7 +622,7 @@ namespace gglab
 				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
 				spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
 				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex) !=
-					spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex),
+				spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex),
 				"ShaderManager loads backend artifacts from an injected immutable registry");
 
 			// Recipe identity semantics: the resolved recipe is the authority, and
@@ -680,35 +634,24 @@ namespace gglab
 			changedArgumentsDesc.m_ExtraArgs.push_back(L"-GGLAB_TEST_ARGUMENT");
 			const ShaderResolvedRecipe changedArgumentsRecipe = compiler.Resolve(changedArgumentsDesc);
 			ShaderDesc canonicalizedCoordinatesDesc = spirVDesc;
-			canonicalizedCoordinatesDesc.m_Target.m_CoordinateOptions =
-				ShaderCoordinateOptions::UseDxPositionW;
-			const ShaderResolvedRecipe canonicalizedCoordinatesRecipe =
-				compiler.Resolve(canonicalizedCoordinatesDesc);
+			canonicalizedCoordinatesDesc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::UseDxPositionW;
+			const ShaderResolvedRecipe canonicalizedCoordinatesRecipe = compiler.Resolve(canonicalizedCoordinatesDesc);
 			context.Check(dxilRecipe.m_RecipeId != spirVRecipe.m_RecipeId &&
 				spirVRecipe.m_RecipeId != changedArgumentsRecipe.m_RecipeId &&
 				spirVRecipe.m_RecipeId == canonicalizedCoordinatesRecipe.m_RecipeId &&
 				spirVRecipe.m_RecipeId.m_DurableDigest != spirVRecipe.m_BuildKey.m_DurableDigest,
 				"Resolved recipe identity covers the normalized logical request and canonicalizes caller coordinate expressions");
-			context.Check(ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity) ==
-				spirVRecipe.m_BuildKey &&
-				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, differentIdentity) !=
-				spirVRecipe.m_BuildKey &&
-				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity,
-					ShaderCompilePolicyRevision + 1) != spirVRecipe.m_BuildKey,
+			context.Check(ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity) == spirVRecipe.m_BuildKey &&
+				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, differentIdentity) != spirVRecipe.m_BuildKey &&
+				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity, ShaderCompilePolicyRevision + 1) != spirVRecipe.m_BuildKey,
 				"Producer identity and compile-policy revision independently participate in the build key");
 
 			context.Check(
-				TryGetShaderTargetProfile(ShaderBinaryFormat::Dxil,
-					ShaderSpirVTargetEnvironment::None) == ShaderTargetProfile::GGLabDX12 &&
-				TryGetShaderTargetProfile(ShaderBinaryFormat::SpirV,
-					ShaderSpirVTargetEnvironment::Vulkan1_3) ==
-						ShaderTargetProfile::GGLabVulkan13 &&
-				!TryGetShaderTargetProfile(ShaderBinaryFormat::Unknown,
-					ShaderSpirVTargetEnvironment::None) &&
-				!TryGetShaderTargetProfile(ShaderBinaryFormat::Dxil,
-					ShaderSpirVTargetEnvironment::Vulkan1_3) &&
-				!TryGetShaderTargetProfile(ShaderBinaryFormat::SpirV,
-					ShaderSpirVTargetEnvironment::None),
+				TryGetShaderTargetProfile(ShaderBinaryFormat::Dxil, ShaderSpirVTargetEnvironment::None) == ShaderTargetProfile::GGLabDX12 &&
+				TryGetShaderTargetProfile(ShaderBinaryFormat::SpirV, ShaderSpirVTargetEnvironment::Vulkan1_3) == ShaderTargetProfile::GGLabVulkan13 &&
+				!TryGetShaderTargetProfile(ShaderBinaryFormat::Unknown, ShaderSpirVTargetEnvironment::None) &&
+				!TryGetShaderTargetProfile(ShaderBinaryFormat::Dxil, ShaderSpirVTargetEnvironment::Vulkan1_3) &&
+				!TryGetShaderTargetProfile(ShaderBinaryFormat::SpirV, ShaderSpirVTargetEnvironment::None),
 				"Target-profile inference accepts only the two declared format/environment pairs");
 
 			bool wireVocabularyRoundTrips = true;
@@ -718,8 +661,7 @@ namespace gglab
 				wireVocabularyRoundTrips &= ShaderBinaryFormatWire::Parse(entry.m_Name, parsed) &&
 					parsed == entry.m_Value && ShaderBinaryFormatWire::Name(parsed) == entry.m_Name;
 			}
-			for (const ShaderSpirVTargetEnvironmentWire::Entry& entry :
-				ShaderSpirVTargetEnvironmentWire::Entries)
+			for (const ShaderSpirVTargetEnvironmentWire::Entry& entry : ShaderSpirVTargetEnvironmentWire::Entries)
 			{
 				ShaderSpirVTargetEnvironment parsed = ShaderSpirVTargetEnvironment::None;
 				wireVocabularyRoundTrips &=
@@ -762,7 +704,8 @@ namespace gglab
 				absoluteRecipe.m_Status == ShaderCompileStatus::InvalidRequest,
 				"Resolve rejects absolute source paths outside the logical identity contract");
 
-			constexpr std::array ReservedArguments{
+			constexpr std::array ReservedArguments
+			{
 				L"-spirv",
 				L"-fspv-target-env=vulkan1.0",
 				L"-fvk-invert-y",
@@ -778,8 +721,7 @@ namespace gglab
 				const ShaderResolvedRecipe recipe = compiler.Resolve(bypassDesc);
 				allReservedArgumentsRejected &= !recipe.IsSuccess() &&
 					recipe.m_Status == ShaderCompileStatus::InvalidRequest &&
-					recipe.m_Diagnostics.m_ValidationError ==
-					ShaderCompileValidationError::ReservedExtraArgument;
+					recipe.m_Diagnostics.m_ValidationError == ShaderCompileValidationError::ReservedExtraArgument;
 			}
 			context.Check(allReservedArgumentsRejected,
 				"Shader validation prevents extra arguments from overriding normalized target options");
@@ -791,13 +733,11 @@ namespace gglab
 			const ShaderResolvedRecipe mismatchedAbiRecipe = compiler.Resolve(mismatchedAbiDesc);
 			context.Check(!mismatchedAbiRecipe.IsSuccess() &&
 				mismatchedAbiRecipe.m_Status == ShaderCompileStatus::InvalidRequest &&
-				mismatchedAbiRecipe.m_Diagnostics.m_ValidationError ==
-				ShaderCompileValidationError::UnsupportedBindingABIRevision,
+				mismatchedAbiRecipe.m_Diagnostics.m_ValidationError == ShaderCompileValidationError::UnsupportedBindingABIRevision,
 				"Resolve reports an explicit illegal binding ABI revision instead of correcting it");
 
 			// DXC unavailable maps to CompilerUnavailable without aborting the process.
-			std::unique_ptr<ShaderCompiler> unavailableCompiler =
-				ShaderCompiler::MakeUnavailable(shaderSourceRoot, shaderCacheRoot);
+			std::unique_ptr<ShaderCompiler> unavailableCompiler = ShaderCompiler::MakeUnavailable(shaderSourceRoot, shaderCacheRoot);
 			const ShaderResolvedRecipe unavailableRecipe = unavailableCompiler->Resolve(spirVDesc);
 			const ShaderCompileResult unavailableResult = unavailableCompiler->Compile(spirVDesc);
 			context.Check(!unavailableRecipe.IsSuccess() &&
@@ -811,8 +751,7 @@ namespace gglab
 			const ShaderCompileResult rejectedCompileResult = compiler.Compile(rejectedCompileDesc);
 			context.Check(!rejectedCompileResult.IsSuccess() &&
 				rejectedCompileResult.m_Status == ShaderCompileStatus::InvalidRequest &&
-				rejectedCompileResult.m_Diagnostics.m_ValidationError ==
-				ShaderCompileValidationError::ReservedExtraArgument,
+				rejectedCompileResult.m_Diagnostics.m_ValidationError == ShaderCompileValidationError::ReservedExtraArgument,
 				"Shader compiler rejects invalid target contracts without relying on assertions");
 
 			ShaderDesc missingDesc = spirVDesc;
@@ -827,8 +766,7 @@ namespace gglab
 			const std::filesystem::path badSourceRoot = tempRoot / L"BadShaderSources";
 			const std::filesystem::path badCacheRoot = tempRoot / L"BadShaderCache";
 			std::filesystem::create_directories(badSourceRoot);
-			const bool badSourceWritten =
-				OverwriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
+			const bool badSourceWritten = OverwriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
 			ShaderCompiler badCompiler(badSourceRoot, badCacheRoot);
 			ShaderDesc badDesc{
 				.m_SourcePath = L"Bad.hlsl",
@@ -842,8 +780,7 @@ namespace gglab
 				"DXC syntax errors map to CompileFailed with the raw DXC diagnostics");
 
 			// A corrupted cached binary is a cache miss, never a fatal read.
-			const bool cacheCorrupted =
-				OverwriteTextFile(spirVBinaryPath, "corrupted derived data");
+			const bool cacheCorrupted = OverwriteTextFile(spirVBinaryPath, "corrupted derived data");
 			const ShaderCompileResult corruptedRecoveryResult = compiler.CompileOrLoad(spirVRecipe);
 			context.Check(cacheCorrupted && corruptedRecoveryResult.IsSuccess() &&
 				!corruptedRecoveryResult.m_FromCache,
@@ -895,8 +832,7 @@ namespace gglab
 				const ShaderResolvedRecipe roundRecipe = compiler.Resolve(roundDesc);
 				const ShaderCompileResult roundReload = compiler.CompileOrLoad(roundRecipe);
 
-				allConcurrentWorkersSucceeded &=
-					firstWorkerResult.IsSuccess() && secondWorkerResult.IsSuccess();
+				allConcurrentWorkersSucceeded &= firstWorkerResult.IsSuccess() && secondWorkerResult.IsSuccess();
 				allConcurrentReloadsValid &= roundReload.IsSuccess();
 				allConcurrentReloadsHitCache &= roundReload.m_FromCache;
 				if (!firstWorkerResult.IsSuccess() || !secondWorkerResult.IsSuccess())
@@ -904,14 +840,14 @@ namespace gglab
 					const auto AppendWorkerDiagnostics = [&concurrentWorkerDiagnostics](
 						int round, std::string_view tag,
 						const ShaderCompileResult& result) noexcept
-						{
-							concurrentWorkerDiagnostics += std::format(
-								" [round{}-{}: status={} validationError={} message=\"{}\" sourceIdentity=\"{}\"]",
-								round, tag, static_cast<int>(result.m_Status),
-								static_cast<int>(result.m_Diagnostics.m_ValidationError),
-								utils::ToString(result.m_Diagnostics.m_Message),
-								utils::ToString(result.m_Diagnostics.m_SourceIdentity));
-						};
+					{
+						concurrentWorkerDiagnostics += std::format(
+							" [round{}-{}: status={} validationError={} message=\"{}\" sourceIdentity=\"{}\"]",
+							round, tag, static_cast<int>(result.m_Status),
+							static_cast<int>(result.m_Diagnostics.m_ValidationError),
+							utils::ToString(result.m_Diagnostics.m_Message),
+							utils::ToString(result.m_Diagnostics.m_SourceIdentity));
+					};
 					if (!firstWorkerResult.IsSuccess())
 					{
 						AppendWorkerDiagnostics(round, "A", firstWorkerResult);
@@ -923,8 +859,7 @@ namespace gglab
 				}
 			}
 			context.Check(allConcurrentWorkersSucceeded,
-				("Both concurrent compiler instances complete their publication"
-					+ concurrentWorkerDiagnostics).c_str());
+				("Both concurrent compiler instances complete their publication" + concurrentWorkerDiagnostics).c_str());
 			context.Check(allConcurrentReloadsValid,
 				"Reload after concurrent publication yields a valid artifact");
 			context.Check(allConcurrentReloadsHitCache,
@@ -932,7 +867,8 @@ namespace gglab
 
 			const std::vector<std::wstring> vertexArguments = spirVRecipe.m_CompileArguments;
 			bool registerShiftsMatch = true;
-			const std::array registerShiftOptions{
+			const std::array registerShiftOptions
+			{
 				std::pair{ L"-fvk-b-shift", VulkanShaderRegisterClass::ConstantBuffer },
 				std::pair{ L"-fvk-t-shift", VulkanShaderRegisterClass::ShaderResource },
 				std::pair{ L"-fvk-u-shift", VulkanShaderRegisterClass::UnorderedAccess },
@@ -942,21 +878,15 @@ namespace gglab
 			{
 				const VulkanFixedRegisterRange range = GetVulkanFixedRegisterRange(registerClass);
 				const std::wstring shift = std::to_wstring(range.m_BindingShift);
-				const std::wstring hlslSpace =
-					std::to_wstring(GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
-				registerShiftsMatch &=
-					ContainsArgumentSequence(vertexArguments, { option, shift, hlslSpace });
+				const std::wstring hlslSpace = std::to_wstring(GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
+				registerShiftsMatch &= ContainsArgumentSequence(vertexArguments, { option, shift, hlslSpace });
 			}
-			const std::wstring resourceBinding =
-				std::to_wstring(GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding);
-			const std::wstring samplerBinding =
-				std::to_wstring(GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding);
-			const std::wstring descriptorSet =
-				std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet);
+			const std::wstring resourceBinding = std::to_wstring(GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding);
+			const std::wstring samplerBinding = std::to_wstring(GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding);
+			const std::wstring descriptorSet = std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet);
 			context.Check(registerShiftsMatch && ContainsArgumentSequence(vertexArguments,
 				{ L"-fvk-bind-resource-heap", resourceBinding, descriptorSet }) &&
-				ContainsArgumentSequence(vertexArguments,
-					{ L"-fvk-bind-sampler-heap", samplerBinding, descriptorSet }),
+				ContainsArgumentSequence(vertexArguments, { L"-fvk-bind-sampler-heap", samplerBinding, descriptorSet }),
 				"SPIR-V compile arguments consume the centralized HLSL-space and descriptor-set ABI");
 			context.Check(ContainsArgument(vertexArguments, L"-spirv") &&
 				ContainsArgument(vertexArguments, L"-fspv-target-env=vulkan1.3") &&
@@ -970,11 +900,10 @@ namespace gglab
 				.m_Stage = ShaderStage::Pixel,
 				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel),
 				.m_Entry = L"PSMain",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderResolvedRecipe forwardPixelRecipe = compiler.Resolve(forwardPixelDesc);
-			context.Check(ContainsArgument(forwardPixelRecipe.m_CompileArguments,
-				L"-fvk-use-dx-position-w") &&
+			context.Check(ContainsArgument(forwardPixelRecipe.m_CompileArguments, L"-fvk-use-dx-position-w") &&
 				!ContainsArgument(forwardPixelRecipe.m_CompileArguments, L"-fvk-invert-y"),
 				"Pixel SPIR-V compile policy preserves the HLSL SV_Position.w contract");
 
@@ -982,8 +911,7 @@ namespace gglab
 			std::string metadata;
 			{
 				std::ifstream metadataInput(spirVRecordPath, std::ios::binary);
-				metadata.assign((std::istreambuf_iterator<char>(metadataInput)),
-					std::istreambuf_iterator<char>());
+				metadata.assign((std::istreambuf_iterator<char>(metadataInput)), std::istreambuf_iterator<char>());
 			}
 			// The read handle is closed before CompileOrLoad below: the
 			// publication protocol commits the cache record by replacing it, and a
@@ -1013,13 +941,10 @@ namespace gglab
 				metadata.find("\"contentDigest\":\"") != std::string::npos &&
 				metadata.find("\"dependencyPhysicalPaths\":[") != std::string::npos,
 				"Cache record carries the complete portable manifest (profile, target semantics, logical identities, dependency provenance) plus explicit local validation state");
-			const bool metadataChanged = ReplaceMetadataValue(
-				spirVRecordPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
+			const bool metadataChanged = ReplaceMetadataValue(spirVRecordPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
-			const std::optional<ShaderArtifactCacheRecord> repairedReadBack =
-				ReadShaderArtifactCacheRecord(spirVRecordPath);
-			context.Check(metadataChanged,
-				"Shader cache metadata tamper is applied");
+			const std::optional<ShaderArtifactCacheRecord> repairedReadBack = ReadShaderArtifactCacheRecord(spirVRecordPath);
+			context.Check(metadataChanged, "Shader cache metadata tamper is applied");
 			context.Check(repairedReadBack.has_value() &&
 				repairedReadBack->m_Manifest.m_BindingABIRevision == 1,
 				"Rejected tampered entry is rebuilt and republished with the supported ABI revision");
@@ -1028,17 +953,14 @@ namespace gglab
 				"Shader cache rejects a manifest tampered with an unsupported binding ABI revision and rebuilds it");
 
 			// A missing required durable field must also reject the entry.
-			const bool manifestFieldRemoved = ReplaceMetadataValue(
-				spirVRecordPath, "\"hlslVersion\":\"2021\",", "");
+			const bool manifestFieldRemoved = ReplaceMetadataValue(spirVRecordPath, "\"hlslVersion\":\"2021\",", "");
 			const ShaderCompileResult missingFieldArtifact = compiler.CompileOrLoad(spirVRecipe);
 			context.Check(manifestFieldRemoved && !missingFieldArtifact.m_FromCache,
 				"Shader cache rejects a manifest missing a required durable field");
 
 			SpirVDecorationReflection coverageReflection;
-			const bool coverageReflected =
-				ReadSpirVDecorations(spirVResult.m_Artifact.m_Binary, coverageReflection);
-			const SpirVEntryPointReflection* coverageEntry =
-				coverageReflection.FindEntryPoint("VSMain");
+			const bool coverageReflected = ReadSpirVDecorations(spirVResult.m_Artifact.m_Binary, coverageReflection);
+			const SpirVEntryPointReflection* coverageEntry = coverageReflection.FindEntryPoint("VSMain");
 			const std::vector<uint32_t> expectedVertexLocations{ 0, 1, 2, 3, 4 };
 			context.Check(coverageReflected && coverageEntry &&
 				coverageEntry->m_ExecutionModel == SpirVExecutionModel::Vertex &&
@@ -1050,10 +972,8 @@ namespace gglab
 
 			const ShaderCompileResult forwardPixelResult = compiler.CompileOrLoad(forwardPixelRecipe);
 			SpirVDecorationReflection forwardPixelReflection;
-			const bool forwardPixelReflected =
-				ReadSpirVDecorations(forwardPixelResult.m_Artifact.m_Binary, forwardPixelReflection);
-			const SpirVEntryPointReflection* forwardPixelEntry =
-				forwardPixelReflection.FindEntryPoint("PSMain");
+			const bool forwardPixelReflected = ReadSpirVDecorations(forwardPixelResult.m_Artifact.m_Binary, forwardPixelReflection);
+			const SpirVEntryPointReflection* forwardPixelEntry = forwardPixelReflection.FindEntryPoint("PSMain");
 			context.Check(forwardPixelReflected && forwardPixelEntry &&
 				forwardPixelEntry->m_ExecutionModel == SpirVExecutionModel::Fragment &&
 				forwardPixelEntry->m_InputBuiltInCount > 0 &&
@@ -1066,13 +986,12 @@ namespace gglab
 				.m_Stage = ShaderStage::Compute,
 				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute),
 				.m_Entry = L"CSMain",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderResolvedRecipe cullRecipe = compiler.Resolve(cullDesc);
 			const ShaderCompileResult cullResult = compiler.CompileOrLoad(cullRecipe);
 			SpirVDecorationReflection cullReflection;
-			const bool cullReflected =
-				ReadSpirVDecorations(cullResult.m_Artifact.m_Binary, cullReflection);
+			const bool cullReflected = ReadSpirVDecorations(cullResult.m_Artifact.m_Binary, cullReflection);
 			const SpirVEntryPointReflection* cullEntry = cullReflection.FindEntryPoint("CSMain");
 			const std::array cullFixedBindings{ 0u, 32u, 33u, 64u, 65u };
 			const bool cullBindingsMatch = std::ranges::all_of(cullFixedBindings,
@@ -1090,29 +1009,27 @@ namespace gglab
 				.m_Stage = ShaderStage::Compute,
 				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute),
 				.m_Entry = L"CSMain",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderResolvedRecipe gtaoRecipe = compiler.Resolve(gtaoDesc);
 			const ShaderCompileResult gtaoResult = compiler.CompileOrLoad(gtaoRecipe);
 			gtaoDesc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"},
+				{ .m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1" },
 			};
 			const ShaderResolvedRecipe gtaoDiagnosticsRecipe = compiler.Resolve(gtaoDesc);
-			const ShaderCompileResult gtaoDiagnosticsResult =
-				compiler.CompileOrLoad(gtaoDiagnosticsRecipe);
+			const ShaderCompileResult gtaoDiagnosticsResult = compiler.CompileOrLoad(gtaoDiagnosticsRecipe);
 
 			ShaderDesc storageDesc{
 				.m_SourcePath = L"Passes/PassRenderGraphComputeSmoke.hlsl",
 				.m_Stage = ShaderStage::Compute,
 				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute),
 				.m_Entry = L"CSWrite",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderResolvedRecipe storageRecipe = compiler.Resolve(storageDesc);
 			const ShaderCompileResult storageResult = compiler.CompileOrLoad(storageRecipe);
 			SpirVDecorationReflection storageReflection;
-			const bool storageReflected =
-				ReadSpirVDecorations(storageResult.m_Artifact.m_Binary, storageReflection);
+			const bool storageReflected = ReadSpirVDecorations(storageResult.m_Artifact.m_Binary, storageReflection);
 			context.Check(storageReflected && HasDescriptorBinding(storageReflection, 0, 2) &&
 				HasDescriptorBinding(storageReflection, 1, 0),
 				"RenderGraph storage-write SPIR-V maps fixed constants and the mutable resource heap");
@@ -1124,17 +1041,16 @@ namespace gglab
 			const ShaderResolvedRecipe fullscreenRecipe = compiler.Resolve(fullscreenDesc);
 			const ShaderCompileResult fullscreenResult = compiler.CompileOrLoad(fullscreenRecipe);
 			SpirVDecorationReflection fullscreenReflection;
-			const bool fullscreenReflected =
-				ReadSpirVDecorations(fullscreenResult.m_Artifact.m_Binary, fullscreenReflection);
-			const SpirVEntryPointReflection* fullscreenEntry =
-				fullscreenReflection.FindEntryPoint("VSMain");
+			const bool fullscreenReflected = ReadSpirVDecorations(fullscreenResult.m_Artifact.m_Binary, fullscreenReflection);
+			const SpirVEntryPointReflection* fullscreenEntry = fullscreenReflection.FindEntryPoint("VSMain");
 			context.Check(fullscreenReflected && fullscreenEntry &&
 				fullscreenEntry->m_InputLocations.empty() &&
 				fullscreenEntry->m_InputBuiltInCount > 0 &&
 				fullscreenEntry->m_OutputBuiltInCount > 0,
 				"SPIR-V reader excludes SV_VertexID and SV_Position from user locations");
 
-			const std::array executionModelCases{
+			const std::array executionModelCases
+			{
 				std::pair{ 5267u, SpirVExecutionModel::Task },
 				std::pair{ 5268u, SpirVExecutionModel::Mesh },
 				std::pair{ 5364u, SpirVExecutionModel::Task },
@@ -1162,7 +1078,8 @@ namespace gglab
 			importanceDesc.m_SourcePath = L"Passes/PassIBLPrefilteredSpecular.hlsl";
 			const auto specularRecipe = compiler.Resolve(importanceDesc);
 			const auto specularResult = compiler.CompileOrLoad(specularRecipe);
-			const std::array validationCases{
+			const std::array validationCases
+			{
 				std::pair{ &spirVResult, &spirVRecipe },
 				std::pair{ &forwardPixelResult, &forwardPixelRecipe },
 				std::pair{ &cullResult, &cullRecipe },
@@ -1180,15 +1097,13 @@ namespace gglab
 						const ShaderCompileResult* result = validationCase.first;
 						const ShaderResolvedRecipe* recipe = validationCase.second;
 						return result->IsSuccess() &&
-							ValidateSpirVBinary(validator.m_Path,
-								compiler.GetCacheBinaryPath(*recipe));
+							ValidateSpirVBinary(validator.m_Path, compiler.GetCacheBinaryPath(*recipe));
 					});
 			context.Check(allValidated,
 				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, storage and specular IBL artifacts");
 		}
 
-		[[nodiscard]] bool WriteTextFile(
-			const std::filesystem::path& path, std::string_view content) noexcept
+		[[nodiscard]] bool WriteTextFile(const std::filesystem::path& path, std::string_view content) noexcept
 		{
 			std::filesystem::create_directories(path.parent_path());
 			std::ofstream output(path, std::ios::binary);
@@ -1207,8 +1122,7 @@ namespace gglab
 			{
 				return false;
 			}
-			std::string content((std::istreambuf_iterator<char>(input)),
-				std::istreambuf_iterator<char>());
+			std::string content((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
 			const std::string prefix = std::string("\"") + std::string(fieldName) + "\":";
 			const std::size_t begin = content.find(prefix);
 			if (begin == std::string::npos)
@@ -1284,8 +1198,7 @@ namespace gglab
 				resultA.IsSuccess() && resultB.IsSuccess() &&
 				recipeA.m_RecipeId == recipeB.m_RecipeId &&
 				recipeA.m_BuildKey == recipeB.m_BuildKey &&
-				resultA.m_Artifact.m_Manifest.m_BinaryContentDigest ==
-				resultB.m_Artifact.m_Manifest.m_BinaryContentDigest,
+				resultA.m_Artifact.m_Manifest.m_BinaryContentDigest == resultB.m_Artifact.m_Manifest.m_BinaryContentDigest,
 				"Same logical request resolves to the same recipe/build identity across checkout locations");
 
 			// The recipe identity must not embed physical -I arguments: a
@@ -1293,8 +1206,7 @@ namespace gglab
 			// must agree even though the physical paths differ.
 			ShaderDesc absoluteIncludeDesc = descA;
 			absoluteIncludeDesc.m_IncludeDirs = { checkoutA };
-			const ShaderResolvedRecipe absoluteIncludeRecipe =
-				compilerA.Resolve(absoluteIncludeDesc);
+			const ShaderResolvedRecipe absoluteIncludeRecipe = compilerA.Resolve(absoluteIncludeDesc);
 			context.Check(absoluteIncludeRecipe.IsSuccess() &&
 				recipeA.m_RecipeId == absoluteIncludeRecipe.m_RecipeId,
 				"Absolute include dirs under the source root canonicalize to the same logical identity");
@@ -1302,8 +1214,7 @@ namespace gglab
 
 		void RunRecipeAuthorityTests(SelfTestContext& context) noexcept
 		{
-			const std::filesystem::path shaderSourceRoot =
-				ResolveShaderSourceRoot(win32::GetExecutableDirectory());
+			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(win32::GetExecutableDirectory());
 			std::error_code errorCode;
 			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
 				std::format("GGLabRecipeAuthority-{}", GetCurrentProcessId());
@@ -1319,34 +1230,29 @@ namespace gglab
 
 			ShaderResolvedRecipe foreignProducerRecipe = recipe;
 			foreignProducerRecipe.m_CompilerIdentity.m_CanonicalIdentity += L"-different";
-			const ShaderCompileResult foreignProducerResult =
-				compiler.CompileOrLoad(foreignProducerRecipe);
+			const ShaderCompileResult foreignProducerResult = compiler.CompileOrLoad(foreignProducerRecipe);
 			context.Check(!foreignProducerResult.IsSuccess() &&
 				foreignProducerResult.m_Status == ShaderCompileStatus::InvalidRequest &&
-				foreignProducerResult.m_Diagnostics.m_ValidationError ==
-				ShaderCompileValidationError::CompilerIdentityMismatch,
+				foreignProducerResult.m_Diagnostics.m_ValidationError == ShaderCompileValidationError::CompilerIdentityMismatch,
 				"CompileOrLoad rejects a recipe resolved by a different producer identity");
 
 			ShaderResolvedRecipe mutatedRequestRecipe = recipe;
 			mutatedRequestRecipe.m_Request.m_ExtraArgs.push_back(L"-DGGLAB_MUTATED=1");
-			const ShaderCompileResult mutatedRequestResult =
-				compiler.CompileOrLoad(mutatedRequestRecipe);
+			const ShaderCompileResult mutatedRequestResult = compiler.CompileOrLoad(mutatedRequestRecipe);
 			context.Check(!mutatedRequestResult.IsSuccess() &&
 				mutatedRequestResult.m_Status == ShaderCompileStatus::InvalidRequest,
 				"CompileOrLoad rejects a recipe whose request was mutated after Resolve");
 
 			ShaderResolvedRecipe mutatedIdentityRecipe = recipe;
 			mutatedIdentityRecipe.m_RecipeId.m_DurableDigest.m_Value[0] ^= std::byte{ 0x01 };
-			const ShaderCompileResult mutatedIdentityResult =
-				compiler.CompileOrLoad(mutatedIdentityRecipe);
+			const ShaderCompileResult mutatedIdentityResult = compiler.CompileOrLoad(mutatedIdentityRecipe);
 			context.Check(!mutatedIdentityResult.IsSuccess() &&
 				mutatedIdentityResult.m_Status == ShaderCompileStatus::InvalidRequest,
 				"CompileOrLoad rejects a recipe with a tampered identity instead of publishing under a stale one");
 
 			ShaderResolvedRecipe mutatedSourceRecipe = recipe;
 			mutatedSourceRecipe.m_LogicalSourcePath = L"Passes/PassForwardPBR.hlsl";
-			const ShaderCompileResult mutatedSourceResult =
-				compiler.CompileOrLoad(mutatedSourceRecipe);
+			const ShaderCompileResult mutatedSourceResult = compiler.CompileOrLoad(mutatedSourceRecipe);
 			context.Check(!mutatedSourceResult.IsSuccess() &&
 				mutatedSourceResult.m_Status == ShaderCompileStatus::InvalidRequest,
 				"CompileOrLoad rejects a recipe whose logical source disagrees with its physical source");
@@ -1395,8 +1301,7 @@ namespace gglab
 			context.Check(filesWritten && firstResult.IsSuccess() && cachedResult.m_FromCache &&
 				includeChanged && changedResult.IsSuccess() && !changedResult.m_FromCache &&
 				revalidatedResult.m_FromCache &&
-				changedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
-				firstResult.m_Artifact.m_Manifest.m_BinaryContentDigest,
+				changedResult.m_Artifact.m_Manifest.m_BinaryContentDigest != firstResult.m_Artifact.m_Manifest.m_BinaryContentDigest,
 				"Changed include content rebuilds the entry and the new digest re-validates");
 
 			// The digest is the sole validation authority. An include rewritten
@@ -1406,8 +1311,7 @@ namespace gglab
 			// all, so there is no recorded-mtime fast path left to bypass this
 			// check.
 			const std::filesystem::path includePath = sourceRoot / L"Probe.hlsli";
-			const std::filesystem::file_time_type includeWriteTime =
-				std::filesystem::last_write_time(includePath, errorCode);
+			const std::filesystem::file_time_type includeWriteTime = std::filesystem::last_write_time(includePath, errorCode);
 			const bool includeChangedSameMtime = !errorCode &&
 				WriteTextFile(includePath, "static const float ProbeValue = 0.75f;\n");
 			std::filesystem::last_write_time(includePath, includeWriteTime, errorCode);
@@ -1418,8 +1322,7 @@ namespace gglab
 
 			// A touched mtime with identical content must stay a hit: mtime
 			// drift alone never invalidates an entry.
-			const std::filesystem::file_time_type touchedWriteTime =
-				includeWriteTime + std::chrono::seconds(1);
+			const std::filesystem::file_time_type touchedWriteTime = includeWriteTime + std::chrono::seconds(1);
 			std::filesystem::last_write_time(includePath, touchedWriteTime, errorCode);
 			const bool includeTouched = !errorCode;
 			const ShaderCompileResult touchedResult = compiler.CompileOrLoad(recipe);
@@ -1450,22 +1353,18 @@ namespace gglab
 			const std::filesystem::path probePath = tempRoot / L"Probe.bin";
 			constexpr std::string_view ProbeContent = "binary read-once probe content";
 			const bool probeWritten = WriteTextFile(probePath, ProbeContent);
-			const std::optional<testing::BinaryReadWithDigest> probe =
-				testing::ReadBinaryWithDigestOnce(probePath);
+			const std::optional<testing::BinaryReadWithDigest> probe = testing::ReadBinaryWithDigestOnce(probePath);
 			const bool probeSelfConsistent = probe.has_value() &&
 				probe->m_Binary.SizeInBytes() == ProbeContent.size() &&
-				std::memcmp(probe->m_Binary.Data(), ProbeContent.data(),
-					ProbeContent.size()) == 0 &&
+				std::memcmp(probe->m_Binary.Data(), ProbeContent.data(), ProbeContent.size()) == 0 &&
 				probe->m_Digest == ComputeSha256(std::span(
 					reinterpret_cast<const std::byte*>(probe->m_Binary.Data()),
 					probe->m_Binary.SizeInBytes()));
 			const bool emptyProbeWritten = WriteTextFile(probePath, "");
-			const std::optional<testing::BinaryReadWithDigest> emptyProbe =
-				testing::ReadBinaryWithDigestOnce(probePath);
+			const std::optional<testing::BinaryReadWithDigest> emptyProbe = testing::ReadBinaryWithDigestOnce(probePath);
 			const bool emptyProbeSelfConsistent = emptyProbe.has_value() &&
 				emptyProbe->m_Binary.SizeInBytes() == 0 &&
-				emptyProbe->m_Digest == ComputeSha256(std::span(
-					reinterpret_cast<const std::byte*>(nullptr), std::size_t{ 0 }));
+				emptyProbe->m_Digest == ComputeSha256(std::span(reinterpret_cast<const std::byte*>(nullptr), std::size_t{ 0 }));
 			context.Check(probeWritten && probeSelfConsistent &&
 				emptyProbeWritten && emptyProbeSelfConsistent,
 				"Binary read-once unit hashes exactly the bytes it returns");
@@ -1501,32 +1400,27 @@ namespace gglab
 					++binaryReadOnceCallCount;
 					return testing::ReadBinaryWithDigestOnce(path);
 				});
-			const std::optional<ShaderArtifactCacheRecord> loaded =
-				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
+			const std::optional<ShaderArtifactCacheRecord> loaded = LoadShaderArtifactCacheRecord(recordPath, binaryPath);
 
-			context.Check(recordWritten && binaryWritten,
-				"Read-once load fixtures are written");
+			context.Check(recordWritten && binaryWritten, "Read-once load fixtures are written");
 			context.Check(loaded.has_value(),
 				"Read-once load accepts the matching record and binary");
 			context.Check(binaryReadOnceCallCount == 1,
 				"Read-once load performs exactly one binary read");
 			context.Check(loaded.has_value() &&
 				loaded->m_Binary.SizeInBytes() == binaryBytes.size() &&
-				std::memcmp(loaded->m_Binary.Data(), binaryBytes.data(),
-					binaryBytes.size()) == 0,
+				std::memcmp(loaded->m_Binary.Data(), binaryBytes.data(), binaryBytes.size()) == 0,
 				"Read-once load returns the exact read bytes");
 			context.Check(loaded.has_value() &&
 				ComputeSha256(std::span(
 					reinterpret_cast<const std::byte*>(loaded->m_Binary.Data()),
-					loaded->m_Binary.SizeInBytes())) ==
-					record.m_Manifest.m_BinaryContentDigest.m_Digest,
+					loaded->m_Binary.SizeInBytes())) == record.m_Manifest.m_BinaryContentDigest.m_Digest,
 				"Read-once load digest matches the manifest digest");
 
 			// A digest mismatch must reject through the same single read
 			// point; the validated digest describes the returned bytes.
 			const bool binaryCorrupted = WriteTextFile(binaryPath, "different bytes");
-			const std::optional<ShaderArtifactCacheRecord> mismatchLoaded =
-				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
+			const std::optional<ShaderArtifactCacheRecord> mismatchLoaded = LoadShaderArtifactCacheRecord(recordPath, binaryPath);
 			const bool mismatchRejected = !mismatchLoaded.has_value() &&
 				binaryReadOnceCallCount == 2;
 			testing::OverrideBinaryReadOnce(nullptr);
@@ -1612,18 +1506,18 @@ namespace gglab
 			// second publication commits B's fresh product.
 			static int publishFailuresRemaining = 0;
 			const auto InjectCountedFailures = []() noexcept
-				{
-					testing::OverridePublishFileFailure([](
-						const std::filesystem::path& /*destination*/) noexcept -> bool
+			{
+				testing::OverridePublishFileFailure([](
+					const std::filesystem::path& /*destination*/) noexcept -> bool
+					{
+						if (publishFailuresRemaining > 0)
 						{
-							if (publishFailuresRemaining > 0)
-							{
-								--publishFailuresRemaining;
-								return true;
-							}
-							return false;
-						});
-				};
+							--publishFailuresRemaining;
+							return true;
+						}
+						return false;
+					});
+			};
 			const bool inputChangedForRepublish = WriteTextFile(
 				sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.5f;\n");
 			// Only the binary rename is consumed: when it fails, the manifest
@@ -1635,8 +1529,7 @@ namespace gglab
 			testing::OverridePublishFileFailure(nullptr);
 			const bool republishSucceeded = republishedResult.IsSuccess() &&
 				!republishedResult.m_FromCache &&
-				republishedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
-					resultA.m_Artifact.m_Manifest.m_BinaryContentDigest;
+				republishedResult.m_Artifact.m_Manifest.m_BinaryContentDigest != resultA.m_Artifact.m_Manifest.m_BinaryContentDigest;
 
 			// Unresolved provenance conflict: the input changes to Z (0.75),
 			// B compiles Z, and every rename keeps failing, so both the first
@@ -1682,12 +1575,9 @@ namespace gglab
 			ShaderCompiler compilerE(sourceRoot, tempRoot / L"CacheE");
 			const ShaderResolvedRecipe winnerRecipe = compilerE.Resolve(desc);
 			const ShaderCompileResult winnerBaseline = compilerE.CompileOrLoad(winnerRecipe);
-			const std::filesystem::path winnerBinaryPath =
-				compilerE.GetCacheBinaryPath(winnerRecipe);
-			const std::filesystem::path winnerRecordPath =
-				MakeCacheRecordPath(winnerBinaryPath);
-			const std::optional<ShaderArtifactCacheRecord> winnerBaselineRecord =
-				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			const std::filesystem::path winnerBinaryPath = compilerE.GetCacheBinaryPath(winnerRecipe);
+			const std::filesystem::path winnerRecordPath = MakeCacheRecordPath(winnerBinaryPath);
+			const std::optional<ShaderArtifactCacheRecord> winnerBaselineRecord = LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
 			bool competingWinnerInstalled = false;
 			ShaderCompileResult committedWinnerResult{};
 			static int committedWinnerFailureCalls = 0;
@@ -1710,14 +1600,12 @@ namespace gglab
 				committedWinnerResult = compilerE.CompileOrLoad(winnerRecipe);
 				testing::OverridePublishFileFailure(nullptr);
 			}
-			const std::optional<ShaderArtifactCacheRecord> observedWinner =
-				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			const std::optional<ShaderArtifactCacheRecord> observedWinner = LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
 			const bool committedWinnerReturned = competingWinnerInstalled &&
 				committedWinnerFailureCalls > 0 && committedWinnerResult.IsSuccess() &&
 				committedWinnerResult.m_FromCache && observedWinner.has_value() &&
 				committedWinnerResult.m_Artifact.m_Manifest == observedWinner->m_Manifest &&
-				committedWinnerResult.m_Artifact.m_Binary.SizeInBytes() ==
-					observedWinner->m_Binary.SizeInBytes() &&
+				committedWinnerResult.m_Artifact.m_Binary.SizeInBytes() == observedWinner->m_Binary.SizeInBytes() &&
 				std::memcmp(committedWinnerResult.m_Artifact.m_Binary.Data(),
 					observedWinner->m_Binary.Data(), observedWinner->m_Binary.SizeInBytes()) == 0;
 
@@ -1729,30 +1617,25 @@ namespace gglab
 			ShaderCompiler compilerD(sourceRoot, tempRoot / L"CacheD");
 			const ShaderResolvedRecipe bindingRecipe = compilerD.Resolve(desc);
 			const ShaderCompileResult bindingBaseline = compilerD.CompileOrLoad(bindingRecipe);
-			const std::filesystem::path bindingBinaryPath =
-				compilerD.GetCacheBinaryPath(bindingRecipe);
-			const std::filesystem::path bindingRecordPath =
-				MakeCacheRecordPath(bindingBinaryPath);
+			const std::filesystem::path bindingBinaryPath = compilerD.GetCacheBinaryPath(bindingRecipe);
+			const std::filesystem::path bindingRecordPath = MakeCacheRecordPath(bindingBinaryPath);
 			const std::optional<ShaderArtifactCacheRecord> bindingBaselineRecord =
 				LoadShaderArtifactCacheRecord(bindingRecordPath, bindingBinaryPath);
 			bool mismatchedRecipeRecordInstalled = false;
 			ShaderPublicationResult mismatchedRecipePublication{};
 			ShaderCompileResult mismatchedRecipeCompile{};
-			if (bindingRecipe.IsSuccess() && bindingBaseline.IsSuccess() &&
-				bindingBaselineRecord.has_value())
+			if (bindingRecipe.IsSuccess() && bindingBaseline.IsSuccess() && bindingBaselineRecord.has_value())
 			{
 				ShaderArtifactCacheRecord mismatchedRecipeRecord = *bindingBaselineRecord;
 				mismatchedRecipeRecord.m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] ^=
 					std::byte{ 0x01 };
-				mismatchedRecipeRecordInstalled =
-					WriteShaderArtifactCacheRecord(bindingRecordPath, mismatchedRecipeRecord);
+				mismatchedRecipeRecordInstalled = WriteShaderArtifactCacheRecord(bindingRecordPath, mismatchedRecipeRecord);
 				testing::OverridePublishFileFailure([](
 					const std::filesystem::path& /*destination*/) noexcept -> bool
 					{
 						return true;
 					});
-				mismatchedRecipePublication = PublishShaderArtifactCacheRecord(
-					bindingBinaryPath, bindingRecordPath, *bindingBaselineRecord);
+				mismatchedRecipePublication = PublishShaderArtifactCacheRecord(bindingBinaryPath, bindingRecordPath, *bindingBaselineRecord);
 				mismatchedRecipeCompile = compilerD.CompileOrLoad(bindingRecipe);
 				testing::OverridePublishFileFailure(nullptr);
 			}
@@ -1809,11 +1692,10 @@ namespace gglab
 			for (std::size_t index = 0; index < 3; ++index)
 			{
 				ShaderArtifactDependency dependency{};
-				dependency.m_LogicalPath = (index == 0)
-					? std::filesystem::path(L"Passes/Probe.hlsl")
-					: std::filesystem::path(std::format(L"Passes/Dep{}.hlsl", index));
-				dependency.m_ContentDigest.m_Value[0] =
-					std::byte{ static_cast<unsigned char>(index + 1) };
+				dependency.m_LogicalPath = (index == 0) ?
+					std::filesystem::path(L"Passes/Probe.hlsl") :
+					std::filesystem::path(std::format(L"Passes/Dep{}.hlsl", index));
+				dependency.m_ContentDigest.m_Value[0] = std::byte{ static_cast<unsigned char>(index + 1) };
 				manifest.m_Dependencies.push_back(std::move(dependency));
 			}
 			record.m_PhysicalSourcePath = L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl";
@@ -1825,48 +1707,37 @@ namespace gglab
 			};
 
 			const bool written = WriteShaderArtifactCacheRecord(recordPath, record);
-			const std::optional<ShaderArtifactCacheRecord> readBack =
-				ReadShaderArtifactCacheRecord(recordPath);
+			const std::optional<ShaderArtifactCacheRecord> readBack = ReadShaderArtifactCacheRecord(recordPath);
 			bool roundTripped = readBack.has_value() &&
 				readBack->m_Manifest.m_RecipeId == record.m_Manifest.m_RecipeId &&
 				readBack->m_Manifest.m_BuildKey == record.m_Manifest.m_BuildKey &&
-				readBack->m_Manifest.m_BinaryContentDigest ==
-					record.m_Manifest.m_BinaryContentDigest &&
+				readBack->m_Manifest.m_BinaryContentDigest == record.m_Manifest.m_BinaryContentDigest &&
 				readBack->m_Manifest.m_TargetProfile == record.m_Manifest.m_TargetProfile &&
 				readBack->m_Manifest.m_BinaryFormat == record.m_Manifest.m_BinaryFormat &&
 				readBack->m_Manifest.m_Stage == record.m_Manifest.m_Stage &&
 				readBack->m_Manifest.m_LogicalSourcePath == record.m_Manifest.m_LogicalSourcePath &&
 				readBack->m_Manifest.m_EntryPoint == record.m_Manifest.m_EntryPoint &&
 				readBack->m_Manifest.m_Defines == record.m_Manifest.m_Defines &&
-				readBack->m_Manifest.m_LogicalIncludeDirs ==
-					record.m_Manifest.m_LogicalIncludeDirs &&
+				readBack->m_Manifest.m_LogicalIncludeDirs == record.m_Manifest.m_LogicalIncludeDirs &&
 				readBack->m_Manifest.m_ExtraArgs == record.m_Manifest.m_ExtraArgs &&
 				readBack->m_PhysicalSourcePath == record.m_PhysicalSourcePath &&
 				readBack->m_PhysicalIncludeDirs == record.m_PhysicalIncludeDirs &&
-				readBack->m_Manifest.m_Dependencies.size() ==
-					record.m_Manifest.m_Dependencies.size() &&
-				readBack->m_DependencyPhysicalPaths.size() ==
-					record.m_DependencyPhysicalPaths.size();
-			for (std::size_t index = 0; roundTripped &&
-				index < record.m_Manifest.m_Dependencies.size(); ++index)
+				readBack->m_Manifest.m_Dependencies.size() == record.m_Manifest.m_Dependencies.size() &&
+				readBack->m_DependencyPhysicalPaths.size() == record.m_DependencyPhysicalPaths.size();
+			for (std::size_t index = 0; roundTripped && index < record.m_Manifest.m_Dependencies.size(); ++index)
 			{
 				roundTripped = roundTripped &&
-					readBack->m_Manifest.m_Dependencies[index].m_LogicalPath ==
-						record.m_Manifest.m_Dependencies[index].m_LogicalPath &&
-					readBack->m_Manifest.m_Dependencies[index].m_ContentDigest ==
-						record.m_Manifest.m_Dependencies[index].m_ContentDigest &&
-					readBack->m_DependencyPhysicalPaths[index] ==
-						record.m_DependencyPhysicalPaths[index];
+					readBack->m_Manifest.m_Dependencies[index].m_LogicalPath == record.m_Manifest.m_Dependencies[index].m_LogicalPath &&
+					readBack->m_Manifest.m_Dependencies[index].m_ContentDigest == record.m_Manifest.m_Dependencies[index].m_ContentDigest &&
+					readBack->m_DependencyPhysicalPaths[index] == record.m_DependencyPhysicalPaths[index];
 			}
 			context.Check(written && roundTripped,
 				"Cache record schema=2 round-trips provenance and physical resolution index-wise");
 
-			const std::optional<std::string> serializedManifest =
-				SerializeShaderArtifactManifest(record.m_Manifest);
-			const std::optional<ShaderArtifactManifest> manifestRoundTrip =
-				serializedManifest.has_value()
-				? DeserializeShaderArtifactManifest(*serializedManifest)
-				: std::nullopt;
+			const std::optional<std::string> serializedManifest = SerializeShaderArtifactManifest(record.m_Manifest);
+			const std::optional<ShaderArtifactManifest> manifestRoundTrip = serializedManifest.has_value() ?
+				DeserializeShaderArtifactManifest(*serializedManifest) :
+				std::nullopt;
 			const bool manifestOnlyRoundTripped = manifestRoundTrip.has_value() &&
 				*manifestRoundTrip == record.m_Manifest;
 			context.Check(manifestOnlyRoundTripped,
@@ -1887,41 +1758,33 @@ namespace gglab
 			// Domain strictness: the document baseline is the emitted schema=2
 			// record; each tamper must reject the document as a cache miss.
 			const auto ReadRecordText = [&recordPath]() noexcept -> std::string
-				{
-					std::ifstream input(recordPath, std::ios::binary);
-					return input
-						? std::string((std::istreambuf_iterator<char>(input)),
-							std::istreambuf_iterator<char>())
-						: std::string{};
-				};
+			{
+				std::ifstream input(recordPath, std::ios::binary);
+				return input ?
+					std::string((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>()) :
+					std::string{};
+			};
 			const std::string baseline = ReadRecordText();
 			const auto RestoreBaseline = [&recordPath, &baseline]() noexcept -> bool
-				{
-					return WriteTextFile(recordPath, baseline);
-				};
+			{
+				return WriteTextFile(recordPath, baseline);
+			};
 
 			const bool duplicateKeyTampered = ReplaceMetadataValue(recordPath,
 				"\"schemaVersion\":2", "\"schemaVersion\":2,\"schemaVersion\":2");
-			const bool duplicateKeyRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool duplicateKeyRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			const bool unknownFieldTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":2", "\"schemaVersion\":2,\"unknownField\":7");
-			const bool unknownFieldRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool unknownFieldTampered = ReplaceMetadataValue(recordPath, "\"schemaVersion\":2", "\"schemaVersion\":2,\"unknownField\":7");
+			const bool unknownFieldRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			const bool typeMismatchTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":2", "\"schemaVersion\":\"2\"");
-			const bool typeMismatchRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool typeMismatchTampered = ReplaceMetadataValue(recordPath, "\"schemaVersion\":2", "\"schemaVersion\":\"2\"");
+			const bool typeMismatchRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			const bool unsupportedSchemaTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":2", "\"schemaVersion\":999");
-			const bool unsupportedSchemaRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool unsupportedSchemaTampered = ReplaceMetadataValue(recordPath, "\"schemaVersion\":2", "\"schemaVersion\":999");
+			const bool unsupportedSchemaRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			// Dependency cardinality invariant: dropping one physical
@@ -1929,22 +1792,17 @@ namespace gglab
 			const bool cardinalityTampered = ReplaceMetadataValue(recordPath,
 				R"("dependencyPhysicalPaths":["C:\\Repo\\Shaders\\Passes\\Probe.hlsl","C:\\Repo\\PhysB.hlsl","C:\\Repo\\PhysC.hlsl"])",
 				R"("dependencyPhysicalPaths":["C:\\Repo\\Shaders\\Passes\\Probe.hlsl","C:\\Repo\\PhysB.hlsl"])");
-			const bool cardinalityRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool cardinalityRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			// The record schema and the manifest schema are independent axes:
 			// bumping either one alone rejects the document.
-			const bool recordSchemaBumped = ReplaceMetadataValue(recordPath,
-				"\"recordSchemaVersion\":2", "\"recordSchemaVersion\":3");
-			const bool recordSchemaBumpedRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool recordSchemaBumped = ReplaceMetadataValue(recordPath, "\"recordSchemaVersion\":2", "\"recordSchemaVersion\":3");
+			const bool recordSchemaBumpedRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			const bool manifestSchemaBumped = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":2", "\"schemaVersion\":3");
-			const bool manifestSchemaBumpedRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool manifestSchemaBumped = ReplaceMetadataValue(recordPath, "\"schemaVersion\":2", "\"schemaVersion\":3");
+			const bool manifestSchemaBumpedRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			// Main-source binding structural invariants: the first dependency
@@ -1952,12 +1810,11 @@ namespace gglab
 			// forms. An empty dependency list, a mismatched first logical
 			// path, or a mismatched first physical resolution must reject the
 			// record as invalid derived data.
-			const auto WriteAndReject = [&recordPath](
-				const ShaderArtifactCacheRecord& probe) noexcept
-				{
-					return WriteShaderArtifactCacheRecord(recordPath, probe) &&
-						!ReadShaderArtifactCacheRecord(recordPath).has_value();
-				};
+			const auto WriteAndReject = [&recordPath](const ShaderArtifactCacheRecord& probe) noexcept
+			{
+				return WriteShaderArtifactCacheRecord(recordPath, probe) &&
+					!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			};
 
 			ShaderArtifactCacheRecord emptyDependencies = record;
 			emptyDependencies.m_Manifest.m_Dependencies.clear();
@@ -1965,13 +1822,11 @@ namespace gglab
 			const bool emptyDependenciesRejected = WriteAndReject(emptyDependencies);
 
 			ShaderArtifactCacheRecord mismatchedLogicalSource = record;
-			mismatchedLogicalSource.m_Manifest.m_Dependencies[0].m_LogicalPath =
-				std::filesystem::path(L"Other/Main.hlsl");
+			mismatchedLogicalSource.m_Manifest.m_Dependencies[0].m_LogicalPath = std::filesystem::path(L"Other/Main.hlsl");
 			const bool mismatchedLogicalSourceRejected = WriteAndReject(mismatchedLogicalSource);
 
 			ShaderArtifactCacheRecord mismatchedPhysicalSource = record;
-			mismatchedPhysicalSource.m_DependencyPhysicalPaths[0] =
-				std::filesystem::path(R"(C:\Repo\Other.hlsl)");
+			mismatchedPhysicalSource.m_DependencyPhysicalPaths[0] = std::filesystem::path(R"(C:\Repo\Other.hlsl)");
 			const bool mismatchedPhysicalSourceRejected = WriteAndReject(mismatchedPhysicalSource);
 
 			RestoreBaseline();
@@ -1982,9 +1837,9 @@ namespace gglab
 			const std::size_t manifestEnd = baseline.find(",\"recordSchemaVersion\":");
 			const bool manifestSectionFound = manifestBegin != std::string::npos &&
 				manifestEnd != std::string::npos && manifestEnd > manifestBegin;
-			const std::string manifestSection = manifestSectionFound
-				? baseline.substr(manifestBegin, manifestEnd - manifestBegin)
-				: std::string{};
+			const std::string manifestSection = manifestSectionFound ?
+				baseline.substr(manifestBegin, manifestEnd - manifestBegin) :
+				std::string{};
 			const bool manifestSectionPortable =
 				manifestSection.find("\"logicalPath\"") != std::string::npos &&
 				manifestSection.find("\"contentDigest\"") != std::string::npos &&
@@ -2003,23 +1858,18 @@ namespace gglab
 				deepDocument += '}';
 			}
 			const bool deepDocumentWritten = WriteTextFile(recordPath, deepDocument);
-			const bool deepDocumentRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool deepDocumentRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			// Integer domain: unsigned integers beyond INT64_MAX must be
 			// rejected instead of being arithmetically converted into the
 			// int64 fields.
-			const bool overflowTampered = OverwriteJsonIntegerField(
-				recordPath, "bindingAbiRevision", "9223372036854775808");
-			const bool overflowRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool overflowTampered = OverwriteJsonIntegerField(recordPath, "bindingAbiRevision", "9223372036854775808");
+			const bool overflowRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			const bool uint64MaxTampered = OverwriteJsonIntegerField(
-				recordPath, "bindingAbiRevision", "18446744073709551615");
-			const bool uint64MaxRejected =
-				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			const bool uint64MaxTampered = OverwriteJsonIntegerField(recordPath, "bindingAbiRevision", "18446744073709551615");
+			const bool uint64MaxRejected = !ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			// Cache epoch evidence: a legacy schema=1 document (previous
@@ -2044,8 +1894,7 @@ namespace gglab
 				R"("contentDigest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",)"
 				R"("lastWriteTimeTicks":9007199254740993}]}})";
 			const bool legacyFixtureWritten = WriteTextFile(legacyPath, legacyFixture);
-			const bool legacyRejected =
-				!ReadShaderArtifactCacheRecord(legacyPath).has_value();
+			const bool legacyRejected = !ReadShaderArtifactCacheRecord(legacyPath).has_value();
 
 			context.Check(!baseline.empty() && duplicateKeyTampered && duplicateKeyRejected,
 				"Cache record reader rejects duplicate object keys");
@@ -2112,46 +1961,48 @@ namespace gglab
 			context.Check(solidAnglesMatch,
 				"Production cubemap texel weights are positive, symmetric and cover exactly four PI steradians");
 
-			const std::array normals{
+			const std::array normals
+			{
 				Vector3::UnitX, -Vector3::UnitX, Vector3::UnitY, -Vector3::UnitY,
 				Vector3::UnitZ, -Vector3::UnitZ, Vector3(1.0f, 1.0f, 1.0f).Normalized(),
 				Vector3(0.17f, -0.31f, 0.935f).Normalized(),
 			};
 			auto integrate = [](const Vector3& normal, uint32_t resolution, const auto& radiance,
 				float* outCosineIntegral = nullptr) noexcept
+			{
+				double result = 0.0;
+				float cosineIntegral = 0.0f;
+				const float inverseResolution = 1.0f / static_cast<float>(resolution);
+				for (uint32_t y = 0; y < resolution; ++y)
 				{
-					double result = 0.0;
-					float cosineIntegral = 0.0f;
-					const float inverseResolution = 1.0f / static_cast<float>(resolution);
-					for (uint32_t y = 0; y < resolution; ++y)
+					for (uint32_t x = 0; x < resolution; ++x)
 					{
-						for (uint32_t x = 0; x < resolution; ++x)
+						const float solidAngle = shader_irradiance_math::GetIrradianceTexelSolidAngle(x, y, resolution);
+						const float u = (static_cast<float>(x) + 0.5f) * inverseResolution * 2.0f - 1.0f;
+						const float v = (static_cast<float>(y) + 0.5f) * inverseResolution * 2.0f - 1.0f;
+						// Permutations of (+/-1, u, v) form a reference sphere grid.
+						// Face orientation is immaterial to these analytic integrals.
+						const std::array directions
 						{
-							const float solidAngle = shader_irradiance_math::GetIrradianceTexelSolidAngle(x, y, resolution);
-							const float u = (static_cast<float>(x) + 0.5f) * inverseResolution * 2.0f - 1.0f;
-							const float v = (static_cast<float>(y) + 0.5f) * inverseResolution * 2.0f - 1.0f;
-							// Permutations of (+/-1, u, v) form a reference sphere grid.
-							// Face orientation is immaterial to these analytic integrals.
-							const std::array directions{
-								Vector3(1.0f, u, v), Vector3(-1.0f, u, v),
-								Vector3(u, 1.0f, v), Vector3(u, -1.0f, v),
-								Vector3(u, v, 1.0f), Vector3(u, v, -1.0f),
-							};
-							for (uint32_t face = 0; face < 6; ++face)
-							{
-								const Vector3 direction = directions[face].Normalized();
-								const float weight = std::max(normal.Dot(direction), 0.0f) * solidAngle;
-								result += radiance(direction, face, x, y) * weight;
-								cosineIntegral += weight;
-							}
+							Vector3(1.0f, u, v), Vector3(-1.0f, u, v),
+							Vector3(u, 1.0f, v), Vector3(u, -1.0f, v),
+							Vector3(u, v, 1.0f), Vector3(u, v, -1.0f),
+						};
+						for (uint32_t face = 0; face < 6; ++face)
+						{
+							const Vector3 direction = directions[face].Normalized();
+							const float weight = std::max(normal.Dot(direction), 0.0f) * solidAngle;
+							result += radiance(direction, face, x, y) * weight;
+							cosineIntegral += weight;
 						}
 					}
-					if (outCosineIntegral)
-					{
-						*outCosineIntegral = cosineIntegral;
-					}
-					return result * shader_irradiance_math::GetIrradianceNormalization(cosineIntegral);
-				};
+				}
+				if (outCosineIntegral)
+				{
+					*outCosineIntegral = cosineIntegral;
+				}
+				return result * shader_irradiance_math::GetIrradianceNormalization(cosineIntegral);
+			};
 			bool constantEnvironmentMatches = true;
 			for (uint32_t resolution : { 1u, 4u, 8u, 16u })
 			{
@@ -2178,7 +2029,9 @@ namespace gglab
 					const double expected = pi + pi / 3.0 * normal.Dot(light);
 					const double actual = integrate(normal, 8u,
 						[&light](const Vector3& direction, auto, auto, auto)
-						{ return 1.0 + 0.5 * direction.Dot(light); });
+						{
+							return 1.0 + 0.5 * direction.Dot(light);
+						});
 					directionalEnvironmentMatches &= std::abs(actual - expected) / pi < 0.003;
 				}
 			}
@@ -2195,7 +2048,9 @@ namespace gglab
 				const double expected = 1000000.0 * peakSolidAngle * std::max(normal.Dot(peakDirection), 0.0f);
 				float cosineIntegral = 0.0f;
 				const double actual = integrate(normal, 8u, [](const auto&, uint32_t face, uint32_t x, uint32_t y)
-					{ return face == 4u && x == 4u && y == 4u ? 1000000.0 : 0.0; }, &cosineIntegral);
+					{
+						return face == 4u && x == 4u && y == 4u ? 1000000.0 : 0.0;
+					}, &cosineIntegral);
 				// Remove the finite-grid white-environment calibration (checked above)
 				// before comparing the fixed texel's analytic cosine response.
 				const double uncalibrated = actual / shader_irradiance_math::GetIrradianceNormalization(cosineIntegral);
@@ -2336,8 +2191,7 @@ namespace gglab
 			const float expected = (150000.0f * alpha + 90000.0f * (1.0f - alpha)) * storageScale;
 			context.Check(std::abs(blended - expected) < 0.000001f &&
 				shader_hdr_math::EncodeSceneColorChannel(-1.0f, storageScale) == 0.0f &&
-				shader_hdr_math::EncodeSceneColorChannel(
-					std::numeric_limits<float>::infinity(), storageScale) == 0.0f,
+				shader_hdr_math::EncodeSceneColorChannel(std::numeric_limits<float>::infinity(), storageScale) == 0.0f,
 				"Pre-exposed RGB preserves alpha blending and rejects invalid HDR channels");
 			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
@@ -2350,7 +2204,7 @@ namespace gglab
 					.m_HlslVersion = L"2021",
 				},
 				.m_Entry = L"CSMain",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderCompileResult artifact = compiler.Compile(desc);
 			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
@@ -2369,24 +2223,21 @@ namespace gglab
 			std::string viewLayoutDisassembly;
 			bool dxilLayoutMatches = viewLayoutDxil.IsSuccess() &&
 				DisassembleDxil(viewLayoutDxil.m_Artifact.m_Binary, viewLayoutDisassembly);
-			const size_t dxilViewDataOffset =
-				viewLayoutDisassembly.find("struct hostlayout.struct.ViewData");
-			const size_t dxilViewDataEnd =
-				viewLayoutDisassembly.find("} $Element;", dxilViewDataOffset);
-			const size_t dxilViewDataLineEnd =
-				viewLayoutDisassembly.find('\n', dxilViewDataEnd);
+			const size_t dxilViewDataOffset = viewLayoutDisassembly.find("struct hostlayout.struct.ViewData");
+			const size_t dxilViewDataEnd = viewLayoutDisassembly.find("} $Element;", dxilViewDataOffset);
+			const size_t dxilViewDataLineEnd = viewLayoutDisassembly.find('\n', dxilViewDataEnd);
 			const std::string_view dxilViewDataLayout =
 				dxilViewDataOffset != std::string::npos &&
-				dxilViewDataEnd != std::string::npos && dxilViewDataLineEnd != std::string::npos
-				? std::string_view(viewLayoutDisassembly).substr(
-					dxilViewDataOffset, dxilViewDataLineEnd - dxilViewDataOffset)
-				: std::string_view{};
+				dxilViewDataEnd != std::string::npos && dxilViewDataLineEnd != std::string::npos ?
+					std::string_view(viewLayoutDisassembly).substr(dxilViewDataOffset, dxilViewDataLineEnd - dxilViewDataOffset) :
+					std::string_view{};
 			struct GPUAbiMember final
 			{
 				std::string_view m_Name;
 				size_t m_Offset = 0;
 			};
-			const std::array viewGPUAbiMembers{
+			const std::array viewGPUAbiMembers
+			{
 				GPUAbiMember{ "ViewMat", offsetof(ViewGPU, ViewMat) },
 				GPUAbiMember{ "ProjMat", offsetof(ViewGPU, ProjMat) },
 				GPUAbiMember{ "InvViewMat", offsetof(ViewGPU, InvViewMat) },
@@ -2394,8 +2245,7 @@ namespace gglab
 				GPUAbiMember{ "PreviousViewMat", offsetof(ViewGPU, PreviousViewMat) },
 				GPUAbiMember{ "PreviousRasterViewProj", offsetof(ViewGPU, PreviousRasterViewProj) },
 				GPUAbiMember{ "CameraPos", offsetof(ViewGPU, CameraPos) },
-				GPUAbiMember{ "PreviousDepthReconstructionParams",
-					offsetof(ViewGPU, PreviousDepthReconstructionParams) },
+				GPUAbiMember{ "PreviousDepthReconstructionParams", offsetof(ViewGPU, PreviousDepthReconstructionParams) },
 				GPUAbiMember{ "Near", offsetof(ViewGPU, Near) },
 				GPUAbiMember{ "Far", offsetof(ViewGPU, Far) },
 				GPUAbiMember{ "FovRadians", offsetof(ViewGPU, FovRadians) },
@@ -2432,9 +2282,9 @@ namespace gglab
 			SpirVDecorationReflection viewLayoutReflection;
 			const bool reflectedViewLayout = viewLayoutSpirV.IsSuccess() &&
 				ReadSpirVDecorations(viewLayoutSpirV.m_Artifact.m_Binary, viewLayoutReflection);
-			const SpirVStructLayoutReflection* spirVViewData = reflectedViewLayout
-				? viewLayoutReflection.FindStructLayout("ViewData")
-				: nullptr;
+			const SpirVStructLayoutReflection* spirVViewData = reflectedViewLayout ?
+				viewLayoutReflection.FindStructLayout("ViewData") :
+				nullptr;
 			bool spirVLayoutMatches = spirVViewData &&
 				spirVViewData->m_Members.size() == viewGPUAbiMembers.size() &&
 				spirVViewData->m_ArrayStride == sizeof(ViewGPU);
@@ -2464,20 +2314,17 @@ namespace gglab
 			std::string objectLayoutDisassembly;
 			bool dxilObjectLayoutMatches = objectLayoutDxil.IsSuccess() &&
 				DisassembleDxil(objectLayoutDxil.m_Artifact.m_Binary, objectLayoutDisassembly);
-			const size_t dxilObjectDataOffset =
-				objectLayoutDisassembly.find("struct hostlayout.struct.ObjectData");
-			const size_t dxilObjectDataEnd =
-				objectLayoutDisassembly.find("} $Element;", dxilObjectDataOffset);
-			const size_t dxilObjectDataLineEnd =
-				objectLayoutDisassembly.find('\n', dxilObjectDataEnd);
+			const size_t dxilObjectDataOffset = objectLayoutDisassembly.find("struct hostlayout.struct.ObjectData");
+			const size_t dxilObjectDataEnd = objectLayoutDisassembly.find("} $Element;", dxilObjectDataOffset);
+			const size_t dxilObjectDataLineEnd = objectLayoutDisassembly.find('\n', dxilObjectDataEnd);
 			const std::string_view dxilObjectDataLayout =
 				dxilObjectDataOffset != std::string::npos &&
 				dxilObjectDataEnd != std::string::npos &&
-				dxilObjectDataLineEnd != std::string::npos
-				? std::string_view(objectLayoutDisassembly).substr(
-					dxilObjectDataOffset, dxilObjectDataLineEnd - dxilObjectDataOffset)
-				: std::string_view{};
-			const std::array objectGPUAbiMembers{
+				dxilObjectDataLineEnd != std::string::npos ?
+					std::string_view(objectLayoutDisassembly).substr(dxilObjectDataOffset, dxilObjectDataLineEnd - dxilObjectDataOffset) :
+					std::string_view{};
+			const std::array objectGPUAbiMembers
+			{
 				GPUAbiMember{ "ModelMat", offsetof(ObjectGPU, ModelMat) },
 				GPUAbiMember{ "PreviousModelMat", offsetof(ObjectGPU, PreviousModelMat) },
 				GPUAbiMember{ "NormalMat", offsetof(ObjectGPU, NormalMat) },
@@ -2502,11 +2349,10 @@ namespace gglab
 			const ShaderCompileResult objectLayoutSpirV = compiler.Compile(desc);
 			SpirVDecorationReflection objectLayoutReflection;
 			const bool reflectedObjectLayout = objectLayoutSpirV.IsSuccess() &&
-				ReadSpirVDecorations(objectLayoutSpirV.m_Artifact.m_Binary,
-					objectLayoutReflection);
-			const SpirVStructLayoutReflection* spirVObjectData = reflectedObjectLayout
-				? objectLayoutReflection.FindStructLayout("ObjectData")
-				: nullptr;
+				ReadSpirVDecorations(objectLayoutSpirV.m_Artifact.m_Binary, objectLayoutReflection);
+			const SpirVStructLayoutReflection* spirVObjectData = reflectedObjectLayout ?
+				objectLayoutReflection.FindStructLayout("ObjectData") :
+				nullptr;
 			bool spirVObjectLayoutMatches = spirVObjectData &&
 				spirVObjectData->m_Members.size() == objectGPUAbiMembers.size() &&
 				spirVObjectData->m_ArrayStride == sizeof(ObjectGPU);
@@ -2515,10 +2361,8 @@ namespace gglab
 				for (size_t index = 0; index < objectGPUAbiMembers.size(); ++index)
 				{
 					spirVObjectLayoutMatches =
-						spirVObjectData->m_Members[index].m_Name ==
-							objectGPUAbiMembers[index].m_Name &&
-						spirVObjectData->m_Members[index].m_Offset ==
-							objectGPUAbiMembers[index].m_Offset;
+						spirVObjectData->m_Members[index].m_Name == objectGPUAbiMembers[index].m_Name &&
+						spirVObjectData->m_Members[index].m_Offset == objectGPUAbiMembers[index].m_Offset;
 					if (!spirVObjectLayoutMatches)
 					{
 						break;
@@ -2574,8 +2418,7 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileResult allLightsForwardPixelArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult allLightsForwardPixelArtifact = compiler.Compile(desc);
 			auto shadowDesc = desc;
 			shadowDesc.m_Target = {};
 			shadowDesc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
@@ -2600,8 +2443,9 @@ namespace gglab
 			SpirVDecorationReflection shadowReflection;
 			const bool shadowSpirVReflected = allLightsForwardPixelArtifact.IsSuccess() &&
 				ReadSpirVDecorations(allLightsForwardPixelArtifact.m_Artifact.m_Binary, shadowReflection);
-			const auto* shadowLayout = shadowSpirVReflected
-				? shadowReflection.FindStructLayout("type.ConstantBuffer.DirectionalShadowData") : nullptr;
+			const auto* shadowLayout = shadowSpirVReflected ?
+				shadowReflection.FindStructLayout("type.ConstantBuffer.DirectionalShadowData") :
+				nullptr;
 			context.Check(shadowLayout && shadowLayout->m_Size == sizeof(DirectionalShadowGPU) &&
 				shadowLayout->m_Members.size() == 12 &&
 				shadowLayout->m_Members[0].m_Offset == offsetof(DirectionalShadowGPU, SplitFar) &&
@@ -2633,8 +2477,9 @@ namespace gglab
 			SpirVDecorationReflection previewReflection;
 			const bool previewSpirVReflected = shadowPreviewSpirV.IsSuccess() &&
 				ReadSpirVDecorations(shadowPreviewSpirV.m_Artifact.m_Binary, previewReflection);
-			const auto* previewLayout = previewSpirVReflected
-				? previewReflection.FindStructLayout("type.ConstantBuffer.ShadowMapPreviewPassParameters") : nullptr;
+			const auto* previewLayout = previewSpirVReflected ?
+				previewReflection.FindStructLayout("type.ConstantBuffer.ShadowMapPreviewPassParameters") :
+				nullptr;
 			context.Check(previewLayout && previewLayout->m_Size == 32u &&
 				previewLayout->m_Members.size() == 8u &&
 				previewLayout->m_Members[6].m_Offset == 24u &&
@@ -2646,45 +2491,38 @@ namespace gglab
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileResult allLightsGTAOContributionPixelArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult allLightsGTAOContributionPixelArtifact = compiler.Compile(desc);
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_FORWARD_PLUS",
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileResult forwardPlusPixelArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult forwardPlusPixelArtifact = compiler.Compile(desc);
 			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
 				.m_Value = L"1",
-				});
-			const ShaderCompileResult forwardPlusGTAOContributionPixelArtifact =
-				compiler.Compile(desc);
+			});
+			const ShaderCompileResult forwardPlusGTAOContributionPixelArtifact = compiler.Compile(desc);
 			desc.m_Defines.pop_back();
 			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
 				.m_Value = L"1",
-				});
-			const ShaderCompileResult forwardPlusValidationPixelArtifact =
-				compiler.Compile(desc);
+			});
+			const ShaderCompileResult forwardPlusValidationPixelArtifact = compiler.Compile(desc);
 			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
 				.m_Value = L"1",
-				});
-			const ShaderCompileResult forwardPlusValidationGTAOContributionPixelArtifact =
-				compiler.Compile(desc);
+			});
+			const ShaderCompileResult forwardPlusValidationGTAOContributionPixelArtifact = compiler.Compile(desc);
 			desc.m_Defines.clear();
 			desc.m_SourcePath = L"Passes/PassSkybox.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
-			const ShaderCompileResult skyboxVertexArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult skyboxVertexArtifact = compiler.Compile(desc);
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
-			const ShaderCompileResult skyboxPixelArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult skyboxPixelArtifact = compiler.Compile(desc);
 			context.Check(allLightsForwardPixelArtifact.IsSuccess() &&
 				allLightsGTAOContributionPixelArtifact.IsSuccess() &&
 				forwardPlusPixelArtifact.IsSuccess() &&
@@ -2746,8 +2584,7 @@ namespace gglab
 				{
 					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS_VALIDATION", L"1" });
 				}
-				for (const auto& target : { MakeDX12CompileTarget(ShaderStage::Pixel),
-					MakeVulkan13CompileTarget(ShaderStage::Pixel) })
+				for (const auto& target : { MakeDX12CompileTarget(ShaderStage::Pixel), MakeVulkan13CompileTarget(ShaderStage::Pixel) })
 				{
 					forwardDxilDesc.m_Target = target;
 					forwardDxilDesc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
@@ -2792,17 +2629,18 @@ namespace gglab
 				DisassembleDxil(litDisplayDxil.m_Artifact.m_Binary, litDisplayText) &&
 				DisassembleDxil(litReferenceDxil.m_Artifact.m_Binary, litReferenceText);
 			auto entryBody = [](const std::string& text, std::string_view entry) -> std::string_view
+			{
+				const size_t function = text.find(std::format("define void @{}() {{", entry));
+				if (function == std::string::npos)
 				{
-					const size_t function = text.find(std::format("define void @{}() {{", entry));
-					if (function == std::string::npos)
-					{
-						return {};
-					}
-					const size_t begin = text.find('\n', function);
-					const size_t end = text.find("\n}", begin);
-					return begin != std::string::npos && end != std::string::npos
-						? std::string_view(text).substr(begin, end - begin) : std::string_view{};
-				};
+					return {};
+				}
+				const size_t begin = text.find('\n', function);
+				const size_t end = text.find("\n}", begin);
+				return begin != std::string::npos && end != std::string::npos ?
+					std::string_view(text).substr(begin, end - begin) :
+					std::string_view{};
+			};
 			const auto litBody = entryBody(litDisplayText, "LitDisplayPS");
 			bool litSpirVCompiles = true;
 			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
@@ -2823,8 +2661,7 @@ namespace gglab
 			desc.m_Defines.clear();
 			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
 			desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
-			const ShaderCompileResult surfaceContractArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult surfaceContractArtifact = compiler.Compile(desc);
 			context.Check(surfaceContractArtifact.IsSuccess(),
 				"Production DXC compiles the Forward PBR surface evaluation "
 				"contract with runtime MaterialData input");
@@ -2836,11 +2673,11 @@ namespace gglab
 			const size_t materialLineEnd = materialDisassembly.find('\n', materialEnd);
 			const std::string_view materialLayout =
 				materialStart != std::string::npos && materialEnd != std::string::npos &&
-				materialLineEnd != std::string::npos
-				? std::string_view(materialDisassembly).substr(materialStart,
-					materialLineEnd - materialStart)
-				: std::string_view{};
-			const std::array materialMembers{
+				materialLineEnd != std::string::npos ?
+					std::string_view(materialDisassembly).substr(materialStart, materialLineEnd - materialStart) :
+					std::string_view{};
+			const std::array materialMembers
+			{
 				GPUAbiMember{ "BaseColorBinding", offsetof(MaterialGPU, BaseColorBinding) },
 				GPUAbiMember{ "EmissiveBinding", offsetof(MaterialGPU, EmissiveBinding) },
 				GPUAbiMember{ "MetallicRoughnessBinding", offsetof(MaterialGPU, MetallicRoughnessBinding) },
@@ -2877,8 +2714,7 @@ namespace gglab
 				if (actual != member.m_Offset)
 				{
 					dxilMaterialLayoutMatches = false;
-					materialMismatch += std::format(" {}:{}->{},", member.m_Name,
-						member.m_Offset, actual.value_or(9999));
+					materialMismatch += std::format(" {}:{}->{},", member.m_Name, member.m_Offset, actual.value_or(9999));
 				}
 			}
 			context.Check(dxilMaterialLayoutMatches, std::format(
@@ -2890,8 +2726,9 @@ namespace gglab
 			SpirVDecorationReflection materialReflection;
 			const bool reflectedMaterial = surfaceContractSpirV.IsSuccess() &&
 				ReadSpirVDecorations(surfaceContractSpirV.m_Artifact.m_Binary, materialReflection);
-			const SpirVStructLayoutReflection* spirVMaterial = reflectedMaterial
-				? materialReflection.FindStructLayout("MaterialData") : nullptr;
+			const SpirVStructLayoutReflection* spirVMaterial = reflectedMaterial ?
+				materialReflection.FindStructLayout("MaterialData") :
+				nullptr;
 			bool spirVMaterialLayoutMatches = spirVMaterial &&
 				spirVMaterial->m_ArrayStride == sizeof(MaterialGPU) &&
 				spirVMaterial->m_Members.size() == materialMembers.size();
@@ -2916,8 +2753,7 @@ namespace gglab
 				DisassembleDxil(normalDecodeDxil.m_Artifact.m_Binary, normalDecodeDisassembly);
 			for (uint32_t component = 0; component < 4; ++component)
 			{
-				normalDecodeMatches &= normalDecodeDisassembly.find(
-					std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+				normalDecodeMatches &= normalDecodeDisassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
 			}
 			context.Check(normalDecodeMatches,
 				"Production RGB normal decoding preserves authored Z for zero, fractional, unit, "
@@ -2928,7 +2764,8 @@ namespace gglab
 
 			desc.m_SourcePath = L"Tests/AnisotropicIBLContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";
-			const std::array anisotropicIBLCases{
+			const std::array anisotropicIBLCases
+			{
 				"zero strength", "fully rough lobe", "normal incidence", "bent reflection",
 				"rotated frame", "mirrored frame", "view along bitangent", "near-grazing view",
 				"isotropic continuity", "specular-AA width contrast", "back-face frame",
@@ -2961,31 +2798,32 @@ namespace gglab
 			};
 			const auto checkShaderNumericContracts = [&compiler, &context, &desc](const wchar_t* sourcePath,
 				std::span<const ShaderNumericContractCase> cases)
+			{
+				desc.m_SourcePath = sourcePath;
+				desc.m_Defines.clear();
+				for (const ShaderNumericContractCase& testCase : cases)
 				{
-					desc.m_SourcePath = sourcePath;
-					desc.m_Defines.clear();
-					for (const ShaderNumericContractCase& testCase : cases)
+					desc.m_Entry = testCase.m_Entry;
+					desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+					desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+					const auto numericDxil = compiler.Compile(desc);
+					std::string disassembly;
+					bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+					for (uint32_t component = 0; component < 4; ++component)
 					{
-						desc.m_Entry = testCase.m_Entry;
-						desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
-						desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
-						const auto numericDxil = compiler.Compile(desc);
-						std::string disassembly;
-						bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
-						for (uint32_t component = 0; component < 4; ++component)
-						{
-							matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
-						}
-						context.Check(matches, std::format("Production shader numeric contract returns zero failure output in DXIL: {}",
-							testCase.m_Description));
-						desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-						desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
-						context.Check(compiler.Compile(desc).IsSuccess(),
-							std::format("Production shader numeric contract compiles to SPIR-V: {}", testCase.m_Description));
+						matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
 					}
-				};
+					context.Check(matches, std::format("Production shader numeric contract returns zero failure output in DXIL: {}",
+						testCase.m_Description));
+					desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+					desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+					context.Check(compiler.Compile(desc).IsSuccess(),
+						std::format("Production shader numeric contract compiles to SPIR-V: {}", testCase.m_Description));
+				}
+			};
 
-			const std::array irradianceCases{
+			const std::array irradianceCases
+			{
 				ShaderNumericContractCase{ L"TestIrradianceGridForLowPreset", "irradiance Low preset selects a 4x4 face grid" },
 				ShaderNumericContractCase{ L"TestIrradianceGridForMediumPreset", "irradiance Medium preset selects an 8x8 face grid" },
 				ShaderNumericContractCase{ L"TestIrradianceGridForHighPreset", "irradiance High preset selects a 16x16 face grid" },
@@ -2997,7 +2835,8 @@ namespace gglab
 			};
 			checkShaderNumericContracts(L"Tests/IrradianceIntegrationContractCompile.hlsl", irradianceCases);
 
-			const std::array specularCases{
+			const std::array specularCases
+			{
 				ShaderNumericContractCase{ L"TestCubemapJacobianAtFaceCenter", "cube-face center has Jacobian 4" },
 				ShaderNumericContractCase{ L"TestCubemapJacobianAtFaceCorner", "cube-face corner has Jacobian 4 / (3 * sqrt(3))" },
 				ShaderNumericContractCase{ L"TestGGXPdfAtUnitAlpha", "unit-alpha GGX has reflected-direction PDF 1 / (4 * pi)" },
@@ -3009,7 +2848,8 @@ namespace gglab
 			};
 			checkShaderNumericContracts(L"Tests/SpecularIntegrationContractCompile.hlsl", specularCases);
 
-			const std::array temporalHistoryClipCases{
+			const std::array temporalHistoryClipCases
+			{
 				ShaderNumericContractCase{ L"TestClipPreservesGrayHistory", "collapsed chroma axes retain in-box luminance history" },
 				ShaderNumericContractCase{ L"TestClipGrayHistoryAtBoundary", "gray history clips at the luminance boundary" },
 				ShaderNumericContractCase{ L"TestClipRejectsOutsideCollapsedAxis", "nonzero direction on a collapsed axis still rejects history" },
@@ -3038,7 +2878,8 @@ namespace gglab
 			}
 			desc.m_Stage = ShaderStage::Pixel;
 
-			const std::array materialShadingCases{
+			const std::array materialShadingCases
+			{
 				ShaderNumericContractCase{ L"TestMaterialDirectionalEnergy", "prepared base retains GGX energy and diffuse partition" },
 				ShaderNumericContractCase{ L"TestMetalSuppressesDiffuseIBL", "metal endpoint suppresses diffuse IBL" },
 				ShaderNumericContractCase{ L"TestClearcoatIBLTransmission", "reflected IBL crosses the coat twice before adding its reflection" },
@@ -3064,7 +2905,8 @@ namespace gglab
 
 			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";
-			const std::array sunDiskCases{
+			const std::array sunDiskCases
+			{
 				"isotropic base only", "anisotropic base only", "smooth base and independent coat",
 				"anisotropic base and smooth coat", "center base and disk coat", "disk base and center coat",
 				"exact alpha threshold", "base below and coat above threshold", "base above and coat below threshold",
@@ -3101,23 +2943,24 @@ namespace gglab
 				{
 					ShaderDesc scanDesc{ .m_SourcePath = L"Passes/PassNonFiniteScan.hlsl", .m_Stage = ShaderStage::Compute,
 						.m_Target = target, .m_Entry = variant == 0 ? L"CSClear" : L"CSMain", .m_IncludeDirs = { L"." } };
-					if (variant == 2) { scanDesc.m_Defines = { { L"GGLAB_NONFINITE_SCAN_BUFFER", L"1" } }; }
+					if (variant == 2)
+					{
+						scanDesc.m_Defines = { { L"GGLAB_NONFINITE_SCAN_BUFFER", L"1" } };
+					}
 					context.Check(compiler.Compile(scanDesc).IsSuccess(), "Non-finite clear/texture/buffer scan compiles for DXIL and SPIR-V");
 				}
 			}
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";
-			const ShaderCompileResult forwardPlusArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult forwardPlusArtifact = compiler.Compile(desc);
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_FORWARD_PLUS_DIAGNOSTICS",
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileResult forwardPlusDiagnosticsArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult forwardPlusDiagnosticsArtifact = compiler.Compile(desc);
 			context.Check(forwardPlusArtifact.IsSuccess() &&
 				forwardPlusDiagnosticsArtifact.IsSuccess(),
 				"Production DXC compiles fixed-stride Forward+ cull and diagnostics variants");
@@ -3130,8 +2973,7 @@ namespace gglab
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileResult hdrDiffTileArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult hdrDiffTileArtifact = compiler.Compile(desc);
 			desc.m_Entry = L"CSReduceFrame";
 			desc.m_Defines = {
 				{
@@ -3139,8 +2981,7 @@ namespace gglab
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileResult hdrDiffFrameArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult hdrDiffFrameArtifact = compiler.Compile(desc);
 			context.Check(hdrDiffTileArtifact.IsSuccess() &&
 				hdrDiffFrameArtifact.IsSuccess(),
 				"Production DXC compiles deterministic Forward+ HDR diff reduction shaders");
@@ -3148,28 +2989,23 @@ namespace gglab
 			desc.m_SourcePath = L"Passes/PassGTAO.hlsl";
 			desc.m_Entry = L"CSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileResult gtaoArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult gtaoArtifact = compiler.Compile(desc);
 			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"},
+				{ .m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1" },
 			};
-			const ShaderCompileResult gtaoDiagnosticsArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult gtaoDiagnosticsArtifact = compiler.Compile(desc);
 			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DENOISE_X", .m_Value = L"1"},
+				{ .m_Name = L"GGLAB_GTAO_DENOISE_X", .m_Value = L"1" },
 			};
-			const ShaderCompileResult gtaoDenoiseXArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult gtaoDenoiseXArtifact = compiler.Compile(desc);
 			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DENOISE_Y", .m_Value = L"1"},
+				{ .m_Name = L"GGLAB_GTAO_DENOISE_Y", .m_Value = L"1" },
 			};
-			const ShaderCompileResult gtaoDenoiseYArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult gtaoDenoiseYArtifact = compiler.Compile(desc);
 			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_UPSAMPLE", .m_Value = L"1"},
+				{ .m_Name = L"GGLAB_GTAO_UPSAMPLE", .m_Value = L"1" },
 			};
-			const ShaderCompileResult gtaoUpsampleArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult gtaoUpsampleArtifact = compiler.Compile(desc);
 			context.Check(gtaoArtifact.IsSuccess() &&
 				gtaoDiagnosticsArtifact.IsSuccess() &&
 				gtaoDenoiseXArtifact.IsSuccess() &&
@@ -3184,27 +3020,33 @@ namespace gglab
 			desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
 			const auto atmosphereDxil = compiler.Compile(desc);
 			std::string atmosphereDisassembly;
-			const bool atmosphereDxilReflected = atmosphereDxil.IsSuccess() && DisassembleDxil(atmosphereDxil.m_Artifact.m_Binary,atmosphereDisassembly);
-			const std::array<const char*,8> atmosphereMembers{ "Radii", "Rayleigh", "Mie", "Absorption", "Ground", "Sun", "Observer", "World" };
+			const bool atmosphereDxilReflected = atmosphereDxil.IsSuccess() && DisassembleDxil(atmosphereDxil.m_Artifact.m_Binary, atmosphereDisassembly);
+			const std::array<const char*, 8> atmosphereMembers{ "Radii", "Rayleigh", "Mie", "Absorption", "Ground", "Sun", "Observer", "World" };
 			bool atmosphereDxilOffsets = atmosphereDxilReflected;
-			for (size_t i=0;i<atmosphereMembers.size();++i)
-				atmosphereDxilOffsets &= FindDxilMemberOffset(atmosphereDisassembly,atmosphereMembers[i])==i*16;
-			context.Check(atmosphereDxilOffsets,"DXIL atmosphere parameter offsets match the explicit CPU float4 layout");
+			for (size_t i = 0; i < atmosphereMembers.size(); ++i)
+			{
+				atmosphereDxilOffsets &= FindDxilMemberOffset(atmosphereDisassembly, atmosphereMembers[i]) == i * 16;
+			}
+			context.Check(atmosphereDxilOffsets, "DXIL atmosphere parameter offsets match the explicit CPU float4 layout");
 			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
 			const auto atmosphereSpirV = compiler.Compile(desc);
 			context.Check(atmosphereDxil.IsSuccess() && atmosphereSpirV.IsSuccess(),
 				"DXIL and SPIR-V compile atmosphere transmittance, multiple scattering and sky-view transport");
 			SpirVDecorationReflection atmosphereReflection;
 			const bool atmosphereReflected = atmosphereSpirV.IsSuccess() &&
-				ReadSpirVDecorations(atmosphereSpirV.m_Artifact.m_Binary,atmosphereReflection);
-			const auto* atmosphereLayout = atmosphereReflected
-				? atmosphereReflection.FindStructLayout("type.ConstantBuffer.AtmosphereParameters") : nullptr;
-			bool atmosphereOffsets = atmosphereLayout && atmosphereLayout->m_Members.size()==8;
+				ReadSpirVDecorations(atmosphereSpirV.m_Artifact.m_Binary, atmosphereReflection);
+			const auto* atmosphereLayout = atmosphereReflected ?
+				atmosphereReflection.FindStructLayout("type.ConstantBuffer.AtmosphereParameters") :
+				nullptr;
+			bool atmosphereOffsets = atmosphereLayout && atmosphereLayout->m_Members.size() == 8;
 			if (atmosphereOffsets)
 			{
-				for (size_t i=0;i<8;++i) atmosphereOffsets &= atmosphereLayout->m_Members[i].m_Offset==i*16;
+				for (size_t i = 0; i < 8; ++i)
+				{
+					atmosphereOffsets &= atmosphereLayout->m_Members[i].m_Offset == i * 16;
+				}
 			}
-			context.Check(atmosphereOffsets,"Atmosphere constant buffer has eight explicitly aligned float4 rows in SPIR-V");
+			context.Check(atmosphereOffsets, "Atmosphere constant buffer has eight explicitly aligned float4 rows in SPIR-V");
 
 			desc.m_SourcePath = L"Passes/PassPhysicalSky.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
@@ -3226,7 +3068,7 @@ namespace gglab
 			desc.m_SourcePath = L"Passes/PassAerialPerspective.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSBuild";
-			desc.m_Defines = { {.m_Name = L"AERIAL_BUILD", .m_Value = L"1"} };
+			desc.m_Defines = { { .m_Name = L"AERIAL_BUILD", .m_Value = L"1" } };
 			desc.m_Target = {};
 			const auto aerialBuildDxil = compiler.Compile(desc);
 			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
@@ -3243,13 +3085,15 @@ namespace gglab
 			SpirVDecorationReflection aerialBuildReflection;
 			const bool aerialBuildReflected = aerialBuildSpirV.IsSuccess() &&
 				ReadSpirVDecorations(aerialBuildSpirV.m_Artifact.m_Binary, aerialBuildReflection);
-			const auto* aerialBuildLayout = aerialBuildReflected
-				? aerialBuildReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") : nullptr;
+			const auto* aerialBuildLayout = aerialBuildReflected ?
+				aerialBuildReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") :
+				nullptr;
 			SpirVDecorationReflection aerialCompositeReflection;
 			const bool aerialCompositeReflected = aerialCompositeSpirV.IsSuccess() &&
 				ReadSpirVDecorations(aerialCompositeSpirV.m_Artifact.m_Binary, aerialCompositeReflection);
-			const auto* aerialCompositeLayout = aerialCompositeReflected
-				? aerialCompositeReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") : nullptr;
+			const auto* aerialCompositeLayout = aerialCompositeReflected ?
+				aerialCompositeReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") :
+				nullptr;
 			context.Check(aerialBuildLayout && aerialBuildLayout->m_Members.size() == 14 &&
 				aerialBuildLayout->m_Members[12].m_Offset == 48 &&
 				aerialCompositeLayout && aerialCompositeLayout->m_Members.size() == 16 &&
@@ -3322,12 +3166,10 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileResult napaVoxelVertexArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult napaVoxelVertexArtifact = compiler.Compile(desc);
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
-			const ShaderCompileResult napaVoxelPixelArtifact =
-				compiler.Compile(desc);
+			const ShaderCompileResult napaVoxelPixelArtifact = compiler.Compile(desc);
 			context.Check(napaVoxelVertexArtifact.IsSuccess() &&
 				napaVoxelPixelArtifact.IsSuccess(),
 				"Production DXC compiles the Napa voxel static mesh shader");
@@ -3351,8 +3193,9 @@ namespace gglab
 			SpirVDecorationReflection finalColorReflection;
 			const bool finalColorReflected = finalColorArtifact.IsSuccess() &&
 				ReadSpirVDecorations(finalColorArtifact.m_Artifact.m_Binary, finalColorReflection);
-			const auto* finalColorLayout = finalColorReflected
-				? finalColorReflection.FindStructLayout("type.ConstantBuffer.FinalColorPassParameters") : nullptr;
+			const auto* finalColorLayout = finalColorReflected ?
+				finalColorReflection.FindStructLayout("type.ConstantBuffer.FinalColorPassParameters") :
+				nullptr;
 			context.Check(finalColorLayout && finalColorLayout->m_Size == 48u &&
 				finalColorLayout->m_Members.size() == 12u && finalColorLayout->m_Members[8].m_Offset == 32u &&
 				finalColorLayout->m_Members[9].m_Offset == 36u && finalColorLayout->m_Members[10].m_Offset == 40u &&

@@ -87,7 +87,7 @@ namespace gglab
 							.m_DrawVariantBits = variantBits,
 							.m_HdrDiffValidation = hdrDiffValidation,
 							.m_GTAOContribution = contribution,
-						});
+							});
 					}
 				}
 			}
@@ -99,9 +99,9 @@ namespace gglab
 			const auto& variant = m_DiagnosticPrewarmVariants[m_DiagnosticPrewarmProgress.m_CompletedCount];
 			const bool transparent =
 				RenderQueueBuilder::DecodeVariantBucket(variant.m_DrawVariantBits) == RenderBucket::Transparent;
-			const bool prewarmed = transparent
-				? m_ForwardTransparentPass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits)
-				: m_ForwardOpaquePass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits,
+			const bool prewarmed = transparent ?
+				m_ForwardTransparentPass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits) :
+				m_ForwardOpaquePass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits,
 					variant.m_HdrDiffValidation, variant.m_GTAOContribution);
 			if (prewarmed)
 			{
@@ -125,15 +125,15 @@ namespace gglab
 		// Upscaling is a recipe capability; the shared planner applies this frame's
 		// native-resolution requirement before selecting extents and allocating history.
 		info.m_TemporalAA.m_UpscalingAvailable = true;
-		const SceneExtensionTemporalParticipation participation = m_SceneExtension
-			? m_SceneExtension->GetTemporalParticipation()
-			: SceneExtensionTemporalParticipation::PostTAA;
+		const SceneExtensionTemporalParticipation participation = m_SceneExtension ?
+			m_SceneExtension->GetTemporalParticipation() :
+			SceneExtensionTemporalParticipation::PostTAA;
 		// TemporalIntegrated remains reserved until the extension API can provide matching
 		// color, depth, motion, and submitted-frame transaction participation.
 		info.m_SceneExtensionParticipation =
-			participation == SceneExtensionTemporalParticipation::TemporalIntegrated
-			? SceneExtensionTemporalParticipation::TemporalUnsupported
-			: participation;
+			participation == SceneExtensionTemporalParticipation::TemporalIntegrated ?
+				SceneExtensionTemporalParticipation::TemporalUnsupported :
+				participation;
 		return gglab::ResolveTemporalFramePlan(info);
 	}
 
@@ -195,11 +195,11 @@ namespace gglab
 		{
 			auto& validation = rg.GetBlackboard().Create<RGForwardPlusValidationResources>(
 				ForwardPlusValidationResourcesName);
-			validation.m_Status = !m_ForwardPlusDebugReadback->IsHdrDiffRequested()
-				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested }
-				: !forwardPlusActive
-				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
-				: ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+			validation.m_Status = !m_ForwardPlusDebugReadback->IsHdrDiffRequested() ?
+				ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested } :
+				!forwardPlusActive ?
+					ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive } :
+					ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			forwardPlusValidationEnabled = validation.IsActive();
 		}
 		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
@@ -230,10 +230,8 @@ namespace gglab
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
 			resolution = context.GetDisplayRenderView().GetResolution(),
 			depthCoverageFramePlan,
-			geometryMotion =
-				context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
-			temporalAAActive =
-				context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
+			geometryMotion = context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
+			temporalAAActive = context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
@@ -295,7 +293,7 @@ namespace gglab
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
 				backBufferDesc.m_Extent =
-					{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
+				{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
@@ -343,7 +341,7 @@ namespace gglab
 				{
 					RHITextureDesc displayDepthDesc = depthBufferDesc;
 					displayDepthDesc.m_Extent =
-						{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
+					{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
 					displayDepth.m_Texture =
 						builder.CreateTexture("DisplayView.DisplayDepth", displayDepthDesc);
 				}
@@ -714,8 +712,9 @@ namespace gglab
 				context, displayView.m_Width, displayView.m_Height),
 		};
 		const DepthCoverageFramePlan& depthCoverage = plan.m_DepthCoverage;
-		plan.m_ForwardPlusStatus = depthCoverage.m_HasDepthCoverageDraws
-			? ForwardPlusFrameStatus::Active : ForwardPlusFrameStatus::NoOpaqueDraws;
+		plan.m_ForwardPlusStatus = depthCoverage.m_HasDepthCoverageDraws ?
+			ForwardPlusFrameStatus::Active :
+			ForwardPlusFrameStatus::NoOpaqueDraws;
 		const bool gtaoEnabled = context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled;
 		const bool gtaoCoreAvailable = m_GTAOPass.GetCapabilityStatus().IsCoreAvailable();
 		plan.m_GTAOStatus = ResolveGTAOFrameStatus(

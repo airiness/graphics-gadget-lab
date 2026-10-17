@@ -90,7 +90,8 @@ namespace gglab
 			properties.m_Height = std::max<uint32_t>(1, desc.Height >> mip);
 			properties.m_SampleCount = desc.SampleDesc.Count;
 			format = key.m_Desc.m_Format == RHIFormat::Unknown ?
-				ToRHIFormat(desc.Format) : key.m_Desc.m_Format;
+				ToRHIFormat(desc.Format) :
+				key.m_Desc.m_Format;
 			if (format == RHIFormat::Unknown)
 			{
 				return false;
@@ -298,7 +299,8 @@ namespace gglab
 		{
 			return false;
 		}
-		const uint32_t bytesPerTexel = copy.m_SourceAspect == RHITextureAspect::Stencil ? 1u :
+		const uint32_t bytesPerTexel = copy.m_SourceAspect == RHITextureAspect::Stencil ?
+			1u :
 			GetRHIFormatInfo(footprint.m_Format).m_BytesPerBlock;
 		if (bytesPerTexel == 0 || footprint.m_BytesPerTexel != bytesPerTexel ||
 			footprint.m_RowSizeInBytes != static_cast<uint64_t>(footprint.m_Width) * bytesPerTexel ||

@@ -25,7 +25,7 @@ namespace gglab
 					"Renders transparent scene geometry with all-lights forward PBR shading.",
 				.m_Category = RenderPassCategory::Geometry,
 				.m_Type = RenderPassType::Graphics,
-			})
+				})
 		{
 		}
 		~RenderPassForwardTransparent() override = default;

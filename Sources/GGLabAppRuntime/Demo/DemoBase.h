@@ -50,8 +50,9 @@ namespace gglab
 				return;
 			}
 			readiness.Add("content",
-				progress->HasFailed() ? FrameCaptureGateState::Failed
-				: FrameCaptureGateState::Pending,
+				progress->HasFailed() ?
+					FrameCaptureGateState::Failed :
+					FrameCaptureGateState::Pending,
 				progress->m_Stage);
 		}
 		// Persisted id of the content inside the Demo that captures identify, such

@@ -88,9 +88,9 @@ namespace gglab
 				if (IsBindlessBindingType(source.m_Type))
 				{
 					slot.m_BackendMapping = RHIBindingBackendMapping::BindlessTable;
-					slot.m_BackendBindingType = source.m_Type == RHIBindingType::BindlessResourceTable
-						? "Set 1 resource array"
-						: "Set 1 sampler array";
+					slot.m_BackendBindingType = source.m_Type == RHIBindingType::BindlessResourceTable ?
+						"Set 1 resource array" :
+						"Set 1 sampler array";
 					layout.m_BindlessResources |=
 						source.m_Type == RHIBindingType::BindlessResourceTable;
 					layout.m_BindlessSamplers |=
@@ -106,7 +106,9 @@ namespace gglab
 							plan->m_Set0Bindings.begin(),
 							plan->m_Set0Bindings.begin() + plan->m_Set0BindingCount,
 							[fixedParameter](const VulkanSet0BindingPlan& candidate)
-							{ return candidate.m_LogicalParameterIndex == fixedParameter; });
+							{
+								return candidate.m_LogicalParameterIndex == fixedParameter;
+							});
 						if (native != plan->m_Set0Bindings.begin() + plan->m_Set0BindingCount)
 						{
 							slot.m_BackendBindingType = std::string("Set 0 binding ") +

@@ -93,9 +93,17 @@ immediate updates only when the state can safely change in place.
 - Use C++20 and include semantic dependencies directly; PCH contents are not an
   include contract. Do not explicitly include removed or build-injected PCH
   headers in ordinary sources.
-- Use braces for every `if` and `else` branch body in first-party C++ and HLSL,
-  even for a single statement or a body that fits on one line. Keep conventional
-  `else if` chains, with braces around each branch body.
+- In ordinary C++ code, end statement-like and declaration-like macro
+  invocations with a semicolon at the call site, even if the expansion
+  already supplies one. Expression-like macros follow the surrounding
+  expression syntax.
+- Use braces for every `if`, `else`, `for` (including range-based loops), `while`
+  and `do-while` body in first-party C++ and HLSL, even for a single statement.
+  Keep conventional `else if` chains, with braces around each branch body.
+- Apply the [gglab-format](.agents/skills/gglab-format/SKILL.md) conventions while
+  editing first-party C++ and HLSL. Use 100 columns as a soft target, prioritizing
+  readability and semantic grouping. Detailed layout rules and examples belong
+  in that skill.
 - Follow neighboring naming and layout. Use `gglab` for GGLab code and
   `napa::voxel` for Napa core code. Use lasting semantic names instead of phase,
   commit or cache-epoch labels in durable identifiers, filenames and comments.
@@ -103,17 +111,13 @@ immediate updates only when the state can safely change in place.
   project convention. Prefer existing assertions and logging within the owning
   domain.
 - Follow `.editorconfig` and `.gitattributes`: UTF-8 without BOM and CRLF by
-  default, preserving per-file exceptions. Before handoff, restore that encoding
-  and line-ending form for every source file modified during the task; otherwise
-  `Scripts/OpenGGLabVS.bat` normalization may create unrelated follow-up diffs.
-  In particular, `Shaders/Tests/Generated/*.hlsli` fixtures are byte-pinned LF
-  files; newline conversion changes their identity. Use Visual Studio's C++
-  formatter as the canonical formatter; do not substitute clang-format or
-  another formatter engine, preserve neighboring pointer/reference spacing and
-  declaration layout, avoid unrelated formatting churn and do not mix formatter
-  engines in one change. Visual Studio project files have repository-specific
-  encoding and formatting requirements; preserve them and use the repository
-  scripts when repair or regeneration is required.
+  default, preserving per-file exceptions. Restore this form before handoff;
+  `Scripts/OpenGGLabVS.bat` normalization must not create follow-up diffs.
+  Preserve the exact LF bytes of `Shaders/Tests/Generated/*.hlsli` fixtures.
+  Use Visual Studio's native C++ formatter for C++ and its HLSL language service
+  for shaders. Do not format HLSL as C++ or substitute clang-format or another
+  formatter engine. Preserve Visual Studio project files' repository-specific
+  encoding and layout; use the repository scripts for repair or regeneration.
 - Preserve the `Externals/Vender` spelling. Edit `Externals` only for a task
   concerning a vendored dependency. Keep build products, IDE state and shader
   caches out of commits.
@@ -133,6 +137,12 @@ do not hand-edit their generated mappings.
 | Shader sources or metadata added, removed or moved | `powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/SyncShadersToVS.ps1 -RootDir .` (also regenerates filters) |
 
 ## Build and verification
+
+After implementing first-party C++ or HLSL changes, complete the scoped
+[gglab-format](.agents/skills/gglab-format/SKILL.md) pass before verification
+builds. Diagnostic compiles during implementation may precede this pass. Revisit
+later code edits before final verification; unchanged code needs no repeated
+formatting pass for each build configuration or test invocation.
 
 Use `README.md` for setup and the executable/suite catalog, and
 `.github/workflows/build.yml` for the CI build matrix and command details. Use

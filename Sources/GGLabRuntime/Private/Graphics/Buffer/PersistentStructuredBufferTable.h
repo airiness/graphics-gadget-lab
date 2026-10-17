@@ -123,7 +123,9 @@ namespace gglab
 		[[nodiscard]] bool ReclaimUnseenSlot() noexcept
 		{
 			const auto stale = std::ranges::find_if(m_Records, [this](const auto& item)
-				{ return item.second.m_LastSeenUpdate != m_UpdateSerial; });
+				{
+					return item.second.m_LastSeenUpdate != m_UpdateSerial;
+				});
 			if (stale == m_Records.end())
 			{
 				return false;
@@ -237,9 +239,9 @@ namespace gglab
 			uint32_t bufferIndex, uint32_t slot) const noexcept
 		{
 			GGLAB_ASSERT(bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size());
-			return bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size()
-				? m_UploadedRevisions[bufferIndex][slot]
-				: 0;
+			return bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size() ?
+				m_UploadedRevisions[bufferIndex][slot] :
+				0;
 		}
 		[[nodiscard]] const BufferVersionStats& GetBufferVersionStats(
 			uint32_t bufferIndex) const noexcept

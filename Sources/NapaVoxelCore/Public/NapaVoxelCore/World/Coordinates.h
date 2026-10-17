@@ -66,23 +66,23 @@ namespace napa::voxel
 		[[nodiscard]] constexpr bool IsEmpty() const noexcept
 		{
 			return m_Min.m_X >= m_MaxExclusive.m_X || m_Min.m_Y >= m_MaxExclusive.m_Y ||
-				   m_Min.m_Z >= m_MaxExclusive.m_Z;
+				m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] constexpr bool Contains(SampleCoord coordinate) const noexcept
 		{
 			return coordinate.m_X >= m_Min.m_X && coordinate.m_Y >= m_Min.m_Y &&
-				   coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
-				   coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
+				coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
+				coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] constexpr bool ContainsBounds(const SampleAabb& bounds) const noexcept
 		{
 			return bounds.m_Min.m_X >= m_Min.m_X && bounds.m_Min.m_Y >= m_Min.m_Y &&
-				   bounds.m_Min.m_Z >= m_Min.m_Z &&
-				   bounds.m_MaxExclusive.m_X <= m_MaxExclusive.m_X &&
-				   bounds.m_MaxExclusive.m_Y <= m_MaxExclusive.m_Y &&
-				   bounds.m_MaxExclusive.m_Z <= m_MaxExclusive.m_Z;
+				bounds.m_Min.m_Z >= m_Min.m_Z &&
+				bounds.m_MaxExclusive.m_X <= m_MaxExclusive.m_X &&
+				bounds.m_MaxExclusive.m_Y <= m_MaxExclusive.m_Y &&
+				bounds.m_MaxExclusive.m_Z <= m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(
@@ -97,14 +97,14 @@ namespace napa::voxel
 		[[nodiscard]] constexpr bool IsEmpty() const noexcept
 		{
 			return m_Min.m_X >= m_MaxExclusive.m_X || m_Min.m_Y >= m_MaxExclusive.m_Y ||
-				   m_Min.m_Z >= m_MaxExclusive.m_Z;
+				m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] constexpr bool Contains(CellCoord coordinate) const noexcept
 		{
 			return coordinate.m_X >= m_Min.m_X && coordinate.m_Y >= m_Min.m_Y &&
-				   coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
-				   coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
+				coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
+				coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(
@@ -119,14 +119,14 @@ namespace napa::voxel
 		[[nodiscard]] constexpr bool IsEmpty() const noexcept
 		{
 			return m_Min.m_X >= m_MaxExclusive.m_X || m_Min.m_Y >= m_MaxExclusive.m_Y ||
-				   m_Min.m_Z >= m_MaxExclusive.m_Z;
+				m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] constexpr bool Contains(ChunkCoord coordinate) const noexcept
 		{
 			return coordinate.m_X >= m_Min.m_X && coordinate.m_Y >= m_Min.m_Y &&
-				   coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
-				   coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
+				coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
+				coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(

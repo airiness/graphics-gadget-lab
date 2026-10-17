@@ -342,8 +342,9 @@ namespace gglab
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, resolution,
 			m_TemporalHistoryManager.get(), scenePreExposure, sample,
 			sample && canAccumulate ? m_TemporalReferenceAccumulator.get() : nullptr,
-			ambientOcclusionHistory && canAccumulateAmbientOcclusion
-				? m_GTAOTemporalHistory.get() : nullptr);
+			ambientOcclusionHistory && canAccumulateAmbientOcclusion ?
+				m_GTAOTemporalHistory.get() :
+				nullptr);
 		return m_ActiveFrame.m_TemporalTransaction;
 	}
 
@@ -640,8 +641,9 @@ namespace gglab
 
 	IBLBakeStage Renderer::GetStageForRecording() const noexcept
 	{
-		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetStageForRecording()
-								  : IBLBakeStage::Idle;
+		return m_IBLBakeScheduler ?
+			m_IBLBakeScheduler->GetStageForRecording() :
+			IBLBakeStage::Idle;
 	}
 
 	void Renderer::NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept
@@ -681,20 +683,23 @@ namespace gglab
 
 	ArtifactCacheCoreStatistics Renderer::GetArtifactCacheStatistics() const noexcept
 	{
-		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetArtifactCacheStatistics()
-								  : ArtifactCacheCoreStatistics{};
+		return m_IBLBakeScheduler ?
+			m_IBLBakeScheduler->GetArtifactCacheStatistics() :
+			ArtifactCacheCoreStatistics{};
 	}
 
 	LocalDerivedDataStoreStatistics Renderer::GetDerivedDataStoreStatistics() const noexcept
 	{
-		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetDerivedDataStoreStatistics()
-								  : LocalDerivedDataStoreStatistics{};
+		return m_IBLBakeScheduler ?
+			m_IBLBakeScheduler->GetDerivedDataStoreStatistics() :
+			LocalDerivedDataStoreStatistics{};
 	}
 
 	TemporalHistoryManagerDiagnostics Renderer::GetTemporalHistoryDiagnostics() const
 	{
-		return m_TemporalHistoryManager ? m_TemporalHistoryManager->GetDiagnostics()
-										: TemporalHistoryManagerDiagnostics{};
+		return m_TemporalHistoryManager ?
+			m_TemporalHistoryManager->GetDiagnostics() :
+			TemporalHistoryManagerDiagnostics{};
 	}
 
 	void Renderer::RetireSceneGpuAllocations(

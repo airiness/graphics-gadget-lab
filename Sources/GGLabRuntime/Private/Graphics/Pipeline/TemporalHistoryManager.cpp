@@ -32,22 +32,22 @@ namespace gglab
 		const RHIDevice& device) noexcept
 	{
 		const auto querySurface = [&device](RHIFormat format)
-		{
-			RHITextureDesc textureDesc{};
-			textureDesc.m_Dimension = RHITextureDimension::Texture2D;
-			textureDesc.m_Format = format;
-			textureDesc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess;
-			textureDesc.m_Extent = { 1, 1, 1 };
-			RHITextureViewDesc viewDesc = MakeRHITexture2DViewDesc(format);
-			viewDesc.m_Type = RHITextureViewType::ShaderResource;
-			const RHITextureSupportResult shaderResource =
-				device.QueryTextureViewSupport(textureDesc, viewDesc);
-			viewDesc.m_Type = RHITextureViewType::UnorderedAccess;
-			return TemporalHistorySurfaceFormatSupport{
-				.m_ShaderResource = shaderResource,
-				.m_TypedUavStore = device.QueryTextureViewSupport(textureDesc, viewDesc),
+			{
+				RHITextureDesc textureDesc{};
+				textureDesc.m_Dimension = RHITextureDimension::Texture2D;
+				textureDesc.m_Format = format;
+				textureDesc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess;
+				textureDesc.m_Extent = { 1, 1, 1 };
+				RHITextureViewDesc viewDesc = MakeRHITexture2DViewDesc(format);
+				viewDesc.m_Type = RHITextureViewType::ShaderResource;
+				const RHITextureSupportResult shaderResource =
+					device.QueryTextureViewSupport(textureDesc, viewDesc);
+				viewDesc.m_Type = RHITextureViewType::UnorderedAccess;
+				return TemporalHistorySurfaceFormatSupport{
+					.m_ShaderResource = shaderResource,
+					.m_TypedUavStore = device.QueryTextureViewSupport(textureDesc, viewDesc),
+				};
 			};
-		};
 
 		return {
 			.m_Color = querySurface(TemporalHistoryColorFormat),
@@ -87,9 +87,9 @@ namespace gglab
 			const TemporalConsumerPlan& temporalAA =
 				plan.GetConsumer(TemporalConsumer::TemporalAA);
 			Invalidate(temporalAA.m_Requested &&
-				temporalAA.m_Status == TemporalConsumerStatus::Unavailable
-				? TemporalHistoryResetReason::AvailabilityChanged
-				: TemporalHistoryResetReason::Disabled);
+				temporalAA.m_Status == TemporalConsumerStatus::Unavailable ?
+					TemporalHistoryResetReason::AvailabilityChanged :
+					TemporalHistoryResetReason::Disabled);
 			return {};
 		}
 
@@ -375,9 +375,9 @@ namespace gglab
 		}
 		return current.m_ColorFormat != compatibility.m_ColorFormat ||
 			current.m_DepthFormat != compatibility.m_DepthFormat ||
-			current.m_ReliabilityFormat != compatibility.m_ReliabilityFormat
-			? TemporalHistoryResetReason::FormatChanged
-			: TemporalHistoryResetReason::None;
+			current.m_ReliabilityFormat != compatibility.m_ReliabilityFormat ?
+				TemporalHistoryResetReason::FormatChanged :
+				TemporalHistoryResetReason::None;
 	}
 
 	bool TemporalHistoryManager::CreateHistorySet(

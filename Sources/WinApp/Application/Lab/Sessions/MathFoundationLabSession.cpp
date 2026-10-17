@@ -58,16 +58,14 @@ namespace gglab
 			.m_DefaultValue = int32_t(MathTopic::Vector),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(MathTopic::Vector), .m_Name = "Vector Operations"},
-					{.m_Value = int32_t(MathTopic::MatrixTransform),
-						.m_Name = "Matrix / Transform"},
-					{.m_Value = int32_t(MathTopic::NormalMatrix), .m_Name = "Normal Matrix"},
-					{.m_Value = int32_t(MathTopic::Quaternion), .m_Name = "Quaternion"},
-					{.m_Value = int32_t(MathTopic::Bounds), .m_Name = "Bounds"},
-					{.m_Value = int32_t(MathTopic::ProjectionFrustum),
-						.m_Name = "Projection / Frustum"},
-					{.m_Value = int32_t(MathTopic::FrustumCulling), .m_Name = "Frustum Culling"},
-					{.m_Value = int32_t(MathTopic::Degenerate), .m_Name = "Degenerate Inputs"},
+					{ .m_Value = int32_t(MathTopic::Vector), .m_Name = "Vector Operations" },
+					{ .m_Value = int32_t(MathTopic::MatrixTransform), .m_Name = "Matrix / Transform" },
+					{ .m_Value = int32_t(MathTopic::NormalMatrix), .m_Name = "Normal Matrix" },
+					{ .m_Value = int32_t(MathTopic::Quaternion), .m_Name = "Quaternion" },
+					{ .m_Value = int32_t(MathTopic::Bounds), .m_Name = "Bounds" },
+					{ .m_Value = int32_t(MathTopic::ProjectionFrustum), .m_Name = "Projection / Frustum" },
+					{ .m_Value = int32_t(MathTopic::FrustumCulling), .m_Name = "Frustum Culling" },
+					{ .m_Value = int32_t(MathTopic::Degenerate), .m_Name = "Degenerate Inputs" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -142,8 +140,9 @@ namespace gglab
 		case MathTopic::Quaternion:
 		{
 			const bool animate = GetParameters().Get(AnimateId, true);
-			const float t = animate ? 0.5f + 0.5f * std::sin(m_ElapsedTime)
-				: GetParameters().Get(InterpolationId, 0.5f);
+			const float t = animate ?
+				0.5f + 0.5f * std::sin(m_ElapsedTime) :
+				GetParameters().Get(InterpolationId, 0.5f);
 			DrawQuaternionValidation(debugDraw, t);
 			break;
 		}

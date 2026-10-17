@@ -286,9 +286,11 @@ namespace gglab
 				{
 					if (const Json* coat = FindObjectField(*extensions, "KHR_materials_clearcoat"))
 					{
-						const char* name = slot == MaterialTextureSlot::Clearcoat
-							? "clearcoatTexture" : slot == MaterialTextureSlot::ClearcoatRoughness
-								? "clearcoatRoughnessTexture" : "clearcoatNormalTexture";
+						const char* name = slot == MaterialTextureSlot::Clearcoat ?
+							"clearcoatTexture" :
+							slot == MaterialTextureSlot::ClearcoatRoughness ?
+								"clearcoatRoughnessTexture" :
+								"clearcoatNormalTexture";
 						return FindObjectField(*coat, name);
 					}
 				}
@@ -314,21 +316,21 @@ namespace gglab
 			uint64_t texCoordIndex = binding.m_TexCoordIndex;
 			const char* texCoordSource = "glTF texture";
 			auto readTexCoord = [&](const Json& source, const char* name) noexcept
-			{
-				const auto found = source.find("texCoord");
-				if (found == source.end())
 				{
+					const auto found = source.find("texCoord");
+					if (found == source.end())
+					{
+						return true;
+					}
+					if (!found->is_number_unsigned())
+					{
+						error = std::format("Invalid {} texCoord.", name);
+						return false;
+					}
+					texCoordIndex = found->get<uint64_t>();
+					texCoordSource = name;
 					return true;
-				}
-				if (!found->is_number_unsigned())
-				{
-					error = std::format("Invalid {} texCoord.", name);
-					return false;
-				}
-				texCoordIndex = found->get<uint64_t>();
-				texCoordSource = name;
-				return true;
-			};
+				};
 			if (!readTexCoord(textureInfo, "glTF texture"))
 			{
 				return false;
@@ -347,20 +349,20 @@ namespace gglab
 			if (transform)
 			{
 				auto readPair = [&](const char* name, Vector2& destination) noexcept
-				{
-					const auto found = transform->find(name);
-					if (found == transform->end())
 					{
-						return true;
-					}
-					if (!found->is_array() || found->size() != 2 || !(*found)[0].is_number() ||
-						!(*found)[1].is_number())
-					{
-						return false;
-					}
-					destination = Vector2((*found)[0].get<float>(), (*found)[1].get<float>());
-					return std::isfinite(destination.m_X) && std::isfinite(destination.m_Y);
-				};
+						const auto found = transform->find(name);
+						if (found == transform->end())
+						{
+							return true;
+						}
+						if (!found->is_array() || found->size() != 2 || !(*found)[0].is_number() ||
+							!(*found)[1].is_number())
+						{
+							return false;
+						}
+						destination = Vector2((*found)[0].get<float>(), (*found)[1].get<float>());
+						return std::isfinite(destination.m_X) && std::isfinite(destination.m_Y);
+					};
 				if (!readPair("offset", binding.m_UVOffset) || !readPair("scale", binding.m_UVScale))
 				{
 					error = "Invalid KHR_texture_transform offset or scale.";
@@ -616,9 +618,9 @@ namespace gglab
 			const bool promoteToAnisotropic = settings.m_EnableAnisotropicFiltering &&
 				minFilter == GltfLinearMipmapLinear && magLinear;
 
-			key.m_Filter = promoteToAnisotropic
-				? RHISamplerFilter::Anisotropic
-				: MakeRHISamplerFilter(minLinear, magLinear, mipLinear);
+			key.m_Filter = promoteToAnisotropic ?
+				RHISamplerFilter::Anisotropic :
+				MakeRHISamplerFilter(minLinear, magLinear, mipLinear);
 			key.m_AddressU = ToRHITextureAddressMode(mapMode[0]);
 			key.m_AddressV = ToRHITextureAddressMode(mapMode[1]);
 			key.m_AddressW = ToRHITextureAddressMode(mapMode[2]);
@@ -682,21 +684,21 @@ namespace gglab
 			}
 			auto readSamplerValue = [&](const char* name, int& value,
 				std::initializer_list<int> allowed) noexcept
-			{
-				const auto found = sampler->find(name);
-				if (found == sampler->end())
 				{
+					const auto found = sampler->find(name);
+					if (found == sampler->end())
+					{
+						return true;
+					}
+					if (!found->is_number_unsigned() ||
+						std::ranges::find(allowed, found->get<uint64_t>()) == allowed.end())
+					{
+						error = std::format("Invalid glTF sampler {}.", name);
+						return false;
+					}
+					value = found->get<int>();
 					return true;
-				}
-				if (!found->is_number_unsigned() ||
-					std::ranges::find(allowed, found->get<uint64_t>()) == allowed.end())
-				{
-					error = std::format("Invalid glTF sampler {}.", name);
-					return false;
-				}
-				value = found->get<int>();
-				return true;
-			};
+				};
 			int wrapS = GltfRepeat;
 			int wrapT = GltfRepeat;
 			if (!readSamplerValue("wrapS", wrapS, { GltfRepeat, GltfClampToEdge, GltfMirroredRepeat }) ||
@@ -709,10 +711,11 @@ namespace gglab
 				return false;
 			}
 			const auto mapMode = [](int wrap) noexcept
-			{
-				return wrap == GltfClampToEdge ? aiTextureMapMode_Clamp :
-					wrap == GltfMirroredRepeat ? aiTextureMapMode_Mirror : aiTextureMapMode_Wrap;
-			};
+				{
+					return wrap == GltfClampToEdge ?
+						aiTextureMapMode_Clamp :
+						wrap == GltfMirroredRepeat ? aiTextureMapMode_Mirror : aiTextureMapMode_Wrap;
+				};
 			destination.m_MapMode[0] = mapMode(wrapS);
 			destination.m_MapMode[1] = mapMode(wrapT);
 			return true;
@@ -810,7 +813,9 @@ namespace gglab
 		const auto canonicalPath = utils::Canonical(path);
 		std::string extension = canonicalPath.extension().string();
 		std::ranges::transform(extension, extension.begin(), [](unsigned char character) noexcept
-			{ return static_cast<char>(std::tolower(character)); });
+			{
+				return static_cast<char>(std::tolower(character));
+			});
 		if (extension != ".gltf")
 		{
 			result.m_Error = std::format("Unsupported model type '{}'.", extension);
@@ -946,8 +951,9 @@ namespace gglab
 			{
 				continue;
 			}
-			const Json* source = sourceMaterials && sourceIndex < sourceMaterials->size()
-				? &(*sourceMaterials)[sourceIndex] : nullptr;
+			const Json* source = sourceMaterials && sourceIndex < sourceMaterials->size() ?
+				&(*sourceMaterials)[sourceIndex] :
+				nullptr;
 			materialSources[index] = source;
 			const aiString name(source && source->contains("name") ? (*source)["name"].get<std::string>() : "");
 			GGLAB_UNUSED(scene->mMaterials[index]->AddProperty(&name, AI_MATKEY_NAME));

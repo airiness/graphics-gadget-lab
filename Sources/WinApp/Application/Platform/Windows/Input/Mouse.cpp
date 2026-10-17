@@ -6,7 +6,8 @@ namespace gglab
 {
 	Mouse::Mouse(IGameInput* gameInput) noexcept :
 		InputBase(gameInput, GameInputKind::GameInputKindMouse)
-	{}
+	{
+	}
 
 	void Mouse::Update() noexcept
 	{

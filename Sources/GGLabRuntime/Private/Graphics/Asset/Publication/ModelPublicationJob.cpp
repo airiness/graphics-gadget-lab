@@ -298,9 +298,9 @@ namespace gglab
 		{
 			return Continued();
 		}
-		const uint32_t materialIndex = importedInstance.m_MaterialIndex < m_MaterialIds.size()
-			? importedInstance.m_MaterialIndex
-			: 0;
+		const uint32_t materialIndex = importedInstance.m_MaterialIndex < m_MaterialIds.size() ?
+			importedInstance.m_MaterialIndex :
+			0;
 		m_PendingInstances.push_back({
 			.m_MeshId = m_MeshIds[importedInstance.m_MeshIndex],
 			.m_MaterialId = m_MaterialIds[materialIndex],

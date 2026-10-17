@@ -116,12 +116,10 @@ namespace gglab
 		std::vector<RHITextureHandle> m_UsedTextures;
 		std::vector<VkImageMemoryBarrier2> m_PendingImageBarriers;
 		std::vector<VkBufferMemoryBarrier2> m_PendingBufferBarriers;
-		std::array<std::optional<VulkanSet0BufferBinding>, RHIBindingLayoutDesc::MaxSlots>
-			m_FixedBufferBindings{};
+		std::array<std::optional<VulkanSet0BufferBinding>, RHIBindingLayoutDesc::MaxSlots> m_FixedBufferBindings{};
 		VkDescriptorSet m_FixedDescriptorSet = VK_NULL_HANDLE;
 		bool m_FixedDescriptorsDirty = true;
-		std::array<std::optional<RHIVertexBufferBinding>,
-			RHIVertexInputLayoutDesc::MaxVertexBuffers> m_VertexBindings{};
+		std::array<std::optional<RHIVertexBufferBinding>, RHIVertexInputLayoutDesc::MaxVertexBuffers> m_VertexBindings{};
 		std::optional<RHIIndexBufferBinding> m_IndexBufferBinding;
 		RHIPrimitiveTopology m_PrimitiveTopology = RHIPrimitiveTopology::Unknown;
 		VkExtent2D m_RenderExtent{};
@@ -182,8 +180,7 @@ namespace gglab
 		VulkanBindingLayout* m_CurrentBindingLayout = nullptr;
 		VulkanDynamicUniformState m_DynamicUniformState;
 		std::vector<uint32_t> m_DynamicOffsets;
-		std::array<std::optional<VulkanSet0BufferBinding>, RHIBindingLayoutDesc::MaxSlots>
-			m_FixedBufferBindings{};
+		std::array<std::optional<VulkanSet0BufferBinding>, RHIBindingLayoutDesc::MaxSlots> m_FixedBufferBindings{};
 		VkDescriptorSet m_FixedDescriptorSet = VK_NULL_HANDLE;
 		bool m_FixedDescriptorsDirty = true;
 	};

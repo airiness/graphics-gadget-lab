@@ -81,7 +81,11 @@ namespace gglab
 			NonFiniteWatchGeneration m_Generation;
 			bool m_WrittenThisFrame = false;
 		};
-		struct Entry { bool m_Applicable = false; std::vector<Binding> m_Bindings; };
+		struct Entry
+		{
+			bool m_Applicable = false;
+			std::vector<Binding> m_Bindings;
+		};
 		bool m_Declared = false;
 		bool m_ConflictingDeclaration = false;
 		std::array<Entry, NonFiniteWatchSemanticCount> m_Entries;

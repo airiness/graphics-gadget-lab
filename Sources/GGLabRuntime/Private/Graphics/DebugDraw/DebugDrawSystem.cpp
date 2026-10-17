@@ -177,7 +177,9 @@ namespace gglab
 					style.m_DepthMode == DebugDrawDepthMode::Always;
 			});
 		fillBatch(m_FrameView.m_OverlayScreen, [](const DebugDrawStyle& style) noexcept
-			{ return style.m_Space == DebugDrawSpace::Screen; });
+			{
+				return style.m_Space == DebugDrawSpace::Screen;
+			});
 		m_FrameView.m_Statistics.m_LineVertexCount =
 			m_FrameView.m_Scene.m_Lines.m_VertexCount +
 			m_FrameView.m_OverlayWorld.m_Lines.m_VertexCount +
@@ -214,7 +216,9 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_Mutex);
 		auto matches = [channel](const Command& command) noexcept
-			{ return command.m_Style.m_Channel == channel; };
+			{
+				return command.m_Style.m_Channel == channel;
+			};
 		std::erase_if(m_PendingCommands, matches);
 		std::erase_if(m_PersistentCommands, matches);
 		m_PendingVertexCount = 0;
@@ -278,7 +282,9 @@ namespace gglab
 		}
 		std::ranges::sort(states,
 			[](const DebugDrawChannelState& lhs, const DebugDrawChannelState& rhs)
-			{ return lhs.m_Channel.Value() < rhs.m_Channel.Value(); });
+			{
+				return lhs.m_Channel.Value() < rhs.m_Channel.Value();
+			});
 		return states;
 	}
 
@@ -343,8 +349,9 @@ namespace gglab
 		std::scoped_lock lock(m_Mutex);
 		++m_PendingStatistics.m_SubmittedCommandCount;
 		m_KnownChannels.insert(style.m_Channel);
-		const bool topologyValid = topology == PrimitiveTopology::Lines ? positions.size() % 2 == 0
-			: positions.size() % 3 == 0;
+		const bool topologyValid = topology == PrimitiveTopology::Lines ?
+			positions.size() % 2 == 0 :
+			positions.size() % 3 == 0;
 		if (positions.empty() || !topologyValid ||
 			!math::IsFinite(style.m_Color) ||
 			!std::isfinite(style.m_DurationSeconds) || style.m_DurationSeconds < 0.0f ||

@@ -59,8 +59,7 @@ namespace napa::voxel::testing
 			CpuMeshBatch initialBatch{};
 			std::unique_ptr<PendingCpuMeshBatch> pending;
 			std::unique_ptr<PreparedCpuMeshPublication> publication;
-			if (GeneratePrimitiveVoxelWorld(config,
-				std::span<const PrimitiveDesc>(&sphere, 1), world, generation).Failed() ||
+			if (GeneratePrimitiveVoxelWorld(config, std::span<const PrimitiveDesc>(&sphere, 1), world, generation).Failed() ||
 				!world || BuildCpuMeshBatch(*world, 1, chunks, initialBatch).Failed() ||
 				ValidateCpuMeshBatch(initialBatch, visible, pending).Failed() ||
 				PrepareCpuMeshBatchPublication(pending, visible, publication).Failed())
@@ -96,51 +95,39 @@ namespace napa::voxel::testing
 			const auto chunksBefore = visible.GetChunks();
 			const ChunkMeshRecord* chunkStorageBefore = chunksBefore.data();
 			const WorldMeshValidationResult validationBefore = visible.GetWorldMeshValidation();
-			const BoundaryContourValidationResult boundaryBefore =
-				visible.GetBoundaryValidation();
+			const BoundaryContourValidationResult boundaryBefore = visible.GetBoundaryValidation();
 
 			std::unique_ptr<PendingDataOnlyPublication> pending;
-			const ValidationResult prepared = PrepareDataOnlyPublication(
-				*world, mutation, visible, pending);
+			const ValidationResult prepared = PrepareDataOnlyPublication(*world, mutation, visible, pending);
 			PendingDataOnlyPublication* preservedPending = pending.get();
 			VoxelMutationResult invalidSurface = mutation;
-			const std::uint8_t originalDensity =
-				invalidSurface.m_SampleChanges.front().m_After.m_Density;
-			invalidSurface.m_SampleChanges.front().m_After.m_Density =
-				originalDensity == std::numeric_limits<std::uint8_t>::max()
-				? static_cast<std::uint8_t>(originalDensity - 1)
-				: static_cast<std::uint8_t>(originalDensity + 1);
-			const ValidationResult surfaceRejected = PrepareDataOnlyPublication(
-				*world, invalidSurface, visible, pending);
+			const std::uint8_t originalDensity = invalidSurface.m_SampleChanges.front().m_After.m_Density;
+			invalidSurface.m_SampleChanges.front().m_After.m_Density = originalDensity == std::numeric_limits<std::uint8_t>::max() ?
+				static_cast<std::uint8_t>(originalDensity - 1) :
+				static_cast<std::uint8_t>(originalDensity + 1);
+			const ValidationResult surfaceRejected = PrepareDataOnlyPublication(*world, invalidSurface, visible, pending);
 			VoxelMutationResult invalidDirty = mutation;
 			invalidDirty.m_DataDirtyChunks.clear();
-			const ValidationResult dirtyRejected = PrepareDataOnlyPublication(
-				*world, invalidDirty, visible, pending);
+			const ValidationResult dirtyRejected = PrepareDataOnlyPublication(*world, invalidDirty, visible, pending);
 			VoxelMutationResult invalidBase = mutation;
 			invalidBase.m_BaseWorldVoxelRevision =
 				invalidBase.m_TargetWorldVoxelRevision;
-			const ValidationResult baseRejected = PrepareDataOnlyPublication(
-				*world, invalidBase, visible, pending);
+			const ValidationResult baseRejected = PrepareDataOnlyPublication(*world, invalidBase, visible, pending);
 			VoxelMutationResult invalidTarget = mutation;
 			++invalidTarget.m_TargetWorldVoxelRevision;
-			const ValidationResult targetRejected = PrepareDataOnlyPublication(
-				*world, invalidTarget, visible, pending);
+			const ValidationResult targetRejected = PrepareDataOnlyPublication(*world, invalidTarget, visible, pending);
 			VoxelMutationResult invalidAfter = mutation;
 			invalidAfter.m_SampleChanges.front().m_After.m_Damage =
-				static_cast<std::uint8_t>(
-					invalidAfter.m_SampleChanges.front().m_After.m_Damage - 1);
-			const ValidationResult afterRejected = PrepareDataOnlyPublication(
-				*world, invalidAfter, visible, pending);
+				static_cast<std::uint8_t>(invalidAfter.m_SampleChanges.front().m_After.m_Damage - 1);
+			const ValidationResult afterRejected = PrepareDataOnlyPublication(*world, invalidAfter, visible, pending);
 			VoxelMutationResult invalidMeshDirty = mutation;
 			invalidMeshDirty.m_MeshDirtyChunks.push_back({});
-			const ValidationResult meshDirtyRejected = PrepareDataOnlyPublication(
-				*world, invalidMeshDirty, visible, pending);
+			const ValidationResult meshDirtyRejected = PrepareDataOnlyPublication(*world, invalidMeshDirty, visible, pending);
 			VoxelMutationResult emptyMutation{
 				.m_BaseWorldVoxelRevision = mutation.m_BaseWorldVoxelRevision,
 				.m_TargetWorldVoxelRevision = mutation.m_TargetWorldVoxelRevision,
 			};
-			const ValidationResult emptyRejected = PrepareDataOnlyPublication(
-				*world, emptyMutation, visible, pending);
+			const ValidationResult emptyRejected = PrepareDataOnlyPublication(*world, emptyMutation, visible, pending);
 			context.Check(prepared.Succeeded() && pending && preservedPending == pending.get() &&
 				surfaceRejected.m_Error == ValidationError::InvalidDataOnlyPublication &&
 				dirtyRejected.m_Error == ValidationError::MismatchedDataOnlyPublication &&
@@ -153,8 +140,7 @@ namespace napa::voxel::testing
 				"authoritative-sample mismatches without replacing a valid token");
 
 			CommitDataOnlyPublication(pending, visible);
-			context.Check(!pending && visible.GetVisibleWorldRevision() ==
-				mutation.m_TargetWorldVoxelRevision &&
+			context.Check(!pending && visible.GetVisibleWorldRevision() == mutation.m_TargetWorldVoxelRevision &&
 				visible.GetChunks().data() == chunkStorageBefore &&
 				visible.GetChunks().size() == chunksBefore.size() &&
 				visible.GetWorldMeshValidation() == validationBefore &&
@@ -164,69 +150,56 @@ namespace napa::voxel::testing
 			std::unique_ptr<VoxelWorld> maximumWorld;
 			VisibleMeshSet maximumVisible{};
 			VoxelMutationResult maximumMutation{};
-			const bool maximumFixture = BuildCoreDataOnlyPublicationInput(
-				maximumWorld, maximumVisible, maximumMutation);
-			maximumMutation.m_TargetWorldVoxelRevision =
-				std::numeric_limits<std::uint64_t>::max();
+			const bool maximumFixture = BuildCoreDataOnlyPublicationInput(maximumWorld, maximumVisible, maximumMutation);
+			maximumMutation.m_TargetWorldVoxelRevision = std::numeric_limits<std::uint64_t>::max();
 			std::unique_ptr<PendingDataOnlyPublication> maximumPending;
-			const ValidationResult maximumPrepared = maximumFixture
-				? testing::PrepareWithAuthoritativeRevision(
+			const ValidationResult maximumPrepared = maximumFixture ?
+				testing::PrepareWithAuthoritativeRevision(
 					*maximumWorld, maximumMutation, maximumVisible,
-					std::numeric_limits<std::uint64_t>::max(), maximumPending)
-				: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
+					std::numeric_limits<std::uint64_t>::max(), maximumPending) :
+				ValidationResult{ ValidationError::InvalidDataOnlyPublication };
 			if (maximumPrepared.Succeeded())
 			{
 				CommitDataOnlyPublication(maximumPending, maximumVisible);
 			}
 			context.Check(maximumPrepared.Succeeded() && !maximumPending &&
-				maximumVisible.GetVisibleWorldRevision() ==
-				std::numeric_limits<std::uint64_t>::max(),
+				maximumVisible.GetVisibleWorldRevision() == std::numeric_limits<std::uint64_t>::max(),
 				"Data-only publication accepts a maximum Target revision without requiring another increment");
 
 			std::unique_ptr<VoxelWorld> allocationWorld;
 			VisibleMeshSet allocationVisible{};
 			VoxelMutationResult allocationMutation{};
-			const bool allocationFixture = BuildCoreDataOnlyPublicationInput(
-				allocationWorld, allocationVisible, allocationMutation);
+			const bool allocationFixture = BuildCoreDataOnlyPublicationInput(allocationWorld, allocationVisible, allocationMutation);
 			std::unique_ptr<PendingDataOnlyPublication> allocationPending;
-			const ValidationResult allocationFailure = allocationFixture
-				? testing::PrepareWithAllocationFailure(
-					*allocationWorld, allocationMutation, allocationVisible,
-					allocationPending)
-				: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
-			context.Check(allocationFailure.m_Error ==
-				ValidationError::DataOnlyPublicationAllocationFailure && !allocationPending &&
-				allocationVisible.GetVisibleWorldRevision() ==
-				allocationMutation.m_BaseWorldVoxelRevision,
+			const ValidationResult allocationFailure = allocationFixture ?
+				testing::PrepareWithAllocationFailure(*allocationWorld, allocationMutation, allocationVisible, allocationPending) :
+				ValidationResult{ ValidationError::InvalidDataOnlyPublication };
+			context.Check(allocationFailure.m_Error == ValidationError::DataOnlyPublicationAllocationFailure && !allocationPending &&
+				allocationVisible.GetVisibleWorldRevision() == allocationMutation.m_BaseWorldVoxelRevision,
 				"Data-only token allocation failure preserves the complete visible state and output");
 
 			std::unique_ptr<VoxelWorld> forgedWorld;
 			VisibleMeshSet forgedVisible{};
 			VoxelMutationResult incompleteMutation{};
-			const bool forgedFixture = BuildCoreDataOnlyPublicationInput(
-				forgedWorld, forgedVisible, incompleteMutation);
+			const bool forgedFixture = BuildCoreDataOnlyPublicationInput(forgedWorld, forgedVisible, incompleteMutation);
 			bool surfaceChanged = false;
-			const ValidationResult surfaceWrite = forgedFixture
-				? forgedWorld->WriteCurrentSample({ 0, 0, 0 }, {
+			const ValidationResult surfaceWrite = forgedFixture ?
+				forgedWorld->WriteCurrentSample({ 0, 0, 0 }, {
 						.m_Density = IsoValue,
 						.m_Material = VoxelMaterial::Stone,
 						.m_Damage = 0,
-					}, surfaceChanged)
-					: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
+					}, surfaceChanged) :
+				ValidationResult{ ValidationError::InvalidDataOnlyPublication };
 			if (surfaceWrite.Succeeded())
 			{
-				incompleteMutation.m_TargetWorldVoxelRevision =
-					forgedWorld->GetWorldVoxelRevision();
+				incompleteMutation.m_TargetWorldVoxelRevision = forgedWorld->GetWorldVoxelRevision();
 			}
 			std::unique_ptr<PendingDataOnlyPublication> forgedPending;
-			const ValidationResult forgedResult = surfaceWrite.Succeeded()
-				? PrepareDataOnlyPublication(
-					*forgedWorld, incompleteMutation, forgedVisible, forgedPending)
-				: surfaceWrite;
-			context.Check(surfaceChanged && forgedResult.m_Error ==
-				ValidationError::MismatchedDataOnlyPublication && !forgedPending &&
-				forgedWorld->GetSurfaceStateRevision() !=
-				forgedVisible.GetSurfaceStateRevision(),
+			const ValidationResult forgedResult = surfaceWrite.Succeeded() ?
+				PrepareDataOnlyPublication(*forgedWorld, incompleteMutation, forgedVisible, forgedPending) :
+				surfaceWrite;
+			context.Check(surfaceChanged && forgedResult.m_Error == ValidationError::MismatchedDataOnlyPublication && !forgedPending &&
+				forgedWorld->GetSurfaceStateRevision() != forgedVisible.GetSurfaceStateRevision(),
 				"Data-only preparation rejects an incomplete Mutation that hides a newer Surface state");
 		}
 	}

@@ -57,7 +57,7 @@ namespace gglab
 		{
 			GGLAB_ASSERT(beginStatus != RHIFrameBeginStatus::Ready);
 		}
-		GGLAB_DELETE_COPYABLE(RenderFrame)
+		GGLAB_DELETE_COPYABLE(RenderFrame);
 		RenderFrame(RenderFrame&& other) noexcept;
 		RenderFrame& operator=(RenderFrame&& other) noexcept;
 		~RenderFrame() noexcept;
@@ -110,8 +110,7 @@ namespace gglab
 	struct RenderFrameBuildResult
 	{
 		std::vector<RenderView> m_RenderViews;
-		std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)>
-			m_ViewRenderSettings{};
+		std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)> m_ViewRenderSettings{};
 		ResolvedTemporalFramePlan m_TemporalFramePlan{};
 		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderScene m_RenderScene{};
@@ -180,7 +179,7 @@ namespace gglab
 	{
 	public:
 		RenderHost() noexcept = default;
-		GGLAB_DELETE_COPYABLE(RenderHost)
+		GGLAB_DELETE_COPYABLE(RenderHost);
 		virtual ~RenderHost() = default;
 
 		[[nodiscard]] virtual bool IsInitialized() const noexcept = 0;

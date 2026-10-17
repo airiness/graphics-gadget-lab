@@ -199,9 +199,9 @@ namespace gglab
 			.m_DefaultValue = int32_t(1),
 			.m_EnumItems =
 				{
-					{.m_Value = 0, .m_Name = "Front"},
-					{.m_Value = 1, .m_Name = "Diagonal"},
-					{.m_Value = 2, .m_Name = "Top"},
+					{ .m_Value = 0, .m_Name = "Front" },
+					{ .m_Value = 1, .m_Name = "Diagonal" },
+					{ .m_Value = 2, .m_Name = "Top" },
 				},
 			}));
 

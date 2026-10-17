@@ -17,8 +17,9 @@ namespace gglab
 
 	bool DX12FencePoint::operator<(const DX12FencePoint& other) const noexcept
 	{
-		return m_FencePtr == other.m_FencePtr ? m_PointValue < other.m_PointValue
-			: m_FencePtr < other.m_FencePtr;
+		return m_FencePtr == other.m_FencePtr ?
+			m_PointValue < other.m_PointValue :
+			m_FencePtr < other.m_FencePtr;
 	}
 
 	bool DX12FencePoint::IsCompleted() const noexcept

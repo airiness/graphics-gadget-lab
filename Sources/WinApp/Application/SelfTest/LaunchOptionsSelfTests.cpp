@@ -43,8 +43,7 @@ namespace gglab
 					result.m_Options.m_StartupDemo == alias.m_Demo &&
 					!result.m_Options.m_StartWithRelativeMouse,
 					"Playground alias selects its content preset with default absolute mouse input");
-				const std::vector<std::string_view> conflict = {
-					"--demo", alias.m_Alias, "--lab", "gglab.lab.culling" };
+				const std::vector<std::string_view> conflict = { "--demo", alias.m_Alias, "--lab", "gglab.lab.culling" };
 				context.Check(!ParseApplicationLaunchOptions(conflict).IsValid(),
 					"Playground content cannot be silently replaced by a Lab selection");
 			}
@@ -54,15 +53,15 @@ namespace gglab
 		{
 			for (const auto backend : { "dx12", "vulkan" })
 			{
-				const std::vector<std::string_view> args = {
-					"--lab", "gglab.lab.texture_contract", "--rhi", backend, "--relative-mouse" };
+				const std::vector<std::string_view> args = { "--lab", "gglab.lab.texture_contract", "--rhi", backend, "--relative-mouse" };
 				const auto result = ParseApplicationLaunchOptions(args);
 				context.Check(result.IsValid() &&
 					result.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
 					result.m_Options.m_StartupLabId == "gglab.lab.texture_contract" &&
 					result.m_Options.m_StartWithRelativeMouse &&
 					result.m_Options.m_RhiBackend == (std::string_view(backend) == "dx12" ?
-						RHIBackendType::DX12 : RHIBackendType::Vulkan),
+						RHIBackendType::DX12 :
+						RHIBackendType::Vulkan),
 					"Texture contract starts through LabHost on the requested backend with relative mouse input");
 			}
 		}
@@ -70,10 +69,10 @@ namespace gglab
 		void RunLaunchOptionContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
-				{
-					const std::vector<std::string_view> args(arguments);
-					return ParseApplicationLaunchOptions(args);
-				};
+			{
+				const std::vector<std::string_view> args(arguments);
+				return ParseApplicationLaunchOptions(args);
+			};
 
 			// --adapter requires an explicit --rhi vulkan.
 			context.Check(parse({ "--state-root", "C:/gglab-state" }).IsValid() &&
@@ -83,14 +82,12 @@ namespace gglab
 				"Explicit state root accepts one absolute path and rejects malformed or duplicate options");
 			{
 				const auto result = parse({ "--adapter", "0" });
-				context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") !=
-					std::string::npos,
-					"--adapter without --rhi vulkan is a parse error");
+			context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") != std::string::npos,
+				"--adapter without --rhi vulkan is a parse error");
 			}
 			{
 				const auto result = parse({ "--rhi", "dx12", "--adapter", "0" });
-				context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") !=
-					std::string::npos,
+				context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") != std::string::npos,
 					"--rhi dx12 with --adapter is a parse error");
 			}
 			{
@@ -108,8 +105,7 @@ namespace gglab
 			}
 			{
 				const auto result = parse({ "--list-adapters", "--adapter", "0" });
-				context.Check(!result.IsValid() && result.m_Error.find("--list-adapters") !=
-					std::string::npos,
+				context.Check(!result.IsValid() && result.m_Error.find("--list-adapters") != std::string::npos,
 					"--list-adapters with --adapter is a parse error");
 			}
 			{
@@ -122,8 +118,7 @@ namespace gglab
 			// conflicts with it.
 			{
 				const auto result = parse({ "--rhi", "dx12", "--list-adapters" });
-				context.Check(!result.IsValid() && result.m_Error.find("--list-adapters") !=
-					std::string::npos,
+				context.Check(!result.IsValid() && result.m_Error.find("--list-adapters") != std::string::npos,
 					"--rhi dx12 with --list-adapters is a parse error");
 			}
 
@@ -152,8 +147,7 @@ namespace gglab
 				const auto duplicateWatch = parse({ "--watch-nonfinite", "--watch-nonfinite" });
 				context.Check(instrumented.IsValid() && instrumented.m_Options.m_WatchNonFinite && !duplicateWatch.IsValid(),
 					"Production counter instrumentation is an explicit startup capability with strict duplicate validation");
-				const auto hidden = parse({ "--hidden", "--window-size", "3840x2160",
-					"--fixed-delta-time", "0.02" });
+				const auto hidden = parse({ "--hidden", "--window-size", "3840x2160", "--fixed-delta-time", "0.02" });
 				context.Check(defaults.IsValid() && !defaults.m_Options.m_Hidden &&
 					defaults.m_Options.m_WindowWidth == 1920 &&
 					defaults.m_Options.m_WindowHeight == 1080 &&
@@ -182,10 +176,8 @@ namespace gglab
 					"--capture-view", "CAM_Overview", "--capture-timeout", "30" });
 				const bool captureValid = capture.IsValid() && capture.m_Options.m_CaptureOnReady;
 				context.Check(captureValid &&
-					capture.m_Options.m_CaptureOnReady->m_OutputDirectory ==
-					std::filesystem::path("C:/gglab-captures") &&
-					capture.m_Options.m_CaptureOnReady->m_Source ==
-					FrameCaptureSource::Composited &&
+					capture.m_Options.m_CaptureOnReady->m_OutputDirectory == std::filesystem::path("C:/gglab-captures") &&
+					capture.m_Options.m_CaptureOnReady->m_Source == FrameCaptureSource::Composited &&
 					capture.m_Options.m_CaptureOnReady->m_SettleFrames == 16 &&
 					capture.m_Options.m_CaptureOnReady->m_Label == "culling" &&
 					capture.m_Options.m_CaptureOnReady->m_ReferenceViewId == "CAM_Overview" &&
@@ -199,16 +191,14 @@ namespace gglab
 				context.Check(!parse({ "--capture-on-ready", "relative/captures" }).IsValid() &&
 					!parse({ "--capture-source", "scene" }).IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-source", "hud" }).IsValid() &&
-					!parse({ "--capture-on-ready", "C:/c", "--capture-settle-frames", "-1" })
-						.IsValid() &&
+					!parse({ "--capture-on-ready", "C:/c", "--capture-settle-frames", "-1" }).IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-timeout", "0" }).IsValid() &&
 					!parse({ "--self-test", "all", "--capture-on-ready", "C:/c" }).IsValid() &&
 					!parse({ "--self-test", "all", "--hidden" }).IsValid(),
 					"Capture options require an absolute capture-on-ready directory and valid values");
 			}
 			{
-				const auto session = parse({ "--hidden", "--session", "agent_01-a",
-					"--idle-timeout", "60" });
+				const auto session = parse({ "--hidden", "--session", "agent_01-a", "--idle-timeout", "60" });
 				context.Check(session.IsValid() && session.m_Options.m_SessionId == "agent_01-a" &&
 					session.m_Options.m_IdleTimeoutSeconds == 60.0 &&
 					parse({ "--session", "a" }).m_Options.m_IdleTimeoutSeconds == 900.0,
@@ -220,8 +210,7 @@ namespace gglab
 					!parse({ "--session", "a", "--idle-timeout", "0" }).IsValid() &&
 					!parse({ "--self-test", "all", "--session", "a" }).IsValid(),
 					"Session options reject unsafe ids, orphan or invalid idle timeouts");
-				context.Check(parse({ "--output-log", "C:/logs/out.log" }).m_Options.m_OutputLog ==
-					std::filesystem::path("C:/logs/out.log") &&
+				context.Check(parse({ "--output-log", "C:/logs/out.log" }).m_Options.m_OutputLog == std::filesystem::path("C:/logs/out.log") &&
 					!parse({ "--output-log", "out.log" }).IsValid() &&
 					!parse({ "--output-log", "C:/a", "--output-log", "C:/b" }).IsValid(),
 					"The output log takes one absolute file path");
@@ -234,8 +223,7 @@ namespace gglab
 			}
 			{
 				const auto result = parse({ "--no-devtools", "--no-devtools" });
-				context.Check(!result.IsValid(),
-					"--no-devtools rejects duplicate specification");
+				context.Check(!result.IsValid(), "--no-devtools rejects duplicate specification");
 			}
 			{
 				const auto unknownOption = parse({ "--unknown-option" });
@@ -259,7 +247,7 @@ namespace gglab
 					assignments.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
 					assignments.m_Options.m_StartupLabParameters.size() == 2 &&
 					assignments.m_Options.m_StartupLabParameters[0].m_Id ==
-						"render_graph_compute.debug.nonfinite.mode" &&
+					"render_graph_compute.debug.nonfinite.mode" &&
 					assignments.m_Options.m_StartupLabParameters[0].m_Value == "Boundary" &&
 					assignments.m_Options.m_StartupLabParameters[1].m_Value == "0",
 					"Debug startup Lab parameters keep their order, ids and textual values");
@@ -284,9 +272,9 @@ namespace gglab
 	{
 		RunLaunchOptionContractTests(context);
 		const auto parseValidation = [](std::initializer_list<std::string_view> args)
-			{
-				return ParseApplicationLaunchOptions(std::span{ args.begin(), args.size() });
-			};
+		{
+			return ParseApplicationLaunchOptions(std::span{ args.begin(), args.size() });
+		};
 		const auto gpuValidation = parseValidation({ "--validation", "gpu", "--rhi", "dx12" });
 		context.Check(gpuValidation.IsValid() &&
 			gpuValidation.m_Options.m_ValidationMode == ApplicationValidationMode::Gpu &&

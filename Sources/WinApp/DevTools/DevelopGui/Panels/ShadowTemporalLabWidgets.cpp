@@ -36,10 +36,12 @@ namespace gglab
 	{
 		auto& state = context.PanelState<ShadowTemporalLabState>();
 		ImGui::TextUnformatted("CAM_ShadowStairs reference path");
-		const auto* shadow = context.m_Diagnostics
-			? context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() : nullptr;
-		const CameraToolingSnapshot cameras = context.m_Cameras
-			? context.m_Cameras->GetCameras() : CameraToolingSnapshot{};
+		const auto* shadow = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() :
+			nullptr;
+		const CameraToolingSnapshot cameras = context.m_Cameras ?
+			context.m_Cameras->GetCameras() :
+			CameraToolingSnapshot{};
 		const CameraToolingObservation* mainCamera = nullptr;
 		for (const auto& camera : cameras.m_Cameras)
 		{
@@ -65,7 +67,7 @@ namespace gglab
 		}
 		if (shadow && mainCamera)
 		{
-			(void) state.m_Temporal.Record(*shadow, mainCamera->m_Id,
+			(void)state.m_Temporal.Record(*shadow, mainCamera->m_Id,
 				cameras.m_LastRestoredReferenceId);
 		}
 		else
@@ -121,7 +123,7 @@ namespace gglab
 				sample.m_Position += state.m_ReplayRight * (0.8f * std::sin(phase)) +
 					state.m_ReplayForward * (0.35f * (1.0f - std::cos(phase)));
 				state.m_ReplayActive = context.m_CameraControl->SetCamera(mainCamera->m_Id, sample);
-				(void) context.m_CameraControl->ResetVelocity(mainCamera->m_Id);
+				(void)context.m_CameraControl->ResetVelocity(mainCamera->m_Id);
 				if (state.m_ReplayStep++ == ReplayLastStep)
 				{
 					state.m_ReplayActive = false;

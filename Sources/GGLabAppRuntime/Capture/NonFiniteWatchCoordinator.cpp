@@ -68,11 +68,16 @@ namespace gglab
 	{
 		switch (failure)
 		{
-		case NonFiniteWatchFailure::NonFiniteDetected: return "NonFiniteDetected";
-		case NonFiniteWatchFailure::NonFiniteReplaced: return "NonFiniteReplaced";
-		case NonFiniteWatchFailure::ClampPolicyExceeded: return "ClampPolicyExceeded";
-		case NonFiniteWatchFailure::MissingCoverage: return "MissingCoverage";
-		default: return "None";
+		case NonFiniteWatchFailure::NonFiniteDetected:
+			return "NonFiniteDetected";
+		case NonFiniteWatchFailure::NonFiniteReplaced:
+			return "NonFiniteReplaced";
+		case NonFiniteWatchFailure::ClampPolicyExceeded:
+			return "ClampPolicyExceeded";
+		case NonFiniteWatchFailure::MissingCoverage:
+			return "MissingCoverage";
+		default:
+			return "None";
 		}
 	}
 
@@ -302,17 +307,18 @@ namespace gglab
 			PublishBoundary(std::move(pending));
 			return;
 		}
-		const uint64_t id = !yieldBoundaryCapacity && m_Pending.size() < 64
-			? m_Capture->RequestNonFiniteScan(pending.m_Scans, m_Status.m_ConfigurationVersion, frameSerial,
-				false, 0, m_Configuration.m_Mode == NonFiniteWatchMode::Fail) : 0;
+		const uint64_t id = !yieldBoundaryCapacity && m_Pending.size() < 64 ?
+			m_Capture->RequestNonFiniteScan(pending.m_Scans, m_Status.m_ConfigurationVersion, frameSerial,
+				false, 0, m_Configuration.m_Mode == NonFiniteWatchMode::Fail) :
+			0;
 		m_PreparedCoverage = CoverageFrame{ .m_FrameSerial = frameSerial, .m_BoundaryPending = id != 0, .m_Targets = pending.m_Targets };
 		if (id == 0)
 		{
 			for (const size_t index : pending.m_ScanIndices)
 			{
-				pending.m_Targets[index].m_Failure = yieldBoundaryCapacity
-					? "MissingCoverage: boundary reporting yielded capacity to a scheduled resource export."
-					: "MissingCoverage: watch request capacity is exhausted.";
+				pending.m_Targets[index].m_Failure = yieldBoundaryCapacity ?
+					"MissingCoverage: boundary reporting yielded capacity to a scheduled resource export." :
+					"MissingCoverage: watch request capacity is exhausted.";
 			}
 			PublishBoundary(std::move(pending));
 			return;
@@ -354,9 +360,9 @@ namespace gglab
 		}
 		else if (target.m_Failure.empty())
 		{
-			target.m_Failure = generation.m_InFlight[mip] != 0
-				? "MissingCoverage: generation scan is pending completion."
-				: "MissingCoverage: generation scan is awaiting admission.";
+			target.m_Failure = generation.m_InFlight[mip] != 0 ?
+				"MissingCoverage: generation scan is pending completion." :
+				"MissingCoverage: generation scan is awaiting admission.";
 		}
 	}
 
@@ -414,7 +420,9 @@ namespace gglab
 				continue;
 			}
 			auto found = std::ranges::find_if(m_Status.m_SiteTotals, [&site](const NonFiniteWatchSiteTotals& totals)
-				{ return totals.m_ProgramIndex == site.m_ProgramIndex && totals.m_SiteIndex == site.m_SiteIndex; });
+				{
+					return totals.m_ProgramIndex == site.m_ProgramIndex && totals.m_SiteIndex == site.m_SiteIndex;
+				});
 			if (found == m_Status.m_SiteTotals.end())
 			{
 				found = m_Status.m_SiteTotals.insert(m_Status.m_SiteTotals.end(), { .m_ProgramIndex = site.m_ProgramIndex,
@@ -446,7 +454,9 @@ namespace gglab
 			return;
 		}
 		auto found = std::ranges::find_if(m_Status.m_TargetTotals, [&target](const NonFiniteWatchTargetTotals& totals)
-			{ return totals.m_Semantic == target.m_Semantic && SameAddress(totals.m_Address, target.m_Address); });
+			{
+				return totals.m_Semantic == target.m_Semantic && SameAddress(totals.m_Address, target.m_Address);
+			});
 		if (found == m_Status.m_TargetTotals.end())
 		{
 			found = m_Status.m_TargetTotals.insert(m_Status.m_TargetTotals.end(),
@@ -457,8 +467,9 @@ namespace gglab
 		if (status == NonFiniteClaimStatus::Failed)
 		{
 			++totals.m_FailedFrames;
-			totals.m_FirstFailedFrameSerial = totals.m_FirstFailedFrameSerial == 0
-				? frameSerial : std::min(totals.m_FirstFailedFrameSerial, frameSerial);
+			totals.m_FirstFailedFrameSerial = totals.m_FirstFailedFrameSerial == 0 ?
+				frameSerial :
+				std::min(totals.m_FirstFailedFrameSerial, frameSerial);
 		}
 		totals.m_NanCount += target.m_Record.m_NanCount;
 		totals.m_PositiveInfCount += target.m_Record.m_PositiveInfCount;
@@ -501,7 +512,9 @@ namespace gglab
 		const auto& payload = result.m_NonFiniteScans;
 		const bool addressesMatch = payload && payload->m_Boundaries.size() == pending.m_Scans.size() &&
 			std::ranges::equal(payload->m_Boundaries, pending.m_Scans, [](const auto& boundary, const auto& target)
-				{ return SameAddress(boundary.m_Target.m_Address, target.m_Address); });
+				{
+					return SameAddress(boundary.m_Target.m_Address, target.m_Address);
+				});
 		if (result.m_Status == FrameCaptureStatus::Completed && result.m_FrameSerial == pending.m_FrameSerial && payload &&
 			payload->m_ConfigurationVersion == pending.m_ConfigurationVersion && addressesMatch)
 		{
@@ -545,8 +558,9 @@ namespace gglab
 		{
 			for (const size_t index : pending.m_ScanIndices)
 			{
-				pending.m_Targets[index].m_Failure = result.m_Failure.empty()
-					? "MissingCoverage: the watch frame returned missing or mismatched scan evidence." : result.m_Failure;
+				pending.m_Targets[index].m_Failure = result.m_Failure.empty() ?
+					"MissingCoverage: the watch frame returned missing or mismatched scan evidence." :
+					result.m_Failure;
 			}
 		}
 		for (const size_t index : pending.m_ScanIndices)
@@ -592,8 +606,9 @@ namespace gglab
 			frame.m_Injection ? std::optional(frame.m_Injection->m_Request) : std::nullopt;
 		const bool injectionMatches = evidenceRequest == m_Configuration.m_Injection;
 		const NonFiniteClaimResult claim = injectionMatches ? frame.m_Claim : NonFiniteClaimResult{};
-		const std::string failure = injectionMatches ? frame.m_Failure
-			: std::string("MissingCoverage: production evidence carries a different injection request than the watch configuration.");
+		const std::string failure = injectionMatches ?
+			frame.m_Failure :
+			std::string("MissingCoverage: production evidence carries a different injection request than the watch configuration.");
 		const bool injectionApplied = injectionMatches && frame.m_Injection && frame.m_Injection->m_AppliedCount != 0;
 		if (injectionMatches && frame.m_Injection && frame.m_FrameSerial >= m_Status.m_InjectionFrameSerial)
 		{
@@ -697,8 +712,9 @@ namespace gglab
 		}
 		frame.m_ProductionPending = report.m_ProductionRequested && report.m_InstrumentationAvailable;
 		frame.m_TrackedAt = std::chrono::steady_clock::now();
-		frame.m_Production = report.m_InstrumentationAvailable ? NonFiniteClaimResult{}
-			: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::MissingCoverage };
+		frame.m_Production = report.m_InstrumentationAvailable ?
+			NonFiniteClaimResult{} :
+			NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::MissingCoverage };
 		coverage.m_Frames.push_back(std::move(frame));
 		RefreshCoverage();
 	}
@@ -726,7 +742,10 @@ namespace gglab
 			++m_SubmissionOrdinal;
 			for (auto& [id, pending] : m_Pending)
 			{
-				if (pending.m_FrameSerial == frameSerial) { pending.m_Submitted = true; }
+				if (pending.m_FrameSerial == frameSerial)
+				{
+					pending.m_Submitted = true;
+				}
 			}
 			RefreshCoverage();
 		}
@@ -742,8 +761,14 @@ namespace gglab
 	}
 	std::string NonFiniteWatchCoordinator::GetFailModeFailure() const noexcept
 	{
-		if (!m_Status.m_Enabled || m_Status.m_Mode != NonFiniteWatchMode::Fail) { return {}; }
-		if (m_Status.m_FirstAnomaly) { return Describe(*m_Status.m_FirstAnomaly, m_Status.m_Injection); }
+		if (!m_Status.m_Enabled || m_Status.m_Mode != NonFiniteWatchMode::Fail)
+		{
+			return {};
+		}
+		if (m_Status.m_FirstAnomaly)
+		{
+			return Describe(*m_Status.m_FirstAnomaly, m_Status.m_Injection);
+		}
 		for (const auto& target : m_Status.m_Targets)
 		{
 			if (m_Status.m_BoundaryFrameSerial != 0 && !target.m_Generation.IsValid() && target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete)
@@ -866,14 +891,22 @@ namespace gglab
 					++report.m_CompletedFrames;
 					return true;
 				});
-			report.m_Boundary = report.m_BoundaryRequested ? coverage.m_Boundary
-				: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
-			report.m_Production = report.m_ProductionRequested ? coverage.m_Production
-				: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
+			report.m_Boundary = report.m_BoundaryRequested ?
+				coverage.m_Boundary :
+				NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
+			report.m_Production = report.m_ProductionRequested ?
+				coverage.m_Production :
+				NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
 			if (!coverage.m_Frames.empty())
 			{
-				if (report.m_BoundaryRequested) { Merge(report.m_Boundary, {}); }
-				if (report.m_ProductionRequested) { Merge(report.m_Production, {}); }
+				if (report.m_BoundaryRequested)
+				{
+					Merge(report.m_Boundary, {});
+				}
+				if (report.m_ProductionRequested)
+				{
+					Merge(report.m_Production, {});
+				}
 			}
 			report.m_Complete = coverage.m_Closed && coverage.m_Frames.empty();
 		}

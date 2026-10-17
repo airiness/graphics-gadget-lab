@@ -70,9 +70,9 @@ namespace gglab
 			plan.m_VertexBindings[index] = {
 				.binding = source.m_InputSlot,
 				.stride = source.m_StrideInBytes,
-				.inputRate = source.m_InputRate == RHIVertexInputRate::PerInstance
-					? VK_VERTEX_INPUT_RATE_INSTANCE
-					: VK_VERTEX_INPUT_RATE_VERTEX,
+				.inputRate = source.m_InputRate == RHIVertexInputRate::PerInstance ?
+					VK_VERTEX_INPUT_RATE_INSTANCE :
+					VK_VERTEX_INPUT_RATE_VERTEX,
 			};
 		}
 
@@ -90,9 +90,9 @@ namespace gglab
 				source.m_AlignedByteOffset > binding->m_StrideInBytes ||
 				formatInfo.m_BytesPerBlock > binding->m_StrideInBytes - source.m_AlignedByteOffset)
 			{
-				plan.m_Error = binding == nullptr
-					? VulkanGraphicsPipelineError::InvalidVertexBinding
-					: VulkanGraphicsPipelineError::InvalidVertexFormat;
+				plan.m_Error = binding == nullptr ?
+					VulkanGraphicsPipelineError::InvalidVertexBinding :
+					VulkanGraphicsPipelineError::InvalidVertexFormat;
 				return plan;
 			}
 			for (uint32_t previous = 0; previous < index; ++previous)

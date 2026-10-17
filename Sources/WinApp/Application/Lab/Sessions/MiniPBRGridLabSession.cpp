@@ -54,13 +54,20 @@ namespace gglab
 		{
 			switch (source)
 			{
-			case SceneSource::MetalRoughSpheres: return MetalRoughSpheresPath;
-			case SceneSource::MetalRoughSpheresNoTextures: return MetalRoughSpheresNoTexturesPath;
-			case SceneSource::AnisotropyStrengthTest: return AnisotropyStrengthTestPath;
-			case SceneSource::AnisotropyRotationTest: return AnisotropyRotationTestPath;
-			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
-			case SceneSource::NormalTangentTest: return NormalTangentTestPath;
-			case SceneSource::ProceduralGrid: return {};
+			case SceneSource::MetalRoughSpheres:
+				return MetalRoughSpheresPath;
+			case SceneSource::MetalRoughSpheresNoTextures:
+				return MetalRoughSpheresNoTexturesPath;
+			case SceneSource::AnisotropyStrengthTest:
+				return AnisotropyStrengthTestPath;
+			case SceneSource::AnisotropyRotationTest:
+				return AnisotropyRotationTestPath;
+			case SceneSource::AnisotropyDiscTest:
+				return AnisotropyDiscTestPath;
+			case SceneSource::NormalTangentTest:
+				return NormalTangentTestPath;
+			case SceneSource::ProceduralGrid:
+				return {};
 			}
 			return {};
 		}
@@ -133,19 +140,13 @@ namespace gglab
 			.m_DefaultValue = int32_t(SceneSource::ProceduralGrid),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid"},
-					{.m_Value = int32_t(SceneSource::MetalRoughSpheres),
-						.m_Name = "MetalRoughSpheres"},
-					{.m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures),
-						.m_Name = "MetalRoughSpheresNoTextures"},
-					{.m_Value = int32_t(SceneSource::AnisotropyStrengthTest),
-						.m_Name = "AnisotropyStrengthTest"},
-					{.m_Value = int32_t(SceneSource::AnisotropyRotationTest),
-						.m_Name = "AnisotropyRotationTest"},
-					{.m_Value = int32_t(SceneSource::AnisotropyDiscTest),
-						.m_Name = "AnisotropyDiscTest"},
-					{.m_Value = int32_t(SceneSource::NormalTangentTest),
-						.m_Name = "NormalTangentTest"},
+					{ .m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid" },
+					{ .m_Value = int32_t(SceneSource::MetalRoughSpheres), .m_Name = "MetalRoughSpheres" },
+					{ .m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures), .m_Name = "MetalRoughSpheresNoTextures" },
+					{ .m_Value = int32_t(SceneSource::AnisotropyStrengthTest), .m_Name = "AnisotropyStrengthTest" },
+					{ .m_Value = int32_t(SceneSource::AnisotropyRotationTest), .m_Name = "AnisotropyRotationTest" },
+					{ .m_Value = int32_t(SceneSource::AnisotropyDiscTest), .m_Name = "AnisotropyDiscTest" },
+					{ .m_Value = int32_t(SceneSource::NormalTangentTest), .m_Name = "NormalTangentTest" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -233,27 +234,27 @@ namespace gglab
 			.m_DefaultValue = int32_t(MaterialDebugView::Lit),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit"},
-					{.m_Value = int32_t(MaterialDebugView::UnfilteredLit), .m_Name = "Lit (Specular AA Off)"},
-					{.m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color"},
-					{.m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic"},
-					{.m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal"},
-					{.m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::NormalVariance), .m_Name = "Normal Variance (Base R, Coat G)"},
-					{.m_Value = int32_t(MaterialDebugView::SpecularAAContribution), .m_Name = "Specular AA (Base R, Coat G, Delta B)"},
-					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
-					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
-					{.m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR"},
-					{.m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor"},
-					{.m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::EffectiveClearcoatRoughness), .m_Name = "Effective Clearcoat Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)"},
+					{ .m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit" },
+					{ .m_Value = int32_t(MaterialDebugView::UnfilteredLit), .m_Name = "Lit (Specular AA Off)" },
+					{ .m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color" },
+					{ .m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic" },
+					{ .m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal" },
+					{ .m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::NormalVariance), .m_Name = "Normal Variance (Base R, Coat G)" },
+					{ .m_Value = int32_t(MaterialDebugView::SpecularAAContribution), .m_Name = "Specular AA (Base R, Coat G, Delta B)" },
+					{ .m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0" },
+					{ .m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags" },
+					{ .m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR" },
+					{ .m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor" },
+					{ .m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::EffectiveClearcoatRoughness), .m_Name = "Effective Clearcoat Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -265,7 +266,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ClearcoatRoughnessId,
 			.m_Name = "Clearcoat Roughness",
@@ -275,7 +276,7 @@ namespace gglab
 			.m_DefaultValue = 0.1f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = AnisotropyStrengthId,
 			.m_Name = "Anisotropy Strength",
@@ -285,7 +286,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = AnisotropyRotationId,
 			.m_Name = "Anisotropy Rotation (Degrees)",
@@ -295,7 +296,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(-180.0f),
 			.m_MaxValue = LabValue(180.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
 			.m_Name = "Intensity",
@@ -388,33 +389,44 @@ namespace gglab
 			.m_Fraction = m_LoadingProgress.m_Fraction,
 			.m_Stage = m_LoadingProgress.m_Stage,
 			.m_Detail = m_LoadingProgress.m_Detail,
-		});
-		const std::string shaderDetail = shaders.HasFailed() ? shaders.m_Error
-			: std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
+			});
+		const std::string shaderDetail = shaders.HasFailed() ?
+			shaders.m_Error :
+			std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
 		progress.AddStep(0.15f, {
-			.m_Status = shaders.HasFailed() ? LoadingStatus::Failed
-				: shaders.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
-			.m_Fraction = shaders.IsReady() ? 1.0f : shaders.m_TotalCount == 0 ? 0.0f
-				: static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
+			.m_Status = shaders.HasFailed() ?
+				LoadingStatus::Failed :
+				shaders.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = shaders.IsReady() ?
+				1.0f :
+				shaders.m_TotalCount == 0 ?
+					0.0f :
+					static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
 			.m_Stage = shaders.HasFailed() ? "Diagnostic shader preload failed" : "Preloading diagnostic shaders",
 			.m_Detail = shaderDetail,
-		});
+			});
 		const bool pipelinesReady = m_DiagnosticVariantsCollected && m_DiagnosticPrewarmProgress.IsReady();
-		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed
-			? "A material diagnostic pipeline could not be created."
-			: !m_DiagnosticVariantsCollected ? "Waiting for scene and shader artifacts."
-			: std::format("{} / {} diagnostic pipelines ready.", m_DiagnosticPrewarmProgress.m_CompletedCount,
-				m_DiagnosticPrewarmProgress.m_TotalCount);
+		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed ?
+			"A material diagnostic pipeline could not be created." :
+			!m_DiagnosticVariantsCollected ?
+				"Waiting for scene and shader artifacts." :
+				std::format("{} / {} diagnostic pipelines ready.", m_DiagnosticPrewarmProgress.m_CompletedCount,
+					m_DiagnosticPrewarmProgress.m_TotalCount);
 		progress.AddStep(0.15f, {
-			.m_Status = m_DiagnosticPrewarmProgress.m_Failed ? LoadingStatus::Failed
-				: pipelinesReady ? LoadingStatus::Ready : LoadingStatus::Preparing,
-			.m_Fraction = pipelinesReady ? 1.0f : m_DiagnosticPrewarmProgress.m_TotalCount == 0 ? 0.0f
-				: static_cast<float>(m_DiagnosticPrewarmProgress.m_CompletedCount) /
-					static_cast<float>(m_DiagnosticPrewarmProgress.m_TotalCount),
-			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed
-				? "Diagnostic pipeline preparation failed" : "Prewarming diagnostic pipelines",
+			.m_Status = m_DiagnosticPrewarmProgress.m_Failed ?
+				LoadingStatus::Failed :
+				pipelinesReady ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = pipelinesReady ?
+				1.0f :
+				m_DiagnosticPrewarmProgress.m_TotalCount == 0 ?
+					0.0f :
+					static_cast<float>(m_DiagnosticPrewarmProgress.m_CompletedCount) /
+						static_cast<float>(m_DiagnosticPrewarmProgress.m_TotalCount),
+			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed ?
+				"Diagnostic pipeline preparation failed" :
+				"Prewarming diagnostic pipelines",
 			.m_Detail = pipelineDetail,
-		});
+			});
 		return progress.Build();
 	}
 
@@ -476,9 +488,10 @@ namespace gglab
 						m_NextGridRow == GridSize ? LoadingStatus::Ready : LoadingStatus::Preparing,
 					.m_Fraction = gridFraction,
 					.m_Stage = "Building procedural material grid",
-					.m_Detail = m_NextGridRow < GridSize ? std::format("Preparing row {} of {}.",
-															   m_NextGridRow + 1, GridSize)
-														 : "Procedural grid complete.",
+					.m_Detail = m_NextGridRow < GridSize ?
+						std::format("Preparing row {} of {}.",
+							m_NextGridRow + 1, GridSize) :
+						"Procedural grid complete.",
 				});
 			if (m_NextGridRow == GridSize)
 			{
@@ -819,8 +832,9 @@ namespace gglab
 		const auto sceneSource = static_cast<SceneSource>(
 			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
 		// Ground-oriented references need an elevated view to show their surface detail.
-		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest
-			? Vector3(0.0f, 16.0f, -20.0f) : Vector3(0.0f, 1.8f, -20.0f);
+		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest ?
+			Vector3(0.0f, 16.0f, -20.0f) :
+			Vector3(0.0f, 1.8f, -20.0f);
 		GetCamera().LookAt(position, Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
 	}

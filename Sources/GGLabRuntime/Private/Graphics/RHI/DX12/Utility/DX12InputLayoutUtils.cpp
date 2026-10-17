@@ -53,9 +53,9 @@ namespace gglab
 			element.Format = ToDXGIFormat(attribute.m_Format);
 			element.InputSlot = attribute.m_InputSlot;
 			element.AlignedByteOffset = attribute.m_AlignedByteOffset;
-			element.InputSlotClass = vertexBuffer
-				? ToDX12InputClassification(vertexBuffer->m_InputRate)
-				: D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+			element.InputSlotClass = vertexBuffer ?
+				ToDX12InputClassification(vertexBuffer->m_InputRate) :
+				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 			element.InstanceDataStepRate = vertexBuffer ? vertexBuffer->m_InstanceStepRate : 0;
 		}
 

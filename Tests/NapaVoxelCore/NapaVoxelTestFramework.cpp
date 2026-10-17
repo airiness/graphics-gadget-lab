@@ -23,26 +23,21 @@ namespace napa::voxel::testing
 
 	void ConsoleTestReporter::OnSuiteStarted(std::string_view suiteName) noexcept
 	{
-		std::printf("Running headless %.*s tests...\n", static_cast<int>(suiteName.size()),
-			suiteName.data());
+		std::printf("Running headless %.*s tests...\n", static_cast<int>(suiteName.size()), suiteName.data());
 	}
 
-	void ConsoleTestReporter::OnCheckCompleted(
-		std::string_view checkName, bool succeeded) noexcept
+	void ConsoleTestReporter::OnCheckCompleted(std::string_view checkName, bool succeeded) noexcept
 	{
 		FILE* output = succeeded ? stdout : stderr;
-		std::fprintf(output, "[%s] %.*s\n", succeeded ? "PASS" : "FAIL",
-			static_cast<int>(checkName.size()), checkName.data());
+		std::fprintf(output, "[%s] %.*s\n", succeeded ? "PASS" : "FAIL", static_cast<int>(checkName.size()), checkName.data());
 	}
 
-	void ConsoleTestReporter::OnSuiteFinished(
-		std::string_view suiteName, const TestSummary& summary) noexcept
+	void ConsoleTestReporter::OnSuiteFinished(std::string_view suiteName, const TestSummary& summary) noexcept
 	{
 		FILE* output = summary.Succeeded() ? stdout : stderr;
 		if (summary.Succeeded())
 		{
-			std::fprintf(output, "%.*s tests passed (%zu checks).\n",
-				static_cast<int>(suiteName.size()), suiteName.data(), summary.m_CheckCount);
+			std::fprintf(output, "%.*s tests passed (%zu checks).\n", static_cast<int>(suiteName.size()), suiteName.data(), summary.m_CheckCount);
 			return;
 		}
 		if (summary.m_CheckCount == 0)

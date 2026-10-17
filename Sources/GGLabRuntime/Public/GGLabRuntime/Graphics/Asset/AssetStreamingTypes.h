@@ -131,9 +131,7 @@ namespace gglab
 		uint64_t m_OverBudgetExecutionCount = 0;
 		uint64_t m_NoProgressContinueCount = 0;
 		uint64_t m_FaultInjectionCount = 0;
-		std::array<AssetResourcePublicationStageStatistics,
-			static_cast<size_t>(AssetResourcePublicationStage::Count)>
-			m_PublicationStages;
+		std::array<AssetResourcePublicationStageStatistics, static_cast<size_t>(AssetResourcePublicationStage::Count)> m_PublicationStages;
 		std::vector<AssetStreamingWorkActivity> m_PendingWork;
 	};
 }

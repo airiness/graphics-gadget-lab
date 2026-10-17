@@ -33,7 +33,8 @@ namespace gglab
 		public:
 			explicit FailingPlatformHost(std::shared_ptr<HostLifetimeProbe> probe) noexcept :
 				m_Probe(std::move(probe))
-			{}
+			{
+			}
 
 			[[nodiscard]] bool Initialize(const PlatformWindowCreateInfo&) noexcept override
 			{
@@ -67,8 +68,7 @@ namespace gglab
 
 		Application::CreateInfo MakeCreateInfo(std::unique_ptr<PlatformHost> host) noexcept
 		{
-			const std::filesystem::path runtimeRoot =
-				std::filesystem::temp_directory_path() / "gglab-application-lifecycle-self-test";
+			const std::filesystem::path runtimeRoot = std::filesystem::temp_directory_path() / "gglab-application-lifecycle-self-test";
 			return {
 				.m_WindowName = L"ApplicationLifecycleSelfTest",
 				.m_PlatformHost = std::move(host),
@@ -100,48 +100,47 @@ namespace gglab
 				application.GetLifecycleState() == Application::LifecycleState::Uninitialized,
 				"Application starts with an explicit uninitialized lifecycle state");
 			context.Check(!application.Initialize(),
-			    "Application rejects initialization without a platform host");
+				"Application rejects initialization without a platform host");
 			context.Check(application.GetLifecycleState() == Application::LifecycleState::Failed &&
 				application.GetExitCode() == 1,
-			    "Missing-host initialization rolls back into a stable failed state");
+				"Missing-host initialization rolls back into a stable failed state");
 
 			application.Shutdown();
 			application.Shutdown();
 			context.Check(application.GetLifecycleState() == Application::LifecycleState::Failed,
-			    "Repeated shutdown preserves the terminal initialization "
-			    "failure state");
+				"Repeated shutdown preserves the terminal initialization "
+				"failure state");
 		}
 
 		const auto probe = std::make_shared<HostLifetimeProbe>();
 		{
 			Application application(MakeCreateInfo(std::make_unique<FailingPlatformHost>(probe)));
 			context.Check(!application.Initialize(),
-			    "Application reports a platform-host initialization failure "
-			    "to its caller");
+				"Application reports a platform-host initialization failure "
+				"to its caller");
 			context.Check(probe->m_InitializeCount == 1 && probe->m_FinalizeCount == 1,
-			    "A partially initialized platform host is finalized exactly once");
+				"A partially initialized platform host is finalized exactly once");
 
 			application.Shutdown();
 			application.Shutdown();
 			context.Check(probe->m_FinalizeCount == 1,
-			    "Explicit repeated shutdown does not finalize the platform host twice");
+				"Explicit repeated shutdown does not finalize the platform host twice");
 			context.Check(!application.Initialize(),
-			    "A failed Application lifetime cannot be silently reinitialized");
+				"A failed Application lifetime cannot be silently reinitialized");
 		}
 		context.Check(probe->m_FinalizeCount == 1,
 			"Application destructor fallback remains idempotent after explicit shutdown");
 
 		const auto stoppedProbe = std::make_shared<HostLifetimeProbe>();
 		{
-			Application application(
-				MakeCreateInfo(std::make_unique<FailingPlatformHost>(stoppedProbe)));
-			application.Shutdown();
-			application.Shutdown();
-			context.Check(application.GetLifecycleState() == Application::LifecycleState::Stopped,
-			    "Shutdown before initialization produces a stable stopped state");
-			context.Check(
-				stoppedProbe->m_InitializeCount == 0 && stoppedProbe->m_FinalizeCount == 0,
-				"Shutdown before initialization does not touch an unstarted platform host");
+			Application application(MakeCreateInfo(std::make_unique<FailingPlatformHost>(stoppedProbe)));
+		application.Shutdown();
+		application.Shutdown();
+		context.Check(application.GetLifecycleState() == Application::LifecycleState::Stopped,
+			"Shutdown before initialization produces a stable stopped state");
+		context.Check(
+			stoppedProbe->m_InitializeCount == 0 && stoppedProbe->m_FinalizeCount == 0,
+			"Shutdown before initialization does not touch an unstarted platform host");
 		}
 	}
 }

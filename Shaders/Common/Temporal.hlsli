@@ -2,7 +2,7 @@
 
 float2 TemporalJitterPixelsToUV(float2 jitterPixels, uint2 extent)
 {
-	return jitterPixels / max(float2(extent), 1.0.xx);
+	return jitterPixels / max((float2)(extent), 1.0.xx);
 }
 
 float2 TemporalJitterPixelsToNDC(float2 jitterPixels, uint2 extent)

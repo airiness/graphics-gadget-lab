@@ -55,8 +55,8 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(!seconds || (std::isfinite(*seconds) && *seconds > 0.0),
 			"A fixed time step must be finite and positive.");
-		m_FixedDeltaTime = seconds && std::isfinite(*seconds) && *seconds > 0.0
-			? seconds
-			: std::nullopt;
+		m_FixedDeltaTime = seconds && std::isfinite(*seconds) && *seconds > 0.0 ?
+			seconds :
+			std::nullopt;
 	}
 }

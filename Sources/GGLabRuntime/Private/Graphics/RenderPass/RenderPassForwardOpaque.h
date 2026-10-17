@@ -26,7 +26,7 @@ namespace gglab
 					"Renders opaque and alpha-tested scene geometry with Forward+ PBR shading.",
 				.m_Category = RenderPassCategory::Geometry,
 				.m_Type = RenderPassType::Graphics,
-			})
+				})
 		{
 		}
 		~RenderPassForwardOpaque() override = default;
@@ -66,8 +66,7 @@ namespace gglab
 
 		static constexpr size_t LightingRecipeCount = static_cast<size_t>(LightingRecipe::Count);
 		// Indexed by lighting recipe, GTAO contribution output and material diagnostics.
-		std::array<std::array<std::array<GraphicsPhysicalPipelineKey, 2>, 2>, LightingRecipeCount>
-			m_PhysicalKeys{};
+		std::array<std::array<std::array<GraphicsPhysicalPipelineKey, 2>, 2>, LightingRecipeCount> m_PhysicalKeys{};
 		using PipelineSlotTable = std::array<std::array<std::array<GraphicsPipelineSlot,
 			RenderQueueBuilder::VariantCount>, 2>, LightingRecipeCount>;
 		PipelineSlotTable m_PipelineSlots{};

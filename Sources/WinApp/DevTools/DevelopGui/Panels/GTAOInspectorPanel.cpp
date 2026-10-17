@@ -267,9 +267,9 @@ namespace gglab
 				requested.m_TemporalMaxSamples, resolved.m_TemporalMaxSamples);
 			const auto formatName = [](GTAOFinalAOFormatPreference preference) noexcept
 				{
-					return preference == GTAOFinalAOFormatPreference::PreferR8Unorm
-						? "Prefer R8"
-						: "Force R16";
+					return preference == GTAOFinalAOFormatPreference::PreferR8Unorm ?
+						"Prefer R8" :
+						"Force R16";
 				};
 			drawText("Format Request", formatName(authoring.m_FinalAOFormatPreference),
 				formatName(requested.m_FinalAOFormatPreference),
@@ -332,9 +332,9 @@ namespace gglab
 				preview.m_Published == selection;
 			if (!published)
 			{
-				ImGui::TextDisabled(snapshot.m_Status == GTAOFrameStatus::Active
-					? "Preview update pending..."
-					: "The selected preview requires an active GTAO frame.");
+				ImGui::TextDisabled(snapshot.m_Status == GTAOFrameStatus::Active ?
+					"Preview update pending..." :
+					"The selected preview requires an active GTAO frame.");
 			}
 			else
 			{

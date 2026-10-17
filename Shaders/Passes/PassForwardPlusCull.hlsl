@@ -48,7 +48,7 @@ bool IntersectsTileFrustum(float3 centerVS, float radius, float minViewZ, float 
 	}
 
 	return dot(leftPlane, centerVS) >= -radius && dot(rightPlane, centerVS) >= -radius &&
-		   dot(topPlane, centerVS) >= -radius && dot(bottomPlane, centerVS) >= -radius;
+		dot(topPlane, centerVS) >= -radius && dot(bottomPlane, centerVS) >= -radius;
 }
 
 [numthreads(FORWARD_PLUS_TILE_SIZE, FORWARD_PLUS_TILE_SIZE, 1)]
@@ -110,10 +110,10 @@ void CSMain(
 		g_TileDepthRanges[tileIndex] = float2(minViewZ, maxViewZ);
 	}
 #endif
-	const float2 tilePixelMin = float2(groupId.xy * FORWARD_PLUS_TILE_SIZE);
+	const float2 tilePixelMin = (float2)(groupId.xy * FORWARD_PLUS_TILE_SIZE);
 	const float2 tilePixelMax =
-		float2(min((groupId.xy + 1u) * FORWARD_PLUS_TILE_SIZE, g_Pass.Extent));
-	const float2 inverseExtent = 1.0 / max(float2(g_Pass.Extent), float2(1.0, 1.0));
+		(float2)(min((groupId.xy + 1u) * FORWARD_PLUS_TILE_SIZE, g_Pass.Extent));
+	const float2 inverseExtent = 1.0 / max((float2)(g_Pass.Extent), float2(1.0, 1.0));
 	const float2 uvMin = tilePixelMin * inverseExtent;
 	const float2 uvMax = tilePixelMax * inverseExtent;
 
@@ -136,9 +136,7 @@ void CSMain(
 			const float3 centerVS = mul(float4(light.Position.xyz, 1.0), viewData.ViewMat).xyz;
 			g_LightHits[groupThreadIndex] =
 				IntersectsTileFrustum(centerVS, light.Range, minViewZ, maxViewZ, leftPlane,
-					rightPlane, topPlane, bottomPlane)
-					? 1u
-					: 0u;
+					rightPlane, topPlane, bottomPlane) ? 1u : 0u;
 		}
 	}
 	GroupMemoryBarrierWithGroupSync();

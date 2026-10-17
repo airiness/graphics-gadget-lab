@@ -34,12 +34,10 @@ namespace napa::voxel::testing
 			napa::voxel::SampleCoord coordinate, napa::voxel::VoxelSample sample) noexcept
 		{
 			bool changed = false;
-			return world.WriteOriginalAndCurrentSample(
-				coordinate, sample, changed).Succeeded() && changed;
+			return world.WriteOriginalAndCurrentSample(coordinate, sample, changed).Succeeded() && changed;
 		}
 
-		[[nodiscard]] bool MutateSample(napa::voxel::VoxelWorld& world,
-			napa::voxel::SampleCoord coordinate, napa::voxel::VoxelSample sample) noexcept
+		[[nodiscard]] bool MutateSample(napa::voxel::VoxelWorld& world, napa::voxel::SampleCoord coordinate, napa::voxel::VoxelSample sample) noexcept
 		{
 			bool changed = false;
 			return world.WriteCurrentSample(coordinate, sample, changed).Succeeded() && changed;
@@ -66,8 +64,7 @@ namespace napa::voxel::testing
 			};
 		}
 
-		[[nodiscard]] bool CreateDivergedRestoreWorld(
-			std::unique_ptr<napa::voxel::VoxelWorld>& world)
+		[[nodiscard]] bool CreateDivergedRestoreWorld(std::unique_ptr<napa::voxel::VoxelWorld>& world)
 		{
 			using namespace napa::voxel;
 			const VoxelSample stone{
@@ -118,8 +115,7 @@ namespace napa::voxel::testing
 				InitializeSample(*world, surfaceCoordinate, soil) &&
 				InitializeSample(*world, damageCoordinate, stone) &&
 				InitializeSample(*world, guardCoordinate, soil);
-			context.Check(initialized,
-				"Restore test data initializes Original and Current Samples");
+			context.Check(initialized, "Restore test data initializes Original and Current Samples");
 			if (!initialized)
 			{
 				return;
@@ -148,7 +144,7 @@ namespace napa::voxel::testing
 				result.m_TargetWorldVoxelRevision == regionBaseRevision + 1 &&
 				result.m_SampleChanges == std::vector<VoxelSampleChange>{
 					{ regionCoordinate, damagedStone, stone },
-				} && result.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+			} && result.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
 				result.m_DataDirtyChunks == std::vector<ChunkCoord>{ { -1, -1, -1 } } &&
 				result.m_MeshDirtyChunks.empty() &&
 				world->GetWorldVoxelRevision() == regionBaseRevision + 1,
@@ -156,8 +152,7 @@ namespace napa::voxel::testing
 
 			CpuMeshBatch damageOnlyBatch{};
 			context.Check(regionRestored &&
-				BuildCpuMeshBatch(*world, result, damageOnlyBatch).m_Error ==
-				ValidationError::InvalidCpuMeshCandidateSet,
+				BuildCpuMeshBatch(*world, result, damageOnlyBatch).m_Error == ValidationError::InvalidCpuMeshCandidateSet,
 				"Damage-only Restore cannot create an empty Mesh Batch");
 
 			const std::uint64_t noOpRevision = world->GetWorldVoxelRevision();
@@ -181,7 +176,7 @@ namespace napa::voxel::testing
 				result.m_SampleChanges == std::vector<VoxelSampleChange>{
 					{ surfaceCoordinate, DefaultVoxelSample, soil },
 					{ damageCoordinate, damagedStone, stone },
-				} && result.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+			} && result.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
 				result.m_DataDirtyChunks == std::vector<ChunkCoord>{ { 0, 0, 0 } } &&
 				result.m_MeshDirtyChunks.size() == 8 &&
 				sharedChunk->GetVoxelRevision() == chunkBaseRevision + 1,
@@ -198,10 +193,8 @@ namespace napa::voxel::testing
 			extraDirty.m_MeshDirtyChunks.push_back({ 1, 1, 1 });
 			CpuMeshBatch unchangedBatch = restoreBatch;
 			const ChunkMeshRecord* const unchangedCandidates = unchangedBatch.m_Candidates.data();
-			context.Check(BuildCpuMeshBatch(*world, missingDirty, unchangedBatch).m_Error ==
-				ValidationError::InvalidVoxelMutation &&
-				BuildCpuMeshBatch(*world, extraDirty, unchangedBatch).m_Error ==
-				ValidationError::InvalidVoxelMutation &&
+			context.Check(BuildCpuMeshBatch(*world, missingDirty, unchangedBatch).m_Error == ValidationError::InvalidVoxelMutation &&
+				BuildCpuMeshBatch(*world, extraDirty, unchangedBatch).m_Error == ValidationError::InvalidVoxelMutation &&
 				unchangedBatch.m_Candidates.data() == unchangedCandidates &&
 				unchangedBatch.m_RequestedChunks == restoreBatch.m_RequestedChunks,
 				"Missing and extra Restore Dirty Candidates fail without changing the Batch");
@@ -224,7 +217,7 @@ namespace napa::voxel::testing
 			context.Check(RestoreSampleOwnerChunk(*world, { 2, 0, 0 }, result).Succeeded() &&
 				result.m_SampleChanges == std::vector<VoxelSampleChange>{
 					{ guardCoordinate, DefaultVoxelSample, soil },
-				} && world->GetWorldVoxelRevision() == guardBaseRevision + 1,
+			} && world->GetWorldVoxelRevision() == guardBaseRevision + 1,
 				"Sample-owner guard Chunk Restore includes only logical Samples");
 
 			context.Check(MutateSample(*world, regionCoordinate, damagedStone) &&
@@ -275,7 +268,7 @@ namespace napa::voxel::testing
 			context.Check(initialized && RestoreAll(*world, result).Succeeded() &&
 				result.m_SampleChanges == std::vector<VoxelSampleChange>{
 					{ coordinate, stone, DefaultVoxelSample },
-				} && result.m_BaseWorldVoxelRevision == baseRevision &&
+			} && result.m_BaseWorldVoxelRevision == baseRevision &&
 				result.m_TargetWorldVoxelRevision == baseRevision + 1 &&
 				world->ReadOriginalSample(coordinate, original).Succeeded() &&
 				world->ReadCurrentSample(coordinate, current).Succeeded() &&
@@ -295,7 +288,8 @@ namespace napa::voxel::testing
 				.m_Material = VoxelMaterial::Stone,
 				.m_Damage = 77,
 			};
-			const std::array scrambledCoordinates{
+			const std::array scrambledCoordinates
+			{
 				SampleCoord{ 9, 9, 9 },
 				SampleCoord{ -7, 8, 1 },
 				SampleCoord{ 8, -7, -7 },
@@ -346,7 +340,7 @@ namespace napa::voxel::testing
 				RestoreAll(*world, result).Succeeded() &&
 				result.m_SampleChanges == std::vector<VoxelSampleChange>{
 					{ { 0, 0, 0 }, stone, DefaultVoxelSample },
-				} && world->GetResidentChunkCount() == 1,
+			} && world->GetResidentChunkCount() == 1,
 				"Restore All scans sparse resident storage instead of the full logical domain");
 		}
 
@@ -358,8 +352,7 @@ namespace napa::voxel::testing
 			VoxelMutationResult successfulResult{};
 			VoxelRestoreAllocationProbe successfulProbe{};
 			const bool restored = CreateDivergedRestoreWorld(successfulWorld) &&
-				RestoreAllWithAllocationProbe(
-					*successfulWorld, successfulResult, successfulProbe).Succeeded();
+				RestoreAllWithAllocationProbe(*successfulWorld, successfulResult, successfulProbe).Succeeded();
 			const std::size_t allocationCount = successfulProbe.m_PrepareAllocationCount;
 			context.Check(restored && successfulResult.Changed() && allocationCount > 0 &&
 				successfulProbe.m_CommitAllocationCount == 0,
@@ -377,13 +370,13 @@ namespace napa::voxel::testing
 				allAllocationFaultsAtomic = CreateDivergedRestoreWorld(world) &&
 					ComputeLogicalVoxelWorldHash(*world, beforeHash).Succeeded();
 				const std::uint64_t revision = allAllocationFaultsAtomic ?
-					world->GetWorldVoxelRevision() : 0;
+					world->GetWorldVoxelRevision() :
+					0;
 				const std::size_t residentCount = allAllocationFaultsAtomic ?
-					world->GetResidentChunkCount() : 0;
+					world->GetResidentChunkCount() :
+					0;
 				allAllocationFaultsAtomic = allAllocationFaultsAtomic &&
-					RestoreAllWithAllocationProbe(
-						*world, result, probe).m_Error ==
-						ValidationError::VoxelMutationAllocationFailure &&
+					RestoreAllWithAllocationProbe(*world, result, probe).m_Error == ValidationError::VoxelMutationAllocationFailure &&
 					probe.m_CommitAllocationCount == 0 && result == sentinel &&
 					world->GetWorldVoxelRevision() == revision &&
 					world->GetResidentChunkCount() == residentCount &&
@@ -401,11 +394,11 @@ namespace napa::voxel::testing
 			const bool exhaustedFixture = CreateDivergedRestoreWorld(exhaustedWorld) &&
 				ComputeLogicalVoxelWorldHash(*exhaustedWorld, beforeHash).Succeeded();
 			const std::uint64_t revision = exhaustedFixture ?
-				exhaustedWorld->GetWorldVoxelRevision() : 0;
+				exhaustedWorld->GetWorldVoxelRevision() :
+				0;
 			context.Check(exhaustedFixture &&
 				RestoreAllWithExhaustedRevision(
-					*exhaustedWorld, exhaustedResult).m_Error ==
-					ValidationError::ArithmeticOverflow && exhaustedResult == sentinel &&
+					*exhaustedWorld, exhaustedResult).m_Error == ValidationError::ArithmeticOverflow && exhaustedResult == sentinel &&
 				exhaustedWorld->GetWorldVoxelRevision() == revision &&
 				ComputeLogicalVoxelWorldHash(*exhaustedWorld, afterHash).Succeeded() &&
 				beforeHash == afterHash,

@@ -235,9 +235,9 @@ namespace gglab
 		// The diagnostics texture carries one payload per frame. A pending diagnostic capture
 		// of a Temporal AA tap selects it; otherwise the interactive preview does.
 		std::optional<PostProcessDebugTap> payloadTap;
-		const std::optional<PostProcessDebugTap> captureTap = services.m_FrameCapture
-			? services.m_FrameCapture->GetPendingDiagnosticTap()
-			: std::nullopt;
+		const std::optional<PostProcessDebugTap> captureTap = services.m_FrameCapture ?
+			services.m_FrameCapture->GetPendingDiagnosticTap() :
+			std::nullopt;
 		if (captureTap && IsTemporalAADiagnosticsTap(*captureTap))
 		{
 			payloadTap = captureTap;
@@ -459,41 +459,41 @@ namespace gglab
 					.m_VarianceClipGamma = temporalAASettings.m_VarianceClipGamma,
 					.m_ViewIndexAndHistoryValid = viewIndex |
 						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u) |
-						(historyColorPreviewRequested
-							? TemporalAAHistoryColorPreviewBit
-							: 0u) |
-						(historySamplesPreviewRequested
-							? TemporalAAHistorySamplesPreviewBit
-							: 0u) |
-						(clipDistancePreviewRequested
-							? TemporalAAClipDistancePreviewBit
-							: 0u) |
-						(historyRelaxationPreviewRequested
-							? TemporalAAHistoryRelaxationPreviewBit
-							: 0u) |
+						(historyColorPreviewRequested ?
+							TemporalAAHistoryColorPreviewBit :
+							0u) |
+						(historySamplesPreviewRequested ?
+							TemporalAAHistorySamplesPreviewBit :
+							0u) |
+						(clipDistancePreviewRequested ?
+							TemporalAAClipDistancePreviewBit :
+							0u) |
+						(historyRelaxationPreviewRequested ?
+							TemporalAAHistoryRelaxationPreviewBit :
+							0u) |
 						(temporalAASettings.m_HistoryFilter ==
-							TemporalAAHistoryFilter::CatmullRomClamped
-							? TemporalAAHistoryCatmullRomBit
-							: 0u) |
-						(temporalAASettings.m_CurrentFilter == TemporalAACurrentFilter::Gaussian
-							? TemporalAACurrentGaussianBit
-							: 0u) |
+							TemporalAAHistoryFilter::CatmullRomClamped ?
+								TemporalAAHistoryCatmullRomBit :
+								0u) |
+						(temporalAASettings.m_CurrentFilter == TemporalAACurrentFilter::Gaussian ?
+							TemporalAACurrentGaussianBit :
+							0u) |
 						(temporalAASettings.m_MotionSelection ==
-							TemporalAAMotionSelection::ClosestDepth
-							? TemporalAAClosestDepthMotionBit
-							: 0u) |
+							TemporalAAMotionSelection::ClosestDepth ?
+								TemporalAAClosestDepthMotionBit :
+								0u) |
 						(resolveDisplayDepth ? TemporalAADisplayDepthBit : 0u) |
 						(temporalAASettings.m_HistoryRectification !=
-							TemporalAAHistoryRectification::MinMaxClamp
-							? TemporalAAVarianceClipBit
-							: 0u) |
+							TemporalAAHistoryRectification::MinMaxClamp ?
+								TemporalAAVarianceClipBit :
+								0u) |
 						(temporalAASettings.m_HistoryRectification ==
-							TemporalAAHistoryRectification::BoundedVarianceClip
-							? TemporalAAVarianceClipBoundedBit
-							: 0u) |
-						(historyAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples
-							? TemporalAAEffectiveSamplesBit
-							: 0u),
+							TemporalAAHistoryRectification::BoundedVarianceClip ?
+								TemporalAAVarianceClipBoundedBit :
+								0u) |
+						(historyAccumulation == TemporalAAHistoryAccumulation::EffectiveSamples ?
+							TemporalAAEffectiveSamplesBit :
+							0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),
@@ -591,10 +591,8 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					depthHistoryParameters);
 				commandContext->Dispatch(
-					(data.m_DepthWidth + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
-					(data.m_DepthHeight + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
+					(data.m_DepthWidth + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
+					(data.m_DepthHeight + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
 					1);
 
 				commandContext->SetPipeline(GetOrCreatePipeline(services));
@@ -610,10 +608,8 @@ namespace gglab
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
-					(data.m_Width + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
-					(data.m_Height + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
+					(data.m_Width + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
+					(data.m_Height + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
 					1);
 			});
 
@@ -667,7 +663,7 @@ namespace gglab
 						.m_View = dsv,
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
-				});
+					});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

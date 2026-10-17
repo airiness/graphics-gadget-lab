@@ -197,9 +197,9 @@ namespace gglab
 			{
 				const bool primaryPresent =
 					result.m_PrimaryCommitted || HasFile(primaryDestination);
-				const bool commitMarker = config.m_ContinueWhenPrimaryPresent
-					? primaryPresent
-					: result.m_PrimaryCommitted;
+				const bool commitMarker = config.m_ContinueWhenPrimaryPresent ?
+					primaryPresent :
+					result.m_PrimaryCommitted;
 				if (commitMarker)
 				{
 					result.m_MarkerCommitted = CommitFile(tempPaths.back(),

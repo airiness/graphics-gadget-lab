@@ -56,7 +56,7 @@ namespace gglab
 	ForwardPlusLabSession::ForwardPlusLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<ForwardPlusDebugReadback> debugReadback) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo,
-			CreateRenderPipelineForwardPlus({.m_ForwardPlusDebugReadback = debugReadback})),
+			CreateRenderPipelineForwardPlus({ .m_ForwardPlusDebugReadback = debugReadback })),
 		m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
 		m_ViewportHeight(createInfo.m_WindowHeight)
 	{
@@ -320,8 +320,9 @@ namespace gglab
 			}
 			else if (fixture == ForwardPlusFixture::MixedLightTypes)
 			{
-				transform.m_Position = lightIndex == 1 ? Vector3(-1.5f, 1.5f, 5.5f)
-					: Vector3(1.8f, 2.0f, 5.8f);
+				transform.m_Position = lightIndex == 1 ?
+					Vector3(-1.5f, 1.5f, 5.5f) :
+					Vector3(1.8f, 2.0f, 5.8f);
 				if (lightIndex == 2)
 				{
 					Vector3 direction = Vector3(0.0f, 0.5f, 6.5f) - transform.m_Position;
@@ -353,15 +354,17 @@ namespace gglab
 			components::LightComponent light{};
 			if (fixture == ForwardPlusFixture::MixedLightTypes)
 			{
-				light.m_Type = lightIndex == 0 ? LightType::Directional
-					: lightIndex == 1 ? LightType::Point
-					: LightType::Spot;
+				light.m_Type = lightIndex == 0 ?
+					LightType::Directional :
+					lightIndex == 1 ?
+						LightType::Point :
+						LightType::Spot;
 			}
 			else
 			{
-				light.m_Type = fixture == ForwardPlusFixture::TileBoundaryLight
-					? LightType::Spot
-					: LightType::Point;
+				light.m_Type = fixture == ForwardPlusFixture::TileBoundaryLight ?
+					LightType::Spot :
+					LightType::Point;
 			}
 			light.m_Color =
 				Color(0.35f + 0.65f * static_cast<float>((lightIndex * 17u) % 31u) / 30.0f,
@@ -505,20 +508,21 @@ namespace gglab
 		{
 			grid.reset();
 		}
-		const ForwardPlusGridMetrics gridMetrics = grid
-			? BuildForwardPlusGridMetrics(grid->m_TileGrid, grid->m_Headers, grid->m_DepthRanges)
-			: ForwardPlusGridMetrics{};
+		const ForwardPlusGridMetrics gridMetrics = grid ?
+			BuildForwardPlusGridMetrics(grid->m_TileGrid, grid->m_Headers, grid->m_DepthRanges) :
+			ForwardPlusGridMetrics{};
 		const ForwardPlusPerformanceReadback performance = m_DebugReadback->GetPerformance();
 		const bool hdrDiffRequested = m_DebugReadback->IsHdrDiffRequested();
-		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation
-		? m_Services.m_RenderServices.m_Presentation->GetDevice()
-		: nullptr;
+		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation ?
+			m_Services.m_RenderServices.m_Presentation->GetDevice() :
+			nullptr;
 		const RHIShaderWaveCapabilities waveCapabilities =
 			device ? device->GetShaderWaveCapabilities() : RHIShaderWaveCapabilities{};
 		const std::string waveLaneRange =
-			waveCapabilities.IsValid() ? std::format("{} - {}", waveCapabilities.m_MinLaneCount,
-				waveCapabilities.m_MaxLaneCount)
-			: "not reported";
+			waveCapabilities.IsValid() ?
+				std::format("{} - {}", waveCapabilities.m_MinLaneCount,
+					waveCapabilities.m_MaxLaneCount) :
+				"not reported";
 		const uint32_t tileIndex =
 			result.m_IsValid ? result.m_TileY * result.m_TileGrid.m_TileCountX + result.m_TileX : 0;
 		const uint32_t lightCount = result.m_Header.GetCount();
@@ -583,21 +587,23 @@ namespace gglab
 			},
 			{
 				.m_Name = "Tile grid",
-				.m_Value = result.m_IsValid ? std::format("{} x {}", result.m_TileGrid.m_TileCountX,
-												  result.m_TileGrid.m_TileCountY)
-											: "pending",
+				.m_Value = result.m_IsValid ?
+					std::format("{} x {}", result.m_TileGrid.m_TileCountX,
+						result.m_TileGrid.m_TileCountY) :
+					"pending",
 			},
 			{
 				.m_Name = "Selected tile",
-				.m_Value = result.m_IsValid
-							   ? std::format("({}, {})", result.m_TileX, result.m_TileY)
-							   : "pending",
+				.m_Value = result.m_IsValid ?
+					std::format("({}, {})", result.m_TileX, result.m_TileY) :
+					"pending",
 			},
 			{
 				.m_Name = "Header",
-				.m_Value = result.m_IsValid ? std::format("offset={}, count={}",
-												  result.m_Header.m_Offset, lightCount)
-											: "pending",
+				.m_Value = result.m_IsValid ?
+					std::format("offset={}, count={}",
+						result.m_Header.m_Offset, lightCount) :
+					"pending",
 			},
 			{
 				.m_Name = "Expected count",
@@ -609,118 +615,131 @@ namespace gglab
 			},
 			{
 				.m_Name = "Non-empty / empty light lists",
-				.m_Value = gridMetrics.m_IsValid
-					? std::format("{} / {}", gridMetrics.m_NonEmptyLightListTileCount,
-						gridMetrics.m_EmptyLightListTileCount)
-					: "pending",
+				.m_Value = gridMetrics.m_IsValid ?
+					std::format("{} / {}", gridMetrics.m_NonEmptyLightListTileCount,
+						gridMetrics.m_EmptyLightListTileCount) :
+					"pending",
 			},
 			{
 				.m_Name = "Light references",
-				.m_Value = gridMetrics.m_IsValid
-					? std::format("{} total, {:.2f} average, {} max",
+				.m_Value = gridMetrics.m_IsValid ?
+					std::format("{} total, {:.2f} average, {} max",
 						gridMetrics.m_TotalLightReferences,
 						gridMetrics.m_AverageLightsPerTile,
-						gridMetrics.m_MaxLightsPerTile)
-					: "pending",
+						gridMetrics.m_MaxLightsPerTile) :
+					"pending",
 			},
 			{
 				.m_Name = "Full-grid View-Z",
-				.m_Value = gridMetrics.m_IsValid
-					? std::format("{:.4f} - {:.4f}", gridMetrics.m_MinViewZ,
-						gridMetrics.m_MaxViewZ)
-					: "pending",
+				.m_Value = gridMetrics.m_IsValid ?
+					std::format("{:.4f} - {:.4f}", gridMetrics.m_MinViewZ,
+						gridMetrics.m_MaxViewZ) :
+					"pending",
 			},
 			{
 				.m_Name = "Latest Forward+ cull + opaque GPU sample",
-				.m_Value = performance.m_HasForwardPlusSample
-					? std::format("{:.3f} + {:.3f} ms",
+				.m_Value = performance.m_HasForwardPlusSample ?
+					std::format("{:.3f} + {:.3f} ms",
 						performance.m_ForwardPlusCullMilliseconds,
-						performance.m_ForwardPlusOpaqueMilliseconds)
-					: "disable HDR diff to capture",
+						performance.m_ForwardPlusOpaqueMilliseconds) :
+					"disable HDR diff to capture",
 			},
 			{
 				.m_Name = "HDR max absolute error",
-				.m_Value = hdrDiff.m_IsValid
-					? std::format("{:.8f}", hdrDiff.m_MaxAbsoluteError)
-					: "pending",
+				.m_Value = hdrDiff.m_IsValid ?
+					std::format("{:.8f}", hdrDiff.m_MaxAbsoluteError) :
+					"pending",
 			},
 			{
 				.m_Name = "HDR max relative luminance error",
-				.m_Value = hdrDiff.m_IsValid
-					? std::format("{:.8f}", hdrDiff.m_MaxRelativeLuminanceError)
-					: "pending",
+				.m_Value = hdrDiff.m_IsValid ?
+					std::format("{:.8f}", hdrDiff.m_MaxRelativeLuminanceError) :
+					"pending",
 			},
 			{
 				.m_Name = "HDR max-error pixel",
-				.m_Value = hdrDiff.m_IsValid
-					? std::format("({}, {})", hdrDiff.m_MaxErrorPixelX,
-						hdrDiff.m_MaxErrorPixelY)
-					: "pending",
+				.m_Value = hdrDiff.m_IsValid ?
+					std::format("({}, {})", hdrDiff.m_MaxErrorPixelX,
+						hdrDiff.m_MaxErrorPixelY) :
+					"pending",
 			},
 		};
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "GPU tile readback",
-				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
-											  : LabDiagnosticCheckStatus::Passed,
+				.m_Status = !result.m_IsValid ?
+					LabDiagnosticCheckStatus::Pending :
+					LabDiagnosticCheckStatus::Passed,
 				.m_Detail = "Header and indices are copied from the completed GPU cull frame.",
 			},
 			{
 				.m_Name = "Full-grid diagnostics",
-				.m_Status = !gridMetrics.m_IsValid ? LabDiagnosticCheckStatus::Pending
-					: LabDiagnosticCheckStatus::Passed,
+				.m_Status = !gridMetrics.m_IsValid ?
+					LabDiagnosticCheckStatus::Pending :
+					LabDiagnosticCheckStatus::Passed,
 				.m_Detail =
 					"Current-generation headers and depth ranges cover every tile in the viewport.",
 			},
 			{
 				.m_Name = "Tile-list capacity",
-				.m_Status = !gridMetrics.m_IsValid ? LabDiagnosticCheckStatus::Pending
-					: gridMetrics.m_OverflowTileCount == 0
-						? LabDiagnosticCheckStatus::Passed
-						: LabDiagnosticCheckStatus::Failed,
+				.m_Status = !gridMetrics.m_IsValid ?
+					LabDiagnosticCheckStatus::Pending :
+					gridMetrics.m_OverflowTileCount == 0 ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "No tile may exceed or flag the fixed 64-light capacity.",
 			},
 			{
 				.m_Name = "Fixed-stride address/count",
-				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
-							: headerValid ? LabDiagnosticCheckStatus::Passed
-											  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = !result.m_IsValid ?
+					LabDiagnosticCheckStatus::Pending :
+					headerValid ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "Offset equals TileIndex * 64 and count does not exceed 64.",
 			},
 			{
 				.m_Name = "Selected fixture result",
-				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
-							: fixtureResultValid ? LabDiagnosticCheckStatus::Passed
-												 : LabDiagnosticCheckStatus::Failed,
+				.m_Status = !result.m_IsValid ?
+					LabDiagnosticCheckStatus::Pending :
+					fixtureResultValid ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"GPU count matches the selected 0/1/64-light fixture, or zero for a background-only tile.",
 			},
 			{
 				.m_Name = "Stable global light order",
-				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
-							: sortedIndices ? LabDiagnosticCheckStatus::Passed
-											  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = !result.m_IsValid ?
+					LabDiagnosticCheckStatus::Pending :
+					sortedIndices ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"Readback light indices are strictly increasing and inside the global 64-light table.",
 			},
 			{
 				.m_Name = "Fixture construction",
-				.m_Status = m_LoadingProgress.IsPreparing() ? LabDiagnosticCheckStatus::Pending
-							: m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-															: LabDiagnosticCheckStatus::Failed,
+				.m_Status = m_LoadingProgress.IsPreparing() ?
+					LabDiagnosticCheckStatus::Pending :
+					m_FixtureConfigured ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"The deterministic geometry and selected local-light fixture were created.",
 			},
 			{
 				.m_Name = "All-lights vs Forward+ HDR diff",
-				.m_Status = !hdrDiffRequested ? LabDiagnosticCheckStatus::Passed
-					: !hdrDiff.m_IsValid ? LabDiagnosticCheckStatus::Pending
-					: IsForwardPlusHdrDiffWithinTolerance(hdrDiff)
-						? LabDiagnosticCheckStatus::Passed
-						: LabDiagnosticCheckStatus::Failed,
-				.m_Detail = !hdrDiffRequested
-					? "HDR diff validation is disabled for the selected lighting mode."
-					: std::format("Compared {} opaque pixels; tolerances are abs <= {} and relative luminance <= {}.",
+				.m_Status = !hdrDiffRequested ?
+					LabDiagnosticCheckStatus::Passed :
+					!hdrDiff.m_IsValid ?
+						LabDiagnosticCheckStatus::Pending :
+						IsForwardPlusHdrDiffWithinTolerance(hdrDiff) ?
+							LabDiagnosticCheckStatus::Passed :
+							LabDiagnosticCheckStatus::Failed,
+				.m_Detail = !hdrDiffRequested ?
+					"HDR diff validation is disabled for the selected lighting mode." :
+					std::format("Compared {} opaque pixels; tolerances are abs <= {} and relative luminance <= {}.",
 						hdrDiff.m_ComparedPixelCount, ForwardPlusHdrDiffAbsoluteTolerance,
 						ForwardPlusHdrDiffRelativeLuminanceTolerance),
 			},

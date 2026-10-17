@@ -123,10 +123,10 @@ namespace gglab
 			{
 				const std::filesystem::path path(state.m_ModelPath.data());
 				const auto request = control->LoadModelAsync(path);
-				state.m_Status = request.IsValid()
-					? std::format("Queued model {} (task {}).",
-						request.m_ModelId.Value(), request.m_TaskId)
-					: "Failed to load model. Only .gltf is currently supported.";
+				state.m_Status = request.IsValid() ?
+					std::format("Queued model {} (task {}).",
+						request.m_ModelId.Value(), request.m_TaskId) :
+					"Failed to load model. Only .gltf is currently supported.";
 			}
 			if (!hasPath || !control)
 			{
@@ -138,11 +138,11 @@ namespace gglab
 			const uint64_t artifactLookupCount = assetSnapshot.m_ModelImportArtifactCacheHitCount +
 				assetSnapshot.m_ModelImportArtifactCacheMissCount;
 			const double artifactHitRate =
-				artifactLookupCount == 0
-				? 0.0
-				: 100.0 *
-				static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheHitCount) /
-				static_cast<double>(artifactLookupCount);
+				artifactLookupCount == 0 ?
+					0.0 :
+					100.0 *
+						static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheHitCount) /
+						static_cast<double>(artifactLookupCount);
 			ImGui::Text("Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
 				assetSnapshot.m_ModelImportArtifactCachedEntryCount,
 				assetSnapshot.m_ModelImportArtifactCacheHitCount,
@@ -295,10 +295,10 @@ namespace gglab
 				const TextureSemantic semantic =
 					TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)];
 				const auto request = control->LoadTextureAsync(path, semantic);
-				state.m_Status = request.IsValid()
-					? std::format("Queued texture {} (task {}).",
-						request.m_TextureId.Value(), request.m_TaskId)
-					: "Failed to load texture.";
+				state.m_Status = request.IsValid() ?
+					std::format("Queued texture {} (task {}).",
+						request.m_TextureId.Value(), request.m_TaskId) :
+					"Failed to load texture.";
 			}
 			if (!hasPath || !control)
 			{
@@ -310,10 +310,10 @@ namespace gglab
 			const uint64_t artifactLookupCount = assetSnapshot.m_TextureArtifactCacheHitCount +
 				assetSnapshot.m_TextureArtifactCacheMissCount;
 			const double artifactHitRate =
-				artifactLookupCount == 0
-				? 0.0
-				: 100.0 * static_cast<double>(assetSnapshot.m_TextureArtifactCacheHitCount) /
-				static_cast<double>(artifactLookupCount);
+				artifactLookupCount == 0 ?
+					0.0 :
+					100.0 * static_cast<double>(assetSnapshot.m_TextureArtifactCacheHitCount) /
+						static_cast<double>(artifactLookupCount);
 			ImGui::Text("Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
 				assetSnapshot.m_TextureArtifactCachedEntryCount,
 				assetSnapshot.m_TextureArtifactCacheHitCount,
@@ -344,10 +344,10 @@ namespace gglab
 			const uint64_t ddcLookupCount = assetSnapshot.m_TextureDerivedDataHitCount +
 				assetSnapshot.m_TextureDerivedDataMissCount;
 			const double ddcHitRate =
-				ddcLookupCount == 0
-				? 0.0
-				: 100.0 * static_cast<double>(assetSnapshot.m_TextureDerivedDataHitCount) /
-				static_cast<double>(ddcLookupCount);
+				ddcLookupCount == 0 ?
+					0.0 :
+					100.0 * static_cast<double>(assetSnapshot.m_TextureDerivedDataHitCount) /
+						static_cast<double>(ddcLookupCount);
 			ImGui::Text("Entries: %llu (%.2f MiB) | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
 				assetSnapshot.m_TextureDerivedDataStoredEntryCount,
 				static_cast<double>(assetSnapshot.m_TextureDerivedDataStoredBytes) /
@@ -376,15 +376,16 @@ namespace gglab
 				const uint64_t catalogAgeMilliseconds =
 					catalogNowMilliseconds >=
 					assetSnapshot
-					.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds
-					? catalogNowMilliseconds -
-					assetSnapshot
-					.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds
-					: 0;
+					.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds ?
+						catalogNowMilliseconds -
+							assetSnapshot
+							.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds :
+						0;
 				ImGui::TextDisabled(
 					"Catalog: %s | reconciled %.1f s ago | refreshes %llu | failures %llu",
-					assetSnapshot.m_IsTextureDerivedDataCatalogApproximate ? "approximate"
-					: "exact",
+					assetSnapshot.m_IsTextureDerivedDataCatalogApproximate ?
+						"approximate" :
+						"exact",
 					static_cast<double>(catalogAgeMilliseconds) / 1000.0,
 					assetSnapshot.m_TextureDerivedDataCatalogReconciliationCount,
 					assetSnapshot.m_TextureDerivedDataCatalogReconciliationFailureCount);
@@ -408,9 +409,9 @@ namespace gglab
 			if (ImGui::Button("Clear Texture Local DDC") && control)
 			{
 				state.m_Status =
-					control->ClearTextureDerivedDataCache()
-					? "Texture local DDC cleared."
-					: "Texture local DDC clear failed; existing data was preserved.";
+					control->ClearTextureDerivedDataCache() ?
+						"Texture local DDC cleared." :
+						"Texture local DDC clear failed; existing data was preserved.";
 			}
 			ImGui::EndDisabled();
 			ImGui::SeparatorText("Loaded Textures");
@@ -590,10 +591,10 @@ namespace gglab
 		void DrawSamplerRegistry(const SamplerRegistrySnapshot& snapshot) noexcept
 		{
 			const uint64_t lookupCount = snapshot.m_CacheHitCount + snapshot.m_CacheMissCount;
-			const double hitRate = lookupCount == 0
-				? 0.0
-				: 100.0 * static_cast<double>(snapshot.m_CacheHitCount) /
-				static_cast<double>(lookupCount);
+			const double hitRate = lookupCount == 0 ?
+				0.0 :
+				100.0 * static_cast<double>(snapshot.m_CacheHitCount) /
+					static_cast<double>(lookupCount);
 			ImGui::Text("Unique: %u | Preset-backed: %u | Custom: %u | Preset bindings: %u",
 				snapshot.m_UniqueSamplerCount, snapshot.m_PresetSamplerCount,
 				snapshot.m_CustomSamplerCount, snapshot.m_PresetBindingCount);
@@ -703,9 +704,9 @@ namespace gglab
 						ImGui::TextUnformatted("-");
 					}
 					ImGui::TableSetColumnIndex(5);
-					ImGui::TextUnformatted(upload.m_Progress.m_Stage.empty()
-						? "-"
-						: upload.m_Progress.m_Stage.c_str());
+					ImGui::TextUnformatted(upload.m_Progress.m_Stage.empty() ?
+						"-" :
+						upload.m_Progress.m_Stage.c_str());
 					if (!upload.m_Progress.m_Detail.empty() && ImGui::IsItemHovered())
 					{
 						ImGui::SetTooltip("%s", upload.m_Progress.m_Detail.c_str());
@@ -738,13 +739,13 @@ namespace gglab
 			const AssetStreamingQueueStatistics& queue) noexcept
 		{
 			const double averageWait =
-				queue.m_QueueSampleCount > 0
-				? queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_QueueSampleCount)
-				: 0.0;
-			const double averageExecution = queue.m_ProcessedCount > 0
-				? queue.m_TotalExecutionMilliseconds /
-				static_cast<double>(queue.m_ProcessedCount)
-				: 0.0;
+				queue.m_QueueSampleCount > 0 ?
+					queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_QueueSampleCount) :
+					0.0;
+			const double averageExecution = queue.m_ProcessedCount > 0 ?
+				queue.m_TotalExecutionMilliseconds /
+					static_cast<double>(queue.m_ProcessedCount) :
+				0.0;
 			ImGui::Text(
 				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu cancelled=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/p95/max)=%.3f/%.3f/%.3f ms",
 				label, queue.m_PendingCount, queue.m_HighWatermark,
@@ -949,10 +950,10 @@ namespace gglab
 				assetSnapshot.m_SucceededUploadCount, assetSnapshot.m_FailedUploadCount,
 				assetSnapshot.m_UploadCompletionCallbackFailureCount);
 			const double averageResourcesPerBatch =
-				assetSnapshot.m_UploadBatchSubmissionCount > 0
-				? static_cast<double>(assetSnapshot.m_SubmittedUploadCount) /
-				static_cast<double>(assetSnapshot.m_UploadBatchSubmissionCount)
-				: 0.0;
+				assetSnapshot.m_UploadBatchSubmissionCount > 0 ?
+					static_cast<double>(assetSnapshot.m_SubmittedUploadCount) /
+						static_cast<double>(assetSnapshot.m_UploadBatchSubmissionCount) :
+					0.0;
 			ImGui::Text("Transfer batches: %llu   Resources/batch: last=%u average=%.2f max=%u",
 				assetSnapshot.m_UploadBatchSubmissionCount,
 				assetSnapshot.m_LastUploadBatchResourceCount, averageResourcesPerBatch,
@@ -986,8 +987,9 @@ namespace gglab
 		const auto* snapshot =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
 		const auto* samplerSnapshot =
-			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<SamplerRegistrySnapshot>()
-			: nullptr;
+			context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<SamplerRegistrySnapshot>() :
+				nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Asset snapshot provider is not available.");

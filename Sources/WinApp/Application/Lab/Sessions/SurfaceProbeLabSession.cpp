@@ -253,9 +253,9 @@ namespace gglab
 			parameters.Get(BaseColorTextureId, int32_t(SurfaceTextureFixture::White));
 		const MaterialDebugView debugView =
 			parameters.Get(DebugViewId, int32_t(MaterialDebugView::Lit)) ==
-			int32_t(MaterialDebugView::BaseColor)
-			? MaterialDebugView::BaseColor
-			: MaterialDebugView::Lit;
+			int32_t(MaterialDebugView::BaseColor) ?
+				MaterialDebugView::BaseColor :
+				MaterialDebugView::Lit;
 
 		auto& registry = m_World.GetRegistry();
 		if (!registry.valid(m_ProbeEntity))
@@ -324,28 +324,28 @@ namespace gglab
 		const int32_t textureIndex = ClampFixtureIndex(textureFixture);
 		const MaterialDebugView debugView =
 			parameters.Get(DebugViewId, int32_t(MaterialDebugView::Lit)) ==
-			int32_t(MaterialDebugView::BaseColor)
-			? MaterialDebugView::BaseColor
-			: MaterialDebugView::Lit;
+			int32_t(MaterialDebugView::BaseColor) ?
+				MaterialDebugView::BaseColor :
+				MaterialDebugView::Lit;
 		const Color factor = SurfaceFactorFixtures[factorIndex];
 
-		std::string factorName = factorIndex == int32_t(SurfaceFactorFixture::Orange)
-			? "B - Orange (0.90, 0.28, 0.10, 1.0)"
-			: "A - Dark Gray (0.10, 0.10, 0.10, 1.0)";
-		std::string textureName = textureIndex == int32_t(SurfaceTextureFixture::Checker)
-			? "B - MissingTextureChecker (64x64 8px purple/black checker)"
-			: "A - BaseColorWhite (1x1 solid white)";
+		std::string factorName = factorIndex == int32_t(SurfaceFactorFixture::Orange) ?
+			"B - Orange (0.90, 0.28, 0.10, 1.0)" :
+			"A - Dark Gray (0.10, 0.10, 0.10, 1.0)";
+		std::string textureName = textureIndex == int32_t(SurfaceTextureFixture::Checker) ?
+			"B - MissingTextureChecker (64x64 8px purple/black checker)" :
+			"A - BaseColorWhite (1x1 solid white)";
 
-		std::string expected = debugView == MaterialDebugView::BaseColor
-			? (textureIndex == int32_t(SurfaceTextureFixture::Checker)
-				? "Unlit base-color view: 8px purple/black checkerboard tiles across each face, "
-				"tinted by the active base color factor."
-				: "Unlit base-color view: uniform surface tinted by the active base color factor "
-				"(factor x white texture).")
-			: (textureIndex == int32_t(SurfaceTextureFixture::Checker)
-				? "Lit Forward PBR: 8px purple/black checkerboard tiles shading under the "
-				"directional light, tinted by the active base color factor."
-				: "Lit Forward PBR: uniform surface shading under the directional light, tinted "
+		std::string expected = debugView == MaterialDebugView::BaseColor ?
+			(textureIndex == int32_t(SurfaceTextureFixture::Checker) ?
+				"Unlit base-color view: 8px purple/black checkerboard tiles across each face, "
+				"tinted by the active base color factor." :
+				"Unlit base-color view: uniform surface tinted by the active base color factor "
+				"(factor x white texture).") :
+			(textureIndex == int32_t(SurfaceTextureFixture::Checker) ?
+				"Lit Forward PBR: 8px purple/black checkerboard tiles shading under the "
+				"directional light, tinted by the active base color factor." :
+				"Lit Forward PBR: uniform surface shading under the directional light, tinted "
 				"by the active base color factor (factor x white texture).");
 
 		// Mechanical CPU-side check: the material instance (the source of the
@@ -386,18 +386,21 @@ namespace gglab
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "Fixture construction",
-				.m_Status = !m_LoadingProgress.IsReady() ? LabDiagnosticCheckStatus::Pending
-					: m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-										  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = !m_LoadingProgress.IsReady() ?
+					LabDiagnosticCheckStatus::Pending :
+					m_FixtureConfigured ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"The probe primitive carries transform, model, and material instance components.",
 			},
 			{
 				.m_Name = "Surface fixtures applied",
-				.m_Status = !m_LoadingProgress.IsReady() || !m_FixtureConfigured
-					? LabDiagnosticCheckStatus::Pending
-					: fixturesApplied ? LabDiagnosticCheckStatus::Passed
-									 : LabDiagnosticCheckStatus::Failed,
+				.m_Status = !m_LoadingProgress.IsReady() || !m_FixtureConfigured ?
+					LabDiagnosticCheckStatus::Pending :
+					fixturesApplied ?
+						LabDiagnosticCheckStatus::Passed :
+						LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"The material instance holds the active base color factor and texture binding; "
 					"the renderer re-encodes it into the runtime material table each frame.",

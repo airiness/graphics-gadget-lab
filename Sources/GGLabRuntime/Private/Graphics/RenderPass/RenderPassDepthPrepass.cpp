@@ -138,7 +138,7 @@ namespace gglab
 						.m_View = dsv,
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
-				});
+					});
 				graphicsContext->ClearDepthAttachment(data.m_ClearDepth);
 
 				const auto& renderQueue = contextPtr->GetRenderQueue(displayViewId);
@@ -336,8 +336,9 @@ namespace gglab
 		coverageKey.m_RasterizerPreset =
 			doubleSided ? RasterizerPreset::TwoSided : RasterizerPreset::Default;
 		const DepthCoverageAlphaVariant alphaVariant =
-			bucket == RenderBucket::AlphaTest ? DepthCoverageAlphaVariant::BaseColorMask
-			: DepthCoverageAlphaVariant::Opaque;
+			bucket == RenderBucket::AlphaTest ?
+				DepthCoverageAlphaVariant::BaseColorMask :
+				DepthCoverageAlphaVariant::Opaque;
 		return gglab::BuildDepthCoveragePipelineSignature(coverageKey,
 			DepthCoverageVertexProgram::RigidMesh, DepthCoverageDeformationVariant::Rigid,
 			DepthCoveragePositionPrecision::Float32, RHIFormat::R32G32B32Float, doubleSided,
@@ -362,17 +363,17 @@ namespace gglab
 		const RenderBucket bucket = RenderQueueBuilder::DecodeVariantBucket(variantBits);
 		GGLAB_ASSERT(bucket != RenderBucket::Transparent);
 		GraphicsPhysicalPipelineKey physicalKey = m_BasePhysicalKey;
-		physicalKey.m_RasterizerPreset = RenderQueueBuilder::DecodeVariantDoubleSided(variantBits)
-			? RasterizerPreset::TwoSided
-			: RasterizerPreset::Default;
+		physicalKey.m_RasterizerPreset = RenderQueueBuilder::DecodeVariantDoubleSided(variantBits) ?
+			RasterizerPreset::TwoSided :
+			RasterizerPreset::Default;
 		if (outputMotion)
 		{
 			physicalKey.m_Formats.m_RenderTargetCount = 1;
 			physicalKey.m_Formats.m_RenderTargetFormats[0] = TemporalMotionFormat;
 			physicalKey.m_BlendPreset = BlendPreset::Default;
-			physicalKey.m_PSId = bucket == RenderBucket::AlphaTest
-				? m_VelocityAlphaTestPixelShader
-				: m_VelocityOpaquePixelShader;
+			physicalKey.m_PSId = bucket == RenderBucket::AlphaTest ?
+				m_VelocityAlphaTestPixelShader :
+				m_VelocityOpaquePixelShader;
 		}
 		else if (bucket == RenderBucket::AlphaTest)
 		{

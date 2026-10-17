@@ -89,8 +89,9 @@ namespace gglab
 
 	[[nodiscard]] constexpr AssetKey MakeAssetKey(AssetKind kind, uint64_t stableId) noexcept
 	{
-		return kind != AssetKind::Unknown ? AssetKey{ .m_Kind = kind, .m_StableId = stableId }
-		: AssetKey{};
+		return kind != AssetKind::Unknown ?
+			AssetKey{ .m_Kind = kind, .m_StableId = stableId } :
+			AssetKey{};
 	}
 
 	[[nodiscard]] constexpr AssetContentVersion MakeAssetContentVersion(

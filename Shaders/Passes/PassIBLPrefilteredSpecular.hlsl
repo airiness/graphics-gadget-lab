@@ -34,7 +34,7 @@ TextureSamplerBindingData GetEnvironmentBinding()
 float GetPerceptualRoughness()
 {
 	uint mipLevels = max(g_Pass.MipLevels, 1u);
-	return mipLevels > 1u ? (float) g_Pass.MipLevel / (float) (mipLevels - 1u) : 0.0;
+	return mipLevels > 1u ? (float)(g_Pass.MipLevel) / (float)(mipLevels - 1u) : 0.0;
 }
 
 float3 ClampSampleLuminance(float3 radiance)
@@ -78,15 +78,15 @@ float3 IntegratePrefilteredSpecular(
 		if (i < ggxCount)
 		{
 			float2 Xi = Hammersley(i, ggxCount);
-			Xi.x += 0.5 / (float)ggxCount;
+			Xi.x += 0.5 / (float)(ggxCount);
 			const float3 halfWS = TangentToWorld(ImportanceSampleGGX(Xi, alpha), normalWS);
 			lightWS = normalize(2.0 * dot(normalWS, halfWS) * halfWS - normalWS);
 		}
 		else
 		{
 			float2 Xi = Hammersley(i - ggxCount, environmentCount);
-			Xi.x += 0.5 / (float)environmentCount;
-			Xi.y += 0.5 / (float)environmentCount;
+			Xi.x += 0.5 / (float)(environmentCount);
+			Xi.y += 0.5 / (float)(environmentCount);
 			lightWS = SampleEnvironmentImportance(importance, g_Pass.ImportanceResolution, totalMass, Xi, environmentPdf);
 		}
 

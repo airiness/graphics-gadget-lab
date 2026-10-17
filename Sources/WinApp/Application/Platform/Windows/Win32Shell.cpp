@@ -27,9 +27,9 @@ namespace gglab::win32
 		}
 		if (!std::filesystem::is_directory(absoluteDirectory, error))
 		{
-			failure = error
-				? std::format("Could not access the output directory (error {}).", error.value())
-				: "The output directory no longer exists or is not a directory.";
+			failure = error ?
+				std::format("Could not access the output directory (error {}).", error.value()) :
+				"The output directory no longer exists or is not a directory.";
 			return false;
 		}
 

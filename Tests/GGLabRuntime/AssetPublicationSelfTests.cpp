@@ -25,15 +25,13 @@ namespace gglab
 		using asset_test::IsStreamingIdle;
 		using asset_test::IsTerminal;
 
-		[[nodiscard]] AssetStreamingIdentity MakeIdentity(
-			const AssetManager::ModelLoadRequest& request) noexcept
+		[[nodiscard]] AssetStreamingIdentity MakeIdentity(const AssetManager::ModelLoadRequest& request) noexcept
 		{
 			return { .m_Kind = AssetStreamingWorkKind::Model,
 				.m_StableId = request.m_ModelId.Value(), .m_Generation = request.m_Generation };
 		}
 
-		[[nodiscard]] AssetStreamingIdentity MakeIdentity(
-			const AssetManager::TextureLoadRequest& request) noexcept
+		[[nodiscard]] AssetStreamingIdentity MakeIdentity(const AssetManager::TextureLoadRequest& request) noexcept
 		{
 			return { .m_Kind = AssetStreamingWorkKind::Texture,
 				.m_StableId = request.m_TextureId.Value(), .m_Generation = request.m_Generation };
@@ -44,16 +42,16 @@ namespace gglab
 			std::string_view sharedImage = {}) noexcept
 		{
 			const auto& root = harness.GetAssetRoot();
-			const std::array<std::string, 2> images{
+			const std::array<std::string, 2> images
+			{
 				sharedImage.empty() ? std::format("{}.Red.png", name) : std::string(sharedImage),
-				std::format("{}.Blue.png", name) };
+			std::format("{}.Blue.png", name) };
 			return asset_test::WriteSolidPng(root / images[0], 255, 0, 0) &&
 				asset_test::WriteSolidPng(root / images[1], 0, 0, 255) &&
 				asset_test::WriteTexturedModel(root / std::format("{}.gltf", name), images);
 		}
 
-		[[nodiscard]] bool PumpUntilModelTerminal(
-			AssetManagerHarness& harness, const AssetManager::ModelLoadRequest& request) noexcept
+		[[nodiscard]] bool PumpUntilModelTerminal(AssetManagerHarness& harness, const AssetManager::ModelLoadRequest& request) noexcept
 		{
 			return request.IsValid() && harness.PumpUntil([&]()
 				{
@@ -87,8 +85,7 @@ namespace gglab
 			}
 			{
 				AssetOwnerScope owner = harness.GetAssets().CreateOwnerScope();
-				const AssetManager::ModelLoadRequest request =
-					owner.LoadModelAsync("Incremental.gltf", TaskPriority::Normal);
+				const AssetManager::ModelLoadRequest request = owner.LoadModelAsync("Incremental.gltf", TaskPriority::Normal);
 				const AssetStreamingIdentity identity = MakeIdentity(request);
 				uint64_t lastProcessed = 0;
 				uint32_t framesWithSteps = 0;
@@ -107,8 +104,7 @@ namespace gglab
 						return model && IsTerminal(model->m_State) && IsStreamingIdle(statistics);
 					});
 				const Model* model = harness.GetAssets().GetModel(request.m_ModelId);
-				const AssetStreamingQueueStatistics publication =
-					harness.GetScheduling().GetStatistics().m_ResourcePublicationQueue;
+				const AssetStreamingQueueStatistics publication = harness.GetScheduling().GetStatistics().m_ResourcePublicationQueue;
 				context.Check(terminal && model && model->m_State == AssetState::Ready &&
 					publication.m_EnqueuedCount == 1 && publication.m_CompletedCount == 1,
 					"A model publishes through exactly one resumable publication job");
@@ -140,15 +136,14 @@ namespace gglab
 			}
 			{
 				AssetOwnerScope owner = harness.GetAssets().CreateOwnerScope();
-				const AssetManager::ModelLoadRequest request =
-					owner.LoadModelAsync("Fault.gltf", TaskPriority::Normal);
+				const AssetManager::ModelLoadRequest request = owner.LoadModelAsync("Fault.gltf", TaskPriority::Normal);
 				harness.GetControl().ArmResourcePublicationFault({
 					.m_Identity = MakeIdentity(request),
 					.m_Stage = fault.m_Stage,
 					.m_Action = fault.m_Action,
 					.m_Timing = fault.m_Timing,
 					.m_TriggerOccurrence = 1,
-					});
+				});
 				bool halfPublished = false;
 				const bool terminal = request.IsValid() && harness.PumpUntil([&]()
 					{
@@ -161,8 +156,7 @@ namespace gglab
 				harness.GetControl().ClearResourcePublicationFault();
 				const bool failed = fault.m_Action == AssetResourcePublicationFaultAction::Fail;
 				const Model* model = harness.GetAssets().GetModel(request.m_ModelId);
-				const AssetStreamingQueueStatistics publication =
-					harness.GetScheduling().GetStatistics().m_ResourcePublicationQueue;
+				const AssetStreamingQueueStatistics publication = harness.GetScheduling().GetStatistics().m_ResourcePublicationQueue;
 				context.Check(terminal && model &&
 					model->m_State == (failed ? AssetState::Failed : AssetState::Cancelled) &&
 					publication.m_FaultInjectionCount == 1 &&
@@ -174,8 +168,7 @@ namespace gglab
 				// Rollback keeps only the owner's model lease; dependency leases taken by the
 				// publication transaction are released.
 				const AssetOwnershipStatistics ownership = harness.GetAssets().GetOwnershipStatistics();
-				const AssetInterestActivity* modelInterest =
-					FindInterest(ownership, AssetKind::Model, request.m_ModelId.Value());
+				const AssetInterestActivity* modelInterest = FindInterest(ownership, AssetKind::Model, request.m_ModelId.Value());
 				context.Check(ownership.m_LeaseCount == 1 && modelInterest &&
 					modelInterest->m_LeaseCount == 1 && ownership.m_PublicationRetainCount == 0,
 					std::format("{}: rollback releases every temporary dependency lease and retain",
@@ -189,7 +182,8 @@ namespace gglab
 			using Stage = AssetResourcePublicationStage;
 			using Action = AssetResourcePublicationFaultAction;
 			using Timing = AssetResourcePublicationFaultTiming;
-			constexpr std::array cases{
+			constexpr std::array cases
+			{
 				PublicationFaultCase{ "Cancel during textures", Stage::Textures },
 				PublicationFaultCase{ "Cancel during materials", Stage::Materials },
 				PublicationFaultCase{ "Cancel during meshes", Stage::Meshes },
@@ -226,14 +220,13 @@ namespace gglab
 					});
 
 				AssetOwnerScope modelOwner = harness.GetAssets().CreateOwnerScope();
-				const AssetManager::ModelLoadRequest model =
-					modelOwner.LoadModelAsync("Shared.gltf", TaskPriority::Normal);
+				const AssetManager::ModelLoadRequest model = modelOwner.LoadModelAsync("Shared.gltf", TaskPriority::Normal);
 				harness.GetControl().ArmResourcePublicationFault({
 					.m_Identity = MakeIdentity(model),
 					.m_Stage = AssetResourcePublicationStage::Materials,
 					.m_Action = AssetResourcePublicationFaultAction::Fail,
 					.m_TriggerOccurrence = 1,
-					});
+				});
 				const bool modelTerminal = PumpUntilModelTerminal(harness, model);
 				harness.GetControl().ClearResourcePublicationFault();
 				const Model* modelEntry = harness.GetAssets().GetModel(model.m_ModelId);
@@ -241,8 +234,7 @@ namespace gglab
 				const AssetSnapshot snapshot = BuildAssetSnapshot(harness.GetAssets());
 				const AssetSnapshot::Texture* shared = FindTexture(snapshot, texture.m_TextureId);
 				const AssetOwnershipStatistics ownership = harness.GetAssets().GetOwnershipStatistics();
-				const AssetInterestActivity* sharedInterest =
-					FindInterest(ownership, AssetKind::Texture, texture.m_TextureId.Value());
+				const AssetInterestActivity* sharedInterest = FindInterest(ownership, AssetKind::Texture, texture.m_TextureId.Value());
 				context.Check(textureReady && modelTerminal && modelEntry &&
 					modelEntry->m_State == AssetState::Failed,
 					"A model sharing a Ready texture fails at the injected materials stage");
@@ -273,16 +265,14 @@ namespace gglab
 					"Priority.png", TextureSemantic::BaseColor, TaskPriority::Background);
 				const AssetManager::TextureLoadRequest criticalRequest = critical.LoadTextureAsync(
 					"Priority.png", TextureSemantic::BaseColor, TaskPriority::Critical);
-				const uint64_t updatesBefore =
-					harness.GetAssets().GetOwnershipStatistics().m_PriorityUpdateCount;
+				const uint64_t updatesBefore = harness.GetAssets().GetOwnershipStatistics().m_PriorityUpdateCount;
 				context.Check(backgroundRequest.IsValid() && criticalRequest.IsValid() &&
 					backgroundRequest.m_TextureId == criticalRequest.m_TextureId &&
 					backgroundRequest.m_Generation == criticalRequest.m_Generation,
 					"Two owners acquire the same texture content version");
 
 				const AssetOwnershipStatistics merged = harness.GetAssets().GetOwnershipStatistics();
-				const AssetInterestActivity* mergedInterest =
-					FindInterest(merged, AssetKind::Texture, backgroundRequest.m_TextureId.Value());
+				const AssetInterestActivity* mergedInterest = FindInterest(merged, AssetKind::Texture, backgroundRequest.m_TextureId.Value());
 				context.Check(mergedInterest && mergedInterest->m_Generation == backgroundRequest.m_Generation &&
 					mergedInterest->m_LeaseCount == 2 && mergedInterest->m_OwnerCount == 2 &&
 					mergedInterest->m_EffectivePriority == TaskPriority::Critical,
@@ -290,8 +280,7 @@ namespace gglab
 
 				critical = {};
 				const AssetOwnershipStatistics reduced = harness.GetAssets().GetOwnershipStatistics();
-				const AssetInterestActivity* reducedInterest =
-					FindInterest(reduced, AssetKind::Texture, backgroundRequest.m_TextureId.Value());
+				const AssetInterestActivity* reducedInterest = FindInterest(reduced, AssetKind::Texture, backgroundRequest.m_TextureId.Value());
 				context.Check(reducedInterest && reducedInterest->m_LeaseCount == 1 &&
 					reducedInterest->m_OwnerCount == 1 &&
 					reducedInterest->m_EffectivePriority == TaskPriority::Background &&
@@ -300,8 +289,7 @@ namespace gglab
 				const bool settled = harness.PumpUntil([&]()
 					{
 						const AssetSnapshot snapshot = BuildAssetSnapshot(harness.GetAssets());
-						const AssetSnapshot::Texture* entry =
-							FindTexture(snapshot, backgroundRequest.m_TextureId);
+						const AssetSnapshot::Texture* entry = FindTexture(snapshot, backgroundRequest.m_TextureId);
 						return entry && IsTerminal(entry->m_State) &&
 							IsStreamingIdle(harness.GetScheduling().GetStatistics());
 					});
@@ -323,12 +311,13 @@ namespace gglab
 			}
 			{
 				AssetOwnerScope owner = harness.GetAssets().CreateOwnerScope();
-				const AssetManager::TextureLoadRequest request =
-					owner.LoadTextureAsync("Held.png", TextureSemantic::BaseColor, TaskPriority::Normal);
+				const AssetManager::TextureLoadRequest request = owner.LoadTextureAsync("Held.png", TextureSemantic::BaseColor, TaskPriority::Normal);
 				const AssetStreamingIdentity identity = MakeIdentity(request);
 				harness.GetControl().ArmGpuCompletionHold(identity);
 				const bool submitted = request.IsValid() && harness.PumpUntil([&]()
-					{ return HasPendingUpload(harness.GetScheduling().GetStatistics(), identity); });
+					{
+						return HasPendingUpload(harness.GetScheduling().GetStatistics(), identity);
+					});
 
 				const AssetSnapshot held = BuildAssetSnapshot(harness.GetAssets());
 				const AssetSnapshot::Texture* heldTexture = FindTexture(held, request.m_TextureId);
@@ -378,8 +367,7 @@ namespace gglab
 			context.Check(fixtures, "Asset fixtures are written into the harness asset root");
 			{
 				AssetOwnerScope owner = harness.GetAssets().CreateOwnerScope();
-				const AssetManager::TextureLoadRequest texture =
-					owner.LoadTextureAsync("Red.png", TextureSemantic::BaseColor, TaskPriority::Normal);
+				const AssetManager::TextureLoadRequest texture = owner.LoadTextureAsync("Red.png", TextureSemantic::BaseColor, TaskPriority::Normal);
 				const bool textureReady = texture.IsValid() && harness.PumpUntil([&]()
 					{
 						const AssetSnapshot snapshot = BuildAssetSnapshot(harness.GetAssets());
@@ -387,14 +375,12 @@ namespace gglab
 						return entry && IsTerminal(entry->m_State);
 					});
 				const AssetSnapshot textureSnapshot = BuildAssetSnapshot(harness.GetAssets());
-				const AssetSnapshot::Texture* textureEntry =
-					FindTexture(textureSnapshot, texture.m_TextureId);
+				const AssetSnapshot::Texture* textureEntry = FindTexture(textureSnapshot, texture.m_TextureId);
 				context.Check(textureReady && textureEntry && textureEntry->m_State == AssetState::Ready &&
 					textureEntry->m_IsUploaded && textureEntry->m_Texture.IsValid(),
 					"A texture loads, uploads and publishes through the headless harness");
 
-				const AssetManager::ModelLoadRequest model =
-					owner.LoadModelAsync("Probe.gltf", TaskPriority::Normal);
+				const AssetManager::ModelLoadRequest model = owner.LoadModelAsync("Probe.gltf", TaskPriority::Normal);
 				const bool modelTerminal = PumpUntilModelTerminal(harness, model);
 				const Model* modelEntry = harness.GetAssets().GetModel(model.m_ModelId);
 				context.Check(modelTerminal && modelEntry && modelEntry->m_State == AssetState::Ready &&
@@ -423,18 +409,20 @@ namespace gglab
 				return;
 			}
 			const auto hasPendingUploads = [&]() noexcept
-				{
-					const AssetUploadStatistics statistics = harness.GetScheduling().GetStatistics();
-					return statistics.m_PendingCount + statistics.m_CpuPayloadQueue.m_PendingCount +
-						statistics.m_ResourcePublicationQueue.m_PendingCount +
-						statistics.m_UploadRecordingQueue.m_PendingCount +
-						statistics.m_GpuFinalizeQueue.m_PendingCount > 0;
-				};
+			{
+				const AssetUploadStatistics statistics = harness.GetScheduling().GetStatistics();
+				return statistics.m_PendingCount + statistics.m_CpuPayloadQueue.m_PendingCount +
+					statistics.m_ResourcePublicationQueue.m_PendingCount +
+					statistics.m_UploadRecordingQueue.m_PendingCount +
+					statistics.m_GpuFinalizeQueue.m_PendingCount > 0;
+			};
 			const auto drain = [&]() noexcept
-				{
-					return harness.PumpUntil([&]()
-						{ return harness.GetAssets().GetInFlightLoadCount() == 0 && !hasPendingUploads(); });
-				};
+			{
+				return harness.PumpUntil([&]()
+					{
+						return harness.GetAssets().GetInFlightLoadCount() == 0 && !hasPendingUploads();
+					});
+			};
 			struct Observation
 			{
 				bool m_LoadOnly = false;
@@ -444,17 +432,17 @@ namespace gglab
 			// reports pending work and frames where neither reports it before the asset
 			// is ready.
 			const auto observeUntil = [&](Observation& observation, auto&& isReady) noexcept
-				{
-					return harness.PumpUntil([&]()
-						{
-							const bool assetReady = isReady();
-							const bool loading = harness.GetAssets().GetInFlightLoadCount() > 0;
-							const bool uploading = hasPendingUploads();
-							observation.m_LoadOnly = observation.m_LoadOnly || (loading && !uploading);
-							observation.m_Gap = observation.m_Gap || (!assetReady && !loading && !uploading);
-							return assetReady;
-						});
-				};
+			{
+				return harness.PumpUntil([&]()
+					{
+						const bool assetReady = isReady();
+						const bool loading = harness.GetAssets().GetInFlightLoadCount() > 0;
+						const bool uploading = hasPendingUploads();
+						observation.m_LoadOnly = observation.m_LoadOnly || (loading && !uploading);
+						observation.m_Gap = observation.m_Gap || (!assetReady && !loading && !uploading);
+						return assetReady;
+					});
+			};
 			{
 				AssetOwnerScope owner = harness.GetAssets().CreateOwnerScope();
 				const AssetManager::TextureLoadRequest texture =
@@ -471,8 +459,7 @@ namespace gglab
 					"A texture decode counts as an in-flight load until its upload is queued");
 				context.Check(drain(), "A completed texture load leaves no in-flight load or upload");
 
-				const AssetManager::ModelLoadRequest model =
-					owner.LoadModelAsync("Noise.gltf", TaskPriority::Normal);
+				const AssetManager::ModelLoadRequest model = owner.LoadModelAsync("Noise.gltf", TaskPriority::Normal);
 				Observation modelObservation;
 				const bool modelReady = model.IsValid() && observeUntil(modelObservation, [&]()
 					{

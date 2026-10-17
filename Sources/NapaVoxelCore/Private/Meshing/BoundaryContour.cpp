@@ -80,13 +80,15 @@ namespace napa::voxel
 						CheckedMul(static_cast<std::int64_t>(chunkAxis),
 							static_cast<std::int64_t>(chunkCellCount));
 					const std::optional<std::int64_t> maximumVoxel =
-						origin ? CheckedAdd(*origin, static_cast<std::int64_t>(chunkCellCount))
-						: std::nullopt;
+						origin ?
+							CheckedAdd(*origin, static_cast<std::int64_t>(chunkCellCount)) :
+							std::nullopt;
 					const std::optional<std::int64_t> preparedMinimum =
 						origin ? CheckedMul(*origin, BoundaryContourPositionScale) : std::nullopt;
 					const std::optional<std::int64_t> preparedMaximum =
-						maximumVoxel ? CheckedMul(*maximumVoxel, BoundaryContourPositionScale)
-						: std::nullopt;
+						maximumVoxel ?
+							CheckedMul(*maximumVoxel, BoundaryContourPositionScale) :
+							std::nullopt;
 					if (!preparedMinimum || !preparedMaximum)
 					{
 						return false;
@@ -206,7 +208,9 @@ namespace napa::voxel
 		{
 			const auto iterator = std::lower_bound(records.begin(), records.end(), chunk,
 				[](const ChunkMeshRecord& record, ChunkCoord coordinate)
-				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+				{
+					return ChunkCoordZYXLess{}(record.m_Chunk, coordinate);
+				});
 			return iterator != records.end() && iterator->m_Chunk == chunk ? &*iterator : nullptr;
 		}
 

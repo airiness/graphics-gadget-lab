@@ -24,9 +24,12 @@ namespace gglab
 		{
 			switch (tap)
 			{
-			case PostProcessDebugTap::AtmosphereTransmittance: return "Atmosphere / Transmittance";
-			case PostProcessDebugTap::AtmosphereMultipleScattering: return "Atmosphere / Multiple Scattering";
-			case PostProcessDebugTap::AtmosphereSkyView: return "Atmosphere / Sky View";
+			case PostProcessDebugTap::AtmosphereTransmittance:
+				return "Atmosphere / Transmittance";
+			case PostProcessDebugTap::AtmosphereMultipleScattering:
+				return "Atmosphere / Multiple Scattering";
+			case PostProcessDebugTap::AtmosphereSkyView:
+				return "Atmosphere / Sky View";
 			case PostProcessDebugTap::SceneColor:
 				return "Scene Color";
 			case PostProcessDebugTap::BloomPrefilter:
@@ -120,9 +123,9 @@ namespace gglab
 			case PostProcessDebugTap::BloomPrefilter:
 				return &snapshot.m_BloomPrefilter;
 			case PostProcessDebugTap::BloomPyramid:
-				return selection.m_BloomPyramidLevel < snapshot.m_BloomLevelCount
-					? &snapshot.m_BloomPyramid[selection.m_BloomPyramidLevel]
-					: nullptr;
+				return selection.m_BloomPyramidLevel < snapshot.m_BloomLevelCount ?
+					&snapshot.m_BloomPyramid[selection.m_BloomPyramidLevel] :
+					nullptr;
 			case PostProcessDebugTap::BloomResult:
 				return &snapshot.m_BloomResult;
 			default:
@@ -175,9 +178,9 @@ namespace gglab
 			bool selectionChanged = DrawTapCombo(selection.m_Tap);
 			if (selection.m_Tap == PostProcessDebugTap::BloomPyramid)
 			{
-				const int maxLevel = snapshot.m_BloomLevelCount > 0
-					? static_cast<int>(snapshot.m_BloomLevelCount - 1u)
-					: 0;
+				const int maxLevel = snapshot.m_BloomLevelCount > 0 ?
+					static_cast<int>(snapshot.m_BloomLevelCount - 1u) :
+					0;
 				const uint32_t clampedLevel = static_cast<uint32_t>(
 					std::clamp(static_cast<int>(selection.m_BloomPyramidLevel), 0, maxLevel));
 				if (selection.m_BloomPyramidLevel != clampedLevel)
@@ -275,9 +278,9 @@ namespace gglab
 				bool active = overrides->m_ScenePreExposure.has_value();
 				if (ImGui::Checkbox("Override Scene Pre-exposure", &active))
 				{
-					overrides->m_ScenePreExposure = active
-						? std::optional<bool>(snapshot->m_Exposure.m_PreExposure != 1.0f)
-						: std::nullopt;
+					overrides->m_ScenePreExposure = active ?
+						std::optional<bool>(snapshot->m_Exposure.m_PreExposure != 1.0f) :
+						std::nullopt;
 				}
 				if (active)
 				{

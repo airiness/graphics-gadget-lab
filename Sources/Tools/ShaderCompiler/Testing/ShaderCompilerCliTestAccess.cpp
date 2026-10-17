@@ -58,8 +58,8 @@ namespace gglab
 		const std::filesystem::path& sourceRoot,
 		const std::filesystem::path& cacheRoot) noexcept
 	{
-		return EnvironmentForces(ForceUnavailableEnvironment)
-			? ShaderCompiler::MakeUnavailable(sourceRoot, cacheRoot)
-			: std::make_unique<ShaderCompiler>(sourceRoot, cacheRoot);
+		return EnvironmentForces(ForceUnavailableEnvironment) ?
+			ShaderCompiler::MakeUnavailable(sourceRoot, cacheRoot) :
+			std::make_unique<ShaderCompiler>(sourceRoot, cacheRoot);
 	}
 }

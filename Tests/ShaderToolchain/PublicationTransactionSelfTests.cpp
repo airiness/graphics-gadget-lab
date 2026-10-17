@@ -24,8 +24,7 @@ namespace gglab
 		uint32_t g_RemainingRenameFailures = 0;
 		std::filesystem::path g_FailingDestination;
 
-		[[nodiscard]] bool InjectRenameFailure(
-			const std::filesystem::path& destination) noexcept
+		[[nodiscard]] bool InjectRenameFailure(const std::filesystem::path& destination) noexcept
 		{
 			(void)destination;
 			if (g_RemainingRenameFailures > 0)
@@ -36,8 +35,7 @@ namespace gglab
 			return false;
 		}
 
-		[[nodiscard]] bool InjectDestinationFailure(
-			const std::filesystem::path& destination) noexcept
+		[[nodiscard]] bool InjectDestinationFailure(const std::filesystem::path& destination) noexcept
 		{
 			return !g_FailingDestination.empty() && destination == g_FailingDestination;
 		}
@@ -66,12 +64,10 @@ namespace gglab
 
 		[[nodiscard]] std::span<const std::byte> AsBytes(const std::string& text) noexcept
 		{
-			return std::span(
-				reinterpret_cast<const std::byte*>(text.data()), text.size());
+			return std::span(reinterpret_cast<const std::byte*>(text.data()), text.size());
 		}
 
-		[[nodiscard]] bool FileHasBytes(const std::filesystem::path& path,
-			std::span<const std::byte> expectedBytes)
+		[[nodiscard]] bool FileHasBytes(const std::filesystem::path& path, std::span<const std::byte> expectedBytes)
 		{
 			std::ifstream input(path, std::ios::binary);
 			if (!input)
@@ -79,9 +75,7 @@ namespace gglab
 				return false;
 			}
 			std::vector<std::byte> observed(expectedBytes.size());
-			input.read(
-				reinterpret_cast<char*>(observed.data()),
-				static_cast<std::streamsize>(observed.size()));
+			input.read(reinterpret_cast<char*>(observed.data()), static_cast<std::streamsize>(observed.size()));
 			return input.gcount() == static_cast<std::streamsize>(observed.size()) &&
 				input.peek() == std::char_traits<char>::eof() &&
 				std::ranges::equal(observed, expectedBytes);
@@ -90,8 +84,7 @@ namespace gglab
 		[[nodiscard]] bool HasTempResidue(const std::filesystem::path& directory) noexcept
 		{
 			std::error_code errorCode;
-			for (const std::filesystem::directory_entry& entry :
-				std::filesystem::directory_iterator(directory, errorCode))
+			for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(directory, errorCode))
 			{
 				if (entry.path().filename().wstring().find(L".tmp.") != std::wstring::npos)
 				{
@@ -112,8 +105,7 @@ namespace gglab
 		std::error_code errorCode;
 		const std::filesystem::path tempRoot =
 			std::filesystem::temp_directory_path(errorCode) /
-			(L"GGLabPublicationTransaction-" +
-				std::to_wstring(static_cast<uint32_t>(::_getpid())));
+			(L"GGLabPublicationTransaction-" + std::to_wstring(static_cast<uint32_t>(::_getpid())));
 		context.Check(!errorCode, "Publication transaction test resolves a temporary root");
 		if (errorCode)
 		{
@@ -137,7 +129,8 @@ namespace gglab
 			// Byte-equality verification publishes both files and leaves no
 			// temporary residue behind.
 			const std::filesystem::path directory = tempRoot / "byte-equality";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -171,7 +164,8 @@ namespace gglab
 			// A digest mismatch fails verification before any commit.
 			const std::filesystem::path directory = tempRoot / "digest-mismatch";
 			Sha256Digest wrongDigest{};
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -189,7 +183,8 @@ namespace gglab
 		{
 			// A matching digest is accepted as the verification policy.
 			const std::filesystem::path directory = tempRoot / "digest-match";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -211,10 +206,10 @@ namespace gglab
 			{
 				std::ofstream output(destination, std::ios::binary);
 				const std::string staleText = "stale-content";
-				output.write(staleText.data(),
-					static_cast<std::streamsize>(staleText.size()));
+				output.write(staleText.data(), static_cast<std::streamsize>(staleText.size()));
 			}
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = destination,
 					.m_Content = primaryBytes,
@@ -234,7 +229,8 @@ namespace gglab
 			const std::filesystem::path directory = tempRoot / "exclusive-failure";
 			ResetInjection();
 			g_RemainingRenameFailures = 1;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -261,12 +257,12 @@ namespace gglab
 			{
 				std::ofstream output(primaryDestination, std::ios::binary);
 				const std::string orphanText = "orphaned-content";
-				output.write(orphanText.data(),
-					static_cast<std::streamsize>(orphanText.size()));
+				output.write(orphanText.data(), static_cast<std::streamsize>(orphanText.size()));
 			}
 			ResetInjection();
 			g_RemainingRenameFailures = 1;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = primaryDestination,
 					.m_Content = primaryBytes,
@@ -297,12 +293,12 @@ namespace gglab
 			{
 				std::ofstream output(directory / "content.bin", std::ios::binary);
 				const std::string presentText = "concurrent-content";
-				output.write(presentText.data(),
-					static_cast<std::streamsize>(presentText.size()));
+				output.write(presentText.data(), static_cast<std::streamsize>(presentText.size()));
 			}
 			ResetInjection();
 			g_RemainingRenameFailures = 1;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -327,7 +323,8 @@ namespace gglab
 		{
 			// Observation retries within its bounded window.
 			const std::filesystem::path directory = tempRoot / "observation-window";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -353,7 +350,8 @@ namespace gglab
 			// A failed observation with repair removes both destinations and
 			// retries the transaction.
 			const std::filesystem::path directory = tempRoot / "observation-repair";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -386,7 +384,8 @@ namespace gglab
 		{
 			// Without an observer the transaction returns after committing.
 			const std::filesystem::path directory = tempRoot / "no-observer";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -409,10 +408,10 @@ namespace gglab
 			const std::string staleText = "stale-content";
 			{
 				std::ofstream output(destination, std::ios::binary);
-				output.write(staleText.data(),
-					static_cast<std::streamsize>(staleText.size()));
+				output.write(staleText.data(), static_cast<std::streamsize>(staleText.size()));
 			}
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = destination,
 					.m_Content = primaryBytes,
@@ -435,13 +434,12 @@ namespace gglab
 			const std::string staleMarkerText = "stale-marker";
 			{
 				std::ofstream primaryOutput(primaryDestination, std::ios::binary);
-				primaryOutput.write(stalePrimaryText.data(),
-					static_cast<std::streamsize>(stalePrimaryText.size()));
+				primaryOutput.write(stalePrimaryText.data(), static_cast<std::streamsize>(stalePrimaryText.size()));
 				std::ofstream markerOutput(markerDestination, std::ios::binary);
-				markerOutput.write(staleMarkerText.data(),
-					static_cast<std::streamsize>(staleMarkerText.size()));
+				markerOutput.write(staleMarkerText.data(), static_cast<std::streamsize>(staleMarkerText.size()));
 			}
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = primaryDestination,
 					.m_Content = primaryBytes,
@@ -470,12 +468,12 @@ namespace gglab
 			const std::string presentText = "concurrent-content";
 			{
 				std::ofstream output(primaryDestination, std::ios::binary);
-				output.write(presentText.data(),
-					static_cast<std::streamsize>(presentText.size()));
+				output.write(presentText.data(), static_cast<std::streamsize>(presentText.size()));
 			}
 			ResetInjection();
 			g_RemainingRenameFailures = 1;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = primaryDestination,
 					.m_Content = primaryBytes,
@@ -507,15 +505,14 @@ namespace gglab
 			const std::string staleMarkerText = "existing-marker";
 			{
 				std::ofstream primaryOutput(primaryDestination, std::ios::binary);
-				primaryOutput.write(stalePrimaryText.data(),
-					static_cast<std::streamsize>(stalePrimaryText.size()));
+				primaryOutput.write(stalePrimaryText.data(), static_cast<std::streamsize>(stalePrimaryText.size()));
 				std::ofstream markerOutput(markerDestination, std::ios::binary);
-				markerOutput.write(staleMarkerText.data(),
-					static_cast<std::streamsize>(staleMarkerText.size()));
+				markerOutput.write(staleMarkerText.data(), static_cast<std::streamsize>(staleMarkerText.size()));
 			}
 			ResetInjection();
 			g_RemainingRenameFailures = 1;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = primaryDestination,
 					.m_Content = primaryBytes,
@@ -548,12 +545,12 @@ namespace gglab
 			{
 				std::ofstream output(primaryDestination, std::ios::binary);
 				const std::string orphanText = "orphaned-content";
-				output.write(orphanText.data(),
-					static_cast<std::streamsize>(orphanText.size()));
+				output.write(orphanText.data(), static_cast<std::streamsize>(orphanText.size()));
 			}
 			ResetInjection();
 			g_RemainingRenameFailures = 2;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = primaryDestination,
 					.m_Content = primaryBytes,
@@ -586,7 +583,8 @@ namespace gglab
 			const std::filesystem::path primaryDestination = directory / "content.bin";
 			const std::filesystem::path markerDestination = directory / "content.json";
 			g_FailingDestination = markerDestination;
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = primaryDestination,
 					.m_Content = primaryBytes,
@@ -608,7 +606,8 @@ namespace gglab
 		{
 			// Repair honors the outer attempt and observation budgets.
 			const std::filesystem::path directory = tempRoot / "repair-attempt-budget";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -640,7 +639,8 @@ namespace gglab
 		{
 			// Repair followed by a successful observation publishes the pair.
 			const std::filesystem::path directory = tempRoot / "repair-then-success";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -674,7 +674,8 @@ namespace gglab
 		{
 			// Observation exhaustion without repair keeps the committed slot.
 			const std::filesystem::path directory = tempRoot / "observation-exhausted";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -701,7 +702,8 @@ namespace gglab
 			// The no-verification policy publishes and mirrors the single-file
 			// marker result.
 			const std::filesystem::path directory = tempRoot / "verification-none";
-			const std::array files{
+			const std::array files
+			{
 				PublicationFileSpec{
 					.m_Destination = directory / "content.bin",
 					.m_Content = primaryBytes,
@@ -718,13 +720,12 @@ namespace gglab
 		{
 			// An empty file list or an empty primary destination returns before
 			// any temporary write.
-			const PublicationTransactionResult emptyResult = ExecutePublicationTransaction(
-				std::span<const PublicationFileSpec>{}, {});
-			const std::array emptyDestinationFiles{
+			const PublicationTransactionResult emptyResult = ExecutePublicationTransaction(std::span<const PublicationFileSpec>{}, {});
+			const std::array emptyDestinationFiles
+			{
 				PublicationFileSpec{ .m_Content = primaryBytes },
 			};
-			const PublicationTransactionResult emptyDestinationResult =
-				ExecutePublicationTransaction(emptyDestinationFiles, {});
+			const PublicationTransactionResult emptyDestinationResult = ExecutePublicationTransaction(emptyDestinationFiles, {});
 			context.Check(!emptyResult.m_TempsWritten && !emptyResult.m_PrimaryCommitted &&
 				!emptyDestinationResult.m_TempsWritten &&
 				!emptyDestinationResult.m_Verified &&

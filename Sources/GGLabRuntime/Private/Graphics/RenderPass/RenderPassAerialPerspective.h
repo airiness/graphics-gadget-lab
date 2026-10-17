@@ -10,7 +10,9 @@ namespace gglab
 		RenderPassAerialPerspective() noexcept : RenderPassBase({
 			.m_TypeName = "Atmosphere.AerialPerspective", .m_DisplayName = "Aerial Perspective",
 			.m_CategoryName = "Lighting", .m_Description = "Integrates atmosphere over opaque view depth.",
-			.m_Category = RenderPassCategory::Lighting, .m_Type = RenderPassType::Compute }) {}
+			.m_Category = RenderPassCategory::Lighting, .m_Type = RenderPassType::Compute })
+		{
+		}
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 

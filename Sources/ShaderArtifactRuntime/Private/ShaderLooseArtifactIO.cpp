@@ -228,7 +228,7 @@ namespace gglab
 		const uint32_t entryPointSize = ReadU32LE(bytes, offset);
 		if (entryPointSize == 0 || entryPointSize > MaxShaderRuntimeEntryPointSize ||
 			bytes.size() != SerializedShaderRuntimeArtifactManifestFixedSize +
-				entryPointSize)
+			entryPointSize)
 		{
 			return std::nullopt;
 		}
@@ -306,9 +306,9 @@ namespace gglab
 					bytes.begin() + offset);
 				offset += Sha256Digest::Size;
 			}
-			return offset == bytes.size()
-				? bytes
-				: SerializedShaderProgramRegistryArtifact{};
+			return offset == bytes.size() ?
+				bytes :
+				SerializedShaderProgramRegistryArtifact{};
 		}
 		catch (...)
 		{
@@ -405,7 +405,7 @@ namespace gglab
 
 			if (offset != bytes.size() ||
 				ValidateShaderProgramRegistryArtifact(artifact) !=
-					ShaderProgramRegistryArtifactValidationStatus::Valid)
+				ShaderProgramRegistryArtifactValidationStatus::Valid)
 			{
 				return std::nullopt;
 			}
@@ -455,9 +455,9 @@ namespace gglab
 			bytes.begin() + offset,
 			Sha256Digest::Size,
 			registryRef.m_RegistryId.m_DurableDigest.m_Value.begin());
-		return registryRef.IsValid()
-			? std::optional<ShaderProgramRegistryArtifactRef>(registryRef)
-			: std::nullopt;
+		return registryRef.IsValid() ?
+			std::optional<ShaderProgramRegistryArtifactRef>(registryRef) :
+			std::nullopt;
 	}
 
 	ShaderLooseArtifactLocator::ShaderLooseArtifactLocator(std::filesystem::path root)
@@ -681,9 +681,9 @@ namespace gglab
 			return {};
 		}
 		const std::filesystem::path targetDirectory =
-			m_TargetProfile == ShaderTargetProfile::GGLabVulkan13
-			? "gglab-vulkan13"
-			: "gglab-dx12";
+			m_TargetProfile == ShaderTargetProfile::GGLabVulkan13 ?
+				"gglab-vulkan13" :
+				"gglab-dx12";
 		return m_Root / "active" / targetDirectory / "program-registry.ggsh.active";
 	}
 
@@ -726,14 +726,13 @@ namespace gglab
 				DeserializeActiveShaderProgramRegistry(std::span(
 					static_cast<const std::byte*>(serializedRecord.Data()),
 					serializedRecord.SizeInBytes()));
-			return registryRef
-				? ActiveShaderProgramRegistryReadResult{
+			return registryRef ?
+				ActiveShaderProgramRegistryReadResult
+				{
 					.m_Status = ActiveShaderProgramRegistryReadStatus::Success,
 					.m_RegistryRef = *registryRef,
-				}
-				: ActiveShaderProgramRegistryReadResult{
-					.m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord,
-				};
+				} :
+				ActiveShaderProgramRegistryReadResult{ .m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord, };
 		}
 		catch (...)
 		{

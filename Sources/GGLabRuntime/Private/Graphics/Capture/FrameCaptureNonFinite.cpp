@@ -123,8 +123,9 @@ namespace gglab
 				target.m_BufferDesc.m_SizeInBytes, layout.m_ValidElementCount);
 			if (boundary.m_BufferLayout.m_Failure != NonFiniteScanLayoutFailure::None)
 			{
-				return boundary.m_BufferLayout.m_Failure == NonFiniteScanLayoutFailure::TooLarge
-					? RGObservationFailure::TooLarge : RGObservationFailure::UnsupportedResource;
+				return boundary.m_BufferLayout.m_Failure == NonFiniteScanLayoutFailure::TooLarge ?
+					RGObservationFailure::TooLarge :
+					RGObservationFailure::UnsupportedResource;
 			}
 			parameters.m_BufferStride = layout.m_Stride;
 			parameters.m_ComponentCount = static_cast<uint32_t>(boundary.m_BufferLayout.m_Components.size());
@@ -141,13 +142,22 @@ namespace gglab
 			{
 			case RHIFormat::R16Float:
 			case RHIFormat::R32Float:
-			case RHIFormat::D32Float: parameters.m_Channels = 1; break;
+			case RHIFormat::D32Float:
+				parameters.m_Channels = 1;
+				break;
 			case RHIFormat::R16G16Float:
-			case RHIFormat::R32G32Float: parameters.m_Channels = 2; break;
-			case RHIFormat::R32G32B32Float: parameters.m_Channels = 3; break;
+			case RHIFormat::R32G32Float:
+				parameters.m_Channels = 2;
+				break;
+			case RHIFormat::R32G32B32Float:
+				parameters.m_Channels = 3;
+				break;
 			case RHIFormat::R16G16B16A16Float:
-			case RHIFormat::R32G32B32A32Float: parameters.m_Channels = 4; break;
-			default: return RGObservationFailure::UnsupportedFormat;
+			case RHIFormat::R32G32B32A32Float:
+				parameters.m_Channels = 4;
+				break;
+			default:
+				return RGObservationFailure::UnsupportedFormat;
 			}
 			parameters.m_Width = std::max(1u, target.m_TextureDesc.m_Extent.m_Width >> target.m_Subresources.m_BaseMip);
 			parameters.m_Height = std::max(1u, target.m_TextureDesc.m_Extent.m_Height >> target.m_Subresources.m_BaseMip);
@@ -207,7 +217,8 @@ namespace gglab
 			};
 		const auto target = readback.m_Boundary.m_Target;
 		const auto components = readback.m_Components.Get();
-		readback.m_Scan.m_Scan = [scan, target, components, parameters = readback.m_Boundary.m_Parameters]
+		readback.m_Scan.m_Scan =
+			[scan, target, components, parameters = readback.m_Boundary.m_Parameters]
 			(RGExecuteContext& context, RGBufferId record, RGTextureViewId view) mutable
 			{
 				if (parameters.m_ScalarCount == 0)

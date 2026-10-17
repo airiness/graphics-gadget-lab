@@ -299,9 +299,10 @@ namespace gglab
 		const float farMarkerRatio =
 			m_FarPlane > 0.0f ? m_InitialFarMarkerViewDistance / m_FarPlane : 0.0f;
 		const Camera& camera = GetCamera();
-		const float expectedAspect = m_ViewportHeight > 0 ? static_cast<float>(m_ViewportWidth) /
-			static_cast<float>(m_ViewportHeight)
-			: 0.0f;
+		const float expectedAspect = m_ViewportHeight > 0 ?
+			static_cast<float>(m_ViewportWidth) /
+				static_cast<float>(m_ViewportHeight) :
+			0.0f;
 		const bool cameraContractMatches = std::abs(camera.GetNear() - m_NearPlane) <= 1.0e-6f &&
 			std::abs(camera.GetFar() - m_FarPlane) <= 1.0e-3f &&
 			m_ViewportWidth > 0 && m_ViewportHeight > 0 &&
@@ -311,7 +312,7 @@ namespace gglab
 			registry && registry->HasPublishedPostProcessPreview(
 				PostProcessPreviewChannel::SceneDepth) &&
 			registry->GetPostProcessPreviewUpdateCount(PostProcessPreviewChannel::SceneDepth) >
-				m_PreviewUpdateCountOnEnter &&
+			m_PreviewUpdateCountOnEnter &&
 			(registry->GetPublishedPostProcessPreviewSelection(
 				PostProcessPreviewChannel::SceneDepth).m_Tap ==
 				PostProcessDebugTap::SceneDepthRaw ||
@@ -327,42 +328,45 @@ namespace gglab
 		}
 		else if (m_LoadingProgress.IsReady())
 		{
-			fixtureStatus = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
-				: LabDiagnosticCheckStatus::Failed;
+			fixtureStatus = m_FixtureConfigured ?
+				LabDiagnosticCheckStatus::Passed :
+				LabDiagnosticCheckStatus::Failed;
 			fixtureDetail =
-				m_FixtureConfigured
-				? "Required alpha, intersection, floor, and far-marker entities have the expected components; pixel correctness remains a visual check."
-				: "Scene preparation completed, but one or more required fixture components are missing.";
+				m_FixtureConfigured ?
+					"Required alpha, intersection, floor, and far-marker entities have the expected components; pixel correctness remains a visual check." :
+					"Scene preparation completed, but one or more required fixture components are missing.";
 		}
 		diagnostics.m_Title = "Sampleable Reversed-Z Depth";
 		diagnostics.m_Metrics = {
-			{.m_Name = "Near plane", .m_Value = std::format("{:.4f}", m_NearPlane)},
-			{.m_Name = "Far plane", .m_Value = std::format("{:.1f}", m_FarPlane)},
-			{.m_Name = "Far / near", .m_Value = std::format("{:.0f}:1", ratio)},
-			{.m_Name = "Initial far-marker view-Z",
+			{ .m_Name = "Near plane", .m_Value = std::format("{:.4f}", m_NearPlane) },
+			{ .m_Name = "Far plane", .m_Value = std::format("{:.1f}", m_FarPlane) },
+			{ .m_Name = "Far / near", .m_Value = std::format("{:.0f}:1", ratio) },
+			{ .m_Name = "Initial far-marker view-Z",
 				.m_Value = std::format("{:.1f} ({:.1f}% of far)", m_InitialFarMarkerViewDistance,
-					farMarkerRatio * 100.0f)},
-			{.m_Name = "Viewport",
-				.m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight)},
+					farMarkerRatio * 100.0f) },
+			{ .m_Name = "Viewport", .m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight) },
 		};
 		diagnostics.m_Checks = {
 			{
 				.m_Name = "Configured near/far ratio",
-				.m_Status = ratio >= 10000.0f ? LabDiagnosticCheckStatus::Passed
-											  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = ratio >= 10000.0f ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "The configured camera range is at least 10,000:1.",
 			},
 			{
 				.m_Name = "Current camera contract",
-				.m_Status = cameraContractMatches ? LabDiagnosticCheckStatus::Passed
-												  : LabDiagnosticCheckStatus::Failed,
+				.m_Status = cameraContractMatches ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"Camera near/far and aspect match the current Lab parameters and viewport.",
 			},
 			{
 				.m_Name = "Depth preview executed",
-				.m_Status = depthPreviewExecuted ? LabDiagnosticCheckStatus::Passed
-												 : LabDiagnosticCheckStatus::Pending,
+				.m_Status = depthPreviewExecuted ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "A depth preview was published after this Lab entered.",
 			},
 			{

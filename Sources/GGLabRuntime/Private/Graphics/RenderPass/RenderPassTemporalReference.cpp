@@ -270,9 +270,9 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
 					(data.m_Width + TemporalReferenceThreadGroupSize - 1) /
-						TemporalReferenceThreadGroupSize,
+					TemporalReferenceThreadGroupSize,
 					(data.m_Height + TemporalReferenceThreadGroupSize - 1) /
-						TemporalReferenceThreadGroupSize,
+					TemporalReferenceThreadGroupSize,
 					1);
 			});
 	}

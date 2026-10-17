@@ -242,7 +242,8 @@ namespace napa::voxel
 		if (preparedResult.Changed())
 		{
 			const std::uint64_t revisionForTarget = detail::SimulateExhaustedWorldRevision ?
-				std::numeric_limits<std::uint64_t>::max() : m_WorldVoxelRevision;
+				std::numeric_limits<std::uint64_t>::max() :
+				m_WorldVoxelRevision;
 			const auto targetRevision = CheckedAdd(revisionForTarget, std::uint64_t{ 1 });
 			if (!targetRevision.has_value())
 			{

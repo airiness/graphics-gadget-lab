@@ -16,8 +16,7 @@ namespace
 
 	void RunBuildContractTests(TestContext& context) noexcept
 	{
-		const napa::voxel::BuildContract& contract =
-			napa::voxel::GetBuildContract();
+		const napa::voxel::BuildContract& contract = napa::voxel::GetBuildContract();
 
 		std::printf(
 			"NapaVoxelCore build contract: core-api=%u, voxel-hash-schema=%u, "
@@ -56,61 +55,25 @@ namespace
 			"Build contract reports the canonical iso value");
 	}
 
-	constexpr std::array RegisteredSuites{
-		TestSuiteDesc{
-			.m_Id = "build-contract",
-			.m_Run = &RunBuildContractTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "coordinate",
-			.m_Run = &RunNapaVoxelCoordinateSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "damage",
-			.m_Run = &RunNapaVoxelDamageSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "edit",
-			.m_Run = &RunNapaVoxelEditSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "hash",
-			.m_Run = &RunNapaVoxelHashSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "mesher",
-			.m_Run = &RunNapaVoxelMesherSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "multi-chunk",
-			.m_Run = &RunNapaVoxelMultiChunkSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "mutation",
-			.m_Run = &RunNapaVoxelMutationSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "primitive",
-			.m_Run = &RunNapaVoxelPrimitiveSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "restore",
-			.m_Run = &RunNapaVoxelRestoreSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "storage",
-			.m_Run = &RunNapaVoxelStorageSelfTests,
-		},
-		TestSuiteDesc{
-			.m_Id = "publication-data-only",
-			.m_Run = &RunNapaVoxelDataOnlyPublicationSelfTests,
-		},
+	constexpr std::array RegisteredSuites
+	{
+		TestSuiteDesc{ .m_Id = "build-contract", .m_Run = &RunBuildContractTests, },
+		TestSuiteDesc{ .m_Id = "coordinate", .m_Run = &RunNapaVoxelCoordinateSelfTests, },
+		TestSuiteDesc{ .m_Id = "damage", .m_Run = &RunNapaVoxelDamageSelfTests, },
+		TestSuiteDesc{ .m_Id = "edit", .m_Run = &RunNapaVoxelEditSelfTests, },
+		TestSuiteDesc{ .m_Id = "hash", .m_Run = &RunNapaVoxelHashSelfTests, },
+		TestSuiteDesc{ .m_Id = "mesher", .m_Run = &RunNapaVoxelMesherSelfTests, },
+		TestSuiteDesc{ .m_Id = "multi-chunk", .m_Run = &RunNapaVoxelMultiChunkSelfTests, },
+		TestSuiteDesc{ .m_Id = "mutation", .m_Run = &RunNapaVoxelMutationSelfTests, },
+		TestSuiteDesc{ .m_Id = "primitive", .m_Run = &RunNapaVoxelPrimitiveSelfTests, },
+		TestSuiteDesc{ .m_Id = "restore", .m_Run = &RunNapaVoxelRestoreSelfTests, },
+		TestSuiteDesc{ .m_Id = "storage", .m_Run = &RunNapaVoxelStorageSelfTests, },
+		TestSuiteDesc{ .m_Id = "publication-data-only", .m_Run = &RunNapaVoxelDataOnlyPublicationSelfTests, },
 	};
 
 	[[nodiscard]] const TestSuiteDesc* FindSuite(std::string_view suiteId) noexcept
 	{
-		const auto iterator =
-			std::ranges::find(RegisteredSuites, suiteId, &TestSuiteDesc::m_Id);
+		const auto iterator = std::ranges::find(RegisteredSuites, suiteId, &TestSuiteDesc::m_Id);
 		return iterator != RegisteredSuites.end() ? &*iterator : nullptr;
 	}
 

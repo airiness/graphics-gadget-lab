@@ -25,7 +25,7 @@ uint ReverseBits32(uint bits)
 float RadicalInverseVdC(uint bits)
 {
 	bits = ReverseBits32(bits);
-	return float(bits) * 2.3283064365386963e-10; // 1 / 2^32
+	return (float)(bits) * 2.3283064365386963e-10; // 1 / 2^32
 }
 
 // Returns the 2D Hammersley sample point for index i out of N samples.
@@ -37,7 +37,7 @@ float RadicalInverseVdC(uint bits)
 // importance sampling and numerical integration.
 float2 Hammersley(uint i, uint N)
 {
-	return float2((float) i / (float) N, RadicalInverseVdC(i));
+	return float2((float)(i) / (float)(N), RadicalInverseVdC(i));
 }
 
 // Returns a cosine-weighted direction on the positive-Z tangent-space hemisphere.

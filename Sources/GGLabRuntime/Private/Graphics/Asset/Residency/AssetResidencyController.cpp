@@ -144,9 +144,9 @@ namespace gglab
 				.m_ExpectedStamp = candidate->m_Stamp,
 				.m_EstimatedBytes = candidate->m_EstimatedBytes,
 				});
-			projectedResidentBytes = projectedResidentBytes > candidate->m_EstimatedBytes
-				? projectedResidentBytes - candidate->m_EstimatedBytes
-				: 0;
+			projectedResidentBytes = projectedResidentBytes > candidate->m_EstimatedBytes ?
+				projectedResidentBytes - candidate->m_EstimatedBytes :
+				0;
 		}
 		return plan;
 	}
@@ -252,10 +252,11 @@ namespace gglab
 		uint64_t snapshotFrame, const AssetResidencyConfig& config) noexcept
 	{
 		const uint64_t lastUsedFrame = entry.m_Stamp.m_LastUsedFrame;
-		const uint64_t unusedFrames = lastUsedFrame == 0 ? snapshotFrame
-			: snapshotFrame > lastUsedFrame
-			? snapshotFrame - lastUsedFrame
-			: 0;
+		const uint64_t unusedFrames = lastUsedFrame == 0 ?
+			snapshotFrame :
+			snapshotFrame > lastUsedFrame ?
+				snapshotFrame - lastUsedFrame :
+				0;
 		return entry.m_Stamp.m_ContentVersion.IsValid() &&
 			entry.m_Stamp.m_ResidencyOperationSerial == 0 &&
 			(entry.m_Stamp.m_ContentVersion.m_Key.m_Kind == AssetKind::Mesh ||

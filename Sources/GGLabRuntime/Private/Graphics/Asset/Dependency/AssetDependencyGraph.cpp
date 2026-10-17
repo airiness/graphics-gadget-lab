@@ -116,18 +116,18 @@ namespace gglab
 		AssetContentVersion model) const noexcept
 	{
 		const auto current = m_Models.find(model.m_Key);
-		return current != m_Models.end() && current->second.m_Model == model
-			? std::addressof(current->second)
-			: nullptr;
+		return current != m_Models.end() && current->second.m_Model == model ?
+			std::addressof(current->second) :
+			nullptr;
 	}
 
 	std::span<const AssetContentVersion> AssetDependencyGraph::FindDependents(
 		AssetContentVersion dependency) const noexcept
 	{
 		const auto dependents = m_ReverseDependencies.find(dependency);
-		return dependents != m_ReverseDependencies.end()
-			? std::span<const AssetContentVersion>(dependents->second)
-			: std::span<const AssetContentVersion>{};
+		return dependents != m_ReverseDependencies.end() ?
+			std::span<const AssetContentVersion>(dependents->second) :
+			std::span<const AssetContentVersion>{};
 	}
 
 	ModelDependencyOutcome AssetDependencyGraph::EvaluateModel(
@@ -238,7 +238,8 @@ namespace gglab
 		{
 			return ModelDependencyOutcome::Pending;
 		}
-		return state.m_ReadyCount > 0 ? ModelDependencyOutcome::Ready
-			: ModelDependencyOutcome::Failed;
+		return state.m_ReadyCount > 0 ?
+			ModelDependencyOutcome::Ready :
+			ModelDependencyOutcome::Failed;
 	}
 }

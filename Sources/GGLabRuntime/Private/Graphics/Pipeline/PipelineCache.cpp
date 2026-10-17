@@ -132,9 +132,9 @@ namespace gglab
 		{
 			return {};
 		}
-		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid()
-			? RHIShaderHandle{ recipe.m_CSId.Value(), 1u }
-		: RHIShaderHandle{};
+		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid() ?
+			RHIShaderHandle{ recipe.m_CSId.Value(), 1u } :
+			RHIShaderHandle{};
 		createInfo.m_ComputeShader = shaderSnapshots[0].m_Bytecode;
 		slot.m_Pipeline = m_PipelineSystem->CreateComputePipeline(createInfo);
 		slot.m_Recipe = recipe;
@@ -176,7 +176,9 @@ namespace gglab
 		auto& usages = m_PipelineUsages[pipeline];
 		const auto existing =
 			std::ranges::find_if(usages, [&renderPassInfo](const RenderPassInfo& usage)
-				{ return usage.m_TypeName == renderPassInfo.m_TypeName; });
+				{
+					return usage.m_TypeName == renderPassInfo.m_TypeName;
+				});
 		if (existing == usages.end())
 		{
 			usages.push_back(renderPassInfo);

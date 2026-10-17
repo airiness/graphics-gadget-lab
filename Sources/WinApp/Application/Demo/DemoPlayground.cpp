@@ -97,9 +97,12 @@ namespace gglab
 				"Models/GGLabCoastalRetreat/bundle.json", failure);
 			if (!bundle)
 			{
-				m_LoadingProgress = { .m_Status = LoadingStatus::Failed,
-					.m_Fraction = 0.0f, .m_Stage = "Installed asset validation failed",
-					.m_Detail = std::move(failure) };
+				m_LoadingProgress = {
+					.m_Status = LoadingStatus::Failed,
+					.m_Fraction = 0.0f,
+					.m_Stage = "Installed asset validation failed",
+					.m_Detail = std::move(failure)
+				};
 				return;
 			}
 			m_CaptureAssetBundle = FrameCaptureAssetBundle{ bundle->m_Id, bundle->m_Revision };
@@ -266,8 +269,9 @@ namespace gglab
 
 	void DemoPlayground::CommitScene() noexcept
 	{
-		m_World.m_Atmosphere = m_Content == PlaygroundContent::CoastalAtrium
-			? std::optional<AtmosphereSettings>(AtmosphereSettings{}) : std::nullopt;
+		m_World.m_Atmosphere = m_Content == PlaygroundContent::CoastalAtrium ?
+			std::optional<AtmosphereSettings>(AtmosphereSettings{}) :
+			std::nullopt;
 		auto& registry = m_World.GetRegistry();
 		for (const PendingModel& pending : m_PendingModels)
 		{
@@ -292,7 +296,8 @@ namespace gglab
 			components::TransformComponent transComp{};
 			// Retreat's exported photon direction: 23 degree sun elevation, authored meters.
 			Vector3 direction = m_Content == PlaygroundContent::CoastalAtrium ?
-				Vector3(-0.6840816f, -0.3907311f, 0.6159450f) : Vector3(-0.6f, -1.6f, 0.4f);
+				Vector3(-0.6840816f, -0.3907311f, 0.6159450f) :
+				Vector3(-0.6f, -1.6f, 0.4f);
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);

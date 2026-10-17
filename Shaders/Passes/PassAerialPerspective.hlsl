@@ -38,7 +38,7 @@ static const float AerialNearScaleKm = 0.02;
 
 float SliceDistanceKm(float slice)
 {
-	float normalized = saturate(slice / float(g_Pass.SliceCount - 1));
+	float normalized = saturate(slice / (float)(g_Pass.SliceCount - 1));
 	return AerialNearScaleKm * (pow(1.0 + g_Pass.MaxDistanceKm / AerialNearScaleKm,
 		normalized) - 1.0);
 }
@@ -46,7 +46,7 @@ float SliceDistanceKm(float slice)
 float SliceCoordinate(float distanceKm)
 {
 	return log(1.0 + min(distanceKm, g_Pass.MaxDistanceKm) / AerialNearScaleKm) /
-		log(1.0 + g_Pass.MaxDistanceKm / AerialNearScaleKm) * float(g_Pass.SliceCount - 1);
+		log(1.0 + g_Pass.MaxDistanceKm / AerialNearScaleKm) * (float)(g_Pass.SliceCount - 1);
 }
 
 float3 WorldDirection(float2 uv, ViewData viewData)
@@ -66,8 +66,8 @@ float2 AtlasUV(float2 screenUV, uint slice)
 	float2 grid = float2(g_Pass.GridWidth, g_Pass.GridHeight);
 	float2 cell = clamp(saturate(screenUV) * grid, 0.5, grid - 0.5);
 	return float2(cell.x / g_Pass.GridWidth,
-		(float(slice * g_Pass.GridHeight) + cell.y) /
-		float(g_Pass.GridHeight * g_Pass.SliceCount));
+		((float)(slice * g_Pass.GridHeight) + cell.y) /
+		(float)(g_Pass.GridHeight * g_Pass.SliceCount));
 }
 
 #if defined(AERIAL_BUILD)
@@ -100,18 +100,19 @@ void CSBuild(uint3 dispatchId : SV_DispatchThreadID)
 	float previousDistanceKm = 0.0;
 	const float groundDistanceKm = AtmosphereGroundDistance(camera, direction);
 	const float topDistanceKm = AtmosphereTopDistance(camera, direction);
-	const float atmosphereEndKm = groundDistanceKm > 0.0
-		? min(groundDistanceKm, topDistanceKm) : topDistanceKm;
+	const float atmosphereEndKm = groundDistanceKm > 0.0 ?
+		min(groundDistanceKm, topDistanceKm) :
+		topDistanceKm;
 	for (uint slice = 0; slice < g_Pass.SliceCount; ++slice)
 	{
-		const float distanceKm = min(SliceDistanceKm(float(slice)), atmosphereEndKm);
+		const float distanceKm = min(SliceDistanceKm((float)(slice)), atmosphereEndKm);
 		const float intervalKm = distanceKm - previousDistanceKm;
-		const uint steps = max(1u, min(48u, uint(ceil(intervalKm / 2.0))));
-		const float stepKm = intervalKm / float(steps);
+		const uint steps = max(1u, min(48u, (uint)(ceil(intervalKm / 2.0))));
+		const float stepKm = intervalKm / (float)(steps);
 		for (uint step = 0; step < steps; ++step)
 		{
 			const float3 position = camera + direction *
-				(previousDistanceKm + (float(step) + 0.5) * stepKm);
+				(previousDistanceKm + ((float)(step) + 0.5) * stepKm);
 			const float radius = length(position);
 			if (radius <= g_Atmosphere.Radii.x || radius >= g_Atmosphere.Radii.y)
 			{
@@ -133,8 +134,9 @@ void CSBuild(uint3 dispatchId : SV_DispatchThreadID)
 		const uint2 atlasPixel = uint2(dispatchId.x,
 			dispatchId.y + slice * g_Pass.GridHeight);
 		radianceAtlas[atlasPixel] = AtmosphereValidated(radiance);
-		throughputAtlas[atlasPixel] = all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_AERIAL_PERSPECTIVE_CSBUILD_ISFINITE, throughput)))
-			? float4(saturate(throughput), 1.0) : float4(1.0, 0.0, 1.0, 0.0);
+		throughputAtlas[atlasPixel] = all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_AERIAL_PERSPECTIVE_CSBUILD_ISFINITE, throughput))) ?
+			float4(saturate(throughput), 1.0) :
+			float4(1.0, 0.0, 1.0, 0.0);
 		previousDistanceKm = distanceKm;
 	}
 }
@@ -163,7 +165,7 @@ void CSComposite(uint3 dispatchId : SV_DispatchThreadID)
 			viewData.InvProjMat);
 		const float distanceKm = length(viewPosition) * g_Atmosphere.World.w;
 		const float slicePosition = SliceCoordinate(distanceKm);
-		const uint lowerSlice = uint(floor(slicePosition));
+		const uint lowerSlice = (uint)(floor(slicePosition));
 		const uint upperSlice = min(lowerSlice + 1, g_Pass.SliceCount - 1);
 		SamplerState linearSampler = GetSamplerState(g_Pass.SamplerIndex);
 		const float4 lowerRadiance = radianceAtlas.SampleLevel(linearSampler,
@@ -192,8 +194,9 @@ void CSComposite(uint3 dispatchId : SV_DispatchThreadID)
 	if (g_Pass.DiagnosticMode != 0)
 	{
 		RWTexture2D<float4> diagnostic = GetRWTexture2DFloat4(g_Pass.Output1);
-		diagnostic[dispatchId.xy] = float4(g_Pass.DiagnosticMode == 1
-			? throughput : EncodeSceneColor(radiance, viewData.ScenePreExposure, NF_SITE_PASS_AERIAL_PERSPECTIVE_CSCOMPOSITE_ENCODE_SCENE_COLOR), 1.0);
+		diagnostic[dispatchId.xy] = float4(g_Pass.DiagnosticMode == 1 ?
+			throughput :
+			EncodeSceneColor(radiance, viewData.ScenePreExposure, NF_SITE_PASS_AERIAL_PERSPECTIVE_CSCOMPOSITE_ENCODE_SCENE_COLOR), 1.0);
 	}
 }
 #endif

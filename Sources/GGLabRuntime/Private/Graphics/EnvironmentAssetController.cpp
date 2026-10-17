@@ -70,7 +70,9 @@ namespace gglab
 		}
 		std::ranges::sort(m_Entries,
 			[](const EnvironmentMapEntry& lhs, const EnvironmentMapEntry& rhs) noexcept
-			{ return lhs.m_Path.generic_string() < rhs.m_Path.generic_string(); });
+			{
+				return lhs.m_Path.generic_string() < rhs.m_Path.generic_string();
+			});
 
 		if (m_Entries.empty())
 		{
@@ -232,9 +234,9 @@ namespace gglab
 		}
 		m_Entries.push_back({
 			.m_Path = resolvedPath,
-			.m_DisplayName = displayName.empty()
-				? resolvedPath.stem().string()
-				: std::string(displayName),
+			.m_DisplayName = displayName.empty() ?
+				resolvedPath.stem().string() :
+				std::string(displayName),
 			});
 		return SelectEnvironment(m_Entries.size() - 1);
 	}

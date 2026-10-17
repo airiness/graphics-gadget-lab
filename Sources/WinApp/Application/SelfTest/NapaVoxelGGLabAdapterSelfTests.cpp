@@ -80,13 +80,11 @@ namespace gglab
 		{
 			std::unique_ptr<napa::voxel::VoxelWorld> world;
 			napa::voxel::PrimitiveWorldGenerationResult generation{};
-			return napa::voxel::GeneratePrimitiveVoxelWorld(
-				config, primitives, world, generation).Succeeded() &&
+			return napa::voxel::GeneratePrimitiveVoxelWorld(config, primitives, world, generation).Succeeded() &&
 				world && napa::voxel::ReferenceMesher(*world).MeshWorld(meshing).Succeeded();
 		}
 
-		[[nodiscard]] bool MatchesVertices(const napa::voxel::MeshData& source,
-			const NapaVoxelCpuChunkMesh& converted) noexcept
+		[[nodiscard]] bool MatchesVertices(const napa::voxel::MeshData& source, const NapaVoxelCpuChunkMesh& converted) noexcept
 		{
 			if (source.m_Vertices.size() != converted.m_Vertices.size())
 			{
@@ -109,8 +107,7 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool MatchesSectionRanges(const napa::voxel::MeshData& source,
-			const NapaVoxelCpuChunkMesh& converted) noexcept
+		[[nodiscard]] bool MatchesSectionRanges(const napa::voxel::MeshData& source, const NapaVoxelCpuChunkMesh& converted) noexcept
 		{
 			if (source.m_Sections.size() != converted.m_SectionDrawRanges.size())
 			{
@@ -129,8 +126,7 @@ namespace gglab
 				{
 					return false;
 				}
-				if (!std::equal(sourceSection.m_Indices.begin(), sourceSection.m_Indices.end(),
-					converted.m_Indices.begin() + firstIndex))
+				if (!std::equal(sourceSection.m_Indices.begin(), sourceSection.m_Indices.end(), converted.m_Indices.begin() + firstIndex))
 				{
 					return false;
 				}
@@ -139,8 +135,7 @@ namespace gglab
 			return firstIndex == converted.m_Indices.size();
 		}
 
-		[[nodiscard]] bool MatchesChunkMesh(const NapaVoxelCpuChunkMesh& lhs,
-			const NapaVoxelCpuChunkMesh& rhs) noexcept
+		[[nodiscard]] bool MatchesChunkMesh(const NapaVoxelCpuChunkMesh& lhs, const NapaVoxelCpuChunkMesh& rhs) noexcept
 		{
 			if (lhs.m_Chunk != rhs.m_Chunk ||
 				lhs.m_SourceWorldVoxelRevision != rhs.m_SourceWorldVoxelRevision ||
@@ -185,8 +180,7 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool MatchesMeshSet(const NapaVoxelCpuMeshSet& lhs,
-			const NapaVoxelCpuMeshSet& rhs) noexcept
+		[[nodiscard]] bool MatchesMeshSet(const NapaVoxelCpuMeshSet& lhs, const NapaVoxelCpuMeshSet& rhs) noexcept
 		{
 			if (lhs.m_RenderableChunkCount != rhs.m_RenderableChunkCount ||
 				lhs.m_VertexCount != rhs.m_VertexCount ||
@@ -211,9 +205,10 @@ namespace gglab
 			using namespace napa::voxel;
 
 			const VoxelWorldConfig config = MakeSingleChunkConfig();
-			const std::array primitives{
-				MakeSphere(1, VoxelMaterial::Soil, { 5.0, 8.0, 8.0 }, 2.0),
-				MakeSphere(2, VoxelMaterial::Stone, { 11.0, 8.0, 8.0 }, 2.0),
+			const std::array primitives
+			{
+				MakeSphere(1, VoxelMaterial::Soil,{ 5.0, 8.0, 8.0 }, 2.0),
+				MakeSphere(2, VoxelMaterial::Stone,{ 11.0, 8.0, 8.0 }, 2.0),
 			};
 			ReferenceWorldMeshingResult meshing{};
 			const bool built = BuildWorldMeshes(config, primitives, meshing);
@@ -226,8 +221,7 @@ namespace gglab
 			const ChunkMeshRecord& source = meshing.m_Chunks[0];
 			const MeshValidationResult sourceValidation = source.m_Validation;
 			NapaVoxelCpuMeshSet converted{};
-			const NapaVoxelMeshAdapterResult result =
-				ConvertNapaVoxelMeshRecords(meshing.m_Chunks, config, converted);
+			const NapaVoxelMeshAdapterResult result = ConvertNapaVoxelMeshRecords(meshing.m_Chunks, config, converted);
 			const bool countsMatch = result.Succeeded() && converted.m_Chunks.size() == 1 &&
 				converted.m_RenderableChunkCount == 1 &&
 				converted.m_VertexCount == meshing.m_Validation.m_VertexCount &&
@@ -266,8 +260,7 @@ namespace gglab
 			ReferenceWorldMeshingResult emptyMeshing{};
 			NapaVoxelCpuMeshSet emptyConverted{};
 			const bool emptyConvertedSuccessfully = BuildWorldMeshes(emptyConfig, {}, emptyMeshing) &&
-				ConvertNapaVoxelMeshRecords(
-					emptyMeshing.m_Chunks, emptyConfig, emptyConverted).Succeeded();
+				ConvertNapaVoxelMeshRecords(emptyMeshing.m_Chunks, emptyConfig, emptyConverted).Succeeded();
 			context.Check(emptyConvertedSuccessfully && emptyConverted.m_Chunks.size() == 1 &&
 				emptyConverted.m_RenderableChunkCount == 0 &&
 				emptyConverted.m_Chunks[0].IsEmpty() &&
@@ -276,15 +269,15 @@ namespace gglab
 				"GGLab adapter keeps an Empty Chunk record without renderable mesh data");
 
 			const VoxelWorldConfig negativeConfig = MakeNegativeChunkConfig();
-			const std::array negativePrimitives{
-				MakeSphere(1, VoxelMaterial::Stone, { -8.0, 8.0, 8.0 }, 2.0),
+			const std::array negativePrimitives
+			{
+				MakeSphere(1, VoxelMaterial::Stone,{ -8.0, 8.0, 8.0 }, 2.0),
 			};
 			ReferenceWorldMeshingResult negativeMeshing{};
 			NapaVoxelCpuMeshSet negativeConverted{};
 			const bool negativeConvertedSuccessfully =
 				BuildWorldMeshes(negativeConfig, negativePrimitives, negativeMeshing) &&
-				ConvertNapaVoxelMeshRecords(
-					negativeMeshing.m_Chunks, negativeConfig, negativeConverted).Succeeded();
+				ConvertNapaVoxelMeshRecords(negativeMeshing.m_Chunks, negativeConfig, negativeConverted).Succeeded();
 			context.Check(negativeConvertedSuccessfully && negativeConverted.m_Chunks.size() == 1,
 				"GGLab adapter converts a validated Negative Chunk mesh");
 			if (!negativeConvertedSuccessfully || negativeConverted.m_Chunks.size() != 1)
@@ -315,28 +308,22 @@ namespace gglab
 			Vector3 unchanged = sentinel;
 			const NapaVoxelMeshAdapterResult nonFiniteResult = ComputeNapaVoxelRenderTranslation(
 				config, {}, { std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0 }, unchanged);
-			context.Check(nonFiniteResult.m_Error ==
-				NapaVoxelMeshAdapterError::NonFiniteWorldPosition &&
+			context.Check(nonFiniteResult.m_Error == NapaVoxelMeshAdapterError::NonFiniteWorldPosition &&
 				unchanged.m_X == sentinel.m_X && unchanged.m_Y == sentinel.m_Y &&
 				unchanged.m_Z == sentinel.m_Z,
 				"GGLab adapter rejects a non-finite Render Origin without modifying output");
 
 			unchanged = sentinel;
-			const double unrepresentable =
-				static_cast<double>(std::numeric_limits<float>::max()) * 2.0;
-			const NapaVoxelMeshAdapterResult rangeResult = ComputeNapaVoxelRenderTranslation(
-				config, { unrepresentable, 0.0, 0.0 }, {}, unchanged);
-			context.Check(rangeResult.m_Error ==
-				NapaVoxelMeshAdapterError::UnrepresentableRenderTranslation &&
+			const double unrepresentable = static_cast<double>(std::numeric_limits<float>::max()) * 2.0;
+			const NapaVoxelMeshAdapterResult rangeResult = ComputeNapaVoxelRenderTranslation(config, { unrepresentable, 0.0, 0.0 }, {}, unchanged);
+			context.Check(rangeResult.m_Error == NapaVoxelMeshAdapterError::UnrepresentableRenderTranslation &&
 				unchanged.m_X == sentinel.m_X && unchanged.m_Y == sentinel.m_Y &&
 				unchanged.m_Z == sentinel.m_Z,
 				"GGLab adapter rejects an unrepresentable Float translation atomically");
 
 			unchanged = sentinel;
-			const NapaVoxelMeshAdapterResult precisionResult = ComputeNapaVoxelRenderTranslation(
-				config, { 4096.0, 0.0, 0.0 }, {}, unchanged);
-			context.Check(precisionResult.m_Error ==
-				NapaVoxelMeshAdapterError::InsufficientRenderTranslationPrecision &&
+			const NapaVoxelMeshAdapterResult precisionResult = ComputeNapaVoxelRenderTranslation(config, { 4096.0, 0.0, 0.0 }, {}, unchanged);
+			context.Check(precisionResult.m_Error == NapaVoxelMeshAdapterError::InsufficientRenderTranslationPrecision &&
 				unchanged.m_X == sentinel.m_X && unchanged.m_Y == sentinel.m_Y &&
 				unchanged.m_Z == sentinel.m_Z,
 				"GGLab adapter rejects a finite Float translation that loses mesh precision");
@@ -366,8 +353,9 @@ namespace gglab
 			using namespace napa::voxel;
 
 			const VoxelWorldConfig config = MakeEightChunkConfig();
-			const std::array primitives{
-				MakeSphere(1, VoxelMaterial::Stone, {}, 2.0),
+			const std::array primitives
+			{
+				MakeSphere(1, VoxelMaterial::Stone,{}, 2.0),
 			};
 			ReferenceWorldMeshingResult meshing{};
 			const bool built = BuildWorldMeshes(config, primitives, meshing);
@@ -399,8 +387,7 @@ namespace gglab
 				.m_IndexCount = 23,
 				.m_SectionCount = 29,
 			};
-			const NapaVoxelMeshAdapterResult duplicateResult =
-				ConvertNapaVoxelMeshRecords(duplicates, config, unchanged);
+			const NapaVoxelMeshAdapterResult duplicateResult = ConvertNapaVoxelMeshRecords(duplicates, config, unchanged);
 			context.Check(duplicateResult.m_Error == NapaVoxelMeshAdapterError::DuplicateChunk &&
 				unchanged.m_Chunks.size() == 1 && unchanged.m_RenderableChunkCount == 17 &&
 				unchanged.m_VertexCount == 19 && unchanged.m_IndexCount == 23 &&
@@ -413,8 +400,9 @@ namespace gglab
 			using namespace napa::voxel;
 
 			const VoxelWorldConfig config = MakeSingleChunkConfig();
-			const std::array primitives{
-				MakeSphere(1, VoxelMaterial::Stone, { 8.0, 8.0, 8.0 }, 2.0),
+			const std::array primitives
+			{
+				MakeSphere(1, VoxelMaterial::Stone,{ 8.0, 8.0, 8.0 }, 2.0),
 			};
 			ReferenceWorldMeshingResult meshing{};
 			if (!BuildWorldMeshes(config, primitives, meshing) || meshing.m_Chunks.size() != 1 ||
@@ -425,25 +413,20 @@ namespace gglab
 			}
 
 			ChunkMeshRecord nonFinite = meshing.m_Chunks[0];
-			nonFinite.m_Mesh.m_Vertices[0].m_Normal.m_X =
-				std::numeric_limits<float>::infinity();
+			nonFinite.m_Mesh.m_Vertices[0].m_Normal.m_X = std::numeric_limits<float>::infinity();
 			NapaVoxelCpuChunkMesh unchanged{
 				.m_SourceWorldVoxelRevision = 37,
 			};
-			const NapaVoxelMeshAdapterResult nonFiniteResult =
-				ConvertNapaVoxelChunkMesh(nonFinite, config, unchanged);
-			context.Check(nonFiniteResult.m_Error ==
-				NapaVoxelMeshAdapterError::CoreValidationFailed &&
+			const NapaVoxelMeshAdapterResult nonFiniteResult = ConvertNapaVoxelChunkMesh(nonFinite, config, unchanged);
+			context.Check(nonFiniteResult.m_Error == NapaVoxelMeshAdapterError::CoreValidationFailed &&
 				nonFiniteResult.m_CoreError == ValidationError::NonFiniteMeshVertex &&
 				unchanged.m_SourceWorldVoxelRevision == 37,
 				"GGLab adapter revalidates Core normals and preserves output on failure");
 
 			ChunkMeshRecord mismatched = meshing.m_Chunks[0];
 			++mismatched.m_Validation.m_IndexCount;
-			const NapaVoxelMeshAdapterResult mismatchResult =
-				ConvertNapaVoxelChunkMesh(mismatched, config, unchanged);
-			context.Check(mismatchResult.m_Error ==
-				NapaVoxelMeshAdapterError::MismatchedCoreValidation &&
+			const NapaVoxelMeshAdapterResult mismatchResult = ConvertNapaVoxelChunkMesh(mismatched, config, unchanged);
+			context.Check(mismatchResult.m_Error == NapaVoxelMeshAdapterError::MismatchedCoreValidation &&
 				unchanged.m_SourceWorldVoxelRevision == 37,
 				"GGLab adapter rejects stale Core validation evidence atomically");
 		}

@@ -24,8 +24,7 @@ namespace napa::voxel::testing
 
 		virtual void OnSuiteStarted(std::string_view suiteName) noexcept = 0;
 		virtual void OnCheckCompleted(std::string_view checkName, bool succeeded) noexcept = 0;
-		virtual void OnSuiteFinished(
-			std::string_view suiteName, const TestSummary& summary) noexcept = 0;
+		virtual void OnSuiteFinished(std::string_view suiteName, const TestSummary& summary) noexcept = 0;
 	};
 
 	class TestContext final
@@ -56,10 +55,8 @@ namespace napa::voxel::testing
 	public:
 		void OnSuiteStarted(std::string_view suiteName) noexcept override;
 		void OnCheckCompleted(std::string_view checkName, bool succeeded) noexcept override;
-		void OnSuiteFinished(
-			std::string_view suiteName, const TestSummary& summary) noexcept override;
+		void OnSuiteFinished(std::string_view suiteName, const TestSummary& summary) noexcept override;
 	};
 
-	[[nodiscard]] bool RunTestSuite(
-		const TestSuiteDesc& suite, TestReporterBase& reporter) noexcept;
+	[[nodiscard]] bool RunTestSuite(const TestSuiteDesc& suite, TestReporterBase& reporter) noexcept;
 }

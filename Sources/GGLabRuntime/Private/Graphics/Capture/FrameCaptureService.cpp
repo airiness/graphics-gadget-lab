@@ -86,8 +86,9 @@ namespace gglab
 	{
 		const auto request = std::ranges::find(
 			m_Queued, FrameCaptureSource::Diagnostic, &QueuedRequest::m_Source);
-		return request != m_Queued.end() ? std::optional(request->m_DiagnosticTap)
-			: std::nullopt;
+		return request != m_Queued.end() ?
+			std::optional(request->m_DiagnosticTap) :
+			std::nullopt;
 	}
 
 	void FrameCaptureService::FailPendingDiagnosticRequests(std::string_view failure) noexcept
@@ -149,7 +150,9 @@ namespace gglab
 					request.m_Source == FrameCaptureSource::NonFiniteScan ||
 					(request.m_FrameSerial != 0 && request.m_FrameSerial != selectedFrame) ||
 					std::ranges::any_of(requiredImages, [&](const QueuedRequest& required)
-						{ return IsBoundBy(request, required.m_Source, required.m_DiagnosticTap); }))
+						{
+							return IsBoundBy(request, required.m_Source, required.m_DiagnosticTap);
+						}))
 				{
 					return false;
 				}
@@ -193,8 +196,9 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::TooLarge;
 		}
-		return GetUnfinishedRequestCount() + m_Results.size() > m_Limits.m_MaxRequests - requestCount
-			? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
+		return GetUnfinishedRequestCount() + m_Results.size() > m_Limits.m_MaxRequests - requestCount ?
+			FrameCaptureAvailability::Busy :
+			FrameCaptureAvailability::Available;
 	}
 
 	FrameCaptureAvailability FrameCaptureService::GetAvailability(
@@ -224,8 +228,9 @@ namespace gglab
 		const auto [usedBytes, payloads] = GetPayloadUsage();
 		return payloads >= m_Limits.m_MaxPayloads ||
 			GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests ||
-			requiredBytes > m_Limits.m_MaxPayloadBytes - usedBytes
-			? FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
+			requiredBytes > m_Limits.m_MaxPayloadBytes - usedBytes ?
+				FrameCaptureAvailability::Busy :
+				FrameCaptureAvailability::Available;
 	}
 
 	bool FrameCaptureService::HasPendingRequests(FrameCaptureSource source) const noexcept
@@ -286,9 +291,9 @@ namespace gglab
 			displayTargetDesc.m_Extent.m_Width, displayTargetDesc.m_Extent.m_Height);
 		if (availability != FrameCaptureAvailability::Available)
 		{
-			FailTap(tap, 0, availability == FrameCaptureAvailability::TooLarge
-				? "The capture target exceeds the payload byte budget."
-				: "Frame capture payload capacity is exhausted.");
+			FailTap(tap, 0, availability == FrameCaptureAvailability::TooLarge ?
+				"The capture target exceeds the payload byte budget." :
+				"Frame capture payload capacity is exhausted.");
 			return std::nullopt;
 		}
 		std::erase_if(m_RetainedImages,
@@ -321,8 +326,10 @@ namespace gglab
 	void FrameCaptureService::BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
 		const bool includeGraph = std::ranges::any_of(m_Taps, [&](const Tap& tap)
-			{ return tap.m_FrameSerial == frameSerial && (tap.m_Source == FrameCaptureSource::ResourceExport || tap.m_Source == FrameCaptureSource::NonFiniteScan) &&
-			std::ranges::any_of(tap.m_Requests, [](const auto& request) { return request.m_IncludeGraph; }); });
+			{
+				return tap.m_FrameSerial == frameSerial && (tap.m_Source == FrameCaptureSource::ResourceExport || tap.m_Source == FrameCaptureSource::NonFiniteScan) &&
+					std::ranges::any_of(tap.m_Requests, [](const auto& request) { return request.m_IncludeGraph; });
+			});
 		if (m_IsShutdown || (!HasPendingRequests(FrameCaptureSource::RenderGraph) && !includeGraph))
 		{
 			return;
@@ -350,16 +357,20 @@ namespace gglab
 		tap.m_GraphExportActive = true;
 		graph.EnableExecutionRecord();
 		for (auto& consumer : m_Taps)
+		{
 			if (consumer.m_FrameSerial == frameSerial)
 			{
 				consumer.m_GraphExportActive = true;
 			}
+		}
 		for (auto& resources : m_Taps)
+		{
 			if (resources.m_FrameSerial == frameSerial && (resources.m_Source == FrameCaptureSource::ResourceExport || resources.m_Source == FrameCaptureSource::NonFiniteScan) &&
 				!resources.m_Requests.empty() && resources.m_Requests[0].m_IncludeGraph)
 			{
 				resources.m_Graph = tap.m_Graph;
 			}
+		}
 		if (!tap.m_Requests.empty())
 		{
 			m_Taps.push_back(std::move(tap));
@@ -369,7 +380,9 @@ namespace gglab
 	void FrameCaptureService::EndGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
 		if (!std::ranges::any_of(m_Taps, [&](const Tap& tap)
-			{ return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted; }))
+			{
+				return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted;
+			}))
 		{
 			return;
 		}
@@ -422,8 +435,9 @@ namespace gglab
 					{
 						PublishFailure(request.m_Id, request.m_Source, frameSerial,
 							"The requested capture frame was aborted before submission.",
-							request.m_Source == FrameCaptureSource::Diagnostic
-							? std::optional(request.m_DiagnosticTap) : std::nullopt);
+							request.m_Source == FrameCaptureSource::Diagnostic ?
+								std::optional(request.m_DiagnosticTap) :
+								std::nullopt);
 					}
 				}
 				return true;
@@ -511,8 +525,9 @@ namespace gglab
 					return false;
 				}
 				PublishFailure(request.m_Id, request.m_Source, 0, std::string(failure),
-					request.m_Source == FrameCaptureSource::Diagnostic
-					? std::optional(request.m_DiagnosticTap) : std::nullopt);
+					request.m_Source == FrameCaptureSource::Diagnostic ?
+						std::optional(request.m_DiagnosticTap) :
+						std::nullopt);
 				return true;
 			});
 	}
@@ -530,8 +545,9 @@ namespace gglab
 		for (const QueuedRequest& request : tap.m_Requests)
 		{
 			PublishFailure(request.m_Id, tap.m_Source, frameSerial, std::string(failure),
-				tap.m_Source == FrameCaptureSource::Diagnostic
-				? std::optional(tap.m_DiagnosticTap) : std::nullopt);
+				tap.m_Source == FrameCaptureSource::Diagnostic ?
+					std::optional(tap.m_DiagnosticTap) :
+					std::nullopt);
 		}
 		tap.m_Requests.clear();
 		tap.m_Buffer.Reset();
@@ -618,8 +634,9 @@ namespace gglab
 				.m_Source = tap.m_Source,
 				.m_Status = FrameCaptureStatus::Completed,
 				.m_FrameSerial = tap.m_FrameSerial,
-				.m_DiagnosticTap = tap.m_Source == FrameCaptureSource::Diagnostic
-					? std::optional(tap.m_DiagnosticTap) : std::nullopt,
+				.m_DiagnosticTap = tap.m_Source == FrameCaptureSource::Diagnostic ?
+					std::optional(tap.m_DiagnosticTap) :
+					std::nullopt,
 				.m_Image = sharedImage,
 				.m_GraphExportActive = tap.m_GraphExportActive,
 				.m_ResourceExportActive = tap.m_ResourceExportActive,

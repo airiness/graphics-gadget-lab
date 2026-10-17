@@ -152,8 +152,9 @@ namespace gglab
 		{
 			CD3DX12_DEPTH_STENCIL_DESC1 desc(D3D12_DEFAULT);
 			desc.DepthEnable = rhiDesc.m_DepthTestEnable;
-			desc.DepthWriteMask = rhiDesc.m_DepthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL
-				: D3D12_DEPTH_WRITE_MASK_ZERO;
+			desc.DepthWriteMask = rhiDesc.m_DepthWriteEnable ?
+				D3D12_DEPTH_WRITE_MASK_ALL :
+				D3D12_DEPTH_WRITE_MASK_ZERO;
 			desc.DepthFunc = ToD3D12ComparisonFunc(rhiDesc.m_DepthCompareOp);
 			desc.StencilEnable = rhiDesc.m_StencilEnable;
 			return desc;

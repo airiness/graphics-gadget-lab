@@ -205,7 +205,9 @@ namespace gglab::win32
 		requests.assign(m_Pending.begin(), m_Pending.end());
 		m_Pending.clear();
 		std::erase_if(m_Outstanding, [](const std::shared_ptr<NamedPipeRequest>& request)
-			{ return request->IsAnswered(); });
+			{
+				return request->IsAnswered();
+			});
 		PruneFinishedConnections();
 		return requests;
 	}

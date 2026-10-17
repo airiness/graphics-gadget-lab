@@ -502,11 +502,11 @@ namespace gglab
 				// resolution. Violations are invalid derived data.
 				if (record.m_Manifest.m_Dependencies.empty() ||
 					record.m_Manifest.m_Dependencies.size() !=
-						record.m_DependencyPhysicalPaths.size() ||
+					record.m_DependencyPhysicalPaths.size() ||
 					record.m_Manifest.m_Dependencies[0].m_LogicalPath !=
-						record.m_Manifest.m_LogicalSourcePath ||
+					record.m_Manifest.m_LogicalSourcePath ||
 					utils::Canonical(record.m_DependencyPhysicalPaths[0]) !=
-						utils::Canonical(record.m_PhysicalSourcePath))
+					utils::Canonical(record.m_PhysicalSourcePath))
 				{
 					return std::nullopt;
 				}
@@ -851,9 +851,9 @@ namespace gglab
 		// manifest digest is compared against the SHA-256 of those exact
 		// in-memory bytes, and those same bytes are returned. Validation and
 		// return content can never diverge.
-		const testing::BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr)
-			? g_BinaryReadOnceOverride
-			: &testing::ReadBinaryWithDigestOnce;
+		const testing::BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr) ?
+			g_BinaryReadOnceOverride :
+			&testing::ReadBinaryWithDigestOnce;
 		const std::optional<testing::BinaryReadWithDigest> loaded = readOnce(binaryPath);
 		if (!loaded.has_value() ||
 			loaded->m_Digest != record->m_Manifest.m_BinaryContentDigest.m_Digest)
@@ -958,9 +958,9 @@ namespace gglab
 			}
 
 			result.m_CommittedRecord = observed;
-			result.m_Outcome = (observed.m_Manifest == record.m_Manifest)
-				? ShaderPublicationOutcome::Published
-				: ShaderPublicationOutcome::CommittedByOther;
+			result.m_Outcome = (observed.m_Manifest == record.m_Manifest) ?
+				ShaderPublicationOutcome::Published :
+				ShaderPublicationOutcome::CommittedByOther;
 			return result;
 		}
 		catch (...)

@@ -13,20 +13,20 @@ float3 GetCubemapFaceDirection(uint face)
 {
 	switch (face)
 	{
-		case CUBEMAP_FACE_POSITIVE_X:
-			return float3(1.0, 0.0, 0.0);
-		case CUBEMAP_FACE_NEGATIVE_X:
-			return float3(-1.0, 0.0, 0.0);
-		case CUBEMAP_FACE_POSITIVE_Y:
-			return float3(0.0, 1.0, 0.0);
-		case CUBEMAP_FACE_NEGATIVE_Y:
-			return float3(0.0, -1.0, 0.0);
-		case CUBEMAP_FACE_POSITIVE_Z:
-			return float3(0.0, 0.0, 1.0);
-		case CUBEMAP_FACE_NEGATIVE_Z:
-			return float3(0.0, 0.0, -1.0);
-		default:
-			return float3(0.0, 0.0, 1.0);
+	case CUBEMAP_FACE_POSITIVE_X:
+		return float3(1.0, 0.0, 0.0);
+	case CUBEMAP_FACE_NEGATIVE_X:
+		return float3(-1.0, 0.0, 0.0);
+	case CUBEMAP_FACE_POSITIVE_Y:
+		return float3(0.0, 1.0, 0.0);
+	case CUBEMAP_FACE_NEGATIVE_Y:
+		return float3(0.0, -1.0, 0.0);
+	case CUBEMAP_FACE_POSITIVE_Z:
+		return float3(0.0, 0.0, 1.0);
+	case CUBEMAP_FACE_NEGATIVE_Z:
+		return float3(0.0, 0.0, -1.0);
+	default:
+		return float3(0.0, 0.0, 1.0);
 	}
 }
 
@@ -34,12 +34,12 @@ float3 GetCubemapFaceUp(uint face)
 {
 	switch (face)
 	{
-		case CUBEMAP_FACE_POSITIVE_Y:
-			return float3(0.0, 0.0, -1.0);
-		case CUBEMAP_FACE_NEGATIVE_Y:
-			return float3(0.0, 0.0, 1.0);
-		default:
-			return float3(0.0, 1.0, 0.0);
+	case CUBEMAP_FACE_POSITIVE_Y:
+		return float3(0.0, 0.0, -1.0);
+	case CUBEMAP_FACE_NEGATIVE_Y:
+		return float3(0.0, 0.0, 1.0);
+	default:
+		return float3(0.0, 1.0, 0.0);
 	}
 }
 

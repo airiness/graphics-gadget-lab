@@ -295,12 +295,12 @@ namespace gglab
 				{
 					const auto& lhsPass = snapshot.m_Passes[lhs];
 					const auto& rhsPass = snapshot.m_Passes[rhs];
-					const int32_t lhsOrder = lhsPass.m_ExecutionOrder >= 0
-						? lhsPass.m_ExecutionOrder
-						: std::numeric_limits<int32_t>::max();
-					const int32_t rhsOrder = rhsPass.m_ExecutionOrder >= 0
-						? rhsPass.m_ExecutionOrder
-						: std::numeric_limits<int32_t>::max();
+					const int32_t lhsOrder = lhsPass.m_ExecutionOrder >= 0 ?
+						lhsPass.m_ExecutionOrder :
+						std::numeric_limits<int32_t>::max();
+					const int32_t rhsOrder = rhsPass.m_ExecutionOrder >= 0 ?
+						rhsPass.m_ExecutionOrder :
+						std::numeric_limits<int32_t>::max();
 					if (lhsOrder != rhsOrder)
 					{
 						return lhsOrder < rhsOrder;
@@ -579,9 +579,9 @@ namespace gglab
 				const bool selected =
 					state.m_SelectedResourceIndex == static_cast<int32_t>(resource.m_Index);
 				const bool hovered = graphInputActive && ImGui::IsMouseHoveringRect(min, max, true);
-				const ImU32 fill = resource.m_ResourceType == RGResourceType::RGTexture
-					? resourceTextureFill
-					: resourceBufferFill;
+				const ImU32 fill = resource.m_ResourceType == RGResourceType::RGTexture ?
+					resourceTextureFill :
+					resourceBufferFill;
 				const ImU32 border = selected || hovered ? selectedBorder : resourceBorder;
 				const float borderThickness = selected ? 2.4f : 1.4f;
 
@@ -729,10 +729,10 @@ namespace gglab
 				const std::string after = devtools::BarrierStateText(barrier.m_After);
 				const std::string range = devtools::SubresourceRangeText(barrier.m_Subresources);
 				const std::string physical =
-					barrier.m_HasPhysicalHandle
-					? std::format("{}:{}", barrier.m_PhysicalHandleIndex,
-						barrier.m_PhysicalHandleGeneration)
-					: "Pending";
+					barrier.m_HasPhysicalHandle ?
+						std::format("{}:{}", barrier.m_PhysicalHandleIndex,
+							barrier.m_PhysicalHandleGeneration) :
+						"Pending";
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -856,9 +856,9 @@ namespace gglab
 			const std::string initialState =
 				devtools::BarrierStateText(resource.m_InitialBarrierState);
 			const std::string finalState =
-				resource.m_HasFinalBarrierState
-				? devtools::BarrierStateText(resource.m_FinalBarrierState)
-				: "-";
+				resource.m_HasFinalBarrierState ?
+					devtools::BarrierStateText(resource.m_FinalBarrierState) :
+					"-";
 			const std::string usage = UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
 			const std::string poolSlot = PoolSlotToString(resource.m_PoolSlot);
 
@@ -888,9 +888,9 @@ namespace gglab
 			ImGui::TextWrapped("Initial State: %s", initialState.c_str());
 			ImGui::TextWrapped("Exported Final State: %s", finalState.c_str());
 			const std::string finalRange =
-				resource.m_HasFinalBarrierState
-				? devtools::SubresourceRangeText(resource.m_FinalBarrierSubresources)
-				: "-";
+				resource.m_HasFinalBarrierState ?
+					devtools::SubresourceRangeText(resource.m_FinalBarrierSubresources) :
+					"-";
 			ImGui::TextWrapped("Exported Final Range: %s", finalRange.c_str());
 		}
 

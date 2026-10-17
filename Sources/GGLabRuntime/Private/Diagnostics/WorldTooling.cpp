@@ -47,12 +47,22 @@ namespace gglab
 		result.m_WorldId = m_WorldId;
 		const auto& registry = m_World.GetRegistry();
 		std::vector<entt::entity> entities;
-		for (auto entity : registry.view<const components::TransformComponent>()) entities.push_back(entity);
-		for (auto entity : registry.view<const components::LightComponent>()) entities.push_back(entity);
-		for (auto entity : registry.view<const components::ModelComponent>()) entities.push_back(entity);
-		std::sort(entities.begin(), entities.end(), [](auto lhs, auto rhs) {
-			return entt::to_integral(lhs) < entt::to_integral(rhs);
-		});
+		for (auto entity : registry.view<const components::TransformComponent>())
+		{
+			entities.push_back(entity);
+		}
+		for (auto entity : registry.view<const components::LightComponent>())
+		{
+			entities.push_back(entity);
+		}
+		for (auto entity : registry.view<const components::ModelComponent>())
+		{
+			entities.push_back(entity);
+		}
+		std::sort(entities.begin(), entities.end(), [](auto lhs, auto rhs)
+			{
+				return entt::to_integral(lhs) < entt::to_integral(rhs);
+			});
 		entities.erase(std::unique(entities.begin(), entities.end()), entities.end());
 		for (auto entity : entities)
 		{

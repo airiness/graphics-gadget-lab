@@ -42,15 +42,17 @@ namespace
 		{
 			GpuSelfTestReporter gpuReporter;
 			return gglab::RunSelfTestSuite({ .m_Id = selection,
-				.m_Run = backend == "dx12" ? &gglab::RunDX12NonFiniteScanNumericSelfTests
-					: &gglab::RunVulkanNonFiniteScanNumericSelfTests }, gpuReporter);
+				.m_Run = backend == "dx12" ?
+					&gglab::RunDX12NonFiniteScanNumericSelfTests :
+					&gglab::RunVulkanNonFiniteScanNumericSelfTests }, gpuReporter);
 		}
 		if (selection == "temporal-accumulation-gpu")
 		{
 			GpuSelfTestReporter gpuReporter;
 			return gglab::RunSelfTestSuite({ .m_Id = selection,
-				.m_Run = backend == "dx12" ? &gglab::RunDX12TemporalAccumulationNumericSelfTests
-					: &gglab::RunVulkanTemporalAccumulationNumericSelfTests }, gpuReporter);
+				.m_Run = backend == "dx12" ?
+					&gglab::RunDX12TemporalAccumulationNumericSelfTests :
+					&gglab::RunVulkanTemporalAccumulationNumericSelfTests }, gpuReporter);
 		}
 		if (selection == "brdf-lut-gpu")
 		{

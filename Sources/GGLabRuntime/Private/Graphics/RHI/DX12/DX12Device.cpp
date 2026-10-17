@@ -372,15 +372,16 @@ namespace gglab
 
 	uint32_t DX12Device::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
-		return viewType == RHIBufferViewType::ConstantBuffer
-			? D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
-			: 1u;
+		return viewType == RHIBufferViewType::ConstantBuffer ?
+			D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT :
+			1u;
 	}
 
 	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
-		return m_QueueSystem ? m_QueueSystem->IsFencePointCompleted(fencePoint)
-			: !fencePoint.IsValid();
+		return m_QueueSystem ?
+			m_QueueSystem->IsFencePointCompleted(fencePoint) :
+			!fencePoint.IsValid();
 	}
 
 	void DX12Device::RecordTextureUse(
@@ -483,8 +484,9 @@ namespace gglab
 
 	DX12DescriptorView DX12Device::ResolveTextureView(RHITextureViewHandle view) const noexcept
 	{
-		return m_DescriptorCache ? m_DescriptorCache->ResolveTextureView(view)
-			: DX12DescriptorView{};
+		return m_DescriptorCache ?
+			m_DescriptorCache->ResolveTextureView(view) :
+			DX12DescriptorView{};
 	}
 
 	bool DX12Device::ResolveTextureViewInfo(RHITextureViewHandle view,

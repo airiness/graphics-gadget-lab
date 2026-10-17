@@ -156,7 +156,7 @@ namespace gglab
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
 					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
-				});
+					});
 				const size_t pipelineIndex = static_cast<size_t>(surfaceMode);
 				graphicsContext->SetPipeline(servicesPtr->m_PipelineResolver->Resolve(
 					m_PipelineSlots[pipelineIndex], m_PipelineKeys[pipelineIndex], GetInfo()));
@@ -237,9 +237,9 @@ namespace gglab
 			key.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
 			key.m_Formats.m_RenderTargetCount = 1;
 			key.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
-			key.m_RasterizerPreset = index == static_cast<size_t>(NapaVoxelSurfaceMode::Wireframe)
-				? RasterizerPreset::Wireframe
-				: RasterizerPreset::Default;
+			key.m_RasterizerPreset = index == static_cast<size_t>(NapaVoxelSurfaceMode::Wireframe) ?
+				RasterizerPreset::Wireframe :
+				RasterizerPreset::Default;
 			key.m_DepthPreset = DepthPreset::ReversedZWrite;
 			key.m_BlendPreset = BlendPreset::Default;
 		}

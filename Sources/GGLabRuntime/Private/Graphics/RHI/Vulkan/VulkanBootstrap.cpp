@@ -100,9 +100,9 @@ namespace gglab
 				availability.m_ResourceDescriptorCount, availability.m_SamplerDescriptorCount,
 				availability.m_CombinedDescriptorCount));
 			const std::string_view layoutState =
-				!snapshot.m_GlobalDescriptorSetLayoutProbed
-				? "not-probed"
-				: capabilities.m_GlobalDescriptorSetLayoutSupported ? "supported" : "unsupported";
+				!snapshot.m_GlobalDescriptorSetLayoutProbed ?
+					"not-probed" :
+					capabilities.m_GlobalDescriptorSetLayoutSupported ? "supported" : "unsupported";
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format("    globalSet1LayoutSupport={} requiredFormatFeatures={}",
 				layoutState, capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
 			const auto& portability = snapshot.m_PortabilityCapabilities;

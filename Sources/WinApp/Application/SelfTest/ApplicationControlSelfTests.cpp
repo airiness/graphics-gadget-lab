@@ -27,8 +27,7 @@ namespace gglab
 
 		void RunParseTests(SelfTestContext& context) noexcept
 		{
-			const ApplicationControlParseResult status =
-				ParseApplicationControlRequest(R"({"protocol":2,"id":7,"command":"status"})");
+			const ApplicationControlParseResult status = ParseApplicationControlRequest(R"({"protocol":2,"id":7,"command":"status"})");
 			context.Check(status.m_Request && status.m_Request->m_Id == 7 &&
 				status.m_Request->m_Command == ApplicationControlCommand::Status,
 				"A status request parses with its id");
@@ -46,8 +45,7 @@ namespace gglab
 				capture.m_Request->m_Capture.m_SettleFrames == 3 &&
 				capture.m_Request->m_Capture.m_RequiredContentId == "gglab.lab.culling" &&
 				capture.m_Request->m_Capture.m_ReferenceViewId == "CAM_Courtyard" &&
-				capture.m_Request->m_Capture.m_OutputDirectory ==
-				std::filesystem::path("D:/captures") &&
+				capture.m_Request->m_Capture.m_OutputDirectory == std::filesystem::path("D:/captures") &&
 				capture.m_Request->m_Capture.m_Label == "a" &&
 				capture.m_Request->m_Capture.m_Note == "b" && !capture.m_Request->m_Wait,
 				"A capture request carries every optional capture field");
@@ -75,11 +73,9 @@ namespace gglab
 				sequence.m_Request->m_Command == ApplicationControlCommand::Sequence &&
 				sequence.m_Request->m_Sequence.m_CameraPathId == "SEQ_DollyDoorway" &&
 				sequence.m_Request->m_Sequence.m_RequiredContentId == "Demo.CoastalAtrium" &&
-				sequence.m_Request->m_Sequence.m_CaptureFrames ==
-				std::vector<uint32_t>{ 0, 90, 179 } &&
+				sequence.m_Request->m_Sequence.m_CaptureFrames == std::vector<uint32_t>{ 0, 90, 179 } &&
 				sequence.m_Request->m_Sequence.m_CaptureSource == FrameCaptureSource::Composited &&
-				sequence.m_Request->m_Sequence.m_OutputDirectory ==
-				std::filesystem::path("D:/captures") &&
+				sequence.m_Request->m_Sequence.m_OutputDirectory == std::filesystem::path("D:/captures") &&
 				sequence.m_Request->m_Sequence.m_Label == "dolly" &&
 				sequence.m_Request->m_Sequence.m_Note == "baseline",
 				"A sequence request carries its path, capture frames and capture fields");
@@ -91,15 +87,12 @@ namespace gglab
 				R"({"protocol":2,"id":14,"command":"capture","source":"diagnostic",)"
 				R"("diagnosticTap":"temporal-history-weight"})");
 			context.Check(diagnosticSequence.m_Request &&
-				diagnosticSequence.m_Request->m_Sequence.m_CaptureSource ==
-				FrameCaptureSource::Diagnostic &&
-				diagnosticSequence.m_Request->m_Sequence.m_DiagnosticTap ==
-				PostProcessDebugTap::TemporalRejection &&
+				diagnosticSequence.m_Request->m_Sequence.m_CaptureSource == FrameCaptureSource::Diagnostic &&
+				diagnosticSequence.m_Request->m_Sequence.m_DiagnosticTap == PostProcessDebugTap::TemporalRejection &&
 				diagnosticSequence.m_Request->m_Sequence.m_ReferenceSamples == 64 &&
 				diagnosticSequence.m_Request->m_Sequence.m_ReferenceTextureLodBias == -3.0f &&
 				diagnosticCapture.m_Request &&
-				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap ==
-				PostProcessDebugTap::TemporalHistoryWeight,
+				diagnosticCapture.m_Request->m_Capture.m_DiagnosticTap == PostProcessDebugTap::TemporalHistoryWeight,
 				"Diagnostic captures and sequences name their tap");
 			const ApplicationControlParseResult evaluation = ParseApplicationControlRequest(
 				R"({"protocol":2,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,)"
@@ -110,9 +103,9 @@ namespace gglab
 				R"("historyRectification":"variance-clip","varianceClipGamma":1.25,)"
 				R"("historyAccumulation":"compatibility-age","historyRelaxation":2,)"
 				R"("textureLodBiasOffset":-1.5,"enabled":false}})");
-			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request
-				? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides
-				: nullptr;
+			const FrameSequenceTemporalAAOverrides* overrides = evaluation.m_Request ?
+				&evaluation.m_Request->m_Sequence.m_TemporalAAOverrides :
+				nullptr;
 			context.Check(overrides && evaluation.m_Request->m_Sequence.m_GpuTiming &&
 				overrides->m_NeighborhoodClampExpansion == 1.0f &&
 				overrides->m_MaxHistoryFeedback == 0.9f && !overrides->m_VelocityWeightScale &&
@@ -131,9 +124,9 @@ namespace gglab
 				R"({"protocol":2,"id":16,"command":"sequence","path":"SEQ_A",)"
 				R"("gtao":{"temporal":true,"temporalMaxSamples":24,"directionCount":1,)"
 				R"("stepCount":8}})");
-			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request
-				? &gtaoEvaluation.m_Request->m_Sequence.m_GTAOOverrides
-				: nullptr;
+			const FrameSequenceGTAOOverrides* gtaoOverrides = gtaoEvaluation.m_Request ?
+				&gtaoEvaluation.m_Request->m_Sequence.m_GTAOOverrides :
+				nullptr;
 			context.Check(gtaoOverrides && gtaoOverrides->m_TemporalAccumulation == true &&
 				gtaoOverrides->m_TemporalMaxSamples == 24u && gtaoOverrides->m_DirectionCount == 1u &&
 				gtaoOverrides->m_StepCount == 8u,
@@ -287,8 +280,7 @@ namespace gglab
 			bool allRejected = true;
 			for (const Rejected& entry : rejected)
 			{
-				const ApplicationControlParseResult parsed =
-					ParseApplicationControlRequest(entry.m_Line);
+				const ApplicationControlParseResult parsed = ParseApplicationControlRequest(entry.m_Line);
 				allRejected = allRejected && !parsed.m_Request && !parsed.m_Error.empty() &&
 					parsed.m_Id == entry.m_Id;
 			}
@@ -357,7 +349,7 @@ namespace gglab
 				.m_UnfinishedCaptures = 2,
 				.m_SettledFrames = 5,
 				.m_Frame = &frame,
-				});
+			});
 			context.Check(Contains(status, R"("ok":true)") && Contains(status, R"("pid":99)") &&
 				Contains(status, R"("labId":"gglab.lab.culling")") &&
 				Contains(status, R"("ready":false)") && Contains(status, R"("settledFrames":5)") &&
@@ -390,7 +382,7 @@ namespace gglab
 			const std::string statusWithSequence = SerializeApplicationControlStatus(11, {
 				.m_SessionId = "s1",
 				.m_Sequence = &sequenceStatus,
-				});
+			});
 			context.Check(Contains(sequenceJson, R"("state":"failed")") &&
 				Contains(sequenceJson, R"("path":"SEQ_DollyDoorway")") &&
 				Contains(sequenceJson, R"("frameCount":180)") &&
@@ -424,7 +416,7 @@ namespace gglab
 				.m_RequestId = 13,
 				.m_Status = FrameCaptureRequestStatus::Failed,
 				.m_Failure = "Device lost.",
-				});
+			});
 			context.Check(Contains(completedJson, R"("status":"completed")") &&
 				Contains(completedJson, R"("image":"D:/captures/a.png")") &&
 				Contains(completedJson, R"("frameSerial":77)") &&
@@ -435,15 +427,13 @@ namespace gglab
 				"Capture results, queued captures and stop acknowledgements serialize their status");
 		}
 
-		[[nodiscard]] std::optional<std::string> SendPipeLine(
-			const std::wstring& pipeName, std::string_view line) noexcept
+		[[nodiscard]] std::optional<std::string> SendPipeLine(const std::wstring& pipeName, std::string_view line) noexcept
 		{
 			HANDLE pipe = INVALID_HANDLE_VALUE;
 			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 			while (pipe == INVALID_HANDLE_VALUE && std::chrono::steady_clock::now() < deadline)
 			{
-				pipe = ::CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-					OPEN_EXISTING, 0, nullptr);
+				pipe = ::CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
 				if (pipe == INVALID_HANDLE_VALUE)
 				{
 					::WaitNamedPipeW(pipeName.c_str(), 100);
@@ -457,8 +447,7 @@ namespace gglab
 			request.push_back('\n');
 			DWORD bytes = 0;
 			std::string response;
-			if (::WriteFile(pipe, request.data(), static_cast<DWORD>(request.size()), &bytes,
-				nullptr))
+			if (::WriteFile(pipe, request.data(), static_cast<DWORD>(request.size()), &bytes, nullptr))
 			{
 				char buffer[512];
 				while (::ReadFile(pipe, buffer, sizeof(buffer), &bytes, nullptr) && bytes > 0)
@@ -532,15 +521,13 @@ namespace gglab
 			}
 			// A client that never reads its response and keeps the pipe open holds
 			// its connection only until the client close timeout.
-			HANDLE silent = ::CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0,
-				nullptr, OPEN_EXISTING, 0, nullptr);
+			HANDLE silent = ::CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
 			bool silentAnswered = false;
 			if (silent != INVALID_HANDLE_VALUE)
 			{
 				constexpr std::string_view silentRequest = "silent\n";
 				DWORD bytes = 0;
-				::WriteFile(silent, silentRequest.data(), static_cast<DWORD>(silentRequest.size()),
-					&bytes, nullptr);
+				::WriteFile(silent, silentRequest.data(), static_cast<DWORD>(silentRequest.size()), &bytes, nullptr);
 				const auto silentDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 				while (!silentAnswered && std::chrono::steady_clock::now() < silentDeadline)
 				{
