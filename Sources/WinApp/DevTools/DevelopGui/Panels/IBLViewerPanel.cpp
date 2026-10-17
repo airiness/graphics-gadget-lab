@@ -471,84 +471,84 @@ namespace gglab
 		auto* previewControl = context.m_IBLPreviewControl;
 
 		const auto drawBrdfLut = [&]() noexcept
-		{
-			const auto* brdfLutDesc = GetAllocatedTexture(resources.m_BrdfLut);
-			if (!brdfLutDesc)
 			{
-				ImGui::TextColored(
-					devtools::style::ErrorTextColor, "BRDF LUT texture is not allocated.");
-				return;
-			}
-			DrawBakeState(resources.m_BrdfLut.m_BakeState);
-
-			ImGui::Checkbox("Show Metadata", &state.m_ShowMetadata);
-
-			if (state.m_ShowMetadata)
-			{
-				const uint32_t srvIndex = resources.m_BrdfLut.m_ShaderVisibleSrvIndex;
-
-				ImGui::Text("Size: %llu x %u",
-					static_cast<unsigned long long>(brdfLutDesc->m_Width),
-					brdfLutDesc->m_Height);
-
-				ImGui::Text("MipLevels: %u", brdfLutDesc->m_MipLevels);
-				ImGui::Text(
-					"Format: %s", devtools::EnumText(brdfLutDesc->m_Format).data());
-				ImGui::Text("Shader Visible SRV Index: %u", srvIndex);
-			}
-
-			ImGui::Separator();
-
-			ImGui::SliderFloat("Preview Size", &state.m_BrdfLutPreviewSize, 64.0f, 512.0f, "%.0f");
-
-			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
-
-			const ImTextureID textureId = devtools::ResolveImGuiTextureId(
-				context.m_DevelopGuiSystem, resources.m_BrdfLut.m_SrvDescriptor);
-
-			if (!textureId)
-			{
-				ImGui::TextColored(
-					devtools::style::ErrorTextColor, "BRDF LUT SRV GPU handle is invalid.");
-				return;
-			}
-
-			const float previewSize = std::clamp(state.m_BrdfLutPreviewSize, 16.0f, 2048.0f);
-			const ImVec2 imageSize(previewSize, previewSize);
-
-			const ImVec2 uv0 = state.m_FlipPreviewY ? ImVec2(0.0f, 1.0f) : ImVec2(0.0f, 0.0f);
-
-			const ImVec2 uv1 = state.m_FlipPreviewY ? ImVec2(1.0f, 0.0f) : ImVec2(1.0f, 1.0f);
-
-			ImGui::TextUnformatted("Preview");
-			ImGui::Image(textureId, imageSize, uv0, uv1);
-
-			ImVec2 imageMin = ImGui::GetItemRectMin();
-			ImVec2 imageMax = ImGui::GetItemRectMax();
-
-			if (ImGui::IsItemHovered())
-			{
-				ImVec2 mouse = ImGui::GetMousePos();
-
-				float u = (mouse.x - imageMin.x) / (imageMax.x - imageMin.x);
-				float v = (mouse.y - imageMin.y) / (imageMax.y - imageMin.y);
-
-				u = std::clamp(u, 0.0f, 1.0f);
-				v = std::clamp(v, 0.0f, 1.0f);
-
-				if (state.m_FlipPreviewY)
+				const auto* brdfLutDesc = GetAllocatedTexture(resources.m_BrdfLut);
+				if (!brdfLutDesc)
 				{
-					v = 1.0f - v;
+					ImGui::TextColored(
+						devtools::style::ErrorTextColor, "BRDF LUT texture is not allocated.");
+					return;
+				}
+				DrawBakeState(resources.m_BrdfLut.m_BakeState);
+
+				ImGui::Checkbox("Show Metadata", &state.m_ShowMetadata);
+
+				if (state.m_ShowMetadata)
+				{
+					const uint32_t srvIndex = resources.m_BrdfLut.m_ShaderVisibleSrvIndex;
+
+					ImGui::Text("Size: %llu x %u",
+						static_cast<unsigned long long>(brdfLutDesc->m_Width),
+						brdfLutDesc->m_Height);
+
+					ImGui::Text("MipLevels: %u", brdfLutDesc->m_MipLevels);
+					ImGui::Text(
+						"Format: %s", devtools::EnumText(brdfLutDesc->m_Format).data());
+					ImGui::Text("Shader Visible SRV Index: %u", srvIndex);
 				}
 
-				ImGui::BeginTooltip();
-				ImGui::Text("NoV: %.3f", u);
-				ImGui::Text("Perceptual Roughness: %.3f", v);
-				ImGui::EndTooltip();
-			}
+				ImGui::Separator();
 
-			ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
-		};
+				ImGui::SliderFloat("Preview Size", &state.m_BrdfLutPreviewSize, 64.0f, 512.0f, "%.0f");
+
+				ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
+
+				const ImTextureID textureId = devtools::ResolveImGuiTextureId(
+					context.m_DevelopGuiSystem, resources.m_BrdfLut.m_SrvDescriptor);
+
+				if (!textureId)
+				{
+					ImGui::TextColored(
+						devtools::style::ErrorTextColor, "BRDF LUT SRV GPU handle is invalid.");
+					return;
+				}
+
+				const float previewSize = std::clamp(state.m_BrdfLutPreviewSize, 16.0f, 2048.0f);
+				const ImVec2 imageSize(previewSize, previewSize);
+
+				const ImVec2 uv0 = state.m_FlipPreviewY ? ImVec2(0.0f, 1.0f) : ImVec2(0.0f, 0.0f);
+
+				const ImVec2 uv1 = state.m_FlipPreviewY ? ImVec2(1.0f, 0.0f) : ImVec2(1.0f, 1.0f);
+
+				ImGui::TextUnformatted("Preview");
+				ImGui::Image(textureId, imageSize, uv0, uv1);
+
+				ImVec2 imageMin = ImGui::GetItemRectMin();
+				ImVec2 imageMax = ImGui::GetItemRectMax();
+
+				if (ImGui::IsItemHovered())
+				{
+					ImVec2 mouse = ImGui::GetMousePos();
+
+					float u = (mouse.x - imageMin.x) / (imageMax.x - imageMin.x);
+					float v = (mouse.y - imageMin.y) / (imageMax.y - imageMin.y);
+
+					u = std::clamp(u, 0.0f, 1.0f);
+					v = std::clamp(v, 0.0f, 1.0f);
+
+					if (state.m_FlipPreviewY)
+					{
+						v = 1.0f - v;
+					}
+
+					ImGui::BeginTooltip();
+					ImGui::Text("NoV: %.3f", u);
+					ImGui::Text("Perceptual Roughness: %.3f", v);
+					ImGui::EndTooltip();
+				}
+
+				ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
+			};
 		if (ImGui::CollapsingHeader("IBL BRDF LUT"))
 		{
 			drawBrdfLut();
@@ -559,134 +559,134 @@ namespace gglab
 			GetAllocatedTexture(resources.m_EnvironmentPreview.m_Texture);
 
 		const auto drawEnvironmentPreview = [&]() noexcept
-		{
-			if (previewControl)
 			{
-				previewControl->RequestIBLPreview(IBLPreviewType::Environment);
-			}
-			DrawBakeState(resources.m_Environment.m_BakeState);
+				if (previewControl)
+				{
+					previewControl->RequestIBLPreview(IBLPreviewType::Environment);
+				}
+				DrawBakeState(resources.m_Environment.m_BakeState);
 
-			if (!environmentDesc || !environmentPreviewDesc)
-			{
-				ImGui::TextColored(devtools::style::ErrorTextColor,
-					"Environment preview texture is not allocated.");
-				return;
-			}
+				if (!environmentDesc || !environmentPreviewDesc)
+				{
+					ImGui::TextColored(devtools::style::ErrorTextColor,
+						"Environment preview texture is not allocated.");
+					return;
+				}
 
-			using PreviewLayout = IBLPreviewLayout;
-			PreviewLayout previewLayout =
-				static_cast<IBLPreviewLayout>(resources.m_EnvironmentPreview.m_Layout);
-			ImGui::BeginDisabled(!previewControl);
-			if (DrawPreviewLayoutCombo("Display Mode##EnvironmentPreviewLayout", previewLayout) &&
-				previewControl)
-			{
-				previewControl->SetIBLEnvironmentPreviewLayout(previewLayout);
-			}
-			ImGui::EndDisabled();
+				using PreviewLayout = IBLPreviewLayout;
+				PreviewLayout previewLayout =
+					static_cast<IBLPreviewLayout>(resources.m_EnvironmentPreview.m_Layout);
+				ImGui::BeginDisabled(!previewControl);
+				if (DrawPreviewLayoutCombo("Display Mode##EnvironmentPreviewLayout", previewLayout) &&
+					previewControl)
+				{
+					previewControl->SetIBLEnvironmentPreviewLayout(previewLayout);
+				}
+				ImGui::EndDisabled();
 
-			const uint32_t environmentMipLevels = environmentDesc->m_MipLevels;
-			const uint32_t maxEnvironmentMip =
-				environmentMipLevels > 0 ? environmentMipLevels - 1u : 0u;
-			uint32_t selectedEnvironmentMip =
-				std::min(resources.m_EnvironmentPreview.m_SelectedMip, maxEnvironmentMip);
-			if (selectedEnvironmentMip != resources.m_EnvironmentPreview.m_SelectedMip &&
-				previewControl)
-			{
-				previewControl->SetIBLEnvironmentPreviewMip(selectedEnvironmentMip);
-			}
+				const uint32_t environmentMipLevels = environmentDesc->m_MipLevels;
+				const uint32_t maxEnvironmentMip =
+					environmentMipLevels > 0 ? environmentMipLevels - 1u : 0u;
+				uint32_t selectedEnvironmentMip =
+					std::min(resources.m_EnvironmentPreview.m_SelectedMip, maxEnvironmentMip);
+				if (selectedEnvironmentMip != resources.m_EnvironmentPreview.m_SelectedMip &&
+					previewControl)
+				{
+					previewControl->SetIBLEnvironmentPreviewMip(selectedEnvironmentMip);
+				}
 
-			int selectedEnvironmentMipInt = static_cast<int>(selectedEnvironmentMip);
-			ImGui::BeginDisabled(!previewControl);
-			if (ImGui::SliderInt("Source Mip", &selectedEnvironmentMipInt, 0,
-				static_cast<int>(maxEnvironmentMip)) && previewControl)
-			{
-				selectedEnvironmentMip = static_cast<uint32_t>(
-					std::clamp(selectedEnvironmentMipInt, 0, static_cast<int>(maxEnvironmentMip)));
-				previewControl->SetIBLEnvironmentPreviewMip(selectedEnvironmentMip);
-			}
-			ImGui::EndDisabled();
+				int selectedEnvironmentMipInt = static_cast<int>(selectedEnvironmentMip);
+				ImGui::BeginDisabled(!previewControl);
+				if (ImGui::SliderInt("Source Mip", &selectedEnvironmentMipInt, 0,
+					static_cast<int>(maxEnvironmentMip)) && previewControl)
+				{
+					selectedEnvironmentMip = static_cast<uint32_t>(
+						std::clamp(selectedEnvironmentMipInt, 0, static_cast<int>(maxEnvironmentMip)));
+					previewControl->SetIBLEnvironmentPreviewMip(selectedEnvironmentMip);
+				}
+				ImGui::EndDisabled();
 
-			const uint64_t selectedEnvironmentWidth =
-				std::max<uint64_t>(1u, environmentDesc->m_Width >> selectedEnvironmentMip);
-			const uint32_t selectedEnvironmentHeight =
-				std::max(1u, environmentDesc->m_Height >> selectedEnvironmentMip);
-			ImGui::Text("Selected Source Mip: %u / %u (%llu x %u)", selectedEnvironmentMip,
-				maxEnvironmentMip, static_cast<unsigned long long>(selectedEnvironmentWidth),
-				selectedEnvironmentHeight);
+				const uint64_t selectedEnvironmentWidth =
+					std::max<uint64_t>(1u, environmentDesc->m_Width >> selectedEnvironmentMip);
+				const uint32_t selectedEnvironmentHeight =
+					std::max(1u, environmentDesc->m_Height >> selectedEnvironmentMip);
+				ImGui::Text("Selected Source Mip: %u / %u (%llu x %u)", selectedEnvironmentMip,
+					maxEnvironmentMip, static_cast<unsigned long long>(selectedEnvironmentWidth),
+					selectedEnvironmentHeight);
 
-			if (state.m_ShowMetadata)
-			{
-				const uint32_t environmentSrvIndex =
-					resources.m_Environment.m_ShaderVisibleSrvIndex;
-				const uint32_t previewSrvIndex =
-					resources.m_EnvironmentPreview.m_Texture.m_ShaderVisibleSrvIndex;
+				if (state.m_ShowMetadata)
+				{
+					const uint32_t environmentSrvIndex =
+						resources.m_Environment.m_ShaderVisibleSrvIndex;
+					const uint32_t previewSrvIndex =
+						resources.m_EnvironmentPreview.m_Texture.m_ShaderVisibleSrvIndex;
 
-				ImGui::Text("Environment Size: %llu x %u x %u",
-					static_cast<unsigned long long>(environmentDesc->m_Width),
-					environmentDesc->m_Height, environmentDesc->m_ArraySize);
-				ImGui::Text("Environment Format: %s",
-					devtools::EnumText(environmentDesc->m_Format).data());
-				ImGui::Text("Environment MipLevels: %u", environmentMipLevels);
-				ImGui::Text("Environment Shader Visible SRV Index: %u", environmentSrvIndex);
+					ImGui::Text("Environment Size: %llu x %u x %u",
+						static_cast<unsigned long long>(environmentDesc->m_Width),
+						environmentDesc->m_Height, environmentDesc->m_ArraySize);
+					ImGui::Text("Environment Format: %s",
+						devtools::EnumText(environmentDesc->m_Format).data());
+					ImGui::Text("Environment MipLevels: %u", environmentMipLevels);
+					ImGui::Text("Environment Shader Visible SRV Index: %u", environmentSrvIndex);
 
-				ImGui::Text("Preview Canvas Size: %llu x %u",
-					static_cast<unsigned long long>(environmentPreviewDesc->m_Width),
-					environmentPreviewDesc->m_Height);
-				ImGui::Text("Preview Format: %s",
-					devtools::EnumText(environmentPreviewDesc->m_Format).data());
-				ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
-			}
+					ImGui::Text("Preview Canvas Size: %llu x %u",
+						static_cast<unsigned long long>(environmentPreviewDesc->m_Width),
+						environmentPreviewDesc->m_Height);
+					ImGui::Text("Preview Format: %s",
+						devtools::EnumText(environmentPreviewDesc->m_Format).data());
+					ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
+				}
 
-			ImGui::SliderFloat("Environment Preview Width", &state.m_EnvironmentPreviewWidth,
-				192.0f, 768.0f, "%.0f");
+				ImGui::SliderFloat("Environment Preview Width", &state.m_EnvironmentPreviewWidth,
+					192.0f, 768.0f, "%.0f");
 
-			const ImTextureID environmentPreviewTextureId =
-				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
-					resources.m_EnvironmentPreview.m_Texture.m_SrvDescriptor);
+				const ImTextureID environmentPreviewTextureId =
+					devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
+						resources.m_EnvironmentPreview.m_Texture.m_SrvDescriptor);
 
-			if (!environmentPreviewTextureId)
-			{
-				ImGui::TextColored(devtools::style::ErrorTextColor,
-					"Environment preview SRV GPU handle is invalid.");
-				return;
-			}
+				if (!environmentPreviewTextureId)
+				{
+					ImGui::TextColored(devtools::style::ErrorTextColor,
+						"Environment preview SRV GPU handle is invalid.");
+					return;
+				}
 
-			const float environmentPreviewWidth =
-				std::clamp(state.m_EnvironmentPreviewWidth, 16.0f, 2048.0f);
+				const float environmentPreviewWidth =
+					std::clamp(state.m_EnvironmentPreviewWidth, 16.0f, 2048.0f);
 
-			ImVec2 uv0(0.0f, 0.0f);
-			ImVec2 uv1(1.0f, 1.0f);
-			float aspect = 3.0f / 4.0f;
-			const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
+				ImVec2 uv0(0.0f, 0.0f);
+				ImVec2 uv1(1.0f, 1.0f);
+				float aspect = 3.0f / 4.0f;
+				const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
 
-			if (previewLayout == PreviewLayout::Grid2x3)
-			{
-				uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
-				aspect = 2.0f / 3.0f;
-				layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
-			}
+				if (previewLayout == PreviewLayout::Grid2x3)
+				{
+					uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
+					aspect = 2.0f / 3.0f;
+					layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
+				}
 
-			const ImVec2 environmentImageSize(
-				environmentPreviewWidth, environmentPreviewWidth * aspect);
+				const ImVec2 environmentImageSize(
+					environmentPreviewWidth, environmentPreviewWidth * aspect);
 
-			ImGui::TextUnformatted(layoutHint);
-			if (resources.m_EnvironmentPreview.m_UpdateCount > 0)
-			{
-				ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
-			}
-			else
-			{
-				ImGui::TextDisabled(previewControl
-					? "Preview requested; it will be available next frame."
-					: "Preview has not been generated; preview control is unavailable.");
-			}
-			{
-				const auto& preview = resources.m_EnvironmentPreview;
-				ImGui::TextDisabled("Preview updates: %llu%s",
-					static_cast<unsigned long long>(preview.m_UpdateCount),
-					preview.m_Dirty ? " (refresh pending)" : "");
-			}
-		};
+				ImGui::TextUnformatted(layoutHint);
+				if (resources.m_EnvironmentPreview.m_UpdateCount > 0)
+				{
+					ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
+				}
+				else
+				{
+					ImGui::TextDisabled(previewControl
+						? "Preview requested; it will be available next frame."
+						: "Preview has not been generated; preview control is unavailable.");
+				}
+				{
+					const auto& preview = resources.m_EnvironmentPreview;
+					ImGui::TextDisabled("Preview updates: %llu%s",
+						static_cast<unsigned long long>(preview.m_UpdateCount),
+						preview.m_Dirty ? " (refresh pending)" : "");
+				}
+			};
 		if (ImGui::CollapsingHeader("Environment Preview", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			drawEnvironmentPreview();
@@ -696,83 +696,83 @@ namespace gglab
 		const auto* irradiancePreviewDesc =
 			GetAllocatedTexture(resources.m_IrradiancePreview.m_Texture);
 		const auto drawIrradiancePreview = [&]() noexcept
-		{
-			if (previewControl)
 			{
-				previewControl->RequestIBLPreview(IBLPreviewType::Irradiance);
-			}
-			DrawBakeState(resources.m_Irradiance.m_BakeState);
+				if (previewControl)
+				{
+					previewControl->RequestIBLPreview(IBLPreviewType::Irradiance);
+				}
+				DrawBakeState(resources.m_Irradiance.m_BakeState);
 
-			if (!irradianceDesc || !irradiancePreviewDesc)
-			{
-				ImGui::TextColored(devtools::style::ErrorTextColor,
-					"Irradiance preview texture is not allocated.");
-				return;
-			}
+				if (!irradianceDesc || !irradiancePreviewDesc)
+				{
+					ImGui::TextColored(devtools::style::ErrorTextColor,
+						"Irradiance preview texture is not allocated.");
+					return;
+				}
 
-			using PreviewLayout = IBLPreviewLayout;
-			PreviewLayout previewLayout =
-				static_cast<IBLPreviewLayout>(resources.m_IrradiancePreview.m_Layout);
-			ImGui::BeginDisabled(!previewControl);
-			if (DrawPreviewLayoutCombo("Display Mode##IrradiancePreviewLayout", previewLayout) &&
-				previewControl)
-			{
-				previewControl->SetIBLIrradiancePreviewLayout(previewLayout);
-			}
-			ImGui::EndDisabled();
+				using PreviewLayout = IBLPreviewLayout;
+				PreviewLayout previewLayout =
+					static_cast<IBLPreviewLayout>(resources.m_IrradiancePreview.m_Layout);
+				ImGui::BeginDisabled(!previewControl);
+				if (DrawPreviewLayoutCombo("Display Mode##IrradiancePreviewLayout", previewLayout) &&
+					previewControl)
+				{
+					previewControl->SetIBLIrradiancePreviewLayout(previewLayout);
+				}
+				ImGui::EndDisabled();
 
-			if (state.m_ShowMetadata)
-			{
-				ImGui::Text("Cubemap Size: %llu x %u x %u",
-					static_cast<unsigned long long>(irradianceDesc->m_Width),
-					irradianceDesc->m_Height, irradianceDesc->m_ArraySize);
-				ImGui::Text("Cubemap Format: %s",
-					devtools::EnumText(irradianceDesc->m_Format).data());
-				ImGui::Text("Cubemap Shader Visible SRV Index: %u",
-					resources.m_Irradiance.m_ShaderVisibleSrvIndex);
-			}
+				if (state.m_ShowMetadata)
+				{
+					ImGui::Text("Cubemap Size: %llu x %u x %u",
+						static_cast<unsigned long long>(irradianceDesc->m_Width),
+						irradianceDesc->m_Height, irradianceDesc->m_ArraySize);
+					ImGui::Text("Cubemap Format: %s",
+						devtools::EnumText(irradianceDesc->m_Format).data());
+					ImGui::Text("Cubemap Shader Visible SRV Index: %u",
+						resources.m_Irradiance.m_ShaderVisibleSrvIndex);
+				}
 
-			ImGui::SliderFloat("Irradiance Preview Width", &state.m_IrradiancePreviewWidth, 192.0f,
-				768.0f, "%.0f");
-			const ImTextureID previewTextureId =
-				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
-					resources.m_IrradiancePreview.m_Texture.m_SrvDescriptor);
-			if (!previewTextureId)
-			{
-				ImGui::TextColored(
-					devtools::style::ErrorTextColor, "Irradiance preview SRV is invalid.");
-				return;
-			}
+				ImGui::SliderFloat("Irradiance Preview Width", &state.m_IrradiancePreviewWidth, 192.0f,
+					768.0f, "%.0f");
+				const ImTextureID previewTextureId =
+					devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
+						resources.m_IrradiancePreview.m_Texture.m_SrvDescriptor);
+				if (!previewTextureId)
+				{
+					ImGui::TextColored(
+						devtools::style::ErrorTextColor, "Irradiance preview SRV is invalid.");
+					return;
+				}
 
-			const float previewWidth = std::clamp(state.m_IrradiancePreviewWidth, 16.0f, 2048.0f);
-			ImVec2 uv1(1.0f, 1.0f);
-			float aspect = 3.0f / 4.0f;
-			const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
-			if (previewLayout == PreviewLayout::Grid2x3)
-			{
-				uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
-				aspect = 2.0f / 3.0f;
-				layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
-			}
-			ImGui::TextUnformatted(layoutHint);
-			if (resources.m_IrradiancePreview.m_UpdateCount > 0)
-			{
-				ImGui::Image(previewTextureId, ImVec2(previewWidth, previewWidth * aspect),
-					ImVec2(0.0f, 0.0f), uv1);
-			}
-			else
-			{
-				ImGui::TextDisabled(previewControl
-					? "Preview requested; it will be available next frame."
-					: "Preview has not been generated; preview control is unavailable.");
-			}
-			{
-				const auto& preview = resources.m_IrradiancePreview;
-				ImGui::TextDisabled("Preview updates: %llu%s",
-					static_cast<unsigned long long>(preview.m_UpdateCount),
-					preview.m_Dirty ? " (refresh pending)" : "");
-			}
-		};
+				const float previewWidth = std::clamp(state.m_IrradiancePreviewWidth, 16.0f, 2048.0f);
+				ImVec2 uv1(1.0f, 1.0f);
+				float aspect = 3.0f / 4.0f;
+				const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
+				if (previewLayout == PreviewLayout::Grid2x3)
+				{
+					uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
+					aspect = 2.0f / 3.0f;
+					layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
+				}
+				ImGui::TextUnformatted(layoutHint);
+				if (resources.m_IrradiancePreview.m_UpdateCount > 0)
+				{
+					ImGui::Image(previewTextureId, ImVec2(previewWidth, previewWidth * aspect),
+						ImVec2(0.0f, 0.0f), uv1);
+				}
+				else
+				{
+					ImGui::TextDisabled(previewControl
+						? "Preview requested; it will be available next frame."
+						: "Preview has not been generated; preview control is unavailable.");
+				}
+				{
+					const auto& preview = resources.m_IrradiancePreview;
+					ImGui::TextDisabled("Preview updates: %llu%s",
+						static_cast<unsigned long long>(preview.m_UpdateCount),
+						preview.m_Dirty ? " (refresh pending)" : "");
+				}
+			};
 		if (ImGui::CollapsingHeader("IBL Irradiance"))
 		{
 			drawIrradiancePreview();
@@ -784,135 +784,135 @@ namespace gglab
 			GetAllocatedTexture(resources.m_PrefilteredSpecularPreview.m_Texture);
 
 		const auto drawPrefilteredSpecularPreview = [&]() noexcept
-		{
-			if (previewControl)
 			{
-				previewControl->RequestIBLPreview(IBLPreviewType::PrefilteredSpecular);
-			}
-			DrawBakeState(resources.m_PrefilteredSpecular.m_BakeState);
+				if (previewControl)
+				{
+					previewControl->RequestIBLPreview(IBLPreviewType::PrefilteredSpecular);
+				}
+				DrawBakeState(resources.m_PrefilteredSpecular.m_BakeState);
 
-			if (!prefilteredSpecularDesc || !prefilteredSpecularPreviewDesc)
-			{
-				ImGui::TextColored(devtools::style::ErrorTextColor,
-					"Prefiltered specular preview texture is not allocated.");
-				return;
-			}
+				if (!prefilteredSpecularDesc || !prefilteredSpecularPreviewDesc)
+				{
+					ImGui::TextColored(devtools::style::ErrorTextColor,
+						"Prefiltered specular preview texture is not allocated.");
+					return;
+				}
 
-			const uint32_t mipLevels = prefilteredSpecularDesc->m_MipLevels;
-			const uint32_t maxMip = mipLevels > 0 ? mipLevels - 1u : 0u;
+				const uint32_t mipLevels = prefilteredSpecularDesc->m_MipLevels;
+				const uint32_t maxMip = mipLevels > 0 ? mipLevels - 1u : 0u;
 
-			uint32_t selectedMip =
-				std::min(resources.m_PrefilteredSpecularPreview.m_SelectedMip, maxMip);
-			if (selectedMip != resources.m_PrefilteredSpecularPreview.m_SelectedMip && previewControl)
-			{
-				previewControl->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
-			}
+				uint32_t selectedMip =
+					std::min(resources.m_PrefilteredSpecularPreview.m_SelectedMip, maxMip);
+				if (selectedMip != resources.m_PrefilteredSpecularPreview.m_SelectedMip && previewControl)
+				{
+					previewControl->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
+				}
 
-			int selectedMipInt = static_cast<int>(selectedMip);
-			ImGui::BeginDisabled(!previewControl);
-			if (ImGui::SliderInt("Output Mip", &selectedMipInt, 0, static_cast<int>(maxMip)) &&
-				previewControl)
-			{
-				selectedMip =
-					static_cast<uint32_t>(std::clamp(selectedMipInt, 0, static_cast<int>(maxMip)));
-				previewControl->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
-			}
-			ImGui::EndDisabled();
+				int selectedMipInt = static_cast<int>(selectedMip);
+				ImGui::BeginDisabled(!previewControl);
+				if (ImGui::SliderInt("Output Mip", &selectedMipInt, 0, static_cast<int>(maxMip)) &&
+					previewControl)
+				{
+					selectedMip =
+						static_cast<uint32_t>(std::clamp(selectedMipInt, 0, static_cast<int>(maxMip)));
+					previewControl->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
+				}
+				ImGui::EndDisabled();
 
-			const float roughness =
-				maxMip > 0 ? static_cast<float>(selectedMip) / static_cast<float>(maxMip) : 0.0f;
-			const float alpha = roughness * roughness;
-			ImGui::Text("Selected Output Mip: %u / %u", selectedMip, maxMip);
-			ImGui::Text("Perceptual Roughness: %.3f", roughness);
-			ImGui::Text("GGX Alpha: %.3f", alpha);
+				const float roughness =
+					maxMip > 0 ? static_cast<float>(selectedMip) / static_cast<float>(maxMip) : 0.0f;
+				const float alpha = roughness * roughness;
+				ImGui::Text("Selected Output Mip: %u / %u", selectedMip, maxMip);
+				ImGui::Text("Perceptual Roughness: %.3f", roughness);
+				ImGui::Text("GGX Alpha: %.3f", alpha);
 
-			using PreviewLayout = IBLPreviewLayout;
-			PreviewLayout previewLayout =
-				static_cast<IBLPreviewLayout>(resources.m_PrefilteredSpecularPreview.m_Layout);
-			ImGui::BeginDisabled(!previewControl);
-			if (DrawPreviewLayoutCombo(
-				"Display Mode##PrefilteredSpecularPreviewLayout", previewLayout) && previewControl)
-			{
-				previewControl->SetIBLPrefilteredSpecularPreviewLayout(previewLayout);
-			}
-			ImGui::EndDisabled();
+				using PreviewLayout = IBLPreviewLayout;
+				PreviewLayout previewLayout =
+					static_cast<IBLPreviewLayout>(resources.m_PrefilteredSpecularPreview.m_Layout);
+				ImGui::BeginDisabled(!previewControl);
+				if (DrawPreviewLayoutCombo(
+					"Display Mode##PrefilteredSpecularPreviewLayout", previewLayout) && previewControl)
+				{
+					previewControl->SetIBLPrefilteredSpecularPreviewLayout(previewLayout);
+				}
+				ImGui::EndDisabled();
 
-			if (state.m_ShowMetadata)
-			{
-				const uint32_t prefilteredSpecularSrvIndex =
-					resources.m_PrefilteredSpecular.m_ShaderVisibleSrvIndex;
-				const uint32_t previewSrvIndex =
-					resources.m_PrefilteredSpecularPreview.m_Texture.m_ShaderVisibleSrvIndex;
+				if (state.m_ShowMetadata)
+				{
+					const uint32_t prefilteredSpecularSrvIndex =
+						resources.m_PrefilteredSpecular.m_ShaderVisibleSrvIndex;
+					const uint32_t previewSrvIndex =
+						resources.m_PrefilteredSpecularPreview.m_Texture.m_ShaderVisibleSrvIndex;
 
-				ImGui::Text("Cubemap Size: %llu x %u x %u",
-					static_cast<unsigned long long>(prefilteredSpecularDesc->m_Width),
-					prefilteredSpecularDesc->m_Height,
-					prefilteredSpecularDesc->m_ArraySize);
-				ImGui::Text("Cubemap MipLevels: %u", mipLevels);
-				ImGui::Text("Cubemap Format: %s",
-					devtools::EnumText(prefilteredSpecularDesc->m_Format).data());
-				ImGui::Text("Cubemap Shader Visible SRV Index: %u", prefilteredSpecularSrvIndex);
+					ImGui::Text("Cubemap Size: %llu x %u x %u",
+						static_cast<unsigned long long>(prefilteredSpecularDesc->m_Width),
+						prefilteredSpecularDesc->m_Height,
+						prefilteredSpecularDesc->m_ArraySize);
+					ImGui::Text("Cubemap MipLevels: %u", mipLevels);
+					ImGui::Text("Cubemap Format: %s",
+						devtools::EnumText(prefilteredSpecularDesc->m_Format).data());
+					ImGui::Text("Cubemap Shader Visible SRV Index: %u", prefilteredSpecularSrvIndex);
 
-				ImGui::Text("Preview Canvas Size: %llu x %u",
-					static_cast<unsigned long long>(
-						prefilteredSpecularPreviewDesc->m_Width),
-					prefilteredSpecularPreviewDesc->m_Height);
-				ImGui::Text("Preview Format: %s",
-					devtools::EnumText(prefilteredSpecularPreviewDesc->m_Format).data());
-				ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
-			}
+					ImGui::Text("Preview Canvas Size: %llu x %u",
+						static_cast<unsigned long long>(
+							prefilteredSpecularPreviewDesc->m_Width),
+						prefilteredSpecularPreviewDesc->m_Height);
+					ImGui::Text("Preview Format: %s",
+						devtools::EnumText(prefilteredSpecularPreviewDesc->m_Format).data());
+					ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
+				}
 
-			ImGui::SliderFloat("Prefiltered Specular Preview Width",
-				&state.m_PrefilteredSpecularPreviewWidth, 192.0f, 768.0f, "%.0f");
+				ImGui::SliderFloat("Prefiltered Specular Preview Width",
+					&state.m_PrefilteredSpecularPreviewWidth, 192.0f, 768.0f, "%.0f");
 
-			const ImTextureID prefilteredSpecularPreviewTextureId =
-				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
-					resources.m_PrefilteredSpecularPreview.m_Texture.m_SrvDescriptor);
+				const ImTextureID prefilteredSpecularPreviewTextureId =
+					devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
+						resources.m_PrefilteredSpecularPreview.m_Texture.m_SrvDescriptor);
 
-			if (!prefilteredSpecularPreviewTextureId)
-			{
-				ImGui::TextColored(devtools::style::ErrorTextColor,
-					"Prefiltered specular preview SRV GPU handle is invalid.");
-				return;
-			}
+				if (!prefilteredSpecularPreviewTextureId)
+				{
+					ImGui::TextColored(devtools::style::ErrorTextColor,
+						"Prefiltered specular preview SRV GPU handle is invalid.");
+					return;
+				}
 
-			const float prefilteredSpecularPreviewWidth =
-				std::clamp(state.m_PrefilteredSpecularPreviewWidth, 16.0f, 2048.0f);
+				const float prefilteredSpecularPreviewWidth =
+					std::clamp(state.m_PrefilteredSpecularPreviewWidth, 16.0f, 2048.0f);
 
-			ImVec2 uv0(0.0f, 0.0f);
-			ImVec2 uv1(1.0f, 1.0f);
-			float aspect = 3.0f / 4.0f;
-			const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
+				ImVec2 uv0(0.0f, 0.0f);
+				ImVec2 uv1(1.0f, 1.0f);
+				float aspect = 3.0f / 4.0f;
+				const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
 
-			if (previewLayout == IBLPreviewLayout::Grid2x3)
-			{
-				uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
-				aspect = 2.0f / 3.0f;
-				layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
-			}
+				if (previewLayout == IBLPreviewLayout::Grid2x3)
+				{
+					uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
+					aspect = 2.0f / 3.0f;
+					layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
+				}
 
-			const ImVec2 prefilteredSpecularImageSize(
-				prefilteredSpecularPreviewWidth, prefilteredSpecularPreviewWidth * aspect);
+				const ImVec2 prefilteredSpecularImageSize(
+					prefilteredSpecularPreviewWidth, prefilteredSpecularPreviewWidth * aspect);
 
-			ImGui::TextUnformatted(layoutHint);
-			if (resources.m_PrefilteredSpecularPreview.m_UpdateCount > 0)
-			{
-				ImGui::Image(
-					prefilteredSpecularPreviewTextureId, prefilteredSpecularImageSize, uv0, uv1);
-			}
-			else
-			{
-				ImGui::TextDisabled(previewControl
-					? "Preview requested; it will be available next frame."
-					: "Preview has not been generated; preview control is unavailable.");
-			}
-			{
-				const auto& preview = resources.m_PrefilteredSpecularPreview;
-				ImGui::TextDisabled("Preview updates: %llu%s",
-					static_cast<unsigned long long>(preview.m_UpdateCount),
-					preview.m_Dirty ? " (refresh pending)" : "");
-			}
-		};
+				ImGui::TextUnformatted(layoutHint);
+				if (resources.m_PrefilteredSpecularPreview.m_UpdateCount > 0)
+				{
+					ImGui::Image(
+						prefilteredSpecularPreviewTextureId, prefilteredSpecularImageSize, uv0, uv1);
+				}
+				else
+				{
+					ImGui::TextDisabled(previewControl
+						? "Preview requested; it will be available next frame."
+						: "Preview has not been generated; preview control is unavailable.");
+				}
+				{
+					const auto& preview = resources.m_PrefilteredSpecularPreview;
+					ImGui::TextDisabled("Preview updates: %llu%s",
+						static_cast<unsigned long long>(preview.m_UpdateCount),
+						preview.m_Dirty ? " (refresh pending)" : "");
+				}
+			};
 		if (ImGui::CollapsingHeader("IBL Prefiltered Specular"))
 		{
 			drawPrefilteredSpecularPreview();

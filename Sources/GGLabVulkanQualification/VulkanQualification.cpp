@@ -1003,16 +1003,19 @@ namespace gglab
 					}
 
 					const RHITextureDesc desc = BuildTextureRHITextureDesc(bootstrapTexture.m_Data);
-					resources.m_Textures.emplace_back(&device, device.CreateTexture({
-						.m_Desc = desc,
-						.m_InitialState = UndefinedRHITextureState(),
-						}, {
+					resources.m_Textures.emplace_back(&device, device.CreateTexture(
+						{
+							.m_Desc = desc,
+							.m_InitialState = UndefinedRHITextureState(),
+						},
+						{
 							.m_Domain = RHIResourceDebugDomain::Diagnostics,
 							.m_Category = "BootstrapTexture",
 							.m_Label = bootstrapTexture.m_Name,
-						}));
-					const RHITextureHandle bootstrapHandle =
-						resources.m_Textures.back().Get();
+						}
+						));
+
+					const RHITextureHandle bootstrapHandle = resources.m_Textures.back().Get();
 					if (!bootstrapHandle.IsValid())
 					{
 						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
@@ -1502,7 +1505,7 @@ namespace gglab
 				.m_Stage = ShaderStage::Vertex,
 				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex),
 				.m_Entry = L"VSMain",
-				.m_IncludeDirs = {L"."},
+				.m_IncludeDirs = { L"." },
 			};
 			const ShaderCompileResult compileResult = compiler.Compile(shaderDesc);
 			if (!compileResult.IsSuccess())
@@ -1785,7 +1788,7 @@ namespace gglab
 				.m_PixelShader = depthOverrideShader,
 				});
 			const RHIPipelineHandle computePipeline = pipelineSystem.CreateComputePipeline({
-				.m_Desc = {.m_BindingLayout = layoutHandle },
+				.m_Desc = { .m_BindingLayout = layoutHandle },
 				.m_ComputeShader = computeShader,
 				});
 			if (!geometryPipeline.IsValid() || !depthPipeline.IsValid() ||
@@ -1903,7 +1906,7 @@ namespace gglab
 						m_Device.DestroySampler(m_Sampler);
 					}
 				}
-			} cleanup{ device, { colorView, depthView, markerView, depthWriteProbeDsv,
+			} cleanup{ device,{ colorView, depthView, markerView, depthWriteProbeDsv,
 				depthWriteProbeSrv, depthOverrideProbeDsv, depthOverrideProbeSrv }, markerSampler };
 			const RHIDescriptorHandle markerDescriptor =
 				resources.GetTextureViewDescriptor(markerView);
@@ -1952,16 +1955,16 @@ namespace gglab
 			}
 
 			constexpr std::array vertices{
-				CoordinateVertex{{-0.9f, 0.75f, 0.5f}, {0.0f, 0.0f}},
-				CoordinateVertex{{-0.1f, -0.7f, 0.5f}, {1.0f, 1.0f}},
-				CoordinateVertex{{-0.75f, -0.55f, 0.5f}, {0.0f, 1.0f}},
-				CoordinateVertex{{0.1f, 0.75f, 0.5f}, {0.0f, 0.0f}},
-				CoordinateVertex{{0.25f, -0.55f, 0.5f}, {0.0f, 1.0f}},
-				CoordinateVertex{{0.9f, -0.7f, 0.5f}, {1.0f, 1.0f}},
-				CoordinateVertex{{-1.0f, 1.0f, 0.5f}, {0.0f, 0.0f}},
-				CoordinateVertex{{1.0f, 1.0f, 0.5f}, {1.0f, 0.0f}},
-				CoordinateVertex{{1.0f, -1.0f, 0.5f}, {1.0f, 1.0f}},
-				CoordinateVertex{{-1.0f, -1.0f, 0.5f}, {0.0f, 1.0f}},
+				CoordinateVertex{ { -0.9f, 0.75f, 0.5f },{ 0.0f, 0.0f } },
+				CoordinateVertex{ { -0.1f, -0.7f, 0.5f },{ 1.0f, 1.0f } },
+				CoordinateVertex{ { -0.75f, -0.55f, 0.5f },{ 0.0f, 1.0f } },
+				CoordinateVertex{ { 0.1f, 0.75f, 0.5f },{ 0.0f, 0.0f } },
+				CoordinateVertex{ { 0.25f, -0.55f, 0.5f },{ 0.0f, 1.0f } },
+				CoordinateVertex{ { 0.9f, -0.7f, 0.5f },{ 1.0f, 1.0f } },
+				CoordinateVertex{ { -1.0f, 1.0f, 0.5f },{ 0.0f, 0.0f } },
+				CoordinateVertex{ { 1.0f, 1.0f, 0.5f },{ 1.0f, 0.0f } },
+				CoordinateVertex{ { 1.0f, -1.0f, 0.5f },{ 1.0f, 1.0f } },
+				CoordinateVertex{ { -1.0f, -1.0f, 0.5f },{ 0.0f, 1.0f } },
 			};
 			constexpr std::array<uint32_t, 6> indices{ 0, 1, 2, 0, 2, 3 };
 			RHIBufferOwner vertexBuffer(&device, device.CreateBuffer({
@@ -2301,7 +2304,7 @@ namespace gglab
 			vkCmdPipelineBarrier2(recording.m_CommandBuffer, &depthProbeDependency);
 
 			const std::array attachments{
-				RHIRenderingAttachment{.m_View = colorView, .m_LoadOp = RHIContentLoadOp::DontCare },
+				RHIRenderingAttachment{ .m_View = colorView, .m_LoadOp = RHIContentLoadOp::DontCare },
 			};
 			const RHIRenderingAttachment depthAttachment{
 				.m_View = depthView,

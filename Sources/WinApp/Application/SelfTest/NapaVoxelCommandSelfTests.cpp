@@ -167,12 +167,12 @@ namespace gglab
 				"Visible mesh Raycast resolves a shared vertex with the same total order");
 
 			std::vector<ChunkMeshRecord> overlappingRecords{
-				MakeRaycastRecord({}, VoxelMaterial::Stone, {
+				MakeRaycastRecord({}, VoxelMaterial::Stone,{
 					Float3{ 0.0f, 0.0f, 1.0f },
 					Float3{ 1.0f, 0.0f, 1.0f },
 					Float3{ 0.0f, 1.0f, 1.0f },
 					}),
-				MakeRaycastRecord({}, VoxelMaterial::Soil, {
+				MakeRaycastRecord({}, VoxelMaterial::Soil,{
 					Float3{ 0.0f, 0.0f, 1.0f },
 					Float3{ 1.0f, 0.0f, 1.0f },
 					Float3{ 0.0f, 1.0f, 1.0f },

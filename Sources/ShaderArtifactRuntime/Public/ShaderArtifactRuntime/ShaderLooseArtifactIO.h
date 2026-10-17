@@ -22,8 +22,8 @@ namespace gglab
 	inline constexpr uintmax_t MaxSerializedShaderProgramRegistryArtifactSize =
 		SerializedShaderProgramRegistryArtifactHeaderSize +
 		static_cast<uintmax_t>(MaxShaderProgramRegistryEntryCount) *
-			(SerializedShaderProgramRegistryEntryFixedSize +
-				2u * MaxShaderProgramIdentityComponentSize);
+		(SerializedShaderProgramRegistryEntryFixedSize +
+			2u * MaxShaderProgramIdentityComponentSize);
 	inline constexpr uint32_t ActiveShaderProgramRegistryFileFormatVersion = 1;
 	inline constexpr uint32_t ActiveShaderProgramRegistrySchemaVersion = 1;
 	inline constexpr size_t SerializedActiveShaderProgramRegistrySize = 48;

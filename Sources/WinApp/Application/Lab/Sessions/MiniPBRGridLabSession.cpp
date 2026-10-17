@@ -140,19 +140,13 @@ namespace gglab
 			.m_DefaultValue = int32_t(SceneSource::ProceduralGrid),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid"},
-					{.m_Value = int32_t(SceneSource::MetalRoughSpheres),
-						.m_Name = "MetalRoughSpheres"},
-					{.m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures),
-						.m_Name = "MetalRoughSpheresNoTextures"},
-					{.m_Value = int32_t(SceneSource::AnisotropyStrengthTest),
-						.m_Name = "AnisotropyStrengthTest"},
-					{.m_Value = int32_t(SceneSource::AnisotropyRotationTest),
-						.m_Name = "AnisotropyRotationTest"},
-					{.m_Value = int32_t(SceneSource::AnisotropyDiscTest),
-						.m_Name = "AnisotropyDiscTest"},
-					{.m_Value = int32_t(SceneSource::NormalTangentTest),
-						.m_Name = "NormalTangentTest"},
+					{ .m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid" },
+					{ .m_Value = int32_t(SceneSource::MetalRoughSpheres), .m_Name = "MetalRoughSpheres" },
+					{ .m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures), .m_Name = "MetalRoughSpheresNoTextures" },
+					{ .m_Value = int32_t(SceneSource::AnisotropyStrengthTest), .m_Name = "AnisotropyStrengthTest" },
+					{ .m_Value = int32_t(SceneSource::AnisotropyRotationTest), .m_Name = "AnisotropyRotationTest" },
+					{ .m_Value = int32_t(SceneSource::AnisotropyDiscTest), .m_Name = "AnisotropyDiscTest" },
+					{ .m_Value = int32_t(SceneSource::NormalTangentTest), .m_Name = "NormalTangentTest" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({

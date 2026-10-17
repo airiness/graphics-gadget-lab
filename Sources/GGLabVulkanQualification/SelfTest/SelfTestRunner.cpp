@@ -48,15 +48,10 @@ namespace gglab
 
 	bool RunVulkanQualificationSelfTestSuites() noexcept
 	{
-		constexpr std::array suites{
-			SelfTestSuiteDesc{
-				.m_Id = "vulkan-qualification-launch-options",
-				.m_Run = &RunQualificationLaunchOptionsSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "vulkan-qualification-contracts",
-				.m_Run = &RunVulkanQualificationSelfTests,
-			},
+		constexpr std::array suites
+		{
+			SelfTestSuiteDesc{ .m_Id = "vulkan-qualification-launch-options", .m_Run = &RunQualificationLaunchOptionsSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "vulkan-qualification-contracts", .m_Run = &RunVulkanQualificationSelfTests, },
 		};
 
 		ConsoleSelfTestReporter reporter;

@@ -212,8 +212,8 @@ namespace gglab
 
 			const VoxelWorldConfig config = MakeSingleChunkConfig();
 			const std::array primitives{
-				MakeSphere(1, VoxelMaterial::Soil, { 5.0, 8.0, 8.0 }, 2.0),
-				MakeSphere(2, VoxelMaterial::Stone, { 11.0, 8.0, 8.0 }, 2.0),
+				MakeSphere(1, VoxelMaterial::Soil,{ 5.0, 8.0, 8.0 }, 2.0),
+				MakeSphere(2, VoxelMaterial::Stone,{ 11.0, 8.0, 8.0 }, 2.0),
 			};
 			ReferenceWorldMeshingResult meshing{};
 			const bool built = BuildWorldMeshes(config, primitives, meshing);
@@ -277,7 +277,7 @@ namespace gglab
 
 			const VoxelWorldConfig negativeConfig = MakeNegativeChunkConfig();
 			const std::array negativePrimitives{
-				MakeSphere(1, VoxelMaterial::Stone, { -8.0, 8.0, 8.0 }, 2.0),
+				MakeSphere(1, VoxelMaterial::Stone,{ -8.0, 8.0, 8.0 }, 2.0),
 			};
 			ReferenceWorldMeshingResult negativeMeshing{};
 			NapaVoxelCpuMeshSet negativeConverted{};
@@ -367,7 +367,7 @@ namespace gglab
 
 			const VoxelWorldConfig config = MakeEightChunkConfig();
 			const std::array primitives{
-				MakeSphere(1, VoxelMaterial::Stone, {}, 2.0),
+				MakeSphere(1, VoxelMaterial::Stone,{}, 2.0),
 			};
 			ReferenceWorldMeshingResult meshing{};
 			const bool built = BuildWorldMeshes(config, primitives, meshing);
@@ -414,7 +414,7 @@ namespace gglab
 
 			const VoxelWorldConfig config = MakeSingleChunkConfig();
 			const std::array primitives{
-				MakeSphere(1, VoxelMaterial::Stone, { 8.0, 8.0, 8.0 }, 2.0),
+				MakeSphere(1, VoxelMaterial::Stone,{ 8.0, 8.0, 8.0 }, 2.0),
 			};
 			ReferenceWorldMeshingResult meshing{};
 			if (!BuildWorldMeshes(config, primitives, meshing) || meshing.m_Chunks.size() != 1 ||

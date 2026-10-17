@@ -147,10 +147,10 @@ namespace gglab
 				m_Snapshot.m_Resources.push_back({ .m_Name = "Preview.IBL.EnvironmentCubemap",
 					.m_Imported = true, .m_ResourceExportSupport = RGObservationFailure::UnsupportedResource });
 				m_Snapshot.m_Passes.push_back({ .m_Occurrence = 1, .m_Name = "Test.UI.Writer", .m_Culled = true,
-					.m_Accesses = { {.m_WrittenResourceNodeIndex = 1, .m_ResourceName = "Test.UI.Texture",
+					.m_Accesses = { { .m_WrittenResourceNodeIndex = 1, .m_ResourceName = "Test.UI.Texture",
 						.m_DependencyAccess = RGDependencyAccess::Write } } });
 				m_Snapshot.m_Passes.push_back({ .m_Occurrence = 2, .m_Name = "Test.UI.Writer",
-					.m_Accesses = { {.m_WrittenResourceNodeIndex = 2, .m_ResourceName = "Test.UI.Texture",
+					.m_Accesses = { { .m_WrittenResourceNodeIndex = 2, .m_ResourceName = "Test.UI.Texture",
 						.m_DependencyAccess = RGDependencyAccess::Write } } });
 			}
 			void AddResources(uint32_t count)
@@ -177,15 +177,15 @@ namespace gglab
 				.m_Backend = "dx12",
 				.m_DemoId = "Demo.LabHost",
 				.m_LabId = "gglab.lab.test",
-				.m_SettleKey = {.m_Temporal = {
-					.m_Identity = {.m_DisplayViewId = RenderViewID::Main,
+				.m_SettleKey = { .m_Temporal = {
+					.m_Identity = { .m_DisplayViewId = RenderViewID::Main,
 						.m_ResetIdentity = reset, .m_SessionIdentity = 1,
 						.m_ColorExtent = { 1, 1 }, .m_DepthExtent = { 1, 1 } },
 					.m_Services = TemporalService::FrameContinuity | TemporalService::ColorDepthHistory,
 					.m_HasCompatiblePreviousHistory = true } },
 				.m_DisplayFormat = RHIFormat::B8G8R8A8Unorm,
 				.m_FrameSerial = serial,
-				.m_Camera = {.m_Name = "Main" },
+				.m_Camera = { .m_Name = "Main" },
 				.m_ReferenceViewIds = { "CAM_Test" },
 			};
 		}
@@ -207,7 +207,9 @@ namespace gglab
 			ApplicationFrameCapture frontEnd({ .m_Coordinator = &coordinator,
 				.m_DefaultOutputDirectory = directory,
 				.m_ConsumeResults = [&coordinator](std::vector<FrameCaptureRequestResult>& results)
-					{ coordinator.ConsumeResults(results); } });
+				{
+					coordinator.ConsumeResults(results);
+				} });
 			frontEnd.GetSettings().m_Source = source;
 			auto state = MakeFrameState(1);
 			state.m_ReferenceViewIds.clear();
@@ -319,17 +321,19 @@ namespace gglab
 				.m_Coordinator = &coordinator,
 				.m_DefaultOutputDirectory = directory,
 				.m_ConsumeResults = [&coordinator](std::vector<FrameCaptureRequestResult>& results)
-					{ coordinator.ConsumeResults(results); },
+				{
+					coordinator.ConsumeResults(results);
+				},
 				.m_OpenDirectory = [&](const std::filesystem::path& path, std::string& failure)
+				{
+					++openCount;
+					openedDirectory = path;
+					if (rejectOpen)
 					{
-						++openCount;
-						openedDirectory = path;
-						if (rejectOpen)
-						{
-							failure = "Injected Shell rejection.";
-						}
-						return !rejectOpen;
-					},
+						failure = "Injected Shell rejection.";
+					}
+					return !rejectOpen;
+				},
 				});
 			context.Check(frontEnd.GetSettings().m_Timing == FrameCaptureTiming::NextFrame,
 				"Interactive exports default to the next rendered frame without a control session");
@@ -472,10 +476,10 @@ namespace gglab
 			settings.m_ReferenceViewId = "CAM_Test";
 			settings.m_OutputDirectory = directory / "resources";
 			std::vector<RGResourceAddress> targets{
-				{.m_Resource = "Test.Depth", .m_Position = RGObservationPosition::Before,
+				{ .m_Resource = "Test.Depth", .m_Position = RGObservationPosition::Before,
 					.m_Pass = "Test.Pass", .m_Occurrence = 2, .m_Mip = 1, .m_FirstSlice = 2,
 					.m_SliceCount = 3, .m_Aspect = RHITextureAspect::Depth },
-				{.m_Resource = "Test.Buffer" },
+				{ .m_Resource = "Test.Buffer" },
 			};
 			const uint64_t resourceId = frontEnd.ExportResources(targets, true);
 			targets.front().m_Resource = "Edited.After.Submission";
@@ -519,7 +523,7 @@ namespace gglab
 			settings.m_ReferenceViewId.clear();
 			settings.m_Timing = FrameCaptureTiming::AfterReady;
 			settings.m_SettleFrames = 2;
-			const uint64_t readyResourceId = frontEnd.ExportResources({ {.m_Resource = "Test.Buffer" } });
+			const uint64_t readyResourceId = frontEnd.ExportResources({ { .m_Resource = "Test.Buffer" } });
 			for (uint64_t serial = 22; serial < 24; ++serial)
 			{
 				coordinator.BeginFrame(MakeFrameState(serial, 3));
@@ -537,7 +541,7 @@ namespace gglab
 				"Manual resource export honors after-ready timing and can omit the paired graph");
 			settings.m_Timing = FrameCaptureTiming::NextFrame;
 			control.m_FailResourceExport = true;
-			const uint64_t failedResourceId = frontEnd.ExportResources({ {.m_Resource = "Missing" } });
+			const uint64_t failedResourceId = frontEnd.ExportResources({ { .m_Resource = "Missing" } });
 			coordinator.BeginFrame(MakeFrameState(25, 3));
 			coordinator.OnFrameSubmitted();
 			coordinator.Update();
@@ -696,7 +700,10 @@ namespace gglab
 			!win32::OpenDirectory(directory / "missing", failure) && !failure.empty(),
 			"The Windows adapter reports empty and deleted directories without launching Explorer");
 		const auto file = directory / "not a folder.txt";
-		{ std::ofstream output(file); output << "test"; }
+		{
+			std::ofstream output(file);
+			output << "test";
+		}
 		context.Check(!win32::OpenDirectory(file, failure) && !failure.empty(),
 			"The Windows adapter refuses a file instead of invoking its associated application");
 		std::filesystem::remove_all(directory.parent_path(), error);

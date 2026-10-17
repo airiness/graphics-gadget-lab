@@ -921,9 +921,9 @@ namespace gglab
 		// empty or mismatched record can never skip source validation.
 		if (record.m_Manifest.m_Dependencies.empty() ||
 			record.m_Manifest.m_Dependencies[0].m_LogicalPath !=
-				recipe.m_LogicalSourcePath ||
+			recipe.m_LogicalSourcePath ||
 			utils::Canonical(record.m_DependencyPhysicalPaths[0]) !=
-				utils::Canonical(record.m_PhysicalSourcePath))
+			utils::Canonical(record.m_PhysicalSourcePath))
 		{
 			return false;
 		}
@@ -996,7 +996,7 @@ namespace gglab
 			.m_ContentDigest = ComputeSha256(std::span(
 				static_cast<const std::byte*>(src->GetBufferPointer()),
 				src->GetBufferSize())),
-		});
+			});
 		outDependencyPhysicalPaths.push_back(
 			utils::Canonical(recipe.m_Request.m_SourcePath));
 

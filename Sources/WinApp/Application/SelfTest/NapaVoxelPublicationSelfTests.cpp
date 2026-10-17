@@ -81,10 +81,14 @@ namespace gglab
 			{
 				return RHIFrameEndResult::Fatal();
 			}
-			[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView()
-				const noexcept override { return nullptr; }
-			[[nodiscard]] EnvironmentLightingControlBase* GetEnvironmentLightingControl()
-				const noexcept override { return nullptr; }
+			[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView() const noexcept override
+			{
+				return nullptr;
+			}
+			[[nodiscard]] EnvironmentLightingControlBase* GetEnvironmentLightingControl() const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] IBLCacheControlBase* GetIBLCacheControl() const noexcept override
 			{
 				return nullptr;
@@ -97,10 +101,15 @@ namespace gglab
 			{
 				return nullptr;
 			}
-			[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView()
-				const noexcept override { return nullptr; }
+			[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView() const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] PostProcessPreviewControlBase* GetPostProcessPreviewControl()
-				const noexcept override { return nullptr; }
+				const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept override
 			{
 				return nullptr;
@@ -1803,14 +1812,14 @@ namespace gglab
 					.m_TaskSystem = &taskSystem,
 					.m_Input = &input,
 					.m_Time = &time,
-					// The lifecycle-only sessions never issue DebugDraw or environment requests.
-					.m_DebugDraw = reinterpret_cast<DebugDrawContext*>(&renderer),
-					.m_EnvironmentAssetController =
-						reinterpret_cast<EnvironmentAssetController*>(&renderer),
+				// The lifecycle-only sessions never issue DebugDraw or environment requests.
+				.m_DebugDraw = reinterpret_cast<DebugDrawContext*>(&renderer),
+				.m_EnvironmentAssetController =
+					reinterpret_cast<EnvironmentAssetController*>(&renderer),
 				},
-				.m_WindowWidth = 64,
-				.m_WindowHeight = 64,
-				.m_RunConfig = {.m_WarmupFrames = 0 },
+			.m_WindowWidth = 64,
+			.m_WindowHeight = 64,
+			.m_RunConfig = { .m_WarmupFrames = 0 },
 			};
 
 			bool runtimeValid = false;

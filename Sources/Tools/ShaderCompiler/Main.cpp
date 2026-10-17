@@ -124,7 +124,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", gglab::utils::ToString(message) },
 			} }) },
-		}, ExitCodeInvalidCommandLine);
+			}, ExitCodeInvalidCommandLine);
 	}
 
 	int PrintCommandLineFailure(gglab::ShaderCompilerCommand command,
@@ -206,7 +206,7 @@ namespace
 			{ "status", CompileStatusText(diagnostics.m_Status) },
 			{ "exitCode", exitCode },
 			{ "diagnostics", nlohmann::json::array({ std::move(diagnostic) }) },
-		}, exitCode);
+			}, exitCode);
 	}
 
 	int PrintTextFailure(const gglab::ShaderCompilerDiagnostics& diagnostics)
@@ -362,7 +362,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", "DXC producer runtime could not be resolved" },
 			} }) },
-		}, ExitCodeCompileFailed);
+			}, ExitCodeCompileFailed);
 	}
 
 	int PrintJsonDescribeInternalError()
@@ -378,7 +378,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", "describe internal failure" },
 			} }) },
-		}, ExitCodeInternalError);
+			}, ExitCodeInternalError);
 	}
 
 	int PrintJsonDescribeUsageFailure(std::wstring_view message)
@@ -393,7 +393,7 @@ namespace
 			{ "diagnostics", nlohmann::json::array({ {
 				{ "message", gglab::utils::ToString(message) },
 			} }) },
-		}, ExitCodeInvalidCommandLine);
+			}, ExitCodeInvalidCommandLine);
 	}
 
 	int RunDescribe()

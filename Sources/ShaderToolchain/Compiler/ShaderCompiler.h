@@ -86,10 +86,8 @@ namespace gglab
 		struct Impl;
 
 		[[nodiscard]] bool IsCompilerAvailable() const noexcept;
-		[[nodiscard]] ShaderCompilerDiagnostics MakeDiagnostics(
-			ShaderCompileStatus status, std::wstring message,
-			ShaderCompileValidationError validationError =
-				ShaderCompileValidationError::None) const noexcept;
+		[[nodiscard]] ShaderCompilerDiagnostics MakeDiagnostics(ShaderCompileStatus status, std::wstring message,
+			ShaderCompileValidationError validationError = ShaderCompileValidationError::None) const noexcept;
 		[[nodiscard]] ShaderResolvedRecipe ResolveRecipe(const ShaderDesc& request) noexcept;
 		[[nodiscard]] ShaderCompileResult CompileOrLoadInternal(
 			const ShaderResolvedRecipe& recipe) noexcept;

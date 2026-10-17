@@ -238,7 +238,7 @@ namespace gglab
 
 			const LabParameterDesc mode{ .m_Id = LabParameterId("test.mode"), .m_Name = "Mode",
 				.m_Type = LabParameterType::Enum, .m_DefaultValue = int32_t(0),
-				.m_EnumItems = { { .m_Value = 0, .m_Name = "Off" }, { .m_Value = 2, .m_Name = "Sanitized" } } };
+				.m_EnumItems = { { .m_Value = 0, .m_Name = "Off" },{ .m_Value = 2, .m_Name = "Sanitized" } } };
 			const auto [byName, byNameError] = parse(mode, "sanitized");
 			const auto [byValue, byValueError] = parse(mode, "2");
 			context.Check(byName && std::get<int32_t>(*byName) == 2 && byValue &&
@@ -309,7 +309,7 @@ namespace gglab
 			.m_ProgramId = "gglab.shader.test",
 			.m_VariantId = "compute",
 			.m_Stage = ShaderStage::Compute,
-		});
+			});
 		const ApplicationContentSelection shaderSelection = ResolveApplicationContentSelection(
 			labSubset, "test.demo.lab", "test.lab.supported");
 		ShaderProgramDemandSet selectedDemands;

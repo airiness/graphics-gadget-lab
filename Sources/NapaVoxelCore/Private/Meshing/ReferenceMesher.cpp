@@ -237,7 +237,7 @@ namespace napa::voxel
 				-gradient.m_X,
 				-gradient.m_Y,
 				-gradient.m_Z,
-			}, normal);
+				}, normal);
 		}
 
 		[[nodiscard]] ValidationResult ComputeReferenceEdgeOutwardNormal(
@@ -261,7 +261,7 @@ namespace napa::voxel
 				static_cast<double>(empty.m_Coordinate.m_X) - solid.m_Coordinate.m_X,
 				static_cast<double>(empty.m_Coordinate.m_Y) - solid.m_Coordinate.m_Y,
 				static_cast<double>(empty.m_Coordinate.m_Z) - solid.m_Coordinate.m_Z,
-			}, normal);
+				}, normal);
 		}
 
 		[[nodiscard]] ValidationResult InterpolatePreparedEdgeCandidate(

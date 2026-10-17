@@ -407,10 +407,10 @@ namespace gglab
 			makeFixturePath(LightChangePathId, "Light Change",
 				"Static fixture view; the directional light steps to 60% at frame 60 and fades "
 				"back over frames 120-179."),
-			// Correspondence of a moving rigid object over a static background.
-			makeFixturePath(MovingObjectPathId, "Moving Object",
-				"Static fixture view; the rigid sphere moves with the path frame, revealing and "
-				"covering the background behind it."),
+				// Correspondence of a moving rigid object over a static background.
+				makeFixturePath(MovingObjectPathId, "Moving Object",
+					"Static fixture view; the rigid sphere moves with the path frame, revealing and "
+					"covering the background behind it."),
 			});
 		GGLAB_ASSERT_MSG(pathsRegistered, "The Temporal AA Lab camera paths must be valid.");
 
@@ -630,57 +630,57 @@ namespace gglab
 			: "waiting for an active submitted TAA frame with profiling";
 		diagnostics.m_Title = "Temporal AA Evidence Domain";
 		diagnostics.m_Metrics = {
-			{.m_Name = "Adapter/driver domain",
+			{ .m_Name = "Adapter/driver domain",
 				.m_Value = device ? std::string(device->GetAdapterCompatibilityIdentity())
-					: "unavailable"},
-			{.m_Name = "Extent", .m_Value = std::format("{} x {}",
-				m_ViewportWidth, m_ViewportHeight)},
-			{.m_Name = "Camera transform", .m_Value = std::format(
+					: "unavailable" },
+			{ .m_Name = "Extent", .m_Value = std::format("{} x {}",
+				m_ViewportWidth, m_ViewportHeight) },
+			{ .m_Name = "Camera transform", .m_Value = std::format(
 				"pos ({:.3f}, {:.3f}, {:.3f}), yaw {:.5f}, pitch {:.5f}",
 				camera.GetPosition().m_X, camera.GetPosition().m_Y, camera.GetPosition().m_Z,
-				camera.GetYaw(), camera.GetPitch())},
-			{.m_Name = "Camera optics", .m_Value = std::format(
+				camera.GetYaw(), camera.GetPitch()) },
+			{ .m_Name = "Camera optics", .m_Value = std::format(
 				"FOV {:.3f} deg, exposure {:.3f} EV", camera.GetFov(),
-				camera.GetExposureCompensationEV())},
-			{.m_Name = "Frozen ceiling", .m_Value = std::format(
+				camera.GetExposureCompensationEV()) },
+			{ .m_Name = "Frozen ceiling", .m_Value = std::format(
 				"{:.6f} -> age {:.0f}; packed {:.6f} -> age {:.0f}",
 				TemporalAAMaxHistoryFeedbackCeiling, ceilingSaturationAge,
-				packedCeiling, packedCeilingSaturationAge)},
-			{.m_Name = "Evidence frames", .m_Value = std::format(
+				packedCeiling, packedCeilingSaturationAge) },
+			{ .m_Name = "Evidence frames", .m_Value = std::format(
 				"{} committed after reset; last jitter {}", m_CommittedFrameCount,
-				history.m_LastCommitted.m_JitterIndex)},
-			{.m_Name = "PostProcess.TemporalAA (submitted domain)", .m_Value = gpuTiming},
-			{.m_Name = "GPU timing settings", .m_Value = timing.m_Domain
-				? FormatTemporalAALabSettings(timing.m_Domain->m_Settings) : "unavailable"},
-			{.m_Name = "GPU timing frame range", .m_Value = std::format(
+				history.m_LastCommitted.m_JitterIndex) },
+			{ .m_Name = "PostProcess.TemporalAA (submitted domain)", .m_Value = gpuTiming },
+			{ .m_Name = "GPU timing settings", .m_Value = timing.m_Domain
+				? FormatTemporalAALabSettings(timing.m_Domain->m_Settings) : "unavailable" },
+			{ .m_Name = "GPU timing frame range", .m_Value = std::format(
 				"domain from {}; first eligible {}; samples {}-{}",
 				timing.m_FirstDomainFrameSerial, timing.m_FirstEligibleFrameSerial,
-				timing.m_FirstSampleFrameSerial, timing.m_LastSampleFrameSerial)},
-			{.m_Name = "History", .m_Value = history.m_HistoryValid ? "valid" : "invalid"},
-			{.m_Name = "Compatibility generation",
-				.m_Value = std::format("{}", history.m_AllocationGeneration)},
-			{.m_Name = "History pressure",
+				timing.m_FirstSampleFrameSerial, timing.m_LastSampleFrameSerial) },
+			{ .m_Name = "History", .m_Value = history.m_HistoryValid ? "valid" : "invalid" },
+			{ .m_Name = "Compatibility generation",
+				.m_Value = std::format("{}", history.m_AllocationGeneration) },
+			{ .m_Name = "History pressure",
 				.m_Value = std::format("{} active / {} pending bytes", history.m_ActiveBytes,
-					history.m_PendingRetirementBytes)},
-			{.m_Name = "Camera mode", .m_Value = m_OrbitCamera ? "pan/rotation"
-				: (m_ContinuousFovZoom ? "continuous FOV zoom" : "static")},
+					history.m_PendingRetirementBytes) },
+			{ .m_Name = "Camera mode", .m_Value = m_OrbitCamera ? "pan/rotation"
+				: (m_ContinuousFovZoom ? "continuous FOV zoom" : "static") },
 		};
 		diagnostics.m_Checks = {
-			{.m_Name = "Deterministic fixture",
+			{ .m_Name = "Deterministic fixture",
 				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, curved/straight references, and controlled matched-world-size and matched-projected-footprint pairs are present."},
-			{.m_Name = "Coupled accumulation bound",
+				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, curved/straight references, and controlled matched-world-size and matched-projected-footprint pairs are present." },
+			{ .m_Name = "Coupled accumulation bound",
 				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Failed,
-				.m_Detail = "The selected feedback ceiling must saturate both accumulation models below the stored accumulation bound and its UNORM16 representation must remain below one."},
-			{.m_Name = "Submitted-domain GPU timing capture",
+				.m_Detail = "The selected feedback ceiling must saturate both accumulation models below the stored accumulation bound and its UNORM16 representation must remain below one." },
+			{ .m_Name = "Submitted-domain GPU timing capture",
 				.m_Status = timing.m_SampleCount >= TemporalAALabGpuTimingSampleTarget
 					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "The shown submitted domain needs 120 distinct completed profiles after two effective jitter cycles (16 Native or 36 Quality frames), at least the RHI frame-slot count. Effective settings, extents, view/session/cut identity and submission gaps reset it; older or unbound profiles are excluded."},
-			{.m_Name = "Sampling-footprint review",
+				.m_Detail = "The shown submitted domain needs 120 distinct completed profiles after two effective jitter cycles (16 Native or 36 Quality frames), at least the RHI frame-slot count. Effective settings, extents, view/session/cut identity and submission gaps reset it; older or unbound profiles are excluded." },
+			{ .m_Name = "Sampling-footprint review",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Inspect named edge/disocclusion ROIs for the selected history filter: Bilinear blends 2x2 RGB texels; CatmullRomClamped (default) uses five bilinear fetches over a 4x4 kernel with the corners omitted, then clamps to the central 2x2 texel range. Accumulation is point sampled (1 texel); depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
+				.m_Detail = "Inspect named edge/disocclusion ROIs for the selected history filter: Bilinear blends 2x2 RGB texels; CatmullRomClamped (default) uses five bilinear fetches over a 4x4 kernel with the corners omitted, then clamps to the central 2x2 texel range. Accumulation is point sampled (1 texel); depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact." },
 		};
 		AppendTemporalAALabSettingsDiagnostics(diagnostics, taa, context, history);
 	}

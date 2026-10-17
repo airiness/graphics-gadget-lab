@@ -41,9 +41,8 @@ namespace gglab
 			.m_DefaultValue = int32_t(SceneSource::Original),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(SceneSource::Original), .m_Name = "Original Contract"},
-					{.m_Value = int32_t(SceneSource::MaterialReferences),
-						.m_Name = "Extended Material References"},
+					{ .m_Value = int32_t(SceneSource::Original), .m_Name = "Original Contract" },
+					{ .m_Value = int32_t(SceneSource::MaterialReferences), .m_Name = "Extended Material References" },
 				},
 			}));
 		GGLAB_UNUSED(GetMutableParameters().Add({

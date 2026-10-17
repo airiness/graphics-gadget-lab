@@ -23,7 +23,9 @@ namespace gglab
 			.m_Coordinator = runtime.GetFrameCaptureCoordinator(),
 			.m_DefaultOutputDirectory = std::move(defaultOutputDirectory),
 			.m_ConsumeResults = [&runtime](std::vector<FrameCaptureRequestResult>& results)
-				{ runtime.ConsumeFrameCaptureResults(results); },
+			{
+				runtime.ConsumeFrameCaptureResults(results);
+			},
 			.m_OpenDirectory = std::move(openDirectory),
 			})
 	{

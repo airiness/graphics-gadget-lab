@@ -1200,8 +1200,8 @@ namespace gglab
 				m_RenderState.GetVisibleWorldRevision() ==
 				m_Publication->GetTargetWorldRevision();
 			m_HasFailed = !m_IsReady;
+			break;
 		}
-		break;
 		case NapaVoxelInitialPublicationStatus::Failed:
 		case NapaVoxelInitialPublicationStatus::Cancelled:
 			m_HasFailed = true;

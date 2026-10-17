@@ -726,14 +726,12 @@ namespace gglab
 				DeserializeActiveShaderProgramRegistry(std::span(
 					static_cast<const std::byte*>(serializedRecord.Data()),
 					serializedRecord.SizeInBytes()));
-			return registryRef
-				? ActiveShaderProgramRegistryReadResult{
-					.m_Status = ActiveShaderProgramRegistryReadStatus::Success,
-					.m_RegistryRef = *registryRef,
-				}
-				: ActiveShaderProgramRegistryReadResult{
-					.m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord,
-				};
+			return registryRef ? ActiveShaderProgramRegistryReadResult
+			{
+				.m_Status = ActiveShaderProgramRegistryReadStatus::Success,
+				.m_RegistryRef = *registryRef,
+			} :
+			ActiveShaderProgramRegistryReadResult{ .m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord, };
 		}
 		catch (...)
 		{

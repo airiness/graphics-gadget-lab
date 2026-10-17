@@ -102,15 +102,14 @@ namespace gglab::devtools
 
 	template <> struct EnumTextTraits<RHISamplerFilter>
 	{
-		static constexpr std::array Entries = {
+		static constexpr std::array Entries =
+		{
 			EnumTextEntry{ RHISamplerFilter::MinMagMipPoint, "Min/Mag/Mip Point" },
 			EnumTextEntry{ RHISamplerFilter::MinMagPointMipLinear, "Min/Mag Point, Mip Linear" },
-			EnumTextEntry{
-				RHISamplerFilter::MinPointMagLinearMipPoint, "Min Point, Mag Linear, Mip Point" },
+			EnumTextEntry{ RHISamplerFilter::MinPointMagLinearMipPoint, "Min Point, Mag Linear, Mip Point" },
 			EnumTextEntry{ RHISamplerFilter::MinPointMagMipLinear, "Min Point, Mag/Mip Linear" },
 			EnumTextEntry{ RHISamplerFilter::MinLinearMagMipPoint, "Min Linear, Mag/Mip Point" },
-			EnumTextEntry{
-				RHISamplerFilter::MinLinearMagPointMipLinear, "Min Linear, Mag Point, Mip Linear" },
+			EnumTextEntry{ RHISamplerFilter::MinLinearMagPointMipLinear, "Min Linear, Mag Point, Mip Linear" },
 			EnumTextEntry{ RHISamplerFilter::MinMagLinearMipPoint, "Min/Mag Linear, Mip Point" },
 			EnumTextEntry{ RHISamplerFilter::MinMagMipLinear, "Min/Mag/Mip Linear" },
 			EnumTextEntry{ RHISamplerFilter::Anisotropic, "Anisotropic" },

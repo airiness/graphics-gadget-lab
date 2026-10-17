@@ -36,66 +36,25 @@ namespace gglab
 	{
 		std::filesystem::path g_ApplicationSelfTestAssetRoot;
 
-		constexpr std::array RegisteredSuites{
-			SelfTestSuiteDesc{
-				.m_Id = "app-content-registration",
-				.m_Run = &RunApplicationContentRegistrationSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-input",
-				.m_Run = &RunApplicationInputSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-host-configuration",
-				.m_Run = &RunApplicationHostConfigurationSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-lifecycle",
-				.m_Run = &RunApplicationLifecycleSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-devtools-view-profile",
-				.m_Run = &RunDevToolsViewProfileSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-control",
-				.m_Run = &RunApplicationControlSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-temporal-aa-lab-diagnostics",
-				.m_Run = &RunTemporalAALabDiagnosticsSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-temporal-aa-lab-gpu-timing",
-				.m_Run = &RunTemporalAALabGpuTimingSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-frame-capture-encoder",
-				.m_Run = &RunFrameCaptureImageEncoderSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-frame-capture",
-				.m_Run = &RunApplicationFrameCaptureSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-launch-options",
-				.m_Run = &RunLaunchOptionsSelfTests,
-			},
+		constexpr std::array RegisteredSuites
+		{
+			SelfTestSuiteDesc{ .m_Id = "app-content-registration", .m_Run = &RunApplicationContentRegistrationSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-input", .m_Run = &RunApplicationInputSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-host-configuration", .m_Run = &RunApplicationHostConfigurationSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-lifecycle", .m_Run = &RunApplicationLifecycleSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-devtools-view-profile", .m_Run = &RunDevToolsViewProfileSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-control", .m_Run = &RunApplicationControlSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-temporal-aa-lab-diagnostics", .m_Run = &RunTemporalAALabDiagnosticsSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-temporal-aa-lab-gpu-timing", .m_Run = &RunTemporalAALabGpuTimingSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-frame-capture-encoder", .m_Run = &RunFrameCaptureImageEncoderSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-frame-capture", .m_Run = &RunApplicationFrameCaptureSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-launch-options", .m_Run = &RunLaunchOptionsSelfTests, },
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
-			SelfTestSuiteDesc{
-				.m_Id = "app-development-shader-process-client",
-				.m_Run = &RunDevelopmentShaderBuildProcessClientSelfTests,
-			},
+			SelfTestSuiteDesc{ .m_Id = "app-development-shader-process-client", .m_Run = &RunDevelopmentShaderBuildProcessClientSelfTests, },
 #endif
-			SelfTestSuiteDesc{
-				.m_Id = "napa-voxel",
-				.m_Run = &RunNapaVoxelSelfTests,
-			},
+			SelfTestSuiteDesc{ .m_Id = "napa-voxel", .m_Run = &RunNapaVoxelSelfTests, },
 #if GGLAB_ENABLE_VULKAN
-			SelfTestSuiteDesc{
-				.m_Id = "app-developgui-vulkan-presentation-contract",
-				.m_Run = &RunDevelopGuiVulkanPresentationContractSelfTests,
-			},
+			SelfTestSuiteDesc{ .m_Id = "app-developgui-vulkan-presentation-contract", .m_Run = &RunDevelopGuiVulkanPresentationContractSelfTests, },
 #endif
 		};
 

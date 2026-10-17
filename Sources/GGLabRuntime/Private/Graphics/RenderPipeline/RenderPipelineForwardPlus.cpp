@@ -87,7 +87,7 @@ namespace gglab
 							.m_DrawVariantBits = variantBits,
 							.m_HdrDiffValidation = hdrDiffValidation,
 							.m_GTAOContribution = contribution,
-						});
+							});
 					}
 				}
 			}
@@ -199,7 +199,7 @@ namespace gglab
 				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested }
 				: !forwardPlusActive
 				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
-				: ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+			: ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			forwardPlusValidationEnabled = validation.IsActive();
 		}
 		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
@@ -231,9 +231,9 @@ namespace gglab
 			resolution = context.GetDisplayRenderView().GetResolution(),
 			depthCoverageFramePlan,
 			geometryMotion =
-				context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
+			context.GetTemporalFramePlan().HasService(TemporalService::GeometryMotion),
 			temporalAAActive =
-				context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
+			context.GetTemporalFramePlan().IsConsumerActive(TemporalConsumer::TemporalAA),
 			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
@@ -295,7 +295,7 @@ namespace gglab
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
 				backBufferDesc.m_Extent =
-					{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
+				{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
@@ -343,7 +343,7 @@ namespace gglab
 				{
 					RHITextureDesc displayDepthDesc = depthBufferDesc;
 					displayDepthDesc.m_Extent =
-						{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
+					{ resolution.m_Display.m_Width, resolution.m_Display.m_Height, 1u };
 					displayDepth.m_Texture =
 						builder.CreateTexture("DisplayView.DisplayDepth", displayDepthDesc);
 				}

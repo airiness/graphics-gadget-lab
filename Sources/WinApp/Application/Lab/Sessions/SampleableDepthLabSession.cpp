@@ -311,7 +311,7 @@ namespace gglab
 			registry && registry->HasPublishedPostProcessPreview(
 				PostProcessPreviewChannel::SceneDepth) &&
 			registry->GetPostProcessPreviewUpdateCount(PostProcessPreviewChannel::SceneDepth) >
-				m_PreviewUpdateCountOnEnter &&
+			m_PreviewUpdateCountOnEnter &&
 			(registry->GetPublishedPostProcessPreviewSelection(
 				PostProcessPreviewChannel::SceneDepth).m_Tap ==
 				PostProcessDebugTap::SceneDepthRaw ||
@@ -336,14 +336,13 @@ namespace gglab
 		}
 		diagnostics.m_Title = "Sampleable Reversed-Z Depth";
 		diagnostics.m_Metrics = {
-			{.m_Name = "Near plane", .m_Value = std::format("{:.4f}", m_NearPlane)},
-			{.m_Name = "Far plane", .m_Value = std::format("{:.1f}", m_FarPlane)},
-			{.m_Name = "Far / near", .m_Value = std::format("{:.0f}:1", ratio)},
-			{.m_Name = "Initial far-marker view-Z",
+			{ .m_Name = "Near plane", .m_Value = std::format("{:.4f}", m_NearPlane) },
+			{ .m_Name = "Far plane", .m_Value = std::format("{:.1f}", m_FarPlane) },
+			{ .m_Name = "Far / near", .m_Value = std::format("{:.0f}:1", ratio) },
+			{ .m_Name = "Initial far-marker view-Z",
 				.m_Value = std::format("{:.1f} ({:.1f}% of far)", m_InitialFarMarkerViewDistance,
-					farMarkerRatio * 100.0f)},
-			{.m_Name = "Viewport",
-				.m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight)},
+					farMarkerRatio * 100.0f) },
+			{ .m_Name = "Viewport", .m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight) },
 		};
 		diagnostics.m_Checks = {
 			{

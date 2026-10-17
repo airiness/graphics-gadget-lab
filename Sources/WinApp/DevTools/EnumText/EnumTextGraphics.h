@@ -125,11 +125,11 @@ namespace gglab::devtools
 
 	template <> struct EnumTextTraits<RenderViewVisibilityMode>
 	{
-		static constexpr std::array Entries = {
+		static constexpr std::array Entries =
+		{
 			EnumTextEntry{ RenderViewVisibilityMode::Self, "Self" },
 			EnumTextEntry{ RenderViewVisibilityMode::MainCamera, "Main Camera" },
-			EnumTextEntry{
-				RenderViewVisibilityMode::IntersectionWithMainCamera, "Intersection With Main" },
+			EnumTextEntry{ RenderViewVisibilityMode::IntersectionWithMainCamera, "Intersection With Main" },
 			EnumTextEntry{ RenderViewVisibilityMode::None, "None" },
 		};
 	};

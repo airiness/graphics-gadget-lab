@@ -200,7 +200,7 @@ namespace gglab
 					!parse({ "--capture-source", "scene" }).IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-source", "hud" }).IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-settle-frames", "-1" })
-						.IsValid() &&
+					.IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-timeout", "0" }).IsValid() &&
 					!parse({ "--self-test", "all", "--capture-on-ready", "C:/c" }).IsValid() &&
 					!parse({ "--self-test", "all", "--hidden" }).IsValid(),
@@ -259,7 +259,7 @@ namespace gglab
 					assignments.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
 					assignments.m_Options.m_StartupLabParameters.size() == 2 &&
 					assignments.m_Options.m_StartupLabParameters[0].m_Id ==
-						"render_graph_compute.debug.nonfinite.mode" &&
+					"render_graph_compute.debug.nonfinite.mode" &&
 					assignments.m_Options.m_StartupLabParameters[0].m_Value == "Boundary" &&
 					assignments.m_Options.m_StartupLabParameters[1].m_Value == "0",
 					"Debug startup Lab parameters keep their order, ids and textual values");

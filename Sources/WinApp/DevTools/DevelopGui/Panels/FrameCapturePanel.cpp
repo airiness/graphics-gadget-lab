@@ -196,7 +196,7 @@ namespace gglab
 					if (ImGui::SmallButton("+"))
 					{
 						const uint32_t id = state.m_NextTargetId++;
-						state.m_ResourceTargets.push_back({ id, resource->m_ResourceType, {.m_Resource = resource->m_Name } });
+						state.m_ResourceTargets.push_back({ id, resource->m_ResourceType,{ .m_Resource = resource->m_Name } });
 						state.m_OpenTargetId = id;
 					}
 					ImGui::PopID();
