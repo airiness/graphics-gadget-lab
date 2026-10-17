@@ -159,17 +159,29 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 {
 	switch (uint(input.PositionCS.x))
 	{
-	case 0: return TestZeroFeedbackWeight();
-	case 1: return TestFractionalHistoryCapacity();
-	case 2: return TestUnitSampleMatchesNativeFeedback();
-	case 3: return TestLowFeedbackWeightedGoldens();
-	case 4: return TestLowCapacityStorageRemainsValid();
-	case 5: return TestRejectedAccumulationRestarts();
-	case 6: return TestFeedbackMonotonicity();
-	case 7: return TestPackedLowFeedback();
-	case 8: return TestDefaultFeedbackCompatibility();
-	case 9: return TestFeedbackCapacityTransition();
-	case 10: return TestInvalidFeedbackHasNoCapacity();
-	default: return 1.0.xxxx;
+	case 0:
+		return TestZeroFeedbackWeight();
+	case 1:
+		return TestFractionalHistoryCapacity();
+	case 2:
+		return TestUnitSampleMatchesNativeFeedback();
+	case 3:
+		return TestLowFeedbackWeightedGoldens();
+	case 4:
+		return TestLowCapacityStorageRemainsValid();
+	case 5:
+		return TestRejectedAccumulationRestarts();
+	case 6:
+		return TestFeedbackMonotonicity();
+	case 7:
+		return TestPackedLowFeedback();
+	case 8:
+		return TestDefaultFeedbackCompatibility();
+	case 9:
+		return TestFeedbackCapacityTransition();
+	case 10:
+		return TestInvalidFeedbackHasNoCapacity();
+	default:
+		return 1.0.xxxx;
 	}
 }
