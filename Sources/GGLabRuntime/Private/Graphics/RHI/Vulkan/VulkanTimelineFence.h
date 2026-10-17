@@ -4,8 +4,10 @@
 
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 
 namespace gglab
@@ -16,6 +18,29 @@ namespace gglab
 			UINT64_MAX :
 			static_cast<uint64_t>(timeoutMilliseconds) * 1'000'000;
 	}
+
+	struct VulkanQueueIdleSignal
+	{
+		VkQueue m_Queue = VK_NULL_HANDLE;
+		VkSemaphore m_Timeline = VK_NULL_HANDLE;
+		// Freshly reserved, later than every submission already issued on this queue.
+		uint64_t m_Value = 0;
+		// Remains true after a timed-out wait, so the owner commits this valid wait target.
+		bool m_Submitted = false;
+	};
+
+	struct VulkanQueueIdleDispatch
+	{
+		PFN_vkQueueSubmit2 m_QueueSubmit2 = vkQueueSubmit2;
+		PFN_vkWaitSemaphores m_WaitSemaphores = vkWaitSemaphores;
+	};
+
+	// Owner-thread operation: append an ALL_COMMANDS signal to every consuming queue and
+	// wait for those fresh values with one timeout budget. No native idle call is used.
+	// Timeline semaphores remain owned by the device, including after Timeout or failure.
+	[[nodiscard]] VkResult WaitVulkanQueuesIdle(VkDevice device,
+		std::span<VulkanQueueIdleSignal> signals, uint32_t timeoutMilliseconds,
+		const VulkanQueueIdleDispatch& dispatch = {}) noexcept;
 
 	// Logical-queue timeline semaphore. The graphics instance is used as the
 	// frame-slot reuse gate; the transfer instance gates upload publication and
@@ -67,10 +92,6 @@ namespace gglab
 		// The last successfully submitted value; waiting at or below it is
 		// always safe.
 		[[nodiscard]] uint64_t GetCurrentSignalValue() const noexcept { return m_SubmittedValue; }
-		// After verified device idle, signals reserved values that no submission committed, so
-		// retention tied to them ends. Requires that no signal operation is pending.
-		[[nodiscard]] VkResult CompleteReservedValuesAfterIdle() noexcept;
-
 		// The stable backend-neutral identity of this timeline; combined
 		// with a committed value it forms a valid RHIFencePoint.
 		[[nodiscard]] RHIFenceHandle GetRHIHandle() const noexcept { return m_RHIHandle; }

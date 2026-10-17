@@ -55,6 +55,114 @@ namespace gglab
 {
 	namespace
 	{
+		struct QueueIdleProbe
+		{
+			std::vector<VkQueue> m_Queues;
+			std::vector<VkSemaphoreSubmitInfo> m_Signals;
+			std::vector<VkSemaphore> m_WaitSemaphores;
+			std::vector<uint64_t> m_WaitValues;
+			uint64_t m_Timeout = 0;
+			uint32_t m_Waits = 0;
+			uint32_t m_FailSubmit = 0;
+			VkResult m_SubmitFailure = VK_ERROR_OUT_OF_HOST_MEMORY;
+			VkResult m_WaitResult = VK_TIMEOUT;
+			bool m_ValidShape = true;
+		};
+
+		thread_local QueueIdleProbe* g_QueueIdleProbe = nullptr;
+
+		VKAPI_ATTR VkResult VKAPI_CALL ProbeQueueIdleSubmit(VkQueue queue, uint32_t count,
+			const VkSubmitInfo2* submits, VkFence fence)
+		{
+			auto& probe = *g_QueueIdleProbe;
+			probe.m_Queues.push_back(queue);
+			if (count != 1 || !submits || submits->commandBufferInfoCount != 0 ||
+				submits->waitSemaphoreInfoCount != 0 || submits->signalSemaphoreInfoCount != 1 ||
+				!submits->pSignalSemaphoreInfos || fence != VK_NULL_HANDLE)
+			{
+				probe.m_ValidShape = false;
+				return VK_ERROR_INITIALIZATION_FAILED;
+			}
+			probe.m_Signals.push_back(*submits->pSignalSemaphoreInfos);
+			probe.m_ValidShape &= submits->pSignalSemaphoreInfos->stageMask ==
+				VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+			return probe.m_Queues.size() == probe.m_FailSubmit ? probe.m_SubmitFailure : VK_SUCCESS;
+		}
+
+		VKAPI_ATTR VkResult VKAPI_CALL ProbeQueueIdleWait(VkDevice,
+			const VkSemaphoreWaitInfo* wait, uint64_t timeout)
+		{
+			auto& probe = *g_QueueIdleProbe;
+			++probe.m_Waits;
+			probe.m_Timeout = timeout;
+			probe.m_ValidShape &= wait->flags == 0 && wait->semaphoreCount == probe.m_Signals.size();
+			probe.m_WaitSemaphores.assign(wait->pSemaphores, wait->pSemaphores + wait->semaphoreCount);
+			probe.m_WaitValues.assign(wait->pValues, wait->pValues + wait->semaphoreCount);
+			return probe.m_WaitResult;
+		}
+
+		void RunVulkanQueueIdleTests(SelfTestContext& context) noexcept
+		{
+			const auto device = reinterpret_cast<VkDevice>(uintptr_t{ 1 });
+			const auto graphics = reinterpret_cast<VkQueue>(uintptr_t{ 2 });
+			const auto transfer = reinterpret_cast<VkQueue>(uintptr_t{ 3 });
+			const auto graphicsTimeline = reinterpret_cast<VkSemaphore>(uintptr_t{ 4 });
+			const auto transferTimeline = reinterpret_cast<VkSemaphore>(uintptr_t{ 5 });
+			const VulkanQueueIdleDispatch dispatch{ ProbeQueueIdleSubmit, ProbeQueueIdleWait };
+			QueueIdleProbe probe;
+			g_QueueIdleProbe = &probe;
+			std::array<VulkanQueueIdleSignal, 2> signals
+			{
+				VulkanQueueIdleSignal{ graphics, graphicsTimeline, 11 },
+				VulkanQueueIdleSignal{ transfer, transferTimeline, 21 },
+			};
+			const VkResult timeout = WaitVulkanQueuesIdle(device, signals, 7, dispatch);
+			context.Check(timeout == VK_TIMEOUT && probe.m_ValidShape && probe.m_Waits == 1 &&
+				probe.m_Timeout <= 7'000'000 && signals[0].m_Submitted && signals[1].m_Submitted &&
+				probe.m_Queues == std::vector<VkQueue>({ graphics, transfer }) &&
+				probe.m_WaitSemaphores == std::vector<VkSemaphore>({ graphicsTimeline, transferTimeline }) &&
+				probe.m_WaitValues == std::vector<uint64_t>({ 11, 21 }),
+				"Bounded idle waits on fresh ALL_COMMANDS signals from both queues and returns Timeout");
+
+			probe = {};
+			probe.m_FailSubmit = 2;
+			const VkResult partial = WaitVulkanQueuesIdle(device, signals, 7, dispatch);
+			context.Check(partial == VK_ERROR_OUT_OF_HOST_MEMORY && probe.m_Waits == 0 &&
+				signals[0].m_Submitted && !signals[1].m_Submitted,
+				"A failed idle marker is never waited on; earlier successful markers remain tracked");
+			probe = {};
+			probe.m_FailSubmit = 1;
+			probe.m_SubmitFailure = VK_ERROR_DEVICE_LOST;
+			context.Check(WaitVulkanQueuesIdle(device, signals, 7, dispatch) == VK_ERROR_DEVICE_LOST &&
+				probe.m_Waits == 0 && !signals[0].m_Submitted && !signals[1].m_Submitted,
+				"Device loss while submitting an idle marker propagates without any fence wait");
+
+			probe = {};
+			probe.m_WaitResult = VK_ERROR_DEVICE_LOST;
+			context.Check(WaitVulkanQueuesIdle(device, signals, 7, dispatch) == VK_ERROR_DEVICE_LOST &&
+				signals[0].m_Submitted && signals[1].m_Submitted && probe.m_Waits == 1,
+				"Device loss from the bounded native wait preserves submitted marker identities");
+
+			probe = {};
+			probe.m_WaitResult = VK_SUCCESS;
+			signals[0].m_Value = 12;
+			signals[1].m_Value = 22;
+			context.Check(WaitVulkanQueuesIdle(device, signals, 7, dispatch) == VK_SUCCESS &&
+				probe.m_WaitValues == std::vector<uint64_t>({ 12, 22 }),
+				"A later successful idle marker covers work retained after the previous timeout");
+			probe = {};
+			context.Check(WaitVulkanQueuesIdle(device, signals, 0, dispatch) == VK_TIMEOUT &&
+				probe.m_Timeout == 0 && probe.m_Waits == 1,
+				"A zero timeout polls the fresh signals without entering an unbounded native idle");
+			probe = {};
+			probe.m_WaitResult = VK_SUCCESS;
+			signals[1].m_Queue = graphics;
+			context.Check(WaitVulkanQueuesIdle(device, signals, RHIInfiniteWaitMilliseconds, dispatch) ==
+				VK_SUCCESS && probe.m_Timeout == UINT64_MAX && probe.m_ValidShape &&
+				probe.m_Queues == std::vector<VkQueue>({ graphics, graphics }),
+				"Shared native queues retain both logical timeline markers; only explicit infinite waits are infinite");
+			g_QueueIdleProbe = nullptr;
+		}
 
 		VulkanDeviceProfileCapabilities MakeSupportedCapabilities() noexcept
 		{
@@ -1802,6 +1910,7 @@ namespace gglab
 		RunDescriptorCapacityTests(context);
 		RunDeviceProfileTests(context);
 		RunVulkanQueueSelectionTests(context);
+		RunVulkanQueueIdleTests(context);
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunVulkanFormatContractTests(context);

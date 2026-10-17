@@ -50,6 +50,13 @@ namespace gglab
 		bool m_DeviceLost = false;
 	};
 
+	// Submits a dependent stream only after its prerequisite has a checked fence and a
+	// confirmed queue join. A failed join leaves the dependent stream without effect.
+	[[nodiscard]] RHISubmittedStream SubmitDependentFrameStream(
+		RHISubmittedStream& prerequisite,
+		const std::function<bool(const RHIFencePoint&)>& join,
+		const std::function<RHISubmittedStream()>& submit) noexcept;
+
 	// Settles the upload batch of one frame transaction from its ordered stream outcomes:
 	// cancel when nothing was accepted, retire on a fence that covers every accepted stream,
 	// or quarantine and try to verify idle. Shared by every backend frame transaction.

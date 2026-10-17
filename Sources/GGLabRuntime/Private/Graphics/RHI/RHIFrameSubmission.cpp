@@ -36,6 +36,19 @@ namespace gglab
 		}
 	}
 
+	RHISubmittedStream SubmitDependentFrameStream(RHISubmittedStream& prerequisite,
+		const std::function<bool(const RHIFencePoint&)>& join,
+		const std::function<RHISubmittedStream()>& submit) noexcept
+	{
+		if (prerequisite.m_Effect != RHISubmitEffect::Accepted ||
+			!prerequisite.m_Fence.IsValid() || !join || !submit || !join(prerequisite.m_Fence))
+		{
+			return {};
+		}
+		prerequisite.m_JoinedByNextStream = true;
+		return submit();
+	}
+
 	RHISubmissionResolution ResolveFrameSubmission(std::span<const RHISubmittedStream> streams,
 		RHIUploadBatch& batch, const RHISubmissionVerification& verification) noexcept
 	{

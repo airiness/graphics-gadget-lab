@@ -570,14 +570,35 @@ namespace gglab
 		{
 			return RHIGpuWaitResult::DeviceLost;
 		}
-		// The bounded timeline waits cover committed work. Device idle then confirms that no
-		// queue still runs an accepted submission whose signal was never committed.
-		RHIGpuWaitResult result = timeoutMilliseconds == RHIInfiniteWaitMilliseconds ?
-			RHIGpuWaitResult::Completed :
-			WaitCommittedTimelines(timeoutMilliseconds);
-		if (result == RHIGpuWaitResult::Completed)
+		VulkanDevice& device = *m_Bootstrap->m_Device;
+		if (!device.RequireOwnerThread("VulkanContext::WaitIdleFor"))
 		{
-			result = ClassifyVulkanWaitResult(vkDeviceWaitIdle(m_Bootstrap->m_Device->Get()));
+			return RHIGpuWaitResult::Failed;
+		}
+		const std::array<VulkanTimelineFence*, 2> timelines = {
+			device.GetGraphicsTimeline(), device.GetTransferTimeline()
+		};
+		if (!timelines[0] || !timelines[1])
+		{
+			return RHIGpuWaitResult::Failed;
+		}
+		// Fresh ALL_COMMANDS signals cover every earlier submission, including accepted work
+		// without a committed signal. Their later values also retire retention on those gaps.
+		std::array<VulkanQueueIdleSignal, 2> signals
+		{
+			VulkanQueueIdleSignal{ device.GetGraphicsQueue(), timelines[0]->Get(),
+				timelines[0]->ReserveSignalValue() },
+			VulkanQueueIdleSignal{ device.GetTransferQueue(), timelines[1]->Get(),
+				timelines[1]->ReserveSignalValue() },
+		};
+		const RHIGpuWaitResult result = ClassifyVulkanWaitResult(
+			WaitVulkanQueuesIdle(device.Get(), signals, timeoutMilliseconds));
+		for (size_t index = 0; index < signals.size(); ++index)
+		{
+			if (signals[index].m_Submitted)
+			{
+				timelines[index]->CommitSubmittedValue(signals[index].m_Value);
+			}
 		}
 		ObserveWaitResult(result, "VulkanContext::WaitIdleFor");
 		if (result != RHIGpuWaitResult::Completed)
@@ -586,27 +607,6 @@ namespace gglab
 				"VulkanContext::WaitIdleFor did not verify idle: {}.",
 				GetRHIGpuWaitResultName(result)));
 			return result;
-		}
-		// Verified idle: reserved points of accepted submissions without a committed signal
-		// can complete, which releases the set-0 arenas, descriptor snapshots and resources
-		// retained on them.
-		VulkanDevice& device = *m_Bootstrap->m_Device;
-		const std::array<VulkanTimelineFence*, 2> timelines = {
-			device.GetGraphicsTimeline(), device.GetTransferTimeline()
-		};
-		for (VulkanTimelineFence* timeline : timelines)
-		{
-			const VkResult completed =
-				timeline ? timeline->CompleteReservedValuesAfterIdle() : VK_SUCCESS;
-			if (completed != VK_SUCCESS)
-			{
-				result = ClassifyVulkanWaitResult(completed);
-				ObserveWaitResult(result, "VulkanTimelineFence::CompleteReservedValuesAfterIdle");
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
-					"VulkanContext could not complete reserved timeline values: {}.",
-					GetRHIGpuWaitResultName(result)));
-				return result;
-			}
 		}
 		if (m_UploadPool)
 		{
@@ -673,39 +673,6 @@ namespace gglab
 					return WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
 				},
 		};
-	}
-
-	RHIGpuWaitResult VulkanContext::WaitCommittedTimelines(
-		uint32_t timeoutMilliseconds) const noexcept
-	{
-		const VulkanDevice& device = *m_Bootstrap->m_Device;
-		std::array<VkSemaphore, 2> semaphores{};
-		std::array<uint64_t, 2> values{};
-		uint32_t count = 0;
-		const std::array<const VulkanTimelineFence*, 2> timelines = {
-			device.GetGraphicsTimeline(), device.GetTransferTimeline()
-		};
-		for (const VulkanTimelineFence* timeline : timelines)
-		{
-			if (timeline && timeline->GetCurrentSignalValue() != 0)
-			{
-				semaphores[count] = timeline->Get();
-				values[count] = timeline->GetCurrentSignalValue();
-				++count;
-			}
-		}
-		if (count == 0)
-		{
-			return RHIGpuWaitResult::Completed;
-		}
-		const VkSemaphoreWaitInfo waitInfo{
-			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-			.semaphoreCount = count,
-			.pSemaphores = semaphores.data(),
-			.pValues = values.data(),
-		};
-		return ClassifyVulkanWaitResult(vkWaitSemaphores(
-			device.Get(), &waitInfo, ToVulkanTimeoutNanoseconds(timeoutMilliseconds)));
 	}
 
 	void VulkanContext::ObserveWaitResult(

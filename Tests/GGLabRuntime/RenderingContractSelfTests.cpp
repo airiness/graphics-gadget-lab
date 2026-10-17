@@ -2055,8 +2055,85 @@ namespace gglab
 				"Teardown reads the device state after every wait and never waits after confirmed loss");
 		}
 
+		void RunDependentFrameSubmissionTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			RHIUploadPool pool(device);
+			const RHIFencePoint computeFence{ RHIFenceHandle{ 2, 1 }, 4 };
+			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+			for (uint32_t scenario = 0; scenario < 3; ++scenario)
+			{
+				device.m_CompletedFenceValue = 0;
+				auto batch = pool.BeginBatch();
+				context.Check(batch->Upload(std::as_bytes(std::span(payload))).IsValid() && batch->Publish(),
+					"A dependent-stream fault case has published upload data");
+				std::vector<uint32_t> events;
+				std::array<RHISubmittedStream, 2> streams{};
+				streams[0] = { RHISubmitEffect::Accepted, scenario == 2 ? RHIFencePoint{} : computeFence };
+				streams[1] = SubmitDependentFrameStream(streams[0],
+					[&](const RHIFencePoint& fence)
+					{
+						events.push_back(fence == computeFence ? 1u : 0u);
+						return scenario == 0;
+					},
+					[&]() -> RHISubmittedStream
+					{
+						events.push_back(2);
+						return { RHISubmitEffect::Accepted, graphicsFence };
+					});
+				uint32_t cpuWaits = 0;
+				const RHISubmissionVerification verification{
+					.m_WaitForFence = [&](const RHIFencePoint&)
+						{
+							++cpuWaits;
+							return RHIGpuWaitResult::Completed;
+						},
+					.m_WaitIdle = []() { return RHIGpuWaitResult::Timeout; },
+				};
+				const auto resolution = ResolveFrameSubmission(streams, *batch, verification);
+				if (scenario == 0)
+				{
+					device.m_CompletedFenceValue = computeFence.m_Value;
+					pool.ReclaimCompleted();
+					context.Check(events == std::vector<uint32_t>({ 1, 2 }) &&
+						streams[0].m_JoinedByNextStream && resolution.m_Fence == graphicsFence &&
+						pool.GetPendingPageCount() == 1 && cpuWaits == 0,
+						"Graphics submits only after the confirmed GPU join and retires after graphics");
+					device.m_CompletedFenceValue = graphicsFence.m_Value;
+				}
+				else if (scenario == 1)
+				{
+					device.m_CompletedFenceValue = computeFence.m_Value - 1;
+					pool.ReclaimCompleted();
+					context.Check(events == std::vector<uint32_t>({ 1 }) &&
+						streams[1].m_Effect == RHISubmitEffect::NoEffect &&
+						resolution.m_State == RHIFrameSubmissionState::Fenced &&
+						resolution.m_Fence == computeFence && pool.GetPendingPageCount() == 1 && cpuWaits == 0,
+						"A failed queue join never submits graphics or performs a late CPU repair");
+					device.m_CompletedFenceValue = computeFence.m_Value;
+				}
+				else
+				{
+					device.m_CompletedFenceValue = graphicsFence.m_Value;
+					pool.ReclaimCompleted();
+					context.Check(events.empty() && streams[1].m_Effect == RHISubmitEffect::NoEffect &&
+						resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+						!resolution.m_DeviceLost && pool.GetQuarantinedPageCount() == 1 && cpuWaits == 0,
+						"A failed compute signal submits no graphics and retains uploads until verified idle");
+					pool.ReleaseQuarantinedAfterVerifiedIdle();
+				}
+				pool.ReclaimCompleted();
+				context.Check(pool.GetPendingPageCount() == 0 && pool.GetQuarantinedPageCount() == 0,
+					"Dependent-stream uploads retire only through the selected completion path");
+			}
+		}
+
 		void RunFrameSubmissionContractTests(SelfTestContext& context) noexcept
 		{
+			RunDependentFrameSubmissionTests(context);
 			RecordingDevice device;
 			device.m_PassConstantsEnabled = true;
 			device.m_UseControlledFenceCompletion = true;

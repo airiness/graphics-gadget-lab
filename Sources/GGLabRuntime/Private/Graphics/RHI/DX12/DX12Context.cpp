@@ -284,6 +284,7 @@ namespace gglab
 		// failed signal retains them instead of releasing them early.
 		std::array<RHISubmittedStream, 2> streams{};
 		size_t streamCount = 0;
+		DX12FencePoint computeRetentionFence{};
 		if (frame->m_ComputeAllocator)
 		{
 			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameSlotIndex);
@@ -292,6 +293,7 @@ namespace gglab
 			computeList->End();
 			const DX12CommandList* lists[] = { computeList };
 			const DX12SignalResult compute = computeQueue->ExecuteChecked(lists);
+			computeRetentionFence = compute.m_FencePoint;
 			for (RHIBufferHandle buffer : computeContext->GetUsedBuffers())
 			{
 				m_Device->RecordBufferUse(buffer, compute.m_FencePoint);
@@ -303,21 +305,56 @@ namespace gglab
 			computeContext->ClearTrackedResourceUses();
 			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute)
 				.RecycleCommandAllocator(frame->m_ComputeAllocator, compute.m_FencePoint);
-			// The graphics queue joins every compute submission before its own submission.
-			// Only a confirmed wait lets the graphics fence cover the compute work.
-			const RHIFencePoint computeFence = compute.GetCheckedFencePoint().ToRHI();
-			const bool joined = computeFence.IsValid() &&
-				m_QueueSystem->WaitForFence(RHIQueueType::Graphics, computeFence);
-			streams[streamCount++] = { RHISubmitEffect::Accepted, computeFence, joined };
+			streams[streamCount++] = {
+				RHISubmitEffect::Accepted, compute.GetCheckedFencePoint().ToRHI(), false
+			};
 		}
 
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameSlotIndex);
 		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex);
 		auto* graphicsQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
-		m_GpuProfiler->EndFrame(frame->m_FrameSlotIndex, *graphicsList);
-		graphicsList->End();
-		const DX12CommandList* lists[] = { graphicsList };
-		const DX12SignalResult graphics = graphicsQueue->ExecuteChecked(lists);
+		DX12SignalResult graphics{};
+		const auto submitGraphics = [&]() -> RHISubmittedStream
+			{
+				m_GpuProfiler->EndFrame(frame->m_FrameSlotIndex, *graphicsList);
+				graphicsList->End();
+				const DX12CommandList* lists[] = { graphicsList };
+				graphics = graphicsQueue->ExecuteChecked(lists);
+				// ExecuteCommandLists reports no failure, so an executed stream is accepted.
+				return { RHISubmitEffect::Accepted, graphics.GetCheckedFencePoint().ToRHI(), false };
+			};
+		const RHISubmittedStream graphicsStream = streamCount == 0 ?
+			submitGraphics() :
+			SubmitDependentFrameStream(streams[0],
+				[this](const RHIFencePoint& fence)
+				{
+					return m_QueueSystem->WaitForFence(RHIQueueType::Graphics, fence);
+				}, submitGraphics);
+		if (graphicsStream.m_Effect == RHISubmitEffect::NoEffect)
+		{
+			// No later CPU wait can repair a missing GPU dependency. Discard graphics before
+			// ExecuteCommandLists, but retain everything the already accepted compute can read.
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 discarded graphics after an unverified compute join.");
+			if (graphicsContext->IsRendering())
+			{
+				graphicsContext->EndRendering();
+			}
+			m_GpuProfiler->AbortFrame(frame->m_FrameSlotIndex);
+			graphicsList->End();
+			graphicsContext->ClearTrackedResourceUses();
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
+				.RecycleCommandAllocator(frame->m_GraphicsAllocator, computeRetentionFence);
+			// Keep descriptor frees pending until verified teardown. A compute fence does not
+			// cover earlier graphics users, and this poisoned context cannot submit another frame.
+			const RHISubmissionResolution resolution = ResolveFrameSubmission(
+				std::span(streams.data(), streamCount), *frame->m_Uploads,
+				MakeSubmissionVerification());
+			m_Poisoned = true;
+			FinishFrame(*frame, resolution.m_Fence);
+			return resolution.m_State == RHIFrameSubmissionState::CompletionUnknown ?
+				RHIFrameEndResult::FatalCompletionUnknown() :
+				RHIFrameEndResult::Fatal(resolution.m_Fence);
+		}
 		for (RHIBufferHandle buffer : graphicsContext->GetUsedBuffers())
 		{
 			m_Device->RecordBufferUse(buffer, graphics.m_FencePoint);
@@ -330,10 +367,7 @@ namespace gglab
 		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
 			.RecycleCommandAllocator(frame->m_GraphicsAllocator, graphics.m_FencePoint);
 		m_DescriptorManager->EndFrame(graphics.m_FencePoint);
-		// ExecuteCommandLists reports no failure, so an executed stream is always accepted.
-		streams[streamCount++] = {
-			RHISubmitEffect::Accepted, graphics.GetCheckedFencePoint().ToRHI(), false
-		};
+		streams[streamCount++] = graphicsStream;
 
 		const RHISubmissionResolution resolution = ResolveFrameSubmission(
 			std::span(streams.data(), streamCount), *frame->m_Uploads,
@@ -429,7 +463,19 @@ namespace gglab
 		{
 			return;
 		}
-		GGLAB_UNUSED(WaitIdle());
+		if (m_Poisoned)
+		{
+			return;
+		}
+		const RHIGpuWaitResult idle = WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
+		if (idle != RHIGpuWaitResult::Completed)
+		{
+			m_Poisoned = true;
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"DX12 skipped swapchain resize because idle was not verified: {}.",
+				GetRHIGpuWaitResultName(idle));
+			return;
+		}
 		m_SwapChain->Resize(width, height);
 		m_BackBufferCompletionFences.assign(m_SwapChain->GetBufferCount(), {});
 	}

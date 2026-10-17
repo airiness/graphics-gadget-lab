@@ -1,9 +1,11 @@
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
-#include <array>
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <format>
+#include <vector>
 
 namespace gglab
 {
@@ -17,6 +19,69 @@ namespace gglab
 			static std::atomic<RHIFenceHandle::IndexType> nextIndex = 0;
 			return RHIFenceHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
 		}
+	}
+
+	VkResult WaitVulkanQueuesIdle(VkDevice device, std::span<VulkanQueueIdleSignal> signals,
+		uint32_t timeoutMilliseconds, const VulkanQueueIdleDispatch& dispatch) noexcept
+	{
+		const auto started = std::chrono::steady_clock::now();
+		if (device == VK_NULL_HANDLE || signals.empty() ||
+			!dispatch.m_QueueSubmit2 || !dispatch.m_WaitSemaphores)
+		{
+			return VK_ERROR_INITIALIZATION_FAILED;
+		}
+		for (VulkanQueueIdleSignal& signal : signals)
+		{
+			signal.m_Submitted = false;
+			if (signal.m_Queue == VK_NULL_HANDLE || signal.m_Timeline == VK_NULL_HANDLE ||
+				signal.m_Value == 0)
+			{
+				return VK_ERROR_INITIALIZATION_FAILED;
+			}
+		}
+		std::vector<VkSemaphore> semaphores;
+		std::vector<uint64_t> values;
+		semaphores.reserve(signals.size());
+		values.reserve(signals.size());
+		for (VulkanQueueIdleSignal& signal : signals)
+		{
+			const VkSemaphoreSubmitInfo signalInfo{
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+				.semaphore = signal.m_Timeline,
+				.value = signal.m_Value,
+				.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+			};
+			const VkSubmitInfo2 submitInfo{
+				.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+				.signalSemaphoreInfoCount = 1,
+				.pSignalSemaphoreInfos = &signalInfo,
+			};
+			const VkResult result = dispatch.m_QueueSubmit2(
+				signal.m_Queue, 1, &submitInfo, VK_NULL_HANDLE);
+			if (result != VK_SUCCESS)
+			{
+				// Never wait on the failed marker. Earlier successful markers stay committed
+				// by the caller, and a later retry can cover the uncertain work with new ones.
+				return result;
+			}
+			signal.m_Submitted = true;
+			semaphores.push_back(signal.m_Timeline);
+			values.push_back(signal.m_Value);
+		}
+		uint64_t remaining = ToVulkanTimeoutNanoseconds(timeoutMilliseconds);
+		if (timeoutMilliseconds != RHIInfiniteWaitMilliseconds)
+		{
+			const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::steady_clock::now() - started).count();
+			remaining -= std::min(remaining, static_cast<uint64_t>(elapsed));
+		}
+		const VkSemaphoreWaitInfo waitInfo{
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+			.semaphoreCount = static_cast<uint32_t>(semaphores.size()),
+			.pSemaphores = semaphores.data(),
+			.pValues = values.data(),
+		};
+		return dispatch.m_WaitSemaphores(device, &waitInfo, remaining);
 	}
 
 	VulkanTimelineFence::~VulkanTimelineFence()
@@ -84,39 +149,6 @@ namespace gglab
 			.pValues = &value,
 		};
 		return vkWaitSemaphores(m_Device, &waitInfo, timeoutNanoseconds);
-	}
-
-	VkResult VulkanTimelineFence::CompleteReservedValuesAfterIdle() noexcept
-	{
-		if (m_Semaphore == VK_NULL_HANDLE)
-		{
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
-		if (m_ReservedValue <= m_SubmittedValue)
-		{
-			return VK_SUCCESS;
-		}
-		uint64_t completedValue = 0;
-		const VkResult counterResult = GetCompletedValue(completedValue);
-		if (counterResult != VK_SUCCESS)
-		{
-			return counterResult;
-		}
-		if (completedValue < m_ReservedValue)
-		{
-			const VkSemaphoreSignalInfo signalInfo{
-				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
-				.semaphore = m_Semaphore,
-				.value = m_ReservedValue,
-			};
-			const VkResult signalResult = vkSignalSemaphore(m_Device, &signalInfo);
-			if (signalResult != VK_SUCCESS)
-			{
-				return signalResult;
-			}
-		}
-		m_SubmittedValue = m_ReservedValue;
-		return VK_SUCCESS;
 	}
 
 	VkResult VulkanTimelineFence::GetCompletedValue(uint64_t& outValue) const noexcept

@@ -109,9 +109,6 @@ namespace gglab
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height) noexcept;
 		void FinishFrame(VulkanFrameContext& frame) noexcept;
 		[[nodiscard]] RHISubmissionVerification MakeSubmissionVerification() noexcept;
-		// Bounded wait on the committed graphics and transfer timeline values.
-		[[nodiscard]] RHIGpuWaitResult WaitCommittedTimelines(
-			uint32_t timeoutMilliseconds) const noexcept;
 		// Records natively confirmed device loss in the runtime health state.
 		void ObserveWaitResult(RHIGpuWaitResult result, std::string_view operation) noexcept;
 		void Finalize() noexcept;
