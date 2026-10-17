@@ -325,7 +325,7 @@ namespace gglab
 		// command buffer is borrowed until EndFrameRecording or AbortFrame.
 		[[nodiscard]] VulkanFrameRecording BeginFrameRecording(
 			VulkanPresentTransitionOwnership transitionOwnership =
-				VulkanPresentTransitionOwnership::FrameRuntime) noexcept;
+			VulkanPresentTransitionOwnership::FrameRuntime) noexcept;
 		// Closes the normal primary command buffer and, when selected at begin,
 		// records the frame-runtime-managed transition to presentation layout.
 		// It does not submit; EndFrame consumes the finalized recording.

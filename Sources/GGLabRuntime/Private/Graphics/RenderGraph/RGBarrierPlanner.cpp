@@ -107,7 +107,7 @@ namespace gglab
 					});
 				if (group == groups.end())
 				{
-					groups.push_back({ barrier.m_Before, barrier.m_After, {} });
+					groups.push_back({ barrier.m_Before, barrier.m_After,{} });
 					group = std::prev(groups.end());
 				}
 				group->m_Subresources.push_back(barrier.m_Subresource);
@@ -279,7 +279,7 @@ namespace gglab
 					TrackedResourceState{
 						.m_State = resource.m_InitialState,
 						.m_LastOrderedUavAccess = HasUavAccess(resource.m_InitialState)
-							? std::optional{RGDependencyAccess::ReadWrite}
+							? std::optional{ RGDependencyAccess::ReadWrite }
 							: std::nullopt,
 					});
 			}
@@ -322,7 +322,7 @@ namespace gglab
 										.m_State = stateTracker.m_InitialState,
 										.m_LastOrderedUavAccess =
 											HasUavAccess(stateTracker.m_InitialState)
-												? std::optional{RGDependencyAccess::ReadWrite}
+												? std::optional{ RGDependencyAccess::ReadWrite }
 												: std::nullopt,
 									})
 								.first;
@@ -468,7 +468,7 @@ namespace gglab
 									.m_State = stateTracker.m_InitialState,
 									.m_LastOrderedUavAccess =
 										HasUavAccess(stateTracker.m_InitialState)
-											? std::optional{RGDependencyAccess::ReadWrite}
+											? std::optional{ RGDependencyAccess::ReadWrite }
 											: std::nullopt,
 								});
 						});

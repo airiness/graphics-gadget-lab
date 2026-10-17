@@ -1112,7 +1112,9 @@ namespace gglab
 				.m_Progress = texture->m_Load.m_Progress,
 			},
 			[this, &uploadData, residencyOperation](TransferBatch& batch) noexcept
-			{ return UploadTexture(uploadData, batch, residencyOperation); },
+			{
+				return UploadTexture(uploadData, batch, residencyOperation);
+			},
 			[this, textureId, generation, residencyOperation](
 				const AssetUploadCompletionInfo& completion) noexcept
 			{

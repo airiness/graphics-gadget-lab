@@ -86,18 +86,18 @@ namespace gglab
 			if (fillMode == DebugDrawFillMode::Wireframe)
 			{
 				constexpr std::array<std::array<uint8_t, 2>, 12> edges = { {
-					{0, 1},
-					{1, 2},
-					{2, 3},
-					{3, 0},
-					{4, 5},
-					{5, 6},
-					{6, 7},
-					{7, 4},
-					{0, 4},
-					{1, 5},
-					{2, 6},
-					{3, 7},
+					{ 0, 1 },
+					{ 1, 2 },
+					{ 2, 3 },
+					{ 3, 0 },
+					{ 4, 5 },
+					{ 5, 6 },
+					{ 6, 7 },
+					{ 7, 4 },
+					{ 0, 4 },
+					{ 1, 5 },
+					{ 2, 6 },
+					{ 3, 7 },
 				} };
 				positions.reserve(edges.size() * 2);
 				for (const auto& edge : edges)
@@ -108,12 +108,12 @@ namespace gglab
 			}
 
 			constexpr std::array<std::array<uint8_t, 4>, 6> faces = { {
-				{0, 3, 2, 1},
-				{4, 5, 6, 7},
-				{0, 1, 5, 4},
-				{3, 7, 6, 2},
-				{0, 4, 7, 3},
-				{1, 2, 6, 5},
+				{ 0, 3, 2, 1 },
+				{ 4, 5, 6, 7 },
+				{ 0, 1, 5, 4 },
+				{ 3, 7, 6, 2 },
+				{ 0, 4, 7, 3 },
+				{ 1, 2, 6, 5 },
 			} };
 			positions.reserve(faces.size() * 6);
 			for (const auto& face : faces)

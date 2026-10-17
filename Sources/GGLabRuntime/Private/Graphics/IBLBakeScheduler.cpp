@@ -75,15 +75,15 @@ namespace gglab
 
 			auto assignStage = [&outIdentities, &artifacts](IBLArtifactStage stage,
 				std::initializer_list<size_t> indices) noexcept
-			{
-				auto& identity = outIdentities[static_cast<size_t>(stage)];
-				identity.m_Count = static_cast<uint32_t>(indices.size());
-				size_t destination = 0;
-				for (const size_t index : indices)
 				{
-					identity.m_ArtifactRefs[destination++] = artifacts[index];
-				}
-			};
+					auto& identity = outIdentities[static_cast<size_t>(stage)];
+					identity.m_Count = static_cast<uint32_t>(indices.size());
+					size_t destination = 0;
+					for (const size_t index : indices)
+					{
+						identity.m_ArtifactRefs[destination++] = artifacts[index];
+					}
+				};
 
 			assignStage(IBLArtifactStage::Environment, { 0, 1, 2, 3 });
 			assignStage(IBLArtifactStage::Irradiance, { 4, 5 });
@@ -91,7 +91,9 @@ namespace gglab
 			assignStage(IBLArtifactStage::BrdfLut, { 8, 9 });
 			return std::ranges::all_of(outIdentities,
 				[](const IBLStageShaderArtifactIdentity& identity) noexcept
-				{ return identity.IsValid(); });
+				{
+					return identity.IsValid();
+				});
 		}
 
 		[[nodiscard]] consteval bool ValidateResourceInitializationAbortSupersede() noexcept
@@ -142,11 +144,16 @@ namespace gglab
 		{
 			switch (stage)
 			{
-			case IBLBakeStage::Environment: return 0.1f;
-			case IBLBakeStage::Irradiance: return 0.4f;
-			case IBLBakeStage::PrefilteredSpecular: return 0.6f;
-			case IBLBakeStage::BrdfLut: return 0.8f;
-			default: return 0.0f;
+			case IBLBakeStage::Environment:
+				return 0.1f;
+			case IBLBakeStage::Irradiance:
+				return 0.4f;
+			case IBLBakeStage::PrefilteredSpecular:
+				return 0.6f;
+			case IBLBakeStage::BrdfLut:
+				return 0.8f;
+			default:
+				return 0.0f;
 			}
 		}
 	}
@@ -477,7 +484,9 @@ namespace gglab
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
-			{ CompleteCacheLookup(completion, work); });
+			{
+				CompleteCacheLookup(completion, work);
+			});
 		if (!m_CacheLookupTask.IsValid())
 		{
 			ReleaseBakingSourceLease();
@@ -908,7 +917,9 @@ namespace gglab
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
-			{ CompleteCacheWrite(completion, work); });
+			{
+				CompleteCacheWrite(completion, work);
+			});
 		if (!work->m_Task.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -943,7 +954,9 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(std::ranges::none_of(m_Status.m_Artifacts,
 			[](const IBLStageArtifactStatus& artifact) noexcept
-			{ return artifact.m_Resolution == IBLArtifactResolution::Miss; }),
+			{
+				return artifact.m_Resolution == IBLArtifactResolution::Miss;
+			}),
 			"IBL staging resources must contain a complete generation before publication.");
 		if (m_BakingRequest.m_PhysicalSky && !m_BakeAtmosphere->CanPublish())
 		{

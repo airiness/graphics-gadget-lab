@@ -39,17 +39,28 @@ namespace gglab
 	{
 		switch (failure)
 		{
-		case RGObservationFailure::None: return "None";
-		case RGObservationFailure::UnknownResource: return "UnknownResource";
-		case RGObservationFailure::UnknownPass: return "UnknownPass";
-		case RGObservationFailure::AmbiguousPass: return "AmbiguousPass";
-		case RGObservationFailure::NotAccessedByPass: return "NotAccessedByPass";
-		case RGObservationFailure::Culled: return "Culled";
-		case RGObservationFailure::UndefinedContent: return "UndefinedContent";
-		case RGObservationFailure::UnsupportedResource: return "UnsupportedResource";
-		case RGObservationFailure::UnsupportedFormat: return "UnsupportedFormat";
-		case RGObservationFailure::TooLarge: return "TooLarge";
-		case RGObservationFailure::Busy: return "Busy";
+		case RGObservationFailure::None:
+			return "None";
+		case RGObservationFailure::UnknownResource:
+			return "UnknownResource";
+		case RGObservationFailure::UnknownPass:
+			return "UnknownPass";
+		case RGObservationFailure::AmbiguousPass:
+			return "AmbiguousPass";
+		case RGObservationFailure::NotAccessedByPass:
+			return "NotAccessedByPass";
+		case RGObservationFailure::Culled:
+			return "Culled";
+		case RGObservationFailure::UndefinedContent:
+			return "UndefinedContent";
+		case RGObservationFailure::UnsupportedResource:
+			return "UnsupportedResource";
+		case RGObservationFailure::UnsupportedFormat:
+			return "UnsupportedFormat";
+		case RGObservationFailure::TooLarge:
+			return "TooLarge";
+		case RGObservationFailure::Busy:
+			return "Busy";
 		}
 		return "Unknown";
 	}
@@ -58,7 +69,10 @@ namespace gglab
 	{
 		RGObservationTarget result{ .m_Address = address, .m_Kind = kind };
 		const auto fail = [&](RGObservationFailure failure)
-			{ result.m_Failure = failure; return result; };
+			{
+				result.m_Failure = failure;
+				return result;
+			};
 		if (!m_ExecutionPlan || !m_ObservationPasses.empty())
 		{
 			return fail(RGObservationFailure::UndefinedContent);
@@ -153,10 +167,12 @@ namespace gglab
 			}
 			result.m_WriterName = m_PassNodes[node.m_Writer.Value()].m_NameId.Name();
 			for (uint32_t i = 0; i <= node.m_Writer.Value(); ++i)
+			{
 				if (m_PassNodes[i].m_NameId.Name() == result.m_WriterName)
 				{
 					++result.m_WriterOccurrence;
 				}
+			}
 		}
 		if (result.m_Type == RGResourceType::RGBuffer)
 		{
@@ -181,7 +197,10 @@ namespace gglab
 			if (!compiled.m_Imported)
 			{
 				result.m_TextureDesc.m_Usage = static_cast<RHITextureUsage>(compiled.m_UsageBits);
-				if (kind == RGObservationKind::NonFiniteScan) { result.m_TextureDesc.m_Usage |= RHITextureUsage::Sampled; }
+				if (kind == RGObservationKind::NonFiniteScan)
+				{
+					result.m_TextureDesc.m_Usage |= RHITextureUsage::Sampled;
+				}
 			}
 			const auto& desc = result.m_TextureDesc;
 			if (desc.m_Dimension != RHITextureDimension::Texture2D || desc.m_SampleCount != 1 ||
@@ -335,13 +354,17 @@ namespace gglab
 	bool RenderGraph::HasResourceObservations() const noexcept
 	{
 		return std::ranges::any_of(m_ObservationPasses, [](const auto& entry)
-			{ return entry.second.m_Kind == RGObservationKind::ResourceExport; });
+			{
+				return entry.second.m_Kind == RGObservationKind::ResourceExport;
+			});
 	}
 
 	bool RenderGraph::HasNonFiniteScans() const noexcept
 	{
 		return std::ranges::any_of(m_ObservationPasses, [](const auto& entry)
-			{ return entry.second.m_Kind != RGObservationKind::ResourceExport; });
+			{
+				return entry.second.m_Kind != RGObservationKind::ResourceExport;
+			});
 	}
 
 	bool RenderGraph::AttachObservationCopies(std::span<const RGObservationCopy> copies) noexcept
@@ -426,7 +449,12 @@ namespace gglab
 			{
 				return false;
 			}
-			struct Data { RGBufferId m_Record; RGBufferId m_Readback; RGProductionCounters m_Config; };
+			struct Data
+			{
+				RGBufferId m_Record;
+				RGBufferId m_Readback;
+				RGProductionCounters m_Config;
+			};
 			RGBufferId record;
 			const uint32_t clearIndex = static_cast<uint32_t>(m_PassNodes.size());
 			AddPass<Data>("Observation.ProductionCounters.Clear", RGPassEncoderType::Compute,
@@ -476,7 +504,11 @@ namespace gglab
 		}
 		for (const auto& copy : resolved)
 		{
-			struct Data { RGBufferId m_Readback; RGObservationCopy m_Copy; };
+			struct Data
+			{
+				RGBufferId m_Readback;
+				RGObservationCopy m_Copy;
+			};
 			const uint32_t index = static_cast<uint32_t>(m_PassNodes.size());
 			const std::string name = std::format("Observation.ResourceExport.{}", index);
 			const std::string bufferName = std::format("{}.Readback", name);

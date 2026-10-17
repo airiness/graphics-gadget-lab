@@ -11,17 +11,28 @@ namespace gglab
 	{
 		switch (semantic)
 		{
-		case NonFiniteWatchSemantic::MotionVectors: return "motion-vectors";
-		case NonFiniteWatchSemantic::AmbientOcclusion: return "ambient-occlusion";
-		case NonFiniteWatchSemantic::TemporalInput: return "scene-color.temporal-input";
-		case NonFiniteWatchSemantic::PostProcessInput: return "scene-color.post-process-input";
-		case NonFiniteWatchSemantic::Environment: return "ibl.environment";
-		case NonFiniteWatchSemantic::Irradiance: return "ibl.irradiance";
-		case NonFiniteWatchSemantic::Specular: return "ibl.specular";
-		case NonFiniteWatchSemantic::AtmosphereTransmittance: return "atmosphere.transmittance";
-		case NonFiniteWatchSemantic::AtmosphereMultipleScattering: return "atmosphere.multiple-scattering";
-		case NonFiniteWatchSemantic::AtmosphereSkyView: return "atmosphere.sky-view";
-		default: return "unknown";
+		case NonFiniteWatchSemantic::MotionVectors:
+			return "motion-vectors";
+		case NonFiniteWatchSemantic::AmbientOcclusion:
+			return "ambient-occlusion";
+		case NonFiniteWatchSemantic::TemporalInput:
+			return "scene-color.temporal-input";
+		case NonFiniteWatchSemantic::PostProcessInput:
+			return "scene-color.post-process-input";
+		case NonFiniteWatchSemantic::Environment:
+			return "ibl.environment";
+		case NonFiniteWatchSemantic::Irradiance:
+			return "ibl.irradiance";
+		case NonFiniteWatchSemantic::Specular:
+			return "ibl.specular";
+		case NonFiniteWatchSemantic::AtmosphereTransmittance:
+			return "atmosphere.transmittance";
+		case NonFiniteWatchSemantic::AtmosphereMultipleScattering:
+			return "atmosphere.multiple-scattering";
+		case NonFiniteWatchSemantic::AtmosphereSkyView:
+			return "atmosphere.sky-view";
+		default:
+			return "unknown";
 		}
 	}
 

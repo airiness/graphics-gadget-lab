@@ -313,10 +313,8 @@ namespace gglab
 			}
 
 			const ModelID modelId = ToModelId(commit.m_Model);
-			if (m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyOwner(
-					modelId) ||
-				m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(
-					modelId))
+			if (m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyOwner(modelId) ||
+				m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(modelId))
 			{
 				return "Model already owns dependency interests before publication commit";
 			}

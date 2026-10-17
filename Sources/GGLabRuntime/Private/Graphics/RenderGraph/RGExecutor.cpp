@@ -150,7 +150,7 @@ namespace gglab
 				}
 				if (record)
 				{
-					record->m_Barriers.push_back({ passIndex, post, {
+					record->m_Barriers.push_back({ passIndex, post,{
 						.m_VirtualResourceIndex = intent.m_Resource.Value(),
 						.m_ResourceName = std::string(resource.m_NameId.Name()),
 						.m_ResourceType = resource.m_ResourceType,

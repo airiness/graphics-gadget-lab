@@ -123,7 +123,9 @@ namespace gglab
 		[[nodiscard]] bool ReclaimUnseenSlot() noexcept
 		{
 			const auto stale = std::ranges::find_if(m_Records, [this](const auto& item)
-				{ return item.second.m_LastSeenUpdate != m_UpdateSerial; });
+				{
+					return item.second.m_LastSeenUpdate != m_UpdateSerial;
+				});
 			if (stale == m_Records.end())
 			{
 				return false;

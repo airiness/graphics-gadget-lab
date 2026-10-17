@@ -146,7 +146,9 @@ namespace gglab
 				return m_Attempt != 0 && m_Generation != 0 && (m_Source.IsValid() || m_PhysicalSky) &&
 					m_ShaderRegistry.IsValid() && std::ranges::all_of(m_ShaderArtifacts,
 						[](const IBLStageShaderArtifactIdentity& identity) noexcept
-						{ return identity.IsValid(); });
+						{
+							return identity.IsValid();
+						});
 			}
 		};
 

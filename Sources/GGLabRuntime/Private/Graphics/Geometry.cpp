@@ -83,43 +83,43 @@ namespace gglab
 		std::vector<Vertex> Cube::GetVerticesData() noexcept
 		{
 			constexpr std::array<std::array<Vector3, VertexCountPerFace>, FaceCount> facePositions = { {
-				// Front face (-Z)
-				{{{-1.0f, -1.0f, -1.0f}, {-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, -1.0f}, {1.0f, -1.0f, -1.0f}}},
-				// Back face (+Z)
-				{{{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f, 1.0f}}},
-				// Top face (+Y)
-				{{{-1.0f, 1.0f, -1.0f}, {-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, -1.0f}}},
-				// Bottom face (-Y)
-				{{{-1.0f, -1.0f, 1.0f}, {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, 1.0f}}},
-				// Left face (-X)
-				{{{-1.0f, -1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}}},
-				// Right face (+X)
-				{{{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, -1.0f, 1.0f}}},
-			} };
+					// Front face (-Z)
+					{ { { -1.0f, -1.0f, -1.0f },{ -1.0f, 1.0f, -1.0f },{ 1.0f, 1.0f, -1.0f },{ 1.0f, -1.0f, -1.0f } } },
+					// Back face (+Z)
+					{ { { 1.0f, -1.0f, 1.0f },{ 1.0f, 1.0f, 1.0f },{ -1.0f, 1.0f, 1.0f },{ -1.0f, -1.0f, 1.0f } } },
+					// Top face (+Y)
+					{ { { -1.0f, 1.0f, -1.0f },{ -1.0f, 1.0f, 1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 1.0f, -1.0f } } },
+					// Bottom face (-Y)
+					{ { { -1.0f, -1.0f, 1.0f },{ -1.0f, -1.0f, -1.0f },{ 1.0f, -1.0f, -1.0f },{ 1.0f, -1.0f, 1.0f } } },
+					// Left face (-X)
+					{ { { -1.0f, -1.0f, 1.0f },{ -1.0f, 1.0f, 1.0f },{ -1.0f, 1.0f, -1.0f },{ -1.0f, -1.0f, -1.0f } } },
+					// Right face (+X)
+					{ { { 1.0f, -1.0f, -1.0f },{ 1.0f, 1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, -1.0f, 1.0f } } },
+				} };
 
 			constexpr std::array<Vector2, VertexCountPerFace> texCoords = { {
-				{0.0f, 1.0f},
-				{0.0f, 0.0f},
-				{1.0f, 0.0f},
-				{1.0f, 1.0f},
+				{ 0.0f, 1.0f },
+				{ 0.0f, 0.0f },
+				{ 1.0f, 0.0f },
+				{ 1.0f, 1.0f },
 			} };
 
 			constexpr std::array<Vector3, FaceCount> faceNormals = { {
-				{0.0f, 0.0f, -1.0f}, // Front
-				{0.0f, 0.0f, 1.0f},	 // Back
-				{0.0f, 1.0f, 0.0f},	 // Top
-				{0.0f, -1.0f, 0.0f}, // Bottom
-				{-1.0f, 0.0f, 0.0f}, // Left
-				{1.0f, 0.0f, 0.0f},	 // Right
+				{ 0.0f, 0.0f, -1.0f }, // Front
+				{ 0.0f, 0.0f, 1.0f },	 // Back
+				{ 0.0f, 1.0f, 0.0f },	 // Top
+				{ 0.0f, -1.0f, 0.0f }, // Bottom
+				{ -1.0f, 0.0f, 0.0f }, // Left
+				{ 1.0f, 0.0f, 0.0f },	 // Right
 			} };
 
 			constexpr std::array<Vector4, FaceCount> faceTangents = { {
-				{1.0f, 0.0f, 0.0f, 1.0f},  // Front
-				{-1.0f, 0.0f, 0.0f, 1.0f}, // Back
-				{1.0f, 0.0f, 0.0f, 1.0f},  // Top
-				{1.0f, 0.0f, 0.0f, 1.0f},  // Bottom
-				{0.0f, 0.0f, -1.0f, 1.0f}, // Left
-				{0.0f, 0.0f, 1.0f, 1.0f},  // Right
+				{ 1.0f, 0.0f, 0.0f, 1.0f },  // Front
+				{ -1.0f, 0.0f, 0.0f, 1.0f }, // Back
+				{ 1.0f, 0.0f, 0.0f, 1.0f },  // Top
+				{ 1.0f, 0.0f, 0.0f, 1.0f },  // Bottom
+				{ 0.0f, 0.0f, -1.0f, 1.0f }, // Left
+				{ 0.0f, 0.0f, 1.0f, 1.0f },  // Right
 			} };
 
 			std::vector<Vertex> vertices;

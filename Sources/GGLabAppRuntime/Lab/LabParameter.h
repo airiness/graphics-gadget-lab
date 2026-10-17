@@ -18,7 +18,8 @@ namespace gglab
 		explicit LabParameterId(std::string_view name) noexcept :
 			m_Hash(name),
 			m_Name(name)
-		{}
+		{
+		}
 
 		bool IsValid() const noexcept { return !m_Name.empty(); }
 		std::string_view GetName() const noexcept { return m_Name; }

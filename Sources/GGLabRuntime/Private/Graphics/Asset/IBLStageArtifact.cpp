@@ -90,7 +90,9 @@ namespace gglab
 	bool IBLStageArtifactSet::IsComplete() const noexcept
 	{
 		return std::ranges::all_of(m_Artifacts, [](const IBLStageArtifactHandle& artifact) noexcept
-			{ return artifact && artifact->IsValid(); });
+			{
+				return artifact && artifact->IsValid();
+			});
 	}
 
 	ArtifactContentDigest ComputeIBLStageArtifactContentDigest(

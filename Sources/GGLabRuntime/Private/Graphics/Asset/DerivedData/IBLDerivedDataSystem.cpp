@@ -16,13 +16,13 @@ namespace gglab
 {
 	namespace
 	{
-		constexpr std::array<std::string_view, static_cast<size_t>(IBLArtifactStage::Count)>
-			ArtifactTypes = {
-				"gglab.ibl.environment",
-				"gglab.ibl.irradiance",
-				"gglab.ibl.prefiltered_specular",
-				"gglab.ibl.brdf_lut",
-			};
+		constexpr std::array<std::string_view, static_cast<size_t>(IBLArtifactStage::Count)> ArtifactTypes =
+		{
+			"gglab.ibl.environment",
+			"gglab.ibl.irradiance",
+			"gglab.ibl.prefiltered_specular",
+			"gglab.ibl.brdf_lut",
+		};
 
 		bool AddCommonKeyFields(DerivedDataKeyBuilder& builder, IBLArtifactStage stage,
 			IBLArtifactCompatibility compatibility, std::string_view adapterScopeIdentity,

@@ -74,7 +74,7 @@ namespace gglab
 		m_State = TemporalFrameTransactionState::Pending;
 		m_Resolution = resolution;
 		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, resolution, m_ColorAbi)
-										: TemporalHistoryFrameState{};
+			: TemporalHistoryFrameState{};
 		m_HasCompatiblePreviousView =
 			plan.HasService(TemporalService::FrameContinuity) && IsCompatible(viewHistory) &&
 			(!historyManager || !plan.HasService(TemporalService::ColorDepthHistory) ||

@@ -67,7 +67,7 @@ namespace gglab
 					.m_BlendStart = cascade.m_BlendStart,
 					.m_Projection = cascade.m_Projection,
 					.m_Bias = cascade.m_Bias,
-				});
+					});
 			}
 		}
 		const auto* resources =

@@ -32,7 +32,8 @@ namespace gglab
 			{
 			case NonFiniteClampPolicyKind::Report:
 			case NonFiniteClampPolicyKind::Error:
-			case NonFiniteClampPolicyKind::Expected: return true;
+			case NonFiniteClampPolicyKind::Expected:
+				return true;
 			case NonFiniteClampPolicyKind::Budgeted:
 				return std::isfinite(policy.m_MaxMagnitude) && policy.m_MaxMagnitude >= 0.0f;
 			}
@@ -66,7 +67,11 @@ namespace gglab
 	{
 		NonFiniteBufferScanLayout result;
 		const auto fail = [&](NonFiniteScanLayoutFailure failure)
-			{ result.m_Failure = failure; result.m_Components.clear(); return result; };
+			{
+				result.m_Failure = failure;
+				result.m_Components.clear();
+				return result;
+			};
 		if (!validElementCount)
 		{
 			return fail(NonFiniteScanLayoutFailure::MissingValidElementCount);
@@ -83,11 +88,18 @@ namespace gglab
 			uint32_t size = 0;
 			switch (field.m_Scalar)
 			{
-			case GpuBufferScalar::Uint8: size = 1; break;
-			case GpuBufferScalar::Float16: size = 2; break;
+			case GpuBufferScalar::Uint8:
+				size = 1;
+				break;
+			case GpuBufferScalar::Float16:
+				size = 2;
+				break;
 			case GpuBufferScalar::Uint32:
-			case GpuBufferScalar::Float32: size = 4; break;
-			default: return fail(NonFiniteScanLayoutFailure::InvalidLayout);
+			case GpuBufferScalar::Float32:
+				size = 4;
+				break;
+			default:
+				return fail(NonFiniteScanLayoutFailure::InvalidLayout);
 			}
 			if (!field.m_Name || field.m_Name[0] == '\0' || field.m_Count == 0 ||
 				field.m_Offset >= layout.m_Stride || field.m_Offset % size != 0 ||
@@ -274,11 +286,16 @@ namespace gglab
 	{
 		switch (value)
 		{
-		case NonFiniteInjectionValue::NaN: return 0x7fc00000u;
-		case NonFiniteInjectionValue::PositiveInfinity: return 0x7f800000u;
-		case NonFiniteInjectionValue::NegativeInfinity: return 0xff800000u;
-		case NonFiniteInjectionValue::Overflow: return std::bit_cast<uint32_t>(NonFiniteInjectionOverflow);
-		case NonFiniteInjectionValue::Negative: return std::bit_cast<uint32_t>(NonFiniteInjectionNegative);
+		case NonFiniteInjectionValue::NaN:
+			return 0x7fc00000u;
+		case NonFiniteInjectionValue::PositiveInfinity:
+			return 0x7f800000u;
+		case NonFiniteInjectionValue::NegativeInfinity:
+			return 0xff800000u;
+		case NonFiniteInjectionValue::Overflow:
+			return std::bit_cast<uint32_t>(NonFiniteInjectionOverflow);
+		case NonFiniteInjectionValue::Negative:
+			return std::bit_cast<uint32_t>(NonFiniteInjectionNegative);
 		}
 		GGLAB_UNREACHABLE("Unhandled NonFiniteInjectionValue.");
 	}
@@ -306,11 +323,16 @@ namespace gglab
 	{
 		switch (value)
 		{
-		case NonFiniteInjectionValue::NaN: return "NaN";
-		case NonFiniteInjectionValue::PositiveInfinity: return "PositiveInfinity";
-		case NonFiniteInjectionValue::NegativeInfinity: return "NegativeInfinity";
-		case NonFiniteInjectionValue::Overflow: return "Overflow";
-		case NonFiniteInjectionValue::Negative: return "Negative";
+		case NonFiniteInjectionValue::NaN:
+			return "NaN";
+		case NonFiniteInjectionValue::PositiveInfinity:
+			return "PositiveInfinity";
+		case NonFiniteInjectionValue::NegativeInfinity:
+			return "NegativeInfinity";
+		case NonFiniteInjectionValue::Overflow:
+			return "Overflow";
+		case NonFiniteInjectionValue::Negative:
+			return "Negative";
 		}
 		GGLAB_UNREACHABLE("Unhandled NonFiniteInjectionValue.");
 	}
@@ -354,10 +376,10 @@ namespace gglab
 			frame.m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
 			frame.m_Sites.reserve(nonfinite::SiteCount * nonfinite::ProgramCount);
 			const auto policy = [](std::string_view kind)
-			{
-				return NonFiniteClampPolicy{ kind == "error" ? NonFiniteClampPolicyKind::Error :
-					kind == "expected" ? NonFiniteClampPolicyKind::Expected : NonFiniteClampPolicyKind::Report };
-			};
+				{
+					return NonFiniteClampPolicy{ kind == "error" ? NonFiniteClampPolicyKind::Error :
+						kind == "expected" ? NonFiniteClampPolicyKind::Expected : NonFiniteClampPolicyKind::Report };
+				};
 			for (uint32_t program = 0; program < nonfinite::ProgramCount; ++program)
 			{
 				for (uint32_t site = 0; site < nonfinite::SiteCount; ++site)

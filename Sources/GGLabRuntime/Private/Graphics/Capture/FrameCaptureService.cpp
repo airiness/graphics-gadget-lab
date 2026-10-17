@@ -149,7 +149,9 @@ namespace gglab
 					request.m_Source == FrameCaptureSource::NonFiniteScan ||
 					(request.m_FrameSerial != 0 && request.m_FrameSerial != selectedFrame) ||
 					std::ranges::any_of(requiredImages, [&](const QueuedRequest& required)
-						{ return IsBoundBy(request, required.m_Source, required.m_DiagnosticTap); }))
+						{
+							return IsBoundBy(request, required.m_Source, required.m_DiagnosticTap);
+						}))
 				{
 					return false;
 				}
@@ -350,16 +352,20 @@ namespace gglab
 		tap.m_GraphExportActive = true;
 		graph.EnableExecutionRecord();
 		for (auto& consumer : m_Taps)
+		{
 			if (consumer.m_FrameSerial == frameSerial)
 			{
 				consumer.m_GraphExportActive = true;
 			}
+		}
 		for (auto& resources : m_Taps)
+		{
 			if (resources.m_FrameSerial == frameSerial && (resources.m_Source == FrameCaptureSource::ResourceExport || resources.m_Source == FrameCaptureSource::NonFiniteScan) &&
 				!resources.m_Requests.empty() && resources.m_Requests[0].m_IncludeGraph)
 			{
 				resources.m_Graph = tap.m_Graph;
 			}
+		}
 		if (!tap.m_Requests.empty())
 		{
 			m_Taps.push_back(std::move(tap));
@@ -369,7 +375,9 @@ namespace gglab
 	void FrameCaptureService::EndGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
 		if (!std::ranges::any_of(m_Taps, [&](const Tap& tap)
-			{ return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted; }))
+			{
+				return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted;
+			}))
 		{
 			return;
 		}

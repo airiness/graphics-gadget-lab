@@ -1036,7 +1036,9 @@ namespace gglab
 	{
 		const size_t removed = std::erase_if(m_State->m_AssetResidencyCoordinator.PendingRetirements(),
 			[contentVersion](const AssetResidencyCoordinator::PendingRetirement& pending) noexcept
-			{ return pending.m_ContentVersion == contentVersion; });
+			{
+				return pending.m_ContentVersion == contentVersion;
+			});
 		m_State->m_AssetPublicationCoordinator.m_Accounting.m_RuntimeRetirementCancellationCount += removed;
 	}
 
@@ -1111,7 +1113,9 @@ namespace gglab
 				{
 					return std::ranges::any_of(candidate->m_MeshInstance,
 						[materialId](const ModelMesh& instance) noexcept
-						{ return instance.m_MaterialId == materialId; });
+						{
+							return instance.m_MaterialId == materialId;
+						});
 				});
 			if (!referenced)
 			{
@@ -2018,7 +2022,9 @@ namespace gglab
 		uint32_t structuralFailureCount = 0;
 		const auto addDependency = [&dependencies](AssetContentVersion contentVersion,
 			const AssetLifecycle& lifecycle) noexcept
-			{ dependencies.push_back(MakeDependencyStatus(contentVersion, lifecycle)); };
+			{
+				dependencies.push_back(MakeDependencyStatus(contentVersion, lifecycle));
+			};
 
 		if (model->m_MeshInstance.empty())
 		{
@@ -2597,7 +2603,9 @@ namespace gglab
 						.m_Progress = currentMesh->m_LoadProgress,
 					},
 					[this, payload, residencyOperation](TransferBatch& batch) noexcept
-					{ return UploadMesh(*payload, batch, residencyOperation); },
+					{
+						return UploadMesh(*payload, batch, residencyOperation);
+					},
 					[this, meshId, generation, residencyOperation](
 						const AssetUploadCompletionInfo& completion) noexcept
 					{
@@ -2702,7 +2710,9 @@ namespace gglab
 				.m_Progress = model->m_LoadProgress,
 			},
 			[this, operation, completion, artifact = std::move(artifact)]() mutable noexcept
-			{ CompleteModelLoad(operation, completion, std::move(artifact)); });
+			{
+				CompleteModelLoad(operation, completion, std::move(artifact));
+			});
 	}
 
 	void AssetManager::RouteMeshReloadCompletion(AssetOperationToken operation,
@@ -2741,7 +2751,9 @@ namespace gglab
 				.m_Priority = completion.m_Priority,
 			},
 			[this, operation, completion, artifact = std::move(artifact)]() mutable noexcept
-			{ CompleteMeshReload(operation, completion, std::move(artifact)); });
+			{
+				CompleteMeshReload(operation, completion, std::move(artifact));
+			});
 	}
 
 	void AssetManager::CompleteModelLoad(AssetOperationToken operation,

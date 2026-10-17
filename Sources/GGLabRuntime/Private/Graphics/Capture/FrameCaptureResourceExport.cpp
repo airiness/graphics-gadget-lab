@@ -21,10 +21,14 @@ namespace gglab
 	{
 		switch (scalar)
 		{
-		case ResourceExportScalar::Uint8: return "|u1";
-		case ResourceExportScalar::Uint32: return "<u4";
-		case ResourceExportScalar::Float16: return "<f2";
-		case ResourceExportScalar::Float32: return "<f4";
+		case ResourceExportScalar::Uint8:
+			return "|u1";
+		case ResourceExportScalar::Uint32:
+			return "<u4";
+		case ResourceExportScalar::Float16:
+			return "<f2";
+		case ResourceExportScalar::Float32:
+			return "<f4";
 		}
 		return "Unknown";
 	}
@@ -90,22 +94,49 @@ namespace gglab
 			}
 			switch (format)
 			{
-			case RHIFormat::R8Unorm: scalar = ResourceExportScalar::Uint8; break;
+			case RHIFormat::R8Unorm:
+				scalar = ResourceExportScalar::Uint8;
+				break;
 			case RHIFormat::R8G8B8A8Unorm:
 			case RHIFormat::R8G8B8A8UnormSrgb:
 			case RHIFormat::B8G8R8A8Unorm:
-			case RHIFormat::B8G8R8A8UnormSrgb: scalar = ResourceExportScalar::Uint8; channels = 4; break;
-			case RHIFormat::R16Float: scalar = ResourceExportScalar::Float16; break;
-			case RHIFormat::R16G16Float: scalar = ResourceExportScalar::Float16; channels = 2; break;
-			case RHIFormat::R16G16B16A16Float: scalar = ResourceExportScalar::Float16; channels = 4; break;
+			case RHIFormat::B8G8R8A8UnormSrgb:
+				scalar = ResourceExportScalar::Uint8;
+				channels = 4;
+				break;
+			case RHIFormat::R16Float:
+				scalar = ResourceExportScalar::Float16;
+				break;
+			case RHIFormat::R16G16Float:
+				scalar = ResourceExportScalar::Float16;
+				channels = 2;
+				break;
+			case RHIFormat::R16G16B16A16Float:
+				scalar = ResourceExportScalar::Float16;
+				channels = 4;
+				break;
 			case RHIFormat::R32Float:
 			case RHIFormat::D32Float:
-			case RHIFormat::D24UnormS8Uint: scalar = ResourceExportScalar::Float32; break;
-			case RHIFormat::R32G32Float: scalar = ResourceExportScalar::Float32; channels = 2; break;
-			case RHIFormat::R32G32B32Float: scalar = ResourceExportScalar::Float32; channels = 3; break;
-			case RHIFormat::R32G32B32A32Float: scalar = ResourceExportScalar::Float32; channels = 4; break;
-			case RHIFormat::R32Uint: scalar = ResourceExportScalar::Uint32; break;
-			default: return false;
+			case RHIFormat::D24UnormS8Uint:
+				scalar = ResourceExportScalar::Float32;
+				break;
+			case RHIFormat::R32G32Float:
+				scalar = ResourceExportScalar::Float32;
+				channels = 2;
+				break;
+			case RHIFormat::R32G32B32Float:
+				scalar = ResourceExportScalar::Float32;
+				channels = 3;
+				break;
+			case RHIFormat::R32G32B32A32Float:
+				scalar = ResourceExportScalar::Float32;
+				channels = 4;
+				break;
+			case RHIFormat::R32Uint:
+				scalar = ResourceExportScalar::Uint32;
+				break;
+			default:
+				return false;
 			}
 			return true;
 		}
@@ -145,7 +176,9 @@ namespace gglab
 				if (layout.m_Stride == stride && !layout.m_Fields.empty())
 				{
 					for (const auto& field : layout.m_Fields)
+					{
 						array.m_Fields.push_back({ field.m_Name, field.m_Offset, field.m_Scalar, field.m_Count });
+					}
 					array.m_Shape = { array.m_ElementCount };
 				}
 				array.m_Encoding = "raw";
@@ -220,7 +253,8 @@ namespace gglab
 			{
 				if (includeProduction)
 				{
-					bytes += ProductionPayloadBytes; ++slots;
+					bytes += ProductionPayloadBytes;
+					++slots;
 				}
 				continue;
 			}
@@ -240,24 +274,48 @@ namespace gglab
 			{
 				for (const auto& readback : tap.m_ExportReadbacks)
 				{
-					bytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes; ++slots;
+					bytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
+					++slots;
 				}
 			}
-			else { bytes += tap.m_Footprint.m_SizeInBytes + tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height; ++slots; }
+			else
+			{
+				bytes += tap.m_Footprint.m_SizeInBytes + tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height;
+				++slots;
+			}
 		}
 		for (const auto& production : m_RetainedProduction)
 		{
 			if (includeProduction && !production.expired())
 			{
-				bytes += ProductionCpuBytes; ++slots;
+				bytes += ProductionCpuBytes;
+				++slots;
 			}
 		}
 		for (const auto& image : m_RetainedImages)
-			if (!image.m_Image.expired()) { bytes += image.m_Bytes; ++slots; }
+		{
+			if (!image.m_Image.expired())
+			{
+				bytes += image.m_Bytes;
+				++slots;
+			}
+		}
 		for (const auto& payload : m_RetainedExports)
-			if (!payload.m_Payload.expired()) { bytes += payload.m_Bytes; slots += payload.m_Slots; }
+		{
+			if (!payload.m_Payload.expired())
+			{
+				bytes += payload.m_Bytes;
+				slots += payload.m_Slots;
+			}
+		}
 		for (const auto& payload : m_RetainedScans)
-			if (!payload.m_Payload.expired()) { bytes += payload.m_Bytes; slots += payload.m_Slots; }
+		{
+			if (!payload.m_Payload.expired())
+			{
+				bytes += payload.m_Bytes;
+				slots += payload.m_Slots;
+			}
+		}
 		return { bytes, slots };
 	}
 
@@ -301,7 +359,11 @@ namespace gglab
 	{
 		const auto defer = [&](const QueuedRequest& request)
 			{
-				if (request.m_FrameSerial == 0) { m_Queued.push_back(request); return; }
+				if (request.m_FrameSerial == 0)
+				{
+					m_Queued.push_back(request);
+					return;
+				}
 				m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = request.m_Source,
 					.m_Status = FrameCaptureStatus::Busy, .m_FrameSerial = frameSerial,
 					.m_ResourceFailure = RGObservationFailure::Busy });
@@ -312,7 +374,10 @@ namespace gglab
 				{
 					return false;
 				}
-				for (const auto& request : tap.m_Requests) defer(request);
+				for (const auto& request : tap.m_Requests)
+				{
+					defer(request);
+				}
 				return true;
 			});
 		std::erase_if(m_Queued, [&](const QueuedRequest& request)
@@ -357,7 +422,8 @@ namespace gglab
 				DeferFrameCaptures(frameSerial);
 				return FrameCaptureAvailability::Busy;
 			}
-			usedBytes += ProductionPayloadBytes; ++usedSlots;
+			usedBytes += ProductionPayloadBytes;
+			++usedSlots;
 		}
 		bool deferFrame = false;
 		// Unbound images record after graph observation admission. Reserve their slots while
@@ -388,7 +454,9 @@ namespace gglab
 		}
 		// Exact sequence groups claim this frame before flexible concurrent exports.
 		std::stable_sort(m_Queued.begin(), m_Queued.end(), [](const auto& a, const auto& b)
-			{ return a.m_DeferFrameOnBusy && !b.m_DeferFrameOnBusy; });
+			{
+				return a.m_DeferFrameOnBusy && !b.m_DeferFrameOnBusy;
+			});
 		std::erase_if(m_Queued, [&](const QueuedRequest& request)
 			{
 				if ((request.m_Source != FrameCaptureSource::ResourceExport && request.m_Source != FrameCaptureSource::NonFiniteScan) ||
@@ -423,7 +491,11 @@ namespace gglab
 						break;
 					}
 					const auto& target = readback.m_Copy.m_Target;
-					if (!DescribeArray(target, readback.m_Array, context)) { failure = RGObservationFailure::UnsupportedFormat; break; }
+					if (!DescribeArray(target, readback.m_Array, context))
+					{
+						failure = RGObservationFailure::UnsupportedFormat;
+						break;
+					}
 					if (readback.m_Array.m_Semantics)
 					{
 						readback.m_Array.m_Semantics->m_WatchTier = GetNonFiniteDefaultWatchTier(graph, target);
@@ -433,20 +505,30 @@ namespace gglab
 						readback.m_Copy.m_Footprint = ComputeRHIObservationCopyFootprint(target.m_TextureDesc,
 							target.m_Subresources.m_BaseMip, target.m_Subresources.m_Aspects);
 						const auto& footprint = readback.m_Copy.m_Footprint;
-						if (!footprint.IsValid()) { failure = RGObservationFailure::UnsupportedFormat; break; }
-						if (footprint.m_SizeInBytes > m_Limits.m_MaxPayloadBytes) { failure = RGObservationFailure::TooLarge; break; }
+						if (!footprint.IsValid())
+						{
+							failure = RGObservationFailure::UnsupportedFormat;
+							break;
+						}
+						if (footprint.m_SizeInBytes > m_Limits.m_MaxPayloadBytes)
+						{
+							failure = RGObservationFailure::TooLarge;
+							break;
+						}
 						// Every slice starts at both a placed-footprint and texel-block boundary.
 						// In particular, RGB32F needs lcm(512, 12), not just 512 bytes.
 						const uint64_t sliceAlignment = std::lcm<uint64_t>(RHITextureCopyPlacementAlignment, footprint.m_BytesPerTexel);
 						const uint64_t slicePadding = (sliceAlignment - footprint.m_SizeInBytes % sliceAlignment) % sliceAlignment;
 						if (slicePadding > m_Limits.m_MaxPayloadBytes - footprint.m_SizeInBytes)
 						{
-							failure = RGObservationFailure::TooLarge; break;
+							failure = RGObservationFailure::TooLarge;
+							break;
 						}
 						readback.m_Copy.m_SlicePitch = footprint.m_SizeInBytes + slicePadding;
 						if (readback.m_Copy.m_SlicePitch > m_Limits.m_MaxPayloadBytes / target.m_Subresources.m_ArraySliceCount)
 						{
-							failure = RGObservationFailure::TooLarge; break;
+							failure = RGObservationFailure::TooLarge;
+							break;
 						}
 						readback.m_Copy.m_ReadbackBytes = readback.m_Copy.m_SlicePitch * target.m_Subresources.m_ArraySliceCount;
 						readback.m_CpuBytes = footprint.m_RowSizeInBytes * footprint.m_Height * target.m_Subresources.m_ArraySliceCount;
@@ -459,7 +541,8 @@ namespace gglab
 						readback.m_CpuBytes > m_Limits.m_MaxPayloadBytes - readback.m_Copy.m_ReadbackBytes ||
 						bytes > m_Limits.m_MaxPayloadBytes - readback.m_Copy.m_ReadbackBytes - readback.m_CpuBytes)
 					{
-						failure = RGObservationFailure::TooLarge; break;
+						failure = RGObservationFailure::TooLarge;
+						break;
 					}
 					bytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
 					tap.m_ExportReadbacks.push_back(std::move(readback));
@@ -475,7 +558,8 @@ namespace gglab
 					const uint64_t scanBytes = readback.GetPayloadBytes();
 					if (scanBytes > m_Limits.m_MaxPayloadBytes || bytes > m_Limits.m_MaxPayloadBytes - scanBytes)
 					{
-						failure = RGObservationFailure::TooLarge; break;
+						failure = RGObservationFailure::TooLarge;
+						break;
 					}
 					bytes += scanBytes;
 					tap.m_ScanReadbacks.push_back(std::move(readback));
@@ -491,10 +575,19 @@ namespace gglab
 					for (const auto& observation : prepared)
 					{
 						required += observation.m_ExportReadbacks.size() + (observation.m_ScanReadbacks.empty() ? 0u : 1u);
-						for (const auto& readback : observation.m_ExportReadbacks) { requiredBytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes; }
-						for (const auto& readback : observation.m_ScanReadbacks) { requiredBytes += readback.GetPayloadBytes(); }
+						for (const auto& readback : observation.m_ExportReadbacks)
+						{
+							requiredBytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
+						}
+						for (const auto& readback : observation.m_ScanReadbacks)
+						{
+							requiredBytes += readback.GetPayloadBytes();
+						}
 					}
-					if (required > m_Limits.m_MaxPayloads || requiredBytes > m_Limits.m_MaxPayloadBytes) { failure = RGObservationFailure::TooLarge; }
+					if (required > m_Limits.m_MaxPayloads || requiredBytes > m_Limits.m_MaxPayloadBytes)
+					{
+						failure = RGObservationFailure::TooLarge;
+					}
 				}
 				// A flexible export can follow an already admitted fail-mode scan. That
 				// scan is required on every retry, so include it in the idle-frame minimum
@@ -536,7 +629,8 @@ namespace gglab
 				{
 					if (failure == RGObservationFailure::Busy && request.m_DeferFrameOnBusy)
 					{
-						deferFrame = true; return false;
+						deferFrame = true;
+						return false;
 					}
 					m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = request.m_Source,
 						.m_Status = failure == RGObservationFailure::Busy ? FrameCaptureStatus::Busy : FrameCaptureStatus::Failed,
@@ -552,7 +646,13 @@ namespace gglab
 			});
 		if (deferFrame)
 		{
-			for (auto& tap : prepared) for (auto& request : tap.m_Requests) m_Queued.push_back(std::move(request));
+			for (auto& tap : prepared)
+			{
+				for (auto& request : tap.m_Requests)
+				{
+					m_Queued.push_back(std::move(request));
+				}
+			}
 			DeferFrameCaptures(frameSerial);
 			return FrameCaptureAvailability::Busy;
 		}
@@ -565,20 +665,36 @@ namespace gglab
 			{
 				readback.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = readback.m_Copy.m_ReadbackBytes,
 					.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu, .m_DebugName = "ResourceExport.Readback" }));
-				if (!readback.m_Buffer) { allocated = false; break; }
+				if (!readback.m_Buffer)
+				{
+					allocated = false;
+					break;
+				}
 				readback.m_Copy.m_Readback = readback.m_Buffer.Get();
 			}
 			for (auto& readback : tap.m_ScanReadbacks)
 			{
-				if (!AllocateScanReadback(readback)) { allocated = false; break; }
+				if (!AllocateScanReadback(readback))
+				{
+					allocated = false;
+					break;
+				}
 			}
 			if (!allocated)
 			{
 				FailTap(tap, frameSerial, "Observation readback allocation or scan program resolution failed.");
-				tap.m_ExportReadbacks.clear(); tap.m_ScanReadbacks.clear(); continue;
+				tap.m_ExportReadbacks.clear();
+				tap.m_ScanReadbacks.clear();
+				continue;
 			}
-			for (const auto& readback : tap.m_ExportReadbacks) copies.push_back(readback.m_Copy);
-			for (const auto& readback : tap.m_ScanReadbacks) scans.push_back(readback.m_Scan);
+			for (const auto& readback : tap.m_ExportReadbacks)
+			{
+				copies.push_back(readback.m_Copy);
+			}
+			for (const auto& readback : tap.m_ScanReadbacks)
+			{
+				scans.push_back(readback.m_Scan);
+			}
 		}
 		if (!graph.AttachObservations(copies, scans, m_ProductionEnabled ? &counters : nullptr))
 		{
@@ -638,7 +754,11 @@ namespace gglab
 		{
 			const auto* mapped = static_cast<const uint8_t*>(m_Device->MapBuffer(readback.m_Buffer.Get(),
 				{ .m_Begin = 0, .m_End = readback.m_Copy.m_ReadbackBytes }));
-			if (!mapped) { FailTap(tap, tap.m_FrameSerial, "Resource export readback mapping failed."); return; }
+			if (!mapped)
+			{
+				FailTap(tap, tap.m_FrameSerial, "Resource export readback mapping failed.");
+				return;
+			}
 			auto& array = readback.m_Array;
 			array.m_Data.resize(static_cast<size_t>(readback.m_CpuBytes));
 			if (array.m_Type == RGResourceType::RGBuffer)
@@ -649,14 +769,19 @@ namespace gglab
 			{
 				const auto& footprint = readback.m_Copy.m_Footprint;
 				for (uint32_t slice = 0; slice < array.m_Shape[0]; ++slice)
+				{
 					for (uint32_t row = 0; row < footprint.m_Height; ++row)
+					{
 						std::memcpy(array.m_Data.data() + (slice * footprint.m_Height + row) * footprint.m_RowSizeInBytes,
 							mapped + slice * readback.m_Copy.m_SlicePitch + row * footprint.m_RowPitch, footprint.m_RowSizeInBytes);
+					}
+				}
 				if (array.m_PhysicalFormat == RHIFormat::D24UnormS8Uint && array.m_Address.m_Aspect == RHITextureAspect::Depth)
 				{
 					for (size_t offset = 0; offset < array.m_Data.size(); offset += 4)
 					{
-						uint32_t packed; std::memcpy(&packed, array.m_Data.data() + offset, 4);
+						uint32_t packed;
+						std::memcpy(&packed, array.m_Data.data() + offset, 4);
 						const float depth = static_cast<float>(packed & 0x00ffffffu) / 16777215.0f;
 						std::memcpy(array.m_Data.data() + offset, &depth, 4);
 					}
