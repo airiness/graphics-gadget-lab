@@ -156,7 +156,7 @@ namespace gglab
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
 					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
-				});
+					});
 				const size_t pipelineIndex = static_cast<size_t>(surfaceMode);
 				graphicsContext->SetPipeline(servicesPtr->m_PipelineResolver->Resolve(
 					m_PipelineSlots[pipelineIndex], m_PipelineKeys[pipelineIndex], GetInfo()));

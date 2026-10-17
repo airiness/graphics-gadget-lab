@@ -34,8 +34,8 @@ namespace gglab
 			const uint64_t key = static_cast<uint64_t>(entt::to_integral(entity));
 			if (selected.m_EntityKey &&
 				(selected.m_WorldSun.has_value() > light.m_WorldSun.has_value() ||
-				(selected.m_WorldSun.has_value() == light.m_WorldSun.has_value() &&
-					(!light.m_WorldSun || *selected.m_EntityKey < key))))
+					(selected.m_WorldSun.has_value() == light.m_WorldSun.has_value() &&
+						(!light.m_WorldSun || *selected.m_EntityKey < key))))
 			{
 				continue;
 			}

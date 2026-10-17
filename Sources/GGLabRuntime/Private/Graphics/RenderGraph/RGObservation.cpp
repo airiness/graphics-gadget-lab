@@ -533,13 +533,16 @@ namespace gglab
 					}
 					const auto& range = data.m_Copy.m_Target.m_Subresources;
 					for (uint32_t slice = 0; slice < range.m_ArraySliceCount; ++slice)
-						commands->CopyTextureToBuffer({ .m_Source = context.GetTextureHandle(RGTextureId{ *data.m_Copy.m_Target.m_Resource }),
+					{
+						commands->CopyTextureToBuffer({
+							.m_Source = context.GetTextureHandle(RGTextureId{ *data.m_Copy.m_Target.m_Resource }),
 							.m_SourceMipLevel = range.m_BaseMip,
 							.m_SourceArraySlice = range.m_BaseArraySlice + slice,
 							.m_Destination = destination,
 							.m_DestinationOffset = slice * data.m_Copy.m_SlicePitch,
 							.m_Footprint = data.m_Copy.m_Footprint,
 							.m_SourceAspect = range.m_Aspects });
+					}
 				});
 			// Dedicated stale-version read. The ordinary builder keeps its Read/Export assertions.
 			m_PassNodes[index].m_Accesses.push_back({ .m_ResourceNodeIndex = copy.m_Target.m_Node,

@@ -216,7 +216,8 @@ namespace gglab
 			};
 		const auto target = readback.m_Boundary.m_Target;
 		const auto components = readback.m_Components.Get();
-		readback.m_Scan.m_Scan = [scan, target, components, parameters = readback.m_Boundary.m_Parameters]
+		readback.m_Scan.m_Scan =
+			[scan, target, components, parameters = readback.m_Boundary.m_Parameters]
 			(RGExecuteContext& context, RGBufferId record, RGTextureViewId view) mutable
 			{
 				if (parameters.m_ScalarCount == 0)

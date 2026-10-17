@@ -131,7 +131,7 @@ namespace gglab
 			.m_TaskSystem = createInfo.m_TaskSystem,
 			.m_ModelImportArtifactCache = &m_ModelImportArtifactCache,
 			.m_TextureArtifactCache = &m_TextureArtifactCache,
-			.m_TextureDerivedDataCacheDirectory = createInfo.m_TextureDerivedDataCacheDirectory,
+			.m_TextureDerivedDataCacheDirectory = createInfo.m_TextureDerivedDataCacheDirectory
 			}),
 		m_TextureAssets(std::make_unique<TextureAssetSystem>(TextureAssetSystem::CreateInfo{
 			.m_Device = createInfo.m_Device,
@@ -140,7 +140,7 @@ namespace gglab
 			.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
 			.m_StateEvents = &m_AssetStateEventQueue,
 			.m_ArtifactCache = &m_TextureArtifactCache,
-			.m_AssetRoot = createInfo.m_AssetRoot,
+			.m_AssetRoot = createInfo.m_AssetRoot
 			})),
 		m_AssetPublicationCoordinator(m_AssetResidencyCoordinator)
 	{

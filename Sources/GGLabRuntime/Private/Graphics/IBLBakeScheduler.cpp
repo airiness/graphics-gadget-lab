@@ -31,23 +31,24 @@ namespace gglab
 	{
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 
-		constexpr std::array<IBLArtifactStage, static_cast<size_t>(IBLArtifactStage::Count)>
-			ArtifactStages = {
-				IBLArtifactStage::Environment,
-				IBLArtifactStage::Irradiance,
-				IBLArtifactStage::PrefilteredSpecular,
-				IBLArtifactStage::BrdfLut,
+		constexpr std::array<IBLArtifactStage, static_cast<size_t>(IBLArtifactStage::Count)> ArtifactStages =
+		{
+			IBLArtifactStage::Environment,
+			IBLArtifactStage::Irradiance,
+			IBLArtifactStage::PrefilteredSpecular,
+			IBLArtifactStage::BrdfLut,
 		};
 
-		constexpr std::array<TextureIndex, static_cast<size_t>(IBLArtifactStage::Count)>
-			ArtifactTextureIndices = {
-				TextureIndex::IBL_EnvironmentCubemap,
-				TextureIndex::IBL_IrradianceCubemap,
-				TextureIndex::IBL_PrefilteredSpecularCubemap,
-				TextureIndex::IBL_BrdfLut,
-			};
+		constexpr std::array<TextureIndex, static_cast<size_t>(IBLArtifactStage::Count)> ArtifactTextureIndices =
+		{
+			TextureIndex::IBL_EnvironmentCubemap,
+			TextureIndex::IBL_IrradianceCubemap,
+			TextureIndex::IBL_PrefilteredSpecularCubemap,
+			TextureIndex::IBL_BrdfLut,
+		};
 
-		const std::array<ShaderProgramRef, 12> IBLProducerPrograms = {
+		const std::array<ShaderProgramRef, 12> IBLProducerPrograms =
+		{
 			shader_programs::IBLEnvironmentVertex,
 			shader_programs::IBLEnvironmentPixel,
 			shader_programs::IBLEnvironmentMipVertex,
@@ -193,13 +194,13 @@ namespace gglab
 
 	IBLBakeStage detail::SelectNextMissingIBLBakeStage(const IBLBakeStatus& status) noexcept
 	{
-		constexpr std::array<std::pair<IBLArtifactStage, IBLBakeStage>,
-			static_cast<size_t>(IBLArtifactStage::Count)> ProducerOrder = { {
-				{ IBLArtifactStage::Environment, IBLBakeStage::Environment },
-				{ IBLArtifactStage::Irradiance, IBLBakeStage::Irradiance },
-				{ IBLArtifactStage::PrefilteredSpecular, IBLBakeStage::PrefilteredSpecular },
-				{ IBLArtifactStage::BrdfLut, IBLBakeStage::BrdfLut },
-			} };
+		constexpr std::array<std::pair<IBLArtifactStage, IBLBakeStage>, static_cast<size_t>(IBLArtifactStage::Count)> ProducerOrder =
+		{ {
+			{ IBLArtifactStage::Environment, IBLBakeStage::Environment },
+			{ IBLArtifactStage::Irradiance, IBLBakeStage::Irradiance },
+			{ IBLArtifactStage::PrefilteredSpecular, IBLBakeStage::PrefilteredSpecular },
+			{ IBLArtifactStage::BrdfLut, IBLBakeStage::BrdfLut },
+		} };
 		for (const auto& [artifactStage, bakeStage] : ProducerOrder)
 		{
 			if (status.m_Artifacts[static_cast<size_t>(artifactStage)].m_Resolution ==

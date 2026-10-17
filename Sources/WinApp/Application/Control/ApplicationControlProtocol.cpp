@@ -163,11 +163,10 @@ namespace gglab
 					std::optional<uint32_t> FrameSequenceGTAOOverrides::* m_Member;
 					uint32_t m_Max;
 				};
-				constexpr std::array<CountField, 3> countFields{ {
-					{ "temporalMaxSamples", &FrameSequenceGTAOOverrides::m_TemporalMaxSamples,
-						GTAOMaxTemporalSamples },
-					{ "directionCount", &FrameSequenceGTAOOverrides::m_DirectionCount,
-						GTAOMaxDirectionCount },
+				constexpr std::array<CountField, 3> countFields
+				{ {
+					{ "temporalMaxSamples", &FrameSequenceGTAOOverrides::m_TemporalMaxSamples, GTAOMaxTemporalSamples },
+					{ "directionCount", &FrameSequenceGTAOOverrides::m_DirectionCount, GTAOMaxDirectionCount },
 					{ "stepCount", &FrameSequenceGTAOOverrides::m_StepCount, GTAOMaxStepCount },
 				} };
 				const auto countField = std::ranges::find(countFields, key, &CountField::m_Name);
@@ -205,30 +204,17 @@ namespace gglab
 				float m_Min;
 				float m_Max;
 			};
-			constexpr std::array<OverrideField, 9> fields{ {
-				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback,
-					0.0f, TemporalAAMaxHistoryFeedbackCeiling },
-				{ "depthAbsoluteThreshold",
-					&FrameSequenceTemporalAAOverrides::m_DepthAbsoluteThreshold,
-					0.0f, TemporalAAMaxDepthThreshold },
-				{ "depthRelativeThreshold",
-					&FrameSequenceTemporalAAOverrides::m_DepthRelativeThreshold,
-					0.0f, TemporalAAMaxDepthThreshold },
-				{ "velocityWeightScale", &FrameSequenceTemporalAAOverrides::m_VelocityWeightScale,
-					0.0f, TemporalAAMaxVelocityWeightScale },
-				{ "luminanceWeightScale",
-					&FrameSequenceTemporalAAOverrides::m_LuminanceWeightScale,
-					0.0f, TemporalAAMaxLuminanceWeightScale },
-				{ "neighborhoodClampExpansion",
-					&FrameSequenceTemporalAAOverrides::m_NeighborhoodClampExpansion,
-					0.0f, TemporalAAMaxNeighborhoodClampExpansion },
-				{ "textureLodBiasOffset",
-					&FrameSequenceTemporalAAOverrides::m_TextureLodBiasOffset,
-					TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
-				{ "varianceClipGamma", &FrameSequenceTemporalAAOverrides::m_VarianceClipGamma,
-					TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
-				{ "historyRelaxation", &FrameSequenceTemporalAAOverrides::m_HistoryRelaxation,
-					0.0f, TemporalAAMaxHistoryRelaxation },
+			constexpr std::array<OverrideField, 9> fields
+			{ {
+				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback, 0.0f, TemporalAAMaxHistoryFeedbackCeiling },
+				{ "depthAbsoluteThreshold", &FrameSequenceTemporalAAOverrides::m_DepthAbsoluteThreshold, 0.0f, TemporalAAMaxDepthThreshold },
+				{ "depthRelativeThreshold", &FrameSequenceTemporalAAOverrides::m_DepthRelativeThreshold, 0.0f, TemporalAAMaxDepthThreshold },
+				{ "velocityWeightScale", &FrameSequenceTemporalAAOverrides::m_VelocityWeightScale, 0.0f, TemporalAAMaxVelocityWeightScale },
+				{ "luminanceWeightScale", &FrameSequenceTemporalAAOverrides::m_LuminanceWeightScale, 0.0f, TemporalAAMaxLuminanceWeightScale },
+				{ "neighborhoodClampExpansion", &FrameSequenceTemporalAAOverrides::m_NeighborhoodClampExpansion, 0.0f, TemporalAAMaxNeighborhoodClampExpansion },
+				{ "textureLodBiasOffset", &FrameSequenceTemporalAAOverrides::m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
+				{ "varianceClipGamma", &FrameSequenceTemporalAAOverrides::m_VarianceClipGamma, TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
+				{ "historyRelaxation", &FrameSequenceTemporalAAOverrides::m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation },
 			} };
 			for (const auto& [key, fieldValue] : value.items())
 			{

@@ -46,17 +46,13 @@ namespace gglab
 					RGTextureId* m_Texture;
 				};
 				Target targets[] = {
-					{TextureIndex::IBL_EnvironmentCubemap, &resources.m_EnvironmentCubemap},
-					{TextureIndex::IBL_IrradianceCubemap, &resources.m_IrradianceCubemap},
-					{TextureIndex::IBL_PrefilteredSpecularCubemap,
-						&resources.m_PrefilteredSpecularCubemap},
-					{TextureIndex::IBL_BrdfLut, &resources.m_BrdfLut},
-					{TextureIndex::Preview_IBL_EnvironmentCubemap,
-						&previewResources.m_EnvironmentCubemapPreview},
-					{TextureIndex::Preview_IBL_IrradianceCubemap,
-						&previewResources.m_IrradianceCubemapPreview},
-					{TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
-						&previewResources.m_PrefilteredSpecularCubemapPreview},
+					{ TextureIndex::IBL_EnvironmentCubemap, &resources.m_EnvironmentCubemap },
+					{ TextureIndex::IBL_IrradianceCubemap, &resources.m_IrradianceCubemap },
+					{ TextureIndex::IBL_PrefilteredSpecularCubemap,&resources.m_PrefilteredSpecularCubemap },
+					{ TextureIndex::IBL_BrdfLut, &resources.m_BrdfLut },
+					{ TextureIndex::Preview_IBL_EnvironmentCubemap, &previewResources.m_EnvironmentCubemapPreview },
+					{ TextureIndex::Preview_IBL_IrradianceCubemap, &previewResources.m_IrradianceCubemapPreview },
+					{ TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, &previewResources.m_PrefilteredSpecularCubemapPreview },
 				};
 
 				for (const Target& target : targets)
@@ -124,11 +120,10 @@ namespace gglab
 					RGTextureId* m_Texture;
 				};
 				Target targets[] = {
-					{TextureIndex::IBL_EnvironmentCubemap, &resources.m_BakeEnvironmentCubemap},
-					{TextureIndex::IBL_IrradianceCubemap, &resources.m_BakeIrradianceCubemap},
-					{TextureIndex::IBL_PrefilteredSpecularCubemap,
-						&resources.m_BakePrefilteredSpecularCubemap},
-					{TextureIndex::IBL_BrdfLut, &resources.m_BakeBrdfLut},
+					{ TextureIndex::IBL_EnvironmentCubemap, &resources.m_BakeEnvironmentCubemap },
+					{ TextureIndex::IBL_IrradianceCubemap, &resources.m_BakeIrradianceCubemap },
+					{ TextureIndex::IBL_PrefilteredSpecularCubemap,&resources.m_BakePrefilteredSpecularCubemap },
+					{ TextureIndex::IBL_BrdfLut, &resources.m_BakeBrdfLut },
 				};
 
 				for (const Target& target : targets)

@@ -42,10 +42,8 @@ namespace gglab
 		uint32_t m_TargetWidth = 0;
 		uint32_t m_TargetHeight = 0;
 		DepthConvention m_DepthConvention = DepthConvention::Reversed;
-		std::array<std::optional<DepthCoveragePipelineSignature>, RenderQueueBuilder::VariantCount>
-			m_PrepassPipelineSignatures{};
-		std::array<std::optional<DepthCoveragePipelineSignature>, RenderQueueBuilder::VariantCount>
-			m_ForwardPipelineSignatures{};
+		std::array<std::optional<DepthCoveragePipelineSignature>, RenderQueueBuilder::VariantCount> m_PrepassPipelineSignatures{};
+		std::array<std::optional<DepthCoveragePipelineSignature>, RenderQueueBuilder::VariantCount> m_ForwardPipelineSignatures{};
 	};
 
 	[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlan(

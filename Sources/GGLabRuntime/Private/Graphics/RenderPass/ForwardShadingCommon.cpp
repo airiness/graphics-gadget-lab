@@ -189,7 +189,7 @@ namespace gglab::forward_shading
 			GGLAB_ASSERT_MSG(AreSceneAttachmentExtentsCompatible(*inputs.m_RasterDomain,
 				builder.GetTextureDesc(color), builder.GetTextureDesc(depth),
 				inputs.m_MaterialDiagnostics ? std::span<const RHITextureDesc>(diagnosticDescs)
-					: std::span<const RHITextureDesc>{}),
+				: std::span<const RHITextureDesc>{}),
 				"Every Forward color, diagnostic and depth attachment must match the raster domain.");
 			GGLAB_ASSERT_MSG(postTemporal || framePlan.m_RasterDomain == inputs.m_RasterDomain,
 				"Pre-temporal Forward must consume the frame-plan raster domain.");

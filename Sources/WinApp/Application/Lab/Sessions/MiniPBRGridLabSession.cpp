@@ -240,27 +240,27 @@ namespace gglab
 			.m_DefaultValue = int32_t(MaterialDebugView::Lit),
 			.m_EnumItems =
 				{
-					{.m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit"},
-					{.m_Value = int32_t(MaterialDebugView::UnfilteredLit), .m_Name = "Lit (Specular AA Off)"},
-					{.m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color"},
-					{.m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic"},
-					{.m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal"},
-					{.m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::NormalVariance), .m_Name = "Normal Variance (Base R, Coat G)"},
-					{.m_Value = int32_t(MaterialDebugView::SpecularAAContribution), .m_Name = "Specular AA (Base R, Coat G, Delta B)"},
-					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
-					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
-					{.m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR"},
-					{.m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor"},
-					{.m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::EffectiveClearcoatRoughness), .m_Name = "Effective Clearcoat Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)"},
-					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)"},
+					{ .m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit" },
+					{ .m_Value = int32_t(MaterialDebugView::UnfilteredLit), .m_Name = "Lit (Specular AA Off)" },
+					{ .m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color" },
+					{ .m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic" },
+					{ .m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal" },
+					{ .m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::NormalVariance), .m_Name = "Normal Variance (Base R, Coat G)" },
+					{ .m_Value = int32_t(MaterialDebugView::SpecularAAContribution), .m_Name = "Specular AA (Base R, Coat G, Delta B)" },
+					{ .m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0" },
+					{ .m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags" },
+					{ .m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR" },
+					{ .m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor" },
+					{ .m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::EffectiveClearcoatRoughness), .m_Name = "Effective Clearcoat Roughness" },
+					{ .m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)" },
+					{ .m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)" },
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -272,7 +272,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ClearcoatRoughnessId,
 			.m_Name = "Clearcoat Roughness",
@@ -282,7 +282,7 @@ namespace gglab
 			.m_DefaultValue = 0.1f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = AnisotropyStrengthId,
 			.m_Name = "Anisotropy Strength",
@@ -292,7 +292,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = AnisotropyRotationId,
 			.m_Name = "Anisotropy Rotation (Degrees)",
@@ -302,7 +302,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(-180.0f),
 			.m_MaxValue = LabValue(180.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
 			.m_Name = "Intensity",
@@ -395,7 +395,7 @@ namespace gglab
 			.m_Fraction = m_LoadingProgress.m_Fraction,
 			.m_Stage = m_LoadingProgress.m_Stage,
 			.m_Detail = m_LoadingProgress.m_Detail,
-		});
+			});
 		const std::string shaderDetail = shaders.HasFailed() ? shaders.m_Error
 			: std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
 		progress.AddStep(0.15f, {
@@ -405,7 +405,7 @@ namespace gglab
 				: static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
 			.m_Stage = shaders.HasFailed() ? "Diagnostic shader preload failed" : "Preloading diagnostic shaders",
 			.m_Detail = shaderDetail,
-		});
+			});
 		const bool pipelinesReady = m_DiagnosticVariantsCollected && m_DiagnosticPrewarmProgress.IsReady();
 		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed
 			? "A material diagnostic pipeline could not be created."
@@ -421,7 +421,7 @@ namespace gglab
 			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed
 				? "Diagnostic pipeline preparation failed" : "Prewarming diagnostic pipelines",
 			.m_Detail = pipelineDetail,
-		});
+			});
 		return progress.Build();
 	}
 

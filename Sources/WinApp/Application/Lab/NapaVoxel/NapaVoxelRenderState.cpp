@@ -986,7 +986,7 @@ namespace gglab
 	}
 
 	NapaVoxelMeshReplacementUploadSession::NapaVoxelMeshReplacementUploadSession(
-			RHIDevice* device, AssetUploadScheduling* scheduler,
+		RHIDevice* device, AssetUploadScheduling* scheduler,
 		NapaVoxelCommandQueue* commandQueue,
 		NapaVoxelPublicationSerialState serialState) noexcept :
 		m_Device(device), m_Scheduler(scheduler), m_CommandQueue(commandQueue),
@@ -1142,7 +1142,7 @@ namespace gglab
 	}
 
 	NapaVoxelPublicationSession::NapaVoxelPublicationSession(
-			RHIDevice* device, AssetUploadScheduling* scheduler,
+		RHIDevice* device, AssetUploadScheduling* scheduler,
 		NapaVoxelCommandQueue* commandQueue) noexcept :
 		m_Device(device), m_Scheduler(scheduler), m_CommandQueue(commandQueue)
 	{

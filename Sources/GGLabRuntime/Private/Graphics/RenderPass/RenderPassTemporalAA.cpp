@@ -591,10 +591,8 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					depthHistoryParameters);
 				commandContext->Dispatch(
-					(data.m_DepthWidth + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
-					(data.m_DepthHeight + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
+					(data.m_DepthWidth + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
+					(data.m_DepthHeight + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
 					1);
 
 				commandContext->SetPipeline(GetOrCreatePipeline(services));
@@ -610,10 +608,8 @@ namespace gglab
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
-					(data.m_Width + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
-					(data.m_Height + TemporalAAThreadGroupSize - 1) /
-						TemporalAAThreadGroupSize,
+					(data.m_Width + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
+					(data.m_Height + TemporalAAThreadGroupSize - 1) / TemporalAAThreadGroupSize,
 					1);
 			});
 
@@ -667,7 +663,7 @@ namespace gglab
 						.m_View = dsv,
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
-				});
+					});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

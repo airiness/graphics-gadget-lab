@@ -115,15 +115,15 @@ namespace gglab
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(PostProcessDebugTap::TemporalHistoryWeight),
 			.m_EnumItems = {
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryColor), .m_Name = "History Color"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalReprojectionUV), .m_Name = "Reprojection UV"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalRejection), .m_Name = "Rejection"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistorySamples), .m_Name = "History Samples"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalClipDistance), .m_Name = "Clip Distance"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryRelaxation), .m_Name = "History Relaxation"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction"},
-				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude"},
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalHistoryColor), .m_Name = "History Color" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalReprojectionUV), .m_Name = "Reprojection UV" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalRejection), .m_Name = "Rejection" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalHistorySamples), .m_Name = "History Samples" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalClipDistance), .m_Name = "Clip Distance" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalHistoryRelaxation), .m_Name = "History Relaxation" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction" },
+				{ .m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude" },
 			},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -514,7 +514,9 @@ namespace gglab
 			distantReference, matchedWorldNear, matchedWorldFar, matchedProjectedNear,
 			matchedProjectedFar, alphaEdge, m_MovingEntity };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
-			{ return registry.valid(entity); });
+			{
+				return registry.valid(entity);
+			});
 		BuildLighting();
 		ApplyImmediateParameters();
 	}

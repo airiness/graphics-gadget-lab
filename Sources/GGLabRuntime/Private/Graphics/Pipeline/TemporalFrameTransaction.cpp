@@ -54,8 +54,8 @@ namespace gglab
 			"A temporal reference sample is exactly the active reference consumer.");
 		GGLAB_ASSERT_MSG(!plan.HasService(TemporalService::ColorDepthHistory) ||
 			IsTemporalColorCompatible(
-			ActiveTemporalColorAbi,
-			PostProcessColorState::SceneLinearRec709, scenePreExposure),
+				ActiveTemporalColorAbi,
+				PostProcessColorState::SceneLinearRec709, scenePreExposure),
 			"Temporal color history requires positive finite scene pre-exposure.");
 		GGLAB_ASSERT_MSG(m_State != TemporalFrameTransactionState::Pending,
 			"A pending temporal frame transaction must be ended before "
@@ -449,11 +449,11 @@ namespace gglab
 	{
 		const TemporalCommittedViewState& committed = history.m_Committed;
 		return history.m_Valid && committed.m_ColorAbi == m_ColorAbi &&
-			IsTemporalColorCompatible(committed.m_ColorAbi,
-				PostProcessColorState::SceneLinearRec709, committed.m_PreExposure) && committed.m_DisplayViewId == m_Plan.m_DisplayViewId &&
-			   committed.m_ResetIdentity == m_Plan.m_ResetIdentity &&
-			   committed.m_SessionIdentity == m_Plan.m_SessionIdentity &&
-			   committed.m_Resolution == m_Resolution;
+			IsTemporalColorCompatible(committed.m_ColorAbi, PostProcessColorState::SceneLinearRec709, committed.m_PreExposure) &&
+			committed.m_DisplayViewId == m_Plan.m_DisplayViewId &&
+			committed.m_ResetIdentity == m_Plan.m_ResetIdentity &&
+			committed.m_SessionIdentity == m_Plan.m_SessionIdentity &&
+			committed.m_Resolution == m_Resolution;
 	}
 
 	void TemporalFrameTransaction::CommitObjectHistory() noexcept

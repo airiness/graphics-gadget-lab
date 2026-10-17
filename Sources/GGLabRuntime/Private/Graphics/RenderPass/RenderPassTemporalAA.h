@@ -18,7 +18,7 @@ namespace gglab
 					"Reprojects opaque history and rejects incompatible previous surfaces.",
 				.m_Category = RenderPassCategory::PostProcess,
 				.m_Type = RenderPassType::Compute,
-			})
+				})
 		{
 		}
 		~RenderPassTemporalAA() override = default;

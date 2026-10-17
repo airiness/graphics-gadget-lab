@@ -61,10 +61,8 @@ namespace gglab
 			const RenderServices& services, TemporalFrameTransaction& transaction,
 			uint32_t viewIndex, const GTAOSettings& settings, bool diagnostics) noexcept;
 
-		std::array<ComputePipelineRecipe, static_cast<size_t>(PipelineVariant::Count)>
-			m_PipelineRecipes{};
-		std::array<ComputePipelineSlot, static_cast<size_t>(PipelineVariant::Count)>
-			m_PipelineSlots{};
+		std::array<ComputePipelineRecipe, static_cast<size_t>(PipelineVariant::Count)> m_PipelineRecipes{};
+		std::array<ComputePipelineSlot, static_cast<size_t>(PipelineVariant::Count)> m_PipelineSlots{};
 		GTAOCapabilityStatus m_Capabilities{};
 		bool m_IsInitialized = false;
 		bool m_IsAvailable = false;

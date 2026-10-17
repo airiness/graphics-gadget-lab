@@ -279,8 +279,7 @@ namespace gglab
 			IBLBakeConfig m_Config{};
 			std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> m_Keys{};
 			std::array<bool, static_cast<size_t>(IBLArtifactStage::Count)> m_BuiltStages{};
-			std::array<RHITextureReadbackRequest, static_cast<size_t>(IBLArtifactStage::Count)>
-				m_Requests{};
+			std::array<RHITextureReadbackRequest, static_cast<size_t>(IBLArtifactStage::Count)> m_Requests{};
 			IBLStageArtifactSet m_Artifacts;
 			TaskHandle m_Task{};
 		};

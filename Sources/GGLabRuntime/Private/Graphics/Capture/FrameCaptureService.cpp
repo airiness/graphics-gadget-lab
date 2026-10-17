@@ -323,8 +323,10 @@ namespace gglab
 	void FrameCaptureService::BeginGraphRecording(uint64_t frameSerial, RenderGraph& graph) noexcept
 	{
 		const bool includeGraph = std::ranges::any_of(m_Taps, [&](const Tap& tap)
-			{ return tap.m_FrameSerial == frameSerial && (tap.m_Source == FrameCaptureSource::ResourceExport || tap.m_Source == FrameCaptureSource::NonFiniteScan) &&
-			std::ranges::any_of(tap.m_Requests, [](const auto& request) { return request.m_IncludeGraph; }); });
+			{
+				return tap.m_FrameSerial == frameSerial && (tap.m_Source == FrameCaptureSource::ResourceExport || tap.m_Source == FrameCaptureSource::NonFiniteScan) &&
+					std::ranges::any_of(tap.m_Requests, [](const auto& request) { return request.m_IncludeGraph; });
+			});
 		if (m_IsShutdown || (!HasPendingRequests(FrameCaptureSource::RenderGraph) && !includeGraph))
 		{
 			return;

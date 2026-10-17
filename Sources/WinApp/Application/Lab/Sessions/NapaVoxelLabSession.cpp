@@ -1243,64 +1243,64 @@ namespace gglab
 
 		diagnostics.m_Title = "Napa Voxel Interactive Destruction";
 		diagnostics.m_Metrics = {
-			{.m_Name = "Preset", .m_Value = m_PresetName },
-			{.m_Name = "Config",
+			{ .m_Name = "Preset", .m_Value = m_PresetName },
+			{ .m_Name = "Config",
 				.m_Value = std::format("{} cells/chunk, {:.3f} m voxel, {:.2f} surface band",
 					m_CurrentConfig.m_ChunkCellCount, m_CurrentConfig.m_VoxelSize,
 					m_CurrentConfig.m_SurfaceBandVoxels) },
-			{.m_Name = "Logical domain",
+			{ .m_Name = "Logical domain",
 				.m_Value = configValid
 					? std::format("{} cells, {} samples", metrics.m_TotalCellCount,
 						metrics.m_TotalSampleCount)
 					: "invalid" },
-			{.m_Name = "Resident / meshed chunks",
+			{ .m_Name = "Resident / meshed chunks",
 				.m_Value = std::format("{} / {}", m_VoxelWorld
 					? m_VoxelWorld->GetResidentChunkCount()
 					: 0, meshValidation.m_ChunkCount) },
-			{.m_Name = "World / visible revision",
+			{ .m_Name = "World / visible revision",
 				.m_Value = std::format("{} / {}", m_VoxelWorld
 					? m_VoxelWorld->GetWorldVoxelRevision()
 					: 0, m_PublicationSession
 					? m_PublicationSession->GetVisibleWorldRevision()
 					: 0) },
-			{.m_Name = "Voxel / mesh hash",
+			{ .m_Name = "Voxel / mesh hash",
 				.m_Value = std::format("{:016X} / {:016X}", m_AuthoritativeVoxelHash,
 					meshValidation.m_ValidationHash) },
-			{.m_Name = "Geometry",
+			{ .m_Name = "Geometry",
 				.m_Value = std::format("{} vertices, {} indices, {} sections",
 					meshValidation.m_VertexCount, meshValidation.m_IndexCount,
 					meshValidation.m_SectionCount) },
-			{.m_Name = "Runtime",
+			{ .m_Name = "Runtime",
 				.m_Value = std::format("{}, queue {}, operation {}", GetRuntimeStateName(m_RuntimeState),
 					m_CommandQueue.GetSize(), m_ActiveOperationSerial) },
-			{.m_Name = "Pending publication",
+			{ .m_Name = "Pending publication",
 				.m_Value = pendingIdentity.m_PublicationSerial != 0
 					? std::format("base {} -> target {}, serial {}",
 						m_PendingMutation.m_BaseWorldVoxelRevision,
 						m_PendingMutation.m_TargetWorldVoxelRevision,
 						pendingIdentity.m_PublicationSerial)
 					: "none" },
-			{.m_Name = "Dirty chunks",
+			{ .m_Name = "Dirty chunks",
 				.m_Value = std::format("data {}, mesh {}",
 					m_VisibleDebugMutation.m_DataDirtyChunks.size(),
 					m_VisibleDebugMutation.m_MeshDirtyChunks.size()) },
-			{.m_Name = "Damage markers",
+			{ .m_Name = "Damage markers",
 				.m_Value = damageSnapshot
 					? std::format("{} visible / {} total{}", damageSnapshot->m_Markers.size(),
 						damageSnapshot->m_TotalDamagedSampleCount,
 						damageSnapshot->m_Truncated ? " (truncated)" : "")
 					: "unavailable" },
-			{.m_Name = "Timing",
+			{ .m_Name = "Timing",
 				.m_Value = std::format("generation {:.3f} ms, edit {:.3f} ms, mesh {:.3f} ms",
 					m_LastGenerationMilliseconds, m_LastEditMilliseconds,
 					m_LastMeshingMilliseconds) },
-			{.m_Name = "Publication",
+			{ .m_Name = "Publication",
 				.m_Value = std::format("visible serial {}, retired sets {}",
 					m_PublicationSession ? m_PublicationSession->GetLastPublicationSerial() : 0,
 					m_PublicationSession
 						? m_PublicationSession->GetRetiredGpuMeshSetCount()
 						: 0) },
-			{.m_Name = "Surface mode", .m_Value = GetSurfaceModeName(m_SurfaceMode) },
+			{ .m_Name = "Surface mode", .m_Value = GetSurfaceModeName(m_SurfaceMode) },
 		};
 		diagnostics.m_Checks = {
 			{

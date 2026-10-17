@@ -151,7 +151,7 @@ namespace gglab
 						resources.m_Marker = builder.CreateTexture("CoordinateConformance.Marker", {
 							.m_Format = MarkerFormat,
 							.m_Extent = { 2, 2, 1 },
-						});
+							});
 						resources.m_Depth = builder.CreateTexture("CoordinateConformance.Depth", {
 							.m_Format = DepthFormat,
 							.m_Extent = { width, height, 1 },
@@ -160,7 +160,7 @@ namespace gglab
 								.m_Depth = 0.0f,
 								.m_IsDepthStencil = true,
 							},
-						});
+							});
 						RHITextureDesc backBufferDesc{};
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						backBufferDesc.m_Extent = { width, height, 1 };
@@ -250,7 +250,7 @@ namespace gglab
 						commandContext->BeginRendering({
 							.m_ColorAttachments = attachments,
 							.m_DepthAttachment = depthAttachment,
-						});
+							});
 						commandContext->ClearColorAttachment(0, { 0.01f, 0.015f, 0.025f, 1.0f });
 						commandContext->ClearDepthAttachment(0.0f);
 
@@ -271,19 +271,19 @@ namespace gglab
 						const uint32_t panelBottom = data.m_Height - panelInset;
 						const auto makeParameters = [&](CoordinateConformanceMode mode,
 							float depth = 0.0f, float depthOverride = 0.0f)
-						{
-							return CoordinateConformanceParameters{
-								.m_TextureIndex = marker.m_Index,
-								.m_SamplerIndex = m_SamplerDescriptor.m_Index,
-								.m_Mode = mode,
-								.m_Depth = depth,
-								.m_TargetExtent = {
-									static_cast<float>(data.m_Width),
-									static_cast<float>(data.m_Height),
-								},
-								.m_DepthOverride = depthOverride,
+							{
+								return CoordinateConformanceParameters{
+									.m_TextureIndex = marker.m_Index,
+									.m_SamplerIndex = m_SamplerDescriptor.m_Index,
+									.m_Mode = mode,
+									.m_Depth = depth,
+									.m_TargetExtent = {
+										static_cast<float>(data.m_Width),
+										static_cast<float>(data.m_Height),
+									},
+									.m_DepthOverride = depthOverride,
+								};
 							};
-						};
 
 						const RHIVertexBufferBinding vertexBinding{
 							.m_Buffer = m_VertexBuffer.Get(),
@@ -471,7 +471,7 @@ namespace gglab
 					.m_Usage = usage,
 					.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
 					.m_DebugName = debugName,
-				}));
+					}));
 				void* mapped = m_Device->MapBuffer(buffer.Get(), { 0, 0 });
 				if (mapped == nullptr)
 				{
@@ -572,7 +572,7 @@ namespace gglab
 					"the position gradient so only the front-facing triangle remains. Indexed "
 					"sampling and reversed-Z probes also executed."
 				: "Waiting for the first complete marker and conformance frame.",
-		});
+			});
 	}
 
 	LabId CoordinateConformanceLabSession::GetId() noexcept

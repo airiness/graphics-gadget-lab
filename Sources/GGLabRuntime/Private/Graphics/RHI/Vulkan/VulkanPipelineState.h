@@ -27,12 +27,9 @@ namespace gglab
 
 	struct VulkanGraphicsPipelinePlan
 	{
-		std::array<VkVertexInputBindingDescription,
-			RHIVertexInputLayoutDesc::MaxVertexBuffers> m_VertexBindings{};
-		std::array<VkVertexInputAttributeDescription,
-			RHIVertexInputLayoutDesc::MaxAttributes> m_VertexAttributes{};
-		std::array<VkPipelineColorBlendAttachmentState,
-			RHIGraphicsPipelineDesc::MaxRenderTargets> m_BlendAttachments{};
+		std::array<VkVertexInputBindingDescription, RHIVertexInputLayoutDesc::MaxVertexBuffers> m_VertexBindings{};
+		std::array<VkVertexInputAttributeDescription, RHIVertexInputLayoutDesc::MaxAttributes> m_VertexAttributes{};
+		std::array<VkPipelineColorBlendAttachmentState, RHIGraphicsPipelineDesc::MaxRenderTargets> m_BlendAttachments{};
 		std::array<VkFormat, RHIGraphicsPipelineDesc::MaxRenderTargets> m_ColorFormats{};
 		uint32_t m_VertexBindingCount = 0;
 		uint32_t m_VertexAttributeCount = 0;

@@ -246,17 +246,12 @@ namespace gglab
 			"Frame planning and scene writes must share one resolved pre-exposure.");
 		info.m_TemporalFrameTransaction->PrepareDisplayView(
 			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
-		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::TemporalAA)
-			.m_Requested ==
-			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
-				.m_TemporalAA.m_Enabled,
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::TemporalAA).m_Requested ==
+			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_TemporalAA.m_Enabled,
 			"Temporal frame plan must be resolved from the display view settings.");
-		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::AmbientOcclusion)
-			.m_Requested ==
-			(result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
-				.m_Lighting.m_GTAO.m_Enabled &&
-				result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
-				.m_Lighting.m_GTAO.m_TemporalAccumulation),
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.GetConsumer(TemporalConsumer::AmbientOcclusion).m_Requested ==
+			(result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_Lighting.m_GTAO.m_Enabled &&
+				result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)].m_Lighting.m_GTAO.m_TemporalAccumulation),
 			"Temporal GTAO planning must be resolved from the display view settings.");
 		// Temporal AA does not integrate post-temporal composition, so the jitter it owns
 		// may be removed from that composition's raster view. Below native resolution the
@@ -327,77 +322,78 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(materialBuffer);
 		GGLAB_ASSERT_NOT_NULL(viewBuffer);
 
-		const auto buildQueue = [&](const RenderView& renderView, RenderQueue& renderQueue,
+		const auto buildQueue = [&](const RenderView& renderView,
+			RenderQueue& renderQueue,
 			uint32_t viewBindingId, uint32_t postTemporalViewBindingId,
 			const FrustumList& queueCullFrustums)
-		{
-			if (!renderView.m_IsValid)
 			{
-				return;
-			}
-			renderQueue.m_ViewId = renderView.m_ViewId;
-
-			if (result.m_RenderSceneStatus != RenderSceneBuildStatus::Ready)
-			{
-				return;
-			}
-
-			const auto makeRasterDomain =
-				[&](uint32_t bindingId, uint32_t width, uint32_t height) noexcept
+				if (!renderView.m_IsValid)
 				{
-					const DepthCoverageBufferSource viewSource{
-						.m_Buffer = viewBuffer->GetBufferHandle(),
-						.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + bindingId,
+					return;
+				}
+				renderQueue.m_ViewId = renderView.m_ViewId;
+
+				if (result.m_RenderSceneStatus != RenderSceneBuildStatus::Ready)
+				{
+					return;
+				}
+
+				const auto makeRasterDomain =
+					[&](uint32_t bindingId, uint32_t width, uint32_t height) noexcept
+					{
+						const DepthCoverageBufferSource viewSource{
+							.m_Buffer = viewBuffer->GetBufferHandle(),
+							.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + bindingId,
+						};
+						return DepthCoverageRasterDomain{
+							.m_FrameSerial = info.m_FrameSerial,
+							.m_ViewBindingId = bindingId,
+							.m_CurrentViewSource = viewSource,
+							.m_CurrentJitteredProjectionSource = viewSource,
+							.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
+							.m_TargetWidth = width,
+							.m_TargetHeight = height,
+							.m_Viewport =
+								{
+									.m_X = 0.0f,
+									.m_Y = 0.0f,
+									.m_Width = static_cast<float>(width),
+									.m_Height = static_cast<float>(height),
+									.m_MinDepth = 0.0f,
+									.m_MaxDepth = 1.0f,
+								},
+							.m_Scissor =
+								{
+									.m_Left = 0,
+									.m_Top = 0,
+									.m_Right = static_cast<int32_t>(width),
+									.m_Bottom = static_cast<int32_t>(height),
+								},
+							.m_DepthConvention = renderView.m_DepthConvention,
+						};
 					};
-					return DepthCoverageRasterDomain{
-						.m_FrameSerial = info.m_FrameSerial,
-						.m_ViewBindingId = bindingId,
-						.m_CurrentViewSource = viewSource,
-						.m_CurrentJitteredProjectionSource = viewSource,
-						.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
-						.m_TargetWidth = width,
-						.m_TargetHeight = height,
-						.m_Viewport =
-							{
-								.m_X = 0.0f,
-								.m_Y = 0.0f,
-								.m_Width = static_cast<float>(width),
-								.m_Height = static_cast<float>(height),
-								.m_MinDepth = 0.0f,
-								.m_MaxDepth = 1.0f,
-							},
-						.m_Scissor =
-							{
-								.m_Left = 0,
-								.m_Top = 0,
-								.m_Right = static_cast<int32_t>(width),
-								.m_Bottom = static_cast<int32_t>(height),
-							},
-						.m_DepthConvention = renderView.m_DepthConvention,
-					};
+				const RenderQueueBuilder::BuildInfo queueBuildInfo{
+					.m_AssetManager = info.m_AssetManager,
+					.m_RenderScene = result.m_RenderScene,
+					.m_RenderView = renderView,
+					.m_CullingFrustums = queueCullFrustums.AsSpan(),
+					.m_CoverageRasterDomain =
+						makeRasterDomain(viewBindingId, renderView.m_Width, renderView.m_Height),
+					// The display raster view of post-temporal composition: the view itself, or
+					// its unjittered post-temporal view. Views that are never displayed, such as
+					// shadow views, have none.
+					.m_PostTemporalRasterDomain =
+						renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0
+							? makeRasterDomain(postTemporalViewBindingId,
+								renderView.m_DisplayWidth, renderView.m_DisplayHeight)
+							: DepthCoverageRasterDomain{},
+					.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
+					.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
+					.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_FrameSlotIndex),
+					.m_MaterialBaseIndex = result.m_RenderScene.m_MaterialBaseIndex,
 				};
-			const RenderQueueBuilder::BuildInfo queueBuildInfo{
-				.m_AssetManager = info.m_AssetManager,
-				.m_RenderScene = result.m_RenderScene,
-				.m_RenderView = renderView,
-				.m_CullingFrustums = queueCullFrustums.AsSpan(),
-				.m_CoverageRasterDomain =
-					makeRasterDomain(viewBindingId, renderView.m_Width, renderView.m_Height),
-				// The display raster view of post-temporal composition: the view itself, or
-				// its unjittered post-temporal view. Views that are never displayed, such as
-				// shadow views, have none.
-				.m_PostTemporalRasterDomain =
-					renderView.m_DisplayWidth != 0 && renderView.m_DisplayHeight != 0
-						? makeRasterDomain(postTemporalViewBindingId,
-							renderView.m_DisplayWidth, renderView.m_DisplayHeight)
-						: DepthCoverageRasterDomain{},
-				.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
-				.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
-				.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_FrameSlotIndex),
-				.m_MaterialBaseIndex = result.m_RenderScene.m_MaterialBaseIndex,
+				renderQueue = m_QueueBuilder.Build(queueBuildInfo);
 			};
-			renderQueue = m_QueueBuilder.Build(queueBuildInfo);
-		};
 
 		for (const RenderView& renderView : result.m_RenderViews)
 		{

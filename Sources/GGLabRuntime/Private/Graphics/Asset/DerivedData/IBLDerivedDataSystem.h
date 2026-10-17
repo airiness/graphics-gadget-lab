@@ -69,8 +69,7 @@ namespace gglab
 
 	struct IBLDerivedDataLookupResult
 	{
-		std::array<IBLStageDerivedDataLookupResult, static_cast<size_t>(IBLArtifactStage::Count)>
-			m_Stages{};
+		std::array<IBLStageDerivedDataLookupResult, static_cast<size_t>(IBLArtifactStage::Count)> m_Stages{};
 
 		[[nodiscard]] IBLStageDerivedDataLookupResult& Get(IBLArtifactStage stage) noexcept
 		{

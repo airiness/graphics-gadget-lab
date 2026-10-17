@@ -214,9 +214,7 @@ namespace gglab
 		QueueTelemetry m_ResourcePublicationTelemetry;
 		QueueTelemetry m_UploadRecordingTelemetry;
 		QueueTelemetry m_GpuFinalizeTelemetry;
-		std::array<PublicationStageTelemetry,
-			static_cast<size_t>(AssetResourcePublicationStage::Count)>
-			m_PublicationStageTelemetry;
+		std::array<PublicationStageTelemetry, static_cast<size_t>(AssetResourcePublicationStage::Count)> m_PublicationStageTelemetry;
 		AssetResourcePublicationFaultInjection m_PublicationFault{};
 		uint32_t m_PublicationFaultObservedOccurrences = 0;
 		AssetStreamingIdentity m_GpuCompletionHold{};

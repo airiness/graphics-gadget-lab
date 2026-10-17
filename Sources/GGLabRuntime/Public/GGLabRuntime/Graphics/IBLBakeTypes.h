@@ -59,8 +59,7 @@ namespace gglab
 		float m_Progress = 0.0f;
 		double m_GpuMilliseconds = 0.0;
 		bool m_GpuTimingAvailable = false;
-		std::array<IBLStageArtifactStatus, static_cast<size_t>(IBLArtifactStage::Count)>
-			m_Artifacts{};
+		std::array<IBLStageArtifactStatus, static_cast<size_t>(IBLArtifactStage::Count)> m_Artifacts{};
 		bool m_CacheHit = false;
 		bool m_PartialCacheHit = false;
 		bool m_CpuCacheHit = false;

@@ -56,8 +56,7 @@ namespace gglab
 		ShaderID m_AlphaTestPixelShader{};
 		ShaderID m_VelocityOpaquePixelShader{};
 		ShaderID m_VelocityAlphaTestPixelShader{};
-		std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>, 2>
-			m_PipelineSlots{};
+		std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>, 2> m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};
 }

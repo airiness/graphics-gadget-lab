@@ -44,32 +44,32 @@ namespace napa::voxel
 		std::array<std::uint8_t, 2>{ 2, 3 },
 	};
 
-	inline constexpr std::array<std::array<std::array<std::uint8_t, 3>, 2>, ChunkBoundaryFaceCount>
-		ReferenceBoundaryFaceTriangles{
-			std::array{
-				std::array<std::uint8_t, 3>{ 0, 2, 6 },
-				std::array<std::uint8_t, 3>{ 0, 6, 4 },
-			},
-			std::array{
-				std::array<std::uint8_t, 3>{ 1, 3, 7 },
-				std::array<std::uint8_t, 3>{ 5, 1, 7 },
-			},
-			std::array{
-				std::array<std::uint8_t, 3>{ 0, 4, 5 },
-				std::array<std::uint8_t, 3>{ 0, 5, 1 },
-			},
-			std::array{
-				std::array<std::uint8_t, 3>{ 3, 2, 7 },
-				std::array<std::uint8_t, 3>{ 2, 6, 7 },
-			},
-			std::array{
-				std::array<std::uint8_t, 3>{ 0, 1, 3 },
-				std::array<std::uint8_t, 3>{ 0, 3, 2 },
-			},
-			std::array{
-				std::array<std::uint8_t, 3>{ 6, 4, 7 },
-				std::array<std::uint8_t, 3>{ 4, 5, 7 },
-			},
+	inline constexpr std::array<std::array<std::array<std::uint8_t, 3>, 2>, ChunkBoundaryFaceCount> ReferenceBoundaryFaceTriangles
+	{
+		std::array{
+			std::array<std::uint8_t, 3>{ 0, 2, 6 },
+			std::array<std::uint8_t, 3>{ 0, 6, 4 },
+		},
+		std::array{
+			std::array<std::uint8_t, 3>{ 1, 3, 7 },
+			std::array<std::uint8_t, 3>{ 5, 1, 7 },
+		},
+		std::array{
+			std::array<std::uint8_t, 3>{ 0, 4, 5 },
+			std::array<std::uint8_t, 3>{ 0, 5, 1 },
+		},
+		std::array{
+			std::array<std::uint8_t, 3>{ 3, 2, 7 },
+			std::array<std::uint8_t, 3>{ 2, 6, 7 },
+		},
+		std::array{
+			std::array<std::uint8_t, 3>{ 0, 1, 3 },
+			std::array<std::uint8_t, 3>{ 0, 3, 2 },
+		},
+		std::array{
+			std::array<std::uint8_t, 3>{ 6, 4, 7 },
+			std::array<std::uint8_t, 3>{ 4, 5, 7 },
+		},
 	};
 
 	struct DensityGradient

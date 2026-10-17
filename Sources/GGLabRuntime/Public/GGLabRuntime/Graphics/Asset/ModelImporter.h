@@ -47,8 +47,7 @@ namespace gglab
 	{
 		std::string m_Name;
 		MaterialProperties m_Properties{};
-		std::array<ImportedMaterialTextureBinding, static_cast<size_t>(MaterialTextureSlot::Count)>
-			m_TextureBindings{};
+		std::array<ImportedMaterialTextureBinding, static_cast<size_t>(MaterialTextureSlot::Count)> m_TextureBindings{};
 	};
 
 	struct ImportedMesh

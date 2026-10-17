@@ -202,8 +202,8 @@ namespace gglab
 				data.m_ThroughputOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 					resources.m_ThroughputAtlas);
 			},
-			[services, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex,
-				samplerIndex, sunDirection](RGExecuteContext& execute, BuildPassData& data)
+			[services, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
+			(RGExecuteContext& execute, BuildPassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
 				AerialBuildParameters parameters{};
@@ -301,9 +301,8 @@ namespace gglab
 						resources.m_Diagnostic);
 				}
 			},
-			[services, &context, compositePipeline, gridWidth, gridHeight, maxDistanceKm,
-				viewIndex, samplerIndex, diagnosticMode](RGExecuteContext& execute,
-				CompositePassData& data)
+			[services, &context, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
+			(RGExecuteContext& execute, CompositePassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
 				AerialCompositeParameters parameters{};

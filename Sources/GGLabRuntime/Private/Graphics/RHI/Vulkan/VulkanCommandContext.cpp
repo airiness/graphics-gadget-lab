@@ -528,8 +528,7 @@ namespace gglab
 		m_ActiveColorAttachments.clear();
 		m_ActiveDepthAttachment.reset();
 
-		std::array<VkRenderingAttachmentInfo, RHIGraphicsPipelineDesc::MaxRenderTargets>
-			colorAttachments{};
+		std::array<VkRenderingAttachmentInfo, RHIGraphicsPipelineDesc::MaxRenderTargets> colorAttachments{};
 		RHIRenderingSignature signature{};
 		VkExtent2D extent{};
 		uint32_t sampleCount = 0;
