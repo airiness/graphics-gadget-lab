@@ -5,9 +5,8 @@
 
 namespace gglab
 {
-	// GPU resources adopted by the renderer for one active frame. The frame
-	// context exposes only the CPU scene value; upload-fence ownership and the
-	// scene GPU allocation handoff stay inside the renderer.
+	// View-ring leases and transfer-fence ownership for one active frame stay
+	// inside the renderer. Constant bindings borrow storage owned by the RHI batch.
 	struct RenderFrameGpuResources
 	{
 		RHIFencePoint m_UploadFencePoint{};

@@ -17,6 +17,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RenderCompositionAccess.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -103,10 +104,9 @@ namespace gglab
 		RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
 	};
 
-	// Owned frame values published by a host frame build. The GPU allocation and
-	// upload-fence handoff stays inside the host; the result carries only the
-	// Public CPU frame values a caller needs for validation, graph authoring and
-	// tooling.
+	// Frame values published by a host frame build, including borrowed constant
+	// bindings valid only for this frame. Storage ownership and transfer-fence
+	// tracking stay inside the RHI and host.
 	struct RenderFrameBuildResult
 	{
 		std::vector<RenderView> m_RenderViews;
@@ -114,6 +114,8 @@ namespace gglab
 		ResolvedTemporalFramePlan m_TemporalFramePlan{};
 		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderScene m_RenderScene{};
+		RenderFrameConstantBindings m_FrameConstants{};
+		RHIFrameUploads m_Uploads{};
 		std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
 		DirectionalShadowFramePlan m_DirectionalShadowFramePlan{};
 		DebugDrawFrameView m_DebugDrawFrame{};
@@ -137,6 +139,8 @@ namespace gglab
 				.m_TemporalFrameTransaction = m_TemporalFrameTransaction,
 				.m_DisplayViewId = m_DisplayViewId,
 				.m_RenderScene = m_RenderScene,
+				.m_FrameConstants = m_FrameConstants,
+				.m_Uploads = m_Uploads,
 				.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
 				.m_DirectionalShadowFramePlan = &m_DirectionalShadowFramePlan,
 				.m_DebugDrawFrame = m_DebugDrawFrame,

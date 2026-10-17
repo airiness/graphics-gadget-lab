@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -457,11 +456,7 @@ namespace gglab
 						PipelineVariant::Evaluate));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
@@ -605,11 +600,7 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreatePipeline(services, PipelineVariant::Upsample));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
@@ -748,11 +739,7 @@ namespace gglab
 					PipelineVariant::Temporal));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());

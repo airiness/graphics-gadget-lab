@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -305,21 +304,12 @@ namespace gglab::forward_shading
 		graphicsContext.SetScissorRect(inputs.m_RasterDomain->m_Scissor);
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-		const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 		graphicsContext.SetConstantBuffer(
 			static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-			{
-				.m_Buffer = sceneBuffer->GetBufferHandle(),
-				.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-				.m_SizeInBytes = sizeof(SceneGPU),
-			});
+			context.m_FrameConstants.m_Scene);
 		graphicsContext.SetConstantBuffer(
 			static_cast<uint32_t>(RootParameter::ShadowConstants),
-			{
-				.m_Buffer = sceneBuffer->GetBufferHandle(),
-				.m_OffsetInBytes = context.m_RenderScene.m_ShadowConstantBufferOffset,
-				.m_SizeInBytes = sizeof(DirectionalShadowGPU),
-			});
+			context.m_FrameConstants.m_DirectionalShadow);
 
 		const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),

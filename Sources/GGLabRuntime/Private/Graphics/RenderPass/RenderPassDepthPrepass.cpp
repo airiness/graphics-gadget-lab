@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -268,14 +267,9 @@ namespace gglab
 						services, drawItem.m_VariantBits, outputMotion));
 				// With counters enabled and motion off, opaque depth has no pixel shader
 				// while alpha-tested depth uses a counter layout. Rebind after every PSO switch.
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = sceneBuffer->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
 					services.m_FrameBuffers->GetObjectStructuredBuffer()->GetBufferHandle(

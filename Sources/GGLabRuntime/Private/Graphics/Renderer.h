@@ -1,5 +1,4 @@
 #pragma once
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -217,15 +216,6 @@ namespace gglab
 		}
 		[[nodiscard]] RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override;
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
-
-		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept override
-		{
-			return m_SceneCB.get();
-		}
-		DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept override
-		{
-			return m_SceneCB.get();
-		}
 		const PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept override
 		{
 			return m_ObjectSB.get();
@@ -359,8 +349,6 @@ namespace gglab
 		GTAOCapabilityStatus m_GTAOCapabilityStatus{};
 		TemporalViewHistory m_TemporalViewHistory{};
 		TemporalObjectHistory m_TemporalObjectHistory{};
-
-		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 
 		std::unique_ptr<PersistentStructuredBuffer<ObjectGPU>> m_ObjectSB;
 		std::unique_ptr<PersistentStructuredBuffer<MaterialGPU>> m_MaterialSB;

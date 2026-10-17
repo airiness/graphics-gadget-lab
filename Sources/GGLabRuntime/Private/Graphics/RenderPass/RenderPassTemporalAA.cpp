@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -583,11 +582,7 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreateDepthHistoryPipeline(services));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
@@ -606,11 +601,7 @@ namespace gglab
 				// the depth copy. Frame-buffer bindings cannot survive that layout switch.
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());

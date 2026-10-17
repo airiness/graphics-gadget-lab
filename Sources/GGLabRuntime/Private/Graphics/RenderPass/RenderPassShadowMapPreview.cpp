@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -126,14 +125,9 @@ namespace gglab
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = sceneBuffer->GetBufferHandle(),
-						.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					contextPtr->m_FrameConstants.m_Scene);
 
 				const ShadowMapPreviewPassParameters passParameters{
 					.ShadowMapTextureIndex = shadowMapSrv.m_Index,

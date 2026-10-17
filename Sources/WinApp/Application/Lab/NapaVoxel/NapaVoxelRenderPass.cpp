@@ -1,7 +1,6 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderPass.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 
@@ -167,11 +166,7 @@ namespace gglab
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = servicesPtr->m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = frameContextPtr->m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					frameContextPtr->m_FrameConstants.m_Scene);
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					servicesPtr->m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());

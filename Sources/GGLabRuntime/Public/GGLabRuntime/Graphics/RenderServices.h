@@ -27,7 +27,6 @@
 
 namespace gglab
 {
-	class DynamicConstantBufferAllocator;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;
 	class RenderPipelineOverlayExtensionBase;
@@ -169,10 +168,6 @@ namespace gglab
 	{
 	public:
 		virtual ~RenderFrameBufferAccess() = default;
-
-		[[nodiscard]] virtual const DynamicConstantBufferAllocator* GetSceneConstantBuffer()
-			const noexcept = 0;
-		virtual DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept = 0;
 
 		[[nodiscard]] virtual const PersistentStructuredBuffer<ObjectGPU>*
 			GetObjectStructuredBuffer() const noexcept = 0;

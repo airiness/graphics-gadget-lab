@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -155,14 +154,9 @@ namespace gglab
 					graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
 					graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 					graphicsContext->SetConstantBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						{
-							.m_Buffer = sceneBuffer->GetBufferHandle(),
-							.m_OffsetInBytes = contextPtr->m_RenderScene.m_SceneConstantBufferOffset,
-							.m_SizeInBytes = sizeof(SceneGPU),
-						});
+						contextPtr->m_FrameConstants.m_Scene);
 
 					const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 					graphicsContext->SetReadOnlyBuffer(

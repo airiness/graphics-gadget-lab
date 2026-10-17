@@ -259,7 +259,6 @@ namespace gglab
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
 
-		m_SceneCB.reset();
 		m_FrameBuilder.reset();
 		m_ObjectTable.reset();
 		m_MaterialTable.reset();
@@ -297,7 +296,6 @@ namespace gglab
 		RHIFrameContext* rhiFrame = beginResult.GetFrame();
 		GGLAB_ASSERT_NOT_NULL(rhiFrame);
 
-		m_SceneCB->Tick();
 		m_ViewSB->Tick();
 
 		m_TransientResourcePool->Tick();
@@ -368,12 +366,14 @@ namespace gglab
 			"Frame building requires the active begun render host frame.");
 		GGLAB_ASSERT_NOT_NULL(m_FrameBuilder.get());
 		GGLAB_ASSERT_NOT_NULL(m_AttachedAssetManager);
+		GGLAB_ASSERT_NOT_NULL(m_ActiveFrame.m_RHIFrame);
 
 		const RenderFrameBuilder::BuildInfo buildInfo{
 			.m_World = request.m_World,
 			.m_CameraRig = request.m_CameraRig,
 			.m_Renderer = *this,
 			.m_AssetManager = *m_AttachedAssetManager,
+			.m_Uploads = m_ActiveFrame.m_RHIFrame->GetUploads(),
 			.m_ShadowVisualizationSettings = request.m_ShadowVisualizationSettings,
 			.m_ViewRenderProfile = request.m_ViewRenderProfile,
 			.m_DisplayViewSettings = request.m_DisplayViewSettings,
@@ -395,6 +395,8 @@ namespace gglab
 		result.m_TemporalFramePlan = built.m_TemporalFramePlan;
 		result.m_TemporalFrameTransaction = built.m_TemporalFrameTransaction;
 		result.m_RenderScene = std::move(built.m_RenderScene);
+		result.m_FrameConstants = built.m_FrameConstants;
+		result.m_Uploads = built.m_Uploads;
 		result.m_RenderQueues = std::move(built.m_RenderQueues);
 		result.m_DirectionalShadowFramePlan = std::move(built.m_DirectionalShadowFramePlan);
 		result.m_DebugDrawFrame = built.m_DebugDrawFrame;
@@ -627,7 +629,7 @@ namespace gglab
 	void Renderer::RetainCompletionUnknownFrame() noexcept
 	{
 		// Nothing the frame can read is released: graph transients stay out of the pool's
-		// free lists, scene ring spans stay leased, capture readbacks stay unread, and the
+		// free lists, view ring spans stay leased, capture readbacks stay unread, and the
 		// Atmosphere, temporal and IBL resources keep their owners. Finalize releases them
 		// once quiescence or device loss is confirmed.
 		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -661,7 +663,6 @@ namespace gglab
 		GGLAB_UNUSED(m_PersistentTexturePool.release());
 		GGLAB_UNUSED(m_TransientResourcePool.release());
 		GGLAB_UNUSED(m_AssetUploadScheduler.release());
-		GGLAB_UNUSED(m_SceneCB.release());
 		GGLAB_UNUSED(m_ObjectTable.release());
 		GGLAB_UNUSED(m_MaterialTable.release());
 		GGLAB_UNUSED(m_LightTable.release());
@@ -791,14 +792,6 @@ namespace gglab
 		{
 			m_ViewSB->Retire(&allocations->m_Views, fencePoint);
 		}
-		if (allocations->m_SceneConstants.IsValid())
-		{
-			m_SceneCB->Retire(&allocations->m_SceneConstants, fencePoint);
-		}
-		if (allocations->m_ShadowConstants.IsValid())
-		{
-			m_SceneCB->Retire(&allocations->m_ShadowConstants, fencePoint);
-		}
 		*allocations = {};
 	}
 
@@ -909,21 +902,6 @@ namespace gglab
 
 	void Renderer::InitializeGpuBuffers() noexcept
 	{
-		// Small, per-frame CPU-visible constant allocations.
-		{
-			DynamicConstantBufferAllocator::CreateInfo createInfo{};
-			createInfo.m_Device = GetDevice();
-			const uint32_t alignment = GetDevice()->GetBufferViewAlignment(RHIBufferViewType::ConstantBuffer);
-			const uint32_t sceneSize = (static_cast<uint32_t>(sizeof(SceneGPU)) + alignment - 1) /
-				alignment * alignment;
-			const uint32_t shadowSize = (static_cast<uint32_t>(sizeof(DirectionalShadowGPU)) + alignment - 1) /
-				alignment * alignment;
-			createInfo.m_CapacityInBytes = (sceneSize + shadowSize) *
-				m_RHIContext->GetFrameSlotCount() * 2;
-			createInfo.m_DebugName = "Renderer.DynamicConstants";
-			m_SceneCB = std::make_unique<DynamicConstantBufferAllocator>(createInfo);
-		}
-
 		// Persistent scene tables are replicated per frame slot. Each frame only updates
 		// the safe physical version selected by its reusable slot.
 		{

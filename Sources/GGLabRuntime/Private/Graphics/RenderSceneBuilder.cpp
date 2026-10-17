@@ -553,29 +553,19 @@ namespace gglab
 		sceneCB.IBLResource.EnvironmentIntensity = environmentSettings.m_Intensity;
 		sceneCB.IBLResource.EnvironmentRotationRadians = environmentSettings.m_RotationRadians;
 
-		result.m_GpuAllocations.m_SceneConstants = info.m_SceneCB.Upload(sceneCB);
-		if (!result.m_GpuAllocations.m_SceneConstants.IsValid())
+		result.m_Constants.m_Scene = info.m_Uploads.UploadConstants(sceneCB);
+		if (!result.m_Constants.m_Scene.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: Scene constant allocation failed.");
 			result.m_Status = RenderSceneBuildStatus::GpuUploadFailed;
 		}
-		else
-		{
-			result.m_RenderScene.m_SceneConstantBufferOffset =
-				result.m_GpuAllocations.m_SceneConstants.m_OffsetInBytes;
-		}
 
-		result.m_GpuAllocations.m_ShadowConstants = info.m_SceneCB.Upload(
+		result.m_Constants.m_DirectionalShadow = info.m_Uploads.UploadConstants(
 			BuildDirectionalShadowGPU(info.m_DirectionalShadowFramePlan, viewUpload.m_ShadowViewBaseOffset));
-		if (!result.m_GpuAllocations.m_ShadowConstants.IsValid())
+		if (!result.m_Constants.m_DirectionalShadow.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: Shadow constant allocation failed.");
 			result.m_Status = RenderSceneBuildStatus::GpuUploadFailed;
-		}
-		else
-		{
-			result.m_RenderScene.m_ShadowConstantBufferOffset =
-				result.m_GpuAllocations.m_ShadowConstants.m_OffsetInBytes;
 		}
 
 		return result;

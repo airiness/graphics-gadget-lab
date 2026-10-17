@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassTemporalReference.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -262,11 +261,7 @@ namespace gglab
 				commandContext->SetPipeline(GetOrCreatePipeline(services));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-						.m_OffsetInBytes = context.m_RenderScene.m_SceneConstantBufferOffset,
-						.m_SizeInBytes = sizeof(SceneGPU),
-					});
+					context.m_FrameConstants.m_Scene);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());

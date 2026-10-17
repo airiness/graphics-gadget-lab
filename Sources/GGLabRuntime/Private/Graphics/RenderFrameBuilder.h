@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "Graphics/RenderWorldExtractor.h"
 
@@ -28,6 +29,7 @@ namespace gglab
 			CameraRig& m_CameraRig;
 			Renderer& m_Renderer;
 			AssetManager& m_AssetManager;
+			RHIFrameUploads m_Uploads{};
 			ShadowVisualizationSettings& m_ShadowVisualizationSettings;
 			const ViewRenderProfile& m_ViewRenderProfile;
 			ResolvedViewRenderSettings m_DisplayViewSettings{};
@@ -48,6 +50,8 @@ namespace gglab
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			RenderScene m_RenderScene{};
+			RenderFrameConstantBindings m_FrameConstants{};
+			RHIFrameUploads m_Uploads{};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
 			DirectionalShadowFramePlan m_DirectionalShadowFramePlan{};

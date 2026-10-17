@@ -2,11 +2,12 @@
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "Graphics/RenderWorldExtractor.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -29,12 +30,10 @@ namespace gglab
 	struct RenderSceneGpuAllocations
 	{
 		DynamicStructuredBufferAllocator<ViewGPU>::Allocation m_Views{};
-		DynamicBufferAllocation m_SceneConstants{};
-		DynamicBufferAllocation m_ShadowConstants{};
 
 		bool IsEmpty() const noexcept
 		{
-			return !m_Views.IsValid() && !m_SceneConstants.IsValid() && !m_ShadowConstants.IsValid();
+			return !m_Views.IsValid();
 		}
 	};
 
@@ -53,7 +52,7 @@ namespace gglab
 			std::span<RenderView> m_RenderViews;
 			const DirectionalShadowFramePlan& m_DirectionalShadowFramePlan;
 
-			DynamicConstantBufferAllocator& m_SceneCB;
+			RHIFrameUploads m_Uploads{};
 			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
 			PersistentStructuredBuffer<MaterialGPU>& m_MaterialsSB;
 			PersistentStructuredBuffer<LightGPU>& m_LightsSB;
@@ -85,6 +84,7 @@ namespace gglab
 			// View offset of BuildInfo::m_PostTemporalView; unassigned without one.
 			uint32_t m_PostTemporalViewOffset = UnassignedViewOffset;
 			RenderScene m_RenderScene{};
+			RenderFrameConstantBindings m_Constants{};
 			RenderSceneGpuAllocations m_GpuAllocations{};
 			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_Status = RenderSceneBuildStatus::GpuUploadFailed;

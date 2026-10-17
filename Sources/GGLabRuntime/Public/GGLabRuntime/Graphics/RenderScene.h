@@ -61,9 +61,6 @@ namespace gglab
 		std::array<uint32_t, MaxLightCapacity> m_LightTypesByIndex{};
 		std::vector<uint32_t> m_GlobalLightIndices;
 
-		uint64_t m_SceneConstantBufferOffset = 0;
-		uint64_t m_ShadowConstantBufferOffset = 0;
-
 		std::vector<RenderInstance> m_RenderInstances;
 	};
 }
