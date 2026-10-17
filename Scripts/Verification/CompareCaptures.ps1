@@ -29,6 +29,11 @@ file names are expected to differ and are not listed. A difference does not
 fail the comparison, but pixel differences of such a pair may come from it
 rather than from rendering.
 
+-RequireMatchingInputs requires the recorded scene/asset identity and effective
+camera, temporal and sequence inputs to match exactly. Static elapsed time and
+IBL publication serials may differ. Incompatible inputs fail before pixel metrics
+are reported; tolerances still need to be selected for the intended image claim.
+
 Prints one JSON object on stdout. The exit code is 0 when every pair was
 compared and stays within the optional tolerances and no sidecar was rejected,
 and 1 otherwise.
@@ -49,7 +54,9 @@ param(
     [int]$DiffScale = 8,
     # Optional tolerances; a pair above either one fails.
     [double]$MaxMeanError = [double]::PositiveInfinity,
-    [double]$MaxDifferingPercent = [double]::PositiveInfinity
+    [double]$MaxDifferingPercent = [double]::PositiveInfinity,
+    # Require recorded scene/asset inputs to agree before interpreting pixel errors.
+    [switch]$RequireMatchingInputs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -190,7 +197,13 @@ $ComparedMetadataFields = @(
     'image.width', 'image.height', 'image.displayFormat', 'camera.referenceView',
     'camera.position', 'camera.forward', 'camera.up', 'camera.verticalFovDegrees',
     'camera.nearPlane', 'camera.farPlane', 'time.fixedDeltaTime', 'time.totalTime',
-    'developmentTools'
+    'developmentTools', 'content.assetBundle', 'sceneInputs',
+    'image.encoding', 'temporal.requested', 'temporal.status', 'temporal.disableReason',
+    'temporal.consumers', 'temporal.services', 'temporal.settings', 'temporal.gtao',
+    'temporal.jitterIndex', 'temporal.jitterSequenceLength', 'temporal.jitterPixels',
+    'temporal.textureLodBias', 'temporal.renderScale', 'temporal.renderExtent', 'temporal.displayExtent',
+    'sequence.cameraPath', 'sequence.cameraPathVersion', 'sequence.frame', 'sequence.frameCount',
+    'sequence.referenceSamples', 'sequence.referenceTextureLodBias'
 )
 
 function Get-MetadataValue($Metadata, [string]$Path) {
@@ -199,7 +212,17 @@ function Get-MetadataValue($Metadata, [string]$Path) {
     return $value
 }
 
-function Test-SameValue($Left, $Right) {
+function Test-SameValue($Left, $Right, [bool]$Exact = $false) {
+    if ($null -eq $Left -or $null -eq $Right) { return $null -eq $Left -and $null -eq $Right }
+    if ($Left -is [pscustomobject] -or $Right -is [pscustomobject]) {
+        $leftNames = @($Left.PSObject.Properties | ForEach-Object { $_.Name } | Sort-Object)
+        $rightNames = @($Right.PSObject.Properties | ForEach-Object { $_.Name } | Sort-Object)
+        if (($leftNames -join '|') -cne ($rightNames -join '|')) { return $false }
+        foreach ($name in $leftNames) {
+            if (-not (Test-SameValue (Get-Field $Left $name) (Get-Field $Right $name) $Exact)) { return $false }
+        }
+        return $true
+    }
     $leftValues = @($Left)
     $rightValues = @($Right)
     if ($leftValues.Count -ne $rightValues.Count) { return $false }
@@ -207,7 +230,11 @@ function Test-SameValue($Left, $Right) {
         $a = $leftValues[$index]
         $b = $rightValues[$index]
         if ($a -is [ValueType] -and $b -is [ValueType] -and $a -isnot [bool] -and $b -isnot [bool]) {
+            if ($Exact -and [double]$a -ne [double]$b) { return $false }
             if ([Math]::Abs([double]$a - [double]$b) -gt 1e-4) { return $false }
+        }
+        elseif ($a -is [pscustomobject] -or $b -is [pscustomobject]) {
+            if (-not (Test-SameValue $a $b $Exact)) { return $false }
         }
         elseif ("$a" -cne "$b") {
             return $false
@@ -312,6 +339,42 @@ function Compare-Pair([string]$Key, [string]$ReferenceImage, [string]$CandidateI
         key = $Key; reference = $ReferenceImage; candidate = $CandidateImage
         width = $comparison.Width; height = $comparison.Height; sizeMatches = $comparison.SizeMatches
         metadataDifferences = @(Get-MetadataDifferences $ReferenceMetadata $CandidateMetadata)
+    }
+    $inputDifferences = @()
+    if ($RequireMatchingInputs) {
+        if ((Get-MetadataValue $ReferenceMetadata 'sceneInputs.schemaVersion') -ne 1 -or
+            (Get-MetadataValue $CandidateMetadata 'sceneInputs.schemaVersion') -ne 1) {
+            $inputDifferences += 'sceneInputs: missing or unsupported recorded inputs'
+        }
+        if ((Get-MetadataValue $ReferenceMetadata 'content.demoId') -eq 'Demo.Playground.CoastalAtrium') {
+            foreach ($metadata in @($ReferenceMetadata, $CandidateMetadata)) {
+                if ((Get-MetadataValue $metadata 'content.assetBundle.revision') -notmatch '^[a-f0-9]{64}$') {
+                    $inputDifferences += 'content.assetBundle: missing installed resource identity'
+                }
+            }
+        }
+        foreach ($field in @($ComparedMetadataFields | Where-Object { $_ -ne 'time.totalTime' })) {
+            $a = Get-MetadataValue $ReferenceMetadata $field
+            $b = Get-MetadataValue $CandidateMetadata $field
+            # Publication serials identify an IBL instance, not its lighting inputs.
+            if ($field -eq 'sceneInputs' -and $null -ne $a -and $null -ne $b) {
+                $a = $a | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+                $b = $b | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+                if ($null -ne (Get-Field $a 'environment')) {
+                    (Get-Field $a 'environment').PSObject.Properties.Remove('activeIBLGeneration')
+                }
+                if ($null -ne (Get-Field $b 'environment')) {
+                    (Get-Field $b 'environment').PSObject.Properties.Remove('activeIBLGeneration')
+                }
+            }
+            if (-not (Test-SameValue $a $b $true)) { $inputDifferences += $field }
+        }
+    }
+    $pair['inputDifferences'] = $inputDifferences
+    if ($inputDifferences.Count -gt 0) {
+        $pair['pass'] = $false
+        $pair['error'] = 'Capture inputs are incompatible; pixel metrics do not establish a rendering regression.'
+        return $pair
     }
     if (-not $comparison.SizeMatches) {
         $pair['pass'] = $false

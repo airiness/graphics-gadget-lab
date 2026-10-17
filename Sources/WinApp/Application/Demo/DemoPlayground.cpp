@@ -3,6 +3,7 @@
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "ApplicationCameraInput.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Content/RuntimeAssetBundle.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Time.h"
@@ -18,6 +19,8 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
 #include <optional>
+#include <string>
+#include <utility>
 
 namespace gglab
 {
@@ -84,12 +87,24 @@ namespace gglab
 
 	void DemoPlayground::BeginPrepare() noexcept
 	{
+		m_CaptureAssetBundle.reset();
 		m_AssetOwnerScope.Reset();
 		m_World.GetRegistry().clear();
 		if (m_Content == PlaygroundContent::CoastalAtrium)
 		{
+			std::string failure;
+			const auto bundle = LoadRuntimeAssetBundle(m_Services.m_AssetRoot /
+				"Models/GGLabCoastalRetreat/bundle.json", failure);
+			if (!bundle)
+			{
+				m_LoadingProgress = { .m_Status = LoadingStatus::Failed,
+					.m_Fraction = 0.0f, .m_Stage = "Installed asset validation failed",
+					.m_Detail = std::move(failure) };
+				return;
+			}
+			m_CaptureAssetBundle = FrameCaptureAssetBundle{ bundle->m_Id, bundle->m_Revision };
 			m_PendingModels = {
-				{ .m_Path = "Assets/Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf" },
+				{ .m_Path = bundle->m_EntryPoint },
 			};
 		}
 		else

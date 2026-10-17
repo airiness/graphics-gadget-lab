@@ -41,7 +41,11 @@ namespace gglab
 			void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 				const RenderServices& services) noexcept override
 			{
-				rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({});
+				// Loading can outlive the first IBL publication. Applicability must
+				// match the active bank registered by the IBL setup pass below.
+				const bool activeIBL = services.m_Environment->GetBakingStatus().m_HasActiveBake;
+				rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({
+					false, false, false, false, activeIBL, activeIBL, activeIBL, false, false, false });
 				auto* swapChain = services.m_Presentation->GetSwapChain();
 				auto* resourceRegistry = services.m_Resources;
 				GGLAB_ASSERT_NOT_NULL(swapChain);

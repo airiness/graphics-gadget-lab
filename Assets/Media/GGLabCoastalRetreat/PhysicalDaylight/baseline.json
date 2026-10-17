@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 3,
+  "id": "gglab.coastal-retreat.physical-daylight",
+  "captureDate": "2026-10-17",
+  "timeZone": "Asia/Tokyo",
+  "purpose": "Pre-GI Physical Daylight reference with installed assets and actual frame inputs",
+  "content": {
+    "assetBundle": {
+      "id": "gglab.coastal-retreat",
+      "revision": "79092da0d167d3bd041de9ead925c45d9f5ed8083cb07f2c0f5351afb94467e9"
+    },
+    "runtimeFiles": [
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/GGLabCoastalRetreat.bin",
+        "sha256": "e46e6c27cbd6a82f42c8e0b489a01e844789b81e841e23c2a5dfa2a54e9c5439"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf",
+        "sha256": "d52b1205fe15e8e5ff503ddaed365cee6d2e88ed9325edb98a77f05a63383ec4"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/CoastalRock_BaseColor.png",
+        "sha256": "56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/CoastalRock_MetallicRoughness.png",
+        "sha256": "4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/CoastalRock_Normal.png",
+        "sha256": "d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/LandingDampTimber_BaseColor.png",
+        "sha256": "35f7ad7f220eb5579db3da267e36035a9d990a310e1888acdb09f9bdd4c88fe6"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/LandingDampTimber_MetallicRoughness.png",
+        "sha256": "4a6992674ad56857cd90d85475e3eca7f8683463d1ecd5a4d81c76cf129e2b40"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/Metal_BaseColor.png",
+        "sha256": "cc09b179567bac43a80d988a64d9089b7c00ea6aea5da00db1ac38b337936064"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/Metal_MetallicRoughness.png",
+        "sha256": "fc86a16fe6f9bf0613593de00471673d0c625514934cea89a4d4c52f42024a1f"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/Metal_Normal.png",
+        "sha256": "b027121d763390e6687f134c74b7ceaac0da4ab92a750536e582e841d15bb476"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatLeaf_BaseColor.png",
+        "sha256": "484c83e4560db452521bfb92b7220063f7a153d5c6feb1be19285dda2fae949b"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatLeaf_MetallicRoughness.png",
+        "sha256": "cf93da884bbc4864e42e6bf6df3ef440c01c07a52e824aee89f9881e56c7aca3"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatLeaf_Normal.png",
+        "sha256": "42d35cbcad7f809413b345b6f2334f72df778fa71f65a522aef051b9a886853e"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatLime_BaseColor.png",
+        "sha256": "4e6167e58c2b2f5ab4eaf612afefe4be4475f930510d566b37bc1d7f2b1e69e2"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatLime_MetallicRoughness.png",
+        "sha256": "a4934b5f01d57b0541716a5e307279e69490abdd9cafc94da3bef832d1bc8ecd"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatLime_Normal.png",
+        "sha256": "973d7b917704d3356e1bdc69e77b6ab8a807a1ac332f47c2197bb118c6c836ae"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatSea_BaseColor.png",
+        "sha256": "f8eb6ed70d054cdbb0245e65abf3b8738b62ef0aced314ecf2a3dd300d66a191"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatSea_MetallicRoughness.png",
+        "sha256": "bc3c844c0b33306104b24dc37ad20e5bd085864dd08a855d676d4dd042b79190"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatSea_Normal.png",
+        "sha256": "d26dac42ed564f639b784cc8150778eb3b910c9a08b8365736dc8c73669fb053"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatStone_BaseColor.png",
+        "sha256": "3e8b0c8b17638b8ac0b1399abd8e72cb1e20add0783c22e63d6aefb7c6096524"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatStone_MetallicRoughness.png",
+        "sha256": "746aec17aa5ff97b9b419b01eeecb8b0dbe55cb29dbe084076308c1d177dee9f"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatStone_Normal.png",
+        "sha256": "f495f98af96dfcc887a5eab0cc7d87c01621c792ec5adbc0057148961c3ac6f4"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatTimber_BaseColor.png",
+        "sha256": "ccac841ba3b20c3978317f6866ccd38ceb78ff04f835d4b7fe0934d71f09f07b"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatTimber_MetallicRoughness.png",
+        "sha256": "727737ccecffdd08de569a4473cd6145556b0d388e2c749c4e52afcdc0f71635"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/RetreatTimber_Normal.png",
+        "sha256": "fe75dc3c10bb4d42ae5aa8e998446e85795da8b750e1fd1d7db31771b25c345d"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/Upholstery_BaseColor.png",
+        "sha256": "8b609f23151ddc922cd926183f7aeb1b3e099ac0b8177d7553a6de943fa54f08"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/Upholstery_MetallicRoughness.png",
+        "sha256": "15ea1ce5c4fc92f21e5588929b044b903ec137fbf15e44abcdb995a571ff1964"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/Textures/Upholstery_Normal.png",
+        "sha256": "5f433933356f2de09dcf550a2cc1e1267ce74287d5b7a89795b08a73dcf4b3d6"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalRetreat/bundle.json",
+        "sha256": "e141f7ffcaeea2c800f08d782878f2b99af4fd62da1ee5e2559aa12814802fcb"
+      }
+    ]
+  },
+  "renderer": {
+    "gitCommit": "c8abb1bc865f9c82d377dd883cb0a2ab3a4b50e9",
+    "dirtyRenderingInputs": false,
+    "configuration": "Develop",
+    "platform": "x64",
+    "toolset": "v145",
+    "msvc": "14.51.36231",
+    "vulkanSdk": "1.3.296.0",
+    "hardware": {
+      "adapter": "NVIDIA GeForce RTX 3060",
+      "vendorId": "0x10de",
+      "deviceId": "0x2504",
+      "driver": "577.19",
+      "windowsDriver": "32.0.15.7719"
+    },
+    "binaries": [
+      {
+        "path": "GraphicsGadgetLab.exe",
+        "sha256": "6dca17b594c383b26814499735ae164854ebe652538eb97e24a9f0050843a178"
+      },
+      {
+        "path": "gglab-shaderc.exe",
+        "sha256": "dd08ffb713ac4e87e5e6c15696112a731844715f8cd245817bf765e7210f8c95"
+      },
+      {
+        "path": "dxcompiler.dll",
+        "sha256": "9a5100511e127c6a2fc78edf984f95074a76d35b90c90c4d342430a5ae160e9b"
+      },
+      {
+        "path": "dxil.dll",
+        "sha256": "feb57253eff0a622561e29b44cedbe86b89fc9a5bc8dc00fa2f98fafd712c2d8"
+      }
+    ],
+    "shaderRegistries": [
+      {
+        "rhi": "dx12",
+        "registryId": "b6f421dea54546517c6612941287a29ff448bd19eab603ebc7b78780e2b5d84a",
+        "files": [
+          {
+            "path": "active/gglab-dx12/program-registry.ggsh.active",
+            "sha256": "be7094435c6ba5bccecf91acea8da166213001d1268c0927e9bbc7de16aa6e53"
+          },
+          {
+            "path": "program-registry/b6/b6f421dea54546517c6612941287a29ff448bd19eab603ebc7b78780e2b5d84a.ggsh.registry",
+            "sha256": "90b592f7dd9bcf2e9159439e499ae1686403eaf6f6bf5e16303547f8bcbe9869"
+          }
+        ]
+      },
+      {
+        "rhi": "vulkan",
+        "registryId": "484e9aa8ccfc44183cd8b455d165c7d67ebd8639afae7541937b992c15537cce",
+        "files": [
+          {
+            "path": "active/gglab-vulkan13/program-registry.ggsh.active",
+            "sha256": "08d9931ae42b7f26e1f9b099b5d2ec7419607b4387aa728f7c941605aee017a8"
+          },
+          {
+            "path": "program-registry/48/484e9aa8ccfc44183cd8b455d165c7d67ebd8639afae7541937b992c15537cce.ggsh.registry",
+            "sha256": "da7312e9e68895bf3cdbc9ef58a409f744ab69627de26462b5b158fae3808cbf"
+          }
+        ]
+      }
+    ]
+  },
+  "captureProfile": {
+    "demo": "Demo.Playground.CoastalAtrium",
+    "resolution": [
+      1280,
+      800
+    ],
+    "source": "scene",
+    "hidden": true,
+    "developmentTools": false,
+    "fixedDeltaTime": 0.016666666666666666,
+    "settleFrames": 64,
+    "views": [
+      "Retreat_Hero",
+      "Retreat_Overview",
+      "Retreat_SeaPassage",
+      "Retreat_Courtyard",
+      "GI_InteriorExterior",
+      "Retreat_Lounge",
+      "Landing_Dock",
+      "Landing_Damp"
+    ],
+    "giViews": [
+      "Retreat_SeaPassage",
+      "Retreat_Courtyard",
+      "GI_InteriorExterior",
+      "Retreat_Lounge"
+    ],
+    "sceneInputs": {
+      "schemaVersion": 1,
+      "exposure": {
+        "manualEV100": 15,
+        "compensationEV": 0,
+        "effectiveEV100": 15,
+        "scale": 2.5431314497836865e-05,
+        "preExposure": 2.5431314497836865e-05
+      },
+      "postProcess": {
+        "toneMapping": 0,
+        "bloomEnabled": false,
+        "bloomThreshold": 1,
+        "bloomSoftKnee": 0.5,
+        "bloomIntensity": 0.07999999821186066,
+        "bloomScatter": 0.699999988079071,
+        "bloomMaxLevels": 6
+      },
+      "environment": {
+        "intensity": 1,
+        "rotationRadians": 0,
+        "skybox": true,
+        "backgroundMode": 2,
+        "iblQuality": "Medium",
+        "activeIBLGeneration": 3,
+        "iblConfig": {
+          "environmentSize": 512,
+          "environmentFormat": 6,
+          "irradianceSize": 32,
+          "irradianceFormat": 6,
+          "irradianceSamples": 256,
+          "specularSize": 128,
+          "specularMipLevels": 5,
+          "specularFormat": 6,
+          "specularSamples": 512,
+          "specularMaxSampleLuminance": 1000,
+          "brdfLutSize": 256,
+          "brdfLutFormat": 4
+        }
+      },
+      "shadows": {
+        "enabled": true,
+        "pcf": true,
+        "mapSize": 2048,
+        "cascadeCount": 4,
+        "splitLambda": 0.6499999761581421,
+        "cascadeBlendFraction": 0.10000000149011612,
+        "distanceFadeFraction": 0.10000000149011612,
+        "fitMode": 1,
+        "texelSnapping": true,
+        "maxDistance": 80,
+        "casterExtrusion": 300,
+        "orthoPadding": 1,
+        "depthPadding": 200,
+        "receiverBiasTexels": 0.5,
+        "receiverSlopeBiasTexels": 0,
+        "receiverMaxSlope": 4
+      },
+      "sun": {
+        "photonDirection": [
+          -0.6840724945068359,
+          -0.39072588086128235,
+          0.6159367561340332
+        ],
+        "chromaticity": [
+          1,
+          1,
+          1
+        ],
+        "directIlluminance": [
+          120000,
+          120000,
+          120000
+        ],
+        "diskRadiance": [
+          1764247296,
+          1764247296,
+          1764247296
+        ],
+        "toaIlluminanceLux": 120000,
+        "angularRadiusRadians": 0.0046530477702617645,
+        "projectedSolidAngle": 6.801767449360341e-05
+      },
+      "atmosphere": {
+        "planetRadiusMeters": 6360000,
+        "heightMeters": 100000.0,
+        "planetCenterMeters": [
+          0,
+          -6360000,
+          0
+        ],
+        "worldUnitsToMeters": 1,
+        "rayleighScattering": [
+          5.802000032417709e-06,
+          1.3558000318880659e-05,
+          3.310000101919286e-05
+        ],
+        "rayleighScaleHeightMeters": 8000,
+        "mieScattering": 3.9960000322025735e-06,
+        "mieExtinction": 4.439999884198187e-06,
+        "mieScaleHeightMeters": 1200,
+        "mieAnisotropy": 0.800000011920929,
+        "absorption": [
+          6.500000040432496e-07,
+          1.8810000028679497e-06,
+          8.500000348021786e-08
+        ],
+        "absorptionCenterMeters": 25000,
+        "absorptionHalfWidthMeters": 15000,
+        "groundAlbedo": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ]
+      },
+      "localLightCount": 0,
+      "aerialPerspective": true
+    },
+    "inputAuthority": "Each unmodified capture sidecar records the issued frame inputs and readiness."
+  },
+  "verification": {
+    "backends": [
+      "dx12",
+      "vulkan"
+    ],
+    "allReferenceViewsPerBackend": 18,
+    "retainedReferenceViewsPerBackend": 8,
+    "retainedGiRepeatsPerBackend": 4,
+    "repeatMaxDifference": 0,
+    "allViewsCrossRhiMeanErrorRange": [
+      0.155,
+      0.5324
+    ],
+    "nonfiniteWatchMode": "fail",
+    "pathsPerBackend": 9,
+    "boundaryAnomalies": 0,
+    "nanInfReplacements": 0,
+    "expectedTaaNegativeClamps": 81,
+    "headlessContentChecks": 342,
+    "limitations": [
+      "Physical Daylight only; no new local lights or diffuse GI transport.",
+      "Core alpha-BLEND glass approximation; no physical transmission.",
+      "No performance claim or cross-hardware qualification.",
+      "Cycles authoring references are not a numeric rendering oracle."
+    ]
+  },
+  "captures": [
+    {
+      "path": "dx12/reference/daylight-GI_InteriorExterior-scene-dx12-20261016-153822-r15.json",
+      "sha256": "2770754b4ffe60f801a48120a67c46ccb7827ed4c3ca4b616c5828710e2123a0"
+    },
+    {
+      "path": "dx12/reference/daylight-GI_InteriorExterior-scene-dx12-20261016-153822-r15.png",
+      "sha256": "baa815bf0570565edbcd49366219d6d8f36cd6660c05c47b2871fe37e0588055"
+    },
+    {
+      "path": "dx12/reference/daylight-Landing_Damp-scene-dx12-20261016-153824-r17.json",
+      "sha256": "5e169cee1b3a767250312d5873cd53d0df02302324fe9250e595f2c77f391dfb"
+    },
+    {
+      "path": "dx12/reference/daylight-Landing_Damp-scene-dx12-20261016-153824-r17.png",
+      "sha256": "b113e2f9b33e3d4f64fa7bc46bd4bf3e754aca97dea53636e4fd001e1ec4ea04"
+    },
+    {
+      "path": "dx12/reference/daylight-Landing_Dock-scene-dx12-20261016-153823-r16.json",
+      "sha256": "e636a8d21b7ab1fa98c4acb931cf27df334d92d2b68754fcc9740e349e37a4a5"
+    },
+    {
+      "path": "dx12/reference/daylight-Landing_Dock-scene-dx12-20261016-153823-r16.png",
+      "sha256": "7d167398fa3cfe44e6225286ce1e30fea1d5837cff085ac973b52762df7d9a72"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Courtyard-scene-dx12-20261016-153816-r10.json",
+      "sha256": "15c31504da8dccb2a6d800f345c07cae00ee821f2ff75191a92309c8cade5b5c"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Courtyard-scene-dx12-20261016-153816-r10.png",
+      "sha256": "da6144999364aa0de72ce86519df6e2ae469e81a3db5c4c490a8c306471ca4ff"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Hero-scene-dx12-20261016-153815-r9.json",
+      "sha256": "244d43b85b28d0f422c4c188c63a9974fec7d8fb4eed840d9932a577f99f73e1"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Hero-scene-dx12-20261016-153815-r9.png",
+      "sha256": "9a8e5f049849f400e40884d4c28efa864f04c624b5ec0b1f191af9bd7b24e9a9"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Lounge-scene-dx12-20261016-153817-r11.json",
+      "sha256": "0d6c3168af313c859dfb1b607915ef4d91eda53941a92c0b2101deed329deef4"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Lounge-scene-dx12-20261016-153817-r11.png",
+      "sha256": "eef28e59bfd774d1bb9e071acc377b317220272d58789f5cf502ab3834a18da8"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Overview-scene-dx12-20261016-153820-r13.json",
+      "sha256": "0ed4ff380ac8d0ca895feb284101f83cedc412b5a7d021a178a276272775565a"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_Overview-scene-dx12-20261016-153820-r13.png",
+      "sha256": "7a49cb4eeacbf1fd77cfa941b180d154e2b657b9d3726e9ee625e028be863f7b"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_SeaPassage-scene-dx12-20261016-153821-r14.json",
+      "sha256": "b6952af3b1fca7381d07b4c427f734aa20a5468b2e702e57bbc50fd37e18d00c"
+    },
+    {
+      "path": "dx12/reference/daylight-Retreat_SeaPassage-scene-dx12-20261016-153821-r14.png",
+      "sha256": "51d8f45ac0fad38ad2758723d7745a82c05c05ce8eebe3f213ed8c011bc2906b"
+    },
+    {
+      "path": "dx12/repeat/daylight-GI_InteriorExterior-scene-dx12-20261016-153830-r21.json",
+      "sha256": "fde5c544b4c19c1540abed0fd070d9e00b2ca53a4d68a5c291c523429cf8efb4"
+    },
+    {
+      "path": "dx12/repeat/daylight-GI_InteriorExterior-scene-dx12-20261016-153830-r21.png",
+      "sha256": "baa815bf0570565edbcd49366219d6d8f36cd6660c05c47b2871fe37e0588055"
+    },
+    {
+      "path": "dx12/repeat/daylight-Retreat_Courtyard-scene-dx12-20261016-153828-r20.json",
+      "sha256": "f12fbe9736d954b89a6f0fd300a7318e6522e878d8868212e95e4fd6b1b9168f"
+    },
+    {
+      "path": "dx12/repeat/daylight-Retreat_Courtyard-scene-dx12-20261016-153828-r20.png",
+      "sha256": "da6144999364aa0de72ce86519df6e2ae469e81a3db5c4c490a8c306471ca4ff"
+    },
+    {
+      "path": "dx12/repeat/daylight-Retreat_Lounge-scene-dx12-20261016-153831-r22.json",
+      "sha256": "b6e25fc199289956cb76859443356d923268b5b39eb7043a407c0f37a8ed49ef"
+    },
+    {
+      "path": "dx12/repeat/daylight-Retreat_Lounge-scene-dx12-20261016-153831-r22.png",
+      "sha256": "eef28e59bfd774d1bb9e071acc377b317220272d58789f5cf502ab3834a18da8"
+    },
+    {
+      "path": "dx12/repeat/daylight-Retreat_SeaPassage-scene-dx12-20261016-153827-r19.json",
+      "sha256": "3ad3f62a48760cb1eb7c9465d7f0aae4bb75dc2819726d4d0a5b0fd86e783f79"
+    },
+    {
+      "path": "dx12/repeat/daylight-Retreat_SeaPassage-scene-dx12-20261016-153827-r19.png",
+      "sha256": "51d8f45ac0fad38ad2758723d7745a82c05c05ce8eebe3f213ed8c011bc2906b"
+    },
+    {
+      "path": "vulkan/reference/daylight-GI_InteriorExterior-scene-vulkan-20261016-153900-r15.json",
+      "sha256": "dc1f2c547743ebec3298c47c9a8b72da1fcfadf2821835142ed8eace51cdb25a"
+    },
+    {
+      "path": "vulkan/reference/daylight-GI_InteriorExterior-scene-vulkan-20261016-153900-r15.png",
+      "sha256": "509c3bd44c0e0770edb5b41d06764415c7c204b3ac271c1c6f8a010affb5bbce"
+    },
+    {
+      "path": "vulkan/reference/daylight-Landing_Damp-scene-vulkan-20261016-153902-r17.json",
+      "sha256": "161bccd47c3098c8c528387a9e2434936e62b65180ac825d40a069f915f74b28"
+    },
+    {
+      "path": "vulkan/reference/daylight-Landing_Damp-scene-vulkan-20261016-153902-r17.png",
+      "sha256": "002414e888f8eb2438734042e192f7b69a0d2edfd3d2bad3b3beeea79f56f00a"
+    },
+    {
+      "path": "vulkan/reference/daylight-Landing_Dock-scene-vulkan-20261016-153901-r16.json",
+      "sha256": "204ca766a873318ea4674d58b62bbf2ee29790384790e5562a12c147a11c623a"
+    },
+    {
+      "path": "vulkan/reference/daylight-Landing_Dock-scene-vulkan-20261016-153901-r16.png",
+      "sha256": "c5edda733d6cfb71a13a0cc06dba113f56c84071bd282d47ce7418e9093d9252"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Courtyard-scene-vulkan-20261016-153854-r10.json",
+      "sha256": "e4d1f63d53d51d83ad14f640703f1949cc42ac3a7f6b9b5e0a2abf2f2670c6ee"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Courtyard-scene-vulkan-20261016-153854-r10.png",
+      "sha256": "04f0a9ecf57fce202f338dea6f373686175a00be130e178ce92e197a35d003b2"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Hero-scene-vulkan-20261016-153853-r9.json",
+      "sha256": "404bb5bb242438409ff1ff8f1a2a1d4170377674b39df207d2b78bc45578ddf5"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Hero-scene-vulkan-20261016-153853-r9.png",
+      "sha256": "bf870c07a6b936a5a38c9ce8f43732809ec85eb3db2e658b0f0f9e547c87da19"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Lounge-scene-vulkan-20261016-153855-r11.json",
+      "sha256": "eeacff53768cf57dd01f065744b894f797768ef8edf687629cbe5da2069cf582"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Lounge-scene-vulkan-20261016-153855-r11.png",
+      "sha256": "5e0da61b740c6f1874934df756f62e5f1e55b953be90518ef0d6aa092239a4cd"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Overview-scene-vulkan-20261016-153858-r13.json",
+      "sha256": "6b930b06673457254faf5fa1326d2136d57e355654957a22af525b3b8235eee3"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_Overview-scene-vulkan-20261016-153858-r13.png",
+      "sha256": "b324b27c06e8b4451f1a41479f563d836848576b849fc5d5b1b9defeafaa4217"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153859-r14.json",
+      "sha256": "877aba340310025330b4a37acb4f53c809332f429303bb96fb76ed436e0a347c"
+    },
+    {
+      "path": "vulkan/reference/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153859-r14.png",
+      "sha256": "488ad5c65b57f51f8c0d2e3a2038f9a5d602915c6074a4a4f428dec1a318ca95"
+    },
+    {
+      "path": "vulkan/repeat/daylight-GI_InteriorExterior-scene-vulkan-20261016-153907-r21.json",
+      "sha256": "2e5f2228ab1121b3b4d4f1b99a6e84f9dca4e3db25daab56b3ee64106885afa3"
+    },
+    {
+      "path": "vulkan/repeat/daylight-GI_InteriorExterior-scene-vulkan-20261016-153907-r21.png",
+      "sha256": "509c3bd44c0e0770edb5b41d06764415c7c204b3ac271c1c6f8a010affb5bbce"
+    },
+    {
+      "path": "vulkan/repeat/daylight-Retreat_Courtyard-scene-vulkan-20261016-153906-r20.json",
+      "sha256": "2a0f932ea0d3f718ec641e1f536a176e1cd51a669e7d6d111b81b7f46fa1c272"
+    },
+    {
+      "path": "vulkan/repeat/daylight-Retreat_Courtyard-scene-vulkan-20261016-153906-r20.png",
+      "sha256": "04f0a9ecf57fce202f338dea6f373686175a00be130e178ce92e197a35d003b2"
+    },
+    {
+      "path": "vulkan/repeat/daylight-Retreat_Lounge-scene-vulkan-20261016-153908-r22.json",
+      "sha256": "802e37d1eb78fbeab171165398fdcca288dd6dbe660cb95c1979fe5db4b928cf"
+    },
+    {
+      "path": "vulkan/repeat/daylight-Retreat_Lounge-scene-vulkan-20261016-153908-r22.png",
+      "sha256": "5e0da61b740c6f1874934df756f62e5f1e55b953be90518ef0d6aa092239a4cd"
+    },
+    {
+      "path": "vulkan/repeat/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153905-r19.json",
+      "sha256": "e5a7d12fbee41db1141990f3cc6baefe66180f6df291eee6b8054dcee1163181"
+    },
+    {
+      "path": "vulkan/repeat/daylight-Retreat_SeaPassage-scene-vulkan-20261016-153905-r19.png",
+      "sha256": "488ad5c65b57f51f8c0d2e3a2038f9a5d602915c6074a4a4f428dec1a318ca95"
+    }
+  ],
+  "supportingFiles": [
+    {
+      "path": "comparison.json",
+      "sha256": "fedb33b06094341b0894ac4b50ff98901f754bbea24851342b71cf57a99ce811"
+    },
+    {
+      "path": "nonfinite-audit.json",
+      "sha256": "c3e77d85f2e17f86c425045fe91a84dc8e3da4eb25dfe72821c989a517da111e"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 param(
     [string]$RootDir = "",
-    [string]$ManifestPath = "Assets/Media/GGLabCoastalAtrium/Baseline1/baseline.json",
+    [string]$ManifestPath = "Assets/Media/GGLabCoastalRetreat/PhysicalDaylight/baseline.json",
     [string]$ShaderArtifactRoot = "",
     [ValidateSet("dx12", "vulkan")][string]$Rhi = "dx12",
     [switch]$CheckRenderer
@@ -17,8 +17,8 @@ if (-not [System.IO.Path]::IsPathRooted($ManifestPath)) {
     $ManifestPath = Join-Path $RootDir $ManifestPath
 }
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-if ($manifest.schemaVersion -ne 2) {
-    throw "Unsupported rendering baseline manifest version. Use schema version 2 for Runtime-only validation; legacy authoring records require separate authoring validation."
+if ($manifest.schemaVersion -notin @(2, 3)) {
+    throw "Unsupported rendering baseline manifest version (supported: 2, 3)."
 }
 
 function Test-RecordedFiles {
@@ -50,16 +50,20 @@ function Test-RecordedFiles {
 
 Test-RecordedFiles $RootDir $manifest.content.runtimeFiles "Runtime content"
 Test-RecordedFiles (Split-Path -Parent $ManifestPath) $manifest.captures "Reference captures"
+if ($manifest.schemaVersion -eq 3) {
+    Test-RecordedFiles (Split-Path -Parent $ManifestPath) $manifest.supportingFiles "Capture evidence"
+}
 
 if ($CheckRenderer) {
     # Documentation commits may follow the capture without changing the renderer.
     $inputs = @("Sources", "Shaders", "Projects", "PropertySheets", "Externals",
         "GraphicsGadgetLab.sln", "Directory.Build.props", "Directory.Build.targets")
-    & git -C $RootDir diff --quiet $manifest.renderer.gitCommit -- $inputs
+    $safeRoot = $RootDir.Replace('\', '/')
+    & git -c "safe.directory=$safeRoot" -C $RootDir diff --quiet $manifest.renderer.gitCommit -- $inputs
     if ($LASTEXITCODE -ne 0) {
         throw "Renderer/build inputs differ from recorded commit $($manifest.renderer.gitCommit)."
     }
-    $untracked = & git -C $RootDir ls-files --others --exclude-standard -- $inputs
+    $untracked = & git -c "safe.directory=$safeRoot" -C $RootDir ls-files --others --exclude-standard -- $inputs
     if ($LASTEXITCODE -ne 0 -or $untracked) {
         throw "Renderer/build inputs contain untracked files or could not be checked."
     }

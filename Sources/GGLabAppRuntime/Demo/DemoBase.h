@@ -1,5 +1,6 @@
 #pragma once
 #include "Capture/FrameCaptureReadiness.h"
+#include "Capture/FrameCaptureMetadata.h"
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -56,6 +57,10 @@ namespace gglab
 		// Persisted id of the content inside the Demo that captures identify, such
 		// as the active Lab. Empty when the Demo itself is the captured content.
 		virtual std::string GetCaptureContentId() const noexcept { return {}; }
+		virtual std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept
+		{
+			return std::nullopt;
+		}
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}

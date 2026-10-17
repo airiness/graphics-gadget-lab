@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "requestId": 13,
+  "label": "daylight",
+  "note": "",
+  "source": "scene",
+  "observation": {
+    "graph": false,
+    "resourceExport": false,
+    "nonFiniteWatch": false
+  },
+  "diagnosticTap": null,
+  "timing": {
+    "mode": "after-ready",
+    "settleFrames": 64,
+    "settledFrames": 64
+  },
+  "backend": "dx12",
+  "content": {
+    "demoId": "Demo.Playground.CoastalAtrium",
+    "labId": "",
+    "assetBundle": {
+      "id": "gglab.coastal-retreat",
+      "revision": "79092da0d167d3bd041de9ead925c45d9f5ed8083cb07f2c0f5351afb94467e9"
+    }
+  },
+  "sceneInputs": {
+    "schemaVersion": 1,
+    "exposure": {
+      "manualEV100": 15,
+      "compensationEV": 0,
+      "effectiveEV100": 15,
+      "scale": 2.5431314497836865e-05,
+      "preExposure": 2.5431314497836865e-05
+    },
+    "postProcess": {
+      "toneMapping": 0,
+      "bloomEnabled": false,
+      "bloomThreshold": 1,
+      "bloomSoftKnee": 0.5,
+      "bloomIntensity": 0.07999999821186066,
+      "bloomScatter": 0.699999988079071,
+      "bloomMaxLevels": 6
+    },
+    "environment": {
+      "intensity": 1,
+      "rotationRadians": 0,
+      "skybox": true,
+      "backgroundMode": 2,
+      "iblQuality": "Medium",
+      "activeIBLGeneration": 3,
+      "iblConfig": {
+        "environmentSize": 512,
+        "environmentFormat": 6,
+        "irradianceSize": 32,
+        "irradianceFormat": 6,
+        "irradianceSamples": 256,
+        "specularSize": 128,
+        "specularMipLevels": 5,
+        "specularFormat": 6,
+        "specularSamples": 512,
+        "specularMaxSampleLuminance": 1000,
+        "brdfLutSize": 256,
+        "brdfLutFormat": 4
+      }
+    },
+    "shadows": {
+      "enabled": true,
+      "pcf": true,
+      "mapSize": 2048,
+      "cascadeCount": 4,
+      "splitLambda": 0.6499999761581421,
+      "cascadeBlendFraction": 0.10000000149011612,
+      "distanceFadeFraction": 0.10000000149011612,
+      "fitMode": 1,
+      "texelSnapping": true,
+      "maxDistance": 80,
+      "casterExtrusion": 300,
+      "orthoPadding": 1,
+      "depthPadding": 200,
+      "receiverBiasTexels": 0.5,
+      "receiverSlopeBiasTexels": 0,
+      "receiverMaxSlope": 4
+    },
+    "sun": {
+      "photonDirection": [
+        -0.6840724945068359,
+        -0.39072588086128235,
+        0.6159367561340332
+      ],
+      "chromaticity": [
+        1,
+        1,
+        1
+      ],
+      "directIlluminance": [
+        120000,
+        120000,
+        120000
+      ],
+      "diskRadiance": [
+        1764247296,
+        1764247296,
+        1764247296
+      ],
+      "toaIlluminanceLux": 120000,
+      "angularRadiusRadians": 0.0046530477702617645,
+      "projectedSolidAngle": 6.801767449360341e-05
+    },
+    "atmosphere": {
+      "planetRadiusMeters": 6360000,
+      "heightMeters": 1e+05,
+      "planetCenterMeters": [
+        0,
+        -6360000,
+        0
+      ],
+      "worldUnitsToMeters": 1,
+      "rayleighScattering": [
+        5.802000032417709e-06,
+        1.3558000318880659e-05,
+        3.310000101919286e-05
+      ],
+      "rayleighScaleHeightMeters": 8000,
+      "mieScattering": 3.9960000322025735e-06,
+      "mieExtinction": 4.439999884198187e-06,
+      "mieScaleHeightMeters": 1200,
+      "mieAnisotropy": 0.800000011920929,
+      "absorption": [
+        6.500000040432496e-07,
+        1.8810000028679497e-06,
+        8.500000348021786e-08
+      ],
+      "absorptionCenterMeters": 25000,
+      "absorptionHalfWidthMeters": 15000,
+      "groundAlbedo": [
+        0.30000001192092896,
+        0.30000001192092896,
+        0.30000001192092896
+      ]
+    },
+    "localLightCount": 0,
+    "aerialPerspective": true
+  },
+  "frame": {
+    "serial": 988,
+    "index": 988
+  },
+  "image": {
+    "file": "daylight-Retreat_Overview-scene-dx12-20261016-153820-r13.png",
+    "width": 1280,
+    "height": 800,
+    "displayFormat": "R8G8B8A8Unorm",
+    "encoding": "png-srgb-rgb8"
+  },
+  "camera": {
+    "name": "Main Camera",
+    "referenceView": "Retreat_Overview",
+    "position": [
+      23,
+      23,
+      -31
+    ],
+    "forward": [
+      -0.5701307654380798,
+      -0.4906863570213318,
+      0.6589217185974121
+    ],
+    "up": [
+      -0.3210648000240326,
+      0.8713362812995911,
+      0.37106671929359436
+    ],
+    "verticalFovDegrees": 34.70804977416992,
+    "nearPlane": 0.05000000074505806,
+    "farPlane": 6000
+  },
+  "time": {
+    "fixedDeltaTime": 0.016666666666666666,
+    "totalTime": 16.450000000000347
+  },
+  "developmentTools": false,
+  "readiness": {
+    "ready": true,
+    "gates": [
+      {
+        "name": "shaders",
+        "state": "ready",
+        "detail": ""
+      },
+      {
+        "name": "content-transition",
+        "state": "ready",
+        "detail": ""
+      },
+      {
+        "name": "content",
+        "state": "ready",
+        "detail": ""
+      },
+      {
+        "name": "environment",
+        "state": "ready",
+        "detail": ""
+      },
+      {
+        "name": "ibl",
+        "state": "ready",
+        "detail": ""
+      },
+      {
+        "name": "asset-loads",
+        "state": "ready",
+        "detail": ""
+      },
+      {
+        "name": "asset-uploads",
+        "state": "ready",
+        "detail": ""
+      }
+    ]
+  },
+  "temporal": {
+    "requested": true,
+    "status": "active",
+    "disableReason": "none",
+    "consumers": [
+      {
+        "name": "temporal-aa",
+        "requested": true,
+        "status": "active",
+        "disableReason": "none",
+        "services": [
+          "projection-jitter",
+          "geometry-motion",
+          "frame-continuity",
+          "color-depth-history"
+        ]
+      },
+      {
+        "name": "reference",
+        "requested": false,
+        "status": "disabled",
+        "disableReason": "not-requested",
+        "services": []
+      },
+      {
+        "name": "temporal-gtao",
+        "requested": true,
+        "status": "active",
+        "disableReason": "none",
+        "services": [
+          "geometry-motion",
+          "frame-continuity"
+        ]
+      }
+    ],
+    "services": [
+      "projection-jitter",
+      "geometry-motion",
+      "frame-continuity",
+      "color-depth-history"
+    ],
+    "sessionIdentity": 8589934592,
+    "resetIdentity": 15,
+    "jitterIndex": 0,
+    "jitterSequenceLength": 8,
+    "jitterPixels": [
+      0,
+      -0.1666666716337204
+    ],
+    "settings": {
+      "maxHistoryFeedback": 0.9700000286102295,
+      "depthAbsoluteThreshold": 0.05000000074505806,
+      "depthRelativeThreshold": 0.019999999552965164,
+      "velocityWeightScale": 0.07500000298023224,
+      "luminanceWeightScale": 0,
+      "neighborhoodClampExpansion": 0,
+      "historyRelaxation": 1,
+      "historyAccumulation": "effective-samples",
+      "historyRectification": "minmax-clamp",
+      "varianceClipGamma": 1,
+      "historyFilter": "catmull-rom-clamped",
+      "currentFilter": "gaussian",
+      "motionSelection": "closest-depth",
+      "postTemporalView": "unjittered",
+      "resolutionPreset": "native",
+      "textureLodBiasOffset": -1
+    },
+    "gtao": {
+      "enabled": true,
+      "radius": 1,
+      "falloffStart": 0.8999999761581421,
+      "falloffEnd": 1,
+      "directionCount": 2,
+      "stepCount": 6,
+      "denoiseRadius": 3,
+      "temporalAccumulation": true,
+      "temporalMaxSamples": 8
+    },
+    "textureLodBias": -1,
+    "renderExtent": [
+      1280,
+      800
+    ],
+    "displayExtent": [
+      1280,
+      800
+    ],
+    "renderScale": 1
+  },
+  "sequence": null,
+  "capturedAtUtc": "2026-10-16T15:38:20.272Z"
+}

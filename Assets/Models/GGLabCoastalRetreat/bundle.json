@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.coastal-retreat",
+  "entryPoint": "GGLabCoastalRetreat.gltf",
+  "files": [
+    {
+      "path": "GGLabCoastalRetreat.bin",
+      "sha256": "e46e6c27cbd6a82f42c8e0b489a01e844789b81e841e23c2a5dfa2a54e9c5439"
+    },
+    {
+      "path": "GGLabCoastalRetreat.gltf",
+      "sha256": "d52b1205fe15e8e5ff503ddaed365cee6d2e88ed9325edb98a77f05a63383ec4"
+    },
+    {
+      "path": "Textures/CoastalRock_BaseColor.png",
+      "sha256": "56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9"
+    },
+    {
+      "path": "Textures/CoastalRock_MetallicRoughness.png",
+      "sha256": "4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342"
+    },
+    {
+      "path": "Textures/CoastalRock_Normal.png",
+      "sha256": "d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8"
+    },
+    {
+      "path": "Textures/LandingDampTimber_BaseColor.png",
+      "sha256": "35f7ad7f220eb5579db3da267e36035a9d990a310e1888acdb09f9bdd4c88fe6"
+    },
+    {
+      "path": "Textures/LandingDampTimber_MetallicRoughness.png",
+      "sha256": "4a6992674ad56857cd90d85475e3eca7f8683463d1ecd5a4d81c76cf129e2b40"
+    },
+    {
+      "path": "Textures/Metal_BaseColor.png",
+      "sha256": "cc09b179567bac43a80d988a64d9089b7c00ea6aea5da00db1ac38b337936064"
+    },
+    {
+      "path": "Textures/Metal_MetallicRoughness.png",
+      "sha256": "fc86a16fe6f9bf0613593de00471673d0c625514934cea89a4d4c52f42024a1f"
+    },
+    {
+      "path": "Textures/Metal_Normal.png",
+      "sha256": "b027121d763390e6687f134c74b7ceaac0da4ab92a750536e582e841d15bb476"
+    },
+    {
+      "path": "Textures/RetreatLeaf_BaseColor.png",
+      "sha256": "484c83e4560db452521bfb92b7220063f7a153d5c6feb1be19285dda2fae949b"
+    },
+    {
+      "path": "Textures/RetreatLeaf_MetallicRoughness.png",
+      "sha256": "cf93da884bbc4864e42e6bf6df3ef440c01c07a52e824aee89f9881e56c7aca3"
+    },
+    {
+      "path": "Textures/RetreatLeaf_Normal.png",
+      "sha256": "42d35cbcad7f809413b345b6f2334f72df778fa71f65a522aef051b9a886853e"
+    },
+    {
+      "path": "Textures/RetreatLime_BaseColor.png",
+      "sha256": "4e6167e58c2b2f5ab4eaf612afefe4be4475f930510d566b37bc1d7f2b1e69e2"
+    },
+    {
+      "path": "Textures/RetreatLime_MetallicRoughness.png",
+      "sha256": "a4934b5f01d57b0541716a5e307279e69490abdd9cafc94da3bef832d1bc8ecd"
+    },
+    {
+      "path": "Textures/RetreatLime_Normal.png",
+      "sha256": "973d7b917704d3356e1bdc69e77b6ab8a807a1ac332f47c2197bb118c6c836ae"
+    },
+    {
+      "path": "Textures/RetreatSea_BaseColor.png",
+      "sha256": "f8eb6ed70d054cdbb0245e65abf3b8738b62ef0aced314ecf2a3dd300d66a191"
+    },
+    {
+      "path": "Textures/RetreatSea_MetallicRoughness.png",
+      "sha256": "bc3c844c0b33306104b24dc37ad20e5bd085864dd08a855d676d4dd042b79190"
+    },
+    {
+      "path": "Textures/RetreatSea_Normal.png",
+      "sha256": "d26dac42ed564f639b784cc8150778eb3b910c9a08b8365736dc8c73669fb053"
+    },
+    {
+      "path": "Textures/RetreatStone_BaseColor.png",
+      "sha256": "3e8b0c8b17638b8ac0b1399abd8e72cb1e20add0783c22e63d6aefb7c6096524"
+    },
+    {
+      "path": "Textures/RetreatStone_MetallicRoughness.png",
+      "sha256": "746aec17aa5ff97b9b419b01eeecb8b0dbe55cb29dbe084076308c1d177dee9f"
+    },
+    {
+      "path": "Textures/RetreatStone_Normal.png",
+      "sha256": "f495f98af96dfcc887a5eab0cc7d87c01621c792ec5adbc0057148961c3ac6f4"
+    },
+    {
+      "path": "Textures/RetreatTimber_BaseColor.png",
+      "sha256": "ccac841ba3b20c3978317f6866ccd38ceb78ff04f835d4b7fe0934d71f09f07b"
+    },
+    {
+      "path": "Textures/RetreatTimber_MetallicRoughness.png",
+      "sha256": "727737ccecffdd08de569a4473cd6145556b0d388e2c749c4e52afcdc0f71635"
+    },
+    {
+      "path": "Textures/RetreatTimber_Normal.png",
+      "sha256": "fe75dc3c10bb4d42ae5aa8e998446e85795da8b750e1fd1d7db31771b25c345d"
+    },
+    {
+      "path": "Textures/Upholstery_BaseColor.png",
+      "sha256": "8b609f23151ddc922cd926183f7aeb1b3e099ac0b8177d7553a6de943fa54f08"
+    },
+    {
+      "path": "Textures/Upholstery_MetallicRoughness.png",
+      "sha256": "15ea1ce5c4fc92f21e5588929b044b903ec137fbf15e44abcdb995a571ff1964"
+    },
+    {
+      "path": "Textures/Upholstery_Normal.png",
+      "sha256": "5f433933356f2de09dcf550a2cc1e1267ce74287d5b7a89795b08a73dcf4b3d6"
+    }
+  ],
+  "revision": "79092da0d167d3bd041de9ead925c45d9f5ed8083cb07f2c0f5351afb94467e9"
+}

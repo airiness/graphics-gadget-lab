@@ -17,7 +17,7 @@ tests and have only been reorganized into this project's asset tree.
 
 | Local path | Source | Copyright / rights holder | License | Attribution |
 | --- | --- | --- | --- | --- |
-| `GGLabCoastalRetreat/` | Original GGLab procedural coastal scene, including the island, architecture, glazing, furniture, planting, dock and all 24 PNG textures | (c) 2026 airiness | Project MIT license, [LICENSE](../../LICENSE) | GGLab project; no third-party models or textures |
+| `GGLabCoastalRetreat/` | Original GGLab procedural coastal scene, including the island, architecture, glazing, furniture, planting, landing fixtures, dock and all 26 PNG textures | (c) 2026 airiness | Project MIT license, [LICENSE](../../LICENSE) | GGLab project; no third-party models or textures |
 
 The installed Retreat bundle is self-contained. Its editable authoring source
 is maintained separately and is not a build, loading or validation dependency
