@@ -4,7 +4,8 @@ namespace gglab
 {
 	Win32PlatformHost::Win32PlatformHost(HINSTANCE instance) noexcept :
 		m_MainWindow(instance)
-	{}
+	{
+	}
 
 	bool Win32PlatformHost::Initialize(const PlatformWindowCreateInfo& createInfo) noexcept
 	{

@@ -26,7 +26,9 @@ namespace gglab
 	void AssetInterestTracker::UnregisterOwner(AssetOwnerId owner) noexcept
 	{
 		GGLAB_ASSERT_MSG(std::ranges::none_of(m_Leases, [owner](const auto& entry) noexcept
-			{ return entry.second.m_Owner == owner; }),
+			{
+				return entry.second.m_Owner == owner;
+			}),
 			"Asset owner unregistered while leases are still active.");
 		m_Owners.erase(owner);
 	}

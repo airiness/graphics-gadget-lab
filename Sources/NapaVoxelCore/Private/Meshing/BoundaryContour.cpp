@@ -206,7 +206,9 @@ namespace napa::voxel
 		{
 			const auto iterator = std::lower_bound(records.begin(), records.end(), chunk,
 				[](const ChunkMeshRecord& record, ChunkCoord coordinate)
-				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+				{
+					return ChunkCoordZYXLess{}(record.m_Chunk, coordinate);
+				});
 			return iterator != records.end() && iterator->m_Chunk == chunk ? &*iterator : nullptr;
 		}
 

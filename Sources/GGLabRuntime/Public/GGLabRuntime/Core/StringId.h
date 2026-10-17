@@ -157,7 +157,7 @@ namespace gglab
 	// Generate Id in compile time
 	consteval StringID operator"" _id(const char* str, size_t len)
 	{
-		return StringID{ Crc64(std::string_view{str, len}) };
+		return StringID{ Crc64(std::string_view{ str, len }) };
 	}
 }
 

@@ -228,7 +228,7 @@ namespace gglab
 		const uint32_t entryPointSize = ReadU32LE(bytes, offset);
 		if (entryPointSize == 0 || entryPointSize > MaxShaderRuntimeEntryPointSize ||
 			bytes.size() != SerializedShaderRuntimeArtifactManifestFixedSize +
-				entryPointSize)
+			entryPointSize)
 		{
 			return std::nullopt;
 		}
@@ -405,7 +405,7 @@ namespace gglab
 
 			if (offset != bytes.size() ||
 				ValidateShaderProgramRegistryArtifact(artifact) !=
-					ShaderProgramRegistryArtifactValidationStatus::Valid)
+				ShaderProgramRegistryArtifactValidationStatus::Valid)
 			{
 				return std::nullopt;
 			}

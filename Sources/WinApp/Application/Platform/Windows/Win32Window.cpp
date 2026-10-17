@@ -10,7 +10,8 @@ namespace gglab
 	Win32Window::MessageSubscription::MessageSubscription(MessageSubscription&& other) noexcept :
 		m_Window(std::exchange(other.m_Window, nullptr)),
 		m_Id(std::exchange(other.m_Id, 0))
-	{}
+	{
+	}
 
 	Win32Window::MessageSubscription& Win32Window::MessageSubscription::operator=(
 		MessageSubscription&& other) noexcept
@@ -41,7 +42,8 @@ namespace gglab
 
 	Win32Window::Win32Window(HINSTANCE instance) noexcept :
 		m_Instance(instance)
-	{}
+	{
+	}
 
 	bool Win32Window::Initialize(const PlatformWindowCreateInfo& createInfo) noexcept
 	{

@@ -342,7 +342,9 @@ namespace napa::voxel::testing
 					fullDomainRecords != boundedRecords ||
 					!std::ranges::all_of(fullDomainRecords,
 						[&editContext](const EligibilityRecord& record) noexcept
-						{ return editContext.GetScanBounds().Contains(record.m_Sample); }))
+						{
+							return editContext.GetScanBounds().Contains(record.m_Sample);
+						}))
 				{
 					allCasesMatched = false;
 					break;

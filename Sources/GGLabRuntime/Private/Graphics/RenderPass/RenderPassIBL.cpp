@@ -30,7 +30,7 @@ namespace gglab
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[renderResRegistry, activeResourcesInitialized, bakeResourcesInitialized,
-				activeGeneration = bakeScheduler->GetBakingStatus().m_ActiveGeneration](
+			activeGeneration = bakeScheduler->GetBakingStatus().m_ActiveGeneration](
 				RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();

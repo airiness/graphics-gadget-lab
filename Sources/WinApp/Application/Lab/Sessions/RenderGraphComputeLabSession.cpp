@@ -52,7 +52,7 @@ namespace gglab
 				services.m_FrameCapture ? services.m_FrameCapture->GetNonFiniteInjection() : std::nullopt;
 			return injection && injection->m_PointIndex < nonfinite::InjectionPoints.size() &&
 				nonfinite::InjectionPoints[injection->m_PointIndex].m_Id ==
-					"pass-render-graph-compute-smoke.csnonfiniteprobe.probe";
+				"pass-render-graph-compute-smoke.csnonfiniteprobe.probe";
 		}
 
 		const RenderPassInfo NonFiniteProbePassInfo{
@@ -226,7 +226,7 @@ namespace gglab
 
 				rg.AddPass<SetupPassData>("Lab.RenderGraphCompute.Setup",
 					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId,
-						boundaryProbe](RenderGraph::RGBuilder& builder, SetupPassData&)
+					boundaryProbe](RenderGraph::RGBuilder& builder, SetupPassData&)
 					{
 						builder.SideEffect();
 
@@ -723,11 +723,11 @@ namespace gglab
 			readWriteExecutions == previewExecutions;
 
 		diagnostics.m_Metrics = {
-			{.m_Name = "Graphics initialize", .m_Value = std::to_string(initializeExecutions)},
-			{.m_Name = "Compute write", .m_Value = std::to_string(writeExecutions)},
-			{.m_Name = "Compute read/write", .m_Value = std::to_string(readWriteExecutions)},
-			{.m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions)},
-			{.m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions)},
+			{ .m_Name = "Graphics initialize", .m_Value = std::to_string(initializeExecutions) },
+			{ .m_Name = "Compute write", .m_Value = std::to_string(writeExecutions) },
+			{ .m_Name = "Compute read/write", .m_Value = std::to_string(readWriteExecutions) },
+			{ .m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions) },
+			{ .m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions) },
 		};
 		if (const uint64_t probeExecutions = m_State->m_ProbeExecutions.load(std::memory_order_relaxed);
 			probeExecutions != 0)

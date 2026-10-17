@@ -33,7 +33,7 @@ namespace napa::voxel
 	[[nodiscard]] constexpr bool IsKnownVoxelMaterial(VoxelMaterial material) noexcept
 	{
 		return material == VoxelMaterial::Empty || material == VoxelMaterial::Soil ||
-			   material == VoxelMaterial::Stone;
+			material == VoxelMaterial::Stone;
 	}
 
 	[[nodiscard]] constexpr ValidationResult ValidateVoxelSample(VoxelSample sample) noexcept

@@ -153,7 +153,8 @@ namespace gglab
 		};
 		static_assert(std::derived_from<EnvironmentAssetController, EnvironmentSelectionControlBase>);
 		static_assert(!std::is_abstract_v<EnvironmentAssetController>);
-		static_assert(requires(EnvironmentSelectionControlBase& control) {
+		static_assert(requires(EnvironmentSelectionControlBase& control)
+		{
 			{ control.SelectEnvironment(0) } noexcept -> std::same_as<bool>;
 		});
 		static_assert(!EnvironmentCatalogAccess<EnvironmentSelectionControlBase>);
@@ -213,7 +214,8 @@ namespace gglab
 		concept ShadowPreviewAllocation = requires(T& value) {
 			value.EnsureShadowPreviewResources();
 		};
-		static_assert(requires(const ShadowPreviewViewBase& view) {
+		static_assert(requires(const ShadowPreviewViewBase& view)
+		{
 			{ view.GetShadowPreviewDiagnostics() } noexcept -> std::same_as<ShadowPreviewDiagnostics>;
 		});
 		static_assert(!ShadowPreviewAllocation<ShadowPreviewViewBase>);

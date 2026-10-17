@@ -22,13 +22,20 @@ namespace gglab
 		{
 			switch (state)
 			{
-			case LabRunState::Uninitialized: return LabSnapshotRunState::Uninitialized;
-			case LabRunState::Loading: return LabSnapshotRunState::Loading;
-			case LabRunState::WarmingUp: return LabSnapshotRunState::WarmingUp;
-			case LabRunState::Ready: return LabSnapshotRunState::Ready;
-			case LabRunState::Capturing: return LabSnapshotRunState::Capturing;
-			case LabRunState::Completed: return LabSnapshotRunState::Completed;
-			case LabRunState::Failed: return LabSnapshotRunState::Failed;
+			case LabRunState::Uninitialized:
+				return LabSnapshotRunState::Uninitialized;
+			case LabRunState::Loading:
+				return LabSnapshotRunState::Loading;
+			case LabRunState::WarmingUp:
+				return LabSnapshotRunState::WarmingUp;
+			case LabRunState::Ready:
+				return LabSnapshotRunState::Ready;
+			case LabRunState::Capturing:
+				return LabSnapshotRunState::Capturing;
+			case LabRunState::Completed:
+				return LabSnapshotRunState::Completed;
+			case LabRunState::Failed:
+				return LabSnapshotRunState::Failed;
 			}
 			return LabSnapshotRunState::Failed;
 		}
@@ -37,13 +44,20 @@ namespace gglab
 		{
 			switch (type)
 			{
-			case LabParameterType::Bool: return LabSnapshotParameterType::Bool;
-			case LabParameterType::Int: return LabSnapshotParameterType::Int;
-			case LabParameterType::UInt: return LabSnapshotParameterType::UInt;
-			case LabParameterType::Float: return LabSnapshotParameterType::Float;
-			case LabParameterType::Enum: return LabSnapshotParameterType::Enum;
-			case LabParameterType::Vector3: return LabSnapshotParameterType::Vector3;
-			case LabParameterType::Color: return LabSnapshotParameterType::Color;
+			case LabParameterType::Bool:
+				return LabSnapshotParameterType::Bool;
+			case LabParameterType::Int:
+				return LabSnapshotParameterType::Int;
+			case LabParameterType::UInt:
+				return LabSnapshotParameterType::UInt;
+			case LabParameterType::Float:
+				return LabSnapshotParameterType::Float;
+			case LabParameterType::Enum:
+				return LabSnapshotParameterType::Enum;
+			case LabParameterType::Vector3:
+				return LabSnapshotParameterType::Vector3;
+			case LabParameterType::Color:
+				return LabSnapshotParameterType::Color;
 			}
 			return LabSnapshotParameterType::Bool;
 		}

@@ -144,7 +144,7 @@ namespace gglab
 						? std::optional<RHIRenderingAttachment>(
 							RHIRenderingAttachment{ .m_View = dsv })
 						: std::nullopt,
-				});
+					});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

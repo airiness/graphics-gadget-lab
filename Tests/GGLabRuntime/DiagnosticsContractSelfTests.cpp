@@ -1090,11 +1090,11 @@ namespace gglab
 		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &secondLabSource });
 		const LabSnapshot* secondLabSnapshot = labDiagnostics.GetSnapshot<LabSnapshot>();
 		context.Check(secondLabSnapshot && secondLabSnapshot == firstLabSnapshot &&
-				secondLabSnapshot->m_ActiveLabName == "Second Lab",
+			secondLabSnapshot->m_ActiveLabName == "Second Lab",
 			"Lab diagnostics recaptures from the current AppRuntime-supplied source");
 		context.Check(!secondLabSource.m_LastContext.m_RequestedTemporalAASettings &&
-				!secondLabSource.m_LastContext.m_TemporalFramePlan &&
-				secondLabSource.m_LastContext.m_FrameSerial == 0,
+			!secondLabSource.m_LastContext.m_TemporalFramePlan &&
+			secondLabSource.m_LastContext.m_FrameSerial == 0,
 			"A new Lab source without a display frame receives no retained frame inputs");
 		labDiagnostics.EndFrame();
 
@@ -1118,8 +1118,8 @@ namespace gglab
 		persistentSnapshot = resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();
 		transientSnapshot = resourceDiagnostics.GetSnapshot<TransientResourcePoolSnapshot>();
 		context.Check(persistentSnapshot && !persistentSnapshot->m_SourceAvailable &&
-				transientSnapshot && !transientSnapshot->m_SourceAvailable &&
-				retainedPersistentSnapshot.m_SourceAvailable,
+			transientSnapshot && !transientSnapshot->m_SourceAvailable &&
+			retainedPersistentSnapshot.m_SourceAvailable,
 			"Missing-source recapture clears availability without changing a retained value copy");
 		resourceDiagnostics.EndFrame();
 
@@ -1142,9 +1142,9 @@ namespace gglab
 			.m_DisplayViewSettings = &temporalDisplay, .m_TemporalFramePlan = &labFramePlan });
 		const auto* temporalSnapshot = resourceDiagnostics.GetSnapshot<TemporalAADiagnosticsSnapshot>();
 		context.Check(temporalSnapshot && temporalSnapshot->m_Available &&
-				temporalSnapshot->m_AuthoringSettings == temporalAuthoring.m_TemporalAA &&
-				temporalSnapshot->m_RequestedSettings == temporalDisplay.m_TemporalAA &&
-				temporalSnapshot->m_RequestedSettings != temporalOverride.m_TemporalAA,
+			temporalSnapshot->m_AuthoringSettings == temporalAuthoring.m_TemporalAA &&
+			temporalSnapshot->m_RequestedSettings == temporalDisplay.m_TemporalAA &&
+			temporalSnapshot->m_RequestedSettings != temporalOverride.m_TemporalAA,
 			"TAA snapshot preserves authoring but publishes final display overrides, not the intermediate profile");
 		const auto retainedTemporal = temporalSnapshot ? *temporalSnapshot : TemporalAADiagnosticsSnapshot{};
 		resourceDiagnostics.EndFrame();
@@ -1153,7 +1153,7 @@ namespace gglab
 			.m_RenderGraph = &temporalGraph, .m_TemporalFramePlan = &labFramePlan });
 		temporalSnapshot = resourceDiagnostics.GetSnapshot<TemporalAADiagnosticsSnapshot>();
 		context.Check(temporalSnapshot && !temporalSnapshot->m_Available &&
-				retainedTemporal.m_RequestedSettings.m_MaxHistoryFeedback == 0.5f,
+			retainedTemporal.m_RequestedSettings.m_MaxHistoryFeedback == 0.5f,
 			"Missing final settings clear TAA snapshot availability and retained snapshots own their values");
 		resourceDiagnostics.EndFrame();
 
@@ -1256,15 +1256,15 @@ namespace gglab
 			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades).m_Cascades.empty(),
 			"Missing and empty cascade sets publish no stale cascade diagnostics");
 		context.Check(shadowSnapshot.m_Available &&
-				shadowSnapshot.m_DirectionalShadowMap.m_Available &&
-				shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Width == 2048 &&
-				shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Height == 2048 &&
-				shadowSnapshot.m_DirectionalShadowMap.m_Format == RHIFormat::R32Typeless &&
-				shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Available &&
-				shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Extent.m_Width == 512 &&
-				shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Format == RHIFormat::R32Float &&
-				shadowSnapshot.m_ShadowMapSize == 2048 &&
-				shadowSnapshot.m_ShadowMapPreviewSize == 512,
+			shadowSnapshot.m_DirectionalShadowMap.m_Available &&
+			shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Width == 2048 &&
+			shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Height == 2048 &&
+			shadowSnapshot.m_DirectionalShadowMap.m_Format == RHIFormat::R32Typeless &&
+			shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Available &&
+			shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Extent.m_Width == 512 &&
+			shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Format == RHIFormat::R32Float &&
+			shadowSnapshot.m_ShadowMapSize == 2048 &&
+			shadowSnapshot.m_ShadowMapPreviewSize == 512,
 			"Shadow diagnostics copies RenderGraph resource state into an immutable snapshot");
 
 		ShadowDiagnosticsSnapshot temporalFrame{};
@@ -1332,17 +1332,17 @@ namespace gglab
 
 		const auto resetsOn = [&](ShadowDiagnosticsSnapshot changed, uint64_t cameraId,
 			std::string_view referenceId) noexcept
-		{
-			ShadowTemporalDiagnostics history;
-			auto first = temporalFrame;
-			first.m_FrameSerial = 1;
-			(void) history.Record(first, 7, "CAM_ShadowStairs");
-			changed.m_FrameSerial = 2;
-			const bool recorded = history.Record(changed, cameraId, referenceId);
-			return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&
-				!history.GetSamples().front().m_HasComparison &&
-				history.GetSamples().front().m_ProjectionDeltaTexels[0].m_X == 0.0f;
-		};
+			{
+				ShadowTemporalDiagnostics history;
+				auto first = temporalFrame;
+				first.m_FrameSerial = 1;
+				(void)history.Record(first, 7, "CAM_ShadowStairs");
+				changed.m_FrameSerial = 2;
+				const bool recorded = history.Record(changed, cameraId, referenceId);
+				return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&
+					!history.GetSamples().front().m_HasComparison &&
+					history.GetSamples().front().m_ProjectionDeltaTexels[0].m_X == 0.0f;
+			};
 		auto changed = temporalFrame;
 		changed.m_LightDirection = { 0.2f, -1.0f, 0.2f };
 		const bool lightReset = resetsOn(changed, 7, "CAM_ShadowStairs");

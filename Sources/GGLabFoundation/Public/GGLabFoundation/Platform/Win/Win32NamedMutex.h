@@ -57,7 +57,7 @@ namespace gglab::win32
 		[[nodiscard]] bool IsValid() const noexcept { return m_Handle != nullptr; }
 		[[nodiscard]] NamedMutexGuard Acquire(
 			std::uint32_t timeoutMilliseconds =
-				std::numeric_limits<std::uint32_t>::max()) const noexcept;
+			std::numeric_limits<std::uint32_t>::max()) const noexcept;
 
 	private:
 		void* m_Handle = nullptr;

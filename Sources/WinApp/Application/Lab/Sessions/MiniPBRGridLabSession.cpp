@@ -54,13 +54,20 @@ namespace gglab
 		{
 			switch (source)
 			{
-			case SceneSource::MetalRoughSpheres: return MetalRoughSpheresPath;
-			case SceneSource::MetalRoughSpheresNoTextures: return MetalRoughSpheresNoTexturesPath;
-			case SceneSource::AnisotropyStrengthTest: return AnisotropyStrengthTestPath;
-			case SceneSource::AnisotropyRotationTest: return AnisotropyRotationTestPath;
-			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
-			case SceneSource::NormalTangentTest: return NormalTangentTestPath;
-			case SceneSource::ProceduralGrid: return {};
+			case SceneSource::MetalRoughSpheres:
+				return MetalRoughSpheresPath;
+			case SceneSource::MetalRoughSpheresNoTextures:
+				return MetalRoughSpheresNoTexturesPath;
+			case SceneSource::AnisotropyStrengthTest:
+				return AnisotropyStrengthTestPath;
+			case SceneSource::AnisotropyRotationTest:
+				return AnisotropyRotationTestPath;
+			case SceneSource::AnisotropyDiscTest:
+				return AnisotropyDiscTestPath;
+			case SceneSource::NormalTangentTest:
+				return NormalTangentTestPath;
+			case SceneSource::ProceduralGrid:
+				return {};
 			}
 			return {};
 		}

@@ -34,7 +34,8 @@ namespace gglab
 			MessageSubscription(Win32Window* window, uint64_t id) noexcept :
 				m_Window(window),
 				m_Id(id)
-			{}
+			{
+			}
 
 			friend class Win32Window;
 

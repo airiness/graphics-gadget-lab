@@ -21,10 +21,14 @@ namespace gglab
 	void RunNonFiniteWatchSelfTests(SelfTestContext& context) noexcept
 	{
 		context.Check(std::ranges::none_of(shader_programs::GetRendererInitialShaderProgramDemand(), [](const ShaderProgramRef& program)
-			{ return program.m_ProgramId == "gglab.shader.nonfinite-scan"; }),
+			{
+				return program.m_ProgramId == "gglab.shader.nonfinite-scan";
+			}),
 			"Ordinary renderer startup never demands observation scan programs");
 		const auto incomplete = [](const auto& result)
-			{ return result.m_Status == NonFiniteClaimStatus::Incomplete && result.m_Failure == NonFiniteWatchFailure::MissingCoverage; };
+			{
+				return result.m_Status == NonFiniteClaimStatus::Incomplete && result.m_Failure == NonFiniteWatchFailure::MissingCoverage;
+			};
 		context.Check(incomplete(EvaluateNonFiniteBoundary(std::nullopt, 4).m_Claim), "Missing scan evidence is incomplete");
 		context.Check(incomplete(EvaluateNonFiniteBoundary(NonFiniteScanRecord{}, 4).m_Claim), "An undispatched record never passes a nonempty scan");
 		context.Check(EvaluateNonFiniteBoundary(NonFiniteScanRecord{}, 0).m_Claim.m_Status == NonFiniteClaimStatus::Passed,
@@ -156,9 +160,11 @@ namespace gglab
 		}
 		const size_t expectedSite = static_cast<size_t>(std::ranges::find(nonfinite::Sites, std::string_view("pass-temporal-aa.csmain.sanitize-hdrcolor"), &nonfinite::Site::m_Id) - nonfinite::Sites.begin());
 		const size_t offset = 8 + expectedSite * 8;
-		raw[offset + 1] = 1; raw[offset + 3] = std::bit_cast<uint32_t>(0.25f);
+		raw[offset + 1] = 1;
+		raw[offset + 3] = std::bit_cast<uint32_t>(0.25f);
 		context.Check(decode().m_Claim.m_Status == NonFiniteClaimStatus::Passed, "The inventoried TAA expected-negative policy accepts an actual decoded clamp");
-		raw[offset + 2] = 1; raw[offset + 4] = std::bit_cast<uint32_t>(70000.0f);
+		raw[offset + 2] = 1;
+		raw[offset + 4] = std::bit_cast<uint32_t>(70000.0f);
 		context.Check(decode().m_Claim.m_Failure == NonFiniteWatchFailure::ClampPolicyExceeded, "The inventoried TAA FP16 overflow policy rejects decoded overflow clamps");
 		raw[offset] = 1;
 		context.Check(decode().m_Claim.m_Failure == NonFiniteWatchFailure::NonFiniteReplaced, "A decoded replacement always fails even at an expected-clamp site");
@@ -171,10 +177,12 @@ namespace gglab
 				std::string_view("pass-forward-pbr.make-forward-pbrpixel-output.encode-forward-scene-color"), &nonfinite::Site::m_Id) - nonfinite::Sites.begin());
 			const size_t words = 8 + site * 8;
 			const auto decodeStorage = [&] { return DecodeNonFiniteProductionFrame(std::as_bytes(std::span(storage)), 91); };
-			storage[words + 2] = 1; storage[words + 4] = std::bit_cast<uint32_t>(70000.0f);
+			storage[words + 2] = 1;
+			storage[words + 4] = std::bit_cast<uint32_t>(70000.0f);
 			context.Check(site < nonfinite::SiteCount && decodeStorage().m_Claim.m_Status == NonFiniteClaimStatus::Passed,
 				"Scene-color storage reports FP16 saturation from bright sources without failing");
-			storage[words + 1] = 1; storage[words + 3] = std::bit_cast<uint32_t>(0.01f);
+			storage[words + 1] = 1;
+			storage[words + 3] = std::bit_cast<uint32_t>(0.01f);
 			context.Check(decodeStorage().m_Claim.m_Failure == NonFiniteWatchFailure::ClampPolicyExceeded,
 				"Negative radiance clamped at a scene-color storage write fails its reviewed policy");
 		}

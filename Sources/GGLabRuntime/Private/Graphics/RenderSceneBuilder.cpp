@@ -122,35 +122,35 @@ namespace gglab
 		auto& viewData = result.m_Views;
 		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size() + 1);
 		const auto appendView = [&viewData](const RenderView& renderView)
-		{
-			ViewGPU viewGpu{};
-			viewGpu.ViewMat = renderView.m_View;
-			viewGpu.ProjMat = renderView.m_RasterProj;
-			viewGpu.InvViewMat = renderView.m_InvView;
-			viewGpu.InvProjMat = renderView.m_InvRasterProj;
-			viewGpu.PreviousViewMat = renderView.m_PreviousView;
-			viewGpu.PreviousRasterViewProj = renderView.m_PreviousRasterViewProj;
-			viewGpu.CameraPos = math::ToVector4(renderView.m_CameraPosition, 1.0f);
-			viewGpu.PreviousDepthReconstructionParams =
-				renderView.m_PreviousDepthReconstructionParams;
-			viewGpu.Near = renderView.m_Near;
-			viewGpu.Far = renderView.m_Far;
-			viewGpu.FovRadians = renderView.m_FovRadians;
-			viewGpu.Aspect = renderView.m_Aspect;
-			viewGpu.CurrentJitterUV = renderView.m_JitterUV;
-			viewGpu.PreviousJitterUV = renderView.m_PreviousJitterUV;
-			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
-			viewGpu.ScenePreExposure = renderView.m_ScenePreExposure;
-			viewGpu.PreviousScenePreExposure = renderView.m_PreviousScenePreExposure;
-			viewGpu.TemporalFrameIndex = renderView.m_TemporalFrameIndex;
-			viewGpu.TextureLodBias = renderView.m_TextureLodBias;
-			viewGpu.Width = renderView.m_Width;
-			viewGpu.Height = renderView.m_Height;
-			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
-			viewGpu.PreviousDepthConvention =
-				static_cast<uint32_t>(renderView.m_PreviousDepthConvention);
-			viewData.push_back(viewGpu);
-		};
+			{
+				ViewGPU viewGpu{};
+				viewGpu.ViewMat = renderView.m_View;
+				viewGpu.ProjMat = renderView.m_RasterProj;
+				viewGpu.InvViewMat = renderView.m_InvView;
+				viewGpu.InvProjMat = renderView.m_InvRasterProj;
+				viewGpu.PreviousViewMat = renderView.m_PreviousView;
+				viewGpu.PreviousRasterViewProj = renderView.m_PreviousRasterViewProj;
+				viewGpu.CameraPos = math::ToVector4(renderView.m_CameraPosition, 1.0f);
+				viewGpu.PreviousDepthReconstructionParams =
+					renderView.m_PreviousDepthReconstructionParams;
+				viewGpu.Near = renderView.m_Near;
+				viewGpu.Far = renderView.m_Far;
+				viewGpu.FovRadians = renderView.m_FovRadians;
+				viewGpu.Aspect = renderView.m_Aspect;
+				viewGpu.CurrentJitterUV = renderView.m_JitterUV;
+				viewGpu.PreviousJitterUV = renderView.m_PreviousJitterUV;
+				viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
+				viewGpu.ScenePreExposure = renderView.m_ScenePreExposure;
+				viewGpu.PreviousScenePreExposure = renderView.m_PreviousScenePreExposure;
+				viewGpu.TemporalFrameIndex = renderView.m_TemporalFrameIndex;
+				viewGpu.TextureLodBias = renderView.m_TextureLodBias;
+				viewGpu.Width = renderView.m_Width;
+				viewGpu.Height = renderView.m_Height;
+				viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
+				viewGpu.PreviousDepthConvention =
+					static_cast<uint32_t>(renderView.m_PreviousDepthConvention);
+				viewData.push_back(viewGpu);
+			};
 		for (const RenderView& view : cameraViews)
 		{
 			appendView(view);

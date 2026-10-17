@@ -242,14 +242,16 @@ namespace gglab
 			}
 			void RemoveDestroyedRow(uint64_t id) noexcept override
 			{
-				std::erase_if(m_State.m_Resources, [id](const TestResourceEntry& entry) {
-					return entry.m_Id == id && entry.m_DestroyRequested;
+				std::erase_if(m_State.m_Resources, [id](const TestResourceEntry& entry)
+					{
+						return entry.m_Id == id && entry.m_DestroyRequested;
 					});
 			}
 			void ClearDestroyedRows() noexcept override
 			{
-				std::erase_if(m_State.m_Resources, [](const TestResourceEntry& entry) {
-					return entry.m_DestroyRequested;
+				std::erase_if(m_State.m_Resources, [](const TestResourceEntry& entry)
+					{
+						return entry.m_DestroyRequested;
 					});
 			}
 			void ProbeInvalidDestroy() noexcept override

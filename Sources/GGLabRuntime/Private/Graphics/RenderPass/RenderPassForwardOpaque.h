@@ -26,7 +26,7 @@ namespace gglab
 					"Renders opaque and alpha-tested scene geometry with Forward+ PBR shading.",
 				.m_Category = RenderPassCategory::Geometry,
 				.m_Type = RenderPassType::Graphics,
-			})
+				})
 		{
 		}
 		~RenderPassForwardOpaque() override = default;

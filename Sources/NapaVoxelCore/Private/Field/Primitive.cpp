@@ -322,7 +322,9 @@ namespace napa::voxel
 		};
 		std::sort(orderedPrimitives.begin(), orderedPrimitives.end(),
 			[](const PrimitiveDesc& lhs, const PrimitiveDesc& rhs)
-			{ return lhs.m_StableId.m_Value < rhs.m_StableId.m_Value; });
+			{
+				return lhs.m_StableId.m_Value < rhs.m_StableId.m_Value;
+			});
 
 		std::unique_ptr<VoxelWorld> generatedWorld;
 		const ValidationResult createResult = VoxelWorld::Create(config, generatedWorld);

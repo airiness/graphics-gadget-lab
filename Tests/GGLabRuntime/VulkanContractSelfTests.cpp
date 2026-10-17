@@ -124,7 +124,9 @@ namespace gglab
 				{
 					return std::ranges::any_of(GGLabVulkanFormatRequirements,
 						[format](const VulkanFormatRequirement& requirement) noexcept
-						{ return requirement.m_Format == format; });
+						{
+							return requirement.m_Format == format;
+						});
 				};
 			context.Check(hasFormat(VK_FORMAT_D32_SFLOAT) &&
 				hasFormat(VK_FORMAT_R16G16B16A16_SFLOAT) &&
@@ -550,7 +552,7 @@ namespace gglab
 				regionsAligned,
 				"Vulkan texture copy layout covers every mip and array layer with aligned offsets");
 			const RHITextureDesc rgb{ .m_Format = RHIFormat::R32G32B32Float,
-				.m_Usage = RHITextureUsage::CopySource, .m_Extent = {1, 1, 1}, .m_ArraySize = 2 };
+				.m_Usage = RHITextureUsage::CopySource, .m_Extent = { 1, 1, 1 }, .m_ArraySize = 2 };
 			const RHIBufferDesc readback{ .m_SizeInBytes = 3072, .m_Usage = RHIBufferUsage::CopyDest };
 			RHITextureToBufferCopy copy{ .m_SourceArraySlice = 1, .m_DestinationOffset = 1024,
 				.m_Footprint = ComputeRHIObservationCopyFootprint(rgb, 0, RHITextureAspect::Color) };
@@ -569,7 +571,7 @@ namespace gglab
 			for (const auto aspect : { RHITextureAspect::Depth, RHITextureAspect::Stencil })
 			{
 				const RHITextureDesc depthStencil{ .m_Format = RHIFormat::D24UnormS8Uint,
-					.m_Usage = RHITextureUsage::CopySource, .m_Extent = {1, 1, 1}, .m_ArraySize = 2 };
+					.m_Usage = RHITextureUsage::CopySource, .m_Extent = { 1, 1, 1 }, .m_ArraySize = 2 };
 				copy.m_DestinationOffset = 512;
 				copy.m_SourceArraySlice = 1;
 				copy.m_SourceAspect = aspect;

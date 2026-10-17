@@ -660,6 +660,8 @@ namespace gglab
 	bool RGCompiler::HasErrors() const noexcept
 	{
 		return std::ranges::any_of(m_Diagnostics, [](const RGCompileDiagnostic& diagnostic)
-			{ return diagnostic.m_Severity == RGCompileDiagnosticSeverity::Error; });
+			{
+				return diagnostic.m_Severity == RGCompileDiagnosticSeverity::Error;
+			});
 	}
 }

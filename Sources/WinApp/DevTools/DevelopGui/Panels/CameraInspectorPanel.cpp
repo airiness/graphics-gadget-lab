@@ -94,7 +94,9 @@ namespace gglab
 			const CameraToolingSnapshot& snapshot)
 		{
 			const auto vectorText = [](const Vector3& value)
-				{ return std::format("({:.9g}, {:.9g}, {:.9g})", value.m_X, value.m_Y, value.m_Z); };
+				{
+					return std::format("({:.9g}, {:.9g}, {:.9g})", value.m_X, value.m_Y, value.m_Z);
+				};
 			const auto& settings = camera.m_Settings;
 			std::string record = std::format(
 				"Camera: {}\nCoordinates: left-handed, Y-up; runtime units\n"

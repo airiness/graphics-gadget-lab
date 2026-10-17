@@ -25,9 +25,12 @@ namespace gglab
 		{
 			switch (status)
 			{
-			case TemporalConsumerStatus::Disabled: return "Disabled";
-			case TemporalConsumerStatus::Unavailable: return "Unavailable";
-			case TemporalConsumerStatus::Active: return "Active";
+			case TemporalConsumerStatus::Disabled:
+				return "Disabled";
+			case TemporalConsumerStatus::Unavailable:
+				return "Unavailable";
+			case TemporalConsumerStatus::Active:
+				return "Active";
 			}
 			return "Unknown";
 		}
@@ -36,8 +39,10 @@ namespace gglab
 		{
 			switch (reason)
 			{
-			case TemporalConsumerDisableReason::None: return "None";
-			case TemporalConsumerDisableReason::NotRequested: return "Not requested";
+			case TemporalConsumerDisableReason::None:
+				return "None";
+			case TemporalConsumerDisableReason::NotRequested:
+				return "Not requested";
 			case TemporalConsumerDisableReason::CoreCapabilityUnavailable:
 				return "Core capability unavailable";
 			case TemporalConsumerDisableReason::DisplayViewIneligible:
@@ -83,24 +88,40 @@ namespace gglab
 		{
 			switch (reason)
 			{
-			case TemporalHistoryResetReason::None: return "None";
-			case TemporalHistoryResetReason::ColdStart: return "Cold start";
-			case TemporalHistoryResetReason::Disabled: return "Disabled";
-			case TemporalHistoryResetReason::DisplayViewChanged: return "Display view changed";
-			case TemporalHistoryResetReason::ResetIdentityChanged: return "Reset identity changed";
-			case TemporalHistoryResetReason::SessionIdentityChanged: return "Session changed";
-			case TemporalHistoryResetReason::ExtentChanged: return "Extent changed";
-			case TemporalHistoryResetReason::FormatChanged: return "Format changed";
-			case TemporalHistoryResetReason::ColorAbiChanged: return "Color ABI changed";
-			case TemporalHistoryResetReason::AccumulationChanged: return "Accumulation changed";
-			case TemporalHistoryResetReason::InvalidExposureMetadata: return "Invalid exposure metadata";
-			case TemporalHistoryResetReason::AllocationFailure: return "Allocation failure";
-			case TemporalHistoryResetReason::AvailabilityChanged: return "Availability changed";
+			case TemporalHistoryResetReason::None:
+				return "None";
+			case TemporalHistoryResetReason::ColdStart:
+				return "Cold start";
+			case TemporalHistoryResetReason::Disabled:
+				return "Disabled";
+			case TemporalHistoryResetReason::DisplayViewChanged:
+				return "Display view changed";
+			case TemporalHistoryResetReason::ResetIdentityChanged:
+				return "Reset identity changed";
+			case TemporalHistoryResetReason::SessionIdentityChanged:
+				return "Session changed";
+			case TemporalHistoryResetReason::ExtentChanged:
+				return "Extent changed";
+			case TemporalHistoryResetReason::FormatChanged:
+				return "Format changed";
+			case TemporalHistoryResetReason::ColorAbiChanged:
+				return "Color ABI changed";
+			case TemporalHistoryResetReason::AccumulationChanged:
+				return "Accumulation changed";
+			case TemporalHistoryResetReason::InvalidExposureMetadata:
+				return "Invalid exposure metadata";
+			case TemporalHistoryResetReason::AllocationFailure:
+				return "Allocation failure";
+			case TemporalHistoryResetReason::AvailabilityChanged:
+				return "Availability changed";
 			case TemporalHistoryResetReason::ResolveProgramChanged:
 				return "Resolve program changed";
-			case TemporalHistoryResetReason::FatalSubmission: return "Fatal submission";
-			case TemporalHistoryResetReason::Resume: return "Resume";
-			case TemporalHistoryResetReason::Shutdown: return "Shutdown";
+			case TemporalHistoryResetReason::FatalSubmission:
+				return "Fatal submission";
+			case TemporalHistoryResetReason::Resume:
+				return "Resume";
+			case TemporalHistoryResetReason::Shutdown:
+				return "Shutdown";
 			}
 			return "Unknown";
 		}
@@ -109,16 +130,26 @@ namespace gglab
 		{
 			switch (tap)
 			{
-			case PostProcessDebugTap::TemporalHistoryColor: return "Accumulated History Color";
-			case PostProcessDebugTap::TemporalReprojectionUV: return "Reprojection UV";
-			case PostProcessDebugTap::TemporalRejection: return "Rejection Reason";
-			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";
-			case PostProcessDebugTap::TemporalHistorySamples: return "History Samples";
-			case PostProcessDebugTap::TemporalClipDistance: return "Clip Distance";
-			case PostProcessDebugTap::TemporalHistoryRelaxation: return "History Relaxation";
-			case PostProcessDebugTap::TemporalMotionDirection: return "Motion Direction";
-			case PostProcessDebugTap::TemporalMotionMagnitude: return "Motion Magnitude";
-			default: return "Temporal Preview";
+			case PostProcessDebugTap::TemporalHistoryColor:
+				return "Accumulated History Color";
+			case PostProcessDebugTap::TemporalReprojectionUV:
+				return "Reprojection UV";
+			case PostProcessDebugTap::TemporalRejection:
+				return "Rejection Reason";
+			case PostProcessDebugTap::TemporalHistoryWeight:
+				return "History Weight";
+			case PostProcessDebugTap::TemporalHistorySamples:
+				return "History Samples";
+			case PostProcessDebugTap::TemporalClipDistance:
+				return "Clip Distance";
+			case PostProcessDebugTap::TemporalHistoryRelaxation:
+				return "History Relaxation";
+			case PostProcessDebugTap::TemporalMotionDirection:
+				return "Motion Direction";
+			case PostProcessDebugTap::TemporalMotionMagnitude:
+				return "Motion Magnitude";
+			default:
+				return "Temporal Preview";
 			}
 		}
 
@@ -377,7 +408,7 @@ namespace gglab
 				static_cast<unsigned long long>(history.m_LastCommitted.m_GraphicsFence.m_Value));
 			ImGui::Text("History color: %s | committed pre-exposure: %.6g",
 				history.m_Compatibility.m_ColorAbi == TemporalColorAbi::LinearRec709PreExposedV2
-					? "Pre-exposed scene linear" : "Scene linear",
+				? "Pre-exposed scene linear" : "Scene linear",
 				history.m_LastCommitted.m_PreExposure);
 			ImGui::Text("History accumulation: %s",
 				GetTemporalAAHistoryAccumulationName(history.m_Compatibility.m_Accumulation).data());

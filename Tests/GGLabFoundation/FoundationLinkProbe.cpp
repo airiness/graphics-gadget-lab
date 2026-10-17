@@ -280,7 +280,9 @@ namespace gglab::foundation::tests
 		for (uint32_t index = 0; index < 8; ++index)
 		{
 			reporters.emplace_back([channel, index]
-				{ channel->Report(static_cast<float>(index + 1) / 8.0f, "parallel"); });
+				{
+					channel->Report(static_cast<float>(index + 1) / 8.0f, "parallel");
+				});
 		}
 		for (std::thread& thread : reporters)
 		{

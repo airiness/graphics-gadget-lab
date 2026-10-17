@@ -130,7 +130,7 @@ namespace gglab
 			capabilities.m_DescriptorBindingPartiallyBound;
 		outSnapshot.m_MutableDescriptorType = capabilities.m_MutableDescriptorType;
 		for (const VulkanDescriptorType type :
-			GGLabVulkanShaderBindingABI.m_ResourceHeapMutableAllowedTypes)
+		GGLabVulkanShaderBindingABI.m_ResourceHeapMutableAllowedTypes)
 		{
 			switch (type)
 			{

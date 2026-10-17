@@ -441,7 +441,8 @@ namespace gglab
 						{
 							return "Field 'slices' must be [first, count], with a positive count and uint32 values.";
 						}
-						address.m_FirstSlice = field[0].get<uint32_t>(); address.m_SliceCount = field[1].get<uint32_t>();
+						address.m_FirstSlice = field[0].get<uint32_t>();
+						address.m_SliceCount = field[1].get<uint32_t>();
 					}
 					else if (key == "aspect")
 					{
@@ -584,7 +585,7 @@ namespace gglab
 						Json address = item;
 						address.erase("buffer");
 						std::vector<RGResourceAddress> addresses;
-						if (auto error = ParseResourceAddresses(Json::array({address}), addresses); !error.empty())
+						if (auto error = ParseResourceAddresses(Json::array({ address }), addresses); !error.empty())
 						{
 							return error;
 						}
@@ -977,11 +978,16 @@ namespace gglab
 		{
 			switch (status)
 			{
-			case NonFiniteClaimStatus::Passed: return "Passed";
-			case NonFiniteClaimStatus::Failed: return "Failed";
-			case NonFiniteClaimStatus::NotApplicable: return "NotApplicable";
-			case NonFiniteClaimStatus::Unavailable: return "Unavailable";
-			default: return "Incomplete";
+			case NonFiniteClaimStatus::Passed:
+				return "Passed";
+			case NonFiniteClaimStatus::Failed:
+				return "Failed";
+			case NonFiniteClaimStatus::NotApplicable:
+				return "NotApplicable";
+			case NonFiniteClaimStatus::Unavailable:
+				return "Unavailable";
+			default:
+				return "Incomplete";
 			}
 		}
 
@@ -989,11 +995,16 @@ namespace gglab
 		{
 			switch (failure)
 			{
-			case NonFiniteWatchFailure::None: return "None";
-			case NonFiniteWatchFailure::NonFiniteDetected: return "NonFiniteDetected";
-			case NonFiniteWatchFailure::NonFiniteReplaced: return "NonFiniteReplaced";
-			case NonFiniteWatchFailure::ClampPolicyExceeded: return "ClampPolicyExceeded";
-			default: return "MissingCoverage";
+			case NonFiniteWatchFailure::None:
+				return "None";
+			case NonFiniteWatchFailure::NonFiniteDetected:
+				return "NonFiniteDetected";
+			case NonFiniteWatchFailure::NonFiniteReplaced:
+				return "NonFiniteReplaced";
+			case NonFiniteWatchFailure::ClampPolicyExceeded:
+				return "ClampPolicyExceeded";
+			default:
+				return "MissingCoverage";
 			}
 		}
 

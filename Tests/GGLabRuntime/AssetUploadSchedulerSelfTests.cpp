@@ -58,7 +58,7 @@ namespace gglab
 				return {
 					.m_Status = m_State->m_Completed ? AssetResourcePublicationStepStatus::Completed
 						: AssetResourcePublicationStepStatus::Continue,
-					.m_Usage = {.m_Stage = AssetResourcePublicationStage::Textures},
+					.m_Usage = { .m_Stage = AssetResourcePublicationStage::Textures },
 				};
 			}
 
@@ -129,7 +129,9 @@ namespace gglab
 		{
 			return std::ranges::any_of(statistics.m_ResourcePublicationQueue.m_PendingWork,
 				[&identity](const AssetStreamingWorkActivity& work) noexcept
-				{ return work.m_Identity == identity; });
+				{
+					return work.m_Identity == identity;
+				});
 		}
 
 		void RunResourcePublicationGenerationTest(SelfTestContext& context) noexcept
@@ -222,7 +224,7 @@ namespace gglab
 							.m_StableId = 9001,
 							.m_Generation = 1,
 							},
-						.m_Estimate = {.m_SourceBytes = 16 },
+						.m_Estimate = { .m_SourceBytes = 16 },
 						},
 						[&]()
 						{

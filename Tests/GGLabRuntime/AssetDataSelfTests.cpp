@@ -73,7 +73,8 @@ namespace gglab
 		};
 		template <typename T>
 		concept IBLBakeTick = requires(T& value) { value.Tick({}); };
-		static_assert(requires(IBLCacheControlBase& control) {
+		static_assert(requires(IBLCacheControlBase& control)
+		{
 			{ control.ClearArtifactCache() } noexcept -> std::same_as<void>;
 			{ control.ClearDerivedDataStore() } noexcept -> std::same_as<bool>;
 		});
@@ -242,14 +243,14 @@ namespace gglab
 			texture.m_MipLevels = 1;
 			texture.m_ColorSpace = TextureColorSpace::SRGB;
 			texture.m_Pixels = {
-				std::byte{0x10},
-				std::byte{0x11},
-				std::byte{0x12},
-				std::byte{0x13},
-				std::byte{0x14},
-				std::byte{0x15},
-				std::byte{0x16},
-				std::byte{0x17},
+				std::byte{ 0x10 },
+				std::byte{ 0x11 },
+				std::byte{ 0x12 },
+				std::byte{ 0x13 },
+				std::byte{ 0x14 },
+				std::byte{ 0x15 },
+				std::byte{ 0x16 },
+				std::byte{ 0x17 },
 			};
 			texture.m_Subresources.push_back({
 				.m_DataOffset = 0,
@@ -271,10 +272,10 @@ namespace gglab
 			texture.m_MipLevels = 2;
 			texture.m_Pixels.insert(texture.m_Pixels.end(),
 				{
-					std::byte{0x20},
-					std::byte{0x21},
-					std::byte{0x22},
-					std::byte{0x23},
+					std::byte{ 0x20 },
+					std::byte{ 0x21 },
+					std::byte{ 0x22 },
+					std::byte{ 0x23 },
 				});
 			texture.m_Subresources.push_back({
 				.m_DataOffset = 8,
@@ -338,8 +339,8 @@ namespace gglab
 				});
 			model.m_Meshes.push_back({
 				.m_Name = "SelfTestMesh",
-				.m_Vertices = {Vertex{}},
-				.m_Indices = {0},
+				.m_Vertices = { Vertex{} },
+				.m_Indices = { 0 },
 				});
 			return model;
 		}
@@ -583,10 +584,10 @@ namespace gglab
 			constexpr std::string_view ArtifactType = "gglab.self-test";
 			constexpr uint32_t SchemaVersion = 1;
 			constexpr std::array<std::byte, 4> Payload{
-				std::byte{0x10},
-				std::byte{0x20},
-				std::byte{0x30},
-				std::byte{0x40},
+				std::byte{ 0x10 },
+				std::byte{ 0x20 },
+				std::byte{ 0x30 },
+				std::byte{ 0x40 },
 			};
 			DerivedDataKey key{};
 			key.m_Value = ComputeSha256(std::as_bytes(std::span{ ArtifactType })).m_Value;
@@ -706,10 +707,10 @@ namespace gglab
 			constexpr std::string_view ArtifactType = "gglab.maintenance-self-test";
 			constexpr uint32_t SchemaVersion = 1;
 			constexpr std::array<std::byte, 4> Payload{
-				std::byte{0x51},
-				std::byte{0x52},
-				std::byte{0x53},
-				std::byte{0x54},
+				std::byte{ 0x51 },
+				std::byte{ 0x52 },
+				std::byte{ 0x53 },
+				std::byte{ 0x54 },
 			};
 			DerivedDataKey key{};
 			key.m_Value = ComputeSha256(std::as_bytes(std::span{ ArtifactType })).m_Value;
@@ -726,7 +727,9 @@ namespace gglab
 				std::wstring alternateText = identityRoot.wstring();
 				std::ranges::transform(alternateText, alternateText.begin(),
 					[](wchar_t value) noexcept
-					{ return static_cast<wchar_t>(std::towupper(value)); });
+					{
+						return static_cast<wchar_t>(std::towupper(value));
+					});
 				std::unique_ptr platform = CreateWin32LocalDerivedDataPlatform();
 				const LocalDerivedDataRootIdentity canonical =
 					platform->ResolveRootIdentity(identityRoot / ".");
@@ -838,11 +841,11 @@ namespace gglab
 					staleReader.Read(key, ArtifactType, SchemaVersion);
 
 				constexpr std::array<std::byte, 5> ReplacementPayload{
-					std::byte{0x61},
-					std::byte{0x62},
-					std::byte{0x63},
-					std::byte{0x64},
-					std::byte{0x65},
+					std::byte{ 0x61 },
+					std::byte{ 0x62 },
+					std::byte{ 0x63 },
+					std::byte{ 0x64 },
+					std::byte{ 0x65 },
 				};
 				ArtifactContentDigest replacementDigest{};
 				replacementDigest.m_Value = ComputeSha256(ReplacementPayload).m_Value;
@@ -1128,10 +1131,10 @@ namespace gglab
 				scene.mMaterials[index] = new aiMaterial();
 			}
 			const auto setName = [&](uint32_t index, std::string_view name)
-			{
-				const aiString identity{ std::string(name) };
-				GGLAB_UNUSED(scene.mMaterials[index]->AddProperty(&identity, AI_MATKEY_NAME));
-			};
+				{
+					const aiString identity{ std::string(name) };
+					GGLAB_UNUSED(scene.mMaterials[index]->AddProperty(&identity, AI_MATKEY_NAME));
+				};
 			setName(0, MakeGltfMaterialIdentity(2));
 			setName(1, "Unused generated material");
 			setName(2, MakeGltfMaterialIdentity(0));

@@ -68,7 +68,10 @@ namespace gglab
 		Json Barriers(const std::vector<RGSnapshotBarrierInfo>& barriers)
 		{
 			Json result = Json::array();
-			for (const auto& barrier : barriers) result.push_back(Barrier(barrier, false));
+			for (const auto& barrier : barriers)
+			{
+				result.push_back(Barrier(barrier, false));
+			}
 			return result;
 		}
 
@@ -107,9 +110,12 @@ namespace gglab
 		{
 			switch (severity)
 			{
-			case RGCompileDiagnosticSeverity::Info: return "Info";
-			case RGCompileDiagnosticSeverity::Warning: return "Warning";
-			case RGCompileDiagnosticSeverity::Error: return "Error";
+			case RGCompileDiagnosticSeverity::Info:
+				return "Info";
+			case RGCompileDiagnosticSeverity::Warning:
+				return "Warning";
+			case RGCompileDiagnosticSeverity::Error:
+				return "Error";
 			}
 			return "Unknown";
 		}
@@ -118,10 +124,14 @@ namespace gglab
 		{
 			switch (code)
 			{
-			case RGCompileDiagnosticCode::InvalidDeclaration: return "InvalidDeclaration";
-			case RGCompileDiagnosticCode::UndefinedContentRead: return "UndefinedContentRead";
-			case RGCompileDiagnosticCode::DependencyCycle: return "DependencyCycle";
-			case RGCompileDiagnosticCode::InvalidExecutionPlan: return "InvalidExecutionPlan";
+			case RGCompileDiagnosticCode::InvalidDeclaration:
+				return "InvalidDeclaration";
+			case RGCompileDiagnosticCode::UndefinedContentRead:
+				return "UndefinedContentRead";
+			case RGCompileDiagnosticCode::DependencyCycle:
+				return "DependencyCycle";
+			case RGCompileDiagnosticCode::InvalidExecutionPlan:
+				return "InvalidExecutionPlan";
 			}
 			return "Unknown";
 		}
@@ -197,7 +207,9 @@ namespace gglab
 		if (summary)
 		{
 			std::sort(passes.begin(), passes.end(), [](const Json& a, const Json& b)
-				{ return a["executionOrder"].get<int32_t>() < b["executionOrder"].get<int32_t>(); });
+				{
+					return a["executionOrder"].get<int32_t>() < b["executionOrder"].get<int32_t>();
+				});
 		}
 		compile["passes"] = std::move(passes);
 		if (!summary)

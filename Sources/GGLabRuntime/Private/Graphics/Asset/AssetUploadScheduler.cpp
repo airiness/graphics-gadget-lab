@@ -762,7 +762,9 @@ namespace gglab
 		const uint64_t sourceBytes = queued.m_Desc.m_Estimate.m_SourceBytes;
 		const auto insertion = std::ranges::find_if(queue,
 			[priority = queued.m_Desc.m_Priority](const QueuedWork& existing) noexcept
-			{ return HasHigherPriority(priority, existing.m_Desc.m_Priority); });
+			{
+				return HasHigherPriority(priority, existing.m_Desc.m_Priority);
+			});
 		queue.insert(insertion, std::move(queued));
 		++telemetry.m_EnqueuedCount;
 		telemetry.m_HighWatermark =
@@ -848,7 +850,9 @@ namespace gglab
 		const auto insertion = std::ranges::find_if(m_ResourcePublicationQueue,
 			[priority = publication.m_Desc.m_Priority](
 				const QueuedResourcePublication& existing) noexcept
-			{ return HasHigherPriority(priority, existing.m_Desc.m_Priority); });
+			{
+				return HasHigherPriority(priority, existing.m_Desc.m_Priority);
+			});
 		m_ResourcePublicationQueue.insert(insertion, std::move(publication));
 	}
 
@@ -1131,7 +1135,9 @@ namespace gglab
 		const auto insertion = std::ranges::find_if(m_GpuFinalizeQueue,
 			[priority = publication.m_Upload.m_Desc.m_Priority](
 				const PendingGpuFinalize& existing) noexcept
-			{ return HasHigherPriority(priority, existing.m_Upload.m_Desc.m_Priority); });
+			{
+				return HasHigherPriority(priority, existing.m_Upload.m_Desc.m_Priority);
+			});
 		m_GpuFinalizeQueue.insert(insertion, std::move(publication));
 		++m_GpuFinalizeTelemetry.m_EnqueuedCount;
 		m_GpuFinalizeTelemetry.m_HighWatermark = std::max(m_GpuFinalizeTelemetry.m_HighWatermark,
@@ -1278,7 +1284,9 @@ namespace gglab
 		{
 			std::ranges::stable_sort(queue,
 				[](const QueuedWork& lhs, const QueuedWork& rhs) noexcept
-				{ return HasHigherPriority(lhs.m_Desc.m_Priority, rhs.m_Desc.m_Priority); });
+				{
+					return HasHigherPriority(lhs.m_Desc.m_Priority, rhs.m_Desc.m_Priority);
+				});
 		}
 		return updatedCount;
 	}
@@ -1301,7 +1309,9 @@ namespace gglab
 			std::ranges::stable_sort(m_ResourcePublicationQueue,
 				[](const QueuedResourcePublication& lhs,
 					const QueuedResourcePublication& rhs) noexcept
-				{ return HasHigherPriority(lhs.m_Desc.m_Priority, rhs.m_Desc.m_Priority); });
+				{
+					return HasHigherPriority(lhs.m_Desc.m_Priority, rhs.m_Desc.m_Priority);
+				});
 		}
 		return updatedCount;
 	}

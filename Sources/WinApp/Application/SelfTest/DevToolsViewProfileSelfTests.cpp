@@ -72,7 +72,9 @@ namespace gglab
 		{
 		public:
 			SettingsNavigationProbe(std::string_view path, uint32_t& draws, std::string& windowName) noexcept :
-				m_Path(path), m_Draws(draws), m_WindowName(windowName) {}
+				m_Path(path), m_Draws(draws), m_WindowName(windowName)
+			{
+			}
 			std::string_view GetPath() const noexcept override { return m_Path; }
 			std::string_view GetTitle() const noexcept override { return m_Path; }
 			void Draw(DevelopGuiContext&) noexcept override
@@ -134,26 +136,26 @@ namespace gglab
 				.m_ViewRenderSettingsOverrides = &overrides,
 				.m_PanelRegistry = &registry,
 				.m_ActiveProfileName = "Settings Fixture",
-				};
+			};
 			RenderingSettingsPanel panel;
 			const auto draw = [&](ImGuiID activation = 0)
-			{
-				if (activation)
 				{
-					ImGui::ActivateItemByID(activation);
-				}
-				ImGui::NewFrame();
-				ImGui::SetNextWindowPos(ImVec2(20, 20));
-				ImGui::SetNextWindowSize(ImVec2(1100, 1100));
-				ImGui::Begin("RenderingSettingsFixture");
-				ImGui::LogToBuffer();
-				panel.Draw(gui);
-				const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
-				ImGui::LogFinish();
-				ImGui::End();
-				ImGui::EndFrame();
-				return text;
-			};
+					if (activation)
+					{
+						ImGui::ActivateItemByID(activation);
+					}
+					ImGui::NewFrame();
+					ImGui::SetNextWindowPos(ImVec2(20, 20));
+					ImGui::SetNextWindowSize(ImVec2(1100, 1100));
+					ImGui::Begin("RenderingSettingsFixture");
+					ImGui::LogToBuffer();
+					panel.Draw(gui);
+					const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+					ImGui::LogFinish();
+					ImGui::End();
+					ImGui::EndFrame();
+					return text;
+				};
 			GGLAB_UNUSED(draw());
 			const auto text = draw();
 			context.Check(text.find("Requested") != std::string::npos &&
@@ -164,11 +166,11 @@ namespace gglab
 				"The cockpit reads only the lightweight settings snapshot without Inspector or GPU services");
 			const ImGuiID windowId = ImGui::FindWindowByName("RenderingSettingsFixture")->ID;
 			const auto widget = [windowId](const char* table, const char* row, const char* label)
-			{
-				const ImGuiID tableId = ImHashStr(table, 0, windowId);
-				const ImGuiID rowId = ImHashStr(row, 0, tableId);
-				return ImHashStr(label, 0, rowId);
-			};
+				{
+					const ImGuiID tableId = ImHashStr(table, 0, windowId);
+					const ImGuiID rowId = ImHashStr(row, 0, tableId);
+					return ImHashStr(label, 0, rowId);
+				};
 			const ViewRenderProfile original = snapshot.m_AuthoringProfile;
 			GGLAB_UNUSED(draw(widget("LightingSettings", "GTAO", "##Enabled")));
 			GGLAB_UNUSED(draw(widget("TemporalSettings", "TAA", "##Enabled")));

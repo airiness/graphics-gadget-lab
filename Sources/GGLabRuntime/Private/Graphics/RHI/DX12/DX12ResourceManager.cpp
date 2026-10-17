@@ -487,7 +487,9 @@ namespace gglab
 
 			const bool completed =
 				std::ranges::all_of(slot.m_RetirementPoints, [this](const RHIFencePoint& point)
-					{ return m_Device && m_Device->IsFencePointCompleted(point); });
+					{
+						return m_Device && m_Device->IsFencePointCompleted(point);
+					});
 			if (!completed)
 			{
 				continue;

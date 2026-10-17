@@ -70,7 +70,9 @@ namespace gglab
 		}
 		std::ranges::sort(m_Entries,
 			[](const EnvironmentMapEntry& lhs, const EnvironmentMapEntry& rhs) noexcept
-			{ return lhs.m_Path.generic_string() < rhs.m_Path.generic_string(); });
+			{
+				return lhs.m_Path.generic_string() < rhs.m_Path.generic_string();
+			});
 
 		if (m_Entries.empty())
 		{

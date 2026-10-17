@@ -26,19 +26,19 @@ namespace gglab
 		};
 
 		constexpr std::array TextureLogicalNameEntries = {
-			TextureLogicalNameEntry{"IBL.Active", "EnvironmentCubemap", true},
-			TextureLogicalNameEntry{"IBL.Active", "IrradianceCubemap", true},
-			TextureLogicalNameEntry{"IBL.Active", "PrefilteredSpecularCubemap", true},
-			TextureLogicalNameEntry{"IBL.Active", "BrdfLut", true},
-			TextureLogicalNameEntry{"Preview.IBL", "EnvironmentCubemap"},
-			TextureLogicalNameEntry{"Preview.IBL", "IrradianceCubemap"},
-			TextureLogicalNameEntry{"Preview.IBL", "PrefilteredSpecularCubemap"},
-			TextureLogicalNameEntry{"Preview.Shadow", "DirectionalShadowMap"},
-			TextureLogicalNameEntry{"Preview.PostProcess", "SelectedTap"},
-			TextureLogicalNameEntry{"Preview.AmbientOcclusion", "SelectedTap"},
-			TextureLogicalNameEntry{"Preview.TemporalAA", "SelectedTap"},
-			TextureLogicalNameEntry{"Preview.Atmosphere", "SelectedTap"},
-			TextureLogicalNameEntry{"Preview.SceneDepth", "SelectedTap"},
+			TextureLogicalNameEntry{ "IBL.Active", "EnvironmentCubemap", true },
+			TextureLogicalNameEntry{ "IBL.Active", "IrradianceCubemap", true },
+			TextureLogicalNameEntry{ "IBL.Active", "PrefilteredSpecularCubemap", true },
+			TextureLogicalNameEntry{ "IBL.Active", "BrdfLut", true },
+			TextureLogicalNameEntry{ "Preview.IBL", "EnvironmentCubemap" },
+			TextureLogicalNameEntry{ "Preview.IBL", "IrradianceCubemap" },
+			TextureLogicalNameEntry{ "Preview.IBL", "PrefilteredSpecularCubemap" },
+			TextureLogicalNameEntry{ "Preview.Shadow", "DirectionalShadowMap" },
+			TextureLogicalNameEntry{ "Preview.PostProcess", "SelectedTap" },
+			TextureLogicalNameEntry{ "Preview.AmbientOcclusion", "SelectedTap" },
+			TextureLogicalNameEntry{ "Preview.TemporalAA", "SelectedTap" },
+			TextureLogicalNameEntry{ "Preview.Atmosphere", "SelectedTap" },
+			TextureLogicalNameEntry{ "Preview.SceneDepth", "SelectedTap" },
 		};
 		static_assert(TextureLogicalNameEntries.size() ==
 			utils::EnumCount<RenderResourceRegistry::TextureIndex>());
@@ -390,16 +390,16 @@ namespace gglab
 	{
 		auto buildPreview = [this](TextureIndex textureIndex, IBLPreviewType previewType,
 			IBLPreviewLayout layout, uint32_t selectedMip) noexcept -> IBLPreviewDiagnostics
-		{
-			return {
-				.m_Texture = BuildIBLTextureDiagnostics(textureIndex),
-				.m_Layout = static_cast<uint32_t>(layout),
-				.m_SelectedMip = selectedMip,
-				.m_UpdateCount = GetIBLPreviewUpdateCount(previewType),
-				.m_Dirty = IsIBLPreviewDirty(previewType),
-				.m_Requested = IsIBLPreviewRequested(previewType),
+			{
+				return {
+					.m_Texture = BuildIBLTextureDiagnostics(textureIndex),
+					.m_Layout = static_cast<uint32_t>(layout),
+					.m_SelectedMip = selectedMip,
+					.m_UpdateCount = GetIBLPreviewUpdateCount(previewType),
+					.m_Dirty = IsIBLPreviewDirty(previewType),
+					.m_Requested = IsIBLPreviewRequested(previewType),
+				};
 			};
-		};
 
 		IBLPreviewResourcesDiagnostics resources{};
 		resources.m_Environment = BuildIBLTextureDiagnostics(TextureIndex::IBL_EnvironmentCubemap);
@@ -692,11 +692,16 @@ namespace gglab
 	{
 		switch (channel)
 		{
-		case PostProcessPreviewChannel::AmbientOcclusion: return TextureIndex::Preview_AmbientOcclusion;
-		case PostProcessPreviewChannel::TemporalAA: return TextureIndex::Preview_TemporalAA;
-		case PostProcessPreviewChannel::Atmosphere: return TextureIndex::Preview_Atmosphere;
-		case PostProcessPreviewChannel::SceneDepth: return TextureIndex::Preview_SceneDepth;
-		default: return TextureIndex::Preview_PostProcess;
+		case PostProcessPreviewChannel::AmbientOcclusion:
+			return TextureIndex::Preview_AmbientOcclusion;
+		case PostProcessPreviewChannel::TemporalAA:
+			return TextureIndex::Preview_TemporalAA;
+		case PostProcessPreviewChannel::Atmosphere:
+			return TextureIndex::Preview_Atmosphere;
+		case PostProcessPreviewChannel::SceneDepth:
+			return TextureIndex::Preview_SceneDepth;
+		default:
+			return TextureIndex::Preview_PostProcess;
 		}
 	}
 

@@ -255,7 +255,9 @@ namespace gglab
 	{
 		auto iter = std::remove_if(m_InFlightInfos.begin(), m_InFlightInfos.end(),
 			[](const std::unique_ptr<InFlightInfo>& info)
-			{ return info->m_FencePoint.IsCompleted(); });
+			{
+				return info->m_FencePoint.IsCompleted();
+			});
 
 		m_InFlightInfos.erase(iter, m_InFlightInfos.end());
 	}

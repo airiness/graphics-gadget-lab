@@ -89,7 +89,12 @@ namespace gglab
 				bool defer, bool includeGraph, uint64_t groupId = 0) noexcept override
 			{
 				const auto id = RequestCapture(FrameCaptureSource::ResourceExport, frameSerial, groupId);
-				if (id != 0) { m_Issued.back().m_Targets = std::move(targets); m_Issued.back().m_Defer = defer; m_Issued.back().m_IncludeGraph = includeGraph; }
+				if (id != 0)
+				{
+					m_Issued.back().m_Targets = std::move(targets);
+					m_Issued.back().m_Defer = defer;
+					m_Issued.back().m_IncludeGraph = includeGraph;
+				}
 				return id;
 			}
 			void Busy(uint64_t id) noexcept

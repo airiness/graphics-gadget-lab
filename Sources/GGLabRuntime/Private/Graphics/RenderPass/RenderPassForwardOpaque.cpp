@@ -126,7 +126,7 @@ namespace gglab
 		const bool gtaoContributionRequested =
 			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion) &&
 			registry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::AmbientOcclusion).m_Tap ==
-				PostProcessDebugTap::GTAOAOOnlyLightingContribution;
+			PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
@@ -235,7 +235,7 @@ namespace gglab
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(renderTargets.data(), renderTargetCount),
 					.m_DepthAttachment = forward_shading::GetDepthAttachment(executeContext, data.m_Scene),
-				});
+					});
 				if (data.m_HdrDiffValidation)
 				{
 					graphicsContext->ClearColorAttachment(1, { 0.0f, 0.0f, 0.0f, 1.0f });

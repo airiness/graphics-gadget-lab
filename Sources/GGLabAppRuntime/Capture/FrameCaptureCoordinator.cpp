@@ -445,7 +445,9 @@ namespace gglab
 			for (Entry& entry : m_Entries)
 			{
 				const bool scheduledGroup = entry.m_GroupId != 0 && std::ranges::any_of(m_Entries, [&](const Entry& member)
-					{ return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
+					{
+						return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+					});
 				if (entry.m_Phase != Phase::Waiting || scheduledGroup)
 				{
 					continue;
@@ -510,7 +512,9 @@ namespace gglab
 				continue;
 			}
 			if (!readinessFailure.empty() && std::ranges::any_of(members, [&](const Entry* member)
-				{ return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state); }))
+				{
+					return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state);
+				}))
 			{
 				for (Entry* member : members)
 				{
@@ -723,7 +727,10 @@ namespace gglab
 
 	void FrameCaptureCoordinator::Update() noexcept
 	{
-		if (m_NonFiniteWatch) { m_NonFiniteWatch->UpdateCoverage(); }
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->UpdateCoverage();
+		}
 		if (m_Capture)
 		{
 			std::vector<FrameCaptureResult> results;
@@ -769,7 +776,10 @@ namespace gglab
 		// Render-host finalization publishes the last fence-completed readbacks.
 		// Drain them before closing only the coverage that still lacks evidence.
 		Update();
-		if (m_NonFiniteWatch) { m_NonFiniteWatch->FinalizeCoverage(); }
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->FinalizeCoverage();
+		}
 		Update();
 		FinishWriting();
 		for (Entry& entry : m_Entries)
@@ -814,7 +824,9 @@ namespace gglab
 	bool FrameCaptureCoordinator::HasFrameResourceExports() const noexcept
 	{
 		return std::ranges::any_of(m_Entries, [](const Entry& entry)
-			{ return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport; });
+			{
+				return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+			});
 	}
 
 	bool FrameCaptureCoordinator::PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
@@ -827,8 +839,10 @@ namespace gglab
 		const bool strictWatch = m_NonFiniteWatch && m_NonFiniteWatch->GetStatus().m_Enabled &&
 			m_NonFiniteWatch->GetStatus().m_Mode == NonFiniteWatchMode::Fail;
 		const bool waitingExactExport = m_LastFrameState && std::ranges::any_of(m_Entries, [&](const Entry& entry)
-			{ return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
-			entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState); });
+			{
+				return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
+					entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState);
+			});
 		if (waitingExactExport)
 		{
 			m_Capture->DeferFrameCaptures(frameSerial);
@@ -946,7 +960,10 @@ namespace gglab
 			});
 		if (entry == m_Entries.end())
 		{
-			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0) { return; }
+			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0)
+			{
+				return;
+			}
 			GGLAB_LOG_WARN("Frame capture result {} has no coordinator request.",
 				result.m_RequestId);
 			return;
@@ -961,7 +978,10 @@ namespace gglab
 				return;
 			}
 			entry->m_Phase = Phase::Waiting;
-			if (m_NonFiniteWatch) { m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId); }
+			if (m_NonFiniteWatch)
+			{
+				m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId);
+			}
 			entry->m_WatchCoverageId = 0;
 			entry->m_CaptureRequestId = 0;
 			entry->m_Metadata = {};
@@ -1012,7 +1032,10 @@ namespace gglab
 					continue;
 				}
 			}
-			if (entry.m_Phase != Phase::AwaitingWatch) { continue; }
+			if (entry.m_Phase != Phase::AwaitingWatch)
+			{
+				continue;
+			}
 			entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch ? m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId) : nullptr;
 			if (const auto& coverage = entry.m_Metadata.m_WatchCoverage; coverage)
 			{
@@ -1021,7 +1044,10 @@ namespace gglab
 					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
 					continue;
 				}
-				if (!coverage->m_Complete) { continue; }
+				if (!coverage->m_Complete)
+				{
+					continue;
+				}
 			}
 			StartEncoding(entry, *entry.m_PendingResult);
 			entry.m_PendingResult.reset();
@@ -1249,7 +1275,10 @@ namespace gglab
 		}
 		result.m_ResourceFailure = entry.m_ResourceFailure;
 		m_Results.push_back(std::move(result));
-		if (m_NonFiniteWatch) { m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId); }
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId);
+		}
 		entry.m_WatchCoverageId = 0;
 		entry.m_PendingResult.reset();
 		entry.m_Job.reset();
@@ -1326,7 +1355,10 @@ namespace gglab
 			const auto names = [&](std::string_view stem)
 				{
 					std::vector<std::filesystem::path> result;
-					for (size_t i = 0; i < temporary.size(); ++i) result.push_back(job.m_Directory / std::format("{}.{}.npy", stem, i));
+					for (size_t i = 0; i < temporary.size(); ++i)
+					{
+						result.push_back(job.m_Directory / std::format("{}.{}.npy", stem, i));
+					}
 					return result;
 				};
 			// Parse/validate metadata before producing any files, including invalid UTF-8.
@@ -1336,7 +1368,10 @@ namespace gglab
 			const auto cleanup = [&]()
 				{
 					std::error_code error;
-					for (const auto& path : temporary) std::filesystem::remove(path, error);
+					for (const auto& path : temporary)
+					{
+						std::filesystem::remove(path, error);
+					}
 					std::filesystem::remove(metadataTemporary, error);
 					std::filesystem::remove(graphTemporary, error);
 				};
@@ -1344,18 +1379,27 @@ namespace gglab
 			for (size_t i = 0; i < temporary.size(); ++i)
 			{
 				const std::string failure = WriteFileContents(temporary[i], headers[i], job.m_Resources->m_Arrays[i].m_Data);
-				if (!failure.empty()) { cleanup(); return failure; }
+				if (!failure.empty())
+				{
+					cleanup();
+					return failure;
+				}
 			}
 			if (job.m_Graph)
 			{
 				const std::string failure = WriteFileContents(graphTemporary,
 					{ reinterpret_cast<const uint8_t*>(graphJson.data()), graphJson.size() });
-				if (!failure.empty()) { cleanup(); return failure; }
+				if (!failure.empty())
+				{
+					cleanup();
+					return failure;
+				}
 			}
 			PublicationClaim expected = PublicationClaim::Open;
 			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
 			{
-				cleanup(); return "The resource export was abandoned at shutdown.";
+				cleanup();
+				return "The resource export was abandoned at shutdown.";
 			}
 			job.m_Stage = EncodeStage::Publishing;
 			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
@@ -1411,11 +1455,16 @@ namespace gglab
 					{
 						std::filesystem::rename(path, partial, error);
 					}
-					if (error) { cleanup(); return "Resource export rollback failed; publication is indeterminate."; }
+					if (error)
+					{
+						cleanup();
+						return "Resource export rollback failed; publication is indeterminate.";
+					}
 				}
 				if (outcome == PublishOutcome::Failed)
 				{
-					cleanup(); return failure.empty() ? "Publishing the resource export group failed." : failure;
+					cleanup();
+					return failure.empty() ? "Publishing the resource export group failed." : failure;
 				}
 			}
 			cleanup();

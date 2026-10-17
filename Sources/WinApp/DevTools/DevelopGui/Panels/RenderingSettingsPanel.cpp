@@ -28,19 +28,32 @@ namespace gglab
 		{
 			switch (reason)
 			{
-			case ViewRenderFeatureReason::None: return "";
-			case ViewRenderFeatureReason::NotRequested: return "Not requested";
-			case ViewRenderFeatureReason::FrameUnavailable: return "Current frame unavailable";
-			case ViewRenderFeatureReason::CoreCapabilityUnavailable: return "Required capabilities unavailable";
-			case ViewRenderFeatureReason::NoOpaqueDraws: return "No opaque draws";
-			case ViewRenderFeatureReason::DisplayViewIneligible: return "Display view ineligible";
-			case ViewRenderFeatureReason::DepthVelocityPathUnavailable: return "Depth / velocity path unavailable";
-			case ViewRenderFeatureReason::SceneExtensionUnsupported: return "Scene extension unsupported";
-			case ViewRenderFeatureReason::MaterialDiagnosticsActive: return "Material diagnostics active";
-			case ViewRenderFeatureReason::RequiredFeatureInactive: return "Required feature inactive";
-			case ViewRenderFeatureReason::ZeroIntensity: return "Intensity is zero";
-			case ViewRenderFeatureReason::ResourcesUnavailable: return "Resources unavailable";
-			case ViewRenderFeatureReason::RenderGraphCulled: return "Work culled from the render graph";
+			case ViewRenderFeatureReason::None:
+				return "";
+			case ViewRenderFeatureReason::NotRequested:
+				return "Not requested";
+			case ViewRenderFeatureReason::FrameUnavailable:
+				return "Current frame unavailable";
+			case ViewRenderFeatureReason::CoreCapabilityUnavailable:
+				return "Required capabilities unavailable";
+			case ViewRenderFeatureReason::NoOpaqueDraws:
+				return "No opaque draws";
+			case ViewRenderFeatureReason::DisplayViewIneligible:
+				return "Display view ineligible";
+			case ViewRenderFeatureReason::DepthVelocityPathUnavailable:
+				return "Depth / velocity path unavailable";
+			case ViewRenderFeatureReason::SceneExtensionUnsupported:
+				return "Scene extension unsupported";
+			case ViewRenderFeatureReason::MaterialDiagnosticsActive:
+				return "Material diagnostics active";
+			case ViewRenderFeatureReason::RequiredFeatureInactive:
+				return "Required feature inactive";
+			case ViewRenderFeatureReason::ZeroIntensity:
+				return "Intensity is zero";
+			case ViewRenderFeatureReason::ResourcesUnavailable:
+				return "Resources unavailable";
+			case ViewRenderFeatureReason::RenderGraphCulled:
+				return "Work culled from the render graph";
 			}
 			GGLAB_UNREACHABLE("Unhandled rendering feature reason.");
 		}
@@ -53,10 +66,19 @@ namespace gglab
 			ImVec4 color = WarningColor;
 			switch (status.m_State)
 			{
-			case ViewRenderFeatureState::Active: label = "Active"; color = ActiveColor; break;
-			case ViewRenderFeatureState::Disabled: label = "Disabled"; color = MutedColor; break;
-			case ViewRenderFeatureState::Inactive: label = "Inactive"; break;
-			case ViewRenderFeatureState::Unavailable: break;
+			case ViewRenderFeatureState::Active:
+				label = "Active";
+				color = ActiveColor;
+				break;
+			case ViewRenderFeatureState::Disabled:
+				label = "Disabled";
+				color = MutedColor;
+				break;
+			case ViewRenderFeatureState::Inactive:
+				label = "Inactive";
+				break;
+			case ViewRenderFeatureState::Unavailable:
+				break;
 			}
 			ImGui::TextColored(color, "%s", label);
 			if (detail && status.m_State == ViewRenderFeatureState::Active)

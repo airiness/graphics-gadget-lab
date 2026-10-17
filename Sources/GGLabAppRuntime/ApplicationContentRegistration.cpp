@@ -71,7 +71,9 @@ namespace gglab
 	{
 		const auto iterator = std::ranges::find_if(m_Labs,
 			[&id](const LabRegistration& registration) noexcept
-			{ return registration.m_Descriptor.m_Id == id; });
+			{
+				return registration.m_Descriptor.m_Id == id;
+			});
 		return iterator != m_Labs.end() ? &*iterator : nullptr;
 	}
 

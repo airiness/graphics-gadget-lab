@@ -661,7 +661,10 @@ namespace gglab
 		return AddPass<EmptyData>(
 			passName, encoderType, [](RGBuilder& builder, EmptyData&) { builder.SideEffect(); },
 			[fn = std::forward<ExecuteFunc>(executeFunc)](
-				RGExecuteContext& executeContext, EmptyData&) { fn(executeContext); });
+				RGExecuteContext& executeContext, EmptyData&)
+			{
+				fn(executeContext);
+			});
 	}
 
 	template <typename RESOURCE>

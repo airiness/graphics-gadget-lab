@@ -108,7 +108,7 @@ namespace gglab
 		}
 
 		const RootSignatureHandle nativeRoot{
-			.m_Id = RootSignatureID{createInfo.m_Desc.m_BindingLayout.Index()},
+			.m_Id = RootSignatureID{ createInfo.m_Desc.m_BindingLayout.Index() },
 			.m_RootSignature = rootSignature->Get(),
 		};
 		DX12GraphicsPipelineShaderInputs shaders{};

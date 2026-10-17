@@ -117,7 +117,10 @@ namespace gglab
 					return nullptr;
 				}
 				++m_MapCount;
-				if (entry->second.m_Desc.m_MemoryUsage == RHIMemoryUsage::GpuToCpu) { ++m_ReadbackMapCalls; }
+				if (entry->second.m_Desc.m_MemoryUsage == RHIMemoryUsage::GpuToCpu)
+				{
+					++m_ReadbackMapCalls;
+				}
 				return entry->second.m_Bytes.data();
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
@@ -281,7 +284,11 @@ namespace gglab
 				return m_FailResolution ? RHIPipelineHandle{} : RHIPipelineHandle{ recipe.m_CSId.Value(), 1 };
 			}
 			void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
-			RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc&) noexcept override { ++m_LayoutCount; return { 0, 1 }; }
+			RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc&) noexcept override
+			{
+				++m_LayoutCount;
+				return { 0, 1 };
+			}
 			RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
 			RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
 			bool IsAlive(RHIBindingLayoutHandle handle) const noexcept override { return handle.IsValid(); }
@@ -311,7 +318,14 @@ namespace gglab
 			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetReadOnlyBuffer(uint32_t slot, RHIBufferHandle buffer, uint64_t) noexcept override
 			{
-				if (slot == 1) { m_Source = buffer; } else { m_Components = buffer; }
+				if (slot == 1)
+				{
+					m_Source = buffer;
+				}
+				else
+				{
+					m_Components = buffer;
+				}
 			}
 			void SetReadWriteBuffer(uint32_t, RHIBufferHandle buffer, uint64_t) noexcept override { m_Record = buffer; }
 			void SetPushConstants(uint32_t, std::span<const uint32_t> words, uint32_t) noexcept override
@@ -322,7 +336,10 @@ namespace gglab
 			{
 				++m_Dispatches;
 				auto* record = static_cast<NonFiniteScanRecord*>(m_Device.MapBuffer(m_Record, {}));
-				if (m_Pipeline.Index() == 0) { *record = {}; }
+				if (m_Pipeline.Index() == 0)
+				{
+					*record = {};
+				}
 				else if (!m_SkipScan)
 				{
 					const auto* source = static_cast<const uint8_t*>(m_Device.MapBuffer(m_Source, {}));
@@ -334,7 +351,8 @@ namespace gglab
 							components[i % m_Parameters.m_ComponentCount].m_Offset, 4);
 						AccumulateNonFiniteScanValue(*record, bits, i);
 					}
-					m_Device.UnmapBuffer(m_Components, {}); m_Device.UnmapBuffer(m_Source, {});
+					m_Device.UnmapBuffer(m_Components, {});
+					m_Device.UnmapBuffer(m_Source, {});
 				}
 				m_Device.UnmapBuffer(m_Record, {});
 			}
@@ -668,9 +686,10 @@ namespace gglab
 			const auto submissionFailed = Consume(service);
 			context.Check(submissionFailed.size() == 2 && device.GetLiveBufferCount() == 0 &&
 				service.GetUnfinishedRequestCount() == 0 &&
-				std::ranges::all_of(submissionFailed, [](const auto& r) {
-					return r.m_Status == FrameCaptureStatus::Failed && !r.m_Image;
-				}), "Submission failure closes bound and unbound frame-restricted requests");
+				std::ranges::all_of(submissionFailed, [](const auto& r)
+					{
+						return r.m_Status == FrameCaptureStatus::Failed && !r.m_Image;
+					}), "Submission failure closes bound and unbound frame-restricted requests");
 			GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Composited, 104));
 			service.OnFrameSubmitted(104, MakeFence(3));
 			context.Check(Consume(service).size() == 1 &&
@@ -912,7 +931,7 @@ namespace gglab
 			context.Check(full["schema"] == "gglab.render-graph" && full["schemaVersion"] == 1 &&
 				full["compile"]["passes"][0]["occurrence"] == 1 &&
 				full["compile"]["passes"][1]["occurrence"] == 2 &&
-				full["compile"]["duplicatePassNames"] == Json::array({"Repeated"}) &&
+				full["compile"]["duplicatePassNames"] == Json::array({ "Repeated" }) &&
 				full["execution"]["gpuTiming"]["status"] == "unavailable" &&
 				!full["execution"]["gpuTiming"]["reason"].get<std::string>().empty() &&
 				summary["compile"]["passes"].size() == 2 && !summary.contains("execution"),

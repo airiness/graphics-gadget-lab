@@ -165,8 +165,10 @@ namespace gglab
 	{
 		switch (accumulation)
 		{
-		case TemporalAAHistoryAccumulation::CompatibilityAge: return "compatibility-age";
-		case TemporalAAHistoryAccumulation::EffectiveSamples: return "effective-samples";
+		case TemporalAAHistoryAccumulation::CompatibilityAge:
+			return "compatibility-age";
+		case TemporalAAHistoryAccumulation::EffectiveSamples:
+			return "effective-samples";
 		}
 		return "unknown";
 	}
@@ -190,8 +192,10 @@ namespace gglab
 	{
 		switch (filter)
 		{
-		case TemporalAAHistoryFilter::Bilinear: return "bilinear";
-		case TemporalAAHistoryFilter::CatmullRomClamped: return "catmull-rom-clamped";
+		case TemporalAAHistoryFilter::Bilinear:
+			return "bilinear";
+		case TemporalAAHistoryFilter::CatmullRomClamped:
+			return "catmull-rom-clamped";
 		}
 		return "unknown";
 	}
@@ -214,8 +218,10 @@ namespace gglab
 	{
 		switch (filter)
 		{
-		case TemporalAACurrentFilter::Point: return "point";
-		case TemporalAACurrentFilter::Gaussian: return "gaussian";
+		case TemporalAACurrentFilter::Point:
+			return "point";
+		case TemporalAACurrentFilter::Gaussian:
+			return "gaussian";
 		}
 		return "unknown";
 	}
@@ -241,8 +247,10 @@ namespace gglab
 	{
 		switch (selection)
 		{
-		case TemporalAAMotionSelection::Center: return "center";
-		case TemporalAAMotionSelection::ClosestDepth: return "closest-depth";
+		case TemporalAAMotionSelection::Center:
+			return "center";
+		case TemporalAAMotionSelection::ClosestDepth:
+			return "closest-depth";
 		}
 		return "unknown";
 	}
@@ -268,8 +276,10 @@ namespace gglab
 	{
 		switch (view)
 		{
-		case TemporalAAPostTemporalView::Jittered: return "jittered";
-		case TemporalAAPostTemporalView::Unjittered: return "unjittered";
+		case TemporalAAPostTemporalView::Jittered:
+			return "jittered";
+		case TemporalAAPostTemporalView::Unjittered:
+			return "unjittered";
 		}
 		return "unknown";
 	}
@@ -289,8 +299,10 @@ namespace gglab
 	{
 		switch (preset)
 		{
-		case TemporalAAResolutionPreset::Native: return "native";
-		case TemporalAAResolutionPreset::Quality: return "quality";
+		case TemporalAAResolutionPreset::Native:
+			return "native";
+		case TemporalAAResolutionPreset::Quality:
+			return "quality";
 		}
 		return "unknown";
 	}
@@ -310,7 +322,7 @@ namespace gglab
 	{
 		return preset == TemporalAAResolutionPreset::Quality
 			? TemporalAARenderScale{ .m_Numerator = 2, .m_Denominator = 3 }
-			: TemporalAARenderScale{};
+		: TemporalAARenderScale{};
 	}
 
 	// Render extent of one display dimension: rounded to the nearest pixel, at least one.
@@ -366,9 +378,12 @@ namespace gglab
 	{
 		switch (rectification)
 		{
-		case TemporalAAHistoryRectification::MinMaxClamp: return "minmax-clamp";
-		case TemporalAAHistoryRectification::VarianceClip: return "variance-clip";
-		case TemporalAAHistoryRectification::BoundedVarianceClip: return "bounded-variance-clip";
+		case TemporalAAHistoryRectification::MinMaxClamp:
+			return "minmax-clamp";
+		case TemporalAAHistoryRectification::VarianceClip:
+			return "variance-clip";
+		case TemporalAAHistoryRectification::BoundedVarianceClip:
+			return "bounded-variance-clip";
 		}
 		return "unknown";
 	}

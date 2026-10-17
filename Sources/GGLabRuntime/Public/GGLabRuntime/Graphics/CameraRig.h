@@ -48,7 +48,7 @@ namespace gglab
 			[[nodiscard]] bool IsValid() const noexcept
 			{
 				return m_CameraSlot != nullptr && m_CameraSlot->m_Camera != nullptr &&
-					   m_ViewId != RenderViewID::Unknown;
+					m_ViewId != RenderViewID::Unknown;
 			}
 		};
 

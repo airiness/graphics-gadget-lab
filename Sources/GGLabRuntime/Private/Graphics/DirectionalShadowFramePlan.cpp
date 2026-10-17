@@ -74,7 +74,7 @@ namespace gglab
 				.m_FilterSupportTexels = settings.m_EnablePCF ? 2.0f : 1.0f,
 				.m_FitMode = settings.m_FitMode,
 				.m_EnableTexelSnapping = settings.m_EnableTexelSnapping,
-			});
+				});
 			result.m_Cascades.push_back({
 				.m_View = shadowView.m_View,
 				.m_SplitNear = splitNear,
@@ -82,7 +82,7 @@ namespace gglab
 				.m_BlendStart = splitFar - (splitFar - splitNear) * settings.m_CascadeBlendFraction,
 				.m_Projection = shadowView.m_Projection,
 				.m_Bias = ResolveDirectionalShadowBias(shadowView, settings),
-			});
+				});
 			splitNear = splitFar;
 		}
 		const auto& last = result.m_Cascades.back();

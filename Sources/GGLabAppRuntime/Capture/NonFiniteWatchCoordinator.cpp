@@ -68,11 +68,16 @@ namespace gglab
 	{
 		switch (failure)
 		{
-		case NonFiniteWatchFailure::NonFiniteDetected: return "NonFiniteDetected";
-		case NonFiniteWatchFailure::NonFiniteReplaced: return "NonFiniteReplaced";
-		case NonFiniteWatchFailure::ClampPolicyExceeded: return "ClampPolicyExceeded";
-		case NonFiniteWatchFailure::MissingCoverage: return "MissingCoverage";
-		default: return "None";
+		case NonFiniteWatchFailure::NonFiniteDetected:
+			return "NonFiniteDetected";
+		case NonFiniteWatchFailure::NonFiniteReplaced:
+			return "NonFiniteReplaced";
+		case NonFiniteWatchFailure::ClampPolicyExceeded:
+			return "ClampPolicyExceeded";
+		case NonFiniteWatchFailure::MissingCoverage:
+			return "MissingCoverage";
+		default:
+			return "None";
 		}
 	}
 
@@ -414,7 +419,9 @@ namespace gglab
 				continue;
 			}
 			auto found = std::ranges::find_if(m_Status.m_SiteTotals, [&site](const NonFiniteWatchSiteTotals& totals)
-				{ return totals.m_ProgramIndex == site.m_ProgramIndex && totals.m_SiteIndex == site.m_SiteIndex; });
+				{
+					return totals.m_ProgramIndex == site.m_ProgramIndex && totals.m_SiteIndex == site.m_SiteIndex;
+				});
 			if (found == m_Status.m_SiteTotals.end())
 			{
 				found = m_Status.m_SiteTotals.insert(m_Status.m_SiteTotals.end(), { .m_ProgramIndex = site.m_ProgramIndex,
@@ -446,7 +453,9 @@ namespace gglab
 			return;
 		}
 		auto found = std::ranges::find_if(m_Status.m_TargetTotals, [&target](const NonFiniteWatchTargetTotals& totals)
-			{ return totals.m_Semantic == target.m_Semantic && SameAddress(totals.m_Address, target.m_Address); });
+			{
+				return totals.m_Semantic == target.m_Semantic && SameAddress(totals.m_Address, target.m_Address);
+			});
 		if (found == m_Status.m_TargetTotals.end())
 		{
 			found = m_Status.m_TargetTotals.insert(m_Status.m_TargetTotals.end(),
@@ -501,7 +510,9 @@ namespace gglab
 		const auto& payload = result.m_NonFiniteScans;
 		const bool addressesMatch = payload && payload->m_Boundaries.size() == pending.m_Scans.size() &&
 			std::ranges::equal(payload->m_Boundaries, pending.m_Scans, [](const auto& boundary, const auto& target)
-				{ return SameAddress(boundary.m_Target.m_Address, target.m_Address); });
+				{
+					return SameAddress(boundary.m_Target.m_Address, target.m_Address);
+				});
 		if (result.m_Status == FrameCaptureStatus::Completed && result.m_FrameSerial == pending.m_FrameSerial && payload &&
 			payload->m_ConfigurationVersion == pending.m_ConfigurationVersion && addressesMatch)
 		{
@@ -698,7 +709,7 @@ namespace gglab
 		frame.m_ProductionPending = report.m_ProductionRequested && report.m_InstrumentationAvailable;
 		frame.m_TrackedAt = std::chrono::steady_clock::now();
 		frame.m_Production = report.m_InstrumentationAvailable ? NonFiniteClaimResult{}
-			: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::MissingCoverage };
+		: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::MissingCoverage };
 		coverage.m_Frames.push_back(std::move(frame));
 		RefreshCoverage();
 	}
@@ -726,7 +737,10 @@ namespace gglab
 			++m_SubmissionOrdinal;
 			for (auto& [id, pending] : m_Pending)
 			{
-				if (pending.m_FrameSerial == frameSerial) { pending.m_Submitted = true; }
+				if (pending.m_FrameSerial == frameSerial)
+				{
+					pending.m_Submitted = true;
+				}
 			}
 			RefreshCoverage();
 		}
@@ -742,8 +756,14 @@ namespace gglab
 	}
 	std::string NonFiniteWatchCoordinator::GetFailModeFailure() const noexcept
 	{
-		if (!m_Status.m_Enabled || m_Status.m_Mode != NonFiniteWatchMode::Fail) { return {}; }
-		if (m_Status.m_FirstAnomaly) { return Describe(*m_Status.m_FirstAnomaly, m_Status.m_Injection); }
+		if (!m_Status.m_Enabled || m_Status.m_Mode != NonFiniteWatchMode::Fail)
+		{
+			return {};
+		}
+		if (m_Status.m_FirstAnomaly)
+		{
+			return Describe(*m_Status.m_FirstAnomaly, m_Status.m_Injection);
+		}
 		for (const auto& target : m_Status.m_Targets)
 		{
 			if (m_Status.m_BoundaryFrameSerial != 0 && !target.m_Generation.IsValid() && target.m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Incomplete)
@@ -872,8 +892,14 @@ namespace gglab
 				: NonFiniteClaimResult{ NonFiniteClaimStatus::Unavailable, NonFiniteWatchFailure::None };
 			if (!coverage.m_Frames.empty())
 			{
-				if (report.m_BoundaryRequested) { Merge(report.m_Boundary, {}); }
-				if (report.m_ProductionRequested) { Merge(report.m_Production, {}); }
+				if (report.m_BoundaryRequested)
+				{
+					Merge(report.m_Boundary, {});
+				}
+				if (report.m_ProductionRequested)
+				{
+					Merge(report.m_Production, {});
+				}
 			}
 			report.m_Complete = coverage.m_Closed && coverage.m_Frames.empty();
 		}

@@ -56,7 +56,7 @@ namespace gglab
 	ForwardPlusLabSession::ForwardPlusLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<ForwardPlusDebugReadback> debugReadback) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo,
-			CreateRenderPipelineForwardPlus({.m_ForwardPlusDebugReadback = debugReadback})),
+			CreateRenderPipelineForwardPlus({ .m_ForwardPlusDebugReadback = debugReadback })),
 		m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
 		m_ViewportHeight(createInfo.m_WindowHeight)
 	{
@@ -511,8 +511,8 @@ namespace gglab
 		const ForwardPlusPerformanceReadback performance = m_DebugReadback->GetPerformance();
 		const bool hdrDiffRequested = m_DebugReadback->IsHdrDiffRequested();
 		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation
-		? m_Services.m_RenderServices.m_Presentation->GetDevice()
-		: nullptr;
+			? m_Services.m_RenderServices.m_Presentation->GetDevice()
+			: nullptr;
 		const RHIShaderWaveCapabilities waveCapabilities =
 			device ? device->GetShaderWaveCapabilities() : RHIShaderWaveCapabilities{};
 		const std::string waveLaneRange =

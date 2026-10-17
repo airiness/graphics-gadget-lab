@@ -48,7 +48,10 @@ namespace gglab
 			return m_Settings;
 		}
 		[[nodiscard]] EnvironmentLightingSettings GetEnvironmentLightingSettings()
-			const noexcept override { return m_Settings; }
+			const noexcept override
+		{
+			return m_Settings;
+		}
 		[[nodiscard]] const IBLBakeConfig& GetBakeConfig() const noexcept
 		{
 			return m_Settings.m_BakeConfig;

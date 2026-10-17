@@ -24,9 +24,12 @@ namespace gglab
 		{
 			switch (tap)
 			{
-			case PostProcessDebugTap::AtmosphereTransmittance: return "Atmosphere / Transmittance";
-			case PostProcessDebugTap::AtmosphereMultipleScattering: return "Atmosphere / Multiple Scattering";
-			case PostProcessDebugTap::AtmosphereSkyView: return "Atmosphere / Sky View";
+			case PostProcessDebugTap::AtmosphereTransmittance:
+				return "Atmosphere / Transmittance";
+			case PostProcessDebugTap::AtmosphereMultipleScattering:
+				return "Atmosphere / Multiple Scattering";
+			case PostProcessDebugTap::AtmosphereSkyView:
+				return "Atmosphere / Sky View";
 			case PostProcessDebugTap::SceneColor:
 				return "Scene Color";
 			case PostProcessDebugTap::BloomPrefilter:

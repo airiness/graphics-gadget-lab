@@ -417,7 +417,9 @@ namespace gglab
 
 			const bool completed =
 				std::ranges::all_of(slot.m_RetirementPoints, [this](const RHIFencePoint& point)
-					{ return m_DX12Device && m_DX12Device->IsFencePointCompleted(point); });
+					{
+						return m_DX12Device && m_DX12Device->IsFencePointCompleted(point);
+					});
 			if (!completed)
 			{
 				continue;
@@ -442,7 +444,9 @@ namespace gglab
 
 			const bool completed =
 				std::ranges::all_of(slot.m_RetirementPoints, [this](const RHIFencePoint& point)
-					{ return m_DX12Device && m_DX12Device->IsFencePointCompleted(point); });
+					{
+						return m_DX12Device && m_DX12Device->IsFencePointCompleted(point);
+					});
 			if (!completed)
 			{
 				continue;

@@ -34,7 +34,11 @@ namespace gglab
 		AtmosphereDiagnostics m_Diagnostics{};
 		RHIFencePoint m_LastFence{};
 		RHIBufferHandle m_Constants{};
-		struct PendingBuffer { RHIBufferHandle m_Buffer; RHIFencePoint m_Fence; };
+		struct PendingBuffer
+		{
+			RHIBufferHandle m_Buffer;
+			RHIFencePoint m_Fence;
+		};
 		std::vector<PendingBuffer> m_PendingBuffers;
 		uint32_t m_ExecutedMask = 0;
 		bool m_InFrame = false;

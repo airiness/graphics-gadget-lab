@@ -274,10 +274,10 @@ namespace gglab
 			const uint32_t x1 = std::min(x0 + 1, size - 1);
 			const uint32_t y1 = std::min(y0 + 1, size - 1);
 			const auto sample = [&](uint32_t channel)
-			{
-				return std::lerp(std::lerp(ReadChannel(data, x0, y0, channel), ReadChannel(data, x1, y0, channel), x - x0),
-					std::lerp(ReadChannel(data, x0, y1, channel), ReadChannel(data, x1, y1, channel), x - x0), y - y0);
-			};
+				{
+					return std::lerp(std::lerp(ReadChannel(data, x0, y0, channel), ReadChannel(data, x1, y0, channel), x - x0),
+						std::lerp(ReadChannel(data, x0, y1, channel), ReadChannel(data, x1, y1, channel), x - x0), y - y0);
+				};
 			return { sample(0), sample(1) };
 		}
 
@@ -456,11 +456,11 @@ namespace gglab
 			const auto runtimeRoot = win32::GetExecutableDirectory();
 			ShaderCompiler compiler(ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			const auto compile = [&](const wchar_t* source, ShaderStage stage, const wchar_t* entry)
-			{
-				ShaderDesc desc{ .m_SourcePath = source, .m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
-				desc.m_Target = backend == RHIBackendType::DX12 ? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
-				return compiler.Compile(desc);
-			};
+				{
+					ShaderDesc desc{ .m_SourcePath = source, .m_Stage = stage, .m_Entry = entry, .m_IncludeDirs = { L"." } };
+					desc.m_Target = backend == RHIBackendType::DX12 ? MakeDX12CompileTarget(stage) : MakeVulkan13CompileTarget(stage);
+					return compiler.Compile(desc);
+				};
 			const auto vertex = compile(L"Passes/PassIBLBrdfLUT.hlsl", ShaderStage::Vertex, L"VSMain");
 			const auto pixel = compile(L"Passes/PassIBLBrdfLUT.hlsl", ShaderStage::Pixel, L"PSMain");
 			const auto furnacePixel = compile(L"Tests/BrdfLutWhiteFurnace.hlsl", ShaderStage::Pixel, L"PSWhiteFurnace");

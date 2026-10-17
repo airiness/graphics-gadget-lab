@@ -106,7 +106,9 @@ namespace gglab
 							plan->m_Set0Bindings.begin(),
 							plan->m_Set0Bindings.begin() + plan->m_Set0BindingCount,
 							[fixedParameter](const VulkanSet0BindingPlan& candidate)
-							{ return candidate.m_LogicalParameterIndex == fixedParameter; });
+							{
+								return candidate.m_LogicalParameterIndex == fixedParameter;
+							});
 						if (native != plan->m_Set0Bindings.begin() + plan->m_Set0BindingCount)
 						{
 							slot.m_BackendBindingType = std::string("Set 0 binding ") +

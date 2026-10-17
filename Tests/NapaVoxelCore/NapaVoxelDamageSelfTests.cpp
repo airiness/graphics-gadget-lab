@@ -696,7 +696,9 @@ namespace napa::voxel::testing
 						destroyedVisible.GetWorldMeshValidation();
 					const auto chunk = std::find_if(destroyedVisible.GetChunks().begin(),
 						destroyedVisible.GetChunks().end(), [](const ChunkMeshRecord& record) noexcept
-						{ return record.m_Chunk == ChunkCoord{}; });
+						{
+							return record.m_Chunk == ChunkCoord{};
+						});
 					firstCycleDestroyedGolden = destroyedVoxelHash == 0x299d47db12f692aeull &&
 						validation.m_ValidationHash == 0x1b29e7c3f53ef189ull &&
 						validation.m_VertexCount == 2946 && validation.m_IndexCount == 2946 &&

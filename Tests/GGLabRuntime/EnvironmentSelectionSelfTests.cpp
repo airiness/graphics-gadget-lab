@@ -75,7 +75,9 @@ namespace gglab
 			const TextureContentRef fallback = harness.GetAssets().GetTextureContentRef(
 				ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap));
 			const bool fallbackResident = harness.PumpUntil([&]()
-				{ return harness.GetAssets().GetResidentTextureResource(fallback).has_value(); });
+				{
+					return harness.GetAssets().GetResidentTextureResource(fallback).has_value();
+				});
 			context.Check(fallbackResident, "The reserved fallback environment cubemap becomes resident");
 			if (!fallbackResident)
 			{
@@ -98,7 +100,9 @@ namespace gglab
 							});
 					};
 				const auto noPending = [&]()
-					{ return controller.GetPendingEnvironmentIndex() == EnvironmentAssetController::InvalidEntryIndex; };
+					{
+						return controller.GetPendingEnvironmentIndex() == EnvironmentAssetController::InvalidEntryIndex;
+					};
 
 				controller.Initialize("Skybox");
 				const bool initial = settle(noPending);

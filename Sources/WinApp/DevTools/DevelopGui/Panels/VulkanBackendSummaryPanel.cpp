@@ -242,7 +242,7 @@ namespace gglab
 		{
 			ImGui::Text("Failure: %s -> %s (%d) | last submitted timeline %llu",
 				snapshot->m_FailingOperation.empty() ? "unknown operation"
-					: snapshot->m_FailingOperation.c_str(),
+				: snapshot->m_FailingOperation.c_str(),
 				snapshot->m_FailingResult.c_str(), snapshot->m_FailingResultCode,
 				static_cast<unsigned long long>(snapshot->m_LastSubmissionBeforeFailure));
 		}

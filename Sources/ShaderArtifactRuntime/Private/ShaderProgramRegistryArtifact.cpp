@@ -144,7 +144,9 @@ namespace gglab
 			std::ranges::sort(artifact.m_Entries,
 				[](const ShaderProgramRegistryEntry& left,
 					const ShaderProgramRegistryEntry& right) noexcept
-				{ return MakeBindingKey(left) < MakeBindingKey(right); });
+				{
+					return MakeBindingKey(left) < MakeBindingKey(right);
+				});
 			for (size_t index = 1; index < artifact.m_Entries.size(); ++index)
 			{
 				if (IsSameBinding(artifact.m_Entries[index - 1], artifact.m_Entries[index]))
@@ -205,7 +207,9 @@ namespace gglab
 			requestedKey,
 			{},
 			[](const ShaderProgramRegistryEntry& entry) noexcept
-			{ return MakeBindingKey(entry); });
+			{
+				return MakeBindingKey(entry);
+			});
 		return iterator != artifact.m_Entries.end() &&
 			MakeBindingKey(*iterator) == requestedKey
 			? std::optional<ShaderArtifactRef>(iterator->m_ArtifactRef)

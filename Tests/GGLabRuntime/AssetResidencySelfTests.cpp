@@ -445,12 +445,16 @@ namespace gglab
 					const TaskSystemStatistics tasks = harness.GetTaskSystem().GetStatistics();
 					return std::ranges::any_of(tasks.m_RecentTasks,
 						[&](const TaskCompletionInfo& completion) noexcept
-						{ return completion.m_Handle == staleReload.m_Task; });
+						{
+							return completion.m_Handle == staleReload.m_Task;
+						});
 				});
 			const TaskSystemStatistics afterStale = harness.GetTaskSystem().GetStatistics();
 			const bool replacementFinished = std::ranges::any_of(afterStale.m_RecentTasks,
 				[&](const TaskCompletionInfo& completion) noexcept
-				{ return completion.m_Handle == replacement.m_Task; });
+				{
+					return completion.m_Handle == replacement.m_Task;
+				});
 			if (!replacementFinished)
 			{
 				const AssetManager::TextureLoadRequest tracked = owner->LoadTextureAsync(

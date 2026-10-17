@@ -135,7 +135,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 				EnsureInitialized(services);
 
-auto* swapChain = services.m_Presentation->GetSwapChain();
+				auto* swapChain = services.m_Presentation->GetSwapChain();
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
@@ -410,20 +410,20 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 				const auto initializeRecipe = [bindingLayout](GraphicsPhysicalPipelineKey& recipe,
 					ShaderID vertexShader, ShaderID pixelShader, InputLayoutID inputLayout,
 					RHIFormat colorFormat, RHIFormat depthFormat, DepthPreset depthPreset) noexcept
-				{
-					recipe.m_BindingLayout = bindingLayout;
-					recipe.m_VSId = vertexShader;
-					recipe.m_PSId = pixelShader;
-					recipe.m_InputLayoutId = inputLayout;
-					recipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
-					recipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-					recipe.m_Formats.m_RenderTargetFormats[0] = colorFormat;
-					recipe.m_Formats.m_RenderTargetCount = 1;
-					recipe.m_Formats.m_DepthStencilFormat = depthFormat;
-					recipe.m_RasterizerPreset = RasterizerPreset::Default;
-					recipe.m_BlendPreset = BlendPreset::Default;
-					recipe.m_DepthPreset = depthPreset;
-				};
+					{
+						recipe.m_BindingLayout = bindingLayout;
+						recipe.m_VSId = vertexShader;
+						recipe.m_PSId = pixelShader;
+						recipe.m_InputLayoutId = inputLayout;
+						recipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+						recipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+						recipe.m_Formats.m_RenderTargetFormats[0] = colorFormat;
+						recipe.m_Formats.m_RenderTargetCount = 1;
+						recipe.m_Formats.m_DepthStencilFormat = depthFormat;
+						recipe.m_RasterizerPreset = RasterizerPreset::Default;
+						recipe.m_BlendPreset = BlendPreset::Default;
+						recipe.m_DepthPreset = depthPreset;
+					};
 				initializeRecipe(m_MarkerRecipe, fullscreenVS, markerPS, InputLayoutID::None,
 					MarkerFormat, RHIFormat::Unknown, DepthPreset::DepthDisabled);
 				initializeRecipe(m_GeometryRecipe, geometryVS, conformancePS, InputLayoutID::P3T2,
@@ -437,16 +437,16 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 					backBufferFormat, DepthFormat, DepthPreset::DepthDisabled);
 
 				constexpr std::array vertices{
-					CoordinateVertex{{-0.9f, 0.75f, 0.5f}, {0.0f, 0.0f}},
-					CoordinateVertex{{-0.1f, -0.7f, 0.5f}, {1.0f, 1.0f}},
-					CoordinateVertex{{-0.75f, -0.55f, 0.5f}, {0.0f, 1.0f}},
-					CoordinateVertex{{0.1f, 0.75f, 0.5f}, {0.0f, 0.0f}},
-					CoordinateVertex{{0.25f, -0.55f, 0.5f}, {0.0f, 1.0f}},
-					CoordinateVertex{{0.9f, -0.7f, 0.5f}, {1.0f, 1.0f}},
-					CoordinateVertex{{-1.0f, 1.0f, 0.5f}, {0.0f, 0.0f}},
-					CoordinateVertex{{1.0f, 1.0f, 0.5f}, {1.0f, 0.0f}},
-					CoordinateVertex{{1.0f, -1.0f, 0.5f}, {1.0f, 1.0f}},
-					CoordinateVertex{{-1.0f, -1.0f, 0.5f}, {0.0f, 1.0f}},
+					CoordinateVertex{ { -0.9f, 0.75f, 0.5f },{ 0.0f, 0.0f } },
+					CoordinateVertex{ { -0.1f, -0.7f, 0.5f },{ 1.0f, 1.0f } },
+					CoordinateVertex{ { -0.75f, -0.55f, 0.5f },{ 0.0f, 1.0f } },
+					CoordinateVertex{ { 0.1f, 0.75f, 0.5f },{ 0.0f, 0.0f } },
+					CoordinateVertex{ { 0.25f, -0.55f, 0.5f },{ 0.0f, 1.0f } },
+					CoordinateVertex{ { 0.9f, -0.7f, 0.5f },{ 1.0f, 1.0f } },
+					CoordinateVertex{ { -1.0f, 1.0f, 0.5f },{ 0.0f, 0.0f } },
+					CoordinateVertex{ { 1.0f, 1.0f, 0.5f },{ 1.0f, 0.0f } },
+					CoordinateVertex{ { 1.0f, -1.0f, 0.5f },{ 1.0f, 1.0f } },
+					CoordinateVertex{ { -1.0f, -1.0f, 0.5f },{ 0.0f, 1.0f } },
 				};
 				constexpr std::array<uint32_t, 6> indices{ 0, 1, 2, 0, 2, 3 };
 				m_VertexBuffer = CreateUploadBuffer(vertices, RHIBufferUsage::Vertex,

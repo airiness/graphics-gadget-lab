@@ -79,7 +79,7 @@ namespace gglab
 				}
 				snapshot.m_GTAOUsesFormatFallback = gtao->m_FinalAOFormat == RHIFormat::R16Float &&
 					snapshot.m_ResolvedSettings.m_Lighting.m_GTAO.m_FinalAOFormatPreference ==
-						GTAOFinalAOFormatPreference::PreferR8Unorm;
+					GTAOFinalAOFormatPreference::PreferR8Unorm;
 			}
 			if (context.m_TemporalFramePlan &&
 				context.m_TemporalFramePlan->m_DisplayViewId == context.m_DisplayViewId)
@@ -185,7 +185,8 @@ namespace gglab
 		{
 			switch (status)
 			{
-			case GTAOFrameStatus::Disabled: return DisabledStatus();
+			case GTAOFrameStatus::Disabled:
+				return DisabledStatus();
 			case GTAOFrameStatus::Active:
 				return { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			case GTAOFrameStatus::CoreCapabilityUnavailable:
@@ -205,7 +206,8 @@ namespace gglab
 			}
 			switch (consumer.m_DisableReason)
 			{
-			case TemporalConsumerDisableReason::NotRequested: return DisabledStatus();
+			case TemporalConsumerDisableReason::NotRequested:
+				return DisabledStatus();
 			case TemporalConsumerDisableReason::CoreCapabilityUnavailable:
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::CoreCapabilityUnavailable };
 			case TemporalConsumerDisableReason::DisplayViewIneligible:

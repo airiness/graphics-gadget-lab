@@ -220,7 +220,9 @@ namespace gglab
 			std::wstring identity = artifactRoot.lexically_normal().generic_wstring();
 			std::ranges::transform(identity, identity.begin(),
 				[](wchar_t character) noexcept
-				{ return static_cast<wchar_t>(std::towlower(character)); });
+				{
+					return static_cast<wchar_t>(std::towlower(character));
+				});
 			Sha256Builder builder;
 			if (!builder.AddStringUtf8(utils::ToString(identity)))
 			{

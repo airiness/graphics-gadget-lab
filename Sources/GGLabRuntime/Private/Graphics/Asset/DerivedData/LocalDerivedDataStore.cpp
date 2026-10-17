@@ -27,14 +27,14 @@ namespace gglab
 	namespace
 	{
 		constexpr std::array<std::byte, 8> ContainerMagic{
-			std::byte{'G'},
-			std::byte{'G'},
-			std::byte{'L'},
-			std::byte{'A'},
-			std::byte{'B'},
-			std::byte{'D'},
-			std::byte{'D'},
-			std::byte{'C'},
+			std::byte{ 'G' },
+			std::byte{ 'G' },
+			std::byte{ 'L' },
+			std::byte{ 'A' },
+			std::byte{ 'B' },
+			std::byte{ 'D' },
+			std::byte{ 'D' },
+			std::byte{ 'C' },
 		};
 		constexpr uint32_t ContainerVersion = 1;
 		constexpr uint64_t ContainerFixedBytes =
@@ -52,12 +52,16 @@ namespace gglab
 			void AddU32LE(uint32_t value)
 			{
 				for (uint32_t i = 0; i < 4; ++i)
+				{
 					m_Bytes.push_back(static_cast<std::byte>((value >> (i * 8)) & 0xffu));
+				}
 			}
 			void AddU64LE(uint64_t value)
 			{
 				for (uint32_t i = 0; i < 8; ++i)
+				{
 					m_Bytes.push_back(static_cast<std::byte>((value >> (i * 8)) & 0xffu));
+				}
 			}
 			std::vector<std::byte> m_Bytes;
 		};
@@ -98,8 +102,10 @@ namespace gglab
 				}
 				value = 0;
 				for (size_t i = 0; i < width; ++i)
+				{
 					value |= static_cast<uint64_t>(std::to_integer<uint8_t>(m_Bytes[m_Offset + i]))
-					<< (i * 8);
+						<< (i * 8);
+				}
 				m_Offset += width;
 				return true;
 			}
@@ -207,7 +213,7 @@ namespace gglab
 		constexpr uint64_t MaxValue = std::numeric_limits<uint64_t>::max();
 		if (artifactType.size() > MaxValue - ContainerFixedBytes ||
 			maximumPayloadBytes > MaxValue - ContainerFixedBytes -
-				static_cast<uint64_t>(artifactType.size()))
+			static_cast<uint64_t>(artifactType.size()))
 		{
 			return MaxValue;
 		}

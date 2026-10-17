@@ -221,7 +221,9 @@ namespace gglab
 
 			const auto selected =
 				std::ranges::find_if(snapshot.m_BindingLayouts, [&state](const auto& layout)
-					{ return layout.m_Handle.Index() == state.m_SelectedLayout; });
+					{
+						return layout.m_Handle.Index() == state.m_SelectedLayout;
+					});
 			if (selected != snapshot.m_BindingLayouts.end())
 			{
 				DrawBindingLayoutDetail(*selected);
@@ -236,13 +238,13 @@ namespace gglab
 				const RHIShaderSnapshot* m_Shader;
 			};
 			const StageEntry graphicsStages[] = {
-				{"VS", &pipeline.m_VertexShader},
-				{"PS", &pipeline.m_PixelShader},
-				{"DS", &pipeline.m_DomainShader},
-				{"HS", &pipeline.m_HullShader},
-				{"GS", &pipeline.m_GeometryShader},
+				{ "VS", &pipeline.m_VertexShader },
+				{ "PS", &pipeline.m_PixelShader },
+				{ "DS", &pipeline.m_DomainShader },
+				{ "HS", &pipeline.m_HullShader },
+				{ "GS", &pipeline.m_GeometryShader },
 			};
-			const StageEntry computeStages[] = { {"CS", &pipeline.m_ComputeShader} };
+			const StageEntry computeStages[] = { { "CS", &pipeline.m_ComputeShader } };
 			const std::span<const StageEntry> stages =
 				pipeline.m_Type == RHIPipelineSnapshotType::Graphics
 				? std::span<const StageEntry>(graphicsStages)
@@ -322,7 +324,9 @@ namespace gglab
 					{
 						const auto buffer = std::ranges::find_if(pipeline.m_VertexBuffers,
 							[&attribute](const auto& value)
-							{ return value.m_InputSlot == attribute.m_InputSlot; });
+							{
+								return value.m_InputSlot == attribute.m_InputSlot;
+							});
 						ImGui::TableNextRow();
 						ImGui::TableSetColumnIndex(0);
 						ImGui::Text(
@@ -489,7 +493,9 @@ namespace gglab
 			}
 			const auto selected =
 				std::ranges::find_if(snapshot.m_Pipelines, [&state](const auto& pipeline)
-					{ return pipeline.m_Handle.Index() == state.m_SelectedPipeline; });
+					{
+						return pipeline.m_Handle.Index() == state.m_SelectedPipeline;
+					});
 			if (selected != snapshot.m_Pipelines.end())
 			{
 				DrawPipelineDetail(*selected);

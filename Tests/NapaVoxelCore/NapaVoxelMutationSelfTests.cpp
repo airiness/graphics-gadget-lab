@@ -101,7 +101,9 @@ namespace napa::voxel::testing
 			using namespace napa::voxel;
 			const auto iterator = std::lower_bound(records.begin(), records.end(), chunk,
 				[](const ChunkMeshRecord& record, ChunkCoord coordinate) noexcept
-				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+				{
+					return ChunkCoordZYXLess{}(record.m_Chunk, coordinate);
+				});
 			return iterator != records.end() && iterator->m_Chunk == chunk ?
 				std::addressof(*iterator) : nullptr;
 		}
@@ -274,7 +276,9 @@ namespace napa::voxel::testing
 			changesValid = changesValid && std::ranges::is_sorted(
 				mutation.m_SampleChanges,
 				[&sampleLess](const VoxelSampleChange& lhs, const VoxelSampleChange& rhs) noexcept
-				{ return sampleLess(lhs.m_Coordinate, rhs.m_Coordinate); });
+				{
+					return sampleLess(lhs.m_Coordinate, rhs.m_Coordinate);
+				});
 			std::map<ChunkCoord, bool, ChunkCoordZYXLess> changedOwners;
 			for (const VoxelSampleChange& change : mutation.m_SampleChanges)
 			{

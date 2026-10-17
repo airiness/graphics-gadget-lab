@@ -131,9 +131,9 @@ namespace gglab
 			physicalPreview ? (environmentSettings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky
 				? "Background.PhysicalSky" : "Background.PhysicalSkyPreview") : GetRenderGraphPassName(),
 			[displayViewId, physicalPreview, useFallback, fallbackTextureHandle, fallbackTextureDesc,
-				environmentTextureIndex,
-				environmentSamplerIndex,
-				sunDirection = physicalPreview ? -context.m_RenderScene.m_WorldSun->m_Direction : Vector3::UnitY](
+			environmentTextureIndex,
+			environmentSamplerIndex,
+			sunDirection = physicalPreview ? -context.m_RenderScene.m_WorldSun->m_Direction : Vector3::UnitY](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -205,7 +205,7 @@ namespace gglab
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
 					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
-				});
+					});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

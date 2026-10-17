@@ -138,7 +138,7 @@ namespace gglab
 						.m_View = dsv,
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
-				});
+					});
 				graphicsContext->ClearDepthAttachment(data.m_ClearDepth);
 
 				const auto& renderQueue = contextPtr->GetRenderQueue(displayViewId);

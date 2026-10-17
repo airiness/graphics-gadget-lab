@@ -107,7 +107,7 @@ namespace gglab
 	public:
 		RenderView BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
 			const ResolvedViewRenderSettings& renderSettings,
-				const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
+			const ResolvedTemporalFramePlan& temporalFramePlan, ViewResolution resolution,
 			StringID name) const noexcept;
 
 		template <RenderViewID ViewId>

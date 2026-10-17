@@ -1113,9 +1113,13 @@ namespace gglab
 					.m_Priority = TaskPriority::High,
 					},
 					[publication](TransferBatch& batch) noexcept
-					{ return publication->RecordUpload(batch); },
+					{
+						return publication->RecordUpload(batch);
+					},
 					[publication](const AssetUploadCompletionInfo& completion) noexcept
-					{ GGLAB_UNUSED(publication->CompleteUpload(completion)); });
+					{
+						GGLAB_UNUSED(publication->CompleteUpload(completion));
+					});
 				GGLAB_UNUSED(publication->SetUploadHandle(handle));
 			});
 	}
@@ -1396,9 +1400,13 @@ namespace gglab
 					.m_Priority = TaskPriority::High,
 					},
 					[publication](TransferBatch& batch) noexcept
-					{ return publication->RecordUpload(batch); },
+					{
+						return publication->RecordUpload(batch);
+					},
 					[publication](const AssetUploadCompletionInfo& completion) noexcept
-					{ GGLAB_UNUSED(publication->CompleteUpload(completion)); });
+					{
+						GGLAB_UNUSED(publication->CompleteUpload(completion));
+					});
 				GGLAB_UNUSED(publication->SetUploadHandle(handle));
 			});
 	}

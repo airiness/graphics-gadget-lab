@@ -12,7 +12,7 @@
 
 namespace gglab
 {
-	using ApplicationDemoFactory = std::unique_ptr<DemoBase> (*)(
+	using ApplicationDemoFactory = std::unique_ptr<DemoBase>(*)(
 		const DemoCreateInfo& createInfo, const LabStartupSelection& startupLab,
 		std::span<const LabRegistration> labRegistrations) noexcept;
 

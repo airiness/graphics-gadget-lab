@@ -48,7 +48,7 @@ namespace gglab
 		const double x = static_cast<double>(camera.m_X) * scale - centerX;
 		const double y = static_cast<double>(camera.m_Y) * scale - centerY;
 		const double z = static_cast<double>(camera.m_Z) * scale - centerZ;
-		const double radius = std::sqrt(x*x + y*y + z*z);
+		const double radius = std::sqrt(x * x + y * y + z * z);
 		const bool valid = std::isfinite(radius) && radius > 1.0;
 		const float mu = valid ? static_cast<float>(-(x * sun.m_Direction.m_X + y * sun.m_Direction.m_Y +
 			z * sun.m_Direction.m_Z) / radius) : -sun.m_Direction.m_Y;
@@ -83,7 +83,7 @@ namespace gglab
 		for (int i = 0; i < 256; ++i)
 		{
 			const double t = (i + 0.5) * step;
-			const float h = static_cast<float>(std::sqrt(r*r + t*t + 2.0*r*t*mu) - a.m_Radii.m_X);
+			const float h = static_cast<float>(std::sqrt(r * r + t * t + 2.0 * r * t * mu) - a.m_Radii.m_X);
 			if (h < 0.0f)
 			{
 				return Vector3::Zero;
@@ -94,10 +94,10 @@ namespace gglab
 			}
 			const float ray = std::exp(-h / a.m_Rayleigh.m_W);
 			const float mie = std::exp(-h / a.m_Mie.m_Z);
-			const float ozone = std::max(0.0f, 1.0f - std::abs(h-a.m_Absorption.m_W)/a.m_Ground.m_W);
-			opticalDepth += Vector3(a.m_Rayleigh.m_X*ray+a.m_Mie.m_Y*mie+a.m_Absorption.m_X*ozone,
-				a.m_Rayleigh.m_Y*ray+a.m_Mie.m_Y*mie+a.m_Absorption.m_Y*ozone,
-				a.m_Rayleigh.m_Z*ray+a.m_Mie.m_Y*mie+a.m_Absorption.m_Z*ozone) * static_cast<float>(step);
+			const float ozone = std::max(0.0f, 1.0f - std::abs(h - a.m_Absorption.m_W) / a.m_Ground.m_W);
+			opticalDepth += Vector3(a.m_Rayleigh.m_X * ray + a.m_Mie.m_Y * mie + a.m_Absorption.m_X * ozone,
+				a.m_Rayleigh.m_Y * ray + a.m_Mie.m_Y * mie + a.m_Absorption.m_Y * ozone,
+				a.m_Rayleigh.m_Z * ray + a.m_Mie.m_Y * mie + a.m_Absorption.m_Z * ozone) * static_cast<float>(step);
 		}
 		return Vector3(std::exp(-opticalDepth.m_X), std::exp(-opticalDepth.m_Y), std::exp(-opticalDepth.m_Z));
 	}

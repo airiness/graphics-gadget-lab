@@ -340,14 +340,18 @@ namespace gglab
 			}
 			AddResolvedPass(rg, context, services, aerial->m_Diagnostic,
 				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering
-					? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
+				? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
 				std::nullopt, selection, channel);
 			return;
 		}
 		if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
 		{
 			const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
-			if (!atmosphere) { registry->InvalidatePostProcessPreview(selection, channel); return; }
+			if (!atmosphere)
+			{
+				registry->InvalidatePostProcessPreview(selection, channel);
+				return;
+			}
 			const auto index = static_cast<uint32_t>(selection.m_Tap) - static_cast<uint32_t>(PostProcessDebugTap::AtmosphereTransmittance);
 			if (!registry->ConsumePostProcessPreviewRequest(channel))
 			{

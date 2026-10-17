@@ -176,7 +176,9 @@ namespace gglab
 		auto& usages = m_PipelineUsages[pipeline];
 		const auto existing =
 			std::ranges::find_if(usages, [&renderPassInfo](const RenderPassInfo& usage)
-				{ return usage.m_TypeName == renderPassInfo.m_TypeName; });
+				{
+					return usage.m_TypeName == renderPassInfo.m_TypeName;
+				});
 		if (existing == usages.end())
 		{
 			usages.push_back(renderPassInfo);

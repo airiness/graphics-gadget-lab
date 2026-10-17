@@ -1175,7 +1175,9 @@ namespace napa::voxel
 			};
 			const auto readDensity = [&voxelSamples](
 				SampleCoord coordinate, std::uint8_t& density) noexcept
-				{ return ReadPreparedDensity(voxelSamples, coordinate, density); };
+				{
+					return ReadPreparedDensity(voxelSamples, coordinate, density);
+				};
 			for (std::size_t z = 0; z < sizeZ; ++z)
 			{
 				for (std::size_t y = 0; y < sizeY; ++y)
@@ -1319,7 +1321,9 @@ namespace napa::voxel
 
 		DensityGradient prepared{};
 		const auto readDensity = [this](SampleCoord sample, std::uint8_t& density) noexcept
-			{ return ReadDensity(m_World, sample, density); };
+			{
+				return ReadDensity(m_World, sample, density);
+			};
 		const ValidationResult xResult = ComputeAxisDensityGradient(
 			bounds, coordinate, CoordinateAxis::X, centerDensity, readDensity, prepared.m_X);
 		if (xResult.Failed())

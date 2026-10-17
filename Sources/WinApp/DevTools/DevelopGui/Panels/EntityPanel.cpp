@@ -57,10 +57,14 @@ namespace gglab
 		{
 			switch (filter)
 			{
-			case EntityComponentFilter::Transform: return entity.m_Transform.has_value();
-			case EntityComponentFilter::Model: return entity.m_Model.has_value();
-			case EntityComponentFilter::Light: return entity.m_Light.has_value();
-			default: return true;
+			case EntityComponentFilter::Transform:
+				return entity.m_Transform.has_value();
+			case EntityComponentFilter::Model:
+				return entity.m_Model.has_value();
+			case EntityComponentFilter::Light:
+				return entity.m_Light.has_value();
+			default:
+				return true;
 			}
 		}
 
@@ -68,11 +72,12 @@ namespace gglab
 		{
 			std::string label = std::format("Entity {}", entity.m_Target.m_EntityId);
 			bool hasAnyComponent = false;
-			auto appendComponent = [&](std::string_view name) {
-				label += hasAnyComponent ? ", " : " [";
-				label += name;
-				hasAnyComponent = true;
-			};
+			auto appendComponent = [&](std::string_view name)
+				{
+					label += hasAnyComponent ? ", " : " [";
+					label += name;
+					hasAnyComponent = true;
+				};
 			if (entity.m_Transform)
 			{
 				appendComponent("Transform");

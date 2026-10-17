@@ -8,7 +8,11 @@ namespace gglab
 {
 	namespace ShaderBinaryFormatWire
 	{
-		struct Entry final { std::string_view m_Name; ShaderBinaryFormat m_Value; };
+		struct Entry final
+		{
+			std::string_view m_Name;
+			ShaderBinaryFormat m_Value;
+		};
 		inline constexpr std::array Entries{
 			Entry{ "dxil", ShaderBinaryFormat::Dxil },
 			Entry{ "spirv", ShaderBinaryFormat::SpirV },
@@ -18,7 +22,10 @@ namespace gglab
 		{
 			for (const Entry& entry : Entries)
 			{
-				if (entry.m_Value == value) { return entry.m_Name; }
+				if (entry.m_Value == value)
+				{
+					return entry.m_Name;
+				}
 			}
 			return "unknown";
 		}
@@ -55,7 +62,10 @@ namespace gglab
 		{
 			for (const Entry& entry : Entries)
 			{
-				if (entry.m_Value == value) { return entry.m_Name; }
+				if (entry.m_Value == value)
+				{
+					return entry.m_Name;
+				}
 			}
 			return "unknown";
 		}
@@ -77,7 +87,11 @@ namespace gglab
 
 	namespace ShaderStageWire
 	{
-		struct Entry final { std::string_view m_Name; ShaderStage m_Value; };
+		struct Entry final
+		{
+			std::string_view m_Name;
+			ShaderStage m_Value;
+		};
 		inline constexpr std::array Entries{
 			Entry{ "vertex", ShaderStage::Vertex },
 			Entry{ "pixel", ShaderStage::Pixel },
@@ -92,7 +106,10 @@ namespace gglab
 		{
 			for (const Entry& entry : Entries)
 			{
-				if (entry.m_Value == value) { return entry.m_Name; }
+				if (entry.m_Value == value)
+				{
+					return entry.m_Name;
+				}
 			}
 			return "unknown";
 		}
@@ -114,7 +131,11 @@ namespace gglab
 
 	namespace ShaderModelWire
 	{
-		struct Entry final { std::string_view m_Name; ShaderModel m_Value; };
+		struct Entry final
+		{
+			std::string_view m_Name;
+			ShaderModel m_Value;
+		};
 		inline constexpr std::array Entries{
 			Entry{ "6_6", ShaderModel::SM_6_6 },
 			Entry{ "6_7", ShaderModel::SM_6_7 },
@@ -125,7 +146,10 @@ namespace gglab
 		{
 			for (const Entry& entry : Entries)
 			{
-				if (entry.m_Value == value) { return entry.m_Name; }
+				if (entry.m_Value == value)
+				{
+					return entry.m_Name;
+				}
 			}
 			return "unknown";
 		}

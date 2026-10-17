@@ -59,7 +59,9 @@ namespace gglab
 		for (uint32_t workerIndex = 0; workerIndex < workerCount; ++workerIndex)
 		{
 			m_Workers.emplace_back([this, workerIndex](std::stop_token stopToken) noexcept
-				{ WorkerMain(stopToken, workerIndex); });
+				{
+					WorkerMain(stopToken, workerIndex);
+				});
 		}
 	}
 
