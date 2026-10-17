@@ -19,7 +19,11 @@ namespace gglab
 		void NotifyExecuted(uint32_t i) noexcept override { m_ExecutedMask |= 1u << i; }
 		AtmosphereDiagnostics GetDiagnostics() const noexcept override { return m_Diagnostics; }
 		void EndFrame(bool completed, const RHIFencePoint& fence) noexcept;
+		// Ends a frame whose GPU completion is unknown without releasing anything it may read.
+		// The LUTs lose their certification; Shutdown releases the retained set.
+		void RetainAfterUnknownCompletion() noexcept;
 		void Tick() noexcept;
+		// Requires verified quiescence or confirmed device loss.
 		void Shutdown() noexcept;
 		[[nodiscard]] bool CanPublish() const noexcept;
 		void SwapPublished(AtmosphereSystem& pending) noexcept;
@@ -40,6 +44,7 @@ namespace gglab
 			RHIFencePoint m_Fence;
 		};
 		std::vector<PendingBuffer> m_PendingBuffers;
+		std::vector<RHIBufferHandle> m_RetainedBuffers;
 		uint32_t m_ExecutedMask = 0;
 		bool m_InFrame = false;
 		bool m_Shutdown = false;

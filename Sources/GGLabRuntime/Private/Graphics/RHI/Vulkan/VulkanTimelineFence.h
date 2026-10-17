@@ -10,6 +10,13 @@
 
 namespace gglab
 {
+	[[nodiscard]] constexpr uint64_t ToVulkanTimeoutNanoseconds(uint32_t timeoutMilliseconds) noexcept
+	{
+		return timeoutMilliseconds == RHIInfiniteWaitMilliseconds ?
+			UINT64_MAX :
+			static_cast<uint64_t>(timeoutMilliseconds) * 1'000'000;
+	}
+
 	// Logical-queue timeline semaphore. The graphics instance is used as the
 	// frame-slot reuse gate; the transfer instance gates upload publication and
 	// staging retirement.
@@ -60,6 +67,9 @@ namespace gglab
 		// The last successfully submitted value; waiting at or below it is
 		// always safe.
 		[[nodiscard]] uint64_t GetCurrentSignalValue() const noexcept { return m_SubmittedValue; }
+		// After verified device idle, signals reserved values that no submission committed, so
+		// retention tied to them ends. Requires that no signal operation is pending.
+		[[nodiscard]] VkResult CompleteReservedValuesAfterIdle() noexcept;
 
 		// The stable backend-neutral identity of this timeline; combined
 		// with a committed value it forms a valid RHIFencePoint.
@@ -69,7 +79,9 @@ namespace gglab
 		// caller must only wait on committed values. Returns VK_SUCCESS or
 		// the Vulkan error (e.g. VK_ERROR_DEVICE_LOST); the result is never
 		// swallowed.
-		[[nodiscard]] VkResult Wait(uint64_t value) const noexcept;
+		[[nodiscard]] VkResult Wait(uint64_t value) const noexcept { return Wait(value, UINT64_MAX); }
+		// Bounded variant: VK_TIMEOUT once the timeout expires before the value is reached.
+		[[nodiscard]] VkResult Wait(uint64_t value, uint64_t timeoutNanoseconds) const noexcept;
 		// Reads the current timeline counter. Returns VK_SUCCESS or the
 		// Vulkan error; outValue is set only on success.
 		[[nodiscard]] VkResult GetCompletedValue(uint64_t& outValue) const noexcept;

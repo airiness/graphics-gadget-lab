@@ -271,10 +271,17 @@ namespace gglab
 		}
 		[[nodiscard]] bool IsFencePointCompleted(
 			const RHIFencePoint& fencePoint) const noexcept override;
+		// Checked CPU wait on a graphics or transfer timeline point; an invalid or foreign
+		// point fails.
+		[[nodiscard]] RHIGpuWaitResult WaitFencePoint(
+			const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept;
+		[[nodiscard]] RHIFenceQueryResult QueryFencePoint(
+			const RHIFencePoint& fencePoint) const noexcept override;
 
 	private:
 		bool m_PixelStorageAtomics = false;
 		void Destroy() noexcept;
+		[[nodiscard]] const VulkanTimelineFence* FindTimeline(RHIFenceHandle fence) const noexcept;
 
 		VkInstance m_Instance = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

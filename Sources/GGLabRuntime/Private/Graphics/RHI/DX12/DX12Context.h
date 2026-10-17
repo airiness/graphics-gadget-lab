@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
 
 #include <Windows.h>
 
@@ -67,13 +68,15 @@ namespace gglab
 
 		RHIFrameBeginResult BeginFrame() noexcept override;
 		RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept override;
-		RHIFencePoint AbortFrame(RHIFrameContext& frame) noexcept override;
-		void WaitForFence(
+		RHIFrameEndResult AbortFrame(RHIFrameContext& frame) noexcept override;
+		bool WaitForFence(
 			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
 
 		void Resize(uint32_t width, uint32_t height) noexcept override;
-		void WaitIdle() noexcept override;
+		RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept override;
 		void RetireCompletedWork() noexcept override;
+		bool IsPoisoned() const noexcept override { return m_Poisoned; }
+		bool IsDeviceLost() const noexcept override;
 		uint32_t GetFrameSlotCount() const noexcept override;
 
 		[[nodiscard]] DX12Device& GetDX12Device() noexcept;
@@ -90,6 +93,7 @@ namespace gglab
 		void BeginGraphicsRecording(DX12FrameContext& frame) noexcept;
 		void BindGlobalDescriptorHeaps(DX12CommandList& commandList) noexcept;
 		void FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept;
+		[[nodiscard]] RHISubmissionVerification MakeSubmissionVerification() noexcept;
 		void Finalize() noexcept;
 
 		std::unique_ptr<DX12Device> m_Device;
@@ -107,5 +111,6 @@ namespace gglab
 		uint32_t m_NextFrameSlotIndex = 0;
 		bool m_Initialized = false;
 		bool m_CompletedProductionFrame = false;
+		bool m_Poisoned = false;
 	};
 }

@@ -222,6 +222,11 @@ namespace gglab
 		[[nodiscard]] bool BeginFrameSnapshot(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool SubmitFrameSnapshot(
 			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
+		// Keeps the snapshot of an accepted submission that has no committed signal on its
+		// reserved graphics timeline point, which completes only once a later signal reaches
+		// it. Retirements derived from the snapshot stay pending until teardown.
+		[[nodiscard]] bool RetainFrameSnapshot(
+			uint32_t frameSlotIndex, const RHIFencePoint& reservedFence) noexcept;
 		[[nodiscard]] bool AbortFrameSnapshot(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool RetireResource(uint32_t index,
 			const RHIDescriptorRetirement& retirement,

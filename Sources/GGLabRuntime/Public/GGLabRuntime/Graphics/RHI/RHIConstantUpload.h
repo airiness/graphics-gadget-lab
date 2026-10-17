@@ -48,8 +48,11 @@ namespace gglab
 
 		[[nodiscard]] std::unique_ptr<RHIConstantUploadBatch> BeginBatch() noexcept;
 		void ReclaimCompleted() noexcept;
+		// Only after every queue that may have read quarantined pages was verified idle.
+		void ReleaseQuarantinedAfterVerifiedIdle() noexcept;
 		[[nodiscard]] size_t GetPageCount() const noexcept { return m_Pages.size(); }
 		[[nodiscard]] size_t GetPendingPageCount() const noexcept;
+		[[nodiscard]] size_t GetQuarantinedPageCount() const noexcept;
 
 	private:
 		friend class RHIConstantUploadBatch;
@@ -60,6 +63,8 @@ namespace gglab
 			uint64_t m_CapacityInBytes = 0;
 			RHIFencePoint m_Fence{};
 			bool m_Leased = false;
+			// Possibly read by work without a reliable completion fence.
+			bool m_Quarantined = false;
 		};
 		[[nodiscard]] size_t AcquirePage(uint64_t minimumSize) noexcept;
 
@@ -77,9 +82,16 @@ namespace gglab
 		[[nodiscard]] RHIConstantBufferBinding Upload(std::span<const std::byte> bytes) noexcept;
 		// Freezes allocation and flushes all leased writes before queue submission.
 		[[nodiscard]] bool PublishWrites() noexcept;
+		// Called once the native submit of a stream that may read the batch was issued.
+		// From then on the batch can no longer be cancelled.
+		void RecordAcceptedSubmission() noexcept { m_HasAcceptedSubmission = true; }
+		[[nodiscard]] bool HasAcceptedSubmission() const noexcept { return m_HasAcceptedSubmission; }
 		// The fence must cover all consumers, including any joined compute work.
 		[[nodiscard]] bool Submitted(const RHIFencePoint& fence) noexcept;
-		// Only after the command stream referencing these bindings has been discarded.
+		// Accepted work may read the pages without a reliable completion fence. The pages
+		// stay quarantined until the pool is told that every consuming queue is idle.
+		void SubmittedWithoutCompletionFence() noexcept;
+		// Only while no stream that reads these bindings has been accepted for execution.
 		void Cancel() noexcept;
 		void Fail() noexcept { m_Failed = true; }
 		[[nodiscard]] bool HasFailed() const noexcept { return m_Failed; }
@@ -95,6 +107,7 @@ namespace gglab
 			Recording,
 			Published,
 			Submitted,
+			Quarantined,
 			Cancelled
 		};
 		struct PageLease
@@ -108,5 +121,6 @@ namespace gglab
 		uint64_t m_Id = 0;
 		State m_State = State::Recording;
 		bool m_Failed = false;
+		bool m_HasAcceptedSubmission = false;
 	};
 }

@@ -37,12 +37,16 @@ namespace gglab
 		return RHIFencePoint(m_FencePtr->GetRHIHandle(), m_PointValue);
 	}
 
-	void DX12FencePoint::Wait(uint32_t timeout) const noexcept
+	RHIFenceQueryResult DX12FencePoint::Query() const noexcept
 	{
-		if (m_FencePtr)
-		{
-			m_FencePtr->WaitCompletion(m_PointValue, timeout);
-		}
+		return m_FencePtr ? m_FencePtr->Query(m_PointValue) : RHIFenceQueryResult::Failed;
+	}
+
+	RHIGpuWaitResult DX12FencePoint::Wait(uint32_t timeoutMilliseconds) const noexcept
+	{
+		return m_FencePtr ?
+			m_FencePtr->WaitCompletion(m_PointValue, timeoutMilliseconds) :
+			RHIGpuWaitResult::Failed;
 	}
 
 	void DX12FencePoint::Reset() noexcept

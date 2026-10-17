@@ -49,6 +49,22 @@ namespace gglab
 		}
 	}
 
+	void RHIConstantUploadPool::ReleaseQuarantinedAfterVerifiedIdle() noexcept
+	{
+		for (auto& page : m_Pages)
+		{
+			page.m_Quarantined = false;
+		}
+	}
+
+	size_t RHIConstantUploadPool::GetQuarantinedPageCount() const noexcept
+	{
+		return std::ranges::count_if(m_Pages, [](const Page& page)
+			{
+				return page.m_Quarantined;
+			});
+	}
+
 	size_t RHIConstantUploadPool::GetPendingPageCount() const noexcept
 	{
 		return std::ranges::count_if(m_Pages, [](const Page& page)
@@ -63,7 +79,8 @@ namespace gglab
 		for (size_t index = 0; index < m_Pages.size(); ++index)
 		{
 			auto& page = m_Pages[index];
-			if (!page.m_Leased && !page.m_Fence.IsValid() && page.m_CapacityInBytes >= minimumSize)
+			if (!page.m_Leased && !page.m_Quarantined && !page.m_Fence.IsValid() &&
+				page.m_CapacityInBytes >= minimumSize)
 			{
 				page.m_Leased = true;
 				return index;
@@ -98,7 +115,7 @@ namespace gglab
 			m_Device->DestroyBuffer(buffer);
 			return InvalidPage;
 		}
-		m_Pages.push_back({ buffer, mapped, capacity, {}, true });
+		m_Pages.push_back({ buffer, mapped, capacity, {}, true, false });
 		return m_Pages.size() - 1;
 	}
 
@@ -109,7 +126,8 @@ namespace gglab
 
 	RHIConstantUploadBatch::~RHIConstantUploadBatch() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_State == State::Submitted || m_State == State::Cancelled,
+		GGLAB_ASSERT_MSG(m_State == State::Submitted || m_State == State::Quarantined ||
+			m_State == State::Cancelled,
 			"A constant upload batch requires explicit submission or command-stream cancellation.");
 	}
 
@@ -202,8 +220,28 @@ namespace gglab
 		return true;
 	}
 
+	void RHIConstantUploadBatch::SubmittedWithoutCompletionFence() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == State::Recording || m_State == State::Published,
+			"Only an unresolved batch can be quarantined.");
+		if (m_State != State::Recording && m_State != State::Published)
+		{
+			return;
+		}
+		for (const auto& lease : m_Leases)
+		{
+			auto& page = m_Pool->m_Pages[lease.m_PageIndex];
+			page.m_Quarantined = true;
+			page.m_Leased = false;
+		}
+		m_State = State::Quarantined;
+	}
+
 	void RHIConstantUploadBatch::Cancel() noexcept
 	{
+		// Accepted work may already be reading the pages; it needs a fence or quarantine.
+		GGLAB_ASSERT_MSG(!m_HasAcceptedSubmission,
+			"Constant uploads read by an accepted submission cannot be cancelled.");
 		GGLAB_ASSERT_MSG(m_State == State::Recording || m_State == State::Published,
 			"Submitted constant uploads must wait for GPU completion.");
 		if (m_State != State::Recording && m_State != State::Published)

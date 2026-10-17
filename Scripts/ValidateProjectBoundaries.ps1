@@ -1925,7 +1925,7 @@ if (Test-Path -LiteralPath $legacyRuntimeShaderTypesPath -PathType Leaf) {
 
 $legacyRuntimePublicRhiIncludeRegex =
     '#include\s*[<"]Graphics[\\/]RHI[\\/](?!RHIHandleTable\.h[>"]|' +
-    'RHISubresourceUtils\.h[>"]|DX12[\\/]|Vulkan[\\/])RHI[^>"\\/]+'
+    'RHISubresourceUtils\.h[>"]|RHIFrameSubmission\.h[>"]|DX12[\\/]|Vulkan[\\/])RHI[^>"\\/]+'
 $legacyRuntimeShaderTypesIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Shader[\\/]ShaderTypes\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `

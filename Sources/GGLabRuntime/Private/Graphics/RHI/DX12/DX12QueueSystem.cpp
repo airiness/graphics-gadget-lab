@@ -114,36 +114,37 @@ namespace gglab
 		return std::make_unique<DX12CommandList>(createInfo);
 	}
 
-	void DX12QueueSystem::WaitForFence(
+	bool DX12QueueSystem::WaitForFence(
 		RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!fencePoint.IsValid())
 		{
-			return;
+			return true;
 		}
 
 		const DX12Fence* fence = ResolveFence(fencePoint.m_Fence);
 		if (!fence)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("DX12QueueSystem::WaitForFence received an unknown fence.");
-			return;
+			return false;
 		}
-		GetQueue(ToDX12QueueType(waitingQueue)).Wait(*fence, fencePoint.m_Value);
+		return GetQueue(ToDX12QueueType(waitingQueue)).Wait(*fence, fencePoint.m_Value);
 	}
 
-	void DX12QueueSystem::WaitForFenceCompletion(const RHIFencePoint& fencePoint) noexcept
+	RHIGpuWaitResult DX12QueueSystem::WaitForFenceCompletion(
+		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) noexcept
 	{
 		if (!fencePoint.IsValid())
 		{
-			return;
+			return RHIGpuWaitResult::Failed;
 		}
 		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
 		{
-			fence->WaitCompletion(fencePoint.m_Value);
-			return;
+			return fence->WaitCompletion(fencePoint.m_Value, timeoutMilliseconds);
 		}
 		GGLAB_LOG_GRAPHICS_WARN(
 			"DX12QueueSystem::WaitForFenceCompletion received an unknown fence.");
+		return RHIGpuWaitResult::Failed;
 	}
 
 	bool DX12QueueSystem::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
@@ -159,6 +160,16 @@ namespace gglab
 		GGLAB_LOG_GRAPHICS_WARN(
 			"DX12QueueSystem::IsFencePointCompleted received an unknown fence.");
 		return false;
+	}
+
+	RHIFenceQueryResult DX12QueueSystem::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		const DX12Fence* fence = ResolveFence(fencePoint.m_Fence);
+		return fence ? fence->Query(fencePoint.m_Value) : RHIFenceQueryResult::Failed;
 	}
 
 	const DX12Fence* DX12QueueSystem::ResolveFence(RHIFenceHandle fenceHandle) const noexcept
@@ -178,15 +189,25 @@ namespace gglab
 		return nullptr;
 	}
 
-	void DX12QueueSystem::WaitIdle() noexcept
+	RHIGpuWaitResult DX12QueueSystem::WaitIdle(uint32_t timeoutMilliseconds) noexcept
 	{
+		// Device loss outranks a failure, which outranks a timeout; every queue is flushed.
+		RHIGpuWaitResult aggregate = RHIGpuWaitResult::Completed;
 		for (auto& queue : m_Queues)
 		{
-			if (queue)
+			if (!queue)
 			{
-				queue->FlushCommandQueue();
+				continue;
+			}
+			const RHIGpuWaitResult result = queue->FlushCommandQueue(timeoutMilliseconds);
+			if (result == RHIGpuWaitResult::DeviceLost ||
+				(result == RHIGpuWaitResult::Failed && aggregate != RHIGpuWaitResult::DeviceLost) ||
+				(result == RHIGpuWaitResult::Timeout && aggregate == RHIGpuWaitResult::Completed))
+			{
+				aggregate = result;
 			}
 		}
+		return aggregate;
 	}
 
 	DX12QueueType DX12QueueSystem::ToDX12QueueType(RHIQueueType type) noexcept

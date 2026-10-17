@@ -405,6 +405,13 @@ namespace gglab
 			!fencePoint.IsValid();
 	}
 
+	RHIFenceQueryResult DX12Device::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	{
+		return m_QueueSystem ?
+			m_QueueSystem->QueryFencePoint(fencePoint) :
+			RHIFenceQueryResult::Failed;
+	}
+
 	void DX12Device::RecordTextureUse(
 		RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
 	{

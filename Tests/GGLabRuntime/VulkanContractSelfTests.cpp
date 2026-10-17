@@ -24,6 +24,8 @@
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #endif
@@ -1091,6 +1093,60 @@ namespace gglab
 					"device-lost wait stops BeginFrame before reset/acquire");
 				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_SURFACE_LOST_KHR) == VulkanBeginGateOutcome::Fatal,
 					"any failed wait stops BeginFrame before reset/acquire");
+			}
+
+			// Checked submit, wait and query results. Only the out-of-memory submit results
+			// prove that a submit had no effect, and only DEVICE_LOST confirms device loss.
+			{
+				context.Check(ClassifyVulkanSubmitEffect(false, VK_SUCCESS) == RHISubmitEffect::NoEffect &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_OUT_OF_HOST_MEMORY) == RHISubmitEffect::NoEffect &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_OUT_OF_DEVICE_MEMORY) == RHISubmitEffect::NoEffect,
+					"an unissued or out-of-memory submit has no effect");
+				context.Check(ClassifyVulkanSubmitEffect(true, VK_SUCCESS) == RHISubmitEffect::Accepted &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_DEVICE_LOST) == RHISubmitEffect::Accepted &&
+					ClassifyVulkanSubmitEffect(true, VK_ERROR_UNKNOWN) == RHISubmitEffect::Accepted,
+					"device loss and unclassified submit errors are accepted streams");
+				context.Check(ClassifyVulkanWaitResult(VK_SUCCESS) == RHIGpuWaitResult::Completed &&
+					ClassifyVulkanWaitResult(VK_TIMEOUT) == RHIGpuWaitResult::Timeout &&
+					ClassifyVulkanWaitResult(VK_ERROR_DEVICE_LOST) == RHIGpuWaitResult::DeviceLost &&
+					ClassifyVulkanWaitResult(VK_ERROR_OUT_OF_HOST_MEMORY) == RHIGpuWaitResult::Failed,
+					"a timed-out or failed wait never reports device loss");
+				context.Check(ClassifyVulkanFenceQuery(VK_SUCCESS, 3, 5) == RHIFenceQueryResult::Pending &&
+					ClassifyVulkanFenceQuery(VK_SUCCESS, 5, 5) == RHIFenceQueryResult::Completed &&
+					ClassifyVulkanFenceQuery(VK_ERROR_DEVICE_LOST, 0, 5) == RHIFenceQueryResult::DeviceLost &&
+					ClassifyVulkanFenceQuery(VK_ERROR_OUT_OF_HOST_MEMORY, 9, 5) == RHIFenceQueryResult::Failed &&
+					ClassifyVulkanFenceQuery(VK_SUCCESS, 9, 0) == RHIFenceQueryResult::Failed,
+					"an in-flight value is Pending and an invalid point is never Completed");
+				context.Check(ToVulkanTimeoutNanoseconds(RHIInfiniteWaitMilliseconds) == UINT64_MAX &&
+					ToVulkanTimeoutNanoseconds(10) == 10'000'000,
+					"bounded waits convert milliseconds while the infinite wait stays unbounded");
+
+				const RHIFencePoint committed{ RHIFenceHandle{ 4, 1 }, 6 };
+				const RHIFencePoint reserved{ RHIFenceHandle{ 4, 1 }, 7 };
+				VulkanSubmitPresentResult presentFailed{};
+				presentFailed.m_SubmitIssued = true;
+				presentFailed.m_Submitted = true;
+				presentFailed.m_Fatal = true;
+				presentFailed.m_SubmittedFencePoint = committed;
+				presentFailed.m_ReservedFencePoint = committed;
+				presentFailed.m_Result = VK_ERROR_OUT_OF_HOST_MEMORY;
+				context.Check(presentFailed.GetSubmitEffect() == RHISubmitEffect::Accepted &&
+					presentFailed.GetRetentionFencePoint() == committed,
+					"a present failure after a committed submit keeps the submission accepted and fenced");
+				VulkanSubmitPresentResult lost{};
+				lost.m_SubmitIssued = true;
+				lost.m_Fatal = true;
+				lost.m_ReservedFencePoint = reserved;
+				lost.m_SubmitResult = VK_ERROR_DEVICE_LOST;
+				lost.m_Result = VK_ERROR_DEVICE_LOST;
+				context.Check(lost.GetSubmitEffect() == RHISubmitEffect::Accepted &&
+					!lost.m_SubmittedFencePoint.IsValid() && lost.GetRetentionFencePoint() == reserved,
+					"an accepted submit without a committed signal retains on its reserved point");
+				VulkanSubmitPresentResult outOfMemory = lost;
+				outOfMemory.m_SubmitResult = VK_ERROR_OUT_OF_DEVICE_MEMORY;
+				context.Check(outOfMemory.GetSubmitEffect() == RHISubmitEffect::NoEffect &&
+					!outOfMemory.GetRetentionFencePoint().IsValid(),
+					"an out-of-memory submit retains nothing");
 			}
 		}
 #endif

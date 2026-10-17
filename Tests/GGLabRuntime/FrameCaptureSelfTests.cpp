@@ -136,6 +136,20 @@ namespace gglab
 			{
 				return fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue;
 			}
+			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
+			{
+				if (!fencePoint.IsValid())
+				{
+					return RHIFenceQueryResult::Failed;
+				}
+				if (m_DeviceLost)
+				{
+					return RHIFenceQueryResult::DeviceLost;
+				}
+				return IsFencePointCompleted(fencePoint) ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
+			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle) const noexcept override
@@ -185,6 +199,7 @@ namespace gglab
 
 			uint32_t m_ReadbackMapCalls = 0;
 			uint64_t m_CompletedFenceValue = 0;
+			bool m_DeviceLost = false;
 			bool m_FailBufferCreation = false;
 			bool m_FailMapping = false;
 
@@ -691,6 +706,62 @@ namespace gglab
 				"A frame without its source cannot leave a restricted capture pending for a later frame");
 			service.Shutdown();
 			context.Check(Consume(service).empty(), "Frame-restricted results are published exactly once");
+		}
+
+		void RunUnknownCompletionAndDeviceLossTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			FrameCaptureService service(device);
+			const RHITextureDesc target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			const auto isFailedWithoutImage = [](const FrameCaptureResult& result)
+				{
+					return result.m_Status == FrameCaptureStatus::Failed && !result.m_Image;
+				};
+
+			const uint64_t unknown = service.RequestCapture(FrameCaptureSource::Scene, 10);
+			const auto unknownTap = service.BindTap(10, FrameCaptureSource::Scene, target);
+			service.OnFrameCompletionUnknown(10);
+			device.m_CompletedFenceValue = 100;
+			const auto unknownResults = Consume(service);
+			context.Check(unknownTap && unknownResults.size() == 1 &&
+				unknownResults[0].m_RequestId == unknown && isFailedWithoutImage(unknownResults[0]) &&
+				device.IsAlive(unknownTap->m_Buffer) && device.m_ReadbackMapCalls == 0,
+				"A frame with unknown GPU completion fails its capture and keeps the readback unread");
+
+			const uint64_t lost = service.RequestCapture(FrameCaptureSource::Scene, 11);
+			const auto lostTap = service.BindTap(11, FrameCaptureSource::Scene, target);
+			if (lostTap)
+			{
+				device.FillReadback(lostTap->m_Buffer, lostTap->m_Footprint);
+			}
+			service.OnFrameSubmitted(11, MakeFence(101));
+			device.m_DeviceLost = true;
+			const auto lostResults = Consume(service);
+			context.Check(lostTap && lostResults.size() == 1 && lostResults[0].m_RequestId == lost &&
+				isFailedWithoutImage(lostResults[0]) && !device.IsAlive(lostTap->m_Buffer) &&
+				device.m_ReadbackMapCalls == 0,
+				"Confirmed device loss fails a submitted capture without reading its readback");
+
+			service.Shutdown();
+			context.Check(Consume(service).empty() && device.GetLiveBufferCount() == 0 &&
+				device.m_ReadbackMapCalls == 0,
+				"Teardown releases a retained readback without reading or publishing it again");
+
+			CaptureTestDevice unverifiedDevice;
+			FrameCaptureService abandoned(unverifiedDevice);
+			const uint64_t inFlight = abandoned.RequestCapture(FrameCaptureSource::Scene, 12);
+			const uint64_t queued = abandoned.RequestCapture(FrameCaptureSource::Scene, 13);
+			const auto inFlightTap = abandoned.BindTap(12, FrameCaptureSource::Scene, target);
+			abandoned.OnFrameSubmitted(12, MakeFence(1));
+			abandoned.Abandon("Idle was not verified.");
+			const auto abandonedResults = Consume(abandoned);
+			context.Check(inFlightTap && abandonedResults.size() == 2 &&
+				std::ranges::all_of(abandonedResults, isFailedWithoutImage) &&
+				std::ranges::any_of(abandonedResults, [&](const auto& r) { return r.m_RequestId == inFlight; }) &&
+				std::ranges::any_of(abandonedResults, [&](const auto& r) { return r.m_RequestId == queued; }) &&
+				unverifiedDevice.IsAlive(inFlightTap->m_Buffer) &&
+				unverifiedDevice.m_ReadbackMapCalls == 0,
+				"Unverified teardown fails every request and leaks readbacks the GPU may still write");
 		}
 
 		void RunFrameEndTests(SelfTestContext& context) noexcept
@@ -2081,6 +2152,7 @@ namespace gglab
 		RunDiagnosticTests(context);
 		RunFrameBindingTests(context);
 		RunFrameEndTests(context);
+		RunUnknownCompletionAndDeviceLossTests(context);
 		RunCapacityTests(context);
 	}
 }

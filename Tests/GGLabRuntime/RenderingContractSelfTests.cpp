@@ -90,7 +90,9 @@
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
@@ -541,6 +543,16 @@ namespace gglab
 			{
 				return !fencePoint.IsValid() || !m_UseControlledFenceCompletion ||
 					fencePoint.m_Value <= m_CompletedFenceValue;
+			}
+			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
+			{
+				if (!fencePoint.IsValid())
+				{
+					return RHIFenceQueryResult::Failed;
+				}
+				return IsFencePointCompleted(fencePoint) ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
 			{
@@ -1839,6 +1851,281 @@ namespace gglab
 			context.Check(!graphics.SetConstantBufferData(passIndex, payload) && graphics.HasRecordingError(),
 				"Data uploads require an explicit recording scope outside the RenderGraph too");
 			graphics.EndConstantRecording();
+		}
+
+		class TeardownTestContext final : public RHIContext
+		{
+		public:
+			RHIDevice& GetDevice() noexcept override { std::terminate(); }
+			const RHIDevice& GetDevice() const noexcept override { std::terminate(); }
+			RHISwapChain& GetSwapChain() noexcept override { std::terminate(); }
+			const RHISwapChain& GetSwapChain() const noexcept override { std::terminate(); }
+			TransferManager& GetTransferManager() noexcept override { std::terminate(); }
+			RHIPipelineSystem& GetPipelineSystem() noexcept override { std::terminate(); }
+			GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
+			RHIFrameBeginResult BeginFrame() noexcept override { return RHIFrameBeginResult::Fatal(); }
+			RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+			RHIFrameEndResult AbortFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+			bool WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override { return true; }
+			void Resize(uint32_t, uint32_t) noexcept override {}
+			RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept override
+			{
+				const size_t attempt = m_WaitTimeouts.size();
+				m_WaitTimeouts.push_back(timeoutMilliseconds);
+				const RHIGpuWaitResult result = attempt < m_WaitResults.size() ?
+					m_WaitResults[attempt] :
+					RHIGpuWaitResult::Completed;
+				m_DeviceLost = m_DeviceLost || attempt == m_LoseDeviceAtAttempt ||
+					result == RHIGpuWaitResult::DeviceLost;
+				return result;
+			}
+			void RetireCompletedWork() noexcept override {}
+			bool IsPoisoned() const noexcept override { return true; }
+			bool IsDeviceLost() const noexcept override { return m_DeviceLost; }
+			uint32_t GetFrameSlotCount() const noexcept override { return 2; }
+
+			std::vector<RHIGpuWaitResult> m_WaitResults;
+			std::vector<uint32_t> m_WaitTimeouts;
+			size_t m_LoseDeviceAtAttempt = std::numeric_limits<size_t>::max();
+			bool m_DeviceLost = false;
+		};
+
+		void RunCheckedCompletionContractTests(SelfTestContext& context) noexcept
+		{
+			using enum RHIFenceQueryResult;
+			context.Check(ClassifyDX12FenceQuery(DX12DeviceRemovedFenceValue, 5, false) == Failed &&
+				ClassifyDX12FenceQuery(DX12DeviceRemovedFenceValue, 5, true) == DeviceLost,
+				"The DX12 removal sentinel is device loss only with native confirmation, never completion");
+			context.Check(ClassifyDX12FenceQuery(3, 5, false) == Pending &&
+				ClassifyDX12FenceQuery(5, 5, false) == Completed &&
+				ClassifyDX12FenceQuery(9, 0, false) == Failed,
+				"A DX12 in-flight value is Pending and an invalid point is never Completed");
+			context.Check(!ClassifyDX12FenceWaitStep(DX12FenceEventWait::Signaled, Pending).has_value() &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::Signaled, DeviceLost) ==
+					RHIGpuWaitResult::DeviceLost &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::Signaled, Failed) ==
+					RHIGpuWaitResult::Failed &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::TimedOut, Pending) ==
+					RHIGpuWaitResult::Timeout &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::TimedOut, Completed) ==
+					RHIGpuWaitResult::Completed &&
+				ClassifyDX12FenceWaitStep(DX12FenceEventWait::Failed, Pending) ==
+					RHIGpuWaitResult::Failed,
+				"A woken DX12 fence event proves nothing; the following query decides the wait");
+			context.Check(ToRHIGpuWaitResult(Pending) == RHIGpuWaitResult::Timeout &&
+				ToRHIGpuWaitResult(Failed) == RHIGpuWaitResult::Failed,
+				"A pending query is a timeout, never device loss");
+
+			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			context.Check(RHIFrameEndResult::Fatal().GetSubmissionState() ==
+					RHIFrameSubmissionState::NoOutstandingWork &&
+				RHIFrameEndResult::Fatal(graphicsFence).GetSubmissionState() ==
+					RHIFrameSubmissionState::Fenced &&
+				RHIFrameEndResult::Completed(graphicsFence).GetSubmissionState() ==
+					RHIFrameSubmissionState::Fenced &&
+				RHIFrameEndResult::FatalCompletionUnknown().IsCompletionUnknown() &&
+				!RHIFrameEndResult::FatalCompletionUnknown().HasSubmission(),
+				"Frame results state whether frame work may still execute");
+
+			const auto quiesce = [](TeardownTestContext& rhi) noexcept
+				{
+					return QuiesceRHIForTeardown(
+						rhi, { .m_AttemptCount = 3, .m_AttemptTimeoutMilliseconds = 7 });
+				};
+			TeardownTestContext retried;
+			retried.m_WaitResults = { RHIGpuWaitResult::Timeout, RHIGpuWaitResult::Timeout };
+			context.Check(quiesce(retried) == RHITeardownState::Quiesced &&
+				retried.m_WaitTimeouts == std::vector<uint32_t>({ 7, 7, 7 }) && !retried.m_DeviceLost,
+				"Timed-out teardown waits on a live device release nothing until a later wait completes");
+			TeardownTestContext exhausted;
+			exhausted.m_WaitResults.assign(3, RHIGpuWaitResult::Timeout);
+			TeardownTestContext failed;
+			failed.m_WaitResults.assign(3, RHIGpuWaitResult::Failed);
+			context.Check(quiesce(exhausted) == RHITeardownState::Unverified &&
+				quiesce(failed) == RHITeardownState::Unverified && exhausted.m_WaitTimeouts.size() == 3 &&
+				!exhausted.m_DeviceLost && !failed.m_DeviceLost,
+				"An exhausted bound leaks on a live device; timeouts and failures never imply loss");
+			TeardownTestContext lost;
+			lost.m_WaitResults = { RHIGpuWaitResult::Timeout };
+			lost.m_LoseDeviceAtAttempt = 0;
+			TeardownTestContext alreadyLost;
+			alreadyLost.m_DeviceLost = true;
+			context.Check(quiesce(lost) == RHITeardownState::DeviceLost && lost.m_WaitTimeouts.size() == 1 &&
+				quiesce(alreadyLost) == RHITeardownState::DeviceLost && alreadyLost.m_WaitTimeouts.empty(),
+				"Teardown reads the device state after every wait and never waits after confirmed loss");
+		}
+
+		void RunFrameSubmissionContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			device.m_UseControlledFenceCompletion = true;
+			device.m_CompletedFenceValue = 0;
+			RHIConstantUploadPool pool(device);
+			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+			bool batchesReady = true;
+			const auto beginPublishedBatch = [&]()
+				{
+					auto batch = pool.BeginBatch();
+					batchesReady &= batch->Upload(std::as_bytes(std::span(payload))).IsValid() &&
+						batch->PublishWrites();
+					return batch;
+				};
+			RHIGpuWaitResult fenceWaitResult = RHIGpuWaitResult::Completed;
+			RHIGpuWaitResult idleWaitResult = RHIGpuWaitResult::Completed;
+			uint32_t fenceWaits = 0;
+			uint32_t idleWaits = 0;
+			const RHISubmissionVerification verification{
+				.m_WaitForFence = [&](const RHIFencePoint&)
+					{
+						++fenceWaits;
+						return fenceWaitResult;
+					},
+				.m_WaitIdle = [&]()
+					{
+						++idleWaits;
+						if (idleWaitResult == RHIGpuWaitResult::Completed)
+						{
+							pool.ReleaseQuarantinedAfterVerifiedIdle();
+						}
+						return idleWaitResult;
+					},
+			};
+			const RHIFencePoint computeFence{ RHIFenceHandle{ 2, 1 }, 4 };
+			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			const auto resolve = [&](RHIConstantUploadBatch& batch,
+				std::initializer_list<RHISubmittedStream> streams)
+				{
+					return ResolveFrameSubmission(
+						std::span(streams.begin(), streams.size()), batch, verification);
+				};
+			using enum RHISubmitEffect;
+
+			{
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch, { { NoEffect, {}, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::NoOutstandingWork &&
+					!batch->HasAcceptedSubmission() && pool.GetPendingPageCount() == 0 &&
+					pool.GetQuarantinedPageCount() == 0 && idleWaits == 0,
+					"A submit without effect cancels the batch and reports no outstanding work");
+			}
+			{
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, true }, { Accepted, graphicsFence, false } });
+				device.m_CompletedFenceValue = computeFence.m_Value;
+				pool.ReclaimCompleted();
+				const bool heldPastCompute = pool.GetPendingPageCount() == 1;
+				device.m_CompletedFenceValue = graphicsFence.m_Value;
+				pool.ReclaimCompleted();
+				context.Check(resolution.m_State == RHIFrameSubmissionState::Fenced &&
+					resolution.m_Fence == graphicsFence && fenceWaits == 0 && heldPastCompute &&
+					pool.GetPendingPageCount() == 0,
+					"A confirmed join retires the batch on the graphics fence, not the compute fence");
+			}
+			{
+				device.m_CompletedFenceValue = 0;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, false }, { NoEffect, {}, false } });
+				device.m_CompletedFenceValue = computeFence.m_Value - 1;
+				pool.ReclaimCompleted();
+				const bool heldBeforeCompute = pool.GetPendingPageCount() == 1;
+				device.m_CompletedFenceValue = computeFence.m_Value;
+				pool.ReclaimCompleted();
+				context.Check(resolution.m_State == RHIFrameSubmissionState::Fenced &&
+					resolution.m_Fence == computeFence && batch->HasAcceptedSubmission() &&
+					heldBeforeCompute && pool.GetPendingPageCount() == 0,
+					"Compute accepted before a graphics list without effect retires on the compute fence");
+			}
+			{
+				device.m_CompletedFenceValue = 0;
+				idleWaitResult = RHIGpuWaitResult::Timeout;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, true }, { Accepted, {}, false } });
+				device.m_CompletedFenceValue = 100;
+				pool.ReclaimCompleted();
+				const size_t pagesBefore = pool.GetPageCount();
+				auto next = pool.BeginBatch();
+				const bool nextUploaded = next->Upload(std::as_bytes(std::span(payload))).IsValid();
+				const bool quarantineSkipped = pool.GetPageCount() == pagesBefore + 1;
+				next->Cancel();
+				context.Check(resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+					!resolution.m_DeviceLost && pool.GetQuarantinedPageCount() == 1 && nextUploaded &&
+					quarantineSkipped,
+					"A graphics stream without a fence quarantines pages past the compute fence");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+				context.Check(pool.GetQuarantinedPageCount() == 0,
+					"Only verified idle releases quarantined pages");
+			}
+			{
+				idleWaitResult = RHIGpuWaitResult::Completed;
+				const uint32_t idleWaitsBefore = idleWaits;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, true }, { Accepted, {}, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::NoOutstandingWork &&
+					idleWaits == idleWaitsBefore + 1 && pool.GetQuarantinedPageCount() == 0,
+					"A verified idle wait resolves an unfenced stream to no outstanding work");
+			}
+			{
+				fenceWaitResult = RHIGpuWaitResult::Timeout;
+				idleWaitResult = RHIGpuWaitResult::Timeout;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch,
+					{ { Accepted, computeFence, false }, { Accepted, graphicsFence, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+					!resolution.m_DeviceLost && fenceWaits == 1 && pool.GetQuarantinedPageCount() == 1,
+					"A failed queue wait is no join, and a timed-out verification leaves the device live");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+				fenceWaitResult = RHIGpuWaitResult::Completed;
+				device.m_CompletedFenceValue = 0;
+				auto verified = beginPublishedBatch();
+				const auto joined = resolve(*verified,
+					{ { Accepted, computeFence, false }, { Accepted, graphicsFence, false } });
+				context.Check(joined.m_State == RHIFrameSubmissionState::Fenced &&
+					joined.m_Fence == graphicsFence && fenceWaits == 2,
+					"A completed CPU wait covers an unjoined earlier stream");
+				device.m_CompletedFenceValue = graphicsFence.m_Value;
+				pool.ReclaimCompleted();
+			}
+			{
+				idleWaitResult = RHIGpuWaitResult::DeviceLost;
+				auto batch = beginPublishedBatch();
+				const auto resolution = resolve(*batch, { { Accepted, {}, false } });
+				context.Check(resolution.m_State == RHIFrameSubmissionState::CompletionUnknown &&
+					resolution.m_DeviceLost && batch->HasAcceptedSubmission() &&
+					pool.GetQuarantinedPageCount() == 1,
+					"An accepted submit lost with the device stays quarantined for device-loss teardown");
+			}
+			context.Check(batchesReady, "Every fault-injection batch uploaded and published its payload");
+
+			RecordingDevice atmosphereDevice;
+			atmosphereDevice.m_AtmosphereBuffersEnabled = true;
+			atmosphereDevice.m_TextureViewsSupported = true;
+			atmosphereDevice.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool texturePool(&atmosphereDevice);
+			AtmosphereSystem atmosphere(&atmosphereDevice, &texturePool);
+			const bool begun = atmosphere.Begin(AtmosphereGPU{}, { 1, 1, 1 });
+			for (uint32_t index = 0; begun && index < 3; ++index)
+			{
+				atmosphere.NotifyExecuted(index);
+			}
+			atmosphere.RetainAfterUnknownCompletion();
+			atmosphereDevice.m_CompletedFenceValue = 100;
+			atmosphere.Tick();
+			texturePool.Tick();
+			context.Check(begun && texturePool.GetDiagnostics().m_ActiveTextureCount == 3 &&
+				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0 &&
+				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 0 &&
+				!atmosphere.GetDiagnostics().m_Available && !atmosphere.IsInitialized(0),
+				"An unknown completion releases no atmosphere LUT or constants and certifies nothing");
+			atmosphere.Shutdown();
+			texturePool.Tick();
+			context.Check(texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 1,
+				"Teardown releases the retained atmosphere set through its owners");
 		}
 
 		void RunRHIFrameAndGraphicsScopeContractTests(SelfTestContext& context) noexcept
@@ -3228,11 +3515,13 @@ namespace gglab
 				GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
 				RHIFrameBeginResult BeginFrame() noexcept override { return RHIFrameBeginResult::Unavailable(); }
 				RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
-				RHIFencePoint AbortFrame(RHIFrameContext&) noexcept override { return {}; }
-				void WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override {}
+				RHIFrameEndResult AbortFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+				bool WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override { return true; }
 				void Resize(uint32_t, uint32_t) noexcept override {}
-				void WaitIdle() noexcept override {}
+				RHIGpuWaitResult WaitIdleFor(uint32_t) noexcept override { return RHIGpuWaitResult::Completed; }
 				void RetireCompletedWork() noexcept override {}
+				bool IsPoisoned() const noexcept override { return false; }
+				bool IsDeviceLost() const noexcept override { return false; }
 				uint32_t GetFrameSlotCount() const noexcept override { return 2; }
 			private:
 				RHIPipelineSystem& m_Pipelines;
@@ -10235,6 +10524,8 @@ namespace gglab
 		RunRenderHostContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunPassParameterContractTests(context);
+		RunCheckedCompletionContractTests(context);
+		RunFrameSubmissionContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);

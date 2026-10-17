@@ -117,6 +117,22 @@ namespace gglab
 		m_Committed = m_Diagnostics.m_Parameters;
 		m_ShaderGenerations = m_PendingShaderGenerations;
 	}
+	void AtmosphereSystem::RetainAfterUnknownCompletion() noexcept
+	{
+		if (!m_InFrame)
+		{
+			return;
+		}
+		if (m_Constants.IsValid())
+		{
+			m_RetainedBuffers.push_back(m_Constants);
+			m_Constants = {};
+		}
+		m_InFrame = false;
+		m_Initialized = {};
+		m_Diagnostics.m_Available = false;
+		m_Diagnostics.m_DirtyMask = 7;
+	}
 	void AtmosphereSystem::Disable() noexcept
 	{
 		GGLAB_ASSERT(!m_InFrame);
@@ -152,6 +168,11 @@ namespace gglab
 		Disable();
 		Tick();
 		GGLAB_ASSERT(m_PendingBuffers.empty());
+		for (const RHIBufferHandle buffer : m_RetainedBuffers)
+		{
+			m_Device->DestroyBuffer(buffer);
+		}
+		m_RetainedBuffers.clear();
 		m_Shutdown = true;
 	}
 	bool AtmosphereSystem::CanPublish() const noexcept

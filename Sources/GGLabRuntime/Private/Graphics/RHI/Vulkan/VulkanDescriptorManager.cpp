@@ -669,6 +669,23 @@ namespace gglab
 		return true;
 	}
 
+	bool VulkanDescriptorManager::RetainFrameSnapshot(uint32_t frameSlotIndex,
+		const RHIFencePoint& reservedFence) noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::RetainFrameSnapshot"))
+		{
+			return false;
+		}
+		const VulkanTimelineFence* timeline = m_Device->GetGraphicsTimeline();
+		if (timeline == nullptr || reservedFence.m_Fence != timeline->GetRHIHandle() ||
+			!m_PublicationTracker.SubmitFrameSnapshot(frameSlotIndex, reservedFence))
+		{
+			return false;
+		}
+		ProcessPendingRetirements();
+		return true;
+	}
+
 	bool VulkanDescriptorManager::AbortFrameSnapshot(uint32_t frameSlotIndex) noexcept
 	{
 		if (!CheckOwnerThread("VulkanDescriptorManager::AbortFrameSnapshot") ||

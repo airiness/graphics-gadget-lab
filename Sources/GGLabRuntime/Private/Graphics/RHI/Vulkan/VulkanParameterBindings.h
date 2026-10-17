@@ -63,6 +63,10 @@ namespace gglab
 		[[nodiscard]] bool BeginFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool EndFrame(
 			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
+		// Closes a frame whose accepted submission has no committed signal. The arena stays
+		// retained on the reserved graphics timeline point until teardown.
+		[[nodiscard]] bool RetainFrame(
+			uint32_t frameSlotIndex, const RHIFencePoint& reservedFence) noexcept;
 		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool IsFrameActive(uint32_t frameSlotIndex) const noexcept;
 		[[nodiscard]] VkDescriptorSet AllocateDescriptorSet(uint32_t frameSlotIndex,

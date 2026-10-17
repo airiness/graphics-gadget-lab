@@ -96,6 +96,15 @@ namespace gglab::asset_test
 		return fencePoint.IsValid() && m_AllFencesCompleted;
 	}
 
+	RHIFenceQueryResult TestRHIDevice::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		return m_AllFencesCompleted ? RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending;
+	}
+
 	TemporaryDirectory::TemporaryDirectory(std::string_view name) noexcept
 	{
 		static std::atomic<uint32_t> sequence = 0;

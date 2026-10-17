@@ -82,7 +82,13 @@ namespace gglab
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
+		// Routine release query: true when the GPU no longer uses work up to the point.
+		// An invalid point records no use. It must not accept GPU-written contents or
+		// verify quiescence; use QueryFencePoint for those decisions.
 		virtual bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept = 0;
+		// Checked completion query. An invalid or unknown point is never Completed.
+		[[nodiscard]] virtual RHIFenceQueryResult QueryFencePoint(
+			const RHIFencePoint& fencePoint) const noexcept = 0;
 		virtual void RecordTextureUse(
 			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept = 0;
 		virtual void RecordBufferUse(

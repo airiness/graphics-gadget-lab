@@ -2,9 +2,11 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIConstantUpload.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -64,13 +66,14 @@ namespace gglab
 
 		RHIFrameBeginResult BeginFrame() noexcept override;
 		RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept override;
-		RHIFencePoint AbortFrame(RHIFrameContext& frame) noexcept override;
-		void WaitForFence(
+		RHIFrameEndResult AbortFrame(RHIFrameContext& frame) noexcept override;
+		bool WaitForFence(
 			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
 
 		void Resize(uint32_t width, uint32_t height) noexcept override;
-		void WaitIdle() noexcept override;
+		RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept override;
 		void RetireCompletedWork() noexcept override;
+		bool IsPoisoned() const noexcept override { return m_Poisoned; }
 		uint32_t GetFrameSlotCount() const noexcept override;
 
 		// Backend-specific integration surface. These borrowed views keep
@@ -87,7 +90,7 @@ namespace gglab
 		{
 			return m_ValidationRequested;
 		}
-		[[nodiscard]] bool IsDeviceLost() const noexcept;
+		[[nodiscard]] bool IsDeviceLost() const noexcept override;
 		[[nodiscard]] uint64_t GetSubmittedTimelineValue() const noexcept;
 		[[nodiscard]] bool TryGetCompletedTimelineValue(uint64_t& outValue) const noexcept;
 
@@ -102,6 +105,12 @@ namespace gglab
 			const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept;
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height) noexcept;
 		void FinishFrame(VulkanFrameContext& frame) noexcept;
+		[[nodiscard]] RHISubmissionVerification MakeSubmissionVerification() noexcept;
+		// Bounded wait on the committed graphics and transfer timeline values.
+		[[nodiscard]] RHIGpuWaitResult WaitCommittedTimelines(
+			uint32_t timeoutMilliseconds) const noexcept;
+		// Records natively confirmed device loss in the runtime health state.
+		void ObserveWaitResult(RHIGpuWaitResult result, std::string_view operation) noexcept;
 		void Finalize() noexcept;
 
 		// Bootstrap owns instance/surface/device/frame-runtime and therefore
@@ -125,5 +134,6 @@ namespace gglab
 		bool m_RecreatePending = false;
 		bool m_CompletedProductionFrame = false;
 		bool m_Initialized = false;
+		bool m_Poisoned = false;
 	};
 }

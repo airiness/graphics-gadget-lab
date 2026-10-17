@@ -186,6 +186,21 @@ namespace gglab
 		return true;
 	}
 
+	bool VulkanSet0DynamicUniformFrames::RetainFrame(
+		uint32_t frameSlotIndex, const RHIFencePoint& reservedFence) noexcept
+	{
+		const auto* timeline = m_Device ? m_Device->GetGraphicsTimeline() : nullptr;
+		if (!timeline || frameSlotIndex >= m_FrameSlots.size() || !m_FrameSlots[frameSlotIndex].m_Active ||
+			!reservedFence.IsValid() || reservedFence.m_Fence != timeline->GetRHIHandle())
+		{
+			return false;
+		}
+		auto& slot = m_FrameSlots[frameSlotIndex];
+		slot.m_LastSubmittedFence = reservedFence;
+		slot.m_Active = false;
+		return true;
+	}
+
 	bool VulkanSet0DynamicUniformFrames::AbortFrame(uint32_t frameSlotIndex) noexcept
 	{
 		if (!m_Device || frameSlotIndex >= m_FrameSlots.size() || !m_FrameSlots[frameSlotIndex].m_Active)

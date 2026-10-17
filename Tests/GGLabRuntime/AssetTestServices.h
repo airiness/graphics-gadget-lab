@@ -77,6 +77,7 @@ namespace gglab::asset_test
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override { return m_LiveBuffers.contains(buffer); }
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override { return sampler.IsValid(); }
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
+		RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 		void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 		RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept override

@@ -282,6 +282,16 @@ namespace gglab
 				}
 				return false;
 			}
+			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
+			{
+				if (!fencePoint.IsValid())
+				{
+					return RHIFenceQueryResult::Failed;
+				}
+				return IsFencePointCompleted(fencePoint) ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
+			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept override
