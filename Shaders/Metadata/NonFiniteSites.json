@@ -538,7 +538,7 @@
       "function": "ReconstructTemporalCurrentColor",
       "operation": "IsTemporalColorFinite",
       "count": 1,
-      "bodySha256": "69fb9c6c5014ed0c617ca93c861acb30403d5c73822c8e6dc3eb3ebeaa2864a0",
+      "bodySha256": "401c1974a733c87bb209625ce34624a8feb323d60b3ce7cfbddc5d90dc17c4a3",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -628,7 +628,7 @@
       "function": "GetTemporalNeighborhoodRange",
       "operation": "IsTemporalColorFinite",
       "count": 1,
-      "bodySha256": "32671532c1cc6e2c707a371d46108d67f077aedaae60da23810f4da6ba8baa3d",
+      "bodySha256": "ace656f50b600faedbc1e76576b7834eb815095cedef10a137702c32a9d1512c",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -829,7 +829,7 @@
       "function": "AccumulateGTAOHistory",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "a21353904d8e4ae20de6947d0010b4ef98cb1e9ab674836f5320004f8011ab6b",
+      "bodySha256": "a9763c97eea3349ecafb511a05ec173666595fc5738ae9b0a7ce24407b35863a",
       "programs": [
         "gglab.shader.gtao"
       ],
@@ -847,7 +847,7 @@
       "function": "DenoiseGTAO",
       "operation": "isfinite",
       "count": 2,
-      "bodySha256": "fbfe2aae9702175806aa4729a872f83151c863c59eb302d97c949d2f53686865",
+      "bodySha256": "c82d3577cf69181d3e5aee892cd0625d1135e5b22342712b813ddcd014e95ee9",
       "programs": [
         "gglab.shader.gtao"
       ],
@@ -865,7 +865,7 @@
       "function": "UpsampleGTAO",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "f94acbe35b7905149bb94122c85201ce049d467bd38ab5e9152878c95ae43050",
+      "bodySha256": "f2efd35211cb0d97659a306de0e71614bf0042b5b5d9b1520d67aaa801fb0bf4",
       "programs": [
         "gglab.shader.gtao"
       ],
@@ -883,7 +883,7 @@
       "function": "CSBuild",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "288bed6275aff20ed796772854a475802bbacbd1266cc852ce749d58f65ea6a3",
+      "bodySha256": "42ca9945521a7354319cab74fbd36b59a70197733408e342714e24496daa2e60",
       "programs": [
         "gglab.shader.aerial-perspective"
       ],
@@ -901,7 +901,7 @@
       "function": "CSComposite",
       "operation": "EncodeSceneColor",
       "count": 2,
-      "bodySha256": "e7f1c43872ac57f6542e185a0e85d2b787ce561dc5c68b0f7447f047a335c4c1",
+      "bodySha256": "8abf08df111f7b038af077155c21ff26e999f1fef5c0e081d2ab1433cb4d2d58",
       "programs": [
         "gglab.shader.aerial-perspective"
       ],
@@ -973,7 +973,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "24b23ee04ca75780eb6b7645deeb96827c24650de2a05e9a614d17354680289a",
+      "bodySha256": "dac0abf4ace3c3358d99f1440770d9204e8793c60171aedfac93bd68c2bb63f5",
       "programs": [
         "gglab.shader.final-color"
       ],
@@ -1027,7 +1027,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "c1a60ef43c2acb65083a960ac27d54b374d1dec5a761283c9f733c4829717e72",
+      "bodySha256": "09d7c13c3a7632a0d093c7ebd580723c45524100f6a8f5b2b248bffdcc0c0771",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
@@ -1063,7 +1063,7 @@
       "function": "CSMain",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "174394a71af805843b6a8b35359ade572479877d4cae2a820267dd316c873ad5",
+      "bodySha256": "ff73952e13ed703f3b93dd98c56eb70353fbf2068d6cbb4aaa7d847e6d4dd422",
       "programs": [
         "gglab.shader.forward-plus-cull"
       ],
@@ -1099,7 +1099,7 @@
       "function": "PSMain",
       "operation": "ACESFitted",
       "count": 1,
-      "bodySha256": "2dcc7037fe8f5645bc3d1f1ff6ff1d73f1e92282c11d505c649a2dcf83f83ef6",
+      "bodySha256": "fecc4cdc97cc1b156542835b4e8548fef9386a670eb905aaac05e90a0b182fb8",
       "programs": [
         "gglab.shader.ibl-cubemap-preview"
       ],
@@ -1189,7 +1189,7 @@
       "function": "PSMain",
       "operation": "SanitizeSceneRadiance",
       "count": 1,
-      "bodySha256": "adbd39c8ccbc0667933cdb1fb2693f2d972286f86e3d0ad4b7c182dabe99b93d",
+      "bodySha256": "97f185c534040060acdf5a4e9ebf8ef68a36cee53d972e0ca802d06910a83466",
       "programs": [
         "gglab.shader.ibl-importance"
       ],
@@ -1207,7 +1207,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "adbd39c8ccbc0667933cdb1fb2693f2d972286f86e3d0ad4b7c182dabe99b93d",
+      "bodySha256": "97f185c534040060acdf5a4e9ebf8ef68a36cee53d972e0ca802d06910a83466",
       "programs": [
         "gglab.shader.ibl-importance"
       ],
@@ -1225,7 +1225,7 @@
       "function": "IntegrateIrradiance",
       "operation": "SanitizeSceneRadiance",
       "count": 2,
-      "bodySha256": "aef4ae0d8c6bbb7ec94caf8f3750c2bf44cca944312c02ef5b0ff10484bcd36c",
+      "bodySha256": "cb4f09b109e6c0a20b9eac539648459ad81a04ec5fdb7dc0ee9f4c87614817a3",
       "programs": [
         "gglab.shader.ibl-irradiance"
       ],
@@ -1243,7 +1243,7 @@
       "function": "IntegrateIrradiance",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "aef4ae0d8c6bbb7ec94caf8f3750c2bf44cca944312c02ef5b0ff10484bcd36c",
+      "bodySha256": "cb4f09b109e6c0a20b9eac539648459ad81a04ec5fdb7dc0ee9f4c87614817a3",
       "programs": [
         "gglab.shader.ibl-irradiance"
       ],
@@ -1297,7 +1297,7 @@
       "function": "IntegratePrefilteredSpecular",
       "operation": "SanitizeSceneRadiance",
       "count": 2,
-      "bodySha256": "cdb0b8b61cd0f7ce85d411ec1d3b49738978ba955eddb51700407b809d50ab2f",
+      "bodySha256": "6263faf6d89abb48f64246bc765c303ee57e905da7ea08a647443d4fb7892404",
       "programs": [
         "gglab.shader.ibl-prefiltered-specular"
       ],
@@ -1315,7 +1315,7 @@
       "function": "IntegratePrefilteredSpecular",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "cdb0b8b61cd0f7ce85d411ec1d3b49738978ba955eddb51700407b809d50ab2f",
+      "bodySha256": "6263faf6d89abb48f64246bc765c303ee57e905da7ea08a647443d4fb7892404",
       "programs": [
         "gglab.shader.ibl-prefiltered-specular"
       ],
@@ -1423,7 +1423,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRChannel",
       "count": 1,
-      "bodySha256": "11d697517d828d408bcdd68d2817bcf410522a6d827999f1a9eaae107f2178bb",
+      "bodySha256": "c5bf3329b8d1d7bf6fb596f84ac5e6cf507ad3b96cb3a145fea9c890a05f6057",
       "programs": [
         "gglab.shader.render-graph-compute"
       ],
@@ -1459,7 +1459,7 @@
       "function": "CSMain",
       "operation": "IsTemporalColorFinite",
       "count": 4,
-      "bodySha256": "e6664adf0e433cceb653ff320efbfca8c90d401e114079523327f57072bc25fa",
+      "bodySha256": "569f6092d35418866abf74682920292539c28360c27769bd45961f8682d126a4",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1477,7 +1477,7 @@
       "function": "CSMain",
       "operation": "isfinite",
       "count": 6,
-      "bodySha256": "7cdbe0d04a358dfd1cb2d9458bb553ec8209b96de3c8c52040fb91a9f21352b2",
+      "bodySha256": "8af74c96646410d5a8bde5c037bfa276f373839d17c833fd42d1fbcc48832a3b",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1495,7 +1495,7 @@
       "function": "CSMain",
       "operation": "IsTemporalHistoryAccumulationValid",
       "count": 1,
-      "bodySha256": "4c301afdc082430f234af3e592051e075b5802a9ab8f2f92340c805cca545264",
+      "bodySha256": "9b002980bf28f78b5ebbc263b230741bb27fd593f6e148cd1a1f27e79024127f",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1513,7 +1513,7 @@
       "function": "CSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "4c301afdc082430f234af3e592051e075b5802a9ab8f2f92340c805cca545264",
+      "bodySha256": "9b002980bf28f78b5ebbc263b230741bb27fd593f6e148cd1a1f27e79024127f",
       "programs": [
         "gglab.shader.temporal-aa"
       ],
@@ -1531,7 +1531,7 @@
       "function": "CSMain",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "b0f789ee2d998e28b1a4c5e7dc1e8c04d35f35f89eaa73b9ecdcf4d8dcf67d86",
+      "bodySha256": "5130cf585d9e9c3e831fba72ce31cd1e7b701c26ceb1e66e9948f44971d98c65",
       "programs": [
         "gglab.shader.temporal-reference"
       ],

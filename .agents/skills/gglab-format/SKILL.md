@@ -81,6 +81,16 @@ errors, not all layout rules. For a large formatting-only pass, compare lexical
 tokens and literal contents before and after, accounting explicitly for any
 deliberate syntax repairs.
 
+If HLSL syntax repairs affect a registered non-finite site, review the source
+change before updating its `bodySha256` in `Shaders/Metadata/NonFiniteSites.json`.
+These identities ignore whitespace, not tokens such as cast parentheses or
+control braces. Regenerate the shared identifiers with
+`python Scripts/GenerateNonFiniteSites.py`, then run
+`python Scripts/GenerateNonFiniteSites.py --check`,
+`python Scripts/ValidateNonFiniteSites.py --self-test` and
+`python Scripts/ValidateNonFiniteSites.py` from the repository root. Do not
+weaken identity validation or refresh unreviewed hashes to make a check pass.
+
 Once the layout is final, run the owning builds and affected tests required by
 the root `AGENTS.md`. Include the formatting scope, relevant verification and
 any formatter limitation in the handoff. This skill is an agent workflow; it

@@ -289,6 +289,17 @@ class SourceCheckTests(unittest.TestCase):
     def test_whitespace_and_comments_do_not_change_identity(self):
         self.assertEqual(discover_sites("float f(float x){return isfinite(x)?x:0;}"), discover_sites("float f(float x) { /* review */ return isfinite ( x ) ? x : 0; }"))
 
+    def test_cast_syntax_change_requires_review(self):
+        document, before = self.fixture(
+            "float f(uint x) { return isfinite(float(x)) ? 1.0 : 0.0; }")
+        _, after = self.fixture(
+            "float f(uint x) { return isfinite((float)(x)) ? 1.0 : 0.0; }")
+        key = next(iter(before))
+        self.assertEqual(before[key][0], after[key][0])
+        self.assertNotEqual(before[key][1], after[key][1])
+        with self.assertRaisesRegex(ValueError, "Stale or changed site requires source/policy review"):
+            validate(document, after, instrumented=set(after))
+
     def test_unregistered_fails(self):
         document, actual = self.fixture()
         document["sites"] = []
