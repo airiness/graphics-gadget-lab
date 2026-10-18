@@ -178,8 +178,8 @@ namespace gglab
 		auto& transferManager = info.m_TransferManager;
 		auto& assetManager = info.m_AssetManager;
 
-		// Reclaim staging uploads. GPU-local structured-buffer allocations are
-		// reclaimed by Renderer from the graphics fence timeline.
+		// Staging copies retire on the transfer timeline; frame snapshots belong
+		// to the RHI upload batch.
 		transferManager.Reclaim();
 
 		// Assembly RenderInstaces
@@ -412,13 +412,7 @@ namespace gglab
 		info.m_MaterialTable.EndUpdate();
 		info.m_LightTable.EndUpdate();
 
-		// Update View Structured Buffer
 		RHIFencePoint uploadFencePoint{};
-		DynamicStructuredBufferAllocator<ViewGPU>::Allocation viewsBufferResult{};
-		if (!viewData.empty())
-		{
-			viewsBufferResult = info.m_ViewsSB.Upload(std::span<const ViewGPU>(viewData));
-		}
 
 		const auto objectDirtyRanges =
 			info.m_ObjectTable.BuildDirtyRanges(info.m_FrameSlotIndex);
@@ -488,12 +482,7 @@ namespace gglab
 		}
 
 		result.m_UploadFencePoint = uploadFencePoint;
-		result.m_GpuAllocations.m_Views = viewsBufferResult;
-
-		const bool viewsUploadSucceeded = viewData.empty() || viewsBufferResult.IsValid();
-
-		if (objectsUploadSucceeded && materialsUploadSucceeded && lightsUploadSucceeded &&
-			viewsUploadSucceeded)
+		if (objectsUploadSucceeded && materialsUploadSucceeded && lightsUploadSucceeded)
 		{
 			result.m_Status = RenderSceneBuildStatus::Ready;
 
@@ -501,8 +490,9 @@ namespace gglab
 			result.m_RenderScene.m_ObjectCount = info.m_ObjectTable.GetLiveCount();
 			result.m_RenderScene.m_MaterialBaseIndex = 0;
 			result.m_RenderScene.m_MaterialCount = info.m_MaterialTable.GetLiveCount();
-			result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
-			result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
+			// View indices are relative to the frame's bound structured slice.
+			result.m_RenderScene.m_ViewBaseIndex = 0;
+			result.m_RenderScene.m_ViewCount = static_cast<uint32_t>(viewData.size());
 			result.m_RenderScene.m_LightBaseIndex = 0;
 			result.m_RenderScene.m_LightCount = info.m_LightTable.GetCapacity();
 			for (uint32_t& globalLightIndex : result.m_RenderScene.m_GlobalLightIndices)
@@ -520,9 +510,8 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"RenderSceneBuilder: GPU scene upload failed "
-				"(objects={}, materials={}, lights={}, views={}). Rendering is disabled for this frame.",
-				objectsUploadSucceeded, materialsUploadSucceeded, lightsUploadSucceeded,
-				viewsUploadSucceeded);
+				"(objects={}, materials={}, lights={}). Rendering is disabled for this frame.",
+				objectsUploadSucceeded, materialsUploadSucceeded, lightsUploadSucceeded);
 		}
 
 		SceneGPU sceneCB{};
@@ -566,6 +555,16 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: Shadow constant allocation failed.");
 			result.m_Status = RenderSceneBuildStatus::GpuUploadFailed;
+		}
+
+		if (!viewData.empty())
+		{
+			result.m_Constants.m_Views = info.m_Uploads.UploadStructured(std::span<const ViewGPU>(viewData));
+			if (!result.m_Constants.m_Views.IsValid())
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: View upload allocation failed.");
+				result.m_Status = RenderSceneBuildStatus::GpuUploadFailed;
+			}
 		}
 
 		return result;

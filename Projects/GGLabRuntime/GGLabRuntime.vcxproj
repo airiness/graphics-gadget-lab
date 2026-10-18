@@ -127,7 +127,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImporter.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
@@ -352,9 +351,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\Buffer.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicConstantBufferAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicStructuredBufferAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\PersistentStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\PersistentStructuredBufferTable.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.h" />
@@ -496,7 +492,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderServices.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderTextureAssetAccess.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\RenderTextureIndex.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameGpuResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDrawService.h" />

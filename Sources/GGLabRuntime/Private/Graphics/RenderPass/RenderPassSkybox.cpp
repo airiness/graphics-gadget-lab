@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
@@ -233,10 +232,12 @@ namespace gglab
 						contextPtr->m_FrameConstants.m_Scene);
 				}
 
-				const auto* viewBuffer = services.m_FrameBuffers->GetViewStructuredBuffer();
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewBuffer->GetBufferHandle());
+					contextPtr->m_FrameConstants.m_Views))
+				{
+					return;
+				}
 
 				if (data.m_PhysicalPreview)
 				{

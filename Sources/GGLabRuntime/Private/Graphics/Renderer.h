@@ -1,9 +1,9 @@
 #pragma once
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
@@ -15,7 +15,10 @@
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 
 #include <array>
+#include <atomic>
 #include <filesystem>
+#include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -49,8 +52,6 @@ namespace gglab
 	class TemporalHistoryManager;
 	class TemporalReferenceAccumulator;
 	class GTAOTemporalHistory;
-	struct RenderFrameGpuResources;
-	struct RenderSceneGpuAllocations;
 
 	class Renderer : public RenderHost,
 		public RenderFrameBufferAccess,
@@ -272,15 +273,6 @@ namespace gglab
 		{
 			return m_LightTable.get();
 		}
-		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer()
-			const noexcept override
-		{
-			return m_ViewSB.get();
-		}
-		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept override
-		{
-			return m_ViewSB.get();
-		}
 
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept override;
 
@@ -304,6 +296,8 @@ namespace gglab
 		struct ActiveFrameState
 		{
 			RHIFrameContext* m_RHIFrame = nullptr;
+			// Persistent scene tables still arrive through the transfer queue.
+			RHIFencePoint m_UploadFencePoint{};
 			RenderGraph* m_RenderGraph = nullptr;
 			uint64_t m_Serial = 0;
 			uint32_t m_FrameSlotIndex = std::numeric_limits<uint32_t>::max();
@@ -321,8 +315,6 @@ namespace gglab
 		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
 		void AbandonGpuOwners() noexcept;
 		void EndFrameLifetime() noexcept;
-		void RetireSceneGpuAllocations(
-			RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept;
 
 	private:
 		std::unique_ptr<RHIContext> m_RHIContext;
@@ -332,7 +324,6 @@ namespace gglab
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;
 		std::unique_ptr<GTAOTemporalHistory> m_GTAOTemporalHistory;
-		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
 		// Outlives Finalize so the application can drain the final capture results.
 		std::unique_ptr<FrameCaptureService> m_FrameCapture;
@@ -357,7 +348,6 @@ namespace gglab
 		std::unique_ptr<PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>>
 			m_MaterialTable;
 		std::unique_ptr<PersistentStructuredBufferTable<uint64_t, LightGPU>> m_LightTable;
-		std::unique_ptr<DynamicStructuredBufferAllocator<ViewGPU>> m_ViewSB;
 
 		std::atomic_bool m_IsInitialized = false;
 		std::atomic_bool m_IsSuspended = false;

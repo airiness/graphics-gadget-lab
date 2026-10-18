@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -189,10 +188,12 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					contextPtr->m_FrameConstants.m_Scene);
 
-				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBufferHandle());
+					contextPtr->m_FrameConstants.m_Views))
+				{
+					return;
+				}
 
 				const FinalColorPassParameters passParameters{
 					.SceneColorTextureIndex = sceneColorSrv.m_Index,

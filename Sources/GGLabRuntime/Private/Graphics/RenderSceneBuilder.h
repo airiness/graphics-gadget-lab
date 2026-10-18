@@ -8,11 +8,11 @@
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <vector>
@@ -26,16 +26,6 @@ namespace gglab
 	class TransferManager;
 	class RenderResourceRegistry;
 	class TemporalFrameTransaction;
-
-	struct RenderSceneGpuAllocations
-	{
-		DynamicStructuredBufferAllocator<ViewGPU>::Allocation m_Views{};
-
-		bool IsEmpty() const noexcept
-		{
-			return !m_Views.IsValid();
-		}
-	};
 
 	class RenderSceneBuilder
 	{
@@ -62,7 +52,6 @@ namespace gglab
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			std::optional<uint64_t> m_DirectionalShadowLightKey;
 			RenderDirectionalLight m_MainDirectionalLight{};
-			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_FrameSlotIndex = 0;
 			// Unjittered display raster view of post-temporal composition, when the frame
 			// uses one; it is uploaded after the shadow views.
@@ -85,7 +74,6 @@ namespace gglab
 			uint32_t m_PostTemporalViewOffset = UnassignedViewOffset;
 			RenderScene m_RenderScene{};
 			RenderFrameConstantBindings m_Constants{};
-			RenderSceneGpuAllocations m_GpuAllocations{};
 			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_Status = RenderSceneBuildStatus::GpuUploadFailed;
 		};

@@ -52,7 +52,6 @@ namespace gglab
 			RenderScene m_RenderScene{};
 			RenderFrameConstantBindings m_FrameConstants{};
 			RHIFrameUploads m_Uploads{};
-			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
 			DirectionalShadowFramePlan m_DirectionalShadowFramePlan{};
 			DebugDrawFrameView m_DebugDrawFrame{};

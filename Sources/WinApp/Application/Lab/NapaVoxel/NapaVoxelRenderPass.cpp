@@ -1,7 +1,6 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderPass.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -167,9 +166,12 @@ namespace gglab
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					frameContextPtr->m_FrameConstants.m_Scene);
-				graphicsContext->SetReadOnlyBuffer(
+				if (!graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					servicesPtr->m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					frameContextPtr->m_FrameConstants.m_Views))
+				{
+					return;
+				}
 
 				for (const NapaVoxelPassChunk& chunk : data.m_Chunks)
 				{

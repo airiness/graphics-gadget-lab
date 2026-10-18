@@ -34,8 +34,6 @@ namespace gglab
 	class RenderAtmosphereAccess;
 	class RHISwapChain;
 	template <typename T>
-	class DynamicStructuredBufferAllocator;
-	template <typename T>
 	class PersistentStructuredBuffer;
 	struct ComputePipelineRecipe;
 	struct ComputePipelineSlot;
@@ -181,10 +179,6 @@ namespace gglab
 		[[nodiscard]] virtual const PersistentStructuredBuffer<LightGPU>*
 			GetLightStructuredBuffer() const noexcept = 0;
 		virtual PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() noexcept = 0;
-
-		[[nodiscard]] virtual const DynamicStructuredBufferAllocator<ViewGPU>*
-			GetViewStructuredBuffer() const noexcept = 0;
-		virtual DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept = 0;
 	};
 
 	class RenderEnvironmentAccess

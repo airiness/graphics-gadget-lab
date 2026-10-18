@@ -28,6 +28,7 @@ namespace gglab
 	{
 		RHIConstantBufferBinding m_Scene{};
 		RHIConstantBufferBinding m_DirectionalShadow{};
+		RHIReadOnlyBufferBinding m_Views{};
 	};
 
 	struct RenderFrameContext

@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -179,9 +178,12 @@ namespace gglab
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 							contextPtr->m_FrameConstants.m_Scene);
-						commandContext->SetReadOnlyBuffer(
+						if (!commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-							services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+							contextPtr->m_FrameConstants.m_Views))
+						{
+							return;
+						}
 						commandContext->SetPrimitiveTopology(triangles ?
 							RHIPrimitiveTopology::TriangleList :
 							RHIPrimitiveTopology::LineList);

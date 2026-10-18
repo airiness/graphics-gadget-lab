@@ -3,7 +3,6 @@
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -167,6 +166,7 @@ namespace gglab
 			static_cast<uint32_t>(utils::ToIndex(displayViewId));
 		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const Vector3 sunDirection = -context.m_RenderScene.m_WorldSun->m_Direction;
+		const auto viewsBinding = context.m_FrameConstants.m_Views;
 		const auto channel = PostProcessPreviewChannel::Atmosphere;
 		const bool previewRequested = services.m_Resources->IsPostProcessPreviewRequested(channel);
 		const PostProcessDebugTap selectedTap = previewRequested ?
@@ -204,7 +204,7 @@ namespace gglab
 				data.m_ThroughputOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 					resources.m_ThroughputAtlas);
 			},
-			[services, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
+			[services, viewsBinding, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
 			(RGExecuteContext& execute, BuildPassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
@@ -227,8 +227,11 @@ namespace gglab
 						.m_OffsetInBytes = 0,
 						.m_SizeInBytes = sizeof(AtmosphereGPU),
 					});
-				command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+				if (!command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+					viewsBinding))
+				{
+					return;
+				}
 				if (!command->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{
@@ -311,7 +314,7 @@ namespace gglab
 						resources.m_Diagnostic);
 				}
 			},
-			[services, &context, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
+			[services, &context, viewsBinding, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
 			(RGExecuteContext& execute, CompositePassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
@@ -341,8 +344,11 @@ namespace gglab
 						.m_OffsetInBytes = 0,
 						.m_SizeInBytes = sizeof(AtmosphereGPU),
 					});
-				command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+				if (!command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+					viewsBinding))
+				{
+					return;
+				}
 				if (!command->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{

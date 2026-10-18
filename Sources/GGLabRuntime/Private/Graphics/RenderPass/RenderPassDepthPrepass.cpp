@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -278,9 +277,12 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 					services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(
 						context.m_FrameSlotIndex));
-				graphicsContext->SetReadOnlyBuffer(
+				if (!graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				const DepthPrepassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(viewId)),
 				};

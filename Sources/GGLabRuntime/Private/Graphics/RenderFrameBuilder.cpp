@@ -306,7 +306,6 @@ namespace gglab
 					result.m_WorldData.m_MainDirectionalLight.m_EntityKey :
 					std::nullopt,
 			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
-			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
 			.m_PostTemporalView = postTemporalView ? std::addressof(*postTemporalView) : nullptr,
 		};
@@ -318,16 +317,13 @@ namespace gglab
 		}
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);
 		result.m_FrameConstants = sceneBuildResult.m_Constants;
-		result.m_SceneGpuAllocations = sceneBuildResult.m_GpuAllocations;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
 		result.m_RenderSceneStatus = sceneBuildResult.m_Status;
 
 		const auto* objectBuffer = info.m_Renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = info.m_Renderer.GetMaterialStructuredBuffer();
-		const auto* viewBuffer = info.m_Renderer.GetViewStructuredBuffer();
 		GGLAB_ASSERT_NOT_NULL(objectBuffer);
 		GGLAB_ASSERT_NOT_NULL(materialBuffer);
-		GGLAB_ASSERT_NOT_NULL(viewBuffer);
 
 		const auto buildQueue = [&](const RenderView& renderView,
 			RenderQueue& renderQueue,
@@ -349,7 +345,8 @@ namespace gglab
 					[&](uint32_t bindingId, uint32_t width, uint32_t height) noexcept
 					{
 						const DepthCoverageBufferSource viewSource{
-							.m_Buffer = viewBuffer->GetBufferHandle(),
+							.m_Buffer = result.m_FrameConstants.m_Views.m_Buffer,
+							.m_OffsetInBytes = result.m_FrameConstants.m_Views.m_OffsetInBytes,
 							.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + bindingId,
 						};
 						return DepthCoverageRasterDomain{

@@ -47,6 +47,7 @@ namespace gglab
 	struct DepthCoverageBufferSource
 	{
 		RHIBufferHandle m_Buffer{};
+		uint64_t m_OffsetInBytes = 0;
 		uint32_t m_ElementIndex = std::numeric_limits<uint32_t>::max();
 
 		[[nodiscard]] bool IsValid() const noexcept

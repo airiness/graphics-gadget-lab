@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"

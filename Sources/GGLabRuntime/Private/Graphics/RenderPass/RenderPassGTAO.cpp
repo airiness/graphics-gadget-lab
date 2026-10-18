@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -457,9 +456,12 @@ namespace gglab
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					context.m_FrameConstants.m_Scene);
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				if (!commandContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{
@@ -601,9 +603,12 @@ namespace gglab
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					context.m_FrameConstants.m_Scene);
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				if (!commandContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{
@@ -740,9 +745,12 @@ namespace gglab
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					context.m_FrameConstants.m_Scene);
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				if (!commandContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{

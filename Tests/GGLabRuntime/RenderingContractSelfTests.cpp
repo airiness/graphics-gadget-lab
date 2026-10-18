@@ -48,7 +48,6 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderMaterialFrameCache.h"
@@ -2541,7 +2540,7 @@ namespace gglab
 				"Teardown releases the retained atmosphere set through its owners");
 		}
 
-		void RunSceneFrameConstantTests(SelfTestContext& context) noexcept
+		void RunFrameConstantUploadTests(SelfTestContext& context) noexcept
 		{
 			asset_test::AssetManagerHarness assets("scene-frame-constants");
 			context.Check(assets.IsValid(), "Scene constant tests compose headless asset services");
@@ -2567,7 +2566,6 @@ namespace gglab
 			PersistentStructuredBuffer<ObjectGPU> objects({ .m_Device = &device, .m_ElementCapacity = 4 });
 			PersistentStructuredBuffer<MaterialGPU> materials({ .m_Device = &device, .m_ElementCapacity = 4 });
 			PersistentStructuredBuffer<LightGPU> lights({ .m_Device = &device, .m_ElementCapacity = 4 });
-			DynamicStructuredBufferAllocator<ViewGPU> views({ .m_Device = &device, .m_ElementCapacity = 16 });
 			PersistentStructuredBufferTable<uint64_t, ObjectGPU> objectTable(4, 1);
 			PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU> materialTable(4, 1);
 			PersistentStructuredBufferTable<uint64_t, LightGPU> lightTable(4, 1);
@@ -2576,9 +2574,8 @@ namespace gglab
 			public:
 				FrameBuffers(PersistentStructuredBuffer<ObjectGPU>& objects,
 					PersistentStructuredBuffer<MaterialGPU>& materials,
-					PersistentStructuredBuffer<LightGPU>& lights,
-					DynamicStructuredBufferAllocator<ViewGPU>& views) noexcept :
-					m_Objects(objects), m_Materials(materials), m_Lights(lights), m_Views(views)
+					PersistentStructuredBuffer<LightGPU>& lights) noexcept :
+					m_Objects(objects), m_Materials(materials), m_Lights(lights)
 				{
 				}
 				const PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept override { return &m_Objects; }
@@ -2587,33 +2584,35 @@ namespace gglab
 				PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept override { return &m_Materials; }
 				const PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() const noexcept override { return &m_Lights; }
 				PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() noexcept override { return &m_Lights; }
-				const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() const noexcept override { return &m_Views; }
-				DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept override { return &m_Views; }
 
 			private:
 				PersistentStructuredBuffer<ObjectGPU>& m_Objects;
 				PersistentStructuredBuffer<MaterialGPU>& m_Materials;
 				PersistentStructuredBuffer<LightGPU>& m_Lights;
-				DynamicStructuredBufferAllocator<ViewGPU>& m_Views;
-			} buffers(objects, materials, lights, views);
+			} buffers(objects, materials, lights);
 			const RenderServices services{ .m_FrameBuffers = &buffers };
 			std::array<RenderView, 1> cameraViews{};
 			cameraViews[0].m_ViewId = RenderViewID::Main;
 			cameraViews[0].m_IsValid = true;
+			cameraViews[0].m_CameraPosition = { 1.0f, 2.0f, 3.0f };
+			cameraViews[0].m_Near = 0.1f;
+			RenderView displayView = cameraViews[0];
+			displayView.m_CameraPosition = { 7.0f, 8.0f, 9.0f };
 			DirectionalShadowFramePlan shadows;
 			shadows.m_Cascades.resize(2);
 			shadows.m_Cascades[0].m_SplitNear = 0.1f;
+			shadows.m_Cascades[0].m_View.m_CameraPosition = { 4.0f, 5.0f, 6.0f };
 			shadows.m_Cascades[0].m_SplitFar = 12.0f;
 			shadows.m_Cascades[1].m_SplitFar = 40.0f;
 			shadows.m_DistanceFadeStart = 35.0f;
 			shadows.m_DistanceFadeInvRange = 0.2f;
 			RenderSceneBuilder builder;
 			RHIUploadWriter writer;
-			for (uint32_t scenario = 0; scenario < 4; ++scenario)
+			for (uint32_t scenario = 0; scenario < 5; ++scenario)
 			{
-				RHIUploadPool pool(device, { .m_PageSizeInBytes = scenario == 3 ? 256u : 1024u,
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = scenario >= 3 ? 256u : 4096u,
 					.m_MaxUploadSizeInBytes = scenario == 2 ? static_cast<uint32_t>(sizeof(SceneGPU)) - 4u : 64u * 1024u,
-					.m_MaxBytesPerBatch = scenario == 3 ? 256u : 16u * 1024u });
+					.m_MaxBytesPerBatch = scenario >= 3 ? (scenario - 2u) * 256u : 16u * 1024u });
 				auto batch = pool.BeginBatch();
 				batch->Attach(writer);
 				const auto uploads = writer.GetFrameUploads();
@@ -2628,15 +2627,19 @@ namespace gglab
 					.m_RenderViews = cameraViews, .m_DirectionalShadowFramePlan = shadows,
 					.m_Uploads = uploads, .m_ObjectsSB = objects, .m_MaterialsSB = materials,
 					.m_LightsSB = lights, .m_ObjectTable = objectTable, .m_MaterialTable = materialTable,
-					.m_LightTable = lightTable, .m_ViewsSB = views });
+					.m_LightTable = lightTable, .m_PostTemporalView = scenario == 1 ? &displayView : nullptr });
 				if (scenario < 2)
 				{
 					const auto& scene = built.m_Constants.m_Scene;
 					const auto& shadow = built.m_Constants.m_DirectionalShadow;
+					const auto& views = built.m_Constants.m_Views;
+					const uint32_t viewCount = scenario == 1 ? 4u : 3u;
 					context.Check(built.m_Status == RenderSceneBuildStatus::Ready &&
-						writer.Owns(scene) && writer.Owns(shadow) &&
-						scene.m_SizeInBytes == sizeof(SceneGPU) && shadow.m_SizeInBytes == sizeof(DirectionalShadowGPU),
-						"One scene build produces two complete bindings owned by the frame upload batch");
+						writer.Owns(scene) && writer.Owns(shadow) && writer.Owns(views) &&
+						scene.m_SizeInBytes == sizeof(SceneGPU) && shadow.m_SizeInBytes == sizeof(DirectionalShadowGPU) &&
+						views.m_OffsetInBytes != 0 && views.m_StrideInBytes == sizeof(ViewGPU) &&
+						views.m_SizeInBytes == viewCount * sizeof(ViewGPU),
+						"One scene build produces three frame bindings, including a nonzero-offset ViewGPU slice");
 					SceneGPU sceneData{};
 					std::memcpy(&sceneData, device.m_PassConstantStorage[scene.m_Buffer.Index() - 1].data() +
 						scene.m_OffsetInBytes, sizeof(sceneData));
@@ -2644,12 +2647,19 @@ namespace gglab
 					std::memcpy(&shadowData, device.m_PassConstantStorage[shadow.m_Buffer.Index() - 1].data() +
 						shadow.m_OffsetInBytes, sizeof(shadowData));
 					const auto expectedShadow = BuildDirectionalShadowGPU(shadows, built.m_ShadowViewBaseOffset);
-					context.Check(sceneData.ObjectCount == 0 && sceneData.MaterialCount == 0 && sceneData.ViewCount == 3 &&
-						sceneData.ViewBaseIndex == built.m_GpuAllocations.m_Views.m_FirstElementIndex &&
+					context.Check(sceneData.ObjectCount == 0 && sceneData.MaterialCount == 0 && sceneData.ViewCount == viewCount &&
+						sceneData.ViewBaseIndex == 0 && built.m_RenderScene.m_ViewBaseIndex == 0 &&
 						sceneData.LightCount == 4 && sceneData.IBLResource.EnvironmentIntensity == 1.5f &&
 						sceneData.IBLResource.EnvironmentRotationRadians == 0.25f &&
 						std::memcmp(&shadowData, &expectedShadow, sizeof(shadowData)) == 0,
-						"Scene values retain the view ring base, lighting and exact cascade payload");
+						"Scene values preserve lighting and exact cascade data while using slice-relative view indices");
+					std::vector<ViewGPU> viewData(viewCount);
+					std::memcpy(viewData.data(), device.m_PassConstantStorage[views.m_Buffer.Index() - 1].data() +
+						views.m_OffsetInBytes, views.m_SizeInBytes);
+					context.Check(viewData[0].CameraPos.m_X == 1.0f && viewData[0].Near == 0.1f &&
+						viewData[1].CameraPos.m_X == 4.0f && built.m_ShadowViewBaseOffset == 1 &&
+						(scenario != 1 || (viewData[3].CameraPos.m_X == 7.0f && built.m_PostTemporalViewOffset == 3)),
+						"Camera, cascade and post-temporal views retain their ordering and relative addresses within the slice");
 					RenderFrameBuilder::BuildResult privateFrame;
 					privateFrame.m_FrameConstants = built.m_Constants;
 					privateFrame.m_Uploads = uploads;
@@ -2663,8 +2673,16 @@ namespace gglab
 					const auto frameContext = moved.MakeRenderFrameContext();
 					context.Check(frameContext.m_Uploads.IsCurrent() &&
 						writer.Owns(frameContext.m_FrameConstants.m_Scene) &&
-						writer.Owns(frameContext.m_FrameConstants.m_DirectionalShadow),
+						writer.Owns(frameContext.m_FrameConstants.m_DirectionalShadow) &&
+						writer.Owns(frameContext.m_FrameConstants.m_Views),
 						"Private and public frame contexts carry complete bindings and preserve them across a move");
+					{
+						RenderFrameBuildResult rejectedFrame;
+						rejectedFrame.m_FrameConstants = built.m_Constants;
+					}
+					context.Check(writer.Owns(scene) && writer.Owns(shadow) && writer.Owns(views) &&
+						pool.GetStatistics().m_Leased.m_PageCount != 0,
+						"Rejecting a CPU frame cannot retire its RHI-owned upload storage before cancellation");
 					RecordingGraphicsCommandContext graphics;
 					RecordingComputeCommandContext compute;
 					graphics.BeginRecordingScope(writer);
@@ -2685,9 +2703,21 @@ namespace gglab
 							shadowBinding.m_ParameterIndex == static_cast<uint32_t>(forward_shading::RootParameter::ShadowConstants) &&
 							shadowBinding.m_Buffer == shadow.m_Buffer && shadowBinding.m_Offset == shadow.m_OffsetInBytes;
 					}
+					const auto matchesViews = [&views](const auto& binding) noexcept
+						{
+							return binding.m_Buffer == views.m_Buffer &&
+								binding.m_OffsetInBytes == views.m_OffsetInBytes &&
+								binding.m_SizeInBytes == views.m_SizeInBytes &&
+								binding.m_StrideInBytes == views.m_StrideInBytes &&
+								binding.m_UploadBatchId == views.m_UploadBatchId;
+						};
 					context.Check(bindingsMatch &&
-						compute.SetConstantBuffer(0, frameContext.m_FrameConstants.m_Scene) && !batch->HasFailed(),
-						"Multiple shading passes and direct compute reuse scene and shadow bindings without uploading again");
+						graphics.m_ReadOnlyBindings.size() == 3 &&
+						std::ranges::all_of(graphics.m_ReadOnlyBindings, matchesViews) &&
+						compute.SetConstantBuffer(0, frameContext.m_FrameConstants.m_Scene) &&
+						compute.SetReadOnlyBuffer(1, views) && matchesViews(compute.m_ReadOnlyBindings.back()) &&
+						!batch->HasFailed(),
+						"Several shading passes and direct compute reuse all frame bindings without another upload");
 					graphics.EndRecordingScope();
 					compute.EndRecordingScope();
 					context.Check(batch->Publish(), "Prepared scene constants publish with their frame batch");
@@ -2695,21 +2725,20 @@ namespace gglab
 				else
 				{
 					context.Check(built.m_Status == RenderSceneBuildStatus::GpuUploadFailed && batch->HasFailed() &&
-						built.m_Constants.m_Scene.IsValid() == (scenario == 3) &&
-						!built.m_Constants.m_DirectionalShadow.IsValid() && !batch->Publish(),
-						"A failed scene or shadow upload disables scene rendering and prevents publication");
+						built.m_Constants.m_Scene.IsValid() == (scenario >= 3) &&
+						built.m_Constants.m_DirectionalShadow.IsValid() == (scenario == 4) &&
+						!built.m_Constants.m_Views.IsValid() && !batch->Publish(),
+						"A failed Scene, Shadow or View upload disables scene rendering and prevents publication");
 				}
 				batch->Detach(writer);
 				batch->Cancel();
 				const auto statistics = pool.GetStatistics();
 				const uint64_t expectedUploads = scenario < 2 ?
-					2u + (scenario == 1 ? 1u : 0u) :
-					scenario == 2 ? 0u : 1u;
+					3u + (scenario == 1 ? 1u : 0u) :
+					scenario - 2u;
 				context.Check(statistics.m_LastBatch.m_UploadCount == expectedUploads &&
 					statistics.m_CancelledBatchCount == 1 && !uploads.IsCurrent(),
-					"Scene/Shadow contribute exactly two uploads per successful frame and leave no capability after cancellation");
-				views.Retire(&built.m_GpuAllocations.m_Views, { RHIFenceHandle{ 1, 1 }, 7 });
-				views.Tick();
+					"Scene/Shadow/Views contribute exactly three uploads per frame and cancel without a ring lease");
 			}
 		}
 
@@ -2753,24 +2782,6 @@ namespace gglab
 				renderContext.m_FrameSlotIndex != renderContext.m_BackBufferIndex &&
 				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
 				"Frame context preserves independent frame-slot and swapchain-image indices");
-
-			RenderSceneGpuAllocations lateValidationAllocations{};
-			lateValidationAllocations.m_Views.m_BufferAllocation.m_OffsetInBytes = 3 * sizeof(ViewGPU);
-			lateValidationAllocations.m_Views.m_BufferAllocation.m_SizeInBytes = 2 * sizeof(ViewGPU);
-			lateValidationAllocations.m_Views.m_FirstElementIndex = 3;
-			lateValidationAllocations.m_Views.m_ElementCount = 2;
-			const RHIFencePoint lateValidationFence{ RHIFenceHandle{ 9, 1 }, 23 };
-			RenderFrameGpuResources frameGpuResources{};
-			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
-			const uint64_t adoptedViewOffset =
-				frameGpuResources.m_SceneGpuAllocations.m_Views.m_BufferAllocation.m_OffsetInBytes;
-			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
-			context.Check(lateValidationAllocations.IsEmpty() &&
-				frameGpuResources.m_UploadFencePoint == lateValidationFence &&
-				frameGpuResources.m_SceneGpuAllocations.m_Views.IsValid() &&
-				adoptedViewOffset == 3 * sizeof(ViewGPU) &&
-				frameGpuResources.m_SceneGpuAllocations.m_Views.m_ElementCount == 2,
-				"Frame GPU resources transfer view leases before late validation and retain them on early return");
 
 			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
 			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);
@@ -4650,11 +4661,13 @@ namespace gglab
 				.m_CurrentViewSource =
 					{
 						.m_Buffer = RHIBufferHandle{ 4, 5 },
+						.m_OffsetInBytes = 512,
 						.m_ElementIndex = 29,
 					},
 				.m_CurrentJitteredProjectionSource =
 					{
 						.m_Buffer = RHIBufferHandle{ 4, 5 },
+						.m_OffsetInBytes = 512,
 						.m_ElementIndex = 29,
 					},
 				.m_ProjectionSource = DepthCoverageProjectionSource::ViewDataProjection,
@@ -4678,6 +4691,14 @@ namespace gglab
 				mutate(changed);
 				return changed != rasterDomain;
 			};
+			DepthCoverageRasterDomain differentSlice = rasterDomain;
+			differentSlice.m_CurrentViewSource.m_OffsetInBytes += 256;
+			differentSlice.m_CurrentJitteredProjectionSource.m_OffsetInBytes += 256;
+			const auto sliceMismatch = CompareDepthCoverageRasterDomains(rasterDomain, differentSlice);
+			context.Check(!sliceMismatch.m_Matches &&
+				sliceMismatch.m_Mismatch.find("CurrentViewSource") != std::string::npos &&
+				DescribeDepthCoverageRasterDomain(rasterDomain) != DescribeDepthCoverageRasterDomain(differentSlice),
+				"Coverage distinguishes two slices on the same page with the same relative view index");
 			context.Check(
 				rasterDomain.IsValid() &&
 				CompareDepthCoverageRasterDomains(rasterDomain, rasterDomain).m_Matches &&
@@ -11115,7 +11136,7 @@ namespace gglab
 		RunUploadBudgetTests(context);
 		RunCheckedCompletionContractTests(context);
 		RunFrameSubmissionContractTests(context);
-		RunSceneFrameConstantTests(context);
+		RunFrameConstantUploadTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);

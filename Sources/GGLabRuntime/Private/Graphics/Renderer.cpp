@@ -28,7 +28,6 @@
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
-#include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -266,7 +265,6 @@ namespace gglab
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
 		m_LightSB.reset();
-		m_ViewSB.reset();
 		m_TemporalViewHistory.Invalidate();
 		m_TemporalObjectHistory.Invalidate();
 		m_TemporalAACapabilityStatus = {};
@@ -296,8 +294,6 @@ namespace gglab
 		RHIFrameContext* rhiFrame = beginResult.GetFrame();
 		GGLAB_ASSERT_NOT_NULL(rhiFrame);
 
-		m_ViewSB->Tick();
-
 		m_TransientResourcePool->Tick();
 		m_PersistentTexturePool->Tick();
 		m_Atmosphere->Tick();
@@ -305,7 +301,6 @@ namespace gglab
 		m_AssetUploadScheduler->Tick();
 
 		m_HasActiveFrame = true;
-		m_FrameGpuResources = std::make_unique<RenderFrameGpuResources>();
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
 		if (GpuProfiler* profiler = m_RHIContext->GetGpuProfiler())
@@ -386,8 +381,15 @@ namespace gglab
 			.m_FrameSerial = request.m_FrameSerial,
 		};
 		RenderFrameBuilder::BuildResult built = m_FrameBuilder->Build(buildInfo);
-		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
-		m_FrameGpuResources->AdoptFrom(built.m_SceneGpuAllocations, built.m_UploadFencePoint);
+		// Keep the transfer dependency even when the caller rejects the built CPU frame.
+		// A later build with no dirty table ranges must not erase an earlier dependency.
+		if (built.m_UploadFencePoint.IsValid())
+		{
+			GGLAB_ASSERT_MSG(!m_ActiveFrame.m_UploadFencePoint.IsValid() ||
+				m_ActiveFrame.m_UploadFencePoint == built.m_UploadFencePoint,
+				"A render frame cannot adopt resources from different upload submissions.");
+			m_ActiveFrame.m_UploadFencePoint = built.m_UploadFencePoint;
+		}
 
 		RenderFrameBuildResult result{};
 		result.m_RenderViews = std::move(built.m_RenderViews);
@@ -451,7 +453,6 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_FrameSerial == m_ActiveFrame.m_Serial);
 
 		m_ActiveFrame.m_RenderGraph = &rg;
-		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 
 		// Window suspended do nothing
 		if (m_IsSuspended.load(std::memory_order_relaxed))
@@ -466,9 +467,9 @@ namespace gglab
 
 		// Wait Structured Buffer upload. Without the queue wait the graph could read uploads
 		// that have not landed, so the frame stays unrecorded and EndFrame aborts it.
-		if (m_FrameGpuResources->m_UploadFencePoint.IsValid() &&
+		if (m_ActiveFrame.m_UploadFencePoint.IsValid() &&
 			!m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint))
+				RHIQueueType::Graphics, m_ActiveFrame.m_UploadFencePoint))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("Renderer could not order the frame after its uploads.");
 			return;
@@ -550,12 +551,6 @@ namespace gglab
 
 		const RHIFencePoint retirementFence =
 			submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
-		if (retirementFence.IsValid())
-		{
-			GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
-			RetireSceneGpuAllocations(
-				&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
-		}
 		m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 
 		EndFrameLifetime();
@@ -573,11 +568,10 @@ namespace gglab
 		{
 			return RHIFrameEndResult::Fatal();
 		}
-		if (m_RHIContext && m_FrameGpuResources &&
-			m_FrameGpuResources->m_UploadFencePoint.IsValid())
+		if (m_RHIContext && m_ActiveFrame.m_UploadFencePoint.IsValid())
 		{
 			GGLAB_UNUSED(m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint));
+				RHIQueueType::Graphics, m_ActiveFrame.m_UploadFencePoint));
 		}
 
 		if (m_RHIContext && m_ActiveFrame.m_RHIFrame)
@@ -599,14 +593,6 @@ namespace gglab
 			const RHIFencePoint retirementFence =
 				submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
 			m_ActiveFrame.m_TemporalTransaction.Abort(retirementFence);
-			if (retirementFence.IsValid())
-			{
-				if (m_FrameGpuResources)
-				{
-					RetireSceneGpuAllocations(
-						&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
-				}
-			}
 			if (m_ActiveFrame.m_RenderGraph)
 			{
 				m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
@@ -629,7 +615,7 @@ namespace gglab
 	void Renderer::RetainCompletionUnknownFrame() noexcept
 	{
 		// Nothing the frame can read is released: graph transients stay out of the pool's
-		// free lists, view ring spans stay leased, capture readbacks stay unread, and the
+		// free lists, upload pages stay quarantined, capture readbacks stay unread, and the
 		// Atmosphere, temporal and IBL resources keep their owners. Finalize releases them
 		// once quiescence or device loss is confirmed.
 		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -669,14 +655,12 @@ namespace gglab
 		GGLAB_UNUSED(m_ObjectSB.release());
 		GGLAB_UNUSED(m_MaterialSB.release());
 		GGLAB_UNUSED(m_LightSB.release());
-		GGLAB_UNUSED(m_ViewSB.release());
 		GGLAB_UNUSED(m_RHIContext.release());
 	}
 
 	void Renderer::EndFrameLifetime() noexcept
 	{
 		m_ActiveFrame = {};
-		m_FrameGpuResources.reset();
 		m_HasActiveFrame = false;
 	}
 
@@ -775,24 +759,6 @@ namespace gglab
 		return m_TemporalHistoryManager ?
 			m_TemporalHistoryManager->GetDiagnostics() :
 			TemporalHistoryManagerDiagnostics{};
-	}
-
-	void Renderer::RetireSceneGpuAllocations(
-		RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept
-	{
-		if (!allocations || allocations->IsEmpty())
-		{
-			return;
-		}
-
-		GGLAB_ASSERT_MSG(
-			fencePoint.IsValid(), "Scene GPU allocations require a valid graphics fence point.");
-
-		if (allocations->m_Views.IsValid())
-		{
-			m_ViewSB->Retire(&allocations->m_Views, fencePoint);
-		}
-		*allocations = {};
 	}
 
 	RHIBindingLayoutDesc Renderer::GetCommonBindingLayoutDesc() const noexcept
@@ -934,15 +900,6 @@ namespace gglab
 			m_LightSB = std::make_unique<PersistentStructuredBuffer<LightGPU>>(lightSBCreateInfo);
 			m_LightTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, LightGPU>>(
 				MaxLightCapacity, m_RHIContext->GetFrameSlotCount());
-
-			// View data remains a small per-frame dynamic upload allocation.
-			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};
-			viewSBCreateInfo.m_Device = GetDevice();
-			viewSBCreateInfo.m_ElementCapacity =
-				MaxViewCapacity * m_RHIContext->GetFrameSlotCount();
-			viewSBCreateInfo.m_DebugName = "Renderer.DynamicViews";
-			m_ViewSB =
-				std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
 		}
 	}
 

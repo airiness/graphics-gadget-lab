@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -88,9 +87,14 @@ namespace gglab
 					if (data.m_RenderQueue && !data.m_RenderQueue->m_DrawItems.empty())
 					{
 						const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
+						const DepthCoverageBufferSource boundView{
+							.m_Buffer = contextPtr->m_FrameConstants.m_Views.m_Buffer,
+							.m_OffsetInBytes = contextPtr->m_FrameConstants.m_Views.m_OffsetInBytes,
+							.m_ElementIndex = contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+						};
 						GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == viewIndex &&
-							data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
-							contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+							data.m_RasterDomain->m_CurrentViewSource == boundView &&
+							data.m_RasterDomain->m_CurrentJitteredProjectionSource == boundView,
 							"Shadow coverage and shader binding must address the same uploaded cascade view.");
 						GGLAB_ASSERT_MSG(
 							data.m_RasterDomain->IsValid() &&
@@ -168,10 +172,12 @@ namespace gglab
 						static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 						materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-					const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-					graphicsContext->SetReadOnlyBuffer(
+					if (!graphicsContext->SetReadOnlyBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-						viewSB->GetBufferHandle());
+						contextPtr->m_FrameConstants.m_Views))
+					{
+						return;
+					}
 
 					const DirectionalShadowPassParameters passParameters{
 						.ViewIndex = viewIndex,

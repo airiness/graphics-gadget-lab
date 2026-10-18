@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
@@ -317,9 +316,11 @@ namespace gglab::forward_shading
 		const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 			materialSB->GetBufferHandle(context.m_FrameSlotIndex));
-		const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-			viewSB->GetBufferHandle());
+		if (!graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+			context.m_FrameConstants.m_Views))
+		{
+			return;
+		}
 		const auto& lightSB = services.m_FrameBuffers->GetLightStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 			lightSB->GetBufferHandle(context.m_FrameSlotIndex));

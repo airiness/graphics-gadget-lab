@@ -477,9 +477,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp">
-      <Filter>Private\Graphics\Buffer</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Camera.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
@@ -1250,9 +1247,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h">
       <Filter>Private\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameGpuResources.h">
-      <Filter>Private\Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.h">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -1896,15 +1890,6 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\Buffer.h">
-      <Filter>Public\GGLabRuntime\Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.h">
-      <Filter>Public\GGLabRuntime\Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicConstantBufferAllocator.h">
-      <Filter>Public\GGLabRuntime\Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicStructuredBufferAllocator.h">
       <Filter>Public\GGLabRuntime\Graphics\Buffer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\PersistentStructuredBuffer.h">

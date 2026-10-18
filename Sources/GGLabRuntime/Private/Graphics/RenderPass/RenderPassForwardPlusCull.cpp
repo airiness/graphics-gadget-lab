@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -263,9 +262,12 @@ namespace gglab
 
 				commandContext->SetPipeline(
 					GetOrCreatePipeline(services, data.m_DiagnosticsEnabled));
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::ViewBuffer),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::LightBuffer),
 					services.m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(
