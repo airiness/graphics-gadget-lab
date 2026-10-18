@@ -1089,6 +1089,9 @@ function Test-ProjectIncludeVisibility {
 
 $runtimePublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public'
 $runtimePrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private'
+# AppRuntime lifecycle tests simulate a backend with the real neutral upload/submission
+# owners. This grants only the neutral RHI directory, not Runtime Private generally.
+$runtimeRhiTestIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private\Graphics\RHI'
 $winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
 $vulkanQualificationIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification'
@@ -1192,11 +1195,11 @@ Test-ProjectIncludeVisibility $shaderRuntimeIntegrationTestsProject `
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePublicIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeRhiTestIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePublicIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeRhiTestIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainProject $shaderToolchainNamespace `

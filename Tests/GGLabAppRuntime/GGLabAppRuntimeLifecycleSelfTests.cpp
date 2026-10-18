@@ -1,4 +1,5 @@
 #include "NonFiniteWatchCoordinatorSelfTests.h"
+#include "GpuFaultLifecycleSelfTests.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabAppRuntime.h"
@@ -20,7 +21,9 @@
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 
+#include <cstdlib>
 #include <filesystem>
+#include <string_view>
 
 namespace gglab
 {
@@ -672,8 +675,23 @@ namespace gglab
 	}
 }
 
-int main()
+int main(int argumentCount, char* arguments[])
 {
+	// Headless test failures must terminate instead of opening a CRT/OS error dialog.
+	_set_error_mode(_OUT_TO_STDERR);
+	_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+	if (argumentCount == 4 && std::string_view(arguments[1]) == "--gpu-fault-child")
+	{
+		if (std::string_view(arguments[2]) != "timeout" && std::string_view(arguments[2]) != "failed")
+		{
+			return 2;
+		}
+		return gglab::RunGpuFaultLifecycleChild(arguments[2], arguments[3]);
+	}
+	if (argumentCount != 1)
+	{
+		return 2;
+	}
 	gglab::ConsoleSelfTestReporter reporter;
 	const bool lifecycleSucceeded = gglab::RunSelfTestSuite({
 		.m_Id = "app-runtime-lifecycle",
@@ -685,5 +703,7 @@ int main()
 		}, reporter);
 	const bool watchSucceeded = gglab::RunSelfTestSuite({ .m_Id = "nonfinite-watch-coordinator",
 		.m_Run = &gglab::RunNonFiniteWatchCoordinatorSelfTests }, reporter);
-	return lifecycleSucceeded && frameCaptureSucceeded && watchSucceeded ? 0 : 1;
+	const bool faultLifecycleSucceeded = gglab::RunSelfTestSuite({ .m_Id = "gpu-fault-lifecycle",
+		.m_Run = &gglab::RunGpuFaultLifecycleSelfTests }, reporter);
+	return lifecycleSucceeded && frameCaptureSucceeded && watchSucceeded && faultLifecycleSucceeded ? 0 : 1;
 }
