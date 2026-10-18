@@ -609,9 +609,16 @@ namespace gglab
 		{
 			GGLAB_UNUSED(AbortFrame(*m_ActiveFrame));
 		}
-		if (!IsDeviceLost())
+		// A verified idle wait also released every quarantined upload page.
+		const RHITeardownState teardown = QuiesceRHIForTeardown(*this);
+		if (teardown == RHITeardownState::Unverified)
 		{
-			GGLAB_UNUSED(WaitIdle());
+			AbandonGpuOwners();
+			return;
+		}
+		if (teardown == RHITeardownState::DeviceLost)
+		{
+			m_UploadPool->ReleaseQuarantinedAfterDeviceLoss();
 		}
 		m_BackBufferCompletionFences.clear();
 		m_Frames.clear();
@@ -634,6 +641,34 @@ namespace gglab
 		m_Device->SetQueueSystem(nullptr);
 		m_QueueSystem.reset();
 		m_Device.reset();
+		m_Initialized = false;
+	}
+
+	void DX12Context::AbandonGpuOwners() noexcept
+	{
+		// Idle was not verified on a live device: destroying any owner could free memory the
+		// GPU still reads. Process exit reclaims the abandoned owners.
+		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+			"DX12Context finalized without verified idle; GPU-visible owners are leaked.");
+		for (auto& frame : m_Frames)
+		{
+			GGLAB_UNUSED(frame.release());
+		}
+		m_Frames.clear();
+		for (auto& computeContext : m_DirectComputeContexts)
+		{
+			GGLAB_UNUSED(computeContext.release());
+		}
+		m_DirectComputeContexts.clear();
+		GGLAB_UNUSED(m_UploadPool.release());
+		GGLAB_UNUSED(m_TransferManager.release());
+		GGLAB_UNUSED(m_GpuProfiler.release());
+		GGLAB_UNUSED(m_SwapChain.release());
+		GGLAB_UNUSED(m_DescriptorManager.release());
+		GGLAB_UNUSED(m_PipelineSystem.release());
+		GGLAB_UNUSED(m_QueueSystem.release());
+		GGLAB_UNUSED(m_Device.release());
+		m_BackBufferCompletionFences.clear();
 		m_Initialized = false;
 	}
 }

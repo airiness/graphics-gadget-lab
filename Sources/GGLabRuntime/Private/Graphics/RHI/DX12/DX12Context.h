@@ -102,6 +102,8 @@ namespace gglab
 		void FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept;
 		[[nodiscard]] RHISubmissionVerification MakeSubmissionVerification() noexcept;
 		void Finalize() noexcept;
+		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
+		void AbandonGpuOwners() noexcept;
 
 		std::unique_ptr<DX12Device> m_Device;
 		std::unique_ptr<RHIUploadPool> m_UploadPool;

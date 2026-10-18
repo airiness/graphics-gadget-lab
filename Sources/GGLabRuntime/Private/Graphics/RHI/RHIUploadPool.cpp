@@ -23,13 +23,27 @@ namespace gglab
 
 	RHIUploadPool::~RHIUploadPool() noexcept
 	{
+		size_t leakedPageCount = 0;
 		for (const auto& page : m_Pages)
 		{
 			GGLAB_ASSERT_MSG(!page.m_Leased,
 				"Upload batches must be submitted or cancelled before pool destruction.");
+			// Work without a reliable completion fence may still read a quarantined page, and
+			// no recorded use defers its destruction. Leak it rather than free live GPU memory.
+			if (page.m_Quarantined)
+			{
+				++leakedPageCount;
+				continue;
+			}
 			// Every write was published when its batch was; ending the mapping writes nothing.
 			m_Device->UnmapBuffer(page.m_Buffer, {});
 			m_Device->DestroyBuffer(page.m_Buffer);
+		}
+		if (leakedPageCount != 0)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Upload pool leaked {} quarantined pages whose GPU completion was never verified.",
+				leakedPageCount);
 		}
 	}
 
@@ -50,6 +64,16 @@ namespace gglab
 	}
 
 	void RHIUploadPool::ReleaseQuarantinedAfterVerifiedIdle() noexcept
+	{
+		ReleaseQuarantinedPages();
+	}
+
+	void RHIUploadPool::ReleaseQuarantinedAfterDeviceLoss() noexcept
+	{
+		ReleaseQuarantinedPages();
+	}
+
+	void RHIUploadPool::ReleaseQuarantinedPages() noexcept
 	{
 		for (auto& page : m_Pages)
 		{
@@ -372,6 +396,15 @@ namespace gglab
 		// Accepted work may already be reading the pages; it needs a fence or quarantine.
 		GGLAB_ASSERT_MSG(!m_HasAcceptedSubmission,
 			"Uploads read by an accepted submission cannot be cancelled.");
+		if (m_HasAcceptedSubmission)
+		{
+			// The assertion is compiled out of release builds, where releasing the leases
+			// would let a later batch rewrite pages the GPU may still read.
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"An upload batch with an accepted submission was cancelled; its pages are quarantined.");
+			SubmittedWithoutCompletionFence();
+			return;
+		}
 		GGLAB_ASSERT_MSG(m_State == State::Recording || m_State == State::Published,
 			"Submitted uploads must wait for GPU completion.");
 		if (m_State != State::Recording && m_State != State::Published)

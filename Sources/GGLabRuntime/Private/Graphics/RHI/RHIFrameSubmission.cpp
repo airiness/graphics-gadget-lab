@@ -45,8 +45,11 @@ namespace gglab
 		{
 			return {};
 		}
-		prerequisite.m_JoinedByNextStream = true;
-		return submit();
+		RHISubmittedStream dependent = submit();
+		// Only an accepted dependent stream carries the queue wait into executed work. A
+		// dependent stream without effect leaves the prerequisite for a checked CPU wait.
+		prerequisite.m_JoinedByNextStream = dependent.m_Effect == RHISubmitEffect::Accepted;
+		return dependent;
 	}
 
 	RHISubmissionResolution ResolveFrameSubmission(std::span<const RHISubmittedStream> streams,

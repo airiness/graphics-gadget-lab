@@ -754,9 +754,19 @@ namespace gglab
 		{
 			GGLAB_UNUSED(AbortFrame(*m_ActiveFrame));
 		}
-		if (m_Bootstrap && m_Bootstrap->m_FrameRuntime && !IsDeviceLost())
+		// Without a frame runtime nothing was submitted through this context. A verified idle
+		// wait also released every quarantined upload page.
+		const RHITeardownState teardown = m_Bootstrap && m_Bootstrap->m_FrameRuntime ?
+			QuiesceRHIForTeardown(*this) :
+			RHITeardownState::Quiesced;
+		if (teardown == RHITeardownState::Unverified)
 		{
-			GGLAB_UNUSED(WaitIdle());
+			AbandonGpuOwners();
+			return;
+		}
+		if (teardown == RHITeardownState::DeviceLost && m_UploadPool)
+		{
+			m_UploadPool->ReleaseQuarantinedAfterDeviceLoss();
 		}
 		if (m_SwapChain)
 		{
@@ -773,6 +783,29 @@ namespace gglab
 		m_TransferManager.reset();
 		m_PipelineSystem.reset();
 		m_Bootstrap.reset();
+		m_Initialized = false;
+	}
+
+	void VulkanContext::AbandonGpuOwners() noexcept
+	{
+		// Idle was not verified on a live device: destroying any owner could free memory the
+		// GPU still reads. Process exit reclaims the abandoned owners.
+		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+			"VulkanContext finalized without verified idle; GPU-visible owners are leaked.");
+		for (auto& frame : m_Frames)
+		{
+			GGLAB_UNUSED(frame.release());
+		}
+		m_Frames.clear();
+		GGLAB_UNUSED(m_SwapChain.release());
+		GGLAB_UNUSED(m_DirectComputeContext.release());
+		GGLAB_UNUSED(m_GraphicsContext.release());
+		GGLAB_UNUSED(m_GpuProfiler.release());
+		GGLAB_UNUSED(m_Set0Frames.release());
+		GGLAB_UNUSED(m_UploadPool.release());
+		GGLAB_UNUSED(m_TransferManager.release());
+		GGLAB_UNUSED(m_PipelineSystem.release());
+		GGLAB_UNUSED(m_Bootstrap.release());
 		m_Initialized = false;
 	}
 }

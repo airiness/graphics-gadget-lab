@@ -28,7 +28,7 @@ namespace gglab
 		RHISubmitEffect m_Effect = RHISubmitEffect::NoEffect;
 		// Valid only when the checked signal after the submit succeeded.
 		RHIFencePoint m_Fence{};
-		// A later stream's queue wait on m_Fence was confirmed.
+		// A later accepted stream's queue wait on m_Fence was confirmed.
 		bool m_JoinedByNextStream = false;
 	};
 

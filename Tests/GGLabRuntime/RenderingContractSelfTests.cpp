@@ -2103,6 +2103,69 @@ namespace gglab
 			}
 		}
 
+		void RunUploadTeardownContractTests(SelfTestContext& context) noexcept
+		{
+			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+			const auto quarantineOnePage = [&](RHIUploadPool& pool)
+				{
+					auto batch = pool.BeginBatch();
+					const bool published =
+						batch->Upload(std::as_bytes(std::span(payload))).IsValid() && batch->Publish();
+					batch->RecordAcceptedSubmission();
+					batch->SubmittedWithoutCompletionFence();
+					return published && pool.GetQuarantinedPageCount() == 1;
+				};
+
+			// A quarantined page has no recorded use that could defer its destruction, so a
+			// pool destroyed before verified idle or confirmed loss must leak it.
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				bool quarantined = false;
+				{
+					RHIUploadPool pool(device);
+					quarantined = quarantineOnePage(pool);
+				}
+				context.Check(quarantined && device.m_AtmosphereDestroyedBufferCount == 0 &&
+					device.m_PassConstantUnmapCount == 0,
+					"Pool destruction leaks quarantined pages instead of freeing memory the GPU may read");
+			}
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				bool released = false;
+				{
+					RHIUploadPool pool(device);
+					released = quarantineOnePage(pool);
+					pool.ReleaseQuarantinedAfterDeviceLoss();
+					released = released && pool.GetQuarantinedPageCount() == 0;
+				}
+				context.Check(released && device.m_AtmosphereDestroyedBufferCount == 1 &&
+					device.m_PassConstantUnmapCount == 1,
+					"Confirmed device loss releases quarantined pages for destruction");
+			}
+
+#if defined(NDEBUG)
+			// Debug asserts on the violated cancellation invariant. Release must quarantine the
+			// pages instead of releasing leases that accepted work may still read.
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device);
+				auto batch = pool.BeginBatch();
+				const bool published =
+					batch->Upload(std::as_bytes(std::span(payload))).IsValid() && batch->Publish();
+				batch->RecordAcceptedSubmission();
+				batch->Cancel();
+				const RHIUploadStatistics statistics = pool.GetStatistics();
+				context.Check(published && pool.GetQuarantinedPageCount() == 1 &&
+					statistics.m_Leased.m_PageCount == 0 && statistics.m_CancelledBatchCount == 0,
+					"Cancelling an accepted batch quarantines its pages in release builds");
+				pool.ReleaseQuarantinedAfterVerifiedIdle();
+			}
+#endif
+		}
+
 		void RunUploadWriterContractTests(SelfTestContext& context) noexcept
 		{
 			static_assert(!std::is_copy_constructible_v<RHIUploadWriter> &&
@@ -2364,6 +2427,40 @@ namespace gglab
 				context.Check(pool.GetPendingPageCount() == 0 && pool.GetQuarantinedPageCount() == 0,
 					"Dependent-stream uploads retire only through the selected completion path");
 			}
+
+			// A confirmed join whose dependent stream had no effect left no executed waiter. A
+			// later independent stream's fence covers the prerequisite only after a CPU wait.
+			{
+				device.m_CompletedFenceValue = 0;
+				const RHIFencePoint independentFence{ RHIFenceHandle{ 1, 1 }, 6 };
+				auto batch = pool.BeginBatch();
+				const bool published =
+					batch->Upload(std::as_bytes(std::span(payload))).IsValid() && batch->Publish();
+				std::array<RHISubmittedStream, 3> streams{};
+				streams[0] = { RHISubmitEffect::Accepted, computeFence };
+				streams[1] = SubmitDependentFrameStream(streams[0],
+					[](const RHIFencePoint&) { return true; },
+					[]() -> RHISubmittedStream { return {}; });
+				streams[2] = { RHISubmitEffect::Accepted, independentFence };
+				std::vector<RHIFencePoint> cpuWaits;
+				const RHISubmissionVerification verification{
+					.m_WaitForFence = [&](const RHIFencePoint& fence)
+						{
+							cpuWaits.push_back(fence);
+							return RHIGpuWaitResult::Completed;
+						},
+					.m_WaitIdle = []() { return RHIGpuWaitResult::Timeout; },
+				};
+				const auto resolution = ResolveFrameSubmission(streams, *batch, verification);
+				context.Check(published && !streams[0].m_JoinedByNextStream &&
+					streams[1].m_Effect == RHISubmitEffect::NoEffect &&
+					cpuWaits == std::vector<RHIFencePoint>({ computeFence }) &&
+					resolution.m_State == RHIFrameSubmissionState::Fenced &&
+					resolution.m_Fence == independentFence,
+					"A dependent stream without effect does not count as a join of its prerequisite");
+				device.m_CompletedFenceValue = independentFence.m_Value;
+				pool.ReclaimCompleted();
+			}
 		}
 
 		void RunFrameSubmissionContractTests(SelfTestContext& context) noexcept
@@ -2510,6 +2607,9 @@ namespace gglab
 					resolution.m_DeviceLost && batch->HasAcceptedSubmission() &&
 					pool.GetQuarantinedPageCount() == 1,
 					"An accepted submit lost with the device stays quarantined for device-loss teardown");
+				pool.ReleaseQuarantinedAfterDeviceLoss();
+				context.Check(pool.GetQuarantinedPageCount() == 0,
+					"Device-loss teardown releases the quarantined pages for destruction");
 			}
 			context.Check(batchesReady, "Every fault-injection batch uploaded and published its payload");
 
@@ -11134,6 +11234,7 @@ namespace gglab
 		RunUploadWriterContractTests(context);
 		RunUploadStorageContractTests(context);
 		RunUploadBudgetTests(context);
+		RunUploadTeardownContractTests(context);
 		RunCheckedCompletionContractTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunFrameConstantUploadTests(context);

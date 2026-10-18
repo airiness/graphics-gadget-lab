@@ -37,6 +37,9 @@ namespace gglab
 		void ReclaimCompleted() noexcept;
 		// Only after every queue that may have read quarantined pages was verified idle.
 		void ReleaseQuarantinedAfterVerifiedIdle() noexcept;
+		// Only after the native API confirmed device loss: the pages may then be destroyed,
+		// but nothing reads them again.
+		void ReleaseQuarantinedAfterDeviceLoss() noexcept;
 		[[nodiscard]] size_t GetPageCount() const noexcept { return m_Pages.size(); }
 		[[nodiscard]] size_t GetPendingPageCount() const noexcept;
 		[[nodiscard]] size_t GetQuarantinedPageCount() const noexcept;
@@ -55,6 +58,7 @@ namespace gglab
 			bool m_Quarantined = false;
 		};
 		[[nodiscard]] size_t AcquirePage(uint64_t minimumSize, uint64_t remainingBatchBytes) noexcept;
+		void ReleaseQuarantinedPages() noexcept;
 
 		RHIDevice* m_Device = nullptr;
 		RHIUploadConfig m_Config{};
@@ -89,7 +93,8 @@ namespace gglab
 		// Accepted work may read the pages without a reliable completion fence. The pages
 		// stay quarantined until the pool is told that every consuming queue is idle.
 		void SubmittedWithoutCompletionFence() noexcept;
-		// Only while no stream that reads these bindings has been accepted for execution.
+		// Only while no stream that reads these bindings has been accepted for execution. A
+		// batch with an accepted submission is quarantined instead, never released for reuse.
 		void Cancel() noexcept;
 		void Fail() noexcept { m_Failed = true; }
 		[[nodiscard]] bool HasFailed() const noexcept { return m_Failed; }

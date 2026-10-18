@@ -116,6 +116,8 @@ namespace gglab
 		// Records natively confirmed device loss in the runtime health state.
 		void ObserveWaitResult(RHIGpuWaitResult result, std::string_view operation) noexcept;
 		void Finalize() noexcept;
+		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
+		void AbandonGpuOwners() noexcept;
 
 		// Bootstrap owns instance/surface/device/frame-runtime and therefore
 		// stays alive until every composed RHI service has been destroyed.
