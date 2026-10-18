@@ -92,6 +92,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
+#include "Graphics/RHI/DX12/DX12TransferContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/RHIFrameSubmission.h"
 #include "Graphics/RHI/RHIUploadPool.h"
@@ -2349,6 +2350,56 @@ namespace gglab
 			size_t m_LoseDeviceAtAttempt = std::numeric_limits<size_t>::max();
 			bool m_DeviceLost = false;
 		};
+
+		void RunDX12TransferCompletionTests(SelfTestContext& context) noexcept
+		{
+			// An opaque fence identity is enough: injected waits must never dereference it.
+			const DX12FencePoint requested(reinterpret_cast<DX12Fence*>(uintptr_t{ 1 }), 7);
+			for (const bool wait : { false, true })
+			{
+				uint32_t waitCalls = 0;
+				const DX12FencePoint completion = ResolveDX12TransferCompletion(
+					{ requested, false }, wait,
+					[&](const DX12FencePoint&)
+					{
+						++waitCalls;
+						return RHIGpuWaitResult::Completed;
+					});
+				context.Check(!completion.IsValid() && waitCalls == 0 && requested.IsValid(),
+					"A failed DX12 transfer signal keeps its retirement identity private and never waits on the unsignaled value");
+			}
+
+			uint32_t asyncWaitCalls = 0;
+			const DX12FencePoint asynchronous = ResolveDX12TransferCompletion(
+				{ requested, true }, false,
+				[&](const DX12FencePoint&)
+				{
+					++asyncWaitCalls;
+					return RHIGpuWaitResult::Failed;
+				});
+			context.Check(asynchronous == requested && asyncWaitCalls == 0,
+				"A successfully signaled asynchronous DX12 transfer returns its dependency without a CPU wait");
+
+			for (const RHIGpuWaitResult result : { RHIGpuWaitResult::Completed,
+				RHIGpuWaitResult::Timeout, RHIGpuWaitResult::Failed, RHIGpuWaitResult::DeviceLost })
+			{
+				uint32_t waitCalls = 0;
+				const DX12FencePoint completion = ResolveDX12TransferCompletion(
+					{ requested, true }, true,
+					[&](const DX12FencePoint& fence)
+					{
+						context.Check(fence == requested,
+							"A synchronous DX12 transfer waits only on its successfully signaled point");
+						++waitCalls;
+						return result;
+					});
+				context.Check(waitCalls == 1 &&
+					completion.IsValid() == (result == RHIGpuWaitResult::Completed),
+					"Synchronous DX12 transfer publication requires Completed; timeout, failure and device loss cannot publish");
+			}
+			context.Check(!ResolveDX12TransferCompletion({ requested, true }, true, {}).IsValid(),
+				"A synchronous DX12 transfer without a completion verifier cannot publish");
+		}
 
 		void RunCheckedCompletionContractTests(SelfTestContext& context) noexcept
 		{
@@ -11358,6 +11409,7 @@ namespace gglab
 		RunUploadTeardownContractTests(context);
 		RunUploadOwnerThreadContractTests(context);
 		RunCheckedCompletionContractTests(context);
+		RunDX12TransferCompletionTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
