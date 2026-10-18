@@ -109,8 +109,7 @@ namespace gglab
 		{
 			return;
 		}
-		if (!context.m_RenderScene.m_Atmosphere || !services.m_Atmosphere ||
-			!services.m_Atmosphere->GetConstants().IsValid())
+		if (!context.m_RenderScene.m_Atmosphere)
 		{
 			return;
 		}
@@ -130,7 +129,7 @@ namespace gglab
 		}
 		const auto* atmosphereResources = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
 			AtmosphereResourcesName);
-		if (!atmosphereResources)
+		if (!atmosphereResources || !atmosphereResources->m_Constants.IsValid())
 		{
 			return;
 		}
@@ -167,6 +166,7 @@ namespace gglab
 		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const Vector3 sunDirection = -context.m_RenderScene.m_WorldSun->m_Direction;
 		const auto viewsBinding = context.m_FrameConstants.m_Views;
+		const auto constants = atmosphereResources->m_Constants;
 		const auto channel = PostProcessPreviewChannel::Atmosphere;
 		const bool previewRequested = services.m_Resources->IsPostProcessPreviewRequested(channel);
 		const PostProcessDebugTap selectedTap = previewRequested ?
@@ -204,7 +204,7 @@ namespace gglab
 				data.m_ThroughputOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 					resources.m_ThroughputAtlas);
 			},
-			[services, viewsBinding, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
+			[services, constants, viewsBinding, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
 			(RGExecuteContext& execute, BuildPassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
@@ -220,13 +220,11 @@ namespace gglab
 				parameters.m_MaxDistanceKm = maxDistanceKm;
 				parameters.m_SunDirection = sunDirection;
 				command->SetPipeline(buildPipeline);
-				command->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_Atmosphere->GetConstants(),
-						.m_OffsetInBytes = 0,
-						.m_SizeInBytes = sizeof(AtmosphereGPU),
-					});
+				if (!command->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+				{
+					return;
+				}
 				if (!command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewsBinding))
 				{
@@ -314,7 +312,7 @@ namespace gglab
 						resources.m_Diagnostic);
 				}
 			},
-			[services, &context, viewsBinding, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
+			[services, &context, constants, viewsBinding, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
 			(RGExecuteContext& execute, CompositePassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
@@ -337,13 +335,11 @@ namespace gglab
 				parameters.m_Height = context.GetDisplayRenderView().m_Height;
 				parameters.m_DiagnosticMode = diagnosticMode;
 				command->SetPipeline(compositePipeline);
-				command->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					{
-						.m_Buffer = services.m_Atmosphere->GetConstants(),
-						.m_OffsetInBytes = 0,
-						.m_SizeInBytes = sizeof(AtmosphereGPU),
-					});
+				if (!command->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+				{
+					return;
+				}
 				if (!command->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewsBinding))
 				{

@@ -17,10 +17,11 @@ namespace gglab
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept override;
 		// Call after all LUT consumers, including sky rendering and diagnostic previews.
 		void AddFinishPass(RenderGraph& rg) noexcept;
-		void AddBakePass(RenderGraph& rg, const RenderServices& services) noexcept;
+		void AddBakePass(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services) noexcept;
 	private:
-		void AddLuts(RenderGraph& rg, const RenderServices& services, RenderAtmosphereAccess& atmosphere,
-			const AtmosphereGPU& parameters, bool skyConstants, bool bake) noexcept;
+		void AddLuts(RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services,
+			RenderAtmosphereAccess& atmosphere, const AtmosphereGPU& parameters, bool bake) noexcept;
 		ComputePipelineRecipe m_Recipe{};
 		ComputePipelineSlot m_Slot{};
 	};

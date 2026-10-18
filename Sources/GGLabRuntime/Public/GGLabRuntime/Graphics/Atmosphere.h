@@ -1,7 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/WorldSun.h"
-#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include <array>
 #include <cstddef>
@@ -75,13 +74,12 @@ namespace gglab
 	{
 	public:
 		virtual ~RenderAtmosphereAccess() = default;
-		virtual bool Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaderGenerations,
-			bool previewSky = false) noexcept = 0;
+		virtual bool Begin(const AtmosphereGPU& parameters,
+			const std::array<uint64_t, 3>& shaderGenerations) noexcept = 0;
 		virtual void Disable() noexcept = 0;
 		virtual RHITextureHandle GetTexture(uint32_t index) const noexcept = 0;
 		virtual RHITextureDesc GetTextureDesc(uint32_t index) const noexcept = 0;
 		virtual bool IsInitialized(uint32_t index) const noexcept = 0;
-		virtual RHIBufferHandle GetConstants() const noexcept = 0;
 		virtual void NotifyExecuted(uint32_t index) noexcept = 0;
 		virtual AtmosphereDiagnostics GetDiagnostics() const noexcept = 0;
 	};

@@ -38,15 +38,13 @@ namespace gglab
 			atmosphere->Disable();
 			return;
 		}
-		const bool skyConstants = services.m_Environment &&
-			services.m_Environment->GetEnvironmentLightingSettings().m_EnableSkybox &&
-			services.m_Environment->GetEnvironmentLightingSettings().m_BackgroundMode !=
-			EnvironmentBackgroundMode::TextureEnvironment;
-		AddLuts(rg, services, *atmosphere, ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
-			context.GetDisplayRenderView().m_CameraPosition), skyConstants, false);
+		AddLuts(rg, context, services, *atmosphere,
+			ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
+				context.GetDisplayRenderView().m_CameraPosition), false);
 	}
 
-	void RenderPassAtmosphere::AddBakePass(RenderGraph& rg, const RenderServices& services) noexcept
+	void RenderPassAtmosphere::AddBakePass(RenderGraph& rg, const RenderFrameContext& context,
+		const RenderServices& services) noexcept
 	{
 		if (!services.m_Environment || !services.m_BakeAtmosphere ||
 			services.m_Environment->GetStageForRecording() != IBLBakeStage::Environment)
@@ -55,12 +53,13 @@ namespace gglab
 		}
 		if (const auto* parameters = services.m_Environment->GetBakingAtmosphereParameters())
 		{
-			AddLuts(rg, services, *services.m_BakeAtmosphere, *parameters, true, true);
+			AddLuts(rg, context, services, *services.m_BakeAtmosphere, *parameters, true);
 		}
 	}
 
-	void RenderPassAtmosphere::AddLuts(RenderGraph& rg, const RenderServices& services,
-		RenderAtmosphereAccess& access, const AtmosphereGPU& parameters, bool skyConstants, bool bake) noexcept
+	void RenderPassAtmosphere::AddLuts(RenderGraph& rg, const RenderFrameContext& context,
+		const RenderServices& services, RenderAtmosphereAccess& access,
+		const AtmosphereGPU& parameters, bool bake) noexcept
 	{
 		auto* atmosphere = &access;
 		if (!m_Recipe.m_CSId.IsValid())
@@ -75,7 +74,13 @@ namespace gglab
 			return;
 		}
 		const uint64_t generation = services.m_ShaderPrograms->GetGeneration(m_Recipe.m_CSId);
-		if (!atmosphere->Begin(parameters, { generation, generation, generation }, skyConstants))
+		const auto constants = context.m_Uploads.UploadConstants(parameters);
+		if (!constants.IsValid())
+		{
+			// Upload failure discards the frame; preserve the instance's previously valid LUTs.
+			return;
+		}
+		if (!atmosphere->Begin(parameters, { generation, generation, generation }))
 		{
 			return;
 		}
@@ -84,6 +89,7 @@ namespace gglab
 		const auto names = bake ? BakeAtmosphereLutNames : AtmosphereLutNames;
 		auto& resources = rg.GetBlackboard().Create<RGAtmosphereResources>(resourceName);
 		resources.m_Diagnostics = diagnostics;
+		resources.m_Constants = constants;
 		rg.AddPass<SetupData>(bake ? "IBL.Atmosphere.Import" : "Atmosphere.Import",
 			[atmosphere, resourceName, names](RenderGraph::RGBuilder& builder, SetupData&)
 			{
@@ -121,7 +127,7 @@ namespace gglab
 						data.m_Multiple = builder.CreateView<RHITextureViewType::ShaderResource>(source);
 					}
 				},
-				[atmosphere, stage, pipeline, sampler](RGExecuteContext& execute, PassData& data)
+				[atmosphere, constants, stage, pipeline, sampler](RGExecuteContext& execute, PassData& data)
 				{
 					auto* command = execute.GetDirectComputeCommandContext();
 					Parameters parameters{};
@@ -139,14 +145,11 @@ namespace gglab
 					parameters.m_Width = AtmosphereLutWidths[stage];
 					parameters.m_Height = AtmosphereLutHeights[stage];
 					command->SetPipeline(pipeline);
-					// CPU-uploaded, immutable for the frame, retained by AtmosphereSystem until submission completes.
-					command->SetConstantBuffer(
-						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						{
-							.m_Buffer = atmosphere->GetConstants(),
-							.m_OffsetInBytes = 0,
-							.m_SizeInBytes = sizeof(AtmosphereGPU),
-						});
+					if (!command->SetConstantBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+					{
+						return;
+					}
 					if (!command->SetConstantBufferData(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 					{

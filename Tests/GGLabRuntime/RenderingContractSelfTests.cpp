@@ -414,10 +414,7 @@ namespace gglab
 			uint32_t m_PassConstantMapCount = 0;
 			uint32_t m_PassConstantPublishCount = 0;
 			uint32_t m_PassConstantUnmapCount = 0;
-			bool m_AtmosphereBuffersEnabled = false;
-			uint32_t m_AtmosphereBufferCount = 0;
 			uint32_t m_AtmosphereDestroyedBufferCount = 0;
-			std::array<std::byte, 256> m_AtmosphereUpload{};
 			RHIBackendType GetBackendType() const noexcept override { return {}; }
 			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
 			{
@@ -462,9 +459,7 @@ namespace gglab
 					m_UploadBufferDescs.push_back(desc);
 					return { static_cast<uint32_t>(m_PassConstantStorage.size()), 1 };
 				}
-				return m_AtmosphereBuffersEnabled ?
-					RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } :
-					RHIBufferHandle{};
+				return {};
 			}
 			RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
@@ -511,7 +506,7 @@ namespace gglab
 					++m_PassConstantMapCount;
 					return m_ConstantMapFails ? nullptr : m_PassConstantStorage[buffer.Index() - 1].data();
 				}
-				return m_AtmosphereBuffersEnabled ? m_AtmosphereUpload.data() : nullptr;
+				return nullptr;
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
 			{
@@ -2786,7 +2781,6 @@ namespace gglab
 			context.Check(batchesReady, "Every fault-injection batch uploaded and published its payload");
 
 			RecordingDevice atmosphereDevice;
-			atmosphereDevice.m_AtmosphereBuffersEnabled = true;
 			atmosphereDevice.m_TextureViewsSupported = true;
 			atmosphereDevice.m_UseControlledFenceCompletion = true;
 			PersistentTexturePool texturePool(&atmosphereDevice);
@@ -2798,17 +2792,16 @@ namespace gglab
 			}
 			atmosphere.RetainAfterUnknownCompletion();
 			atmosphereDevice.m_CompletedFenceValue = 100;
-			atmosphere.Tick();
 			texturePool.Tick();
 			context.Check(begun && texturePool.GetDiagnostics().m_ActiveTextureCount == 3 &&
 				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0 &&
 				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 0 &&
 				!atmosphere.GetDiagnostics().m_Available && !atmosphere.IsInitialized(0),
-				"An unknown completion releases no atmosphere LUT or constants and certifies nothing");
+				"An unknown completion releases no atmosphere LUT and certifies nothing");
 			atmosphere.Shutdown();
 			texturePool.Tick();
 			context.Check(texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
-				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 1,
+				atmosphereDevice.m_AtmosphereDestroyedBufferCount == 0,
 				"Teardown releases the retained atmosphere set through its owners");
 		}
 
@@ -8899,7 +8892,8 @@ namespace gglab
 				sanitized.m_Rayleigh.m_W > 0.0f, "Atmosphere sanitization preserves nonnegative absorption and finite density scales");
 
 			RecordingDevice device;
-			device.m_AtmosphereBuffersEnabled = true;
+			device.m_PassConstantsEnabled = true;
+			device.m_CreateValidDescriptors = true;
 			device.m_TextureViewsSupported = true;
 			device.m_UseControlledFenceCompletion = true;
 			PersistentTexturePool pool(&device);
@@ -8941,6 +8935,11 @@ namespace gglab
 			const RenderServices services{ .m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
 				.m_Samplers = &samplers, .m_BindingLayout = &bindings, .m_Atmosphere = &system };
 			RenderFrameBuildResult frame{};
+			RHIUploadPool uploads(device);
+			RHIUploadWriter writer;
+			auto uploadBatch = uploads.BeginBatch();
+			uploadBatch->Attach(writer);
+			frame.m_Uploads = writer.GetFrameUploads();
 			frame.m_RenderScene.m_Atmosphere = AtmosphereSettings{};
 			frame.m_RenderScene.m_WorldSun = sun;
 			frame.m_RenderViews.resize(1);
@@ -8971,10 +8970,10 @@ namespace gglab
 				}
 			}
 			system.EndFrame(true, { RHIFenceHandle{ 1,1 },10 });
-			const bool cached = system.Begin(a, { 1,1,1 }, true);
-			context.Check(cached && system.GetDiagnostics().m_DirtyMask == 0 && system.GetDiagnostics().m_Generations[0] == 1 &&
-				system.GetConstants().IsValid(),
-				"Physical sky preview retains frame constants without recomputing cached atmosphere LUTs");
+			const bool cached = system.Begin(a, { 1,1,1 });
+			context.Check(cached && system.GetDiagnostics().m_DirtyMask == 0 &&
+				system.GetDiagnostics().m_Generations[0] == 1,
+				"Cached atmosphere keeps its LUT generations without owning a constants buffer");
 			system.EndFrame(true, { RHIFenceHandle{ 1,1 },11 });
 			changed = a;
 			changed.m_Observer.m_X += 1.0f;
@@ -8987,12 +8986,12 @@ namespace gglab
 			system.EndFrame(false, { RHIFenceHandle{ 1,1 },12 });
 			context.Check(!system.GetDiagnostics().m_Available && system.GetDiagnostics().m_Generations[2] == 1 &&
 				pool.GetDiagnostics().m_PendingRetirementTextureCount == 3 && device.m_AtmosphereDestroyedBufferCount == 0,
-				"Cancelled submitted atmosphere work publishes no generation and retains textures and constants until its fence");
+				"Cancelled submitted atmosphere work publishes no generation and retains textures until its fence");
 			device.m_CompletedFenceValue = 12;
-			system.Tick();
 			pool.Tick();
-			context.Check(device.m_AtmosphereDestroyedBufferCount == 3 && pool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
-				"Atmosphere constants and textures retire after GPU completion");
+			context.Check(device.m_AtmosphereDestroyedBufferCount == 0 &&
+				pool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Atmosphere textures retire after GPU completion without private constants buffers");
 			const bool retry = system.Begin(a, { 1,1,1 });
 			if (retry)
 			{
@@ -9002,8 +9001,9 @@ namespace gglab
 			device.m_CompletedFenceValue = 12;
 			system.Shutdown();
 			pool.Tick();
-			context.Check(pool.GetDiagnostics().m_ActiveTextureCount == 0 && device.m_AtmosphereDestroyedBufferCount == 4,
-				"Unsubmitted atmosphere cancellation destroys its upload and leaves no active resources");
+			context.Check(pool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				device.m_AtmosphereDestroyedBufferCount == 0,
+				"Unsubmitted atmosphere cancellation leaves no active LUT or private constants resources");
 
 			// Exercise the actual inspector consumer between LUT production and final export.
 			// A producer-only graph cannot detect reads declared after an early Export.
@@ -9154,7 +9154,7 @@ namespace gglab
 						*registry.GetIBLBakeTextureDesc(RenderTextureIndex::IBL_PrefilteredSpecularCubemap),
 						UndefinedRHITextureState(), RGContentValidity::Undefined);
 				});
-			pass.AddBakePass(bakeGraph, bakeServices);
+			pass.AddBakePass(bakeGraph, disabledContext, bakeServices);
 			RenderPassIBLEnvironment environmentPass;
 			environmentPass.AddPass(bakeGraph, disabledContext, bakeServices);
 			RenderPassIBLEnvironmentMipChain environmentMipPass;
@@ -9381,6 +9381,155 @@ namespace gglab
 			registry.ReleaseAll({ RHIFenceHandle{ 1, 1 }, fenceValue });
 			previewAtmosphere.Shutdown();
 			previewPool.Tick();
+			pool.Tick();
+			uploadBatch->Detach(writer);
+			uploadBatch->Cancel();
+
+			AtmosphereSystem snapshotLive(&device, &pool);
+			AtmosphereSystem snapshotBake(&device, &pool);
+			BakeEnvironmentAccess snapshotEnvironment;
+			snapshotEnvironment.m_Parameters = a;
+			snapshotEnvironment.m_Parameters.m_Sun.m_X *= 0.5f;
+			auto snapshotServices = services;
+			snapshotServices.m_Atmosphere = &snapshotLive;
+			snapshotServices.m_BakeAtmosphere = &snapshotBake;
+			snapshotServices.m_Environment = &snapshotEnvironment;
+			RenderPassAtmosphere snapshotPass;
+			uploadBatch = uploads.BeginBatch();
+			uploadBatch->Attach(writer);
+			frame.m_Uploads = writer.GetFrameUploads();
+			const auto snapshotContext = frame.MakeRenderFrameContext();
+			RenderGraph snapshotGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			snapshotPass.AddPass(snapshotGraph, snapshotContext, snapshotServices);
+			snapshotPass.AddBakePass(snapshotGraph, snapshotContext, snapshotServices);
+			snapshotPass.AddFinishPass(snapshotGraph);
+			const auto liveSnapshot = snapshotGraph.GetBlackboard().Get<RGAtmosphereResources>(
+				AtmosphereResourcesName);
+			const auto bakeSnapshotResources = snapshotGraph.GetBlackboard().Get<RGAtmosphereResources>(
+				BakeAtmosphereResourcesName);
+			const auto matchesPayload = [&device](const RGAtmosphereResources& resources)
+				{
+					const auto& binding = resources.m_Constants;
+					return binding.IsValid() && binding.m_SizeInBytes == sizeof(AtmosphereGPU) &&
+						std::memcmp(device.m_PassConstantStorage[binding.m_Buffer.Index() - 1].data() +
+							binding.m_OffsetInBytes, &resources.m_Diagnostics.m_Parameters,
+							sizeof(AtmosphereGPU)) == 0;
+				};
+			context.Check(writer.Owns(liveSnapshot.m_Constants) && writer.Owns(bakeSnapshotResources.m_Constants) &&
+				liveSnapshot.m_Constants.m_Buffer == bakeSnapshotResources.m_Constants.m_Buffer &&
+				liveSnapshot.m_Constants.m_OffsetInBytes != bakeSnapshotResources.m_Constants.m_OffsetInBytes &&
+				matchesPayload(liveSnapshot) && matchesPayload(bakeSnapshotResources),
+				"Live and bake atmosphere snapshots have independent exact payloads in the same frame batch");
+			// Mutating the producer after composition must not change either recorded snapshot.
+			snapshotEnvironment.m_Parameters = {};
+			RecordingGraphicsCommandContext snapshotGraphics;
+			RecordingComputeCommandContext snapshotCompute;
+			snapshotGraphics.BeginRecordingScope(writer);
+			snapshotCompute.BeginRecordingScope(writer);
+			const bool snapshotCompiled = snapshotGraph.Compile();
+			if (snapshotCompiled)
+			{
+				RGExecuteContext execute({ &snapshotGraphics, &snapshotCompute, nullptr });
+				snapshotGraph.Execute(execute);
+			}
+			const auto countBindings = [&snapshotCompute](const RHIConstantBufferBinding& expected)
+				{
+					return std::ranges::count_if(snapshotCompute.m_ConstantBindings,
+						[&expected](const RecordedConstantBinding& binding)
+						{
+							return binding.m_ParameterIndex == static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB) &&
+								binding.m_Buffer == expected.m_Buffer && binding.m_Offset == expected.m_OffsetInBytes;
+						});
+				};
+			context.Check(snapshotCompiled && countBindings(liveSnapshot.m_Constants) == 3 &&
+				countBindings(bakeSnapshotResources.m_Constants) == 3 && matchesPayload(bakeSnapshotResources) &&
+				!snapshotCompute.HasRecordingError(),
+				"Every live and bake LUT stage binds its composition snapshot without re-uploading or observing later edits");
+			snapshotGraphics.EndRecordingScope();
+			snapshotCompute.EndRecordingScope();
+			uploadBatch->Detach(writer);
+			const RHIFencePoint snapshotFence{ RHIFenceHandle{ 1, 1 }, 300 };
+			const bool published = uploadBatch->Publish();
+			uploadBatch->RecordAcceptedSubmission();
+			const bool submitted = uploadBatch->Submitted(snapshotFence);
+			snapshotLive.EndFrame(snapshotCompiled, snapshotFence);
+			snapshotBake.EndFrame(snapshotCompiled, snapshotFence);
+			context.Check(published && submitted && uploads.GetStatistics().m_LastBatch.m_UploadCount == 8 &&
+				device.m_UploadBufferDescs.size() == 1 &&
+				Test(device.m_UploadBufferDescs[0].m_CreateFlags, RHIBufferCreateFlags::UploadStorage),
+				"Two atmosphere instances upload once each plus six PassCBs, with no private constants allocation");
+			device.m_CompletedFenceValue = 300;
+			uploads.ReclaimCompleted();
+
+			// Cached LUTs still need fresh constants for sky and aerial consumers each frame.
+			snapshotEnvironment.m_Parameters = bakeSnapshotResources.m_Diagnostics.m_Parameters;
+			uploadBatch = uploads.BeginBatch();
+			uploadBatch->Attach(writer);
+			frame.m_Uploads = writer.GetFrameUploads();
+			const auto cachedContext = frame.MakeRenderFrameContext();
+			RenderGraph cachedGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			snapshotPass.AddPass(cachedGraph, cachedContext, snapshotServices);
+			snapshotPass.AddBakePass(cachedGraph, cachedContext, snapshotServices);
+			const auto& cachedLive = cachedGraph.GetBlackboard().Get<RGAtmosphereResources>(AtmosphereResourcesName);
+			context.Check(cachedLive.m_Constants.m_UploadBatchId != liveSnapshot.m_Constants.m_UploadBatchId &&
+				writer.Owns(cachedLive.m_Constants) && matchesPayload(cachedLive) &&
+				snapshotLive.GetDiagnostics().m_DirtyMask == 0 && snapshotBake.GetDiagnostics().m_DirtyMask == 0,
+				"Cached live and bake LUTs receive current-frame constants without scheduling new LUT producers");
+			snapshotLive.EndFrame(true, snapshotFence);
+			snapshotBake.EndFrame(true, snapshotFence);
+			uploadBatch->Detach(writer);
+			uploadBatch->Cancel();
+			context.Check(uploads.GetStatistics().m_LastBatch.m_UploadCount == 2,
+				"Cached atmosphere composition uploads exactly one constants snapshot per instance");
+
+			const auto validTexture = snapshotLive.GetTexture(0);
+			const auto validBakeTexture = snapshotBake.GetTexture(0);
+			const auto validGenerations = snapshotLive.GetDiagnostics().m_Generations;
+			const auto validBakeGenerations = snapshotBake.GetDiagnostics().m_Generations;
+			const auto limits = device.m_UploadLimits;
+			device.m_UploadLimits.m_MaxConstantRangeInBytes = sizeof(AtmosphereGPU) - 4;
+			uploadBatch = uploads.BeginBatch();
+			uploadBatch->Attach(writer);
+			frame.m_Uploads = writer.GetFrameUploads();
+			RenderGraph failedGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			const auto failedContext = frame.MakeRenderFrameContext();
+			snapshotPass.AddPass(failedGraph, failedContext, snapshotServices);
+			snapshotPass.AddBakePass(failedGraph, failedContext, snapshotServices);
+			context.Check(uploadBatch->HasFailed() &&
+				!failedGraph.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName) &&
+				!failedGraph.GetBlackboard().TryGet<RGAtmosphereResources>(BakeAtmosphereResourcesName) &&
+				snapshotLive.GetTexture(0) == validTexture && snapshotLive.IsInitialized(0) &&
+				snapshotBake.GetTexture(0) == validBakeTexture && snapshotBake.IsInitialized(0) &&
+				snapshotLive.GetDiagnostics().m_Generations == validGenerations &&
+				snapshotBake.GetDiagnostics().m_Generations == validBakeGenerations && snapshotBake.CanPublish(),
+				"Upload failure fails the frame before Begin and preserves both valid atmosphere instances");
+			uploadBatch->Detach(writer);
+			uploadBatch->Cancel();
+			device.m_UploadLimits = limits;
+
+			uploadBatch = uploads.BeginBatch();
+			uploadBatch->Attach(writer);
+			frame.m_Uploads = writer.GetFrameUploads();
+			frame.m_RenderViews[0].m_CameraPosition += Vector3(0.0f, 1000.0f, 0.0f);
+			RenderGraph unexecutedGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			snapshotPass.AddPass(unexecutedGraph, frame.MakeRenderFrameContext(), snapshotServices);
+			const bool unexecutedCompiled = unexecutedGraph.Compile();
+			RGSnapshot unexecutedSnapshot;
+			BuildRenderGraphSnapshot(unexecutedGraph, unexecutedSnapshot);
+			context.Check(unexecutedCompiled && std::ranges::any_of(unexecutedSnapshot.m_Passes,
+				[](const RGSnapshotPassInfo& info)
+				{
+					return info.m_Name == AtmosphereLutNames[2] && info.m_SideEffect && !info.m_Culled;
+				}), "Imported atmosphere LUT writes remain live even without an export or sky consumer");
+			// Do not execute: composition and even a frame fence cannot certify unwritten LUTs.
+			snapshotLive.EndFrame(true, snapshotFence);
+			context.Check(!snapshotLive.GetDiagnostics().m_Available &&
+				snapshotLive.GetDiagnostics().m_Generations == validGenerations,
+				"Unexecuted LUT work cannot publish a generation even when the surrounding frame submits");
+			uploadBatch->Detach(writer);
+			uploadBatch->Cancel();
+			snapshotLive.Shutdown();
+			snapshotBake.Shutdown();
 			pool.Tick();
 		}
 

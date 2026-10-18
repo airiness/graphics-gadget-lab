@@ -83,11 +83,14 @@ namespace gglab
 		}
 
 		EnsureInitialized(services);
+		const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
+			AtmosphereResourcesName);
 		const bool physicalPreview =
 			environmentSettings.m_BackgroundMode != EnvironmentBackgroundMode::TextureEnvironment &&
 			context.m_RenderScene.m_Atmosphere && context.m_RenderScene.m_WorldSun &&
-			services.m_Atmosphere && services.m_Atmosphere->GetConstants().IsValid() &&
-			rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
+			atmosphere && atmosphere->m_Constants.IsValid();
+		const auto constants = physicalPreview ?
+			atmosphere->m_Constants : context.m_FrameConstants.m_Scene;
 		auto* assetManager = services.m_TextureAssets;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
 		auto* bakeScheduler = services.m_Environment;
@@ -196,7 +199,7 @@ namespace gglab
 				data.m_EnvironmentTextureIndex = environmentTextureIndex;
 				data.m_EnvironmentSamplerIndex = environmentSamplerIndex;
 			},
-			[this, services, contextPtr, displayViewId](
+			[this, services, contextPtr, displayViewId, constants](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -204,6 +207,11 @@ namespace gglab
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
 				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_PhysicalPreview));
+				if (!commandContext->SetConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+				{
+					return;
+				}
 				const RHIRenderingAttachment colorAttachment{ .m_View = rtv };
 				commandContext->BeginRendering({
 					.m_ColorAttachments =
@@ -214,23 +222,6 @@ namespace gglab
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
-
-				if (data.m_PhysicalPreview)
-				{
-					commandContext->SetConstantBuffer(
-						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						{
-							.m_Buffer = services.m_Atmosphere->GetConstants(),
-							.m_OffsetInBytes = 0,
-							.m_SizeInBytes = sizeof(AtmosphereGPU),
-						});
-				}
-				else
-				{
-					commandContext->SetConstantBuffer(
-						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						contextPtr->m_FrameConstants.m_Scene);
-				}
 
 				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),

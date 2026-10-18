@@ -322,8 +322,6 @@ namespace gglab
 
 		m_TransientResourcePool->Tick();
 		m_PersistentTexturePool->Tick();
-		m_Atmosphere->Tick();
-		m_BakeAtmosphere->Tick();
 		m_AssetUploadScheduler->Tick();
 
 		m_HasActiveFrame = true;
