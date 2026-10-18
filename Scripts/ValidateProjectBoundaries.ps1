@@ -1142,9 +1142,9 @@ Test-ProjectIncludeVisibility $vulkanQualificationProject `
     @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
-# AppRuntime consumes Runtime Public contracts only. DynamicBufferAllocator
-# keeps its RingSpanAllocator storage opaque, so neither AppRuntime target
-# receives Runtime Private or legacy Runtime include visibility.
+# AppRuntime consumes Runtime Public contracts only and receives no Runtime
+# Private or legacy Runtime include visibility. Its test target's only Private
+# exception is the neutral RHI directory declared by $runtimeRhiTestIncludeRoot.
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
     @($appRuntimeIncludeRoot, $runtimePublicIncludeRoot,
