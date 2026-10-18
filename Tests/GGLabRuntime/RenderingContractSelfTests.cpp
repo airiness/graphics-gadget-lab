@@ -115,6 +115,7 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "GGLabRuntime/Graphics/TransferBatch.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <algorithm>
 #include <array>
@@ -126,6 +127,7 @@
 #include <exception>
 #include <initializer_list>
 #include <limits>
+#include <memory>
 #include <numbers>
 #include <ranges>
 #include <thread>
@@ -1323,7 +1325,7 @@ namespace gglab
 			void ReclaimCompleted() noexcept override {}
 			bool UploadBuffer(const void*, uint64_t, RHIBufferHandle, uint64_t) noexcept override
 			{
-				return !m_FailUploads;
+				return !m_FailUploads && m_UploadBufferCallCount++ < m_SucceedingUploadBufferCount;
 			}
 			bool UploadTexture(const RHITextureUploadData&, RHITextureHandle) noexcept override
 			{
@@ -1348,6 +1350,8 @@ namespace gglab
 			bool m_FailUploads = false;
 			bool m_FailReadbacks = true;
 			bool m_FailSubmit = false;
+			uint32_t m_SucceedingUploadBufferCount = std::numeric_limits<uint32_t>::max();
+			uint32_t m_UploadBufferCallCount = 0;
 			uint32_t m_SubmitCallCount = 0;
 			uint32_t m_AbortCallCount = 0;
 		};
@@ -11428,6 +11432,68 @@ namespace gglab
 		}
 	}
 
+	void RunSceneTableUploadContractTests(SelfTestContext& context) noexcept
+	{
+		PersistentStructuredBufferTable<uint64_t, ObjectGPU> objectTable(2, 2);
+		PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU> materialTable(2, 2);
+		PersistentStructuredBufferTable<uint64_t, LightGPU> lightTable(2, 2);
+		objectTable.BeginUpdate();
+		materialTable.BeginUpdate();
+		lightTable.BeginUpdate();
+		const uint32_t objectSlot = objectTable.Upsert(1, {});
+		GGLAB_UNUSED(materialTable.Upsert(RenderMaterialKey::FromAsset(MaterialID{ 1 }), {}));
+		GGLAB_UNUSED(lightTable.Upsert(1, {}));
+		objectTable.EndUpdate();
+		materialTable.EndUpdate();
+		lightTable.EndUpdate();
+
+		auto ownedTransferContext = std::make_unique<RecordingTransferContext>();
+		RecordingTransferContext& transferContext = *ownedTransferContext;
+		TransferManager transferManager(std::move(ownedTransferContext));
+		const RenderSceneBuilder::SceneTableUploadInfo uploadInfo{
+			.m_TransferManager = transferManager,
+			.m_ObjectTable = objectTable,
+			.m_MaterialTable = materialTable,
+			.m_LightTable = lightTable,
+			.m_ObjectBuffer = RHIBufferHandle{ 1, 1 },
+			.m_MaterialBuffer = RHIBufferHandle{ 2, 1 },
+			.m_LightBuffer = RHIBufferHandle{ 3, 1 },
+			.m_FrameSlotIndex = 0,
+		};
+		const auto allTablesDirty = [&](uint32_t frameSlot) noexcept
+			{
+				return !objectTable.BuildDirtyRanges(frameSlot).empty() &&
+					!materialTable.BuildDirtyRanges(frameSlot).empty() &&
+					!lightTable.BuildDirtyRangesIncludingFreeSlots(frameSlot).empty();
+			};
+
+		// The light upload is recorded last; failing it poisons the shared batch.
+		transferContext.m_SucceedingUploadBufferCount = 2;
+		const auto lightFailure = RenderSceneBuilder::UploadSceneTables(uploadInfo);
+		context.Check(!lightFailure.IsCommitted() && lightFailure.m_ObjectsRecorded &&
+			lightFailure.m_MaterialsRecorded && !lightFailure.m_LightsRecorded &&
+			!lightFailure.m_Completion.IsValid() && transferContext.m_SubmitCallCount == 0 &&
+			transferContext.m_AbortCallCount == 1 && allTablesDirty(0) &&
+			objectTable.GetUploadedRevision(0, objectSlot) == 0,
+			"A poisoned scene-table batch advances no table, so every dirty range is reported next build");
+
+		transferContext.m_SucceedingUploadBufferCount = std::numeric_limits<uint32_t>::max();
+		transferContext.m_FailSubmit = true;
+		const auto submitFailure = RenderSceneBuilder::UploadSceneTables(uploadInfo);
+		context.Check(!submitFailure.IsCommitted() && submitFailure.m_ObjectsRecorded &&
+			submitFailure.m_MaterialsRecorded && submitFailure.m_LightsRecorded &&
+			!submitFailure.m_Submitted && !submitFailure.m_Completion.IsValid() &&
+			transferContext.m_SubmitCallCount == 1 && allTablesDirty(0),
+			"A failed scene-table submission advances no table, so every dirty range is reported next build");
+
+		transferContext.m_FailSubmit = false;
+		const auto success = RenderSceneBuilder::UploadSceneTables(uploadInfo);
+		context.Check(success.IsCommitted() && success.m_Completion.IsValid() &&
+			objectTable.BuildDirtyRanges(0).empty() && materialTable.BuildDirtyRanges(0).empty() &&
+			lightTable.BuildDirtyRangesIncludingFreeSlots(0).empty() && allTablesDirty(1),
+			"A submitted scene-table batch commits every table for its frame slot only");
+	}
+
 	void RunMaterialBaselineContractTests(SelfTestContext& context) noexcept
 	{
 		constexpr double Pi = std::numbers::pi_v<double>;
@@ -11610,6 +11676,7 @@ namespace gglab
 		RunMaterialDiagnosticPrewarmTests(context);
 		RunMaterialBaselineContractTests(context);
 		RunMaterialFrameCacheContractTests(context);
+		RunSceneTableUploadContractTests(context);
 		RunMaterialDiagnosticDemandTests(context);
 		RunGGXEnergyCompensationContractTests(context);
 		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };

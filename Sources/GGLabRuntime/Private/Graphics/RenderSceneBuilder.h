@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -78,8 +79,41 @@ namespace gglab
 			RenderSceneBuildStatus m_Status = RenderSceneBuildStatus::GpuUploadFailed;
 		};
 
+		struct SceneTableUploadInfo
+		{
+			TransferManager& m_TransferManager;
+			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
+			PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>& m_MaterialTable;
+			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
+			RHIBufferHandle m_ObjectBuffer{};
+			RHIBufferHandle m_MaterialBuffer{};
+			RHIBufferHandle m_LightBuffer{};
+			uint32_t m_FrameSlotIndex = 0;
+		};
+
+		struct SceneTableUploadResult
+		{
+			// Invalid when nothing was dirty or the batch was not submitted.
+			RHIFencePoint m_Completion{};
+			bool m_ObjectsRecorded = true;
+			bool m_MaterialsRecorded = true;
+			bool m_LightsRecorded = true;
+			bool m_Submitted = true;
+
+			[[nodiscard]] bool IsCommitted() const noexcept
+			{
+				return m_ObjectsRecorded && m_MaterialsRecorded && m_LightsRecorded && m_Submitted;
+			}
+		};
+
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
+
+		// Uploads the dirty ranges of the persistent scene tables into the frame slot's buffers
+		// as one transfer batch. Revisions are committed only when every range was recorded and
+		// the batch was submitted.
+		[[nodiscard]] static SceneTableUploadResult UploadSceneTables(
+			const SceneTableUploadInfo& info) noexcept;
 
 		[[nodiscard]] static LightGPU BuildLightData(uint64_t entityKey,
 			const components::TransformComponent& transform, const components::LightComponent& light,

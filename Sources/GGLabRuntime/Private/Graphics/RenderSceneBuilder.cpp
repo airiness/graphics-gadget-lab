@@ -170,6 +170,61 @@ namespace gglab
 		return result;
 	}
 
+	RenderSceneBuilder::SceneTableUploadResult RenderSceneBuilder::UploadSceneTables(
+		const SceneTableUploadInfo& info) noexcept
+	{
+		SceneTableUploadResult result{};
+		const auto objectDirtyRanges = info.m_ObjectTable.BuildDirtyRanges(info.m_FrameSlotIndex);
+		const auto materialDirtyRanges =
+			info.m_MaterialTable.BuildDirtyRanges(info.m_FrameSlotIndex);
+		const auto lightDirtyRanges =
+			info.m_LightTable.BuildDirtyRangesIncludingFreeSlots(info.m_FrameSlotIndex);
+
+		// Only upload changed contiguous ranges into the physical buffer version
+		// associated with the current frame slot.
+		if (!objectDirtyRanges.empty() || !materialDirtyRanges.empty() || !lightDirtyRanges.empty())
+		{
+			auto batch = info.m_TransferManager.BeginBatch();
+			for (const auto& range : objectDirtyRanges)
+			{
+				const std::span<const ObjectGPU> data = info.m_ObjectTable.GetData(range);
+				result.m_ObjectsRecorded &= batch.UploadBuffer(info.m_ObjectBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(ObjectGPU), data.data(),
+					data.size_bytes());
+			}
+			for (const auto& range : materialDirtyRanges)
+			{
+				const std::span<const MaterialGPU> data = info.m_MaterialTable.GetData(range);
+				result.m_MaterialsRecorded &= batch.UploadBuffer(info.m_MaterialBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(MaterialGPU), data.data(),
+					data.size_bytes());
+			}
+			for (const auto& range : lightDirtyRanges)
+			{
+				const std::span<const LightGPU> data = info.m_LightTable.GetData(range);
+				result.m_LightsRecorded &= batch.UploadBuffer(info.m_LightBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(LightGPU), data.data(),
+					data.size_bytes());
+			}
+
+			result.m_Completion = batch.Submit(false).m_Completion;
+			result.m_Submitted = result.m_Completion.IsValid();
+		}
+
+		// The three tables share one transfer batch, so their uploaded revisions advance
+		// together or not at all. A failed upload poisons the batch and a failed submission
+		// copies nothing; committing any table then would leave this frame slot's buffer
+		// stale until those elements change again.
+		if (!result.IsCommitted())
+		{
+			return result;
+		}
+		info.m_ObjectTable.Commit(info.m_FrameSlotIndex, objectDirtyRanges);
+		info.m_MaterialTable.Commit(info.m_FrameSlotIndex, materialDirtyRanges);
+		info.m_LightTable.Commit(info.m_FrameSlotIndex, lightDirtyRanges);
+		return result;
+	}
+
 	RenderSceneBuilder::BuildResult RenderSceneBuilder::Build(const BuildInfo& info) noexcept
 	{
 		BuildResult result{};
@@ -412,77 +467,19 @@ namespace gglab
 		info.m_MaterialTable.EndUpdate();
 		info.m_LightTable.EndUpdate();
 
-		RHIFencePoint uploadFencePoint{};
+		const SceneTableUploadResult tableUpload = UploadSceneTables({
+			.m_TransferManager = transferManager,
+			.m_ObjectTable = info.m_ObjectTable,
+			.m_MaterialTable = info.m_MaterialTable,
+			.m_LightTable = info.m_LightTable,
+			.m_ObjectBuffer = info.m_ObjectsSB.GetBufferHandle(info.m_FrameSlotIndex),
+			.m_MaterialBuffer = info.m_MaterialsSB.GetBufferHandle(info.m_FrameSlotIndex),
+			.m_LightBuffer = info.m_LightsSB.GetBufferHandle(info.m_FrameSlotIndex),
+			.m_FrameSlotIndex = info.m_FrameSlotIndex,
+			});
 
-		const auto objectDirtyRanges =
-			info.m_ObjectTable.BuildDirtyRanges(info.m_FrameSlotIndex);
-		const auto materialDirtyRanges =
-			info.m_MaterialTable.BuildDirtyRanges(info.m_FrameSlotIndex);
-		const auto lightDirtyRanges =
-			info.m_LightTable.BuildDirtyRangesIncludingFreeSlots(info.m_FrameSlotIndex);
-		bool objectsUploadSucceeded = true;
-		bool materialsUploadSucceeded = true;
-		bool lightsUploadSucceeded = true;
-
-		// Only upload changed contiguous ranges into the physical buffer version
-		// associated with the current frame slot.
-		if (!objectDirtyRanges.empty() || !materialDirtyRanges.empty() || !lightDirtyRanges.empty())
-		{
-			auto batch = transferManager.BeginBatch();
-
-			const RHIBufferHandle objectBuffer =
-				info.m_ObjectsSB.GetBufferHandle(info.m_FrameSlotIndex);
-			for (const auto& range : objectDirtyRanges)
-			{
-				const std::span<const ObjectGPU> data = info.m_ObjectTable.GetData(range);
-				objectsUploadSucceeded &= batch.UploadBuffer(objectBuffer,
-					static_cast<uint64_t>(range.m_FirstElement) * sizeof(ObjectGPU), data.data(),
-					data.size_bytes());
-			}
-
-			const RHIBufferHandle materialBuffer =
-				info.m_MaterialsSB.GetBufferHandle(info.m_FrameSlotIndex);
-			for (const auto& range : materialDirtyRanges)
-			{
-				const std::span<const MaterialGPU> data = info.m_MaterialTable.GetData(range);
-				materialsUploadSucceeded &= batch.UploadBuffer(materialBuffer,
-					static_cast<uint64_t>(range.m_FirstElement) * sizeof(MaterialGPU), data.data(),
-					data.size_bytes());
-			}
-
-			const RHIBufferHandle lightBuffer =
-				info.m_LightsSB.GetBufferHandle(info.m_FrameSlotIndex);
-			for (const auto& range : lightDirtyRanges)
-			{
-				const std::span<const LightGPU> data = info.m_LightTable.GetData(range);
-				lightsUploadSucceeded &= batch.UploadBuffer(lightBuffer,
-					static_cast<uint64_t>(range.m_FirstElement) * sizeof(LightGPU), data.data(),
-					data.size_bytes());
-			}
-
-			uploadFencePoint = batch.Submit(false).m_Completion;
-			if (objectsUploadSucceeded)
-			{
-				info.m_ObjectTable.Commit(info.m_FrameSlotIndex, objectDirtyRanges);
-			}
-			if (materialsUploadSucceeded)
-			{
-				info.m_MaterialTable.Commit(info.m_FrameSlotIndex, materialDirtyRanges);
-			}
-			if (lightsUploadSucceeded)
-			{
-				info.m_LightTable.Commit(info.m_FrameSlotIndex, lightDirtyRanges);
-			}
-		}
-		else
-		{
-			info.m_ObjectTable.Commit(info.m_FrameSlotIndex, {});
-			info.m_MaterialTable.Commit(info.m_FrameSlotIndex, {});
-			info.m_LightTable.Commit(info.m_FrameSlotIndex, {});
-		}
-
-		result.m_UploadFencePoint = uploadFencePoint;
-		if (objectsUploadSucceeded && materialsUploadSucceeded && lightsUploadSucceeded)
+		result.m_UploadFencePoint = tableUpload.m_Completion;
+		if (tableUpload.IsCommitted())
 		{
 			result.m_Status = RenderSceneBuildStatus::Ready;
 
@@ -510,8 +507,10 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"RenderSceneBuilder: GPU scene upload failed "
-				"(objects={}, materials={}, lights={}). Rendering is disabled for this frame.",
-				objectsUploadSucceeded, materialsUploadSucceeded, lightsUploadSucceeded);
+				"(objects={}, materials={}, lights={}, submitted={}). "
+				"Rendering is disabled for this frame.",
+				tableUpload.m_ObjectsRecorded, tableUpload.m_MaterialsRecorded,
+				tableUpload.m_LightsRecorded, tableUpload.m_Submitted);
 		}
 
 		SceneGPU sceneCB{};
