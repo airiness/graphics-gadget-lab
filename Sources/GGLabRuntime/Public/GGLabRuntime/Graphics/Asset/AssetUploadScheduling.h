@@ -68,6 +68,9 @@ namespace gglab
 			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept = 0;
 		virtual uint32_t Tick() noexcept = 0;
 		virtual void DrainReadyWork() noexcept = 0;
+		// Stop admissions, recording, submission and publication without releasing GPU owners.
+		// Finalize cancels retained work only after verified idle or native-confirmed device loss.
+		virtual void StopGpuWork() noexcept = 0;
 		virtual void Finalize() noexcept = 0;
 		[[nodiscard]] virtual bool IsOwnerThread() const noexcept = 0;
 	};

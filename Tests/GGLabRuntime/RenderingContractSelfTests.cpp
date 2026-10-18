@@ -23,6 +23,7 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
@@ -68,6 +69,7 @@
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
 #include <cstring>
+#include <optional>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -126,6 +128,32 @@
 
 namespace gglab
 {
+	// Privileged Runtime tests seed an already-submitted readback without shader/GPU setup.
+	struct IBLBakeSchedulerTestAccess
+	{
+		static void SetReadback(IBLBakeScheduler& scheduler, RHITextureReadbackRequest request,
+			const RHIFencePoint& fence) noexcept
+		{
+			auto work = std::make_shared<IBLBakeScheduler::CacheWriteWork>();
+			constexpr size_t index = static_cast<size_t>(IBLArtifactStage::BrdfLut);
+			work->m_Config.m_BrdfLutSize = 1;
+			work->m_BuiltStages[index] = true;
+			DerivedDataKeyBuilder key;
+			GGLAB_UNUSED(key.AddStringUtf8("gglab.tests.ibl.checked-readback"));
+			work->m_Keys[index] = key.Finish();
+			work->m_Requests[index] = std::move(request);
+			scheduler.m_ReadbackWork = std::move(work);
+			scheduler.m_CacheReadbackInFlight = true;
+			scheduler.m_InFlightFence = fence;
+		}
+
+		[[nodiscard]] static bool HasReadback(const IBLBakeScheduler& scheduler) noexcept
+		{
+			return scheduler.m_ReadbackWork && scheduler.m_CacheReadbackInFlight &&
+				scheduler.m_InFlightFence.IsValid();
+		}
+	};
+
 	namespace
 	{
 		template <typename T>
@@ -549,18 +577,18 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
-			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
+			using RHIDevice::ObserveGpuWaitResult;
+			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				return !fencePoint.IsValid() || !m_UseControlledFenceCompletion ||
-					fencePoint.m_Value <= m_CompletedFenceValue;
-			}
-			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
-			{
+				if (m_FenceQueryResult)
+				{
+					return *m_FenceQueryResult;
+				}
 				if (!fencePoint.IsValid())
 				{
 					return RHIFenceQueryResult::Failed;
 				}
-				return IsFencePointCompleted(fencePoint) ?
+				return !m_UseControlledFenceCompletion || fencePoint.m_Value <= m_CompletedFenceValue ?
 					RHIFenceQueryResult::Completed :
 					RHIFenceQueryResult::Pending;
 			}
@@ -593,6 +621,7 @@ namespace gglab
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
+			std::optional<RHIFenceQueryResult> m_FenceQueryResult;
 			bool m_UseControlledFenceCompletion = false;
 			uint64_t m_CompletedFenceValue = 0;
 			uint32_t m_CreateTextureCount = 0;
@@ -2344,6 +2373,70 @@ namespace gglab
 			bool m_DeviceLost = false;
 		};
 
+		void RunIBLCheckedReadbackTests(SelfTestContext& context) noexcept
+		{
+			for (const RHIFenceQueryResult result : { RHIFenceQueryResult::Pending,
+				RHIFenceQueryResult::Completed, RHIFenceQueryResult::DeviceLost, RHIFenceQueryResult::Failed })
+			{
+				asset_test::TemporaryDirectory directory("IBLCheckedReadback");
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_CreateValidDescriptors = true;
+				device.m_FenceQueryResult = result;
+				TransientResourcePool pool(&device);
+				SamplerRegistry samplers({ .m_Device = &device });
+				RenderResourceRegistry registry({
+					.m_Device = &device,
+					.m_TransientResourcePool = &pool,
+					.m_SamplerRegistry = &samplers,
+					});
+				EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
+				TransferManager transfer(std::make_unique<asset_test::TestTransferContext>());
+				TaskSystem tasks({ .m_WorkerCount = 1 });
+				ShaderManager shaders({});
+				IBLBakeScheduler scheduler({
+					.m_Device = &device,
+					.m_TaskSystem = &tasks,
+					.m_EnvironmentLightingSystem = &environment,
+					.m_RenderResourceRegistry = &registry,
+					.m_TransferManager = &transfer,
+					.m_ShaderManager = &shaders,
+					.m_DerivedDataCacheDirectory = directory.GetPath(),
+					});
+				const RHIBufferHandle buffer = device.CreateBuffer({ .m_SizeInBytes = 4 }, {});
+				RHITextureReadbackRequest request{
+					.m_Buffer = RHIBufferOwner(&device, buffer),
+					.m_BufferSizeInBytes = 4,
+					.m_TextureDesc = { .m_Format = RHIFormat::R16G16Float, .m_Extent = { 1, 1, 1 } },
+					.m_Subresources = { { .m_RowPitch = 4, .m_RowSizeInBytes = 4,
+						.m_SlicePitch = 4, .m_RowCount = 1, .m_Width = 1, .m_Height = 1 } },
+				};
+				IBLBakeSchedulerTestAccess::SetReadback(
+					scheduler, std::move(request), { RHIFenceHandle{ 1, 1 }, 5 });
+				scheduler.Tick({});
+				tasks.Shutdown();
+				GGLAB_UNUSED(tasks.PumpCompletions());
+
+				const bool completed = result == RHIFenceQueryResult::Completed;
+				context.Check(device.m_PassConstantMapCount == (completed ? 1u : 0u) &&
+					device.m_PassConstantUnmapCount == (completed ? 1u : 0u) &&
+					scheduler.GetArtifactCacheStatistics().m_AdmissionCount == (completed ? 1u : 0u),
+					"IBL maps and admits a readback artifact only after checked Completed, never release eligibility");
+				context.Check(IBLBakeSchedulerTestAccess::HasReadback(scheduler) ==
+					(result == RHIFenceQueryResult::Pending || result == RHIFenceQueryResult::Failed),
+					"IBL retains pending or unqueryable live-device readbacks and discards a lost-device result");
+				if (result == RHIFenceQueryResult::Failed || result == RHIFenceQueryResult::DeviceLost)
+				{
+					device.m_FenceQueryResult = RHIFenceQueryResult::Completed;
+					scheduler.Tick({});
+					context.Check(scheduler.GetStatus().m_Stage == IBLBakeStage::Failed &&
+						device.m_PassConstantMapCount == 0 &&
+						scheduler.GetArtifactCacheStatistics().m_AdmissionCount == 0,
+						"IBL completion failure is sticky and cannot publish a late result or restart a bake");
+				}
+			}
+		}
+
 		void RunCheckedCompletionContractTests(SelfTestContext& context) noexcept
 		{
 			using enum RHIFenceQueryResult;
@@ -2371,6 +2464,53 @@ namespace gglab
 				"A pending query is a timeout, never device loss");
 
 			const RHIFencePoint graphicsFence{ RHIFenceHandle{ 1, 1 }, 5 };
+			for (const RHIFenceQueryResult result : { Pending, Completed, Failed, DeviceLost })
+			{
+				RecordingDevice device;
+				device.m_FenceQueryResult = result;
+				context.Check(device.IsFencePointCompleted(graphicsFence) ==
+					(result == Completed || result == DeviceLost) &&
+					device.HasCompletionError() == (result == Failed || result == DeviceLost) &&
+					device.HasObservedDeviceLoss() == (result == DeviceLost),
+					"Routine release queries use checked results and propagate failure without inventing loss");
+				device.m_FenceQueryResult = Completed;
+				context.Check(device.QueryFencePoint(graphicsFence) ==
+					(result == DeviceLost ? DeviceLost : Completed) &&
+					device.HasCompletionError() == (result == Failed || result == DeviceLost),
+					"Later successful queries cannot clear completion poison or confirmed device loss");
+			}
+			RecordingDevice invalid;
+			context.Check(invalid.IsFencePointCompleted({}) && !invalid.HasCompletionError() &&
+				invalid.QueryFencePoint({}) == Failed && invalid.HasCompletionError() &&
+				!invalid.HasObservedDeviceLoss(),
+				"An absent retirement point is releasable but never authenticates contents in a checked query");
+			RecordingDevice timedOut;
+			context.Check(timedOut.ObserveGpuWaitResult(RHIGpuWaitResult::Timeout) ==
+				RHIGpuWaitResult::Timeout && !timedOut.HasCompletionError(),
+				"A routine wait timeout neither poisons recording nor invents device loss");
+			context.Check(timedOut.ObserveGpuWaitResult(RHIGpuWaitResult::Failed) ==
+				RHIGpuWaitResult::Failed && timedOut.HasCompletionError() && !timedOut.HasObservedDeviceLoss(),
+				"A failed CPU wait poisons recording while retaining the live-device distinction");
+
+			for (const RHIFenceQueryResult result : { Failed, DeviceLost })
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool uploads(device);
+				auto batch = uploads.BeginBatch();
+				const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+				context.Check(batch->Upload(std::as_bytes(std::span(payload))).IsValid() &&
+					batch->Publish() && batch->Submitted(graphicsFence),
+					"A retirement-query regression starts with a submitted upload page");
+				device.m_FenceQueryResult = result;
+				uploads.ReclaimCompleted();
+				context.Check(device.HasCompletionError() &&
+					uploads.GetPendingPageCount() == (result == Failed ? 1u : 0u),
+					"Routine page retirement propagates query errors, retaining failed live-device work and releasing only after native-confirmed loss");
+				device.m_FenceQueryResult = Completed;
+				uploads.ReclaimCompleted();
+			}
+
 			context.Check(RHIFrameEndResult::Fatal().GetSubmissionState() ==
 					RHIFrameSubmissionState::NoOutstandingWork &&
 				RHIFrameEndResult::Fatal(graphicsFence).GetSubmissionState() ==
@@ -11293,6 +11433,7 @@ namespace gglab
 		RunUploadTeardownContractTests(context);
 		RunUploadOwnerThreadContractTests(context);
 		RunCheckedCompletionContractTests(context);
+		RunIBLCheckedReadbackTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);

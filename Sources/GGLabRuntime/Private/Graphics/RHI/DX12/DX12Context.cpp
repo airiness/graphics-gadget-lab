@@ -211,10 +211,10 @@ namespace gglab
 		{
 			return RHIFrameBeginResult::Fatal();
 		}
-		if (m_Poisoned)
+		if (IsPoisoned() || IsDeviceLost())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"DX12Context refuses new frames after an unknown frame completion.");
+				"DX12Context refuses new frames after a GPU completion failure.");
 			return RHIFrameBeginResult::Fatal();
 		}
 
@@ -243,6 +243,10 @@ namespace gglab
 			return RHIFrameBeginResult::Fatal();
 		}
 		RetireCompletedWork();
+		if (IsPoisoned() || IsDeviceLost())
+		{
+			return RHIFrameBeginResult::Fatal();
+		}
 
 		frame.m_BackBufferIndex = backBufferIndex;
 		GGLAB_ASSERT(frame.m_BackBufferIndex < m_SwapChain->GetBufferCount());
@@ -269,7 +273,8 @@ namespace gglab
 			return RHIFrameEndResult::Fatal();
 		}
 
-		if (m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex).HasRecordingError() ||
+		if (IsPoisoned() || IsDeviceLost() ||
+			m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex).HasRecordingError() ||
 			m_DirectComputeContexts[frame->m_FrameSlotIndex]->HasRecordingError() ||
 			(frame->m_ComputeAllocator &&
 				m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex).HasRecordingError()) ||
@@ -463,7 +468,7 @@ namespace gglab
 		{
 			return;
 		}
-		if (m_Poisoned)
+		if (IsPoisoned() || IsDeviceLost())
 		{
 			return;
 		}
@@ -496,9 +501,14 @@ namespace gglab
 		return result;
 	}
 
+	bool DX12Context::IsPoisoned() const noexcept
+	{
+		return m_Poisoned || (m_Device && m_Device->HasCompletionError());
+	}
+
 	bool DX12Context::IsDeviceLost() const noexcept
 	{
-		return m_Device && m_Device->IsDeviceRemoved();
+		return m_Device && (m_Device->HasObservedDeviceLoss() || m_Device->IsDeviceRemoved());
 	}
 
 	RHISubmissionVerification DX12Context::MakeSubmissionVerification() noexcept

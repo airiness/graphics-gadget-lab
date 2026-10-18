@@ -61,7 +61,6 @@ namespace gglab
 			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept;
 		RHIGpuWaitResult WaitForFenceCompletion(const RHIFencePoint& fencePoint,
 			uint32_t timeoutMilliseconds = RHIInfiniteWaitMilliseconds) noexcept;
-		[[nodiscard]] bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept;
 		[[nodiscard]] RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept;
 		[[nodiscard]] const DX12Fence* ResolveFence(RHIFenceHandle fence) const noexcept;
 		// Flushes every queue. Completed only when every queue was verified idle.

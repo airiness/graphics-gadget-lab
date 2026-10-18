@@ -63,9 +63,8 @@ namespace gglab
 		const DX12SignalResult signal = SignalChecked();
 		if (!signal.m_Signaled)
 		{
-			return m_DX12Device->IsDeviceRemoved() ?
-				RHIGpuWaitResult::DeviceLost :
-				RHIGpuWaitResult::Failed;
+			return m_DX12Device->ObserveGpuWaitResult(m_DX12Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
 		}
 		return signal.m_FencePoint.Wait(timeoutMilliseconds);
 	}
@@ -90,6 +89,8 @@ namespace gglab
 		const HRESULT result = m_D3D12CommandQueue->Wait(fence.Get(), value);
 		if (FAILED(result))
 		{
+			m_DX12Device->ObserveGpuWaitResult(m_DX12Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
 			GGLAB_LOG_GRAPHICS_ERROR("ID3D12CommandQueue::Wait failed (HRESULT 0x{:08X}).",
 				static_cast<uint32_t>(result));
 			return false;

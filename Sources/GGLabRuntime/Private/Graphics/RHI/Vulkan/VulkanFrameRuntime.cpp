@@ -1020,22 +1020,7 @@ namespace gglab
 
 	bool VulkanFrameRuntime::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
-		if (!fencePoint.IsValid())
-		{
-			return true;
-		}
-		if (m_Timeline == nullptr || fencePoint.m_Fence != m_Timeline->GetRHIHandle())
-		{
-			// An unknown fence is not a completed fence; resource
-			// retirement must never assume a foreign point finished.
-			return false;
-		}
-		uint64_t completedValue = 0;
-		if (m_Timeline->GetCompletedValue(completedValue) != VK_SUCCESS)
-		{
-			return false;
-		}
-		return completedValue >= fencePoint.m_Value;
+		return !fencePoint.IsValid() || (m_Device && m_Device->IsFencePointCompleted(fencePoint));
 	}
 
 	void VulkanFrameRuntime::MarkFatal(
@@ -1047,6 +1032,10 @@ namespace gglab
 			UpdateVulkanRuntimeHealth(VulkanRuntimeHealthState{ m_Fatal, m_DeviceLost }, error);
 		m_Fatal = next.m_Fatal;
 		m_DeviceLost = next.m_DeviceLost;
+		if (error == VK_ERROR_DEVICE_LOST && m_Device)
+		{
+			m_Device->ObserveFenceQueryResult(RHIFenceQueryResult::DeviceLost);
+		}
 	}
 
 	void VulkanFrameRuntime::DestroyFrameSlots() noexcept

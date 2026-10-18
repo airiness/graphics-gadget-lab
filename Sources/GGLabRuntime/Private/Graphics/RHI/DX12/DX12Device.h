@@ -115,8 +115,9 @@ namespace gglab
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
 		RHIUploadLimits GetUploadLimits() const noexcept override;
 		bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override;
-		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
-		RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override;
+		// Private backend primitives report their checked results through the same health state.
+		using RHIDevice::ObserveFenceQueryResult;
+		using RHIDevice::ObserveGpuWaitResult;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
 		void RecordTextureUse(
 			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
@@ -155,6 +156,7 @@ namespace gglab
 		}
 
 	private:
+		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
 		void InitializeWinPIX() noexcept;
 		void InitializeDXGIFactory(bool enableDebugValidation) noexcept;
 		void InitializeDXGIAdapter() noexcept;

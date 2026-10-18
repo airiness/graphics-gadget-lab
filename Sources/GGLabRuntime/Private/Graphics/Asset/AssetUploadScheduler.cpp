@@ -58,6 +58,7 @@ namespace gglab
 			AssetUploadCompletion completion = {}) noexcept override;
 		uint32_t Tick() noexcept override;
 		void DrainReadyWork() noexcept override;
+		void StopGpuWork() noexcept override;
 		void Finalize() noexcept override;
 		void SetFrameBudget(const AssetStreamingFrameBudget& budget) noexcept override;
 		[[nodiscard]] const AssetStreamingFrameBudget& GetFrameBudget() const noexcept override
@@ -149,6 +150,8 @@ namespace gglab
 			AssetResourcePublicationStage stage, AssetResourcePublicationFaultTiming timing,
 			AssetResourcePublicationStepResult& result) noexcept;
 		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
+		[[nodiscard]] bool CanSchedule() noexcept;
+		void CancelReadyWorkForShutdown() noexcept;
 		void FlushRecordedUploads() noexcept;
 		uint32_t PollCompletedUploads() noexcept;
 		void EnqueueGpuFinalize(PendingUpload&& upload, AssetUploadStatus status) noexcept;
@@ -222,6 +225,7 @@ namespace gglab
 		uint64_t m_PublicationNoProgressContinueCount = 0;
 		uint64_t m_PublicationFaultInjectionCount = 0;
 		bool m_IsRecordingUploadBatch = false;
+		bool m_GpuWorkStopped = false;
 	};
 
 	AssetUploadSchedulerInstance CreateAssetUploadScheduler(
@@ -448,7 +452,7 @@ namespace gglab
 			IsOwnerThread(), "Asset uploads must be recorded on the scheduler owner thread.");
 		GGLAB_ASSERT_MSG(m_IsRecordingUploadBatch,
 			"Asset uploads must be recorded while the upload-recording queue is being drained.");
-		if (!IsOwnerThread() || !m_IsRecordingUploadBatch || !record)
+		if (!IsOwnerThread() || !m_IsRecordingUploadBatch || !record || !CanSchedule())
 		{
 			return {};
 		}
@@ -492,6 +496,10 @@ namespace gglab
 			return;
 		}
 
+		if (!CanSchedule())
+		{
+			return;
+		}
 		GGLAB_ASSERT_NOT_NULL(m_RecordingBatch.get());
 		const uint32_t uploadCount = static_cast<uint32_t>(m_RecordedUploads.size());
 		const auto submittedAt = std::chrono::steady_clock::now();
@@ -530,13 +538,17 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(
 			IsOwnerThread(), "Asset upload fences must be polled on the scheduler owner thread.");
-		if (!IsOwnerThread())
+		if (!IsOwnerThread() || !CanSchedule())
 		{
 			return 0;
 		}
 
 		DrainWorkerHandoffs();
 		GGLAB_UNUSED(PollCompletedUploads());
+		if (!CanSchedule())
+		{
+			return 0;
+		}
 		m_LastFrameUsage = {};
 		GGLAB_UNUSED(DrainCpuPayloadQueue(false));
 		DrainWorkerHandoffs();
@@ -544,20 +556,20 @@ namespace gglab
 		DrainWorkerHandoffs();
 		GGLAB_UNUSED(DrainUploadRecordingQueue(false));
 		GGLAB_UNUSED(PollCompletedUploads());
-		return DrainGpuFinalizeQueue(false);
+		return CanSchedule() ? DrainGpuFinalizeQueue(false) : 0;
 	}
 
 	void AssetUploadScheduler::DrainReadyWork() noexcept
 	{
 		GGLAB_ASSERT_MSG(
 			IsOwnerThread(), "AssetUploadScheduler::DrainReadyWork must run on the owner thread.");
-		if (!IsOwnerThread())
+		if (!IsOwnerThread() || !CanSchedule())
 		{
 			return;
 		}
 
 		m_LastFrameUsage = {};
-		for (;;)
+		while (CanSchedule())
 		{
 			DrainWorkerHandoffs();
 			if (m_CpuPayloadQueue.empty() && m_ResourcePublicationQueue.empty() &&
@@ -569,8 +581,61 @@ namespace gglab
 			GGLAB_UNUSED(DrainResourcePublicationQueue(true));
 			GGLAB_UNUSED(DrainUploadRecordingQueue(true));
 		}
-		GGLAB_UNUSED(PollCompletedUploads());
-		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
+		if (CanSchedule())
+		{
+			GGLAB_UNUSED(PollCompletedUploads());
+			if (CanSchedule())
+			{
+				GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
+			}
+		}
+	}
+
+	void AssetUploadScheduler::StopGpuWork() noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Stopping asset GPU work requires the owner thread.");
+		if (IsOwnerThread())
+		{
+			m_GpuWorkStopped = true;
+		}
+	}
+
+	bool AssetUploadScheduler::CanSchedule() noexcept
+	{
+		if (m_Device->HasCompletionError())
+		{
+			StopGpuWork();
+		}
+		return !m_GpuWorkStopped;
+	}
+
+	void AssetUploadScheduler::CancelReadyWorkForShutdown() noexcept
+	{
+		// Finalize is called only after verified idle or native-confirmed loss. In particular,
+		// abort callbacks may release resources belonging to partially recorded publications.
+		while (!m_CpuPayloadQueue.empty() || !m_ResourcePublicationQueue.empty() ||
+			!m_UploadRecordingQueue.empty() || HasWorkerHandoffs())
+		{
+			DrainWorkerHandoffs();
+			while (!m_CpuPayloadQueue.empty())
+			{
+				const AssetStreamingIdentity identity = m_CpuPayloadQueue.front().m_Desc.m_Identity;
+				GGLAB_UNUSED(CancelQueuedWork(m_CpuPayloadQueue, m_CpuPayloadTelemetry, identity, false));
+			}
+			while (!m_ResourcePublicationQueue.empty())
+			{
+				const AssetStreamingIdentity identity =
+					m_ResourcePublicationQueue.front().m_Desc.m_Identity;
+				GGLAB_UNUSED(CancelResourcePublication(
+					identity, AssetResourcePublicationAbortReason::Shutdown));
+			}
+			while (!m_UploadRecordingQueue.empty())
+			{
+				const AssetStreamingIdentity identity = m_UploadRecordingQueue.front().m_Desc.m_Identity;
+				GGLAB_UNUSED(CancelQueuedWork(
+					m_UploadRecordingQueue, m_UploadRecordingTelemetry, identity, true));
+			}
+		}
 	}
 
 	uint32_t AssetUploadScheduler::PollCompletedUploads() noexcept
@@ -583,8 +648,14 @@ namespace gglab
 				++iterator;
 				continue;
 			}
-			if (!m_Device->IsFencePointCompleted(iterator->m_FencePoint))
+			const RHIFenceQueryResult completion = m_Device->QueryFencePoint(iterator->m_FencePoint);
+			if (completion != RHIFenceQueryResult::Completed)
 			{
+				if (completion != RHIFenceQueryResult::Pending)
+				{
+					StopGpuWork();
+					break;
+				}
 				++iterator;
 				continue;
 			}
@@ -622,10 +693,42 @@ namespace gglab
 
 		DrainWorkerHandoffs();
 		m_GpuCompletionHold = {};
+		if (!CanSchedule())
+		{
+			CancelReadyWorkForShutdown();
+			// Recorded but unsubmitted transfers were retained across the failed completion.
+			m_RecordingBatch.reset();
+			for (PendingUpload& upload : m_RecordedUploads)
+			{
+				EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
+			}
+			m_RecordedUploads.clear();
+			m_RecordedUploadBytes = 0;
+			while (!m_PendingUploads.empty())
+			{
+				PendingUpload upload = std::move(m_PendingUploads.front());
+				m_PendingUploads.pop_front();
+				EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
+			}
+			m_InFlightBytes = 0;
+			for (PendingGpuFinalize& publication : m_GpuFinalizeQueue)
+			{
+				publication.m_Status = AssetUploadStatus::Failed;
+			}
+			GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
+			CancelReadyWorkForShutdown();
+			m_TransferManager->Reclaim();
+			return;
+		}
 		GGLAB_ASSERT_MSG(m_CpuPayloadQueue.empty() && m_ResourcePublicationQueue.empty() &&
 			m_UploadRecordingQueue.empty(),
 			"AssetUploadScheduler::Finalize requires ready work to be drained before the RHI context becomes idle.");
 		GGLAB_UNUSED(PollCompletedUploads());
+		if (!CanSchedule())
+		{
+			Finalize();
+			return;
+		}
 		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
 		GGLAB_ASSERT_MSG(m_PendingUploads.empty(),
 			"AssetUploadScheduler::Finalize requires the RHI context to be idle.");
@@ -858,7 +961,7 @@ namespace gglab
 	{
 		const uint32_t initialCount = static_cast<uint32_t>(m_CpuPayloadQueue.size());
 		uint32_t processedCount = 0;
-		while (processedCount < initialCount && !m_CpuPayloadQueue.empty())
+		while (CanSchedule() && processedCount < initialCount && !m_CpuPayloadQueue.empty())
 		{
 			const QueuedWork& next = m_CpuPayloadQueue.front();
 			if (!ignoreBudget && processedCount > 0 &&
@@ -925,7 +1028,7 @@ namespace gglab
 	{
 		uint32_t processedCount = 0;
 		AssetResourcePublicationContext context{};
-		while (!m_ResourcePublicationQueue.empty())
+		while (CanSchedule() && !m_ResourcePublicationQueue.empty())
 		{
 			const bool budgetExhausted = m_LastFrameUsage.m_ResourcePublicationSteps >=
 				m_FrameBudget.m_MaxResourcePublicationSteps ||
@@ -1071,7 +1174,7 @@ namespace gglab
 		m_IsRecordingUploadBatch = true;
 		const uint32_t initialCount = static_cast<uint32_t>(m_UploadRecordingQueue.size());
 		uint32_t processedCount = 0;
-		while (processedCount < initialCount && !m_UploadRecordingQueue.empty())
+		while (CanSchedule() && processedCount < initialCount && !m_UploadRecordingQueue.empty())
 		{
 			const AssetStreamingWorkEstimate& estimate =
 				m_UploadRecordingQueue.front().m_Desc.m_Estimate;

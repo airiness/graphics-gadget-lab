@@ -256,11 +256,132 @@ namespace gglab
 			scheduler.m_Scheduling->Finalize();
 		}
 
+		void RunCompletionFailureDuringRecordingTest(SelfTestContext& context) noexcept
+		{
+			asset_test::TestRHIDevice device;
+			auto nativeContext = std::make_unique<asset_test::TestTransferContext>();
+			auto* nativeTransfer = nativeContext.get();
+			TransferManager transfer(std::move(nativeContext));
+			auto instance = CreateAssetUploadScheduler({ .m_Device = &device, .m_TransferManager = &transfer });
+			AssetUploadScheduling& scheduler = *instance.m_Scheduling;
+			uint32_t completions = 0;
+			bool succeeded = false;
+			uint32_t laterRecordings = 0;
+			scheduler.EnqueueUploadRecording({ .m_Name = "Fail during recording" },
+				[&]()
+				{
+					GGLAB_UNUSED(scheduler.RecordUpload({ .m_Name = "Unsubmitted recording" },
+						[&](TransferBatch&)
+						{
+							device.SetFenceQueryResult(RHIFenceQueryResult::Failed);
+							GGLAB_UNUSED(device.QueryFencePoint({ RHIFenceHandle{ 1, 1 }, 3 }));
+							return true;
+						},
+						[&](const AssetUploadCompletionInfo& completion)
+						{
+							++completions;
+							succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
+						}));
+				});
+			scheduler.EnqueueUploadRecording({ .m_Name = "Later recording" }, [&]() { ++laterRecordings; });
+			GGLAB_UNUSED(scheduler.Tick());
+			scheduler.DrainReadyWork();
+			context.Check(!nativeTransfer->GetLastSubmittedFence().IsValid() &&
+				completions == 0 && laterRecordings == 0,
+				"A completion failure during recording retains the open transfer batch and prevents its flush and later recordings");
+			scheduler.Finalize();
+			context.Check(!nativeTransfer->GetLastSubmittedFence().IsValid() &&
+				completions == 1 && !succeeded && laterRecordings == 0,
+				"Quiescent finalization aborts an unsubmitted batch and reports failure once without a native submit");
+		}
+
+		void RunStoppedGpuWorkTest(SelfTestContext& context) noexcept
+		{
+			for (uint32_t scenario = 0; scenario < 3; ++scenario)
+			{
+				asset_test::TestRHIDevice device;
+				device.SetFencesComplete(false);
+				auto transferContext = std::make_unique<asset_test::TestTransferContext>();
+				auto* nativeTransfer = transferContext.get();
+				TransferManager transfer(std::move(transferContext));
+				auto instance = CreateAssetUploadScheduler({ .m_Device = &device, .m_TransferManager = &transfer });
+				AssetUploadScheduling& scheduler = *instance.m_Scheduling;
+				uint32_t completionCount = 0;
+				AssetUploadStatus completionStatus = AssetUploadStatus::Pending;
+				scheduler.EnqueueUploadRecording({ .m_Name = "In-flight upload" },
+					[&]()
+					{
+						GGLAB_UNUSED(scheduler.RecordUpload({ .m_Name = "In-flight upload",
+							.m_Identity = { .m_Kind = AssetStreamingWorkKind::Mesh,
+								.m_StableId = 123, .m_Generation = 1 },
+							.m_Estimate = { .m_StagingBytes = 64 } },
+							[](TransferBatch&) { return true; },
+							[&](const AssetUploadCompletionInfo& info)
+							{
+								++completionCount;
+								completionStatus = info.m_Status;
+							}));
+					});
+				GGLAB_UNUSED(scheduler.Tick());
+				const RHIFencePoint submitted = nativeTransfer->GetLastSubmittedFence();
+				context.Check(submitted.IsValid() && completionCount == 0,
+					"A stopped-work regression begins with a genuinely submitted pending upload");
+
+				uint32_t cpuExecutions = 0;
+				uint32_t recordingExecutions = 0;
+				auto readyPayload = std::make_shared<uint32_t>(7);
+				std::weak_ptr<uint32_t> retainedPayload = readyPayload;
+				std::thread worker(
+					[&]()
+					{
+						scheduler.EnqueueCpuPayload({ .m_Name = "Worker handoff" }, [&]() { ++cpuExecutions; });
+					});
+				worker.join();
+				scheduler.EnqueueUploadRecording({ .m_Name = "Unrecorded upload",
+					.m_Estimate = { .m_SourceBytes = 16 } },
+					[&, payload = std::move(readyPayload)]() { recordingExecutions += *payload; });
+				auto publication = std::make_shared<SyntheticPublicationState>();
+				scheduler.EnqueueResourcePublication({ .m_Name = "Unstarted publication",
+					.m_Estimate = { .m_SourceBytes = 32 } },
+					std::make_unique<SyntheticPublicationJob>(publication));
+
+				if (scenario == 0)
+				{
+					// A CompletionUnknown context explicitly stops work even without a query error.
+					scheduler.StopGpuWork();
+				}
+				else
+				{
+					device.SetFenceQueryResult(scenario == 1 ?
+						RHIFenceQueryResult::Failed : RHIFenceQueryResult::DeviceLost);
+				}
+				GGLAB_UNUSED(scheduler.Tick());
+				scheduler.DrainReadyWork();
+				context.Check(nativeTransfer->GetLastSubmittedFence() == submitted &&
+					cpuExecutions == 0 && recordingExecutions == 0 && publication->m_Steps == 0 &&
+					publication->m_AbortCount == 0 && completionCount == 0 && !retainedPayload.expired(),
+					"Stopped, failed and lost-device schedulers neither submit nor publish or release retained work before quiescence");
+
+				// The fixture has no real GPU; model AppRuntime's verified-quiescence boundary.
+				scheduler.Finalize();
+				const AssetUploadStatistics statistics = scheduler.GetStatistics();
+				context.Check(nativeTransfer->GetLastSubmittedFence() == submitted &&
+					completionCount == 1 && completionStatus == AssetUploadStatus::Failed &&
+					publication->m_AbortCount == 1 &&
+					publication->m_AbortReason == AssetResourcePublicationAbortReason::Shutdown &&
+					retainedPayload.expired() && statistics.m_InFlightBytes == 0 &&
+					statistics.m_ReadyPayloadBytes == 0 && statistics.m_FailedCount == 1,
+					"Quiescent finalization cancels CPU/publication work, fails uploads once and conserves payload accounting without submission");
+			}
+		}
+
 	}
 
 	void RunAssetUploadSchedulerSelfTests(SelfTestContext& context) noexcept
 	{
 		RunAssetUploadSchedulerWorkerHandoffTest(context);
+		RunStoppedGpuWorkTest(context);
+		RunCompletionFailureDuringRecordingTest(context);
 		RunResourcePublicationGenerationTest(context);
 		RunResourcePublicationDrainTest(context);
 	}

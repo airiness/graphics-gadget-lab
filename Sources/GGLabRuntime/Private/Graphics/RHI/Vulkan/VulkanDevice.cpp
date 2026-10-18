@@ -543,63 +543,23 @@ namespace gglab
 		}
 	}
 
-	bool VulkanDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
-	{
-		if (!RequireOwnerThread("VulkanDevice::IsFencePointCompleted"))
-		{
-			return false;
-		}
-		if (!fencePoint.IsValid())
-		{
-			return true;
-		}
-		const VulkanTimelineFence* timeline = nullptr;
-		if (m_GraphicsTimeline && fencePoint.m_Fence == m_GraphicsTimeline->GetRHIHandle())
-		{
-			timeline = m_GraphicsTimeline;
-		}
-		else if (m_TransferTimeline &&
-			fencePoint.m_Fence == m_TransferTimeline->GetRHIHandle())
-		{
-			timeline = m_TransferTimeline.get();
-		}
-		if (!timeline)
-		{
-			// An unknown fence never counts as completed.
-			return false;
-		}
-		uint64_t completedValue = 0;
-		const VkResult result = timeline->GetCompletedValue(completedValue);
-		if (result == VK_ERROR_DEVICE_LOST)
-		{
-			// Release query: a lost device executes no more work, so destruction is allowed.
-			// Consumers of GPU-written contents query with QueryFencePoint instead.
-			return true;
-		}
-		if (result != VK_SUCCESS)
-		{
-			return false;
-		}
-		return completedValue >= fencePoint.m_Value;
-	}
-
 	RHIGpuWaitResult VulkanDevice::WaitFencePoint(
 		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
 	{
 		if (!RequireOwnerThread("VulkanDevice::WaitFencePoint") || !fencePoint.IsValid())
 		{
-			return RHIGpuWaitResult::Failed;
+			return ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
 		}
 		const VulkanTimelineFence* timeline = FindTimeline(fencePoint.m_Fence);
 		if (!timeline)
 		{
-			return RHIGpuWaitResult::Failed;
+			return ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
 		}
-		return ClassifyVulkanWaitResult(
-			timeline->Wait(fencePoint.m_Value, ToVulkanTimeoutNanoseconds(timeoutMilliseconds)));
+		return ObserveGpuWaitResult(ClassifyVulkanWaitResult(
+			timeline->Wait(fencePoint.m_Value, ToVulkanTimeoutNanoseconds(timeoutMilliseconds))));
 	}
 
-	RHIFenceQueryResult VulkanDevice::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	RHIFenceQueryResult VulkanDevice::QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept
 	{
 		if (!RequireOwnerThread("VulkanDevice::QueryFencePoint") || !fencePoint.IsValid())
 		{
@@ -609,6 +569,10 @@ namespace gglab
 		if (!timeline)
 		{
 			return RHIFenceQueryResult::Failed;
+		}
+		if (HasObservedDeviceLoss())
+		{
+			return RHIFenceQueryResult::DeviceLost;
 		}
 		uint64_t completedValue = 0;
 		const VkResult result = timeline->GetCompletedValue(completedValue);

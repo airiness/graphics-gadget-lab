@@ -414,14 +414,7 @@ namespace gglab
 		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 	}
 
-	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
-	{
-		return m_QueueSystem ?
-			m_QueueSystem->IsFencePointCompleted(fencePoint) :
-			!fencePoint.IsValid();
-	}
-
-	RHIFenceQueryResult DX12Device::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	RHIFenceQueryResult DX12Device::QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept
 	{
 		return m_QueueSystem ?
 			m_QueueSystem->QueryFencePoint(fencePoint) :

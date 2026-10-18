@@ -29,6 +29,12 @@ namespace gglab
 
 	inline constexpr uint32_t RHIInfiniteWaitMilliseconds = UINT32_MAX;
 
+	// Native-confirmed loss permits destruction, never acceptance of GPU-written data.
+	[[nodiscard]] constexpr bool IsFenceSafeToRelease(RHIFenceQueryResult result) noexcept
+	{
+		return result == RHIFenceQueryResult::Completed || result == RHIFenceQueryResult::DeviceLost;
+	}
+
 	[[nodiscard]] constexpr RHIGpuWaitResult ToRHIGpuWaitResult(RHIFenceQueryResult query) noexcept
 	{
 		switch (query)

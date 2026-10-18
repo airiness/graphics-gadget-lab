@@ -125,6 +125,7 @@ namespace gglab
 		const DX12Fence* fence = ResolveFence(fencePoint.m_Fence);
 		if (!fence)
 		{
+			m_Device->ObserveFenceQueryResult(RHIFenceQueryResult::Failed);
 			GGLAB_LOG_GRAPHICS_WARN("DX12QueueSystem::WaitForFence received an unknown fence.");
 			return false;
 		}
@@ -136,7 +137,7 @@ namespace gglab
 	{
 		if (!fencePoint.IsValid())
 		{
-			return RHIGpuWaitResult::Failed;
+			return m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
 		}
 		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
 		{
@@ -144,22 +145,7 @@ namespace gglab
 		}
 		GGLAB_LOG_GRAPHICS_WARN(
 			"DX12QueueSystem::WaitForFenceCompletion received an unknown fence.");
-		return RHIGpuWaitResult::Failed;
-	}
-
-	bool DX12QueueSystem::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
-	{
-		if (!fencePoint.IsValid())
-		{
-			return true;
-		}
-		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
-		{
-			return fence->IsCompleted(fencePoint.m_Value);
-		}
-		GGLAB_LOG_GRAPHICS_WARN(
-			"DX12QueueSystem::IsFencePointCompleted received an unknown fence.");
-		return false;
+		return m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
 	}
 
 	RHIFenceQueryResult DX12QueueSystem::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept

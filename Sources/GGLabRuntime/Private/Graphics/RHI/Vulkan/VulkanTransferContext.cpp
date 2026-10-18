@@ -3,6 +3,7 @@
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
@@ -128,7 +129,7 @@ namespace gglab
 		{
 			return {};
 		}
-		if (m_RecordingFailed)
+		if (m_RecordingFailed || m_Device->HasCompletionError())
 		{
 			Abort();
 			return {};
@@ -173,6 +174,7 @@ namespace gglab
 			vkQueueSubmit2(m_Device->GetTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 		if (submitResult != VK_SUCCESS)
 		{
+			m_Device->ObserveGpuWaitResult(ClassifyVulkanWaitResult(submitResult));
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Vulkan transfer queue submission failed with {}.", ToString(submitResult));
 			DestroyInfo(*m_ExecutingInfo);
@@ -197,6 +199,7 @@ namespace gglab
 		if (wait)
 		{
 			const VkResult waitResult = timeline->Wait(signalValue);
+			m_Device->ObserveGpuWaitResult(ClassifyVulkanWaitResult(waitResult));
 			if (waitResult != VK_SUCCESS)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(

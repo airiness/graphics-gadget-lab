@@ -328,7 +328,7 @@ namespace gglab
 		{
 			return RHIFrameBeginResult::Fatal();
 		}
-		if (m_Poisoned)
+		if (IsPoisoned() || IsDeviceLost())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"VulkanContext refuses new frames after an unknown frame completion.");
@@ -374,9 +374,18 @@ namespace gglab
 		}
 
 		RetireCompletedWork();
+		if (IsPoisoned() || IsDeviceLost())
+		{
+			// No commands were recorded. Retain the acquired slot until verified teardown;
+			// AbortFrame would submit an empty present transaction on the poisoned device.
+			return RHIFrameBeginResult::Fatal();
+		}
 		if (!m_Set0Frames->BeginFrame(begin.m_FrameSlotIndex))
 		{
-			GGLAB_UNUSED(m_Bootstrap->m_FrameRuntime->AbortFrame());
+			if (!IsPoisoned() && !IsDeviceLost())
+			{
+				GGLAB_UNUSED(m_Bootstrap->m_FrameRuntime->AbortFrame());
+			}
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"VulkanContext failed to begin its frame-local descriptor arena.");
 			return RHIFrameBeginResult::Fatal();
@@ -421,7 +430,8 @@ namespace gglab
 			m_GraphicsContext->GetUsedTextures().begin(), m_GraphicsContext->GetUsedTextures().end());
 		const std::vector usedBuffers(
 			m_GraphicsContext->GetUsedBuffers().begin(), m_GraphicsContext->GetUsedBuffers().end());
-		if (m_GraphicsContext->HasRecordingError() || m_DirectComputeContext->HasRecordingError() ||
+		if (IsPoisoned() || IsDeviceLost() ||
+			m_GraphicsContext->HasRecordingError() || m_DirectComputeContext->HasRecordingError() ||
 			!frame->m_Uploads->Publish() || !m_GraphicsContext->FinishEncoding() ||
 			!m_Bootstrap->m_FrameRuntime->EndFrameRecording())
 		{
@@ -505,6 +515,13 @@ namespace gglab
 
 		m_GraphicsContext->AbortEncoding();
 		GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
+		if (IsPoisoned() || IsDeviceLost())
+		{
+			// Never submit the normal empty present transaction after a completion failure.
+			frame->m_Uploads->Cancel();
+			FinishFrame(*frame);
+			return RHIFrameEndResult::Fatal();
+		}
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->AbortFrame();
 		// The frame's own command buffer is never submitted, so no accepted stream reads the
 		// upload batch, whatever the abort submission returned.
@@ -652,10 +669,17 @@ namespace gglab
 		return m_Bootstrap->m_FrameRuntime->GetSwapChain();
 	}
 
+	bool VulkanContext::IsPoisoned() const noexcept
+	{
+		return m_Poisoned || (m_Bootstrap && m_Bootstrap->m_Device &&
+			m_Bootstrap->m_Device->HasCompletionError());
+	}
+
 	bool VulkanContext::IsDeviceLost() const noexcept
 	{
-		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&
-			m_Bootstrap->m_FrameRuntime->IsDeviceLost();
+		return m_Bootstrap &&
+			((m_Bootstrap->m_FrameRuntime && m_Bootstrap->m_FrameRuntime->IsDeviceLost()) ||
+				(m_Bootstrap->m_Device && m_Bootstrap->m_Device->HasObservedDeviceLoss()));
 	}
 
 	RHISubmissionVerification VulkanContext::MakeSubmissionVerification() noexcept
@@ -678,6 +702,10 @@ namespace gglab
 	void VulkanContext::ObserveWaitResult(
 		RHIGpuWaitResult result, std::string_view operation) noexcept
 	{
+		if (m_Bootstrap && m_Bootstrap->m_Device)
+		{
+			m_Bootstrap->m_Device->ObserveGpuWaitResult(result);
+		}
 		if (result == RHIGpuWaitResult::DeviceLost && m_Bootstrap && m_Bootstrap->m_FrameRuntime)
 		{
 			m_Bootstrap->m_FrameRuntime->MarkFatal(VK_ERROR_DEVICE_LOST, operation);
@@ -700,7 +728,7 @@ namespace gglab
 	bool VulkanContext::RecreateSwapChain(uint32_t width, uint32_t height) noexcept
 	{
 		if (!m_Bootstrap || !m_Bootstrap->m_FrameRuntime || !m_SwapChain ||
-			m_ActiveFrame != nullptr || width == 0 || height == 0)
+			m_ActiveFrame != nullptr || width == 0 || height == 0 || IsPoisoned() || IsDeviceLost())
 		{
 			return false;
 		}

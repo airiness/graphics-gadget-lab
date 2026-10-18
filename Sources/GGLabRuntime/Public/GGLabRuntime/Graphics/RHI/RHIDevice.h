@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResourceDebug.h"
 
+#include <atomic>
 #include <memory>
 #include <string_view>
 
@@ -90,10 +91,29 @@ namespace gglab
 		// Routine release query: true when the GPU no longer uses work up to the point.
 		// An invalid point records no use. It must not accept GPU-written contents or
 		// verify quiescence; use QueryFencePoint for those decisions.
-		virtual bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept = 0;
+		[[nodiscard]] bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+		{
+			return !fencePoint.IsValid() || IsFenceSafeToRelease(QueryFencePoint(fencePoint));
+		}
 		// Checked completion query. An invalid or unknown point is never Completed.
-		[[nodiscard]] virtual RHIFenceQueryResult QueryFencePoint(
-			const RHIFencePoint& fencePoint) const noexcept = 0;
+		[[nodiscard]] RHIFenceQueryResult QueryFencePoint(
+			const RHIFencePoint& fencePoint) const noexcept
+		{
+			const RHIFenceQueryResult result = fencePoint.IsValid() ?
+				QueryFencePointImpl(fencePoint) :
+				RHIFenceQueryResult::Failed;
+			return ObserveFenceQueryResult(result);
+		}
+		// Sticky completion failures poison recording, not the native device. Pending queries
+		// and routine wait timeouts never set either state; only a native loss sets the latter.
+		[[nodiscard]] bool HasCompletionError() const noexcept
+		{
+			return m_CompletionFailed.load(std::memory_order_relaxed) || HasObservedDeviceLoss();
+		}
+		[[nodiscard]] bool HasObservedDeviceLoss() const noexcept
+		{
+			return m_DeviceLost.load(std::memory_order_relaxed);
+		}
 		virtual void RecordTextureUse(
 			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept = 0;
 		virtual void RecordBufferUse(
@@ -118,5 +138,40 @@ namespace gglab
 		}
 
 		virtual void RetireCompletedWork() noexcept = 0;
+
+	protected:
+		[[nodiscard]] virtual RHIFenceQueryResult QueryFencePointImpl(
+			const RHIFencePoint& fencePoint) const noexcept = 0;
+		RHIFenceQueryResult ObserveFenceQueryResult(RHIFenceQueryResult result) const noexcept
+		{
+			if (result == RHIFenceQueryResult::Failed)
+			{
+				m_CompletionFailed.store(true, std::memory_order_relaxed);
+			}
+			else if (result == RHIFenceQueryResult::DeviceLost)
+			{
+				m_DeviceLost.store(true, std::memory_order_relaxed);
+			}
+			// A confirmed loss remains authoritative even if a later counter query succeeds.
+			return result != RHIFenceQueryResult::Failed && HasObservedDeviceLoss() ?
+				RHIFenceQueryResult::DeviceLost :
+				result;
+		}
+		RHIGpuWaitResult ObserveGpuWaitResult(RHIGpuWaitResult result) const noexcept
+		{
+			if (result == RHIGpuWaitResult::Failed)
+			{
+				ObserveFenceQueryResult(RHIFenceQueryResult::Failed);
+			}
+			else if (result == RHIGpuWaitResult::DeviceLost)
+			{
+				ObserveFenceQueryResult(RHIFenceQueryResult::DeviceLost);
+			}
+			return result;
+		}
+
+	private:
+		mutable std::atomic<bool> m_CompletionFailed{ false };
+		mutable std::atomic<bool> m_DeviceLost{ false };
 	};
 }

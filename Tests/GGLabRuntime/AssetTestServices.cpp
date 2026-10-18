@@ -95,18 +95,14 @@ namespace gglab::asset_test
 		m_LiveBuffers.erase(buffer);
 	}
 
-	bool TestRHIDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
-	{
-		return fencePoint.IsValid() && m_AllFencesCompleted;
-	}
-
-	RHIFenceQueryResult TestRHIDevice::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept
+	RHIFenceQueryResult TestRHIDevice::QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept
 	{
 		if (!fencePoint.IsValid())
 		{
 			return RHIFenceQueryResult::Failed;
 		}
-		return m_AllFencesCompleted ? RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending;
+		return m_FenceQueryResult.value_or(m_AllFencesCompleted ?
+			RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending);
 	}
 
 	TemporaryDirectory::TemporaryDirectory(std::string_view name) noexcept

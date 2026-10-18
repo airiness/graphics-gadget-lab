@@ -82,7 +82,7 @@ namespace gglab
 			return m_UploadPool ? m_UploadPool->GetStatistics() : RHIUploadStatistics{};
 		}
 		void RetireCompletedWork() noexcept override;
-		bool IsPoisoned() const noexcept override { return m_Poisoned; }
+		bool IsPoisoned() const noexcept override;
 		bool IsDeviceLost() const noexcept override;
 		uint32_t GetFrameSlotCount() const noexcept override;
 

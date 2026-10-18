@@ -43,9 +43,7 @@ namespace gglab
 
 	bool DX12Fence::IsCompleted(uint64_t fenceValue) const noexcept
 	{
-		const auto completedValue = GetCompletedValue();
-		//OutputDebugString(std::format(L"Completed fence value: {}, Checked fence value: {}\n", completedValue, fenceValue).c_str());
-		return completedValue >= fenceValue;
+		return IsFenceSafeToRelease(Query(fenceValue));
 	}
 
 	RHIFenceQueryResult DX12Fence::Query(uint64_t fenceValue) const noexcept
@@ -53,7 +51,9 @@ namespace gglab
 		const uint64_t completedValue = GetCompletedValue();
 		const bool deviceRemoved = completedValue == DX12DeviceRemovedFenceValue &&
 			m_Device && m_Device->IsDeviceRemoved();
-		return ClassifyDX12FenceQuery(completedValue, fenceValue, deviceRemoved);
+		return m_Device->ObserveFenceQueryResult(
+			ClassifyDX12FenceQuery(completedValue, fenceValue,
+				deviceRemoved || m_Device->HasObservedDeviceLoss()));
 	}
 
 	DX12SignalResult DX12Fence::Signal(DX12CommandQueue* dx12CommandQueue) noexcept
@@ -69,6 +69,8 @@ namespace gglab
 		}
 		else
 		{
+			m_Device->ObserveGpuWaitResult(m_Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
 			GGLAB_LOG_GRAPHICS_ERROR("ID3D12CommandQueue::Signal failed (HRESULT 0x{:08X}).",
 				static_cast<uint32_t>(result));
 		}
@@ -84,13 +86,12 @@ namespace gglab
 			const RHIFenceQueryResult query = Query(fenceValue);
 			if (query != RHIFenceQueryResult::Pending)
 			{
-				return ToRHIGpuWaitResult(query);
+				return m_Device->ObserveGpuWaitResult(ToRHIGpuWaitResult(query));
 			}
 			if (FAILED(m_D3D12Fence->SetEventOnCompletion(fenceValue, m_EventHandle)))
 			{
-				return m_Device && m_Device->IsDeviceRemoved() ?
-					RHIGpuWaitResult::DeviceLost :
-					RHIGpuWaitResult::Failed;
+				return m_Device->ObserveGpuWaitResult(m_Device->IsDeviceRemoved() ?
+					RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
 			}
 			DWORD remaining = INFINITE;
 			if (timeoutMilliseconds != RHIInfiniteWaitMilliseconds)
@@ -108,7 +109,7 @@ namespace gglab
 					DX12FenceEventWait::Failed;
 			if (const auto step = ClassifyDX12FenceWaitStep(wait, Query(fenceValue)))
 			{
-				return *step;
+				return m_Device->ObserveGpuWaitResult(*step);
 			}
 		}
 	}

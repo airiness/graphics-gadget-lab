@@ -245,11 +245,20 @@ namespace gglab
 			uploads.m_PageCountFailures, uploads.m_PageCreationFailures,
 			uploads.m_PageMappingFailures, uploads.m_PublicationFailures);
 
-		if (QuiesceRHIForTeardown(*m_RHIContext) == RHITeardownState::Unverified)
+		if (m_Poisoned || m_RHIContext->IsPoisoned() || m_RHIContext->IsDeviceLost())
+		{
+			m_AssetUploadScheduler->StopGpuWork();
+		}
+		const RHITeardownState teardown = QuiesceRHIForTeardown(*m_RHIContext);
+		if (teardown == RHITeardownState::Unverified)
 		{
 			AbandonGpuOwners();
 			m_IsInitialized = false;
 			return;
+		}
+		if (teardown == RHITeardownState::DeviceLost)
+		{
+			m_AssetUploadScheduler->StopGpuWork();
 		}
 		// No queue still runs work: every owner below may release. Captures publish their
 		// rows only after verified idle; after device loss they fail without reading.

@@ -139,11 +139,7 @@ namespace gglab
 				return m_Buffers.contains(buffer);
 			}
 			bool IsAlive(RHISamplerHandle) const noexcept override { return false; }
-			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
-			{
-				return fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue;
-			}
-			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
+			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
 				if (!fencePoint.IsValid())
 				{
@@ -153,9 +149,8 @@ namespace gglab
 				{
 					return RHIFenceQueryResult::DeviceLost;
 				}
-				return IsFencePointCompleted(fencePoint) ?
-					RHIFenceQueryResult::Completed :
-					RHIFenceQueryResult::Pending;
+				return fencePoint.m_Value <= m_CompletedFenceValue ?
+					RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}

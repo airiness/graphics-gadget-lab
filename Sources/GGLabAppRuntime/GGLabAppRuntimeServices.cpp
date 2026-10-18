@@ -429,12 +429,24 @@ namespace gglab
 				"App runtime asset lifetime requires an initialized render host.");
 			if (m_RenderHost && m_RenderHost->IsInitialized())
 			{
-				m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
+				RHIContext& context = *m_RenderHost->GetRHIContext();
+				if (context.IsPoisoned() || context.IsDeviceLost())
+				{
+					m_RenderComposition->GetAssetUploadScheduler()->StopGpuWork();
+				}
+				else
+				{
+					m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
+				}
 				// Verified idle, or confirmed device loss, lets every owner below release.
-				if (QuiesceRHIForTeardown(*m_RenderHost->GetRHIContext()) ==
-					RHITeardownState::Unverified)
+				const RHITeardownState teardown = QuiesceRHIForTeardown(context);
+				if (teardown == RHITeardownState::Unverified)
 				{
 					AbandonProcessAfterUnverifiedGpuTeardown();
+				}
+				if (teardown == RHITeardownState::DeviceLost)
+				{
+					m_RenderComposition->GetAssetUploadScheduler()->StopGpuWork();
 				}
 				// Host-owned tooling may retain backend pipelines, descriptors and user
 				// textures referenced by the last submitted frame. Retire them only at

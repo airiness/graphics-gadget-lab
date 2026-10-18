@@ -229,6 +229,11 @@ namespace gglab
 
 	RHIFencePoint DX12TransferContext::Submit(bool wait) noexcept
 	{
+		if (m_Device->HasCompletionError())
+		{
+			Abort();
+			return {};
+		}
 		return End(wait).ToRHI();
 	}
 

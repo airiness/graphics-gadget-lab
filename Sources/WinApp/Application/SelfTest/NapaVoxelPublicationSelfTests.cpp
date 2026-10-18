@@ -269,35 +269,21 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
-			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
+			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				if (!fencePoint.IsValid())
-				{
-					return false;
-				}
 				if (m_AllFencesCompleted)
 				{
-					return true;
+					return RHIFenceQueryResult::Completed;
 				}
 				for (const RHIFencePoint& completed : m_CompletedFencePoints)
 				{
 					if (completed.m_Fence == fencePoint.m_Fence &&
 						completed.m_Value >= fencePoint.m_Value)
 					{
-						return true;
+						return RHIFenceQueryResult::Completed;
 					}
 				}
-				return false;
-			}
-			RHIFenceQueryResult QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept override
-			{
-				if (!fencePoint.IsValid())
-				{
-					return RHIFenceQueryResult::Failed;
-				}
-				return IsFencePointCompleted(fencePoint) ?
-					RHIFenceQueryResult::Completed :
-					RHIFenceQueryResult::Pending;
+				return RHIFenceQueryResult::Pending;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
