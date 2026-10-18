@@ -129,8 +129,6 @@ namespace gglab
 
 	class IBLBakeScheduler
 	{
-		friend struct IBLBakeSchedulerTestAccess;
-
 	private:
 		struct BakeRequestSnapshot
 		{

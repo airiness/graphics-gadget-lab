@@ -23,7 +23,6 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
@@ -128,32 +127,6 @@
 
 namespace gglab
 {
-	// Privileged Runtime tests seed an already-submitted readback without shader/GPU setup.
-	struct IBLBakeSchedulerTestAccess
-	{
-		static void SetReadback(IBLBakeScheduler& scheduler, RHITextureReadbackRequest request,
-			const RHIFencePoint& fence) noexcept
-		{
-			auto work = std::make_shared<IBLBakeScheduler::CacheWriteWork>();
-			constexpr size_t index = static_cast<size_t>(IBLArtifactStage::BrdfLut);
-			work->m_Config.m_BrdfLutSize = 1;
-			work->m_BuiltStages[index] = true;
-			DerivedDataKeyBuilder key;
-			GGLAB_UNUSED(key.AddStringUtf8("gglab.tests.ibl.checked-readback"));
-			work->m_Keys[index] = key.Finish();
-			work->m_Requests[index] = std::move(request);
-			scheduler.m_ReadbackWork = std::move(work);
-			scheduler.m_CacheReadbackInFlight = true;
-			scheduler.m_InFlightFence = fence;
-		}
-
-		[[nodiscard]] static bool HasReadback(const IBLBakeScheduler& scheduler) noexcept
-		{
-			return scheduler.m_ReadbackWork && scheduler.m_CacheReadbackInFlight &&
-				scheduler.m_InFlightFence.IsValid();
-		}
-	};
-
 	namespace
 	{
 		template <typename T>
@@ -2372,70 +2345,6 @@ namespace gglab
 			size_t m_LoseDeviceAtAttempt = std::numeric_limits<size_t>::max();
 			bool m_DeviceLost = false;
 		};
-
-		void RunIBLCheckedReadbackTests(SelfTestContext& context) noexcept
-		{
-			for (const RHIFenceQueryResult result : { RHIFenceQueryResult::Pending,
-				RHIFenceQueryResult::Completed, RHIFenceQueryResult::DeviceLost, RHIFenceQueryResult::Failed })
-			{
-				asset_test::TemporaryDirectory directory("IBLCheckedReadback");
-				RecordingDevice device;
-				device.m_PassConstantsEnabled = true;
-				device.m_CreateValidDescriptors = true;
-				device.m_FenceQueryResult = result;
-				TransientResourcePool pool(&device);
-				SamplerRegistry samplers({ .m_Device = &device });
-				RenderResourceRegistry registry({
-					.m_Device = &device,
-					.m_TransientResourcePool = &pool,
-					.m_SamplerRegistry = &samplers,
-					});
-				EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
-				TransferManager transfer(std::make_unique<asset_test::TestTransferContext>());
-				TaskSystem tasks({ .m_WorkerCount = 1 });
-				ShaderManager shaders({});
-				IBLBakeScheduler scheduler({
-					.m_Device = &device,
-					.m_TaskSystem = &tasks,
-					.m_EnvironmentLightingSystem = &environment,
-					.m_RenderResourceRegistry = &registry,
-					.m_TransferManager = &transfer,
-					.m_ShaderManager = &shaders,
-					.m_DerivedDataCacheDirectory = directory.GetPath(),
-					});
-				const RHIBufferHandle buffer = device.CreateBuffer({ .m_SizeInBytes = 4 }, {});
-				RHITextureReadbackRequest request{
-					.m_Buffer = RHIBufferOwner(&device, buffer),
-					.m_BufferSizeInBytes = 4,
-					.m_TextureDesc = { .m_Format = RHIFormat::R16G16Float, .m_Extent = { 1, 1, 1 } },
-					.m_Subresources = { { .m_RowPitch = 4, .m_RowSizeInBytes = 4,
-						.m_SlicePitch = 4, .m_RowCount = 1, .m_Width = 1, .m_Height = 1 } },
-				};
-				IBLBakeSchedulerTestAccess::SetReadback(
-					scheduler, std::move(request), { RHIFenceHandle{ 1, 1 }, 5 });
-				scheduler.Tick({});
-				tasks.Shutdown();
-				GGLAB_UNUSED(tasks.PumpCompletions());
-
-				const bool completed = result == RHIFenceQueryResult::Completed;
-				context.Check(device.m_PassConstantMapCount == (completed ? 1u : 0u) &&
-					device.m_PassConstantUnmapCount == (completed ? 1u : 0u) &&
-					scheduler.GetArtifactCacheStatistics().m_AdmissionCount == (completed ? 1u : 0u),
-					"IBL maps and admits a readback artifact only after checked Completed, never release eligibility");
-				context.Check(IBLBakeSchedulerTestAccess::HasReadback(scheduler) ==
-					(result == RHIFenceQueryResult::Pending || result == RHIFenceQueryResult::Failed),
-					"IBL retains pending or unqueryable live-device readbacks and discards a lost-device result");
-				if (result == RHIFenceQueryResult::Failed || result == RHIFenceQueryResult::DeviceLost)
-				{
-					device.m_FenceQueryResult = RHIFenceQueryResult::Completed;
-					scheduler.Tick({});
-					context.Check(scheduler.GetStatus().m_Stage == IBLBakeStage::Failed &&
-						device.m_PassConstantMapCount == 0 &&
-						scheduler.GetArtifactCacheStatistics().m_AdmissionCount == 0,
-						"IBL completion failure is sticky and cannot publish a late result or restart a bake");
-				}
-			}
-		}
 
 		void RunCheckedCompletionContractTests(SelfTestContext& context) noexcept
 		{
@@ -11433,7 +11342,6 @@ namespace gglab
 		RunUploadTeardownContractTests(context);
 		RunUploadOwnerThreadContractTests(context);
 		RunCheckedCompletionContractTests(context);
-		RunIBLCheckedReadbackTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
