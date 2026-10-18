@@ -92,7 +92,12 @@
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
+#include "Graphics/RHI/DX12/DX12CommandContext.h"
+#include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/DX12TransferContext.h"
+#if GGLAB_ENABLE_VULKAN
+#include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
+#endif
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/RHIFrameSubmission.h"
 #include "Graphics/RHI/RHIUploadPool.h"
@@ -113,6 +118,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <concepts>
 #include <cmath>
 #include <cstdint>
@@ -130,6 +136,22 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept PublicInlineConstantWords = requires(T& value, std::span<const uint32_t> words)
+		{
+			value.SetInlineConstantWords(0, words, 0);
+		};
+		static_assert(!PublicInlineConstantWords<RHIGraphicsCommandContext>);
+		static_assert(!PublicInlineConstantWords<RHIComputeCommandContext>);
+		static_assert(!PublicInlineConstantWords<DX12GraphicsCommandContext>);
+		static_assert(!PublicInlineConstantWords<DX12ComputeCommandContext>);
+#if GGLAB_ENABLE_VULKAN
+		static_assert(!PublicInlineConstantWords<VulkanGraphicsCommandContext>);
+		static_assert(!PublicInlineConstantWords<VulkanComputeCommandContext>);
+#endif
+		static_assert(std::is_same_v<decltype(std::declval<const DX12RootSignature&>().GetParameterPlan()),
+			const DX12RootParameterPlan&>);
+
 		template <typename T>
 		concept CameraRoutingMutation = requires(T& value) { value.SetDisplayViewId(RenderViewID::Main); };
 		template <typename T>
@@ -1179,7 +1201,7 @@ namespace gglab
 			}
 			std::vector<RHIReadOnlyBufferBinding> m_ReadOnlyBindings;
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
+			void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
 			{
 				m_LastInlineParameter = parameterIndex;
 				m_LastInlineOffset = offset;
@@ -1252,7 +1274,7 @@ namespace gglab
 			std::vector<RHIReadOnlyBufferBinding> m_ReadOnlyBindings;
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
 			void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
+			void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> words, uint32_t offset) noexcept override
 			{
 				m_LastInlineParameter = parameterIndex;
 				m_LastInlineOffset = offset;
@@ -1696,7 +1718,7 @@ namespace gglab
 			const auto inlineIndex = static_cast<uint32_t>(CommonRSRootParamIndex::InlineConstants);
 			context.Check(layout.m_Slots[passIndex].m_Type == RHIBindingType::ConstantBuffer &&
 				layout.m_Slots[passIndex].m_Binding == 2 &&
-				layout.m_Slots[inlineIndex].m_Type == RHIBindingType::PushConstants &&
+				layout.m_Slots[inlineIndex].m_Type == RHIBindingType::InlineConstants &&
 				layout.m_Slots[inlineIndex].m_Binding == 4,
 				"Common binding layout separates b2 pass buffers from b4 inline constants");
 			DX12BindingLayoutBuildResult lowered{};
@@ -1705,9 +1727,54 @@ namespace gglab
 				lowered.m_RootParameters[inlineIndex].ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS &&
 				lowered.m_RootParameters[inlineIndex].Constants.Num32BitValues == MaxInlineConstantDWORDs,
 				"DX12 lowers pass buffers to root CBVs while retaining immediate constants");
-			context.Check(IsValidPushConstantWrite(32, 8, 0) && IsValidPushConstantWrite(32, 2, 6) &&
-				!IsValidPushConstantWrite(32, 2, 7) && !IsValidPushConstantWrite(32, 1, UINT32_MAX) &&
-				!IsValidPushConstantWrite(0, 1, 0) && !IsValidPushConstantWrite(32, 0, 0),
+			const auto commonPlan = BuildDX12RootParameterPlan(
+				{ lowered.m_Desc.Desc_1_1.pParameters, lowered.m_Desc.Desc_1_1.NumParameters });
+			context.Check(commonPlan.m_BufferBindingTypes[passIndex] == RHIBindingType::ConstantBuffer &&
+				commonPlan.m_BufferBindingTypes[static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB)] ==
+					RHIBindingType::ReadOnlyStorageBuffer &&
+				commonPlan.m_InlineConstantSizesInBytes[inlineIndex] == MaxInlineConstantDWORDs * sizeof(uint32_t) &&
+				commonPlan.m_InlineConstantSizesInBytes[passIndex] == 0,
+				"The DX12 native parameter plan keeps common CBV, SRV and inline capacities distinct");
+			RHIBindingLayoutDesc compactLayout{};
+			compactLayout.m_SlotCount = 8;
+			compactLayout.m_Slots[0] = { .m_Type = RHIBindingType::BindlessResourceTable, .m_Count = 0 };
+			compactLayout.m_Slots[2] = { .m_Type = RHIBindingType::InlineConstants, .m_SizeInBytes = 16 };
+			compactLayout.m_Slots[3] = { .m_Type = RHIBindingType::ConstantBuffer };
+			compactLayout.m_Slots[4] = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer };
+			compactLayout.m_Slots[5] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer };
+			compactLayout.m_Slots[6] = { .m_Type = RHIBindingType::ConstantBuffer, .m_Count = 2 };
+			compactLayout.m_Slots[7] = { .m_Type = RHIBindingType::BindlessSamplerTable, .m_Count = 0 };
+			const auto compactPlan = [&compactLayout]()
+				{
+					DX12BindingLayoutBuildResult native{};
+					BuildDX12RootSignatureDesc(compactLayout, native);
+					return BuildDX12RootParameterPlan(
+						{ native.m_Desc.Desc_1_1.pParameters, native.m_Desc.Desc_1_1.NumParameters });
+				}();
+			context.Check(compactPlan.m_InlineConstantSizesInBytes[0] == 16 &&
+				compactPlan.m_BufferBindingTypes[1] == RHIBindingType::ConstantBuffer &&
+				compactPlan.m_BufferBindingTypes[2] == RHIBindingType::ReadOnlyStorageBuffer &&
+				compactPlan.m_BufferBindingTypes[3] == RHIBindingType::ReadWriteStorageBuffer,
+				"The cached native plan skips unknown and bindless slots and owns values beyond descriptor lifetime");
+			context.Check(compactPlan.m_BufferBindingTypes[4] == RHIBindingType::Unknown &&
+				compactPlan.m_InlineConstantSizesInBytes[4] == 0 &&
+				!IsValidInlineConstantWrite(compactPlan.m_InlineConstantSizesInBytes[4], 1, 0) &&
+				compactPlan.m_BufferBindingTypes.back() == RHIBindingType::Unknown &&
+				compactPlan.m_InlineConstantSizesInBytes.back() == 0,
+				"Descriptor tables and unused native parameters cannot be bound as root buffers or inline words");
+			compactLayout.m_Slots[2].m_SizeInBytes = 8;
+			DX12BindingLayoutBuildResult alternateNative{};
+			BuildDX12RootSignatureDesc(compactLayout, alternateNative);
+			const auto alternatePlan = BuildDX12RootParameterPlan(
+				{ alternateNative.m_Desc.Desc_1_1.pParameters, alternateNative.m_Desc.Desc_1_1.NumParameters });
+			context.Check(compactPlan.m_InlineConstantSizesInBytes[0] == 16 &&
+				alternatePlan.m_InlineConstantSizesInBytes[0] == 8 &&
+				IsValidInlineConstantWrite(compactPlan.m_InlineConstantSizesInBytes[0], 2, 2) &&
+				!IsValidInlineConstantWrite(alternatePlan.m_InlineConstantSizesInBytes[0], 2, 2),
+				"Switching native plans changes inline capacity without mutating a cached earlier layout");
+			context.Check(IsValidInlineConstantWrite(32, 8, 0) && IsValidInlineConstantWrite(32, 2, 6) &&
+				!IsValidInlineConstantWrite(32, 2, 7) && !IsValidInlineConstantWrite(32, 1, UINT32_MAX) &&
+				!IsValidInlineConstantWrite(0, 1, 0) && !IsValidInlineConstantWrite(32, 0, 0),
 				"Inline writes reject non-inline bindings, empty payloads and overflowing partial writes");
 
 			RecordingDevice device;
@@ -1734,6 +1801,19 @@ namespace gglab
 					uploadBatch.Detach(writer);
 				};
 			beginRecording(*batch);
+			struct InlinePayload
+			{
+				float m_Value;
+				uint32_t m_Flags;
+			};
+			graphics.SetInlineConstants(inlineIndex, InlinePayload{ 1.5f, 0xabcdef01u }, 2);
+			std::array<uint32_t, 2> inlineWords{ 11, 19 };
+			compute.SetInlineConstants(inlineIndex, std::span(inlineWords), 3);
+			inlineWords.fill(0);
+			context.Check(graphics.m_LastInlineParameter == inlineIndex && graphics.m_LastInlineOffset == 2 &&
+				graphics.m_LastInlineWords == std::vector<uint32_t>({ std::bit_cast<uint32_t>(1.5f), 0xabcdef01u }) &&
+				compute.m_LastInlineOffset == 3 && compute.m_LastInlineWords == std::vector<uint32_t>({ 11, 19 }),
+				"Public inline entry points preserve typed payload bits, span elements and word offsets");
 			RGExecuteContext execution({ &graphics, &compute, nullptr });
 			std::array<uint32_t, 24> payload{};
 			payload.fill(0x12345678u);
@@ -1884,7 +1964,7 @@ namespace gglab
 			endRecording(*publicationFailure);
 			publicationFailure->Cancel();
 			auto oversized = uploads.BeginBatch();
-			std::vector<std::byte> tooLarge(device.GetMaxConstantBufferRange() + 4);
+			std::vector<std::byte> tooLarge(device.GetUploadLimits().m_MaxConstantRangeInBytes + 4);
 			context.Check(!oversized->Upload(tooLarge).IsValid() && oversized->HasFailed(),
 				"Constant uploads reject ranges beyond device capabilities");
 			oversized->Cancel();

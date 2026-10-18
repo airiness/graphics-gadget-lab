@@ -8,7 +8,8 @@ namespace gglab
 {
 	DX12RootSignature::DX12RootSignature(
 		DX12Device* dx12Device, const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept :
-		m_Desc(desc)
+		m_Desc(desc), m_ParameterPlan(BuildDX12RootParameterPlan(
+			{ desc.Desc_1_1.pParameters, desc.Desc_1_1.NumParameters }))
 	{
 		GGLAB_ASSERT_MSG(dx12Device, "DX12Device is null");
 

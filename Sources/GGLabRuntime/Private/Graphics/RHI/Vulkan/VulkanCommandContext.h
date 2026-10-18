@@ -27,7 +27,6 @@ namespace gglab
 			VulkanGpuProfiler* gpuProfiler = nullptr) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanGraphicsCommandContext);
 		~VulkanGraphicsCommandContext() override = default;
-		using RHIGraphicsCommandContext::SetPushConstants;
 
 		[[nodiscard]] bool BeginEncoding(
 			VkCommandBuffer commandBuffer, uint32_t frameSlotIndex) noexcept;
@@ -68,6 +67,8 @@ namespace gglab
 		bool SetConstantBuffer(
 			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
 	protected:
+		void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
 		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
 			const RHIReadOnlyBufferBinding& binding) noexcept override;
 
@@ -75,8 +76,6 @@ namespace gglab
 		using RHIGraphicsCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept override;
 		void SetVertexBuffers(
 			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept override;
 		void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept override;
@@ -143,7 +142,6 @@ namespace gglab
 		explicit VulkanComputeCommandContext(VulkanGraphicsCommandContext& graphicsContext) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanComputeCommandContext);
 		~VulkanComputeCommandContext() override;
-		using RHIComputeCommandContext::SetPushConstants;
 		// The submission owner's recording scope for the frame's upload writer.
 		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
 		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
@@ -168,6 +166,8 @@ namespace gglab
 		bool SetConstantBuffer(
 			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
 	protected:
+		void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
 		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
 			const RHIReadOnlyBufferBinding& binding) noexcept override;
 
@@ -177,8 +177,6 @@ namespace gglab
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetReadWriteBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept override;
 		void Dispatch(
 			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept override;
 

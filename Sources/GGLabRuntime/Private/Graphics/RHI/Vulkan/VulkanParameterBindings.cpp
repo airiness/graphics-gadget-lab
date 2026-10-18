@@ -44,7 +44,7 @@ namespace gglab
 		const size_t destOffsetInBytes = static_cast<size_t>(destOffsetInWords) * sizeof(uint32_t);
 		const size_t sourceSizeInBytes = values.size_bytes();
 		if (slot.m_DynamicOffsetSlot == UINT32_MAX ||
-			!IsValidPushConstantWrite(static_cast<uint32_t>(slot.m_Bytes.size()),
+			!IsValidInlineConstantWrite(static_cast<uint32_t>(slot.m_Bytes.size()),
 				values.size(), destOffsetInWords))
 		{
 			return false;

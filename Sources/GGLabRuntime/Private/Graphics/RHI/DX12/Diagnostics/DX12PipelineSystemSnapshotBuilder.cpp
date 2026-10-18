@@ -19,7 +19,7 @@ namespace gglab
 	{
 		const char* BackendBindingType(const RHIBindingSlotDesc& slot) noexcept
 		{
-			if (slot.m_Type == RHIBindingType::PushConstants)
+			if (slot.m_Type == RHIBindingType::InlineConstants)
 			{
 				return "Inline constants";
 			}

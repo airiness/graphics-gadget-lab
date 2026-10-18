@@ -79,7 +79,6 @@ namespace gglab
 		[[nodiscard]] virtual bool FlushMappedBufferWrites(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
-		virtual uint32_t GetMaxConstantBufferRange() const noexcept { return 64 * 1024; }
 		[[nodiscard]] virtual RHIUploadLimits GetUploadLimits() const noexcept = 0;
 		// Callers reject upload storage outside batch-scoped bindings. A backend that cannot
 		// check the identity, for example off its owner thread, reports true.

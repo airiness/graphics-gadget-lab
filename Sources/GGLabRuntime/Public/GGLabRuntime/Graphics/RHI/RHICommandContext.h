@@ -353,16 +353,21 @@ namespace gglab
 			return SetConstantBufferData(parameterIndex, std::as_bytes(std::span<const T>(&data, 1)));
 		}
 		template <typename T>
-		void SetInlineConstants(uint32_t parameterIndex, const T& data, uint32_t destOffsetInWords = 0) noexcept
+		void SetInlineConstants(uint32_t parameterIndex, const T& values,
+			uint32_t destOffsetInWords = 0) noexcept
 		{
-			SetPushConstants(parameterIndex, data, destOffsetInWords);
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> words{};
+			std::memcpy(words.data(), &values, sizeof(T));
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
 		}
 		template <typename T, size_t Extent>
 		void SetInlineConstants(uint32_t parameterIndex, std::span<T, Extent> words,
 			uint32_t destOffsetInWords = 0) noexcept
 		{
 			static_assert(std::is_same_v<std::remove_const_t<T>, uint32_t>);
-			SetPushConstants(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
 		}
 		[[nodiscard]] bool SetReadOnlyBuffer(uint32_t parameterIndex,
 			const RHIReadOnlyBufferBinding& binding) noexcept
@@ -371,6 +376,8 @@ namespace gglab
 		}
 
 	protected:
+		virtual void SetInlineConstantWords(uint32_t parameterIndex,
+			std::span<const uint32_t> values, uint32_t destOffsetInWords) noexcept = 0;
 		virtual bool SetReadOnlyBufferBinding(uint32_t,
 			const RHIReadOnlyBufferBinding&) noexcept
 		{
@@ -381,22 +388,6 @@ namespace gglab
 	public:
 		virtual void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
-		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept = 0;
-
-		template <typename T>
-		void SetPushConstants(
-			uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
-		{
-			static_assert(std::is_trivially_copyable_v<T>);
-			static_assert(std::is_standard_layout_v<T>);
-			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
-
-			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> data{};
-			std::memcpy(data.data(), &values, sizeof(T));
-			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
-		}
-
 		virtual void SetVertexBuffers(
 			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept = 0;
 		virtual void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept = 0;
@@ -440,16 +431,21 @@ namespace gglab
 			return SetConstantBufferData(parameterIndex, std::as_bytes(std::span<const T>(&data, 1)));
 		}
 		template <typename T>
-		void SetInlineConstants(uint32_t parameterIndex, const T& data, uint32_t destOffsetInWords = 0) noexcept
+		void SetInlineConstants(uint32_t parameterIndex, const T& values,
+			uint32_t destOffsetInWords = 0) noexcept
 		{
-			SetPushConstants(parameterIndex, data, destOffsetInWords);
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> words{};
+			std::memcpy(words.data(), &values, sizeof(T));
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
 		}
 		template <typename T, size_t Extent>
 		void SetInlineConstants(uint32_t parameterIndex, std::span<T, Extent> words,
 			uint32_t destOffsetInWords = 0) noexcept
 		{
 			static_assert(std::is_same_v<std::remove_const_t<T>, uint32_t>);
-			SetPushConstants(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
 		}
 		[[nodiscard]] bool SetReadOnlyBuffer(uint32_t parameterIndex,
 			const RHIReadOnlyBufferBinding& binding) noexcept
@@ -458,6 +454,8 @@ namespace gglab
 		}
 
 	protected:
+		virtual void SetInlineConstantWords(uint32_t parameterIndex,
+			std::span<const uint32_t> values, uint32_t destOffsetInWords) noexcept = 0;
 		virtual bool SetReadOnlyBufferBinding(uint32_t,
 			const RHIReadOnlyBufferBinding&) noexcept
 		{
@@ -470,22 +468,6 @@ namespace gglab
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetReadWriteBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
-		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept = 0;
-
-		template <typename T>
-		void SetPushConstants(
-			uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
-		{
-			static_assert(std::is_trivially_copyable_v<T>);
-			static_assert(std::is_standard_layout_v<T>);
-			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
-
-			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> data{};
-			std::memcpy(data.data(), &values, sizeof(T));
-			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
-		}
-
 		virtual void Dispatch(
 			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept = 0;
 	};

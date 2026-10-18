@@ -3,10 +3,21 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <d3dx12.h>
 
 namespace gglab
 {
+	// Immutable native root-argument validation data; descriptor tables are not root buffers.
+	struct DX12RootParameterPlan
+	{
+		std::array<uint32_t, RHIBindingLayoutDesc::MaxSlots> m_InlineConstantSizesInBytes{};
+		std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> m_BufferBindingTypes{};
+	};
+
+	[[nodiscard]] DX12RootParameterPlan BuildDX12RootParameterPlan(
+		std::span<const D3D12_ROOT_PARAMETER1> parameters) noexcept;
+
 	struct DX12BindingLayoutBuildResult
 	{
 		std::array<CD3DX12_ROOT_PARAMETER1, RHIBindingLayoutDesc::MaxSlots> m_RootParameters{};

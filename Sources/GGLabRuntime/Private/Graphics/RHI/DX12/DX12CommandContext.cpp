@@ -442,8 +442,7 @@ namespace gglab
 		{
 			m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
-			m_PushConstantSizes = m_PipelineSystem->GetPushConstantSizes(pipeline);
-			m_BufferBindingTypes = m_PipelineSystem->GetBufferBindingTypes(pipeline);
+			m_RootParameterPlan = rootSignature->GetParameterPlan();
 		}
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
@@ -692,7 +691,8 @@ namespace gglab
 		DX12Buffer* buffer = m_Backend.GetDevice()->ResolveBuffer(binding.m_Buffer);
 		const auto* desc = m_Backend.GetDevice()->GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
-			parameterIndex >= m_BufferBindingTypes.size() || m_BufferBindingTypes[parameterIndex] != RHIBindingType::ConstantBuffer ||
+			parameterIndex >= m_RootParameterPlan.m_BufferBindingTypes.size() ||
+			m_RootParameterPlan.m_BufferBindingTypes[parameterIndex] != RHIBindingType::ConstantBuffer ||
 			!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Constant) ||
 			!IsConstantBufferBindingInRange(binding, desc->m_SizeInBytes, m_Backend.GetDevice()->GetUploadLimits()) ||
 			(binding.m_UploadBatchId == 0 && m_Backend.GetDevice()->IsUploadStorage(binding.m_Buffer)))
@@ -738,8 +738,8 @@ namespace gglab
 		if (!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Structured) ||
 			!IsReadOnlyBufferBindingInRange(binding, desc->m_SizeInBytes, device.GetUploadLimits()) ||
 			(binding.m_UploadBatchId == 0 && device.IsUploadStorage(binding.m_Buffer)) ||
-			!m_CurrentRootSignature || parameterIndex >= m_BufferBindingTypes.size() ||
-			m_BufferBindingTypes[parameterIndex] != RHIBindingType::ReadOnlyStorageBuffer)
+			!m_CurrentRootSignature || parameterIndex >= m_RootParameterPlan.m_BufferBindingTypes.size() ||
+			m_RootParameterPlan.m_BufferBindingTypes[parameterIndex] != RHIBindingType::ReadOnlyStorageBuffer)
 		{
 			FailRecording();
 			return false;
@@ -750,15 +750,16 @@ namespace gglab
 		return true;
 	}
 
-	void DX12GraphicsCommandContext::SetPushConstants(
+	void DX12GraphicsCommandContext::SetInlineConstantWords(
 		uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
 			"SetPipeline must bind a graphics root signature before root arguments.");
-		if (!m_CurrentRootSignature || parameterIndex >= m_PushConstantSizes.size() ||
-			!IsValidPushConstantWrite(m_PushConstantSizes[parameterIndex], values.size(), destOffset))
+		if (!m_CurrentRootSignature || parameterIndex >= m_RootParameterPlan.m_InlineConstantSizesInBytes.size() ||
+			!IsValidInlineConstantWrite(m_RootParameterPlan.m_InlineConstantSizesInBytes[parameterIndex],
+				values.size(), destOffset))
 		{
-			GGLAB_LOG_GRAPHICS_WARN("Graphics push constant write does not fit the active binding layout.");
+			GGLAB_LOG_GRAPHICS_WARN("Graphics inline constant write does not fit the active binding layout.");
 			FailRecording();
 			return;
 		}
@@ -970,8 +971,7 @@ namespace gglab
 		{
 			m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
-			m_PushConstantSizes = m_PipelineSystem->GetPushConstantSizes(pipeline);
-			m_BufferBindingTypes = m_PipelineSystem->GetBufferBindingTypes(pipeline);
+			m_RootParameterPlan = rootSignature->GetParameterPlan();
 		}
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
@@ -1016,7 +1016,8 @@ namespace gglab
 		DX12Buffer* buffer = m_Backend->GetDevice()->ResolveBuffer(binding.m_Buffer);
 		const auto* desc = m_Backend->GetDevice()->GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
-			parameterIndex >= m_BufferBindingTypes.size() || m_BufferBindingTypes[parameterIndex] != RHIBindingType::ConstantBuffer ||
+			parameterIndex >= m_RootParameterPlan.m_BufferBindingTypes.size() ||
+			m_RootParameterPlan.m_BufferBindingTypes[parameterIndex] != RHIBindingType::ConstantBuffer ||
 			!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Constant) ||
 			!IsConstantBufferBindingInRange(binding, desc->m_SizeInBytes, m_Backend->GetDevice()->GetUploadLimits()) ||
 			(binding.m_UploadBatchId == 0 && m_Backend->GetDevice()->IsUploadStorage(binding.m_Buffer)))
@@ -1060,8 +1061,8 @@ namespace gglab
 		if (!buffer || !desc || !Test(desc->m_Usage, RHIBufferUsage::Structured) ||
 			!IsReadOnlyBufferBindingInRange(binding, desc->m_SizeInBytes, device.GetUploadLimits()) ||
 			(binding.m_UploadBatchId == 0 && device.IsUploadStorage(binding.m_Buffer)) ||
-			!m_CurrentRootSignature || parameterIndex >= m_BufferBindingTypes.size() ||
-			m_BufferBindingTypes[parameterIndex] != RHIBindingType::ReadOnlyStorageBuffer)
+			!m_CurrentRootSignature || parameterIndex >= m_RootParameterPlan.m_BufferBindingTypes.size() ||
+			m_RootParameterPlan.m_BufferBindingTypes[parameterIndex] != RHIBindingType::ReadOnlyStorageBuffer)
 		{
 			FailRecording();
 			return false;
@@ -1092,13 +1093,14 @@ namespace gglab
 		m_Backend->TrackBufferUse(buffer);
 	}
 
-	void DX12ComputeCommandContext::SetPushConstants(
+	void DX12ComputeCommandContext::SetInlineConstantWords(
 		uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
-		if (!m_CurrentRootSignature || parameterIndex >= m_PushConstantSizes.size() ||
-			!IsValidPushConstantWrite(m_PushConstantSizes[parameterIndex], values.size(), destOffset))
+		if (!m_CurrentRootSignature || parameterIndex >= m_RootParameterPlan.m_InlineConstantSizesInBytes.size() ||
+			!IsValidInlineConstantWrite(m_RootParameterPlan.m_InlineConstantSizesInBytes[parameterIndex],
+				values.size(), destOffset))
 		{
-			GGLAB_LOG_GRAPHICS_WARN("Compute push constant write does not fit the active binding layout.");
+			GGLAB_LOG_GRAPHICS_WARN("Compute inline constant write does not fit the active binding layout.");
 			FailRecording();
 			return;
 		}

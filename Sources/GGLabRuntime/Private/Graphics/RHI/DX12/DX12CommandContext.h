@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
+#include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 
 #include <array>
@@ -111,8 +112,7 @@ namespace gglab
 			m_Backend.ClearTrackedResourceUses();
 			m_IndexBufferBinding.reset();
 			m_CurrentRootSignature = nullptr;
-			m_PushConstantSizes = {};
-			m_BufferBindingTypes = {};
+			m_RootParameterPlan = {};
 			m_CurrentPipelineDesc.reset();
 			m_ActiveRenderingSignature.reset();
 			m_ActiveColorAttachments.clear();
@@ -164,6 +164,8 @@ namespace gglab
 		bool SetConstantBuffer(
 			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
 	protected:
+		void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
 		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
 			const RHIReadOnlyBufferBinding& binding) noexcept override;
 
@@ -171,8 +173,6 @@ namespace gglab
 		using RHIGraphicsCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept override;
 		void SetVertexBuffers(
 			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept override;
 		void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept override;
@@ -196,8 +196,7 @@ namespace gglab
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
 		std::optional<RHIGraphicsPipelineDesc> m_CurrentPipelineDesc;
-		std::array<uint32_t, RHIBindingLayoutDesc::MaxSlots> m_PushConstantSizes{};
-		std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> m_BufferBindingTypes{};
+		DX12RootParameterPlan m_RootParameterPlan{};
 		std::optional<RHIRenderingSignature> m_ActiveRenderingSignature;
 		std::vector<DX12DescriptorView> m_ActiveColorAttachments;
 		std::optional<DX12DescriptorView> m_ActiveDepthAttachment;
@@ -238,14 +237,12 @@ namespace gglab
 		{
 			m_Backend->ClearTrackedResourceUses();
 			m_CurrentRootSignature = nullptr;
-			m_PushConstantSizes = {};
-			m_BufferBindingTypes = {};
+			m_RootParameterPlan = {};
 		}
 		void ResetEncoderState() noexcept
 		{
 			m_CurrentRootSignature = nullptr;
-			m_PushConstantSizes = {};
-			m_BufferBindingTypes = {};
+			m_RootParameterPlan = {};
 		}
 
 		void TrackTextureUse(RHITextureHandle texture) noexcept override
@@ -284,6 +281,8 @@ namespace gglab
 		bool SetConstantBuffer(
 			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
 	protected:
+		void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
 		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
 			const RHIReadOnlyBufferBinding& binding) noexcept override;
 
@@ -293,8 +292,6 @@ namespace gglab
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetReadWriteBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept override;
 		void Dispatch(
 			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept override;
 		void BeginGpuProfileScope(std::string_view name) noexcept override;
@@ -309,8 +306,7 @@ namespace gglab
 		DX12CommandContext* m_Backend = nullptr;
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
-		std::array<uint32_t, RHIBindingLayoutDesc::MaxSlots> m_PushConstantSizes{};
-		std::array<RHIBindingType, RHIBindingLayoutDesc::MaxSlots> m_BufferBindingTypes{};
+		DX12RootParameterPlan m_RootParameterPlan{};
 		DX12GpuProfiler* m_GpuProfiler = nullptr;
 	};
 }

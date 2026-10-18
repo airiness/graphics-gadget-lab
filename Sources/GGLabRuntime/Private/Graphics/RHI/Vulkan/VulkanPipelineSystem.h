@@ -24,7 +24,7 @@ namespace gglab
 		UnknownBindingType,
 		UnsupportedRegisterSpace,
 		InvalidDescriptorCount,
-		InvalidPushConstantSize,
+		InvalidInlineConstantSize,
 		DuplicateNativeBinding,
 	};
 

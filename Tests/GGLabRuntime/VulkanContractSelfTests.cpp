@@ -1701,7 +1701,7 @@ namespace gglab
 
 		RHIBindingLayoutDesc desc{};
 		desc.m_Slots[desc.m_SlotCount++] = {
-			.m_Type = RHIBindingType::PushConstants,
+			.m_Type = RHIBindingType::InlineConstants,
 			.m_Visibility = RHIShaderStage::All,
 			.m_Binding = 2,
 			.m_SizeInBytes = 16,
@@ -1712,7 +1712,7 @@ namespace gglab
 			.m_Binding = 0,
 		};
 		desc.m_Slots[desc.m_SlotCount++] = {
-			.m_Type = RHIBindingType::PushConstants,
+			.m_Type = RHIBindingType::InlineConstants,
 			.m_Visibility = RHIShaderStage::All,
 			.m_Binding = 1,
 			.m_SizeInBytes = 16,
@@ -1756,13 +1756,13 @@ namespace gglab
 		}
 		context.Check(initialized && firstApplied && secondApplied &&
 			shadowWords == std::array<uint32_t, 4>{ 0, 3, 7, 11 },
-			"Push-constant destOffset uses 32-bit words and partial updates preserve shadow data");
+			"Inline-constant destOffset uses 32-bit words and partial updates preserve shadow data");
 		context.Check(!state.UpdateShadow(0, firstUpdate, 3),
-			"Push-constant shadow updates reject ranges beyond the logical slot");
+			"Inline-constant shadow updates reject ranges beyond the logical slot");
 
 		RHIBindingLayoutDesc oversized = desc;
 		oversized.m_Slots[0].m_SizeInBytes = 128;
-		context.Check(BuildVulkanBindingLayoutPlan(oversized, 64).m_Error == VulkanBindingLayoutError::InvalidPushConstantSize,
+		context.Check(BuildVulkanBindingLayoutPlan(oversized, 64).m_Error == VulkanBindingLayoutError::InvalidInlineConstantSize,
 			"Vulkan binding layout rejects dynamic uniform ranges beyond the device limit");
 		RHIBindingLayoutDesc duplicate{};
 		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];

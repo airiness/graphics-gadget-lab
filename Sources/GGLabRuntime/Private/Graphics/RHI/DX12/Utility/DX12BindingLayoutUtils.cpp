@@ -1,6 +1,8 @@
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 
 namespace gglab
@@ -50,6 +52,37 @@ namespace gglab
 		}
 	}
 
+	DX12RootParameterPlan BuildDX12RootParameterPlan(
+		std::span<const D3D12_ROOT_PARAMETER1> parameters) noexcept
+	{
+		DX12RootParameterPlan plan{};
+		GGLAB_ASSERT(parameters.size() <= RHIBindingLayoutDesc::MaxSlots);
+		const size_t count = std::min(parameters.size(), plan.m_BufferBindingTypes.size());
+		for (size_t index = 0; index < count; ++index)
+		{
+			const auto& parameter = parameters[index];
+			switch (parameter.ParameterType)
+			{
+			case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+				plan.m_InlineConstantSizesInBytes[index] = parameter.Constants.Num32BitValues *
+					static_cast<uint32_t>(sizeof(uint32_t));
+				break;
+			case D3D12_ROOT_PARAMETER_TYPE_CBV:
+				plan.m_BufferBindingTypes[index] = RHIBindingType::ConstantBuffer;
+				break;
+			case D3D12_ROOT_PARAMETER_TYPE_SRV:
+				plan.m_BufferBindingTypes[index] = RHIBindingType::ReadOnlyStorageBuffer;
+				break;
+			case D3D12_ROOT_PARAMETER_TYPE_UAV:
+				plan.m_BufferBindingTypes[index] = RHIBindingType::ReadWriteStorageBuffer;
+				break;
+			default:
+				break;
+			}
+		}
+		return plan;
+	}
+
 	void BuildDX12RootSignatureDesc(
 		const RHIBindingLayoutDesc& rhiDesc, DX12BindingLayoutBuildResult& outDesc) noexcept
 	{
@@ -78,7 +111,7 @@ namespace gglab
 			auto& rootParameter = outDesc.m_RootParameters[outDesc.m_RootParameterCount++];
 			const auto visibility = ToDX12ShaderVisibility(slot.m_Visibility);
 
-			if (slot.m_Type == RHIBindingType::PushConstants)
+			if (slot.m_Type == RHIBindingType::InlineConstants)
 			{
 				GGLAB_ASSERT(slot.m_SizeInBytes % sizeof(uint32_t) == 0);
 				rootParameter.InitAsConstants(slot.m_SizeInBytes / sizeof(uint32_t), slot.m_Binding,

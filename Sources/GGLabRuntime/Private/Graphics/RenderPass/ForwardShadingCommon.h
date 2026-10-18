@@ -179,7 +179,7 @@ namespace gglab::forward_shading
 					hasBoundMesh = true;
 				}
 
-				graphicsContext.SetPushConstants(
+				graphicsContext.SetInlineConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 					drawPacket.m_DrawParameters);
 

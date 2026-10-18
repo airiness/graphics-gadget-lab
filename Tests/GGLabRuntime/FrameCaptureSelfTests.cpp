@@ -274,7 +274,7 @@ namespace gglab
 				return ValidateConstantBinding(binding);
 			}
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
+			void SetInlineConstantWords(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
 			void SetVertexBuffers(uint32_t, std::span<const RHIVertexBufferBinding>) noexcept override {}
 			void SetIndexBuffer(const RHIIndexBufferBinding&) noexcept override {}
 			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
@@ -351,7 +351,7 @@ namespace gglab
 				}
 			}
 			void SetReadWriteBuffer(uint32_t, RHIBufferHandle buffer, uint64_t) noexcept override { m_Record = buffer; }
-			void SetPushConstants(uint32_t, std::span<const uint32_t> words, uint32_t) noexcept override
+			void SetInlineConstantWords(uint32_t, std::span<const uint32_t> words, uint32_t) noexcept override
 			{
 				std::memcpy(&m_Parameters, words.data(), sizeof(m_Parameters));
 			}

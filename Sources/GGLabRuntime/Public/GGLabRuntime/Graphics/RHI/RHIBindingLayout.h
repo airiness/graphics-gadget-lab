@@ -17,7 +17,7 @@ namespace gglab
 		SampledTexture,
 		StorageTexture,
 		Sampler,
-		PushConstants,
+		InlineConstants,
 		BindlessResourceTable,
 		BindlessSamplerTable,
 	};
@@ -56,7 +56,7 @@ namespace gglab
 		const char* m_DebugName = nullptr;
 	};
 
-	[[nodiscard]] constexpr bool IsValidPushConstantWrite(uint32_t sizeInBytes,
+	[[nodiscard]] constexpr bool IsValidInlineConstantWrite(uint32_t sizeInBytes,
 		size_t wordCount, uint32_t destOffsetInWords) noexcept
 	{
 		const uint32_t capacity = sizeInBytes / sizeof(uint32_t);

@@ -835,25 +835,25 @@ namespace gglab
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer");
 	}
 
-	void VulkanGraphicsCommandContext::SetPushConstants(uint32_t parameterIndex,
+	void VulkanGraphicsCommandContext::SetInlineConstantWords(uint32_t parameterIndex,
 		std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
 		if (m_CurrentBindingLayout == nullptr)
 		{
-			Reject("SetPushConstants", "no pipeline binding layout is active");
+			Reject("SetInlineConstants", "no pipeline binding layout is active");
 			return;
 		}
 		if (!m_DynamicUniformState.UpdateShadow(parameterIndex, values, destOffset))
 		{
-			Reject("SetPushConstants", "the inline write exceeds its declared layout");
+			Reject("SetInlineConstants", "the inline write exceeds its declared layout");
 			return;
 		}
 		const auto binding = UploadConstants(m_DynamicUniformState.GetShadow(parameterIndex));
 		if (!binding.IsValid() || !SetBufferDescriptor(parameterIndex, binding.m_Buffer,
 			binding.m_OffsetInBytes, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-			RHIBufferUsage::Constant, "SetPushConstants", binding.m_SizeInBytes))
+			RHIBufferUsage::Constant, "SetInlineConstants", binding.m_SizeInBytes))
 		{
-			Reject("SetPushConstants", "the immutable inline allocation failed");
+			Reject("SetInlineConstants", "the immutable inline allocation failed");
 		}
 	}
 
@@ -1255,25 +1255,25 @@ namespace gglab
 			"SetReadWriteBuffer");
 	}
 
-	void VulkanComputeCommandContext::SetPushConstants(uint32_t parameterIndex,
+	void VulkanComputeCommandContext::SetInlineConstantWords(uint32_t parameterIndex,
 		std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
 		if (m_CurrentBindingLayout == nullptr)
 		{
-			Reject("SetPushConstants", "no pipeline binding layout is active");
+			Reject("SetInlineConstants", "no pipeline binding layout is active");
 			return;
 		}
 		if (!m_DynamicUniformState.UpdateShadow(parameterIndex, values, destOffset))
 		{
-			Reject("SetPushConstants", "the inline write exceeds its declared layout");
+			Reject("SetInlineConstants", "the inline write exceeds its declared layout");
 			return;
 		}
 		const auto binding = UploadConstants(m_DynamicUniformState.GetShadow(parameterIndex));
 		if (!binding.IsValid() || !SetBufferDescriptor(parameterIndex, binding.m_Buffer,
 			binding.m_OffsetInBytes, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-			RHIBufferUsage::Constant, "SetPushConstants", binding.m_SizeInBytes))
+			RHIBufferUsage::Constant, "SetInlineConstants", binding.m_SizeInBytes))
 		{
-			Reject("SetPushConstants", "the immutable inline allocation failed");
+			Reject("SetInlineConstants", "the immutable inline allocation failed");
 		}
 	}
 

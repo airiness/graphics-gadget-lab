@@ -33,7 +33,7 @@ namespace gglab
 		if (!m_ScanPipelineSystem->IsAlive(m_ScanBindingLayout))
 		{
 			RHIBindingLayoutDesc desc;
-			desc.m_Slots[0] = { .m_Type = RHIBindingType::PushConstants, .m_Visibility = RHIShaderStage::Compute,
+			desc.m_Slots[0] = { .m_Type = RHIBindingType::InlineConstants, .m_Visibility = RHIShaderStage::Compute,
 				.m_Binding = 2, .m_SizeInBytes = sizeof(NonFiniteScanParameters) };
 			desc.m_Slots[1] = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 0 };
 			desc.m_Slots[2] = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 1 };

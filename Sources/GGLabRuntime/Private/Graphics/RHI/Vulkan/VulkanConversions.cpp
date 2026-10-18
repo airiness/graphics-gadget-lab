@@ -159,7 +159,7 @@ namespace gglab
 		switch (type)
 		{
 		case RHIBindingType::ConstantBuffer:
-		case RHIBindingType::PushConstants:
+		case RHIBindingType::InlineConstants:
 			return VulkanShaderRegisterClass::ConstantBuffer;
 		case RHIBindingType::ReadOnlyStorageBuffer:
 		case RHIBindingType::SampledTexture:
@@ -189,7 +189,7 @@ namespace gglab
 			return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		case RHIBindingType::Sampler:
 			return VK_DESCRIPTOR_TYPE_SAMPLER;
-		case RHIBindingType::PushConstants:
+		case RHIBindingType::InlineConstants:
 			return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		default:
 			return VK_DESCRIPTOR_TYPE_MAX_ENUM;

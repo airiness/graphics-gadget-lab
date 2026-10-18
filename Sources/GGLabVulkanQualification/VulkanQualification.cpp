@@ -1399,14 +1399,14 @@ namespace gglab
 			RHIBindingLayoutDesc layoutDesc{};
 			layoutDesc.m_DebugName = "Qualification.DynamicUniformLayout";
 			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
-				.m_Type = RHIBindingType::PushConstants,
+				.m_Type = RHIBindingType::InlineConstants,
 				.m_Visibility = RHIShaderStage::All,
 				.m_Binding = 2,
 				.m_SizeInBytes = 64,
 				.m_DebugName = "PassConstants",
 			};
 			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
-				.m_Type = RHIBindingType::PushConstants,
+				.m_Type = RHIBindingType::InlineConstants,
 				.m_Visibility = RHIShaderStage::All,
 				.m_Binding = 1,
 				.m_SizeInBytes = 16,
@@ -1591,7 +1591,7 @@ namespace gglab
 			RHIBindingLayoutDesc layoutDesc{};
 			layoutDesc.m_DebugName = "Qualification.GraphicsLayout";
 			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
-				.m_Type = RHIBindingType::PushConstants,
+				.m_Type = RHIBindingType::InlineConstants,
 				.m_Visibility = RHIShaderStage::All,
 				.m_Binding = 2,
 				.m_SizeInBytes = sizeof(CoordinateConformanceParameters),

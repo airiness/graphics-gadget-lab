@@ -667,7 +667,7 @@ namespace gglab
 				.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu, .m_DebugName = "Numeric.ScanReadback" }));
 			auto& pipelines = rhi->GetPipelineSystem();
 			RHIBindingLayoutDesc bindings;
-			bindings.m_Slots[0] = { .m_Type = RHIBindingType::PushConstants, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 2, .m_SizeInBytes = sizeof(NonFiniteScanParameters) };
+			bindings.m_Slots[0] = { .m_Type = RHIBindingType::InlineConstants, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 2, .m_SizeInBytes = sizeof(NonFiniteScanParameters) };
 			bindings.m_Slots[1] = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 0 };
 			bindings.m_Slots[2] = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 1 };
 			bindings.m_Slots[3] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 0 };
@@ -711,7 +711,7 @@ namespace gglab
 				commands.SetReadOnlyBuffer(2, components.Get());
 				commands.SetReadWriteBuffer(3, record.Get());
 				const uint32_t count = elementCounts[test] * 4;
-				commands.SetPushConstants(0, NonFiniteScanParameters{ .m_ScalarCount = count,
+				commands.SetInlineConstants(0, NonFiniteScanParameters{ .m_ScalarCount = count,
 					.m_DispatchGroupsX = 1, .m_BufferStride = 20, .m_ComponentCount = 4 });
 				// Exercise the y dimension and the partial final wave, not only a 1D row.
 				commands.Dispatch(1, count == 0 ? 1 : (count + 63) / 64, 1);

@@ -802,7 +802,7 @@ namespace gglab
 
 		AddBindingSlot(
 			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 1, 0, 1,
+		AddBindingSlot(desc, RHIBindingType::InlineConstants, RHIShaderStage::All, 1, 0, 1,
 			MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
 		AddBindingSlot(
 			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 2, 0, 1, 0, "PassCB");
@@ -815,7 +815,7 @@ namespace gglab
 			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
 			"LightSB");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 4, 0, 1,
+		AddBindingSlot(desc, RHIBindingType::InlineConstants, RHIShaderStage::All, 4, 0, 1,
 			MaxInlineConstantDWORDs * sizeof(uint32_t), "InlineConstants");
 		AddBindingSlot(desc, RHIBindingType::BindlessResourceTable, RHIShaderStage::All, 0, 0, 0, 0,
 			"BindlessResources");

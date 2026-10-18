@@ -100,7 +100,7 @@ namespace gglab
 		{
 			RHIBindingLayoutDesc desc{};
 			desc.m_DebugName = "ForwardPlusHdrDiff.TileBindingLayout";
-			AppendBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::Compute, 0,
+			AppendBindingSlot(desc, RHIBindingType::InlineConstants, RHIShaderStage::Compute, 0,
 				sizeof(HdrDiffParameters), "HdrDiffConstants");
 			AppendBindingSlot(desc, RHIBindingType::ReadWriteStorageBuffer,
 				RHIShaderStage::Compute, 0, 0, "TileMetrics");
@@ -113,7 +113,7 @@ namespace gglab
 		{
 			RHIBindingLayoutDesc desc{};
 			desc.m_DebugName = "ForwardPlusHdrDiff.FrameBindingLayout";
-			AppendBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::Compute, 0,
+			AppendBindingSlot(desc, RHIBindingType::InlineConstants, RHIShaderStage::Compute, 0,
 				sizeof(HdrDiffParameters), "HdrDiffConstants");
 			AppendBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer,
 				RHIShaderStage::Compute, 0, 0, "TileMetrics");

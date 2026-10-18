@@ -94,7 +94,7 @@ namespace gglab
 		{
 			RHIBindingLayoutDesc desc{};
 			desc.m_DebugName = "ForwardPlusCull.BindingLayout";
-			AppendBindingSlot(desc, RHIBindingType::PushConstants, 0,
+			AppendBindingSlot(desc, RHIBindingType::InlineConstants, 0,
 				sizeof(ForwardPlusCullParameters), "ForwardPlusCullConstants");
 			AppendBindingSlot(
 				desc, RHIBindingType::ReadOnlyStorageBuffer, 0, 0, "ForwardPlusViews");

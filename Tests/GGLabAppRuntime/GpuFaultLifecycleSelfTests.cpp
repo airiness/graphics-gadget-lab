@@ -228,7 +228,7 @@ namespace gglab
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
 			bool SetConstantBuffer(uint32_t, const RHIConstantBufferBinding& binding) noexcept override { return this->ValidateConstantBinding(binding); }
 			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
-			void SetPushConstants(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
+			void SetInlineConstantWords(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
 		protected:
 			bool SetReadOnlyBufferBinding(uint32_t, const RHIReadOnlyBufferBinding&) noexcept override { return true; }
 		};
