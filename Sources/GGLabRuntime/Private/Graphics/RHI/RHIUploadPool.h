@@ -137,7 +137,6 @@ namespace gglab
 		RHIUploadPool* m_Pool = nullptr;
 		RHIUploadWriter* m_Writer = nullptr;
 		std::vector<PageLease> m_Leases;
-		uint64_t m_LeasedCapacityInBytes = 0;
 		RHIUploadBatchStatistics m_Statistics{};
 		RHIUploadBatchId m_Id = 0;
 		State m_State = State::Recording;

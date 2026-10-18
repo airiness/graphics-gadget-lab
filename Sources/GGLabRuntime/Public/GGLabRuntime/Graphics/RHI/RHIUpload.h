@@ -35,6 +35,8 @@ namespace gglab
 		uint64_t m_UploadCount = 0;
 		uint64_t m_RequestedBytes = 0;
 		uint64_t m_ReservedBytes = 0;
+		// Capacity of the leased pages: the quantity the batch byte budget charges.
+		uint64_t m_LeasedBytes = 0;
 		uint64_t m_PageCount = 0;
 	};
 
@@ -48,6 +50,10 @@ namespace gglab
 		// Most recently ended batch; page states above describe the current pool.
 		RHIUploadBatchStatistics m_LastBatch;
 		uint64_t m_HighWaterReservedBytesPerBatch = 0;
+		// Budget evidence: the batch byte and page caps charge leased page capacity, which
+		// exceeds reserved bytes by the space left unused at each page rollover.
+		uint64_t m_HighWaterLeasedBytesPerBatch = 0;
+		uint64_t m_HighWaterPagesPerBatch = 0;
 		uint64_t m_OversizedUploadFailures = 0;
 		uint64_t m_BatchByteBudgetFailures = 0;
 		uint64_t m_PoolByteBudgetFailures = 0;

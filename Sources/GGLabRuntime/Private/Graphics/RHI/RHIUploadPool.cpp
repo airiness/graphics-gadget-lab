@@ -296,7 +296,7 @@ namespace gglab
 				return {};
 			}
 			const size_t index = m_Pool->AcquirePage(reservedSize,
-				m_Pool->m_Config.m_MaxBytesPerBatch - m_LeasedCapacityInBytes);
+				m_Pool->m_Config.m_MaxBytesPerBatch - m_Statistics.m_LeasedBytes);
 			if (index == InvalidPage)
 			{
 				// AcquirePage logged the budget, creation or mapping failure.
@@ -304,7 +304,7 @@ namespace gglab
 				return {};
 			}
 			m_Leases.push_back({ index, 0 });
-			m_LeasedCapacityInBytes += m_Pool->m_Pages[index].m_CapacityInBytes;
+			m_Statistics.m_LeasedBytes += m_Pool->m_Pages[index].m_CapacityInBytes;
 			offset = 0;
 		}
 		auto& lease = m_Leases.back();
@@ -317,8 +317,13 @@ namespace gglab
 		m_Statistics.m_RequestedBytes += bytes.size();
 		m_Statistics.m_ReservedBytes += consumed;
 		m_Statistics.m_PageCount = m_Leases.size();
-		m_Pool->m_Statistics.m_HighWaterReservedBytesPerBatch = std::max(
-			m_Pool->m_Statistics.m_HighWaterReservedBytesPerBatch, m_Statistics.m_ReservedBytes);
+		auto& poolStatistics = m_Pool->m_Statistics;
+		poolStatistics.m_HighWaterReservedBytesPerBatch = std::max(
+			poolStatistics.m_HighWaterReservedBytesPerBatch, m_Statistics.m_ReservedBytes);
+		poolStatistics.m_HighWaterLeasedBytesPerBatch = std::max(
+			poolStatistics.m_HighWaterLeasedBytesPerBatch, m_Statistics.m_LeasedBytes);
+		poolStatistics.m_HighWaterPagesPerBatch = std::max(
+			poolStatistics.m_HighWaterPagesPerBatch, m_Statistics.m_PageCount);
 		return { page.m_Buffer, offset, static_cast<uint32_t>(bytes.size()), m_Id };
 	}
 

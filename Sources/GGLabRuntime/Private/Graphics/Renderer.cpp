@@ -30,6 +30,7 @@
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -227,6 +228,22 @@ namespace gglab
 			"Renderer::Finalize called while a render frame is still active.");
 
 		m_IsSuspended.store(true, std::memory_order_relaxed);
+
+		// Budget evidence for the session. The batch byte and page caps charge leased page
+		// capacity; reserved bytes show how much of it carried payload and padding.
+		const RHIUploadStatistics uploads = m_RHIContext->GetUploadStatistics();
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
+			"Upload statistics: per-batch high-water leased={} B, pages={}, reserved={} B; "
+			"pool pages={}, capacity={} B; batches submitted={}, cancelled={}; failures "
+			"oversized={}, batch-bytes={}, pool-bytes={}, page-count={}, creation={}, mapping={}, "
+			"publication={}.",
+			uploads.m_HighWaterLeasedBytesPerBatch, uploads.m_HighWaterPagesPerBatch,
+			uploads.m_HighWaterReservedBytesPerBatch, uploads.m_Total.m_PageCount,
+			uploads.m_Total.m_CapacityInBytes, uploads.m_SubmittedBatchCount,
+			uploads.m_CancelledBatchCount, uploads.m_OversizedUploadFailures,
+			uploads.m_BatchByteBudgetFailures, uploads.m_PoolByteBudgetFailures,
+			uploads.m_PageCountFailures, uploads.m_PageCreationFailures,
+			uploads.m_PageMappingFailures, uploads.m_PublicationFailures);
 
 		if (QuiesceRHIForTeardown(*m_RHIContext) == RHITeardownState::Unverified)
 		{

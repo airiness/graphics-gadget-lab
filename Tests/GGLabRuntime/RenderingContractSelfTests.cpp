@@ -1952,6 +1952,9 @@ namespace gglab
 				pending.m_LastBatch.m_ReservedBytes == 1280 && pending.m_LastBatch.m_PageCount == 1 &&
 				pending.m_HighWaterReservedBytesPerBatch == 1280 && device.IsUploadStorage(first.m_Buffer),
 				"Completed batch statistics retain payload, reservation, capacity state and submission counts");
+			context.Check(pending.m_LastBatch.m_LeasedBytes == 2048 &&
+				pending.m_HighWaterLeasedBytesPerBatch == 2048 && pending.m_HighWaterPagesPerBatch == 1,
+				"Batch statistics charge the full leased page capacity, not the reserved bytes");
 			device.m_CompletedFenceValue = 9;
 			pool.ReclaimCompleted();
 			context.Check(pool.GetStatistics().m_Idle.m_CapacityInBytes == 2048 &&
@@ -2014,6 +2017,29 @@ namespace gglab
 		void RunUploadBudgetTests(SelfTestContext& context) noexcept
 		{
 			const std::array<uint32_t, 1> payload{ 7 };
+			{
+				// Two 768-byte uploads cannot share a 1024-byte page, so the rollover leaves
+				// unused capacity that the batch budget still charges.
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 1024 });
+				const std::array<uint32_t, 192> slice{};
+				auto heavy = pool.BeginBatch();
+				const bool heavyUploaded = heavy->Upload(std::as_bytes(std::span(slice))).IsValid() &&
+					heavy->Upload(std::as_bytes(std::span(slice))).IsValid();
+				heavy->Cancel();
+				auto light = pool.BeginBatch();
+				const bool lightUploaded = light->Upload(std::as_bytes(std::span(payload))).IsValid();
+				light->Cancel();
+				const auto statistics = pool.GetStatistics();
+				context.Check(heavyUploaded && lightUploaded &&
+					statistics.m_LastBatch.m_LeasedBytes == 1024 &&
+					statistics.m_LastBatch.m_PageCount == 1 &&
+					statistics.m_HighWaterReservedBytesPerBatch == 1536 &&
+					statistics.m_HighWaterLeasedBytesPerBatch == 2048 &&
+					statistics.m_HighWaterPagesPerBatch == 2,
+					"Per-batch high-water keeps leased capacity and pages across rollover");
+			}
 			{
 				RecordingDevice device;
 				device.m_PassConstantsEnabled = true;
