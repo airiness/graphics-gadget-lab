@@ -152,6 +152,7 @@ namespace gglab
 		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
 		[[nodiscard]] bool CanSchedule() noexcept;
 		void CancelReadyWorkForShutdown() noexcept;
+		void FinalizeStoppedWork() noexcept;
 		void FlushRecordedUploads() noexcept;
 		uint32_t PollCompletedUploads() noexcept;
 		void EnqueueGpuFinalize(PendingUpload&& upload, AssetUploadStatus status) noexcept;
@@ -695,29 +696,7 @@ namespace gglab
 		m_GpuCompletionHold = {};
 		if (!CanSchedule())
 		{
-			CancelReadyWorkForShutdown();
-			// Recorded but unsubmitted transfers were retained across the failed completion.
-			m_RecordingBatch.reset();
-			for (PendingUpload& upload : m_RecordedUploads)
-			{
-				EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
-			}
-			m_RecordedUploads.clear();
-			m_RecordedUploadBytes = 0;
-			while (!m_PendingUploads.empty())
-			{
-				PendingUpload upload = std::move(m_PendingUploads.front());
-				m_PendingUploads.pop_front();
-				EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
-			}
-			m_InFlightBytes = 0;
-			for (PendingGpuFinalize& publication : m_GpuFinalizeQueue)
-			{
-				publication.m_Status = AssetUploadStatus::Failed;
-			}
-			GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
-			CancelReadyWorkForShutdown();
-			m_TransferManager->Reclaim();
+			FinalizeStoppedWork();
 			return;
 		}
 		GGLAB_ASSERT_MSG(m_CpuPayloadQueue.empty() && m_ResourcePublicationQueue.empty() &&
@@ -726,7 +705,7 @@ namespace gglab
 		GGLAB_UNUSED(PollCompletedUploads());
 		if (!CanSchedule())
 		{
-			Finalize();
+			FinalizeStoppedWork();
 			return;
 		}
 		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
@@ -739,6 +718,33 @@ namespace gglab
 			EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
 		}
 		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
+		m_TransferManager->Reclaim();
+	}
+
+	void AssetUploadScheduler::FinalizeStoppedWork() noexcept
+	{
+		CancelReadyWorkForShutdown();
+		// Recorded but unsubmitted transfers were retained across the failed completion.
+		m_RecordingBatch.reset();
+		for (PendingUpload& upload : m_RecordedUploads)
+		{
+			EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
+		}
+		m_RecordedUploads.clear();
+		m_RecordedUploadBytes = 0;
+		while (!m_PendingUploads.empty())
+		{
+			PendingUpload upload = std::move(m_PendingUploads.front());
+			m_PendingUploads.pop_front();
+			EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
+		}
+		m_InFlightBytes = 0;
+		for (PendingGpuFinalize& publication : m_GpuFinalizeQueue)
+		{
+			publication.m_Status = AssetUploadStatus::Failed;
+		}
+		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
+		CancelReadyWorkForShutdown();
 		m_TransferManager->Reclaim();
 	}
 

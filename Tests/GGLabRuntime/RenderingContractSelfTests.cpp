@@ -555,7 +555,10 @@ namespace gglab
 			{
 				if (m_FenceQueryResult)
 				{
-					return *m_FenceQueryResult;
+					// Unobserved results model caller misuse rejected before any native query.
+					return m_ObserveFenceQueryResult ?
+						ObserveFenceQueryResult(*m_FenceQueryResult) :
+						*m_FenceQueryResult;
 				}
 				if (!fencePoint.IsValid())
 				{
@@ -595,6 +598,7 @@ namespace gglab
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
 			std::optional<RHIFenceQueryResult> m_FenceQueryResult;
+			bool m_ObserveFenceQueryResult = true;
 			bool m_UseControlledFenceCompletion = false;
 			uint64_t m_CompletedFenceValue = 0;
 			uint32_t m_CreateTextureCount = 0;
@@ -2390,9 +2394,21 @@ namespace gglab
 			}
 			RecordingDevice invalid;
 			context.Check(invalid.IsFencePointCompleted({}) && !invalid.HasCompletionError() &&
-				invalid.QueryFencePoint({}) == Failed && invalid.HasCompletionError() &&
-				!invalid.HasObservedDeviceLoss(),
-				"An absent retirement point is releasable but never authenticates contents in a checked query");
+				invalid.QueryFencePoint({}) == Failed && !invalid.HasCompletionError(),
+				"An absent retirement point is releasable but never authenticates contents, without poisoning recording");
+			RecordingDevice misuse;
+			misuse.m_FenceQueryResult = Failed;
+			misuse.m_ObserveFenceQueryResult = false;
+			context.Check(!misuse.IsFencePointCompleted(graphicsFence) &&
+				misuse.QueryFencePoint(graphicsFence) == Failed && !misuse.HasCompletionError(),
+				"Rejected caller misuse fails release and checked queries without poisoning recording");
+			misuse.m_ObserveFenceQueryResult = true;
+			misuse.m_FenceQueryResult = DeviceLost;
+			GGLAB_UNUSED(misuse.QueryFencePoint(graphicsFence));
+			misuse.m_ObserveFenceQueryResult = false;
+			misuse.m_FenceQueryResult = Completed;
+			context.Check(misuse.QueryFencePoint(graphicsFence) == DeviceLost,
+				"Observed device loss stays authoritative over later unobserved backend results");
 			RecordingDevice timedOut;
 			context.Check(timedOut.ObserveGpuWaitResult(RHIGpuWaitResult::Timeout) ==
 				RHIGpuWaitResult::Timeout && !timedOut.HasCompletionError(),

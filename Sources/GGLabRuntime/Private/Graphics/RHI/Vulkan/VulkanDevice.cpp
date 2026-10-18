@@ -1,6 +1,6 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
+#include "Graphics/RHI/Vulkan/VulkanResultClassification.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "GGLabFoundation/String/StringUtils.h"
@@ -546,14 +546,15 @@ namespace gglab
 	RHIGpuWaitResult VulkanDevice::WaitFencePoint(
 		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
 	{
+		// Off-owner, invalid and foreign points are caller misuse, not native failures.
 		if (!RequireOwnerThread("VulkanDevice::WaitFencePoint") || !fencePoint.IsValid())
 		{
-			return ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
+			return RHIGpuWaitResult::Failed;
 		}
 		const VulkanTimelineFence* timeline = FindTimeline(fencePoint.m_Fence);
 		if (!timeline)
 		{
-			return ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
+			return RHIGpuWaitResult::Failed;
 		}
 		return ObserveGpuWaitResult(ClassifyVulkanWaitResult(
 			timeline->Wait(fencePoint.m_Value, ToVulkanTimeoutNanoseconds(timeoutMilliseconds))));
@@ -576,7 +577,8 @@ namespace gglab
 		}
 		uint64_t completedValue = 0;
 		const VkResult result = timeline->GetCompletedValue(completedValue);
-		return ClassifyVulkanFenceQuery(result, completedValue, fencePoint.m_Value);
+		return ObserveFenceQueryResult(
+			ClassifyVulkanFenceQuery(result, completedValue, fencePoint.m_Value));
 	}
 
 	const VulkanTimelineFence* VulkanDevice::FindTimeline(RHIFenceHandle fence) const noexcept

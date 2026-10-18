@@ -64,6 +64,8 @@ namespace gglab
 			RHIBufferUsage usage, RHIMemoryUsage memoryUsage, std::string_view owner) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer) noexcept;
 		void RecordTextureUse(RHITextureHandle texture) noexcept;
+		// Moves the executing batch in flight and records its resource uses at the point.
+		void RetainExecutingInfo(const RHIFencePoint& fencePoint) noexcept;
 		void DestroyInfo(InFlightInfo& info) noexcept;
 
 		RHICommandContextHandle m_Handle{};

@@ -125,7 +125,6 @@ namespace gglab
 		const DX12Fence* fence = ResolveFence(fencePoint.m_Fence);
 		if (!fence)
 		{
-			m_Device->ObserveFenceQueryResult(RHIFenceQueryResult::Failed);
 			GGLAB_LOG_GRAPHICS_WARN("DX12QueueSystem::WaitForFence received an unknown fence.");
 			return false;
 		}
@@ -135,9 +134,10 @@ namespace gglab
 	RHIGpuWaitResult DX12QueueSystem::WaitForFenceCompletion(
 		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) noexcept
 	{
+		// Invalid or unknown points are caller misuse, not native completion failures.
 		if (!fencePoint.IsValid())
 		{
-			return m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
+			return RHIGpuWaitResult::Failed;
 		}
 		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
 		{
@@ -145,7 +145,7 @@ namespace gglab
 		}
 		GGLAB_LOG_GRAPHICS_WARN(
 			"DX12QueueSystem::WaitForFenceCompletion received an unknown fence.");
-		return m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
+		return RHIGpuWaitResult::Failed;
 	}
 
 	RHIFenceQueryResult DX12QueueSystem::QueryFencePoint(const RHIFencePoint& fencePoint) const noexcept

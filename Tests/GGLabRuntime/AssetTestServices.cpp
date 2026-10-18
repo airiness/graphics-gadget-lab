@@ -101,8 +101,9 @@ namespace gglab::asset_test
 		{
 			return RHIFenceQueryResult::Failed;
 		}
-		return m_FenceQueryResult.value_or(m_AllFencesCompleted ?
-			RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending);
+		// The fixture models native backend results, which feed the sticky health state.
+		return ObserveFenceQueryResult(m_FenceQueryResult.value_or(m_AllFencesCompleted ?
+			RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending));
 	}
 
 	TemporaryDirectory::TemporaryDirectory(std::string_view name) noexcept

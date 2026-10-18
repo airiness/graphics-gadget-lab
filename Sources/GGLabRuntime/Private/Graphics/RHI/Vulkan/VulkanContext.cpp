@@ -331,7 +331,7 @@ namespace gglab
 		if (IsPoisoned() || IsDeviceLost())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"VulkanContext refuses new frames after an unknown frame completion.");
+				"VulkanContext refuses new frames after a GPU completion failure.");
 			return RHIFrameBeginResult::Fatal();
 		}
 
@@ -617,6 +617,7 @@ namespace gglab
 				timelines[index]->CommitSubmittedValue(signals[index].m_Value);
 			}
 		}
+		device.ObserveGpuWaitResult(result);
 		ObserveWaitResult(result, "VulkanContext::WaitIdleFor");
 		if (result != RHIGpuWaitResult::Completed)
 		{
@@ -702,10 +703,7 @@ namespace gglab
 	void VulkanContext::ObserveWaitResult(
 		RHIGpuWaitResult result, std::string_view operation) noexcept
 	{
-		if (m_Bootstrap && m_Bootstrap->m_Device)
-		{
-			m_Bootstrap->m_Device->ObserveGpuWaitResult(result);
-		}
+		// Native wait sites record device health, so a rejected misuse wait never poisons it.
 		if (result == RHIGpuWaitResult::DeviceLost && m_Bootstrap && m_Bootstrap->m_FrameRuntime)
 		{
 			m_Bootstrap->m_FrameRuntime->MarkFatal(VK_ERROR_DEVICE_LOST, operation);

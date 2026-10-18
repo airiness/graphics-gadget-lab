@@ -147,7 +147,7 @@ namespace gglab
 				}
 				if (m_DeviceLost)
 				{
-					return RHIFenceQueryResult::DeviceLost;
+					return ObserveFenceQueryResult(RHIFenceQueryResult::DeviceLost);
 				}
 				return fencePoint.m_Value <= m_CompletedFenceValue ?
 					RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending;

@@ -63,8 +63,11 @@ namespace gglab
 		const DX12SignalResult signal = SignalChecked();
 		if (!signal.m_Signaled)
 		{
-			return m_DX12Device->ObserveGpuWaitResult(m_DX12Device->IsDeviceRemoved() ?
-				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
+			// DX12Fence::Signal already recorded a native loss; a live-device signal failure
+			// leaves earlier points completable by a later signal.
+			return m_DX12Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost :
+				RHIGpuWaitResult::Failed;
 		}
 		return signal.m_FencePoint.Wait(timeoutMilliseconds);
 	}

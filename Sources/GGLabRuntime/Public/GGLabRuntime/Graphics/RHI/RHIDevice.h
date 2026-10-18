@@ -95,17 +95,18 @@ namespace gglab
 		{
 			return !fencePoint.IsValid() || IsFenceSafeToRelease(QueryFencePoint(fencePoint));
 		}
-		// Checked completion query. An invalid or unknown point is never Completed.
+		// Checked completion query. An invalid or unknown point is never Completed. Caller
+		// misuse fails the query without touching the sticky health state below.
 		[[nodiscard]] RHIFenceQueryResult QueryFencePoint(
 			const RHIFencePoint& fencePoint) const noexcept
 		{
-			const RHIFenceQueryResult result = fencePoint.IsValid() ?
-				QueryFencePointImpl(fencePoint) :
+			return fencePoint.IsValid() ?
+				ApplyObservedDeviceLoss(QueryFencePointImpl(fencePoint)) :
 				RHIFenceQueryResult::Failed;
-			return ObserveFenceQueryResult(result);
 		}
-		// Sticky completion failures poison recording, not the native device. Pending queries
-		// and routine wait timeouts never set either state; only a native loss sets the latter.
+		// Sticky completion failures poison recording, not the native device. Only checked
+		// native results set them: pending queries, routine wait timeouts and caller misuse
+		// (invalid, unknown or off-owner points) never do; only a native loss sets the latter.
 		[[nodiscard]] bool HasCompletionError() const noexcept
 		{
 			return m_CompletionFailed.load(std::memory_order_relaxed) || HasObservedDeviceLoss();
@@ -140,8 +141,11 @@ namespace gglab
 		virtual void RetireCompletedWork() noexcept = 0;
 
 	protected:
+		// Receives only valid points. Implementations pass native query results through
+		// ObserveFenceQueryResult and fail unknown or off-owner points without observing them.
 		[[nodiscard]] virtual RHIFenceQueryResult QueryFencePointImpl(
 			const RHIFencePoint& fencePoint) const noexcept = 0;
+		// Records a checked native query result in the sticky health state.
 		RHIFenceQueryResult ObserveFenceQueryResult(RHIFenceQueryResult result) const noexcept
 		{
 			if (result == RHIFenceQueryResult::Failed)
@@ -152,11 +156,9 @@ namespace gglab
 			{
 				m_DeviceLost.store(true, std::memory_order_relaxed);
 			}
-			// A confirmed loss remains authoritative even if a later counter query succeeds.
-			return result != RHIFenceQueryResult::Failed && HasObservedDeviceLoss() ?
-				RHIFenceQueryResult::DeviceLost :
-				result;
+			return ApplyObservedDeviceLoss(result);
 		}
+		// Records a checked native wait or submission-signal result in the sticky health state.
 		RHIGpuWaitResult ObserveGpuWaitResult(RHIGpuWaitResult result) const noexcept
 		{
 			if (result == RHIGpuWaitResult::Failed)
@@ -171,6 +173,15 @@ namespace gglab
 		}
 
 	private:
+		[[nodiscard]] RHIFenceQueryResult ApplyObservedDeviceLoss(
+			RHIFenceQueryResult result) const noexcept
+		{
+			// A confirmed loss remains authoritative even if a later counter query succeeds.
+			return result != RHIFenceQueryResult::Failed && HasObservedDeviceLoss() ?
+				RHIFenceQueryResult::DeviceLost :
+				result;
+		}
+
 		mutable std::atomic<bool> m_CompletionFailed{ false };
 		mutable std::atomic<bool> m_DeviceLost{ false };
 	};

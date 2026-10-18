@@ -49,8 +49,8 @@ namespace gglab
 	RHIFenceQueryResult DX12Fence::Query(uint64_t fenceValue) const noexcept
 	{
 		const uint64_t completedValue = GetCompletedValue();
-		const bool deviceRemoved = completedValue == DX12DeviceRemovedFenceValue &&
-			m_Device && m_Device->IsDeviceRemoved();
+		const bool deviceRemoved =
+			completedValue == DX12DeviceRemovedFenceValue && m_Device->IsDeviceRemoved();
 		return m_Device->ObserveFenceQueryResult(
 			ClassifyDX12FenceQuery(completedValue, fenceValue,
 				deviceRemoved || m_Device->HasObservedDeviceLoss()));
@@ -59,7 +59,8 @@ namespace gglab
 	DX12SignalResult DX12Fence::Signal(DX12CommandQueue* dx12CommandQueue) noexcept
 	{
 		// The value advances even when the signal fails: a later successful signal then also
-		// completes this point, because a queue signals only after its earlier work.
+		// completes this point, because a queue signals only after its earlier work. Only a
+		// native removal is therefore sticky; callers handle the unsignaled point themselves.
 		const uint64_t value = m_NextRequestValue++;
 		const HRESULT result = dx12CommandQueue->Get()->Signal(Get(), value);
 		const DX12SignalResult signal{ DX12FencePoint(this, value), SUCCEEDED(result) };
@@ -69,8 +70,10 @@ namespace gglab
 		}
 		else
 		{
-			m_Device->ObserveGpuWaitResult(m_Device->IsDeviceRemoved() ?
-				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
+			if (m_Device->IsDeviceRemoved())
+			{
+				m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::DeviceLost);
+			}
 			GGLAB_LOG_GRAPHICS_ERROR("ID3D12CommandQueue::Signal failed (HRESULT 0x{:08X}).",
 				static_cast<uint32_t>(result));
 		}

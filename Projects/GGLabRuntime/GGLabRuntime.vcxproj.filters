@@ -1613,6 +1613,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResourceManager.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResultClassification.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
