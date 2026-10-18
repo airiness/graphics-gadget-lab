@@ -2286,6 +2286,15 @@ namespace gglab
 			// handle entries and stripped ids, including pages outside the leased state.
 			RHIUploadPool rejectionPool(device);
 			bool storageRejected = true;
+			// Off the owner thread the identity cannot be checked, so it must read as upload
+			// storage and every handle entry rejects it.
+			bool offOwnerRejected = false;
+			std::thread offOwner([&]()
+				{
+					offOwnerRejected = device.IsUploadStorage(computeReadback.Get());
+				});
+			offOwner.join();
+			storageRejected &= !device.IsUploadStorage(computeReadback.Get()) && offOwnerRejected;
 			const RHIFencePoint previousCompletion(runtime.GetTimeline().GetRHIHandle(),
 				runtime.GetTimelineSignalValue());
 			storageRejected &= runtime.GetTimeline().Wait(previousCompletion.m_Value, 5'000'000'000) == VK_SUCCESS;

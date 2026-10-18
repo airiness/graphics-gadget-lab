@@ -220,7 +220,8 @@ namespace gglab
 		template <typename T, size_t Extent>
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<T, Extent> data) noexcept
 		{
-			static_assert(std::is_trivially_copyable_v<T>);
+			// Element size may be smaller than a word; the byte overload checks the total size.
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
 			return UploadConstants(std::span<const std::byte>(std::as_bytes(data)));
 		}
 		template <typename T>

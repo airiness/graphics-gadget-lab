@@ -2166,6 +2166,36 @@ namespace gglab
 #endif
 		}
 
+		void RunUploadOwnerThreadContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			RHIUploadPool pool(device);
+			RHIUploadWriter writer;
+			auto batch = pool.BeginBatch();
+			batch->Attach(writer);
+			const RHIFrameUploads uploads = writer.GetFrameUploads();
+			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
+			RHIConstantBufferBinding foreignConstants{};
+			RHIReadOnlyBufferBinding foreignStructured{};
+			std::thread foreign([&]()
+				{
+					foreignConstants = uploads.UploadConstants(payload);
+					foreignStructured = uploads.UploadStructured(std::span<const uint32_t>(payload));
+				});
+			foreign.join();
+			// A foreign thread is rejected without touching batch state; only the encoder that
+			// binds the invalid result fails the recording.
+			context.Check(!foreignConstants.IsValid() && !foreignStructured.IsValid() &&
+				!batch->HasFailed() && batch->GetPageCount() == 0 && pool.GetPageCount() == 0,
+				"Off-owner uploads return invalid bindings without touching the batch");
+			const RHIConstantBufferBinding owned = uploads.UploadConstants(payload);
+			context.Check(owned.IsValid() && writer.Owns(owned) && !batch->HasFailed(),
+				"The owner thread still uploads into a batch after a rejected foreign upload");
+			batch->Detach(writer);
+			batch->Cancel();
+		}
+
 		void RunUploadWriterContractTests(SelfTestContext& context) noexcept
 		{
 			static_assert(!std::is_copy_constructible_v<RHIUploadWriter> &&
@@ -11235,6 +11265,7 @@ namespace gglab
 		RunUploadStorageContractTests(context);
 		RunUploadBudgetTests(context);
 		RunUploadTeardownContractTests(context);
+		RunUploadOwnerThreadContractTests(context);
 		RunCheckedCompletionContractTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunFrameConstantUploadTests(context);

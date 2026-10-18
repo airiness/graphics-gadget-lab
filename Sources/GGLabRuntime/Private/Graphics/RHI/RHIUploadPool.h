@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <thread>
 #include <vector>
 
 namespace gglab
@@ -24,8 +25,9 @@ namespace gglab
 		uint32_t m_MaxPoolPages = 1024;
 	};
 
-	// Owner-thread component shared by the submission owners. Pages stay mapped for their
-	// lifetime and are never reused until every command consuming the batch has completed.
+	// Owner-thread component shared by the submission owners; the constructing thread owns it.
+	// Pages stay mapped for their lifetime and are never reused until every command consuming
+	// the batch has completed.
 	class RHIUploadPool
 	{
 	public:
@@ -44,6 +46,10 @@ namespace gglab
 		[[nodiscard]] size_t GetPendingPageCount() const noexcept;
 		[[nodiscard]] size_t GetQuarantinedPageCount() const noexcept;
 		[[nodiscard]] RHIUploadStatistics GetStatistics() const noexcept;
+		[[nodiscard]] bool IsOwnerThread() const noexcept
+		{
+			return std::this_thread::get_id() == m_OwnerThread;
+		}
 
 	private:
 		friend class RHIUploadBatch;
@@ -61,6 +67,7 @@ namespace gglab
 		void ReleaseQuarantinedPages() noexcept;
 
 		RHIDevice* m_Device = nullptr;
+		std::thread::id m_OwnerThread = std::this_thread::get_id();
 		RHIUploadConfig m_Config{};
 		std::vector<Page> m_Pages;
 		uint64_t m_CapacityInBytes = 0;
@@ -68,7 +75,8 @@ namespace gglab
 	};
 
 	// The pages one submission writes. Only its submission owner drives the transitions; a
-	// producer reaches the batch through the attached writer.
+	// producer reaches the batch through the attached writer. Uploads from any thread other
+	// than the pool's owner return invalid bindings.
 	class RHIUploadBatch
 	{
 	public:
@@ -121,6 +129,7 @@ namespace gglab
 			size_t m_PageIndex = 0;
 			uint64_t m_CursorInBytes = 0;
 		};
+		[[nodiscard]] bool AcceptsUploadOnCurrentThread() const noexcept;
 		[[nodiscard]] RHIConstantBufferBinding UploadBytes(std::span<const std::byte> bytes,
 			uint32_t alignment, uint32_t maximumRange) noexcept;
 		void FinishStatistics() noexcept;

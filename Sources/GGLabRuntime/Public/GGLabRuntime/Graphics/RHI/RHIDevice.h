@@ -80,6 +80,8 @@ namespace gglab
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
 		virtual uint32_t GetMaxConstantBufferRange() const noexcept { return 64 * 1024; }
 		[[nodiscard]] virtual RHIUploadLimits GetUploadLimits() const noexcept = 0;
+		// Callers reject upload storage outside batch-scoped bindings. A backend that cannot
+		// check the identity, for example off its owner thread, reports true.
 		[[nodiscard]] virtual bool IsUploadStorage(RHIBufferHandle buffer) const noexcept = 0;
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;

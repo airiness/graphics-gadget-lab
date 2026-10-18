@@ -220,8 +220,24 @@ namespace gglab
 		m_Writer = nullptr;
 	}
 
+	bool RHIUploadBatch::AcceptsUploadOnCurrentThread() const noexcept
+	{
+		if (m_Pool->IsOwnerThread())
+		{
+			return true;
+		}
+		// Detection only: a foreign thread must not touch batch state, so it neither writes
+		// nor fails the batch. The encoder that binds the invalid result fails instead.
+		GGLAB_LOG_GRAPHICS_ERROR("Upload batch {} rejected an upload off its owner thread.", m_Id);
+		return false;
+	}
+
 	RHIConstantBufferBinding RHIUploadBatch::Upload(std::span<const std::byte> bytes) noexcept
 	{
+		if (!AcceptsUploadOnCurrentThread())
+		{
+			return {};
+		}
 		const auto limits = m_Pool->m_Device->GetUploadLimits();
 		return UploadBytes(bytes, limits.m_ConstantOffsetAlignment, limits.m_MaxConstantRangeInBytes);
 	}
@@ -229,6 +245,10 @@ namespace gglab
 	RHIReadOnlyBufferBinding RHIUploadBatch::UploadStructured(
 		std::span<const std::byte> bytes, uint32_t strideInBytes) noexcept
 	{
+		if (!AcceptsUploadOnCurrentThread())
+		{
+			return {};
+		}
 		if (strideInBytes == 0 || strideInBytes % sizeof(uint32_t) != 0 || bytes.size() % strideInBytes != 0)
 		{
 			Fail();

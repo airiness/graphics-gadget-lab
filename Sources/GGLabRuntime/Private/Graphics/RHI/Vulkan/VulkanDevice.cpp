@@ -456,7 +456,8 @@ namespace gglab
 	{
 		if (!RequireOwnerThread("VulkanDevice::IsUploadStorage"))
 		{
-			return false;
+			// Every caller rejects upload storage. An unchecked identity must not pass.
+			return true;
 		}
 		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
 		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);

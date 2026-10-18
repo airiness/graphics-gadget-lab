@@ -568,10 +568,15 @@ namespace gglab
 		{
 			return RHIFrameEndResult::Fatal();
 		}
-		if (m_RHIContext && m_ActiveFrame.m_UploadFencePoint.IsValid())
+		if (m_RHIContext && m_ActiveFrame.m_UploadFencePoint.IsValid() &&
+			!m_RHIContext->WaitForFence(RHIQueueType::Graphics, m_ActiveFrame.m_UploadFencePoint))
 		{
-			GGLAB_UNUSED(m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, m_ActiveFrame.m_UploadFencePoint));
+			// Unlike Render, abort can tolerate the missing order: the frame's own command lists
+			// never execute and nothing retired below takes part in the scene-table upload. Its
+			// staging retires on the transfer timeline and its destination tables outlive the
+			// frame.
+			GGLAB_LOG_GRAPHICS_WARN(
+				"Renderer aborted a frame whose abort fence is not ordered after its uploads.");
 		}
 
 		if (m_RHIContext && m_ActiveFrame.m_RHIFrame)

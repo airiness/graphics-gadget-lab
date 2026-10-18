@@ -125,7 +125,8 @@ namespace gglab
 		template <typename T, size_t Extent>
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<T, Extent> data) noexcept
 		{
-			static_assert(std::is_trivially_copyable_v<T>);
+			// Element size may be smaller than a word; the byte overload checks the total size.
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
 			return UploadConstants(std::span<const std::byte>(std::as_bytes(data)));
 		}
 		template <typename T>
@@ -165,8 +166,11 @@ namespace gglab
 	};
 
 	// Copyable producer capability for one frame's upload batch. It records the batch id it
-	// was issued for; once that batch is detached or replaced, uploads return invalid
-	// bindings, log and fail any batch that is attached instead of reaching another frame.
+	// was issued for; once that batch is detached or replaced, uploads log and return invalid
+	// bindings instead of reaching another frame. When the issuing writer already serves a
+	// later batch, that batch is failed as well; a backend may use one writer per frame slot,
+	// so a stale capability is not guaranteed to fail the frame that is recording now. It
+	// borrows its writer and must not outlive the RHI context that issued it.
 	class RHIFrameUploads
 	{
 	public:
@@ -178,7 +182,8 @@ namespace gglab
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(
 			std::span<T, Extent> data) const noexcept
 		{
-			static_assert(std::is_trivially_copyable_v<T>);
+			// Element size may be smaller than a word; the byte overload checks the total size.
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
 			return UploadConstants(std::span<const std::byte>(std::as_bytes(data)));
 		}
 		template <typename T>
