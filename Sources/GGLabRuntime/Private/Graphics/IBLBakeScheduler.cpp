@@ -285,6 +285,11 @@ namespace gglab
 
 	void IBLBakeScheduler::Tick(const RHIFencePoint& lastSubmittedFence) noexcept
 	{
+		if (m_Device->HasCompletionError())
+		{
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
 		m_Status.m_RequestedGeneration = m_EnvironmentLightingSystem->GetBakeRequestGeneration();
 		const bool shaderRegistryChanged = detail::HasIBLBakeShaderRegistryChanged(
 			m_BakingRequest.m_ShaderRegistry, m_ShaderManager->GetActiveRegistryRef());
@@ -306,8 +311,22 @@ namespace gglab
 
 		if (m_InFlightFence.IsValid())
 		{
-			if (!m_Device->IsFencePointCompleted(m_InFlightFence))
+			const RHIFenceQueryResult completion = m_Device->QueryFencePoint(m_InFlightFence);
+			if (completion != RHIFenceQueryResult::Completed)
 			{
+				if (completion != RHIFenceQueryResult::Pending)
+				{
+					// Release eligibility on device loss cannot authenticate readback contents.
+					// Keep an unqueryable live-device submission intact until verified teardown.
+					if (completion == RHIFenceQueryResult::DeviceLost)
+					{
+						m_InFlightFence = {};
+						m_CacheReadbackInFlight = false;
+						m_ReadbackWork.reset();
+					}
+					GGLAB_LOG_GRAPHICS_ERROR("IBL bake stopped after a GPU completion query failed.");
+					SetStage(IBLBakeStage::Failed, 0.0f);
+				}
 				return;
 			}
 

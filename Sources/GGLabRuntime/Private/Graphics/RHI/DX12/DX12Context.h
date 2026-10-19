@@ -1,6 +1,9 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
+#include "Graphics/RHI/RHIUploadPool.h"
 
 #include <Windows.h>
 
@@ -34,6 +37,7 @@ namespace gglab
 		RHIGraphicsCommandContext& GetGraphicsContext() noexcept override;
 		RHIComputeCommandContext& GetDirectComputeContext() noexcept override;
 		RHIComputeCommandContext* GetComputeContext() noexcept override;
+		RHIFrameUploads GetUploads() noexcept override;
 
 	private:
 		friend class DX12Context;
@@ -44,6 +48,8 @@ namespace gglab
 		DX12CommandAllocator* m_GraphicsAllocator = nullptr;
 		DX12CommandAllocator* m_ComputeAllocator = nullptr;
 		RHIFencePoint m_SubmittedFence{};
+		RHIUploadWriter m_UploadWriter;
+		std::unique_ptr<RHIUploadBatch> m_Uploads;
 		bool m_Active = false;
 	};
 
@@ -65,13 +71,19 @@ namespace gglab
 
 		RHIFrameBeginResult BeginFrame() noexcept override;
 		RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept override;
-		RHIFencePoint AbortFrame(RHIFrameContext& frame) noexcept override;
-		void WaitForFence(
+		RHIFrameEndResult AbortFrame(RHIFrameContext& frame) noexcept override;
+		bool WaitForFence(
 			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
 
 		void Resize(uint32_t width, uint32_t height) noexcept override;
-		void WaitIdle() noexcept override;
+		RHIGpuWaitResult WaitIdleFor(uint32_t timeoutMilliseconds) noexcept override;
+		RHIUploadStatistics GetUploadStatistics() const noexcept override
+		{
+			return m_UploadPool ? m_UploadPool->GetStatistics() : RHIUploadStatistics{};
+		}
 		void RetireCompletedWork() noexcept override;
+		bool IsPoisoned() const noexcept override;
+		bool IsDeviceLost() const noexcept override;
 		uint32_t GetFrameSlotCount() const noexcept override;
 
 		[[nodiscard]] DX12Device& GetDX12Device() noexcept;
@@ -88,9 +100,13 @@ namespace gglab
 		void BeginGraphicsRecording(DX12FrameContext& frame) noexcept;
 		void BindGlobalDescriptorHeaps(DX12CommandList& commandList) noexcept;
 		void FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept;
+		[[nodiscard]] RHISubmissionVerification MakeSubmissionVerification() noexcept;
 		void Finalize() noexcept;
+		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
+		void AbandonGpuOwners() noexcept;
 
 		std::unique_ptr<DX12Device> m_Device;
+		std::unique_ptr<RHIUploadPool> m_UploadPool;
 		std::unique_ptr<DX12QueueSystem> m_QueueSystem;
 		std::unique_ptr<RHIPipelineSystem> m_PipelineSystem;
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
@@ -104,5 +120,6 @@ namespace gglab
 		uint32_t m_NextFrameSlotIndex = 0;
 		bool m_Initialized = false;
 		bool m_CompletedProductionFrame = false;
+		bool m_Poisoned = false;
 	};
 }

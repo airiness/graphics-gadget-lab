@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
+#include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 
 #include <array>
@@ -39,6 +40,7 @@ namespace gglab
 		[[nodiscard]] RHIQueueType GetQueueType() const noexcept { return m_QueueType; }
 		[[nodiscard]] DX12CommandList* GetCommandList() const noexcept { return m_CommandList; }
 		[[nodiscard]] ID3D12GraphicsCommandList* Get() const noexcept;
+		[[nodiscard]] bool IsUploadStorage(RHIBufferHandle buffer) const noexcept;
 
 		[[nodiscard]] std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
 		{
@@ -93,6 +95,9 @@ namespace gglab
 		RHIQueueType GetQueueType() const noexcept override { return m_Backend.GetQueueType(); }
 		DX12CommandList* GetCommandList() const noexcept { return m_Backend.GetCommandList(); }
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_Backend.Get(); }
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 
 		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
 		{
@@ -107,6 +112,7 @@ namespace gglab
 			m_Backend.ClearTrackedResourceUses();
 			m_IndexBufferBinding.reset();
 			m_CurrentRootSignature = nullptr;
+			m_RootParameterPlan = {};
 			m_CurrentPipelineDesc.reset();
 			m_ActiveRenderingSignature.reset();
 			m_ActiveColorAttachments.clear();
@@ -127,10 +133,20 @@ namespace gglab
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override
 		{
+			if (m_Backend.IsUploadStorage(destination) || m_Backend.IsUploadStorage(source))
+			{
+				FailRecording();
+				return;
+			}
 			m_Backend.CopyBuffer(destination, destinationOffset, source, sourceOffset, sizeInBytes);
 		}
 		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
 		{
+			if (m_Backend.IsUploadStorage(copy.m_Destination))
+			{
+				FailRecording();
+				return;
+			}
 			m_Backend.CopyTextureToBuffer(copy);
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
@@ -145,12 +161,18 @@ namespace gglab
 		void SetViewport(const RHIViewport& viewport) noexcept override;
 		void SetScissorRect(const RHIScissorRect& rect) noexcept override;
 		void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept override;
-		void SetConstantBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		bool SetConstantBuffer(
+			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
+	protected:
+		void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
+		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept override;
+
+	public:
+		using RHIGraphicsCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept override;
 		void SetVertexBuffers(
 			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept override;
 		void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept override;
@@ -174,6 +196,7 @@ namespace gglab
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
 		std::optional<RHIGraphicsPipelineDesc> m_CurrentPipelineDesc;
+		DX12RootParameterPlan m_RootParameterPlan{};
 		std::optional<RHIRenderingSignature> m_ActiveRenderingSignature;
 		std::vector<DX12DescriptorView> m_ActiveColorAttachments;
 		std::optional<DX12DescriptorView> m_ActiveDepthAttachment;
@@ -198,6 +221,9 @@ namespace gglab
 		RHIQueueType GetQueueType() const noexcept override { return m_Backend->GetQueueType(); }
 		DX12CommandList* GetCommandList() const noexcept { return m_Backend->GetCommandList(); }
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_Backend->Get(); }
+		// The submission owner's recording scope for the frame's upload writer.
+		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
+		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }
 
 		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
 		{
@@ -211,8 +237,13 @@ namespace gglab
 		{
 			m_Backend->ClearTrackedResourceUses();
 			m_CurrentRootSignature = nullptr;
+			m_RootParameterPlan = {};
 		}
-		void ResetEncoderState() noexcept { m_CurrentRootSignature = nullptr; }
+		void ResetEncoderState() noexcept
+		{
+			m_CurrentRootSignature = nullptr;
+			m_RootParameterPlan = {};
+		}
 
 		void TrackTextureUse(RHITextureHandle texture) noexcept override
 		{
@@ -228,23 +259,39 @@ namespace gglab
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override
 		{
+			if (m_Backend->IsUploadStorage(destination) || m_Backend->IsUploadStorage(source))
+			{
+				FailRecording();
+				return;
+			}
 			m_Backend->CopyBuffer(
 				destination, destinationOffset, source, sourceOffset, sizeInBytes);
 		}
 		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
 		{
+			if (m_Backend->IsUploadStorage(copy.m_Destination))
+			{
+				FailRecording();
+				return;
+			}
 			m_Backend->CopyTextureToBuffer(copy);
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
-		void SetConstantBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		bool SetConstantBuffer(
+			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override;
+	protected:
+		void SetInlineConstantWords(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
+		bool SetReadOnlyBufferBinding(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept override;
+
+	public:
+		using RHIComputeCommandContext::SetReadOnlyBuffer;
 		void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void SetReadWriteBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept override;
 		void Dispatch(
 			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept override;
 		void BeginGpuProfileScope(std::string_view name) noexcept override;
@@ -259,6 +306,7 @@ namespace gglab
 		DX12CommandContext* m_Backend = nullptr;
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
+		DX12RootParameterPlan m_RootParameterPlan{};
 		DX12GpuProfiler* m_GpuProfiler = nullptr;
 	};
 }

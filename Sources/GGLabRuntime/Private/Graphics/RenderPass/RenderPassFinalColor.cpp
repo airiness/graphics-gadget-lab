@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassFinalColor.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -34,7 +34,7 @@ namespace gglab
 			uint32_t MaterialDiagnosticsEnabled = 0;
 			uint32_t MaterialDiagnosticLightingIndex = 0;
 		};
-		static_assert(IsPassRootConstantStruct<FinalColorPassParameters>);
+		static_assert(IsPassConstantBufferStruct<FinalColorPassParameters>);
 		static_assert(sizeof(FinalColorPassParameters) == 48);
 
 		struct PassData
@@ -184,16 +184,16 @@ namespace gglab
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+					contextPtr->m_FrameConstants.m_Scene);
 
-				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBufferHandle());
+					contextPtr->m_FrameConstants.m_Views))
+				{
+					return;
+				}
 
 				const FinalColorPassParameters passParameters{
 					.SceneColorTextureIndex = sceneColorSrv.m_Index,
@@ -209,8 +209,11 @@ namespace gglab
 					.MaterialDiagnosticsEnabled = materialDiagnostics ? 1u : 0u,
 					.MaterialDiagnosticLightingIndex = diagnosticLightingSrv.m_Index,
 				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+				{
+					return;
+				}
 
 				commandContext->DrawFullscreenTriangle();
 			});

@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
@@ -304,11 +303,12 @@ namespace gglab::forward_shading
 		graphicsContext.SetScissorRect(inputs.m_RasterDomain->m_Scissor);
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-		const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
-		graphicsContext.SetConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-			sceneBuffer->GetBufferHandle(), context.m_RenderScene.m_SceneConstantBufferOffset);
-		graphicsContext.SetConstantBuffer(static_cast<uint32_t>(RootParameter::ShadowConstants),
-			sceneBuffer->GetBufferHandle(), context.m_RenderScene.m_ShadowConstantBufferOffset);
+		graphicsContext.SetConstantBuffer(
+			static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+			context.m_FrameConstants.m_Scene);
+		graphicsContext.SetConstantBuffer(
+			static_cast<uint32_t>(RootParameter::ShadowConstants),
+			context.m_FrameConstants.m_DirectionalShadow);
 
 		const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
@@ -316,9 +316,11 @@ namespace gglab::forward_shading
 		const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 			materialSB->GetBufferHandle(context.m_FrameSlotIndex));
-		const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-			viewSB->GetBufferHandle());
+		if (!graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+			context.m_FrameConstants.m_Views))
+		{
+			return;
+		}
 		const auto& lightSB = services.m_FrameBuffers->GetLightStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 			lightSB->GetBufferHandle(context.m_FrameSlotIndex));

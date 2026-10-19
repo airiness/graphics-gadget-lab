@@ -25,7 +25,9 @@ namespace gglab
 		RHIFencePoint ToRHI() const noexcept;
 
 		bool IsCompleted() const noexcept;
-		void Wait(uint32_t timeout = std::numeric_limits<uint32_t>::max()) const noexcept;
+		[[nodiscard]] RHIFenceQueryResult Query() const noexcept;
+		RHIGpuWaitResult Wait(
+			uint32_t timeoutMilliseconds = RHIInfiniteWaitMilliseconds) const noexcept;
 		void Reset() noexcept;
 
 	private:

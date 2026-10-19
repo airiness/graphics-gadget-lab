@@ -46,7 +46,7 @@ namespace gglab::forward_shading
 		uint32_t m_GTAOTextureIndex = 0;
 		uint32_t m_GTAOFlags = 0;
 	};
-	static_assert(IsPassRootConstantStruct<PassParameters>);
+	static_assert(IsPassConstantBufferStruct<PassParameters>);
 	static_assert(sizeof(PassParameters) == 64);
 
 	inline constexpr uint32_t GTAOEnabledFlag = 1u;
@@ -179,7 +179,7 @@ namespace gglab::forward_shading
 					hasBoundMesh = true;
 				}
 
-				graphicsContext.SetPushConstants(
+				graphicsContext.SetInlineConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 					drawPacket.m_DrawParameters);
 

@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -28,7 +29,7 @@ namespace gglab
 			uint32_t PhysicalSky = 0;
 			uint32_t Padding = 0;
 		};
-		static_assert(IsPassRootConstantStruct<IBLIrradiancePassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLIrradiancePassParameters>);
 		static_assert(sizeof(IBLIrradiancePassParameters) == 32);
 		static_assert(offsetof(IBLIrradiancePassParameters, PhysicalSky) == 24);
 
@@ -138,9 +139,11 @@ namespace gglab
 						.SampleCount = data.m_SampleCount,
 						.PhysicalSky = bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u,
 					};
-					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-						passParameters);
+					if (!commandContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+					{
+						return;
+					}
 
 					commandContext->DrawFullscreenTriangle();
 					commandContext->EndRendering();

@@ -6,6 +6,7 @@
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
@@ -61,6 +62,18 @@ namespace gglab
 			}
 			return desc;
 		}
+	}
+
+	DX12FencePoint ResolveDX12TransferCompletion(const DX12SignalResult& signal,
+		bool wait, const std::function<RHIGpuWaitResult(const DX12FencePoint&)>& waitForFence) noexcept
+	{
+		const DX12FencePoint completion = signal.GetCheckedFencePoint();
+		if (!completion.IsValid() ||
+			(wait && (!waitForFence || waitForFence(completion) != RHIGpuWaitResult::Completed)))
+		{
+			return {};
+		}
+		return completion;
 	}
 
 	DX12TransferContext::DX12TransferContext(
@@ -202,33 +215,47 @@ namespace gglab
 		m_CommandList->End();
 
 		DX12CommandList* commandLists[] = { m_CommandList.get() };
-		DX12FencePoint fencePoint = m_CommandQueue->Execute(std::span{ commandLists });
+		const DX12SignalResult signal = m_CommandQueue->ExecuteChecked(std::span{ commandLists });
+		const DX12FencePoint retirementFence = signal.m_FencePoint;
 
-		m_CommandAllocatorPool->RecycleCommandAllocator(m_CurrentCommandAllocator, fencePoint);
+		// ExecuteCommandLists was issued even if its following signal failed. Keep every
+		// owner on the requested point; a later verified idle signal covers this gap.
+		m_CommandAllocatorPool->RecycleCommandAllocator(m_CurrentCommandAllocator, retirementFence);
 		m_CurrentCommandAllocator = nullptr;
-
-		if (wait)
-		{
-			fencePoint.Wait();
-		}
 
 		for (const RHIBufferHandle buffer : m_ExecutingInfo->m_UsedBuffers)
 		{
-			m_Device->RecordBufferUse(buffer, fencePoint);
+			m_Device->RecordBufferUse(buffer, retirementFence);
 		}
 		for (const RHITextureHandle texture : m_ExecutingInfo->m_UsedTextures)
 		{
-			m_Device->RecordTextureUse(texture, fencePoint);
+			m_Device->RecordTextureUse(texture, retirementFence);
 		}
 
-		m_ExecutingInfo->m_FencePoint = fencePoint;
+		m_ExecutingInfo->m_FencePoint = retirementFence;
 		m_InFlightInfos.push_back(std::move(m_ExecutingInfo));
 
-		return fencePoint;
+		const DX12FencePoint completion = ResolveDX12TransferCompletion(signal, wait,
+			[](const DX12FencePoint& fence) { return fence.Wait(); });
+		if (!completion.IsValid())
+		{
+			// This transfer has no publishable completion. Stop new work without treating a
+			// live-device signal/wait failure as device loss or releasing its retained owners.
+			m_Device->ObserveGpuWaitResult(m_Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DX12 transfer submission has no verified completion; GPU work is stopped.");
+		}
+		return completion;
 	}
 
 	RHIFencePoint DX12TransferContext::Submit(bool wait) noexcept
 	{
+		if (m_Device->HasCompletionError())
+		{
+			Abort();
+			return {};
+		}
 		return End(wait).ToRHI();
 	}
 

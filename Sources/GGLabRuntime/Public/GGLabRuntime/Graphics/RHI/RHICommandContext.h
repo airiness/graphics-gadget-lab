@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
@@ -201,13 +202,99 @@ namespace gglab
 	{
 	public:
 		virtual ~RHICommandContext() = default;
+		[[nodiscard]] bool HasRecordingError() const noexcept
+		{
+			return m_RecordingFailed || (m_UploadWriter && m_UploadWriter->HasFailed());
+		}
+		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<const std::byte> bytes) noexcept
+		{
+			const auto binding = m_UploadWriter ?
+				m_UploadWriter->UploadConstants(bytes) :
+				RHIConstantBufferBinding{};
+			if (!binding.IsValid())
+			{
+				FailRecording();
+			}
+			return binding;
+		}
+		template <typename T, size_t Extent>
+		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<T, Extent> data) noexcept
+		{
+			// Element size may be smaller than a word; the byte overload checks the total size.
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			return UploadConstants(std::span<const std::byte>(std::as_bytes(data)));
+		}
+		template <typename T>
+		[[nodiscard]] RHIConstantBufferBinding UploadConstants(const T& data) noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+			return UploadConstants(std::as_bytes(std::span<const T>(&data, 1)));
+		}
 		// A declared pass storage buffer is rebound after every compatible pipeline
 		// switch. Clearing it at the pass boundary prevents cross-pass inheritance.
-		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept { m_PassStorageBuffer = binding; }
-		[[nodiscard]] const std::optional<RHIPassStorageBufferBinding>& GetPassStorageBuffer() const noexcept { return m_PassStorageBuffer; }
+		void SetPassStorageBuffer(std::optional<RHIPassStorageBufferBinding> binding) noexcept
+		{
+			if (binding && m_UploadWriter && m_UploadWriter->IsUploadStorage(binding->m_Buffer))
+			{
+				FailRecording();
+				return;
+			}
+			m_PassStorageBuffer = binding;
+		}
+		[[nodiscard]] const std::optional<RHIPassStorageBufferBinding>& GetPassStorageBuffer() const noexcept
+		{
+			return m_PassStorageBuffer;
+		}
+
+	protected:
+		// The submission owner binds the frame's upload writer for one recording scope, which
+		// resets the recording error. Binding null ends the scope and keeps the error.
+		void BindUploadWriter(RHIUploadWriter* writer) noexcept
+		{
+			m_UploadWriter = writer;
+			if (writer)
+			{
+				m_RecordingFailed = false;
+			}
+		}
+		// A failed recording also poisons the upload batch shared by the submission.
+		void FailRecording() noexcept
+		{
+			m_RecordingFailed = true;
+			if (m_UploadWriter)
+			{
+				m_UploadWriter->Fail();
+			}
+		}
+		[[nodiscard]] bool ValidateConstantBinding(const RHIConstantBufferBinding& binding) noexcept
+		{
+			if (HasRecordingError() || !binding.IsValid() || binding.m_SizeInBytes % sizeof(uint32_t) != 0 ||
+				(binding.m_UploadBatchId != 0 && (!m_UploadWriter || !m_UploadWriter->Owns(binding))) ||
+				(binding.m_UploadBatchId == 0 && m_UploadWriter && m_UploadWriter->IsUploadStorage(binding.m_Buffer)))
+			{
+				FailRecording();
+				return false;
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool ValidateReadOnlyBinding(const RHIReadOnlyBufferBinding& binding) noexcept
+		{
+			if (HasRecordingError() || !binding.IsValid() ||
+				(binding.m_UploadBatchId != 0 && (!m_UploadWriter || !m_UploadWriter->Owns(binding))) ||
+				(binding.m_UploadBatchId == 0 && m_UploadWriter && m_UploadWriter->IsUploadStorage(binding.m_Buffer)))
+			{
+				FailRecording();
+				return false;
+			}
+			return true;
+		}
 
 	private:
 		std::optional<RHIPassStorageBufferBinding> m_PassStorageBuffer;
+		RHIUploadWriter* m_UploadWriter = nullptr;
+		bool m_RecordingFailed = false;
 
 	public:
 
@@ -246,26 +333,61 @@ namespace gglab
 		virtual void SetViewport(const RHIViewport& viewport) noexcept = 0;
 		virtual void SetScissorRect(const RHIScissorRect& rect) noexcept = 0;
 		virtual void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept = 0;
-		virtual void SetConstantBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
-		virtual void SetReadOnlyBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
-		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept = 0;
-
-		template <typename T>
-		void SetPushConstants(
-			uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
+		virtual bool SetConstantBuffer(
+			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept = 0;
+		[[nodiscard]] bool SetConstantBufferData(uint32_t parameterIndex, std::span<const std::byte> bytes) noexcept
 		{
-			static_assert(std::is_trivially_copyable_v<T>);
-			static_assert(std::is_standard_layout_v<T>);
+			const auto binding = UploadConstants(bytes);
+			return binding.IsValid() && SetConstantBuffer(parameterIndex, binding);
+		}
+		template <typename T, size_t Extent>
+		[[nodiscard]] bool SetConstantBufferData(uint32_t parameterIndex, std::span<T, Extent> data) noexcept
+		{
+			return SetConstantBufferData(parameterIndex, std::span<const std::byte>(std::as_bytes(data)));
+		}
+		template <typename T>
+		[[nodiscard]] bool SetConstantBufferData(uint32_t parameterIndex, const T& data) noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
 			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
-
-			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> data{};
-			std::memcpy(data.data(), &values, sizeof(T));
-			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
+			return SetConstantBufferData(parameterIndex, std::as_bytes(std::span<const T>(&data, 1)));
+		}
+		template <typename T>
+		void SetInlineConstants(uint32_t parameterIndex, const T& values,
+			uint32_t destOffsetInWords = 0) noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> words{};
+			std::memcpy(words.data(), &values, sizeof(T));
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
+		}
+		template <typename T, size_t Extent>
+		void SetInlineConstants(uint32_t parameterIndex, std::span<T, Extent> words,
+			uint32_t destOffsetInWords = 0) noexcept
+		{
+			static_assert(std::is_same_v<std::remove_const_t<T>, uint32_t>);
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
+		}
+		[[nodiscard]] bool SetReadOnlyBuffer(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept
+		{
+			return ValidateReadOnlyBinding(binding) && SetReadOnlyBufferBinding(parameterIndex, binding);
 		}
 
+	protected:
+		virtual void SetInlineConstantWords(uint32_t parameterIndex,
+			std::span<const uint32_t> values, uint32_t destOffsetInWords) noexcept = 0;
+		virtual bool SetReadOnlyBufferBinding(uint32_t,
+			const RHIReadOnlyBufferBinding&) noexcept
+		{
+			FailRecording();
+			return false;
+		}
+
+	public:
+		virtual void SetReadOnlyBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetVertexBuffers(
 			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept = 0;
 		virtual void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept = 0;
@@ -289,28 +411,63 @@ namespace gglab
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
-		virtual void SetConstantBuffer(
-			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
+		virtual bool SetConstantBuffer(
+			uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept = 0;
+		[[nodiscard]] bool SetConstantBufferData(uint32_t parameterIndex, std::span<const std::byte> bytes) noexcept
+		{
+			const auto binding = UploadConstants(bytes);
+			return binding.IsValid() && SetConstantBuffer(parameterIndex, binding);
+		}
+		template <typename T, size_t Extent>
+		[[nodiscard]] bool SetConstantBufferData(uint32_t parameterIndex, std::span<T, Extent> data) noexcept
+		{
+			return SetConstantBufferData(parameterIndex, std::span<const std::byte>(std::as_bytes(data)));
+		}
+		template <typename T>
+		[[nodiscard]] bool SetConstantBufferData(uint32_t parameterIndex, const T& data) noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+			return SetConstantBufferData(parameterIndex, std::as_bytes(std::span<const T>(&data, 1)));
+		}
+		template <typename T>
+		void SetInlineConstants(uint32_t parameterIndex, const T& values,
+			uint32_t destOffsetInWords = 0) noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> words{};
+			std::memcpy(words.data(), &values, sizeof(T));
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
+		}
+		template <typename T, size_t Extent>
+		void SetInlineConstants(uint32_t parameterIndex, std::span<T, Extent> words,
+			uint32_t destOffsetInWords = 0) noexcept
+		{
+			static_assert(std::is_same_v<std::remove_const_t<T>, uint32_t>);
+			SetInlineConstantWords(parameterIndex, std::span<const uint32_t>(words), destOffsetInWords);
+		}
+		[[nodiscard]] bool SetReadOnlyBuffer(uint32_t parameterIndex,
+			const RHIReadOnlyBufferBinding& binding) noexcept
+		{
+			return ValidateReadOnlyBinding(binding) && SetReadOnlyBufferBinding(parameterIndex, binding);
+		}
+
+	protected:
+		virtual void SetInlineConstantWords(uint32_t parameterIndex,
+			std::span<const uint32_t> values, uint32_t destOffsetInWords) noexcept = 0;
+		virtual bool SetReadOnlyBufferBinding(uint32_t,
+			const RHIReadOnlyBufferBinding&) noexcept
+		{
+			FailRecording();
+			return false;
+		}
+
+	public:
 		virtual void SetReadOnlyBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetReadWriteBuffer(
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
-		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
-			uint32_t destOffset = 0) noexcept = 0;
-
-		template <typename T>
-		void SetPushConstants(
-			uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
-		{
-			static_assert(std::is_trivially_copyable_v<T>);
-			static_assert(std::is_standard_layout_v<T>);
-			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
-
-			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> data{};
-			std::memcpy(data.data(), &values, sizeof(T));
-			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
-		}
-
 		virtual void Dispatch(
 			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept = 0;
 	};

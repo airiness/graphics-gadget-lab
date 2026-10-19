@@ -81,6 +81,10 @@ namespace gglab::asset_test
 
 	RHIBufferHandle TestRHIDevice::CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept
 	{
+		if (Test(desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage))
+		{
+			return {};
+		}
 		const RHIBufferHandle handle{ m_NextBufferIndex++, 1 };
 		m_LiveBuffers.emplace(handle, desc.m_SizeInBytes);
 		return handle;
@@ -91,9 +95,15 @@ namespace gglab::asset_test
 		m_LiveBuffers.erase(buffer);
 	}
 
-	bool TestRHIDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+	RHIFenceQueryResult TestRHIDevice::QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept
 	{
-		return fencePoint.IsValid() && m_AllFencesCompleted;
+		if (!fencePoint.IsValid())
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		// The fixture models native backend results, which feed the sticky health state.
+		return ObserveFenceQueryResult(m_FenceQueryResult.value_or(m_AllFencesCompleted ?
+			RHIFenceQueryResult::Completed : RHIFenceQueryResult::Pending));
 	}
 
 	TemporaryDirectory::TemporaryDirectory(std::string_view name) noexcept

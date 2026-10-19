@@ -24,12 +24,13 @@ namespace gglab
 		UnknownBindingType,
 		UnsupportedRegisterSpace,
 		InvalidDescriptorCount,
-		InvalidPushConstantSize,
+		InvalidInlineConstantSize,
 		DuplicateNativeBinding,
 	};
 
 	struct VulkanSet0BindingPlan
 	{
+		RHIBindingType m_BindingType = RHIBindingType::Unknown;
 		uint32_t m_LogicalParameterIndex = 0;
 		uint32_t m_Binding = 0;
 		VkDescriptorType m_DescriptorType = VK_DESCRIPTOR_TYPE_MAX_ENUM;
@@ -37,6 +38,7 @@ namespace gglab
 		VkShaderStageFlags m_StageFlags = 0;
 		uint32_t m_SizeInBytes = 0;
 		uint32_t m_DynamicOffsetSlot = UINT32_MAX;
+		bool m_IsInlineConstants = false;
 	};
 
 	struct VulkanBindingLayoutPlan

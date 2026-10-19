@@ -20,6 +20,14 @@ namespace gglab
 	};
 	GGLAB_ENUM_FLAGS(RHIBufferUsage);
 
+	enum class RHIBufferCreateFlags : uint8_t
+	{
+		None = 0,
+		// Reserved for the upload pool. Such storage requires a batch-scoped binding.
+		UploadStorage = 1u << 0,
+	};
+	GGLAB_ENUM_FLAGS(RHIBufferCreateFlags);
+
 	struct RHIBufferDesc
 	{
 		uint64_t m_SizeInBytes = 0;
@@ -27,6 +35,7 @@ namespace gglab
 		RHIBufferUsage m_Usage = RHIBufferUsage::None;
 		RHIMemoryUsage m_MemoryUsage = RHIMemoryUsage::GpuOnly;
 		const char* m_DebugName = nullptr;
+		RHIBufferCreateFlags m_CreateFlags = RHIBufferCreateFlags::None;
 	};
 
 	struct RHIMappedBufferRange

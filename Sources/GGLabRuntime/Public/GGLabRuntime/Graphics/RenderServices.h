@@ -27,15 +27,12 @@
 
 namespace gglab
 {
-	class DynamicConstantBufferAllocator;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;
 	class RenderPipelineOverlayExtensionBase;
 	class RHIDevice;
 	class RenderAtmosphereAccess;
 	class RHISwapChain;
-	template <typename T>
-	class DynamicStructuredBufferAllocator;
 	template <typename T>
 	class PersistentStructuredBuffer;
 	struct ComputePipelineRecipe;
@@ -170,10 +167,6 @@ namespace gglab
 	public:
 		virtual ~RenderFrameBufferAccess() = default;
 
-		[[nodiscard]] virtual const DynamicConstantBufferAllocator* GetSceneConstantBuffer()
-			const noexcept = 0;
-		virtual DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept = 0;
-
 		[[nodiscard]] virtual const PersistentStructuredBuffer<ObjectGPU>*
 			GetObjectStructuredBuffer() const noexcept = 0;
 		virtual PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept = 0;
@@ -186,10 +179,6 @@ namespace gglab
 		[[nodiscard]] virtual const PersistentStructuredBuffer<LightGPU>*
 			GetLightStructuredBuffer() const noexcept = 0;
 		virtual PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() noexcept = 0;
-
-		[[nodiscard]] virtual const DynamicStructuredBufferAllocator<ViewGPU>*
-			GetViewStructuredBuffer() const noexcept = 0;
-		virtual DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept = 0;
 	};
 
 	class RenderEnvironmentAccess

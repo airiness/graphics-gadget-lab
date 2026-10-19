@@ -11,6 +11,7 @@
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 
 #include <cstdint>
 #include <span>
@@ -22,6 +23,14 @@ namespace gglab
 	class TemporalFrameTransaction;
 	struct RenderFrameContext;
 
+	// Bindings borrow immutable upload data from this frame's submission batch.
+	struct RenderFrameConstantBindings
+	{
+		RHIConstantBufferBinding m_Scene{};
+		RHIConstantBufferBinding m_DirectionalShadow{};
+		RHIReadOnlyBufferBinding m_Views{};
+	};
+
 	struct RenderFrameContext
 	{
 		std::span<RenderView> m_RenderViews;
@@ -30,6 +39,8 @@ namespace gglab
 		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
+		RenderFrameConstantBindings m_FrameConstants{};
+		RHIFrameUploads m_Uploads{};
 		std::span<const RenderQueue> m_RenderQueues;
 		const DirectionalShadowFramePlan* m_DirectionalShadowFramePlan = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};

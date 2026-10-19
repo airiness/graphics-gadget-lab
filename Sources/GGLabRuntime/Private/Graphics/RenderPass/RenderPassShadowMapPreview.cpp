@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -31,7 +31,7 @@ namespace gglab
 			uint32_t PreviewAllCascades = 0;
 			uint32_t PreviewCascadeCount = 0;
 		};
-		static_assert(IsPassRootConstantStruct<ShadowMapPreviewPassParameters>);
+		static_assert(IsPassConstantBufferStruct<ShadowMapPreviewPassParameters>);
 		static_assert(sizeof(ShadowMapPreviewPassParameters) == 32);
 		static_assert(offsetof(ShadowMapPreviewPassParameters, PreviewAllCascades) == 24);
 		static_assert(offsetof(ShadowMapPreviewPassParameters, PreviewCascadeCount) == 28);
@@ -124,11 +124,9 @@ namespace gglab
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+					contextPtr->m_FrameConstants.m_Scene);
 
 				const ShadowMapPreviewPassParameters passParameters{
 					.ShadowMapTextureIndex = shadowMapSrv.m_Index,
@@ -140,8 +138,11 @@ namespace gglab
 					.PreviewAllCascades = data.m_PreviewAllCascades,
 					.PreviewCascadeCount = data.m_CascadeCount,
 				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (!commandContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+				{
+					return;
+				}
 
 				commandContext->DrawFullscreenTriangle();
 				services.m_Resources->ClearDirty(

@@ -224,6 +224,10 @@ namespace gglab
 		void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
+		RHIUploadLimits GetUploadLimits() const noexcept override;
+		bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override;
+		bool FlushMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
@@ -263,12 +267,18 @@ namespace gglab
 		{
 			return m_TransferTimeline.get();
 		}
-		[[nodiscard]] bool IsFencePointCompleted(
-			const RHIFencePoint& fencePoint) const noexcept override;
+		using RHIDevice::ObserveFenceQueryResult;
+		using RHIDevice::ObserveGpuWaitResult;
+		// Checked CPU wait on a graphics or transfer timeline point; an invalid or foreign
+		// point fails.
+		[[nodiscard]] RHIGpuWaitResult WaitFencePoint(
+			const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept;
 
 	private:
+		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
 		bool m_PixelStorageAtomics = false;
 		void Destroy() noexcept;
+		[[nodiscard]] const VulkanTimelineFence* FindTimeline(RHIFenceHandle fence) const noexcept;
 
 		VkInstance m_Instance = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

@@ -1,6 +1,6 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderPass.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -21,7 +21,7 @@ namespace gglab
 			Vector3 m_ChunkTranslation{};
 			float m_Padding1 = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<NapaVoxelPassParameters>);
+		static_assert(IsPassConstantBufferStruct<NapaVoxelPassParameters>);
 		static_assert(sizeof(NapaVoxelPassParameters) == 32);
 
 		struct NapaVoxelPassChunk
@@ -165,11 +165,13 @@ namespace gglab
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					servicesPtr->m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
-					frameContextPtr->m_RenderScene.m_SceneConstantBufferOffset);
-				graphicsContext->SetReadOnlyBuffer(
+					frameContextPtr->m_FrameConstants.m_Scene);
+				if (!graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					servicesPtr->m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					frameContextPtr->m_FrameConstants.m_Views))
+				{
+					return;
+				}
 
 				for (const NapaVoxelPassChunk& chunk : data.m_Chunks)
 				{
@@ -198,8 +200,11 @@ namespace gglab
 							.m_Material = static_cast<uint32_t>(section.m_Material),
 							.m_ChunkTranslation = chunk.m_Translation,
 						};
-						graphicsContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+						if (!graphicsContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+						{
+							return;
+						}
 						graphicsContext->DrawIndexed(
 							section.m_IndexCount, 1, section.m_FirstIndex);
 					}

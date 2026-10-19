@@ -153,7 +153,9 @@ namespace gglab
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
 			!HasRHIResourceDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferCreateCount;
-		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, resolvedIdentity);
+		const auto handle = AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, resolvedIdentity);
+		m_Buffers.SlotAt(handle.Index()).m_RHIDesc = desc;
+		return handle;
 	}
 
 	RHITextureHandle DX12ResourceManager::ImportTexture(const ImportedTextureDesc& desc) noexcept
@@ -222,8 +224,10 @@ namespace gglab
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
 			!HasRHIResourceDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferImportCount;
-		return AllocateBufferSlot(
+		const auto handle = AllocateBufferSlot(
 			std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);
+		m_Buffers.SlotAt(handle.Index()).m_RHIDesc = desc.m_RHI.m_Desc;
+		return handle;
 	}
 
 	void DX12ResourceManager::DestroyTexture(RHITextureHandle texture) noexcept
@@ -331,6 +335,12 @@ namespace gglab
 		}
 
 		return slot->m_Resource.get();
+	}
+
+	const RHIBufferDesc* DX12ResourceManager::ResolveBufferDesc(RHIBufferHandle buffer) const noexcept
+	{
+		const BufferSlot* slot = m_Buffers.Resolve(buffer);
+		return slot && slot->m_Resource ? &slot->m_RHIDesc : nullptr;
 	}
 
 	void DX12ResourceManager::RetireCompletedResources() noexcept

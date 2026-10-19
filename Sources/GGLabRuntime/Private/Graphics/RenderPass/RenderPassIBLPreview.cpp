@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -27,7 +27,7 @@ namespace gglab
 			uint32_t CubemapSamplerIndex = 0;
 			uint32_t SampleMip = 0;
 		};
-		static_assert(IsPassRootConstantStruct<IBLCubemapPreviewPassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLCubemapPreviewPassParameters>);
 		static_assert(sizeof(IBLCubemapPreviewPassParameters) == 16);
 
 		struct CubemapPreviewPassData
@@ -130,11 +130,9 @@ namespace gglab
 							static_cast<float>(data.m_Height) });
 						commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 							static_cast<int32_t>(data.m_Height) });
-						const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-							sceneBuffer->GetBufferHandle(),
-							contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+							contextPtr->m_FrameConstants.m_Scene);
 
 						const IBLCubemapPreviewPassParameters passParameters{
 							.DisplayLayout = data.m_DisplayLayout,
@@ -142,9 +140,11 @@ namespace gglab
 							.CubemapSamplerIndex = data.m_CubemapSamplerIndex,
 							.SampleMip = data.m_SampleMip,
 						};
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							passParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+						{
+							return;
+						}
 
 						commandContext->DrawFullscreenTriangle();
 						renderResRegistry->ClearIBLPreviewDirty(previewType);

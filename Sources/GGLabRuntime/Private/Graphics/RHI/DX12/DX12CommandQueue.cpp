@@ -4,6 +4,7 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 
 #include <memory>
 #include <span>
@@ -31,6 +32,12 @@ namespace gglab
 	DX12FencePoint DX12CommandQueue::Execute(
 		std::span<const DX12CommandList* const> commandLists) noexcept
 	{
+		return ExecuteChecked(commandLists).m_FencePoint;
+	}
+
+	DX12SignalResult DX12CommandQueue::ExecuteChecked(
+		std::span<const DX12CommandList* const> commandLists) noexcept
+	{
 		std::vector<ID3D12CommandList*> d3d12CommandLists;
 		d3d12CommandLists.reserve(commandLists.size());
 
@@ -42,7 +49,7 @@ namespace gglab
 		m_D3D12CommandQueue->ExecuteCommandLists(
 			static_cast<UINT>(d3d12CommandLists.size()), d3d12CommandLists.data());
 
-		return Signal();
+		return SignalChecked();
 	}
 
 	RHIFencePoint DX12CommandQueue::Submit(
@@ -51,29 +58,46 @@ namespace gglab
 		return Execute(commandLists).ToRHI();
 	}
 
-	void DX12CommandQueue::FlushCommandQueue() noexcept
+	RHIGpuWaitResult DX12CommandQueue::FlushCommandQueue(uint32_t timeoutMilliseconds) noexcept
 	{
-		auto fencePoint = Signal();
-		fencePoint.Wait();
+		const DX12SignalResult signal = SignalChecked();
+		if (!signal.m_Signaled)
+		{
+			// DX12Fence::Signal already recorded a native loss; a live-device signal failure
+			// leaves earlier points completable by a later signal.
+			return m_DX12Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost :
+				RHIGpuWaitResult::Failed;
+		}
+		return signal.m_FencePoint.Wait(timeoutMilliseconds);
 	}
 
 	DX12FencePoint DX12CommandQueue::Signal() noexcept
 	{
+		return SignalChecked().m_FencePoint;
+	}
+
+	DX12SignalResult DX12CommandQueue::SignalChecked() noexcept
+	{
 		return m_Fence->Signal(this);
 	}
 
-	void DX12CommandQueue::Wait(const DX12FencePoint& fencePoint) const noexcept
+	bool DX12CommandQueue::Wait(const DX12FencePoint& fencePoint) const noexcept
 	{
-		if (!fencePoint.IsValid())
-		{
-			return;
-		}
-
-		Wait(*fencePoint.GetFence(), fencePoint.GetValue());
+		return fencePoint.IsValid() && Wait(*fencePoint.GetFence(), fencePoint.GetValue());
 	}
 
-	void DX12CommandQueue::Wait(const DX12Fence& fence, uint64_t value) const noexcept
+	bool DX12CommandQueue::Wait(const DX12Fence& fence, uint64_t value) const noexcept
 	{
-		m_D3D12CommandQueue->Wait(fence.Get(), value);
+		const HRESULT result = m_D3D12CommandQueue->Wait(fence.Get(), value);
+		if (FAILED(result))
+		{
+			m_DX12Device->ObserveGpuWaitResult(m_DX12Device->IsDeviceRemoved() ?
+				RHIGpuWaitResult::DeviceLost : RHIGpuWaitResult::Failed);
+			GGLAB_LOG_GRAPHICS_ERROR("ID3D12CommandQueue::Wait failed (HRESULT 0x{:08X}).",
+				static_cast<uint32_t>(result));
+			return false;
+		}
+		return true;
 	}
 }

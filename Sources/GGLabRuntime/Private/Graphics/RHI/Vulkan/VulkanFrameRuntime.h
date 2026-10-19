@@ -2,7 +2,9 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
+#include "Graphics/RHI/RHIFrameSubmission.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanResultClassification.h"
 #include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 
@@ -236,6 +238,8 @@ namespace gglab
 
 	struct VulkanSubmitPresentResult
 	{
+		// True once vkQueueSubmit2 was called, whatever it returned.
+		bool m_SubmitIssued = false;
 		// True when the graphics submission was accepted and the timeline
 		// signal plus the frame-slot reuse gate are valid.
 		bool m_Submitted = false;
@@ -252,6 +256,12 @@ namespace gglab
 		// point. It is the fence point resource last-use tracking records
 		// for work submitted by this frame transaction.
 		RHIFencePoint m_SubmittedFencePoint{};
+		// The reserved timeline point of an issued submission. It completes only
+		// once a later committed submission reaches it, so retention tied to it is
+		// never shortened when the submission itself failed.
+		RHIFencePoint m_ReservedFencePoint{};
+		// The vkQueueSubmit2 result; m_Result reports the last native call.
+		VkResult m_SubmitResult = VK_SUCCESS;
 		VkResult m_Result = VK_SUCCESS;
 
 		// A committed submission alone is insufficient: production frame
@@ -259,6 +269,22 @@ namespace gglab
 		[[nodiscard]] bool IsComplete() const noexcept
 		{
 			return m_Submitted && m_Presented && !m_Fatal;
+		}
+		[[nodiscard]] RHISubmitEffect GetSubmitEffect() const noexcept
+		{
+			return ClassifyVulkanSubmitEffect(m_SubmitIssued, m_SubmitResult);
+		}
+		// The point that retains everything the submission may read: the committed point,
+		// or the reserved point of an accepted submission without a committed signal.
+		[[nodiscard]] RHIFencePoint GetRetentionFencePoint() const noexcept
+		{
+			if (m_Submitted)
+			{
+				return m_SubmittedFencePoint;
+			}
+			return GetSubmitEffect() == RHISubmitEffect::Accepted ?
+				m_ReservedFencePoint :
+				RHIFencePoint{};
 		}
 	};
 

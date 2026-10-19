@@ -112,12 +112,19 @@ namespace gglab
 		void OnFrameAborted(uint64_t frameSerial) noexcept;
 		// The frame's submission failed; its requests finish as Failed.
 		void OnFrameSubmissionFailed(uint64_t frameSerial) noexcept;
-		// Publishes every submitted tap whose fence has completed.
+		// The frame's work may still execute. Its requests finish as Failed, and its
+		// readback buffers are kept unread until Shutdown.
+		void OnFrameCompletionUnknown(uint64_t frameSerial) noexcept;
+		// Publishes every submitted tap whose fence has completed. A lost device fails
+		// the tap without reading its readbacks.
 		void CollectCompleted() noexcept;
-		// Requires the device to be idle. Publishes completed taps, fails every
-		// remaining request and releases all readback buffers. Later requests fail
+		// Requires verified idle or confirmed device loss. Publishes completed taps, fails
+		// every remaining request and releases all readback buffers. Later requests fail
 		// immediately.
 		void Shutdown() noexcept;
+		// Teardown could not verify idle: fails every remaining request and leaks the
+		// readback buffers, which the GPU may still write. Later requests fail immediately.
+		void Abandon(std::string_view failure) noexcept;
 
 	private:
 		struct QueuedRequest
@@ -172,6 +179,8 @@ namespace gglab
 			RHIFencePoint m_Fence{};
 			bool m_ProductionCounters = false;
 			bool m_Submitted = false;
+			// The failure was published; the readbacks wait for teardown unread.
+			bool m_CompletionUnknown = false;
 			bool m_GraphExportActive = false;
 			bool m_ResourceExportActive = false;
 			bool m_NonFiniteScanActive = false;
@@ -223,6 +232,8 @@ namespace gglab
 			std::optional<PostProcessDebugTap> diagnosticTap = std::nullopt) noexcept;
 		void FailQueuedFrameRequests(uint64_t frameSerial, std::string_view failure) noexcept;
 		void FailTap(Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept;
+		// Publishes the tap's failure without releasing its readbacks.
+		void PublishTapFailure(Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept;
 		void PublishTap(Tap& tap) noexcept;
 		void PublishResourceTap(Tap& tap) noexcept;
 

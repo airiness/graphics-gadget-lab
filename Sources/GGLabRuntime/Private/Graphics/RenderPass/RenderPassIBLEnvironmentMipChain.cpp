@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLEnvironmentMipChain.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -27,7 +28,7 @@ namespace gglab
 			uint32_t SourceSamplerIndex = 0;
 			uint32_t PhysicalSky = 0;
 		};
-		static_assert(IsPassRootConstantStruct<IBLEnvironmentMipPassParameters>);
+		static_assert(IsPassConstantBufferStruct<IBLEnvironmentMipPassParameters>);
 		static_assert(sizeof(IBLEnvironmentMipPassParameters) == 16);
 		static_assert(offsetof(IBLEnvironmentMipPassParameters, PhysicalSky) == 12);
 
@@ -159,9 +160,11 @@ namespace gglab
 							.SourceSamplerIndex = data.m_SourceSamplerIndex,
 							.PhysicalSky = bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u,
 						};
-						commandContext->SetPushConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							passParameters);
+						if (!commandContext->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+						{
+							return;
+						}
 						commandContext->DrawFullscreenTriangle();
 						commandContext->EndRendering();
 					}

@@ -53,6 +53,11 @@ namespace gglab
 		void Finalize() noexcept;
 
 		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }
+		// Native confirmation of device removal; it never infers removal from a failed wait.
+		[[nodiscard]] bool IsDeviceRemoved() const noexcept
+		{
+			return m_D3D12Device && m_D3D12Device->GetDeviceRemovedReason() != S_OK;
+		}
 		IDXGIFactory7* GetDXGIFactory() const noexcept { return m_DxgiFactory.Get(); }
 		IDXGIAdapter1* GetDXGIAdapter() const noexcept { return m_DxgiAdapter.Get(); }
 		std::string_view GetAdapterName() const noexcept { return m_AdapterName; }
@@ -105,8 +110,14 @@ namespace gglab
 		void* MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept override;
 		void UnmapBuffer(
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
+		bool FlushMappedBufferWrites(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
-		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
+		RHIUploadLimits GetUploadLimits() const noexcept override;
+		bool IsUploadStorage(RHIBufferHandle buffer) const noexcept override;
+		// Private backend primitives report their checked results through the same health state.
+		using RHIDevice::ObserveFenceQueryResult;
+		using RHIDevice::ObserveGpuWaitResult;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
 		void RecordTextureUse(
 			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
@@ -145,6 +156,7 @@ namespace gglab
 		}
 
 	private:
+		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
 		void InitializeWinPIX() noexcept;
 		void InitializeDXGIFactory(bool enableDebugValidation) noexcept;
 		void InitializeDXGIAdapter() noexcept;

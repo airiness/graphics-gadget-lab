@@ -188,6 +188,10 @@ namespace gglab
 			}
 			RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
+				if (Test(desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage))
+				{
+					return {};
+				}
 				if (m_FailNextBufferCreation)
 				{
 					m_FailNextBufferCreation = false;
@@ -244,7 +248,15 @@ namespace gglab
 				return nullptr;
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
+			bool FlushMappedBufferWrites(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			{
+				// This device never maps buffers, so there is never a write to publish.
+				return false;
+			}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			RHIUploadLimits GetUploadLimits() const noexcept override { return { 1, 64 * 1024, 1, UINT32_MAX }; }
+			// This publication fixture cannot create mapped upload storage.
+			bool IsUploadStorage(RHIBufferHandle) const noexcept override { return false; }
 			bool IsAlive(RHITextureHandle texture) const noexcept override
 			{
 				return texture.IsValid();
@@ -257,25 +269,21 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
-			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
+			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				if (!fencePoint.IsValid())
-				{
-					return false;
-				}
 				if (m_AllFencesCompleted)
 				{
-					return true;
+					return RHIFenceQueryResult::Completed;
 				}
 				for (const RHIFencePoint& completed : m_CompletedFencePoints)
 				{
 					if (completed.m_Fence == fencePoint.m_Fence &&
 						completed.m_Value >= fencePoint.m_Value)
 					{
-						return true;
+						return RHIFenceQueryResult::Completed;
 					}
 				}
-				return false;
+				return RHIFenceQueryResult::Pending;
 			}
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}

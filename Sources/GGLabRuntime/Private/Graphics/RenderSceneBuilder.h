@@ -2,16 +2,18 @@
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "Graphics/RenderWorldExtractor.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <vector>
@@ -25,18 +27,6 @@ namespace gglab
 	class TransferManager;
 	class RenderResourceRegistry;
 	class TemporalFrameTransaction;
-
-	struct RenderSceneGpuAllocations
-	{
-		DynamicStructuredBufferAllocator<ViewGPU>::Allocation m_Views{};
-		DynamicBufferAllocation m_SceneConstants{};
-		DynamicBufferAllocation m_ShadowConstants{};
-
-		bool IsEmpty() const noexcept
-		{
-			return !m_Views.IsValid() && !m_SceneConstants.IsValid() && !m_ShadowConstants.IsValid();
-		}
-	};
 
 	class RenderSceneBuilder
 	{
@@ -53,7 +43,7 @@ namespace gglab
 			std::span<RenderView> m_RenderViews;
 			const DirectionalShadowFramePlan& m_DirectionalShadowFramePlan;
 
-			DynamicConstantBufferAllocator& m_SceneCB;
+			RHIFrameUploads m_Uploads{};
 			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
 			PersistentStructuredBuffer<MaterialGPU>& m_MaterialsSB;
 			PersistentStructuredBuffer<LightGPU>& m_LightsSB;
@@ -63,7 +53,6 @@ namespace gglab
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			std::optional<uint64_t> m_DirectionalShadowLightKey;
 			RenderDirectionalLight m_MainDirectionalLight{};
-			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_FrameSlotIndex = 0;
 			// Unjittered display raster view of post-temporal composition, when the frame
 			// uses one; it is uploaded after the shadow views.
@@ -85,13 +74,46 @@ namespace gglab
 			// View offset of BuildInfo::m_PostTemporalView; unassigned without one.
 			uint32_t m_PostTemporalViewOffset = UnassignedViewOffset;
 			RenderScene m_RenderScene{};
-			RenderSceneGpuAllocations m_GpuAllocations{};
+			RenderFrameConstantBindings m_Constants{};
 			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_Status = RenderSceneBuildStatus::GpuUploadFailed;
 		};
 
+		struct SceneTableUploadInfo
+		{
+			TransferManager& m_TransferManager;
+			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
+			PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>& m_MaterialTable;
+			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
+			RHIBufferHandle m_ObjectBuffer{};
+			RHIBufferHandle m_MaterialBuffer{};
+			RHIBufferHandle m_LightBuffer{};
+			uint32_t m_FrameSlotIndex = 0;
+		};
+
+		struct SceneTableUploadResult
+		{
+			// Invalid when nothing was dirty or the batch was not submitted.
+			RHIFencePoint m_Completion{};
+			bool m_ObjectsRecorded = true;
+			bool m_MaterialsRecorded = true;
+			bool m_LightsRecorded = true;
+			bool m_Submitted = true;
+
+			[[nodiscard]] bool IsCommitted() const noexcept
+			{
+				return m_ObjectsRecorded && m_MaterialsRecorded && m_LightsRecorded && m_Submitted;
+			}
+		};
+
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
+
+		// Uploads the dirty ranges of the persistent scene tables into the frame slot's buffers
+		// as one transfer batch. Revisions are committed only when every range was recorded and
+		// the batch was submitted.
+		[[nodiscard]] static SceneTableUploadResult UploadSceneTables(
+			const SceneTableUploadInfo& info) noexcept;
 
 		[[nodiscard]] static LightGPU BuildLightData(uint64_t entityKey,
 			const components::TransformComponent& transform, const components::LightComponent& light,

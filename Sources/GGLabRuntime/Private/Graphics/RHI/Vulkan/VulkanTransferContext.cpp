@@ -4,6 +4,7 @@
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
+#include "Graphics/RHI/Vulkan/VulkanResultClassification.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
@@ -128,7 +129,7 @@ namespace gglab
 		{
 			return {};
 		}
-		if (m_RecordingFailed)
+		if (m_RecordingFailed || m_Device->HasCompletionError())
 		{
 			Abort();
 			return {};
@@ -171,17 +172,51 @@ namespace gglab
 		};
 		const VkResult submitResult =
 			vkQueueSubmit2(m_Device->GetTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+		const RHIFencePoint fencePoint{ timeline->GetRHIHandle(), signalValue };
 		if (submitResult != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Vulkan transfer queue submission failed with {}.", ToString(submitResult));
-			DestroyInfo(*m_ExecutingInfo);
-			m_ExecutingInfo.reset();
+			if (submitResult == VK_ERROR_DEVICE_LOST)
+			{
+				m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::DeviceLost);
+			}
+			if (submitResult == VK_ERROR_DEVICE_LOST ||
+				ClassifyVulkanSubmitEffect(true, submitResult) == RHISubmitEffect::NoEffect)
+			{
+				// Out-of-memory submits had no effect, and a lost device runs nothing further.
+				DestroyInfo(*m_ExecutingInfo);
+				m_ExecutingInfo.reset();
+				return {};
+			}
+			// Any other failure may have accepted the batch without a committed signal: its
+			// completion is unknown. Retain its owners on the reserved point, which only a
+			// later committed signal (such as a verified idle wait) reaches.
+			m_Device->ObserveGpuWaitResult(RHIGpuWaitResult::Failed);
+			RetainExecutingInfo(fencePoint);
 			return {};
 		}
 
 		timeline->CommitSubmittedValue(signalValue);
-		const RHIFencePoint fencePoint{ timeline->GetRHIHandle(), signalValue };
+		RetainExecutingInfo(fencePoint);
+		m_RecordingFailed = false;
+
+		if (wait)
+		{
+			const VkResult waitResult = timeline->Wait(signalValue);
+			m_Device->ObserveGpuWaitResult(ClassifyVulkanWaitResult(waitResult));
+			if (waitResult != VK_SUCCESS)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Vulkan transfer timeline wait failed with {}.", ToString(waitResult));
+			}
+			ReclaimCompleted();
+		}
+		return fencePoint;
+	}
+
+	void VulkanTransferContext::RetainExecutingInfo(const RHIFencePoint& fencePoint) noexcept
+	{
 		for (const RHIBufferHandle buffer : m_ExecutingInfo->m_UsedBuffers)
 		{
 			m_Device->RecordBufferUse(buffer, fencePoint);
@@ -192,19 +227,6 @@ namespace gglab
 		}
 		m_ExecutingInfo->m_FencePoint = fencePoint;
 		m_InFlightInfos.push_back(std::move(m_ExecutingInfo));
-		m_RecordingFailed = false;
-
-		if (wait)
-		{
-			const VkResult waitResult = timeline->Wait(signalValue);
-			if (waitResult != VK_SUCCESS)
-			{
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"Vulkan transfer timeline wait failed with {}.", ToString(waitResult));
-			}
-			ReclaimCompleted();
-		}
-		return fencePoint;
 	}
 
 	void VulkanTransferContext::Abort() noexcept

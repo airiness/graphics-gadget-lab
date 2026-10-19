@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -24,7 +24,7 @@ namespace gglab
 			uint32_t ViewIndex = 0;
 			uint32_t Padding[3]{};
 		};
-		static_assert(IsPassRootConstantStruct<DepthPrepassParameters>);
+		static_assert(IsPassConstantBufferStruct<DepthPrepassParameters>);
 		static_assert(sizeof(DepthPrepassParameters) == 16);
 
 		struct PassData
@@ -220,7 +220,8 @@ namespace gglab
 		m_IsInitialized = true;
 	}
 
-	void RenderPassDepthPrepass::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassDepthPrepass::DrawRenderQueue(
+		RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
 		RenderViewID viewId, bool outputMotion) noexcept
 	{
@@ -234,7 +235,8 @@ namespace gglab
 			ranges[utils::ToIndex(RenderBucket::AlphaTest)], outputMotion);
 	}
 
-	void RenderPassDepthPrepass::DrawRange(RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassDepthPrepass::DrawRange(
+		RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 		const RenderQueue& renderQueue,
 		const DrawItemsRange& range, bool outputMotion) noexcept
@@ -264,10 +266,9 @@ namespace gglab
 						services, drawItem.m_VariantBits, outputMotion));
 				// With counters enabled and motion off, opaque depth has no pixel shader
 				// while alpha-tested depth uses a counter layout. Rebind after every PSO switch.
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(), context.m_RenderScene.m_SceneConstantBufferOffset);
+					context.m_FrameConstants.m_Scene);
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
 					services.m_FrameBuffers->GetObjectStructuredBuffer()->GetBufferHandle(
@@ -276,14 +277,20 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 					services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(
 						context.m_FrameSlotIndex));
-				graphicsContext->SetReadOnlyBuffer(
+				if (!graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				const DepthPrepassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(viewId)),
 				};
-				graphicsContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (!graphicsContext->SetConstantBufferData(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+				{
+					return;
+				}
 				lastVariantBits = drawItem.m_VariantBits;
 			}
 
@@ -298,7 +305,7 @@ namespace gglab
 				hasBoundMesh = true;
 			}
 
-			graphicsContext->SetPushConstants(
+			graphicsContext->SetInlineConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawPacket.m_DrawParameters);
 

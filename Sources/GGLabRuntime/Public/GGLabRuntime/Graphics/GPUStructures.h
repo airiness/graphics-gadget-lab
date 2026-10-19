@@ -239,6 +239,4 @@ namespace gglab
 	static_assert(offsetof(ViewGPU, TextureLodBias) == 480);
 	static_assert(offsetof(ViewGPU, Padding2) == 492);
 	static_assert(sizeof(ViewGPU) == 496);
-	static constexpr uint32_t MaxViewCapacity =
-		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
 }

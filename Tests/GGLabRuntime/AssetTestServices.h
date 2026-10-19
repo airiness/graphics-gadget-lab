@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -70,11 +71,16 @@ namespace gglab::asset_test
 		std::string_view GetBufferDebugName(RHIBufferHandle) const noexcept override { return {}; }
 		void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override { return nullptr; }
 		void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
+		// This device never maps buffers, so there is never a write to publish.
+		bool FlushMappedBufferWrites(RHIBufferHandle, RHIMappedBufferRange) noexcept override { return false; }
 		uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+		RHIUploadLimits GetUploadLimits() const noexcept override { return { 1, 64 * 1024, 1, UINT32_MAX }; }
+		// This fixture cannot create mapped upload storage.
+		bool IsUploadStorage(RHIBufferHandle) const noexcept override { return false; }
 		bool IsAlive(RHITextureHandle texture) const noexcept override { return m_LiveTextures.contains(texture); }
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override { return m_LiveBuffers.contains(buffer); }
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override { return sampler.IsValid(); }
-		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
+		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 		void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 		RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept override
@@ -90,6 +96,7 @@ namespace gglab::asset_test
 
 		// Fences complete immediately unless a test withholds completion.
 		void SetFencesComplete(bool complete) noexcept { m_AllFencesCompleted = complete; }
+		void SetFenceQueryResult(RHIFenceQueryResult result) noexcept { m_FenceQueryResult = result; }
 		[[nodiscard]] size_t GetLiveTextureCount() const noexcept { return m_LiveTextures.size(); }
 
 	private:
@@ -100,6 +107,7 @@ namespace gglab::asset_test
 		uint32_t m_NextSamplerIndex = 0;
 		uint32_t m_NextBufferIndex = 0;
 		bool m_AllFencesCompleted = true;
+		std::optional<RHIFenceQueryResult> m_FenceQueryResult;
 	};
 
 	class TestTransferContext final : public RHITransferContext

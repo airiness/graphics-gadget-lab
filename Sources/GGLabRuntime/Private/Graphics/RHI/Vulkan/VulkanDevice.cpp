@@ -1,5 +1,6 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "Graphics/RHI/Vulkan/VulkanResultClassification.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "GGLabFoundation/String/StringUtils.h"
@@ -311,6 +312,11 @@ namespace gglab
 	RHIBufferViewHandle VulkanDevice::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
+		if (IsUploadStorage(buffer))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Upload storage cannot create a persistent buffer view.");
+			return {};
+		}
 		return RequireOwnerThread("VulkanDevice::CreateBufferView") ?
 			m_ResourceManager.CreateBufferView(buffer, desc) :
 			RHIBufferViewHandle{};
@@ -412,6 +418,13 @@ namespace gglab
 		}
 	}
 
+	bool VulkanDevice::FlushMappedBufferWrites(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::FlushMappedBufferWrites") &&
+			m_ResourceManager.FlushBuffer(buffer, writtenRange);
+	}
+
 	uint32_t VulkanDevice::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
 		VkDeviceSize alignment = 1;
@@ -427,6 +440,27 @@ namespace gglab
 			break;
 		}
 		return static_cast<uint32_t>(std::max<VkDeviceSize>(alignment, 1));
+	}
+
+	RHIUploadLimits VulkanDevice::GetUploadLimits() const noexcept
+	{
+		return {
+			static_cast<uint32_t>(std::max<VkDeviceSize>(m_PhysicalDeviceLimits.minUniformBufferOffsetAlignment, 1)),
+			m_PhysicalDeviceLimits.maxUniformBufferRange,
+			static_cast<uint32_t>(std::max<VkDeviceSize>(m_PhysicalDeviceLimits.minStorageBufferOffsetAlignment, 1)),
+			m_PhysicalDeviceLimits.maxStorageBufferRange,
+		};
+	}
+
+	bool VulkanDevice::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::IsUploadStorage"))
+		{
+			// Every caller rejects upload storage. An unchecked identity must not pass.
+			return true;
+		}
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 	}
 
 	bool VulkanDevice::IsAlive(RHITextureHandle texture) const noexcept
@@ -509,37 +543,55 @@ namespace gglab
 		}
 	}
 
-	bool VulkanDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+	RHIGpuWaitResult VulkanDevice::WaitFencePoint(
+		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
 	{
-		if (!RequireOwnerThread("VulkanDevice::IsFencePointCompleted"))
+		// Off-owner, invalid and foreign points are caller misuse, not native failures.
+		if (!RequireOwnerThread("VulkanDevice::WaitFencePoint") || !fencePoint.IsValid())
 		{
-			return false;
+			return RHIGpuWaitResult::Failed;
 		}
-		if (!fencePoint.IsValid())
-		{
-			return true;
-		}
-		const VulkanTimelineFence* timeline = nullptr;
-		if (m_GraphicsTimeline && fencePoint.m_Fence == m_GraphicsTimeline->GetRHIHandle())
-		{
-			timeline = m_GraphicsTimeline;
-		}
-		else if (m_TransferTimeline &&
-			fencePoint.m_Fence == m_TransferTimeline->GetRHIHandle())
-		{
-			timeline = m_TransferTimeline.get();
-		}
+		const VulkanTimelineFence* timeline = FindTimeline(fencePoint.m_Fence);
 		if (!timeline)
 		{
-			// An unknown fence never counts as completed.
-			return false;
+			return RHIGpuWaitResult::Failed;
+		}
+		return ObserveGpuWaitResult(ClassifyVulkanWaitResult(
+			timeline->Wait(fencePoint.m_Value, ToVulkanTimeoutNanoseconds(timeoutMilliseconds))));
+	}
+
+	RHIFenceQueryResult VulkanDevice::QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryFencePoint") || !fencePoint.IsValid())
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		const VulkanTimelineFence* timeline = FindTimeline(fencePoint.m_Fence);
+		if (!timeline)
+		{
+			return RHIFenceQueryResult::Failed;
+		}
+		if (HasObservedDeviceLoss())
+		{
+			return RHIFenceQueryResult::DeviceLost;
 		}
 		uint64_t completedValue = 0;
-		if (timeline->GetCompletedValue(completedValue) != VK_SUCCESS)
+		const VkResult result = timeline->GetCompletedValue(completedValue);
+		return ObserveFenceQueryResult(
+			ClassifyVulkanFenceQuery(result, completedValue, fencePoint.m_Value));
+	}
+
+	const VulkanTimelineFence* VulkanDevice::FindTimeline(RHIFenceHandle fence) const noexcept
+	{
+		if (m_GraphicsTimeline && fence == m_GraphicsTimeline->GetRHIHandle())
 		{
-			return false;
+			return m_GraphicsTimeline;
 		}
-		return completedValue >= fencePoint.m_Value;
+		if (m_TransferTimeline && fence == m_TransferTimeline->GetRHIHandle())
+		{
+			return m_TransferTimeline.get();
+		}
+		return nullptr;
 	}
 
 	void VulkanDevice::Destroy() noexcept

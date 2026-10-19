@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -26,7 +26,7 @@ namespace gglab
 			uint32_t ViewIndex = 0;
 			uint32_t Padding[3]{};
 		};
-		static_assert(IsPassRootConstantStruct<DirectionalShadowPassParameters>);
+		static_assert(IsPassConstantBufferStruct<DirectionalShadowPassParameters>);
 		static_assert(sizeof(DirectionalShadowPassParameters) == 16);
 
 		struct PassData
@@ -87,9 +87,14 @@ namespace gglab
 					if (data.m_RenderQueue && !data.m_RenderQueue->m_DrawItems.empty())
 					{
 						const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
+						const DepthCoverageBufferSource boundView{
+							.m_Buffer = contextPtr->m_FrameConstants.m_Views.m_Buffer,
+							.m_OffsetInBytes = contextPtr->m_FrameConstants.m_Views.m_OffsetInBytes,
+							.m_ElementIndex = contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+						};
 						GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == viewIndex &&
-							data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
-							contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+							data.m_RasterDomain->m_CurrentViewSource == boundView &&
+							data.m_RasterDomain->m_CurrentJitteredProjectionSource == boundView,
 							"Shadow coverage and shader binding must address the same uploaded cascade view.");
 						GGLAB_ASSERT_MSG(
 							data.m_RasterDomain->IsValid() &&
@@ -153,11 +158,9 @@ namespace gglab
 					graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
 					graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 					graphicsContext->SetConstantBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-						sceneBuffer->GetBufferHandle(),
-						contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+						contextPtr->m_FrameConstants.m_Scene);
 
 					const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 					graphicsContext->SetReadOnlyBuffer(
@@ -169,16 +172,21 @@ namespace gglab
 						static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 						materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-					const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-					graphicsContext->SetReadOnlyBuffer(
+					if (!graphicsContext->SetReadOnlyBuffer(
 						static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-						viewSB->GetBufferHandle());
+						contextPtr->m_FrameConstants.m_Views))
+					{
+						return;
+					}
 
 					const DirectionalShadowPassParameters passParameters{
 						.ViewIndex = viewIndex,
 					};
-					graphicsContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+					if (!graphicsContext->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
+					{
+						return;
+					}
 
 					DrawRenderQueue(graphicsContext, services, renderQueue);
 				});
@@ -281,7 +289,7 @@ namespace gglab
 				hasBoundMesh = true;
 			}
 
-			graphicsContext->SetPushConstants(
+			graphicsContext->SetInlineConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawPacket.m_DrawParameters);
 

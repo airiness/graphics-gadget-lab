@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -21,6 +22,12 @@ namespace gglab
 	class DX12CommandAllocatorPool;
 	class DX12CommandList;
 	class DX12QueueSystem;
+	struct DX12SignalResult;
+
+	// A requested retirement point is never a completion dependency unless its signal
+	// succeeded. Synchronous publication additionally requires a checked Completed wait.
+	[[nodiscard]] DX12FencePoint ResolveDX12TransferCompletion(const DX12SignalResult& signal,
+		bool wait, const std::function<RHIGpuWaitResult(const DX12FencePoint&)>& waitForFence) noexcept;
 
 	class DX12TransferContext final : public RHITransferContext
 	{

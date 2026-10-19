@@ -1089,6 +1089,9 @@ function Test-ProjectIncludeVisibility {
 
 $runtimePublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public'
 $runtimePrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private'
+# AppRuntime lifecycle tests simulate a backend with the real neutral upload/submission
+# owners. This grants only the neutral RHI directory, not Runtime Private generally.
+$runtimeRhiTestIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private\Graphics\RHI'
 $winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
 $vulkanQualificationIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification'
@@ -1139,9 +1142,9 @@ Test-ProjectIncludeVisibility $vulkanQualificationProject `
     @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
-# AppRuntime consumes Runtime Public contracts only. DynamicBufferAllocator
-# keeps its RingSpanAllocator storage opaque, so neither AppRuntime target
-# receives Runtime Private or legacy Runtime include visibility.
+# AppRuntime consumes Runtime Public contracts only and receives no Runtime
+# Private or legacy Runtime include visibility. Its test target's only Private
+# exception is the neutral RHI directory declared by $runtimeRhiTestIncludeRoot.
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
     @($appRuntimeIncludeRoot, $runtimePublicIncludeRoot,
@@ -1192,11 +1195,11 @@ Test-ProjectIncludeVisibility $shaderRuntimeIntegrationTestsProject `
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePublicIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeRhiTestIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePublicIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeRhiTestIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainProject $shaderToolchainNamespace `
@@ -1925,7 +1928,8 @@ if (Test-Path -LiteralPath $legacyRuntimeShaderTypesPath -PathType Leaf) {
 
 $legacyRuntimePublicRhiIncludeRegex =
     '#include\s*[<"]Graphics[\\/]RHI[\\/](?!RHIHandleTable\.h[>"]|' +
-    'RHISubresourceUtils\.h[>"]|DX12[\\/]|Vulkan[\\/])RHI[^>"\\/]+'
+    'RHISubresourceUtils\.h[>"]|RHIFrameSubmission\.h[>"]|RHIUploadPool\.h[>"]|DX12[\\/]|' +
+    'Vulkan[\\/])RHI[^>"\\/]+'
 $legacyRuntimeShaderTypesIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Shader[\\/]ShaderTypes\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `

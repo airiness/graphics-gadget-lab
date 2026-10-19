@@ -134,6 +134,8 @@ namespace gglab
 			.m_TemporalFrameTransaction = m_TemporalFrameTransaction,
 			.m_DisplayViewId = m_DisplayViewId,
 			.m_RenderScene = m_RenderScene,
+			.m_FrameConstants = m_FrameConstants,
+			.m_Uploads = m_Uploads,
 			.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
 			.m_DirectionalShadowFramePlan = &m_DirectionalShadowFramePlan,
 			.m_DebugDrawFrame = m_DebugDrawFrame,
@@ -149,6 +151,7 @@ namespace gglab
 	RenderFrameBuilder::BuildResult RenderFrameBuilder::Build(const BuildInfo& info) noexcept
 	{
 		BuildResult result{};
+		result.m_Uploads = info.m_Uploads;
 		result.m_FrameSlotIndex = info.m_FrameSlotIndex;
 		result.m_BackBufferIndex = info.m_BackBufferIndex;
 		result.m_FrameSerial = info.m_FrameSerial;
@@ -290,7 +293,7 @@ namespace gglab
 			.m_EnvironmentLightingSystem = *info.m_Renderer.GetEnvironmentLightingSystemService(),
 			.m_RenderViews = std::span<RenderView>(result.m_RenderViews),
 			.m_DirectionalShadowFramePlan = result.m_DirectionalShadowFramePlan,
-			.m_SceneCB = *info.m_Renderer.GetSceneConstantBuffer(),
+			.m_Uploads = info.m_Uploads,
 			.m_ObjectsSB = *info.m_Renderer.GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *info.m_Renderer.GetMaterialStructuredBuffer(),
 			.m_LightsSB = *info.m_Renderer.GetLightStructuredBuffer(),
@@ -303,7 +306,6 @@ namespace gglab
 					result.m_WorldData.m_MainDirectionalLight.m_EntityKey :
 					std::nullopt,
 			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
-			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
 			.m_PostTemporalView = postTemporalView ? std::addressof(*postTemporalView) : nullptr,
 		};
@@ -314,16 +316,14 @@ namespace gglab
 			result.m_DirectionalShadowFramePlan.m_ViewBaseOffset = sceneBuildResult.m_ShadowViewBaseOffset;
 		}
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);
-		result.m_SceneGpuAllocations = sceneBuildResult.m_GpuAllocations;
+		result.m_FrameConstants = sceneBuildResult.m_Constants;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
 		result.m_RenderSceneStatus = sceneBuildResult.m_Status;
 
 		const auto* objectBuffer = info.m_Renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = info.m_Renderer.GetMaterialStructuredBuffer();
-		const auto* viewBuffer = info.m_Renderer.GetViewStructuredBuffer();
 		GGLAB_ASSERT_NOT_NULL(objectBuffer);
 		GGLAB_ASSERT_NOT_NULL(materialBuffer);
-		GGLAB_ASSERT_NOT_NULL(viewBuffer);
 
 		const auto buildQueue = [&](const RenderView& renderView,
 			RenderQueue& renderQueue,
@@ -345,7 +345,8 @@ namespace gglab
 					[&](uint32_t bindingId, uint32_t width, uint32_t height) noexcept
 					{
 						const DepthCoverageBufferSource viewSource{
-							.m_Buffer = viewBuffer->GetBufferHandle(),
+							.m_Buffer = result.m_FrameConstants.m_Views.m_Buffer,
+							.m_OffsetInBytes = result.m_FrameConstants.m_Views.m_OffsetInBytes,
 							.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + bindingId,
 						};
 						return DepthCoverageRasterDomain{

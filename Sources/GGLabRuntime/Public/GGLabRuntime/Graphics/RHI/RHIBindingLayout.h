@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstddef>
 
 namespace gglab
 {
@@ -16,7 +17,7 @@ namespace gglab
 		SampledTexture,
 		StorageTexture,
 		Sampler,
-		PushConstants,
+		InlineConstants,
 		BindlessResourceTable,
 		BindlessSamplerTable,
 	};
@@ -26,6 +27,12 @@ namespace gglab
 		return type == RHIBindingType::BindlessResourceTable ||
 			type == RHIBindingType::BindlessSamplerTable;
 	}
+
+	enum class RHIBufferBindingMode : uint8_t
+	{
+		Fixed,
+		Dynamic,
+	};
 
 	struct RHIBindingSlotDesc
 	{
@@ -37,6 +44,7 @@ namespace gglab
 		uint32_t m_Count = 1;
 		uint32_t m_SizeInBytes = 0;
 		const char* m_DebugName = nullptr;
+		RHIBufferBindingMode m_BufferBindingMode = RHIBufferBindingMode::Fixed;
 	};
 
 	struct RHIBindingLayoutDesc
@@ -47,4 +55,13 @@ namespace gglab
 		uint32_t m_SlotCount = 0;
 		const char* m_DebugName = nullptr;
 	};
+
+	[[nodiscard]] constexpr bool IsValidInlineConstantWrite(uint32_t sizeInBytes,
+		size_t wordCount, uint32_t destOffsetInWords) noexcept
+	{
+		const uint32_t capacity = sizeInBytes / sizeof(uint32_t);
+		return sizeInBytes != 0 && sizeInBytes % sizeof(uint32_t) == 0 &&
+			wordCount != 0 && destOffsetInWords <= capacity &&
+			wordCount <= capacity - destOffsetInWords;
+	}
 }

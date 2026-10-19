@@ -161,8 +161,8 @@ namespace gglab
 
 		std::string DescribeSource(const DepthCoverageBufferSource& source)
 		{
-			return std::format("{}:{}:{}", source.m_Buffer.Index(), source.m_Buffer.Generation(),
-				source.m_ElementIndex);
+			return std::format("{}:{}:{}:{}", source.m_Buffer.Index(), source.m_Buffer.Generation(),
+				source.m_OffsetInBytes, source.m_ElementIndex);
 		}
 	}
 

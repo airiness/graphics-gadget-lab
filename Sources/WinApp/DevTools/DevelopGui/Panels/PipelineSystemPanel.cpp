@@ -43,7 +43,7 @@ namespace gglab
 					switch (slot.m_Type)
 					{
 					case RHIBindingType::ConstantBuffer:
-					case RHIBindingType::PushConstants:
+					case RHIBindingType::InlineConstants:
 						return 'b';
 					case RHIBindingType::ReadWriteStorageBuffer:
 					case RHIBindingType::StorageTexture:

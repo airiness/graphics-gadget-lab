@@ -94,11 +94,13 @@ namespace gglab
 				.m_CurrentModelSource =
 					{
 						.m_Buffer = info.m_ObjectBuffer,
+						.m_OffsetInBytes = 0,
 						.m_ElementIndex = info.m_ObjectBaseIndex + instance.m_ObjectOffset,
 					},
 				.m_MaterialAlphaSource =
 					{
 						.m_Buffer = info.m_MaterialBuffer,
+						.m_OffsetInBytes = 0,
 						.m_ElementIndex = info.m_MaterialBaseIndex + instance.m_MaterialOffset,
 					},
 			};

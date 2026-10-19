@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -43,7 +42,7 @@ namespace gglab
 			uint32_t m_TileCountX = 0;
 			uint32_t m_TileCountY = 0;
 		};
-		static_assert(IsPassRootConstantStruct<ForwardPlusCullParameters>);
+		static_assert(IsInlineConstantStruct<ForwardPlusCullParameters>);
 		static_assert(sizeof(ForwardPlusCullParameters) == 32);
 
 		struct PassData
@@ -95,7 +94,7 @@ namespace gglab
 		{
 			RHIBindingLayoutDesc desc{};
 			desc.m_DebugName = "ForwardPlusCull.BindingLayout";
-			AppendBindingSlot(desc, RHIBindingType::PushConstants, 0,
+			AppendBindingSlot(desc, RHIBindingType::InlineConstants, 0,
 				sizeof(ForwardPlusCullParameters), "ForwardPlusCullConstants");
 			AppendBindingSlot(
 				desc, RHIBindingType::ReadOnlyStorageBuffer, 0, 0, "ForwardPlusViews");
@@ -263,9 +262,12 @@ namespace gglab
 
 				commandContext->SetPipeline(
 					GetOrCreatePipeline(services, data.m_DiagnosticsEnabled));
-				commandContext->SetReadOnlyBuffer(
+				if (!commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::ViewBuffer),
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+					context.m_FrameConstants.m_Views))
+				{
+					return;
+				}
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::LightBuffer),
 					services.m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(
@@ -283,7 +285,7 @@ namespace gglab
 					commandContext->SetReadWriteBuffer(
 						static_cast<uint32_t>(ForwardPlusRootParameter::TileDepthRanges), depthRanges);
 				}
-				commandContext->SetPushConstants(
+				commandContext->SetInlineConstants(
 					static_cast<uint32_t>(ForwardPlusRootParameter::PassConstants),
 					ForwardPlusCullParameters{
 						.m_DepthTextureIndex = depthSrv.m_Index,

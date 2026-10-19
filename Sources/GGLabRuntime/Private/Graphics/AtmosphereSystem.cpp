@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include <algorithm>
-#include <cstring>
 #include <utility>
 namespace gglab
 {
@@ -17,8 +16,8 @@ namespace gglab
 			.m_Extent = { AtmosphereLutWidths[i], AtmosphereLutHeights[i], 1 },
 			.m_DebugName = AtmosphereLutNames[i] };
 	}
-	bool AtmosphereSystem::Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaders,
-		bool previewSky) noexcept
+	bool AtmosphereSystem::Begin(const AtmosphereGPU& parameters,
+		const std::array<uint64_t, 3>& shaders) noexcept
 	{
 		GGLAB_ASSERT(!m_InFrame && !m_Shutdown);
 		m_Diagnostics.m_Available = false;
@@ -52,26 +51,6 @@ namespace gglab
 		m_Diagnostics.m_Parameters = parameters;
 		m_Diagnostics.m_DirtyMask = dirty;
 		m_PendingShaderGenerations = shaders;
-		if (dirty || previewSky)
-		{
-			m_Constants = m_Device->CreateBuffer({ .m_SizeInBytes = 256, .m_Usage = RHIBufferUsage::Constant,
-				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu, .m_DebugName = "Atmosphere.Constants" });
-			if (!m_Constants.IsValid())
-			{
-				Disable();
-				return false;
-			}
-			void* mapped = m_Device->MapBuffer(m_Constants, {});
-			if (!mapped)
-			{
-				m_Device->DestroyBuffer(m_Constants);
-				m_Constants = {};
-				Disable();
-				return false;
-			}
-			std::memcpy(mapped, &parameters, sizeof(parameters));
-			m_Device->UnmapBuffer(m_Constants, { 0, sizeof(parameters) });
-		}
 		m_ExecutedMask = 0;
 		m_InFrame = true;
 		m_Diagnostics.m_Available = true;
@@ -86,18 +65,6 @@ namespace gglab
 		if (fence.IsValid())
 		{
 			m_LastFence = fence;
-		}
-		if (m_Constants.IsValid())
-		{
-			if (fence.IsValid())
-			{
-				m_PendingBuffers.push_back({ m_Constants, fence });
-			}
-			else
-			{
-				m_Device->DestroyBuffer(m_Constants);
-			}
-			m_Constants = {};
 		}
 		m_InFrame = false;
 		if (!completed || !fence.IsValid() || m_ExecutedMask != m_Diagnostics.m_DirtyMask)
@@ -117,6 +84,17 @@ namespace gglab
 		m_Committed = m_Diagnostics.m_Parameters;
 		m_ShaderGenerations = m_PendingShaderGenerations;
 	}
+	void AtmosphereSystem::RetainAfterUnknownCompletion() noexcept
+	{
+		if (!m_InFrame)
+		{
+			return;
+		}
+		m_InFrame = false;
+		m_Initialized = {};
+		m_Diagnostics.m_Available = false;
+		m_Diagnostics.m_DirtyMask = 7;
+	}
 	void AtmosphereSystem::Disable() noexcept
 	{
 		GGLAB_ASSERT(!m_InFrame);
@@ -134,24 +112,10 @@ namespace gglab
 		m_Diagnostics.m_Available = false;
 		m_Diagnostics.m_DirtyMask = 7;
 	}
-	void AtmosphereSystem::Tick() noexcept
-	{
-		std::erase_if(m_PendingBuffers, [this](const PendingBuffer& buffer)
-			{
-				if (!m_Device->IsFencePointCompleted(buffer.m_Fence))
-				{
-					return false;
-				}
-				m_Device->DestroyBuffer(buffer.m_Buffer);
-				return true;
-			});
-	}
 	void AtmosphereSystem::Shutdown() noexcept
 	{
 		GGLAB_ASSERT(!m_InFrame);
 		Disable();
-		Tick();
-		GGLAB_ASSERT(m_PendingBuffers.empty());
 		m_Shutdown = true;
 	}
 	bool AtmosphereSystem::CanPublish() const noexcept

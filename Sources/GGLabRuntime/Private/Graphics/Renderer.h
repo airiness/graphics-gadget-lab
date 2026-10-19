@@ -1,10 +1,9 @@
 #pragma once
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
@@ -16,7 +15,10 @@
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 
 #include <array>
+#include <atomic>
 #include <filesystem>
+#include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -50,8 +52,6 @@ namespace gglab
 	class TemporalHistoryManager;
 	class TemporalReferenceAccumulator;
 	class GTAOTemporalHistory;
-	struct RenderFrameGpuResources;
-	struct RenderSceneGpuAllocations;
 
 	class Renderer : public RenderHost,
 		public RenderFrameBufferAccess,
@@ -217,15 +217,6 @@ namespace gglab
 		}
 		[[nodiscard]] RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override;
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
-
-		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept override
-		{
-			return m_SceneCB.get();
-		}
-		DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept override
-		{
-			return m_SceneCB.get();
-		}
 		const PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept override
 		{
 			return m_ObjectSB.get();
@@ -282,15 +273,6 @@ namespace gglab
 		{
 			return m_LightTable.get();
 		}
-		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer()
-			const noexcept override
-		{
-			return m_ViewSB.get();
-		}
-		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept override
-		{
-			return m_ViewSB.get();
-		}
 
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept override;
 
@@ -314,6 +296,8 @@ namespace gglab
 		struct ActiveFrameState
 		{
 			RHIFrameContext* m_RHIFrame = nullptr;
+			// Persistent scene tables still arrive through the transfer queue.
+			RHIFencePoint m_UploadFencePoint{};
 			RenderGraph* m_RenderGraph = nullptr;
 			uint64_t m_Serial = 0;
 			uint32_t m_FrameSlotIndex = std::numeric_limits<uint32_t>::max();
@@ -325,10 +309,12 @@ namespace gglab
 		void CreateCommonBindingLayout() noexcept;
 		void InitializeGpuBuffers() noexcept;
 		void AbortFrame(uint64_t frameSerial) noexcept override;
-		[[nodiscard]] RHIFencePoint AbortActiveFrame(uint64_t frameSerial) noexcept;
+		[[nodiscard]] RHIFrameEndResult AbortActiveFrame(uint64_t frameSerial) noexcept;
+		// Ends a frame whose work may still execute without releasing anything it can read.
+		void RetainCompletionUnknownFrame() noexcept;
+		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
+		void AbandonGpuOwners() noexcept;
 		void EndFrameLifetime() noexcept;
-		void RetireSceneGpuAllocations(
-			RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept;
 
 	private:
 		std::unique_ptr<RHIContext> m_RHIContext;
@@ -338,7 +324,6 @@ namespace gglab
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;
 		std::unique_ptr<GTAOTemporalHistory> m_GTAOTemporalHistory;
-		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
 		// Outlives Finalize so the application can drain the final capture results.
 		std::unique_ptr<FrameCaptureService> m_FrameCapture;
@@ -356,8 +341,6 @@ namespace gglab
 		TemporalViewHistory m_TemporalViewHistory{};
 		TemporalObjectHistory m_TemporalObjectHistory{};
 
-		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
-
 		std::unique_ptr<PersistentStructuredBuffer<ObjectGPU>> m_ObjectSB;
 		std::unique_ptr<PersistentStructuredBuffer<MaterialGPU>> m_MaterialSB;
 		std::unique_ptr<PersistentStructuredBuffer<LightGPU>> m_LightSB;
@@ -365,7 +348,6 @@ namespace gglab
 		std::unique_ptr<PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>>
 			m_MaterialTable;
 		std::unique_ptr<PersistentStructuredBufferTable<uint64_t, LightGPU>> m_LightTable;
-		std::unique_ptr<DynamicStructuredBufferAllocator<ViewGPU>> m_ViewSB;
 
 		std::atomic_bool m_IsInitialized = false;
 		std::atomic_bool m_IsSuspended = false;
@@ -375,5 +357,7 @@ namespace gglab
 		ActiveFrameState m_ActiveFrame{};
 		AssetManager* m_AttachedAssetManager = nullptr;
 		bool m_HasActiveFrame = false;
+		// Set once a frame's GPU completion became unknown; no further frame begins.
+		bool m_Poisoned = false;
 	};
 }

@@ -200,7 +200,7 @@ namespace gglab
 			commands.SetPipeline(pipeline);
 			if (parameters)
 			{
-				commands.SetPushConstants(0, *parameters);
+				commands.SetInlineConstants(0, *parameters);
 			}
 			commands.SetViewport({ 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height) });
 			commands.SetScissorRect({ 0, 0, static_cast<int32_t>(width), static_cast<int32_t>(height) });
@@ -489,7 +489,7 @@ namespace gglab
 			}
 			std::printf("BRDF LUT adapter identity: %s\n", std::string(rhi->GetDevice().GetAdapterCompatibilityIdentity()).c_str());
 			RHIBindingLayoutDesc layoutDesc{};
-			layoutDesc.m_Slots[0] = { .m_Type = RHIBindingType::PushConstants, .m_Visibility = RHIShaderStage::Pixel,
+			layoutDesc.m_Slots[0] = { .m_Type = RHIBindingType::InlineConstants, .m_Visibility = RHIShaderStage::Pixel,
 				.m_Binding = 2, .m_SizeInBytes = 16 };
 			layoutDesc.m_Slots[1] = { .m_Type = RHIBindingType::BindlessResourceTable, .m_Visibility = RHIShaderStage::Pixel, .m_Count = 0 };
 			layoutDesc.m_Slots[2] = { .m_Type = RHIBindingType::BindlessSamplerTable, .m_Visibility = RHIShaderStage::Pixel, .m_Count = 0 };

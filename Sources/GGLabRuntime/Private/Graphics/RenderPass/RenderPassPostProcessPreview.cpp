@@ -1,8 +1,8 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
@@ -39,7 +39,7 @@ namespace gglab
 			float Padding1 = 0.0f;
 			float Padding2 = 0.0f;
 		};
-		static_assert(IsPassRootConstantStruct<PostProcessPreviewPassParameters>);
+		static_assert(IsPassConstantBufferStruct<PostProcessPreviewPassParameters>);
 		static_assert(sizeof(PostProcessPreviewPassParameters) == 32);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthRaw) == 4);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthLinearViewZ) == 5);
@@ -152,14 +152,15 @@ namespace gglab
 			commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 				static_cast<int32_t>(data.m_Height) });
 
-			const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 			commandContext->SetConstantBuffer(
 				static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-				sceneBuffer->GetBufferHandle(),
-				context.m_RenderScene.m_SceneConstantBufferOffset);
-			commandContext->SetReadOnlyBuffer(
+				context.m_FrameConstants.m_Scene);
+			if (!commandContext->SetReadOnlyBuffer(
 				static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-				services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
+				context.m_FrameConstants.m_Views))
+			{
+				return;
+			}
 
 			const PostProcessPreviewPassParameters parameters{
 				.SourceTextureIndex = sourceSrv.m_Index,
@@ -169,8 +170,11 @@ namespace gglab
 				.SourcePreExposure = data.m_SourcePreExposure,
 				.PreviewExposureScale = data.m_PreviewExposureScale,
 			};
-			commandContext->SetPushConstants(
-				static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
+			if (!commandContext->SetConstantBufferData(
+				static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+			{
+				return;
+			}
 			commandContext->DrawFullscreenTriangle();
 		}
 

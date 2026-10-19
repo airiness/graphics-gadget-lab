@@ -25,7 +25,7 @@ namespace gglab
 		{
 			RHIBindingLayoutDesc desc;
 			desc.m_Slots[0] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 0 };
-			desc.m_Slots[1] = { .m_Type = RHIBindingType::PushConstants, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 2, .m_SizeInBytes = 28 };
+			desc.m_Slots[1] = { .m_Type = RHIBindingType::InlineConstants, .m_Visibility = RHIShaderStage::Compute, .m_Binding = 2, .m_SizeInBytes = 28 };
 			desc.m_SlotCount = 2;
 			desc.m_DebugName = "NonFiniteCounters.Clear";
 			m_ProductionClearLayout = m_ScanPipelineSystem->CreateBindingLayout(desc);
@@ -81,7 +81,7 @@ namespace gglab
 					auto* commands = context.GetDirectComputeCommandContext();
 					commands->SetPipeline(pipeline);
 					commands->SetReadWriteBuffer(0, context.GetBufferHandle(record));
-					commands->SetPushConstants(1, constants);
+					commands->SetInlineConstants(1, constants);
 					commands->Dispatch((nonfinite::SiteCount * nonfinite::ProgramCount + 63) / 64, 1, 1);
 				} };
 		return true;

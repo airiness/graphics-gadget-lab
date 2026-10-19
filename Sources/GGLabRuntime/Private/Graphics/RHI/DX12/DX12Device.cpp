@@ -244,6 +244,11 @@ namespace gglab
 	RHIBufferViewHandle DX12Device::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
+		if (IsUploadStorage(buffer))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Upload storage cannot create a persistent buffer view.");
+			return {};
+		}
 		if (!m_DescriptorCache)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -370,6 +375,27 @@ namespace gglab
 		}
 	}
 
+	bool DX12Device::FlushMappedBufferWrites(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		const auto* nativeBuffer = ResolveBuffer(buffer);
+		if (!nativeBuffer)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::FlushMappedBufferWrites received a non-live buffer handle.");
+			return false;
+		}
+		if (writtenRange.m_Begin > writtenRange.m_End ||
+			writtenRange.m_End > nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12Device::FlushMappedBufferWrites received an invalid range.");
+			return false;
+		}
+		// Upload-heap writes need no explicit flush, the mapping may stay persistent, and
+		// queue submission orders preceding CPU writes before the GPU reads them.
+		return true;
+	}
+
 	uint32_t DX12Device::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
 		return viewType == RHIBufferViewType::ConstantBuffer ?
@@ -377,11 +403,22 @@ namespace gglab
 			1u;
 	}
 
-	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+	RHIUploadLimits DX12Device::GetUploadLimits() const noexcept
+	{
+		return { D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, 64 * 1024, 4, UINT32_MAX };
+	}
+
+	bool DX12Device::IsUploadStorage(RHIBufferHandle buffer) const noexcept
+	{
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		return desc && Test(desc->m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
+	}
+
+	RHIFenceQueryResult DX12Device::QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept
 	{
 		return m_QueueSystem ?
-			m_QueueSystem->IsFencePointCompleted(fencePoint) :
-			!fencePoint.IsValid();
+			m_QueueSystem->QueryFencePoint(fencePoint) :
+			RHIFenceQueryResult::Failed;
 	}
 
 	void DX12Device::RecordTextureUse(
