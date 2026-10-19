@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
+#include "Graphics/RenderPass/ForwardBindingLayout.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -49,7 +49,7 @@ namespace gglab::forward_shading
 
 	// Creates the common binding layout plus shadow constants and, for Forward+
 	// shading, the tile light-list buffers.
-	[[nodiscard]] ResolvedRenderLayout CreateBindingLayout(
+	[[nodiscard]] ForwardBindingLayout CreateBindingLayout(
 		const RenderServices& services, bool forwardPlusLightLists) noexcept;
 
 	// HDR scene-color target over D32 depth; presets are resolved per draw variant.
@@ -128,10 +128,10 @@ namespace gglab::forward_shading
 
 	// Binds raster state, scene and shadow constants and the frame structured buffers.
 	// A pipeline must already be set so that the root layout is established.
-	void BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
+	[[nodiscard]] bool BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
 		const SceneInputs& inputs, const RenderQueue& renderQueue,
-		uint32_t shadowParameterIndex) noexcept;
+		const ForwardBindingLayout& layout) noexcept;
 
 	// Draws the bucket ranges with the exact draw packets accepted by the frame plan.
 	template <typename ResolvePipeline>

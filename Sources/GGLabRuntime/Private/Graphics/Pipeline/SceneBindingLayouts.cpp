@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
@@ -14,7 +15,7 @@ namespace gglab::scene_bindings
 		[[nodiscard]] constexpr LayoutBindingRequirement Binding(LayoutBindingKey key,
 			RHIBindingType type, uint32_t address, uint32_t order, const char* name,
 			RHIShaderStage visibility = RHIShaderStage::All, uint32_t size = 0,
-			RHIBufferBindingMode mode = RHIBufferBindingMode::Fixed) noexcept
+			RHIBufferBindingMode mode = RHIBufferBindingMode::Fixed, LayoutPayloadTag payload = {}) noexcept
 		{
 			return {
 				.m_Key = key,
@@ -23,6 +24,7 @@ namespace gglab::scene_bindings
 					.m_Count = IsBindlessBindingType(type) ? 0u : 1u, .m_SizeInBytes = size,
 					.m_DebugName = name, .m_BufferBindingMode = mode,
 				},
+				.m_PayloadTag = payload,
 				.m_ParameterOrder = order,
 			};
 		}
@@ -30,7 +32,8 @@ namespace gglab::scene_bindings
 		// Order preserves both the legacy native parameters and the descriptor slot sequence.
 		constexpr std::array CommonBindings
 		{
-			Binding(SceneConstants, RHIBindingType::ConstantBuffer, 0, 0, "SceneCB"),
+			Binding(SceneConstants, RHIBindingType::ConstantBuffer, 0, 0, "SceneCB",
+				RHIShaderStage::All, 0, RHIBufferBindingMode::Fixed, ConstantPayloadTraits<SceneGPU>::Tag),
 			Binding(DrawParameters, RHIBindingType::InlineConstants, 1, 1, "DrawConstants",
 				RHIShaderStage::All, MaxDrawConstantDWORDs * sizeof(uint32_t)),
 			Binding(PassParameters, RHIBindingType::ConstantBuffer, 2, 2, "PassCB",
@@ -47,7 +50,8 @@ namespace gglab::scene_bindings
 		constexpr std::array ShadowBindings
 		{
 			Binding(DirectionalShadow, RHIBindingType::ConstantBuffer, 3, 10,
-				"DirectionalShadowCB", RHIShaderStage::Pixel),
+				"DirectionalShadowCB", RHIShaderStage::Pixel, 0, RHIBufferBindingMode::Fixed,
+				ConstantPayloadTraits<DirectionalShadowGPU>::Tag),
 		};
 		constexpr std::array TileBindings
 		{

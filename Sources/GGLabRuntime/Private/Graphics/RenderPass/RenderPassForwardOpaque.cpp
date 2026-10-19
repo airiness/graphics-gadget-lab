@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -60,10 +59,6 @@ namespace gglab
 			{
 				return;
 			}
-			const auto& contract = *m_BindingLayout.GetContract();
-			m_ShadowParameterIndex = contract.FindParameterIndex(scene_bindings::DirectionalShadow).value();
-			m_TileHeadersParameterIndex = contract.FindParameterIndex(scene_bindings::ForwardPlusTileHeaders).value();
-			m_TileIndicesParameterIndex = contract.FindParameterIndex(scene_bindings::ForwardPlusTileIndices).value();
 			const auto bindingLayout = m_BindingLayout.GetNativeLayout();
 			const auto prepareRecipe = [&](LightingRecipe lighting, const ForwardOpaquePixelShaders& shaders,
 				uint32_t lightingTargetCount)
@@ -299,17 +294,20 @@ namespace gglab
 					};
 				graphicsContext->SetPipeline(
 					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
-				forward_shading::BindSceneResources(
-					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_ShadowParameterIndex);
+				if (!forward_shading::BindSceneResources(
+					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_BindingLayout))
+				{
+					return;
+				}
 
 				const RHIBufferHandle tileHeaders = executeContext.GetBufferHandle(data.m_TileHeaders);
 				const RHIBufferHandle tileIndices = executeContext.GetBufferHandle(data.m_TileIndices);
 				GGLAB_ASSERT_MSG(tileHeaders.IsValid() && tileIndices.IsValid(),
 					"Forward+ tile buffers must resolve before opaque shading.");
-				graphicsContext->SetReadOnlyBuffer(
-					m_TileHeadersParameterIndex, tileHeaders);
-				graphicsContext->SetReadOnlyBuffer(
-					m_TileIndicesParameterIndex, tileIndices);
+				if (!m_BindingLayout.BindTileLists(*graphicsContext, tileHeaders, tileIndices))
+				{
+					return;
+				}
 				if (!graphicsContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
 				{

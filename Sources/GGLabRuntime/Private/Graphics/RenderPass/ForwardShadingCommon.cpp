@@ -1,5 +1,4 @@
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
-#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -14,7 +13,7 @@
 
 namespace gglab::forward_shading
 {
-	ResolvedRenderLayout CreateBindingLayout(
+	ForwardBindingLayout CreateBindingLayout(
 		const RenderServices& services, bool forwardPlusLightLists) noexcept
 	{
 		const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
@@ -23,18 +22,10 @@ namespace gglab::forward_shading
 		{
 			return {};
 		}
-		const auto composition = scene_bindings::ComposeForwardLayout(*common, forwardPlusLightLists);
-		GGLAB_ASSERT_MSG(composition.IsSuccess(), "Forward shading layout fragments must compose.");
-		if (!composition.m_Layout)
-		{
-			return {};
-		}
 		auto* rhiContext = services.m_Presentation->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
-		auto layout = ResolvedRenderLayout::Create(rhiContext->GetPipelineSystem(),
-			*composition.m_Layout, forwardPlusLightLists ?
-				"ForwardPBR.ForwardPlusBindingLayout" :
-				"ForwardPBR.BindingLayout");
+		auto layout = ForwardBindingLayout::Create(
+			rhiContext->GetPipelineSystem(), *common, forwardPlusLightLists);
 		GGLAB_ASSERT_MSG(layout.IsValid(), "Forward shading requires its pass-specific binding layout.");
 		return layout;
 	}
@@ -270,10 +261,10 @@ namespace gglab::forward_shading
 		return nullptr;
 	}
 
-	void BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
+	bool BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
 		const SceneInputs& inputs, const RenderQueue& renderQueue,
-		uint32_t shadowParameterIndex) noexcept
+		const ForwardBindingLayout& layout) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(inputs.m_RasterDomain);
 		GGLAB_ASSERT_MSG(inputs.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain) ||
@@ -283,12 +274,11 @@ namespace gglab::forward_shading
 		graphicsContext.SetScissorRect(inputs.m_RasterDomain->m_Scissor);
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-		graphicsContext.SetConstantBuffer(
-			static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-			context.m_FrameConstants.m_Scene);
-		graphicsContext.SetConstantBuffer(
-			shadowParameterIndex,
-			context.m_FrameConstants.m_DirectionalShadow);
+		if (!layout.BindFrameConstants(graphicsContext, context.m_FrameConstants.m_SceneSnapshot,
+			context.m_FrameConstants.m_DirectionalShadowSnapshot))
+		{
+			return false;
+		}
 
 		const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
@@ -299,10 +289,11 @@ namespace gglab::forward_shading
 		if (!graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 			context.m_FrameConstants.m_Views))
 		{
-			return;
+			return false;
 		}
 		const auto& lightSB = services.m_FrameBuffers->GetLightStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 			lightSB->GetBufferHandle(context.m_FrameSlotIndex));
+		return !graphicsContext.HasRecordingError();
 	}
 }

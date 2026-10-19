@@ -3037,15 +3037,37 @@ namespace gglab
 					RecordingComputeCommandContext compute;
 					graphics.BeginRecordingScope(writer);
 					compute.BeginRecordingScope(writer);
-					const auto forwardLayout = scene_bindings::ComposeForwardLayout(
-						scene_bindings::GetCommonLayoutContract(), false);
-					const uint32_t shadowParameter = forwardLayout.m_Layout->FindParameterIndex(
-						scene_bindings::DirectionalShadow).value();
+					class LayoutPipelineSystem final : public RHIPipelineSystem
+					{
+					public:
+						RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc&) noexcept override { return { 1, 1 }; }
+						RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
+						RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
+						bool IsAlive(RHIBindingLayoutHandle handle) const noexcept override { return handle.IsValid(); }
+						bool IsAlive(RHIPipelineHandle handle) const noexcept override { return handle.IsValid(); }
+						uint64_t GetRevision() const noexcept override { return 1; }
+						void Clear() noexcept override {}
+					} pipelines;
+					const auto forwardLayout = ForwardBindingLayout::Create(
+						pipelines, scene_bindings::GetCommonLayoutContract(), false);
+					const auto& typedScene = frameContext.m_FrameConstants.m_SceneSnapshot;
+					const auto& typedShadow = frameContext.m_FrameConstants.m_DirectionalShadowSnapshot;
+					const auto matchesRaw = [](const auto& typed, const RHIConstantBufferBinding& raw)
+						{
+							const auto& binding = typed.GetBinding();
+							return typed.IsValid() && binding.m_Buffer == raw.m_Buffer &&
+								binding.m_OffsetInBytes == raw.m_OffsetInBytes &&
+								binding.m_SizeInBytes == raw.m_SizeInBytes &&
+								binding.m_UploadBatchId == raw.m_UploadBatchId;
+						};
+					context.Check(matchesRaw(typedScene, scene) && matchesRaw(typedShadow, shadow),
+						"Producer-created typed snapshots preserve the exact raw binding across frame moves");
 					for (uint32_t pass = 0; pass < 3; ++pass)
 					{
 						const auto& queue = moved.m_RenderQueues[0];
-						forward_shading::BindSceneResources(graphics, frameContext, services,
-							{ .m_RasterDomain = &queue.m_CoverageRasterDomain }, queue, shadowParameter);
+						context.Check(forward_shading::BindSceneResources(graphics, frameContext, services,
+							{ .m_RasterDomain = &queue.m_CoverageRasterDomain }, queue, forwardLayout),
+							"Forward consumes the frame's typed Scene and Shadow snapshots");
 					}
 					bool bindingsMatch = graphics.m_ConstantBindings.size() == 6;
 					for (size_t pass = 0; bindingsMatch && pass < 3; ++pass)
@@ -3072,9 +3094,49 @@ namespace gglab
 						compute.SetReadOnlyBuffer(1, views) && matchesViews(compute.m_ReadOnlyBindings.back()) &&
 						!batch->HasFailed(),
 						"Several shading passes and direct compute reuse all frame bindings without another upload");
+					const auto resolved = ResolvedRenderLayout::Create(
+						pipelines, scene_bindings::GetCommonLayoutContract());
+					const auto sceneReference = ResolvedBindingRef<SceneGPU>::Resolve(
+						resolved, scene_bindings::SceneConstants);
+					context.Check(BindConstantSnapshot(compute, resolved, sceneReference, typedScene),
+						"Typed compute binding retains the producer's original Scene snapshot");
 					graphics.EndRecordingScope();
 					compute.EndRecordingScope();
 					context.Check(batch->Publish(), "Prepared scene constants publish with their frame batch");
+
+					RHIUploadPool rejectionPool(device, { .m_PageSizeInBytes = 4096u });
+					RHIUploadWriter rejectionWriter;
+					auto rejectedBatch = rejectionPool.BeginBatch();
+					rejectedBatch->Attach(rejectionWriter);
+					const auto currentScene = TypedConstantSnapshot<SceneGPU>::Upload(
+						rejectionWriter.GetFrameUploads(), SceneGPU{});
+					graphics.BeginRecordingScope(rejectionWriter);
+					const auto otherLayout = ResolvedRenderLayout::Create(
+						pipelines, scene_bindings::GetCommonLayoutContract());
+					context.Check(!BindConstantSnapshot(graphics, otherLayout, sceneReference, currentScene) &&
+						graphics.HasRecordingError() && rejectedBatch->HasFailed(),
+						"A wrong logical reference poisons recording and the shared batch in every configuration");
+					graphics.EndRecordingScope();
+					rejectedBatch->Detach(rejectionWriter);
+					rejectedBatch->Cancel();
+					auto nextBatch = rejectionPool.BeginBatch();
+					nextBatch->Attach(rejectionWriter);
+					graphics.BeginRecordingScope(rejectionWriter);
+					context.Check(!BindConstantSnapshot(graphics, resolved, sceneReference, currentScene) &&
+						graphics.HasRecordingError() && nextBatch->HasFailed(),
+						"A correctly typed snapshot from a cancelled batch still fails encoder ownership validation");
+					graphics.EndRecordingScope();
+					nextBatch->Detach(rejectionWriter);
+					nextBatch->Cancel();
+					auto missingBatch = rejectionPool.BeginBatch();
+					missingBatch->Attach(rejectionWriter);
+					graphics.BeginRecordingScope(rejectionWriter);
+					context.Check(!BindConstantSnapshot(graphics, resolved, sceneReference, TypedConstantSnapshot<SceneGPU>{}) &&
+						graphics.HasRecordingError() && missingBatch->HasFailed(),
+						"An unavailable typed snapshot rejects recording through the shared batch failure path");
+					graphics.EndRecordingScope();
+					missingBatch->Detach(rejectionWriter);
+					missingBatch->Cancel();
 				}
 				else
 				{

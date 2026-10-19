@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
@@ -28,6 +29,8 @@ namespace gglab
 	{
 		RHIConstantBufferBinding m_Scene{};
 		RHIConstantBufferBinding m_DirectionalShadow{};
+		TypedConstantSnapshot<SceneGPU> m_SceneSnapshot{};
+		TypedConstantSnapshot<DirectionalShadowGPU> m_DirectionalShadowSnapshot{};
 		RHIReadOnlyBufferBinding m_Views{};
 	};
 

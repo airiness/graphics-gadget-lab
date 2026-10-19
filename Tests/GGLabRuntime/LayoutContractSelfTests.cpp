@@ -1,6 +1,8 @@
 #include "LayoutContractSelfTests.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
+#include "Graphics/RenderPass/ForwardBindingLayout.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Renderer.h"
@@ -19,6 +21,17 @@
 
 namespace gglab
 {
+	struct EqualSizeConstantFixture
+	{
+		std::array<uint32_t, sizeof(SceneGPU) / sizeof(uint32_t)> m_Values{};
+	};
+
+	template <>
+	struct ConstantPayloadTraits<EqualSizeConstantFixture>
+	{
+		static constexpr LayoutPayloadTag Tag{ 90 };
+	};
+
 	namespace
 	{
 		[[nodiscard]] LayoutBindingRequirement MakeBinding(uint32_t key, RHIBindingType type,
@@ -411,6 +424,61 @@ namespace gglab
 				second.GetContract()->FindParameterIndex(LayoutBindingKey{ 2 }) == 0u &&
 				!second.GetContract()->FindParameterIndex(LayoutBindingKey{ 1 }),
 				"Two logical meanings keep independent owned maps when the backend reuses one native handle");
+			static_assert(sizeof(EqualSizeConstantFixture) == sizeof(SceneGPU));
+			static_assert(!std::is_invocable_r_v<bool,
+				decltype(&BindConstantSnapshot<RHIGraphicsCommandContext, SceneGPU>),
+				RHIGraphicsCommandContext&, const ResolvedRenderLayout&,
+				const ResolvedBindingRef<SceneGPU>&, const TypedConstantSnapshot<EqualSizeConstantFixture>&>);
+			static_assert(!std::is_constructible_v<TypedConstantSnapshot<SceneGPU>, RHIConstantBufferBinding>);
+			static_assert(!std::is_convertible_v<TypedConstantSnapshot<SceneGPU>,
+				TypedConstantSnapshot<DirectionalShadowGPU>>);
+			const auto sceneReference = ResolvedBindingRef<SceneGPU>::Resolve(first, LayoutBindingKey{ 1 });
+			context.Check(sceneReference.GetParameterIndex(first) == 0u &&
+				!sceneReference.GetParameterIndex(second),
+				"Typed references belong to the logical instance even when native handles match");
+			context.Check(!ResolvedBindingRef<SceneGPU>::Resolve(first, LayoutBindingKey{ 99 }).IsValid() &&
+				!ResolvedBindingRef<EqualSizeConstantFixture>::Resolve(first, LayoutBindingKey{ 1 }).IsValid(),
+				"Missing keys and equal-size payloads with another meaning cannot resolve typed references");
+			auto copy = first;
+			auto moved = std::move(copy);
+			context.Check(sceneReference.GetParameterIndex(moved) == 0u && !copy.IsValid() &&
+				!copy.GetNativeLayout().IsValid(),
+				"Layout copies share the immutable instance and moving preserves references without a moved-from handle");
+			moved = second;
+			context.Check(!sceneReference.GetParameterIndex(moved),
+				"Replacing a layout rejects references from its previous logical instance");
+			const auto expired = [&pipelineSystem]
+				{
+					const auto layout = ResolvedRenderLayout::Create(
+						pipelineSystem, scene_bindings::GetCommonLayoutContract());
+					return ResolvedBindingRef<SceneGPU>::Resolve(layout, scene_bindings::SceneConstants);
+				}();
+			context.Check(!expired.IsValid() && !expired.GetParameterIndex(first),
+				"A reference expires when the last owner of its logical layout is destroyed");
+			auto wrongSize = MakeBinding(1, RHIBindingType::ConstantBuffer, 0);
+			wrongSize.m_PayloadTag = ConstantPayloadTraits<SceneGPU>::Tag;
+			wrongSize.m_Slot.m_SizeInBytes = 4;
+			const auto wrongSizeContract = ComposeOne(wrongSize);
+			const auto wrongSizeLayout = ResolvedRenderLayout::Create(pipelineSystem, *wrongSizeContract.m_Layout);
+			context.Check(!ResolvedBindingRef<SceneGPU>::Resolve(wrongSizeLayout, wrongSize.m_Key).IsValid(),
+				"Typed reference resolution rejects a mismatched declared payload extent");
+			wrongSize.m_Slot.m_Type = RHIBindingType::InlineConstants;
+			const auto inlineContract = ComposeOne(wrongSize);
+			const auto inlineLayout = ResolvedRenderLayout::Create(pipelineSystem, *inlineContract.m_Layout);
+			context.Check(!ResolvedBindingRef<SceneGPU>::Resolve(inlineLayout, wrongSize.m_Key).IsValid(),
+				"A constant-buffer reference cannot resolve an inline-constant declaration");
+			const auto& common = scene_bindings::GetCommonLayoutContract();
+			const auto forward = ForwardBindingLayout::Create(pipelineSystem, common, false);
+			const auto forwardPlus = ForwardBindingLayout::Create(pipelineSystem, common, true);
+			context.Check(forward.IsValid() && forwardPlus.IsValid(),
+				"Concrete Forward layouts create complete maps for both shading families");
+			const auto incompleteForward = ForwardBindingLayout::Create(pipelineSystem, *composed.m_Layout, false);
+			context.Check(!incompleteForward.IsValid() && !incompleteForward.GetNativeLayout().IsValid(),
+				"A Forward layout with a missing required Scene binding is never published as valid");
+			const auto recreated = ResolvedRenderLayout::Create(pipelineSystem, *first.GetContract());
+			context.Check(recreated.GetNativeLayout() == first.GetNativeLayout() &&
+				!sceneReference.GetParameterIndex(recreated),
+				"Independent resolution creates a fresh reference scope even for identical logical content");
 			pipelineSystem.m_Fail = true;
 			const auto failed = ResolvedRenderLayout::Create(pipelineSystem, *composed.m_Layout);
 			context.Check(!failed.IsValid() && !failed.GetContract() && !failed.GetNativeLayout().IsValid(),

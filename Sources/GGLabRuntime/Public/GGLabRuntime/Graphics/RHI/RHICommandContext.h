@@ -206,6 +206,8 @@ namespace gglab
 		{
 			return m_RecordingFailed || (m_UploadWriter && m_UploadWriter->HasFailed());
 		}
+		// Higher-layer validation can reject a recording through the same batch failure path.
+		void RejectRecording() noexcept { FailRecording(); }
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<const std::byte> bytes) noexcept
 		{
 			const auto binding = m_UploadWriter ?

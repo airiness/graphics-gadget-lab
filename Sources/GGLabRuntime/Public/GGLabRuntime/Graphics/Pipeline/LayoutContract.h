@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -12,6 +13,8 @@
 namespace gglab
 {
 	class RHIPipelineSystem;
+	template <typename T>
+	class ResolvedBindingRef;
 	// Process-local domain keys, independent of shader registers and native parameters.
 	struct LayoutBindingKeyTag;
 	using LayoutBindingKey = TypedIndex<LayoutBindingKeyTag>;
@@ -116,12 +119,17 @@ namespace gglab
 	public:
 		[[nodiscard]] static ResolvedRenderLayout Create(RHIPipelineSystem& pipelineSystem,
 			const ComposedLayout& contract, const char* debugName = nullptr) noexcept;
-		[[nodiscard]] bool IsValid() const noexcept { return m_Contract.has_value(); }
+		[[nodiscard]] bool IsValid() const noexcept { return m_Contract != nullptr; }
 		[[nodiscard]] const ComposedLayout* GetContract() const noexcept;
-		[[nodiscard]] RHIBindingLayoutHandle GetNativeLayout() const noexcept { return m_NativeLayout; }
+		[[nodiscard]] RHIBindingLayoutHandle GetNativeLayout() const noexcept
+		{
+			return IsValid() ? m_NativeLayout : RHIBindingLayoutHandle{};
+		}
 
 	private:
-		std::optional<ComposedLayout> m_Contract;
+		template <typename T>
+		friend class ResolvedBindingRef;
+		std::shared_ptr<const ComposedLayout> m_Contract;
 		RHIBindingLayoutHandle m_NativeLayout{};
 	};
 

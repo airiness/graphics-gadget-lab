@@ -219,7 +219,7 @@ namespace gglab
 		const auto nativeLayout = pipelineSystem.CreateBindingLayout(contract.BuildRHIDesc(debugName));
 		if (nativeLayout.IsValid())
 		{
-			result.m_Contract = contract;
+			result.m_Contract = std::make_shared<const ComposedLayout>(contract);
 			result.m_NativeLayout = nativeLayout;
 		}
 		return result;
@@ -227,7 +227,7 @@ namespace gglab
 
 	const ComposedLayout* ResolvedRenderLayout::GetContract() const noexcept
 	{
-		return m_Contract ? std::addressof(*m_Contract) : nullptr;
+		return m_Contract.get();
 	}
 
 	LayoutCompositionResult ComposeLayoutFragments(std::span<const LayoutFragment> fragments,

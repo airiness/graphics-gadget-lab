@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardTransparent.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
@@ -38,8 +37,6 @@ namespace gglab
 			{
 				return;
 			}
-			m_ShadowParameterIndex = m_BindingLayout.GetContract()->FindParameterIndex(
-				scene_bindings::DirectionalShadow).value();
 			m_PhysicalKeys[0] = forward_shading::MakeBasePhysicalKey(
 				m_BindingLayout.GetNativeLayout(),
 				shaderSet.m_CoverageVertexShader, shaderSet.m_AllLightsShadingPixelShader);
@@ -107,8 +104,11 @@ namespace gglab
 					};
 				graphicsContext->SetPipeline(
 					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
-				forward_shading::BindSceneResources(
-					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_ShadowParameterIndex);
+				if (!forward_shading::BindSceneResources(
+					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_BindingLayout))
+				{
+					return;
+				}
 				if (!graphicsContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
 				{
