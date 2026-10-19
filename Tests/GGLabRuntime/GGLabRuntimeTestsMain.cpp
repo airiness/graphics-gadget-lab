@@ -7,6 +7,7 @@
 #include "DiagnosticsContractSelfTests.h"
 #include "EnvironmentSelectionSelfTests.h"
 #include "FrameCaptureSelfTests.h"
+#include "LayoutContractSelfTests.h"
 #include "NonFiniteWatchSelfTests.h"
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -62,6 +63,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "nonfinite-watch",
 			.m_Run = &gglab::RunNonFiniteWatchSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "layout-contracts",
+			.m_Run = &gglab::RunLayoutContractSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "publication-accounting",

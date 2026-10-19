@@ -546,6 +546,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\LayoutContract.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\PipelineCache.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
@@ -2022,6 +2025,9 @@
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GTAOTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\LayoutContract.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\PipelinePresets.h">
