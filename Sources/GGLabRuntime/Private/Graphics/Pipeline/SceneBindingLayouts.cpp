@@ -5,6 +5,7 @@
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <array>
+#include <cstdint>
 #include <span>
 #include <utility>
 
@@ -71,6 +72,32 @@ namespace gglab::scene_bindings
 			LayoutBindingReservation{ NonFiniteCounters,
 				RHIBindingType::ReadWriteStorageBuffer, nonfinite::CounterBinding },
 		};
+
+		// Composed values own their debug labels outside the declarations. A copy borrows the
+		// source contract's labels, so that contract must outlive the composition using it.
+		struct CommonFragmentBindings
+		{
+			std::array<LayoutBindingRequirement, RHIBindingLayoutDesc::MaxSlots> m_Bindings{};
+			uint32_t m_Count = 0;
+
+			[[nodiscard]] LayoutFragment AsFragment() const noexcept
+			{
+				return { "Common", std::span(m_Bindings).first(m_Count) };
+			}
+		};
+
+		[[nodiscard]] CommonFragmentBindings RematerializeCommonBindings(
+			const ComposedLayout& common) noexcept
+		{
+			const auto desc = common.BuildRHIDesc();
+			CommonFragmentBindings result{ .m_Count = desc.m_SlotCount };
+			for (uint32_t index = 0; index < desc.m_SlotCount; ++index)
+			{
+				result.m_Bindings[index] = common.GetBindings()[index];
+				result.m_Bindings[index].m_Slot.m_DebugName = desc.m_Slots[index].m_DebugName;
+			}
+			return result;
+		}
 	}
 
 	const ComposedLayout& GetCommonLayoutContract() noexcept
@@ -87,16 +114,9 @@ namespace gglab::scene_bindings
 
 	LayoutCompositionResult ComposeAtmosphereLayout(const ComposedLayout& common) noexcept
 	{
-		// Rematerialize borrowed debug labels while retaining the owned semantic declarations.
-		const auto commonDesc = common.BuildRHIDesc();
-		std::array<LayoutBindingRequirement, RHIBindingLayoutDesc::MaxSlots> commonBindings{};
-		for (uint32_t index = 0; index < commonDesc.m_SlotCount; ++index)
-		{
-			commonBindings[index] = common.GetBindings()[index];
-			commonBindings[index].m_Slot.m_DebugName = commonDesc.m_Slots[index].m_DebugName;
-		}
+		const auto commonBindings = RematerializeCommonBindings(common);
 		const std::array fragments{
-			LayoutFragment{ "Common", std::span(commonBindings).first(commonDesc.m_SlotCount) },
+			commonBindings.AsFragment(),
 			LayoutFragment{ "Atmosphere", AtmosphereBindings },
 		};
 		return ComposeLayoutFragments(fragments, Reservations);
@@ -105,16 +125,9 @@ namespace gglab::scene_bindings
 	LayoutCompositionResult ComposeForwardLayout(
 		const ComposedLayout& common, bool forwardPlusLightLists) noexcept
 	{
-		// Rematerialize borrowed debug labels while retaining the owned semantic declarations.
-		const auto commonDesc = common.BuildRHIDesc();
-		std::array<LayoutBindingRequirement, RHIBindingLayoutDesc::MaxSlots> commonBindings{};
-		for (uint32_t index = 0; index < commonDesc.m_SlotCount; ++index)
-		{
-			commonBindings[index] = common.GetBindings()[index];
-			commonBindings[index].m_Slot.m_DebugName = commonDesc.m_Slots[index].m_DebugName;
-		}
+		const auto commonBindings = RematerializeCommonBindings(common);
 		const std::array fragments{
-			LayoutFragment{ "Common", std::span(commonBindings).first(commonDesc.m_SlotCount) },
+			commonBindings.AsFragment(),
 			LayoutFragment{ "DirectionalShadow", ShadowBindings },
 			LayoutFragment{ "Atmosphere", AtmosphereBindings },
 			LayoutFragment{ "ForwardPlus", forwardPlusLightLists ?

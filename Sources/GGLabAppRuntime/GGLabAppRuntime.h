@@ -47,6 +47,8 @@ namespace gglab
 		StartupContentUnavailable,
 		RendererInitializationFailed,
 		ShaderManagerInitializationFailed,
+		// The active registry lacks an exact startup program key, such as a revised interface.
+		StartupShaderProgramsUnavailable,
 	};
 
 	enum class AppRuntimeTickResult : uint8_t
@@ -239,7 +241,7 @@ namespace gglab
 		void CollectFrameCaptureResults() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
-		[[nodiscard]] bool BeginInitialShaderPreload(
+		[[nodiscard]] AppRuntimeServiceInitializeResult BeginInitialShaderPreload(
 			const ApplicationContentSelection& contentSelection) noexcept;
 		void Resize(uint32_t width, uint32_t height) noexcept;
 		// Records failure evidence that survives Release builds and makes Failed terminal.

@@ -567,10 +567,13 @@ namespace gglab
 									program.m_VariantId.resize(program.m_VariantId.size() - revision.size());
 								}
 							}
-							entries.push_back({ .m_ProgramRef = counters ? nonfinite::CounterVariant(program) : program,
+							entries.push_back({
+								.m_ProgramRef = counters ? nonfinite::CounterVariant(program) : program,
 								.m_TargetProfile = backend == AppRuntimeRHIBackend::DX12 ?
-									ShaderTargetProfile::GGLabDX12 : ShaderTargetProfile::GGLabVulkan13,
-								.m_ArtifactRef = placeholder });
+									ShaderTargetProfile::GGLabDX12 :
+									ShaderTargetProfile::GGLabVulkan13,
+								.m_ArtifactRef = placeholder,
+								});
 						}
 						const auto registry = BuildShaderProgramRegistryArtifact(entries);
 						context.Check(registry.IsSuccess(), "Startup rejection fixture is a byte-valid registry");
@@ -579,23 +582,34 @@ namespace gglab
 							continue;
 						}
 						const ShaderProgramRegistryArtifactRef ref{ .m_RegistryId = registry.m_Artifact.m_RegistryId };
-						const auto path = ShaderLooseProgramRegistryArtifactLocator(info.m_Paths.m_ShaderArtifactRoot).GetPath(ref);
+						const auto path = ShaderLooseProgramRegistryArtifactLocator(
+							info.m_Paths.m_ShaderArtifactRoot).GetPath(ref);
 						std::filesystem::create_directories(path.m_Path.parent_path());
 						const auto bytes = SerializeShaderProgramRegistryArtifact(registry.m_Artifact);
 						{
 							std::ofstream file(path.m_Path, std::ios::binary | std::ios::trunc);
-							file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+							file.write(reinterpret_cast<const char*>(bytes.data()),
+								static_cast<std::streamsize>(bytes.size()));
 							context.Check(file.good(), "Startup rejection fixture is written completely");
 						}
 						// No artifact payload is needed: exact-key rejection precedes async I/O and RHI work.
 						NullRHIContextFactory factory;
 						ApplicationInput input;
 						GGLabAppRuntime runtime;
-						context.Check(runtime.Initialize(info) == AppRuntimeInitializeResult::Succeeded &&
-							runtime.InitializeServices({ .m_RHIContextFactory = &factory, .m_Input = &input,
-								.m_ContentRegistration = MakeContentRegistration(), .m_WindowWidth = 640, .m_WindowHeight = 480,
-								.m_ShaderArtifactRoot = info.m_Paths.m_ShaderArtifactRoot, .m_ActiveShaderRegistry = ref }) ==
-								AppRuntimeServiceInitializeResult::InvalidContentRegistration &&
+						const bool initialized = runtime.Initialize(info) == AppRuntimeInitializeResult::Succeeded;
+						const AppRuntimeServiceInitializeResult result = initialized ?
+							runtime.InitializeServices({
+								.m_RHIContextFactory = &factory,
+								.m_Input = &input,
+								.m_ContentRegistration = MakeContentRegistration(),
+								.m_WindowWidth = 640,
+								.m_WindowHeight = 480,
+								.m_ShaderArtifactRoot = info.m_Paths.m_ShaderArtifactRoot,
+								.m_ActiveShaderRegistry = ref,
+								}) :
+							AppRuntimeServiceInitializeResult::InvalidState;
+						context.Check(initialized &&
+							result == AppRuntimeServiceInitializeResult::StartupShaderProgramsUnavailable &&
 							runtime.GetLifecycleState() == AppRuntimeLifecycleState::Failed &&
 							!runtime.AreServicesInitialized() && factory.m_CreateCount == 0,
 							oldInterface ?

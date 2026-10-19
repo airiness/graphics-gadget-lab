@@ -3180,7 +3180,18 @@ namespace gglab
 						};
 					context.Check(matchesRaw(typedScene, scene) && matchesRaw(typedShadow, shadow),
 						"Producer-created typed snapshots preserve the exact raw binding across frame moves");
-					const auto neutralSnapshot = TypedConstantSnapshot<AtmosphereGPU>::Upload(uploads, MakeNeutralAtmosphere());
+					const auto neutralSnapshot = TypedConstantSnapshot<AtmosphereGPU>::Upload(
+						uploads, MakeNeutralAtmosphere());
+					const auto forwardContract = scene_bindings::ComposeForwardLayout(
+						scene_bindings::GetCommonLayoutContract(), false);
+					const auto forwardParameter = [&forwardContract](LayoutBindingKey key) noexcept
+						{
+							return forwardContract.IsSuccess() ?
+								forwardContract.m_Layout->FindParameterIndex(key) :
+								std::nullopt;
+						};
+					const auto shadowParameter = forwardParameter(scene_bindings::DirectionalShadow);
+					const auto atmosphereParameter = forwardParameter(scene_bindings::AtmosphereConstants);
 					for (uint32_t pass = 0; pass < 3; ++pass)
 					{
 						const auto& queue = moved.m_RenderQueues[0];
@@ -3191,15 +3202,21 @@ namespace gglab
 								queue, forwardLayout, constants),
 							"Forward consumes typed Scene, Shadow and neutral Atmosphere snapshots");
 					}
-					bool bindingsMatch = graphics.m_ConstantBindings.size() == 9;
+					const auto& neutralBinding = neutralSnapshot.GetBinding();
+					bool bindingsMatch = graphics.m_ConstantBindings.size() == 9 &&
+						shadowParameter.has_value() && atmosphereParameter.has_value();
 					for (size_t pass = 0; bindingsMatch && pass < 3; ++pass)
 					{
 						const auto& sceneBinding = graphics.m_ConstantBindings[pass * 3];
 						const auto& shadowBinding = graphics.m_ConstantBindings[pass * 3 + 1];
+						const auto& atmosphereBinding = graphics.m_ConstantBindings[pass * 3 + 2];
 						bindingsMatch &= sceneBinding.m_ParameterIndex == static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB) &&
 							sceneBinding.m_Buffer == scene.m_Buffer && sceneBinding.m_Offset == scene.m_OffsetInBytes &&
-							shadowBinding.m_ParameterIndex == 8u &&
-							shadowBinding.m_Buffer == shadow.m_Buffer && shadowBinding.m_Offset == shadow.m_OffsetInBytes;
+							shadowBinding.m_ParameterIndex == *shadowParameter &&
+							shadowBinding.m_Buffer == shadow.m_Buffer && shadowBinding.m_Offset == shadow.m_OffsetInBytes &&
+							atmosphereBinding.m_ParameterIndex == *atmosphereParameter &&
+							atmosphereBinding.m_Buffer == neutralBinding.m_Buffer &&
+							atmosphereBinding.m_Offset == neutralBinding.m_OffsetInBytes;
 					}
 					const auto matchesViews = [&views](const auto& binding) noexcept
 						{
@@ -9780,12 +9797,17 @@ namespace gglab
 				RGExecuteContext execute({ &snapshotGraphics, &snapshotCompute, nullptr });
 				snapshotGraph.Execute(execute);
 			}
-			const auto countBindings = [&snapshotCompute](const RHIConstantBufferBinding& expected)
+			const auto atmosphereContract = scene_bindings::ComposeAtmosphereLayout(
+				scene_bindings::GetCommonLayoutContract());
+			const auto atmosphereParameter = atmosphereContract.IsSuccess() ?
+				atmosphereContract.m_Layout->FindParameterIndex(scene_bindings::AtmosphereConstants) :
+				std::nullopt;
+			const auto countBindings = [&snapshotCompute, atmosphereParameter](const RHIConstantBufferBinding& expected)
 				{
 					return std::ranges::count_if(snapshotCompute.m_ConstantBindings,
-						[&expected](const RecordedConstantBinding& binding)
+						[&expected, atmosphereParameter](const RecordedConstantBinding& binding)
 						{
-							return binding.m_ParameterIndex == 8 &&
+							return atmosphereParameter && binding.m_ParameterIndex == *atmosphereParameter &&
 								binding.m_Buffer == expected.m_Buffer && binding.m_Offset == expected.m_OffsetInBytes;
 						});
 				};
@@ -12204,8 +12226,10 @@ namespace gglab
 				atmosphereLayout.Bind(bindings, snapshot), "The Atmosphere adapter resolves and binds its own typed b5 meaning");
 			command.Dispatch(1, 1, 1);
 			context.Check(command.m_CommandCount == 1 && command.m_ConstantBindings.size() == 1 &&
-				command.m_ConstantBindings.front().m_ParameterIndex == 8 && !batch->HasFailed(),
-				"Atmosphere recording uses fixed b5 after the eight common parameters");
+				command.m_ConstantBindings.front().m_ParameterIndex ==
+					scene_bindings::GetCommonLayoutContract().GetParameterCount() &&
+				!batch->HasFailed(),
+				"Atmosphere recording uses fixed b5 after the common parameters");
 		}
 		{
 			const auto scene = TypedConstantSnapshot<SceneGPU>::Upload(writer.GetFrameUploads(), SceneGPU{});

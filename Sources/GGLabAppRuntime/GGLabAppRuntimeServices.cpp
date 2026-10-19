@@ -171,10 +171,11 @@ namespace gglab
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::ShaderManagerInitializationFailed);
 		}
-		if (!BeginInitialShaderPreload(contentSelection))
+		const AppRuntimeServiceInitializeResult preloadResult =
+			BeginInitialShaderPreload(contentSelection);
+		if (preloadResult != AppRuntimeServiceInitializeResult::Succeeded)
 		{
-			return FailServiceInitialization(
-				AppRuntimeServiceInitializeResult::InvalidContentRegistration);
+			return FailServiceInitialization(preloadResult);
 		}
 
 		RenderHostInstance renderHostInstance = CreateRenderHost(RenderHostCreateInfo{
@@ -327,14 +328,14 @@ namespace gglab
 		return result;
 	}
 
-	bool GGLabAppRuntime::BeginInitialShaderPreload(
+	AppRuntimeServiceInitializeResult GGLabAppRuntime::BeginInitialShaderPreload(
 		const ApplicationContentSelection& contentSelection) noexcept
 	{
 		ShaderProgramDemandSet demands;
 		if (!demands.AddRange(shader_programs::GetRendererInitialShaderProgramDemand()) ||
 			!AppendSelectedContentShaderProgramDemand(contentSelection, demands))
 		{
-			return false;
+			return AppRuntimeServiceInitializeResult::InvalidContentRegistration;
 		}
 		std::vector<ShaderProgramRef> shaderDemandSnapshot = demands.ReleasePrograms();
 		// Reject incompatible registries before creating a render host. Otherwise a missing
@@ -343,15 +344,16 @@ namespace gglab
 		{
 			if (!m_ShaderManager->ResolveArtifact(program))
 			{
-				GGLAB_LOG_ERROR("Startup program registry has no binding for {}::{} (stage={}, counters={}).",
+				GGLAB_LOG_ERROR(
+					"Startup program registry has no binding for {}::{} (stage={}, counters={}).",
 					program.m_ProgramId, program.m_VariantId, static_cast<uint32_t>(program.m_Stage),
 					m_ShaderManager->HasNonFiniteCounters());
-				return false;
+				return AppRuntimeServiceInitializeResult::StartupShaderProgramsUnavailable;
 			}
 		}
 		GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
 			*m_TaskSystem, std::move(shaderDemandSnapshot), TaskPriority::Critical));
-		return true;
+		return AppRuntimeServiceInitializeResult::Succeeded;
 	}
 
 	LoadingProgress GGLabAppRuntime::GetStartupLoadingProgress() const noexcept
