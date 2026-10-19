@@ -337,6 +337,18 @@ namespace gglab
 			return false;
 		}
 		std::vector<ShaderProgramRef> shaderDemandSnapshot = demands.ReleasePrograms();
+		// Reject incompatible registries before creating a render host. Otherwise a missing
+		// interface key only fails the async job and leaves the bootstrap shell running.
+		for (const auto& program : shaderDemandSnapshot)
+		{
+			if (!m_ShaderManager->ResolveArtifact(program))
+			{
+				GGLAB_LOG_ERROR("Startup program registry has no binding for {}::{} (stage={}, counters={}).",
+					program.m_ProgramId, program.m_VariantId, static_cast<uint32_t>(program.m_Stage),
+					m_ShaderManager->HasNonFiniteCounters());
+				return false;
+			}
+		}
 		GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
 			*m_TaskSystem, std::move(shaderDemandSnapshot), TaskPriority::Critical));
 		return true;

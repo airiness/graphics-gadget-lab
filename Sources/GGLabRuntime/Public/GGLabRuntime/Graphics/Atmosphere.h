@@ -28,7 +28,7 @@ namespace gglab
 		Vector3 m_GroundAlbedo = Vector3(0.3f, 0.3f, 0.3f);
 	};
 
-	// Explicit float4 rows match AtmosphereParameters in Atmosphere.hlsli; all lengths are km.
+	// Explicit float4 rows match AtmosphereParameters in AtmosphereBinding.hlsli; lengths are km.
 	struct AtmosphereGPU
 	{
 		Vector4 m_Radii{}; // bottom, top, unused, unused
@@ -52,6 +52,8 @@ namespace gglab
 
 	[[nodiscard]] AtmosphereGPU ResolveAtmosphere(const AtmosphereSettings& settings,
 		const ResolvedWorldSun& sun, const Vector3& cameraWorldPosition) noexcept;
+	// Finite vacuum coefficients with valid radii and scale heights for disabled attenuation.
+	[[nodiscard]] AtmosphereGPU MakeNeutralAtmosphere() noexcept;
 	// Dependency masks: bit 0 transmittance, bit 1 multiple scattering, bit 2 sky view.
 	[[nodiscard]] uint32_t AtmosphereDirtyMask(const AtmosphereGPU& previous, const AtmosphereGPU& current) noexcept;
 	[[nodiscard]] Vector3 EvaluateAtmosphereTransmittance(const AtmosphereGPU& atmosphere,

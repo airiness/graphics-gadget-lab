@@ -994,6 +994,9 @@
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SceneAtmosphereBindingsContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -1093,6 +1096,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\AtmosphereBinding.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">

@@ -60,6 +60,17 @@ namespace gglab
 			bottom + 0.001f, std::clamp(mu, -1.0f, 1.0f), 0.0f, 0.0f);
 		return a;
 	}
+	AtmosphereGPU MakeNeutralAtmosphere() noexcept
+	{
+		AtmosphereSettings settings;
+		settings.m_RayleighScattering = Vector3::Zero;
+		settings.m_MieScattering = 0.0f;
+		settings.m_MieExtinction = 0.0f;
+		settings.m_Absorption = Vector3::Zero;
+		settings.m_GroundAlbedo = Vector3::Zero;
+		return ResolveAtmosphere(settings, ResolvedWorldSun{}, Vector3::Zero);
+	}
+
 	uint32_t AtmosphereDirtyMask(const AtmosphereGPU& previous, const AtmosphereGPU& current) noexcept
 	{
 		auto p = previous;

@@ -24,11 +24,12 @@ namespace gglab
 		[[nodiscard]] ScopedConstantBindings<RHIGraphicsCommandContext> BeginRecording(
 			RHIGraphicsCommandContext& context) const noexcept
 		{
-			return ScopedConstantBindings<RHIGraphicsCommandContext>(context, m_Layout, m_Scene, m_Shadow);
+			return ScopedConstantBindings<RHIGraphicsCommandContext>(context, m_Layout, m_Scene, m_Shadow, m_Atmosphere);
 		}
 		[[nodiscard]] bool BindFrameConstants(ScopedConstantBindings<RHIGraphicsCommandContext>& scope,
 			const TypedConstantSnapshot<SceneGPU>& scene,
-			const TypedConstantSnapshot<DirectionalShadowGPU>& shadow) const noexcept;
+			const TypedConstantSnapshot<DirectionalShadowGPU>& shadow,
+			const TypedConstantSnapshot<AtmosphereGPU>& atmosphere) const noexcept;
 		// Buffers remain declared RenderGraph inputs; this only records their existing bindings.
 		[[nodiscard]] bool BindTileLists(RHIGraphicsCommandContext& context,
 			RHIBufferHandle headers, RHIBufferHandle indices) const noexcept;
@@ -37,6 +38,7 @@ namespace gglab
 		ResolvedRenderLayout m_Layout;
 		ResolvedBindingRef<SceneGPU> m_Scene;
 		ResolvedBindingRef<DirectionalShadowGPU> m_Shadow;
+		ResolvedBindingRef<AtmosphereGPU> m_Atmosphere;
 		std::optional<uint32_t> m_TileHeaders;
 		std::optional<uint32_t> m_TileIndices;
 	};

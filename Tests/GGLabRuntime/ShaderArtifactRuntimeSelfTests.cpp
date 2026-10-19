@@ -1123,9 +1123,10 @@ namespace gglab
 			});
 			const RenderPassInfo usage{ .m_TypeName = "CounterLayout.Resolve" };
 			const auto& common = scene_bindings::GetCommonLayoutContract();
-			for (uint32_t family = 0; family < 3; ++family)
+			for (uint32_t family = 0; family < 4; ++family)
 			{
-				const auto forward = scene_bindings::ComposeForwardLayout(common, family == 2);
+				const auto forward = family == 3 ? scene_bindings::ComposeAtmosphereLayout(common) :
+					scene_bindings::ComposeForwardLayout(common, family == 2);
 				if (!forward.m_Layout)
 				{
 					context.Check(false, "Counter pipeline layout families compose successfully");
@@ -1133,7 +1134,7 @@ namespace gglab
 				}
 				const auto base = (family == 0 ? common : *forward.m_Layout).BuildRHIDesc();
 				const auto baseHandle = pipelineSystem.CreateBindingLayout(base);
-				const uint32_t parameterCount = family == 0 ? 8u : family == 1 ? 9u : 11u;
+				const uint32_t parameterCount = family == 0 ? 8u : family == 3 ? 9u : family == 1 ? 10u : 12u;
 				const GraphicsPhysicalPipelineKey key{
 					.m_BindingLayout = baseHandle, .m_VSId = vertexId, .m_PSId = pixelId,
 				};
@@ -1171,7 +1172,7 @@ namespace gglab
 				BuildDX12RootSignatureDesc(derived, dx12);
 				context.Check(dx12.m_RootParameterCount == parameterCount + 1 &&
 					dx12.m_RootParameters[parameterCount].Descriptor.ShaderRegister == nonfinite::CounterBinding &&
-					(family == 0 || dx12.m_RootParameters[8].Descriptor.ShaderRegister == 3),
+					(family == 0 || family == 3 || dx12.m_RootParameters[8].Descriptor.ShaderRegister == 3),
 					"The actual Resolve-derived DX12 layout retains the base parameters and u31");
 #if GGLAB_ENABLE_VULKAN
 				const auto vulkan = BuildVulkanBindingLayoutPlan(derived, 16 * 1024);

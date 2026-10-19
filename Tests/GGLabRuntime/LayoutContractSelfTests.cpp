@@ -351,7 +351,7 @@ namespace gglab
 				}
 				const auto& contract = family == 0 ? common : *forward.m_Layout;
 				const auto base = contract.BuildRHIDesc();
-				const uint32_t parameterCount = family == 0 ? 8u : family == 1 ? 9u : 11u;
+				const uint32_t parameterCount = family == 0 ? 8u : family == 1 ? 10u : 12u;
 				bool preserved = base.m_SlotCount == parameterCount + 2;
 				for (uint32_t index = 0; index < legacyKeys.size(); ++index)
 				{
@@ -360,15 +360,17 @@ namespace gglab
 						std::string_view(base.m_Slots[index].m_DebugName) == legacyNames[index];
 				}
 				context.Check(preserved && (family == 0 ||
-					contract.FindParameterIndex(scene_bindings::DirectionalShadow) == 8u) &&
+					(contract.FindParameterIndex(scene_bindings::DirectionalShadow) == 8u &&
+						contract.FindParameterIndex(scene_bindings::AtmosphereConstants) == (family == 1 ? 9u : 11u))) &&
 					(family != 2 || (contract.FindParameterIndex(scene_bindings::ForwardPlusTileHeaders) == 9u &&
 						contract.FindParameterIndex(scene_bindings::ForwardPlusTileIndices) == 10u)),
-					"Common, Forward and Forward+ preserve base maps and resolve their semantic extensions");
+					"Common, Forward and Forward+ preserve base maps and resolve Shadow, tile lists and Atmosphere extensions");
 
 				DX12BindingLayoutBuildResult dx12{};
 				BuildDX12RootSignatureDesc(base, dx12);
 				context.Check(dx12.m_RootParameterCount == parameterCount &&
-					(family == 0 || dx12.m_RootParameters[8].Descriptor.ShaderRegister == 3),
+					(family == 0 || (dx12.m_RootParameters[8].Descriptor.ShaderRegister == 3 &&
+						dx12.m_RootParameters[parameterCount - 1].Descriptor.ShaderRegister == 5)),
 					"DX12 layouts retain the common parameters and semantic extension positions");
 #if GGLAB_ENABLE_VULKAN
 				const auto vulkan = BuildVulkanBindingLayoutPlan(base, 16 * 1024);
@@ -513,19 +515,23 @@ namespace gglab
 				"Concrete Forward layouts create complete maps for both shading families");
 			const auto atmosphereLayout = AtmosphereBindingLayout::Create(pipelineSystem, common);
 			const auto commonDesc = common.BuildRHIDesc();
-			bool unchangedPhysicalMap = atmosphereLayout.IsValid() &&
-				pipelineSystem.m_LastDesc.m_SlotCount == commonDesc.m_SlotCount;
-			for (uint32_t index = 0; unchangedPhysicalMap && index < commonDesc.m_SlotCount; ++index)
+			bool preservedCommon = atmosphereLayout.IsValid() &&
+				pipelineSystem.m_LastDesc.m_SlotCount == commonDesc.m_SlotCount + 1;
+			for (uint32_t index = 0; preservedCommon && index < commonDesc.m_SlotCount; ++index)
 			{
 				const auto& actual = pipelineSystem.m_LastDesc.m_Slots[index];
 				const auto& expected = commonDesc.m_Slots[index];
-				unchangedPhysicalMap = actual.m_Type == expected.m_Type && actual.m_Visibility == expected.m_Visibility &&
+				preservedCommon = actual.m_Type == expected.m_Type && actual.m_Visibility == expected.m_Visibility &&
 					actual.m_Binding == expected.m_Binding && actual.m_Space == expected.m_Space &&
 					actual.m_Count == expected.m_Count && actual.m_SizeInBytes == expected.m_SizeInBytes &&
 					actual.m_BufferBindingMode == expected.m_BufferBindingMode;
 			}
-			context.Check(unchangedPhysicalMap,
-				"The legacy Atmosphere logical adapter preserves every common physical slot and native deduplication input");
+			const auto& atmosphereSlot = pipelineSystem.m_LastDesc.m_Slots[commonDesc.m_SlotCount];
+			context.Check(preservedCommon && atmosphereSlot.m_Binding == 5 && atmosphereSlot.m_Space == 0 &&
+				atmosphereSlot.m_Visibility == RHIShaderStage::All && atmosphereSlot.m_Count == 1 &&
+				atmosphereSlot.m_SizeInBytes == 0 && atmosphereSlot.m_Type == RHIBindingType::ConstantBuffer &&
+				atmosphereSlot.m_BufferBindingMode == RHIBufferBindingMode::Fixed,
+				"Atmosphere appends fixed b5 while preserving every common physical slot");
 			const auto incompleteForward = ForwardBindingLayout::Create(pipelineSystem, *composed.m_Layout, false);
 			context.Check(!incompleteForward.IsValid() && !incompleteForward.GetNativeLayout().IsValid(),
 				"A Forward layout with a missing required Scene binding is never published as valid");

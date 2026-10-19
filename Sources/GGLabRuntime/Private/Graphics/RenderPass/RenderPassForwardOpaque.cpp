@@ -320,7 +320,7 @@ namespace gglab
 
 				forward_shading::DrawBuckets(*graphicsContext, renderQueue, OpaqueBuckets,
 					data.m_Scene.m_ExpectedRenderQueue, m_BindingLayout, contextPtr->m_FrameConstants,
-					constants, resolvePipeline);
+					data.m_Scene.m_AtmosphereSnapshot, constants, resolvePipeline);
 			});
 	}
 

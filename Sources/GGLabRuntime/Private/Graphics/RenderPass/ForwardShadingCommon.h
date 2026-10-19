@@ -71,6 +71,7 @@ namespace gglab::forward_shading
 		RGTextureId m_BrdfLut{};
 		RGTextureId m_ShadowMap{};
 		RGTextureId m_AtmosphereTransmittance{};
+		TypedConstantSnapshot<AtmosphereGPU> m_AtmosphereSnapshot{};
 
 		RGTextureViewId m_Rtv{};
 		RGTextureViewId m_Dsv{};
@@ -139,6 +140,7 @@ namespace gglab::forward_shading
 	void DrawBuckets(RHIGraphicsCommandContext& graphicsContext, const RenderQueue& renderQueue,
 		std::span<const RenderBucket> buckets, const RenderQueue* expectedRenderQueue,
 		const ForwardBindingLayout& layout, const RenderFrameConstantBindings& frameConstants,
+		const TypedConstantSnapshot<AtmosphereGPU>& atmosphere,
 		ScopedConstantBindings<RHIGraphicsCommandContext>& constants,
 		ResolvePipeline&& resolvePipeline) noexcept
 	{
@@ -167,7 +169,7 @@ namespace gglab::forward_shading
 				{
 					if (!constants.SetPipeline(resolvePipeline(drawItem.m_VariantBits)) ||
 						!layout.BindFrameConstants(constants, frameConstants.m_SceneSnapshot,
-							frameConstants.m_DirectionalShadowSnapshot))
+							frameConstants.m_DirectionalShadowSnapshot, atmosphere))
 					{
 						return;
 					}

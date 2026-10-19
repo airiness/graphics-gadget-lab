@@ -64,14 +64,11 @@ namespace gglab
 		uint32_t Padding;
 
 		IBLResourceGPU IBLResource;
-		Vector4 AtmosphereWorld; // planet center km, km per world unit
-		Vector4 AtmosphereRadii; // bottom and top radius km
 	};
-	static_assert(sizeof(SceneGPU) == 128);
+	static_assert(sizeof(SceneGPU) == 96);
 	static_assert(offsetof(SceneGPU, WorldSunLightIndex) == 36);
 	static_assert(offsetof(SceneGPU, WorldSunAngularRadius) == 40);
-	static_assert(offsetof(SceneGPU, AtmosphereWorld) == 96);
-	static_assert(offsetof(SceneGPU, AtmosphereRadii) == 112);
+	static_assert(offsetof(SceneGPU, IBLResource) == 48);
 
 	// Matches DirectionalShadowData in Lighting/DirectionalShadowData.hlsli (b3).
 	struct alignas(16) DirectionalShadowGPU

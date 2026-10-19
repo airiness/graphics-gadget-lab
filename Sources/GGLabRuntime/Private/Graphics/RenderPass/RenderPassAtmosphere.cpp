@@ -10,6 +10,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace gglab
 {
@@ -27,12 +28,34 @@ namespace gglab
 	void RenderPassAtmosphere::AddPass(RenderGraph& rg, const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		const auto& scene = context.m_RenderScene;
+		auto& forward = rg.GetBlackboard().Create<RGForwardAtmosphereConstants>();
+		forward.m_AttenuationEnabled = scene.m_Atmosphere && scene.m_WorldSun &&
+			scene.m_WorldSunLightIndex != std::numeric_limits<uint32_t>::max();
+		if (!forward.m_AttenuationEnabled)
+		{
+			forward.m_Snapshot = TypedConstantSnapshot<AtmosphereGPU>::Upload(
+				context.m_Uploads, MakeNeutralAtmosphere());
+		}
+		const auto rejectMissingLiveSnapshot = [&rg]
+			{
+				rg.AddPass<SetupData>("Atmosphere.MissingLiveSnapshot",
+					[](RenderGraph::RGBuilder& builder, SetupData&) { builder.SideEffect(); },
+					[](RGExecuteContext& execute, SetupData&)
+					{
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Required live Atmosphere snapshot is unavailable.");
+						execute.GetGraphicsCommandContext()->RejectRecording();
+					});
+			};
 		auto* atmosphere = services.m_Atmosphere;
 		if (!atmosphere)
 		{
+			if (forward.m_AttenuationEnabled)
+			{
+				rejectMissingLiveSnapshot();
+			}
 			return;
 		}
-		const auto& scene = context.m_RenderScene;
 		if (!scene.m_Atmosphere || !scene.m_WorldSun)
 		{
 			atmosphere->Disable();
@@ -41,6 +64,18 @@ namespace gglab
 		AddLuts(rg, context, services, *atmosphere,
 			ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
 				context.GetDisplayRenderView().m_CameraPosition), false);
+		if (forward.m_AttenuationEnabled)
+		{
+			if (const auto* live = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName))
+			{
+				forward.m_Snapshot = live->m_ConstantSnapshot;
+			}
+			// Missing enabled data remains invalid; migrated Forward work must reject it.
+			if (!forward.m_Snapshot.IsValid())
+			{
+				rejectMissingLiveSnapshot();
+			}
+		}
 	}
 
 	void RenderPassAtmosphere::AddBakePass(RenderGraph& rg, const RenderFrameContext& context,

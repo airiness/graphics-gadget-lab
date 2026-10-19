@@ -127,6 +127,10 @@ namespace gglab::forward_shading
 		inputs.m_PrefilteredSpecularCubemap =
 			builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 		inputs.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
+		if (const auto* constants = blackboard.TryGet<RGForwardAtmosphereConstants>())
+		{
+			inputs.m_AtmosphereSnapshot = constants->m_Snapshot;
+		}
 		const auto* atmosphere = blackboard.TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
 		if (atmosphere && context.m_RenderScene.m_WorldSunLightIndex != std::numeric_limits<uint32_t>::max())
 		{
@@ -276,7 +280,7 @@ namespace gglab::forward_shading
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 		if (!layout.BindFrameConstants(constants, context.m_FrameConstants.m_SceneSnapshot,
-			context.m_FrameConstants.m_DirectionalShadowSnapshot))
+			context.m_FrameConstants.m_DirectionalShadowSnapshot, inputs.m_AtmosphereSnapshot))
 		{
 			return false;
 		}

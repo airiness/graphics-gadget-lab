@@ -53,6 +53,12 @@ namespace gglab::scene_bindings
 				"DirectionalShadowCB", RHIShaderStage::Pixel, 0, RHIBufferBindingMode::Fixed,
 				ConstantPayloadTraits<DirectionalShadowGPU>::Tag),
 		};
+		constexpr std::array AtmosphereBindings
+		{
+			Binding(AtmosphereConstants, RHIBindingType::ConstantBuffer, 5, 13,
+				"AtmosphereCB", RHIShaderStage::All, 0, RHIBufferBindingMode::Fixed,
+				ConstantPayloadTraits<AtmosphereGPU>::Tag),
+		};
 		constexpr std::array TileBindings
 		{
 			Binding(ForwardPlusTileHeaders, RHIBindingType::ReadOnlyStorageBuffer, 5, 11,
@@ -79,6 +85,23 @@ namespace gglab::scene_bindings
 		return common;
 	}
 
+	LayoutCompositionResult ComposeAtmosphereLayout(const ComposedLayout& common) noexcept
+	{
+		// Rematerialize borrowed debug labels while retaining the owned semantic declarations.
+		const auto commonDesc = common.BuildRHIDesc();
+		std::array<LayoutBindingRequirement, RHIBindingLayoutDesc::MaxSlots> commonBindings{};
+		for (uint32_t index = 0; index < commonDesc.m_SlotCount; ++index)
+		{
+			commonBindings[index] = common.GetBindings()[index];
+			commonBindings[index].m_Slot.m_DebugName = commonDesc.m_Slots[index].m_DebugName;
+		}
+		const std::array fragments{
+			LayoutFragment{ "Common", std::span(commonBindings).first(commonDesc.m_SlotCount) },
+			LayoutFragment{ "Atmosphere", AtmosphereBindings },
+		};
+		return ComposeLayoutFragments(fragments, Reservations);
+	}
+
 	LayoutCompositionResult ComposeForwardLayout(
 		const ComposedLayout& common, bool forwardPlusLightLists) noexcept
 	{
@@ -93,6 +116,7 @@ namespace gglab::scene_bindings
 		const std::array fragments{
 			LayoutFragment{ "Common", std::span(commonBindings).first(commonDesc.m_SlotCount) },
 			LayoutFragment{ "DirectionalShadow", ShadowBindings },
+			LayoutFragment{ "Atmosphere", AtmosphereBindings },
 			LayoutFragment{ "ForwardPlus", forwardPlusLightLists ?
 				std::span<const LayoutBindingRequirement>(TileBindings) :
 				std::span<const LayoutBindingRequirement>{} },

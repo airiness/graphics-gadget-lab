@@ -528,13 +528,6 @@ namespace gglab
 		{
 			sceneCB.WorldSunAngularRadius = result.m_RenderScene.m_WorldSun->m_AngularRadiusRadians;
 		}
-		if (result.m_RenderScene.m_Atmosphere && result.m_RenderScene.m_WorldSun)
-		{
-			const auto atmosphere = ResolveAtmosphere(*result.m_RenderScene.m_Atmosphere,
-				*result.m_RenderScene.m_WorldSun, Vector3::Zero);
-			sceneCB.AtmosphereWorld = atmosphere.m_World;
-			sceneCB.AtmosphereRadii = atmosphere.m_Radii;
-		}
 
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
 		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetRenderSettings();

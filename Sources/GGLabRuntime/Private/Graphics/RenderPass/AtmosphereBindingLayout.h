@@ -1,18 +1,11 @@
 #pragma once
-#include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
 #include "GGLabRuntime/Graphics/Pipeline/ScopedConstantBindings.h"
 
 namespace gglab
 {
 	struct RenderServices;
-	template <>
-	struct ConstantPayloadTraits<AtmosphereGPU>
-	{
-		static constexpr LayoutPayloadTag Tag{ 3 };
-	};
-
-	// The legacy b0 family has an Atmosphere meaning, independent of Scene b0.
-	// The physical common parameter map is retained until the b5 ABI migration.
+	// Atmosphere uses an independent fixed snapshot at b5 alongside the common map.
 	class AtmosphereBindingLayout final
 	{
 	public:

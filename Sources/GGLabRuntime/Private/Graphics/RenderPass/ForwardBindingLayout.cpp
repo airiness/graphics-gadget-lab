@@ -18,7 +18,8 @@ namespace gglab
 			forwardPlusLightLists ? "ForwardPBR.ForwardPlusBindingLayout" : "ForwardPBR.BindingLayout");
 		result.m_Scene = ResolvedBindingRef<SceneGPU>::Resolve(layout, scene_bindings::SceneConstants);
 		result.m_Shadow = ResolvedBindingRef<DirectionalShadowGPU>::Resolve(layout, scene_bindings::DirectionalShadow);
-		if (!result.m_Scene.IsValid() || !result.m_Shadow.IsValid())
+		result.m_Atmosphere = ResolvedBindingRef<AtmosphereGPU>::Resolve(layout, scene_bindings::AtmosphereConstants);
+		if (!result.m_Scene.IsValid() || !result.m_Shadow.IsValid() || !result.m_Atmosphere.IsValid())
 		{
 			return {};
 		}
@@ -38,9 +39,10 @@ namespace gglab
 
 	bool ForwardBindingLayout::BindFrameConstants(ScopedConstantBindings<RHIGraphicsCommandContext>& scope,
 		const TypedConstantSnapshot<SceneGPU>& scene,
-		const TypedConstantSnapshot<DirectionalShadowGPU>& shadow) const noexcept
+		const TypedConstantSnapshot<DirectionalShadowGPU>& shadow,
+		const TypedConstantSnapshot<AtmosphereGPU>& atmosphere) const noexcept
 	{
-		return scope.Bind(m_Scene, scene) && scope.Bind(m_Shadow, shadow);
+		return scope.Bind(m_Scene, scene) && scope.Bind(m_Shadow, shadow) && scope.Bind(m_Atmosphere, atmosphere);
 	}
 
 	bool ForwardBindingLayout::BindTileLists(RHIGraphicsCommandContext& context,
