@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
@@ -46,6 +47,8 @@ namespace gglab
 		using PipelineSlotTable = std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>;
 		PipelineSlotTable m_PipelineSlots{};
 		std::unique_ptr<PipelineSlotTable> m_MaterialDiagnosticPipelineSlots;
+		ResolvedRenderLayout m_BindingLayout;
+		uint32_t m_ShadowParameterIndex = 0;
 		bool m_IsInitialized = false;
 	};
 }

@@ -11,6 +11,7 @@
 
 namespace gglab
 {
+	class RHIPipelineSystem;
 	// Process-local domain keys, independent of shader registers and native parameters.
 	struct LayoutBindingKeyTag;
 	using LayoutBindingKey = TypedIndex<LayoutBindingKeyTag>;
@@ -106,6 +107,22 @@ namespace gglab
 		LayoutCompositionError m_Error;
 
 		[[nodiscard]] bool IsSuccess() const noexcept { return m_Layout.has_value(); }
+	};
+
+	// Owns logical metadata independently of backend native-layout deduplication.
+	// The backend retains ownership of the native handle's lifetime.
+	class ResolvedRenderLayout final
+	{
+	public:
+		[[nodiscard]] static ResolvedRenderLayout Create(RHIPipelineSystem& pipelineSystem,
+			const ComposedLayout& contract, const char* debugName = nullptr) noexcept;
+		[[nodiscard]] bool IsValid() const noexcept { return m_Contract.has_value(); }
+		[[nodiscard]] const ComposedLayout* GetContract() const noexcept;
+		[[nodiscard]] RHIBindingLayoutHandle GetNativeLayout() const noexcept { return m_NativeLayout; }
+
+	private:
+		std::optional<ComposedLayout> m_Contract;
+		RHIBindingLayoutHandle m_NativeLayout{};
 	};
 
 	inline constexpr uint32_t MaxLayoutFragments = 64;

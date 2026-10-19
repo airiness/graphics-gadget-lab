@@ -7,10 +7,18 @@
 
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
+#include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
+#if GGLAB_ENABLE_VULKAN
+#include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#endif
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -21,6 +29,7 @@
 #include <span>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace gglab
 {
@@ -227,6 +236,84 @@ namespace gglab
 			uint32_t m_NextPipelineIndex = 0;
 			uint32_t m_Generation = 1;
 			uint64_t m_Revision = 1;
+		};
+
+		class RecordingPipelineSystem final : public RHIPipelineSystem
+		{
+		public:
+			RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc& desc) noexcept override
+			{
+				if (m_FailLayoutCreation)
+				{
+					return {};
+				}
+				auto recorded = desc;
+				recorded.m_DebugName = nullptr;
+				for (auto& slot : recorded.m_Slots)
+				{
+					slot.m_DebugName = nullptr;
+				}
+				m_Layouts.push_back(recorded);
+				return { static_cast<uint32_t>(m_Layouts.size() - 1), m_Generation };
+			}
+
+			bool GetBindingLayoutDesc(
+				RHIBindingLayoutHandle layout, RHIBindingLayoutDesc& desc) const noexcept override
+			{
+				if (m_FailLayoutRead || !IsAlive(layout))
+				{
+					return false;
+				}
+				desc = m_Layouts[layout.Index()];
+				return true;
+			}
+
+			RHIPipelineHandle CreateGraphicsPipeline(
+				const RHIGraphicsPipelineCreateInfo& createInfo) noexcept override
+			{
+				m_LastGraphicsLayout = createInfo.m_Desc.m_BindingLayout;
+				return { m_PipelineCreateCount++, m_Generation };
+			}
+
+			RHIPipelineHandle CreateComputePipeline(
+				const RHIComputePipelineCreateInfo& createInfo) noexcept override
+			{
+				m_LastComputeLayout = createInfo.m_Desc.m_BindingLayout;
+				return { m_PipelineCreateCount++, m_Generation };
+			}
+
+			bool IsAlive(RHIBindingLayoutHandle layout) const noexcept override
+			{
+				return layout.IsValid() && layout.Generation() == m_Generation &&
+					layout.Index() < m_Layouts.size();
+			}
+
+			bool IsAlive(RHIPipelineHandle pipeline) const noexcept override
+			{
+				return pipeline.IsValid() && pipeline.Generation() == m_Generation &&
+					pipeline.Index() < m_PipelineCreateCount;
+			}
+
+			uint64_t GetRevision() const noexcept override { return m_Generation; }
+
+			void Clear() noexcept override
+			{
+				m_Layouts.clear();
+				m_PipelineCreateCount = 0;
+				m_LastGraphicsLayout = {};
+				m_LastComputeLayout = {};
+				++m_Generation;
+			}
+
+			std::vector<RHIBindingLayoutDesc> m_Layouts;
+			RHIBindingLayoutHandle m_LastGraphicsLayout{};
+			RHIBindingLayoutHandle m_LastComputeLayout{};
+			uint32_t m_PipelineCreateCount = 0;
+			bool m_FailLayoutRead = false;
+			bool m_FailLayoutCreation = false;
+
+		private:
+			uint32_t m_Generation = 1;
 		};
 
 		void RunIdentityTests(SelfTestContext& context) noexcept
@@ -983,6 +1070,234 @@ namespace gglab
 
 			std::filesystem::remove_all(root, errorCode);
 		}
+
+		void RunCounterPipelineLayoutTests(SelfTestContext& context) noexcept
+		{
+			const std::filesystem::path root = std::filesystem::temp_directory_path() /
+				"gglab-counter-pipeline-layout-test";
+			std::error_code errorCode;
+			std::filesystem::remove_all(root, errorCode);
+			const auto vertex = MakeDxilArtifact(ShaderStage::Vertex);
+			const auto pixel = MakeDxilArtifact(ShaderStage::Pixel);
+			const auto compute = MakeDxilArtifact(ShaderStage::Compute);
+			const std::array entries
+			{
+				ShaderProgramRegistryEntry{ shader_programs::ForwardCoverageVertex, ShaderTargetProfile::GGLabDX12, MakeRef(vertex) },
+				ShaderProgramRegistryEntry{ nonfinite::CounterVariant(shader_programs::ForwardPBRAllLightsPixel), ShaderTargetProfile::GGLabDX12, MakeRef(pixel) },
+				ShaderProgramRegistryEntry{ nonfinite::CounterVariant(shader_programs::ForwardPlusCullCompute), ShaderTargetProfile::GGLabDX12, MakeRef(compute) },
+				ShaderProgramRegistryEntry{ shader_programs::ForwardPBRAllLightsPixel, ShaderTargetProfile::GGLabDX12, MakeRef(pixel) },
+				ShaderProgramRegistryEntry{ shader_programs::ForwardPlusCullCompute, ShaderTargetProfile::GGLabDX12, MakeRef(compute) },
+			};
+			const auto registry = WriteRegistryFixture(root, entries);
+			if (!registry || !WriteArtifactFixture(root, vertex) ||
+				!WriteArtifactFixture(root, pixel) || !WriteArtifactFixture(root, compute))
+			{
+				context.Check(false, "Counter pipeline fixtures publish successfully");
+				std::filesystem::remove_all(root, errorCode);
+				return;
+			}
+
+			ShaderManager manager({
+				.m_ActiveBackend = RHIBackendType::DX12,
+				.m_ArtifactRoot = root,
+				.m_ActiveRegistry = *registry,
+				.m_NonFiniteCounters = true,
+			});
+			const ShaderID vertexId = manager.LoadProgram(shader_programs::ForwardCoverageVertex);
+			const ShaderID pixelId = manager.LoadProgram(shader_programs::ForwardPBRAllLightsPixel);
+			const ShaderID computeId = manager.LoadProgram(shader_programs::ForwardPlusCullCompute);
+			const bool loaded = manager.IsReady() && vertexId.IsValid() && pixelId.IsValid() &&
+				computeId.IsValid() && !manager.IsNonFiniteCounterShader(vertexId) &&
+				manager.IsNonFiniteCounterShader(pixelId) && manager.IsNonFiniteCounterShader(computeId);
+			context.Check(loaded, "The real ShaderManager selects instrumented pixel and compute programs");
+			if (!loaded)
+			{
+				std::filesystem::remove_all(root, errorCode);
+				return;
+			}
+
+			RecordingPipelineSystem pipelineSystem;
+			PipelineCache pipelineCache({
+				.m_PipelineSystem = &pipelineSystem,
+				.m_ShaderManager = &manager,
+			});
+			const RenderPassInfo usage{ .m_TypeName = "CounterLayout.Resolve" };
+			const auto& common = scene_bindings::GetCommonLayoutContract();
+			for (uint32_t family = 0; family < 3; ++family)
+			{
+				const auto forward = scene_bindings::ComposeForwardLayout(common, family == 2);
+				if (!forward.m_Layout)
+				{
+					context.Check(false, "Counter pipeline layout families compose successfully");
+					continue;
+				}
+				const auto base = (family == 0 ? common : *forward.m_Layout).BuildRHIDesc();
+				const auto baseHandle = pipelineSystem.CreateBindingLayout(base);
+				const uint32_t parameterCount = family == 0 ? 8u : family == 1 ? 9u : 11u;
+				const GraphicsPhysicalPipelineKey key{
+					.m_BindingLayout = baseHandle, .m_VSId = vertexId, .m_PSId = pixelId,
+				};
+				GraphicsPipelineSlot graphicsSlot{};
+				const auto pipeline = pipelineCache.Resolve(graphicsSlot, key, usage);
+				const auto derivedHandle = pipelineSystem.m_LastGraphicsLayout;
+				RHIBindingLayoutDesc derived{};
+				const bool resolved = pipeline.IsValid() && derivedHandle != baseHandle &&
+					pipelineSystem.GetBindingLayoutDesc(derivedHandle, derived) &&
+					derived.m_SlotCount == base.m_SlotCount + 1;
+				context.Check(resolved, "Graphics Resolve derives one counter slot for each scene layout family");
+				if (!resolved)
+				{
+					continue;
+				}
+				bool prefixPreserved = true;
+				for (uint32_t index = 0; index < base.m_SlotCount; ++index)
+				{
+					const auto& expected = base.m_Slots[index];
+					const auto& actual = derived.m_Slots[index];
+					prefixPreserved &= actual.m_Type == expected.m_Type &&
+						actual.m_Visibility == expected.m_Visibility && actual.m_Binding == expected.m_Binding &&
+						actual.m_Space == expected.m_Space && actual.m_Count == expected.m_Count &&
+						actual.m_SizeInBytes == expected.m_SizeInBytes &&
+						actual.m_BufferBindingMode == expected.m_BufferBindingMode;
+				}
+				const auto& counter = derived.m_Slots[base.m_SlotCount];
+				context.Check(prefixPreserved && counter.m_Type == RHIBindingType::ReadWriteStorageBuffer &&
+					counter.m_Binding == nonfinite::CounterBinding && counter.m_Space == 0 &&
+					counter.m_Count == 1 &&
+					counter.m_Visibility == (RHIShaderStage::Pixel | RHIShaderStage::Compute),
+					"Resolve preserves every base slot and appends the reserved counter storage ABI");
+
+				DX12BindingLayoutBuildResult dx12{};
+				BuildDX12RootSignatureDesc(derived, dx12);
+				context.Check(dx12.m_RootParameterCount == parameterCount + 1 &&
+					dx12.m_RootParameters[parameterCount].Descriptor.ShaderRegister == nonfinite::CounterBinding &&
+					(family == 0 || dx12.m_RootParameters[8].Descriptor.ShaderRegister == 3),
+					"The actual Resolve-derived DX12 layout retains the base parameters and u31");
+#if GGLAB_ENABLE_VULKAN
+				const auto vulkan = BuildVulkanBindingLayoutPlan(derived, 16 * 1024);
+				const auto bindings = std::span(vulkan.m_Set0Bindings).first(vulkan.m_Set0BindingCount);
+				const auto counterBinding = std::ranges::find(bindings, parameterCount,
+					&VulkanSet0BindingPlan::m_LogicalParameterIndex);
+				context.Check(vulkan.IsValid() && vulkan.m_Set0BindingCount == parameterCount + 1 &&
+					counterBinding != bindings.end() &&
+					counterBinding->m_DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					"The actual Resolve-derived Vulkan layout retains logical numbering and counter storage");
+#endif
+				const auto layoutCount = pipelineSystem.m_Layouts.size();
+				const auto pipelineCount = pipelineSystem.m_PipelineCreateCount;
+				context.Check(pipelineCache.Resolve(graphicsSlot, key, usage) == pipeline &&
+					pipelineSystem.m_Layouts.size() == layoutCount &&
+					pipelineSystem.m_PipelineCreateCount == pipelineCount,
+					"Unchanged graphics Resolve reuses the pipeline and its derived layout");
+				GraphicsPipelineSlot secondGraphicsSlot{};
+				ComputePipelineSlot computeSlot{};
+				const ComputePipelineRecipe recipe{
+					.m_BindingLayout = baseHandle, .m_CSId = computeId,
+				};
+				context.Check(pipelineCache.Resolve(secondGraphicsSlot, key, usage).IsValid() &&
+					pipelineCache.Resolve(computeSlot, recipe, usage).IsValid() &&
+					pipelineSystem.m_LastGraphicsLayout == derivedHandle &&
+					pipelineSystem.m_LastComputeLayout == derivedHandle &&
+					pipelineSystem.m_Layouts.size() == layoutCount,
+					"Fresh graphics and compute slots share the cached derivative of one base layout");
+			}
+
+			constexpr std::array rejectionNames{
+				"Resolve rejects UAV arrays crossing u31 before creating either pipeline",
+				"Resolve rejects a direct u31 alias before creating either pipeline",
+				"Resolve rejects unbounded UAV ranges covering u31 before creating either pipeline",
+				"Resolve rejects exhausted layout capacity before creating either pipeline",
+				"Resolve propagates descriptor lookup failure before creating either pipeline",
+				"Resolve propagates derived native layout failure before creating either pipeline",
+			};
+			for (uint32_t failure = 0; failure < rejectionNames.size(); ++failure)
+			{
+				RHIBindingLayoutDesc base{};
+				base.m_SlotCount = 1;
+				base.m_Slots[0] = {
+					.m_Type = RHIBindingType::StorageTexture, .m_Binding = 30, .m_Count = 2,
+				};
+				if (failure == 1)
+				{
+					base.m_Slots[0] = {
+						.m_Type = RHIBindingType::ReadWriteStorageBuffer, .m_Binding = 31,
+					};
+				}
+				else if (failure == 2)
+				{
+					base.m_Slots[0].m_Count = 0;
+				}
+				else if (failure == 3)
+				{
+					base.m_SlotCount = RHIBindingLayoutDesc::MaxSlots;
+				}
+				else if (failure >= 4)
+				{
+					base = common.BuildRHIDesc();
+				}
+				const auto baseHandle = pipelineSystem.CreateBindingLayout(base);
+				pipelineSystem.m_FailLayoutRead = failure == 4;
+				pipelineSystem.m_FailLayoutCreation = failure == 5;
+				const auto pipelineCount = pipelineSystem.m_PipelineCreateCount;
+				GraphicsPipelineSlot graphicsSlot{};
+				ComputePipelineSlot computeSlot{};
+				const GraphicsPhysicalPipelineKey key{
+					.m_BindingLayout = baseHandle, .m_VSId = vertexId, .m_PSId = pixelId,
+				};
+				const ComputePipelineRecipe recipe{
+					.m_BindingLayout = baseHandle, .m_CSId = computeId,
+				};
+				context.Check(!pipelineCache.Resolve(graphicsSlot, key, usage).IsValid() &&
+					!pipelineCache.Resolve(computeSlot, recipe, usage).IsValid() &&
+					pipelineSystem.m_PipelineCreateCount == pipelineCount,
+					rejectionNames[failure]);
+				pipelineSystem.m_FailLayoutRead = false;
+				pipelineSystem.m_FailLayoutCreation = false;
+				if (failure >= 4)
+				{
+					context.Check(pipelineCache.Resolve(graphicsSlot, key, usage).IsValid() &&
+						pipelineCache.Resolve(computeSlot, recipe, usage).IsValid(),
+						"Failed counter derivation is retried after the RHI failure clears");
+				}
+			}
+
+			ShaderManager ordinaryManager({
+				.m_ActiveBackend = RHIBackendType::DX12,
+				.m_ArtifactRoot = root,
+				.m_ActiveRegistry = *registry,
+			});
+			PipelineCache ordinaryCache({
+				.m_PipelineSystem = &pipelineSystem,
+				.m_ShaderManager = &ordinaryManager,
+			});
+			RHIBindingLayoutDesc ordinaryBase{};
+			ordinaryBase.m_SlotCount = 1;
+			ordinaryBase.m_Slots[0] = {
+				.m_Type = RHIBindingType::ReadWriteStorageBuffer, .m_Binding = 31,
+			};
+			const auto ordinaryHandle = pipelineSystem.CreateBindingLayout(ordinaryBase);
+			const auto layoutCount = pipelineSystem.m_Layouts.size();
+			GraphicsPipelineSlot ordinaryGraphicsSlot{};
+			ComputePipelineSlot ordinaryComputeSlot{};
+			const GraphicsPhysicalPipelineKey ordinaryKey{
+				.m_BindingLayout = ordinaryHandle,
+				.m_VSId = ordinaryManager.LoadProgram(shader_programs::ForwardCoverageVertex),
+				.m_PSId = ordinaryManager.LoadProgram(shader_programs::ForwardPBRAllLightsPixel),
+			};
+			const ComputePipelineRecipe ordinaryRecipe{
+				.m_BindingLayout = ordinaryHandle,
+				.m_CSId = ordinaryManager.LoadProgram(shader_programs::ForwardPlusCullCompute),
+			};
+			context.Check(ordinaryKey.m_VSId.IsValid() && ordinaryKey.m_PSId.IsValid() &&
+				ordinaryRecipe.m_CSId.IsValid() &&
+				ordinaryCache.Resolve(ordinaryGraphicsSlot, ordinaryKey, usage).IsValid() &&
+				ordinaryCache.Resolve(ordinaryComputeSlot, ordinaryRecipe, usage).IsValid() &&
+				pipelineSystem.m_LastGraphicsLayout == ordinaryHandle &&
+				pipelineSystem.m_LastComputeLayout == ordinaryHandle &&
+				pipelineSystem.m_Layouts.size() == layoutCount,
+				"Ordinary shader variants retain their original layouts without counter derivation");
+			std::filesystem::remove_all(root, errorCode);
+		}
 	}
 
 	void RunShaderArtifactRuntimeSelfTests(SelfTestContext& context) noexcept
@@ -994,5 +1309,6 @@ namespace gglab
 		RunStoreTests(context);
 		RunArtifactOnlyShaderManagerTests(context);
 		RunArtifactLocalPipelineInvalidationTests(context);
+		RunCounterPipelineLayoutTests(context);
 	}
 }

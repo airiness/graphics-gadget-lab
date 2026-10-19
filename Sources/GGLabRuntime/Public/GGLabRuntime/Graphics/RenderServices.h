@@ -27,6 +27,7 @@
 
 namespace gglab
 {
+	class ComposedLayout;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;
 	class RenderPipelineOverlayExtensionBase;
@@ -230,6 +231,7 @@ namespace gglab
 		virtual ~RenderBindingLayoutAccess() = default;
 
 		[[nodiscard]] virtual RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept = 0;
+		[[nodiscard]] virtual const ComposedLayout* GetCommonLayoutContract() const noexcept = 0;
 		[[nodiscard]] virtual RHIBindingLayoutDesc GetCommonBindingLayoutDesc()
 			const noexcept = 0;
 	};

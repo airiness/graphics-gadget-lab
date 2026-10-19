@@ -1,5 +1,8 @@
 #include "LayoutContractSelfTests.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #if GGLAB_ENABLE_VULKAN
@@ -11,6 +14,7 @@
 #include <limits>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace gglab
@@ -283,6 +287,136 @@ namespace gglab
 				"Composed copies own debug labels without retaining input pointers");
 		}
 
+		void RunSceneFamilyTests(SelfTestContext& context) noexcept
+		{
+			const auto& common = scene_bindings::GetCommonLayoutContract();
+			const auto desc = common.BuildRHIDesc();
+			constexpr std::array legacyKeys{
+				scene_bindings::SceneConstants, scene_bindings::DrawParameters,
+				scene_bindings::PassParameters, scene_bindings::ObjectTable,
+				scene_bindings::MaterialTable, scene_bindings::ViewTable,
+				scene_bindings::LightTable, scene_bindings::InlineParameters,
+			};
+			constexpr std::array legacyTypes{
+				RHIBindingType::ConstantBuffer, RHIBindingType::InlineConstants,
+				RHIBindingType::ConstantBuffer, RHIBindingType::ReadOnlyStorageBuffer,
+				RHIBindingType::ReadOnlyStorageBuffer, RHIBindingType::ReadOnlyStorageBuffer,
+				RHIBindingType::ReadOnlyStorageBuffer, RHIBindingType::InlineConstants,
+				RHIBindingType::BindlessResourceTable, RHIBindingType::BindlessSamplerTable,
+			};
+			constexpr std::array legacyRegisters{ 0u, 1u, 2u, 1u, 2u, 3u, 4u, 4u, 0u, 0u };
+			constexpr std::array legacyNames{
+				"SceneCB", "DrawConstants", "PassCB", "ObjectSB", "MaterialSB",
+				"ViewSB", "LightSB", "InlineConstants", "BindlessResources", "BindlessSamplers",
+			};
+			context.Check(desc.m_SlotCount == 10 && common.GetParameterCount() == 8,
+				"The common preset retains its ten slots and eight ordinary parameters");
+			for (uint32_t index = 0; index < legacyTypes.size(); ++index)
+			{
+				const auto& slot = desc.m_Slots[index];
+				const uint32_t size = index == 1 ?
+					MaxDrawConstantDWORDs * sizeof(uint32_t) :
+					index == 7 ? MaxInlineConstantDWORDs * sizeof(uint32_t) : 0u;
+				context.Check(slot.m_Type == legacyTypes[index] && slot.m_Binding == legacyRegisters[index] &&
+					slot.m_Space == 0 && slot.m_Visibility == RHIShaderStage::All &&
+					slot.m_Count == (index < 8 ? 1u : 0u) && slot.m_SizeInBytes == size &&
+					slot.m_BufferBindingMode == (index == 2 ? RHIBufferBindingMode::Dynamic : RHIBufferBindingMode::Fixed) &&
+					slot.m_DebugName && std::string_view(slot.m_DebugName) == legacyNames[index] &&
+					(index >= legacyKeys.size() || common.FindParameterIndex(legacyKeys[index]) == index),
+					"Every common slot retains its pre-composition register, policy, label and legacy index");
+			}
+			for (uint32_t family = 0; family < 3; ++family)
+			{
+				const auto forward = scene_bindings::ComposeForwardLayout(common, family == 2);
+				context.Check(forward.IsSuccess(), "The bounded Forward family composes from the common preset");
+				if (!forward.m_Layout)
+				{
+					continue;
+				}
+				const auto& contract = family == 0 ? common : *forward.m_Layout;
+				const auto base = contract.BuildRHIDesc();
+				const uint32_t parameterCount = family == 0 ? 8u : family == 1 ? 9u : 11u;
+				bool preserved = base.m_SlotCount == parameterCount + 2;
+				for (uint32_t index = 0; index < legacyKeys.size(); ++index)
+				{
+					preserved &= contract.FindParameterIndex(legacyKeys[index]) == index &&
+						base.m_Slots[index].m_DebugName &&
+						std::string_view(base.m_Slots[index].m_DebugName) == legacyNames[index];
+				}
+				context.Check(preserved && (family == 0 ||
+					contract.FindParameterIndex(scene_bindings::DirectionalShadow) == 8u) &&
+					(family != 2 || (contract.FindParameterIndex(scene_bindings::ForwardPlusTileHeaders) == 9u &&
+						contract.FindParameterIndex(scene_bindings::ForwardPlusTileIndices) == 10u)),
+					"Common, Forward and Forward+ preserve base maps and resolve their semantic extensions");
+
+				DX12BindingLayoutBuildResult dx12{};
+				BuildDX12RootSignatureDesc(base, dx12);
+				context.Check(dx12.m_RootParameterCount == parameterCount &&
+					(family == 0 || dx12.m_RootParameters[8].Descriptor.ShaderRegister == 3),
+					"DX12 layouts retain the common parameters and semantic extension positions");
+#if GGLAB_ENABLE_VULKAN
+				const auto vulkan = BuildVulkanBindingLayoutPlan(base, 16 * 1024);
+				context.Check(vulkan.IsValid() && vulkan.m_Set0BindingCount == parameterCount,
+					"Vulkan layouts preserve the common and extension parameter count");
+#endif
+			}
+		}
+
+		void RunResolvedLayoutTests(SelfTestContext& context) noexcept
+		{
+			// Models native deduplication and the backend descriptor entry being overwritten.
+			class SharedNativePipelineSystem final : public RHIPipelineSystem
+			{
+			public:
+				RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc& desc) noexcept override
+				{
+					m_LastDesc = desc;
+					m_LastDesc.m_DebugName = nullptr;
+					for (auto& slot : m_LastDesc.m_Slots)
+					{
+						slot.m_DebugName = nullptr;
+					}
+					return m_Fail ? RHIBindingLayoutHandle{} : RHIBindingLayoutHandle{ 7, 1 };
+				}
+				bool GetBindingLayoutDesc(RHIBindingLayoutHandle, RHIBindingLayoutDesc& desc) const noexcept override
+				{
+					desc = m_LastDesc;
+					return true;
+				}
+				RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
+				RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
+				bool IsAlive(RHIBindingLayoutHandle handle) const noexcept override { return handle.IsValid(); }
+				bool IsAlive(RHIPipelineHandle handle) const noexcept override { return handle.IsValid(); }
+				uint64_t GetRevision() const noexcept override { return 1; }
+				void Clear() noexcept override {}
+				RHIBindingLayoutDesc m_LastDesc{};
+				bool m_Fail = false;
+			} pipelineSystem;
+			const auto first = [&pipelineSystem]
+				{
+					auto scene = MakeBinding(1, RHIBindingType::ConstantBuffer, 0);
+					scene.m_PayloadTag = LayoutPayloadTag{ 1 };
+					const auto composed = ComposeOne(scene);
+					return ResolvedRenderLayout::Create(pipelineSystem, *composed.m_Layout);
+				}();
+			auto atmosphere = MakeBinding(2, RHIBindingType::ConstantBuffer, 0);
+			atmosphere.m_PayloadTag = LayoutPayloadTag{ 2 };
+			const auto composed = ComposeOne(atmosphere);
+			const auto second = ResolvedRenderLayout::Create(pipelineSystem, *composed.m_Layout);
+			context.Check(first.IsValid() && second.IsValid() &&
+				first.GetNativeLayout() == second.GetNativeLayout() &&
+				!(*first.GetContract() == *second.GetContract()) &&
+				first.GetContract()->FindParameterIndex(LayoutBindingKey{ 1 }) == 0u &&
+				!first.GetContract()->FindParameterIndex(LayoutBindingKey{ 2 }) &&
+				second.GetContract()->FindParameterIndex(LayoutBindingKey{ 2 }) == 0u &&
+				!second.GetContract()->FindParameterIndex(LayoutBindingKey{ 1 }),
+				"Two logical meanings keep independent owned maps when the backend reuses one native handle");
+			pipelineSystem.m_Fail = true;
+			const auto failed = ResolvedRenderLayout::Create(pipelineSystem, *composed.m_Layout);
+			context.Check(!failed.IsValid() && !failed.GetContract() && !failed.GetNativeLayout().IsValid(),
+				"Native creation failure publishes neither a logical map nor a native handle");
+		}
+
 		void RunBackendPlanTests(SelfTestContext& context) noexcept
 		{
 			const auto common = Renderer::BuildCommonRHIBindingLayoutDesc();
@@ -344,5 +478,7 @@ namespace gglab
 		RunValidationTests(context);
 		RunReservationAndOwnershipTests(context);
 		RunBackendPlanTests(context);
+		RunSceneFamilyTests(context);
+		RunResolvedLayoutTests(context);
 	}
 }

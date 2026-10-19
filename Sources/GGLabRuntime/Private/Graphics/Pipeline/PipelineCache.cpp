@@ -32,22 +32,28 @@ namespace gglab
 			return found->second;
 		}
 		RHIBindingLayoutDesc desc;
-		if (!m_PipelineSystem->GetBindingLayoutDesc(original, desc) || desc.m_SlotCount == desc.MaxSlots)
+		if (!m_PipelineSystem->GetBindingLayoutDesc(original, desc) || desc.m_SlotCount >= desc.MaxSlots)
 		{
 			return {};
 		}
-		for (uint32_t i = 0; i < desc.m_SlotCount; ++i)
+		for (uint32_t index = 0; index < desc.m_SlotCount; ++index)
 		{
-			const auto& slot = desc.m_Slots[i];
-			if (slot.m_Space == 0 && slot.m_Binding == nonfinite::CounterBinding &&
-				(slot.m_Type == RHIBindingType::ReadWriteStorageBuffer || slot.m_Type == RHIBindingType::StorageTexture))
+			const auto& slot = desc.m_Slots[index];
+			// The reserved register must not overlap any element of an existing UAV range.
+			if (slot.m_Space == 0 && slot.m_Binding <= nonfinite::CounterBinding &&
+				(slot.m_Type == RHIBindingType::ReadWriteStorageBuffer ||
+					slot.m_Type == RHIBindingType::StorageTexture) &&
+				(slot.m_Count == 0 || nonfinite::CounterBinding - slot.m_Binding < slot.m_Count))
 			{
-				return {}; // Never alias an existing shader register with observation storage.
+				return {};
 			}
 		}
 		desc.m_DebugName = "NonFiniteCounters.Instrumented";
-		desc.m_Slots[desc.m_SlotCount++] = { .m_Type = RHIBindingType::ReadWriteStorageBuffer,
-			.m_Visibility = RHIShaderStage::Pixel | RHIShaderStage::Compute, .m_Binding = nonfinite::CounterBinding };
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::ReadWriteStorageBuffer,
+			.m_Visibility = RHIShaderStage::Pixel | RHIShaderStage::Compute,
+			.m_Binding = nonfinite::CounterBinding,
+		};
 		const auto result = m_PipelineSystem->CreateBindingLayout(desc);
 		if (result.IsValid())
 		{

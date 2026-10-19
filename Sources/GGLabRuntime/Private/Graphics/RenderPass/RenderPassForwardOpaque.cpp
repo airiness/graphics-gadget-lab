@@ -1,5 +1,6 @@
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -54,8 +55,16 @@ namespace gglab
 			}
 
 			m_IncludesHdrDiffValidation = shaderSet.m_IncludesHdrDiffValidation;
-			const RHIBindingLayoutHandle bindingLayout =
-				forward_shading::CreateBindingLayout(services, true);
+			m_BindingLayout = forward_shading::CreateBindingLayout(services, true);
+			if (!m_BindingLayout.IsValid())
+			{
+				return;
+			}
+			const auto& contract = *m_BindingLayout.GetContract();
+			m_ShadowParameterIndex = contract.FindParameterIndex(scene_bindings::DirectionalShadow).value();
+			m_TileHeadersParameterIndex = contract.FindParameterIndex(scene_bindings::ForwardPlusTileHeaders).value();
+			m_TileIndicesParameterIndex = contract.FindParameterIndex(scene_bindings::ForwardPlusTileIndices).value();
+			const auto bindingLayout = m_BindingLayout.GetNativeLayout();
 			const auto prepareRecipe = [&](LightingRecipe lighting, const ForwardOpaquePixelShaders& shaders,
 				uint32_t lightingTargetCount)
 				{
@@ -291,16 +300,16 @@ namespace gglab
 				graphicsContext->SetPipeline(
 					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
 				forward_shading::BindSceneResources(
-					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue);
+					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_ShadowParameterIndex);
 
 				const RHIBufferHandle tileHeaders = executeContext.GetBufferHandle(data.m_TileHeaders);
 				const RHIBufferHandle tileIndices = executeContext.GetBufferHandle(data.m_TileIndices);
 				GGLAB_ASSERT_MSG(tileHeaders.IsValid() && tileIndices.IsValid(),
 					"Forward+ tile buffers must resolve before opaque shading.");
 				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(forward_shading::RootParameter::TileHeaders), tileHeaders);
+					m_TileHeadersParameterIndex, tileHeaders);
 				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(forward_shading::RootParameter::TileIndices), tileIndices);
+					m_TileIndicesParameterIndex, tileIndices);
 				if (!graphicsContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
 				{

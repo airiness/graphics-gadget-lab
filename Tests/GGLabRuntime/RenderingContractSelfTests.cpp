@@ -78,6 +78,7 @@
 #include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -3036,11 +3037,15 @@ namespace gglab
 					RecordingComputeCommandContext compute;
 					graphics.BeginRecordingScope(writer);
 					compute.BeginRecordingScope(writer);
+					const auto forwardLayout = scene_bindings::ComposeForwardLayout(
+						scene_bindings::GetCommonLayoutContract(), false);
+					const uint32_t shadowParameter = forwardLayout.m_Layout->FindParameterIndex(
+						scene_bindings::DirectionalShadow).value();
 					for (uint32_t pass = 0; pass < 3; ++pass)
 					{
 						const auto& queue = moved.m_RenderQueues[0];
 						forward_shading::BindSceneResources(graphics, frameContext, services,
-							{ .m_RasterDomain = &queue.m_CoverageRasterDomain }, queue);
+							{ .m_RasterDomain = &queue.m_CoverageRasterDomain }, queue, shadowParameter);
 					}
 					bool bindingsMatch = graphics.m_ConstantBindings.size() == 6;
 					for (size_t pass = 0; bindingsMatch && pass < 3; ++pass)
@@ -3049,7 +3054,7 @@ namespace gglab
 						const auto& shadowBinding = graphics.m_ConstantBindings[pass * 2 + 1];
 						bindingsMatch &= sceneBinding.m_ParameterIndex == static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB) &&
 							sceneBinding.m_Buffer == scene.m_Buffer && sceneBinding.m_Offset == scene.m_OffsetInBytes &&
-							shadowBinding.m_ParameterIndex == static_cast<uint32_t>(forward_shading::RootParameter::ShadowConstants) &&
+							shadowBinding.m_ParameterIndex == 8u &&
 							shadowBinding.m_Buffer == shadow.m_Buffer && shadowBinding.m_Offset == shadow.m_OffsetInBytes;
 					}
 					const auto matchesViews = [&views](const auto& binding) noexcept
@@ -3591,6 +3596,10 @@ namespace gglab
 			public:
 				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return {}; }
 				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+				const ComposedLayout* GetCommonLayoutContract() const noexcept override
+				{
+					return &scene_bindings::GetCommonLayoutContract();
+				}
 			} bindings;
 			const RenderServices services{ .m_ShaderPrograms = &shaders, .m_BindingLayout = &bindings };
 			for (uint32_t count : { 1u, 4u })
@@ -4398,6 +4407,10 @@ namespace gglab
 			public:
 				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return { 1, 1 }; }
 				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+				const ComposedLayout* GetCommonLayoutContract() const noexcept override
+				{
+					return &scene_bindings::GetCommonLayoutContract();
+				}
 			} bindings;
 			class PipelineSystem final : public RHIPipelineSystem
 			{
@@ -6789,6 +6802,10 @@ namespace gglab
 			public:
 				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return { 1, 1 }; }
 				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+				const ComposedLayout* GetCommonLayoutContract() const noexcept override
+				{
+					return &scene_bindings::GetCommonLayoutContract();
+				}
 			} bindings;
 			const RenderServices services{ .m_ShaderPrograms = &shaders, .m_BindingLayout = &bindings };
 			RenderPassTemporalReference pass;
@@ -8993,6 +9010,10 @@ namespace gglab
 			public:
 				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return {}; }
 				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+				const ComposedLayout* GetCommonLayoutContract() const noexcept override
+				{
+					return &scene_bindings::GetCommonLayoutContract();
+				}
 			} bindings;
 			class PipelineAccess final : public RenderPipelineResolver
 			{

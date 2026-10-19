@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/ForwardShadingCommon.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -13,49 +14,27 @@
 
 namespace gglab::forward_shading
 {
-	namespace
-	{
-		void AppendReadOnlyBufferSlot(RHIBindingLayoutDesc& desc, uint32_t binding,
-			const char* debugName) noexcept
-		{
-			GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
-			desc.m_Slots[desc.m_SlotCount++] = {
-				.m_Type = RHIBindingType::ReadOnlyStorageBuffer,
-				.m_Visibility = RHIShaderStage::Pixel,
-				.m_Binding = binding,
-				.m_Space = 0,
-				.m_Count = 1,
-				.m_DebugName = debugName,
-			};
-		}
-	}
-
-	RHIBindingLayoutHandle CreateBindingLayout(
+	ResolvedRenderLayout CreateBindingLayout(
 		const RenderServices& services, bool forwardPlusLightLists) noexcept
 	{
-		RHIBindingLayoutDesc desc = services.m_BindingLayout->GetCommonBindingLayoutDesc();
-		desc.m_DebugName = forwardPlusLightLists ?
-			"ForwardPBR.ForwardPlusBindingLayout" :
-			"ForwardPBR.BindingLayout";
-		GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
-		desc.m_Slots[desc.m_SlotCount++] = {
-			.m_Type = RHIBindingType::ConstantBuffer,
-			.m_Visibility = RHIShaderStage::Pixel,
-			.m_Binding = 3,
-			.m_Space = 0,
-			.m_Count = 1,
-			.m_DebugName = "DirectionalShadowCB",
-		};
-		if (forwardPlusLightLists)
+		const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
+		GGLAB_ASSERT_MSG(common, "Forward shading requires the common logical layout contract.");
+		if (!common)
 		{
-			AppendReadOnlyBufferSlot(desc, 5, "ForwardPlusTileHeaders");
-			AppendReadOnlyBufferSlot(desc, 6, "ForwardPlusTileIndices");
+			return {};
 		}
-
+		const auto composition = scene_bindings::ComposeForwardLayout(*common, forwardPlusLightLists);
+		GGLAB_ASSERT_MSG(composition.IsSuccess(), "Forward shading layout fragments must compose.");
+		if (!composition.m_Layout)
+		{
+			return {};
+		}
 		auto* rhiContext = services.m_Presentation->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
-		const RHIBindingLayoutHandle layout =
-			rhiContext->GetPipelineSystem().CreateBindingLayout(desc);
+		auto layout = ResolvedRenderLayout::Create(rhiContext->GetPipelineSystem(),
+			*composition.m_Layout, forwardPlusLightLists ?
+				"ForwardPBR.ForwardPlusBindingLayout" :
+				"ForwardPBR.BindingLayout");
 		GGLAB_ASSERT_MSG(layout.IsValid(), "Forward shading requires its pass-specific binding layout.");
 		return layout;
 	}
@@ -293,7 +272,8 @@ namespace gglab::forward_shading
 
 	void BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
-		const SceneInputs& inputs, const RenderQueue& renderQueue) noexcept
+		const SceneInputs& inputs, const RenderQueue& renderQueue,
+		uint32_t shadowParameterIndex) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(inputs.m_RasterDomain);
 		GGLAB_ASSERT_MSG(inputs.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain) ||
@@ -307,7 +287,7 @@ namespace gglab::forward_shading
 			static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 			context.m_FrameConstants.m_Scene);
 		graphicsContext.SetConstantBuffer(
-			static_cast<uint32_t>(RootParameter::ShadowConstants),
+			shadowParameterIndex,
 			context.m_FrameConstants.m_DirectionalShadow);
 
 		const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();

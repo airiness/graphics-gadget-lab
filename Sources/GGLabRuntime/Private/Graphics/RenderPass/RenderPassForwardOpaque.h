@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
@@ -73,6 +74,10 @@ namespace gglab
 		// Optional diagnostic variants must not double the pass object's inline cache.
 		std::unique_ptr<PipelineSlotTable> m_MaterialDiagnosticPipelineSlots;
 		bool m_IncludesHdrDiffValidation = false;
+		ResolvedRenderLayout m_BindingLayout;
+		uint32_t m_ShadowParameterIndex = 0;
+		uint32_t m_TileHeadersParameterIndex = 0;
+		uint32_t m_TileIndicesParameterIndex = 0;
 		bool m_IsInitialized = false;
 	};
 }

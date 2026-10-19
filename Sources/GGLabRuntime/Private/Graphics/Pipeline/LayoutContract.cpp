@@ -1,8 +1,10 @@
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -208,6 +210,24 @@ namespace gglab
 			}
 		}
 		return true;
+	}
+
+	ResolvedRenderLayout ResolvedRenderLayout::Create(RHIPipelineSystem& pipelineSystem,
+		const ComposedLayout& contract, const char* debugName) noexcept
+	{
+		ResolvedRenderLayout result;
+		const auto nativeLayout = pipelineSystem.CreateBindingLayout(contract.BuildRHIDesc(debugName));
+		if (nativeLayout.IsValid())
+		{
+			result.m_Contract = contract;
+			result.m_NativeLayout = nativeLayout;
+		}
+		return result;
+	}
+
+	const ComposedLayout* ResolvedRenderLayout::GetContract() const noexcept
+	{
+		return m_Contract ? std::addressof(*m_Contract) : nullptr;
 	}
 
 	LayoutCompositionResult ComposeLayoutFragments(std::span<const LayoutFragment> fragments,
