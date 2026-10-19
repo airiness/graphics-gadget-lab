@@ -1165,7 +1165,14 @@ namespace gglab
 			}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
-			void SetPipeline(RHIPipelineHandle) noexcept override {}
+			void SetPipeline(RHIPipelineHandle pipeline) noexcept override
+			{
+				InvalidatePipelineBindings();
+				if (pipeline.IsValid())
+				{
+					ConfirmBindingPipeline(pipeline);
+				}
+			}
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
 			void BeginRendering(const RHIRenderingInfo&) noexcept override
 			{
@@ -1189,6 +1196,7 @@ namespace gglab
 			void SetPrimitiveTopology(RHIPrimitiveTopology) noexcept override {}
 			bool SetConstantBuffer(uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override
 			{
+				InvalidateScopedConstant(parameterIndex);
 				if (!ValidateConstantBinding(binding))
 				{
 					return false;
@@ -1214,8 +1222,15 @@ namespace gglab
 			{
 			}
 			void SetIndexBuffer(const RHIIndexBufferBinding&) noexcept override {}
-			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
-			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override {}
+			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override
+			{
+				m_CommandCount += ValidateConstantBindingReadiness() ? 1u : 0u;
+			}
+			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override
+			{
+				m_CommandCount += ValidateConstantBindingReadiness() ? 1u : 0u;
+			}
+			uint32_t m_CommandCount = 0;
 
 			std::vector<RecordedConstantBinding> m_ConstantBindings;
 			std::vector<uint32_t> m_LastInlineWords;
@@ -1257,10 +1272,18 @@ namespace gglab
 			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
-			void SetPipeline(RHIPipelineHandle) noexcept override {}
+			void SetPipeline(RHIPipelineHandle pipeline) noexcept override
+			{
+				InvalidatePipelineBindings();
+				if (pipeline.IsValid())
+				{
+					ConfirmBindingPipeline(pipeline);
+				}
+			}
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
 			bool SetConstantBuffer(uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept override
 			{
+				InvalidateScopedConstant(parameterIndex);
 				if (!ValidateConstantBinding(binding))
 				{
 					return false;
@@ -1283,7 +1306,11 @@ namespace gglab
 				m_LastInlineOffset = offset;
 				m_LastInlineWords.assign(words.begin(), words.end());
 			}
-			void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override {}
+			void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override
+			{
+				m_CommandCount += ValidateConstantBindingReadiness() ? 1u : 0u;
+			}
+			uint32_t m_CommandCount = 0;
 
 			std::vector<RecordedConstantBinding> m_ConstantBindings;
 			std::vector<uint32_t> m_LastInlineWords;
@@ -1294,6 +1321,97 @@ namespace gglab
 			uint32_t m_FlushBarrierCount = 0;
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
+		};
+
+		class BindingTestPipelineSystem final : public RHIPipelineSystem
+		{
+		public:
+			RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc&) noexcept override { return { 1, 1 }; }
+			RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
+			RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
+			bool IsAlive(RHIBindingLayoutHandle handle) const noexcept override { return handle.IsValid(); }
+			bool IsAlive(RHIPipelineHandle handle) const noexcept override { return handle.IsValid(); }
+			uint64_t GetRevision() const noexcept override { return 1; }
+			void Clear() noexcept override {}
+		};
+
+		class BindingTestResolver final : public RenderPipelineResolver
+		{
+		public:
+			RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&,
+				const RenderPassInfo&) noexcept override { return m_Pipeline; }
+			RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
+				const RenderPassInfo&) noexcept override { return m_Pipeline; }
+			void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
+			RHIPipelineHandle m_Pipeline{ 1, 1 };
+		};
+
+		template <typename Context = RHIGraphicsCommandContext, typename Layout>
+		ResolvedRenderPipeline ResolveBindingTestPipeline(const Layout& layout, uint32_t index = 1) noexcept
+		{
+			BindingTestResolver resolver;
+			resolver.m_Pipeline = RHIPipelineHandle{ index, 1 };
+			if constexpr (std::derived_from<Context, RHIComputeCommandContext>)
+			{
+				ComputePipelineSlot slot;
+				const ComputePipelineRecipe recipe{ .m_BindingLayout = layout.GetNativeLayout() };
+				if constexpr (std::same_as<Layout, ResolvedRenderLayout>)
+				{
+					return layout.Resolve(resolver, slot, recipe, {});
+				}
+				else
+				{
+					return layout.ResolvePipeline(resolver, slot, recipe, {});
+				}
+			}
+			else
+			{
+				GraphicsPipelineSlot slot;
+				const GraphicsPhysicalPipelineKey recipe{ .m_BindingLayout = layout.GetNativeLayout() };
+				if constexpr (std::same_as<Layout, ResolvedRenderLayout>)
+				{
+					return layout.Resolve(resolver, slot, recipe, {});
+				}
+				else
+				{
+					return layout.ResolvePipeline(resolver, slot, recipe, {});
+				}
+			}
+		}
+
+		class BindingTestRHIContext final : public RHIContext
+		{
+		public:
+			RHIDevice& GetDevice() noexcept override { std::terminate(); }
+			const RHIDevice& GetDevice() const noexcept override { std::terminate(); }
+			RHISwapChain& GetSwapChain() noexcept override { std::terminate(); }
+			const RHISwapChain& GetSwapChain() const noexcept override { std::terminate(); }
+			TransferManager& GetTransferManager() noexcept override { std::terminate(); }
+			RHIPipelineSystem& GetPipelineSystem() noexcept override { return m_Pipelines; }
+			GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
+			RHIFrameBeginResult BeginFrame() noexcept override { return RHIFrameBeginResult::Unavailable(); }
+			RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+			RHIFrameEndResult AbortFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+			bool WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override { return true; }
+			void Resize(uint32_t, uint32_t) noexcept override {}
+			RHIGpuWaitResult WaitIdleFor(uint32_t) noexcept override { return RHIGpuWaitResult::Completed; }
+			void RetireCompletedWork() noexcept override {}
+			bool IsPoisoned() const noexcept override { return false; }
+			bool IsDeviceLost() const noexcept override { return false; }
+			uint32_t GetFrameSlotCount() const noexcept override { return 2; }
+			BindingTestPipelineSystem m_Pipelines;
+		};
+
+		class BindingTestPresentation final : public RenderPresentationAccess
+		{
+		public:
+			RHIContext* GetRHIContext() const noexcept override { return &m_Context; }
+			RHIDevice* GetDevice() const noexcept override { return nullptr; }
+			RHISwapChain* GetSwapChain() const noexcept override { return nullptr; }
+			const std::array<float, 4>& GetBackBufferClearColor() const noexcept override { return m_Clear; }
+			RHIFencePoint GetLastSubmittedFencePoint() const noexcept override { return {}; }
+			mutable BindingTestRHIContext m_Context;
+			std::array<float, 4> m_Clear{};
 		};
 
 		class RecordingTransferContext final : public RHITransferContext
@@ -3065,8 +3183,10 @@ namespace gglab
 					for (uint32_t pass = 0; pass < 3; ++pass)
 					{
 						const auto& queue = moved.m_RenderQueues[0];
-						context.Check(forward_shading::BindSceneResources(graphics, frameContext, services,
-							{ .m_RasterDomain = &queue.m_CoverageRasterDomain }, queue, forwardLayout),
+						auto constants = forwardLayout.BeginRecording(graphics);
+						context.Check(constants.SetPipeline(ResolveBindingTestPipeline(forwardLayout)) &&
+							forward_shading::BindSceneResources(graphics, frameContext, services,
+								{ .m_RasterDomain = &queue.m_CoverageRasterDomain }, queue, forwardLayout, constants),
 							"Forward consumes the frame's typed Scene and Shadow snapshots");
 					}
 					bool bindingsMatch = graphics.m_ConstantBindings.size() == 6;
@@ -5296,6 +5416,59 @@ namespace gglab
 			queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Transparent)] = {
 				.m_Start = 1,
 			};
+			// Exercise the production bucket helper for both owners, including a
+			// same-layout material pipeline switch and a missing required snapshot.
+			for (const auto bucket : { RenderBucket::Opaque, RenderBucket::Transparent })
+			{
+				for (const bool missingShadow : { false, true })
+				{
+					RecordingDevice recordingDevice;
+					recordingDevice.m_PassConstantsEnabled = true;
+					RHIUploadPool recordingPool(recordingDevice);
+					RHIUploadWriter recordingWriter;
+					auto recordingBatch = recordingPool.BeginBatch();
+					recordingBatch->Attach(recordingWriter);
+					RenderFrameConstantBindings frameConstants;
+					frameConstants.m_SceneSnapshot = TypedConstantSnapshot<SceneGPU>::Upload(
+						recordingWriter.GetFrameUploads(), SceneGPU{});
+					const auto shadow = TypedConstantSnapshot<DirectionalShadowGPU>::Upload(
+						recordingWriter.GetFrameUploads(), DirectionalShadowGPU{});
+					if (!missingShadow)
+					{
+						frameConstants.m_DirectionalShadowSnapshot = shadow;
+					}
+					BindingTestPipelineSystem bindingPipelines;
+					const auto bindingLayout = ForwardBindingLayout::Create(
+						bindingPipelines, scene_bindings::GetCommonLayoutContract(), false);
+					auto recordingQueue = queue;
+					recordingQueue.m_DrawItems.resize(2, queue.m_DrawItems.front());
+					recordingQueue.m_DrawItems[0].m_VariantBits = 0;
+					recordingQueue.m_DrawItems[1].m_VariantBits = 1;
+					recordingQueue.m_BucketDrawRanges = {};
+					recordingQueue.m_BucketDrawRanges[utils::ToIndex(bucket)] = { 0, 2 };
+					RecordingGraphicsCommandContext recording;
+					recording.BeginRecordingScope(recordingWriter);
+					{
+						auto bindings = bindingLayout.BeginRecording(recording);
+						const std::array buckets{ bucket };
+						forward_shading::DrawBuckets(recording, recordingQueue, buckets, &recordingQueue,
+							bindingLayout, frameConstants, bindings, [&bindingLayout](uint64_t variant) noexcept
+							{
+								return ResolveBindingTestPipeline(bindingLayout, static_cast<uint32_t>(variant) + 1u);
+							});
+						context.Check(missingShadow ? recording.m_CommandCount == 0 && recordingBatch->HasFailed() :
+							recording.m_CommandCount == 2 && recording.m_ConstantBindings.size() == 4 &&
+							!recordingBatch->HasFailed(),
+							std::format("Production Forward bucket {} rejects missing Shadow or rebinds both inputs across material pipelines (missing={})",
+								static_cast<uint32_t>(bucket), missingShadow));
+					}
+					recording.EndRecordingScope();
+					recordingBatch->Detach(recordingWriter);
+					recordingBatch->Cancel();
+					context.Check(recordingPool.GetStatistics().m_LastBatch.m_UploadCount == 2,
+						"Opaque and transparent bucket recording reuse their two producer uploads");
+				}
+			}
 			const auto& prepassPacket = queue.m_DrawItems.front().m_CoverageDrawPacket;
 			const auto& forwardPacket = queue.m_DrawItems.front().m_CoverageDrawPacket;
 			const DepthCoverageDrawPacket copiedPacket = packet;
@@ -9099,8 +9272,10 @@ namespace gglab
 				uint32_t GetSamplerIndex(const SamplerID&) const noexcept override { return 0; }
 				uint32_t ResolveSamplerIndex(SamplerID, SamplerPreset) const noexcept override { return 0; }
 			} samplers;
+			BindingTestPresentation bindingPresentation;
 			const RenderServices services{ .m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
-				.m_Samplers = &samplers, .m_BindingLayout = &bindings, .m_Atmosphere = &system };
+				.m_Samplers = &samplers, .m_Presentation = &bindingPresentation,
+				.m_BindingLayout = &bindings, .m_Atmosphere = &system };
 			RenderFrameBuildResult frame{};
 			RHIUploadPool uploads(device);
 			RHIUploadWriter writer;
@@ -9182,12 +9357,13 @@ namespace gglab
 			class PresentationAccess final : public RenderPresentationAccess
 			{
 			public:
-				RHIContext* GetRHIContext() const noexcept override { return nullptr; }
+				RHIContext* GetRHIContext() const noexcept override { return &m_Context; }
 				RHIDevice* GetDevice() const noexcept override { return nullptr; }
 				RHISwapChain* GetSwapChain() const noexcept override { return nullptr; }
 				const std::array<float, 4>& GetBackBufferClearColor() const noexcept override { return m_Clear; }
 				RHIFencePoint GetLastSubmittedFencePoint() const noexcept override { return {}; }
 			private:
+				mutable BindingTestRHIContext m_Context;
 				std::array<float, 4> m_Clear{};
 			} presentation;
 			AtmosphereSystem previewAtmosphere(&device, &pool);
@@ -11754,6 +11930,218 @@ namespace gglab
 			"Zero clearcoat factor reproduces the white Lambert base reference");
 	}
 
+	void RunScopedConstantRecordingTests(SelfTestContext& context) noexcept
+	{
+		constexpr std::array scenarioNames
+		{
+			"complete inputs",
+			"missing all inputs",
+			"missing Shadow",
+			"external pipeline switch",
+			"scoped switch without rebinding",
+			"scoped switch with complete rebinding",
+			"foreign logical reference",
+			"cancelled batch snapshot",
+			"unavailable snapshot",
+			"expired recording scope",
+			"overlapping contract scope",
+			"same-pipeline reselection",
+			"invalid pipeline selection",
+			"numeric writes without typed readiness",
+			"numeric overwrite after typed readiness",
+			"repeatable ready state",
+			"foreign logical pipeline",
+			"wrong pipeline bind point",
+			"failed pipeline resolution",
+			"expired logical pipeline",
+		};
+		BindingTestPipelineSystem pipelines;
+		const auto composed = scene_bindings::ComposeForwardLayout(scene_bindings::GetCommonLayoutContract(), false);
+		const auto layout = ResolvedRenderLayout::Create(pipelines, *composed.m_Layout);
+		const auto other = ResolvedRenderLayout::Create(pipelines, *composed.m_Layout);
+		const auto sceneRef = ResolvedBindingRef<SceneGPU>::Resolve(layout, scene_bindings::SceneConstants);
+		const auto shadowRef = ResolvedBindingRef<DirectionalShadowGPU>::Resolve(layout, scene_bindings::DirectionalShadow);
+		const auto otherScene = ResolvedBindingRef<SceneGPU>::Resolve(other, scene_bindings::SceneConstants);
+		context.Check(layout.GetNativeLayout() == other.GetNativeLayout(),
+			"Recording rejection fixtures share one native layout while retaining independent logical contracts");
+		static_assert(sizeof(SceneGPU) == sizeof(AtmosphereGPU));
+		static_assert(!std::is_invocable_v<decltype(&BindConstantSnapshot<RHIGraphicsCommandContext, SceneGPU>),
+			RHIGraphicsCommandContext&, const ResolvedRenderLayout&, const ResolvedBindingRef<SceneGPU>&,
+			const TypedConstantSnapshot<AtmosphereGPU>&>);
+
+		const auto run = [&]<typename Command>()
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				RHIUploadPool pool(device, { .m_PageSizeInBytes = 4096u });
+				RHIUploadWriter writer;
+				auto previousBatch = pool.BeginBatch();
+				previousBatch->Attach(writer);
+				const auto staleScene = TypedConstantSnapshot<SceneGPU>::Upload(writer.GetFrameUploads(), SceneGPU{});
+				previousBatch->Detach(writer);
+				previousBatch->Cancel();
+				for (uint32_t scenario = 0; scenario < scenarioNames.size(); ++scenario)
+				{
+					auto batch = pool.BeginBatch();
+					batch->Attach(writer);
+					const auto scene = TypedConstantSnapshot<SceneGPU>::Upload(writer.GetFrameUploads(), SceneGPU{});
+					const auto shadow = TypedConstantSnapshot<DirectionalShadowGPU>::Upload(
+						writer.GetFrameUploads(), DirectionalShadowGPU{});
+					Command command;
+					command.BeginRecordingScope(writer);
+					{
+						ScopedConstantBindings<Command> bindings(command, layout, sceneRef, shadowRef);
+						const bool selected = bindings.SetPipeline(ResolveBindingTestPipeline<Command>(layout));
+						bool bound = selected;
+						if (scenario != 1 && scenario != 13)
+						{
+							bound &= bindings.Bind(sceneRef, scenario == 7 ? staleScene :
+								scenario == 8 ? TypedConstantSnapshot<SceneGPU>{} : scene);
+						}
+						if (scenario != 1 && scenario != 2 && scenario != 13)
+						{
+							bound &= bindings.Bind(shadowRef, shadow);
+						}
+						if (scenario == 3 || scenario == 11)
+						{
+							command.SetPipeline(RHIPipelineHandle{ scenario == 3 ? 2u : 1u, 1 });
+						}
+						if (scenario == 4 || scenario == 5)
+						{
+							bound &= bindings.SetPipeline(ResolveBindingTestPipeline<Command>(layout, 2));
+							if (scenario == 5)
+							{
+								bound &= bindings.Bind(sceneRef, scene) && bindings.Bind(shadowRef, shadow);
+							}
+						}
+						if (scenario == 6)
+						{
+							bound &= bindings.Bind(otherScene, scene);
+						}
+						if (scenario == 9)
+						{
+							command.EndRecordingScope();
+							command.BeginRecordingScope(writer);
+							bound &= bindings.Bind(sceneRef, scene);
+						}
+						if (scenario == 10)
+						{
+							ScopedConstantBindings<Command> replacement(command, other, otherScene);
+							bound &= replacement.SetPipeline(ResolveBindingTestPipeline<Command>(other));
+						}
+						if (scenario == 12)
+						{
+							bound &= bindings.SetPipeline({});
+						}
+						if (scenario == 13 || scenario == 14)
+						{
+							// Numeric writes neither satisfy nor preserve a typed capability.
+							bound &= command.SetConstantBuffer(*sceneRef.GetParameterIndex(layout), scene.GetBinding());
+							bound &= command.SetConstantBuffer(*shadowRef.GetParameterIndex(layout), shadow.GetBinding());
+						}
+						if (scenario == 16)
+						{
+							bound &= bindings.SetPipeline(ResolveBindingTestPipeline<Command>(other));
+						}
+						if (scenario == 17)
+						{
+							using OtherContext = std::conditional_t<std::derived_from<Command, RHIGraphicsCommandContext>,
+								RHIComputeCommandContext, RHIGraphicsCommandContext>;
+							bound &= bindings.SetPipeline(ResolveBindingTestPipeline<OtherContext>(layout));
+						}
+						if (scenario == 18)
+						{
+							BindingTestResolver failedResolver;
+							failedResolver.m_Pipeline = {};
+							GraphicsPipelineSlot slot;
+							bound &= bindings.SetPipeline(layout.Resolve(failedResolver, slot,
+								GraphicsPhysicalPipelineKey{ .m_BindingLayout = layout.GetNativeLayout() }, {}));
+						}
+						if (scenario == 19)
+						{
+							const auto expired = [&pipelines, &composed]
+								{
+									const auto temporary = ResolvedRenderLayout::Create(pipelines, *composed.m_Layout);
+									return ResolveBindingTestPipeline<Command>(temporary);
+								}();
+							bound &= bindings.SetPipeline(expired);
+						}
+						if constexpr (std::derived_from<Command, RHIGraphicsCommandContext>)
+						{
+							if (scenario % 2 == 0)
+							{
+								command.DrawIndexed(3, 1, 0, 0, 0);
+							}
+							else
+							{
+								command.Draw(3, 1, 0, 0);
+							}
+						}
+						else
+						{
+							command.Dispatch(1, 1, 1);
+						}
+						if (scenario == 15)
+						{
+							if constexpr (std::derived_from<Command, RHIGraphicsCommandContext>)
+							{
+								command.Draw(3, 1, 0, 0);
+							}
+							else
+							{
+								command.Dispatch(1, 1, 1);
+							}
+						}
+						const bool expected = scenario == 0 || scenario == 5 || scenario == 15;
+						const uint32_t expectedCommandCount = scenario == 15 ? 2u : 1u;
+						context.Check(expected ? bound && command.m_CommandCount == expectedCommandCount && !batch->HasFailed() :
+							command.m_CommandCount == 0 && command.HasRecordingError() && batch->HasFailed(),
+							std::format("Scoped {} command: {} enforces required inputs at execution in every configuration",
+								std::derived_from<Command, RHIGraphicsCommandContext> ? "graphics" : "compute", scenarioNames[scenario]));
+					}
+					command.EndRecordingScope();
+					batch->Detach(writer);
+					batch->Cancel();
+					context.Check(pool.GetStatistics().m_LastBatch.m_UploadCount == 2,
+						"Scoped pipeline rebinding reuses the two original uploads without duplicating GPU storage");
+				}
+			};
+		run.template operator()<RecordingGraphicsCommandContext>();
+		run.template operator()<RecordingComputeCommandContext>();
+
+		const auto atmosphereLayout = AtmosphereBindingLayout::Create(pipelines, scene_bindings::GetCommonLayoutContract());
+		RecordingDevice device;
+		device.m_PassConstantsEnabled = true;
+		RHIUploadPool pool(device);
+		RHIUploadWriter writer;
+		auto batch = pool.BeginBatch();
+		batch->Attach(writer);
+		const auto snapshot = TypedConstantSnapshot<AtmosphereGPU>::Upload(writer.GetFrameUploads(), AtmosphereGPU{});
+		RecordingComputeCommandContext command;
+		command.BeginRecordingScope(writer);
+		{
+			auto bindings = atmosphereLayout.BeginRecording(command);
+			context.Check(atmosphereLayout.IsValid() && bindings.SetPipeline(ResolveBindingTestPipeline<RHIComputeCommandContext>(atmosphereLayout)) &&
+				atmosphereLayout.Bind(bindings, snapshot), "The legacy Atmosphere adapter resolves and binds its own typed b0 meaning");
+			command.Dispatch(1, 1, 1);
+			context.Check(command.m_CommandCount == 1 && command.m_ConstantBindings.size() == 1 &&
+				command.m_ConstantBindings.front().m_ParameterIndex == 0 && !batch->HasFailed(),
+				"Legacy Atmosphere recording preserves the native b0 parameter while consuming readiness");
+		}
+		{
+			const auto scene = TypedConstantSnapshot<SceneGPU>::Upload(writer.GetFrameUploads(), SceneGPU{});
+			auto bindings = atmosphereLayout.BeginRecording(command);
+			context.Check(bindings.SetPipeline(ResolveBindingTestPipeline<RHIComputeCommandContext>(atmosphereLayout)) && !bindings.Bind(sceneRef, scene),
+				"Scene cannot satisfy the legacy Atmosphere scope despite equal size and a shared native b0 layout");
+			command.Dispatch(1, 1, 1);
+			context.Check(command.m_CommandCount == 1 && command.HasRecordingError() && batch->HasFailed(),
+				"A logical Scene-to-Atmosphere switch rejects stale typed state before dispatch");
+		}
+		command.EndRecordingScope();
+		batch->Detach(writer);
+		batch->Cancel();
+	}
+
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
 		RunMaterialDiagnosticPrewarmTests(context);
@@ -11791,6 +12179,7 @@ namespace gglab
 		RunDX12TransferCompletionTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunFrameConstantUploadTests(context);
+		RunScopedConstantRecordingTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);

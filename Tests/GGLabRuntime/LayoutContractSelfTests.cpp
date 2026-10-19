@@ -3,8 +3,11 @@
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
 #include "Graphics/RenderPass/ForwardBindingLayout.h"
+#include "Graphics/RenderPass/AtmosphereBindingLayout.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #if GGLAB_ENABLE_VULKAN
@@ -424,6 +427,42 @@ namespace gglab
 				second.GetContract()->FindParameterIndex(LayoutBindingKey{ 2 }) == 0u &&
 				!second.GetContract()->FindParameterIndex(LayoutBindingKey{ 1 }),
 				"Two logical meanings keep independent owned maps when the backend reuses one native handle");
+			class Resolver final : public RenderPipelineResolver
+			{
+			public:
+				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&,
+					const RenderPassInfo&) noexcept override
+				{
+					++m_Calls;
+					return { 9, 1 };
+				}
+				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
+					const RenderPassInfo&) noexcept override
+				{
+					++m_Calls;
+					return { 9, 1 };
+				}
+				void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
+				uint32_t m_Calls = 0;
+			} resolver;
+			GraphicsPipelineSlot graphicsSlot;
+			ComputePipelineSlot computeSlot;
+			const auto wrongRecipe = first.Resolve(resolver, graphicsSlot,
+				GraphicsPhysicalPipelineKey{ .m_BindingLayout = RHIBindingLayoutHandle{ 8, 1 } }, {});
+			context.Check(!wrongRecipe.IsValid() && resolver.m_Calls == 0,
+				"A scoped pipeline cannot resolve a recipe owned by a different native layout");
+			const auto graphicsPipeline = first.Resolve(resolver, graphicsSlot,
+				GraphicsPhysicalPipelineKey{ .m_BindingLayout = first.GetNativeLayout() }, {});
+			const auto computePipeline = first.Resolve(resolver, computeSlot,
+				ComputePipelineRecipe{ .m_BindingLayout = first.GetNativeLayout() }, {});
+			context.Check(graphicsPipeline.IsValid() && computePipeline.IsValid() && resolver.m_Calls == 2 &&
+				graphicsPipeline.GetHandle(first, false) == computePipeline.GetHandle(first, true) &&
+				!graphicsPipeline.GetHandle(first, true).IsValid() && !computePipeline.GetHandle(first, false).IsValid(),
+				"Scoped graphics and compute pipeline associations remain distinct even when native handles are shared");
+			context.Check(!graphicsPipeline.GetHandle(second, false).IsValid() &&
+				!computePipeline.GetHandle(second, true).IsValid(),
+				"A native pipeline handle cannot transfer its logical contract to another scope");
+			static_assert(!std::is_constructible_v<ResolvedRenderPipeline, RHIPipelineHandle>);
 			static_assert(sizeof(EqualSizeConstantFixture) == sizeof(SceneGPU));
 			static_assert(!std::is_invocable_r_v<bool,
 				decltype(&BindConstantSnapshot<RHIGraphicsCommandContext, SceneGPU>),
@@ -472,6 +511,21 @@ namespace gglab
 			const auto forwardPlus = ForwardBindingLayout::Create(pipelineSystem, common, true);
 			context.Check(forward.IsValid() && forwardPlus.IsValid(),
 				"Concrete Forward layouts create complete maps for both shading families");
+			const auto atmosphereLayout = AtmosphereBindingLayout::Create(pipelineSystem, common);
+			const auto commonDesc = common.BuildRHIDesc();
+			bool unchangedPhysicalMap = atmosphereLayout.IsValid() &&
+				pipelineSystem.m_LastDesc.m_SlotCount == commonDesc.m_SlotCount;
+			for (uint32_t index = 0; unchangedPhysicalMap && index < commonDesc.m_SlotCount; ++index)
+			{
+				const auto& actual = pipelineSystem.m_LastDesc.m_Slots[index];
+				const auto& expected = commonDesc.m_Slots[index];
+				unchangedPhysicalMap = actual.m_Type == expected.m_Type && actual.m_Visibility == expected.m_Visibility &&
+					actual.m_Binding == expected.m_Binding && actual.m_Space == expected.m_Space &&
+					actual.m_Count == expected.m_Count && actual.m_SizeInBytes == expected.m_SizeInBytes &&
+					actual.m_BufferBindingMode == expected.m_BufferBindingMode;
+			}
+			context.Check(unchangedPhysicalMap,
+				"The legacy Atmosphere logical adapter preserves every common physical slot and native deduplication input");
 			const auto incompleteForward = ForwardBindingLayout::Create(pipelineSystem, *composed.m_Layout, false);
 			context.Check(!incompleteForward.IsValid() && !incompleteForward.GetNativeLayout().IsValid(),
 				"A Forward layout with a missing required Scene binding is never published as valid");

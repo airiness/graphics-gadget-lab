@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
+#include "Graphics/RenderPass/AtmosphereBindingLayout.h"
 namespace gglab
 {
 	inline constexpr const char* AtmosphereResourcesName = "Atmosphere.Resources";
@@ -14,5 +15,6 @@ namespace gglab
 		std::array<RHITextureHandle, 3> m_Textures{};
 		AtmosphereDiagnostics m_Diagnostics{};
 		RHIConstantBufferBinding m_Constants{};
+		TypedConstantSnapshot<AtmosphereGPU> m_ConstantSnapshot{};
 	};
 }

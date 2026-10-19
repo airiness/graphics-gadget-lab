@@ -425,6 +425,7 @@ namespace gglab
 
 	void DX12GraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
+		InvalidatePipelineBindings();
 		DX12PipelineState* pipelineState = nullptr;
 		DX12RootSignature* rootSignature = nullptr;
 		RHIGraphicsPipelineDesc pipelineDesc{};
@@ -465,6 +466,7 @@ namespace gglab
 			}
 		}
 		m_CurrentPipelineDesc = pipelineDesc;
+		ConfirmBindingPipeline(pipeline);
 	}
 
 	void DX12GraphicsCommandContext::SetDescriptorTable(
@@ -688,6 +690,7 @@ namespace gglab
 	bool DX12GraphicsCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
+		InvalidateScopedConstant(parameterIndex);
 		DX12Buffer* buffer = m_Backend.GetDevice()->ResolveBuffer(binding.m_Buffer);
 		const auto* desc = m_Backend.GetDevice()->GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
@@ -842,7 +845,7 @@ namespace gglab
 		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
-		if (HasRecordingError())
+		if (!ValidateConstantBindingReadiness())
 		{
 			return;
 		}
@@ -877,7 +880,7 @@ namespace gglab
 	void DX12GraphicsCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
 		uint32_t startVertexLocation, uint32_t startInstanceLocation) noexcept
 	{
-		if (HasRecordingError())
+		if (!ValidateConstantBindingReadiness())
 		{
 			return;
 		}
@@ -958,6 +961,7 @@ namespace gglab
 
 	void DX12ComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
+		InvalidatePipelineBindings();
 		DX12PipelineState* pipelineState = nullptr;
 		DX12RootSignature* rootSignature = nullptr;
 		if (!m_PipelineSystem ||
@@ -993,6 +997,7 @@ namespace gglab
 				}
 			}
 		}
+		ConfirmBindingPipeline(pipeline);
 	}
 
 	void DX12ComputeCommandContext::SetDescriptorTable(
@@ -1013,6 +1018,7 @@ namespace gglab
 	bool DX12ComputeCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
+		InvalidateScopedConstant(parameterIndex);
 		DX12Buffer* buffer = m_Backend->GetDevice()->ResolveBuffer(binding.m_Buffer);
 		const auto* desc = m_Backend->GetDevice()->GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		if (!ValidateConstantBinding(binding) || !m_CurrentRootSignature ||
@@ -1111,7 +1117,7 @@ namespace gglab
 	void DX12ComputeCommandContext::Dispatch(
 		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
 	{
-		if (HasRecordingError())
+		if (!ValidateConstantBindingReadiness())
 		{
 			return;
 		}

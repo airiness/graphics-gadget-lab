@@ -17,6 +17,8 @@
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 
 #include <cstdint>
 #include <span>
@@ -83,14 +85,18 @@ namespace gglab
 		}
 
 		EnsureInitialized(services);
+		if (!m_IsInitialized)
+		{
+			return;
+		}
 		const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
 			AtmosphereResourcesName);
 		const bool physicalPreview =
 			environmentSettings.m_BackgroundMode != EnvironmentBackgroundMode::TextureEnvironment &&
 			context.m_RenderScene.m_Atmosphere && context.m_RenderScene.m_WorldSun &&
 			atmosphere && atmosphere->m_Constants.IsValid();
-		const auto constants = physicalPreview ?
-			atmosphere->m_Constants : context.m_FrameConstants.m_Scene;
+		const auto atmosphereSnapshot = physicalPreview ?
+			atmosphere->m_ConstantSnapshot : TypedConstantSnapshot<AtmosphereGPU>{};
 		auto* assetManager = services.m_TextureAssets;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
 		auto* bakeScheduler = services.m_Environment;
@@ -199,16 +205,19 @@ namespace gglab
 				data.m_EnvironmentTextureIndex = environmentTextureIndex;
 				data.m_EnvironmentSamplerIndex = environmentSamplerIndex;
 			},
-			[this, services, contextPtr, displayViewId, constants](
+			[this, services, contextPtr, displayViewId, atmosphereSnapshot](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
-				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_PhysicalPreview));
-				if (!commandContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+				auto bindings = data.m_PhysicalPreview ?
+					m_AtmosphereLayout.BeginRecording(*commandContext) :
+					ScopedConstantBindings<RHIGraphicsCommandContext>(*commandContext, m_SceneLayout, m_SceneReference);
+				if (!bindings.SetPipeline(GetOrCreatePSO(services, data.m_PhysicalPreview)) ||
+					!(data.m_PhysicalPreview ? m_AtmosphereLayout.Bind(bindings, atmosphereSnapshot) :
+						bindings.Bind(m_SceneReference, contextPtr->m_FrameConstants.m_SceneSnapshot)))
 				{
 					return;
 				}
@@ -276,7 +285,20 @@ namespace gglab
 		const auto vsId = shaderManager->LoadProgram(shader_programs::SkyboxVertex);
 		const auto psId = shaderManager->LoadProgram(shader_programs::SkyboxPixel);
 
-		m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
+		m_AtmosphereLayout = AtmosphereBindingLayout::Create(services);
+		const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
+		auto* rhi = services.m_Presentation->GetRHIContext();
+		if (!common || !rhi || !m_AtmosphereLayout.IsValid())
+		{
+			return;
+		}
+		m_SceneLayout = ResolvedRenderLayout::Create(rhi->GetPipelineSystem(), *common);
+		m_SceneReference = ResolvedBindingRef<SceneGPU>::Resolve(m_SceneLayout, scene_bindings::SceneConstants);
+		if (!m_SceneReference.IsValid())
+		{
+			return;
+		}
+		m_BaseRecipe.m_BindingLayout = m_SceneLayout.GetNativeLayout();
 		m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 		m_BaseRecipe.m_VSId = vsId;
 		m_BaseRecipe.m_PSId = psId;
@@ -291,18 +313,19 @@ namespace gglab
 		m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
 		m_BaseRecipe.m_DepthPreset = DepthPreset::ReversedZEqualReadOnly;
 		m_PhysicalPreviewRecipe = m_BaseRecipe;
+		m_PhysicalPreviewRecipe.m_BindingLayout = m_AtmosphereLayout.GetNativeLayout();
 		m_PhysicalPreviewRecipe.m_VSId = shaderManager->LoadProgram(shader_programs::PhysicalSkyPreviewVertex);
 		m_PhysicalPreviewRecipe.m_PSId = shaderManager->LoadProgram(shader_programs::PhysicalSkyPreviewPixel);
 		m_IsInitialized = true;
 	}
 
-	RHIPipelineHandle RenderPassSkybox::GetOrCreatePSO(const RenderServices& services,
+	ResolvedRenderPipeline RenderPassSkybox::GetOrCreatePSO(const RenderServices& services,
 		bool physicalPreview) noexcept
 	{
 		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return physicalPreview ?
-			pipelineCache->Resolve(m_PhysicalPreviewPipelineSlot, m_PhysicalPreviewRecipe, GetInfo()) :
-			pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
+			m_AtmosphereLayout.ResolvePipeline(*pipelineCache, m_PhysicalPreviewPipelineSlot, m_PhysicalPreviewRecipe, GetInfo()) :
+			m_SceneLayout.Resolve(*pipelineCache, m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}
 }

@@ -1,5 +1,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -228,6 +230,46 @@ namespace gglab
 	const ComposedLayout* ResolvedRenderLayout::GetContract() const noexcept
 	{
 		return m_Contract.get();
+	}
+
+	RHIPipelineHandle ResolvedRenderPipeline::GetHandle(const ResolvedRenderLayout& layout, bool compute) const noexcept
+	{
+		const auto contract = m_Contract.lock();
+		return contract && contract.get() == layout.GetContract() && m_IsCompute == compute ?
+			m_Pipeline : RHIPipelineHandle{};
+	}
+
+	ResolvedRenderPipeline ResolvedRenderLayout::Resolve(RenderPipelineResolver& resolver,
+		GraphicsPipelineSlot& slot, const GraphicsPhysicalPipelineKey& recipe,
+		const RenderPassInfo& info) const noexcept
+	{
+		ResolvedRenderPipeline result;
+		if (IsValid() && recipe.m_BindingLayout == m_NativeLayout)
+		{
+			result.m_Pipeline = resolver.Resolve(slot, recipe, info);
+			if (result.m_Pipeline.IsValid())
+			{
+				result.m_Contract = m_Contract;
+			}
+		}
+		return result;
+	}
+
+	ResolvedRenderPipeline ResolvedRenderLayout::Resolve(RenderPipelineResolver& resolver,
+		ComputePipelineSlot& slot, const ComputePipelineRecipe& recipe,
+		const RenderPassInfo& info) const noexcept
+	{
+		ResolvedRenderPipeline result;
+		result.m_IsCompute = true;
+		if (IsValid() && recipe.m_BindingLayout == m_NativeLayout)
+		{
+			result.m_Pipeline = resolver.Resolve(slot, recipe, info);
+			if (result.m_Pipeline.IsValid())
+			{
+				result.m_Contract = m_Contract;
+			}
+		}
+		return result;
 	}
 
 	LayoutCompositionResult ComposeLayoutFragments(std::span<const LayoutFragment> fragments,

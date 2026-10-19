@@ -62,7 +62,7 @@ namespace gglab
 			bool m_MaterialDiagnostics = false;
 		};
 
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePSOForVariant(const RenderServices& services,
+		[[nodiscard]] ResolvedRenderPipeline GetOrCreatePSOForVariant(const RenderServices& services,
 			uint64_t variantBits, const OutputVariant& output) noexcept;
 
 		static constexpr size_t LightingRecipeCount = static_cast<size_t>(LightingRecipe::Count);

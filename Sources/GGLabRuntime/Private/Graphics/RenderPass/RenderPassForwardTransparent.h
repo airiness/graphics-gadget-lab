@@ -39,7 +39,7 @@ namespace gglab
 			const RenderServices& services, uint64_t variantBits) noexcept;
 
 	private:
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePSOForVariant(const RenderServices& services,
+		[[nodiscard]] ResolvedRenderPipeline GetOrCreatePSOForVariant(const RenderServices& services,
 			uint64_t variantBits, bool materialDiagnostics) noexcept;
 
 		// Indexed by material diagnostics output.

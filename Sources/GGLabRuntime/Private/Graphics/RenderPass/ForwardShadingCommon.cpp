@@ -264,7 +264,8 @@ namespace gglab::forward_shading
 	bool BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
 		const SceneInputs& inputs, const RenderQueue& renderQueue,
-		const ForwardBindingLayout& layout) noexcept
+		const ForwardBindingLayout& layout,
+		ScopedConstantBindings<RHIGraphicsCommandContext>& constants) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(inputs.m_RasterDomain);
 		GGLAB_ASSERT_MSG(inputs.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain) ||
@@ -274,7 +275,7 @@ namespace gglab::forward_shading
 		graphicsContext.SetScissorRect(inputs.m_RasterDomain->m_Scissor);
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-		if (!layout.BindFrameConstants(graphicsContext, context.m_FrameConstants.m_SceneSnapshot,
+		if (!layout.BindFrameConstants(constants, context.m_FrameConstants.m_SceneSnapshot,
 			context.m_FrameConstants.m_DirectionalShadowSnapshot))
 		{
 			return false;

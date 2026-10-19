@@ -64,17 +64,22 @@ namespace gglab
 		auto* atmosphere = &access;
 		if (!m_Recipe.m_CSId.IsValid())
 		{
+			m_BindingLayout = AtmosphereBindingLayout::Create(services);
+			if (!m_BindingLayout.IsValid())
+			{
+				return;
+			}
 			m_Recipe.m_CSId = services.m_ShaderPrograms->LoadProgram(shader_programs::AtmosphereLutCompute);
-			m_Recipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
+			m_Recipe.m_BindingLayout = m_BindingLayout.GetNativeLayout();
 		}
-		const auto pipeline = services.m_PipelineResolver->Resolve(m_Slot, m_Recipe, GetInfo());
+		const auto pipeline = m_BindingLayout.ResolvePipeline(*services.m_PipelineResolver, m_Slot, m_Recipe, GetInfo());
 		if (!pipeline.IsValid())
 		{
 			atmosphere->Disable();
 			return;
 		}
 		const uint64_t generation = services.m_ShaderPrograms->GetGeneration(m_Recipe.m_CSId);
-		const auto constants = context.m_Uploads.UploadConstants(parameters);
+		const auto constants = TypedConstantSnapshot<AtmosphereGPU>::Upload(context.m_Uploads, parameters);
 		if (!constants.IsValid())
 		{
 			// Upload failure discards the frame; preserve the instance's previously valid LUTs.
@@ -89,7 +94,8 @@ namespace gglab
 		const auto names = bake ? BakeAtmosphereLutNames : AtmosphereLutNames;
 		auto& resources = rg.GetBlackboard().Create<RGAtmosphereResources>(resourceName);
 		resources.m_Diagnostics = diagnostics;
-		resources.m_Constants = constants;
+		resources.m_Constants = constants.GetBinding();
+		resources.m_ConstantSnapshot = constants;
 		rg.AddPass<SetupData>(bake ? "IBL.Atmosphere.Import" : "Atmosphere.Import",
 			[atmosphere, resourceName, names](RenderGraph::RGBuilder& builder, SetupData&)
 			{
@@ -127,7 +133,7 @@ namespace gglab
 						data.m_Multiple = builder.CreateView<RHITextureViewType::ShaderResource>(source);
 					}
 				},
-				[atmosphere, constants, stage, pipeline, sampler](RGExecuteContext& execute, PassData& data)
+				[this, atmosphere, constants, stage, pipeline, sampler](RGExecuteContext& execute, PassData& data)
 				{
 					auto* command = execute.GetDirectComputeCommandContext();
 					Parameters parameters{};
@@ -144,9 +150,8 @@ namespace gglab
 					parameters.m_Stage = stage;
 					parameters.m_Width = AtmosphereLutWidths[stage];
 					parameters.m_Height = AtmosphereLutHeights[stage];
-					command->SetPipeline(pipeline);
-					if (!command->SetConstantBuffer(
-						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+					auto bindings = m_BindingLayout.BeginRecording(*command);
+					if (!bindings.SetPipeline(pipeline) || !m_BindingLayout.Bind(bindings, constants))
 					{
 						return;
 					}

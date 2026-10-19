@@ -36,12 +36,11 @@ namespace gglab
 		return result;
 	}
 
-	bool ForwardBindingLayout::BindFrameConstants(RHIGraphicsCommandContext& context,
+	bool ForwardBindingLayout::BindFrameConstants(ScopedConstantBindings<RHIGraphicsCommandContext>& scope,
 		const TypedConstantSnapshot<SceneGPU>& scene,
 		const TypedConstantSnapshot<DirectionalShadowGPU>& shadow) const noexcept
 	{
-		return BindConstantSnapshot(context, m_Layout, m_Scene, scene) &&
-			BindConstantSnapshot(context, m_Layout, m_Shadow, shadow);
+		return scope.Bind(m_Scene, scene) && scope.Bind(m_Shadow, shadow);
 	}
 
 	bool ForwardBindingLayout::BindTileLists(RHIGraphicsCommandContext& context,

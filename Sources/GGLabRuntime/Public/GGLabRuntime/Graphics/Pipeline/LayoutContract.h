@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/TypedIndex.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 
 #include <array>
 #include <cstdint>
@@ -13,6 +14,13 @@
 namespace gglab
 {
 	class RHIPipelineSystem;
+	class RenderPipelineResolver;
+	class ResolvedRenderLayout;
+	struct GraphicsPipelineSlot;
+	struct GraphicsPhysicalPipelineKey;
+	struct ComputePipelineSlot;
+	struct ComputePipelineRecipe;
+	struct RenderPassInfo;
 	template <typename T>
 	class ResolvedBindingRef;
 	// Process-local domain keys, independent of shader registers and native parameters.
@@ -112,6 +120,21 @@ namespace gglab
 		[[nodiscard]] bool IsSuccess() const noexcept { return m_Layout.has_value(); }
 	};
 
+	// Produced with the checked layout recipe, never by labeling an arbitrary raw
+	// pipeline handle. Native cache reuse does not erase the logical association.
+	class ResolvedRenderPipeline final
+	{
+	public:
+		[[nodiscard]] bool IsValid() const noexcept { return m_Pipeline.IsValid() && !m_Contract.expired(); }
+		[[nodiscard]] RHIPipelineHandle GetHandle(const ResolvedRenderLayout& layout, bool compute) const noexcept;
+
+	private:
+		friend class ResolvedRenderLayout;
+		RHIPipelineHandle m_Pipeline{};
+		std::weak_ptr<const ComposedLayout> m_Contract;
+		bool m_IsCompute = false;
+	};
+
 	// Owns logical metadata independently of backend native-layout deduplication.
 	// The backend retains ownership of the native handle's lifetime.
 	class ResolvedRenderLayout final
@@ -121,6 +144,12 @@ namespace gglab
 			const ComposedLayout& contract, const char* debugName = nullptr) noexcept;
 		[[nodiscard]] bool IsValid() const noexcept { return m_Contract != nullptr; }
 		[[nodiscard]] const ComposedLayout* GetContract() const noexcept;
+		[[nodiscard]] ResolvedRenderPipeline Resolve(RenderPipelineResolver& resolver,
+			GraphicsPipelineSlot& slot, const GraphicsPhysicalPipelineKey& recipe,
+			const RenderPassInfo& info) const noexcept;
+		[[nodiscard]] ResolvedRenderPipeline Resolve(RenderPipelineResolver& resolver,
+			ComputePipelineSlot& slot, const ComputePipelineRecipe& recipe,
+			const RenderPassInfo& info) const noexcept;
 		[[nodiscard]] RHIBindingLayoutHandle GetNativeLayout() const noexcept
 		{
 			return IsValid() ? m_NativeLayout : RHIBindingLayoutHandle{};

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
+#include "GGLabRuntime/Graphics/Pipeline/ScopedConstantBindings.h"
 
 #include <cstdint>
 #include <optional>
@@ -14,7 +15,18 @@ namespace gglab
 			const ComposedLayout& common, bool forwardPlusLightLists) noexcept;
 		[[nodiscard]] bool IsValid() const noexcept { return m_Layout.IsValid(); }
 		[[nodiscard]] RHIBindingLayoutHandle GetNativeLayout() const noexcept { return m_Layout.GetNativeLayout(); }
-		[[nodiscard]] bool BindFrameConstants(RHIGraphicsCommandContext& context,
+		[[nodiscard]] ResolvedRenderPipeline ResolvePipeline(RenderPipelineResolver& resolver,
+			GraphicsPipelineSlot& slot, const GraphicsPhysicalPipelineKey& recipe,
+			const RenderPassInfo& info) const noexcept
+		{
+			return m_Layout.Resolve(resolver, slot, recipe, info);
+		}
+		[[nodiscard]] ScopedConstantBindings<RHIGraphicsCommandContext> BeginRecording(
+			RHIGraphicsCommandContext& context) const noexcept
+		{
+			return ScopedConstantBindings<RHIGraphicsCommandContext>(context, m_Layout, m_Scene, m_Shadow);
+		}
+		[[nodiscard]] bool BindFrameConstants(ScopedConstantBindings<RHIGraphicsCommandContext>& scope,
 			const TypedConstantSnapshot<SceneGPU>& scene,
 			const TypedConstantSnapshot<DirectionalShadowGPU>& shadow) const noexcept;
 		// Buffers remain declared RenderGraph inputs; this only records their existing bindings.

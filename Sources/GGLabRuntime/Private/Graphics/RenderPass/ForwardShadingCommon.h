@@ -131,14 +131,18 @@ namespace gglab::forward_shading
 	[[nodiscard]] bool BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
 		const SceneInputs& inputs, const RenderQueue& renderQueue,
-		const ForwardBindingLayout& layout) noexcept;
+		const ForwardBindingLayout& layout,
+		ScopedConstantBindings<RHIGraphicsCommandContext>& constants) noexcept;
 
 	// Draws the bucket ranges with the exact draw packets accepted by the frame plan.
 	template <typename ResolvePipeline>
 	void DrawBuckets(RHIGraphicsCommandContext& graphicsContext, const RenderQueue& renderQueue,
 		std::span<const RenderBucket> buckets, const RenderQueue* expectedRenderQueue,
+		const ForwardBindingLayout& layout, const RenderFrameConstantBindings& frameConstants,
+		ScopedConstantBindings<RHIGraphicsCommandContext>& constants,
 		ResolvePipeline&& resolvePipeline) noexcept
 	{
+		GGLAB_UNUSED(expectedRenderQueue);
 		GGLAB_ASSERT_MSG(renderQueue.m_CoverageRasterDomain.IsValid(),
 			"Forward depth coverage requires one valid raster domain per view.");
 		for (const RenderBucket bucket : buckets)
@@ -161,7 +165,12 @@ namespace gglab::forward_shading
 
 				if (drawItem.m_VariantBits != lastVariantBits)
 				{
-					graphicsContext.SetPipeline(resolvePipeline(drawItem.m_VariantBits));
+					if (!constants.SetPipeline(resolvePipeline(drawItem.m_VariantBits)) ||
+						!layout.BindFrameConstants(constants, frameConstants.m_SceneSnapshot,
+							frameConstants.m_DirectionalShadowSnapshot))
+					{
+						return;
+					}
 					lastVariantBits = drawItem.m_VariantBits;
 				}
 

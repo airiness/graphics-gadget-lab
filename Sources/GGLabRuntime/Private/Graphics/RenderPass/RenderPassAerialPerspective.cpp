@@ -135,16 +135,21 @@ namespace gglab
 		}
 		if (!m_BuildRecipe.m_CSId.IsValid())
 		{
+			m_BindingLayout = AtmosphereBindingLayout::Create(services);
+			if (!m_BindingLayout.IsValid())
+			{
+				return;
+			}
 			m_BuildRecipe.m_CSId = services.m_ShaderPrograms->LoadProgram(
 				shader_programs::AerialPerspectiveBuildCompute);
 			m_CompositeRecipe.m_CSId = services.m_ShaderPrograms->LoadProgram(
 				shader_programs::AerialPerspectiveCompositeCompute);
-			m_BuildRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
+			m_BuildRecipe.m_BindingLayout = m_BindingLayout.GetNativeLayout();
 			m_CompositeRecipe.m_BindingLayout = m_BuildRecipe.m_BindingLayout;
 		}
-		const RHIPipelineHandle buildPipeline = services.m_PipelineResolver->Resolve(
+		const auto buildPipeline = m_BindingLayout.ResolvePipeline(*services.m_PipelineResolver,
 			m_BuildSlot, m_BuildRecipe, GetInfo());
-		const RHIPipelineHandle compositePipeline = services.m_PipelineResolver->Resolve(
+		const auto compositePipeline = m_BindingLayout.ResolvePipeline(*services.m_PipelineResolver,
 			m_CompositeSlot, m_CompositeRecipe, GetInfo());
 		if (!buildPipeline.IsValid() || !compositePipeline.IsValid())
 		{
@@ -166,7 +171,7 @@ namespace gglab
 		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const Vector3 sunDirection = -context.m_RenderScene.m_WorldSun->m_Direction;
 		const auto viewsBinding = context.m_FrameConstants.m_Views;
-		const auto constants = atmosphereResources->m_Constants;
+		const auto constants = atmosphereResources->m_ConstantSnapshot;
 		const auto channel = PostProcessPreviewChannel::Atmosphere;
 		const bool previewRequested = services.m_Resources->IsPostProcessPreviewRequested(channel);
 		const PostProcessDebugTap selectedTap = previewRequested ?
@@ -204,7 +209,7 @@ namespace gglab
 				data.m_ThroughputOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(
 					resources.m_ThroughputAtlas);
 			},
-			[services, constants, viewsBinding, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
+			[this, services, constants, viewsBinding, buildPipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, sunDirection]
 			(RGExecuteContext& execute, BuildPassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
@@ -219,9 +224,8 @@ namespace gglab
 				parameters.m_GridHeight = gridHeight;
 				parameters.m_MaxDistanceKm = maxDistanceKm;
 				parameters.m_SunDirection = sunDirection;
-				command->SetPipeline(buildPipeline);
-				if (!command->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+				auto bindings = m_BindingLayout.BeginRecording(*command);
+				if (!bindings.SetPipeline(buildPipeline) || !m_BindingLayout.Bind(bindings, constants))
 				{
 					return;
 				}
@@ -312,7 +316,7 @@ namespace gglab
 						resources.m_Diagnostic);
 				}
 			},
-			[services, &context, constants, viewsBinding, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
+			[this, services, &context, constants, viewsBinding, compositePipeline, gridWidth, gridHeight, maxDistanceKm, viewIndex, samplerIndex, diagnosticMode]
 			(RGExecuteContext& execute, CompositePassData& data)
 			{
 				auto* command = execute.GetDirectComputeCommandContext();
@@ -334,9 +338,8 @@ namespace gglab
 				parameters.m_Width = context.GetDisplayRenderView().m_Width;
 				parameters.m_Height = context.GetDisplayRenderView().m_Height;
 				parameters.m_DiagnosticMode = diagnosticMode;
-				command->SetPipeline(compositePipeline);
-				if (!command->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB), constants))
+				auto bindings = m_BindingLayout.BeginRecording(*command);
+				if (!bindings.SetPipeline(compositePipeline) || !m_BindingLayout.Bind(bindings, constants))
 				{
 					return;
 				}

@@ -292,10 +292,14 @@ namespace gglab
 					{
 						return GetOrCreatePSOForVariant(services, variantBits, output);
 					};
-				graphicsContext->SetPipeline(
-					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
+				auto constants = m_BindingLayout.BeginRecording(*graphicsContext);
+				if (!constants.SetPipeline(
+					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits)))
+				{
+					return;
+				}
 				if (!forward_shading::BindSceneResources(
-					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_BindingLayout))
+					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_BindingLayout, constants))
 				{
 					return;
 				}
@@ -315,7 +319,8 @@ namespace gglab
 				}
 
 				forward_shading::DrawBuckets(*graphicsContext, renderQueue, OpaqueBuckets,
-					data.m_Scene.m_ExpectedRenderQueue, resolvePipeline);
+					data.m_Scene.m_ExpectedRenderQueue, m_BindingLayout, contextPtr->m_FrameConstants,
+					constants, resolvePipeline);
 			});
 	}
 
@@ -329,7 +334,7 @@ namespace gglab
 			}).IsValid();
 	}
 
-	RHIPipelineHandle RenderPassForwardOpaque::GetOrCreatePSOForVariant(const RenderServices& services,
+	ResolvedRenderPipeline RenderPassForwardOpaque::GetOrCreatePSOForVariant(const RenderServices& services,
 		uint64_t variantBits, const OutputVariant& output) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
@@ -352,7 +357,8 @@ namespace gglab
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slots = output.m_MaterialDiagnostics ? *m_MaterialDiagnosticPipelineSlots : m_PipelineSlots;
-		return pipelineCache->Resolve(slots[lighting][contribution][slotIndex], physicalKey, GetInfo());
+		return m_BindingLayout.ResolvePipeline(
+			*pipelineCache, slots[lighting][contribution][slotIndex], physicalKey, GetInfo());
 	}
 
 	std::optional<DepthCoveragePipelineSignature> RenderPassForwardOpaque::

@@ -8,6 +8,7 @@ namespace gglab::scene_bindings
 	inline constexpr LayoutBindingKey PassParameters{ 0x102 };
 	inline constexpr LayoutBindingKey InlineParameters{ 0x103 };
 	inline constexpr LayoutBindingKey DirectionalShadow{ 0x104 };
+	inline constexpr LayoutBindingKey LegacyAtmosphereConstants{ 0x105 };
 	inline constexpr LayoutBindingKey ObjectTable{ 0x200 };
 	inline constexpr LayoutBindingKey MaterialTable{ 0x201 };
 	inline constexpr LayoutBindingKey ViewTable{ 0x202 };
