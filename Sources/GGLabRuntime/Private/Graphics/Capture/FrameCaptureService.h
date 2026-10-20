@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Capture/CapturePayloadBudget.h"
+#include "Graphics/Capture/CaptureProducers.h"
 #include "Graphics/Capture/FencedReadback.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
@@ -59,7 +60,7 @@ namespace gglab
 			uint64_t groupId = 0, bool deferFrameOnBusy = false) noexcept override;
 		bool EnableNonFiniteProduction() noexcept
 		{
-			if (m_Limits.m_MaxPayloads < 2 || ProductionPayloadBytes + ProductionCpuBytes > m_Limits.m_MaxPayloadBytes)
+			if (m_Limits.m_MaxPayloads < 2 || ProductionCaptureProducer::MinimumBytes > m_Limits.m_MaxPayloadBytes)
 			{
 				return false;
 			}
@@ -144,40 +145,17 @@ namespace gglab
 			bool m_IncludeGraph = false;
 		};
 
-		struct ExportReadback
-		{
-			RGObservationCopy m_Copy;
-			RHIBufferOwner m_Buffer;
-			ResourceExportArray m_Array;
-			uint64_t m_CpuBytes = 0;
-		};
-
-		struct ScanReadback
-		{
-			RGObservationScan m_Scan;
-			RHIBufferOwner m_Buffer;
-			RHIBufferOwner m_Components;
-			NonFiniteScanBoundary m_Boundary;
-			// GPU record/readback, peak CPU record copies, and the upload plus
-			// two owned CPU layout tables. Metadata objects are not payload bytes.
-			[[nodiscard]] uint64_t GetPayloadBytes() const noexcept
-			{
-				return 4 * sizeof(NonFiniteScanRecord) + 3 * m_Scan.m_ComponentBytes;
-			}
-		};
-
 		struct Tap
 		{
 			uint64_t m_FrameSerial = 0;
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 			std::vector<QueuedRequest> m_Requests;
-			CapturePayloadBudget::Lease m_ImageBudget;
+			CapturePayloadBudget::Lease m_PayloadLease;
 			FencedReadback m_Readback;
-			RHIBufferOwner m_ProductionBuffer;
-			std::shared_ptr<RGSnapshot> m_Graph;
-			std::vector<ExportReadback> m_ExportReadbacks;
-			std::vector<ScanReadback> m_ScanReadbacks;
+			std::shared_ptr<GraphCaptureProducer> m_Graph;
+			ResourceCaptureProducer m_Resources;
+			ScanCaptureProducer m_Scans;
 			std::string m_AdapterCompatibilityIdentity;
 			RHITextureCopyFootprint m_Footprint{};
 			bool m_ProductionCounters = false;
@@ -186,30 +164,15 @@ namespace gglab
 			bool m_NonFiniteScanActive = false;
 		};
 
-		struct RetainedExport
-		{
-			std::weak_ptr<const ResourceExportPayload> m_Payload;
-			uint64_t m_Bytes = 0;
-			uint32_t m_Slots = 0;
-		};
-		struct RetainedScan
-		{
-			std::weak_ptr<const NonFiniteScanPayload> m_Payload;
-			uint64_t m_Bytes = 0;
-			uint32_t m_Slots = 0;
-		};
 		[[nodiscard]] RGObservationFailure PrepareScanTarget(RenderGraph& graph,
-			const NonFiniteScanTarget& target, ScanReadback& readback) noexcept;
-		[[nodiscard]] bool AllocateScanReadback(ScanReadback& readback) noexcept;
+			const NonFiniteScanTarget& target, ScanCaptureReadback& readback) noexcept;
+		[[nodiscard]] bool AllocateScanReadback(ScanCaptureReadback& readback, FencedReadback& storage) noexcept;
 		[[nodiscard]] RHIPipelineHandle ResolveScanPipeline(uint32_t variant) noexcept;
 		void PublishScanTap(Tap& tap) noexcept;
 		bool PrepareProductionCounters(uint64_t frameSerial, Tap& tap, RGProductionCounters& counters) noexcept;
 		void PublishProductionTap(Tap& tap) noexcept;
 		void PublishProductionFrame(std::shared_ptr<const NonFiniteProductionFrame> frame) noexcept;
 		std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_ProductionResults;
-		static constexpr uint64_t ProductionCpuBytes = nonfinite::SiteCount * nonfinite::ProgramCount * sizeof(NonFiniteProductionSite);
-		static constexpr uint64_t ProductionPayloadBytes = nonfinite::BufferBytes * 3 + ProductionCpuBytes;
-		std::vector<std::weak_ptr<const NonFiniteProductionFrame>> m_RetainedProduction;
 		bool m_ProductionEnabled = false;
 		std::optional<NonFiniteInjection> m_NonFiniteInjection;
 		ComputePipelineRecipe m_ProductionClearRecipe;
@@ -238,9 +201,8 @@ namespace gglab
 		std::vector<QueuedRequest> m_Queued;
 		std::vector<Tap> m_Taps;
 		std::vector<FrameCaptureResult> m_Results;
-		CapturePayloadBudget m_ImageBudget;
-		std::vector<RetainedExport> m_RetainedExports;
-		std::vector<RetainedScan> m_RetainedScans;
+		CapturePayloadBudget m_PayloadBudget;
+		CapturePayloadBudget m_ProductionBudget;
 		RenderShaderProgramAccess* m_ScanShaders = nullptr;
 		RenderPipelineResolver* m_ScanResolver = nullptr;
 		RHIPipelineSystem* m_ScanPipelineSystem = nullptr;

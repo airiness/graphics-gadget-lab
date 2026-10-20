@@ -7,10 +7,8 @@
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 
 #include <array>
-#include <cstddef>
 #include <memory>
 #include <iterator>
-#include <span>
 #include <utility>
 
 namespace gglab
@@ -53,12 +51,7 @@ namespace gglab
 		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		tap.m_ProductionCounters = true;
 		tap.m_NonFiniteScanActive = true;
-		tap.m_ProductionBuffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({
-			.m_SizeInBytes = nonfinite::BufferBytes,
-			.m_Usage = RHIBufferUsage::CopyDest,
-			.m_MemoryUsage = RHIMemoryUsage::GpuToCpu,
-			.m_DebugName = "NonFiniteCounters.Readback" }));
-		if (!tap.m_ProductionBuffer)
+		if (!ProductionCaptureProducer::Allocate(*m_Device, tap.m_Readback))
 		{
 			return false;
 		}
@@ -73,7 +66,7 @@ namespace gglab
 			constants[5] = m_NonFiniteInjection->m_Y;
 			constants[6] = m_NonFiniteInjection->m_Component;
 		}
-		counters = { .m_Readback = tap.m_ProductionBuffer.Get(),
+		counters = { .m_Readback = tap.m_Readback.GetBuffer(),
 			.m_Bytes = nonfinite::BufferBytes,
 			.m_Binding = nonfinite::CounterBinding,
 			.m_Clear = [pipeline, constants](RGExecuteContext& context, RGBufferId record)
@@ -99,7 +92,6 @@ namespace gglab
 
 	void FrameCaptureService::PublishProductionFrame(std::shared_ptr<const NonFiniteProductionFrame> frame) noexcept
 	{
-		m_RetainedProduction.push_back(frame);
 		m_ProductionResults.push_back(frame);
 		m_LatestProduction = std::move(frame);
 	}
@@ -113,21 +105,7 @@ namespace gglab
 
 	void FrameCaptureService::PublishProductionTap(Tap& tap) noexcept
 	{
-		auto frame = std::make_shared<NonFiniteProductionFrame>();
-		frame->m_FrameSerial = tap.m_FrameSerial;
-		const auto* mapped = static_cast<const uint32_t*>(m_Device->MapBuffer(tap.m_ProductionBuffer.Get(), { 0, nonfinite::BufferBytes }));
-		if (!mapped)
-		{
-			frame->m_Failure = "Production counter readback mapping failed.";
-			PublishProductionFrame(std::move(frame));
-			return;
-		}
-		*frame = DecodeNonFiniteProductionFrame(std::span(reinterpret_cast<const std::byte*>(mapped), nonfinite::BufferBytes), tap.m_FrameSerial);
-		m_Device->UnmapBuffer(tap.m_ProductionBuffer.Get(), {});
-		frame->m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index();
-		frame->m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation();
-		frame->m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value;
-		frame->m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity;
-		PublishProductionFrame(std::move(frame));
+		PublishProductionFrame(ProductionCaptureProducer::ReadProduct(
+			*m_Device, tap.m_Readback, tap.m_PayloadLease, tap.m_FrameSerial));
 	}
 }

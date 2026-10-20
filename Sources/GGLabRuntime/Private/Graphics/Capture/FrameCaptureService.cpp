@@ -1,4 +1,5 @@
 #include "Graphics/Capture/FrameCaptureService.h"
+#include "Graphics/Capture/CaptureProduct.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -16,16 +17,6 @@
 
 namespace gglab
 {
-	namespace
-	{
-		struct BudgetedCaptureImage
-		{
-			// Destroy the pixels before returning their credit to another admission.
-			CapturePayloadBudget::Lease m_Lease;
-			FrameCaptureImage m_Image;
-		};
-	}
-
 	FrameCaptureService::FrameCaptureService(RHIDevice& device, FrameCaptureLimits limits) noexcept :
 		m_Device(std::addressof(device)), m_Limits(limits)
 	{
@@ -236,8 +227,11 @@ namespace gglab
 		}
 		const uint64_t requiredBytes = footprint.m_SizeInBytes + imageBytes;
 		const auto [usedBytes, payloads] = GetPayloadUsage();
+		// Failure reports can retain CPU credit beside unread GPU work. Saturation
+		// must not wrap remaining-byte arithmetic or authorize another allocation.
 		return payloads >= m_Limits.m_MaxPayloads ||
 			GetUnfinishedRequestCount() + m_Results.size() >= m_Limits.m_MaxRequests ||
+			usedBytes > m_Limits.m_MaxPayloadBytes ||
 			requiredBytes > m_Limits.m_MaxPayloadBytes - usedBytes ?
 				FrameCaptureAvailability::Busy :
 				FrameCaptureAvailability::Available;
@@ -308,7 +302,7 @@ namespace gglab
 		}
 		// Only this owner admits work. Concurrent CPU consumers can only release credit
 		// between the aggregate availability check and this reservation.
-		tap.m_ImageBudget = m_ImageBudget.Reserve(tap.m_Footprint.m_SizeInBytes +
+		tap.m_PayloadLease = m_PayloadBudget.Reserve(tap.m_Footprint.m_SizeInBytes +
 			tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height, 1);
 
 		const RHIBufferDesc bufferDesc{
@@ -361,13 +355,11 @@ namespace gglab
 		{
 			return;
 		}
-		tap.m_Graph = std::make_shared<RGSnapshot>();
-		BuildRenderGraphSnapshot(graph, *tap.m_Graph);
+		tap.m_Graph = std::make_shared<GraphCaptureProducer>(graph);
 		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		tap.m_ResourceExportActive = graph.HasResourceObservations();
 		tap.m_NonFiniteScanActive = graph.HasNonFiniteScans();
 		tap.m_GraphExportActive = true;
-		graph.EnableExecutionRecord();
 		for (auto& consumer : m_Taps)
 		{
 			if (consumer.m_FrameSerial == frameSerial)
@@ -407,7 +399,7 @@ namespace gglab
 		{
 			if (tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Readback.IsSubmitted())
 			{
-				tap.m_Graph->m_Execution = std::move(*record);
+				tap.m_Graph->Finish(std::move(*record));
 				break; // All graph consumers of this frame share this immutable snapshot.
 			}
 		}
@@ -610,9 +602,8 @@ namespace gglab
 		Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept
 	{
 		PublishTapFailure(tap, frameSerial, failure);
-		tap.m_Readback.ReleaseBuffer();
-		tap.m_ImageBudget.Reset();
-		tap.m_ProductionBuffer.Reset();
+		tap.m_Readback.ReleaseBuffers();
+		tap.m_PayloadLease.Reset();
 	}
 
 	void FrameCaptureService::PublishTapFailure(
@@ -620,10 +611,12 @@ namespace gglab
 	{
 		if (tap.m_ProductionCounters)
 		{
-			auto frame = std::make_shared<NonFiniteProductionFrame>();
-			frame->m_FrameSerial = frameSerial;
-			frame->m_Failure = failure;
-			PublishProductionFrame(std::move(frame));
+			NonFiniteProductionFrame frame;
+			frame.m_FrameSerial = frameSerial;
+			frame.m_Failure = failure;
+			// Failure reports retain the existing CPU charge independently of unknown GPU work.
+			PublishProductionFrame(MakeCaptureProduct(std::move(frame),
+				m_ProductionBudget.Reserve(ProductionCaptureProducer::CpuBytes, 1)));
 		}
 		for (const QueuedRequest& request : tap.m_Requests)
 		{
@@ -654,7 +647,7 @@ namespace gglab
 		}
 		if (tap.m_Graph)
 		{
-			if (!tap.m_Graph->m_Execution.m_Recorded)
+			if (!tap.m_Graph->IsRecorded())
 			{
 				FailTap(tap, tap.m_FrameSerial, "The requested graph did not execute.");
 				return;
@@ -666,7 +659,7 @@ namespace gglab
 					.m_Source = tap.m_Source,
 					.m_Status = FrameCaptureStatus::Completed,
 					.m_FrameSerial = tap.m_FrameSerial,
-					.m_Graph = tap.m_Graph,
+					.m_Graph = tap.m_Graph ? tap.m_Graph->GetProduct() : nullptr,
 					.m_GraphExportActive = tap.m_GraphExportActive,
 					.m_ResourceExportActive = tap.m_ResourceExportActive,
 					.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
@@ -680,8 +673,7 @@ namespace gglab
 			return;
 		}
 		const RHITextureCopyFootprint& footprint = tap.m_Footprint;
-		auto payload = std::make_shared<BudgetedCaptureImage>();
-		FrameCaptureImage& image = payload->m_Image;
+		FrameCaptureImage image;
 		image.m_Format = footprint.m_Format;
 		image.m_Width = footprint.m_Width;
 		image.m_Height = footprint.m_Height;
@@ -695,10 +687,9 @@ namespace gglab
 			FailTap(tap, tap.m_FrameSerial, "The completed readback buffer could not be mapped.");
 			return;
 		}
-		tap.m_Readback.ReleaseBuffer();
-		tap.m_ImageBudget.ReduceTo(image.m_Pixels.size());
-		payload->m_Lease = std::move(tap.m_ImageBudget);
-		const std::shared_ptr<const FrameCaptureImage> sharedImage(payload, &image);
+		tap.m_Readback.ReleaseBuffers();
+		tap.m_PayloadLease.ReduceTo(image.m_Pixels.size());
+		const auto sharedImage = MakeCaptureProduct(std::move(image), std::move(tap.m_PayloadLease));
 		for (const QueuedRequest& request : tap.m_Requests)
 		{
 			m_Results.push_back({

@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -86,7 +85,7 @@ namespace gglab
 	}
 
 	RGObservationFailure FrameCaptureService::PrepareScanTarget(RenderGraph& graph,
-		const NonFiniteScanTarget& request, ScanReadback& readback) noexcept
+		const NonFiniteScanTarget& request, ScanCaptureReadback& readback) noexcept
 	{
 		auto& boundary = readback.m_Boundary;
 		boundary.m_Target = graph.ResolveObservation(request.m_Address, RGObservationKind::NonFiniteScan);
@@ -174,7 +173,7 @@ namespace gglab
 		return RGObservationFailure::None;
 	}
 
-	bool FrameCaptureService::AllocateScanReadback(ScanReadback& readback) noexcept
+	bool FrameCaptureService::AllocateScanReadback(ScanCaptureReadback& readback, FencedReadback& storage) noexcept
 	{
 		const auto clear = ResolveScanPipeline(0);
 		const bool buffer = readback.m_Boundary.m_Target.m_Type == RGResourceType::RGBuffer;
@@ -183,31 +182,10 @@ namespace gglab
 		{
 			return false;
 		}
-		readback.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = sizeof(NonFiniteScanRecord),
-			.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu, .m_DebugName = "NonFiniteScan.Readback" }));
-		if (!readback.m_Buffer)
+		if (!readback.Allocate(*m_Device, storage))
 		{
 			return false;
 		}
-		if (buffer)
-		{
-			readback.m_Components = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = readback.m_Scan.m_ComponentBytes,
-				.m_StrideInBytes = sizeof(NonFiniteBufferComponent), .m_Usage = RHIBufferUsage::Structured,
-				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu, .m_DebugName = "NonFiniteScan.Components" }));
-			if (!readback.m_Components)
-			{
-				return false;
-			}
-			void* mapped = m_Device->MapBuffer(readback.m_Components.Get(), {});
-			if (!mapped)
-			{
-				return false;
-			}
-			std::memcpy(mapped, readback.m_Boundary.m_BufferLayout.m_Components.data(), static_cast<size_t>(readback.m_Scan.m_ComponentBytes));
-			m_Device->UnmapBuffer(readback.m_Components.Get(), { 0, readback.m_Scan.m_ComponentBytes });
-		}
-		readback.m_Scan.m_Readback = readback.m_Buffer.Get();
-		readback.m_Scan.m_Components = readback.m_Components.Get();
 		readback.m_Scan.m_Clear = [clear](RGExecuteContext& context, RGBufferId record)
 			{
 				auto* commands = context.GetDirectComputeCommandContext();
@@ -216,7 +194,7 @@ namespace gglab
 				commands->Dispatch(1, 1, 1);
 			};
 		const auto target = readback.m_Boundary.m_Target;
-		const auto components = readback.m_Components.Get();
+		const auto components = readback.m_Scan.m_Components;
 		readback.m_Scan.m_Scan =
 			[scan, target, components, parameters = readback.m_Boundary.m_Parameters]
 			(RGExecuteContext& context, RGBufferId record, RGTextureViewId view) mutable
@@ -252,38 +230,23 @@ namespace gglab
 
 	void FrameCaptureService::PublishScanTap(Tap& tap) noexcept
 	{
-		if (tap.m_Graph && !tap.m_Graph->m_Execution.m_Recorded)
+		if (tap.m_Graph && !tap.m_Graph->IsRecorded())
 		{
 			FailTap(tap, tap.m_FrameSerial, "The scan's paired graph did not execute.");
 			return;
 		}
-		auto payload = std::make_shared<NonFiniteScanPayload>();
-		payload->m_ConfigurationVersion = tap.m_Requests[0].m_ConfigurationVersion;
-		for (auto& readback : tap.m_ScanReadbacks)
+		const auto payload = tap.m_Scans.ReadProduct(*m_Device, tap.m_Readback, tap.m_PayloadLease,
+			tap.m_Requests[0].m_ConfigurationVersion);
+		if (!payload)
 		{
-			const void* mapped = m_Device->MapBuffer(readback.m_Buffer.Get(), { 0, sizeof(NonFiniteScanRecord) });
-			if (!mapped)
-			{
-				FailTap(tap, tap.m_FrameSerial, "Non-finite scan readback mapping failed.");
-				return;
-			}
-			std::memcpy(&readback.m_Boundary.m_Record, mapped, sizeof(NonFiniteScanRecord));
-			m_Device->UnmapBuffer(readback.m_Buffer.Get(), {});
-			readback.m_Boundary.m_Result = EvaluateNonFiniteBoundary(readback.m_Boundary.m_Record,
-				readback.m_Boundary.m_Parameters.m_ScalarCount);
-			payload->m_Boundaries.push_back(std::move(readback.m_Boundary));
+			FailTap(tap, tap.m_FrameSerial, "Non-finite scan readback mapping failed.");
+			return;
 		}
-		uint64_t retainedBytes = 0;
-		for (const auto& boundary : payload->m_Boundaries)
-		{
-			retainedBytes += sizeof(NonFiniteScanRecord) + boundary.m_BufferLayout.m_Components.size() * sizeof(NonFiniteBufferComponent);
-		}
-		m_RetainedScans.push_back({ payload, retainedBytes, 1u });
 		for (const auto& request : tap.m_Requests)
 		{
 			m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = FrameCaptureSource::NonFiniteScan,
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial,
-				.m_Graph = tap.m_Graph, .m_NonFiniteScans = payload,
+				.m_Graph = tap.m_Graph ? tap.m_Graph->GetProduct() : nullptr, .m_NonFiniteScans = payload,
 				.m_GraphExportActive = tap.m_GraphExportActive, .m_ResourceExportActive = tap.m_ResourceExportActive,
 				.m_NonFiniteScanActive = true, .m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index(),
 				.m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation(),

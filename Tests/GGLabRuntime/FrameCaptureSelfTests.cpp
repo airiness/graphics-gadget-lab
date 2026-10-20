@@ -13,6 +13,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Capture/CapturePayloadBudget.h"
+#include "Graphics/Capture/CaptureProducers.h"
 #include "Graphics/Capture/FencedReadback.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -74,7 +75,8 @@ namespace gglab
 			}
 			RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				if (m_FailBufferCreation)
+				++m_BufferCreateCalls;
+				if (m_FailBufferCreation || m_BufferCreateCalls == m_FailBufferCreationAt)
 				{
 					return {};
 				}
@@ -121,6 +123,12 @@ namespace gglab
 				++m_MapCount;
 				if (entry->second.m_Desc.m_MemoryUsage == RHIMemoryUsage::GpuToCpu)
 				{
+					++m_ReadbackMapAttempts;
+					if (m_ReadbackMapAttempts == m_FailReadbackMapAt)
+					{
+						--m_MapCount;
+						return nullptr;
+					}
 					++m_ReadbackMapCalls;
 				}
 				return entry->second.m_Bytes.data();
@@ -214,6 +222,10 @@ namespace gglab
 			bool m_FailBufferCreation = false;
 			bool m_FailMapping = false;
 			bool m_FailFenceQuery = false;
+			uint32_t m_BufferCreateCalls = 0;
+			uint32_t m_FailBufferCreationAt = 0;
+			uint32_t m_ReadbackMapAttempts = 0;
+			uint32_t m_FailReadbackMapAt = 0;
 
 		private:
 			struct Buffer
@@ -1040,7 +1052,7 @@ namespace gglab
 				moved.CopyRows(device, footprint, pixels) && pixels[16] == std::byte{ 16 } &&
 				pixels[31] == std::byte{ 31 } && device.GetMapCount() == 0,
 				"Completed readback copies tight rows and closes its mapping before retirement");
-			moved.ReleaseBuffer();
+			moved.ReleaseBuffers();
 			context.Check(!device.IsAlive(buffer), "Completed storage retires independently of CPU pixels");
 
 			FencedReadback unknown;
@@ -1123,6 +1135,340 @@ namespace gglab
 					device.m_ReadbackMapCalls == 0,
 					"Certified teardown releases query-failed image storage without reading it");
 			}
+		}
+
+		void RunResourceProducerLifetimeTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			CapturePayloadBudget budget;
+			ResourceCaptureProducer producer;
+			producer.m_Readbacks.resize(2);
+			for (auto& item : producer.m_Readbacks)
+			{
+				item.m_Copy.m_ReadbackBytes = item.m_CpuBytes = 16;
+				item.m_Array.m_Type = RGResourceType::RGBuffer;
+			}
+			const auto [bytes, slots] = producer.GetPayloadCost();
+			auto lease = budget.Reserve(bytes, slots);
+			FencedReadback readback;
+			context.Check(producer.Allocate(device, readback) && device.GetLiveBufferCount() == 2 &&
+				bytes == 64 && slots == 2, "An array group reserves every GPU/CPU copy and one slot per array");
+			const RHITextureCopyFootprint fill{ .m_Height = 1, .m_RowSizeInBytes = 16, .m_RowPitch = 16 };
+			for (auto& item : producer.m_Readbacks)
+			{
+				device.FillReadback(item.m_Copy.m_Readback, fill);
+			}
+			readback.Submit(MakeFence(1));
+			context.Check(!producer.ReadProduct(device, readback, lease) &&
+				device.m_ReadbackMapCalls == 0 && device.GetLiveBufferCount() == 2 &&
+				budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 64, 2 },
+				"An incomplete array group cannot map, drop storage or return its payload credit");
+			device.m_CompletedFenceValue = 1;
+			GGLAB_UNUSED(readback.Poll(device));
+			bool rangeCorrect = false;
+			context.Check(readback.Read(device, producer.m_Readbacks[0].m_Copy.m_Readback, { 4, 8 },
+				[&](std::span<const std::byte> data)
+				{
+					rangeCorrect = data.size() == 4 && data[0] == std::byte{ 4 } && data[3] == std::byte{ 7 };
+				}) && rangeCorrect && device.GetMapCount() == 0,
+				"A completed mapping exposes the requested byte range and unmaps before returning");
+			RHIBufferOwner foreign(&device, device.CreateBuffer({ .m_SizeInBytes = 16,
+				.m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, {}));
+			const auto mapCalls = device.m_ReadbackMapCalls;
+			context.Check(!readback.Read(device, foreign.Get(), { 0, 16 }, [](auto) {}) &&
+				device.m_ReadbackMapCalls == mapCalls,
+				"A completed fence cannot authorize mapping storage owned by another readback group");
+			foreign.Reset();
+			auto product = producer.ReadProduct(device, readback, lease);
+			context.Check(product && product->m_Arrays.size() == 2 &&
+				product->m_Arrays[1].m_Data[15] == 15 && device.GetLiveBufferCount() == 0 &&
+				budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 32, 2 },
+				"Array publication retires all GPU storage while retaining both CPU slots");
+			auto held = product;
+			product.reset();
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 32, 2 },
+				"Shared array consumers cannot return each other's CPU credit");
+			std::thread writer([held = std::move(held)]() mutable
+				{
+					held.reset();
+				});
+			writer.join();
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+				"The last array consumer returns all group credit from the writer thread");
+
+			ResourceCaptureProducer partial;
+			partial.m_Readbacks.resize(2);
+			for (auto& item : partial.m_Readbacks)
+			{
+				item.m_Copy.m_ReadbackBytes = item.m_CpuBytes = 16;
+				item.m_Array.m_Type = RGResourceType::RGBuffer;
+			}
+			auto partialLease = budget.Reserve(64, 2);
+			FencedReadback partialReadback;
+			context.Check(partial.Allocate(device, partialReadback), "Partial-map fixture allocates both arrays");
+			partialReadback.Submit(MakeFence(2));
+			device.m_CompletedFenceValue = 2;
+			GGLAB_UNUSED(partialReadback.Poll(device));
+			device.m_FailReadbackMapAt = device.m_ReadbackMapAttempts + 2;
+			context.Check(!partial.ReadProduct(device, partialReadback, partialLease) &&
+				device.GetMapCount() == 0 && device.GetLiveBufferCount() == 2 &&
+				budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 64, 2 },
+				"Failure after the first array copy publishes no partial group and retains rollback credit");
+			partialReadback.ReleaseBuffers();
+			partialLease.Reset();
+			context.Check(device.GetLiveBufferCount() == 0 &&
+				budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+				"Safe failure retirement releases every array allocation and reservation");
+		}
+
+		void RunScanProducerLifetimeTests(SelfTestContext& context) noexcept
+		{
+			CapturePayloadBudget budget;
+			std::shared_ptr<const NonFiniteScanPayload> held;
+			{
+				CaptureTestDevice device;
+				ScanCaptureProducer producer;
+				FencedReadback readback;
+				producer.m_Readbacks.resize(2);
+				for (auto& item : producer.m_Readbacks)
+				{
+					item.m_Boundary.m_Target.m_Type = RGResourceType::RGBuffer;
+					item.m_Boundary.m_Parameters.m_ScalarCount = 1;
+					item.m_Boundary.m_BufferLayout.m_Components.resize(1);
+					item.m_Scan.m_ComponentBytes = sizeof(NonFiniteBufferComponent);
+					context.Check(item.Allocate(device, readback), "A scan owns its record and component upload together");
+					NonFiniteScanRecord record;
+					AccumulateNonFiniteScanValue(record, std::bit_cast<uint32_t>(1.0f), 0);
+					std::memcpy(device.MapBuffer(item.m_Scan.m_Readback, {}), &record, sizeof(record));
+					device.UnmapBuffer(item.m_Scan.m_Readback, {});
+				}
+				const auto [bytes, slots] = producer.GetPayloadCost();
+				auto lease = budget.Reserve(bytes, slots);
+				context.Check(bytes == 304 && slots == 1 && device.GetLiveBufferCount() == 4,
+					"Multiple scan boundaries reserve exact layout/record bytes in one logical slot");
+				readback.Submit(MakeFence(1));
+				context.Check(!producer.ReadProduct(device, readback, lease, 17) &&
+					device.GetLiveBufferCount() == 4,
+					"Pending scans retain both record buffers and component uploads");
+				device.m_CompletedFenceValue = 1;
+				GGLAB_UNUSED(readback.Poll(device));
+				held = producer.ReadProduct(device, readback, lease, 17);
+				context.Check(held && held->m_ConfigurationVersion == 17 && held->m_Boundaries.size() == 2 &&
+					held->m_Boundaries[1].m_Result.m_Claim.m_Status == NonFiniteClaimStatus::Passed &&
+					device.GetLiveBufferCount() == 0 && device.GetMapCount() == 0 &&
+					budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 80, 1 },
+					"A scan product retains only CPU records/layouts after all GPU storage retires");
+			}
+			context.Check(held && held->m_Boundaries[0].m_Record.m_FiniteCount == 1,
+				"Scan evidence remains readable after its producer and device are destroyed");
+			std::thread writer([held = std::move(held)]() mutable
+				{
+					held.reset();
+				});
+			writer.join();
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+				"A writer returns scan CPU credit without calling the destroyed producer or device");
+		}
+
+		void RunProductionFailureLifetimeTests(SelfTestContext& context) noexcept
+		{
+			std::shared_ptr<const NonFiniteProductionFrame> held;
+			{
+				CaptureTestDevice device;
+				ScanTestPrograms programs;
+				FrameCaptureService service(device, { .m_MaxPayloads = 3 });
+				service.ConfigureNonFiniteScans(programs, programs, programs);
+				TransientResourcePool pool(&device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				context.Check(service.EnableNonFiniteProduction() && graph.Compile() &&
+					service.PrepareResourceExports(1, graph) == FrameCaptureAvailability::Available &&
+					service.GetNonFiniteScanTargetLimit() != 0,
+					"Production admission reserves its GPU payload beside future scan/latest-report capacity");
+				service.OnFrameSubmitted(1, MakeFence(1));
+				device.m_FailFenceQuery = true;
+				std::vector<std::shared_ptr<const NonFiniteProductionFrame>> frames;
+				service.ConsumeNonFiniteProductionFrames(frames);
+				if (frames.size() == 1)
+				{
+					held = frames[0];
+				}
+				context.Check(held && !held->m_Failure.empty() && device.GetLiveBufferCount() == 1 &&
+					device.m_ReadbackMapCalls == 0 && service.GetNonFiniteScanTargetLimit() == 0,
+					"Unknown production keeps its GPU credit and independently charges the CPU failure report");
+				frames.clear();
+				device.m_FailFenceQuery = false;
+				device.m_CompletedFenceValue = 1;
+				service.ConsumeNonFiniteProductionFrames(frames);
+				context.Check(frames.empty() && device.GetLiveBufferCount() == 1 &&
+					device.m_ReadbackMapCalls == 0,
+					"Later fence progress neither maps unknown counters nor duplicates the failure report");
+				service.Shutdown();
+				context.Check(device.GetLiveBufferCount() == 0 && device.m_ReadbackMapCalls == 0,
+					"Verified teardown releases unknown counter storage while its CPU report stays retained");
+			}
+			context.Check(held && !held->m_Failure.empty(),
+				"Production failure reports outlive the capture service and device");
+			const std::weak_ptr<const NonFiniteProductionFrame> observed = held;
+			std::thread writer([held = std::move(held)]() mutable
+				{
+					held.reset();
+				});
+			writer.join();
+			context.Check(observed.expired(), "The last production report retires safely on a writer thread");
+		}
+
+		void RunProductionFailurePressureTests(SelfTestContext& context) noexcept
+		{
+			for (const bool byteLimited : { false, true })
+			{
+				CaptureTestDevice device;
+				ScanTestPrograms programs;
+				TransientResourcePool pool(&device);
+				FrameCaptureService service(device, { .m_MaxPayloads = byteLimited ? 8u : 3u,
+					.m_MaxPayloadBytes = byteLimited ? 2 * ProductionCaptureProducer::PayloadBytes : 256ull * 1024 * 1024 });
+				service.ConfigureNonFiniteScans(programs, programs, programs);
+				context.Check(service.EnableNonFiniteProduction(), "Failure-pressure fixture enables production accounting");
+				for (uint64_t frame = 1; frame <= 2; ++frame)
+				{
+					RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+					context.Check(graph.Compile() &&
+						service.PrepareResourceExports(frame, graph) == FrameCaptureAvailability::Available,
+						"Two pending counter frames fit before failure reports are produced");
+					service.OnFrameSubmitted(frame, MakeFence(frame));
+				}
+				device.m_FailFenceQuery = true;
+				std::vector<std::shared_ptr<const NonFiniteProductionFrame>> reports;
+				service.ConsumeNonFiniteProductionFrames(reports);
+				context.Check(reports.size() == 2 && device.GetLiveBufferCount() == 2 &&
+					device.m_ReadbackMapCalls == 0,
+					"Each failed query retains its unread buffer and an independent CPU failure receipt");
+				context.Check(service.GetAvailability(RHIFormat::R8G8B8A8Unorm, 4, 2) == FrameCaptureAvailability::Busy,
+					"Failure-receipt pressure above a slot or byte limit cannot admit an image");
+				RenderGraph blocked({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				context.Check(blocked.Compile() &&
+					service.PrepareResourceExports(3, blocked) == FrameCaptureAvailability::Busy &&
+					device.GetLiveBufferCount() == 2,
+					"Failure pressure above a slot or byte limit cannot allocate another production frame");
+				service.Shutdown();
+				context.Check(device.GetLiveBufferCount() == 0 && device.m_ReadbackMapCalls == 0,
+					"Budget saturation never substitutes for certified retirement of unknown work");
+			}
+		}
+
+		void RunProducerAllocationRollbackTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			FrameCaptureService service(device, { .m_MaxPayloads = 2 });
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Inputs {};
+			graph.AddPass<Inputs>("Inputs", RGPassEncoderType::Copy,
+				[](RenderGraph::RGBuilder& builder, Inputs&)
+				{
+					GGLAB_UNUSED(builder.Write(builder.CreateBuffer("First", { .m_SizeInBytes = 16 }), RGBufferAccess::CopyDest));
+					GGLAB_UNUSED(builder.Write(builder.CreateBuffer("Second", { .m_SizeInBytes = 16 }), RGBufferAccess::CopyDest));
+					builder.SideEffect();
+				}, [](RGExecuteContext&, Inputs&) {});
+			context.Check(graph.Compile(), "Partial allocation fixture compiles two observable buffers");
+			const auto id = service.RequestResourceExport({ { .m_Resource = "First" }, { .m_Resource = "Second" } }, 1);
+			device.m_FailBufferCreationAt = device.m_BufferCreateCalls + 2;
+			GGLAB_UNUSED(service.PrepareResourceExports(1, graph));
+			const auto failed = Consume(service);
+			context.Check(failed.size() == 1 && failed[0].m_RequestId == id &&
+				failed[0].m_Status == FrameCaptureStatus::Failed && !failed[0].m_Resources &&
+				device.GetLiveBufferCount() == 0 && !graph.HasResourceObservations(),
+				"Failure on the second allocation rolls back the first without attaching a partial graph group");
+			context.Check(service.GetResourceExportFrameAvailability() == FrameCaptureAvailability::Available &&
+				Consume(service).empty(), "Partial allocation rollback restores all admission slots and reports once");
+			service.Shutdown();
+		}
+
+		void RunProducerFenceVerdictTests(SelfTestContext& context) noexcept
+		{
+			for (uint32_t verdict = 0; verdict < 4; ++verdict)
+			{
+				CaptureTestDevice device;
+				CapturePayloadBudget budget;
+				ResourceCaptureProducer producer;
+				producer.m_Readbacks.resize(2);
+				for (auto& item : producer.m_Readbacks)
+				{
+					item.m_Copy.m_ReadbackBytes = item.m_CpuBytes = 16;
+					item.m_Array.m_Type = RGResourceType::RGBuffer;
+				}
+				auto lease = budget.Reserve(64, 2);
+				FencedReadback readback;
+				const bool allocated = producer.Allocate(device, readback);
+				if (verdict == 2)
+				{
+					readback.MarkCompletionUnknown();
+				}
+				else
+				{
+					readback.Submit(MakeFence(1));
+				}
+				device.m_FailFenceQuery = verdict == 1;
+				device.m_DeviceLost = verdict == 3;
+				const auto result = readback.Poll(device);
+				const auto expected = verdict == 0 ?
+					RHIFenceQueryResult::Pending :
+					verdict == 3 ? RHIFenceQueryResult::DeviceLost : RHIFenceQueryResult::Failed;
+				context.Check(allocated && result == expected &&
+					!producer.ReadProduct(device, readback, lease) && device.GetLiveBufferCount() == 2 &&
+					device.m_ReadbackMapCalls == 0 && budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 64, 2 },
+					"Pending, query-failed, unknown and lost groups cannot read or prematurely return owned storage");
+				if (verdict == 1 || verdict == 2)
+				{
+					device.m_FailFenceQuery = false;
+					device.m_CompletedFenceValue = 1;
+					context.Check(readback.Poll(device) == RHIFenceQueryResult::Failed &&
+						!producer.ReadProduct(device, readback, lease) && device.m_ReadbackMapCalls == 0,
+						"A later fence observation cannot revive a failed or unknown multi-buffer group");
+				}
+				// The fake has no GPU work; this is the verified teardown boundary.
+				readback.ReleaseBuffers();
+				lease.Reset();
+				context.Check(device.GetLiveBufferCount() == 0 &&
+					budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+					"Certified teardown returns all retained multi-buffer storage and credit together");
+			}
+		}
+
+		void RunGraphProductLifetimeTests(SelfTestContext& context) noexcept
+		{
+			std::shared_ptr<const RGSnapshot> held;
+			std::string serialized;
+			{
+				CaptureTestDevice device;
+				TransientResourcePool pool(&device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				graph.AddTrivialSideEffectPass("Retained.Graph", [](RGExecuteContext&) {});
+				context.Check(graph.Compile(), "Retained graph fixture compiles");
+				GraphCaptureProducer producer(graph);
+				context.Check(!producer.IsRecorded() && !producer.GetProduct(),
+					"A mutable graph recording cannot escape as a finished CPU product");
+				RGDeferredCommitList commits;
+				ExportTestCommands commands(device);
+				RGExecuteContext execute(commits, { .m_GraphicsCommandContext = &commands });
+				graph.Execute(execute);
+				commits.Discard();
+				auto record = graph.TakeExecutionRecord();
+				if (record)
+				{
+					producer.Finish(std::move(*record));
+				}
+				held = producer.GetProduct();
+				context.Check(held && held == producer.GetProduct() && held->m_Execution.m_Recorded &&
+					held->m_Execution.m_ExecutedPassIndices.size() == 1,
+					"Graph consumers share one frozen compile/execution product");
+				if (held)
+				{
+					serialized = SerializeRenderGraphSnapshot(*held);
+				}
+				graph.Retire({});
+			}
+			context.Check(held && SerializeRenderGraphSnapshot(*held) == serialized,
+				"A frozen graph is immutable and readable after producer, graph and device teardown");
 		}
 
 		void RunGraphCaptureTests(SelfTestContext& context) noexcept
@@ -2369,5 +2715,12 @@ namespace gglab
 		RunPayloadLeaseTests(context);
 		RunFencedReadbackTests(context);
 		RunImageLifetimeTests(context);
+		RunResourceProducerLifetimeTests(context);
+		RunScanProducerLifetimeTests(context);
+		RunProductionFailureLifetimeTests(context);
+		RunProductionFailurePressureTests(context);
+		RunProducerAllocationRollbackTests(context);
+		RunProducerFenceVerdictTests(context);
+		RunGraphProductLifetimeTests(context);
 	}
 }
