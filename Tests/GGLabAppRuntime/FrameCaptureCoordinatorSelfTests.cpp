@@ -1,5 +1,6 @@
 #include "FrameCaptureCoordinatorSelfTests.h"
 #include "CapturePublicationTestFileSystem.h"
+#include "Capture/CaptureBundle.h"
 #include "Capture/CaptureWriter.h"
 
 #include "Capture/FrameCaptureCoordinator.h"
@@ -2960,8 +2961,9 @@ namespace gglab
 				const auto result = coordinator.TakeJobResult(admission.m_JobId);
 				context.Check(result && result->m_JobId == admission.m_JobId && result->m_Products.size() == 3 &&
 					result->m_Status == (failWrite ? CaptureJobStatus::Failed : CaptureJobStatus::Completed) &&
-					result->m_Publication == (failWrite ? CaptureJobPublication::PartiallyPublished : CaptureJobPublication::Published),
-					"One terminal job distinguishes full publication from a published sibling followed by file failure");
+					result->m_Publication == (failWrite ? CaptureJobPublication::NotPublished : CaptureJobPublication::Published) &&
+					result->m_ManifestPath.empty() == failWrite,
+					"Required products publish one final manifest or fail together without partial bundle success");
 				context.Check(final && final->m_Stage == CaptureJobStage::Finished && final->m_FinishedProducts == 3 &&
 					final->m_FrameSerial == 17 && result && std::ranges::all_of(result->m_Products, [](const auto& product)
 					{
@@ -2971,7 +2973,7 @@ namespace gglab
 				if (result)
 				{
 					context.Check(result->m_Products[0].m_ProductIndex == 0 && result->m_Products[1].m_ProductIndex == 1 &&
-						result->m_Products[2].m_ProductIndex == 2 && result->m_Products[1].m_Files.size() == 2 &&
+						result->m_Products[2].m_ProductIndex == 2 && result->m_Products[1].m_Files.size() == (failWrite ? 0u : 2u) &&
 						result->m_Products[0].m_Files.size() == (failWrite ? 0u : 1u) &&
 						result->m_Products[2].m_Files.size() == (failWrite ? 0u : 2u),
 						"Graph-first plans retain plan order and separate graph, image and resource file records");
@@ -3020,6 +3022,288 @@ namespace gglab
 				}) && Consume(coordinator).empty(),
 				"The sole terminal receipt contains only the successful retry's provenance");
 			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunBundleProvenanceTests(SelfTestContext& context) noexcept
+		{
+			CaptureProductEncodeInput image{
+				.m_Image = std::make_shared<FrameCaptureImage>(),
+				.m_Submission = { 1, 1, 3, "test-adapter" },
+			};
+			image.m_Metadata.m_Backend = "dx12";
+			image.m_Metadata.m_FrameSerial = 17;
+			CaptureBundleInput input{ .m_RunIdentity = "0123456789abcdef0123456789abcdef",
+				.m_JobId = 1, .m_Attempt = 2, .m_ProductCount = 2,
+				.m_Deliveries = { { .m_ProductIndex = 0, .m_Input = image },
+					{ .m_ProductIndex = 1, .m_Input = image } } };
+			std::atomic<CaptureWriteStage> stage = CaptureWriteStage::Queued;
+			const auto valid = EncodeCaptureBundle(input, &EncodeTestPng, stage);
+			context.Check(valid.m_Failure.empty() && valid.m_Content.m_Files.size() == 5 &&
+				valid.m_Products.size() == 2, "Matched completed image products form one required bundle");
+			for (uint32_t change = 0; change < 10; ++change)
+			{
+				auto invalid = input;
+				auto& second = invalid.m_Deliveries[1];
+				switch (change)
+				{
+				case 0:
+					++second.m_Input.m_Metadata.m_FrameSerial;
+					break;
+				case 1:
+					second.m_Input.m_Metadata.m_Backend = "vulkan";
+					break;
+				case 2:
+					++second.m_Input.m_Submission.m_FenceValue;
+					break;
+				case 3:
+					second.m_Input.m_Submission.m_AdapterIdentity = "other-adapter";
+					break;
+				case 4:
+					second.m_Input.m_Submission.m_FenceValue = 0;
+					break;
+				case 5:
+					second.m_Input.m_Image.reset();
+					break;
+				case 6:
+					second.m_ProductIndex = 0;
+					break;
+				case 7:
+					invalid.m_Deliveries.pop_back();
+					break;
+				case 8:
+					invalid.m_RunIdentity = "old-local-id";
+					break;
+				case 9:
+					second.m_GraphProductIndex = 0;
+					break;
+				}
+				const auto rejected = EncodeCaptureBundle(invalid, &EncodeTestPng, stage);
+				context.Check(!rejected.m_Failure.empty() && rejected.m_Content.m_Files.empty(),
+					"Inconsistent provenance, incomplete products or unqualified identity cannot reach publication");
+			}
+			NonFiniteWatchCoverage coverage{ .m_ConfigurationVersion = 1,
+				.m_ProductionRequested = true, .m_InstrumentationAvailable = true,
+				.m_FirstFrameSerial = 17, .m_LastFrameSerial = 17, .m_FrameCount = 1,
+				.m_CompletedFrames = 1, .m_Complete = true,
+				.m_Production = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced } };
+			for (uint32_t change = 0; change < 6; ++change)
+			{
+				auto watched = input;
+				auto claim = coverage;
+				if (change == 1)
+				{
+					claim.m_Mode = NonFiniteWatchMode::Fail;
+				}
+				else if (change == 2)
+				{
+					claim.m_Complete = false;
+				}
+				else if (change == 3)
+				{
+					claim.m_FirstFrameSerial = claim.m_LastFrameSerial = 18;
+				}
+				else if (change == 5)
+				{
+					claim.m_Mode = NonFiniteWatchMode::Fail;
+					claim.m_Production = { NonFiniteClaimStatus::NotApplicable, NonFiniteWatchFailure::None };
+				}
+				for (auto& delivery : watched.m_Deliveries)
+				{
+					delivery.m_Input.m_Metadata.m_WatchCoverage = std::make_shared<const NonFiniteWatchCoverage>(claim);
+				}
+				if (change == 4)
+				{
+					watched.m_Deliveries[1].m_Input.m_Metadata.m_WatchCoverage.reset();
+				}
+				const auto encoded = EncodeCaptureBundle(watched, &EncodeTestPng, stage);
+				const bool accepted = change == 0 || change == 5;
+				context.Check(encoded.m_Failure.empty() == accepted,
+					"Bundles preserve report/fail claim semantics and require complete identical submitted-frame coverage");
+			}
+		}
+
+		void RunBundlePublicationTests(SelfTestContext& context) noexcept
+		{
+			for (const bool publicationFault : { false, true })
+			{
+				for (uint32_t position = 1; position <= 6; ++position)
+				{
+					TemporaryDirectory directory("capture-bundle-fault");
+					FakeCaptureControl control;
+					auto files = std::make_shared<CapturePublicationTestFileSystem>();
+					files->m_FailWrite = publicationFault ? 0 : position;
+					files->m_FailPublish = publicationFault ? position : 0;
+					FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+						.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+						.m_WriteOnCallingThread = true, .m_PublicationFileSystem = files });
+					const auto admission = coordinator.TrySubmit(MakeRequiredTestPlan());
+					coordinator.BeginFrame(MakeFrameState(true));
+					for (const auto& issued : control.m_Issued)
+					{
+						control.Complete(issued.m_Id);
+					}
+					coordinator.Update();
+					const auto result = coordinator.TakeJobResult(admission.m_JobId);
+					context.Check(result && result->m_Status == CaptureJobStatus::Failed &&
+						result->m_Publication == CaptureJobPublication::NotPublished && result->m_ManifestPath.empty() &&
+						(publicationFault ? files->GetPublishCount() : files->GetWriteCount()) == position &&
+						std::ranges::all_of(result->m_Products, [](const auto& product)
+						{
+							return product.m_Status == CaptureJobStatus::Failed && product.m_Files.empty();
+						}) && !HasAnyFile(directory.GetPath()) && !HasPartialFile(directory.GetPath()),
+						"Every data, sidecar and final-manifest file fault rolls back the required bundle and leaves no completion marker");
+					coordinator.FinalizeAfterRenderHost();
+				}
+			}
+			for (uint32_t collision = 1; collision <= 6; ++collision)
+			{
+				TemporaryDirectory directory("capture-bundle-collision");
+				FakeCaptureControl control;
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				files->m_CollidePublish = collision;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true, .m_PublicationFileSystem = files });
+				const auto admission = coordinator.TrySubmit(MakeRequiredTestPlan());
+				coordinator.BeginFrame(MakeFrameState(true));
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.Update();
+				const auto result = coordinator.TakeJobResult(admission.m_JobId);
+				context.Check(result && result->m_Status == CaptureJobStatus::Completed &&
+					files->GetPublishCount() == collision + 6 &&
+					ReadText(files->m_CollisionPath) == "existing capture" && !HasPartialFile(directory.GetPath()),
+					"A collision at any bundle file preserves existing content and retries the complete group");
+				if (result && !result->m_ManifestPath.empty())
+				{
+					const auto manifest = nlohmann::json::parse(ReadText(result->m_ManifestPath));
+					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 1 &&
+						manifest["schema"] == "gglab.capture-bundle" && manifest["products"].size() == 3;
+					for (const auto& product : manifest["products"])
+					{
+						const auto metadataName = product["metadata"].get<std::string>();
+						const auto metadata = nlohmann::json::parse(ReadText(directory.GetPath() /
+							std::filesystem::path(std::u8string(metadataName.begin(), metadataName.end()))));
+						bound &= metadata["schemaVersion"] == product["schemaVersion"];
+						for (const auto& name : product["files"])
+						{
+							const auto filename = name.get<std::string>();
+							bound &= std::filesystem::is_regular_file(directory.GetPath() /
+								std::filesystem::path(std::u8string(filename.begin(), filename.end())));
+						}
+						if (product["source"] == "scene")
+						{
+							bound &= metadata["image"]["file"] == product["files"][0];
+						}
+						if (product["source"] == "resource-export")
+						{
+							bound &= metadata["targets"][0]["array"] == product["files"][0];
+						}
+					}
+					context.Check(bound, "Retried bundle manifests and every path-bound sidecar reference the final candidate names");
+				}
+				coordinator.FinalizeAfterRenderHost();
+			}
+			TemporaryDirectory directory("capture-bundle-rollback");
+			FakeCaptureControl control;
+			auto files = std::make_shared<CapturePublicationTestFileSystem>();
+			files->m_FailPublish = 6;
+			files->m_FailWithdraw = true;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true, .m_PublicationFileSystem = files });
+			const auto admission = coordinator.TrySubmit(MakeRequiredTestPlan());
+			coordinator.BeginFrame(MakeFrameState(true));
+			for (const auto& issued : control.m_Issued)
+			{
+				control.Complete(issued.m_Id);
+			}
+			coordinator.Update();
+			const auto result = coordinator.TakeJobResult(admission.m_JobId);
+			context.Check(result && result->m_Publication == CaptureJobPublication::Indeterminate &&
+				result->m_ManifestPath.empty() && HasAnyFile(directory.GetPath()) &&
+				std::ranges::none_of(std::filesystem::directory_iterator(directory.GetPath()), [](const auto& file)
+				{
+					return file.path().filename().string().ends_with(".capture-bundle.json");
+				}), "Rollback failure reports indeterminate orphan files without claiming a complete bundle");
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunBundleSingleProductTests(SelfTestContext& context) noexcept
+		{
+			for (const auto product : std::vector<CaptureProductSpec>{ ImageCaptureProduct{},
+				ImageCaptureProduct{ CaptureImageSource::Composited },
+				DiagnosticCaptureProduct{ PostProcessDebugTap::TemporalHistoryWeight }, GraphCaptureProduct{},
+				ResourceCaptureProduct{ { { .m_Resource = "Values" } } } })
+			{
+				TemporaryDirectory directory("capture-bundle-single");
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath() / std::filesystem::path(u8"\u4e2d\u6587 \U0001F9EA"),
+					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
+				const auto admission = coordinator.TrySubmit({ .m_RequiredProducts = { product } });
+				coordinator.BeginFrame(MakeFrameState(true));
+				control.Complete(control.m_Issued[0].m_Id);
+				coordinator.Update();
+				const auto result = coordinator.TakeJobResult(admission.m_JobId);
+				context.Check(result && result->m_Status == CaptureJobStatus::Completed &&
+					result->m_Products.size() == 1 && std::filesystem::exists(result->m_ManifestPath),
+					"Every single-product operation uses the same final bundle marker, including Unicode output roots");
+				if (result && !result->m_ManifestPath.empty())
+				{
+					const auto manifest = nlohmann::json::parse(ReadText(result->m_ManifestPath));
+					context.Check(manifest["products"][0]["source"].get<std::string>() == GetFrameCaptureSourceName(GetCaptureProductSource(product)) &&
+						manifest["provenance"]["frame"]["serial"] == 17 && manifest["jobId"] == admission.m_JobId &&
+						manifest["runIdentity"].get<std::string>().size() == 32 && manifest["attempt"] == 1,
+						"Bundle identity qualifies the logical job/attempt and product records preserve the requested source");
+				}
+				coordinator.FinalizeAfterRenderHost();
+			}
+		}
+
+		void RunBundleManifestShutdownTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("capture-bundle-manifest-shutdown");
+			FakeCaptureControl control;
+			auto files = std::make_shared<CapturePublicationTestFileSystem>();
+			files->m_Block = CapturePublicationTestFileSystem::Block::Publication;
+			files->m_BlockPublication = 6;
+			{
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_ShutdownWriteTimeout = std::chrono::milliseconds(50), .m_PublicationFileSystem = files });
+				const auto admission = coordinator.TrySubmit(MakeRequiredTestPlan());
+				coordinator.BeginFrame(MakeFrameState(true));
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.Update();
+				context.Check(files->WaitEntered() && !coordinator.TakeJobResult(admission.m_JobId) &&
+					HasAnyFile(directory.GetPath()) && coordinator.GetJobSnapshot(admission.m_JobId)->m_FinishedProducts == 0,
+					"Published product files cannot complete a job while its final manifest is blocked");
+				coordinator.FinalizeAfterRenderHost();
+				const auto result = coordinator.TakeJobResult(admission.m_JobId);
+				context.Check(result && result->m_Publication == CaptureJobPublication::Indeterminate &&
+					!result->m_BundleId.empty() && result->m_ManifestPath.empty() &&
+					std::ranges::all_of(result->m_Products, [](const auto& product)
+					{
+						return product.m_Status == CaptureJobStatus::Failed && product.m_Publication == CaptureJobPublication::Indeterminate;
+					}), "One timeout snapshot settles all required products consistently after the shared publication claim");
+				files->Release();
+			}
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (files.use_count() > 1 && std::chrono::steady_clock::now() < deadline)
+			{
+				std::this_thread::yield();
+			}
+			context.Check(files.use_count() == 1 && !HasPartialFile(directory.GetPath()) &&
+				std::ranges::any_of(std::filesystem::directory_iterator(directory.GetPath()), [](const auto& file)
+				{
+					return file.path().filename().string().ends_with(".capture-bundle.json");
+				}), "A claimed detached bundle may publish its manifest late without rewriting the terminal result");
 		}
 
 		void RunJobShutdownTests(SelfTestContext& context) noexcept
@@ -3741,6 +4025,10 @@ namespace gglab
 		RunJobAdmissionTests(context);
 		RunConcurrentJobReceiptTests(context);
 		RunJobResultTests(context);
+		RunBundleProvenanceTests(context);
+		RunBundlePublicationTests(context);
+		RunBundleSingleProductTests(context);
+		RunBundleManifestShutdownTests(context);
 		RunJobShutdownTests(context);
 		RunResourceWritingTests(context);
 		RunResourceSequenceTests(context);

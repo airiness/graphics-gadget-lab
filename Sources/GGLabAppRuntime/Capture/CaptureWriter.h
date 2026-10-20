@@ -1,5 +1,6 @@
 #pragma once
 #include "Capture/CaptureProductEncoder.h"
+#include "Capture/CaptureBundle.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <chrono>
@@ -15,6 +16,12 @@
 
 namespace gglab
 {
+	struct CaptureBundleProductReceipt
+	{
+		uint32_t m_ProductIndex = 0;
+		std::vector<std::filesystem::path> m_Files;
+	};
+
 	struct CaptureWriteReceipt
 	{
 		CapturePublicationOutcome m_Publication = CapturePublicationOutcome::NotPublished;
@@ -23,11 +30,15 @@ namespace gglab
 		std::vector<std::filesystem::path> m_ResourcePaths;
 		std::filesystem::path m_GraphPath;
 		std::string m_Failure;
+		std::string m_BundleId;
+		std::filesystem::path m_ManifestPath;
+		std::vector<CaptureBundleProductReceipt> m_BundleProducts;
 	};
 
 	struct CaptureWriteJob
 	{
 		CaptureProductEncodeInput m_Products;
+		std::optional<CaptureBundleInput> m_Bundle;
 		std::filesystem::path m_Directory;
 		std::string m_BaseStem;
 		uint64_t m_RequestId = 0;

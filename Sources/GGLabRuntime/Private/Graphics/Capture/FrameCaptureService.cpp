@@ -320,6 +320,7 @@ namespace gglab
 			return std::nullopt;
 		}
 
+		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		const FrameCaptureTapTarget target{
 			.m_Buffer = tap.m_Readback.GetBuffer(),
 			.m_BufferDesc = bufferDesc,
@@ -704,6 +705,10 @@ namespace gglab
 				.m_GraphExportActive = tap.m_GraphExportActive,
 				.m_ResourceExportActive = tap.m_ResourceExportActive,
 				.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
+				.m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index(),
+				.m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation(),
+				.m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value,
+				.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity,
 				});
 		}
 		tap.m_Requests.clear();

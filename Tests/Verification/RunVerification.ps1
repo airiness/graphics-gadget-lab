@@ -33,6 +33,7 @@ $catalog = @(
     @{ name = 'resource-export-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateResourceExports.py'; arguments = @('--self-test') }) },
     @{ name = 'nonfinite-coverage-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateNonFiniteCoverage.py'; arguments = @('--self-test') }) },
     @{ name = 'capture-comparison'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestCompareCaptures.ps1' }) },
+    @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'nonfinite-coverage'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestNonFiniteCoverage.ps1' }) },
     @{ name = 'nonfinite-generations'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestNonFiniteGenerations.ps1' }) },
     @{ name = 'nonfinite-injection'; group = 'gpu'; configurations = @('Debug', 'Develop'); steps = @(@{ path = 'Tests/Verification/TestNonFiniteInjection.ps1' }) },

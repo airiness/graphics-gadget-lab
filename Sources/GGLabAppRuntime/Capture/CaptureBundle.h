@@ -1,0 +1,53 @@
+#pragma once
+#include "Capture/CaptureProductEncoder.h"
+
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace gglab
+{
+	inline constexpr uint32_t CaptureBundleSchemaVersion = 1;
+
+	struct CaptureBundleDelivery
+	{
+		uint32_t m_ProductIndex = 0;
+		std::optional<uint32_t> m_GraphProductIndex;
+		CaptureProductEncodeInput m_Input;
+	};
+
+	struct CaptureBundleInput
+	{
+		std::string m_RunIdentity;
+		uint64_t m_JobId = 0;
+		uint64_t m_Attempt = 0;
+		uint32_t m_ProductCount = 0;
+		std::vector<CaptureBundleDelivery> m_Deliveries;
+	};
+
+	struct CaptureBundleProductFiles
+	{
+		uint32_t m_ProductIndex = 0;
+		std::vector<size_t> m_FileIndices;
+	};
+
+	struct CaptureEncodedBundle
+	{
+		CapturePublicationContent m_Content;
+		std::string m_BundleId;
+		std::vector<CaptureBundleProductFiles> m_Products;
+		std::string m_Failure;
+	};
+
+	// A random 128-bit run identity qualifies process-local job/attempt IDs.
+	// Failure returns empty; persisted identity never falls back to a clock/hash.
+	[[nodiscard]] std::string CreateCaptureRunIdentity() noexcept;
+	[[nodiscard]] std::string MakeCaptureBundleId(std::string_view runIdentity,
+		uint64_t jobId, uint64_t attempt);
+	[[nodiscard]] CaptureEncodedBundle EncodeCaptureBundle(const CaptureBundleInput& input,
+		const FrameCaptureImageEncoder& imageEncoder, std::atomic<CaptureWriteStage>& stage) noexcept;
+}

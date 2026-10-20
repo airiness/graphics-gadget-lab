@@ -1426,8 +1426,10 @@ namespace gglab
 			}
 			checks.Check(result && result->m_Products.size() == 3 &&
 				result->m_Status == (missingResource ? CaptureJobStatus::Failed : CaptureJobStatus::Completed) &&
-				result->m_Publication == (missingResource ? CaptureJobPublication::NotPublished : CaptureJobPublication::Published),
-				"Production compiled failure or successful GPU transport reaches exactly one logical job result");
+				result->m_Publication == (missingResource ? CaptureJobPublication::NotPublished : CaptureJobPublication::Published) &&
+				result->m_ManifestPath.empty() == missingResource,
+				std::format("Production compiled failure or successful GPU transport reaches exactly one logical job result ({}).",
+					result && !result->m_Products.empty() ? result->m_Products.front().m_Failure : "no receipt"));
 			if (result && result->m_Products.front().m_Metadata)
 			{
 				const auto serial = result->m_Products.front().m_Metadata->m_FrameSerial;

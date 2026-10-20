@@ -174,6 +174,7 @@ namespace gglab
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
 		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
 			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
+		m_RunIdentity(CreateCaptureRunIdentity()),
 		m_JobLimits(createInfo.m_JobLimits),
 		m_JobReceipts(m_JobLimits.m_MaxReceipts)
 	{
@@ -248,6 +249,10 @@ namespace gglab
 		if (m_NextJobId == 0)
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityExhausted };
+		}
+		if (m_RunIdentity.empty())
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityUnavailable };
 		}
 		if (m_ActiveJobs >= m_JobLimits.m_MaxActiveJobs)
 		{
@@ -1301,6 +1306,11 @@ namespace gglab
 			{
 				continue;
 			}
+			if (job.m_ReceiptSlot)
+			{
+				StartBundleEncoding(job);
+				continue;
+			}
 			for (CaptureOutput* member : outputs)
 			{
 				// A synchronous encode failure can destroy this product attempt.
@@ -1308,6 +1318,100 @@ namespace gglab
 				member->m_Attempt->m_PendingResult.reset();
 				StartEncoding(*member, result);
 			}
+		}
+	}
+
+	CaptureProductEncodeInput FrameCaptureCoordinator::MakeEncodeInput(
+		CaptureOutput& entry, const FrameCaptureResult& result) noexcept
+	{
+		FrameCaptureMetadata& metadata = entry.m_Attempt->m_Metadata;
+		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
+		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
+		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
+		if (result.m_Image)
+		{
+			const FrameCaptureImage& image = *result.m_Image;
+			metadata.m_Width = image.m_Width;
+			metadata.m_Height = image.m_Height;
+			metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
+		}
+		return {
+			.m_Image = result.m_Image,
+			.m_Graph = result.m_Graph,
+			.m_Resources = result.m_Resources,
+			.m_ResourceExportActive = result.m_ResourceExportActive,
+			.m_GraphSummary = entry.IsGraphSummary(),
+			.m_Submission = { result.m_SubmissionFenceIndex, result.m_SubmissionFenceGeneration,
+				result.m_SubmissionFenceValue, result.m_AdapterCompatibilityIdentity },
+			.m_Metadata = metadata,
+		};
+	}
+
+	void FrameCaptureCoordinator::StartBundleEncoding(CaptureJob& job) noexcept
+	{
+		const auto directory = job.m_Plan.m_OutputDirectory.empty() ?
+			m_DefaultOutputDirectory :
+			job.m_Plan.m_OutputDirectory;
+		if (directory.empty())
+		{
+			FailPlan(job, "No capture output directory is configured.");
+			return;
+		}
+		const auto outputs = GetOutputs(job);
+		auto write = std::make_shared<CaptureWriteJob>();
+		write->m_Bundle.emplace(CaptureBundleInput{ .m_RunIdentity = m_RunIdentity,
+			.m_JobId = job.m_Result.m_JobId, .m_Attempt = job.m_AttemptCount,
+			.m_ProductCount = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()) });
+		for (CaptureOutput* member : outputs)
+		{
+			const FrameCaptureResult result = std::move(*member->m_Attempt->m_PendingResult);
+			member->m_Attempt->m_PendingResult.reset();
+			write->m_Bundle->m_Deliveries.push_back({
+				.m_ProductIndex = static_cast<uint32_t>(member->m_ProductIndex),
+				.m_GraphProductIndex = member->m_GraphIndex ?
+					std::optional(static_cast<uint32_t>(*member->m_GraphIndex)) : std::nullopt,
+				.m_Input = MakeEncodeInput(*member, result),
+			});
+		}
+		job.m_Result.m_BundleId = MakeCaptureBundleId(m_RunIdentity, job.m_Result.m_JobId, job.m_AttemptCount);
+		std::string subject = job.m_Plan.m_Label.empty() ? "capture" : SanitizeFileStemComponent(job.m_Plan.m_Label);
+		subject.resize(std::min(subject.size(), size_t{ 32 }));
+		write->m_BaseStem = std::format("{}.{}", subject, job.m_Result.m_BundleId);
+		write->m_Directory = directory;
+		write->m_RequestId = job.m_OutputIds.front();
+		for (CaptureOutput* member : outputs)
+		{
+			member->m_Phase = Phase::Encoding;
+			member->m_WriteJob = write;
+		}
+		if (!m_Writer->Submit(std::move(write)))
+		{
+			FinishBundleWriting(job, { .m_Failure = "Capture writer queue is full." });
+		}
+	}
+
+	void FrameCaptureCoordinator::FinishBundleWriting(
+		CaptureJob& job, const CaptureWriteReceipt& receipt) noexcept
+	{
+		job.m_Result.m_ManifestPath = receipt.m_ManifestPath;
+		for (CaptureOutput* member : GetOutputs(job))
+		{
+			member->m_WriteReceipt = receipt;
+			if (receipt.m_Publication == CapturePublicationOutcome::Published)
+			{
+				const auto product = std::ranges::find(receipt.m_BundleProducts,
+					member->m_ProductIndex, &CaptureBundleProductReceipt::m_ProductIndex);
+				GGLAB_ASSERT_MSG(product != receipt.m_BundleProducts.end(), "A published bundle retains every required product.");
+				for (const auto& path : product->m_Files)
+				{
+					if (path.extension() == ".png")
+					{
+						member->m_Attempt->m_Metadata.m_ImageFile = GetFrameCapturePathText(path.filename());
+					}
+				}
+			}
+			Finish(*member, receipt.m_Publication == CapturePublicationOutcome::Published ?
+				FrameCaptureRequestStatus::Completed : FrameCaptureRequestStatus::Failed, receipt.m_Failure);
 		}
 	}
 
@@ -1323,17 +1427,8 @@ namespace gglab
 			Finish(entry, FrameCaptureRequestStatus::Failed, "No capture output directory is configured.");
 			return;
 		}
-		FrameCaptureMetadata& metadata = entry.m_Attempt->m_Metadata;
-		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
-		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
-		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
-		if (result.m_Image)
-		{
-			const FrameCaptureImage& image = *result.m_Image;
-			metadata.m_Width = image.m_Width;
-			metadata.m_Height = image.m_Height;
-			metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
-		}
+		auto products = MakeEncodeInput(entry, result);
+		const FrameCaptureMetadata& metadata = entry.m_Attempt->m_Metadata;
 		const std::string_view subject = !plan.m_Label.empty() ?
 			std::string_view(plan.m_Label) :
 			!metadata.m_LabId.empty() ?
@@ -1352,16 +1447,7 @@ namespace gglab
 			SanitizeFileStemComponent(subject), view, GetFrameCaptureSourceName(metadata.m_Source),
 			SanitizeFileStemComponent(metadata.m_Backend), timestamp, entry.m_Id);
 		auto job = std::make_shared<CaptureWriteJob>();
-		job->m_Products = {
-			.m_Image = result.m_Image,
-			.m_Graph = result.m_Graph,
-			.m_Resources = result.m_Resources,
-			.m_ResourceExportActive = result.m_ResourceExportActive,
-			.m_GraphSummary = entry.IsGraphSummary(),
-			.m_Submission = { result.m_SubmissionFenceIndex, result.m_SubmissionFenceGeneration,
-				result.m_SubmissionFenceValue, result.m_AdapterCompatibilityIdentity },
-			.m_Metadata = metadata,
-		};
+		job->m_Products = std::move(products);
 		job->m_Directory = directory;
 		job->m_BaseStem = result.m_Resources ?
 			std::format("{}.{}.resource-export", SanitizeFileStemComponent(subject), metadata.m_FrameSerial) :
@@ -1380,11 +1466,17 @@ namespace gglab
 
 	bool FrameCaptureCoordinator::TryFinishWritten(CaptureOutput& entry) noexcept
 	{
-		entry.m_WriteReceipt = entry.m_WriteJob->GetReceipt();
-		if (!entry.m_WriteReceipt)
+		auto receipt = entry.m_WriteJob->GetReceipt();
+		if (!receipt)
 		{
 			return false;
 		}
+		if (entry.m_Job->m_ReceiptSlot)
+		{
+			FinishBundleWriting(*entry.m_Job, *receipt);
+			return true;
+		}
+		entry.m_WriteReceipt = std::move(receipt);
 		const FrameCaptureRequestStatus status =
 			entry.m_WriteReceipt->m_Publication == CapturePublicationOutcome::Published ?
 				FrameCaptureRequestStatus::Completed :
@@ -1434,7 +1526,13 @@ namespace gglab
 			{
 				continue;
 			}
-			entry.m_WriteReceipt = m_Writer->Abandon(*entry.m_WriteJob, m_ShutdownWriteTimeout);
+			auto receipt = m_Writer->Abandon(*entry.m_WriteJob, m_ShutdownWriteTimeout);
+			if (entry.m_Job->m_ReceiptSlot)
+			{
+				FinishBundleWriting(*entry.m_Job, receipt);
+				continue;
+			}
+			entry.m_WriteReceipt = std::move(receipt);
 			if (entry.m_WriteReceipt->m_Publication == CapturePublicationOutcome::Published)
 			{
 				// Completion may race the timeout snapshot; consume that receipt normally.
@@ -1539,7 +1637,15 @@ namespace gglab
 						break;
 					}
 				}
-				if (graph)
+				if (entry.m_WriteReceipt && !entry.m_WriteReceipt->m_BundleProducts.empty())
+				{
+					const auto files = std::ranges::find(entry.m_WriteReceipt->m_BundleProducts,
+						index, &CaptureBundleProductReceipt::m_ProductIndex);
+					GGLAB_ASSERT_MSG(files != entry.m_WriteReceipt->m_BundleProducts.end(),
+						"A bundle receipt retains every product's files.");
+					product.m_Files = files->m_Files;
+				}
+				else if (graph)
 				{
 					if (!result.m_GraphPath.empty())
 					{

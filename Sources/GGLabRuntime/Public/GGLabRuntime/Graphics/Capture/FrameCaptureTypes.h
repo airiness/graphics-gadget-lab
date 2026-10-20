@@ -82,6 +82,8 @@ namespace gglab
 		bool m_GraphExportActive = false;
 		bool m_ResourceExportActive = false;
 		bool m_NonFiniteScanActive = false;
+		// Completed file-producing products carry their actual certified submission,
+		// including images. These fields qualify transport, not persisted artifact IDs.
 		uint32_t m_SubmissionFenceIndex = 0;
 		uint32_t m_SubmissionFenceGeneration = 0;
 		uint64_t m_SubmissionFenceValue = 0;

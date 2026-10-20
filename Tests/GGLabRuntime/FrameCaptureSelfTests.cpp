@@ -538,6 +538,12 @@ namespace gglab
 				context.Check(completed && !device.IsAlive(tap->m_Buffer) &&
 					device.GetMapCount() == 0 && service.GetUnfinishedRequestCount() == 1,
 					"Completed taps publish one shared image per frame and release the readback");
+				context.Check(completed && std::ranges::all_of(results, [](const auto& result)
+					{
+						return result.m_SubmissionFenceIndex == 1 && result.m_SubmissionFenceGeneration == 1 &&
+							result.m_SubmissionFenceValue == 3 &&
+							result.m_AdapterCompatibilityIdentity == "GGLab.FrameCaptureTestDevice";
+					}), "Every shared image consumer receives the certified submission fence and adapter after buffer retirement");
 				if (completed)
 				{
 					const FrameCaptureImage& image = *results[0].m_Image;

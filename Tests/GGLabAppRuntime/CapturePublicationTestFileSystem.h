@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -22,6 +23,11 @@ namespace gglab
 		Block m_Block = Block::None;
 		uint32_t m_FailWrite = 0;
 		uint32_t m_FailPublish = 0;
+		uint32_t m_CollidePublish = 0;
+		uint32_t m_BlockPublication = 1;
+		std::filesystem::path m_CollisionPath;
+		[[nodiscard]] uint32_t GetWriteCount() const noexcept { return m_Writes; }
+		[[nodiscard]] uint32_t GetPublishCount() const noexcept { return m_Publishes; }
 		bool m_FailWithdraw = false;
 		bool m_RenameOnly = false;
 
@@ -39,13 +45,20 @@ namespace gglab
 		CaptureFilePublishOutcome Publish(const std::filesystem::path& temporary,
 			const std::filesystem::path& final) noexcept override
 		{
-			if (++m_Publishes == 1 && m_Block == Block::Publication)
+			if (++m_Publishes == m_BlockPublication && m_Block == Block::Publication)
 			{
 				WaitForRelease();
 			}
 			if (m_Publishes == m_FailPublish)
 			{
 				return CaptureFilePublishOutcome::Failed;
+			}
+			if (m_Publishes == m_CollidePublish)
+			{
+				m_CollisionPath = final;
+				std::ofstream file(final, std::ios::binary);
+				file << "existing capture";
+				return CaptureFilePublishOutcome::NameTaken;
 			}
 			if (m_RenameOnly)
 			{

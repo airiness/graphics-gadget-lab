@@ -35,6 +35,7 @@ namespace gglab
 		PlanTooLarge,
 		ShuttingDown,
 		IdentityExhausted,
+		IdentityUnavailable,
 	};
 
 	// Busy/rejected admission consumes no identity, receipt or caller-owned plan.
@@ -71,13 +72,15 @@ namespace gglab
 	};
 
 	// One terminal receipt per accepted job, with products in plan order. Published
-	// means the existing product markers, not a bundle manifest or atomic file group.
+	// requires the final bundle manifest; individual file existence is insufficient.
 	struct CaptureJobResult
 	{
 		uint64_t m_JobId = 0;
 		CaptureJobStatus m_Status = CaptureJobStatus::Completed;
 		CaptureJobPublication m_Publication = CaptureJobPublication::NotPublished;
 		std::vector<CaptureProductResult> m_Products;
+		std::string m_BundleId;
+		std::filesystem::path m_ManifestPath;
 	};
 
 	enum class CaptureJobStage : uint8_t

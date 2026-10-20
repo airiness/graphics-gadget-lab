@@ -24,6 +24,8 @@ namespace gglab
 	class NonFiniteWatchCoordinator;
 	class CapturePublicationFileSystemBase;
 	class CaptureWriter;
+	struct CaptureProductEncodeInput;
+	struct CaptureWriteReceipt;
 
 	struct FrameCaptureRequest
 	{
@@ -282,6 +284,10 @@ namespace gglab
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void PollWatchCaptures() noexcept;
 		void StartEncoding(CaptureOutput& entry, const FrameCaptureResult& result) noexcept;
+		[[nodiscard]] static CaptureProductEncodeInput MakeEncodeInput(
+			CaptureOutput& entry, const FrameCaptureResult& result) noexcept;
+		void StartBundleEncoding(CaptureJob& job) noexcept;
+		void FinishBundleWriting(CaptureJob& job, const CaptureWriteReceipt& receipt) noexcept;
 		// Publishes the result of a written output; false while it is unfinished.
 		[[nodiscard]] bool TryFinishWritten(CaptureOutput& entry) noexcept;
 		void CollectWrittenJobs() noexcept;
@@ -296,6 +302,7 @@ namespace gglab
 		std::filesystem::path m_DefaultOutputDirectory;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 		std::unique_ptr<CaptureWriter> m_Writer;
+		std::string m_RunIdentity;
 		CaptureJobLimits m_JobLimits;
 		// Fixed at construction. Each accepted job reserves one slot until consumed,
 		// including while active. Rejected submissions never create failure receipts.

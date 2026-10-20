@@ -76,11 +76,13 @@ namespace gglab
 		// resource arrays are streamed without another full-size CPU allocation.
 		std::shared_ptr<const std::vector<uint8_t>> m_Tail;
 		CaptureWriteStage m_Stage = CaptureWriteStage::WritingGraph;
+		// Bundle sidecars also depend on the final collision candidate's names.
+		std::function<std::string(std::span<const std::filesystem::path>)> m_MakeBytes;
 	};
 
 	struct CapturePublicationContent
 	{
-		// The last file is the existing completion marker, not a new bundle schema.
+		// The last file is the completion marker for this publication group.
 		std::vector<CapturePublicationFile> m_Files;
 		// Name-bound sidecars are validated before I/O and regenerated for each
 		// collision candidate. Other product encoding is already complete.

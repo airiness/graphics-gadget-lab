@@ -199,13 +199,21 @@ namespace gglab
 			}
 			// Validate path-bound metadata before producing any files (including
 			// invalid UTF-8), without fixing it to names a collision may change.
+			for (const auto& file : content.m_Files)
+			{
+				if (file.m_MakeBytes)
+				{
+					(void)file.m_MakeBytes(paths);
+				}
+			}
 			if (content.m_MakeMarker)
 			{
 				(void)content.m_MakeMarker(paths);
 			}
 			for (size_t i = 0; i < content.m_Files.size(); ++i)
 			{
-				if (i + 1 == content.m_Files.size() && content.m_MakeMarker)
+				if (content.m_Files[i].m_MakeBytes ||
+					(i + 1 == content.m_Files.size() && content.m_MakeMarker))
 				{
 					continue;
 				}
@@ -235,10 +243,15 @@ namespace gglab
 				CaptureFilePublishOutcome outcome = CaptureFilePublishOutcome::Published;
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
-					if (i + 1 == paths.size() && content.m_MakeMarker)
+					const auto& makeBytes = content.m_Files[i].m_MakeBytes ?
+						content.m_Files[i].m_MakeBytes :
+						i + 1 == paths.size() ?
+							content.m_MakeMarker :
+							content.m_Files[i].m_MakeBytes;
+					if (makeBytes)
 					{
 						control.m_Stage = CaptureWriteStage::WritingMetadata;
-						const std::string json = content.m_MakeMarker(paths);
+						const std::string json = makeBytes(paths);
 						std::string reason = files.Write(temporary.m_Paths[i],
 							{ reinterpret_cast<const uint8_t*>(json.data()), json.size() }, {});
 						if (!reason.empty())
