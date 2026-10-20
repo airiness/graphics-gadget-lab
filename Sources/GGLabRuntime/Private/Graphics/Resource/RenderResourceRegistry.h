@@ -74,6 +74,8 @@ namespace gglab
 			RHITextureViewHandle m_Srv{};
 			RHITextureViewDesc m_SrvDesc{};
 
+			uint64_t m_ContentRevision = 0;
+			uint64_t m_PublishedContentRevision = 0;
 			bool m_Allocated = false;
 			bool m_Dirty = false;
 		};
@@ -97,13 +99,9 @@ namespace gglab
 			return m_HasInitializedActiveIBL;
 		}
 		void MarkActiveIBLInitialized() noexcept { m_HasInitializedActiveIBL = true; }
-		void RequestShadowPreview() noexcept override { m_ShadowPreviewRequested = true; }
-		[[nodiscard]] bool ConsumeShadowPreviewRequest() noexcept
-		{
-			const bool requested = m_ShadowPreviewRequested;
-			m_ShadowPreviewRequested = false;
-			return requested;
-		}
+		void RequestShadowPreview() noexcept override;
+		[[nodiscard]] RenderPreviewRequest ObserveShadowPreviewRequest() const noexcept override;
+		void PublishShadowPreview(uint64_t generation, uint64_t revision) noexcept override;
 		void EnsureShadowPreviewResources(
 			uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
@@ -115,7 +113,9 @@ namespace gglab
 
 		void MarkDirty(TextureIndex index) noexcept;
 		bool IsDirty(TextureIndex index) const noexcept;
-		void ClearDirty(TextureIndex index) noexcept;
+		[[nodiscard]] uint64_t GetTextureContentRevision(TextureIndex index) const noexcept override;
+		[[nodiscard]] uint64_t GetPublishedTextureContentRevision(TextureIndex index) const noexcept;
+		void CommitTextureContent(TextureIndex index, uint64_t revision) noexcept override;
 
 		const RHITextureDesc* GetTextureDesc(TextureIndex index) const noexcept;
 		RHITextureHandle GetTextureHandle(TextureIndex index) noexcept;
@@ -152,10 +152,12 @@ namespace gglab
 		}
 
 		void RequestIBLPreview(IBLPreviewType type) noexcept override;
-		[[nodiscard]] bool ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept;
+		[[nodiscard]] RenderPreviewRequest ObserveIBLPreviewRequest(IBLPreviewType type) const noexcept override;
+		void AcknowledgeIBLPreviewRequest(IBLPreviewType type, uint64_t generation) noexcept override;
 		void MarkIBLPreviewDirty(IBLPreviewType type) noexcept;
 		void MarkAllIBLPreviewsDirty() noexcept;
-		void ClearIBLPreviewDirty(IBLPreviewType type) noexcept;
+		void PublishIBLPreview(IBLPreviewType type, const RenderPreviewRequest& request,
+			IBLPreviewLayout layout, uint32_t mip) noexcept override;
 		[[nodiscard]] bool IsIBLPreviewDirty(IBLPreviewType type) const noexcept;
 		[[nodiscard]] bool IsIBLPreviewRequested(IBLPreviewType type) const noexcept;
 		[[nodiscard]] uint64_t GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept;
@@ -179,10 +181,11 @@ namespace gglab
 		}
 		void RequestPostProcessPreview(
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept override;
-		[[nodiscard]] bool ConsumePostProcessPreviewRequest(
-			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept;
+		[[nodiscard]] RenderPreviewRequest ObservePostProcessPreviewRequest(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept override;
 		void PublishPostProcessPreview(PostProcessDebugSelection selection,
-			PostProcessPreviewChannel channel, uint64_t frameSerial) noexcept;
+			PostProcessPreviewChannel channel, uint64_t frameSerial,
+			const RenderPreviewRequest& request) noexcept override;
 		void InvalidatePostProcessPreview(PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept;
 		[[nodiscard]] bool IsPostProcessPreviewRequested(
@@ -241,8 +244,13 @@ namespace gglab
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_IBLBakeTextureEntries;
 		bool m_HasInitializedActiveIBL = false;
+		uint64_t m_NextContentRevision = 0;
+		uint64_t m_NextRequestGeneration = 0;
 		struct IBLPreviewState
 		{
+			uint64_t m_RequestGeneration = 0;
+			IBLPreviewLayout m_PublishedLayout = IBLPreviewLayout::Cross;
+			uint32_t m_PublishedMip = 0;
 			bool m_Requested = false;
 			bool m_Dirty = true;
 			uint64_t m_UpdateCount = 0;
@@ -260,11 +268,13 @@ namespace gglab
 			float m_ExposureEV = 0.0f;
 			uint64_t m_UpdateCount = 0;
 			uint64_t m_PublishedFrameSerial = 0;
+			uint64_t m_RequestGeneration = 0;
 			bool m_Requested = false;
 			bool m_HasPublished = false;
 		};
 		std::array<PostProcessPreviewState, utils::EnumCount<PostProcessPreviewChannel>()> m_PostProcessPreviewStates{};
 		bool m_ShadowPreviewRequested = false;
+		uint64_t m_ShadowPreviewRequestGeneration = 0;
 
 	};
 }

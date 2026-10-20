@@ -36,6 +36,7 @@ namespace gglab
 		Vector3 m_LightDirection = Vector3::Zero;
 		bool m_ShadingEnabled = false;
 		bool m_PreviewRequested = false;
+		uint64_t m_PreviewRequestGeneration = 0;
 		float m_DistanceFadeStart = 0.0f;
 		float m_DistanceFadeInvRange = 0.0f;
 		std::vector<DirectionalShadowCascade> m_Cascades;

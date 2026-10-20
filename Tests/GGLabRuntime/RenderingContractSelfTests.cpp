@@ -67,6 +67,10 @@
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "Graphics/RenderPass/RenderPassIBLClear.h"
+#include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "Graphics/RenderPass/RenderPassIBL.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
 #include <cstring>
@@ -211,9 +215,9 @@ namespace gglab
 			value.RequestPostProcessPreview();
 		};
 		template <typename T>
-		concept PostProcessPreviewConsumption = requires(T& value)
+		concept PostProcessPreviewSettlement = requires(T& value)
 		{
-			value.ConsumePostProcessPreviewRequest();
+			value.PublishPostProcessPreview({}, PostProcessPreviewChannel::PostProcessing, 1, {});
 		};
 		template <typename T>
 		concept IBLPreviewQuery = requires(const T& value)
@@ -228,9 +232,9 @@ namespace gglab
 			value.SetIBLEnvironmentPreviewMip(1);
 		};
 		template <typename T>
-		concept IBLPreviewConsumption = requires(T& value)
+		concept IBLPreviewSettlement = requires(T& value)
 		{
-			value.ConsumeIBLPreviewRequest(IBLPreviewType::Environment);
+			value.PublishIBLPreview(IBLPreviewType::Environment, {}, IBLPreviewLayout::Cross, 0);
 		};
 		template <typename T>
 		concept IBLPreviewAllocation = requires(T& value)
@@ -241,8 +245,8 @@ namespace gglab
 		static_assert(!IBLPreviewRequest<IBLPreviewViewBase>);
 		static_assert(IBLPreviewRequest<IBLPreviewControlBase>);
 		static_assert(!IBLPreviewQuery<IBLPreviewControlBase>);
-		static_assert(!IBLPreviewConsumption<IBLPreviewViewBase>);
-		static_assert(!IBLPreviewConsumption<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewSettlement<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewSettlement<IBLPreviewControlBase>);
 		static_assert(!IBLPreviewAllocation<IBLPreviewViewBase>);
 		static_assert(!IBLPreviewAllocation<IBLPreviewControlBase>);
 
@@ -250,8 +254,8 @@ namespace gglab
 		static_assert(!PostProcessPreviewRequest<PostProcessPreviewViewBase>);
 		static_assert(PostProcessPreviewRequest<PostProcessPreviewControlBase>);
 		static_assert(!PostProcessPreviewQuery<PostProcessPreviewControlBase>);
-		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewViewBase>);
-		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewSettlement<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewSettlement<PostProcessPreviewControlBase>);
 
 		template <typename T>
 		concept ShadowPreviewAllocation = requires(T& value)
@@ -666,7 +670,7 @@ namespace gglab
 			{
 				for (auto type : PreviewTypes)
 				{
-					registry.ClearIBLPreviewDirty(type);
+					registry.PublishIBLPreview(type, registry.ObserveIBLPreviewRequest(type), IBLPreviewLayout::Cross, 0);
 				}
 			};
 			const auto allPreviewsDirty = [&]()
@@ -843,16 +847,18 @@ namespace gglab
 				"Invalid public preview requests are ignored");
 			control.RequestIBLPreview(IBLPreviewType::Environment);
 			control.RequestIBLPreview(IBLPreviewType::Environment);
-			context.Check(registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
-				!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment),
-				"Repeated preview requests coalesce until the render pass consumes them");
-			registry.ClearIBLPreviewDirty(IBLPreviewType::Environment);
-			registry.ClearIBLPreviewDirty(IBLPreviewType::Irradiance);
-			registry.ClearIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+			context.Check(registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment).m_Requested &&
+				registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment).m_Requested,
+				"Repeated preview requests remain observable until a submitted draw acknowledges them");
+			registry.PublishIBLPreview(IBLPreviewType::Environment, registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment), IBLPreviewLayout::Cross, 0);
+			registry.PublishIBLPreview(IBLPreviewType::Irradiance, registry.ObserveIBLPreviewRequest(IBLPreviewType::Irradiance), IBLPreviewLayout::Cross, 0);
+			registry.PublishIBLPreview(IBLPreviewType::PrefilteredSpecular, registry.ObserveIBLPreviewRequest(IBLPreviewType::PrefilteredSpecular), IBLPreviewLayout::Cross, 0);
 			control.RequestIBLPreview(IBLPreviewType::Environment);
-			context.Check(!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
+			registry.AcknowledgeIBLPreviewRequest(IBLPreviewType::Environment,
+				registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment).m_Generation);
+			context.Check(!registry.IsIBLPreviewDirty(IBLPreviewType::Environment) &&
 				!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Requested,
-				"A clean preview consumes its request without scheduling another update");
+				"A clean preview acknowledges its generation without scheduling another update");
 			control.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Count);
 			control.SetIBLIrradiancePreviewLayout(static_cast<IBLPreviewLayout>(99));
 			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Count);
@@ -955,10 +961,11 @@ namespace gglab
 			});
 			const ShadowPreviewViewBase& view = registry;
 			ShadowPreviewControlBase& control = registry;
-			context.Check(!registry.ConsumeShadowPreviewRequest(), "Shadow previews start without rendering demand");
+			context.Check(!registry.ObserveShadowPreviewRequest().m_Requested, "Shadow previews start without rendering demand");
 			control.RequestShadowPreview();
 			control.RequestShadowPreview();
-			context.Check(registry.ConsumeShadowPreviewRequest() && !registry.ConsumeShadowPreviewRequest() &&
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested &&
+				registry.ObserveShadowPreviewRequest().m_Requested &&
 				device.m_CreateTextureCount == 0, "Shadow preview requests coalesce without allocating resources");
 			const auto empty = view.GetShadowPreviewDiagnostics();
 			context.Check(!empty.m_Allocated && !empty.m_SrvDescriptor.IsValid() &&
@@ -978,7 +985,8 @@ namespace gglab
 			context.Check(repeated.m_SrvDescriptor.m_Index == allocated.m_SrvDescriptor.m_Index &&
 				device.m_CreateTextureCount == 1 && registry.IsDirty(Index),
 				"Repeated shadow queries leave allocation identity and pending initialization unchanged");
-			registry.ClearDirty(Index);
+			registry.PublishShadowPreview(registry.ObserveShadowPreviewRequest().m_Generation,
+				registry.GetTextureContentRevision(Index));
 			registry.EnsureShadowPreviewResources();
 			context.Check(view.GetShadowPreviewDiagnostics().m_SrvDescriptor.m_Index ==
 				allocated.m_SrvDescriptor.m_Index && !registry.IsDirty(Index) &&
@@ -1048,9 +1056,9 @@ namespace gglab
 			control.RequestPostProcessPreview();
 			control.RequestPostProcessPreview();
 			context.Check(view.GetPostProcessPreviewDiagnostics().m_Requested &&
-				registry.ConsumePostProcessPreviewRequest() &&
-				!registry.ConsumePostProcessPreviewRequest() && device.m_CreateTextureCount == 0,
-				"Repeated preview requests coalesce and only the Runtime owner consumes them");
+				registry.ObservePostProcessPreviewRequest().m_Requested &&
+				registry.ObservePostProcessPreviewRequest().m_Requested && device.m_CreateTextureCount == 0,
+				"Repeated preview requests coalesce and only the Runtime owner acknowledges them");
 
 			registry.EnsurePostProcessPreviewResources(1024, 512);
 			const auto allocated = view.GetPostProcessPreviewDiagnostics();
@@ -1059,7 +1067,7 @@ namespace gglab
 				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
 				device.m_CreateTextureCount == 1,
 				"Preview observation distinguishes allocated descriptors from recorded contents");
-			registry.PublishPostProcessPreview(selected.m_Selected, PostProcessPreviewChannel::PostProcessing, 42);
+			registry.PublishPostProcessPreview(selected.m_Selected, PostProcessPreviewChannel::PostProcessing, 42, registry.ObservePostProcessPreviewRequest());
 			const auto published = view.GetPostProcessPreviewDiagnostics();
 			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
 			control.SetPostProcessPreviewSelection(nextSelection);
@@ -1080,7 +1088,7 @@ namespace gglab
 				"Preview invalidation changes live availability without rewriting copied metadata");
 
 			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
-			registry.PublishPostProcessPreview(nextSelection, PostProcessPreviewChannel::PostProcessing, 43);
+			registry.PublishPostProcessPreview(nextSelection, PostProcessPreviewChannel::PostProcessing, 43, registry.ObservePostProcessPreviewRequest());
 			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
 			const auto resized = view.GetPostProcessPreviewDiagnostics();
 			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
@@ -1119,7 +1127,7 @@ namespace gglab
 			context.Check(ao.m_Selected == aoSelection && ao.m_Requested &&
 				taa.m_Selected == taaSelection && !taa.m_Requested && taa.m_ExposureEV == 2.0f &&
 				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::PostProcessing) &&
-				registry.ConsumePostProcessPreviewRequest(PostProcessPreviewChannel::AmbientOcclusion) &&
+				registry.ObservePostProcessPreviewRequest(PostProcessPreviewChannel::AmbientOcclusion).m_Requested &&
 				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA),
 				"Feature previews keep independent selections, exposure and requests");
 		}
@@ -2976,6 +2984,256 @@ namespace gglab
 						"Culled passes enqueue nothing and live passes commit in execution order");
 					graph.Retire(submitted.m_Fence);
 				}
+			}
+		}
+
+		void RunPreviewSubmissionContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			const RGCommitContext submitted{ 73, { RHIFenceHandle{ 1, 1 }, 42 } };
+			for (uint32_t i = 0; i < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++i)
+			{
+				const auto channel = static_cast<PostProcessPreviewChannel>(i);
+				const auto index = RenderResourceRegistry::GetPostProcessPreviewTextureIndex(channel);
+				registry.RequestPostProcessPreview(channel);
+				registry.EnsurePostProcessPreviewResources(64, 64, nullptr, channel);
+				const auto observed = registry.ObservePostProcessPreviewRequest(channel);
+				const auto selection = registry.GetPostProcessPreviewSelection(channel);
+				RGDeferredCommitList discarded;
+				RGExecuteContext execute(discarded);
+				execute.DeferCommit([&registry, selection, channel, observed](const RGCommitContext& commit) noexcept
+					{
+						registry.PublishPostProcessPreview(selection, channel, commit.m_FrameSerial, observed);
+					});
+				discarded.Discard();
+				context.Check(registry.IsPostProcessPreviewRequested(channel) && registry.IsDirty(index) &&
+					!registry.HasPublishedPostProcessPreview(channel),
+					"Discard preserves each channel's demand and undefined content without publication");
+				registry.RequestPostProcessPreview(channel);
+				registry.SetPostProcessPreviewExposureEV(1.0f, channel);
+				registry.PublishPostProcessPreview(selection, channel, submitted.m_FrameSerial, observed);
+				context.Check(registry.IsPostProcessPreviewRequested(channel) && registry.IsDirty(index) &&
+					registry.GetPublishedTextureContentRevision(index) == observed.m_ContentRevision &&
+					registry.GetPublishedPostProcessPreviewSelection(channel) == selection,
+					"An older submitted preview publishes its identity while preserving newer demand and content");
+				const auto current = registry.ObservePostProcessPreviewRequest(channel);
+				registry.PublishPostProcessPreview(selection, channel, 74, current);
+				context.Check(!registry.IsPostProcessPreviewRequested(channel) && !registry.IsDirty(index),
+					"The matching preview revision and request generation settle independently");
+			}
+
+			registry.EnsureIblResources();
+			for (uint32_t i = 0; i < static_cast<uint32_t>(IBLPreviewType::Count); ++i)
+			{
+				const auto type = static_cast<IBLPreviewType>(i);
+				registry.RequestIBLPreview(type);
+				const auto observed = registry.ObserveIBLPreviewRequest(type);
+				RGDeferredCommitList discarded;
+				RGExecuteContext execute(discarded);
+				execute.DeferCommit([&registry, type, observed](const RGCommitContext&) noexcept
+					{
+						registry.PublishIBLPreview(type, observed, IBLPreviewLayout::Cross, 0);
+					});
+				discarded.Discard();
+				context.Check(registry.IsIBLPreviewRequested(type) && registry.IsIBLPreviewDirty(type) &&
+					registry.GetIBLPreviewUpdateCount(type) == 0,
+					"Discard leaves every IBL preview pending and dirty");
+				registry.RequestIBLPreview(type);
+				registry.MarkIBLPreviewDirty(type);
+				registry.PublishIBLPreview(type, observed, IBLPreviewLayout::Cross, 0);
+				context.Check(registry.IsIBLPreviewRequested(type) && registry.IsIBLPreviewDirty(type),
+					"A stale IBL draw cannot clear a newer request or content revision");
+				registry.PublishIBLPreview(type, registry.ObserveIBLPreviewRequest(type), IBLPreviewLayout::Grid2x3, 1);
+				registry.RequestIBLPreview(type);
+				const auto clean = registry.ObserveIBLPreviewRequest(type);
+				registry.AcknowledgeIBLPreviewRequest(type, clean.m_Generation);
+				context.Check(!registry.IsIBLPreviewRequested(type) && !registry.IsIBLPreviewDirty(type) &&
+					registry.GetIBLPreviewUpdateCount(type) == 2,
+					"A clean IBL request is satisfied without another submitted draw");
+			}
+
+			registry.RequestShadowPreview();
+			registry.EnsureShadowPreviewResources();
+			const auto shadow = registry.ObserveShadowPreviewRequest();
+			constexpr auto shadowIndex = RenderTextureIndex::Preview_Shadow_DirectionalShadowMap;
+			// A frame with no shadow pass performs no acknowledgement.
+			RGDeferredCommitList empty;
+			empty.CommitAll(submitted);
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested && registry.IsDirty(shadowIndex),
+				"A submitted frame without a shadow preview pass preserves its request");
+			registry.RequestShadowPreview();
+			registry.MarkDirty(shadowIndex);
+			registry.PublishShadowPreview(shadow.m_Generation, shadow.m_ContentRevision);
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested && registry.IsDirty(shadowIndex),
+				"A shadow draw preserves newer request and content generations");
+			const auto requestOnly = registry.ObserveShadowPreviewRequest();
+			registry.RequestShadowPreview();
+			registry.PublishShadowPreview(requestOnly.m_Generation, requestOnly.m_ContentRevision);
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested && !registry.IsDirty(shadowIndex),
+				"A newer request survives even when the drawn content revision is still current");
+			const auto contentOnly = registry.ObserveShadowPreviewRequest();
+			registry.MarkDirty(shadowIndex);
+			registry.PublishShadowPreview(contentOnly.m_Generation, contentOnly.m_ContentRevision);
+			context.Check(!registry.ObserveShadowPreviewRequest().m_Requested && registry.IsDirty(shadowIndex),
+				"A newer content revision survives even when the drawn request generation is still current");
+			registry.RequestShadowPreview();
+			const auto currentShadow = registry.ObserveShadowPreviewRequest();
+			registry.PublishShadowPreview(currentShadow.m_Generation, currentShadow.m_ContentRevision);
+			context.Check(!registry.ObserveShadowPreviewRequest().m_Requested && !registry.IsDirty(shadowIndex),
+				"A matching shadow preview submission acknowledges and initializes its content");
+			const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 42 };
+			registry.EnsureShadowPreviewResources(256, &fence);
+			registry.CommitTextureContent(shadowIndex, currentShadow.m_ContentRevision);
+			context.Check(registry.IsDirty(shadowIndex) &&
+				registry.GetTextureContentRevision(shadowIndex) != currentShadow.m_ContentRevision,
+				"Reallocation changes the content revision before any old clear can settle");
+		}
+
+		void RunPreviewPassContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_TextureViewsSupported = true;
+			device.m_PassConstantsEnabled = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			registry.EnsureIblResources();
+			class Shaders final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef&) noexcept override { return ShaderID{ 1 }; }
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			} shaders;
+			class Bindings final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return { 1, 1 }; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+				const ComposedLayout* GetCommonLayoutContract() const noexcept override
+				{
+					return &scene_bindings::GetCommonLayoutContract();
+				}
+			} bindings;
+			BindingTestResolver pipelines;
+			BindingTestPresentation presentation;
+			const RenderServices services{ .m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
+				.m_Samplers = &samplers, .m_Resources = &registry, .m_Presentation = &presentation,
+				.m_BindingLayout = &bindings };
+			RenderPassIBLClear clear;
+			RenderPassIBLPreview preview;
+			RenderPassIBL ibl;
+			RenderPassPostProcessPreview post;
+			RHIUploadPool uploads(device);
+			for (uint32_t phase = 0; phase < 4; ++phase)
+			{
+				RHIUploadWriter writer;
+				auto batch = uploads.BeginBatch();
+				batch->Attach(writer);
+				RenderFrameBuildResult frame;
+				frame.m_FrameSerial = phase + 1;
+				frame.m_RenderViews.resize(1);
+				frame.m_RenderViews[0].m_Width = 64;
+				frame.m_RenderViews[0].m_Height = 64;
+				frame.m_RenderViews[0].m_DisplayWidth = 64;
+				frame.m_RenderViews[0].m_DisplayHeight = 64;
+				frame.m_FrameConstants.m_Scene = writer.UploadConstants(SceneGPU{});
+				const std::array<ViewGPU, 1> views{};
+				frame.m_FrameConstants.m_Views = writer.UploadStructured(std::span(views));
+				const auto frameContext = frame.MakeRenderFrameContext();
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				struct Imports {};
+				graph.AddPass<Imports>("PreviewTest.Import",
+					[&registry](RenderGraph::RGBuilder& builder, Imports&)
+					{
+						auto& sources = builder.GetBlackboard().Create<RGIBLResources>(IBLResourcesName);
+						auto& previews = builder.GetBlackboard().Create<RGIBLPreviewResources>(IBLPreviewResourcesName);
+						const std::array targets{
+							&sources.m_EnvironmentCubemap, &sources.m_IrradianceCubemap,
+							&sources.m_PrefilteredSpecularCubemap, &sources.m_BrdfLut,
+							&previews.m_EnvironmentCubemapPreview, &previews.m_IrradianceCubemapPreview,
+							&previews.m_PrefilteredSpecularCubemapPreview };
+						for (size_t i = 0; i < targets.size(); ++i)
+						{
+							const auto index = static_cast<RenderTextureIndex>(i);
+							const bool initialized = i < 4 ? registry.HasInitializedActiveIBL() : !registry.IsDirty(index);
+							*targets[i] = builder.ImportTexture(std::format("PreviewTest.Texture{}", i).c_str(),
+								registry.GetTextureHandle(index), *registry.GetTextureDesc(index), CommonRHIResourceState(),
+								initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
+						}
+					});
+				registry.RequestIBLPreview(IBLPreviewType::Environment);
+				clear.AddPass(graph, frameContext, services);
+				preview.AddPass(graph, frameContext, services);
+				if (phase < 3)
+				{
+					registry.SetPostProcessPreviewSelection({ PostProcessDebugTap::SceneColor, 0 });
+					registry.RequestPostProcessPreview();
+					const RGPostProcessColor source{ graph.GetBlackboard().Get<RGIBLPreviewResources>(
+						IBLPreviewResourcesName).m_EnvironmentCubemapPreview, PostProcessColorState::SceneLinearRec709, 1.0f };
+					post.AddPassForTap(graph, frameContext, services, source, PostProcessDebugTap::SceneColor);
+					post.AddPassForTap(graph, frameContext, services, source, PostProcessDebugTap::SceneColor);
+				}
+				ibl.AddFinishPass(graph);
+				const bool compiled = graph.Compile();
+				context.Check(compiled, "Actual IBL clear and preview producers compile with inspector consumers");
+				if (!compiled)
+				{
+					batch->Detach(writer);
+					batch->Cancel();
+					return;
+				}
+				if (phase == 1)
+				{
+					registry.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Grid2x3);
+					registry.SetIBLEnvironmentPreviewMip(1);
+					registry.RequestIBLPreview(IBLPreviewType::Environment);
+					registry.RequestPostProcessPreview();
+					registry.SetPostProcessPreviewExposureEV(1.0f);
+				}
+				RecordingGraphicsCommandContext graphics;
+				graphics.BeginRecordingScope(writer);
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits, { .m_GraphicsCommandContext = &graphics });
+				const auto before = registry.GetIBLPreviewUpdateCount(IBLPreviewType::Environment);
+				graph.Execute(execute);
+				commits.Seal();
+				context.Check(registry.GetIBLPreviewUpdateCount(IBLPreviewType::Environment) == before &&
+					(phase > 1 || !registry.HasInitializedActiveIBL()),
+					"Actual execute lambdas leave publication and IBL initialization unchanged while recording");
+				const RGCommitContext submitted{ frame.m_FrameSerial, { RHIFenceHandle{ 1, 1 }, phase + 1 } };
+				if (phase == 0)
+				{
+					commits.Discard();
+					context.Check(!registry.HasInitializedActiveIBL() && registry.IsPostProcessPreviewRequested() &&
+						!registry.HasPublishedPostProcessPreview() && registry.IsIBLPreviewDirty(IBLPreviewType::Environment),
+						"Discarding actual recorded preview passes preserves demand, dirty state and uninitialized IBL");
+				}
+				else
+				{
+					commits.CommitAll(submitted);
+					const auto state = registry.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview;
+					context.Check(registry.HasInitializedActiveIBL() && state.m_UpdateCount == (phase < 3 ? phase : 2u) &&
+						state.m_Dirty == (phase == 1) && state.m_Requested == (phase == 1) &&
+						state.m_PublishedMip == (phase == 1 ? 0u : 1u) &&
+						registry.IsPostProcessPreviewRequested() == (phase == 1) &&
+						registry.GetPostProcessPreviewUpdateCount() == (phase < 3 ? phase : 2u),
+						"Actual passes publish built selections, preserve newer requests, retry once and leave clean IBL cached");
+				}
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				context.Check(std::ranges::count(snapshot.m_Passes, "PostProcess.Preview", &RGSnapshotPassInfo::m_Name) ==
+					(phase < 3 ? 1 : 0), "Graph-local preview deduplication keeps one producer per channel");
+				graphics.EndRecordingScope();
+				graph.Retire(submitted.m_Fence);
+				batch->Detach(writer);
+				batch->Cancel();
 			}
 		}
 
@@ -9655,7 +9913,8 @@ namespace gglab
 			RenderGraph disabledGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
 			const auto disabledContext = frame.MakeRenderFrameContext();
 			pass.AddPass(disabledGraph, disabledContext, previewServices);
-			registry.PublishPostProcessPreview({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere, 42);
+			registry.PublishPostProcessPreview({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere, 42,
+				registry.ObservePostProcessPreviewRequest(PostProcessPreviewChannel::Atmosphere));
 			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere);
 			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 			RenderPassPostProcessPreview unavailablePreview;
@@ -12478,6 +12737,8 @@ namespace gglab
 		RunFrameSubmissionContractTests(context);
 		RunRenderFrameOutcomeContractTests(context);
 		RunDeferredCommitContractTests(context);
+		RunPreviewSubmissionContractTests(context);
+		RunPreviewPassContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunScopedConstantRecordingTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);

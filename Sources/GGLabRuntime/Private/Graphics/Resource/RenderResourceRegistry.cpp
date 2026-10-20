@@ -391,11 +391,16 @@ namespace gglab
 		auto buildPreview = [this](TextureIndex textureIndex, IBLPreviewType previewType,
 			IBLPreviewLayout layout, uint32_t selectedMip) noexcept -> IBLPreviewDiagnostics
 			{
+				const auto& state = m_IBLPreviewStates[utils::ToIndex(previewType)];
 				return {
 					.m_Texture = BuildIBLTextureDiagnostics(textureIndex),
 					.m_Layout = static_cast<uint32_t>(layout),
 					.m_SelectedMip = selectedMip,
 					.m_UpdateCount = GetIBLPreviewUpdateCount(previewType),
+					.m_ContentRevision = GetTextureContentRevision(textureIndex),
+					.m_PublishedContentRevision = GetPublishedTextureContentRevision(textureIndex),
+					.m_PublishedLayout = static_cast<uint32_t>(state.m_PublishedLayout),
+					.m_PublishedMip = state.m_PublishedMip,
 					.m_Dirty = IsIBLPreviewDirty(previewType),
 					.m_Requested = IsIBLPreviewRequested(previewType),
 				};
@@ -479,7 +484,9 @@ namespace gglab
 
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
 	{
-		m_TextureEntries[utils::ToIndex(index)].m_Dirty = true;
+		auto& entry = m_TextureEntries[utils::ToIndex(index)];
+		entry.m_Dirty = true;
+		entry.m_ContentRevision = ++m_NextContentRevision;
 		InvalidatePreviewForSource(index);
 		InvalidateDependents(index);
 	}
@@ -519,9 +526,47 @@ namespace gglab
 		return m_TextureEntries[utils::ToIndex(index)].m_Dirty;
 	}
 
-	void RenderResourceRegistry::ClearDirty(TextureIndex index) noexcept
+	uint64_t RenderResourceRegistry::GetTextureContentRevision(TextureIndex index) const noexcept
 	{
-		m_TextureEntries[utils::ToIndex(index)].m_Dirty = false;
+		return m_TextureEntries[utils::ToIndex(index)].m_ContentRevision;
+	}
+
+	uint64_t RenderResourceRegistry::GetPublishedTextureContentRevision(TextureIndex index) const noexcept
+	{
+		return m_TextureEntries[utils::ToIndex(index)].m_PublishedContentRevision;
+	}
+
+	void RenderResourceRegistry::CommitTextureContent(TextureIndex index, uint64_t revision) noexcept
+	{
+		auto& entry = m_TextureEntries[utils::ToIndex(index)];
+		// Publishing the drawn version and acknowledging current content are separate decisions.
+		entry.m_PublishedContentRevision = revision;
+		if (entry.m_ContentRevision == revision)
+		{
+			entry.m_Dirty = false;
+		}
+	}
+
+	void RenderResourceRegistry::RequestShadowPreview() noexcept
+	{
+		m_ShadowPreviewRequested = true;
+		m_ShadowPreviewRequestGeneration = ++m_NextRequestGeneration;
+	}
+
+	RenderPreviewRequest RenderResourceRegistry::ObserveShadowPreviewRequest() const noexcept
+	{
+		return { m_ShadowPreviewRequestGeneration,
+			GetTextureContentRevision(TextureIndex::Preview_Shadow_DirectionalShadowMap),
+			m_ShadowPreviewRequested };
+	}
+
+	void RenderResourceRegistry::PublishShadowPreview(uint64_t generation, uint64_t revision) noexcept
+	{
+		CommitTextureContent(TextureIndex::Preview_Shadow_DirectionalShadowMap, revision);
+		if (m_ShadowPreviewRequestGeneration == generation)
+		{
+			m_ShadowPreviewRequested = false;
+		}
 	}
 
 	const RHITextureDesc* RenderResourceRegistry::GetTextureDesc(TextureIndex index) const noexcept
@@ -640,21 +685,33 @@ namespace gglab
 		{
 			return;
 		}
-		m_IBLPreviewStates[utils::ToIndex(type)].m_Requested = true;
+		auto& state = m_IBLPreviewStates[utils::ToIndex(type)];
+		state.m_Requested = true;
+		state.m_RequestGeneration = ++m_NextRequestGeneration;
 	}
 
-	bool RenderResourceRegistry::ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept
+	RenderPreviewRequest RenderResourceRegistry::ObserveIBLPreviewRequest(IBLPreviewType type) const noexcept
+	{
+		const auto& state = m_IBLPreviewStates[utils::ToIndex(type)];
+		return { state.m_RequestGeneration, GetTextureContentRevision(GetPreviewTextureIndex(type)),
+			state.m_Requested };
+	}
+
+	void RenderResourceRegistry::AcknowledgeIBLPreviewRequest(IBLPreviewType type, uint64_t generation) noexcept
 	{
 		auto& state = m_IBLPreviewStates[utils::ToIndex(type)];
-		const bool shouldUpdate = state.m_Requested && state.m_Dirty;
-		state.m_Requested = false;
-		return shouldUpdate;
+		if (state.m_RequestGeneration == generation)
+		{
+			state.m_Requested = false;
+		}
 	}
 
 	void RenderResourceRegistry::MarkIBLPreviewDirty(IBLPreviewType type) noexcept
 	{
 		m_IBLPreviewStates[utils::ToIndex(type)].m_Dirty = true;
-		m_TextureEntries[utils::ToIndex(GetPreviewTextureIndex(type))].m_Dirty = true;
+		auto& entry = m_TextureEntries[utils::ToIndex(GetPreviewTextureIndex(type))];
+		entry.m_Dirty = true;
+		entry.m_ContentRevision = ++m_NextContentRevision;
 	}
 
 	void RenderResourceRegistry::MarkAllIBLPreviewsDirty() noexcept
@@ -664,12 +721,19 @@ namespace gglab
 		MarkIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
 	}
 
-	void RenderResourceRegistry::ClearIBLPreviewDirty(IBLPreviewType type) noexcept
+	void RenderResourceRegistry::PublishIBLPreview(IBLPreviewType type,
+		const RenderPreviewRequest& request, IBLPreviewLayout layout, uint32_t mip) noexcept
 	{
 		auto& state = m_IBLPreviewStates[utils::ToIndex(type)];
-		state.m_Dirty = false;
+		state.m_PublishedLayout = layout;
+		state.m_PublishedMip = mip;
 		++state.m_UpdateCount;
-		m_TextureEntries[utils::ToIndex(GetPreviewTextureIndex(type))].m_Dirty = false;
+		CommitTextureContent(GetPreviewTextureIndex(type), request.m_ContentRevision);
+		if (GetTextureContentRevision(GetPreviewTextureIndex(type)) == request.m_ContentRevision)
+		{
+			state.m_Dirty = false;
+		}
+		AcknowledgeIBLPreviewRequest(type, request.m_Generation);
 	}
 
 	bool RenderResourceRegistry::IsIBLPreviewDirty(IBLPreviewType type) const noexcept
@@ -738,39 +802,55 @@ namespace gglab
 		}
 		selection.m_BloomPyramidLevel =
 			std::min(selection.m_BloomPyramidLevel, MaxBloomPyramidLevels - 1u);
-		m_PostProcessPreviewStates[utils::ToIndex(channel)].m_Selection = selection;
+		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
+		if (state.m_Selection != selection)
+		{
+			state.m_Selection = selection;
+			MarkDirty(GetPostProcessPreviewTextureIndex(channel));
+		}
 	}
 
 	void RenderResourceRegistry::SetPostProcessPreviewExposureEV(
 		float exposureEV, PostProcessPreviewChannel channel) noexcept
 	{
-		m_PostProcessPreviewStates[utils::ToIndex(channel)].m_ExposureEV = std::clamp(exposureEV, -8.0f, 8.0f);
+		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
+		const float clamped = std::clamp(exposureEV, -8.0f, 8.0f);
+		if (state.m_ExposureEV != clamped)
+		{
+			state.m_ExposureEV = clamped;
+			MarkDirty(GetPostProcessPreviewTextureIndex(channel));
+		}
 	}
 
 	void RenderResourceRegistry::RequestPostProcessPreview(PostProcessPreviewChannel channel) noexcept
 	{
-		m_PostProcessPreviewStates[utils::ToIndex(channel)].m_Requested = true;
+		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
+		state.m_Requested = true;
+		state.m_RequestGeneration = ++m_NextRequestGeneration;
 	}
 
-	bool RenderResourceRegistry::ConsumePostProcessPreviewRequest(
-		PostProcessPreviewChannel channel) noexcept
+	RenderPreviewRequest RenderResourceRegistry::ObservePostProcessPreviewRequest(
+		PostProcessPreviewChannel channel) const noexcept
 	{
-		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
-		const bool requested = state.m_Requested;
-		state.m_Requested = false;
-		return requested;
+		const auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
+		return { state.m_RequestGeneration,
+			GetTextureContentRevision(GetPostProcessPreviewTextureIndex(channel)), state.m_Requested };
 	}
 
 	void RenderResourceRegistry::PublishPostProcessPreview(
 		PostProcessDebugSelection selection, PostProcessPreviewChannel channel,
-		uint64_t frameSerial) noexcept
+		uint64_t frameSerial, const RenderPreviewRequest& request) noexcept
 	{
 		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
 		state.m_PublishedSelection = selection;
 		state.m_HasPublished = true;
 		state.m_PublishedFrameSerial = frameSerial;
 		++state.m_UpdateCount;
-		m_TextureEntries[utils::ToIndex(GetPostProcessPreviewTextureIndex(channel))].m_Dirty = false;
+		CommitTextureContent(GetPostProcessPreviewTextureIndex(channel), request.m_ContentRevision);
+		if (state.m_RequestGeneration == request.m_Generation)
+		{
+			state.m_Requested = false;
+		}
 	}
 
 	void RenderResourceRegistry::InvalidatePostProcessPreview(
@@ -910,6 +990,7 @@ namespace gglab
 					"RenderResourceRegistry: failed to publish texture SRV descriptor.");
 
 				outEntry.m_Dirty = true;
+				outEntry.m_ContentRevision = ++m_NextContentRevision;
 				if (&entries == &m_TextureEntries)
 				{
 					InvalidatePreviewForSource(index);
@@ -984,5 +1065,6 @@ namespace gglab
 		m_TransientResourcePool->RetireTexture(std::move(entry.m_PhysicalAllocation), fencePoint);
 
 		entry = {};
+		entry.m_ContentRevision = ++m_NextContentRevision;
 	}
 }

@@ -142,6 +142,8 @@ namespace gglab
 			FrameCaptureControlBase* m_CaptureControl = nullptr;
 			uint64_t m_ExportRequest = 0;
 			bool m_EnableDeferredCommits = false;
+			bool m_EnablePreviewCommits = false;
+			bool m_ChangePreviewAfterBuild = false;
 			CommitEnqueueFault m_CommitEnqueueFault = CommitEnqueueFault::None;
 			std::optional<RGExecuteContext> m_RetainedExecuteContext;
 			std::array<CommitObservation, 64> m_CommitObservations{};
@@ -702,6 +704,36 @@ namespace gglab
 						EnqueueFaultFrameCommits(execute, m_Probe, serial);
 					});
 				m_IBL->AddPass(graph, frame, services);
+				if (m_Probe.m_EnablePreviewCommits)
+				{
+					// The simulated producer uses the production registry and settlement APIs.
+					// Native captures separately cover the actual preview shader passes.
+					auto* resources = services.m_Resources;
+					const auto post = resources->ObservePostProcessPreviewRequest();
+					const auto selection = resources->GetPostProcessPreviewSelection();
+					const auto ibl = resources->ObserveIBLPreviewRequest(IBLPreviewType::Environment);
+					const auto layout = resources->GetIBLEnvironmentPreviewLayout();
+					const auto mip = resources->GetIBLEnvironmentPreviewMip();
+					graph.AddTrivialSideEffectPass("FaultLifecycle.Preview",
+						[resources, post, selection, ibl, layout, mip](RGExecuteContext& execute)
+						{
+							if (post.m_Requested)
+							{
+								execute.DeferCommit([resources, post, selection](const RGCommitContext& commit) noexcept
+									{
+										resources->PublishPostProcessPreview(selection,
+											PostProcessPreviewChannel::PostProcessing, commit.m_FrameSerial, post);
+									});
+							}
+							if (ibl.m_Requested)
+							{
+								execute.DeferCommit([resources, ibl, layout, mip](const RGCommitContext&) noexcept
+									{
+										resources->PublishIBLPreview(IBLPreviewType::Environment, ibl, layout, mip);
+									});
+							}
+						});
+				}
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Scene);
 				m_IBL->AddFinishPass(graph);
 				if (m_Probe.m_EnableTemporalHistory)
@@ -896,6 +928,14 @@ namespace gglab
 			{
 				return RHIFrameEndResult::Fatal();
 			}
+			if (probe.m_ChangePreviewAfterBuild)
+			{
+				host.GetIBLPreviewControl()->SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Grid2x3);
+				host.GetIBLPreviewControl()->SetIBLEnvironmentPreviewMip(1);
+				host.GetIBLPreviewControl()->RequestIBLPreview(IBLPreviewType::Environment);
+				host.GetPostProcessPreviewControl()->SetPostProcessPreviewExposureEV(2.0f);
+				host.GetPostProcessPreviewControl()->RequestPostProcessPreview();
+			}
 			probe.m_RejectUploadWait = action == HostFrameAction::RejectUploadOrder;
 			host.Render(frame, graph, context);
 			if (action == HostFrameAction::DiscardAfterRecording)
@@ -925,6 +965,29 @@ namespace gglab
 				});
 		}
 
+		void RequestOutcomePreviews(GGLabAppRuntime& runtime, LifetimeProbe& probe)
+		{
+			probe.m_EnablePreviewCommits = true;
+			runtime.GetRenderHost()->GetShadowPreviewControl()->RequestShadowPreview();
+			auto* resources = runtime.GetRenderServices().m_Resources;
+			resources->EnsurePostProcessPreviewResources(32, 32);
+			resources->RequestPostProcessPreview();
+			resources->MarkIBLPreviewDirty(IBLPreviewType::Environment);
+			resources->RequestIBLPreview(IBLPreviewType::Environment);
+		}
+
+		void CheckOutcomePreviews(SelfTestContext& checks, GGLabAppRuntime& runtime, bool submitted)
+		{
+			auto* resources = runtime.GetRenderServices().m_Resources;
+			checks.Check(resources->IsPostProcessPreviewRequested() != submitted &&
+				resources->IsDirty(RenderTextureIndex::Preview_PostProcess) != submitted &&
+				resources->HasPublishedPostProcessPreview() == submitted &&
+				resources->ObserveShadowPreviewRequest().m_Requested &&
+				resources->IsIBLPreviewRequested(IBLPreviewType::Environment) != submitted &&
+				(submitted || resources->IsIBLPreviewDirty(IBLPreviewType::Environment)),
+				"Production Renderer commits previews only on Submitted, preserves demand and dirty state otherwise, and keeps shadow demand without a producer");
+		}
+
 		void RunEndFrameOutcomeScenario(SelfTestContext& checks, const std::filesystem::path& root,
 			FrameEndInjection injection, AbortInjection abort)
 		{
@@ -936,6 +999,7 @@ namespace gglab
 			{
 				return;
 			}
+			RequestOutcomePreviews(runtime, probe);
 			const auto previousFence = runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint();
 			const uint32_t callbacks = probe.m_SubmittedCallbacks;
 			const uint32_t ends = probe.m_FrameEnds;
@@ -973,6 +1037,7 @@ namespace gglab
 					probe.m_CommitObservations[1].m_Order == 2 &&
 					probe.m_CommitObservations[1].m_Fence == frameFence)),
 				"Production settlement commits once in order with its fence only on Submitted and drops Failed captures");
+			CheckOutcomePreviews(checks, runtime, submitted);
 			if (!submitted)
 			{
 				const uint32_t begins = probe.m_FrameBegins;
@@ -1005,6 +1070,7 @@ namespace gglab
 				registry.emplace<components::TransformComponent>(light);
 				registry.emplace<components::LightComponent>(light);
 			}
+			RequestOutcomePreviews(runtime, probe);
 			const auto previousFence = runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint();
 			const uint32_t ends = probe.m_FrameEnds;
 			const uint32_t aborts = probe.m_FrameAborts;
@@ -1029,6 +1095,7 @@ namespace gglab
 			probe.m_CaptureControl->ConsumeResults(results);
 			checks.Check(probe.m_CommitsRun == 0 && probe.m_CommitPayloadsDestroyed == (recorded ? 2u : 0u),
 				"Discarded and unknown-completion frames destroy recorded CPU commits without running them");
+			CheckOutcomePreviews(checks, runtime, false);
 			if (unknown)
 			{
 				checks.Check(results.size() == 1 && results[0].m_RequestId == capture &&
@@ -1047,6 +1114,7 @@ namespace gglab
 					"Discarded requeues flexible captures and preserves the previously committed temporal history");
 				probe.m_AbortInjection = AbortInjection::Unfenced;
 				const auto next = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
+				CheckOutcomePreviews(checks, runtime, true);
 				probe.m_CaptureControl->ConsumeResults(results);
 				checks.Check(next.IsCompleted() && results.size() == 1 && results[0].m_RequestId == capture &&
 					results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Image,
@@ -1089,6 +1157,7 @@ namespace gglab
 			const uint32_t aborts = probe.m_FrameAborts;
 			const uint32_t callbacks = probe.m_SubmittedCallbacks;
 			const uint32_t commits = probe.m_CommitsRun;
+			RequestOutcomePreviews(runtime, probe);
 			probe.m_QueueExport = true;
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_ExportRequest != 0 &&
 				probe.m_GraphBuilds == builds + 1 && probe.m_GraphExecutions == executions &&
@@ -1097,10 +1166,12 @@ namespace gglab
 				"Production AppRuntime export deferral aborts after graph build without recording or submitting");
 			checks.Check(probe.m_CommitsRun == commits && probe.m_CommitPayloadsDestroyed == commits,
 				"The export-deferral abort carries no CPU commits from graph setup");
+			CheckOutcomePreviews(checks, runtime, false);
 			held.clear();
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_FrameEnds == ends + 1 &&
 				probe.m_SubmittedCallbacks == callbacks + 1,
 				"Production AppRuntime continues with one successful frame after export pressure clears");
+			CheckOutcomePreviews(checks, runtime, true);
 			std::vector<FrameCaptureResult> results;
 			probe.m_CaptureControl->ConsumeResults(results);
 			checks.Check(results.size() == 1 && results[0].m_RequestId == probe.m_ExportRequest &&
@@ -1109,6 +1180,38 @@ namespace gglab
 			checks.Check(probe.m_CommitsRun == commits + 2 && probe.m_CommitPayloadsDestroyed == commits + 2 &&
 				probe.m_CommitIdentityMatches,
 				"The post-deferral submission commits only its own state once");
+			runtime.Shutdown();
+		}
+
+		void RunPreviewChangeScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			RequestOutcomePreviews(runtime, probe);
+			const auto before = runtime.GetRenderHost()->GetIBLPreviewView()->GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview;
+			probe.m_ChangePreviewAfterBuild = true;
+			const auto first = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
+			const auto stale = runtime.GetRenderHost()->GetIBLPreviewView()->GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview;
+			auto* resources = runtime.GetRenderServices().m_Resources;
+			checks.Check(first.IsCompleted() && stale.m_Dirty && stale.m_Requested &&
+				stale.m_PublishedLayout == before.m_Layout && stale.m_PublishedMip == before.m_SelectedMip &&
+				stale.m_UpdateCount == before.m_UpdateCount + 1 &&
+				resources->IsPostProcessPreviewRequested() && resources->IsDirty(RenderTextureIndex::Preview_PostProcess),
+				"Build-to-execute selection changes preserve dirty state and newer requests while publishing only the drawn IBL selection");
+			probe.m_ChangePreviewAfterBuild = false;
+			const auto next = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
+			const auto current = runtime.GetRenderHost()->GetIBLPreviewView()->GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview;
+			checks.Check(next.IsCompleted() && !current.m_Requested &&
+				current.m_PublishedLayout == static_cast<uint32_t>(IBLPreviewLayout::Grid2x3) &&
+				current.m_PublishedMip == 1 && current.m_UpdateCount == stale.m_UpdateCount + 1,
+				"The next requesting frame publishes the newer IBL layout and mip exactly once");
+			CheckOutcomePreviews(checks, runtime, true);
 			runtime.Shutdown();
 		}
 
@@ -1205,6 +1308,7 @@ namespace gglab
 			RunDiscardOutcomeScenario(checks, root / "abort-unknown", HostFrameAction::DiscardAfterRecording,
 				AbortInjection::CompletionUnknown);
 			RunExportDeferralOutcomeScenario(checks, root / "export-deferral");
+			RunPreviewChangeScenario(checks, root / "preview-change");
 			RunLateCommitScenario(checks, root / "late-sealed-unfenced",
 				CommitEnqueueFault::BeforeSubmission, AbortInjection::Unfenced);
 			RunLateCommitScenario(checks, root / "late-sealed-fenced",

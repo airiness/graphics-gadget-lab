@@ -48,6 +48,18 @@ Submitted. Direct EndFrame checks its `Fatal(realFence)` result; production
 hooks and subsequent frames. No participant is settled twice. Normal consumers
 must never retain the context, list or any enqueue capability.
 
+Preview settlement scenarios use the production registry's request-generation and
+content-revision APIs through a simulated producer on the production Renderer.
+They cover fenced/unfenced failure, discard before/after recording, export
+backpressure and retry, and layout/mip changes between build and execution.
+Dirty state and unsatisfied demand survive unsuccessful frames; submitted stale
+content records only its drawn selection and leaves newer requests pending.
+Shadow demand also survives frames whose pipeline adds no shadow preview pass.
+The Runtime rendering-contract suite separately executes the actual IBL clear,
+IBL preview and post-process preview passes, including clean IBL caching and
+per-graph channel deduplication. Native captures cover successful shader output;
+the simulated producer does not establish preview pixel correctness.
+
 After production IBL has queued a pending readback, a frame submission is
 accepted without a completion signal and idle verification fails. The suite
 checks upload quarantine, retained graph/capture/IBL owners, terminal runtime

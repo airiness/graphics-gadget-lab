@@ -86,6 +86,15 @@ namespace gglab
 			SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept = 0;
 	};
 
+	// Build observes demand and content independently. Submitted draws acknowledge them;
+	// a clean IBL preview may acknowledge a request at build because it needs no work.
+	struct RenderPreviewRequest
+	{
+		uint64_t m_Generation = 0;
+		uint64_t m_ContentRevision = 0;
+		bool m_Requested = false;
+	};
+
 	class RenderResourceRegistryAccess
 	{
 	public:
@@ -104,7 +113,11 @@ namespace gglab
 		[[nodiscard]] virtual uint32_t GetShaderVisibleSrvIndex(
 			RenderTextureIndex index) const noexcept = 0;
 		[[nodiscard]] virtual bool IsDirty(RenderTextureIndex index) const noexcept = 0;
-		virtual void ClearDirty(RenderTextureIndex index) noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetTextureContentRevision(RenderTextureIndex index) const noexcept = 0;
+		// Record the drawn revision; clear dirty only if that content is still current.
+		virtual void CommitTextureContent(RenderTextureIndex index, uint64_t revision) noexcept = 0;
+		[[nodiscard]] virtual RenderPreviewRequest ObserveShadowPreviewRequest() const noexcept = 0;
+		virtual void PublishShadowPreview(uint64_t generation, uint64_t revision) noexcept = 0;
 		virtual void MarkDirty(RenderTextureIndex index) noexcept = 0;
 
 		[[nodiscard]] virtual const RHITextureDesc* GetIBLBakeTextureDesc(
@@ -122,8 +135,8 @@ namespace gglab
 
 		[[nodiscard]] virtual bool IsPostProcessPreviewRequested(
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
-		[[nodiscard]] virtual bool ConsumePostProcessPreviewRequest(
-			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual RenderPreviewRequest ObservePostProcessPreviewRequest(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
 		[[nodiscard]] virtual PostProcessDebugSelection GetPostProcessPreviewSelection(
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept = 0;
@@ -139,7 +152,8 @@ namespace gglab
 		[[nodiscard]] virtual float GetPostProcessPreviewExposureEV(
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
 		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection,
-			PostProcessPreviewChannel channel, uint64_t frameSerial) noexcept = 0;
+			PostProcessPreviewChannel channel, uint64_t frameSerial,
+			const RenderPreviewRequest& request) noexcept = 0;
 		virtual void InvalidatePostProcessPreview(
 			PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
@@ -147,10 +161,12 @@ namespace gglab
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
 
 		virtual void RequestIBLPreview(IBLPreviewType type) noexcept = 0;
-		[[nodiscard]] virtual bool ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept = 0;
+		[[nodiscard]] virtual RenderPreviewRequest ObserveIBLPreviewRequest(IBLPreviewType type) const noexcept = 0;
+		virtual void AcknowledgeIBLPreviewRequest(IBLPreviewType type, uint64_t generation) noexcept = 0;
 		virtual void MarkIBLPreviewDirty(IBLPreviewType type) noexcept = 0;
 		virtual void MarkAllIBLPreviewsDirty() noexcept = 0;
-		virtual void ClearIBLPreviewDirty(IBLPreviewType type) noexcept = 0;
+		virtual void PublishIBLPreview(IBLPreviewType type, const RenderPreviewRequest& request,
+			IBLPreviewLayout layout, uint32_t mip) noexcept = 0;
 		[[nodiscard]] virtual bool IsIBLPreviewDirty(IBLPreviewType type) const noexcept = 0;
 		[[nodiscard]] virtual bool IsIBLPreviewRequested(IBLPreviewType type) const noexcept = 0;
 		[[nodiscard]] virtual IBLPreviewLayout GetIBLEnvironmentPreviewLayout()
