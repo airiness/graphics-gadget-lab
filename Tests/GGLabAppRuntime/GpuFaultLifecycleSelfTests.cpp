@@ -3,6 +3,8 @@
 #include "Capture/CaptureWriter.h"
 #include "ApplicationInput.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/FrameCaptureImageEncoder.h"
+#include "Capture/FrameSequenceCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
@@ -16,6 +18,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
@@ -133,6 +136,7 @@ namespace gglab
 			AbortInjection m_AbortInjection = AbortInjection::Unfenced;
 			bool m_RejectUploadWait = false;
 			bool m_QueueExport = false;
+			uint32_t m_RequiredPlanDeferrals = 0;
 			bool m_EnableTemporalHistory = false;
 			uint32_t m_FrameBegins = 0;
 			uint32_t m_FrameEnds = 0;
@@ -819,6 +823,14 @@ namespace gglab
 							GGLAB_UNUSED(exported);
 						});
 				}
+				if (m_Probe.m_RequiredPlanDeferrals != 0 &&
+					m_Probe.m_CaptureControl->GetUnfinishedRequestCount() >= 2)
+				{
+					// Inject the real late-admission deferral after image binding. The
+					// production coordinator and RAII host must abort the whole plan.
+					--m_Probe.m_RequiredPlanDeferrals;
+					m_Probe.m_CaptureControl->DeferFrameCaptures(frame.m_FrameSerial);
+				}
 				if (m_Probe.m_QueueExport)
 				{
 					m_Probe.m_QueueExport = false;
@@ -895,7 +907,7 @@ namespace gglab
 
 		bool InitializeOutcomeRuntime(SelfTestContext& checks, GGLabAppRuntime& runtime,
 			FaultFactory& factory, ApplicationInput& input, LifetimeProbe& probe,
-			const std::filesystem::path& root)
+			const std::filesystem::path& root, FrameCaptureImageEncoder imageEncoder = {})
 		{
 			probe.m_EnableTemporalHistory = true;
 			const GGLabAppRuntimeCreateInfo info{
@@ -904,7 +916,8 @@ namespace gglab
 				.m_Paths = { .m_RuntimeRoot = root, .m_AssetRoot = root / "Assets",
 					.m_ShaderArtifactRoot = root / "Shaders", .m_IblDerivedDataRoot = root / "IBL",
 					.m_TextureDerivedDataRoot = root / "Texture", .m_EnvironmentAssetRoot = root / "Environment",
-					.m_SettingsRoot = root / "Settings", .m_CaptureRoot = root / "Captures" } };
+					.m_SettingsRoot = root / "Settings", .m_CaptureRoot = root / "Captures" },
+				.m_HostServices = { .m_FrameCaptureImageEncoder = std::move(imageEncoder) } };
 			ApplicationContentRegistration content;
 			content.m_Demos.push_back({ .m_Id = "FaultLifecycle.Demo", .m_Factory = &CreateFaultDemo });
 			const auto registry = WriteShaderFixtures(info.m_Paths.m_ShaderArtifactRoot);
@@ -1241,6 +1254,129 @@ namespace gglab
 				probe.m_CommitIdentityMatches,
 				"The post-deferral submission commits only its own state once");
 			runtime.Shutdown();
+		}
+
+		void RunRequiredPlanOutcomeScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			uint32_t referenceSamples, bool missingResource)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			// Encoding is a stand-in here; native backend captures verify real PNGs.
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root,
+				[&](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					++probe.m_ImageEncodes;
+					return std::vector<uint8_t>{ 0x89, 'P', 'N', 'G', 13, 10, 26, 10 };
+				}))
+			{
+				return;
+			}
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (!runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_Readiness.IsReady() &&
+				std::chrono::steady_clock::now() < deadline)
+			{
+				GGLAB_UNUSED(runtime.Tick());
+				std::this_thread::yield();
+			}
+			auto& rig = runtime.GetDemoManager()->GetActiveDemo()->GetCameraRig();
+			checks.Check(rig.SetCameraPaths({ {
+				.m_Id = "SEQ_RequiredProducts", .m_Name = "Required products", .m_Version = 1,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+					{ .m_Frame = 1, .m_Position = { 1, 1, 0 }, .m_Target = { 1, 1, 10 } },
+				},
+			} }), "The production camera rig registers a deterministic required-product sequence");
+			runtime.GetTime()->SetFixedDeltaTime(1.0 / 60.0);
+			auto& sequence = *runtime.GetFrameSequenceCoordinator();
+			auto& capture = *runtime.GetFrameCaptureCoordinator();
+			std::string error;
+			checks.Check(sequence.Start({ .m_CameraPathId = "SEQ_RequiredProducts", .m_CaptureFrames = { 0 },
+				.m_Exports = { { .m_Frame = 0,
+					.m_Targets = { { .m_Resource = missingResource ? "Missing.RequiredResource" : "FaultLifecycle.Color" } },
+					.m_IncludeGraph = true } },
+				.m_ReferenceSamples = referenceSamples }, error) != 0,
+				"The production sequence accepts image, arrays and graph as one required-product plan");
+			if (missingResource)
+			{
+				const auto executions = probe.m_GraphExecutions;
+				const auto ends = probe.m_FrameEnds;
+				const auto aborts = probe.m_FrameAborts;
+				const auto maps = probe.m_ReadbackMaps;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue &&
+					probe.m_GraphExecutions == executions && probe.m_FrameEnds == ends &&
+					probe.m_FrameAborts == aborts + 1 && probe.m_ReadbackMaps == maps,
+					"A permanent compiled-resource failure aborts before image recording, readback or partial submission");
+				std::vector<FrameCaptureRequestResult> results;
+				runtime.ConsumeFrameCaptureResults(results);
+				checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					sequence.GetStatus()->m_SubmittedFrames == 0 && results.size() == 2 &&
+					std::ranges::all_of(results, [](const auto& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Failed && result.m_ImagePath.empty() &&
+							result.m_ResourcePaths.empty() && !result.m_Failure.empty();
+					}) && capture.GetUnfinishedRequestCount() == 0 &&
+					probe.m_CaptureControl->GetUnfinishedRequestCount() == 0 && probe.m_ImageEncodes == 0,
+					"The permanent failure fans out exactly once and drains every Runtime request without encoding its image");
+			}
+			else
+			{
+				probe.m_RequiredPlanDeferrals = 2;
+				for (uint32_t attempt = 0; attempt < 8 && probe.m_RequiredPlanDeferrals == 2; ++attempt)
+				{
+					GGLAB_UNUSED(runtime.Tick());
+				}
+				const double time = runtime.GetTime()->GetTotalTime();
+				const auto serial = capture.GetLastFrameState()->m_FrameSerial;
+				const auto ids = sequence.GetStatus()->m_CaptureRequestIds;
+				const auto executions = probe.m_GraphExecutions;
+				const auto ends = probe.m_FrameEnds;
+				const auto aborts = probe.m_FrameAborts;
+				const auto maps = probe.m_ReadbackMaps;
+				checks.Check(probe.m_RequiredPlanDeferrals == 1 && ids.size() == 2 &&
+					sequence.GetStatus()->m_State == FrameSequenceState::Running &&
+					sequence.GetStatus()->m_SubmittedFrames == 0 && capture.GetUnfinishedRequestCount() == 2 &&
+					sequence.ShouldHoldTime() && probe.m_CaptureControl->GetUnfinishedRequestCount() == 0,
+					"Late production deferral retires bound Runtime owners but preserves "
+					"both IDs and the unsubmitted sequence sample");
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_RequiredPlanDeferrals == 0 &&
+					probe.m_GraphExecutions == executions && probe.m_FrameEnds == ends && probe.m_FrameAborts == aborts + 1 &&
+					probe.m_ReadbackMaps == maps && runtime.GetTime()->GetTotalTime() == time &&
+					capture.GetLastFrameState()->m_FrameSerial == serial + 1 &&
+					sequence.GetStatus()->m_CaptureRequestIds == ids && sequence.GetStatus()->m_SubmittedFrames == 0,
+					"A second real RAII abort records no GPU work, maps no payload "
+					"and repeats the same simulation instant with fresh provenance");
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_FrameEnds == ends + 1 &&
+					probe.m_GraphExecutions == executions + 1 && runtime.GetTime()->GetTotalTime() == time &&
+					sequence.GetStatus()->m_SubmittedFrames == 1,
+					"Only the successful complete-plan retry submits and advances the sequence "
+					"at the preserved simulation instant");
+				const auto successfulSerial = capture.GetLastFrameState()->m_FrameSerial;
+				std::vector<FrameCaptureRequestResult> results;
+				for (uint32_t attempt = 0; attempt < 100 && results.size() < 2; ++attempt)
+				{
+					GGLAB_UNUSED(runtime.Tick());
+					runtime.ConsumeFrameCaptureResults(results);
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+				checks.Check(results.size() == 2 && std::ranges::all_of(results, [&](const auto& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Completed && result.m_Metadata &&
+							result.m_Metadata->m_FrameSerial == successfulSerial && result.m_Metadata->m_TotalTime == time &&
+							result.m_Metadata->m_Sequence && result.m_Metadata->m_Sequence->m_Frame == 0 &&
+							std::ranges::find(ids, result.m_RequestId) != ids.end();
+					}) && probe.m_ImageEncodes == 1 && capture.GetUnfinishedRequestCount() == 0 &&
+					probe.m_CaptureControl->GetUnfinishedRequestCount() == 0 &&
+					probe.m_CaptureControl->GetResourceExportFrameAvailability() == FrameCaptureAvailability::Available,
+					"Production image, graph and NPY publication uses only the successful attempt "
+					"and releases all payload/write reservations");
+			}
+			runtime.Shutdown();
+			std::vector<FrameCaptureRequestResult> late;
+			runtime.ConsumeFrameCaptureResults(late);
+			checks.Check(late.empty() && probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0,
+				"Required-product teardown adds no duplicate terminal result and releases GPU owners only after safe settlement");
 		}
 
 		void RunPreviewChangeScenario(SelfTestContext& checks, const std::filesystem::path& root)
@@ -1680,6 +1816,9 @@ namespace gglab
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		RunFrameOutcomeScenarios(context, root / "outcomes");
+		RunRequiredPlanOutcomeScenario(context, root / "required-plan-late", 0, false);
+		RunRequiredPlanOutcomeScenario(context, root / "required-plan-reference", 3, false);
+		RunRequiredPlanOutcomeScenario(context, root / "required-plan-missing", 0, true);
 		RunPublicationRetentionScenario(context, root / "publication-before-claim", false);
 		RunPublicationRetentionScenario(context, root / "publication-after-claim", true);
 		for (const auto completion : { RHIFenceQueryResult::Pending, RHIFenceQueryResult::Failed,

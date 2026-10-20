@@ -290,25 +290,30 @@ namespace gglab
 
 	bool FrameSequenceCoordinator::ShouldDeferFrame() const noexcept
 	{
-		const bool exportFrame = (m_Request.m_ReferenceSamples == 0 || m_Sample + 1 == m_Request.m_ReferenceSamples) &&
-			std::ranges::any_of(m_Request.m_Exports, [&](const auto& entry) { return entry.m_Frame == m_Frame; });
+		if (!IsActive())
+		{
+			return false;
+		}
 		const auto* previous = m_Capture->GetLastFrameState();
-		const bool startingExportFrame = m_Status && m_Status->m_State == FrameSequenceState::Waiting &&
-			previous && previous->m_Readiness.IsReady() && MatchesRequiredContent(m_Request.m_RequiredContentId, *previous);
-		const bool imageFrame = (m_Request.m_ReferenceSamples == 0 || m_Sample + 1 == m_Request.m_ReferenceSamples) &&
-			std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame);
-		const uint32_t requestCount = static_cast<uint32_t>(imageFrame) + static_cast<uint32_t>(exportFrame);
-		// Capacity covers GPU payloads, retained images and reserved write slots.
-		// Only temporary pressure defers: an impossible target must fail explicitly.
-		return m_Status && ((m_Status->m_State == FrameSequenceState::Running && IsCaptureDue() &&
-			m_Capture->GetCaptureAvailability(m_Request.m_CaptureSource) == FrameCaptureAvailability::Busy) ||
-			((m_Status->m_State == FrameSequenceState::Running || startingExportFrame) && exportFrame &&
-				m_Capture->GetCaptureAvailability(FrameCaptureSource::ResourceExport, requestCount) == FrameCaptureAvailability::Busy));
+		const bool starting = m_Status->m_State == FrameSequenceState::Waiting && previous &&
+			previous->m_Readiness.IsReady() && MatchesRequiredContent(m_Request.m_RequiredContentId, *previous);
+		if (m_Status->m_State != FrameSequenceState::Running && !starting)
+		{
+			return false;
+		}
+		// Query the same required products that BeginFrame submits. Already
+		// accepted IDs survive a late deferral, but the sample has not advanced.
+		const CapturePlan plan = MakeFrameCapturePlan();
+		return !plan.m_RequiredProducts.empty() &&
+			m_Capture->GetCaptureAvailability(plan) == FrameCaptureAvailability::Busy;
 	}
 
 	bool FrameSequenceCoordinator::ShouldHoldTime() const noexcept
 	{
-		return m_Status && m_Status->m_State == FrameSequenceState::Running && m_Sample > 0;
+		// A begun frame without matching submission is the same simulation instant
+		// on retry, including sample zero and non-reference sequences.
+		return m_Status && m_Status->m_State == FrameSequenceState::Running &&
+			(m_Sample > 0 || m_FrameBegun);
 	}
 
 	bool FrameSequenceCoordinator::WantsGpuTiming() const noexcept
@@ -334,6 +339,62 @@ namespace gglab
 		}
 		const auto found = std::ranges::find(m_Request.m_Exports, m_Frame, &FrameSequenceResourceExport::m_Frame);
 		return found == m_Request.m_Exports.end() ? nullptr : &*found;
+	}
+
+	CapturePlan FrameSequenceCoordinator::MakeFrameCapturePlan() const noexcept
+	{
+		CapturePlan plan{
+			.m_OutputDirectory = m_Request.m_OutputDirectory,
+			.m_Label = std::format("{}-f{:04}", m_Request.m_Label, m_Frame),
+			.m_Note = m_Request.m_Note,
+			.m_Sequence = FrameCaptureSequenceInfo{
+				.m_SequenceId = m_Status->m_SequenceId,
+				.m_CameraPathId = m_Request.m_CameraPathId,
+				.m_CameraPathVersion = m_Status->m_CameraPathVersion,
+				.m_Frame = m_Frame,
+				.m_FrameCount = m_Status->m_FrameCount,
+				.m_ReferenceSamples = m_Request.m_ReferenceSamples,
+				.m_ReferenceTextureLodBias = m_Request.m_ReferenceTextureLodBias,
+			},
+		};
+		if (m_Request.m_ReferenceSamples != 0 && m_Sample + 1 != m_Request.m_ReferenceSamples)
+		{
+			return plan;
+		}
+		if (std::ranges::binary_search(m_Request.m_CaptureFrames, m_Frame))
+		{
+			switch (m_Request.m_CaptureSource)
+			{
+			case FrameCaptureSource::Scene:
+				plan.m_RequiredProducts.emplace_back(ImageCaptureProduct{ CaptureImageSource::Scene });
+				break;
+			case FrameCaptureSource::Composited:
+				plan.m_RequiredProducts.emplace_back(ImageCaptureProduct{ CaptureImageSource::Composited });
+				break;
+			case FrameCaptureSource::Diagnostic:
+				plan.m_RequiredProducts.emplace_back(DiagnosticCaptureProduct{ m_Request.m_DiagnosticTap });
+				break;
+			case FrameCaptureSource::RenderGraph:
+				plan.m_RequiredProducts.emplace_back(GraphCaptureProduct{});
+				break;
+			case FrameCaptureSource::ResourceExport:
+				plan.m_RequiredProducts.emplace_back(ResourceCaptureProduct{});
+				break;
+			default:
+				plan.m_RequiredProducts.emplace_back(UnsupportedCaptureProduct{ m_Request.m_CaptureSource });
+				break;
+			}
+		}
+		const auto resource = std::ranges::find(m_Request.m_Exports, m_Frame, &FrameSequenceResourceExport::m_Frame);
+		if (resource != m_Request.m_Exports.end())
+		{
+			plan.m_RequiredProducts.emplace_back(ResourceCaptureProduct{ resource->m_Targets });
+			if (resource->m_IncludeGraph)
+			{
+				plan.m_RequiredProducts.emplace_back(GraphCaptureProduct{});
+			}
+		}
+		return plan;
 	}
 
 	std::optional<FrameSequencePoseRequest> FrameSequenceCoordinator::PrepareFrame(
@@ -468,41 +529,21 @@ namespace gglab
 			return;
 		}
 
-		if (IsCaptureDue())
+		const bool imageDue = IsCaptureDue();
+		const bool resourcesDue = GetDueExport() != nullptr;
+		if (imageDue || resourcesDue)
 		{
-			const uint64_t requestId = m_Capture->Submit(FrameCaptureRequest{
-				.m_Source = m_Request.m_CaptureSource,
-				.m_Timing = FrameCaptureTiming::NextFrame,
-				.m_OutputDirectory = m_Request.m_OutputDirectory,
-				.m_Label = std::format("{}-f{:04}", m_Request.m_Label, m_Frame),
-				.m_Note = m_Request.m_Note,
-				.m_Sequence = FrameCaptureSequenceInfo{
-					.m_SequenceId = m_Status->m_SequenceId,
-					.m_CameraPathId = m_Request.m_CameraPathId,
-					.m_CameraPathVersion = m_Status->m_CameraPathVersion,
-					.m_Frame = m_Frame,
-					.m_FrameCount = m_Status->m_FrameCount,
-					.m_ReferenceSamples = m_Request.m_ReferenceSamples,
-					.m_ReferenceTextureLodBias = m_Request.m_ReferenceTextureLodBias,
-				},
-				.m_DiagnosticTap = m_Request.m_DiagnosticTap,
-				});
-			m_Status->m_CaptureRequestIds.push_back(requestId);
-			m_CaptureRequestFrames.push_back(m_Frame);
-			m_CapturedFrame = m_Frame;
-		}
-		if (const auto* resourceExport = GetDueExport())
-		{
-			const uint64_t requestId = m_Capture->Submit(FrameCaptureRequest{
-				.m_Source = FrameCaptureSource::ResourceExport, .m_Timing = FrameCaptureTiming::NextFrame,
-				.m_OutputDirectory = m_Request.m_OutputDirectory, .m_Label = std::format("{}-f{:04}", m_Request.m_Label, m_Frame),
-				.m_Note = m_Request.m_Note, .m_ResourceTargets = resourceExport->m_Targets, .m_IncludeGraph = resourceExport->m_IncludeGraph,
-				.m_Sequence = FrameCaptureSequenceInfo{ .m_SequenceId = m_Status->m_SequenceId, .m_CameraPathId = m_Request.m_CameraPathId,
-					.m_CameraPathVersion = m_Status->m_CameraPathVersion, .m_Frame = m_Frame, .m_FrameCount = m_Status->m_FrameCount,
-					.m_ReferenceSamples = m_Request.m_ReferenceSamples, .m_ReferenceTextureLodBias = m_Request.m_ReferenceTextureLodBias } });
-			m_Status->m_CaptureRequestIds.push_back(requestId);
-			m_CaptureRequestFrames.push_back(m_Frame);
-			m_ExportedFrame = m_Frame;
+			const auto ids = m_Capture->SubmitPlan(MakeFrameCapturePlan());
+			m_Status->m_CaptureRequestIds.insert(m_Status->m_CaptureRequestIds.end(), ids.begin(), ids.end());
+			m_CaptureRequestFrames.insert(m_CaptureRequestFrames.end(), ids.size(), m_Frame);
+			if (imageDue)
+			{
+				m_CapturedFrame = m_Frame;
+			}
+			if (resourcesDue)
+			{
+				m_ExportedFrame = m_Frame;
+			}
 		}
 		if (!m_WatchStarted)
 		{

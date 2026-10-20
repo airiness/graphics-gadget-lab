@@ -68,7 +68,8 @@ namespace gglab
 
 			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override
 			{
-				if (m_RejectRequest || GetRequestAvailability() != FrameCaptureAvailability::Available)
+				if (m_RejectRequest || m_Issued.size() >= m_RejectAfterIssued ||
+					GetRequestAvailability() != FrameCaptureAvailability::Available)
 				{
 					return 0;
 				}
@@ -78,7 +79,8 @@ namespace gglab
 			}
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap tap, uint64_t frameSerial = 0, uint64_t groupId = 0) noexcept override
 			{
-				if (m_RejectRequest || GetRequestAvailability() != FrameCaptureAvailability::Available)
+				if (m_RejectRequest || m_Issued.size() >= m_RejectAfterIssued ||
+					GetRequestAvailability() != FrameCaptureAvailability::Available)
 				{
 					return 0;
 				}
@@ -167,7 +169,7 @@ namespace gglab
 				image->m_Pixels = { 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 10, 20, 30, 0 };
 				m_LastImage = image;
 				std::shared_ptr<RGSnapshot> graph;
-				if (issued->m_Source == FrameCaptureSource::RenderGraph || issued->m_IncludeGraph)
+				if (!m_OmitGraph && (issued->m_Source == FrameCaptureSource::RenderGraph || issued->m_IncludeGraph))
 				{
 					graph = std::make_shared<RGSnapshot>();
 					graph->m_Execution.m_Recorded = true;
@@ -218,6 +220,8 @@ namespace gglab
 			FrameCaptureAvailability m_RequestAvailability = FrameCaptureAvailability::Available;
 			FrameCaptureAvailability m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
 			bool m_RejectRequest = false;
+			size_t m_RejectAfterIssued = std::numeric_limits<size_t>::max();
+			bool m_OmitGraph = false;
 			bool m_Instrumentation = false;
 			std::vector<std::shared_ptr<const NonFiniteProductionFrame>> m_Production;
 			uint32_t m_RequestLimit = 64;
@@ -1638,6 +1642,10 @@ namespace gglab
 					m_Sequence.OnCaptureResults(Consume(m_Capture));
 					return std::nullopt;
 				}
+				if (!m_Sequence.ShouldHoldTime())
+				{
+					m_SimulationTime += 1.0 / 60.0;
+				}
 				const std::optional<FrameSequencePoseRequest> pose = m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
 				m_LastSample = pose ? pose->m_ReferenceSample : std::nullopt;
 				m_LastTemporalAAOverrides = pose ?
@@ -1655,6 +1663,7 @@ namespace gglab
 				}
 				FrameCaptureFrameState state = MakeFrameState(m_Ready, temporalSession);
 				state.m_FrameSerial = ++m_RenderSerial;
+				state.m_TotalTime = m_SimulationTime;
 				state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity = m_CameraResetSerial;
 				state.m_SettleKey.m_Temporal.m_Identity.m_DepthExtent = m_RenderExtent;
 				state.m_SettleKey.m_Temporal.m_Identity.m_Accumulation = m_Accumulation;
@@ -1666,6 +1675,25 @@ namespace gglab
 				}
 				m_Sequence.BeginFrame(state);
 				m_Capture.BeginFrame(std::move(state));
+				if (m_LateDeferrals != 0 && std::ranges::any_of(m_Control.m_Issued, [&](const auto& issued)
+					{
+						return issued.m_FrameSerial == m_RenderSerial && issued.m_Source == FrameCaptureSource::ResourceExport;
+					}))
+				{
+					--m_LateDeferrals;
+					for (const auto& issued : m_Control.m_Issued)
+					{
+						if (issued.m_FrameSerial == m_RenderSerial)
+						{
+							m_Control.Busy(issued.m_Id);
+						}
+					}
+					m_Capture.Update();
+					m_Sequence.OnCaptureResults(Consume(m_Capture));
+					m_Completed = m_Control.m_Issued.size();
+					m_Deferred = true;
+					return pose ? std::optional<uint32_t>(pose->m_Frame) : std::nullopt;
+				}
 				if (submit)
 				{
 					m_Capture.OnFrameSubmitted();
@@ -1688,6 +1716,8 @@ namespace gglab
 			std::vector<CameraPath> m_Paths;
 			uint64_t m_CameraResetSerial = 1;
 			uint64_t m_RenderSerial = 0;
+			double m_SimulationTime = 0.0;
+			uint32_t m_LateDeferrals = 0;
 			ViewExtent m_RenderExtent{ 64, 32 };
 			TemporalAAHistoryAccumulation m_Accumulation = TemporalAAHistoryAccumulation::EffectiveSamples;
 			bool m_HistoryCompatible = true;
@@ -2735,6 +2765,328 @@ namespace gglab
 			coordinator.FinalizeAfterRenderHost();
 		}
 
+		[[nodiscard]] CapturePlan MakeRequiredTestPlan()
+		{
+			return {
+				.m_RequiredProducts = { ImageCaptureProduct{},
+					ResourceCaptureProduct{ { { .m_Resource = "A" } } }, GraphCaptureProduct{} },
+				.m_Label = "required-products",
+			};
+		}
+
+		void RunRequiredPlanLifecycleTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("required-plan-lifecycle");
+			{
+				FakeCaptureControl control;
+				control.m_ResourceFrameAvailability = FrameCaptureAvailability::Busy;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true });
+				auto plan = MakeRequiredTestPlan();
+				plan.m_Sequence = FrameCaptureSequenceInfo{ .m_SequenceId = 91, .m_Frame = 3 };
+				const auto first = coordinator.SubmitPlan(plan);
+				const auto second = coordinator.SubmitPlan(plan);
+				const auto independent = coordinator.Submit({ .m_Sequence = plan.m_Sequence });
+				context.Check(coordinator.Cancel(first[0]) && coordinator.GetUnfinishedRequestCount() == 3,
+					"Cancelling an explicit plan does not reconstruct membership from identical sequence metadata");
+				const auto cancelled = Consume(coordinator);
+				context.Check(cancelled.size() == 2 && cancelled[0].m_RequestId == first[0] &&
+					cancelled[1].m_RequestId == first[1] && coordinator.Cancel(independent) &&
+					Consume(coordinator).size() == 1 && coordinator.GetUnfinishedRequestCount() == 2,
+					"Legacy single-output submission remains independent of an explicit plan with the same provenance");
+				control.m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
+				coordinator.BeginFrame(MakeFrameState(true));
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.OnFrameSubmitted();
+				coordinator.Update();
+				const auto completed = Consume(coordinator);
+				context.Check(completed.size() == 2 && completed[0].m_RequestId == second[0] &&
+					completed[1].m_RequestId == second[1] && control.m_Issued.size() == 2 &&
+					control.m_Issued[0].m_GroupId == second[0] && control.m_Issued[1].m_GroupId == second[0],
+					"Only the surviving plan issues, with its own stable Runtime association and legacy results");
+				coordinator.FinalizeAfterRenderHost();
+			}
+			for (const bool missingGraph : { false, true })
+			{
+				TemporaryDirectory failedDirectory("required-plan-transport-failure");
+				FakeCaptureControl control;
+				uint32_t encodes = 0;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = failedDirectory.GetPath(),
+					.m_ImageEncoder = [&](const FrameCaptureImage& image)
+					{
+						++encodes;
+						return EncodeTestPng(image);
+					},
+					.m_WriteOnCallingThread = true });
+				const auto ids = coordinator.SubmitPlan(MakeRequiredTestPlan());
+				coordinator.BeginFrame(MakeFrameState(true));
+				coordinator.OnFrameSubmitted();
+				control.Complete(control.m_Issued[0].m_Id);
+				coordinator.Update();
+				const auto image = control.m_LastImage;
+				context.Check(Consume(coordinator).empty() && encodes == 0 && !image.expired() &&
+					!std::filesystem::exists(failedDirectory.GetPath()),
+					"A ready image retains its product but cannot publish before the required arrays and graph arrive");
+				if (missingGraph)
+				{
+					control.m_OmitGraph = true;
+					control.Complete(control.m_Issued[1].m_Id);
+				}
+				else
+				{
+					control.Fail(control.m_Issued[1].m_Id, "Required resource transport failed.");
+				}
+				coordinator.Update();
+				const auto failed = Consume(coordinator);
+				context.Check(failed.size() == 2 && failed[0].m_RequestId == ids[0] && failed[1].m_RequestId == ids[1] &&
+					std::ranges::all_of(failed, [](const auto& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Failed && result.m_ImagePath.empty() &&
+							result.m_ResourcePaths.empty() && !result.m_Failure.empty();
+					}) && encodes == 0 && image.expired() && coordinator.GetUnfinishedRequestCount() == 0 &&
+					control.GetUnfinishedRequestCount() == 0 && !std::filesystem::exists(failedDirectory.GetPath()),
+					"Missing required graph or failed resource transport fails every output "
+					"without partial publication or retained products");
+				coordinator.FinalizeAfterRenderHost();
+			}
+			{
+				FakeCaptureControl control;
+				control.m_RejectAfterIssued = 1;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true });
+				GGLAB_UNUSED(coordinator.SubmitPlan(MakeRequiredTestPlan()));
+				coordinator.BeginFrame(MakeFrameState(true));
+				const auto failed = Consume(coordinator);
+				context.Check(failed.size() == 2 && failed[0].m_Status == FrameCaptureRequestStatus::Failed &&
+					failed[1].m_Status == FrameCaptureRequestStatus::Failed && failed[0].m_Metadata &&
+					!failed[1].m_Metadata && control.m_Issued.size() == 1,
+					"An unexpected rejection after advisory admission fails all outputs, including the accepted sibling");
+				control.Complete(control.m_Issued[0].m_Id);
+				coordinator.Update();
+				context.Check(Consume(coordinator).empty() && control.GetUnfinishedRequestCount() == 0 &&
+					coordinator.GetCaptureAvailability(FrameCaptureSource::RenderGraph, 9) == FrameCaptureAvailability::Available,
+					"The rejected plan drains its late Runtime product without another result or an orphan writer reservation");
+				coordinator.FinalizeAfterRenderHost();
+			}
+		}
+
+		void RunRequiredPlanRetryTests(SelfTestContext& context) noexcept
+		{
+			for (const auto mode : { NonFiniteWatchMode::Report, NonFiniteWatchMode::Fail })
+			{
+				for (const bool diagnostic : { false, true })
+				{
+					for (const size_t busyIndex : { 0u, 1u })
+					{
+						TemporaryDirectory directory("required-plan-retry");
+						FakeCaptureControl control;
+						control.m_Instrumentation = true;
+						NonFiniteWatchCoordinator watch(&control);
+						std::string error;
+						context.Check(watch.Configure({ .m_Mode = mode, .m_Boundary = false }, error),
+							"A required-plan retry configures its existing production watch mode");
+						FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+							.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+							.m_WriteOnCallingThread = true, .m_NonFiniteWatch = &watch });
+						auto plan = MakeRequiredTestPlan();
+						if (diagnostic)
+						{
+							plan.m_RequiredProducts[0] = DiagnosticCaptureProduct{ PostProcessDebugTap::TemporalHistoryWeight };
+						}
+						const auto ids = coordinator.SubmitPlan(std::move(plan));
+						auto state = MakeFrameState(true);
+						coordinator.BeginFrame(state);
+						for (uint32_t retry = 0; retry < 3; ++retry)
+						{
+							const auto first = control.m_Issued.size() - 2;
+							const auto staleSibling = control.m_Issued[first + 1 - busyIndex].m_Id;
+							control.Busy(control.m_Issued[first + busyIndex].m_Id);
+							coordinator.Update();
+							context.Check(Consume(coordinator).empty() && coordinator.GetUnfinishedRequestCount() == 2 &&
+								coordinator.GetCaptureAvailability(FrameCaptureSource::RenderGraph, 9) ==
+									FrameCaptureAvailability::Available,
+								"One Busy result retires the complete required-product attempt "
+								"and returns every writer reservation");
+							++state.m_FrameSerial;
+							++state.m_FrameIndex;
+							state.m_TotalTime += 0.25;
+							state.m_Camera.m_Name = std::format("Retried camera {}", retry);
+							coordinator.BeginFrame(state);
+							control.Complete(staleSibling);
+							coordinator.Update();
+							context.Check(Consume(coordinator).empty() && !std::filesystem::exists(directory.GetPath()) &&
+								control.m_Issued[first + 2].m_GroupId == ids[0] &&
+								control.m_Issued[first + 3].m_GroupId == ids[0],
+								"A late sibling from a discarded attempt cannot publish into the freshly bound plan");
+						}
+						coordinator.SetFrameSceneInputs(state.m_FrameSerial, { .m_LocalLightCount = 99 });
+						watch.OnFrameSubmitted(state.m_FrameSerial);
+						coordinator.OnFrameSubmitted();
+						const auto final = control.m_Issued.size() - 2;
+						control.Complete(control.m_Issued[final].m_Id);
+						coordinator.Update();
+						context.Check(Consume(coordinator).empty() && !std::filesystem::exists(directory.GetPath()),
+							"A retried image waits for every other required product and the final attempt's coverage");
+						control.Complete(control.m_Issued[final + 1].m_Id);
+						coordinator.Update();
+						context.Check(Consume(coordinator).empty() && !std::filesystem::exists(directory.GetPath()),
+							"Ready image, arrays and graph do not bypass missing required watch evidence");
+						auto production = std::make_shared<NonFiniteProductionFrame>();
+						production->m_FrameSerial = state.m_FrameSerial;
+						production->m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
+						control.m_Production.push_back(std::move(production));
+						coordinator.Update();
+						const auto completed = Consume(coordinator);
+						context.Check(completed.size() == 2 && std::ranges::all_of(completed, [&](const auto& result)
+							{
+								const auto& metadata = result.m_Metadata;
+								return result.m_Status == FrameCaptureRequestStatus::Completed && metadata &&
+									metadata->m_FrameSerial == state.m_FrameSerial &&
+									metadata->m_FrameIndex == state.m_FrameIndex &&
+									metadata->m_TotalTime == state.m_TotalTime &&
+									metadata->m_Camera.m_Name == state.m_Camera.m_Name &&
+									metadata->m_SceneInputs && metadata->m_SceneInputs->m_LocalLightCount == 99 &&
+									metadata->m_WatchCoverage && metadata->m_WatchCoverage->m_Complete &&
+									metadata->m_WatchCoverage->m_FrameCount == 1 &&
+									metadata->m_WatchCoverage->m_FirstFrameSerial == state.m_FrameSerial;
+							}) && completed[0].m_Metadata->m_WatchCoverage == completed[1].m_Metadata->m_WatchCoverage,
+							"All legacy results share fresh actual-frame provenance and one coverage snapshot "
+							"excluding discarded attempts");
+						if (completed.size() == 2 && completed[0].m_Status == FrameCaptureRequestStatus::Completed &&
+							completed[1].m_Status == FrameCaptureRequestStatus::Completed)
+						{
+							const auto image = nlohmann::json::parse(ReadText(completed[0].m_MetadataPath));
+							const auto resources = nlohmann::json::parse(ReadText(completed[1].m_MetadataPath));
+							const auto graph = nlohmann::json::parse(ReadText(completed[1].m_GraphPath));
+							context.Check(image["frame"] == resources["frame"]["frame"] &&
+								image["frame"] == graph["frame"]["frame"] &&
+								image["camera"] == resources["frame"]["camera"] && image["time"] == graph["frame"]["time"] &&
+								image["watch"] == resources["frame"]["watch"] && image["watch"] == graph["frame"]["watch"],
+								"Published PNG sidecar, resource metadata and graph agree on actual frame, "
+								"camera, time and watch coverage");
+						}
+						coordinator.FinalizeAfterRenderHost();
+						context.Check(Consume(coordinator).empty() && coordinator.GetUnfinishedRequestCount() == 0 &&
+							control.GetUnfinishedRequestCount() == 0 && control.m_LastImage.expired(),
+							"Repeated whole-plan retries leave no duplicate terminal result, "
+							"live Runtime request or retained CPU product");
+					}
+				}
+			}
+		}
+
+		void RunRequiredPlanWatchTests(SelfTestContext& context) noexcept
+		{
+			for (const auto mode : { NonFiniteWatchMode::Report, NonFiniteWatchMode::Fail })
+			{
+				TemporaryDirectory directory("required-plan-watch");
+				FakeCaptureControl control;
+				control.m_Instrumentation = true;
+				NonFiniteWatchCoordinator watch(&control);
+				std::string error;
+				context.Check(watch.Configure({ .m_Mode = mode, .m_Boundary = false }, error),
+					"Required products retain report/fail watch configuration");
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true, .m_NonFiniteWatch = &watch });
+				GGLAB_UNUSED(coordinator.SubmitPlan(MakeRequiredTestPlan()));
+				const auto state = MakeFrameState(true);
+				coordinator.BeginFrame(state);
+				watch.OnFrameSubmitted(state.m_FrameSerial);
+				coordinator.OnFrameSubmitted();
+				auto production = std::make_shared<NonFiniteProductionFrame>();
+				production->m_FrameSerial = state.m_FrameSerial;
+				production->m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced };
+				production->m_Sites.push_back({ .m_ProgramIndex = 2, .m_SiteIndex = 3, .m_Claim = production->m_Claim });
+				control.m_Production.push_back(std::move(production));
+				coordinator.Update();
+				const auto early = Consume(coordinator);
+				context.Check((mode == NonFiniteWatchMode::Fail ? early.size() == 2 : early.empty()) &&
+					!std::filesystem::exists(directory.GetPath()),
+					"Fail mode terminates the entire plan before readbacks arrive; report mode preserves the required products");
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.Update();
+				const auto late = Consume(coordinator);
+				const auto& results = mode == NonFiniteWatchMode::Fail ? early : late;
+				context.Check(results.size() == 2 && std::ranges::all_of(results, [&](const auto& result)
+					{
+						return result.m_Status == (mode == NonFiniteWatchMode::Fail ?
+							FrameCaptureRequestStatus::Failed :
+							FrameCaptureRequestStatus::Completed) &&
+							result.m_Metadata && result.m_Metadata->m_WatchCoverage &&
+							result.m_Metadata->m_WatchCoverage->m_FirstAnomaly.has_value();
+					}) && (mode != NonFiniteWatchMode::Fail || late.empty()) &&
+					coordinator.GetUnfinishedRequestCount() == 0 && control.GetUnfinishedRequestCount() == 0,
+					"Report publishes both outputs with anomaly evidence; fail mode drains "
+					"both late products without duplicate results");
+				coordinator.FinalizeAfterRenderHost();
+			}
+		}
+
+		void RunSequenceLateDeferralTests(SelfTestContext& context) noexcept
+		{
+			for (const uint32_t samples : { 0u, 3u })
+			{
+				TemporaryDirectory directory("sequence-late-deferral");
+				SequenceHarness harness(directory.GetPath());
+				GGLAB_UNUSED(harness.Frame());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 },
+					.m_Exports = { { .m_Frame = 0, .m_Targets = { { .m_Resource = "A" } }, .m_IncludeGraph = true } },
+					.m_ReferenceSamples = samples }, error));
+				harness.m_LateDeferrals = 2;
+				for (uint32_t attempt = 0; attempt < 4 && !harness.m_Deferred; ++attempt)
+				{
+					GGLAB_UNUSED(harness.Frame());
+				}
+				const double time = harness.m_SimulationTime;
+				const auto serial = harness.m_RenderSerial;
+				const auto ids = harness.m_Sequence.GetStatus()->m_CaptureRequestIds;
+				context.Check(harness.m_Deferred && ids.size() == 2 && harness.m_Results.empty() &&
+					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 0 && harness.m_Sequence.ShouldHoldTime() &&
+					(samples == 0 || (harness.m_LastSample && harness.m_LastSample->m_Index == samples - 1)),
+					"Late Busy preserves the exact sequence frame and reference sample without a terminal result");
+				harness.m_Control.m_ResourceFrameAvailability = FrameCaptureAvailability::Busy;
+				GGLAB_UNUSED(harness.Frame());
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_RenderSerial == serial && harness.m_SimulationTime == time,
+					"Waiting for complete-plan capacity after a late deferral does not simulate another frame");
+				harness.m_Control.m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_Deferred && harness.m_SimulationTime == time &&
+					harness.m_Sequence.GetStatus()->m_CaptureRequestIds == ids && harness.m_Results.empty() &&
+					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 0,
+					"A second late Busy reuses both accepted IDs and the simulation instant instead of advancing sample or time");
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(!harness.m_Deferred && harness.m_SimulationTime == time && harness.m_Results.size() == 2 &&
+					harness.m_Sequence.GetStatus()->m_CaptureRequestIds == ids &&
+					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 1 &&
+					std::ranges::all_of(harness.m_Results, [&](const auto& result)
+					{
+						return result.m_Status == FrameCaptureRequestStatus::Completed && result.m_Metadata &&
+							result.m_Metadata->m_FrameSerial == harness.m_RenderSerial &&
+							result.m_Metadata->m_TotalTime == time &&
+							result.m_Metadata->m_Sequence && result.m_Metadata->m_Sequence->m_Frame == 0;
+					}),
+					"Only the successful retry advances the sequence, "
+					"with fresh render provenance for the same simulation instant");
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_SimulationTime == time + 1.0 / 60.0 && harness.m_Results.size() == 2 &&
+					harness.m_Capture.GetUnfinishedRequestCount() == 0 && harness.m_Control.GetUnfinishedRequestCount() == 0,
+					"The next sequence frame advances time exactly once and leaves no orphan reservation or duplicate result");
+				harness.m_Capture.FinalizeAfterRenderHost();
+			}
+		}
+
 		void RunSequenceGroupAdmissionTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("sequence-group-admission");
@@ -2747,9 +3099,13 @@ namespace gglab
 					GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::RenderGraph, .m_WaitForCapacity = true }));
 				}
 				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 77, .m_Frame = 4 };
-				const auto image = coordinator.Submit({ .m_Sequence = sequence });
-				const auto resources = coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
-					.m_ResourceTargets = { { .m_Resource = "A" } }, .m_IncludeGraph = true, .m_Sequence = sequence });
+				const auto ids = coordinator.SubmitPlan({
+					.m_RequiredProducts = { ImageCaptureProduct{}, ResourceCaptureProduct{ { { .m_Resource = "A" } } },
+						GraphCaptureProduct{} },
+					.m_Sequence = sequence,
+				});
+				const auto image = ids[0];
+				const auto resources = ids[1];
 				auto state = MakeFrameState(true);
 				state.m_FrameSerial = 100;
 				coordinator.BeginFrame(state);
@@ -2793,9 +3149,10 @@ namespace gglab
 				FrameCaptureCoordinator coordinator({ .m_Capture = &control, .m_DefaultOutputDirectory = directory.GetPath(),
 					.m_ImageEncoder = &EncodeTestPng, .m_WriteOnCallingThread = true });
 				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 79, .m_Frame = 5 };
-				GGLAB_UNUSED(coordinator.Submit({ .m_Sequence = sequence }));
-				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
-					.m_ResourceTargets = { { .m_Resource = "A" } }, .m_Sequence = sequence }));
+				GGLAB_UNUSED(coordinator.SubmitPlan({
+					.m_RequiredProducts = { ImageCaptureProduct{}, ResourceCaptureProduct{ { { .m_Resource = "A" } } } },
+					.m_Sequence = sequence,
+				}));
 				auto state = MakeFrameState(true);
 				coordinator.BeginFrame(state);
 				const uint64_t groupId = control.m_Issued.empty() ? 0 : control.m_Issued[0].m_GroupId;
@@ -2868,8 +3225,11 @@ namespace gglab
 				FakeCaptureControl control;
 				FrameCaptureCoordinator coordinator({ .m_Capture = &control });
 				const FrameCaptureSequenceInfo sequence{ .m_SequenceId = 88 };
-				const auto image = coordinator.Submit({ .m_Sequence = sequence });
-				GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport, .m_Sequence = sequence }));
+				const auto ids = coordinator.SubmitPlan({
+					.m_RequiredProducts = { ImageCaptureProduct{}, ResourceCaptureProduct{} },
+					.m_Sequence = sequence,
+				});
+				const auto image = ids[0];
 				control.m_ResourceFrameAvailability = FrameCaptureAvailability::Busy;
 				coordinator.BeginFrame(MakeFrameState(true));
 				context.Check(control.m_Issued.empty() && coordinator.Cancel(image),
@@ -3085,6 +3445,10 @@ namespace gglab
 		RunResourceWritingTests(context);
 		RunResourceSequenceTests(context);
 		RunSequenceGroupAdmissionTests(context);
+		RunRequiredPlanLifecycleTests(context);
+		RunRequiredPlanRetryTests(context);
+		RunRequiredPlanWatchTests(context);
+		RunSequenceLateDeferralTests(context);
 		RunGraphWritingTests(context);
 		RunGraphFailureTests(context);
 		RunNextFrameTests(context);

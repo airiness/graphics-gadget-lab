@@ -226,8 +226,8 @@ namespace gglab
 		// render a frame, so the sequence stays deterministic. Poll capture results
 		// to retire GPU work while the writer drains on its own thread.
 		[[nodiscard]] bool ShouldDeferFrame() const noexcept;
-		// True for every reference sample after the first of a sequence frame: the
-		// runtime then starts the frame without advancing simulation time.
+		// True for later reference samples and retries of a begun, unsubmitted
+		// sequence frame: the runtime must preserve the same simulation instant.
 		[[nodiscard]] bool ShouldHoldTime() const noexcept;
 		// True while an active sequence records GPU timing; the runtime then keeps GPU
 		// profiling enabled.
@@ -276,6 +276,7 @@ namespace gglab
 		// not been captured yet.
 		[[nodiscard]] bool IsCaptureDue() const noexcept;
 		[[nodiscard]] const FrameSequenceResourceExport* GetDueExport() const noexcept;
+		[[nodiscard]] CapturePlan MakeFrameCapturePlan() const noexcept;
 
 		FrameCaptureCoordinator* m_Capture = nullptr;
 		uint64_t m_NextSequenceId = 1;
