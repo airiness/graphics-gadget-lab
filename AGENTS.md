@@ -114,10 +114,9 @@ immediate updates only when the state can safely change in place.
   default, preserving per-file exceptions. Restore this form before handoff;
   `Scripts/OpenGGLabVS.bat` normalization must not create follow-up diffs.
   Preserve the exact LF bytes of `Shaders/Tests/Generated/*.hlsli` fixtures.
-  Use Visual Studio's native C++ formatter for C++ and its HLSL language service
-  for shaders. Do not format HLSL as C++ or substitute clang-format or another
-  formatter engine. Preserve Visual Studio project files' repository-specific
-  encoding and layout; use the repository scripts for repair or regeneration.
+  Review C++ and HLSL layout manually as described in gglab-format.
+  Preserve Visual Studio project files' repository-specific encoding and layout;
+  use the repository scripts for repair or regeneration.
 - Preserve the `Externals/Vender` spelling. Edit `Externals` only for a task
   concerning a vendored dependency. Keep build products, IDE state and shader
   caches out of commits.

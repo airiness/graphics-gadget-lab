@@ -6,7 +6,7 @@ description: Review and normalize first-party gglab C++ and HLSL layout after im
 # GGLab format
 
 Apply the repository's layout conventions while editing, then complete a scoped
-formatting pass before building the completed implementation for verification.
+manual layout review before building the completed implementation for verification.
 Read [Layout rules](references/layout-rules.md). Consult the relevant sections
 of [Examples](references/examples.md) for the constructs being changed.
 
@@ -17,37 +17,32 @@ of [Examples](references/examples.md) for the constructs being changed.
 - Use it for explicitly requested formatting cleanup or audits. Honor a
   review-only request by reporting findings without editing.
 - Documentation-only work and read-only investigations need no source formatting.
-  A diagnostic compile during implementation may precede this pass. After later
+  A diagnostic compile during implementation may precede this review. After later
   code edits, revisit the affected regions before final verification; unchanged
-  code needs no repeated pass for each build configuration or test invocation.
+  code needs no repeated review for each build configuration or test invocation.
 
 ## Establish the editing scope
 
 Identify the paths and regions changed by this task, including new untracked
 source files. Inspect the working tree and index to distinguish them from the
-owner's existing changes. Git's complete dirty-file list is not the formatting
+owner's existing changes. Git's complete dirty-file list is not the review
 scope. Leave staging and unrelated changes untouched.
 
-For an existing file, format the affected regions and enough surrounding code to
-keep the enclosing construct consistent. A new file can be formatted as a whole.
-If the available formatter operates on a whole file, use an isolated copy with
-the same effective configuration and apply only reviewed changes in scope.
+For an existing file, review the affected regions and enough surrounding code to
+keep the enclosing construct consistent. Review a new file as a whole.
 Repository-wide cleanup requires an explicitly requested broader scope.
 
 Exclude vendored code, build outputs and generated fixtures unless the task
 specifically concerns them. In particular, preserve the byte-pinned LF files in
 `Shaders/Tests/Generated/*.hlsli`.
 
-## Format and review
+## Manual layout review
 
-Use the root `.editorconfig` and `.gitattributes`. Use Visual Studio's native C++
-formatter for C++ and the HLSL language service for shaders. Do not run HLSL
-through a C++ formatter, or substitute clang-format or another formatting engine.
-Do not change shared IDE preferences or repository formatting settings to make
-one formatting pass succeed.
+Use the root `.editorconfig` and `.gitattributes` together with the layout rules
+and examples. Inspect C++ and HLSL manually and make scoped repairs. Do not invoke
+automatic formatters as part of this workflow.
 
-After native formatting, inspect the affected constructs against the layout
-rules, particularly:
+Inspect the affected constructs against the layout rules, particularly:
 
 - Control bodies, scoped `case` branches and macro call-site semicolons.
 - Continuation levels, nested ternaries and their branch initializers.
@@ -55,11 +50,6 @@ rules, particularly:
 - Complete declarations, readable calls, arrays, repeated records and JSON fields.
 - HLSL attributes and casts, comments inside conditional compilation, and code
   following multiline raw strings.
-
-Repair formatter regressions manually. Stable formatter output is not proof that
-it follows these conventions. Finish with the reviewed layout; do not repeatedly
-format away the corrections. If the native formatter is unavailable, make scoped
-manual repairs and report that limitation while continuing applicable checks.
 
 Preserve token order, literal bytes, comments and preprocessor boundaries during
 whitespace-only edits. Inserting required control braces or correcting an HLSL
@@ -92,6 +82,6 @@ control braces. Regenerate the shared identifiers with
 weaken identity validation or refresh unreviewed hashes to make a check pass.
 
 Once the layout is final, run the owning builds and affected tests required by
-the root `AGENTS.md`. Include the formatting scope, relevant verification and
-any formatter limitation in the handoff. This skill is an agent workflow; it
-does not install a build hook or establish GPU or visual correctness.
+the root `AGENTS.md`. Include the review scope, relevant verification and any
+remaining limitations in the handoff. This skill is an agent workflow; it does
+not install a build hook or establish GPU or visual correctness.

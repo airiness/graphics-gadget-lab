@@ -32,13 +32,17 @@ namespace gglab
 		uint32_t m_Layout = 0;
 		uint32_t m_SelectedMip = 0;
 		uint64_t m_UpdateCount = 0;
+		uint64_t m_ContentRevision = 0;
+		uint64_t m_PublishedContentRevision = 0;
+		uint32_t m_PublishedLayout = 0;
+		uint32_t m_PublishedMip = 0;
 		bool m_Dirty = true;
 		bool m_Requested = false;
 	};
 
 	// Copied active resources; staging bake allocations are never exposed.
-	// Layout and mip describe requested selection. Update counts track recording,
-	// not fence completion or the generation of the current allocation.
+	// Layout and mip describe requested selection. Published fields and update counts track successful frame submission,
+	// not GPU fence completion. Requested selection may be newer than published content.
 	struct IBLPreviewResourcesDiagnostics
 	{
 		IBLTextureDiagnostics m_Environment;

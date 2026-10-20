@@ -88,7 +88,10 @@ namespace gglab
 					commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 					commandContext->EndRendering();
 				}
-				registry->MarkActiveIBLInitialized();
+				executeContext.DeferCommit([registry](const RGCommitContext&) noexcept
+					{
+						registry->MarkActiveIBLInitialized();
+					});
 			});
 	}
 

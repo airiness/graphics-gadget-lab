@@ -662,7 +662,9 @@ namespace gglab
 			}
 			toolingFrame.Abort();
 			return FailRuntime(std::format(
-				"Rendering contract failure: pipeline='{}', frame={}, backend={}, reason='{}'{}{}",
+				"{}: pipeline='{}', frame={}, backend={}, reason='{}'{}{}",
+				validation.m_Status == RenderFrameValidationStatus::DeviceLost ?
+					"Rendering device lost" : "Rendering contract failure",
 				renderPipeline.GetName(), frame.m_FrameSerial, GetBackendName(m_Config.m_RhiBackend),
 				validation.m_Reason, validation.m_Detail.empty() ? "" : ", detail=",
 				validation.m_Detail));

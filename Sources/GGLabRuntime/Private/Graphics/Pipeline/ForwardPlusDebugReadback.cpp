@@ -3,12 +3,14 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -29,6 +31,17 @@ namespace gglab
 			return;
 		}
 
+		if (!m_ValidationFailure.IsReady() || device.HasCompletionError())
+		{
+			return;
+		}
+		const auto pending = [](const auto& slot) { return slot.m_Pending; };
+		if (std::ranges::any_of(m_PendingSlots, pending) ||
+			std::ranges::any_of(m_PendingHdrDiffSlots, pending) ||
+			std::ranges::any_of(m_PendingGridSlots, pending))
+		{
+			return;
+		}
 		ReleaseBuffers();
 		if (bufferCount == 0)
 		{
@@ -73,11 +86,18 @@ namespace gglab
 	void ForwardPlusDebugReadback::PrepareGridBuffer(RHIDevice& device, uint32_t bufferIndex,
 		const ForwardPlusTileGrid& tileGrid) noexcept
 	{
+		if (!m_ValidationFailure.IsReady())
+		{
+			return;
+		}
 		GGLAB_ASSERT(m_Device == std::addressof(device));
 		GGLAB_ASSERT(tileGrid.IsValid());
 		GGLAB_ASSERT(bufferIndex < m_GridBuffers.size());
 		if (m_Device != std::addressof(device) || !tileGrid.IsValid() ||
-			bufferIndex >= m_GridBuffers.size())
+			bufferIndex >= m_GridBuffers.size() || device.HasCompletionError() ||
+			m_PendingSlots[bufferIndex].m_Pending ||
+			m_PendingHdrDiffSlots[bufferIndex].m_Pending ||
+			m_PendingGridSlots[bufferIndex].m_Pending)
 		{
 			return;
 		}
@@ -153,15 +173,67 @@ namespace gglab
 		}
 	}
 
-	void ForwardPlusDebugReadback::ConsumeCompletedSlot(uint32_t bufferIndex) noexcept
+	RenderFrameValidationResult ForwardPlusDebugReadback::ConsumeCompletedSlot(
+		uint32_t bufferIndex) noexcept
 	{
+		if (!m_ValidationFailure.IsReady())
+		{
+			return m_ValidationFailure;
+		}
 		if (!m_Device || bufferIndex >= m_Buffers.size() ||
 			bufferIndex >= m_HdrDiffBuffers.size() || bufferIndex >= m_GridBuffers.size() ||
 			bufferIndex >= m_PendingSlots.size() ||
 			bufferIndex >= m_PendingHdrDiffSlots.size() ||
 			bufferIndex >= m_PendingGridSlots.size())
 		{
-			return;
+			return RenderFrameValidationResult::Ready();
+		}
+
+		RenderFrameValidationResult validation;
+		const auto check = [&](const auto& pending, std::string_view kind)
+			{
+				if (!pending.m_Pending || validation.m_Status == RenderFrameValidationStatus::DeviceLost)
+				{
+					return;
+				}
+				const RHIFenceQueryResult completion = m_Device->QueryFencePoint(pending.m_Fence);
+				if (completion == RHIFenceQueryResult::Completed)
+				{
+					return;
+				}
+				const bool lost = completion == RHIFenceQueryResult::DeviceLost;
+				if (!validation.IsReady() && !lost)
+				{
+					return;
+				}
+				const std::string_view evidence = lost ? "DeviceLost" :
+					completion == RHIFenceQueryResult::Pending ? "Pending" :
+					m_Device->HasCompletionError() ? "Failed (native completion failure)" :
+					"Failed (rejected query: invalid, unknown or off-owner fence)";
+				std::string detail = std::format(
+					"slot={}, readback={}, frame={}, fence=({}:{}), value={}, query={}, completionError={}",
+					bufferIndex, kind, pending.m_FrameSerial, pending.m_Fence.m_Fence.Index(),
+					pending.m_Fence.m_Fence.Generation(), pending.m_Fence.m_Value, evidence,
+					m_Device->HasCompletionError());
+				validation = lost ?
+					RenderFrameValidationResult::DeviceLost(
+						"Forward+ readback fence confirmed device loss.", std::move(detail)) :
+					RenderFrameValidationResult::ContractFailure(
+						"Forward+ readback fence did not complete before frame-slot reuse.", std::move(detail));
+			};
+		// BeginFrame's slot wait remains the reuse authority. Query every fence before
+		// even discarding stale results; unresolved buffers retain their ownership.
+		check(m_PendingSlots[bufferIndex], "tile");
+		check(m_PendingHdrDiffSlots[bufferIndex], "hdr-diff");
+		check(m_PendingGridSlots[bufferIndex], "grid");
+		if (!validation.IsReady())
+		{
+			if (validation.m_Status == RenderFrameValidationStatus::DeviceLost)
+			{
+				ReleaseBuffers();
+			}
+			m_ValidationFailure = validation;
+			return validation;
 		}
 
 		const uint64_t currentGeneration = GetCurrentGeneration();
@@ -297,7 +369,7 @@ namespace gglab
 		}
 		if (!pendingGrid.m_Pending)
 		{
-			return;
+			return RenderFrameValidationResult::Ready();
 		}
 
 		const uint64_t readbackSize =
@@ -312,7 +384,7 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Forward+ failed to map completed grid readback slot {}.", bufferIndex);
 			pendingGrid.m_Pending = false;
-			return;
+			return RenderFrameValidationResult::Ready();
 		}
 
 		auto result = std::make_shared<ForwardPlusGridReadback>();
@@ -342,19 +414,27 @@ namespace gglab
 		{
 			m_LatestGrid = std::move(result);
 		}
+		return RenderFrameValidationResult::Ready();
 	}
 
 	void ForwardPlusDebugReadback::MarkScheduled(uint32_t bufferIndex, uint64_t frameSerial,
+		const RHIFencePoint& fence, uint64_t requestGeneration,
 		const ForwardPlusTileGrid& tileGrid, uint32_t tileX, uint32_t tileY) noexcept
 	{
+		if (!m_ValidationFailure.IsReady() || !m_Device)
+		{
+			return;
+		}
 		GGLAB_ASSERT(bufferIndex < m_PendingSlots.size());
-		if (bufferIndex >= m_PendingSlots.size())
+		if (bufferIndex >= m_PendingSlots.size() ||
+			m_Device->HasCompletionError() || m_PendingSlots[bufferIndex].m_Pending)
 		{
 			return;
 		}
 		m_PendingSlots[bufferIndex] = {
+			.m_Fence = fence,
 			.m_FrameSerial = frameSerial,
-			.m_RequestGeneration = GetCurrentGeneration(),
+			.m_RequestGeneration = requestGeneration,
 			.m_TileGrid = tileGrid,
 			.m_TileX = tileX,
 			.m_TileY = tileY,
@@ -364,16 +444,23 @@ namespace gglab
 	}
 
 	void ForwardPlusDebugReadback::MarkHdrDiffScheduled(uint32_t bufferIndex,
-		uint64_t frameSerial, uint32_t width, uint32_t height) noexcept
+		uint64_t frameSerial, const RHIFencePoint& fence, uint64_t requestGeneration,
+		uint32_t width, uint32_t height) noexcept
 	{
+		if (!m_ValidationFailure.IsReady() || !m_Device)
+		{
+			return;
+		}
 		GGLAB_ASSERT(bufferIndex < m_PendingHdrDiffSlots.size());
-		if (bufferIndex >= m_PendingHdrDiffSlots.size())
+		if (bufferIndex >= m_PendingHdrDiffSlots.size() ||
+			m_Device->HasCompletionError() || m_PendingHdrDiffSlots[bufferIndex].m_Pending)
 		{
 			return;
 		}
 		m_PendingHdrDiffSlots[bufferIndex] = {
+			.m_Fence = fence,
 			.m_FrameSerial = frameSerial,
-			.m_RequestGeneration = GetCurrentGeneration(),
+			.m_RequestGeneration = requestGeneration,
 			.m_Width = width,
 			.m_Height = height,
 			.m_Pending = true,
@@ -381,16 +468,23 @@ namespace gglab
 	}
 
 	void ForwardPlusDebugReadback::MarkGridScheduled(uint32_t bufferIndex, uint64_t frameSerial,
+		const RHIFencePoint& fence, uint64_t requestGeneration,
 		const ForwardPlusTileGrid& tileGrid) noexcept
 	{
+		if (!m_ValidationFailure.IsReady() || !m_Device)
+		{
+			return;
+		}
 		GGLAB_ASSERT(bufferIndex < m_PendingGridSlots.size());
-		if (bufferIndex >= m_PendingGridSlots.size())
+		if (bufferIndex >= m_PendingGridSlots.size() ||
+			m_Device->HasCompletionError() || m_PendingGridSlots[bufferIndex].m_Pending)
 		{
 			return;
 		}
 		m_PendingGridSlots[bufferIndex] = {
+			.m_Fence = fence,
 			.m_FrameSerial = frameSerial,
-			.m_RequestGeneration = GetCurrentGeneration(),
+			.m_RequestGeneration = requestGeneration,
 			.m_TileGrid = tileGrid,
 			.m_Pending = true,
 		};

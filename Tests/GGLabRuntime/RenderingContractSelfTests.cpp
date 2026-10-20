@@ -48,6 +48,8 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/RenderFrameOutcome.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderMaterialFrameCache.h"
@@ -65,6 +67,10 @@
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "Graphics/RenderPass/RenderPassIBLClear.h"
+#include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "Graphics/RenderPass/RenderPassIBL.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
 #include <cstring>
@@ -209,9 +215,9 @@ namespace gglab
 			value.RequestPostProcessPreview();
 		};
 		template <typename T>
-		concept PostProcessPreviewConsumption = requires(T& value)
+		concept PostProcessPreviewSettlement = requires(T& value)
 		{
-			value.ConsumePostProcessPreviewRequest();
+			value.PublishPostProcessPreview({}, PostProcessPreviewChannel::PostProcessing, 1, {});
 		};
 		template <typename T>
 		concept IBLPreviewQuery = requires(const T& value)
@@ -226,9 +232,9 @@ namespace gglab
 			value.SetIBLEnvironmentPreviewMip(1);
 		};
 		template <typename T>
-		concept IBLPreviewConsumption = requires(T& value)
+		concept IBLPreviewSettlement = requires(T& value)
 		{
-			value.ConsumeIBLPreviewRequest(IBLPreviewType::Environment);
+			value.PublishIBLPreview(IBLPreviewType::Environment, {}, IBLPreviewLayout::Cross, 0);
 		};
 		template <typename T>
 		concept IBLPreviewAllocation = requires(T& value)
@@ -239,8 +245,8 @@ namespace gglab
 		static_assert(!IBLPreviewRequest<IBLPreviewViewBase>);
 		static_assert(IBLPreviewRequest<IBLPreviewControlBase>);
 		static_assert(!IBLPreviewQuery<IBLPreviewControlBase>);
-		static_assert(!IBLPreviewConsumption<IBLPreviewViewBase>);
-		static_assert(!IBLPreviewConsumption<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewSettlement<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewSettlement<IBLPreviewControlBase>);
 		static_assert(!IBLPreviewAllocation<IBLPreviewViewBase>);
 		static_assert(!IBLPreviewAllocation<IBLPreviewControlBase>);
 
@@ -248,8 +254,8 @@ namespace gglab
 		static_assert(!PostProcessPreviewRequest<PostProcessPreviewViewBase>);
 		static_assert(PostProcessPreviewRequest<PostProcessPreviewControlBase>);
 		static_assert(!PostProcessPreviewQuery<PostProcessPreviewControlBase>);
-		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewViewBase>);
-		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewSettlement<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewSettlement<PostProcessPreviewControlBase>);
 
 		template <typename T>
 		concept ShadowPreviewAllocation = requires(T& value)
@@ -574,6 +580,7 @@ namespace gglab
 			using RHIDevice::ObserveGpuWaitResult;
 			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
+				++m_FenceQueryCount;
 				if (m_FenceQueryResult)
 				{
 					// Unobserved results model caller misuse rejected before any native query.
@@ -618,6 +625,7 @@ namespace gglab
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
+			mutable uint32_t m_FenceQueryCount = 0;
 			std::optional<RHIFenceQueryResult> m_FenceQueryResult;
 			bool m_ObserveFenceQueryResult = true;
 			bool m_UseControlledFenceCompletion = false;
@@ -664,7 +672,7 @@ namespace gglab
 			{
 				for (auto type : PreviewTypes)
 				{
-					registry.ClearIBLPreviewDirty(type);
+					registry.PublishIBLPreview(type, registry.ObserveIBLPreviewRequest(type), IBLPreviewLayout::Cross, 0);
 				}
 			};
 			const auto allPreviewsDirty = [&]()
@@ -841,16 +849,18 @@ namespace gglab
 				"Invalid public preview requests are ignored");
 			control.RequestIBLPreview(IBLPreviewType::Environment);
 			control.RequestIBLPreview(IBLPreviewType::Environment);
-			context.Check(registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
-				!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment),
-				"Repeated preview requests coalesce until the render pass consumes them");
-			registry.ClearIBLPreviewDirty(IBLPreviewType::Environment);
-			registry.ClearIBLPreviewDirty(IBLPreviewType::Irradiance);
-			registry.ClearIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+			context.Check(registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment).m_Requested &&
+				registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment).m_Requested,
+				"Repeated preview requests remain observable until a submitted draw acknowledges them");
+			registry.PublishIBLPreview(IBLPreviewType::Environment, registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment), IBLPreviewLayout::Cross, 0);
+			registry.PublishIBLPreview(IBLPreviewType::Irradiance, registry.ObserveIBLPreviewRequest(IBLPreviewType::Irradiance), IBLPreviewLayout::Cross, 0);
+			registry.PublishIBLPreview(IBLPreviewType::PrefilteredSpecular, registry.ObserveIBLPreviewRequest(IBLPreviewType::PrefilteredSpecular), IBLPreviewLayout::Cross, 0);
 			control.RequestIBLPreview(IBLPreviewType::Environment);
-			context.Check(!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
+			registry.AcknowledgeIBLPreviewRequest(IBLPreviewType::Environment,
+				registry.ObserveIBLPreviewRequest(IBLPreviewType::Environment).m_Generation);
+			context.Check(!registry.IsIBLPreviewDirty(IBLPreviewType::Environment) &&
 				!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Requested,
-				"A clean preview consumes its request without scheduling another update");
+				"A clean preview acknowledges its generation without scheduling another update");
 			control.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Count);
 			control.SetIBLIrradiancePreviewLayout(static_cast<IBLPreviewLayout>(99));
 			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Count);
@@ -953,10 +963,11 @@ namespace gglab
 			});
 			const ShadowPreviewViewBase& view = registry;
 			ShadowPreviewControlBase& control = registry;
-			context.Check(!registry.ConsumeShadowPreviewRequest(), "Shadow previews start without rendering demand");
+			context.Check(!registry.ObserveShadowPreviewRequest().m_Requested, "Shadow previews start without rendering demand");
 			control.RequestShadowPreview();
 			control.RequestShadowPreview();
-			context.Check(registry.ConsumeShadowPreviewRequest() && !registry.ConsumeShadowPreviewRequest() &&
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested &&
+				registry.ObserveShadowPreviewRequest().m_Requested &&
 				device.m_CreateTextureCount == 0, "Shadow preview requests coalesce without allocating resources");
 			const auto empty = view.GetShadowPreviewDiagnostics();
 			context.Check(!empty.m_Allocated && !empty.m_SrvDescriptor.IsValid() &&
@@ -976,7 +987,8 @@ namespace gglab
 			context.Check(repeated.m_SrvDescriptor.m_Index == allocated.m_SrvDescriptor.m_Index &&
 				device.m_CreateTextureCount == 1 && registry.IsDirty(Index),
 				"Repeated shadow queries leave allocation identity and pending initialization unchanged");
-			registry.ClearDirty(Index);
+			registry.PublishShadowPreview(registry.ObserveShadowPreviewRequest().m_Generation,
+				registry.GetTextureContentRevision(Index));
 			registry.EnsureShadowPreviewResources();
 			context.Check(view.GetShadowPreviewDiagnostics().m_SrvDescriptor.m_Index ==
 				allocated.m_SrvDescriptor.m_Index && !registry.IsDirty(Index) &&
@@ -1046,9 +1058,9 @@ namespace gglab
 			control.RequestPostProcessPreview();
 			control.RequestPostProcessPreview();
 			context.Check(view.GetPostProcessPreviewDiagnostics().m_Requested &&
-				registry.ConsumePostProcessPreviewRequest() &&
-				!registry.ConsumePostProcessPreviewRequest() && device.m_CreateTextureCount == 0,
-				"Repeated preview requests coalesce and only the Runtime owner consumes them");
+				registry.ObservePostProcessPreviewRequest().m_Requested &&
+				registry.ObservePostProcessPreviewRequest().m_Requested && device.m_CreateTextureCount == 0,
+				"Repeated preview requests coalesce and only the Runtime owner acknowledges them");
 
 			registry.EnsurePostProcessPreviewResources(1024, 512);
 			const auto allocated = view.GetPostProcessPreviewDiagnostics();
@@ -1057,7 +1069,7 @@ namespace gglab
 				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
 				device.m_CreateTextureCount == 1,
 				"Preview observation distinguishes allocated descriptors from recorded contents");
-			registry.PublishPostProcessPreview(selected.m_Selected, PostProcessPreviewChannel::PostProcessing, 42);
+			registry.PublishPostProcessPreview(selected.m_Selected, PostProcessPreviewChannel::PostProcessing, 42, registry.ObservePostProcessPreviewRequest());
 			const auto published = view.GetPostProcessPreviewDiagnostics();
 			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
 			control.SetPostProcessPreviewSelection(nextSelection);
@@ -1078,7 +1090,7 @@ namespace gglab
 				"Preview invalidation changes live availability without rewriting copied metadata");
 
 			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
-			registry.PublishPostProcessPreview(nextSelection, PostProcessPreviewChannel::PostProcessing, 43);
+			registry.PublishPostProcessPreview(nextSelection, PostProcessPreviewChannel::PostProcessing, 43, registry.ObservePostProcessPreviewRequest());
 			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
 			const auto resized = view.GetPostProcessPreviewDiagnostics();
 			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
@@ -1117,7 +1129,7 @@ namespace gglab
 			context.Check(ao.m_Selected == aoSelection && ao.m_Requested &&
 				taa.m_Selected == taaSelection && !taa.m_Requested && taa.m_ExposureEV == 2.0f &&
 				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::PostProcessing) &&
-				registry.ConsumePostProcessPreviewRequest(PostProcessPreviewChannel::AmbientOcclusion) &&
+				registry.ObservePostProcessPreviewRequest(PostProcessPreviewChannel::AmbientOcclusion).m_Requested &&
 				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA),
 				"Feature previews keep independent selections, exposure and requests");
 		}
@@ -1937,7 +1949,8 @@ namespace gglab
 				graphics.m_LastInlineWords == std::vector<uint32_t>({ std::bit_cast<uint32_t>(1.5f), 0xabcdef01u }) &&
 				compute.m_LastInlineOffset == 3 && compute.m_LastInlineWords == std::vector<uint32_t>({ 11, 19 }),
 				"Public inline entry points preserve typed payload bits, span elements and word offsets");
-			RGExecuteContext execution({ &graphics, &compute, nullptr });
+			RGDeferredCommitList executionCommits;
+			RGExecuteContext execution(executionCommits, { &graphics, &compute, nullptr });
 			std::array<uint32_t, 24> payload{};
 			payload.fill(0x12345678u);
 			bool uploaded = true;
@@ -1965,6 +1978,7 @@ namespace gglab
 				});
 			context.Check(graph.Compile(), "Constant upload graph compiles");
 			graph.Execute(execution);
+			executionCommits.Discard();
 			context.Check(uploaded && graphics.m_ConstantBindings.size() == 1 &&
 				compute.m_ConstantBindings.size() == 6,
 				"Graphics and compute upload typed parameters larger than root constants");
@@ -1990,7 +2004,9 @@ namespace gglab
 					uploaded &= graphics.SetConstantBufferData(passIndex, payload);
 				});
 			context.Check(secondGraph.Compile(), "A second graph shares the recording batch");
+			executionCommits = RGDeferredCommitList{};
 			secondGraph.Execute(execution);
+			executionCommits.Discard();
 			const auto reusable = graphics.UploadConstants(std::span(payload));
 			context.Check(uploaded && reusable.m_SizeInBytes == sizeof(payload) &&
 				graphics.SetConstantBuffer(passIndex, reusable) && compute.SetConstantBuffer(passIndex, reusable),
@@ -2831,6 +2847,429 @@ namespace gglab
 				device.m_CompletedFenceValue = independentFence.m_Value;
 				pool.ReclaimCompleted();
 			}
+		}
+
+		void RunDeferredCommitContractTests(SelfTestContext& context) noexcept
+		{
+			struct ThrowingCommit
+			{
+				void operator()(const RGCommitContext&) {}
+			};
+			static_assert(!std::is_default_constructible_v<RGExecuteContext>);
+			static_assert(!std::is_constructible_v<RGExecuteContext, RGBackendExecuteContext>);
+			static_assert(std::is_nothrow_constructible_v<RGExecuteContext, RGDeferredCommitList&>);
+			static_assert(!std::is_copy_constructible_v<RGDeferredCommit>);
+			static_assert(std::is_nothrow_move_constructible_v<RGDeferredCommit>);
+			static_assert(!std::is_constructible_v<RGDeferredCommit, ThrowingCommit>);
+			struct Payload
+			{
+				uint32_t& m_Destructions;
+				~Payload() noexcept { ++m_Destructions; }
+			};
+			const RGCommitContext submitted{ 71, { RHIFenceHandle{ 1, 1 }, 42 } };
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				std::vector<uint32_t> order;
+				uint32_t destroyed = 0;
+				bool identityMatches = true;
+				for (uint32_t index : { 1u, 2u })
+				{
+					execute.DeferCommit([&, index, payload = std::make_unique<Payload>(destroyed)]
+						(const RGCommitContext& commit) noexcept
+						{
+							identityMatches &= commit.m_FrameSerial == submitted.m_FrameSerial &&
+								commit.m_Fence == submitted.m_Fence;
+							order.push_back(index);
+						});
+				}
+				context.Check(order.empty() && destroyed == 0,
+					"Enqueue retains move-only CPU captures without committing during recording");
+				commits.Seal();
+				commits.CommitAll(submitted);
+				commits.CommitAll(submitted);
+				commits.Discard();
+				context.Check(order == std::vector<uint32_t>({ 1, 2 }) && identityMatches &&
+					destroyed == 2 && !commits.HasFailed(),
+					"Deferred commits run once in enqueue order with the real serial/fence and release CPU captures");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				uint32_t ran = 0;
+				uint32_t destroyed = 0;
+				execute.DeferCommit([&, payload = std::make_unique<Payload>(destroyed)]
+					(const RGCommitContext&) noexcept { ++ran; });
+				commits.Discard();
+				commits.CommitAll(submitted);
+				context.Check(ran == 0 && destroyed == 1 && !commits.HasFailed(),
+					"Discard drops unsubmitted CPU captures without invoking them or allowing a later commit");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				uint32_t ran = 0;
+				execute.DeferCommit([&](const RGCommitContext&) noexcept { ++ran; });
+				commits.CommitAll({ 71, {} });
+				commits.CommitAll(submitted);
+				context.Check(commits.HasFailed() && ran == 0,
+					"CommitAll rejects an invalid fence in every configuration and never invokes that batch");
+				RGDeferredCommitList empty;
+				empty.CommitAll({});
+				context.Check(empty.HasFailed(), "Even an empty commit list requires a valid submission fence");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				uint32_t ran = 0;
+				uint32_t destroyed = 0;
+				execute.DeferCommit([&](const RGCommitContext&) noexcept { ++ran; });
+				commits.Seal();
+				execute.DeferCommit([&, payload = std::make_unique<Payload>(destroyed)]
+					(const RGCommitContext&) noexcept { ++ran; });
+				commits.CommitAll(submitted);
+				context.Check(commits.HasFailed() && ran == 0 && destroyed == 1,
+					"A sealed list rejects and releases a late enqueue, and its failed batch cannot commit");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				std::vector<uint32_t> order;
+				// Deliberately retain a still-live context to exercise the reentry guard.
+				execute.DeferCommit([&](const RGCommitContext&) noexcept
+					{
+						order.push_back(1);
+						execute.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(99); });
+					});
+				execute.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(2); });
+				commits.Seal();
+				commits.CommitAll(submitted);
+				commits.CommitAll(submitted);
+				context.Check(commits.HasFailed() && order == std::vector<uint32_t>({ 1, 2 }),
+					"Settlement rejects enqueue without invalidating iteration or skipping/repeating original commits");
+			}
+			{
+				RecordingDevice device;
+				TransientResourcePool pool(&device);
+				RecordingGraphicsCommandContext graphics;
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits, { .m_GraphicsCommandContext = &graphics });
+				std::vector<uint32_t> order;
+				graph.AddTrivialSideEffectPass("Commit.First", [&](RGExecuteContext& execution)
+					{
+						execution.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(1); });
+					});
+				graph.AddPass<StorageAccessPassData>("Commit.Culled",
+					[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+					{
+						data.m_Buffer = builder.Write(builder.CreateBuffer("Commit.Unused", { .m_SizeInBytes = 4 }),
+							RGBufferAccess::StorageWrite);
+					},
+					[&](RGExecuteContext& execution, StorageAccessPassData&)
+					{
+						execution.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(99); });
+					});
+				graph.AddTrivialSideEffectPass("Commit.Last", [&](RGExecuteContext& execution)
+					{
+						execution.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(2); });
+					});
+				const bool compiled = graph.Compile();
+				context.Check(compiled, "Deferred-commit liveness fixture compiles");
+				if (compiled)
+				{
+					graph.Execute(execute);
+					commits.Seal();
+					context.Check(order.empty(), "Graph execution only enqueues its CPU state changes");
+					commits.CommitAll(submitted);
+					context.Check(order == std::vector<uint32_t>({ 1, 2 }),
+						"Culled passes enqueue nothing and live passes commit in execution order");
+					graph.Retire(submitted.m_Fence);
+				}
+			}
+		}
+
+		void RunPreviewSubmissionContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			const RGCommitContext submitted{ 73, { RHIFenceHandle{ 1, 1 }, 42 } };
+			for (uint32_t i = 0; i < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++i)
+			{
+				const auto channel = static_cast<PostProcessPreviewChannel>(i);
+				const auto index = RenderResourceRegistry::GetPostProcessPreviewTextureIndex(channel);
+				registry.RequestPostProcessPreview(channel);
+				registry.EnsurePostProcessPreviewResources(64, 64, nullptr, channel);
+				const auto observed = registry.ObservePostProcessPreviewRequest(channel);
+				const auto selection = registry.GetPostProcessPreviewSelection(channel);
+				RGDeferredCommitList discarded;
+				RGExecuteContext execute(discarded);
+				execute.DeferCommit([&registry, selection, channel, observed](const RGCommitContext& commit) noexcept
+					{
+						registry.PublishPostProcessPreview(selection, channel, commit.m_FrameSerial, observed);
+					});
+				discarded.Discard();
+				context.Check(registry.IsPostProcessPreviewRequested(channel) && registry.IsDirty(index) &&
+					!registry.HasPublishedPostProcessPreview(channel),
+					"Discard preserves each channel's demand and undefined content without publication");
+				registry.RequestPostProcessPreview(channel);
+				registry.SetPostProcessPreviewExposureEV(1.0f, channel);
+				registry.PublishPostProcessPreview(selection, channel, submitted.m_FrameSerial, observed);
+				context.Check(registry.IsPostProcessPreviewRequested(channel) && registry.IsDirty(index) &&
+					registry.GetPublishedTextureContentRevision(index) == observed.m_ContentRevision &&
+					registry.GetPublishedPostProcessPreviewSelection(channel) == selection,
+					"An older submitted preview publishes its identity while preserving newer demand and content");
+				const auto current = registry.ObservePostProcessPreviewRequest(channel);
+				registry.PublishPostProcessPreview(selection, channel, 74, current);
+				context.Check(!registry.IsPostProcessPreviewRequested(channel) && !registry.IsDirty(index),
+					"The matching preview revision and request generation settle independently");
+			}
+
+			registry.EnsureIblResources();
+			for (uint32_t i = 0; i < static_cast<uint32_t>(IBLPreviewType::Count); ++i)
+			{
+				const auto type = static_cast<IBLPreviewType>(i);
+				registry.RequestIBLPreview(type);
+				const auto observed = registry.ObserveIBLPreviewRequest(type);
+				RGDeferredCommitList discarded;
+				RGExecuteContext execute(discarded);
+				execute.DeferCommit([&registry, type, observed](const RGCommitContext&) noexcept
+					{
+						registry.PublishIBLPreview(type, observed, IBLPreviewLayout::Cross, 0);
+					});
+				discarded.Discard();
+				context.Check(registry.IsIBLPreviewRequested(type) && registry.IsIBLPreviewDirty(type) &&
+					registry.GetIBLPreviewUpdateCount(type) == 0,
+					"Discard leaves every IBL preview pending and dirty");
+				registry.RequestIBLPreview(type);
+				registry.MarkIBLPreviewDirty(type);
+				registry.PublishIBLPreview(type, observed, IBLPreviewLayout::Cross, 0);
+				context.Check(registry.IsIBLPreviewRequested(type) && registry.IsIBLPreviewDirty(type),
+					"A stale IBL draw cannot clear a newer request or content revision");
+				registry.PublishIBLPreview(type, registry.ObserveIBLPreviewRequest(type), IBLPreviewLayout::Grid2x3, 1);
+				registry.RequestIBLPreview(type);
+				const auto clean = registry.ObserveIBLPreviewRequest(type);
+				registry.AcknowledgeIBLPreviewRequest(type, clean.m_Generation);
+				context.Check(!registry.IsIBLPreviewRequested(type) && !registry.IsIBLPreviewDirty(type) &&
+					registry.GetIBLPreviewUpdateCount(type) == 2,
+					"A clean IBL request is satisfied without another submitted draw");
+			}
+
+			registry.RequestShadowPreview();
+			registry.EnsureShadowPreviewResources();
+			const auto shadow = registry.ObserveShadowPreviewRequest();
+			constexpr auto shadowIndex = RenderTextureIndex::Preview_Shadow_DirectionalShadowMap;
+			// A frame with no shadow pass performs no acknowledgement.
+			RGDeferredCommitList empty;
+			empty.CommitAll(submitted);
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested && registry.IsDirty(shadowIndex),
+				"A submitted frame without a shadow preview pass preserves its request");
+			registry.RequestShadowPreview();
+			registry.MarkDirty(shadowIndex);
+			registry.PublishShadowPreview(shadow.m_Generation, shadow.m_ContentRevision);
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested && registry.IsDirty(shadowIndex),
+				"A shadow draw preserves newer request and content generations");
+			const auto requestOnly = registry.ObserveShadowPreviewRequest();
+			registry.RequestShadowPreview();
+			registry.PublishShadowPreview(requestOnly.m_Generation, requestOnly.m_ContentRevision);
+			context.Check(registry.ObserveShadowPreviewRequest().m_Requested && !registry.IsDirty(shadowIndex),
+				"A newer request survives even when the drawn content revision is still current");
+			const auto contentOnly = registry.ObserveShadowPreviewRequest();
+			registry.MarkDirty(shadowIndex);
+			registry.PublishShadowPreview(contentOnly.m_Generation, contentOnly.m_ContentRevision);
+			context.Check(!registry.ObserveShadowPreviewRequest().m_Requested && registry.IsDirty(shadowIndex),
+				"A newer content revision survives even when the drawn request generation is still current");
+			registry.RequestShadowPreview();
+			const auto currentShadow = registry.ObserveShadowPreviewRequest();
+			registry.PublishShadowPreview(currentShadow.m_Generation, currentShadow.m_ContentRevision);
+			context.Check(!registry.ObserveShadowPreviewRequest().m_Requested && !registry.IsDirty(shadowIndex),
+				"A matching shadow preview submission acknowledges and initializes its content");
+			const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 42 };
+			registry.EnsureShadowPreviewResources(256, &fence);
+			registry.CommitTextureContent(shadowIndex, currentShadow.m_ContentRevision);
+			context.Check(registry.IsDirty(shadowIndex) &&
+				registry.GetTextureContentRevision(shadowIndex) != currentShadow.m_ContentRevision,
+				"Reallocation changes the content revision before any old clear can settle");
+		}
+
+		void RunPreviewPassContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_TextureViewsSupported = true;
+			device.m_PassConstantsEnabled = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			registry.EnsureIblResources();
+			class Shaders final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef&) noexcept override { return ShaderID{ 1 }; }
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			} shaders;
+			class Bindings final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return { 1, 1 }; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+				const ComposedLayout* GetCommonLayoutContract() const noexcept override
+				{
+					return &scene_bindings::GetCommonLayoutContract();
+				}
+			} bindings;
+			BindingTestResolver pipelines;
+			BindingTestPresentation presentation;
+			const RenderServices services{ .m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
+				.m_Samplers = &samplers, .m_Resources = &registry, .m_Presentation = &presentation,
+				.m_BindingLayout = &bindings };
+			RenderPassIBLClear clear;
+			RenderPassIBLPreview preview;
+			RenderPassIBL ibl;
+			RenderPassPostProcessPreview post;
+			RHIUploadPool uploads(device);
+			for (uint32_t phase = 0; phase < 4; ++phase)
+			{
+				RHIUploadWriter writer;
+				auto batch = uploads.BeginBatch();
+				batch->Attach(writer);
+				RenderFrameBuildResult frame;
+				frame.m_FrameSerial = phase + 1;
+				frame.m_RenderViews.resize(1);
+				frame.m_RenderViews[0].m_Width = 64;
+				frame.m_RenderViews[0].m_Height = 64;
+				frame.m_RenderViews[0].m_DisplayWidth = 64;
+				frame.m_RenderViews[0].m_DisplayHeight = 64;
+				frame.m_FrameConstants.m_Scene = writer.UploadConstants(SceneGPU{});
+				const std::array<ViewGPU, 1> views{};
+				frame.m_FrameConstants.m_Views = writer.UploadStructured(std::span(views));
+				const auto frameContext = frame.MakeRenderFrameContext();
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				struct Imports {};
+				graph.AddPass<Imports>("PreviewTest.Import",
+					[&registry](RenderGraph::RGBuilder& builder, Imports&)
+					{
+						auto& sources = builder.GetBlackboard().Create<RGIBLResources>(IBLResourcesName);
+						auto& previews = builder.GetBlackboard().Create<RGIBLPreviewResources>(IBLPreviewResourcesName);
+						const std::array targets{
+							&sources.m_EnvironmentCubemap, &sources.m_IrradianceCubemap,
+							&sources.m_PrefilteredSpecularCubemap, &sources.m_BrdfLut,
+							&previews.m_EnvironmentCubemapPreview, &previews.m_IrradianceCubemapPreview,
+							&previews.m_PrefilteredSpecularCubemapPreview };
+						for (size_t i = 0; i < targets.size(); ++i)
+						{
+							const auto index = static_cast<RenderTextureIndex>(i);
+							const bool initialized = i < 4 ? registry.HasInitializedActiveIBL() : !registry.IsDirty(index);
+							*targets[i] = builder.ImportTexture(std::format("PreviewTest.Texture{}", i).c_str(),
+								registry.GetTextureHandle(index), *registry.GetTextureDesc(index), CommonRHIResourceState(),
+								initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
+						}
+					});
+				registry.RequestIBLPreview(IBLPreviewType::Environment);
+				clear.AddPass(graph, frameContext, services);
+				preview.AddPass(graph, frameContext, services);
+				if (phase < 3)
+				{
+					registry.SetPostProcessPreviewSelection({ PostProcessDebugTap::SceneColor, 0 });
+					registry.RequestPostProcessPreview();
+					const RGPostProcessColor source{ graph.GetBlackboard().Get<RGIBLPreviewResources>(
+						IBLPreviewResourcesName).m_EnvironmentCubemapPreview, PostProcessColorState::SceneLinearRec709, 1.0f };
+					post.AddPassForTap(graph, frameContext, services, source, PostProcessDebugTap::SceneColor);
+					post.AddPassForTap(graph, frameContext, services, source, PostProcessDebugTap::SceneColor);
+				}
+				ibl.AddFinishPass(graph);
+				const bool compiled = graph.Compile();
+				context.Check(compiled, "Actual IBL clear and preview producers compile with inspector consumers");
+				if (!compiled)
+				{
+					batch->Detach(writer);
+					batch->Cancel();
+					return;
+				}
+				if (phase == 1)
+				{
+					registry.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Grid2x3);
+					registry.SetIBLEnvironmentPreviewMip(1);
+					registry.RequestIBLPreview(IBLPreviewType::Environment);
+					registry.RequestPostProcessPreview();
+					registry.SetPostProcessPreviewExposureEV(1.0f);
+				}
+				RecordingGraphicsCommandContext graphics;
+				graphics.BeginRecordingScope(writer);
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits, { .m_GraphicsCommandContext = &graphics });
+				const auto before = registry.GetIBLPreviewUpdateCount(IBLPreviewType::Environment);
+				graph.Execute(execute);
+				commits.Seal();
+				context.Check(registry.GetIBLPreviewUpdateCount(IBLPreviewType::Environment) == before &&
+					(phase > 1 || !registry.HasInitializedActiveIBL()),
+					"Actual execute lambdas leave publication and IBL initialization unchanged while recording");
+				const RGCommitContext submitted{ frame.m_FrameSerial, { RHIFenceHandle{ 1, 1 }, phase + 1 } };
+				if (phase == 0)
+				{
+					commits.Discard();
+					context.Check(!registry.HasInitializedActiveIBL() && registry.IsPostProcessPreviewRequested() &&
+						!registry.HasPublishedPostProcessPreview() && registry.IsIBLPreviewDirty(IBLPreviewType::Environment),
+						"Discarding actual recorded preview passes preserves demand, dirty state and uninitialized IBL");
+				}
+				else
+				{
+					commits.CommitAll(submitted);
+					const auto state = registry.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview;
+					context.Check(registry.HasInitializedActiveIBL() && state.m_UpdateCount == (phase < 3 ? phase : 2u) &&
+						state.m_Dirty == (phase == 1) && state.m_Requested == (phase == 1) &&
+						state.m_PublishedMip == (phase == 1 ? 0u : 1u) &&
+						registry.IsPostProcessPreviewRequested() == (phase == 1) &&
+						registry.GetPostProcessPreviewUpdateCount() == (phase < 3 ? phase : 2u),
+						"Actual passes publish built selections, preserve newer requests, retry once and leave clean IBL cached");
+				}
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				context.Check(std::ranges::count(snapshot.m_Passes, "PostProcess.Preview", &RGSnapshotPassInfo::m_Name) ==
+					(phase < 3 ? 1 : 0), "Graph-local preview deduplication keeps one producer per channel");
+				graphics.EndRecordingScope();
+				graph.Retire(submitted.m_Fence);
+				batch->Detach(writer);
+				batch->Cancel();
+			}
+		}
+
+		void RunRenderFrameOutcomeContractTests(SelfTestContext& context) noexcept
+		{
+			const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 42 };
+			struct Case
+			{
+				RenderFrameEndPath m_Path;
+				RHIFrameEndResult m_Result;
+				RenderFrameOutcomeKind m_Expected;
+				std::string_view m_Description;
+			};
+			const std::array cases
+			{
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::Completed(fence), RenderFrameOutcomeKind::Submitted, "A completed EndFrame is Submitted with its frame fence" },
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::Fatal(fence), RenderFrameOutcomeKind::Failed, "A fenced EndFrame failure stays Failed even after full submission" },
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::Fatal(), RenderFrameOutcomeKind::Failed, "An unfenced EndFrame failure stays Failed even when work is already idle" },
+				Case{ RenderFrameEndPath::AbortActiveFrame, RHIFrameEndResult::Fatal(fence), RenderFrameOutcomeKind::Discarded, "A fenced Renderer abort is Discarded with its retention fence" },
+				Case{ RenderFrameEndPath::AbortActiveFrame, RHIFrameEndResult::Fatal(), RenderFrameOutcomeKind::Discarded, "An unfenced Renderer abort is Discarded" },
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::FatalCompletionUnknown(), RenderFrameOutcomeKind::CompletionUnknown, "Unknown completion overrides the EndFrame path" },
+				Case{ RenderFrameEndPath::AbortActiveFrame, RHIFrameEndResult::FatalCompletionUnknown(), RenderFrameOutcomeKind::CompletionUnknown, "Unknown completion overrides the Renderer abort path" },
+			};
+			uint64_t serial = 100;
+			for (const Case& test : cases)
+			{
+				const auto outcome = ResolveRenderFrameOutcome(test.m_Path, ++serial, test.m_Result);
+				context.Check(outcome.m_Kind == test.m_Expected && outcome.m_FrameSerial == serial &&
+					outcome.m_Fence == test.m_Result.GetSubmittedFence(), test.m_Description);
+			}
+			const auto withoutRHI = ResolveRenderFrameOutcome(RenderFrameEndPath::AbortActiveFrame, ++serial);
+			context.Check(withoutRHI.m_Kind == RenderFrameOutcomeKind::Discarded &&
+				withoutRHI.m_FrameSerial == serial && !withoutRHI.m_Fence.IsValid(),
+				"A Renderer abort without an RHI frame is Discarded without a fence");
 		}
 
 		void RunFrameSubmissionContractTests(SelfTestContext& context) noexcept
@@ -4465,10 +4904,12 @@ namespace gglab
 					snapshot.m_Passes[1].m_PostBarriers.size() == 1,
 					"RenderGraph snapshot publishes the inferred sampleable-depth contract");
 
-				RGExecuteContext executeContext({
+				RGDeferredCommitList executeContextCommits;
+				RGExecuteContext executeContext(executeContextCommits, {
 					.m_GraphicsCommandContext = &recordingGraphicsContext,
 				});
 				graph.Execute(executeContext);
+				executeContextCommits.Discard();
 				const auto isFullResourceBarrier = [](const RHITextureBarrier& barrier) noexcept
 				{
 					return !barrier.m_Subresources.has_value();
@@ -4779,6 +5220,119 @@ namespace gglab
 			context.Check(failed.m_Failed && !failed.IsReady() && failed.m_CompletedCount == 0 &&
 				failed.m_TotalCount == 2,
 				"Changed draw demand restarts preparation and a failed PSO cannot report ready");
+		}
+
+		void RunForwardPlusReadbackFenceTests(SelfTestContext& context) noexcept
+		{
+			const RHIFencePoint fence{ RHIFenceHandle{ 19, 3 }, 42 };
+			const auto grid = MakeForwardPlusTileGrid(32, 16);
+			for (const auto completion : { RHIFenceQueryResult::Completed, RHIFenceQueryResult::Pending,
+				RHIFenceQueryResult::Failed, RHIFenceQueryResult::DeviceLost })
+			{
+				for (const bool nativeQuery : { false, true })
+				{
+					RecordingDevice device;
+					device.m_PassConstantsEnabled = true;
+					device.m_FenceQueryResult = completion;
+					device.m_ObserveFenceQueryResult = nativeQuery;
+					auto readback = std::make_shared<ForwardPlusDebugReadback>();
+					readback->Initialize(device, 1);
+					readback->PrepareGridBuffer(device, 0, grid);
+					context.Check(readback->ConsumeCompletedSlot(0).IsReady() &&
+						device.m_PassConstantMapCount == 0 && device.m_FenceQueryCount == 0,
+						"An unscheduled Forward+ slot never queries or maps unsubmitted data");
+					const uint64_t generation = readback->GetCurrentGeneration();
+					readback->MarkScheduled(0, 7, fence, generation, grid, 0, 0);
+					readback->MarkHdrDiffScheduled(0, 7, fence, generation, 32, 16);
+					readback->MarkGridScheduled(0, 7, fence, generation, grid);
+					const auto validation = readback->ConsumeCompletedSlot(0);
+					const bool completed = completion == RHIFenceQueryResult::Completed;
+					const bool lost = completion == RHIFenceQueryResult::DeviceLost;
+					const auto expected = completed ?
+						RenderFrameValidationStatus::Ready :
+						lost ? RenderFrameValidationStatus::DeviceLost : RenderFrameValidationStatus::ContractFailure;
+					ForwardPlusFrameValidationInputs inputs{
+						.m_ReadbackValidation = validation,
+						.m_PresentationAvailable = true,
+						.m_DisplayExtentMatchesPresentation = true,
+						.m_RenderSceneReady = true,
+						.m_DepthCoverageValid = true,
+					};
+					context.Check(ClassifyForwardPlusFrame(inputs).m_Status == expected &&
+						device.m_PassConstantMapCount == (completed ? 3u : 0u),
+						"Only Completed accepts tile, HDR and grid bytes after the frame-slot wait");
+					if (completed)
+					{
+						context.Check(readback->GetLatest().m_FrameSerial == 7 &&
+							readback->GetLatestHdrDiff().m_FrameSerial == 7 && readback->GetLatestGrid(),
+							"All three completed readback decoders publish the submitted frame");
+						continue;
+					}
+					context.Check(validation.m_Detail.find("fence=(19:3), value=42") != std::string::npos &&
+						validation.m_Detail.find(lost ? "DeviceLost" :
+							completion == RHIFenceQueryResult::Pending ? "Pending" :
+							nativeQuery ? "native completion failure" : "rejected query") != std::string::npos,
+						"Fatal diagnostics retain the original queried fence and native-versus-rejected result");
+					inputs.m_DisplayExtentMatchesPresentation = false;
+					context.Check(ClassifyForwardPlusFrame(inputs).m_Status == expected,
+						"Readback failures and confirmed loss take precedence over resize skips");
+					const auto allocations = device.m_PassConstantStorage.size();
+					const auto destructions = device.m_AtmosphereDestroyedBufferCount;
+					readback->InvalidateResults();
+					readback->PrepareGridBuffer(device, 0, MakeForwardPlusTileGrid(64, 64));
+					readback->Initialize(device, 2);
+					readback->MarkScheduled(0, 99, fence, generation, grid, 0, 0);
+					readback->MarkHdrDiffScheduled(0, 99, fence, generation, 64, 64);
+					readback->MarkGridScheduled(0, 99, fence, generation, grid);
+					context.Check(readback->ConsumeCompletedSlot(0).m_Detail == validation.m_Detail &&
+						readback->GetScheduledCount() == 1 && device.m_PassConstantMapCount == 0 &&
+						device.m_PassConstantStorage.size() == allocations &&
+						device.m_AtmosphereDestroyedBufferCount == destructions,
+						"A fatal slot retains its original evidence and cannot map, resize or reschedule");
+					// Empty services deliberately make any presentation access or preparation invalid.
+					RenderPipelineForwardPlus pipeline({ .m_ForwardPlusDebugReadback = readback });
+					const RenderScene scene;
+					const RenderFrameContext frame{ .m_RenderScene = scene };
+					context.Check(pipeline.ValidateRenderFrame(frame, {}).m_Detail == validation.m_Detail,
+						"Production validation checks the readback before presentation, resize or pipeline preparation");
+				}
+			}
+			// A later unresolved fence must prevent mapping an earlier completed readback.
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_UseControlledFenceCompletion = true;
+				device.m_CompletedFenceValue = fence.m_Value;
+				ForwardPlusDebugReadback readback;
+				readback.Initialize(device, 1);
+				readback.PrepareGridBuffer(device, 0, grid);
+				const auto generation = readback.GetCurrentGeneration();
+				readback.MarkScheduled(0, 7, fence, generation, grid, 0, 0);
+				readback.MarkHdrDiffScheduled(0, 7,
+					{ fence.m_Fence, fence.m_Value + 1 }, generation, 32, 16);
+				readback.MarkGridScheduled(0, 7, fence, generation, grid);
+				const auto validation = readback.ConsumeCompletedSlot(0);
+				context.Check(validation.m_Status == RenderFrameValidationStatus::ContractFailure &&
+					validation.m_Detail.find("readback=hdr-diff") != std::string::npos &&
+					device.m_PassConstantMapCount == 0 && device.m_FenceQueryCount == 3,
+					"All adopted fences are checked before mapping any completed tile, HDR or grid bytes");
+			}
+			// Generation filtering cannot erase unresolved fences, and completed stale bytes never map.
+			for (const bool completed : { false, true })
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_FenceQueryResult = completed ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
+				ForwardPlusDebugReadback readback;
+				readback.Initialize(device, 1);
+				readback.MarkScheduled(0, 7, fence, readback.GetCurrentGeneration(), grid, 0, 0);
+				readback.InvalidateResults();
+				context.Check(readback.ConsumeCompletedSlot(0).IsReady() == completed &&
+					device.m_PassConstantMapCount == 0 && !readback.GetLatest().m_IsValid,
+					"Generation filtering follows completion and never maps stale or unresolved bytes");
+			}
 		}
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
@@ -5681,7 +6235,8 @@ namespace gglab
 			RunRenderViewConventionTests(context);
 			RunSampleableDepthFormatTests(context);
 			RunDepthCoverageContractTests(context);
-			RunForwardPlusContractTests(context);
+			RunForwardPlusReadbackFenceTests(context);
+		RunForwardPlusContractTests(context);
 
 			context.Check(MakeGTAOHalfResolutionExtent(1920, 1080) == GTAOExtent{ 960, 540 } &&
 				MakeGTAOHalfResolutionExtent(1919, 1079) == GTAOExtent{ 960, 540 } &&
@@ -6711,12 +7266,14 @@ namespace gglab
 					encoderSnapshot.m_Passes[3].m_Culled,
 					"RenderGraph snapshots preserve encoder metadata for live and culled passes");
 
-				RGExecuteContext executeContext({
+				RGDeferredCommitList executeContextCommits;
+				RGExecuteContext executeContext(executeContextCommits, {
 					.m_GraphicsCommandContext = &graphicsContext,
 					.m_DirectComputeCommandContext = &directComputeContext,
 					.m_AsyncComputeCommandContext = nullptr,
 				});
 				encoderGraph.Execute(executeContext);
+				executeContextCommits.Discard();
 				context.Check(graphicsExecutions == 1 && computeExecutions == 1 &&
 					copyExecutions == 1 && culledComputeExecutions == 0 &&
 					graphicsContextSelected && directComputeContextSelected &&
@@ -6769,12 +7326,14 @@ namespace gglab
 			context.Check(barrierBatchingCompiled, "RenderGraph barrier batching fixture compiles");
 			if (barrierBatchingCompiled)
 			{
-				RGExecuteContext batchingExecuteContext({
+				RGDeferredCommitList batchingExecuteContextCommits;
+				RGExecuteContext batchingExecuteContext(batchingExecuteContextCommits, {
 					.m_GraphicsCommandContext = &batchingGraphicsContext,
 					.m_DirectComputeCommandContext = &batchingComputeContext,
 					.m_AsyncComputeCommandContext = nullptr,
 				});
 				barrierBatchingGraph.Execute(batchingExecuteContext);
+				batchingExecuteContextCommits.Discard();
 				context.Check(batchingComputeContext.m_TextureBarrierCount == 1 &&
 					batchingComputeContext.m_BufferBarrierCount == 1 &&
 					batchingComputeContext.m_FlushBarrierCount == 1,
@@ -8150,8 +8709,10 @@ namespace gglab
 					});
 				context.Check(snapshotGraph.Compile(), "Execution snapshot allocation fixture compiles");
 				snapshotGraph.EnableExecutionRecord();
-				RGExecuteContext execute({ .m_DirectComputeCommandContext = &snapshotCommands });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { .m_DirectComputeCommandContext = &snapshotCommands });
 				snapshotGraph.Execute(execute);
+				executeCommits.Discard();
 				RGSnapshot snapshot;
 				BuildRenderGraphSnapshot(snapshotGraph, snapshot);
 				context.Check(snapshot.m_Execution.m_Recorded && snapshot.m_Execution.m_Allocations.size() == 1 &&
@@ -8185,8 +8746,10 @@ namespace gglab
 					});
 				context.Check(barrierGraph.Compile(), "Failed barrier resolution fixture compiles");
 				barrierGraph.EnableExecutionRecord();
-				RGExecuteContext execute({ .m_DirectComputeCommandContext = &commands });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { .m_DirectComputeCommandContext = &commands });
 				barrierGraph.Execute(execute);
+				executeCommits.Discard();
 				auto first = barrierGraph.TakeExecutionRecord();
 				context.Check(first && first->m_Barriers.size() == 2 &&
 					std::ranges::all_of(first->m_Barriers, [](const auto& b) { return b.m_Barrier.m_HasPhysicalHandle; }),
@@ -8195,7 +8758,9 @@ namespace gglab
 				resource->m_ImportedHandle = {};
 				commands.m_TextureBarrierCount = 0;
 				barrierGraph.EnableExecutionRecord();
+				executeCommits = RGDeferredCommitList{};
 				barrierGraph.Execute(execute);
+				executeCommits.Discard();
 				auto failed = barrierGraph.TakeExecutionRecord();
 				context.Check(failed && failed->m_Recorded && failed->m_Barriers.size() == 2 &&
 					commands.m_TextureBarrierCount == 0 &&
@@ -9464,7 +10029,8 @@ namespace gglab
 			RenderGraph disabledGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
 			const auto disabledContext = frame.MakeRenderFrameContext();
 			pass.AddPass(disabledGraph, disabledContext, previewServices);
-			registry.PublishPostProcessPreview({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere, 42);
+			registry.PublishPostProcessPreview({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere, 42,
+				registry.ObservePostProcessPreviewRequest(PostProcessPreviewChannel::Atmosphere));
 			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 }, PostProcessPreviewChannel::Atmosphere);
 			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 			RenderPassPostProcessPreview unavailablePreview;
@@ -9794,8 +10360,10 @@ namespace gglab
 			const bool snapshotCompiled = snapshotGraph.Compile();
 			if (snapshotCompiled)
 			{
-				RGExecuteContext execute({ &snapshotGraphics, &snapshotCompute, nullptr });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { &snapshotGraphics, &snapshotCompute, nullptr });
 				snapshotGraph.Execute(execute);
+				executeCommits.Discard();
 			}
 			const auto atmosphereContract = scene_bindings::ComposeAtmosphereLayout(
 				scene_bindings::GetCommonLayoutContract());
@@ -9908,8 +10476,10 @@ namespace gglab
 			const bool missingCompiled = unavailableGraph.Compile();
 			if (missingCompiled)
 			{
-				RGExecuteContext execute({ &missingGraphics, &missingCompute, nullptr });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { &missingGraphics, &missingCompute, nullptr });
 				unavailableGraph.Execute(execute);
+				executeCommits.Discard();
 			}
 			context.Check(missingCompiled && missingGraphics.HasRecordingError() && uploadBatch->HasFailed(),
 				"Missing enabled live data fails the frame even when no Forward draw is emitted");
@@ -12281,6 +12851,10 @@ namespace gglab
 		RunCheckedCompletionContractTests(context);
 		RunDX12TransferCompletionTests(context);
 		RunFrameSubmissionContractTests(context);
+		RunRenderFrameOutcomeContractTests(context);
+		RunDeferredCommitContractTests(context);
+		RunPreviewSubmissionContractTests(context);
+		RunPreviewPassContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunScopedConstantRecordingTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);

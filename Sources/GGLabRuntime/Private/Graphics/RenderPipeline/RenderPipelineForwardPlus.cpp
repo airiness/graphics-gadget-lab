@@ -619,6 +619,10 @@ namespace gglab
 	RenderFrameValidationResult ClassifyForwardPlusFrame(
 		const ForwardPlusFrameValidationInputs& inputs) noexcept
 	{
+		if (!inputs.m_ReadbackValidation.IsReady())
+		{
+			return inputs.m_ReadbackValidation;
+		}
 		if (!inputs.m_PresentationAvailable)
 		{
 			return RenderFrameValidationResult::ContractFailure(
@@ -683,6 +687,15 @@ namespace gglab
 		const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		m_FramePlan.reset();
+		if (m_ForwardPlusDebugReadback)
+		{
+			const auto completion =
+				m_ForwardPlusDebugReadback->ConsumeCompletedSlot(context.m_FrameSlotIndex);
+			if (!completion.IsReady())
+			{
+				return ClassifyForwardPlusFrame({ .m_ReadbackValidation = completion });
+			}
+		}
 		const auto* swapChain = services.m_Presentation->GetSwapChain();
 		if (!swapChain || !swapChain->IsValid())
 		{

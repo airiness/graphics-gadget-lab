@@ -14,6 +14,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Diagnostics/RenderGraphEnumText.h"
 
@@ -951,8 +952,10 @@ namespace gglab
 			context.Check(service.GetUnfinishedRequestCount() == 1,
 				"Graph recording cannot retarget a frame-restricted request");
 			service.BeginGraphRecording(7, graph);
-			RGExecuteContext executeContext({});
+			RGDeferredCommitList executeContextCommits;
+			RGExecuteContext executeContext(executeContextCommits, {});
 			graph.Execute(executeContext);
+			executeContextCommits.Discard();
 			service.EndGraphRecording(7, graph);
 			service.OnFrameSubmitted(7, MakeFence(9));
 			context.Check(Consume(service).empty() && device.GetLiveBufferCount() == 0 && device.GetMapCount() == 0,
@@ -1203,8 +1206,10 @@ namespace gglab
 				"Observers preserve original liveness/order and occupy the exact version cut");
 			service.BeginGraphRecording(7, graph);
 			ExportTestCommands commands(device);
-			RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+			RGDeferredCommitList executionCommits;
+			RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &commands });
 			graph.Execute(execution);
+			executionCommits.Discard();
 			service.EndGraphRecording(7, graph);
 			service.OnFrameSubmitted(7, MakeFence(3));
 			service.CollectCompleted();
@@ -1232,8 +1237,10 @@ namespace gglab
 				auto* mapped = device.MapBuffer(handle, {});
 				std::memcpy(mapped, arrays[1].m_Data.data(), arrays[1].m_Data.size());
 				device.UnmapBuffer(handle, {});
-				debugReadback.MarkGridScheduled(0, 7, grid);
-				debugReadback.ConsumeCompletedSlot(0);
+				debugReadback.MarkGridScheduled(0, 7, MakeFence(3),
+					debugReadback.GetCurrentGeneration(), grid);
+				context.Check(debugReadback.ConsumeCompletedSlot(0).IsReady(),
+					"Completed grid decoding accepts the adopted submission fence");
 				const auto readback = debugReadback.GetLatestGrid();
 				context.Check(readback && readback->m_IsValid && readback->m_Headers.size() == 2 &&
 					std::memcmp(readback->m_Headers.data(), arrays[1].m_Data.data(), arrays[1].m_Data.size()) == 0,
@@ -1481,8 +1488,10 @@ namespace gglab
 			context.Check(uav && copyTransition, "The general barrier planner supplies clear-to-scan UAV and scan-to-copy ordering");
 			ExportTestCommands graphics(device);
 			ScanTestCommands compute(device);
-			RGExecuteContext execution({ .m_GraphicsCommandContext = &graphics, .m_DirectComputeCommandContext = &compute });
+			RGDeferredCommitList executionCommits;
+			RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &graphics, .m_DirectComputeCommandContext = &compute });
 			graph.Execute(execution);
+			executionCommits.Discard();
 			service.EndGraphRecording(30, graph);
 			context.Check(device.m_ReadbackMapCalls == 0 && compute.m_Dispatches == 4, "Recording scans does not map a readback or wait on the CPU");
 			service.OnFrameSubmitted(30, MakeFence(10));
@@ -1620,7 +1629,9 @@ namespace gglab
 			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout } }, 25, 38));
 			GGLAB_UNUSED(service.PrepareResourceExports(38, atomic));
 			compute.m_SkipScan = true;
+			executionCommits = RGDeferredCommitList{};
 			atomic.Execute(execution);
+			executionCommits.Discard();
 			service.OnFrameSubmitted(38, MakeFence(11));
 			device.m_CompletedFenceValue = 11;
 			failed = Consume(service);
@@ -1634,7 +1645,9 @@ namespace gglab
 			GGLAB_UNUSED(service.RequestNonFiniteScan({ { final, layout } }, 26, 39));
 			GGLAB_UNUSED(service.PrepareResourceExports(39, mapFailure));
 			compute.m_SkipScan = false;
+			executionCommits = RGDeferredCommitList{};
 			mapFailure.Execute(execution);
+			executionCommits.Discard();
 			service.OnFrameSubmitted(39, MakeFence(12));
 			device.m_CompletedFenceValue = 12;
 			device.m_FailMapping = true;
@@ -1789,8 +1802,10 @@ namespace gglab
 				"The last observer restores the imported owner's final state before returning ownership");
 			service.BeginGraphRecording(11, graph);
 			ExportTestCommands commands(device);
-			RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+			RGDeferredCommitList executionCommits;
+			RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &commands });
 			graph.Execute(execution);
+			executionCommits.Discard();
 			service.EndGraphRecording(11, graph);
 			service.OnFrameSubmitted(11, MakeFence(5));
 			device.m_CompletedFenceValue = 5;
@@ -1847,8 +1862,10 @@ namespace gglab
 				{ .m_Resource = "Depth", .m_Aspect = RHITextureAspect::Stencil } }, 10));
 			context.Check(service.PrepareResourceExports(10, graph) == FrameCaptureAvailability::Available, "Color/depth/stencil group is admitted atomically");
 			ExportTestCommands commands(device);
-			RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+			RGDeferredCommitList executionCommits;
+			RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &commands });
 			graph.Execute(execution);
+			executionCommits.Discard();
 			service.OnFrameSubmitted(10, MakeFence(4));
 			device.m_CompletedFenceValue = 4;
 			service.CollectCompleted();
@@ -1919,8 +1936,10 @@ namespace gglab
 				context.Check(service.PrepareResourceExports(12, graph) == FrameCaptureAvailability::Available && graph.HasResourceObservations(),
 					"An RGB32F group binds with legal slice placement");
 				ExportTestCommands commands(device);
-				RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+				RGDeferredCommitList executionCommits;
+				RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &commands });
 				graph.Execute(execution);
+				executionCommits.Discard();
 				bool copiesAligned = commands.m_TextureCopies.size() == textureCase.m_Slices;
 				for (size_t slice = 0; copiesAligned && slice < commands.m_TextureCopies.size(); ++slice)
 				{
@@ -1993,8 +2012,10 @@ namespace gglab
 					"Only the unrelated screenshots return Busy; the resource group is not mislabeled TooLarge");
 				service.BeginGraphRecording(20, graph);
 				ExportTestCommands commands(device);
-				RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+				RGDeferredCommitList executionCommits;
+				RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &commands });
 				graph.Execute(execution);
+				executionCommits.Discard();
 				service.EndGraphRecording(20, graph);
 				service.OnFrameSubmitted(20, MakeFence(20));
 				device.m_CompletedFenceValue = 20;
@@ -2056,8 +2077,10 @@ namespace gglab
 				if (targetCount == 7)
 				{
 					ExportTestCommands commands(device);
-					RGExecuteContext execution({ .m_GraphicsCommandContext = &commands });
+					RGDeferredCommitList executionCommits;
+					RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &commands });
 					graph.Execute(execution);
+					executionCommits.Discard();
 					service.OnFrameSubmitted(23, MakeFence(23));
 					device.FillReadback(tap->m_Buffer, tap->m_Footprint);
 					device.m_CompletedFenceValue = 23;
@@ -2096,8 +2119,10 @@ namespace gglab
 			context.Check(service.GetRequestAvailability() == FrameCaptureAvailability::Busy,
 				"Graph admission uses the configured request limit rather than 64");
 			service.BeginGraphRecording(1, graph);
-			RGExecuteContext execute({});
+			RGDeferredCommitList executeCommits;
+			RGExecuteContext execute(executeCommits, {});
 			graph.Execute(execute);
+			executeCommits.Discard();
 			service.EndGraphRecording(1, graph);
 			context.Check(!graph.TakeExecutionRecord(), "Ending graph recording transfers the execution record exactly once");
 			service.OnFrameSubmitted(1, MakeFence(1));

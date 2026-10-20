@@ -29,6 +29,7 @@
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
+#include "Graphics/RenderFrameOutcome.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
@@ -459,6 +460,12 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == m_ActiveFrame.m_FrameSlotIndex);
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == m_ActiveFrame.m_BackBufferIndex);
 		GGLAB_ASSERT(renderContext.m_FrameSerial == m_ActiveFrame.m_Serial);
+		struct DeferredCommitSeal
+		{
+			RGDeferredCommitList& m_Commits;
+			~DeferredCommitSeal() noexcept { m_Commits.Seal(); }
+		};
+		const DeferredCommitSeal commitSeal{ m_ActiveFrame.m_DeferredCommits };
 
 		m_ActiveFrame.m_RenderGraph = &rg;
 
@@ -483,7 +490,7 @@ namespace gglab
 			return;
 		}
 
-		RGExecuteContext executeContext{ RGBackendExecuteContext{
+		RGExecuteContext executeContext{ m_ActiveFrame.m_DeferredCommits, RGBackendExecuteContext{
 			.m_GraphicsCommandContext = &m_ActiveFrame.m_RHIFrame->GetGraphicsContext(),
 			.m_DirectComputeCommandContext = &m_ActiveFrame.m_RHIFrame->GetDirectComputeContext(),
 			.m_AsyncComputeCommandContext = nullptr,
@@ -501,7 +508,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial,
 			"Renderer::EndFrame called without the matching active render host frame.");
 
-		if (m_ActiveFrame.m_Phase != FramePhase::Recorded)
+		if (m_ActiveFrame.m_Phase != FramePhase::Recorded || m_ActiveFrame.m_DeferredCommits.HasFailed())
 		{
 			return AbortActiveFrame(frame.GetSerial());
 		}
@@ -510,59 +517,13 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_ActiveFrame.m_RenderGraph);
 
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
-		if (result.IsCompletionUnknown())
-		{
-			RetainCompletionUnknownFrame();
-			return result;
-		}
-		// Fenced, or no outstanding work: the cleanup below cannot release anything the GPU
-		// may still read.
-		const RHIFencePoint submittedFence = result.GetSubmittedFence();
-		if (result.IsCompleted() && submittedFence.IsValid())
-		{
-			m_FrameCapture->OnFrameSubmitted(m_ActiveFrame.m_Serial, submittedFence);
-		}
-		else
-		{
-			m_FrameCapture->OnFrameSubmissionFailed(m_ActiveFrame.m_Serial);
-		}
-		m_Atmosphere->EndFrame(result.IsCompleted(), submittedFence);
-		m_BakeAtmosphere->EndFrame(result.IsCompleted(), submittedFence);
-		if (result.IsCompleted() && submittedFence.IsValid())
-		{
-			m_ActiveFrame.m_TemporalTransaction.CommitCompleted(submittedFence);
-		}
-		else
-		{
-			m_ActiveFrame.m_TemporalTransaction.InvalidateAfterFatal(submittedFence);
-			m_TemporalHistoryManager->Invalidate(
-				TemporalHistoryResetReason::FatalSubmission, submittedFence);
-			m_TemporalViewHistory.Invalidate();
-			m_TemporalObjectHistory.Invalidate();
-		}
-		if (submittedFence.IsValid())
-		{
-			m_LastSubmittedFencePoint = submittedFence;
-			if (result.IsCompleted())
-			{
-				m_IBLBakeScheduler->OnFrameSubmitted(submittedFence);
-			}
-			else
-			{
-				m_IBLBakeScheduler->OnFrameAborted(submittedFence);
-			}
-		}
-		else
-		{
-			m_IBLBakeScheduler->OnFrameAborted();
-		}
-
-		const RHIFencePoint retirementFence =
-			submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
-		m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
-
+		SettleFrame(ResolveRenderFrameOutcome(
+			RenderFrameEndPath::EndFrame, m_ActiveFrame.m_Serial, result));
+		// Settlement-time violations cannot undo submitted work or settle participants twice.
+		const RHIFrameEndResult settledResult = result.IsCompleted() && m_ActiveFrame.m_DeferredCommits.HasFailed() ?
+			RHIFrameEndResult::Fatal(result.GetSubmittedFence()) : result;
 		EndFrameLifetime();
-		return result;
+		return settledResult;
 	}
 
 	void Renderer::AbortFrame(uint64_t frameSerial) noexcept
@@ -590,58 +551,125 @@ namespace gglab
 		if (m_RHIContext && m_ActiveFrame.m_RHIFrame)
 		{
 			const RHIFrameEndResult result = m_RHIContext->AbortFrame(*m_ActiveFrame.m_RHIFrame);
-			if (result.IsCompletionUnknown())
-			{
-				RetainCompletionUnknownFrame();
-				return result;
-			}
-			const RHIFencePoint submittedFence = result.GetSubmittedFence();
-			m_Atmosphere->EndFrame(false, submittedFence);
-			m_BakeAtmosphere->EndFrame(false, submittedFence);
-			m_IBLBakeScheduler->OnFrameAborted(submittedFence);
-			if (submittedFence.IsValid())
-			{
-				m_LastSubmittedFencePoint = submittedFence;
-			}
-			const RHIFencePoint retirementFence =
-				submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
-			m_ActiveFrame.m_TemporalTransaction.Abort(retirementFence);
-			if (m_ActiveFrame.m_RenderGraph)
-			{
-				m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
-			}
-			// Release capture readbacks only after the RHI abort recorded their uses.
-			m_FrameCapture->OnFrameAborted(frameSerial);
+			SettleFrame(ResolveRenderFrameOutcome(
+				RenderFrameEndPath::AbortActiveFrame, frameSerial, result));
 			EndFrameLifetime();
 			return result;
 		}
 
-		m_Atmosphere->EndFrame(false, {});
-		m_BakeAtmosphere->EndFrame(false, {});
-		m_IBLBakeScheduler->OnFrameAborted();
-		m_ActiveFrame.m_TemporalTransaction.Abort();
-		m_FrameCapture->OnFrameAborted(frameSerial);
+		SettleFrame(ResolveRenderFrameOutcome(RenderFrameEndPath::AbortActiveFrame, frameSerial));
 		EndFrameLifetime();
 		return RHIFrameEndResult::Fatal();
 	}
 
-	void Renderer::RetainCompletionUnknownFrame() noexcept
+	void Renderer::SettleFrame(const RenderFrameOutcome& outcome) noexcept
 	{
-		// Nothing the frame can read is released: graph transients stay out of the pool's
-		// free lists, upload pages stay quarantined, capture readbacks stay unread, and the
-		// Atmosphere, temporal and IBL resources keep their owners. Finalize releases them
-		// once quiescence or device loss is confirmed.
-		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-			"Renderer retained a frame whose GPU completion is unknown; no further frame begins.");
-		m_Poisoned = true;
-		m_FrameCapture->OnFrameCompletionUnknown(m_ActiveFrame.m_Serial);
-		m_Atmosphere->RetainAfterUnknownCompletion();
-		m_BakeAtmosphere->RetainAfterUnknownCompletion();
-		m_IBLBakeScheduler->OnFrameAborted();
-		m_ActiveFrame.m_TemporalTransaction.Abort();
-		m_TemporalViewHistory.Invalidate();
-		m_TemporalObjectHistory.Invalidate();
-		EndFrameLifetime();
+		GGLAB_ASSERT(m_HasActiveFrame && outcome.m_FrameSerial == m_ActiveFrame.m_Serial);
+		const RHIFencePoint fence = outcome.m_Fence;
+		switch (outcome.m_Kind)
+		{
+		case RenderFrameOutcomeKind::Submitted:
+		case RenderFrameOutcomeKind::Failed:
+		{
+			// Preserve EndFrame order: capture, live/bake atmosphere, temporal histories,
+			// last fence and IBL, then graph retirement. Submitted does not mean GPU idle.
+			const bool submitted = outcome.m_Kind == RenderFrameOutcomeKind::Submitted;
+			if (submitted && fence.IsValid())
+			{
+				m_FrameCapture->OnFrameSubmitted(outcome.m_FrameSerial, fence);
+			}
+			else
+			{
+				m_FrameCapture->OnFrameSubmissionFailed(outcome.m_FrameSerial);
+			}
+			m_Atmosphere->EndFrame(submitted, fence);
+			m_BakeAtmosphere->EndFrame(submitted, fence);
+			if (submitted && fence.IsValid())
+			{
+				m_ActiveFrame.m_TemporalTransaction.CommitCompleted(fence);
+			}
+			else
+			{
+				m_ActiveFrame.m_TemporalTransaction.InvalidateAfterFatal(fence);
+				m_TemporalHistoryManager->Invalidate(TemporalHistoryResetReason::FatalSubmission, fence);
+				m_TemporalViewHistory.Invalidate();
+				m_TemporalObjectHistory.Invalidate();
+			}
+			if (fence.IsValid())
+			{
+				m_LastSubmittedFencePoint = fence;
+				if (submitted)
+				{
+					m_IBLBakeScheduler->OnFrameSubmitted(fence);
+				}
+				else
+				{
+					m_IBLBakeScheduler->OnFrameAborted(fence);
+				}
+			}
+			else
+			{
+				m_IBLBakeScheduler->OnFrameAborted();
+			}
+			const RHIFencePoint retirementFence = fence.IsValid() ? fence : m_LastSubmittedFencePoint;
+			m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
+			break;
+		}
+		case RenderFrameOutcomeKind::Discarded:
+		{
+			// Preserve abort order: live/bake atmosphere, IBL, last fence, temporal,
+			// graph, capture. RHI abort must record resource uses before capture releases.
+			m_Atmosphere->EndFrame(false, fence);
+			m_BakeAtmosphere->EndFrame(false, fence);
+			m_IBLBakeScheduler->OnFrameAborted(fence);
+			if (m_RHIContext && m_ActiveFrame.m_RHIFrame)
+			{
+				if (fence.IsValid())
+				{
+					m_LastSubmittedFencePoint = fence;
+				}
+				const RHIFencePoint retirementFence = fence.IsValid() ? fence : m_LastSubmittedFencePoint;
+				m_ActiveFrame.m_TemporalTransaction.Abort(retirementFence);
+				if (m_ActiveFrame.m_RenderGraph)
+				{
+					m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
+				}
+			}
+			else
+			{
+				// No RHI frame means no graph allocations to retire and no retention fence.
+				m_ActiveFrame.m_TemporalTransaction.Abort();
+			}
+			m_FrameCapture->OnFrameAborted(outcome.m_FrameSerial);
+			break;
+		}
+		case RenderFrameOutcomeKind::CompletionUnknown:
+		{
+			// Preserve retention order: poison, capture, live/bake atmosphere, IBL, temporal.
+			// Nothing the frame can read is released or returned to the graph pool. Finalize
+			// releases retained owners only after verified quiescence or confirmed device loss.
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer retained a frame whose GPU completion is unknown; no further frame begins.");
+			m_Poisoned = true;
+			m_FrameCapture->OnFrameCompletionUnknown(outcome.m_FrameSerial);
+			m_Atmosphere->RetainAfterUnknownCompletion();
+			m_BakeAtmosphere->RetainAfterUnknownCompletion();
+			m_IBLBakeScheduler->OnFrameAborted();
+			m_ActiveFrame.m_TemporalTransaction.Abort();
+			m_TemporalViewHistory.Invalidate();
+			m_TemporalObjectHistory.Invalidate();
+			break;
+		}
+		}
+		// Plain CPU commits settle after every GPU-owning participant, in enqueue order.
+		if (outcome.m_Kind == RenderFrameOutcomeKind::Submitted)
+		{
+			m_ActiveFrame.m_DeferredCommits.CommitAll({ outcome.m_FrameSerial, fence });
+		}
+		else
+		{
+			m_ActiveFrame.m_DeferredCommits.Discard();
+		}
 	}
 
 	void Renderer::AbandonGpuOwners() noexcept
@@ -673,6 +701,7 @@ namespace gglab
 
 	void Renderer::EndFrameLifetime() noexcept
 	{
+		m_ActiveFrame.m_DeferredCommits.Discard();
 		m_ActiveFrame = {};
 		m_HasActiveFrame = false;
 	}

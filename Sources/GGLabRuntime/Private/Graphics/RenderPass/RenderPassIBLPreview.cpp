@@ -63,6 +63,17 @@ namespace gglab
 			TextureIndex sourceIndex, TextureIndex previewIndex,
 			PreviewLayout layout, uint32_t sampleMip) noexcept
 			{
+				const auto request = renderResRegistry->ObserveIBLPreviewRequest(previewType);
+				if (!request.m_Requested)
+				{
+					return;
+				}
+				if (!renderResRegistry->IsIBLPreviewDirty(previewType))
+				{
+					// Valid cached content already satisfies this generation without GPU work.
+					renderResRegistry->AcknowledgeIBLPreviewRequest(previewType, request.m_Generation);
+					return;
+				}
 				const std::string passName = MakeRenderGraphPassName(suffix);
 				rg.AddPass<CubemapPreviewPassData>(
 					passName.c_str(),
@@ -113,7 +124,7 @@ namespace gglab
 							services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 						data.m_SampleMip = sampleMip;
 					},
-					[this, services, renderResRegistry, contextPtr, previewType](
+					[this, services, renderResRegistry, contextPtr, previewType, request](
 						RGExecuteContext& executeContext, CubemapPreviewPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -147,11 +158,17 @@ namespace gglab
 						}
 
 						commandContext->DrawFullscreenTriangle();
-						renderResRegistry->ClearIBLPreviewDirty(previewType);
+						executeContext.DeferCommit(
+							[renderResRegistry, previewType, request,
+								layout = static_cast<PreviewLayout>(data.m_DisplayLayout), mip = data.m_SampleMip]
+							(const RGCommitContext&) noexcept
+							{
+								renderResRegistry->PublishIBLPreview(previewType, request, layout, mip);
+							});
 					});
 			};
 
-		if (renderResRegistry->ConsumeIBLPreviewRequest(PreviewType::Environment))
+		if (renderResRegistry->IsIBLPreviewRequested(PreviewType::Environment))
 		{
 			const auto* environmentDesc =
 				renderResRegistry->GetTextureDesc(TextureIndex::IBL_EnvironmentCubemap);
@@ -165,14 +182,14 @@ namespace gglab
 				renderResRegistry->GetIBLEnvironmentPreviewLayout(), sampleMip);
 		}
 
-		if (renderResRegistry->ConsumeIBLPreviewRequest(PreviewType::Irradiance))
+		if (renderResRegistry->IsIBLPreviewRequested(PreviewType::Irradiance))
 		{
 			addPreviewPass("IrradianceCubemap", PreviewType::Irradiance,
 				TextureIndex::IBL_IrradianceCubemap, TextureIndex::Preview_IBL_IrradianceCubemap,
 				renderResRegistry->GetIBLIrradiancePreviewLayout(), 0);
 		}
 
-		if (renderResRegistry->ConsumeIBLPreviewRequest(PreviewType::PrefilteredSpecular))
+		if (renderResRegistry->IsIBLPreviewRequested(PreviewType::PrefilteredSpecular))
 		{
 			const auto* prefilteredDesc =
 				renderResRegistry->GetTextureDesc(TextureIndex::IBL_PrefilteredSpecularCubemap);

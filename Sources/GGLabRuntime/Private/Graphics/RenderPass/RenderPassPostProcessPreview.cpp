@@ -19,7 +19,9 @@
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -62,6 +64,11 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOHistorySamples) == 28);
+
+		struct PreviewBuildState
+		{
+			std::array<bool, static_cast<std::size_t>(PostProcessPreviewChannel::Count)> m_Added{};
+		};
 
 		struct PassData
 		{
@@ -129,7 +136,7 @@ namespace gglab
 
 		// Records the fullscreen preview draw shared by inspector previews and
 		// diagnostic captures.
-		void RecordPreviewDraw(RGExecuteContext& executeContext, const PassData& data,
+		bool RecordPreviewDraw(RGExecuteContext& executeContext, const PassData& data,
 			RHIPipelineHandle pipeline, const RenderServices& services,
 			const RenderFrameContext& context, RenderViewID displayViewId) noexcept
 		{
@@ -159,7 +166,7 @@ namespace gglab
 				static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 				context.m_FrameConstants.m_Views))
 			{
-				return;
+				return false;
 			}
 
 			const PostProcessPreviewPassParameters parameters{
@@ -173,9 +180,10 @@ namespace gglab
 			if (!commandContext->SetConstantBufferData(
 				static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 			{
-				return;
+				return false;
 			}
 			commandContext->DrawFullscreenTriangle();
+			return true;
 		}
 
 		struct DiagnosticSource
@@ -339,7 +347,7 @@ namespace gglab
 				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				return;
 			}
@@ -359,7 +367,7 @@ namespace gglab
 				return;
 			}
 			const auto index = static_cast<uint32_t>(selection.m_Tap) - static_cast<uint32_t>(PostProcessDebugTap::AtmosphereTransmittance);
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				return;
 			}
@@ -378,7 +386,7 @@ namespace gglab
 				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				return;
 			}
@@ -394,7 +402,7 @@ namespace gglab
 				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				return;
 			}
@@ -414,7 +422,7 @@ namespace gglab
 				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				return;
 			}
@@ -423,7 +431,7 @@ namespace gglab
 		}
 		if (IsDepthPreview(selection.m_Tap))
 		{
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				return;
 			}
@@ -449,7 +457,7 @@ namespace gglab
 		}
 		GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
 			"Post-process preview requires scene-linear Rec.709 input.");
-		if (registry->ConsumePostProcessPreviewRequest(channel))
+		if (registry->IsPostProcessPreviewRequested(channel))
 		{
 			AddResolvedPass(rg, context, services, source.m_Texture, source.m_PreExposure,
 				std::nullopt, selection, channel);
@@ -479,7 +487,7 @@ namespace gglab
 			}
 			GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
 				"Post-process preview requires scene-linear Rec.709 input.");
-			if (!registry->ConsumePostProcessPreviewRequest(channel))
+			if (!registry->IsPostProcessPreviewRequested(channel))
 			{
 				continue;
 			}
@@ -510,6 +518,15 @@ namespace gglab
 		registry->EnsurePostProcessPreviewResources(
 			displayView.m_DisplayWidth, displayView.m_DisplayHeight,
 			retireFence.IsValid() ? &retireFence : nullptr, channel);
+
+		auto& added = rg.GetBlackboard().GetOrCreate<PreviewBuildState>("PostProcess.Preview.Build")
+			.m_Added[static_cast<std::size_t>(channel)];
+		if (added)
+		{
+			return;
+		}
+		added = true;
+		const auto request = registry->ObservePostProcessPreviewRequest(channel);
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		const TextureIndex PreviewIndex = RenderResourceRegistry::GetPostProcessPreviewTextureIndex(channel);
@@ -573,13 +590,20 @@ namespace gglab
 				data.m_SourcePreExposure = sourcePreExposure;
 				data.m_PreviewExposureScale = previewExposureScale;
 			},
-			[this, services, registry, contextPtr, displayViewId, channel](
+			[this, services, registry, contextPtr, displayViewId, channel, request](
 				RGExecuteContext& executeContext, PassData& data)
 			{
-				RecordPreviewDraw(executeContext, data, GetOrCreatePSO(services), services,
-					*contextPtr, displayViewId);
-				registry->PublishPostProcessPreview(data.m_Selection, channel,
-					contextPtr->m_FrameSerial);
+				if (!RecordPreviewDraw(executeContext, data, GetOrCreatePSO(services), services,
+					*contextPtr, displayViewId))
+				{
+					return;
+				}
+				executeContext.DeferCommit(
+					[registry, selection = data.m_Selection, channel, request]
+					(const RGCommitContext& commit) noexcept
+					{
+						registry->PublishPostProcessPreview(selection, channel, commit.m_FrameSerial, request);
+					});
 			});
 	}
 

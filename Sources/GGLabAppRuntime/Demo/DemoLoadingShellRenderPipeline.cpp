@@ -59,6 +59,7 @@ namespace gglab
 
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
 				const RenderViewID displayViewId = context.GetDisplayViewId();
+				const uint64_t shadowRevision = resourceRegistry->GetTextureContentRevision(shadowIndex);
 				rg.AddPass<LoadingShellSetupPassData>(
 					"LoadingShell.Setup",
 					[swapChain, resourceRegistry, backBufferIndex, displayViewId, shadowIndex, shadowPreviewInitialized]
@@ -108,7 +109,7 @@ namespace gglab
 									shadow.m_DirectionalShadowMapPreview);
 						}
 					},
-					[backBufferClearColor, resourceRegistry, shadowIndex](
+					[backBufferClearColor, resourceRegistry, shadowIndex, shadowRevision](
 						RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -134,7 +135,12 @@ namespace gglab
 								std::span<const RHIRenderingAttachment>(&shadowAttachment, 1) });
 							commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 							commandContext->EndRendering();
-							resourceRegistry->ClearDirty(shadowIndex);
+							executeContext.DeferCommit(
+								[resourceRegistry, shadowIndex, shadowRevision]
+								(const RGCommitContext&) noexcept
+								{
+									resourceRegistry->CommitTextureContent(shadowIndex, shadowRevision);
+								});
 						}
 					});
 

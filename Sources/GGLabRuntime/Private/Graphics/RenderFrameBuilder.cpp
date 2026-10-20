@@ -235,10 +235,12 @@ namespace gglab
 		}
 
 		const auto& shadowSettings = result.m_WorldData.GetMainDirectionalShadowSettings();
+		const auto shadowPreview = info.m_Renderer.GetRenderResourceRegistry()->ObserveShadowPreviewRequest();
 		result.m_DirectionalShadowFramePlan = BuildDirectionalShadowFramePlan(
 			result.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 			result.m_WorldData.m_MainDirectionalLight.m_Direction, shadowSettings,
-			info.m_Renderer.GetRenderResourceRegistry()->ConsumeShadowPreviewRequest());
+			shadowPreview.m_Requested);
+		result.m_DirectionalShadowFramePlan.m_PreviewRequestGeneration = shadowPreview.m_Generation;
 
 		result.m_DisplayViewId = info.m_DisplayViewId;
 		GGLAB_ASSERT_MSG(IsValidBuiltView(result.m_RenderViews, result.m_DisplayViewId),

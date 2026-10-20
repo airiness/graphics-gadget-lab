@@ -63,6 +63,9 @@ namespace gglab
 
 
 		EnsureInitialized(services);
+		const uint64_t generation = context.GetDirectionalShadowFramePlan().m_PreviewRequestGeneration;
+		const uint64_t revision = services.m_Resources->GetTextureContentRevision(
+			RenderTextureIndex::Preview_Shadow_DirectionalShadowMap);
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
@@ -101,7 +104,7 @@ namespace gglab
 				data.m_PreviewAllCascades = settings.m_PreviewAllCascades && shadowRes.m_CascadeCount > 1 ? 1u : 0u;
 				data.m_CascadeCount = shadowRes.m_CascadeCount;
 			},
-			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, services, generation, revision](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto shadowMapSrv = executeContext.GetViewDescriptor(data.m_ShadowMapSrv);
@@ -145,8 +148,12 @@ namespace gglab
 				}
 
 				commandContext->DrawFullscreenTriangle();
-				services.m_Resources->ClearDirty(
-					RenderTextureIndex::Preview_Shadow_DirectionalShadowMap);
+				executeContext.DeferCommit(
+					[registry = services.m_Resources, generation, revision]
+					(const RGCommitContext&) noexcept
+					{
+						registry->PublishShadowPreview(generation, revision);
+					});
 			});
 	}
 

@@ -36,6 +36,8 @@ namespace gglab
 		// The selected pipeline's contract is violated. The owning host must not
 		// resume this rendering path or substitute another rendering algorithm.
 		ContractFailure,
+		// Confirmed native loss. Stop rendering and enter checked device-loss teardown.
+		DeviceLost,
 	};
 
 	struct RenderFrameValidationResult
@@ -53,6 +55,13 @@ namespace gglab
 			std::string_view reason, std::string detail = {}) noexcept
 		{
 			return { .m_Status = RenderFrameValidationStatus::ContractFailure,
+				.m_Reason = reason, .m_Detail = std::move(detail) };
+		}
+
+		[[nodiscard]] static RenderFrameValidationResult DeviceLost(
+			std::string_view reason, std::string detail = {}) noexcept
+		{
+			return { .m_Status = RenderFrameValidationStatus::DeviceLost,
 				.m_Reason = reason, .m_Detail = std::move(detail) };
 		}
 

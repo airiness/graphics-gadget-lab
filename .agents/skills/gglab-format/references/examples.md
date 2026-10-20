@@ -80,7 +80,7 @@ const auto outcome = succeeded ?
 
 ## Lambdas
 
-An ordinary assigned lambda retains the native initializer-continuation
+An ordinary assigned lambda uses initializer-continuation
 indentation: its braces are one level beyond the declaration, and its body is
 one further level.
 
@@ -142,7 +142,7 @@ constexpr std::array cases
 ```
 
 Put each JSON field on its own line. This example keeps outer closing braces
-after the final entry and accepts the native initializer-brace spacing.
+after the final entry and preserves the established initializer-brace spacing.
 
 ```cpp
 return Json{

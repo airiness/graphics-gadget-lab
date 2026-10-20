@@ -77,7 +77,7 @@ namespace gglab
 			uint32_t m_BufferIndex = 0;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
-			uint64_t m_FrameSerial = 0;
+			uint64_t m_RequestGeneration = 0;
 		};
 
 		void AppendBindingSlot(RHIBindingLayoutDesc& desc, RHIBindingType type,
@@ -301,10 +301,10 @@ namespace gglab
 
 		const auto debugReadback = m_DebugReadback;
 		const uint32_t bufferIndex = context.m_FrameSlotIndex;
-		const uint64_t frameSerial = context.m_FrameSerial;
+		const uint64_t requestGeneration = debugReadback->GetCurrentGeneration();
 		rg.AddPass<ReadbackPassData>(
 			"Lighting.ForwardPlus.HdrDiffReadback", RGPassEncoderType::Copy,
-			[debugReadback, bufferIndex, frameSerial](
+			[debugReadback, bufferIndex, requestGeneration](
 				RenderGraph::RGBuilder& builder, ReadbackPassData& data)
 			{
 				builder.SideEffect();
@@ -327,7 +327,7 @@ namespace gglab
 					RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;
-				data.m_FrameSerial = frameSerial;
+				data.m_RequestGeneration = requestGeneration;
 			},
 			[debugReadback](RGExecuteContext& executeContext, ReadbackPassData& data)
 			{
@@ -338,8 +338,14 @@ namespace gglab
 				const RHIBufferHandle readback = executeContext.GetBufferHandle(data.m_Readback);
 				commandContext->CopyBuffer(readback, 0, frameMetrics, 0,
 					ForwardPlusDebugReadback::HdrDiffReadbackSizeInBytes);
-				debugReadback->MarkHdrDiffScheduled(data.m_BufferIndex, data.m_FrameSerial,
-					data.m_Width, data.m_Height);
+				executeContext.DeferCommit(
+					[readbackOwner = debugReadback.get(), bufferIndex = data.m_BufferIndex,
+					requestGeneration = data.m_RequestGeneration, width = data.m_Width,
+					height = data.m_Height](const RGCommitContext& commit) noexcept
+					{
+						readbackOwner->MarkHdrDiffScheduled(bufferIndex, commit.m_FrameSerial,
+							commit.m_Fence, requestGeneration, width, height);
+					});
 			});
 	}
 
