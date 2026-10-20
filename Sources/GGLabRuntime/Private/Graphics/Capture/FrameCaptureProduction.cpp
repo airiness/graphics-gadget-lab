@@ -53,12 +53,12 @@ namespace gglab
 		tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
 		tap.m_ProductionCounters = true;
 		tap.m_NonFiniteScanActive = true;
-		tap.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({
+		tap.m_ProductionBuffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({
 			.m_SizeInBytes = nonfinite::BufferBytes,
 			.m_Usage = RHIBufferUsage::CopyDest,
 			.m_MemoryUsage = RHIMemoryUsage::GpuToCpu,
 			.m_DebugName = "NonFiniteCounters.Readback" }));
-		if (!tap.m_Buffer)
+		if (!tap.m_ProductionBuffer)
 		{
 			return false;
 		}
@@ -73,7 +73,7 @@ namespace gglab
 			constants[5] = m_NonFiniteInjection->m_Y;
 			constants[6] = m_NonFiniteInjection->m_Component;
 		}
-		counters = { .m_Readback = tap.m_Buffer.Get(),
+		counters = { .m_Readback = tap.m_ProductionBuffer.Get(),
 			.m_Bytes = nonfinite::BufferBytes,
 			.m_Binding = nonfinite::CounterBinding,
 			.m_Clear = [pipeline, constants](RGExecuteContext& context, RGBufferId record)
@@ -115,7 +115,7 @@ namespace gglab
 	{
 		auto frame = std::make_shared<NonFiniteProductionFrame>();
 		frame->m_FrameSerial = tap.m_FrameSerial;
-		const auto* mapped = static_cast<const uint32_t*>(m_Device->MapBuffer(tap.m_Buffer.Get(), { 0, nonfinite::BufferBytes }));
+		const auto* mapped = static_cast<const uint32_t*>(m_Device->MapBuffer(tap.m_ProductionBuffer.Get(), { 0, nonfinite::BufferBytes }));
 		if (!mapped)
 		{
 			frame->m_Failure = "Production counter readback mapping failed.";
@@ -123,10 +123,10 @@ namespace gglab
 			return;
 		}
 		*frame = DecodeNonFiniteProductionFrame(std::span(reinterpret_cast<const std::byte*>(mapped), nonfinite::BufferBytes), tap.m_FrameSerial);
-		m_Device->UnmapBuffer(tap.m_Buffer.Get(), {});
-		frame->m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index();
-		frame->m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation();
-		frame->m_SubmissionFenceValue = tap.m_Fence.m_Value;
+		m_Device->UnmapBuffer(tap.m_ProductionBuffer.Get(), {});
+		frame->m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index();
+		frame->m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation();
+		frame->m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value;
 		frame->m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity;
 		PublishProductionFrame(std::move(frame));
 	}

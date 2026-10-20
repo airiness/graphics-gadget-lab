@@ -1,4 +1,6 @@
 #pragma once
+#include "Graphics/Capture/CapturePayloadBudget.h"
+#include "Graphics/Capture/FencedReadback.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
@@ -170,27 +172,20 @@ namespace gglab
 			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
 			PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::SceneColor;
 			std::vector<QueuedRequest> m_Requests;
-			RHIBufferOwner m_Buffer;
+			CapturePayloadBudget::Lease m_ImageBudget;
+			FencedReadback m_Readback;
+			RHIBufferOwner m_ProductionBuffer;
 			std::shared_ptr<RGSnapshot> m_Graph;
 			std::vector<ExportReadback> m_ExportReadbacks;
 			std::vector<ScanReadback> m_ScanReadbacks;
 			std::string m_AdapterCompatibilityIdentity;
 			RHITextureCopyFootprint m_Footprint{};
-			RHIFencePoint m_Fence{};
 			bool m_ProductionCounters = false;
-			bool m_Submitted = false;
-			// The failure was published; the readbacks wait for teardown unread.
-			bool m_CompletionUnknown = false;
 			bool m_GraphExportActive = false;
 			bool m_ResourceExportActive = false;
 			bool m_NonFiniteScanActive = false;
 		};
 
-		struct RetainedImage
-		{
-			std::weak_ptr<const FrameCaptureImage> m_Image;
-			uint64_t m_Bytes = 0;
-		};
 		struct RetainedExport
 		{
 			std::weak_ptr<const ResourceExportPayload> m_Payload;
@@ -243,7 +238,7 @@ namespace gglab
 		std::vector<QueuedRequest> m_Queued;
 		std::vector<Tap> m_Taps;
 		std::vector<FrameCaptureResult> m_Results;
-		std::vector<RetainedImage> m_RetainedImages;
+		CapturePayloadBudget m_ImageBudget;
 		std::vector<RetainedExport> m_RetainedExports;
 		std::vector<RetainedScan> m_RetainedScans;
 		RenderShaderProgramAccess* m_ScanShaders = nullptr;

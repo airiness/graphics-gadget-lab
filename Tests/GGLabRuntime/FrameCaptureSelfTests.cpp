@@ -12,6 +12,8 @@
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
+#include "Graphics/Capture/CapturePayloadBudget.h"
+#include "Graphics/Capture/FencedReadback.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
@@ -22,14 +24,20 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bit>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
 #include <limits>
+#include <latch>
+#include <memory>
 #include <optional>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 // Headless contracts for frame capture: copy footprints, display-byte
@@ -142,7 +150,7 @@ namespace gglab
 			bool IsAlive(RHISamplerHandle) const noexcept override { return false; }
 			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				if (!fencePoint.IsValid())
+				if (!fencePoint.IsValid() || m_FailFenceQuery)
 				{
 					return RHIFenceQueryResult::Failed;
 				}
@@ -205,6 +213,7 @@ namespace gglab
 			bool m_DeviceLost = false;
 			bool m_FailBufferCreation = false;
 			bool m_FailMapping = false;
+			bool m_FailFenceQuery = false;
 
 		private:
 			struct Buffer
@@ -938,6 +947,182 @@ namespace gglab
 				countLimited.GetAvailability(target.m_Format, 4, 4) == FrameCaptureAvailability::Available,
 				"Mapping failure releases the single payload slot and byte reservation");
 			countLimited.Shutdown();
+		}
+
+		void RunPayloadLeaseTests(SelfTestContext& context) noexcept
+		{
+			CapturePayloadBudget budget;
+			auto lease = budget.Reserve(1088, 1);
+			auto moved = std::move(lease);
+			lease.Reset();
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 1088, 1 },
+				"Moving a lease transfers credit without returning the live reservation");
+			auto replaced = budget.Reserve(512, 2);
+			replaced = std::move(moved);
+			moved.Reset();
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 1088, 1 },
+				"Move assignment returns the destination reservation exactly once");
+			replaced.ReduceTo(64);
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 64, 1 },
+				"Retiring GPU bytes preserves the CPU product's logical payload slot");
+			replaced.Reset();
+			replaced.Reset();
+			context.Check(budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+				"Repeated retirement cannot return a lease's credit twice");
+
+			CapturePayloadBudget::Lease escaped;
+			std::optional<CapturePayloadBudget> observer;
+			{
+				CapturePayloadBudget temporary;
+				escaped = temporary.Reserve(64, 1);
+				observer = temporary;
+			}
+			std::thread detachedConsumer([lease = std::move(escaped)]() mutable
+				{
+					lease.Reset();
+				});
+			detachedConsumer.join();
+			context.Check(observer->GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+				"A lease can return credit on another thread after its accounting owner is gone");
+
+			std::vector<CapturePayloadBudget::Lease> retained;
+			for (uint32_t i = 0; i < 128; ++i)
+			{
+				retained.push_back(budget.Reserve(64, 1));
+			}
+			std::latch start(1);
+			std::atomic<bool> done = false;
+			std::thread consumer([&]()
+				{
+					start.wait();
+					for (auto& credit : retained)
+					{
+						credit.Reset();
+					}
+					done.store(true);
+				});
+			bool consistent = true;
+			start.count_down();
+			do
+			{
+				const auto [bytes, slots] = budget.GetUsage();
+				consistent = consistent && bytes == 64ull * slots;
+			} while (!done.load());
+			consumer.join();
+			context.Check(consistent && budget.GetUsage() == std::pair<uint64_t, uint32_t>{ 0, 0 },
+				"Concurrent CPU retirement exposes consistent byte/slot snapshots and conserves credit");
+		}
+
+		void RunFencedReadbackTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			const auto footprint = ComputeRHITextureCopyFootprint(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			FencedReadback readback;
+			readback.SetBuffer(RHIBufferOwner(&device, device.CreateBuffer({
+				.m_SizeInBytes = footprint.m_SizeInBytes, .m_Usage = RHIBufferUsage::CopyDest,
+				.m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, {})));
+			const auto buffer = readback.GetBuffer();
+			device.FillReadback(buffer, footprint);
+			std::array<std::byte, 32> pixels{};
+			context.Check(readback.Poll(device) == RHIFenceQueryResult::Pending &&
+				!readback.CopyRows(device, footprint, pixels) && device.m_ReadbackMapCalls == 0,
+				"An unsubmitted readback cannot map its storage");
+			readback.Submit(MakeFence(5));
+			auto moved = std::move(readback);
+			context.Check(!readback.GetBuffer().IsValid() && moved.GetBuffer() == buffer &&
+				moved.Poll(device) == RHIFenceQueryResult::Pending &&
+				!moved.CopyRows(device, footprint, pixels) && device.m_ReadbackMapCalls == 0,
+				"Moving pending readback ownership retains its fence and unread buffer");
+			device.m_CompletedFenceValue = 5;
+			context.Check(!moved.CopyRows(device, footprint, pixels) && device.m_ReadbackMapCalls == 0,
+				"A reached fence must be observed before accepting GPU-written contents");
+			context.Check(moved.Poll(device) == RHIFenceQueryResult::Completed &&
+				moved.CopyRows(device, footprint, pixels) && pixels[16] == std::byte{ 16 } &&
+				pixels[31] == std::byte{ 31 } && device.GetMapCount() == 0,
+				"Completed readback copies tight rows and closes its mapping before retirement");
+			moved.ReleaseBuffer();
+			context.Check(!device.IsAlive(buffer), "Completed storage retires independently of CPU pixels");
+
+			FencedReadback unknown;
+			unknown.Submit(MakeFence(6));
+			device.m_FailFenceQuery = true;
+			context.Check(unknown.Poll(device) == RHIFenceQueryResult::Failed &&
+				unknown.IsCompletionUnknown(), "A failed fence query latches unknown completion");
+			device.m_FailFenceQuery = false;
+			device.m_CompletedFenceValue = 6;
+			context.Check(unknown.Poll(device) == RHIFenceQueryResult::Failed &&
+				!unknown.CopyRows(device, footprint, pixels),
+				"Later fence progress cannot turn an unknown readback into a successful product");
+		}
+
+		void RunImageLifetimeTests(SelfTestContext& context) noexcept
+		{
+			const auto target = MakeDisplayTarget(RHIFormat::R8G8B8A8Unorm, 4, 2);
+			std::shared_ptr<const FrameCaptureImage> held;
+			std::weak_ptr<const FrameCaptureImage> observed;
+			{
+				CaptureTestDevice device;
+				FrameCaptureService service(device, { .m_MaxPayloads = 1 });
+				GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene));
+				GGLAB_UNUSED(service.RequestCapture(FrameCaptureSource::Scene));
+				const auto tap = service.BindTap(1, FrameCaptureSource::Scene, target);
+				if (tap)
+				{
+					device.FillReadback(tap->m_Buffer, tap->m_Footprint);
+				}
+				service.OnFrameSubmitted(1, MakeFence(1));
+				device.m_CompletedFenceValue = 1;
+				auto results = Consume(service);
+				if (results.size() == 2)
+				{
+					held = results[0].m_Image;
+					observed = held;
+					results.erase(results.begin());
+				}
+				context.Check(held && results.size() == 1 && results[0].m_Image == held &&
+					device.GetLiveBufferCount() == 0 &&
+					service.GetAvailability(target.m_Format, 4, 2) == FrameCaptureAvailability::Busy,
+					"A shared CPU image keeps one slot after one result is retired and GPU storage is gone");
+				results.clear();
+				service.Shutdown();
+			}
+			context.Check(held && held->m_Pixels.size() == 32 && held->m_Pixels[16] == 16,
+				"A CPU product remains readable after capture service and device destruction");
+			std::thread writer([image = std::move(held)]() mutable
+				{
+					image.reset();
+				});
+			writer.join();
+			context.Check(observed.expired(),
+				"A writer can retire the last image and its lease after Runtime teardown");
+
+			for (const auto source : { FrameCaptureSource::Scene, FrameCaptureSource::Composited,
+				FrameCaptureSource::Diagnostic })
+			{
+				CaptureTestDevice device;
+				FrameCaptureService service(device, { .m_MaxPayloads = 1 });
+				const auto id = source == FrameCaptureSource::Diagnostic ?
+					service.RequestDiagnosticCapture(PostProcessDebugTap::TemporalHistoryWeight) :
+					service.RequestCapture(source);
+				const auto tap = service.BindTap(1, source, target);
+				service.OnFrameSubmitted(1, MakeFence(1));
+				device.m_FailFenceQuery = true;
+				const auto failures = Consume(service);
+				context.Check(tap && failures.size() == 1 && failures[0].m_RequestId == id &&
+					failures[0].m_Status == FrameCaptureStatus::Failed && !failures[0].m_Image &&
+					device.IsAlive(tap->m_Buffer) && device.m_ReadbackMapCalls == 0 &&
+					service.GetAvailability(target.m_Format, 4, 2) == FrameCaptureAvailability::Busy,
+					"Query failure reports one image failure while retaining unread storage and payload credit");
+				device.m_FailFenceQuery = false;
+				device.m_CompletedFenceValue = 1;
+				context.Check(Consume(service).empty() && tap && device.IsAlive(tap->m_Buffer) &&
+					device.m_ReadbackMapCalls == 0,
+					"Subsequent polling neither maps an unknown image nor publishes another receipt");
+				service.Shutdown();
+				context.Check(Consume(service).empty() && device.GetLiveBufferCount() == 0 &&
+					device.m_ReadbackMapCalls == 0,
+					"Certified teardown releases query-failed image storage without reading it");
+			}
 		}
 
 		void RunGraphCaptureTests(SelfTestContext& context) noexcept
@@ -2181,5 +2366,8 @@ namespace gglab
 		RunFrameEndTests(context);
 		RunUnknownCompletionAndDeviceLossTests(context);
 		RunCapacityTests(context);
+		RunPayloadLeaseTests(context);
+		RunFencedReadbackTests(context);
+		RunImageLifetimeTests(context);
 	}
 }

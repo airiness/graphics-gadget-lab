@@ -285,8 +285,9 @@ namespace gglab
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial,
 				.m_Graph = tap.m_Graph, .m_NonFiniteScans = payload,
 				.m_GraphExportActive = tap.m_GraphExportActive, .m_ResourceExportActive = tap.m_ResourceExportActive,
-				.m_NonFiniteScanActive = true, .m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
-				.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(), .m_SubmissionFenceValue = tap.m_Fence.m_Value,
+				.m_NonFiniteScanActive = true, .m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index(),
+				.m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation(),
+				.m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value,
 				.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity });
 		}
 		tap.m_Requests.clear();

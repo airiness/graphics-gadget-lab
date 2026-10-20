@@ -8,14 +8,24 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <cstring>
 #include <format>
 #include <iterator>
 #include <memory>
+#include <span>
 #include <utility>
 
 namespace gglab
 {
+	namespace
+	{
+		struct BudgetedCaptureImage
+		{
+			// Destroy the pixels before returning their credit to another admission.
+			CapturePayloadBudget::Lease m_Lease;
+			FrameCaptureImage m_Image;
+		};
+	}
+
 	FrameCaptureService::FrameCaptureService(RHIDevice& device, FrameCaptureLimits limits) noexcept :
 		m_Device(std::addressof(device)), m_Limits(limits)
 	{
@@ -296,8 +306,10 @@ namespace gglab
 				"Frame capture payload capacity is exhausted.");
 			return std::nullopt;
 		}
-		std::erase_if(m_RetainedImages,
-			[](const RetainedImage& image) { return image.m_Image.expired(); });
+		// Only this owner admits work. Concurrent CPU consumers can only release credit
+		// between the aggregate availability check and this reservation.
+		tap.m_ImageBudget = m_ImageBudget.Reserve(tap.m_Footprint.m_SizeInBytes +
+			tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height, 1);
 
 		const RHIBufferDesc bufferDesc{
 			.m_SizeInBytes = tap.m_Footprint.m_SizeInBytes,
@@ -305,8 +317,8 @@ namespace gglab
 			.m_MemoryUsage = RHIMemoryUsage::GpuToCpu,
 			.m_DebugName = "FrameCapture.Readback",
 		};
-		tap.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(bufferDesc));
-		if (!tap.m_Buffer)
+		tap.m_Readback.SetBuffer(RHIBufferOwner(m_Device, m_Device->CreateBuffer(bufferDesc)));
+		if (!tap.m_Readback.GetBuffer().IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("Frame capture failed to allocate a {}-byte readback buffer.",
 				bufferDesc.m_SizeInBytes);
@@ -315,7 +327,7 @@ namespace gglab
 		}
 
 		const FrameCaptureTapTarget target{
-			.m_Buffer = tap.m_Buffer.Get(),
+			.m_Buffer = tap.m_Readback.GetBuffer(),
 			.m_BufferDesc = bufferDesc,
 			.m_Footprint = tap.m_Footprint,
 		};
@@ -381,7 +393,7 @@ namespace gglab
 	{
 		if (!std::ranges::any_of(m_Taps, [&](const Tap& tap)
 			{
-				return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted;
+				return tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Readback.IsSubmitted();
 			}))
 		{
 			return;
@@ -393,7 +405,7 @@ namespace gglab
 		}
 		for (Tap& tap : m_Taps)
 		{
-			if (tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Submitted)
+			if (tap.m_FrameSerial == frameSerial && tap.m_Graph && !tap.m_Readback.IsSubmitted())
 			{
 				tap.m_Graph->m_Execution = std::move(*record);
 				break; // All graph consumers of this frame share this immutable snapshot.
@@ -407,10 +419,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(fence.IsValid(), "A submitted frame must provide its completion fence.");
 		for (Tap& tap : m_Taps)
 		{
-			if (tap.m_FrameSerial == frameSerial && !tap.m_Submitted)
+			if (tap.m_FrameSerial == frameSerial && !tap.m_Readback.IsSubmitted())
 			{
-				tap.m_Fence = fence;
-				tap.m_Submitted = true;
+				tap.m_Readback.Submit(fence);
 			}
 		}
 		FailQueuedFrameRequests(frameSerial, "The requested frame did not record its capture tap.");
@@ -421,7 +432,7 @@ namespace gglab
 		std::vector<QueuedRequest> returned;
 		std::erase_if(m_Taps, [&](const Tap& tap)
 			{
-				if (tap.m_FrameSerial != frameSerial || tap.m_Submitted)
+				if (tap.m_FrameSerial != frameSerial || tap.m_Readback.IsSubmitted())
 				{
 					return false;
 				}
@@ -456,7 +467,7 @@ namespace gglab
 	{
 		std::erase_if(m_Taps, [&](Tap& tap)
 			{
-				if (tap.m_FrameSerial != frameSerial || tap.m_Submitted)
+				if (tap.m_FrameSerial != frameSerial || tap.m_Readback.IsSubmitted())
 				{
 					return false;
 				}
@@ -470,11 +481,11 @@ namespace gglab
 	{
 		for (Tap& tap : m_Taps)
 		{
-			if (tap.m_FrameSerial == frameSerial && !tap.m_Submitted && !tap.m_CompletionUnknown)
+			if (tap.m_FrameSerial == frameSerial && !tap.m_Readback.IsSubmitted() && !tap.m_Readback.IsCompletionUnknown())
 			{
 				PublishTapFailure(tap, frameSerial,
 					"The GPU completion of the frame that recorded the capture is unknown.");
-				tap.m_CompletionUnknown = true;
+				tap.m_Readback.MarkCompletionUnknown();
 			}
 		}
 		FailQueuedFrameRequests(
@@ -485,13 +496,13 @@ namespace gglab
 	{
 		std::erase_if(m_Taps, [this](Tap& tap)
 			{
-				if (!tap.m_Submitted || tap.m_CompletionUnknown)
+				if (!tap.m_Readback.IsSubmitted() || tap.m_Readback.IsCompletionUnknown())
 				{
 					return false;
 				}
 				// Only a completed fence certifies the readback contents. A lost device allows
 				// releasing the readbacks, never reading them.
-				switch (m_Device->QueryFencePoint(tap.m_Fence))
+				switch (tap.m_Readback.Poll(*m_Device))
 				{
 				case RHIFenceQueryResult::Pending:
 					return false;
@@ -509,7 +520,7 @@ namespace gglab
 				// until teardown.
 				PublishTapFailure(tap, tap.m_FrameSerial,
 					"The completion of the frame that recorded the capture could not be queried.");
-				tap.m_CompletionUnknown = true;
+				tap.m_Readback.MarkCompletionUnknown();
 				return false;
 			});
 	}
@@ -523,7 +534,7 @@ namespace gglab
 		CollectCompleted();
 		for (Tap& tap : m_Taps)
 		{
-			if (!tap.m_CompletionUnknown)
+			if (!tap.m_Readback.IsCompletionUnknown())
 			{
 				FailTap(tap, tap.m_FrameSerial,
 					"The render host was finalized before the capture completed.");
@@ -547,7 +558,7 @@ namespace gglab
 		}
 		for (Tap& tap : m_Taps)
 		{
-			if (!tap.m_CompletionUnknown)
+			if (!tap.m_Readback.IsCompletionUnknown())
 			{
 				PublishTapFailure(tap, tap.m_FrameSerial, failure);
 			}
@@ -599,7 +610,9 @@ namespace gglab
 		Tap& tap, uint64_t frameSerial, std::string_view failure) noexcept
 	{
 		PublishTapFailure(tap, frameSerial, failure);
-		tap.m_Buffer.Reset();
+		tap.m_Readback.ReleaseBuffer();
+		tap.m_ImageBudget.Reset();
+		tap.m_ProductionBuffer.Reset();
 	}
 
 	void FrameCaptureService::PublishTapFailure(
@@ -657,9 +670,9 @@ namespace gglab
 					.m_GraphExportActive = tap.m_GraphExportActive,
 					.m_ResourceExportActive = tap.m_ResourceExportActive,
 					.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
-					.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
-					.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(),
-					.m_SubmissionFenceValue = tap.m_Fence.m_Value,
+					.m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index(),
+					.m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation(),
+					.m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value,
 					.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity,
 					});
 			}
@@ -667,35 +680,25 @@ namespace gglab
 			return;
 		}
 		const RHITextureCopyFootprint& footprint = tap.m_Footprint;
-		const RHIBufferHandle buffer = tap.m_Buffer.Get();
-		const auto* mapped = static_cast<const std::byte*>(m_Device->MapBuffer(buffer, {
-			.m_Begin = 0,
-			.m_End = footprint.m_SizeInBytes,
-			}));
-		if (!mapped)
+		auto payload = std::make_shared<BudgetedCaptureImage>();
+		FrameCaptureImage& image = payload->m_Image;
+		image.m_Format = footprint.m_Format;
+		image.m_Width = footprint.m_Width;
+		image.m_Height = footprint.m_Height;
+		image.m_Pixels.resize(
+			static_cast<size_t>(footprint.m_RowSizeInBytes) * footprint.m_Height);
+		if (!tap.m_Readback.CopyRows(*m_Device, footprint,
+			std::as_writable_bytes(std::span(image.m_Pixels))))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Frame capture failed to map the readback of frame {}.", tap.m_FrameSerial);
 			FailTap(tap, tap.m_FrameSerial, "The completed readback buffer could not be mapped.");
 			return;
 		}
-
-		auto image = std::make_shared<FrameCaptureImage>();
-		image->m_Format = footprint.m_Format;
-		image->m_Width = footprint.m_Width;
-		image->m_Height = footprint.m_Height;
-		image->m_Pixels.resize(
-			static_cast<size_t>(footprint.m_RowSizeInBytes) * footprint.m_Height);
-		for (uint32_t row = 0; row < footprint.m_Height; ++row)
-		{
-			std::memcpy(image->m_Pixels.data() + row * footprint.m_RowSizeInBytes,
-				mapped + row * footprint.m_RowPitch, footprint.m_RowSizeInBytes);
-		}
-		m_Device->UnmapBuffer(buffer, {});
-
-		std::shared_ptr<const FrameCaptureImage> sharedImage = std::move(image);
-		m_RetainedImages.push_back({ .m_Image = sharedImage,
-			.m_Bytes = footprint.m_RowSizeInBytes * footprint.m_Height });
+		tap.m_Readback.ReleaseBuffer();
+		tap.m_ImageBudget.ReduceTo(image.m_Pixels.size());
+		payload->m_Lease = std::move(tap.m_ImageBudget);
+		const std::shared_ptr<const FrameCaptureImage> sharedImage(payload, &image);
 		for (const QueuedRequest& request : tap.m_Requests)
 		{
 			m_Results.push_back({
@@ -713,6 +716,5 @@ namespace gglab
 				});
 		}
 		tap.m_Requests.clear();
-		tap.m_Buffer.Reset();
 	}
 }

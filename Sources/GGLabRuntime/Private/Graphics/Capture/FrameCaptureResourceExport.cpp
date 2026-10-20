@@ -249,8 +249,7 @@ namespace gglab
 
 	std::pair<uint64_t, uint32_t> FrameCaptureService::GetPayloadUsage(bool includeProduction) const noexcept
 	{
-		uint64_t bytes = 0;
-		uint32_t slots = 0;
+		auto [bytes, slots] = m_ImageBudget.GetUsage();
 		for (const auto& tap : m_Taps)
 		{
 			if (tap.m_ProductionCounters)
@@ -282,25 +281,12 @@ namespace gglab
 					++slots;
 				}
 			}
-			else
-			{
-				bytes += tap.m_Footprint.m_SizeInBytes + tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height;
-				++slots;
-			}
 		}
 		for (const auto& production : m_RetainedProduction)
 		{
 			if (includeProduction && !production.expired())
 			{
 				bytes += ProductionCpuBytes;
-				++slots;
-			}
-		}
-		for (const auto& image : m_RetainedImages)
-		{
-			if (!image.m_Image.expired())
-			{
-				bytes += image.m_Bytes;
 				++slots;
 			}
 		}
@@ -374,7 +360,7 @@ namespace gglab
 			};
 		std::erase_if(m_Taps, [&](const Tap& tap)
 			{
-				if (tap.m_FrameSerial != frameSerial || tap.m_Submitted)
+				if (tap.m_FrameSerial != frameSerial || tap.m_Readback.IsSubmitted())
 				{
 					return false;
 				}
@@ -438,12 +424,12 @@ namespace gglab
 		uint64_t boundImageBytes = 0;
 		for (const auto& image : m_Taps)
 		{
-			if (image.m_FrameSerial == frameSerial && !image.m_Submitted &&
+			if (image.m_FrameSerial == frameSerial && !image.m_Readback.IsSubmitted() &&
 				(image.m_Source == FrameCaptureSource::Scene || image.m_Source == FrameCaptureSource::Composited ||
 					image.m_Source == FrameCaptureSource::Diagnostic) && !image.m_ProductionCounters)
 			{
 				++boundImageSlots;
-				boundImageBytes += image.m_Footprint.m_SizeInBytes + image.m_Footprint.m_RowSizeInBytes * image.m_Footprint.m_Height;
+				boundImageBytes += image.m_ImageBudget.GetBytes();
 			}
 		}
 		for (const auto& request : m_Queued)
@@ -479,7 +465,7 @@ namespace gglab
 						imageTap.m_Source != FrameCaptureSource::NonFiniteScan &&
 						std::ranges::any_of(imageTap.m_Requests, [&](const auto& imageRequest) { return imageRequest.m_GroupId == request.m_GroupId; }))
 					{
-						pairedBytes += imageTap.m_Footprint.m_SizeInBytes + imageTap.m_Footprint.m_RowSizeInBytes * imageTap.m_Footprint.m_Height;
+						pairedBytes += imageTap.m_ImageBudget.GetBytes();
 						++pairedSlots;
 					}
 				}
@@ -802,8 +788,9 @@ namespace gglab
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial, .m_Graph = tap.m_Graph, .m_Resources = payload,
 				.m_GraphExportActive = tap.m_GraphExportActive, .m_ResourceExportActive = true,
 				.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
-				.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
-				.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(), .m_SubmissionFenceValue = tap.m_Fence.m_Value,
+				.m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index(),
+				.m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation(),
+				.m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value,
 				.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity });
 		}
 		tap.m_Requests.clear();

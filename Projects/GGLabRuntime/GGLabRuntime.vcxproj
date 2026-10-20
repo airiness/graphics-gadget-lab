@@ -265,6 +265,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CapturePayloadBudget.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FencedReadback.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureResourceExport.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureNonFinite.cpp" />
@@ -669,6 +671,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CapturePayloadBudget.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FencedReadback.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureAccess.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureControlBase.h" />
