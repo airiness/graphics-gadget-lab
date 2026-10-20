@@ -1827,6 +1827,100 @@ namespace gglab
 				"A conflicting sequence capture fails on its required frame and never issues a later substitute");
 		}
 
+		void RunAttemptRetryTests(SelfTestContext& context) noexcept
+		{
+			for (const auto source : { FrameCaptureSource::Scene, FrameCaptureSource::Diagnostic,
+				FrameCaptureSource::RenderGraph, FrameCaptureSource::ResourceExport })
+			{
+				TemporaryDirectory directory("frame-capture-attempt-retry");
+				FakeCaptureControl control;
+				control.m_Instrumentation = true;
+				NonFiniteWatchCoordinator watch(&control);
+				std::string error;
+				context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail,
+					.m_Boundary = false }, error), "Attempt retry configures production coverage");
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true, .m_NonFiniteWatch = &watch });
+				const uint64_t id = coordinator.Submit({ .m_Source = source,
+					.m_Label = "retry", .m_Note = "Keep the logical request across attempts.",
+					.m_GraphSummary = true, .m_ResourceTargets = { { .m_Resource = "A" } },
+					.m_IncludeGraph = true,
+					.m_DiagnosticTap = PostProcessDebugTap::TemporalHistoryWeight });
+				auto state = MakeFrameState(true);
+				for (uint32_t retry = 0; retry < 2; ++retry)
+				{
+					coordinator.BeginFrame(state);
+					coordinator.SetFrameSceneInputs(state.m_FrameSerial,
+						{ .m_LocalLightCount = retry + 1 });
+					control.Busy(control.m_Issued.back().m_Id);
+					coordinator.Update();
+					context.Check(Consume(coordinator).empty() &&
+						coordinator.GetUnfinishedRequestCount() == 1 &&
+						!std::filesystem::exists(directory.GetPath()),
+						"Busy retires an attempt without completing or publishing its logical job");
+					++state.m_FrameSerial;
+					++state.m_FrameIndex;
+					state.m_TotalTime += 1.0;
+					state.m_Camera.m_Name = "Retried camera";
+				}
+				coordinator.BeginFrame(state);
+				coordinator.SetFrameSceneInputs(state.m_FrameSerial, { .m_LocalLightCount = 99 });
+				watch.OnFrameSubmitted(state.m_FrameSerial);
+				coordinator.OnFrameSubmitted();
+				control.Complete(control.m_Issued.front().m_Id);
+				coordinator.Update();
+				context.Check(control.m_Issued.size() == 3 && Consume(coordinator).empty() &&
+					coordinator.GetUnfinishedRequestCount() == 1,
+					"A stale Runtime result cannot complete a newer attempt of the same job");
+
+				control.Complete(control.m_Issued.back().m_Id);
+				coordinator.Update();
+				context.Check(Consume(coordinator).empty() &&
+					!std::filesystem::exists(directory.GetPath()),
+					"The retried product still waits for its own submitted-frame coverage");
+				auto production = std::make_shared<NonFiniteProductionFrame>();
+				production->m_FrameSerial = state.m_FrameSerial;
+				production->m_Claim = { NonFiniteClaimStatus::Passed, NonFiniteWatchFailure::None };
+				control.m_Production.push_back(std::move(production));
+				coordinator.Update();
+				const auto completed = Consume(coordinator);
+				context.Check(completed.size() == 1 && completed[0].m_RequestId == id &&
+					completed[0].m_Status == FrameCaptureRequestStatus::Completed &&
+					completed[0].m_Metadata && completed[0].m_Metadata->m_Source == source &&
+					completed[0].m_Metadata->m_FrameSerial == state.m_FrameSerial &&
+					completed[0].m_Metadata->m_FrameIndex == state.m_FrameIndex &&
+					completed[0].m_Metadata->m_TotalTime == state.m_TotalTime &&
+					completed[0].m_Metadata->m_Camera.m_Name == state.m_Camera.m_Name &&
+					completed[0].m_Metadata->m_SceneInputs &&
+					completed[0].m_Metadata->m_SceneInputs->m_LocalLightCount == 99 &&
+					completed[0].m_Metadata->m_WatchCoverage &&
+					completed[0].m_Metadata->m_WatchCoverage->m_Complete &&
+					completed[0].m_Metadata->m_WatchCoverage->m_FrameCount == 1 &&
+					completed[0].m_Metadata->m_WatchCoverage->m_FirstFrameSerial == state.m_FrameSerial &&
+					completed[0].m_Metadata->m_WatchCoverage->m_LastFrameSerial == state.m_FrameSerial,
+					"One logical result uses only the final attempt's provenance and coverage");
+				control.Complete(control.m_Issued.back().m_Id);
+				coordinator.Update();
+				context.Check(Consume(coordinator).empty() &&
+					coordinator.GetUnfinishedRequestCount() == 0,
+					"A duplicate late result cannot publish or complete the job twice");
+			}
+
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control });
+			const auto id = coordinator.Submit({});
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Busy(control.m_Issued.back().m_Id);
+			coordinator.Update();
+			context.Check(coordinator.Cancel(id), "A job returned from Busy remains cancellable");
+			const auto cancelled = Consume(coordinator);
+			context.Check(cancelled.size() == 1 && cancelled[0].m_RequestId == id &&
+				cancelled[0].m_Status == FrameCaptureRequestStatus::Cancelled &&
+				!cancelled[0].m_Metadata && coordinator.GetUnfinishedRequestCount() == 0,
+				"Cancelling after Busy publishes no provenance from the discarded attempt");
+		}
+
 		void RunFrameResultIdentityTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-result-identity");
@@ -2836,6 +2930,7 @@ namespace gglab
 		RunDiagnosticCaptureTests(context);
 		RunDiagnosticSchedulingTests(context);
 		RunFrameResultIdentityTests(context);
+		RunAttemptRetryTests(context);
 		RunReferenceSequenceTests(context);
 		RunFrameSequenceEvaluationTests(context);
 		RunFrameSequenceGpuTimingTests(context);

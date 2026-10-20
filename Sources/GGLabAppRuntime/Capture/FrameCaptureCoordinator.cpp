@@ -23,6 +23,7 @@
 #include <system_error>
 #include <thread>
 #include <utility>
+#include <variant>
 
 namespace gglab
 {
@@ -74,7 +75,124 @@ namespace gglab
 			Publishing,
 			Abandoned,
 		};
+
+		enum class CaptureImageSource : uint8_t
+		{
+			Scene,
+			Composited,
+		};
+
+		struct ImageCaptureProduct
+		{
+			CaptureImageSource m_Source = CaptureImageSource::Scene;
+		};
+
+		struct DiagnosticCaptureProduct
+		{
+			std::optional<PostProcessDebugTap> m_Tap;
+		};
+
+		struct GraphCaptureProduct
+		{
+			bool m_Summary = false;
+		};
+
+		struct ResourceCaptureProduct
+		{
+			std::vector<RGResourceAddress> m_Targets;
+			bool m_IncludeGraph = false;
+		};
+
+		// Preserve rejection by the Runtime boundary for sources unsupported by
+		// the application capture input, rather than interpreting them as images.
+		struct UnsupportedCaptureProduct
+		{
+			FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+		};
 	}
+
+	struct FrameCaptureCoordinator::CapturePlan
+	{
+		std::variant<ImageCaptureProduct, DiagnosticCaptureProduct, GraphCaptureProduct,
+			ResourceCaptureProduct, UnsupportedCaptureProduct> m_Product;
+		FrameCaptureTiming m_Timing = FrameCaptureTiming::NextFrame;
+		uint32_t m_SettleFrames = 0;
+		std::string m_RequiredContentId;
+		std::string m_ReferenceViewId;
+		bool m_WaitForCapacity = false;
+		std::filesystem::path m_OutputDirectory;
+		std::string m_Label;
+		std::string m_Note;
+		std::optional<FrameCaptureSequenceInfo> m_Sequence;
+
+		[[nodiscard]] FrameCaptureSource GetSource() const noexcept
+		{
+			if (const auto* image = std::get_if<ImageCaptureProduct>(&m_Product))
+			{
+				return image->m_Source == CaptureImageSource::Scene ?
+					FrameCaptureSource::Scene :
+					FrameCaptureSource::Composited;
+			}
+			if (std::holds_alternative<DiagnosticCaptureProduct>(m_Product))
+			{
+				return FrameCaptureSource::Diagnostic;
+			}
+			if (std::holds_alternative<GraphCaptureProduct>(m_Product))
+			{
+				return FrameCaptureSource::RenderGraph;
+			}
+			if (std::holds_alternative<ResourceCaptureProduct>(m_Product))
+			{
+				return FrameCaptureSource::ResourceExport;
+			}
+			return std::get<UnsupportedCaptureProduct>(m_Product).m_Source;
+		}
+
+		[[nodiscard]] std::optional<PostProcessDebugTap> GetDiagnosticTap() const noexcept
+		{
+			const auto* diagnostic = std::get_if<DiagnosticCaptureProduct>(&m_Product);
+			return diagnostic ? diagnostic->m_Tap : std::nullopt;
+		}
+
+		[[nodiscard]] bool IsGraphSummary() const noexcept
+		{
+			const auto* graph = std::get_if<GraphCaptureProduct>(&m_Product);
+			return graph && graph->m_Summary;
+		}
+
+		[[nodiscard]] bool IncludesGraph() const noexcept
+		{
+			const auto* resources = std::get_if<ResourceCaptureProduct>(&m_Product);
+			return resources && resources->m_IncludeGraph;
+		}
+	};
+
+	// Host-side association with one Runtime request. GPU owners and their
+	// settlement remain in Runtime even after this tracking record is discarded.
+	struct FrameCaptureCoordinator::FrameAttempt
+	{
+		uint64_t m_CaptureRequestId = 0;
+		FrameCaptureMetadata m_Metadata{};
+		uint64_t m_WatchCoverageId = 0;
+		std::optional<FrameCaptureResult> m_PendingResult;
+	};
+
+	struct FrameCaptureCoordinator::CaptureJob
+	{
+		uint64_t m_Id = 0;
+		CapturePlan m_Plan{};
+		Phase m_Phase = Phase::Waiting;
+		// Transient Runtime association for the outputs of one sequence frame.
+		uint64_t m_GroupId = 0;
+		// An applied view survives capacity deferral; an issued attempt does not.
+		// A later camera-reset serial requires restoring the requested view again.
+		bool m_ViewApplied = false;
+		std::optional<uint64_t> m_ViewCameraResetSerial;
+		std::optional<FrameAttempt> m_Attempt;
+		// Includes admission failures that occur before an attempt is issued.
+		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
+		std::shared_ptr<EncodeJob> m_WriteJob;
+	};
 
 	struct FrameCaptureCoordinator::EncodeJob
 	{
@@ -285,21 +403,60 @@ namespace gglab
 		StopWriter();
 	}
 
+	FrameCaptureCoordinator::CapturePlan FrameCaptureCoordinator::MakeCapturePlan(
+		FrameCaptureRequest request) noexcept
+	{
+		CapturePlan plan{
+			.m_Timing = request.m_Timing,
+			.m_SettleFrames = request.m_SettleFrames,
+			.m_RequiredContentId = std::move(request.m_RequiredContentId),
+			.m_ReferenceViewId = std::move(request.m_ReferenceViewId),
+			.m_WaitForCapacity = request.m_WaitForCapacity,
+			.m_OutputDirectory = std::move(request.m_OutputDirectory),
+			.m_Label = std::move(request.m_Label),
+			.m_Note = std::move(request.m_Note),
+			.m_Sequence = std::move(request.m_Sequence),
+		};
+		switch (request.m_Source)
+		{
+		case FrameCaptureSource::Scene:
+			plan.m_Product = ImageCaptureProduct{ CaptureImageSource::Scene };
+			break;
+		case FrameCaptureSource::Composited:
+			plan.m_Product = ImageCaptureProduct{ CaptureImageSource::Composited };
+			break;
+		case FrameCaptureSource::Diagnostic:
+			plan.m_Product = DiagnosticCaptureProduct{ request.m_DiagnosticTap };
+			break;
+		case FrameCaptureSource::RenderGraph:
+			plan.m_Product = GraphCaptureProduct{ request.m_GraphSummary };
+			break;
+		case FrameCaptureSource::ResourceExport:
+			plan.m_Product = ResourceCaptureProduct{
+				std::move(request.m_ResourceTargets), request.m_IncludeGraph };
+			break;
+		default:
+			plan.m_Product = UnsupportedCaptureProduct{ request.m_Source };
+			break;
+		}
+		return plan;
+	}
+
 	uint64_t FrameCaptureCoordinator::Submit(FrameCaptureRequest request) noexcept
 	{
-		Entry& entry = m_Entries.emplace_back();
+		CaptureJob& entry = m_Jobs.emplace_back();
 		entry.m_Id = m_NextRequestId++;
-		entry.m_Request = std::move(request);
-		if (entry.m_Request.m_Sequence)
+		entry.m_Plan = MakeCapturePlan(std::move(request));
+		if (entry.m_Plan.m_Sequence)
 		{
-			const auto& sequence = *entry.m_Request.m_Sequence;
-			const auto first = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+			const auto& sequence = *entry.m_Plan.m_Sequence;
+			const auto first = std::ranges::find_if(m_Jobs, [&](const CaptureJob& candidate)
 				{
-					return candidate.m_GroupId != 0 && candidate.m_Request.m_Sequence &&
-						candidate.m_Request.m_Sequence->m_SequenceId == sequence.m_SequenceId &&
-						candidate.m_Request.m_Sequence->m_Frame == sequence.m_Frame;
+					return candidate.m_GroupId != 0 && candidate.m_Plan.m_Sequence &&
+						candidate.m_Plan.m_Sequence->m_SequenceId == sequence.m_SequenceId &&
+						candidate.m_Plan.m_Sequence->m_Frame == sequence.m_Frame;
 				});
-			entry.m_GroupId = first == m_Entries.end() ? entry.m_Id : first->m_GroupId;
+			entry.m_GroupId = first == m_Jobs.end() ? entry.m_Id : first->m_GroupId;
 		}
 		if (m_IsShuttingDown)
 		{
@@ -311,12 +468,12 @@ namespace gglab
 
 	bool FrameCaptureCoordinator::Cancel(uint64_t requestId) noexcept
 	{
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Id == requestId && entry.m_Phase == Phase::Waiting)
 			{
 				const uint64_t groupId = entry.m_GroupId;
-				for (Entry& member : m_Entries)
+				for (CaptureJob& member : m_Jobs)
 				{
 					if (member.m_Phase == Phase::Waiting &&
 						(member.m_Id == requestId || (groupId != 0 && member.m_GroupId == groupId)))
@@ -333,7 +490,7 @@ namespace gglab
 	void FrameCaptureCoordinator::ConsumeResults(
 		std::vector<FrameCaptureRequestResult>& outResults) noexcept
 	{
-		RemoveFinishedEntries();
+		RemoveFinishedJobs();
 		outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
 			std::make_move_iterator(m_Results.end()));
 		m_Results.clear();
@@ -341,8 +498,8 @@ namespace gglab
 
 	uint32_t FrameCaptureCoordinator::GetUnfinishedRequestCount() const noexcept
 	{
-		return static_cast<uint32_t>(std::ranges::count_if(m_Entries,
-			[](const Entry& entry) { return entry.m_Phase != Phase::Finished; }));
+		return static_cast<uint32_t>(std::ranges::count_if(m_Jobs,
+			[](const CaptureJob& entry) { return entry.m_Phase != Phase::Finished; }));
 	}
 
 	const FrameCaptureFrameState* FrameCaptureCoordinator::GetLastFrameState() const noexcept
@@ -373,7 +530,7 @@ namespace gglab
 		}
 		// A write slot is reserved before GPU work and stays reserved through encoding.
 		// Counting only queued writer jobs misses issued captures still on the GPU.
-		const auto reserved = std::ranges::count_if(m_Entries, [](const Entry& entry)
+		const auto reserved = std::ranges::count_if(m_Jobs, [](const CaptureJob& entry)
 			{
 				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch || entry.m_Phase == Phase::Encoding;
 			});
@@ -419,7 +576,7 @@ namespace gglab
 		{
 			m_SettledFrames = 0;
 		}
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Phase != Phase::Waiting || !entry.m_ViewApplied)
 			{
@@ -445,11 +602,11 @@ namespace gglab
 			// Check every member's share together, then issue the group contiguously
 			// on the frame-driving thread before ordinary requests consume any slots.
 			IssueSequenceGroups(state, diagnosticTap);
-			for (Entry& entry : m_Entries)
+			for (CaptureJob& entry : m_Jobs)
 			{
-				const bool scheduledGroup = entry.m_GroupId != 0 && std::ranges::any_of(m_Entries, [&](const Entry& member)
+				const bool scheduledGroup = entry.m_GroupId != 0 && std::ranges::any_of(m_Jobs, [&](const CaptureJob& member)
 					{
-						return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+						return member.m_GroupId == entry.m_GroupId && member.m_Plan.GetSource() == FrameCaptureSource::ResourceExport;
 					});
 				if (entry.m_Phase != Phase::Waiting || scheduledGroup)
 				{
@@ -459,17 +616,17 @@ namespace gglab
 				// now instead of at the caller's timeout. Content still to come is
 				// not judged by the failure of the content it replaces.
 				if (!readinessFailure.empty() &&
-					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+					entry.m_Plan.m_Timing == FrameCaptureTiming::AfterReady &&
 					MatchesRequiredContent(entry, state))
 				{
 					Finish(entry, FrameCaptureRequestStatus::Failed, readinessFailure);
 				}
 				else if (IsDue(entry, state))
 				{
-					const FrameCaptureRequest& request = entry.m_Request;
-					if (request.m_Source == FrameCaptureSource::Diagnostic && request.m_DiagnosticTap &&
-						!GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty() &&
-						diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+					const CapturePlan& request = entry.m_Plan;
+					if (request.GetSource() == FrameCaptureSource::Diagnostic && request.GetDiagnosticTap() &&
+						!GetFrameCaptureDiagnosticTapName(*request.GetDiagnosticTap()).empty() &&
+						diagnosticTap && diagnosticTap != request.GetDiagnosticTap())
 					{
 						if (request.m_Sequence)
 						{
@@ -479,9 +636,9 @@ namespace gglab
 						continue;
 					}
 					Issue(entry, state);
-					if (entry.m_Phase == Phase::Issued && request.m_Source == FrameCaptureSource::Diagnostic)
+					if (entry.m_Phase == Phase::Issued && request.GetSource() == FrameCaptureSource::Diagnostic)
 					{
-						diagnosticTap = request.m_DiagnosticTap;
+						diagnosticTap = request.GetDiagnosticTap();
 					}
 				}
 			}
@@ -494,7 +651,7 @@ namespace gglab
 	{
 		std::vector<uint64_t> visited;
 		const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Phase != Phase::Waiting || entry.m_GroupId == 0 ||
 				std::ranges::find(visited, entry.m_GroupId) != visited.end())
@@ -502,50 +659,53 @@ namespace gglab
 				continue;
 			}
 			visited.push_back(entry.m_GroupId);
-			std::vector<Entry*> members;
-			for (Entry& member : m_Entries)
+			std::vector<CaptureJob*> members;
+			for (CaptureJob& member : m_Jobs)
 			{
 				if (member.m_Phase == Phase::Waiting && member.m_GroupId == entry.m_GroupId)
 				{
 					members.push_back(&member);
 				}
 			}
-			if (!std::ranges::any_of(members, [](const Entry* member) { return member->m_Request.m_Source == FrameCaptureSource::ResourceExport; }))
+			if (!std::ranges::any_of(members, [](const CaptureJob* member)
+				{
+					return member->m_Plan.GetSource() == FrameCaptureSource::ResourceExport;
+				}))
 			{
 				continue;
 			}
-			if (!readinessFailure.empty() && std::ranges::any_of(members, [&](const Entry* member)
+			if (!readinessFailure.empty() && std::ranges::any_of(members, [&](const CaptureJob* member)
 				{
-					return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state);
+					return member->m_Plan.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state);
 				}))
 			{
-				for (Entry* member : members)
+				for (CaptureJob* member : members)
 				{
 					Finish(*member, FrameCaptureRequestStatus::Failed, readinessFailure);
 				}
 				continue;
 			}
-			if (!std::ranges::all_of(members, [&](const Entry* member) { return IsDue(*member, state); }))
+			if (!std::ranges::all_of(members, [&](const CaptureJob* member) { return IsDue(*member, state); }))
 			{
 				continue;
 			}
 			FrameCaptureAvailability availability = FrameCaptureAvailability::Available;
 			std::string failure;
-			for (const Entry* member : members)
+			for (const CaptureJob* member : members)
 			{
-				const auto& request = member->m_Request;
-				if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
-					GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+				const auto& request = member->m_Plan;
+				if (request.GetSource() == FrameCaptureSource::Diagnostic && (!request.GetDiagnosticTap() ||
+					GetFrameCaptureDiagnosticTapName(*request.GetDiagnosticTap()).empty()))
 				{
 					failure = "A diagnostic capture requires a supported diagnostic tap.";
 					break;
 				}
-				if (request.m_Source == FrameCaptureSource::Diagnostic && diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+				if (request.GetSource() == FrameCaptureSource::Diagnostic && diagnosticTap && diagnosticTap != request.GetDiagnosticTap())
 				{
 					failure = "A different diagnostic tap occupies the requested sequence frame.";
 					break;
 				}
-				availability = GetCaptureAvailability(request.m_Source, state, static_cast<uint32_t>(members.size()));
+				availability = GetCaptureAvailability(request.GetSource(), state, static_cast<uint32_t>(members.size()));
 				if (availability != FrameCaptureAvailability::Available)
 				{
 					break;
@@ -563,9 +723,9 @@ namespace gglab
 						"The sequence capture group exceeds the capture capacity budget." :
 						"The sequence capture group is unavailable.";
 				}
-				for (Entry* member : members)
+				for (CaptureJob* member : members)
 				{
-					if (member->m_Request.m_Source == FrameCaptureSource::ResourceExport && availability == FrameCaptureAvailability::TooLarge)
+					if (member->m_Plan.GetSource() == FrameCaptureSource::ResourceExport && availability == FrameCaptureAvailability::TooLarge)
 					{
 						member->m_ResourceFailure = RGObservationFailure::TooLarge;
 					}
@@ -573,16 +733,16 @@ namespace gglab
 				}
 				continue;
 			}
-			for (Entry* member : members)
+			for (CaptureJob* member : members)
 			{
 				Issue(*member, state);
-				if (member->m_Phase == Phase::Issued && member->m_Request.m_Source == FrameCaptureSource::Diagnostic)
+				if (member->m_Phase == Phase::Issued && member->m_Plan.GetSource() == FrameCaptureSource::Diagnostic)
 				{
-					diagnosticTap = member->m_Request.m_DiagnosticTap;
+					diagnosticTap = member->m_Plan.GetDiagnosticTap();
 				}
 				if (member->m_Phase == Phase::Finished)
 				{
-					for (Entry* remaining : members)
+					for (CaptureJob* remaining : members)
 					{
 						if (remaining->m_Phase == Phase::Waiting)
 						{
@@ -604,28 +764,28 @@ namespace gglab
 		}
 		// Views apply in submission order, so earlier requests keep the camera
 		// they were submitted against until they are issued.
-		const auto head = std::ranges::find(m_Entries, Phase::Waiting, &Entry::m_Phase);
-		if (head == m_Entries.end() || head->m_Request.m_ReferenceViewId.empty() ||
+		const auto head = std::ranges::find(m_Jobs, Phase::Waiting, &CaptureJob::m_Phase);
+		if (head == m_Jobs.end() || head->m_Plan.m_ReferenceViewId.empty() ||
 			head->m_ViewApplied || !MatchesRequiredContent(*head, *m_LastFrameState))
 		{
 			return std::nullopt;
 		}
 		// An after-ready view waits for loaded content, which registers its views.
-		if (head->m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+		if (head->m_Plan.m_Timing == FrameCaptureTiming::AfterReady &&
 			!m_LastFrameState->m_Readiness.IsReady())
 		{
 			return std::nullopt;
 		}
 		// A flexible batch keeps its current camera while earlier images retain
 		// GPU/readback or writer capacity. The actual frame rechecks before issue.
-		if (head->m_Request.m_WaitForCapacity && !head->m_Request.m_Sequence &&
-			GetCaptureAvailability(head->m_Request.m_Source, *m_LastFrameState) == FrameCaptureAvailability::Busy)
+		if (head->m_Plan.m_WaitForCapacity && !head->m_Plan.m_Sequence &&
+			GetCaptureAvailability(head->m_Plan.GetSource(), *m_LastFrameState) == FrameCaptureAvailability::Busy)
 		{
 			return std::nullopt;
 		}
 		return FrameCaptureViewChange{
 			.m_RequestId = head->m_Id,
-			.m_ReferenceViewId = head->m_Request.m_ReferenceViewId,
+			.m_ReferenceViewId = head->m_Plan.m_ReferenceViewId,
 		};
 	}
 
@@ -636,13 +796,13 @@ namespace gglab
 		{
 			return false;
 		}
-		return std::ranges::any_of(m_Entries, [this](const Entry& entry)
+		return std::ranges::any_of(m_Jobs, [this](const CaptureJob& entry)
 			{
 				// A view restored for this frame is already a camera cut.
-				const bool viewSettling = entry.m_Request.m_ReferenceViewId.empty() ||
+				const bool viewSettling = entry.m_Plan.m_ReferenceViewId.empty() ||
 					entry.m_ViewCameraResetSerial.has_value();
 				return entry.m_Phase == Phase::Waiting &&
-					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
+					entry.m_Plan.m_Timing == FrameCaptureTiming::AfterReady &&
 					viewSettling && MatchesRequiredContent(entry, *m_LastFrameState);
 			});
 	}
@@ -653,20 +813,20 @@ namespace gglab
 		{
 			return false;
 		}
-		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+		return std::ranges::any_of(m_Jobs, [](const CaptureJob& entry)
 			{
 				return entry.m_Phase == Phase::Waiting &&
-					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady;
+					entry.m_Plan.m_Timing == FrameCaptureTiming::AfterReady;
 			});
 	}
 
 	void FrameCaptureCoordinator::OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept
 	{
-		const auto entry = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+		const auto entry = std::ranges::find_if(m_Jobs, [&](const CaptureJob& candidate)
 			{
 				return candidate.m_Id == requestId && candidate.m_Phase == Phase::Waiting;
 			});
-		if (entry == m_Entries.end())
+		if (entry == m_Jobs.end())
 		{
 			return;
 		}
@@ -691,18 +851,18 @@ namespace gglab
 		}
 		Finish(*entry, FrameCaptureRequestStatus::Failed,
 			std::format("Reference view '{}' is not registered by '{}' (available: {}).",
-				entry->m_Request.m_ReferenceViewId, content,
+				entry->m_Plan.m_ReferenceViewId, content,
 				available.empty() ? "none" : available));
 	}
 
 	void FrameCaptureCoordinator::SetFrameSceneInputs(
 		uint64_t frameSerial, const FrameCaptureSceneInputs& inputs) noexcept
 	{
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
-			if (entry.m_Phase == Phase::Issued && entry.m_Metadata.m_FrameSerial == frameSerial)
+			if (entry.m_Phase == Phase::Issued && entry.m_Attempt->m_Metadata.m_FrameSerial == frameSerial)
 			{
-				entry.m_Metadata.m_SceneInputs = inputs;
+				entry.m_Attempt->m_Metadata.m_SceneInputs = inputs;
 			}
 		}
 	}
@@ -711,13 +871,13 @@ namespace gglab
 	{
 		if (m_NonFiniteWatch && m_LastFrameState)
 		{
-			for (auto& entry : m_Entries)
+			for (auto& entry : m_Jobs)
 			{
-				if (entry.m_Phase == Phase::Issued && entry.m_WatchCoverageId != 0 &&
-					entry.m_Metadata.m_FrameSerial == m_LastFrameState->m_FrameSerial)
+				if (entry.m_Phase == Phase::Issued && entry.m_Attempt->m_WatchCoverageId != 0 &&
+					entry.m_Attempt->m_Metadata.m_FrameSerial == m_LastFrameState->m_FrameSerial)
 				{
-					m_NonFiniteWatch->TrackCoverageFrame(entry.m_WatchCoverageId, m_LastFrameState->m_FrameSerial);
-					m_NonFiniteWatch->CloseCoverage(entry.m_WatchCoverageId);
+					m_NonFiniteWatch->TrackCoverageFrame(entry.m_Attempt->m_WatchCoverageId, m_LastFrameState->m_FrameSerial);
+					m_NonFiniteWatch->CloseCoverage(entry.m_Attempt->m_WatchCoverageId);
 				}
 			}
 		}
@@ -763,7 +923,7 @@ namespace gglab
 	void FrameCaptureCoordinator::PrepareForShutdown() noexcept
 	{
 		m_IsShuttingDown = true;
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Phase == Phase::Waiting)
 			{
@@ -786,7 +946,7 @@ namespace gglab
 		}
 		Update();
 		FinishWriting();
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Phase == Phase::Waiting)
 			{
@@ -803,16 +963,16 @@ namespace gglab
 	}
 
 	bool FrameCaptureCoordinator::MatchesRequiredContent(
-		const Entry& entry, const FrameCaptureFrameState& state) noexcept
+		const CaptureJob& entry, const FrameCaptureFrameState& state) noexcept
 	{
-		const std::string& required = entry.m_Request.m_RequiredContentId;
+		const std::string& required = entry.m_Plan.m_RequiredContentId;
 		return required.empty() || required == state.m_DemoId || required == state.m_LabId;
 	}
 
 	bool FrameCaptureCoordinator::IsDue(
-		const Entry& entry, const FrameCaptureFrameState& state) const noexcept
+		const CaptureJob& entry, const FrameCaptureFrameState& state) const noexcept
 	{
-		const FrameCaptureRequest& request = entry.m_Request;
+		const CapturePlan& request = entry.m_Plan;
 		if (!request.m_ReferenceViewId.empty() && !entry.m_ViewApplied)
 		{
 			return false;
@@ -827,9 +987,10 @@ namespace gglab
 
 	bool FrameCaptureCoordinator::HasFrameResourceExports() const noexcept
 	{
-		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+		return std::ranges::any_of(m_Jobs, [](const CaptureJob& entry)
 			{
-				return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+				return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) &&
+					entry.m_Plan.GetSource() == FrameCaptureSource::ResourceExport;
 			});
 	}
 
@@ -842,10 +1003,10 @@ namespace gglab
 		}
 		const bool strictWatch = m_NonFiniteWatch && m_NonFiniteWatch->GetStatus().m_Enabled &&
 			m_NonFiniteWatch->GetStatus().m_Mode == NonFiniteWatchMode::Fail;
-		const bool waitingExactExport = m_LastFrameState && std::ranges::any_of(m_Entries, [&](const Entry& entry)
+		const bool waitingExactExport = m_LastFrameState && std::ranges::any_of(m_Jobs, [&](const CaptureJob& entry)
 			{
-				return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
-					entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState);
+				return entry.m_Phase == Phase::Waiting && (entry.m_Plan.m_Sequence || strictWatch) &&
+					entry.m_Plan.GetSource() == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState);
 			});
 		if (waitingExactExport)
 		{
@@ -861,7 +1022,7 @@ namespace gglab
 		return prepared;
 	}
 
-	void FrameCaptureCoordinator::Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept
+	void FrameCaptureCoordinator::Issue(CaptureJob& entry, const FrameCaptureFrameState& state) noexcept
 	{
 		if (!m_Capture)
 		{
@@ -873,18 +1034,18 @@ namespace gglab
 			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture requires a live render frame serial.");
 			return;
 		}
-		const FrameCaptureRequest& request = entry.m_Request;
-		if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
-			GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+		const CapturePlan& request = entry.m_Plan;
+		if (request.GetSource() == FrameCaptureSource::Diagnostic && (!request.GetDiagnosticTap() ||
+			GetFrameCaptureDiagnosticTapName(*request.GetDiagnosticTap()).empty()))
 		{
 			Finish(entry, FrameCaptureRequestStatus::Failed, "A diagnostic capture requires a supported diagnostic tap.");
 			return;
 		}
-		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Request.m_Source, state);
+		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Plan.GetSource(), state);
 		if (availability != FrameCaptureAvailability::Available)
 		{
 			if (availability == FrameCaptureAvailability::Busy &&
-				(request.m_Source == FrameCaptureSource::ResourceExport ||
+				(request.GetSource() == FrameCaptureSource::ResourceExport ||
 					(request.m_WaitForCapacity && !request.m_Sequence)))
 			{
 				return;
@@ -902,11 +1063,13 @@ namespace gglab
 			return;
 		}
 
-		FrameCaptureMetadata& metadata = entry.m_Metadata;
+		GGLAB_ASSERT_MSG(!entry.m_Attempt, "A waiting capture job must not retain a frame attempt.");
+		FrameAttempt attempt;
+		FrameCaptureMetadata& metadata = attempt.m_Metadata;
 		metadata.m_RequestId = entry.m_Id;
 		metadata.m_Label = request.m_Label;
 		metadata.m_Note = request.m_Note;
-		metadata.m_Source = request.m_Source;
+		metadata.m_Source = request.GetSource();
 		metadata.m_Timing = request.m_Timing;
 		metadata.m_SettleFrames =
 			request.m_Timing == FrameCaptureTiming::AfterReady ? request.m_SettleFrames : 0;
@@ -925,44 +1088,46 @@ namespace gglab
 		metadata.m_Readiness = state.m_Readiness;
 		metadata.m_Temporal = state.m_Temporal;
 		metadata.m_Sequence = request.m_Sequence;
-		metadata.m_DiagnosticTap = request.m_Source == FrameCaptureSource::Diagnostic &&
-			request.m_DiagnosticTap ?
-				std::string(GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap)) :
+		metadata.m_DiagnosticTap = request.GetSource() == FrameCaptureSource::Diagnostic &&
+			request.GetDiagnosticTap() ?
+				std::string(GetFrameCaptureDiagnosticTapName(*request.GetDiagnosticTap())) :
 				std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
 			std::chrono::floor<std::chrono::milliseconds>(std::chrono::system_clock::now()));
 
-		if (request.m_Source == FrameCaptureSource::ResourceExport)
+		if (const auto* resources = std::get_if<ResourceCaptureProduct>(&request.m_Product))
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestResourceExport(request.m_ResourceTargets,
-				state.m_FrameSerial, request.m_Sequence.has_value(), request.m_IncludeGraph, entry.m_GroupId);
+			attempt.m_CaptureRequestId = m_Capture->RequestResourceExport(resources->m_Targets,
+				state.m_FrameSerial, request.m_Sequence.has_value(), resources->m_IncludeGraph, entry.m_GroupId);
 		}
-		else if (request.m_Source == FrameCaptureSource::Diagnostic)
+		else if (request.GetSource() == FrameCaptureSource::Diagnostic)
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
-				*request.m_DiagnosticTap, state.m_FrameSerial, entry.m_GroupId);
+			attempt.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
+				*request.GetDiagnosticTap(), state.m_FrameSerial, entry.m_GroupId);
 		}
 		else
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source, state.m_FrameSerial, entry.m_GroupId);
+			attempt.m_CaptureRequestId = m_Capture->RequestCapture(
+				request.GetSource(), state.m_FrameSerial, entry.m_GroupId);
 		}
-		if (entry.m_CaptureRequestId == 0)
+		if (attempt.m_CaptureRequestId == 0)
 		{
 			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture request capacity is exhausted.");
 			return;
 		}
+		attempt.m_WatchCoverageId = m_NonFiniteWatch ? m_NonFiniteWatch->OpenCoverage() : 0;
+		entry.m_Attempt = std::move(attempt);
 		entry.m_Phase = Phase::Issued;
-		entry.m_WatchCoverageId = m_NonFiniteWatch ? m_NonFiniteWatch->OpenCoverage() : 0;
 	}
 
 	void FrameCaptureCoordinator::HandleCaptureResult(FrameCaptureResult result) noexcept
 	{
-		const auto entry = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+		const auto entry = std::ranges::find_if(m_Jobs, [&](const CaptureJob& candidate)
 			{
 				return candidate.m_Phase == Phase::Issued &&
-					candidate.m_CaptureRequestId == result.m_RequestId;
+					candidate.m_Attempt->m_CaptureRequestId == result.m_RequestId;
 			});
-		if (entry == m_Entries.end())
+		if (entry == m_Jobs.end())
 		{
 			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0)
 			{
@@ -973,30 +1138,34 @@ namespace gglab
 			return;
 		}
 
-		const bool graph = entry->m_Request.m_Source == FrameCaptureSource::RenderGraph;
+		FrameAttempt& attempt = *entry->m_Attempt;
+		const CapturePlan& plan = entry->m_Plan;
+		const FrameCaptureSource source = plan.GetSource();
+		const bool graph = source == FrameCaptureSource::RenderGraph;
 		if (result.m_Status == FrameCaptureStatus::Busy)
 		{
-			if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial || result.m_Source != entry->m_Request.m_Source)
+			if (result.m_FrameSerial != attempt.m_Metadata.m_FrameSerial || result.m_Source != source)
 			{
-				Finish(*entry, FrameCaptureRequestStatus::Failed, "The deferred capture result does not match its requested frame or source.");
+				Finish(*entry, FrameCaptureRequestStatus::Failed,
+					"The deferred capture result does not match its requested frame or source.");
 				return;
 			}
 			entry->m_Phase = Phase::Waiting;
 			if (m_NonFiniteWatch)
 			{
-				m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId);
+				m_NonFiniteWatch->ReleaseCoverage(attempt.m_WatchCoverageId);
 			}
-			entry->m_WatchCoverageId = 0;
-			entry->m_CaptureRequestId = 0;
-			entry->m_Metadata = {};
+			// Busy ends this attempt, not its job. A later frame must start with
+			// fresh provenance, Runtime identity and watch coverage together.
+			entry->m_Attempt.reset();
 			return;
 		}
-		const bool resources = entry->m_Request.m_Source == FrameCaptureSource::ResourceExport;
+		const bool resources = source == FrameCaptureSource::ResourceExport;
 		entry->m_ResourceFailure = result.m_ResourceFailure;
 		if (result.m_Status != FrameCaptureStatus::Completed ||
 			(resources ?
 				(!result.m_Resources || result.m_Resources->m_Arrays.empty() ||
-					(entry->m_Request.m_IncludeGraph && !result.m_Graph)) :
+					(plan.IncludesGraph() && !result.m_Graph)) :
 				graph ? !result.m_Graph : !result.m_Image))
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
@@ -1006,36 +1175,38 @@ namespace gglab
 			return;
 		}
 		const std::optional<PostProcessDebugTap> expectedTap =
-			entry->m_Request.m_Source == FrameCaptureSource::Diagnostic ?
-				entry->m_Request.m_DiagnosticTap :
+			source == FrameCaptureSource::Diagnostic ?
+				plan.GetDiagnosticTap() :
 				std::nullopt;
-		if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial ||
-			result.m_Source != entry->m_Request.m_Source || result.m_DiagnosticTap != expectedTap)
+		if (result.m_FrameSerial != attempt.m_Metadata.m_FrameSerial ||
+			result.m_Source != source || result.m_DiagnosticTap != expectedTap)
 		{
 			Finish(*entry, FrameCaptureRequestStatus::Failed,
 				"The capture result does not match its requested render frame, source or diagnostic tap.");
 			return;
 		}
-		entry->m_PendingResult = std::move(result);
+		attempt.m_PendingResult = std::move(result);
 		entry->m_Phase = Phase::AwaitingWatch;
 	}
 
 	void FrameCaptureCoordinator::PollWatchCaptures() noexcept
 	{
 		const std::string failure = m_NonFiniteWatch ? m_NonFiniteWatch->GetFailModeFailure() : std::string{};
-		for (auto& entry : m_Entries)
+		for (auto& entry : m_Jobs)
 		{
-			if (entry.m_Phase == Phase::Waiting && entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady && !failure.empty())
+			if (entry.m_Phase == Phase::Waiting &&
+				entry.m_Plan.m_Timing == FrameCaptureTiming::AfterReady && !failure.empty())
 			{
 				Finish(entry, FrameCaptureRequestStatus::Failed, failure);
 			}
 			if (entry.m_Phase == Phase::Issued && m_NonFiniteWatch)
 			{
-				const auto coverage = m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId);
+				FrameAttempt& attempt = *entry.m_Attempt;
+				const auto coverage = m_NonFiniteWatch->GetCoverage(attempt.m_WatchCoverageId);
 				if (coverage && coverage->Fails())
 				{
-					m_DiscardedCaptureResults.push_back(entry.m_CaptureRequestId);
-					entry.m_Metadata.m_WatchCoverage = coverage;
+					m_DiscardedCaptureResults.push_back(attempt.m_CaptureRequestId);
+					attempt.m_Metadata.m_WatchCoverage = coverage;
 					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
 					continue;
 				}
@@ -1044,8 +1215,11 @@ namespace gglab
 			{
 				continue;
 			}
-			entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch ? m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId) : nullptr;
-			if (const auto& coverage = entry.m_Metadata.m_WatchCoverage; coverage)
+			FrameAttempt& attempt = *entry.m_Attempt;
+			attempt.m_Metadata.m_WatchCoverage = m_NonFiniteWatch ?
+				m_NonFiniteWatch->GetCoverage(attempt.m_WatchCoverageId) :
+				nullptr;
+			if (const auto& coverage = attempt.m_Metadata.m_WatchCoverage; coverage)
 			{
 				if (coverage->Fails())
 				{
@@ -1057,17 +1231,20 @@ namespace gglab
 					continue;
 				}
 			}
-			StartEncoding(entry, *entry.m_PendingResult);
-			entry.m_PendingResult.reset();
+			// Encoding can fail synchronously and finish the job, destroying its
+			// attempt. Keep the payload local across that transition.
+			FrameCaptureResult result = std::move(*attempt.m_PendingResult);
+			attempt.m_PendingResult.reset();
+			StartEncoding(entry, result);
 		}
 	}
 
 	void FrameCaptureCoordinator::StartEncoding(
-		Entry& entry, const FrameCaptureResult& result) noexcept
+		CaptureJob& entry, const FrameCaptureResult& result) noexcept
 	{
-		const std::filesystem::path directory = entry.m_Request.m_OutputDirectory.empty() ?
+		const std::filesystem::path directory = entry.m_Plan.m_OutputDirectory.empty() ?
 			m_DefaultOutputDirectory :
-			entry.m_Request.m_OutputDirectory;
+			entry.m_Plan.m_OutputDirectory;
 		if (directory.empty())
 		{
 			Finish(entry, FrameCaptureRequestStatus::Failed,
@@ -1075,7 +1252,7 @@ namespace gglab
 			return;
 		}
 
-		FrameCaptureMetadata& metadata = entry.m_Metadata;
+		FrameCaptureMetadata& metadata = entry.m_Attempt->m_Metadata;
 		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
 		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
 		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
@@ -1087,8 +1264,8 @@ namespace gglab
 			metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
 		}
 
-		const std::string_view subject = !entry.m_Request.m_Label.empty() ?
-			std::string_view(entry.m_Request.m_Label) :
+		const std::string_view subject = !entry.m_Plan.m_Label.empty() ?
+			std::string_view(entry.m_Plan.m_Label) :
 			!metadata.m_LabId.empty() ?
 				std::string_view(metadata.m_LabId) :
 				std::string_view(metadata.m_DemoId);
@@ -1112,7 +1289,7 @@ namespace gglab
 		job->m_Graph = result.m_Graph;
 		job->m_Resources = result.m_Resources;
 		job->m_ResourceExportActive = result.m_ResourceExportActive;
-		job->m_GraphSummary = entry.m_Request.m_GraphSummary;
+		job->m_GraphSummary = entry.m_Plan.IsGraphSummary();
 		job->m_SubmissionFenceIndex = result.m_SubmissionFenceIndex;
 		job->m_SubmissionFenceGeneration = result.m_SubmissionFenceGeneration;
 		job->m_SubmissionFenceValue = result.m_SubmissionFenceValue;
@@ -1122,11 +1299,11 @@ namespace gglab
 			std::format("{}.{}.resource-export", SanitizeFileStemComponent(subject), metadata.m_FrameSerial) :
 			result.m_Graph ?
 				std::format("{}.{}.graph{}", SanitizeFileStemComponent(subject), metadata.m_FrameSerial,
-					entry.m_Request.m_GraphSummary ? "-summary" : "") :
+					entry.m_Plan.IsGraphSummary() ? "-summary" : "") :
 				baseStem;
 		job->m_TemporaryStem = std::format("{}.{}.{}", job->m_BaseStem, m_TemporaryTag, entry.m_Id);
 		job->m_Metadata = metadata;
-		entry.m_Job = job;
+		entry.m_WriteJob = job;
 		entry.m_Phase = Phase::Encoding;
 
 		if (m_WriteOnCallingThread)
@@ -1148,9 +1325,9 @@ namespace gglab
 		m_Writer->m_Condition.notify_one();
 	}
 
-	bool FrameCaptureCoordinator::TryFinishWritten(Entry& entry) noexcept
+	bool FrameCaptureCoordinator::TryFinishWritten(CaptureJob& entry) noexcept
 	{
-		EncodeJob& job = *entry.m_Job;
+		EncodeJob& job = *entry.m_WriteJob;
 		std::unique_lock lock(job.m_Mutex);
 		if (!job.m_IsDone)
 		{
@@ -1164,7 +1341,7 @@ namespace gglab
 			FrameCaptureRequestStatus::Failed;
 		if (status == FrameCaptureRequestStatus::Completed)
 		{
-			entry.m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
+			entry.m_Attempt->m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
 		}
 		lock.unlock();
 		Finish(entry, status, std::move(failure));
@@ -1173,13 +1350,13 @@ namespace gglab
 
 	void FrameCaptureCoordinator::CollectWrittenJobs() noexcept
 	{
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Phase != Phase::Encoding || TryFinishWritten(entry))
 			{
 				continue;
 			}
-			EncodeJob& job = *entry.m_Job;
+			EncodeJob& job = *entry.m_WriteJob;
 			if (!job.m_StallReported &&
 				std::chrono::steady_clock::now() - job.m_SubmittedAt >= EncodeStallReportTime)
 			{
@@ -1195,13 +1372,13 @@ namespace gglab
 	{
 		// One deadline bounds the whole wait, however many captures are unfinished.
 		const auto deadline = std::chrono::steady_clock::now() + m_ShutdownWriteTimeout;
-		for (Entry& entry : m_Entries)
+		for (CaptureJob& entry : m_Jobs)
 		{
 			if (entry.m_Phase != Phase::Encoding)
 			{
 				continue;
 			}
-			EncodeJob& job = *entry.m_Job;
+			EncodeJob& job = *entry.m_WriteJob;
 			{
 				std::unique_lock lock(job.m_Mutex);
 				job.m_Condition.wait_until(lock, deadline, [&job]() { return job.m_IsDone; });
@@ -1260,47 +1437,49 @@ namespace gglab
 	}
 
 	void FrameCaptureCoordinator::Finish(
-		Entry& entry, FrameCaptureRequestStatus status, std::string failure) noexcept
+		CaptureJob& entry, FrameCaptureRequestStatus status, std::string failure) noexcept
 	{
+		GGLAB_ASSERT_MSG(entry.m_Phase != Phase::Finished, "A capture job must finish exactly once.");
 		FrameCaptureRequestResult result{
 			.m_RequestId = entry.m_Id,
 			.m_Status = status,
 			.m_Failure = std::move(failure),
 		};
-		if (entry.m_Job)
+		if (entry.m_WriteJob)
 		{
 			if (status == FrameCaptureRequestStatus::Completed)
 			{
-				result.m_ImagePath = entry.m_Job->m_ImagePath;
-				result.m_MetadataPath = entry.m_Job->m_MetadataPath;
-				result.m_ResourcePaths = entry.m_Job->m_ResourcePaths;
-				result.m_GraphPath = entry.m_Job->m_GraphPath;
+				result.m_ImagePath = entry.m_WriteJob->m_ImagePath;
+				result.m_MetadataPath = entry.m_WriteJob->m_MetadataPath;
+				result.m_ResourcePaths = entry.m_WriteJob->m_ResourcePaths;
+				result.m_GraphPath = entry.m_WriteJob->m_GraphPath;
 			}
 		}
 		if (entry.m_Phase != Phase::Waiting)
 		{
-			if (m_NonFiniteWatch && entry.m_WatchCoverageId != 0 && !entry.m_Metadata.m_WatchCoverage)
+			FrameAttempt& attempt = *entry.m_Attempt;
+			if (m_NonFiniteWatch && attempt.m_WatchCoverageId != 0 && !attempt.m_Metadata.m_WatchCoverage)
 			{
-				entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId);
+				attempt.m_Metadata.m_WatchCoverage =
+					m_NonFiniteWatch->GetCoverage(attempt.m_WatchCoverageId);
 			}
-			result.m_Metadata = entry.m_Metadata;
+			result.m_Metadata = attempt.m_Metadata;
 		}
 		result.m_ResourceFailure = entry.m_ResourceFailure;
 		m_Results.push_back(std::move(result));
-		if (m_NonFiniteWatch)
+		if (m_NonFiniteWatch && entry.m_Attempt)
 		{
-			m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId);
+			m_NonFiniteWatch->ReleaseCoverage(entry.m_Attempt->m_WatchCoverageId);
 		}
-		entry.m_WatchCoverageId = 0;
-		entry.m_PendingResult.reset();
-		entry.m_Job.reset();
+		entry.m_Attempt.reset();
+		entry.m_WriteJob.reset();
 		entry.m_Phase = Phase::Finished;
 	}
 
-	void FrameCaptureCoordinator::RemoveFinishedEntries() noexcept
+	void FrameCaptureCoordinator::RemoveFinishedJobs() noexcept
 	{
-		std::erase_if(m_Entries,
-			[](const Entry& entry) { return entry.m_Phase == Phase::Finished; });
+		std::erase_if(m_Jobs,
+			[](const CaptureJob& entry) { return entry.m_Phase == Phase::Finished; });
 	}
 
 	void FrameCaptureCoordinator::RunWriter(

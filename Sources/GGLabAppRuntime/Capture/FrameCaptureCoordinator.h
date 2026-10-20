@@ -224,6 +224,9 @@ namespace gglab
 	private:
 		struct EncodeJob;
 		struct WriterState;
+		struct CapturePlan;
+		struct FrameAttempt;
+		struct CaptureJob;
 
 		enum class Phase : uint8_t
 		{
@@ -234,46 +237,28 @@ namespace gglab
 			Finished,
 		};
 
-		struct Entry
-		{
-			uint64_t m_Id = 0;
-			FrameCaptureRequest m_Request{};
-			Phase m_Phase = Phase::Waiting;
-			uint64_t m_CaptureRequestId = 0;
-			// Transient Runtime association for the outputs of one sequence frame.
-			uint64_t m_GroupId = 0;
-			// The requested reference view was restored, and the camera reset
-			// serial of the first frame rendered with it. A different serial later
-			// means another camera cut replaced the view, which is then restored again.
-			bool m_ViewApplied = false;
-			std::optional<uint64_t> m_ViewCameraResetSerial;
-			FrameCaptureMetadata m_Metadata{};
-			RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
-			std::shared_ptr<EncodeJob> m_Job;
-			uint64_t m_WatchCoverageId = 0;
-			std::optional<FrameCaptureResult> m_PendingResult;
-		};
-
+		// Transitional input adapter; accepted jobs retain only the typed plan.
+		[[nodiscard]] static CapturePlan MakeCapturePlan(FrameCaptureRequest request) noexcept;
 		[[nodiscard]] static bool MatchesRequiredContent(
-			const Entry& entry, const FrameCaptureFrameState& state) noexcept;
+			const CaptureJob& entry, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(
-			const Entry& entry, const FrameCaptureFrameState& state) const noexcept;
+			const CaptureJob& entry, const FrameCaptureFrameState& state) const noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
 			const FrameCaptureFrameState& state, uint32_t requestCount = 1) const noexcept;
 		void IssueSequenceGroups(const FrameCaptureFrameState& state, std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
-		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
+		void Issue(CaptureJob& entry, const FrameCaptureFrameState& state) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void PollWatchCaptures() noexcept;
-		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;
+		void StartEncoding(CaptureJob& entry, const FrameCaptureResult& result) noexcept;
 		// Publishes the result of a written job; false while it is unfinished.
-		[[nodiscard]] bool TryFinishWritten(Entry& entry) noexcept;
+		[[nodiscard]] bool TryFinishWritten(CaptureJob& entry) noexcept;
 		void CollectWrittenJobs() noexcept;
 		// Waits for unfinished writing until the shutdown write timeout, then
 		// fails what remains and abandons jobs that have not claimed publication.
 		void FinishWriting() noexcept;
 		void StopWriter() noexcept;
-		void Finish(Entry& entry, FrameCaptureRequestStatus status, std::string failure) noexcept;
-		void RemoveFinishedEntries() noexcept;
+		void Finish(CaptureJob& entry, FrameCaptureRequestStatus status, std::string failure) noexcept;
+		void RemoveFinishedJobs() noexcept;
 		static void RunWriter(std::shared_ptr<WriterState> state,
 			FrameCaptureImageEncoder encoder) noexcept;
 		static void RunEncodeJob(EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
@@ -293,7 +278,7 @@ namespace gglab
 		// file I/O; shutdown then leaves it to finish on its own.
 		bool m_HasAbandonedJobs = false;
 		uint64_t m_NextRequestId = 1;
-		std::vector<Entry> m_Entries;
+		std::vector<CaptureJob> m_Jobs;
 		std::vector<FrameCaptureRequestResult> m_Results;
 		// Runtime retains and retires these payloads normally; only publication was
 		// cancelled by a watch failure before the capture result arrived.
