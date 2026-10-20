@@ -2,8 +2,8 @@
 
 The root `AGENTS.md` retains the core control-body and macro call-site rules.
 The root `.editorconfig` defines mechanical C++ formatting settings, while
-`.gitattributes` defines newline exceptions. Use the conventions below for the
-layout choices and formatter corrections those settings cannot fully express.
+`.gitattributes` defines newline exceptions. Use the conventions below for
+manual review of layout choices those settings cannot fully express.
 
 ## Control flow, comments and operators
 
@@ -65,8 +65,7 @@ is not necessarily the condition's base.
 
 Preserve nesting in conditional branches and their initializers. A ternary in a
 false branch retains its own branch hierarchy. Adjacent pieces of one string
-literal remain siblings. Restore this hierarchy if native formatting flattens
-it or introduces excess indentation.
+literal remain siblings.
 
 See [Ternary expressions](examples.md#ternary-expressions).
 
@@ -88,10 +87,8 @@ A lambda passed as an argument follows the call's argument nesting, with its
 scope braces aligned with the capture. A control-flow body inside either lambda
 follows the normal control-body rules.
 
-Keep the native indentation produced by
-`cpp_indent_lambda_braces_when_parameter = true`, including for ordinary
-assigned lambdas. Do not manually outdent their braces or bodies to align with
-the variable declaration.
+Do not outdent ordinary assigned lambda braces or bodies to align with the
+variable declaration.
 
 See [Lambdas](examples.md#lambdas).
 
@@ -108,9 +105,8 @@ the declaration. Preserve intentional row grouping within the data.
 
 For multiline JSON construction, put each named field on its own line and make
 the nested object hierarchy clear. Outer closing braces may follow the last
-data entry on its line. Accept the native formatter's initializer punctuation,
-including `Type{}` and a comma immediately followed by `{`; do not enable a
-global space before initializer braces to force one JSON spacing detail.
+data entry on its line. Preserve established initializer punctuation, including
+`Type{}` and a comma immediately followed by `{`.
 
 See [Arrays and JSON](examples.md#arrays-and-json).
 
@@ -126,21 +122,21 @@ reinterpretation. Do not treat every type-named call as an interchangeable cast.
 
 See [HLSL conversions](examples.md#hlsl-conversions).
 
-## Literal data and formatter review
+## Literal data and layout review
 
 Indentation inside a raw string is part of the string's value. Preserve raw
 string bytes, other literal contents, and byte-pinned fixtures during formatting.
 Unindented literal data can be intentional. Beautifying JSON embedded in a raw
 string is a separate fixture edit, even if its parsed meaning is unchanged.
 
-A standalone stream continuation after a multiline raw string can be pushed to
-column zero by native formatting. It can be kept beside the literal's closing
-token by changing only whitespace outside the literal.
+Keep a standalone stream continuation after a multiline raw string at the
+expression's continuation indentation. It may stay beside the literal's closing
+token when that reads clearly; change whitespace only outside the literal.
 
-Review native output around ternaries, ordinary lambdas, nested aggregate call
-closers, constructor initializers, `requires` parameters, pointer arrays and
-conditional compilation. Preserve neighboring pointer/reference spacing rather
-than accepting changes such as `T& value` to `T & value` or spreading
-`new Element*[count]{}` into unrelated declaration styles.
+Check layout around ternaries, ordinary lambdas, nested aggregate call closers,
+constructor initializers, `requires` parameters, pointer arrays and conditional
+compilation. Preserve neighboring pointer/reference spacing and avoid unnecessary
+changes such as `T& value` to `T & value` or spreading `new Element*[count]{}`
+into unrelated declaration styles.
 
 See [Raw strings and macros](examples.md#raw-strings-and-macros).
