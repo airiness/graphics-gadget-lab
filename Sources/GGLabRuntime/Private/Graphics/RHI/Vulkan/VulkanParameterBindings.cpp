@@ -102,6 +102,11 @@ namespace gglab
 		}
 		m_Device = device;
 		m_FrameSlots.resize(frameSlotCount);
+		m_SubmittedFrameCount = 0;
+		m_HighWaterSnapshotCount = 0;
+		m_LastSubmittedSnapshotCount = 0;
+		m_LastSubmittedBindCount = 0;
+		m_LastSubmittedReuseCount = 0;
 		return true;
 	}
 
@@ -115,6 +120,11 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
+			"Vulkan set-0 descriptor statistics: submitted frames={}, snapshots high-water={}; "
+			"last submitted frame snapshots={}, binds={}, reused={}.",
+			m_SubmittedFrameCount, m_HighWaterSnapshotCount, m_LastSubmittedSnapshotCount,
+			m_LastSubmittedBindCount, m_LastSubmittedReuseCount);
 		for (const auto& slot : m_FrameSlots)
 		{
 			GGLAB_ASSERT_MSG(!slot.m_Active,
@@ -166,6 +176,8 @@ namespace gglab
 		}
 		slot.m_PoolIndex = 0;
 		slot.m_AllocationCount = 0;
+		slot.m_BindCount = 0;
+		slot.m_ReuseCount = 0;
 		slot.m_LastSubmittedFence = {};
 		slot.m_Active = true;
 		return true;
@@ -184,6 +196,12 @@ namespace gglab
 		auto& slot = m_FrameSlots[frameSlotIndex];
 		slot.m_LastSubmittedFence = fence;
 		slot.m_Active = false;
+		// Only accepted, signaled submissions contribute; aborted or retained streams do not.
+		++m_SubmittedFrameCount;
+		m_HighWaterSnapshotCount = std::max(m_HighWaterSnapshotCount, slot.m_AllocationCount);
+		m_LastSubmittedSnapshotCount = slot.m_AllocationCount;
+		m_LastSubmittedBindCount = slot.m_BindCount;
+		m_LastSubmittedReuseCount = slot.m_ReuseCount;
 		return true;
 	}
 
@@ -215,6 +233,16 @@ namespace gglab
 	bool VulkanSet0DynamicUniformFrames::IsFrameActive(uint32_t frameSlotIndex) const noexcept
 	{
 		return frameSlotIndex < m_FrameSlots.size() && m_FrameSlots[frameSlotIndex].m_Active;
+	}
+
+	void VulkanSet0DynamicUniformFrames::RecordDescriptorBind(
+		uint32_t frameSlotIndex, bool reusedSnapshot) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsFrameActive(frameSlotIndex),
+			"Descriptor binding statistics require an active frame.");
+		auto& slot = m_FrameSlots[frameSlotIndex];
+		++slot.m_BindCount;
+		slot.m_ReuseCount += reusedSnapshot ? 1u : 0u;
 	}
 
 	VkDescriptorSet VulkanSet0DynamicUniformFrames::AllocateDescriptorSet(uint32_t frameSlotIndex,

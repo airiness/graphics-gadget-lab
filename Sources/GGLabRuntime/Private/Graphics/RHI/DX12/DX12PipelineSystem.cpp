@@ -45,7 +45,12 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 	}
 
-	DX12PipelineSystem::~DX12PipelineSystem() = default;
+	DX12PipelineSystem::~DX12PipelineSystem()
+	{
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("DX12 native binding layouts retained at teardown: {}.",
+			std::ranges::count_if(m_BindingLayouts,
+				[](const BindingLayoutBinding& binding) { return binding.m_Registered; }));
+	}
 
 	RHIBindingLayoutHandle DX12PipelineSystem::CreateBindingLayout(
 		const RHIBindingLayoutDesc& desc) noexcept

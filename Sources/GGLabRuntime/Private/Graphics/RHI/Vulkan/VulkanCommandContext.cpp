@@ -1030,6 +1030,7 @@ namespace gglab
 			Reject("Draw", "no pipeline binding layout is active");
 			return false;
 		}
+		const bool reusedSnapshot = !m_FixedDescriptorsDirty;
 		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
 		if (m_FixedDescriptorsDirty)
 		{
@@ -1049,6 +1050,7 @@ namespace gglab
 		vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			m_CurrentBindingLayout->GetPipelineLayout(), 0, static_cast<uint32_t>(sets.size()),
 			sets.data(), static_cast<uint32_t>(m_DynamicOffsets.size()), m_DynamicOffsets.data());
+		m_Set0Frames->RecordDescriptorBind(m_FrameSlotIndex, reusedSnapshot);
 		return true;
 	}
 
@@ -1363,6 +1365,7 @@ namespace gglab
 			Reject("Dispatch", "no pipeline binding layout is active");
 			return false;
 		}
+		const bool reusedSnapshot = !m_FixedDescriptorsDirty;
 		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
 		if (m_FixedDescriptorsDirty)
 		{
@@ -1383,6 +1386,8 @@ namespace gglab
 			VK_PIPELINE_BIND_POINT_COMPUTE, m_CurrentBindingLayout->GetPipelineLayout(), 0,
 			static_cast<uint32_t>(sets.size()), sets.data(),
 			static_cast<uint32_t>(m_DynamicOffsets.size()), m_DynamicOffsets.data());
+		m_GraphicsContext->m_Set0Frames->RecordDescriptorBind(
+			m_GraphicsContext->m_FrameSlotIndex, reusedSnapshot);
 		return true;
 	}
 
