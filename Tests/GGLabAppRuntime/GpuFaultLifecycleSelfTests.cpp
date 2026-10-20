@@ -2,6 +2,7 @@
 #include "ApplicationInput.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
+#include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -10,6 +11,8 @@
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -43,6 +46,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -62,6 +66,21 @@ namespace gglab
 			DeviceLost,
 			Timeout,
 			Failed,
+		};
+
+		enum class FrameEndInjection
+		{
+			Completed,
+			FatalFenced,
+			FatalUnfenced,
+			RecordingFailure,
+		};
+
+		enum class AbortInjection
+		{
+			Unfenced,
+			Fenced,
+			CompletionUnknown,
 		};
 
 		// Only the backend is simulated. Renderer, graph, capture, IBL, upload scheduler,
@@ -89,6 +108,22 @@ namespace gglab
 			std::atomic<uint32_t> m_ImageEncodes = 0;
 			uint32_t m_QuarantinedPages = 0;
 			RHIFencePoint m_ReadbackFence{};
+			FrameEndInjection m_FrameEndInjection = FrameEndInjection::Completed;
+			AbortInjection m_AbortInjection = AbortInjection::Unfenced;
+			bool m_RejectUploadWait = false;
+			bool m_QueueExport = false;
+			bool m_EnableTemporalHistory = false;
+			uint32_t m_FrameBegins = 0;
+			uint32_t m_FrameEnds = 0;
+			uint32_t m_FrameAborts = 0;
+			uint32_t m_GraphBuilds = 0;
+			uint32_t m_GraphExecutions = 0;
+			uint32_t m_SubmittedCallbacks = 0;
+			uint32_t m_RejectedUploadWaits = 0;
+			RHIFencePoint m_LastEndFence{};
+			RHIFencePoint m_LastAbortFence{};
+			FrameCaptureControlBase* m_CaptureControl = nullptr;
+			uint64_t m_ExportRequest = 0;
 
 			void Record(std::string_view event) const
 			{
@@ -174,7 +209,11 @@ namespace gglab
 				const auto found = m_Buffers.find(handle);
 				return found != m_Buffers.end() && Test(found->second.m_Desc.m_CreateFlags, RHIBufferCreateFlags::UploadStorage);
 			}
-			bool IsAlive(RHITextureHandle handle) const noexcept override { return m_Textures.contains(handle); }
+			bool IsAlive(RHITextureHandle handle) const noexcept override
+			{
+				// The simulated swap chain owns its back buffer for the context's lifetime.
+				return handle == RHITextureHandle{ 100000, 1 } || m_Textures.contains(handle);
+			}
 			bool IsAlive(RHIBufferHandle handle) const noexcept override { return m_Buffers.contains(handle); }
 			bool IsAlive(RHISamplerHandle handle) const noexcept override { return handle.IsValid(); }
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
@@ -395,10 +434,16 @@ namespace gglab
 				m_Frame.m_Batch->Attach(m_Frame.m_Writer);
 				m_Frame.m_Graphics.SetWriter(&m_Frame.m_Writer);
 				m_Frame.m_Compute.SetWriter(&m_Frame.m_Writer);
+				++m_Probe.m_FrameBegins;
 				return RHIFrameBeginResult::Ready(m_Frame);
 			}
 			RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override
 			{
+				++m_Probe.m_FrameEnds;
+				if (m_Probe.m_FrameEndInjection == FrameEndInjection::RecordingFailure)
+				{
+					return AbortFrame(m_Frame);
+				}
 				const bool published = m_Frame.m_Batch->Publish();
 				GGLAB_ASSERT(published);
 				if (!published)
@@ -406,8 +451,10 @@ namespace gglab
 					return AbortFrame(m_Frame);
 				}
 				++m_Probe.m_FrameSubmits;
+				const bool verifiedIdleFailure = m_Probe.m_FrameEndInjection == FrameEndInjection::FatalUnfenced;
 				const RHISubmittedStream stream{ RHISubmitEffect::Accepted,
-					m_Probe.m_Inject ? RHIFencePoint{} : RHIFencePoint{ RHIFenceHandle{ 1, 1 }, m_Probe.m_FrameSubmits } };
+					m_Probe.m_Inject || verifiedIdleFailure ?
+						RHIFencePoint{} : RHIFencePoint{ RHIFenceHandle{ 1, 1 }, ++m_NextGraphicsFence } };
 				if (m_Probe.m_Inject)
 				{
 					m_Probe.m_Faulted = true;
@@ -420,23 +467,68 @@ namespace gglab
 							m_Probe.Record("invalid_fence_wait");
 							return RHIGpuWaitResult::Failed;
 						},
-					.m_WaitIdle = [&]() { return WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds); } };
+					.m_WaitIdle = [&]()
+						{
+							if (verifiedIdleFailure)
+							{
+								++m_Probe.m_IdleCalls;
+								m_Uploads.ReleaseQuarantinedAfterVerifiedIdle();
+								return RHIGpuWaitResult::Completed;
+							}
+							return WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
+						} };
 				const auto resolved = ResolveFrameSubmission(
 					std::span(&stream, 1), *m_Frame.m_Batch, verification);
 				m_Probe.m_QuarantinedPages = static_cast<uint32_t>(m_Uploads.GetQuarantinedPageCount());
 				FinishFrame();
+				m_Probe.m_LastEndFence = resolved.m_Fence;
+				if (!m_Probe.m_Inject && m_Probe.m_FrameEndInjection != FrameEndInjection::Completed)
+				{
+					return RHIFrameEndResult::Fatal(resolved.m_Fence);
+				}
 				return resolved.m_State == RHIFrameSubmissionState::CompletionUnknown ?
 					RHIFrameEndResult::FatalCompletionUnknown() :
 					RHIFrameEndResult::Completed(resolved.m_Fence);
 			}
 			RHIFrameEndResult AbortFrame(RHIFrameContext&) noexcept override
 			{
-				m_Frame.m_Batch->Cancel();
+				++m_Probe.m_FrameAborts;
+				RHIFrameEndResult result = RHIFrameEndResult::Fatal();
+				if (m_Probe.m_AbortInjection == AbortInjection::CompletionUnknown)
+				{
+					// The abort's retirement signal is accepted without a verifiable fence.
+					// The frame's recorded graphics/compute command lists are not executed.
+					m_Probe.m_Faulted = true;
+					m_Probe.m_SafeToRelease = false;
+					const RHISubmittedStream retirement{ RHISubmitEffect::Accepted, {} };
+					const auto resolved = ResolveFrameSubmission(std::span(&retirement, 1),
+						*m_Frame.m_Batch, { .m_WaitIdle = [&]()
+							{
+								return WaitIdleFor(RHIFrameVerificationTimeoutMilliseconds);
+							} });
+					GGLAB_ASSERT(resolved.m_State == RHIFrameSubmissionState::CompletionUnknown);
+					result = RHIFrameEndResult::FatalCompletionUnknown();
+				}
+				else
+				{
+					m_Frame.m_Batch->Cancel();
+					if (m_Probe.m_AbortInjection == AbortInjection::Fenced)
+					{
+						m_Probe.m_LastAbortFence = { RHIFenceHandle{ 1, 1 },
+							++m_NextGraphicsFence };
+						result = RHIFrameEndResult::Fatal(m_Probe.m_LastAbortFence);
+					}
+				}
 				FinishFrame();
-				return RHIFrameEndResult::Fatal();
+				return result;
 			}
 			bool WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override
 			{
+				if (m_Probe.m_RejectUploadWait)
+				{
+					++m_Probe.m_RejectedUploadWaits;
+					return false;
+				}
 				if (m_Probe.m_Faulted)
 				{
 					++m_Probe.m_FenceWaitsAfterFault;
@@ -488,6 +580,7 @@ namespace gglab
 			FaultSwapChain m_SwapChain;
 			RHIUploadPool m_Uploads;
 			FaultFrame m_Frame;
+			uint64_t m_NextGraphicsFence = 0;
 		};
 		class FaultFactory final : public RHIContextFactoryBase
 		{
@@ -501,9 +594,21 @@ namespace gglab
 		class FaultPipeline final : public RenderPipelineBase
 		{
 		public:
+			explicit FaultPipeline(LifetimeProbe& probe) : m_Probe(probe) {}
 			std::string_view GetName() const noexcept override { return "FaultLifecycle.Pipeline"; }
+			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
+			{
+				auto plan = RenderPipelineBase::ResolveTemporalFramePlan(info);
+				if (m_Probe.m_EnableTemporalHistory)
+				{
+					// A synthetic history producer exercises the real temporal owner without a shader.
+					plan.m_Services |= TemporalService::ColorDepthHistory | TemporalService::FrameContinuity;
+				}
+				return plan;
+			}
 			void BuildRenderGraph(RenderGraph& graph, const RenderFrameContext& frame, const RenderServices& services) noexcept override
 			{
+				++m_Probe.m_GraphBuilds;
 				struct Data
 				{
 					RGTextureId m_Texture;
@@ -520,8 +625,9 @@ namespace gglab
 						builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(frame.GetDisplayViewId()).m_BackBuffer = data.m_Texture;
 					},
-					[](RGExecuteContext& execute, Data& data)
+					[this](RGExecuteContext& execute, Data& data)
 					{
+						++m_Probe.m_GraphExecutions;
 						const RHIRenderingAttachment attachment{ .m_View = execute.GetViewHandle(data.m_View) };
 						auto* commands = execute.GetGraphicsCommandContext();
 						commands->BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) });
@@ -531,14 +637,47 @@ namespace gglab
 				m_IBL->AddPass(graph, frame, services);
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Scene);
 				m_IBL->AddFinishPass(graph);
+				if (m_Probe.m_EnableTemporalHistory)
+				{
+					struct HistoryData
+					{
+						TemporalHistoryRenderGraphResources m_History;
+					};
+					graph.AddPass<HistoryData>("FaultLifecycle.History",
+						[&](RenderGraph::RGBuilder& builder, HistoryData& data)
+						{
+							auto& transaction = *frame.m_TemporalFrameTransaction;
+							const bool imported = transaction.ImportHistoryResources(builder, data.m_History);
+							GGLAB_ASSERT(imported);
+							if (!imported)
+							{
+								return;
+							}
+							builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+							builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+							builder.WriteInPlace(data.m_History.m_NextReliability, RGTextureAccess::StorageWrite);
+							const bool exported = transaction.ExportHistoryResources(builder, data.m_History);
+							GGLAB_ASSERT(exported);
+							GGLAB_UNUSED(exported);
+						});
+				}
+				if (m_Probe.m_QueueExport)
+				{
+					m_Probe.m_QueueExport = false;
+					m_Probe.m_ExportRequest = m_Probe.m_CaptureControl->RequestResourceExport(
+						{ { .m_Resource = "FaultLifecycle.Color" } }, 0, true);
+				}
 			}
 		private:
+			LifetimeProbe& m_Probe;
 			std::unique_ptr<IBLGraphSetupPass> m_IBL = CreateIBLGraphSetupPass();
 		};
 		class FaultDemo final : public DemoBase
 		{
 		public:
-			explicit FaultDemo(const DemoCreateInfo& info) : m_CameraOwner(info) {}
+			explicit FaultDemo(const DemoCreateInfo& info) : m_CameraOwner(info),
+				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe),
+				m_Pipeline(m_Probe) {}
 			std::string_view GetName() const noexcept override { return "FaultLifecycle.Demo"; }
 			void Update() noexcept override { m_CameraOwner.Update(); }
 			World& GetWorld() noexcept override { return m_CameraOwner.GetWorld(); }
@@ -547,8 +686,10 @@ namespace gglab
 			CameraRig& GetCameraRig() noexcept override { return m_CameraOwner.GetCameraRig(); }
 			const ViewRenderProfile& GetViewRenderProfile() const noexcept override { return m_CameraOwner.GetViewRenderProfile(); }
 			RenderPipelineBase& GetRenderPipeline() noexcept override { return m_Pipeline; }
+			void OnFrameSubmitted(const DemoFrameFeedback&) noexcept override { ++m_Probe.m_SubmittedCallbacks; }
 		private:
 			DemoLoadingShell m_CameraOwner;
+			LifetimeProbe& m_Probe;
 			FaultPipeline m_Pipeline;
 		};
 		std::unique_ptr<DemoBase> CreateFaultDemo(const DemoCreateInfo& info, const LabStartupSelection&, std::span<const LabRegistration>) noexcept { return std::make_unique<FaultDemo>(info); }
@@ -591,6 +732,312 @@ namespace gglab
 				WriteBytes(path.m_Path, SerializeShaderProgramRegistryArtifact(registry.m_Artifact)) ?
 				ref :
 				ShaderProgramRegistryArtifactRef{};
+		}
+
+		bool InitializeOutcomeRuntime(SelfTestContext& checks, GGLabAppRuntime& runtime,
+			FaultFactory& factory, ApplicationInput& input, LifetimeProbe& probe,
+			const std::filesystem::path& root)
+		{
+			probe.m_EnableTemporalHistory = true;
+			const GGLabAppRuntimeCreateInfo info{
+				.m_Config = { .m_RhiBackend = AppRuntimeRHIBackend::DX12,
+					.m_StartupDemoId = "FaultLifecycle.Demo", .m_InitialExtent = { 32, 32 } },
+				.m_Paths = { .m_RuntimeRoot = root, .m_AssetRoot = root / "Assets",
+					.m_ShaderArtifactRoot = root / "Shaders", .m_IblDerivedDataRoot = root / "IBL",
+					.m_TextureDerivedDataRoot = root / "Texture", .m_EnvironmentAssetRoot = root / "Environment",
+					.m_SettingsRoot = root / "Settings", .m_CaptureRoot = root / "Captures" } };
+			ApplicationContentRegistration content;
+			content.m_Demos.push_back({ .m_Id = "FaultLifecycle.Demo", .m_Factory = &CreateFaultDemo });
+			const auto registry = WriteShaderFixtures(info.m_Paths.m_ShaderArtifactRoot);
+			const bool initialized = runtime.Initialize(info) == AppRuntimeInitializeResult::Succeeded &&
+				runtime.InitializeServices({ .m_RHIContextFactory = &factory, .m_Input = &input,
+					.m_ContentRegistration = std::move(content), .m_WindowWidth = 32, .m_WindowHeight = 32,
+					.m_ShaderArtifactRoot = info.m_Paths.m_ShaderArtifactRoot,
+					.m_ActiveShaderRegistry = registry }) == AppRuntimeServiceInitializeResult::Succeeded;
+			checks.Check(initialized, "Frame outcome harness initializes production AppRuntime services");
+			if (!initialized)
+			{
+				return false;
+			}
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (!runtime.GetShaderManager()->GetPreloadStatus().IsReady() &&
+				std::chrono::steady_clock::now() < deadline)
+			{
+				runtime.GetTaskSystem()->PumpCompletions();
+				std::this_thread::yield();
+			}
+			while (probe.m_GraphExecutions == 0 && std::chrono::steady_clock::now() < deadline)
+			{
+				if (runtime.Tick() != AppRuntimeTickResult::Continue)
+				{
+					break;
+				}
+				std::this_thread::yield();
+			}
+			probe.m_CaptureControl = runtime.GetRenderHost()->GetFrameCaptureControl();
+			checks.Check(probe.m_GraphExecutions > 0 && probe.m_SubmittedCallbacks > 0,
+				"The outcome harness reaches its production content and submission hook before injection");
+			return probe.m_GraphExecutions > 0;
+		}
+
+		enum class HostFrameAction
+		{
+			Submit,
+			DiscardAfterBuild,
+			DiscardAfterRecording,
+			RejectUploadOrder,
+		};
+
+		RHIFrameEndResult RunOutcomeHostFrame(SelfTestContext& checks, GGLabAppRuntime& runtime,
+			LifetimeProbe& probe, HostFrameAction action)
+		{
+			auto& host = *runtime.GetRenderHost();
+			auto& demo = *runtime.GetDemoManager()->GetActiveDemo();
+			// Keep the graph alive until the RenderFrame's RAII abort has settled it.
+			RenderGraph graph(host.CreateRenderGraphCreateInfo());
+			auto frame = host.BeginFrame();
+			checks.Check(frame.IsReady(), "The production Renderer begins the outcome test frame");
+			if (!frame.IsReady())
+			{
+				return RHIFrameEndResult::Fatal();
+			}
+			const auto resolution = ResolveNativeViewResolution({ 32, 32 });
+			auto settings = ResolveViewRenderSettings(demo.GetViewRenderProfile(), demo.GetCamera());
+			settings.m_TemporalAA.m_Enabled = false;
+			settings.m_Lighting.m_GTAO.m_Enabled = false;
+			const auto compatibility = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics().m_Compatibility;
+			const ResolvedTemporalFramePlan plan{ .m_DisplayViewId = RenderViewID::Main,
+				.m_Services = TemporalService::ColorDepthHistory | TemporalService::FrameContinuity,
+				.m_ResetIdentity = compatibility.m_ResetIdentity,
+				.m_SessionIdentity = compatibility.m_SessionIdentity };
+			auto& temporal = host.BeginTemporalFrame(
+				frame, plan, resolution, settings.m_Exposure.m_PreExposure, std::nullopt);
+			ShadowVisualizationSettings shadows;
+			auto built = host.BuildFrame({ .m_World = demo.GetWorld(), .m_CameraRig = demo.GetCameraRig(),
+				.m_ViewRenderProfile = demo.GetViewRenderProfile(), .m_ShadowVisualizationSettings = shadows,
+				.m_DisplayViewSettings = settings, .m_TemporalFramePlan = plan,
+				.m_TemporalFrameTransaction = temporal, .m_ViewResolution = resolution,
+				.m_FrameSlotIndex = frame.GetFrameSlotIndex(), .m_BackBufferIndex = frame.GetBackBufferIndex(),
+				.m_FrameSerial = frame.GetSerial() });
+			auto context = built.MakeRenderFrameContext();
+			demo.GetRenderPipeline().BuildRenderGraph(graph, context, runtime.GetRenderServices());
+			const bool compiled = graph.Compile();
+			checks.Check(compiled, "The outcome test compiles the production content graph");
+			if (!compiled || action == HostFrameAction::DiscardAfterBuild)
+			{
+				return RHIFrameEndResult::Fatal();
+			}
+			probe.m_RejectUploadWait = action == HostFrameAction::RejectUploadOrder;
+			host.Render(frame, graph, context);
+			if (action == HostFrameAction::DiscardAfterRecording)
+			{
+				return RHIFrameEndResult::Fatal();
+			}
+			return host.EndFrame(frame);
+		}
+
+		bool HasOutcomeTextureState(GGLabAppRuntime& runtime, TransientPoolSlotState state,
+			const RHIFencePoint& fence)
+		{
+			TransientResourcePoolSnapshot snapshot;
+			BuildTransientResourcePoolSnapshot(
+				*runtime.GetRenderHost()->CreateRenderGraphCreateInfo().m_TransientResourcePool, snapshot);
+			return std::ranges::any_of(snapshot.m_Textures, [&](const TransientTextureSlotSnapshot& slot)
+				{
+					return slot.m_LogicalName == "FaultLifecycle.Color" && slot.m_State == state &&
+						slot.m_RetirementFence == fence;
+				});
+		}
+
+		void RunEndFrameOutcomeScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			FrameEndInjection injection, AbortInjection abort)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			const auto previousFence = runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint();
+			const uint32_t callbacks = probe.m_SubmittedCallbacks;
+			const uint32_t ends = probe.m_FrameEnds;
+			const uint32_t aborts = probe.m_FrameAborts;
+			const uint64_t capture = probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene);
+			probe.m_FrameEndInjection = injection;
+			probe.m_AbortInjection = abort;
+			const bool submitted = injection == FrameEndInjection::Completed;
+			checks.Check(runtime.Tick() == (submitted ? AppRuntimeTickResult::Continue : AppRuntimeTickResult::Fatal) &&
+				probe.m_FrameEnds == ends + 1 &&
+				probe.m_FrameAborts == aborts + (injection == FrameEndInjection::RecordingFailure ? 1u : 0u) &&
+				probe.m_SubmittedCallbacks == callbacks + (submitted ? 1u : 0u),
+				"The production host accepts only Completed and runs no submission hooks after any EndFrame Fatal");
+			const RHIFencePoint frameFence = injection == FrameEndInjection::RecordingFailure ?
+				probe.m_LastAbortFence : probe.m_LastEndFence;
+			const auto expectedFence = frameFence.IsValid() ? frameFence : previousFence;
+			checks.Check(runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
+				HasOutcomeTextureState(runtime, TransientPoolSlotState::PendingRetirement, expectedFence),
+				"Submitted and Failed retire the recorded graph on the returned fence or the previous retention fence");
+			std::vector<FrameCaptureResult> results;
+			probe.m_CaptureControl->ConsumeResults(results);
+			checks.Check(capture != 0 && results.size() == 1 && results[0].m_RequestId == capture &&
+				results[0].m_Status == (submitted ? FrameCaptureStatus::Completed : FrameCaptureStatus::Failed) &&
+				bool(results[0].m_Image) == submitted,
+				"EndFrame Fatal fails the capture once, including fenceless and RHI-internal abort failures");
+			const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			checks.Check(submitted ?
+				temporal.m_HistoryValid && temporal.m_LastCommitted.m_GraphicsFence == frameFence :
+				!temporal.m_HasActiveHistory &&
+					temporal.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission,
+				"Submitted commits temporal history on its fence; every EndFrame failure invalidates it");
+			if (!submitted)
+			{
+				const uint32_t begins = probe.m_FrameBegins;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal && probe.m_FrameBegins == begins,
+					"The failed production host begins no follow-up frame");
+			}
+			runtime.Shutdown();
+			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0,
+				"Known-completion outcome teardown finalizes the backend once without early release");
+		}
+
+		void RunDiscardOutcomeScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			HostFrameAction action, AbortInjection abort)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			if (action == HostFrameAction::RejectUploadOrder)
+			{
+				// Force a real scene-table transfer so Renderer::Render must order after it.
+				auto& registry = runtime.GetDemoManager()->GetActiveDemo()->GetWorld().GetRegistry();
+				const auto light = registry.create();
+				registry.emplace<components::TransformComponent>(light);
+				registry.emplace<components::LightComponent>(light);
+			}
+			const auto previousFence = runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint();
+			const uint32_t ends = probe.m_FrameEnds;
+			const uint32_t aborts = probe.m_FrameAborts;
+			const uint32_t executions = probe.m_GraphExecutions;
+			const auto previousTemporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			const uint64_t capture = probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene);
+			probe.m_AbortInjection = abort;
+			GGLAB_UNUSED(RunOutcomeHostFrame(checks, runtime, probe, action));
+			probe.m_RejectUploadWait = false;
+			const bool recorded = action == HostFrameAction::DiscardAfterRecording;
+			checks.Check(probe.m_FrameEnds == ends && probe.m_FrameAborts == aborts + 1 &&
+				probe.m_GraphExecutions == executions + (recorded ? 1u : 0u) &&
+				(action != HostFrameAction::RejectUploadOrder || probe.m_RejectedUploadWaits >= 1),
+				"Build deferral, upload-order failure and recorded RAII abort each settle through RHI AbortFrame once");
+			const bool unknown = abort == AbortInjection::CompletionUnknown;
+			const auto expectedFence = probe.m_LastAbortFence.IsValid() ? probe.m_LastAbortFence : previousFence;
+			checks.Check(runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
+				(unknown ? !recorded || HasOutcomeTextureState(runtime, TransientPoolSlotState::Leased, {}) :
+					!recorded || HasOutcomeTextureState(runtime, TransientPoolSlotState::PendingRetirement, expectedFence)),
+				"Renderer abort preserves the previous fence, adopts a retirement fence, or retains unknown work");
+			std::vector<FrameCaptureResult> results;
+			probe.m_CaptureControl->ConsumeResults(results);
+			if (unknown)
+			{
+				checks.Check(results.size() == 1 && results[0].m_RequestId == capture &&
+					results[0].m_Status == FrameCaptureStatus::Failed && !results[0].m_Image &&
+					probe.m_ReadbackMaps == 0 && probe.m_EarlyDestructions == 0 &&
+					runtime.GetRenderHost()->BeginFrame().IsFatal(),
+					"AbortFrame CompletionUnknown fails capture unread and poisons the real Renderer");
+			}
+			else
+			{
+				const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+				checks.Check(results.empty() && probe.m_CaptureControl->GetUnfinishedRequestCount() == 1 &&
+					temporal.m_ResetCount == previousTemporal.m_ResetCount && temporal.m_HistoryValid &&
+					temporal.m_ReadIndex == previousTemporal.m_ReadIndex &&
+					temporal.m_LastCommitted.m_GraphicsFence == previousTemporal.m_LastCommitted.m_GraphicsFence,
+					"Discarded requeues flexible captures and preserves the previously committed temporal history");
+				probe.m_AbortInjection = AbortInjection::Unfenced;
+				const auto next = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
+				probe.m_CaptureControl->ConsumeResults(results);
+				checks.Check(next.IsCompleted() && results.size() == 1 && results[0].m_RequestId == capture &&
+					results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Image,
+					"The next submitted frame fulfills the original requeued request exactly once");
+			}
+			runtime.Shutdown();
+			checks.Check(probe.m_ContextDestructions == 1 && probe.m_SafeToRelease &&
+				probe.m_EarlyDestructions == 0 && probe.m_LateSubmits == 0,
+				"Abort outcome teardown verifies quiescence before releasing retained GPU owners");
+		}
+
+		void RunExportDeferralOutcomeScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			// Retain completed CPU payloads to fill the real capture service's shared budget.
+			std::vector<FrameCaptureResult> held;
+			for (uint32_t index = 0; index < 8; ++index)
+			{
+				GGLAB_UNUSED(probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene));
+				GGLAB_UNUSED(RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit));
+				probe.m_CaptureControl->ConsumeResults(held);
+			}
+			checks.Check(held.size() == 8 && probe.m_CaptureControl->GetResourceExportFrameAvailability() ==
+				FrameCaptureAvailability::Busy, "Eight held production payloads create genuine export backpressure");
+			const uint32_t builds = probe.m_GraphBuilds;
+			const uint32_t executions = probe.m_GraphExecutions;
+			const uint32_t ends = probe.m_FrameEnds;
+			const uint32_t aborts = probe.m_FrameAborts;
+			const uint32_t callbacks = probe.m_SubmittedCallbacks;
+			probe.m_QueueExport = true;
+			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_ExportRequest != 0 &&
+				probe.m_GraphBuilds == builds + 1 && probe.m_GraphExecutions == executions &&
+				probe.m_FrameEnds == ends && probe.m_FrameAborts == aborts + 1 &&
+				probe.m_SubmittedCallbacks == callbacks,
+				"Production AppRuntime export deferral aborts after graph build without recording or submitting");
+			held.clear();
+			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_FrameEnds == ends + 1 &&
+				probe.m_SubmittedCallbacks == callbacks + 1,
+				"Production AppRuntime continues with one successful frame after export pressure clears");
+			std::vector<FrameCaptureResult> results;
+			probe.m_CaptureControl->ConsumeResults(results);
+			checks.Check(results.size() == 1 && results[0].m_RequestId == probe.m_ExportRequest &&
+				results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Resources,
+				"The deferred resource request is fulfilled by the follow-up frame exactly once");
+			runtime.Shutdown();
+		}
+
+		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
+				FrameEndInjection::FatalUnfenced, FrameEndInjection::RecordingFailure })
+			{
+				RunEndFrameOutcomeScenario(checks, root / ("end-" + std::to_string(static_cast<int>(injection))),
+					injection, AbortInjection::Unfenced);
+			}
+			RunEndFrameOutcomeScenario(checks, root / "internal-abort-fenced",
+				FrameEndInjection::RecordingFailure, AbortInjection::Fenced);
+			for (const auto action : { HostFrameAction::DiscardAfterBuild,
+				HostFrameAction::DiscardAfterRecording, HostFrameAction::RejectUploadOrder })
+			{
+				for (const auto abort : { AbortInjection::Unfenced, AbortInjection::Fenced })
+				{
+					const auto name = "abort-" + std::to_string(static_cast<int>(action)) +
+						"-" + std::to_string(static_cast<int>(abort));
+					RunDiscardOutcomeScenario(checks, root / name, action, abort);
+				}
+			}
+			RunDiscardOutcomeScenario(checks, root / "abort-unknown", HostFrameAction::DiscardAfterRecording,
+				AbortInjection::CompletionUnknown);
+			RunExportDeferralOutcomeScenario(checks, root / "export-deferral");
 		}
 
 		void RunScenario(SelfTestContext& checks, LifetimeProbe& probe, const std::filesystem::path& root)
@@ -742,6 +1189,7 @@ namespace gglab
 		const auto root = std::filesystem::temp_directory_path() /
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		RunFrameOutcomeScenarios(context, root / "outcomes");
 		for (const auto outcome : { TeardownOutcome::Completed, TeardownOutcome::DeviceLost })
 		{
 			LifetimeProbe probe;

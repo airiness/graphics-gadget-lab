@@ -53,6 +53,7 @@ namespace gglab
 	class TemporalHistoryManager;
 	class TemporalReferenceAccumulator;
 	class GTAOTemporalHistory;
+	struct RenderFrameOutcome;
 
 	class Renderer : public RenderHost,
 		public RenderFrameBufferAccess,
@@ -315,8 +316,7 @@ namespace gglab
 		void InitializeGpuBuffers() noexcept;
 		void AbortFrame(uint64_t frameSerial) noexcept override;
 		[[nodiscard]] RHIFrameEndResult AbortActiveFrame(uint64_t frameSerial) noexcept;
-		// Ends a frame whose work may still execute without releasing anything it can read.
-		void RetainCompletionUnknownFrame() noexcept;
+		void SettleFrame(const RenderFrameOutcome& outcome) noexcept;
 		// Leaks every GPU-visible owner when teardown cannot verify idle on a live device.
 		void AbandonGpuOwners() noexcept;
 		void EndFrameLifetime() noexcept;

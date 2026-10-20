@@ -1259,6 +1259,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h">
       <Filter>Private\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameOutcome.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.h">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClInclude>

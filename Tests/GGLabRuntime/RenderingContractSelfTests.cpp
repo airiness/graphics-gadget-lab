@@ -48,6 +48,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/RenderFrameOutcome.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderMaterialFrameCache.h"
@@ -2831,6 +2832,39 @@ namespace gglab
 				device.m_CompletedFenceValue = independentFence.m_Value;
 				pool.ReclaimCompleted();
 			}
+		}
+
+		void RunRenderFrameOutcomeContractTests(SelfTestContext& context) noexcept
+		{
+			const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 42 };
+			struct Case
+			{
+				RenderFrameEndPath m_Path;
+				RHIFrameEndResult m_Result;
+				RenderFrameOutcomeKind m_Expected;
+				std::string_view m_Description;
+			};
+			const std::array cases
+			{
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::Completed(fence), RenderFrameOutcomeKind::Submitted, "A completed EndFrame is Submitted with its frame fence" },
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::Fatal(fence), RenderFrameOutcomeKind::Failed, "A fenced EndFrame failure stays Failed even after full submission" },
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::Fatal(), RenderFrameOutcomeKind::Failed, "An unfenced EndFrame failure stays Failed even when work is already idle" },
+				Case{ RenderFrameEndPath::AbortActiveFrame, RHIFrameEndResult::Fatal(fence), RenderFrameOutcomeKind::Discarded, "A fenced Renderer abort is Discarded with its retention fence" },
+				Case{ RenderFrameEndPath::AbortActiveFrame, RHIFrameEndResult::Fatal(), RenderFrameOutcomeKind::Discarded, "An unfenced Renderer abort is Discarded" },
+				Case{ RenderFrameEndPath::EndFrame, RHIFrameEndResult::FatalCompletionUnknown(), RenderFrameOutcomeKind::CompletionUnknown, "Unknown completion overrides the EndFrame path" },
+				Case{ RenderFrameEndPath::AbortActiveFrame, RHIFrameEndResult::FatalCompletionUnknown(), RenderFrameOutcomeKind::CompletionUnknown, "Unknown completion overrides the Renderer abort path" },
+			};
+			uint64_t serial = 100;
+			for (const Case& test : cases)
+			{
+				const auto outcome = ResolveRenderFrameOutcome(test.m_Path, ++serial, test.m_Result);
+				context.Check(outcome.m_Kind == test.m_Expected && outcome.m_FrameSerial == serial &&
+					outcome.m_Fence == test.m_Result.GetSubmittedFence(), test.m_Description);
+			}
+			const auto withoutRHI = ResolveRenderFrameOutcome(RenderFrameEndPath::AbortActiveFrame, ++serial);
+			context.Check(withoutRHI.m_Kind == RenderFrameOutcomeKind::Discarded &&
+				withoutRHI.m_FrameSerial == serial && !withoutRHI.m_Fence.IsValid(),
+				"A Renderer abort without an RHI frame is Discarded without a fence");
 		}
 
 		void RunFrameSubmissionContractTests(SelfTestContext& context) noexcept
@@ -12281,6 +12315,7 @@ namespace gglab
 		RunCheckedCompletionContractTests(context);
 		RunDX12TransferCompletionTests(context);
 		RunFrameSubmissionContractTests(context);
+		RunRenderFrameOutcomeContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunScopedConstantRecordingTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
