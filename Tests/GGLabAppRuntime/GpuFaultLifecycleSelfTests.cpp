@@ -18,6 +18,8 @@
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/ForwardPlusFrameValidation.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
@@ -152,6 +154,14 @@ namespace gglab
 			uint32_t m_LateCommitsRun = 0;
 			bool m_CommitIdentityMatches = true;
 			RenderPresentationAccess* m_Presentation = nullptr;
+			bool m_EnableForwardPlusReadback = false;
+			bool m_ResizeValidation = false;
+			bool m_ObserveForwardPlusQuery = true;
+			std::optional<RHIFenceQueryResult> m_ForwardPlusQuery;
+			RHIFencePoint m_ForwardPlusFence;
+			ForwardPlusDebugReadback* m_ForwardPlusReadback = nullptr;
+			RenderFrameValidationResult m_LastValidation;
+			uint32_t m_ValidationPreparations = 0;
 
 			void Record(std::string_view event) const
 			{
@@ -294,6 +304,14 @@ namespace gglab
 		private:
 			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& point) const noexcept override
 			{
+				if (point == m_Probe.m_ForwardPlusFence && m_Probe.m_ForwardPlusQuery &&
+					!m_Probe.m_SafeToRelease)
+				{
+					const auto result = *m_Probe.m_ForwardPlusQuery;
+					m_Probe.m_Faulted = result != RHIFenceQueryResult::Completed;
+					m_Probe.m_SafeToRelease = result == RHIFenceQueryResult::DeviceLost;
+					return m_Probe.m_ObserveForwardPlusQuery ? ObserveFenceQueryResult(result) : result;
+				}
 				if (HasObservedDeviceLoss())
 				{
 					return RHIFenceQueryResult::DeviceLost;
@@ -674,6 +692,31 @@ namespace gglab
 				}
 				return plan;
 			}
+			RenderFrameValidationResult ValidateRenderFrame(
+				const RenderFrameContext& frame, const RenderServices& services) noexcept override
+			{
+				if (!m_Probe.m_EnableForwardPlusReadback)
+				{
+					return RenderFrameValidationResult::Ready();
+				}
+				// The production recipe needs native shader preparation. This harness uses
+				// its actual slot owner and classifier to drive the production host boundary.
+				const auto completion = m_Readback->ConsumeCompletedSlot(frame.m_FrameSlotIndex);
+				m_Probe.m_LastValidation = ClassifyForwardPlusFrame({
+					.m_ReadbackValidation = completion,
+					.m_PresentationAvailable = true,
+					.m_DisplayExtentMatchesPresentation = !m_Probe.m_ResizeValidation,
+					.m_RenderSceneReady = true,
+					.m_DepthCoverageValid = true,
+					});
+				if (m_Probe.m_LastValidation.IsReady())
+				{
+					++m_Probe.m_ValidationPreparations;
+					m_Readback->Initialize(*services.m_Presentation->GetDevice(), 1);
+					m_Probe.m_ForwardPlusReadback = m_Readback.get();
+				}
+				return m_Probe.m_LastValidation;
+			}
 			void BuildRenderGraph(RenderGraph& graph, const RenderFrameContext& frame, const RenderServices& services) noexcept override
 			{
 				++m_Probe.m_GraphBuilds;
@@ -703,6 +746,20 @@ namespace gglab
 						commands->EndRendering();
 						EnqueueFaultFrameCommits(execute, m_Probe, serial);
 					});
+				if (m_Probe.m_EnableForwardPlusReadback)
+				{
+					const auto generation = m_Readback->GetCurrentGeneration();
+					graph.AddTrivialSideEffectPass("FaultLifecycle.ForwardPlusReadback",
+						[this, slot = frame.m_FrameSlotIndex, generation](RGExecuteContext& execute)
+						{
+							execute.DeferCommit([this, slot, generation](const RGCommitContext& commit) noexcept
+								{
+									m_Readback->MarkScheduled(slot, commit.m_FrameSerial, commit.m_Fence,
+										generation, MakeForwardPlusTileGrid(32, 32), 0, 0);
+									m_Probe.m_ForwardPlusFence = commit.m_Fence;
+								});
+						});
+				}
 				m_IBL->AddPass(graph, frame, services);
 				if (m_Probe.m_EnablePreviewCommits)
 				{
@@ -770,6 +827,7 @@ namespace gglab
 		private:
 			LifetimeProbe& m_Probe;
 			std::unique_ptr<IBLGraphSetupPass> m_IBL = CreateIBLGraphSetupPass();
+			std::unique_ptr<ForwardPlusDebugReadback> m_Readback = std::make_unique<ForwardPlusDebugReadback>();
 		};
 		class FaultDemo final : public DemoBase
 		{
@@ -1285,6 +1343,60 @@ namespace gglab
 				"Late-enqueue teardown neither repeats commits nor releases GPU resources early");
 		}
 
+		void RunForwardPlusValidationScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			RHIFenceQueryResult completion, bool resize, bool nativeQuery)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			probe.m_EnableForwardPlusReadback = true;
+			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue &&
+				probe.m_ForwardPlusFence.IsValid() && probe.m_ForwardPlusReadback->GetScheduledCount() == 1,
+				"The production Renderer adopts a Forward+ readback fence only after Submitted");
+			const auto fence = probe.m_ForwardPlusFence;
+			const auto begins = probe.m_FrameBegins;
+			const auto ends = probe.m_FrameEnds;
+			const auto aborts = probe.m_FrameAborts;
+			const auto builds = probe.m_GraphBuilds;
+			const auto executions = probe.m_GraphExecutions;
+			const auto submits = probe.m_FrameSubmits;
+			const auto maps = probe.m_ReadbackMaps;
+			const auto preparations = probe.m_ValidationPreparations;
+			probe.m_SafeToRelease = false;
+			probe.m_ForwardPlusQuery = completion;
+			probe.m_ObserveForwardPlusQuery = nativeQuery;
+			probe.m_ResizeValidation = resize;
+			if (completion == RHIFenceQueryResult::DeviceLost)
+			{
+				probe.m_Outcome = TeardownOutcome::DeviceLost;
+			}
+			checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal &&
+				probe.m_FrameBegins == begins + 1 && probe.m_FrameEnds == ends &&
+				probe.m_FrameAborts == aborts + 1 && probe.m_GraphBuilds == builds &&
+				probe.m_GraphExecutions == executions && probe.m_FrameSubmits == submits &&
+				probe.m_ReadbackMaps == maps && probe.m_ValidationPreparations == preparations &&
+				probe.m_ForwardPlusReadback->GetScheduledCount() == 1,
+				"Readback validation fatally aborts the production host before preparation, graph build/compile/execute or resubmission");
+			checks.Check(probe.m_LastValidation.m_Status == (completion == RHIFenceQueryResult::DeviceLost ?
+				RenderFrameValidationStatus::DeviceLost : RenderFrameValidationStatus::ContractFailure) &&
+				probe.m_LastValidation.m_Detail.find("value=" + std::to_string(fence.m_Value)) != std::string::npos &&
+				probe.m_LastValidation.m_Detail.find(completion == RHIFenceQueryResult::DeviceLost ? "DeviceLost" :
+					completion == RHIFenceQueryResult::Pending ? "Pending" :
+					nativeQuery ? "native completion failure" : "rejected query") != std::string::npos,
+				"The host receives the actual Forward+ classifier verdict and original query evidence even during resize");
+			checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal && probe.m_FrameBegins == begins + 1,
+				"Fatal Forward+ validation prevents the next frame from beginning in Debug and Release");
+			runtime.Shutdown();
+			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 &&
+				probe.m_LateSubmits == 0 && probe.m_ReadbackMaps == maps,
+				"Checked idle or confirmed-device-loss teardown releases retained resources without mapping or late submissions");
+		}
+
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
@@ -1475,6 +1587,18 @@ namespace gglab
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		RunFrameOutcomeScenarios(context, root / "outcomes");
+		for (const auto completion : { RHIFenceQueryResult::Pending, RHIFenceQueryResult::Failed,
+			RHIFenceQueryResult::DeviceLost })
+		{
+			for (const bool resize : { false, true })
+			{
+				const auto name = "forward-plus-" + std::to_string(static_cast<int>(completion)) +
+					(resize ? "-resize" : "-ready");
+				RunForwardPlusValidationScenario(context, root / name, completion, resize, true);
+			}
+		}
+		RunForwardPlusValidationScenario(context, root / "forward-plus-rejected",
+			RHIFenceQueryResult::Failed, false, false);
 		for (const auto outcome : { TeardownOutcome::Completed, TeardownOutcome::DeviceLost })
 		{
 			LifetimeProbe probe;

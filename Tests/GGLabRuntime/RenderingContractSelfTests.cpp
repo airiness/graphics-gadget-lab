@@ -580,6 +580,7 @@ namespace gglab
 			using RHIDevice::ObserveGpuWaitResult;
 			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
+				++m_FenceQueryCount;
 				if (m_FenceQueryResult)
 				{
 					// Unobserved results model caller misuse rejected before any native query.
@@ -624,6 +625,7 @@ namespace gglab
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
+			mutable uint32_t m_FenceQueryCount = 0;
 			std::optional<RHIFenceQueryResult> m_FenceQueryResult;
 			bool m_ObserveFenceQueryResult = true;
 			bool m_UseControlledFenceCompletion = false;
@@ -5220,6 +5222,119 @@ namespace gglab
 				"Changed draw demand restarts preparation and a failed PSO cannot report ready");
 		}
 
+		void RunForwardPlusReadbackFenceTests(SelfTestContext& context) noexcept
+		{
+			const RHIFencePoint fence{ RHIFenceHandle{ 19, 3 }, 42 };
+			const auto grid = MakeForwardPlusTileGrid(32, 16);
+			for (const auto completion : { RHIFenceQueryResult::Completed, RHIFenceQueryResult::Pending,
+				RHIFenceQueryResult::Failed, RHIFenceQueryResult::DeviceLost })
+			{
+				for (const bool nativeQuery : { false, true })
+				{
+					RecordingDevice device;
+					device.m_PassConstantsEnabled = true;
+					device.m_FenceQueryResult = completion;
+					device.m_ObserveFenceQueryResult = nativeQuery;
+					auto readback = std::make_shared<ForwardPlusDebugReadback>();
+					readback->Initialize(device, 1);
+					readback->PrepareGridBuffer(device, 0, grid);
+					context.Check(readback->ConsumeCompletedSlot(0).IsReady() &&
+						device.m_PassConstantMapCount == 0 && device.m_FenceQueryCount == 0,
+						"An unscheduled Forward+ slot never queries or maps unsubmitted data");
+					const uint64_t generation = readback->GetCurrentGeneration();
+					readback->MarkScheduled(0, 7, fence, generation, grid, 0, 0);
+					readback->MarkHdrDiffScheduled(0, 7, fence, generation, 32, 16);
+					readback->MarkGridScheduled(0, 7, fence, generation, grid);
+					const auto validation = readback->ConsumeCompletedSlot(0);
+					const bool completed = completion == RHIFenceQueryResult::Completed;
+					const bool lost = completion == RHIFenceQueryResult::DeviceLost;
+					const auto expected = completed ?
+						RenderFrameValidationStatus::Ready :
+						lost ? RenderFrameValidationStatus::DeviceLost : RenderFrameValidationStatus::ContractFailure;
+					ForwardPlusFrameValidationInputs inputs{
+						.m_ReadbackValidation = validation,
+						.m_PresentationAvailable = true,
+						.m_DisplayExtentMatchesPresentation = true,
+						.m_RenderSceneReady = true,
+						.m_DepthCoverageValid = true,
+					};
+					context.Check(ClassifyForwardPlusFrame(inputs).m_Status == expected &&
+						device.m_PassConstantMapCount == (completed ? 3u : 0u),
+						"Only Completed accepts tile, HDR and grid bytes after the frame-slot wait");
+					if (completed)
+					{
+						context.Check(readback->GetLatest().m_FrameSerial == 7 &&
+							readback->GetLatestHdrDiff().m_FrameSerial == 7 && readback->GetLatestGrid(),
+							"All three completed readback decoders publish the submitted frame");
+						continue;
+					}
+					context.Check(validation.m_Detail.find("fence=(19:3), value=42") != std::string::npos &&
+						validation.m_Detail.find(lost ? "DeviceLost" :
+							completion == RHIFenceQueryResult::Pending ? "Pending" :
+							nativeQuery ? "native completion failure" : "rejected query") != std::string::npos,
+						"Fatal diagnostics retain the original queried fence and native-versus-rejected result");
+					inputs.m_DisplayExtentMatchesPresentation = false;
+					context.Check(ClassifyForwardPlusFrame(inputs).m_Status == expected,
+						"Readback failures and confirmed loss take precedence over resize skips");
+					const auto allocations = device.m_PassConstantStorage.size();
+					const auto destructions = device.m_AtmosphereDestroyedBufferCount;
+					readback->InvalidateResults();
+					readback->PrepareGridBuffer(device, 0, MakeForwardPlusTileGrid(64, 64));
+					readback->Initialize(device, 2);
+					readback->MarkScheduled(0, 99, fence, generation, grid, 0, 0);
+					readback->MarkHdrDiffScheduled(0, 99, fence, generation, 64, 64);
+					readback->MarkGridScheduled(0, 99, fence, generation, grid);
+					context.Check(readback->ConsumeCompletedSlot(0).m_Detail == validation.m_Detail &&
+						readback->GetScheduledCount() == 1 && device.m_PassConstantMapCount == 0 &&
+						device.m_PassConstantStorage.size() == allocations &&
+						device.m_AtmosphereDestroyedBufferCount == destructions,
+						"A fatal slot retains its original evidence and cannot map, resize or reschedule");
+					// Empty services deliberately make any presentation access or preparation invalid.
+					RenderPipelineForwardPlus pipeline({ .m_ForwardPlusDebugReadback = readback });
+					const RenderScene scene;
+					const RenderFrameContext frame{ .m_RenderScene = scene };
+					context.Check(pipeline.ValidateRenderFrame(frame, {}).m_Detail == validation.m_Detail,
+						"Production validation checks the readback before presentation, resize or pipeline preparation");
+				}
+			}
+			// A later unresolved fence must prevent mapping an earlier completed readback.
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_UseControlledFenceCompletion = true;
+				device.m_CompletedFenceValue = fence.m_Value;
+				ForwardPlusDebugReadback readback;
+				readback.Initialize(device, 1);
+				readback.PrepareGridBuffer(device, 0, grid);
+				const auto generation = readback.GetCurrentGeneration();
+				readback.MarkScheduled(0, 7, fence, generation, grid, 0, 0);
+				readback.MarkHdrDiffScheduled(0, 7,
+					{ fence.m_Fence, fence.m_Value + 1 }, generation, 32, 16);
+				readback.MarkGridScheduled(0, 7, fence, generation, grid);
+				const auto validation = readback.ConsumeCompletedSlot(0);
+				context.Check(validation.m_Status == RenderFrameValidationStatus::ContractFailure &&
+					validation.m_Detail.find("readback=hdr-diff") != std::string::npos &&
+					device.m_PassConstantMapCount == 0 && device.m_FenceQueryCount == 3,
+					"All adopted fences are checked before mapping any completed tile, HDR or grid bytes");
+			}
+			// Generation filtering cannot erase unresolved fences, and completed stale bytes never map.
+			for (const bool completed : { false, true })
+			{
+				RecordingDevice device;
+				device.m_PassConstantsEnabled = true;
+				device.m_FenceQueryResult = completed ?
+					RHIFenceQueryResult::Completed :
+					RHIFenceQueryResult::Pending;
+				ForwardPlusDebugReadback readback;
+				readback.Initialize(device, 1);
+				readback.MarkScheduled(0, 7, fence, readback.GetCurrentGeneration(), grid, 0, 0);
+				readback.InvalidateResults();
+				context.Check(readback.ConsumeCompletedSlot(0).IsReady() == completed &&
+					device.m_PassConstantMapCount == 0 && !readback.GetLatest().m_IsValid,
+					"Generation filtering follows completion and never maps stale or unresolved bytes");
+			}
+		}
+
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
 			const ForwardPlusFrameValidationInputs ready{
@@ -6120,7 +6235,8 @@ namespace gglab
 			RunRenderViewConventionTests(context);
 			RunSampleableDepthFormatTests(context);
 			RunDepthCoverageContractTests(context);
-			RunForwardPlusContractTests(context);
+			RunForwardPlusReadbackFenceTests(context);
+		RunForwardPlusContractTests(context);
 
 			context.Check(MakeGTAOHalfResolutionExtent(1920, 1080) == GTAOExtent{ 960, 540 } &&
 				MakeGTAOHalfResolutionExtent(1919, 1079) == GTAOExtent{ 960, 540 } &&

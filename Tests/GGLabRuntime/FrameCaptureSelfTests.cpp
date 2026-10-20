@@ -1237,8 +1237,10 @@ namespace gglab
 				auto* mapped = device.MapBuffer(handle, {});
 				std::memcpy(mapped, arrays[1].m_Data.data(), arrays[1].m_Data.size());
 				device.UnmapBuffer(handle, {});
-				debugReadback.MarkGridScheduled(0, 7, grid);
-				debugReadback.ConsumeCompletedSlot(0);
+				debugReadback.MarkGridScheduled(0, 7, MakeFence(3),
+					debugReadback.GetCurrentGeneration(), grid);
+				context.Check(debugReadback.ConsumeCompletedSlot(0).IsReady(),
+					"Completed grid decoding accepts the adopted submission fence");
 				const auto readback = debugReadback.GetLatestGrid();
 				context.Check(readback && readback->m_IsValid && readback->m_Headers.size() == 2 &&
 					std::memcmp(readback->m_Headers.data(), arrays[1].m_Data.data(), arrays[1].m_Data.size()) == 0,

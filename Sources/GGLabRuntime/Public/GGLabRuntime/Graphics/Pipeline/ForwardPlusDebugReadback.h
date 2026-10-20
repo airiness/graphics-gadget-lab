@@ -2,6 +2,8 @@
 
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 #include <array>
 #include <atomic>
@@ -108,12 +110,16 @@ namespace gglab
 		{
 			m_HdrDiffRequested.store(requested, std::memory_order_release);
 		}
-		void ConsumeCompletedSlot(uint32_t bufferIndex) noexcept;
+		// Called only after BeginFrame returned this slot Ready. Verify all adopted
+		// fences before filtering generations or mapping any buffer.
+		[[nodiscard]] RenderFrameValidationResult ConsumeCompletedSlot(uint32_t bufferIndex) noexcept;
 		void MarkScheduled(uint32_t bufferIndex, uint64_t frameSerial,
+			const RHIFencePoint& fence, uint64_t requestGeneration,
 			const ForwardPlusTileGrid& tileGrid, uint32_t tileX, uint32_t tileY) noexcept;
-		void MarkHdrDiffScheduled(uint32_t bufferIndex, uint64_t frameSerial, uint32_t width,
-			uint32_t height) noexcept;
+		void MarkHdrDiffScheduled(uint32_t bufferIndex, uint64_t frameSerial,
+			const RHIFencePoint& fence, uint64_t requestGeneration, uint32_t width, uint32_t height) noexcept;
 		void MarkGridScheduled(uint32_t bufferIndex, uint64_t frameSerial,
+			const RHIFencePoint& fence, uint64_t requestGeneration,
 			const ForwardPlusTileGrid& tileGrid) noexcept;
 		void RecordForwardPlusGpuTiming(uint64_t frameSerial, double cullMilliseconds,
 			double opaqueMilliseconds) noexcept;
@@ -165,6 +171,7 @@ namespace gglab
 	private:
 		struct PendingSlot
 		{
+			RHIFencePoint m_Fence;
 			uint64_t m_FrameSerial = 0;
 			uint64_t m_RequestGeneration = 0;
 			ForwardPlusTileGrid m_TileGrid{};
@@ -175,6 +182,7 @@ namespace gglab
 
 		struct PendingHdrDiffSlot
 		{
+			RHIFencePoint m_Fence;
 			uint64_t m_FrameSerial = 0;
 			uint64_t m_RequestGeneration = 0;
 			uint32_t m_Width = 0;
@@ -184,6 +192,7 @@ namespace gglab
 
 		struct PendingGridSlot
 		{
+			RHIFencePoint m_Fence;
 			uint64_t m_FrameSerial = 0;
 			uint64_t m_RequestGeneration = 0;
 			ForwardPlusTileGrid m_TileGrid{};
@@ -192,6 +201,7 @@ namespace gglab
 
 		void ReleaseBuffers() noexcept;
 
+		RenderFrameValidationResult m_ValidationFailure;
 		RHIDevice* m_Device = nullptr;
 		std::vector<RHIBufferHandle> m_Buffers;
 		std::vector<RHIBufferHandle> m_HdrDiffBuffers;

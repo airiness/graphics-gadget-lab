@@ -72,7 +72,7 @@ namespace gglab
 			uint32_t m_BufferIndex = 0;
 			uint32_t m_TileX = 0;
 			uint32_t m_TileY = 0;
-			uint64_t m_FrameSerial = 0;
+			uint64_t m_RequestGeneration = 0;
 		};
 
 		void AppendBindingSlot(RHIBindingLayoutDesc& desc, RHIBindingType type, uint32_t binding,
@@ -172,7 +172,6 @@ namespace gglab
 			GGLAB_ASSERT_NOT_NULL(rhiContext);
 			GGLAB_ASSERT_NOT_NULL(swapChain);
 			m_DebugReadback->Initialize(*device, rhiContext->GetFrameSlotCount());
-			m_DebugReadback->ConsumeCompletedSlot(context.m_FrameSlotIndex);
 			// The tile grid covers the render extent of the display view.
 			m_DebugReadback->PrepareGridBuffer(*device, context.m_FrameSlotIndex,
 				MakeForwardPlusTileGrid(context.GetDisplayRenderView().m_Width,
@@ -308,10 +307,10 @@ namespace gglab
 
 		const auto debugReadback = m_DebugReadback;
 		const uint32_t bufferIndex = context.m_FrameSlotIndex;
-		const uint64_t frameSerial = context.m_FrameSerial;
+		const uint64_t requestGeneration = debugReadback->GetCurrentGeneration();
 		rg.AddPass<ReadbackPassData>(
 			"Lighting.ForwardPlus.Readback", RGPassEncoderType::Copy,
-			[debugReadback, bufferIndex, frameSerial](
+			[debugReadback, bufferIndex, requestGeneration](
 				RenderGraph::RGBuilder& builder, ReadbackPassData& data)
 			{
 				builder.SideEffect();
@@ -361,7 +360,7 @@ namespace gglab
 				builder.WriteInPlace(
 					data.m_GridReadback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;
-				data.m_FrameSerial = frameSerial;
+				data.m_RequestGeneration = requestGeneration;
 			},
 			[debugReadback](RGExecuteContext& executeContext, ReadbackPassData& data)
 			{
@@ -389,10 +388,16 @@ namespace gglab
 						data.m_TileGrid.m_TileCount),
 					depthRanges, 0, static_cast<uint64_t>(data.m_TileGrid.m_TileCount) *
 					sizeof(ForwardPlusTileDepthRange));
-				debugReadback->MarkScheduled(data.m_BufferIndex, data.m_FrameSerial,
-					data.m_TileGrid, data.m_TileX, data.m_TileY);
-				debugReadback->MarkGridScheduled(
-					data.m_BufferIndex, data.m_FrameSerial, data.m_TileGrid);
+				executeContext.DeferCommit(
+					[readbackOwner = debugReadback.get(), bufferIndex = data.m_BufferIndex,
+					requestGeneration = data.m_RequestGeneration, tileGrid = data.m_TileGrid,
+					tileX = data.m_TileX, tileY = data.m_TileY](const RGCommitContext& commit) noexcept
+					{
+						readbackOwner->MarkScheduled(bufferIndex, commit.m_FrameSerial, commit.m_Fence,
+							requestGeneration, tileGrid, tileX, tileY);
+						readbackOwner->MarkGridScheduled(bufferIndex, commit.m_FrameSerial,
+							commit.m_Fence, requestGeneration, tileGrid);
+					});
 			});
 	}
 
