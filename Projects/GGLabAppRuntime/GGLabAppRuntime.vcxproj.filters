@@ -18,6 +18,15 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureProductEncoder.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePublisher.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureWriter.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
@@ -72,6 +81,15 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureProductEncoder.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePublisher.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureWriter.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.h">
       <Filter>Capture</Filter>
     </ClInclude>

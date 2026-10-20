@@ -1,5 +1,5 @@
 #include "Capture/FrameCaptureCoordinator.h"
-#include "Capture/ResourceExportWriter.h"
+#include "Capture/CaptureWriter.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 
 #include "AppRuntimeLog.h"
@@ -7,21 +7,10 @@
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
-#include <atomic>
 #include <chrono>
-#include <condition_variable>
-#include <deque>
 #include <format>
-#include <fstream>
 #include <limits>
-#include <mutex>
-#include <random>
-#include <span>
-#include <system_error>
-#include <thread>
 #include <utility>
 #include <variant>
 
@@ -29,53 +18,6 @@ namespace gglab
 {
 	namespace
 	{
-		enum class EncodeStage : uint32_t
-		{
-			Queued,
-			Encoding,
-			SerializingGraph,
-			WritingGraph,
-			WritingImage,
-			WritingMetadata,
-			Publishing,
-			Done,
-		};
-
-		[[nodiscard]] const char* GetEncodeStageName(EncodeStage stage) noexcept
-		{
-			switch (stage)
-			{
-			case EncodeStage::Queued:
-				return "queued";
-			case EncodeStage::Encoding:
-				return "encoding";
-			case EncodeStage::SerializingGraph:
-				return "serializing graph";
-			case EncodeStage::WritingGraph:
-				return "writing graph";
-			case EncodeStage::WritingImage:
-				return "writing image";
-			case EncodeStage::WritingMetadata:
-				return "writing metadata";
-			case EncodeStage::Publishing:
-				return "publishing";
-			case EncodeStage::Done:
-				return "done";
-			}
-			return "unknown";
-		}
-
-		// Decides whether a job's files may appear. Shutdown can abandon a job
-		// only before the writer claims publication; abandoned jobs never publish.
-		// If the writer claims publication first, its files may already exist or
-		// appear later even when shutdown reports the unfinished job as failed.
-		enum class PublicationClaim : uint8_t
-		{
-			Open,
-			Publishing,
-			Abandoned,
-		};
-
 		enum class CaptureImageSource : uint8_t
 		{
 			Scene,
@@ -191,55 +133,8 @@ namespace gglab
 		std::optional<FrameAttempt> m_Attempt;
 		// Includes admission failures that occur before an attempt is issued.
 		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
-		std::shared_ptr<EncodeJob> m_WriteJob;
-	};
-
-	struct FrameCaptureCoordinator::EncodeJob
-	{
-		std::shared_ptr<const FrameCaptureImage> m_Image;
-		// Immutable JSON prepared from the fenced Runtime record on the writer thread.
-		std::shared_ptr<const RGSnapshot> m_Graph;
-		std::shared_ptr<const ResourceExportPayload> m_Resources;
-		bool m_ResourceExportActive = false;
-		bool m_GraphSummary = false;
-		uint32_t m_SubmissionFenceIndex = 0;
-		uint32_t m_SubmissionFenceGeneration = 0;
-		uint64_t m_SubmissionFenceValue = 0;
-		std::string m_AdapterCompatibilityIdentity;
-		std::filesystem::path m_Directory;
-		// Preferred file stem; the writer appends a suffix when it is taken.
-		std::string m_BaseStem;
-		// Unique across processes, so concurrent writers never share a
-		// temporary file.
-		std::string m_TemporaryStem;
-		// The writer records the published image file name before serializing.
-		FrameCaptureMetadata m_Metadata;
-		// Published paths, set by the writer before it marks the job done.
-		std::filesystem::path m_ImagePath;
-		std::filesystem::path m_MetadataPath;
-		std::vector<std::filesystem::path> m_ResourcePaths;
-		std::filesystem::path m_GraphPath;
-
-		// Progress is published by the writer for stall and shutdown reports.
-		std::atomic<EncodeStage> m_Stage = EncodeStage::Queued;
-		std::atomic<PublicationClaim> m_Claim = PublicationClaim::Open;
-		std::chrono::steady_clock::time_point m_SubmittedAt{};
-		bool m_StallReported = false;
-
-		std::mutex m_Mutex;
-		std::condition_variable m_Condition;
-		bool m_IsDone = false;
-		std::string m_Failure;
-	};
-
-	// The writer thread holds its own reference, so a writer left blocked in file
-	// I/O at shutdown never touches the destroyed coordinator.
-	struct FrameCaptureCoordinator::WriterState
-	{
-		std::mutex m_Mutex;
-		std::condition_variable m_Condition;
-		std::deque<std::shared_ptr<EncodeJob>> m_Queue;
-		bool m_Stopping = false;
+		std::shared_ptr<CaptureWriteJob> m_WriteJob;
+		std::optional<CaptureWriteReceipt> m_WriteReceipt;
 	};
 
 	namespace
@@ -270,87 +165,6 @@ namespace gglab
 			return failure;
 		}
 
-		// A capture keeps its preferred name unless another capture, possibly of
-		// another process, already published it.
-		constexpr uint32_t MaxPublishAttempts = 1000;
-
-		[[nodiscard]] std::string CreateTemporaryTag() noexcept
-		{
-			uint64_t value = static_cast<uint64_t>(
-				std::chrono::steady_clock::now().time_since_epoch().count());
-			try
-			{
-				std::random_device device;
-				value ^= (static_cast<uint64_t>(device()) << 32) | device();
-			}
-			catch (...)
-			{
-			}
-			return std::format("{:016x}", value);
-		}
-
-		// Writes the whole file, which is published only once it is complete.
-		[[nodiscard]] std::string WriteFileContents(
-			const std::filesystem::path& path, std::span<const uint8_t> bytes,
-			std::span<const uint8_t> tail = {}) noexcept
-		{
-			std::error_code errorCode;
-			std::filesystem::create_directories(path.parent_path(), errorCode);
-			if (!std::filesystem::is_directory(path.parent_path(), errorCode))
-			{
-				return std::format("The output directory '{}' could not be created.",
-					GetFrameCapturePathText(path.parent_path()));
-			}
-
-			std::ofstream file(path, std::ios::binary | std::ios::trunc);
-			file.write(reinterpret_cast<const char*>(bytes.data()),
-				static_cast<std::streamsize>(bytes.size()));
-			if (!tail.empty())
-			{
-				file.write(reinterpret_cast<const char*>(tail.data()), static_cast<std::streamsize>(tail.size()));
-			}
-			file.close();
-			if (!file)
-			{
-				std::filesystem::remove(path, errorCode);
-				return std::format("Writing '{}' failed.", GetFrameCapturePathText(path));
-			}
-			return {};
-		}
-
-		enum class PublishOutcome : uint8_t
-		{
-			Published,
-			NameTaken,
-			Failed,
-		};
-
-		// Publishes a complete temporary file under a name that must not exist yet.
-		// A hard link creates the name only if it is free, so a file of another
-		// writer is never replaced. File systems without hard links fall back to a
-		// rename after checking the name, which a concurrent writer can still race.
-		[[nodiscard]] PublishOutcome PublishNewFile(
-			const std::filesystem::path& temporaryPath, const std::filesystem::path& path) noexcept
-		{
-			std::error_code errorCode;
-			std::filesystem::create_hard_link(temporaryPath, path, errorCode);
-			if (!errorCode)
-			{
-				return PublishOutcome::Published;
-			}
-			if (errorCode == std::errc::file_exists)
-			{
-				return PublishOutcome::NameTaken;
-			}
-			std::error_code existsError;
-			if (std::filesystem::exists(path, existsError))
-			{
-				return PublishOutcome::NameTaken;
-			}
-			std::filesystem::rename(temporaryPath, path, errorCode);
-			return errorCode ? PublishOutcome::Failed : PublishOutcome::Published;
-		}
-
 		[[nodiscard]] std::string SanitizeFileStemComponent(std::string_view value) noexcept
 		{
 			std::string result;
@@ -374,33 +188,16 @@ namespace gglab
 		m_Capture(createInfo.m_Capture),
 		m_NonFiniteWatch(createInfo.m_NonFiniteWatch),
 		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
-		m_ImageEncoder(createInfo.m_ImageEncoder),
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
-		m_WriteOnCallingThread(createInfo.m_WriteOnCallingThread),
-		m_TemporaryTag(CreateTemporaryTag())
+		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
+			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem))
 	{
-		if (m_WriteOnCallingThread)
-		{
-			return;
-		}
-		try
-		{
-			m_Writer = std::make_shared<WriterState>();
-			m_WriterThread = std::thread(&FrameCaptureCoordinator::RunWriter, m_Writer, m_ImageEncoder);
-		}
-		catch (...)
-		{
-			GGLAB_LOG_WARN_ALWAYS(
-				"The frame capture writer thread could not start; captures are written on the frame thread.");
-			m_Writer.reset();
-			m_WriteOnCallingThread = true;
-		}
+		static_assert(MaxInFlightCaptures == CaptureWriter::MaxInFlightJobs);
 	}
 
 	FrameCaptureCoordinator::~FrameCaptureCoordinator()
 	{
 		FinishWriting();
-		StopWriter();
 	}
 
 	FrameCaptureCoordinator::CapturePlan FrameCaptureCoordinator::MakeCapturePlan(
@@ -1283,17 +1080,17 @@ namespace gglab
 			GetFrameCaptureSourceName(metadata.m_Source),
 			SanitizeFileStemComponent(metadata.m_Backend), timestamp, entry.m_Id);
 
-		auto job = std::make_shared<EncodeJob>();
-		job->m_SubmittedAt = std::chrono::steady_clock::now();
-		job->m_Image = result.m_Image;
-		job->m_Graph = result.m_Graph;
-		job->m_Resources = result.m_Resources;
-		job->m_ResourceExportActive = result.m_ResourceExportActive;
-		job->m_GraphSummary = entry.m_Plan.IsGraphSummary();
-		job->m_SubmissionFenceIndex = result.m_SubmissionFenceIndex;
-		job->m_SubmissionFenceGeneration = result.m_SubmissionFenceGeneration;
-		job->m_SubmissionFenceValue = result.m_SubmissionFenceValue;
-		job->m_AdapterCompatibilityIdentity = result.m_AdapterCompatibilityIdentity;
+		auto job = std::make_shared<CaptureWriteJob>();
+		job->m_Products = {
+			.m_Image = result.m_Image,
+			.m_Graph = result.m_Graph,
+			.m_Resources = result.m_Resources,
+			.m_ResourceExportActive = result.m_ResourceExportActive,
+			.m_GraphSummary = entry.m_Plan.IsGraphSummary(),
+			.m_Submission = { result.m_SubmissionFenceIndex, result.m_SubmissionFenceGeneration,
+				result.m_SubmissionFenceValue, result.m_AdapterCompatibilityIdentity },
+			.m_Metadata = metadata,
+		};
 		job->m_Directory = directory;
 		job->m_BaseStem = result.m_Resources ?
 			std::format("{}.{}.resource-export", SanitizeFileStemComponent(subject), metadata.m_FrameSerial) :
@@ -1301,50 +1098,32 @@ namespace gglab
 				std::format("{}.{}.graph{}", SanitizeFileStemComponent(subject), metadata.m_FrameSerial,
 					entry.m_Plan.IsGraphSummary() ? "-summary" : "") :
 				baseStem;
-		job->m_TemporaryStem = std::format("{}.{}.{}", job->m_BaseStem, m_TemporaryTag, entry.m_Id);
-		job->m_Metadata = metadata;
+		job->m_RequestId = entry.m_Id;
 		entry.m_WriteJob = job;
 		entry.m_Phase = Phase::Encoding;
-
-		if (m_WriteOnCallingThread)
+		if (!m_Writer->Submit(std::move(job)))
 		{
-			RunEncodeJob(*job, m_ImageEncoder);
-			return;
+			Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
 		}
-		{
-			std::scoped_lock lock(m_Writer->m_Mutex);
-			// Slots were reserved before capture. All nine may enter the queue before
-			// the writer starts; once it claims one, at most eight remain pending.
-			if (m_Writer->m_Queue.size() >= MaxInFlightCaptures)
-			{
-				Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
-				return;
-			}
-			m_Writer->m_Queue.push_back(std::move(job));
-		}
-		m_Writer->m_Condition.notify_one();
 	}
 
 	bool FrameCaptureCoordinator::TryFinishWritten(CaptureJob& entry) noexcept
 	{
-		EncodeJob& job = *entry.m_WriteJob;
-		std::unique_lock lock(job.m_Mutex);
-		if (!job.m_IsDone)
+		entry.m_WriteReceipt = entry.m_WriteJob->GetReceipt();
+		if (!entry.m_WriteReceipt)
 		{
 			return false;
 		}
-		std::string failure = std::move(job.m_Failure);
-		// Decided before the failure moves into Finish: argument evaluation order
-		// is unspecified, so testing it in the same call could see the moved-from text.
-		const FrameCaptureRequestStatus status = failure.empty() ?
-			FrameCaptureRequestStatus::Completed :
-			FrameCaptureRequestStatus::Failed;
-		if (status == FrameCaptureRequestStatus::Completed)
+		const FrameCaptureRequestStatus status =
+			entry.m_WriteReceipt->m_Publication == CapturePublicationOutcome::Published ?
+				FrameCaptureRequestStatus::Completed :
+				FrameCaptureRequestStatus::Failed;
+		if (status == FrameCaptureRequestStatus::Completed && !entry.m_WriteReceipt->m_ImagePath.empty())
 		{
-			entry.m_Attempt->m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
+			entry.m_Attempt->m_Metadata.m_ImageFile =
+				GetFrameCapturePathText(entry.m_WriteReceipt->m_ImagePath.filename());
 		}
-		lock.unlock();
-		Finish(entry, status, std::move(failure));
+		Finish(entry, status, entry.m_WriteReceipt->m_Failure);
 		return true;
 	}
 
@@ -1356,14 +1135,15 @@ namespace gglab
 			{
 				continue;
 			}
-			EncodeJob& job = *entry.m_WriteJob;
+			CaptureWriteJob& job = *entry.m_WriteJob;
 			if (!job.m_StallReported &&
 				std::chrono::steady_clock::now() - job.m_SubmittedAt >= EncodeStallReportTime)
 			{
 				job.m_StallReported = true;
 				GGLAB_LOG_WARN_ALWAYS(
 					"Frame capture {} has not finished encoding after {} seconds (stage: {}).",
-					entry.m_Id, EncodeStallReportTime.count(), GetEncodeStageName(job.m_Stage));
+					entry.m_Id, EncodeStallReportTime.count(),
+					GetCaptureWriteStageName(job.m_Publication.m_Stage));
 			}
 		}
 	}
@@ -1378,61 +1158,21 @@ namespace gglab
 			{
 				continue;
 			}
-			EncodeJob& job = *entry.m_WriteJob;
-			{
-				std::unique_lock lock(job.m_Mutex);
-				job.m_Condition.wait_until(lock, deadline, [&job]() { return job.m_IsDone; });
-			}
+			entry.m_WriteJob->WaitUntil(deadline);
 			if (TryFinishWritten(entry))
 			{
 				continue;
 			}
-
-			const EncodeStage stage = job.m_Stage;
-			PublicationClaim expected = PublicationClaim::Open;
-			if (job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Abandoned))
+			entry.m_WriteReceipt = m_Writer->Abandon(*entry.m_WriteJob, m_ShutdownWriteTimeout);
+			if (entry.m_WriteReceipt->m_Publication == CapturePublicationOutcome::Published)
 			{
-				m_HasAbandonedJobs = true;
-				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
-					"Writing did not finish within {} ms of shutdown (stage: {}); the capture "
-					"was abandoned and its files are not published.",
-					m_ShutdownWriteTimeout.count(), GetEncodeStageName(stage)));
+				// Completion may race the timeout snapshot. Consume that receipt normally.
+				GGLAB_UNUSED(TryFinishWritten(entry));
 			}
-			else if (!TryFinishWritten(entry))
+			else
 			{
-				// Publication started before the timeout. Its outcome is indeterminate:
-				// files may already exist or appear after this failure is reported.
-				m_HasAbandonedJobs = true;
-				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
-					"Publishing did not finish within {} ms of shutdown; capture publication "
-					"is indeterminate and files may already exist or appear later.",
-					m_ShutdownWriteTimeout.count()));
+				Finish(entry, FrameCaptureRequestStatus::Failed, entry.m_WriteReceipt->m_Failure);
 			}
-		}
-	}
-
-	void FrameCaptureCoordinator::StopWriter() noexcept
-	{
-		if (!m_WriterThread.joinable())
-		{
-			return;
-		}
-		{
-			std::scoped_lock lock(m_Writer->m_Mutex);
-			m_Writer->m_Stopping = true;
-		}
-		m_Writer->m_Condition.notify_all();
-		// File I/O cannot be interrupted. Every capture unfinished at the timeout
-		// already has its failed result, and the writer owns all state it still uses.
-		// A blocked writer is left to finish on its own; jobs that already claimed
-		// publication may still publish files after shutdown reports their failure.
-		if (m_HasAbandonedJobs)
-		{
-			m_WriterThread.detach();
-		}
-		else
-		{
-			m_WriterThread.join();
 		}
 	}
 
@@ -1445,15 +1185,12 @@ namespace gglab
 			.m_Status = status,
 			.m_Failure = std::move(failure),
 		};
-		if (entry.m_WriteJob)
+		if (entry.m_WriteReceipt && status == FrameCaptureRequestStatus::Completed)
 		{
-			if (status == FrameCaptureRequestStatus::Completed)
-			{
-				result.m_ImagePath = entry.m_WriteJob->m_ImagePath;
-				result.m_MetadataPath = entry.m_WriteJob->m_MetadataPath;
-				result.m_ResourcePaths = entry.m_WriteJob->m_ResourcePaths;
-				result.m_GraphPath = entry.m_WriteJob->m_GraphPath;
-			}
+			result.m_ImagePath = entry.m_WriteReceipt->m_ImagePath;
+			result.m_MetadataPath = entry.m_WriteReceipt->m_MetadataPath;
+			result.m_ResourcePaths = entry.m_WriteReceipt->m_ResourcePaths;
+			result.m_GraphPath = entry.m_WriteReceipt->m_GraphPath;
 		}
 		if (entry.m_Phase != Phase::Waiting)
 		{
@@ -1480,341 +1217,5 @@ namespace gglab
 	{
 		std::erase_if(m_Jobs,
 			[](const CaptureJob& entry) { return entry.m_Phase == Phase::Finished; });
-	}
-
-	void FrameCaptureCoordinator::RunWriter(
-		std::shared_ptr<WriterState> state, FrameCaptureImageEncoder encoder) noexcept
-	{
-		while (true)
-		{
-			std::shared_ptr<EncodeJob> job;
-			{
-				std::unique_lock lock(state->m_Mutex);
-				state->m_Condition.wait(lock,
-					[&state]() { return state->m_Stopping || !state->m_Queue.empty(); });
-				if (state->m_Queue.empty())
-				{
-					return;
-				}
-				job = std::move(state->m_Queue.front());
-				state->m_Queue.pop_front();
-			}
-			RunEncodeJob(*job, encoder);
-		}
-	}
-
-	void FrameCaptureCoordinator::RunEncodeJob(
-		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
-	{
-		// A job abandoned while it was queued is not written at all.
-		std::string failure = job.m_Claim == PublicationClaim::Abandoned ?
-			std::string("The capture was abandoned at shutdown.") :
-			WriteAndPublish(job, encoder);
-		// Release Runtime payload capacity on the writer thread before reporting
-		// completion. No frame-thread state or RHI resource is touched here.
-		job.m_Image.reset();
-		job.m_Graph.reset();
-		job.m_Resources.reset();
-		job.m_Stage = EncodeStage::Done;
-		{
-			std::scoped_lock lock(job.m_Mutex);
-			job.m_Failure = std::move(failure);
-			job.m_IsDone = true;
-		}
-		job.m_Condition.notify_all();
-	}
-
-	std::string FrameCaptureCoordinator::WriteAndPublish(
-		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept try
-	{
-		const ResourceExportSubmission submission{ job.m_SubmissionFenceIndex, job.m_SubmissionFenceGeneration,
-			job.m_SubmissionFenceValue, job.m_AdapterCompatibilityIdentity };
-		if (job.m_Resources)
-		{
-			job.m_Stage = EncodeStage::SerializingGraph;
-			std::vector<std::vector<uint8_t>> headers;
-			std::vector<std::filesystem::path> temporary;
-			for (size_t i = 0; i < job.m_Resources->m_Arrays.size(); ++i)
-			{
-				headers.push_back(MakeResourceExportNpyHeader(job.m_Resources->m_Arrays[i]));
-				temporary.push_back(job.m_Directory / std::format("{}.{}.npy.partial", job.m_TemporaryStem, i));
-			}
-			const auto metadataTemporary = job.m_Directory / (job.m_TemporaryStem + ".json.partial");
-			const auto graphTemporary = job.m_Directory / (job.m_TemporaryStem + ".graph.json.partial");
-			const std::string graphJson = job.m_Graph ?
-				SerializeFrameGraphExport(*job.m_Graph,
-					job.m_Metadata, submission, false, true) :
-				std::string{};
-			const auto names = [&](std::string_view stem)
-				{
-					std::vector<std::filesystem::path> result;
-					for (size_t i = 0; i < temporary.size(); ++i)
-					{
-						result.push_back(job.m_Directory / std::format("{}.{}.npy", stem, i));
-					}
-					return result;
-				};
-			// Parse/validate metadata before producing any files, including invalid UTF-8.
-			const auto firstNames = names(job.m_BaseStem);
-			(void)SerializeResourceExportMetadata(*job.m_Resources, job.m_Metadata, submission, firstNames,
-				job.m_Graph ? job.m_Directory / (job.m_BaseStem + ".graph.json") : std::filesystem::path{});
-			const auto cleanup = [&]()
-				{
-					std::error_code error;
-					for (const auto& path : temporary)
-					{
-						std::filesystem::remove(path, error);
-					}
-					std::filesystem::remove(metadataTemporary, error);
-					std::filesystem::remove(graphTemporary, error);
-				};
-			job.m_Stage = EncodeStage::WritingGraph;
-			for (size_t i = 0; i < temporary.size(); ++i)
-			{
-				const std::string failure = WriteFileContents(temporary[i], headers[i], job.m_Resources->m_Arrays[i].m_Data);
-				if (!failure.empty())
-				{
-					cleanup();
-					return failure;
-				}
-			}
-			if (job.m_Graph)
-			{
-				const std::string failure = WriteFileContents(graphTemporary,
-					{ reinterpret_cast<const uint8_t*>(graphJson.data()), graphJson.size() });
-				if (!failure.empty())
-				{
-					cleanup();
-					return failure;
-				}
-			}
-			PublicationClaim expected = PublicationClaim::Open;
-			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
-			{
-				cleanup();
-				return "The resource export was abandoned at shutdown.";
-			}
-			job.m_Stage = EncodeStage::Publishing;
-			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
-			{
-				const std::string stem = attempt == 1 ? job.m_BaseStem : std::format("{}-{}", job.m_BaseStem, attempt);
-				const auto files = names(stem);
-				const auto graphPath = job.m_Graph ? job.m_Directory / (stem + ".graph.json") : std::filesystem::path{};
-				const auto metadataPath = job.m_Directory / (stem + ".json");
-				const std::string json = SerializeResourceExportMetadata(*job.m_Resources, job.m_Metadata, submission, files, graphPath);
-				std::vector<std::pair<std::filesystem::path, std::filesystem::path>> published;
-				PublishOutcome outcome = PublishOutcome::Published;
-				for (size_t i = 0; i < files.size(); ++i)
-				{
-					outcome = PublishNewFile(temporary[i], files[i]);
-					if (outcome != PublishOutcome::Published)
-					{
-						break;
-					}
-					published.emplace_back(temporary[i], files[i]);
-				}
-				if (outcome == PublishOutcome::Published && job.m_Graph)
-				{
-					outcome = PublishNewFile(graphTemporary, graphPath);
-					if (outcome == PublishOutcome::Published)
-					{
-						published.emplace_back(graphTemporary, graphPath);
-					}
-				}
-				std::string failure;
-				if (outcome == PublishOutcome::Published)
-				{
-					failure = WriteFileContents(metadataTemporary, { reinterpret_cast<const uint8_t*>(json.data()), json.size() });
-					outcome = failure.empty() ? PublishNewFile(metadataTemporary, metadataPath) : PublishOutcome::Failed;
-				}
-				if (outcome == PublishOutcome::Published)
-				{
-					job.m_MetadataPath = metadataPath;
-					job.m_ResourcePaths = files;
-					job.m_GraphPath = graphPath;
-					cleanup();
-					return {};
-				}
-				// Withdraw only files this attempt created. Restore renamed temporary
-				// files on volumes without hard links before trying the next group name.
-				for (const auto& [partial, path] : published)
-				{
-					std::error_code error;
-					if (std::filesystem::exists(partial, error))
-					{
-						std::filesystem::remove(path, error);
-					}
-					else
-					{
-						std::filesystem::rename(path, partial, error);
-					}
-					if (error)
-					{
-						cleanup();
-						return "Resource export rollback failed; publication is indeterminate.";
-					}
-				}
-				if (outcome == PublishOutcome::Failed)
-				{
-					cleanup();
-					return failure.empty() ? "Publishing the resource export group failed." : failure;
-				}
-			}
-			cleanup();
-			return "No unused group file name was found for the resource export.";
-		}
-		if (job.m_Graph)
-		{
-			job.m_Stage = EncodeStage::SerializingGraph;
-			const std::string json = SerializeFrameGraphExport(*job.m_Graph, job.m_Metadata,
-				submission, job.m_GraphSummary, job.m_ResourceExportActive);
-			const auto temporary = job.m_Directory / (job.m_TemporaryStem + ".json.partial");
-			const auto* bytes = reinterpret_cast<const uint8_t*>(json.data());
-			job.m_Stage = EncodeStage::WritingGraph;
-			std::string failure = WriteFileContents(temporary, { bytes, json.size() });
-			if (!failure.empty())
-			{
-				return failure;
-			}
-			PublicationClaim expected = PublicationClaim::Open;
-			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
-			{
-				std::error_code error;
-				std::filesystem::remove(temporary, error);
-				return "The graph export was abandoned at shutdown.";
-			}
-			job.m_Stage = EncodeStage::Publishing;
-			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
-			{
-				const auto path = job.m_Directory / ((attempt == 1 ?
-					job.m_BaseStem :
-					std::format("{}-{}", job.m_BaseStem, attempt)) + ".json");
-				const PublishOutcome outcome = PublishNewFile(temporary, path);
-				if (outcome == PublishOutcome::NameTaken)
-				{
-					continue;
-				}
-				std::error_code error;
-				std::filesystem::remove(temporary, error);
-				if (outcome == PublishOutcome::Failed)
-				{
-					return std::format("Publishing '{}' failed.", GetFrameCapturePathText(path));
-				}
-				job.m_MetadataPath = path;
-				return {};
-			}
-			std::error_code error;
-			std::filesystem::remove(temporary, error);
-			return "No unused file name was found for the graph export.";
-		}
-		if (!encoder)
-		{
-			return "No capture image encoder is configured.";
-		}
-		job.m_Stage = EncodeStage::Encoding;
-		const std::optional<std::vector<uint8_t>> encoded =
-			job.m_Image ? encoder(*job.m_Image) : std::nullopt;
-		if (!encoded)
-		{
-			return "The captured image could not be encoded as PNG.";
-		}
-
-		const std::filesystem::path temporaryImage =
-			job.m_Directory / (job.m_TemporaryStem + ".png.partial");
-		const std::filesystem::path temporaryMetadata =
-			job.m_Directory / (job.m_TemporaryStem + ".json.partial");
-		const auto removeTemporaryFiles = [&]() noexcept
-			{
-				std::error_code errorCode;
-				std::filesystem::remove(temporaryImage, errorCode);
-				std::filesystem::remove(temporaryMetadata, errorCode);
-			};
-		job.m_Stage = EncodeStage::WritingImage;
-		std::string failure = WriteFileContents(temporaryImage, *encoded);
-		if (!failure.empty())
-		{
-			return failure;
-		}
-
-		// Shutdown may have abandoned the job before publication started. Only
-		// that claim guarantees that its files never appear after a failed result.
-		PublicationClaim expected = PublicationClaim::Open;
-		if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
-		{
-			removeTemporaryFiles();
-			return "The capture was abandoned at shutdown.";
-		}
-
-		job.m_Stage = EncodeStage::Publishing;
-		for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
-		{
-			const std::string stem = attempt == 1 ?
-				job.m_BaseStem :
-				std::format("{}-{}", job.m_BaseStem, attempt);
-			const std::filesystem::path imagePath = job.m_Directory / (stem + ".png");
-			const std::filesystem::path metadataPath = job.m_Directory / (stem + ".json");
-			const PublishOutcome image = PublishNewFile(temporaryImage, imagePath);
-			if (image == PublishOutcome::NameTaken)
-			{
-				continue;
-			}
-			if (image == PublishOutcome::Failed)
-			{
-				removeTemporaryFiles();
-				return std::format("Publishing '{}' failed.", GetFrameCapturePathText(imagePath));
-			}
-
-			// The sidecar names the image file, so it is written once the name is fixed.
-			job.m_Stage = EncodeStage::WritingMetadata;
-			job.m_Metadata.m_ImageFile = GetFrameCapturePathText(imagePath.filename());
-			const std::string json = SerializeFrameCaptureMetadata(job.m_Metadata);
-			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(json.data());
-			failure = WriteFileContents(
-				temporaryMetadata, std::span<const uint8_t>(jsonBytes, json.size()));
-			const PublishOutcome metadata = failure.empty() ?
-				PublishNewFile(temporaryMetadata, metadataPath) :
-				PublishOutcome::Failed;
-			if (metadata == PublishOutcome::Published)
-			{
-				removeTemporaryFiles();
-				job.m_ImagePath = imagePath;
-				job.m_MetadataPath = metadataPath;
-				return {};
-			}
-
-			// A capture is complete only with both files. This image was created
-			// above, so withdrawing it never touches another writer's file; after a
-			// rename fallback it moves back to be published under the next name.
-			std::error_code errorCode;
-			if (std::filesystem::exists(temporaryImage, errorCode))
-			{
-				std::filesystem::remove(imagePath, errorCode);
-			}
-			else
-			{
-				std::filesystem::rename(imagePath, temporaryImage, errorCode);
-			}
-			if (metadata == PublishOutcome::Failed)
-			{
-				removeTemporaryFiles();
-				return failure.empty() ?
-					std::format("Publishing '{}' failed.", GetFrameCapturePathText(metadataPath)) :
-					failure;
-			}
-			job.m_Stage = EncodeStage::Publishing;
-		}
-		removeTemporaryFiles();
-		return std::format("No unused file name was found for '{}' after {} attempts.",
-			job.m_BaseStem, MaxPublishAttempts);
-	}
-	catch (const nlohmann::json::exception& error)
-	{
-		// Invalid UTF-8 or malformed metadata must fail the request, not terminate
-		// the noexcept writer. Serialization finishes before any graph file is written.
-		return std::format("Serializing the {} export failed: {}", job.m_Resources ? "resource" : "graph", error.what());
-	}
-	catch (const std::exception& error)
-	{
-		return std::format("Serializing the resource export failed: {}", error.what());
 	}
 }

@@ -14,13 +14,14 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace gglab
 {
 	class FrameCaptureControlBase;
 	class NonFiniteWatchCoordinator;
+	class CapturePublicationFileSystemBase;
+	class CaptureWriter;
 
 	struct FrameCaptureRequest
 	{
@@ -148,6 +149,8 @@ namespace gglab
 			// result is published by the Update that collected the capture.
 			bool m_WriteOnCallingThread = false;
 			NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
+			// Optional host-neutral file capability; the writer retains it independently.
+			std::shared_ptr<CapturePublicationFileSystemBase> m_PublicationFileSystem;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -222,8 +225,6 @@ namespace gglab
 		void FinalizeAfterRenderHost() noexcept;
 
 	private:
-		struct EncodeJob;
-		struct WriterState;
 		struct CapturePlan;
 		struct FrameAttempt;
 		struct CaptureJob;
@@ -256,36 +257,20 @@ namespace gglab
 		// Waits for unfinished writing until the shutdown write timeout, then
 		// fails what remains and abandons jobs that have not claimed publication.
 		void FinishWriting() noexcept;
-		void StopWriter() noexcept;
 		void Finish(CaptureJob& entry, FrameCaptureRequestStatus status, std::string failure) noexcept;
 		void RemoveFinishedJobs() noexcept;
-		static void RunWriter(std::shared_ptr<WriterState> state,
-			FrameCaptureImageEncoder encoder) noexcept;
-		static void RunEncodeJob(EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
-		[[nodiscard]] static std::string WriteAndPublish(
-			EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
 
 		FrameCaptureControlBase* m_Capture = nullptr;
 		NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
 		std::filesystem::path m_DefaultOutputDirectory;
-		FrameCaptureImageEncoder m_ImageEncoder;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
-		bool m_WriteOnCallingThread = false;
-		// Shared with the writer thread, which keeps its own reference.
-		std::shared_ptr<WriterState> m_Writer;
-		std::thread m_WriterThread;
-		// A writer with jobs unfinished at the shutdown timeout may be blocked in
-		// file I/O; shutdown then leaves it to finish on its own.
-		bool m_HasAbandonedJobs = false;
+		std::unique_ptr<CaptureWriter> m_Writer;
 		uint64_t m_NextRequestId = 1;
 		std::vector<CaptureJob> m_Jobs;
 		std::vector<FrameCaptureRequestResult> m_Results;
 		// Runtime retains and retires these payloads normally; only publication was
 		// cancelled by a watch failure before the capture result arrived.
 		std::vector<uint64_t> m_DiscardedCaptureResults;
-		// Names this coordinator's temporary files apart from those of other
-		// processes writing to the same directory.
-		std::string m_TemporaryTag;
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		uint32_t m_SettledFrames = 0;
 		// Every frame of the current settle key so far had every gate ready.

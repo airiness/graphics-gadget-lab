@@ -1,4 +1,6 @@
 #include "GpuFaultLifecycleSelfTests.h"
+#include "CapturePublicationTestFileSystem.h"
+#include "Capture/CaptureWriter.h"
 #include "ApplicationInput.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
@@ -1397,6 +1399,97 @@ namespace gglab
 				"Checked idle or confirmed-device-loss teardown releases retained resources without mapping or late submissions");
 		}
 
+		void RunPublicationRetentionScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool claimed)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto* capture = probe.m_CaptureControl;
+			GGLAB_UNUSED(capture->RequestCapture(FrameCaptureSource::Scene));
+			GGLAB_UNUSED(capture->RequestCapture(FrameCaptureSource::Scene));
+			GGLAB_UNUSED(RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit));
+			std::vector<FrameCaptureResult> products;
+			capture->ConsumeResults(products);
+			const bool shared = products.size() == 2 && products[0].m_Image &&
+				products[0].m_Image == products[1].m_Image;
+			checks.Check(shared, "Two production capture subscribers share one fenced immutable CPU image");
+			if (!shared)
+			{
+				runtime.Shutdown();
+				return;
+			}
+			std::weak_ptr<const FrameCaptureImage> image = products[0].m_Image;
+			auto files = std::make_shared<CapturePublicationTestFileSystem>();
+			files->m_Block = claimed ?
+				CapturePublicationTestFileSystem::Block::Publication :
+				CapturePublicationTestFileSystem::Block::TemporaryWrite;
+			auto writer = std::make_unique<CaptureWriter>(
+				[](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					return std::vector<uint8_t>{ 1, 2, 3 };
+				}, false, files);
+			std::array<std::shared_ptr<CaptureWriteJob>, 2> jobs;
+			for (size_t i = 0; i < jobs.size(); ++i)
+			{
+				jobs[i] = std::make_shared<CaptureWriteJob>();
+				jobs[i]->m_Products.m_Image = products[i].m_Image;
+				jobs[i]->m_Directory = root / "Published";
+				jobs[i]->m_BaseStem = i == 0 ? "running" : "queued";
+				jobs[i]->m_RequestId = i + 1;
+				checks.Check(writer->Submit(jobs[i]), "The production product enters the independent writer");
+			}
+			products.clear();
+			checks.Check(files->WaitEntered(), "Production capture transport reaches the blocked publication boundary");
+			// Seven other physical products saturate the real eight-slot budget.
+			// The two writer subscribers must retain exactly one additional credit.
+			for (uint32_t i = 0; i < 7; ++i)
+			{
+				GGLAB_UNUSED(capture->RequestCapture(FrameCaptureSource::Scene));
+				GGLAB_UNUSED(RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit));
+				capture->ConsumeResults(products);
+			}
+			checks.Check(products.size() == 7 && capture->GetAvailability(RHIFormat::R8G8B8A8Unorm, 32, 32) ==
+				FrameCaptureAvailability::Busy,
+				"Blocked shared writer products conserve real Runtime payload credit after GPU buffers retire");
+			const auto running = writer->Abandon(*jobs[0], std::chrono::milliseconds(0));
+			const auto queued = writer->Abandon(*jobs[1], std::chrono::milliseconds(0));
+			checks.Check(running.m_Publication == (claimed ?
+				CapturePublicationOutcome::Indeterminate :
+				CapturePublicationOutcome::NotPublished) &&
+				queued.m_Publication == CapturePublicationOutcome::NotPublished &&
+				capture->GetAvailability(RHIFormat::R8G8B8A8Unorm, 32, 32) == FrameCaptureAvailability::Busy,
+				"Timeout receipts do not release credits still held by running or queued consumers");
+			runtime.Shutdown();
+			const auto maps = probe.m_ReadbackMaps;
+			products.clear();
+			writer.reset();
+			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 && !image.expired(),
+				"The real Renderer and device can retire while an independent writer retains CPU products");
+			files->Release();
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			for (const auto& job : jobs)
+			{
+				job->WaitUntil(deadline);
+			}
+			const auto late = jobs[0]->GetReceipt();
+			const auto skipped = jobs[1]->GetReceipt();
+			checks.Check(late && skipped &&
+				late->m_Publication == (claimed ?
+					CapturePublicationOutcome::Published :
+					CapturePublicationOutcome::NotPublished) &&
+				skipped->m_Publication == CapturePublicationOutcome::NotPublished && image.expired() &&
+				probe.m_ReadbackMaps == maps &&
+				std::filesystem::exists(root / "Published/running.json") == claimed &&
+				!std::filesystem::exists(root / "Published/queued.json"),
+				"Late worker completion releases the last CPU lease without touching a destroyed device or publishing abandoned work");
+		}
+
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
@@ -1587,6 +1680,8 @@ namespace gglab
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		RunFrameOutcomeScenarios(context, root / "outcomes");
+		RunPublicationRetentionScenario(context, root / "publication-before-claim", false);
+		RunPublicationRetentionScenario(context, root / "publication-after-claim", true);
 		for (const auto completion : { RHIFenceQueryResult::Pending, RHIFenceQueryResult::Failed,
 			RHIFenceQueryResult::DeviceLost })
 		{

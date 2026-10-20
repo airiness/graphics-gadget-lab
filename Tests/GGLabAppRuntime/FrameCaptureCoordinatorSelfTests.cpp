@@ -1,4 +1,6 @@
 #include "FrameCaptureCoordinatorSelfTests.h"
+#include "CapturePublicationTestFileSystem.h"
+#include "Capture/CaptureWriter.h"
 
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureMetadata.h"
@@ -35,6 +37,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -162,6 +165,7 @@ namespace gglab
 				image->m_Width = 2;
 				image->m_Height = 2;
 				image->m_Pixels = { 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 10, 20, 30, 0 };
+				m_LastImage = image;
 				std::shared_ptr<RGSnapshot> graph;
 				if (issued->m_Source == FrameCaptureSource::RenderGraph || issued->m_IncludeGraph)
 				{
@@ -208,6 +212,7 @@ namespace gglab
 			}
 
 			std::vector<Issued> m_Issued;
+			std::weak_ptr<const FrameCaptureImage> m_LastImage;
 			std::optional<PostProcessDebugTap> m_PendingDiagnosticTap;
 			FrameCaptureAvailability m_Availability = FrameCaptureAvailability::Available;
 			FrameCaptureAvailability m_RequestAvailability = FrameCaptureAvailability::Available;
@@ -1340,6 +1345,178 @@ namespace gglab
 			}
 			context.Check(gate.use_count() == 1 && !HasAnyFile(directory.GetPath()),
 				"An abandoned capture publishes no files, even after its writing resumes");
+		}
+
+		void RunPublicationFaultTests(SelfTestContext& context) noexcept
+		{
+			for (const uint32_t failWrite : { 0u, 1u, 2u, 4u })
+			{
+				for (const uint32_t failPublish : { 0u, 1u, 2u, 4u })
+				{
+					if (failWrite == 0 && failPublish == 0)
+					{
+						continue;
+					}
+					TemporaryDirectory directory("capture-publication-fault");
+					FakeCaptureControl control;
+					auto files = std::make_shared<CapturePublicationTestFileSystem>();
+					files->m_FailWrite = failWrite;
+					files->m_FailPublish = failPublish;
+					FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+						.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true,
+						.m_PublicationFileSystem = files });
+					const auto id = coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
+						.m_ResourceTargets = { { .m_Resource = "First" }, { .m_Resource = "Second" } },
+						.m_IncludeGraph = true });
+					coordinator.BeginFrame(MakeFrameState(true));
+					control.Complete(control.m_Issued.front().m_Id);
+					coordinator.Update();
+					const auto results = Consume(coordinator);
+					context.Check(results.size() == 1 && results[0].m_RequestId == id &&
+						results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+						results[0].m_ResourcePaths.empty() && !results[0].m_Failure.empty() &&
+						!HasAnyFile(directory.GetPath()),
+						"A temporary write or partial group publication failure withdraws every owned file");
+					coordinator.Update();
+					context.Check(Consume(coordinator).empty(), "A failed publication has exactly one terminal result");
+				}
+			}
+
+			TemporaryDirectory directory("capture-publication-rollback");
+			auto files = std::make_shared<CapturePublicationTestFileSystem>();
+			files->m_FailPublish = 2;
+			files->m_FailWithdraw = true;
+			auto job = std::make_shared<CaptureWriteJob>();
+			job->m_Products.m_Image = std::make_shared<FrameCaptureImage>();
+			job->m_Directory = directory.GetPath();
+			job->m_BaseStem = "rollback";
+			CaptureWriter writer(&EncodeTestPng, true, files);
+			context.Check(writer.Submit(job), "The writer accepts the rollback-fault fixture");
+			const auto receipt = job->GetReceipt();
+			context.Check(receipt && receipt->m_Publication == CapturePublicationOutcome::Indeterminate &&
+				receipt->m_Failure.find("indeterminate") != std::string::npos &&
+				std::filesystem::exists(directory.GetPath() / "rollback.png") &&
+				!std::filesystem::exists(directory.GetPath() / "rollback.json") &&
+				!HasPartialFile(directory.GetPath()),
+				"Failed rollback retains a typed Indeterminate receipt without a false completion marker");
+
+			TemporaryDirectory throwingDirectory("capture-publication-serialization");
+			CapturePublicationContent content;
+			content.m_Files = { { .m_Suffix = ".data", .m_Bytes = { 1, 2, 3 } }, { .m_Suffix = ".json" } };
+			uint32_t calls = 0;
+			content.m_MakeMarker = [&](std::span<const std::filesystem::path>) -> std::string
+				{
+					if (++calls == 2)
+					{
+						throw std::runtime_error("Injected name-bound serialization failure.");
+					}
+					return "{}";
+				};
+			CapturePublicationControl publication;
+			auto native = CreateCapturePublicationFileSystem();
+			const auto failed = PublishCaptureFiles(content, throwingDirectory.GetPath(),
+				"serialization", "unique", publication, *native);
+			context.Check(calls == 2 && failed.m_Outcome == CapturePublicationOutcome::NotPublished &&
+				failed.m_Failure.find("serialization failure") != std::string::npos &&
+				!HasAnyFile(throwingDirectory.GetPath()),
+				"A serializer exception after data publication rolls back the data and all temporary files");
+		}
+
+		void RunRenamePublicationTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("capture-publication-rename");
+			std::filesystem::create_directories(directory.GetPath());
+			const auto occupied = directory.GetPath() / "renamed.17.resource-export.json";
+			{
+				std::ofstream file(occupied);
+				file << "another writer";
+			}
+			FakeCaptureControl control;
+			auto files = std::make_shared<CapturePublicationTestFileSystem>();
+			files->m_RenameOnly = true;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true,
+				.m_PublicationFileSystem = files });
+			GGLAB_UNUSED(coordinator.Submit({ .m_Source = FrameCaptureSource::ResourceExport,
+				.m_Label = "renamed", .m_ResourceTargets = { { .m_Resource = "First" }, { .m_Resource = "Second" } },
+				.m_IncludeGraph = true }));
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Complete(control.m_Issued.front().m_Id);
+			coordinator.Update();
+			const auto results = Consume(coordinator);
+			const bool complete = results.size() == 1 && results[0].m_Status == FrameCaptureRequestStatus::Completed;
+			context.Check(complete && results[0].m_MetadataPath.filename() == "renamed.17.resource-export-2.json" &&
+				ReadText(occupied) == "another writer" &&
+				!std::filesystem::exists(directory.GetPath() / "renamed.17.resource-export.0.npy") &&
+				!HasPartialFile(directory.GetPath()),
+				"A last-file collision restores renamed temporary data and retries the entire group without overwrite");
+			if (complete)
+			{
+				const auto metadata = nlohmann::json::parse(ReadText(results[0].m_MetadataPath));
+				context.Check(metadata["targets"][0]["array"] ==
+					GetFrameCapturePathText(results[0].m_ResourcePaths[0].filename()) &&
+					metadata["targets"][1]["array"] ==
+					GetFrameCapturePathText(results[0].m_ResourcePaths[1].filename()) &&
+					metadata["graph"] == GetFrameCapturePathText(results[0].m_GraphPath.filename()),
+					"Name-bound array and graph metadata use the final collision-resolved paths");
+			}
+		}
+
+		void RunPublicationShutdownTests(SelfTestContext& context) noexcept
+		{
+			for (const auto source : { FrameCaptureSource::Scene, FrameCaptureSource::RenderGraph,
+				FrameCaptureSource::ResourceExport })
+			{
+				for (const auto block : { CapturePublicationTestFileSystem::Block::TemporaryWrite,
+					CapturePublicationTestFileSystem::Block::Publication })
+				{
+					TemporaryDirectory directory("capture-publication-shutdown");
+					FakeCaptureControl control;
+					auto files = std::make_shared<CapturePublicationTestFileSystem>();
+					files->m_Block = block;
+					const bool claimed = block == CapturePublicationTestFileSystem::Block::Publication;
+					std::vector<FrameCaptureRequestResult> results;
+					{
+						FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+							.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+							.m_ShutdownWriteTimeout = std::chrono::milliseconds(100), .m_PublicationFileSystem = files });
+						const auto id = coordinator.Submit({ .m_Source = source,
+							.m_ResourceTargets = { { .m_Resource = "Values" } }, .m_IncludeGraph = true });
+						coordinator.BeginFrame(MakeFrameState(true));
+						control.Complete(control.m_Issued.front().m_Id);
+						coordinator.Update();
+						context.Check(files->WaitEntered() && Consume(coordinator).empty() && !coordinator.Cancel(id),
+							"A blocked file writer leaves issued work unfinished and preserves waiting-only cancellation");
+						if (source == FrameCaptureSource::Scene)
+						{
+							context.Check(!control.m_LastImage.expired(), "The blocked writer retains the shared CPU image");
+						}
+						coordinator.PrepareForShutdown();
+						const auto start = std::chrono::steady_clock::now();
+						coordinator.FinalizeAfterRenderHost();
+						results = Consume(coordinator);
+						context.Check(std::chrono::steady_clock::now() - start < std::chrono::seconds(2) &&
+							results.size() == 1 && results[0].m_RequestId == id &&
+							results[0].m_Status == FrameCaptureRequestStatus::Failed &&
+							results[0].m_Failure.find(claimed ? "indeterminate" : "abandoned") != std::string::npos &&
+							results[0].m_MetadataPath.empty() && coordinator.GetUnfinishedRequestCount() == 0,
+							"Shutdown distinguishes publication claim from completion under one bounded wait");
+						coordinator.Update();
+						context.Check(Consume(coordinator).empty(), "Repeated collection cannot duplicate the timeout result");
+					}
+					context.Check(source != FrameCaptureSource::Scene || !control.m_LastImage.expired(),
+						"Destroying the coordinator does not destroy products held by its detached writer");
+					files->Release();
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (files.use_count() > 1 && std::chrono::steady_clock::now() < deadline)
+					{
+						std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					}
+					context.Check(files.use_count() == 1 && !HasPartialFile(directory.GetPath()) &&
+						HasAnyFile(directory.GetPath()) == claimed && control.m_LastImage.expired(),
+						"A detached writer drains safely: abandoned files never publish, while claimed publication may finish late");
+				}
+			}
 		}
 
 		void RunMetadataSerializationTests(SelfTestContext& context) noexcept
@@ -2924,6 +3101,9 @@ namespace gglab
 		RunDeferredCapacityTests(context);
 		RunWriterQueueLimitTests(context);
 		RunAbandonedWritingTests(context);
+		RunPublicationFaultTests(context);
+		RunRenamePublicationTests(context);
+		RunPublicationShutdownTests(context);
 		RunMetadataSerializationTests(context);
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
