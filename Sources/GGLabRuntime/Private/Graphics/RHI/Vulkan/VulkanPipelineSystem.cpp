@@ -301,6 +301,8 @@ namespace gglab
 
 	VulkanPipelineSystem::~VulkanPipelineSystem()
 	{
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan native binding layouts retained at teardown: {}.",
+			m_BindingLayouts.size());
 		Clear();
 	}
 

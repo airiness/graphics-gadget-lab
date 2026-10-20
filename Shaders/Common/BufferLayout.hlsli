@@ -48,8 +48,6 @@ struct SceneData
 	uint Padding;
 
 	IBLResourceData IBLResource;
-	float4 AtmosphereWorld;
-	float4 AtmosphereRadii;
 };
 
 struct ObjectData

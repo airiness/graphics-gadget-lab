@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RenderPass/ForwardBindingLayout.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
@@ -61,7 +62,7 @@ namespace gglab
 			bool m_MaterialDiagnostics = false;
 		};
 
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePSOForVariant(const RenderServices& services,
+		[[nodiscard]] ResolvedRenderPipeline GetOrCreatePSOForVariant(const RenderServices& services,
 			uint64_t variantBits, const OutputVariant& output) noexcept;
 
 		static constexpr size_t LightingRecipeCount = static_cast<size_t>(LightingRecipe::Count);
@@ -73,6 +74,7 @@ namespace gglab
 		// Optional diagnostic variants must not double the pass object's inline cache.
 		std::unique_ptr<PipelineSlotTable> m_MaterialDiagnosticPipelineSlots;
 		bool m_IncludesHdrDiffValidation = false;
+		ForwardBindingLayout m_BindingLayout;
 		bool m_IsInitialized = false;
 	};
 }

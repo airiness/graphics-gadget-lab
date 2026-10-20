@@ -206,6 +206,54 @@ namespace gglab
 		{
 			return m_RecordingFailed || (m_UploadWriter && m_UploadWriter->HasFailed());
 		}
+		// Higher-layer validation can reject a recording through the same batch failure path.
+		void RejectRecording() noexcept { FailRecording(); }
+		// Higher layers assign a small, recording-local required constant set. RHI
+		// tracks only readiness, never payload meanings or logical layout metadata.
+		[[nodiscard]] uint64_t BeginConstantBindingScope(std::span<const uint32_t> parameters) noexcept
+		{
+			const auto count = parameters.size();
+			if (m_RequiredConstants != 0 || count == 0 || count > 3)
+			{
+				FailRecording();
+				return 0;
+			}
+			++m_ConstantScope;
+			m_RequiredConstants = (1u << count) - 1;
+			m_ReadyConstants = 0;
+			for (size_t index = 0; index < count; ++index)
+			{
+				m_ConstantParameters[index] = parameters[index];
+			}
+			return m_ConstantScope;
+		}
+		void EndConstantBindingScope(uint64_t scope) noexcept
+		{
+			if (IsConstantBindingScopeCurrent(scope))
+			{
+				m_RequiredConstants = 0;
+				m_ReadyConstants = 0;
+				++m_ConstantScope;
+			}
+		}
+		[[nodiscard]] bool IsConstantBindingScopeCurrent(uint64_t scope) const noexcept
+		{
+			return scope != 0 && scope == m_ConstantScope && m_RequiredConstants != 0;
+		}
+		[[nodiscard]] uint64_t GetPipelineBindingRevision() const noexcept { return m_PipelineBindingRevision; }
+		[[nodiscard]] RHIPipelineHandle GetSelectedBindingPipeline() const noexcept { return m_SelectedBindingPipeline; }
+		[[nodiscard]] bool MarkConstantBindingReady(uint64_t scope, uint32_t index) noexcept
+		{
+			if (!IsConstantBindingScopeCurrent(scope) || index >= 3 ||
+				(m_RequiredConstants & (1u << index)) == 0 || !m_SelectedBindingPipeline.IsValid() ||
+				HasRecordingError())
+			{
+				FailRecording();
+				return false;
+			}
+			m_ReadyConstants |= 1u << index;
+			return true;
+		}
 		[[nodiscard]] RHIConstantBufferBinding UploadConstants(std::span<const std::byte> bytes) noexcept
 		{
 			const auto binding = m_UploadWriter ?
@@ -252,11 +300,48 @@ namespace gglab
 		// resets the recording error. Binding null ends the scope and keeps the error.
 		void BindUploadWriter(RHIUploadWriter* writer) noexcept
 		{
+			++m_ConstantScope;
+			m_RequiredConstants = 0;
+			m_ReadyConstants = 0;
+			InvalidatePipelineBindings();
 			m_UploadWriter = writer;
 			if (writer)
 			{
 				m_RecordingFailed = false;
 			}
+		}
+		// Invalidate on every selection attempt, including failed and same-native-layout
+		// switches. Backends confirm only a successfully resolved pipeline.
+		void InvalidatePipelineBindings() noexcept
+		{
+			++m_PipelineBindingRevision;
+			m_SelectedBindingPipeline = {};
+			m_ReadyConstants = 0;
+		}
+		void ConfirmBindingPipeline(RHIPipelineHandle pipeline) noexcept { m_SelectedBindingPipeline = pipeline; }
+		void InvalidateScopedConstant(uint32_t parameter) noexcept
+		{
+			if (m_RequiredConstants == 0)
+			{
+				return;
+			}
+			for (uint32_t index = 0; index < m_ConstantParameters.size(); ++index)
+			{
+				if (m_ConstantParameters[index] == parameter)
+				{
+					m_ReadyConstants &= ~(1u << index);
+				}
+			}
+		}
+		[[nodiscard]] bool ValidateConstantBindingReadiness() noexcept
+		{
+			if (HasRecordingError() || (m_RequiredConstants != 0 &&
+				(!m_SelectedBindingPipeline.IsValid() || m_ReadyConstants != m_RequiredConstants)))
+			{
+				FailRecording();
+				return false;
+			}
+			return true;
 		}
 		// A failed recording also poisons the upload batch shared by the submission.
 		void FailRecording() noexcept
@@ -295,6 +380,12 @@ namespace gglab
 		std::optional<RHIPassStorageBufferBinding> m_PassStorageBuffer;
 		RHIUploadWriter* m_UploadWriter = nullptr;
 		bool m_RecordingFailed = false;
+		uint64_t m_ConstantScope = 0;
+		uint64_t m_PipelineBindingRevision = 0;
+		RHIPipelineHandle m_SelectedBindingPipeline{};
+		uint32_t m_RequiredConstants = 0;
+		uint32_t m_ReadyConstants = 0;
+		std::array<uint32_t, 3> m_ConstantParameters{};
 
 	public:
 

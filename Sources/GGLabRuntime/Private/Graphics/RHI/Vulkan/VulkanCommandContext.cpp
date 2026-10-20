@@ -477,6 +477,7 @@ namespace gglab
 
 	void VulkanGraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
+		InvalidatePipelineBindings();
 		if (m_CommandBuffer == VK_NULL_HANDLE)
 		{
 			Reject("SetPipeline", "no command buffer is active");
@@ -527,6 +528,7 @@ namespace gglab
 				}
 			}
 		}
+		ConfirmBindingPipeline(pipeline);
 	}
 
 	void VulkanGraphicsCommandContext::SetDescriptorTable(
@@ -786,6 +788,7 @@ namespace gglab
 	bool VulkanGraphicsCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
+		InvalidateScopedConstant(parameterIndex);
 		const auto* desc = m_Device->GetResourceManager().ResolveBufferDesc(binding.m_Buffer);
 		if (!desc || !IsConstantBufferBindingInRange(binding, desc->m_SizeInBytes, m_Device->GetUploadLimits()) ||
 			(binding.m_UploadBatchId == 0 && m_Device->IsUploadStorage(binding.m_Buffer)))
@@ -918,7 +921,8 @@ namespace gglab
 		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
-		if (indexCount == 0 || instanceCount == 0 || !ValidateDraw("DrawIndexed", true))
+		if (!ValidateConstantBindingReadiness() || indexCount == 0 || instanceCount == 0 ||
+			!ValidateDraw("DrawIndexed", true))
 		{
 			return;
 		}
@@ -939,8 +943,8 @@ namespace gglab
 	void VulkanGraphicsCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
 		uint32_t startVertexLocation, uint32_t startInstanceLocation) noexcept
 	{
-		if (vertexCount == 0 || instanceCount == 0 || !ValidateDraw("Draw", false) ||
-			!BindDescriptorSets())
+		if (!ValidateConstantBindingReadiness() || vertexCount == 0 || instanceCount == 0 ||
+			!ValidateDraw("Draw", false) || !BindDescriptorSets())
 		{
 			return;
 		}
@@ -1026,6 +1030,7 @@ namespace gglab
 			Reject("Draw", "no pipeline binding layout is active");
 			return false;
 		}
+		const bool reusedSnapshot = !m_FixedDescriptorsDirty;
 		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
 		if (m_FixedDescriptorsDirty)
 		{
@@ -1045,6 +1050,7 @@ namespace gglab
 		vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			m_CurrentBindingLayout->GetPipelineLayout(), 0, static_cast<uint32_t>(sets.size()),
 			sets.data(), static_cast<uint32_t>(m_DynamicOffsets.size()), m_DynamicOffsets.data());
+		m_Set0Frames->RecordDescriptorBind(m_FrameSlotIndex, reusedSnapshot);
 		return true;
 	}
 
@@ -1128,6 +1134,7 @@ namespace gglab
 
 	void VulkanComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
+		InvalidatePipelineBindings();
 		if (m_GraphicsContext->m_CommandBuffer == VK_NULL_HANDLE)
 		{
 			Reject("SetPipeline", "no command buffer is active");
@@ -1176,6 +1183,7 @@ namespace gglab
 				}
 			}
 		}
+		ConfirmBindingPipeline(pipeline);
 	}
 
 	void VulkanComputeCommandContext::SetDescriptorTable(
@@ -1191,6 +1199,7 @@ namespace gglab
 	bool VulkanComputeCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, const RHIConstantBufferBinding& binding) noexcept
 	{
+		InvalidateScopedConstant(parameterIndex);
 		auto& device = *m_GraphicsContext->m_Device;
 		const auto* desc = device.GetResourceManager().ResolveBufferDesc(binding.m_Buffer);
 		if (!desc || !IsConstantBufferBindingInRange(binding, desc->m_SizeInBytes, device.GetUploadLimits()) ||
@@ -1280,6 +1289,10 @@ namespace gglab
 	void VulkanComputeCommandContext::Dispatch(
 		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
 	{
+		if (!ValidateConstantBindingReadiness())
+		{
+			return;
+		}
 		if (m_GraphicsContext->m_CommandBuffer == VK_NULL_HANDLE ||
 			m_GraphicsContext->m_IsRendering || m_CurrentPipeline == nullptr ||
 			groupCountX == 0 || groupCountY == 0 || groupCountZ == 0)
@@ -1352,6 +1365,7 @@ namespace gglab
 			Reject("Dispatch", "no pipeline binding layout is active");
 			return false;
 		}
+		const bool reusedSnapshot = !m_FixedDescriptorsDirty;
 		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
 		if (m_FixedDescriptorsDirty)
 		{
@@ -1372,6 +1386,8 @@ namespace gglab
 			VK_PIPELINE_BIND_POINT_COMPUTE, m_CurrentBindingLayout->GetPipelineLayout(), 0,
 			static_cast<uint32_t>(sets.size()), sets.data(),
 			static_cast<uint32_t>(m_DynamicOffsets.size()), m_DynamicOffsets.data());
+		m_GraphicsContext->m_Set0Frames->RecordDescriptorBind(
+			m_GraphicsContext->m_FrameSlotIndex, reusedSnapshot);
 		return true;
 	}
 

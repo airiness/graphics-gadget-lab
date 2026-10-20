@@ -1027,7 +1027,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "09d7c13c3a7632a0d093c7ebd580723c45524100f6a8f5b2b248bffdcc0c0771",
+      "bodySha256": "b59d2cee8330cab901feae4f89b9392e1246922ab642b0a8be6e4bef80bf63ea",
       "programs": [
         "gglab.shader.forward-pbr"
       ],

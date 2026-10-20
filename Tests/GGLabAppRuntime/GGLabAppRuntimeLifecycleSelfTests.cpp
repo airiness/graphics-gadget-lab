@@ -20,10 +20,18 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
+#include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
@@ -41,8 +49,10 @@ namespace gglab
 		public:
 			std::unique_ptr<RHIContext> CreateContext(const RHIContextDesc&) const noexcept override
 			{
+				++m_CreateCount;
 				return nullptr;
 			}
+			mutable uint32_t m_CreateCount = 0;
 		};
 
 		std::unique_ptr<DemoBase> CreateLifecycleTestDemo(const DemoCreateInfo&,
@@ -529,8 +539,90 @@ namespace gglab
 			};
 		}
 
+		void RunStartupRegistryRejectionTests(SelfTestContext& context)
+		{
+			for (const auto backend : { AppRuntimeRHIBackend::DX12, AppRuntimeRHIBackend::Vulkan })
+			{
+				for (const bool counters : { false, true })
+				{
+					for (const bool oldInterface : { false, true })
+					{
+						auto info = MakeCreateInfo();
+						info.m_Config.m_RhiBackend = backend;
+						info.m_Config.m_NonFiniteCounters = counters;
+						std::vector<ShaderProgramRegistryEntry> entries;
+						ShaderArtifactRef placeholder;
+						placeholder.m_ArtifactId.m_DurableDigest.m_Value[0] = std::byte{ 1 };
+						for (auto program : shader_programs::GetRendererInitialShaderProgramDemand())
+						{
+							if (!oldInterface && program == shader_programs::AtmosphereLutCompute)
+							{
+								continue;
+							}
+							if (oldInterface)
+							{
+								constexpr std::string_view revision = ".binding-layout-v2";
+								if (program.m_VariantId.ends_with(revision))
+								{
+									program.m_VariantId.resize(program.m_VariantId.size() - revision.size());
+								}
+							}
+							entries.push_back({
+								.m_ProgramRef = counters ? nonfinite::CounterVariant(program) : program,
+								.m_TargetProfile = backend == AppRuntimeRHIBackend::DX12 ?
+									ShaderTargetProfile::GGLabDX12 :
+									ShaderTargetProfile::GGLabVulkan13,
+								.m_ArtifactRef = placeholder,
+								});
+						}
+						const auto registry = BuildShaderProgramRegistryArtifact(entries);
+						context.Check(registry.IsSuccess(), "Startup rejection fixture is a byte-valid registry");
+						if (!registry.IsSuccess())
+						{
+							continue;
+						}
+						const ShaderProgramRegistryArtifactRef ref{ .m_RegistryId = registry.m_Artifact.m_RegistryId };
+						const auto path = ShaderLooseProgramRegistryArtifactLocator(
+							info.m_Paths.m_ShaderArtifactRoot).GetPath(ref);
+						std::filesystem::create_directories(path.m_Path.parent_path());
+						const auto bytes = SerializeShaderProgramRegistryArtifact(registry.m_Artifact);
+						{
+							std::ofstream file(path.m_Path, std::ios::binary | std::ios::trunc);
+							file.write(reinterpret_cast<const char*>(bytes.data()),
+								static_cast<std::streamsize>(bytes.size()));
+							context.Check(file.good(), "Startup rejection fixture is written completely");
+						}
+						// No artifact payload is needed: exact-key rejection precedes async I/O and RHI work.
+						NullRHIContextFactory factory;
+						ApplicationInput input;
+						GGLabAppRuntime runtime;
+						const bool initialized = runtime.Initialize(info) == AppRuntimeInitializeResult::Succeeded;
+						const AppRuntimeServiceInitializeResult result = initialized ?
+							runtime.InitializeServices({
+								.m_RHIContextFactory = &factory,
+								.m_Input = &input,
+								.m_ContentRegistration = MakeContentRegistration(),
+								.m_WindowWidth = 640,
+								.m_WindowHeight = 480,
+								.m_ShaderArtifactRoot = info.m_Paths.m_ShaderArtifactRoot,
+								.m_ActiveShaderRegistry = ref,
+								}) :
+							AppRuntimeServiceInitializeResult::InvalidState;
+						context.Check(initialized &&
+							result == AppRuntimeServiceInitializeResult::StartupShaderProgramsUnavailable &&
+							runtime.GetLifecycleState() == AppRuntimeLifecycleState::Failed &&
+							!runtime.AreServicesInitialized() && factory.m_CreateCount == 0,
+							oldInterface ?
+								"Old interface registry rejects before render-host creation on both RHIs and counter modes" :
+								"Partial revised registry rejects missing Atmosphere before render-host creation on both RHIs and counter modes");
+					}
+				}
+			}
+		}
+
 		void RunLifecycleSelfTests(SelfTestContext& context) noexcept
 		{
+			RunStartupRegistryRejectionTests(context);
 			RunApplicationFrameworkSelfTests(context);
 			RunApplicationInputSelfTests(context);
 			RunApplicationToolingSelfTests(context);

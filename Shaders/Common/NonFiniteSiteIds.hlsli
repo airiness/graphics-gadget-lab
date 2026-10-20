@@ -86,5 +86,5 @@ static const uint NF_INJECT_PASS_TEMPORAL_AA_CSMAIN_HISTORY = 2u;
 static const uint NF_INJECTION_POINT_COUNT = 3u;
 
 static const uint NF_ABI_VERSION = 2u;
-static const uint NF_INVENTORY_LOW = 0x9954bbd2u;
-static const uint NF_INVENTORY_HIGH = 0x0aae78c8u;
+static const uint NF_INVENTORY_LOW = 0x161b9549u;
+static const uint NF_INVENTORY_HIGH = 0xb01a2a20u;

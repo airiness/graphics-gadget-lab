@@ -1,6 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "Graphics/RenderPass/AtmosphereBindingLayout.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
 
 namespace gglab
 {
@@ -26,9 +28,12 @@ namespace gglab
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
-		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services, bool physicalPreview) noexcept;
+		ResolvedRenderPipeline GetOrCreatePSO(const RenderServices& services, bool physicalPreview) noexcept;
 
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
+		AtmosphereBindingLayout m_AtmosphereLayout;
+		ResolvedRenderLayout m_SceneLayout;
+		ResolvedBindingRef<SceneGPU> m_SceneReference;
 		GraphicsPhysicalPipelineKey m_PhysicalPreviewRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};
 		GraphicsPipelineSlot m_PhysicalPreviewPipelineSlot{};

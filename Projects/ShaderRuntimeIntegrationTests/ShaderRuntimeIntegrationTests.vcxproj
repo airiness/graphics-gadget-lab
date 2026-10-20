@@ -127,6 +127,7 @@
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\TemporalAccumulationNumericSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\NonFiniteScanNumericSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\LayoutBindingNumericSelfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\BrdfLutNumericSelfTests.h" />
@@ -134,6 +135,7 @@
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\TemporalAccumulationNumericSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\NonFiniteScanNumericSelfTests.h" />
+    <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\LayoutBindingNumericSelfTests.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">

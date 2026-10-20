@@ -54,8 +54,12 @@ namespace gglab
 			}
 
 			m_IncludesHdrDiffValidation = shaderSet.m_IncludesHdrDiffValidation;
-			const RHIBindingLayoutHandle bindingLayout =
-				forward_shading::CreateBindingLayout(services, true);
+			m_BindingLayout = forward_shading::CreateBindingLayout(services, true);
+			if (!m_BindingLayout.IsValid())
+			{
+				return;
+			}
+			const auto bindingLayout = m_BindingLayout.GetNativeLayout();
 			const auto prepareRecipe = [&](LightingRecipe lighting, const ForwardOpaquePixelShaders& shaders,
 				uint32_t lightingTargetCount)
 				{
@@ -288,19 +292,26 @@ namespace gglab
 					{
 						return GetOrCreatePSOForVariant(services, variantBits, output);
 					};
-				graphicsContext->SetPipeline(
-					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
-				forward_shading::BindSceneResources(
-					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue);
+				auto constants = m_BindingLayout.BeginRecording(*graphicsContext);
+				if (!constants.SetPipeline(
+					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits)))
+				{
+					return;
+				}
+				if (!forward_shading::BindSceneResources(
+					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_BindingLayout, constants))
+				{
+					return;
+				}
 
 				const RHIBufferHandle tileHeaders = executeContext.GetBufferHandle(data.m_TileHeaders);
 				const RHIBufferHandle tileIndices = executeContext.GetBufferHandle(data.m_TileIndices);
 				GGLAB_ASSERT_MSG(tileHeaders.IsValid() && tileIndices.IsValid(),
 					"Forward+ tile buffers must resolve before opaque shading.");
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(forward_shading::RootParameter::TileHeaders), tileHeaders);
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(forward_shading::RootParameter::TileIndices), tileIndices);
+				if (!m_BindingLayout.BindTileLists(*graphicsContext, tileHeaders, tileIndices))
+				{
+					return;
+				}
 				if (!graphicsContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
 				{
@@ -308,7 +319,8 @@ namespace gglab
 				}
 
 				forward_shading::DrawBuckets(*graphicsContext, renderQueue, OpaqueBuckets,
-					data.m_Scene.m_ExpectedRenderQueue, resolvePipeline);
+					data.m_Scene.m_ExpectedRenderQueue, m_BindingLayout, contextPtr->m_FrameConstants,
+					data.m_Scene.m_AtmosphereSnapshot, constants, resolvePipeline);
 			});
 	}
 
@@ -322,7 +334,7 @@ namespace gglab
 			}).IsValid();
 	}
 
-	RHIPipelineHandle RenderPassForwardOpaque::GetOrCreatePSOForVariant(const RenderServices& services,
+	ResolvedRenderPipeline RenderPassForwardOpaque::GetOrCreatePSOForVariant(const RenderServices& services,
 		uint64_t variantBits, const OutputVariant& output) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
@@ -345,7 +357,8 @@ namespace gglab
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slots = output.m_MaterialDiagnostics ? *m_MaterialDiagnosticPipelineSlots : m_PipelineSlots;
-		return pipelineCache->Resolve(slots[lighting][contribution][slotIndex], physicalKey, GetInfo());
+		return m_BindingLayout.ResolvePipeline(
+			*pipelineCache, slots[lighting][contribution][slotIndex], physicalKey, GetInfo());
 	}
 
 	std::optional<DepthCoveragePipelineSignature> RenderPassForwardOpaque::

@@ -69,6 +69,7 @@ namespace gglab
 			uint32_t frameSlotIndex, const RHIFencePoint& reservedFence) noexcept;
 		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool IsFrameActive(uint32_t frameSlotIndex) const noexcept;
+		void RecordDescriptorBind(uint32_t frameSlotIndex, bool reusedSnapshot) noexcept;
 		[[nodiscard]] uint64_t GetDescriptorAllocationCount(uint32_t frameSlotIndex) const noexcept
 		{
 			return frameSlotIndex < m_FrameSlots.size() ? m_FrameSlots[frameSlotIndex].m_AllocationCount : 0;
@@ -83,6 +84,8 @@ namespace gglab
 			std::vector<VkDescriptorPool> m_Pools;
 			size_t m_PoolIndex = 0;
 			uint64_t m_AllocationCount = 0;
+			uint64_t m_BindCount = 0;
+			uint64_t m_ReuseCount = 0;
 			RHIFencePoint m_LastSubmittedFence{};
 			bool m_Active = false;
 		};
@@ -90,5 +93,10 @@ namespace gglab
 		[[nodiscard]] VkDescriptorPool CreatePool() noexcept;
 		VulkanDevice* m_Device = nullptr;
 		std::vector<FrameSlot> m_FrameSlots;
+		uint64_t m_SubmittedFrameCount = 0;
+		uint64_t m_HighWaterSnapshotCount = 0;
+		uint64_t m_LastSubmittedSnapshotCount = 0;
+		uint64_t m_LastSubmittedBindCount = 0;
+		uint64_t m_LastSubmittedReuseCount = 0;
 	};
 }

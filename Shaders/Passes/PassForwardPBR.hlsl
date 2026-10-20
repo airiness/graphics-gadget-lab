@@ -7,6 +7,7 @@
 #include <Common/SurfaceEvaluation.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
 #include <Lighting/AmbientOcclusion.hlsli>
+#include <Lighting/AtmosphereBinding.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
@@ -325,10 +326,10 @@ float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
 	{
 		return 1.0.xxx;
 	}
-	float3 positionKm = positionWS * g_Scene.AtmosphereWorld.w - g_Scene.AtmosphereWorld.xyz;
+	float3 positionKm = positionWS * g_Atmosphere.World.w - g_Atmosphere.World.xyz;
 	float radiusKm = length(positionKm);
-	float bottomKm = g_Scene.AtmosphereRadii.x;
-	float topKm = g_Scene.AtmosphereRadii.y;
+	float bottomKm = g_Atmosphere.Radii.x;
+	float topKm = g_Atmosphere.Radii.y;
 	float mu = dot(positionKm, sunDirection) / max(radiusKm, 1.0e-6);
 	float b = radiusKm * mu;
 	float c = (radiusKm - bottomKm) * (radiusKm + bottomKm);

@@ -124,7 +124,7 @@ function Invoke-PackageSmoke {
     $stderrPath = Join-Path $PackageRoot "artifact-only-smoke.stderr.log"
     $arguments = @(
         "--lab", "gglab.lab.culling",
-        "--no-devtools"
+        "--no-devtools", "--hidden"
     )
     $process = Start-Process -FilePath $executable -WorkingDirectory $PackageRoot `
         -ArgumentList $arguments -RedirectStandardOutput $stdoutPath `
@@ -148,7 +148,7 @@ function Invoke-PackageSmoke {
             }
             $hasArtifactStartup = $output -match
                 "Artifact-only shader startup selected the packaged $targetProfile active registry"
-            $hasPreload = $output -match "Async artifact preload published 30 shaders"
+            $hasPreload = $output -match "Async artifact preload published 50 shaders"
             $hasBackendFrame = if ($SelectedBackend -eq "vulkan") {
                 $output -match "Vulkan completed its first production submit/present frame transaction"
             } else {

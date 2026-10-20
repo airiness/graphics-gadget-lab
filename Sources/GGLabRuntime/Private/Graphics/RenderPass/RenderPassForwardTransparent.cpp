@@ -32,8 +32,13 @@ namespace gglab
 			{
 				return;
 			}
+			m_BindingLayout = forward_shading::CreateBindingLayout(services, false);
+			if (!m_BindingLayout.IsValid())
+			{
+				return;
+			}
 			m_PhysicalKeys[0] = forward_shading::MakeBasePhysicalKey(
-				forward_shading::CreateBindingLayout(services, false),
+				m_BindingLayout.GetNativeLayout(),
 				shaderSet.m_CoverageVertexShader, shaderSet.m_AllLightsShadingPixelShader);
 			m_IsInitialized = true;
 		}
@@ -97,10 +102,17 @@ namespace gglab
 					{
 						return GetOrCreatePSOForVariant(services, variantBits, materialDiagnostics);
 					};
-				graphicsContext->SetPipeline(
-					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
-				forward_shading::BindSceneResources(
-					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue);
+				auto constants = m_BindingLayout.BeginRecording(*graphicsContext);
+				if (!constants.SetPipeline(
+					resolvePipeline(renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits)))
+				{
+					return;
+				}
+				if (!forward_shading::BindSceneResources(
+					*graphicsContext, *contextPtr, services, data.m_Scene, renderQueue, m_BindingLayout, constants))
+				{
+					return;
+				}
 				if (!graphicsContext->SetConstantBufferData(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), passParameters))
 				{
@@ -108,7 +120,8 @@ namespace gglab
 				}
 
 				forward_shading::DrawBuckets(*graphicsContext, renderQueue, TransparentBuckets,
-					data.m_Scene.m_ExpectedRenderQueue, resolvePipeline);
+					data.m_Scene.m_ExpectedRenderQueue, m_BindingLayout, contextPtr->m_FrameConstants,
+					data.m_Scene.m_AtmosphereSnapshot, constants, resolvePipeline);
 			});
 	}
 
@@ -118,7 +131,7 @@ namespace gglab
 		return GetOrCreatePSOForVariant(services, variantBits, true).IsValid();
 	}
 
-	RHIPipelineHandle RenderPassForwardTransparent::GetOrCreatePSOForVariant(
+	ResolvedRenderPipeline RenderPassForwardTransparent::GetOrCreatePSOForVariant(
 		const RenderServices& services, uint64_t variantBits, bool materialDiagnostics) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
@@ -138,6 +151,6 @@ namespace gglab
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slots = materialDiagnostics ? *m_MaterialDiagnosticPipelineSlots : m_PipelineSlots;
-		return pipelineCache->Resolve(slots[slotIndex], physicalKey, GetInfo());
+		return m_BindingLayout.ResolvePipeline(*pipelineCache, slots[slotIndex], physicalKey, GetInfo());
 	}
 }

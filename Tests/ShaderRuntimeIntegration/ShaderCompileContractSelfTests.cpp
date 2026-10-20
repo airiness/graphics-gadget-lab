@@ -13,6 +13,7 @@
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
+#include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/RHI/RHICoordinatePolicy.h"
@@ -624,6 +625,29 @@ namespace gglab
 				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex) !=
 				spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex),
 				"ShaderManager loads backend artifacts from an injected immutable registry");
+
+			// A valid registry from before this interface revision cannot satisfy the new keys.
+			auto oldEntries = registryEntries;
+			for (auto& entry : oldEntries)
+			{
+				entry.m_ProgramRef.m_VariantId = "vertex";
+			}
+			const auto oldBuild = BuildShaderProgramRegistryArtifact(oldEntries);
+			const auto oldPublication = PublishShaderProgramRegistryArtifact(runtimeArtifactRoot, oldBuild.m_Artifact);
+			for (const auto backend : { RHIBackendType::DX12, RHIBackendType::Vulkan })
+			{
+				ShaderManager oldManager({ .m_ActiveBackend = backend, .m_ArtifactRoot = runtimeArtifactRoot,
+					.m_ActiveRegistry = oldPublication.m_RegistryRef });
+				const ShaderProgramRef oldProgram{ "gglab.shader.forward-coverage", "vertex", ShaderStage::Vertex };
+				context.Check(oldBuild.IsSuccess() && oldPublication.IsSuccess() && oldManager.IsReady() &&
+					oldManager.LoadProgram(oldProgram).IsValid() &&
+					!oldManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
+					!oldManager.LoadProgram(shader_programs::ForwardCoverageVertex).IsValid(),
+					"A byte-valid old registry resolves its historical key but rejects the revised interface without fallback");
+			}
+			context.Check(!dxilManager.LoadProgram(shader_programs::ForwardPBRAllLightsPixel).IsValid() &&
+				!spirVManager.LoadProgram(shader_programs::ForwardPBRAllLightsPixel).IsValid(),
+				"A partial revised registry rejects missing cohort programs on either target");
 
 			// Recipe identity semantics: the resolved recipe is the authority, and
 			// producer identity is a separate build-key axis.
@@ -2205,6 +2229,40 @@ namespace gglab
 			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
 			ShaderCompiler compiler(shaderSourceRoot, ResolveShaderCacheRoot(runtimeRoot));
+			ShaderDesc bindingDesc{ .m_SourcePath = L"Tests/SceneAtmosphereBindingsContractCompile.hlsl",
+				.m_Stage = ShaderStage::Pixel, .m_Entry = L"PSMain", .m_IncludeDirs = { L"." } };
+			bindingDesc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			bindingDesc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const auto bindingDxil = compiler.Compile(bindingDesc);
+			bindingDesc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const auto bindingSpirV = compiler.Compile(bindingDesc);
+			std::string bindingDisassembly;
+			context.Check(bindingDxil.IsSuccess() &&
+				DisassembleDxil(bindingDxil.m_Artifact.m_Binary, bindingDisassembly) &&
+				FindDxilMemberOffset(bindingDisassembly, "ObjectCount") == offsetof(SceneGPU, ObjectCount) &&
+				FindDxilMemberOffset(bindingDisassembly, "WorldSunAngularRadius") == offsetof(SceneGPU, WorldSunAngularRadius) &&
+				FindDxilMemberOffset(bindingDisassembly, "World") == offsetof(AtmosphereGPU, m_World) &&
+				bindingDisassembly.find("cb0") != std::string::npos &&
+				bindingDisassembly.find("cb3") != std::string::npos &&
+				bindingDisassembly.find("cb5") != std::string::npos &&
+				bindingDisassembly.find("AtmosphereWorld") == std::string::npos,
+				"DXIL consumes Scene b0, Shadow b3 and Atmosphere b5 with current CPU offsets and no Scene duplicates");
+			SpirVDecorationReflection bindingReflection;
+			const bool bindingReflected = bindingSpirV.IsSuccess() &&
+				ReadSpirVDecorations(bindingSpirV.m_Artifact.m_Binary, bindingReflection);
+			const auto* sceneLayout = bindingReflection.FindStructLayout("type.ConstantBuffer.SceneData");
+			const auto* iblLayout = bindingReflection.FindStructLayout("IBLResourceData");
+			const auto* boundAtmosphereLayout = bindingReflection.FindStructLayout("type.ConstantBuffer.AtmosphereParameters");
+			context.Check(bindingReflected && HasDescriptorBinding(bindingReflection, 0, 0) &&
+				HasDescriptorBinding(bindingReflection, 0, 3) && HasDescriptorBinding(bindingReflection, 0, 5) &&
+				sceneLayout && sceneLayout->m_Members.size() == 13 &&
+				sceneLayout->m_Members.back().m_Offset == offsetof(SceneGPU, IBLResource) &&
+				iblLayout && iblLayout->m_Size == sizeof(IBLResourceGPU) &&
+				sceneLayout->m_Members.back().m_Offset + *iblLayout->m_Size == sizeof(SceneGPU) &&
+				boundAtmosphereLayout && boundAtmosphereLayout->m_Size == sizeof(AtmosphereGPU) &&
+				boundAtmosphereLayout->m_Members.back().m_Offset == offsetof(AtmosphereGPU, m_World),
+				"SPIR-V preserves the distinct registers, 96-byte Scene and 128-byte Atmosphere packing");
+
 			ShaderDesc desc{
 				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
 				.m_Stage = ShaderStage::Compute,

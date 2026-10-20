@@ -2,18 +2,7 @@
 #include <Common/NonFiniteCounters.hlsli>
 // Original RGB atmosphere implementation. Lengths are km; coefficients are inverse km.
 // LUT decomposition follows Hillaire (2020); the multiple-scattering closure is isotropic.
-struct AtmosphereParameters
-{
-	float4 Radii;
-	float4 Rayleigh;
-	float4 Mie;
-	float4 Absorption;
-	float4 Ground;
-	float4 Sun;
-	float4 Observer;
-	float4 World;
-};
-ConstantBuffer<AtmosphereParameters> g_Atmosphere : register(b0);
+#include <Lighting/AtmosphereBinding.hlsli>
 static const float AtmospherePi = 3.141592653589793;
 float2 AtmosphereSkyViewUV(float3 direction, float3 up, float3 sun)
 {

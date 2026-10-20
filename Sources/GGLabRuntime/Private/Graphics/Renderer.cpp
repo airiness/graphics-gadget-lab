@@ -1,4 +1,5 @@
 #include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/AtmosphereSystem.h"
@@ -44,24 +45,6 @@
 namespace gglab
 {
 	Renderer::Renderer() noexcept = default;
-
-	namespace
-	{
-		void AddBindingSlot(RHIBindingLayoutDesc& desc, RHIBindingType type,
-			RHIShaderStage visibility, uint32_t binding, uint32_t space, uint32_t count,
-			uint32_t sizeInBytes, const char* debugName) noexcept
-		{
-			GGLAB_ASSERT(desc.m_SlotCount < RHIBindingLayoutDesc::MaxSlots);
-			auto& slot = desc.m_Slots[desc.m_SlotCount++];
-			slot.m_Type = type;
-			slot.m_Visibility = visibility;
-			slot.m_Binding = binding;
-			slot.m_Space = space;
-			slot.m_Count = count;
-			slot.m_SizeInBytes = sizeInBytes;
-			slot.m_DebugName = debugName;
-		}
-	}
 
 	Renderer::~Renderer()
 	{
@@ -296,6 +279,7 @@ namespace gglab
 		m_TemporalAACapabilityStatus = {};
 		m_GTAOCapabilityStatus = {};
 
+		m_CommonBindingLayout = {};
 		m_RHIContext.reset();
 
 		m_IsInitialized = false;
@@ -797,31 +781,7 @@ namespace gglab
 
 	RHIBindingLayoutDesc Renderer::BuildCommonRHIBindingLayoutDesc() noexcept
 	{
-		RHIBindingLayoutDesc desc{};
-		desc.m_DebugName = "RendererCommonBindingLayout";
-
-		AddBindingSlot(
-			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
-		AddBindingSlot(desc, RHIBindingType::InlineConstants, RHIShaderStage::All, 1, 0, 1,
-			MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
-		AddBindingSlot(
-			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 2, 0, 1, 0, "PassCB");
-		desc.m_Slots[desc.m_SlotCount - 1].m_BufferBindingMode = RHIBufferBindingMode::Dynamic;
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 1, 0, 1, 0,
-			"ObjectSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 2, 0, 1, 0,
-			"MaterialSB");
-		AddBindingSlot(
-			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
-			"LightSB");
-		AddBindingSlot(desc, RHIBindingType::InlineConstants, RHIShaderStage::All, 4, 0, 1,
-			MaxInlineConstantDWORDs * sizeof(uint32_t), "InlineConstants");
-		AddBindingSlot(desc, RHIBindingType::BindlessResourceTable, RHIShaderStage::All, 0, 0, 0, 0,
-			"BindlessResources");
-		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0,
-			"BindlessSamplers");
-		return desc;
+		return scene_bindings::GetCommonLayoutContract().BuildRHIDesc("RendererCommonBindingLayout");
 	}
 
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
@@ -888,9 +848,8 @@ namespace gglab
 
 	void Renderer::CreateCommonBindingLayout() noexcept
 	{
-		const RHIBindingLayoutDesc commonBindingLayout = BuildCommonRHIBindingLayoutDesc();
-		m_CommonBindingLayout =
-			m_RHIContext->GetPipelineSystem().CreateBindingLayout(commonBindingLayout);
+		m_CommonBindingLayout = ResolvedRenderLayout::Create(m_RHIContext->GetPipelineSystem(),
+			scene_bindings::GetCommonLayoutContract(), "RendererCommonBindingLayout");
 		GGLAB_ASSERT_MSG(m_CommonBindingLayout.IsValid(),
 			"Renderer failed to create the common RHI binding layout.");
 	}

@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "Graphics/RenderPass/ForwardBindingLayout.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -20,12 +21,6 @@
 // output and bucket policy.
 namespace gglab::forward_shading
 {
-	enum class RootParameter : uint32_t
-	{
-		ShadowConstants = static_cast<uint32_t>(CommonRSRootParamIndex::Count),
-		TileHeaders,
-		TileIndices,
-	};
 
 	struct PassParameters
 	{
@@ -54,7 +49,7 @@ namespace gglab::forward_shading
 
 	// Creates the common binding layout plus shadow constants and, for Forward+
 	// shading, the tile light-list buffers.
-	[[nodiscard]] RHIBindingLayoutHandle CreateBindingLayout(
+	[[nodiscard]] ForwardBindingLayout CreateBindingLayout(
 		const RenderServices& services, bool forwardPlusLightLists) noexcept;
 
 	// HDR scene-color target over D32 depth; presets are resolved per draw variant.
@@ -76,6 +71,7 @@ namespace gglab::forward_shading
 		RGTextureId m_BrdfLut{};
 		RGTextureId m_ShadowMap{};
 		RGTextureId m_AtmosphereTransmittance{};
+		TypedConstantSnapshot<AtmosphereGPU> m_AtmosphereSnapshot{};
 
 		RGTextureViewId m_Rtv{};
 		RGTextureViewId m_Dsv{};
@@ -133,16 +129,22 @@ namespace gglab::forward_shading
 
 	// Binds raster state, scene and shadow constants and the frame structured buffers.
 	// A pipeline must already be set so that the root layout is established.
-	void BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
+	[[nodiscard]] bool BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
-		const SceneInputs& inputs, const RenderQueue& renderQueue) noexcept;
+		const SceneInputs& inputs, const RenderQueue& renderQueue,
+		const ForwardBindingLayout& layout,
+		ScopedConstantBindings<RHIGraphicsCommandContext>& constants) noexcept;
 
 	// Draws the bucket ranges with the exact draw packets accepted by the frame plan.
 	template <typename ResolvePipeline>
 	void DrawBuckets(RHIGraphicsCommandContext& graphicsContext, const RenderQueue& renderQueue,
 		std::span<const RenderBucket> buckets, const RenderQueue* expectedRenderQueue,
+		const ForwardBindingLayout& layout, const RenderFrameConstantBindings& frameConstants,
+		const TypedConstantSnapshot<AtmosphereGPU>& atmosphere,
+		ScopedConstantBindings<RHIGraphicsCommandContext>& constants,
 		ResolvePipeline&& resolvePipeline) noexcept
 	{
+		GGLAB_UNUSED(expectedRenderQueue);
 		GGLAB_ASSERT_MSG(renderQueue.m_CoverageRasterDomain.IsValid(),
 			"Forward depth coverage requires one valid raster domain per view.");
 		for (const RenderBucket bucket : buckets)
@@ -165,7 +167,12 @@ namespace gglab::forward_shading
 
 				if (drawItem.m_VariantBits != lastVariantBits)
 				{
-					graphicsContext.SetPipeline(resolvePipeline(drawItem.m_VariantBits));
+					if (!constants.SetPipeline(resolvePipeline(drawItem.m_VariantBits)) ||
+						!layout.BindFrameConstants(constants, frameConstants.m_SceneSnapshot,
+							frameConstants.m_DirectionalShadowSnapshot, atmosphere))
+					{
+						return;
+					}
 					lastVariantBits = drawItem.m_VariantBits;
 				}
 

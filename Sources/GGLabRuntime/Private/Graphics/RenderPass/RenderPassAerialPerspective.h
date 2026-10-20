@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "Graphics/RenderPass/AtmosphereBindingLayout.h"
 
 namespace gglab
 {
@@ -18,6 +19,7 @@ namespace gglab
 
 	private:
 		ComputePipelineRecipe m_BuildRecipe{};
+		AtmosphereBindingLayout m_BindingLayout;
 		ComputePipelineRecipe m_CompositeRecipe{};
 		ComputePipelineSlot m_BuildSlot{};
 		ComputePipelineSlot m_CompositeSlot{};

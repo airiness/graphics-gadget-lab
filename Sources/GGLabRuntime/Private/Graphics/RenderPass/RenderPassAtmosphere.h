@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "Graphics/RenderPass/AtmosphereBindingLayout.h"
 namespace gglab
 {
 	class RenderAtmosphereAccess;
@@ -24,5 +25,6 @@ namespace gglab
 			RenderAtmosphereAccess& atmosphere, const AtmosphereGPU& parameters, bool bake) noexcept;
 		ComputePipelineRecipe m_Recipe{};
 		ComputePipelineSlot m_Slot{};
+		AtmosphereBindingLayout m_BindingLayout;
 	};
 }

@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
+#include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -213,7 +214,11 @@ namespace gglab
 
 		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override
 		{
-			return m_CommonBindingLayout;
+			return m_CommonBindingLayout.GetNativeLayout();
+		}
+		[[nodiscard]] const ComposedLayout* GetCommonLayoutContract() const noexcept override
+		{
+			return m_CommonBindingLayout.GetContract();
 		}
 		[[nodiscard]] RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override;
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
@@ -334,7 +339,7 @@ namespace gglab
 		std::unique_ptr<AtmosphereSystem> m_BakeAtmosphere;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
-		RHIBindingLayoutHandle m_CommonBindingLayout{};
+		ResolvedRenderLayout m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
 		GTAOCapabilityStatus m_GTAOCapabilityStatus{};

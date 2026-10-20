@@ -13,49 +13,19 @@
 
 namespace gglab::forward_shading
 {
-	namespace
-	{
-		void AppendReadOnlyBufferSlot(RHIBindingLayoutDesc& desc, uint32_t binding,
-			const char* debugName) noexcept
-		{
-			GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
-			desc.m_Slots[desc.m_SlotCount++] = {
-				.m_Type = RHIBindingType::ReadOnlyStorageBuffer,
-				.m_Visibility = RHIShaderStage::Pixel,
-				.m_Binding = binding,
-				.m_Space = 0,
-				.m_Count = 1,
-				.m_DebugName = debugName,
-			};
-		}
-	}
-
-	RHIBindingLayoutHandle CreateBindingLayout(
+	ForwardBindingLayout CreateBindingLayout(
 		const RenderServices& services, bool forwardPlusLightLists) noexcept
 	{
-		RHIBindingLayoutDesc desc = services.m_BindingLayout->GetCommonBindingLayoutDesc();
-		desc.m_DebugName = forwardPlusLightLists ?
-			"ForwardPBR.ForwardPlusBindingLayout" :
-			"ForwardPBR.BindingLayout";
-		GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
-		desc.m_Slots[desc.m_SlotCount++] = {
-			.m_Type = RHIBindingType::ConstantBuffer,
-			.m_Visibility = RHIShaderStage::Pixel,
-			.m_Binding = 3,
-			.m_Space = 0,
-			.m_Count = 1,
-			.m_DebugName = "DirectionalShadowCB",
-		};
-		if (forwardPlusLightLists)
+		const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
+		GGLAB_ASSERT_MSG(common, "Forward shading requires the common logical layout contract.");
+		if (!common)
 		{
-			AppendReadOnlyBufferSlot(desc, 5, "ForwardPlusTileHeaders");
-			AppendReadOnlyBufferSlot(desc, 6, "ForwardPlusTileIndices");
+			return {};
 		}
-
 		auto* rhiContext = services.m_Presentation->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
-		const RHIBindingLayoutHandle layout =
-			rhiContext->GetPipelineSystem().CreateBindingLayout(desc);
+		auto layout = ForwardBindingLayout::Create(
+			rhiContext->GetPipelineSystem(), *common, forwardPlusLightLists);
 		GGLAB_ASSERT_MSG(layout.IsValid(), "Forward shading requires its pass-specific binding layout.");
 		return layout;
 	}
@@ -157,6 +127,10 @@ namespace gglab::forward_shading
 		inputs.m_PrefilteredSpecularCubemap =
 			builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 		inputs.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
+		if (const auto* constants = blackboard.TryGet<RGForwardAtmosphereConstants>())
+		{
+			inputs.m_AtmosphereSnapshot = constants->m_Snapshot;
+		}
 		const auto* atmosphere = blackboard.TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
 		if (atmosphere && context.m_RenderScene.m_WorldSunLightIndex != std::numeric_limits<uint32_t>::max())
 		{
@@ -291,9 +265,11 @@ namespace gglab::forward_shading
 		return nullptr;
 	}
 
-	void BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
+	bool BindSceneResources(RHIGraphicsCommandContext& graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
-		const SceneInputs& inputs, const RenderQueue& renderQueue) noexcept
+		const SceneInputs& inputs, const RenderQueue& renderQueue,
+		const ForwardBindingLayout& layout,
+		ScopedConstantBindings<RHIGraphicsCommandContext>& constants) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(inputs.m_RasterDomain);
 		GGLAB_ASSERT_MSG(inputs.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain) ||
@@ -303,12 +279,11 @@ namespace gglab::forward_shading
 		graphicsContext.SetScissorRect(inputs.m_RasterDomain->m_Scissor);
 		graphicsContext.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-		graphicsContext.SetConstantBuffer(
-			static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-			context.m_FrameConstants.m_Scene);
-		graphicsContext.SetConstantBuffer(
-			static_cast<uint32_t>(RootParameter::ShadowConstants),
-			context.m_FrameConstants.m_DirectionalShadow);
+		if (!layout.BindFrameConstants(constants, context.m_FrameConstants.m_SceneSnapshot,
+			context.m_FrameConstants.m_DirectionalShadowSnapshot, inputs.m_AtmosphereSnapshot))
+		{
+			return false;
+		}
 
 		const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
@@ -319,10 +294,11 @@ namespace gglab::forward_shading
 		if (!graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 			context.m_FrameConstants.m_Views))
 		{
-			return;
+			return false;
 		}
 		const auto& lightSB = services.m_FrameBuffers->GetLightStructuredBuffer();
 		graphicsContext.SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 			lightSB->GetBufferHandle(context.m_FrameSlotIndex));
+		return !graphicsContext.HasRecordingError();
 	}
 }

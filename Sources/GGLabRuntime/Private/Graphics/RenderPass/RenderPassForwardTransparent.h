@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RenderPass/ForwardBindingLayout.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
@@ -38,7 +39,7 @@ namespace gglab
 			const RenderServices& services, uint64_t variantBits) noexcept;
 
 	private:
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePSOForVariant(const RenderServices& services,
+		[[nodiscard]] ResolvedRenderPipeline GetOrCreatePSOForVariant(const RenderServices& services,
 			uint64_t variantBits, bool materialDiagnostics) noexcept;
 
 		// Indexed by material diagnostics output.
@@ -46,6 +47,7 @@ namespace gglab
 		using PipelineSlotTable = std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>;
 		PipelineSlotTable m_PipelineSlots{};
 		std::unique_ptr<PipelineSlotTable> m_MaterialDiagnosticPipelineSlots;
+		ForwardBindingLayout m_BindingLayout;
 		bool m_IsInitialized = false;
 	};
 }
