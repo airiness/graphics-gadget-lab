@@ -46,6 +46,11 @@ through a C++ formatter, or substitute clang-format or another formatting engine
 Do not change shared IDE preferences or repository formatting settings to make
 one formatting pass succeed.
 
+For command-line VS automation, read
+[Native formatter automation](references/native-formatter.md) before launching
+DTE or diagnosing COM failures. It covers execution identity, instance selection,
+readiness, bounded retries and task-owned cleanup.
+
 After native formatting, inspect the affected constructs against the layout
 rules, particularly:
 
