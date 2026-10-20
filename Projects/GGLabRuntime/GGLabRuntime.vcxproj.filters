@@ -588,6 +588,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGCompiler.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGDeferredCommit.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -2127,6 +2130,9 @@
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGCompileDiagnostic.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGDeferredCommit.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGObservation.h">

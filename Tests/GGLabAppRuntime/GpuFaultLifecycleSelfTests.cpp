@@ -11,6 +11,9 @@
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureAccess.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
@@ -83,6 +86,20 @@ namespace gglab
 			CompletionUnknown,
 		};
 
+		enum class CommitEnqueueFault
+		{
+			None,
+			BeforeSubmission,
+			DuringSettlement,
+		};
+
+		struct CommitObservation
+		{
+			uint64_t m_Serial = 0;
+			RHIFencePoint m_Fence{};
+			uint32_t m_Order = 0;
+		};
+
 		// Only the backend is simulated. Renderer, graph, capture, IBL, upload scheduler,
 		// AppRuntime::Tick/Shutdown and their owners are the production implementations.
 		struct LifetimeProbe
@@ -124,6 +141,15 @@ namespace gglab
 			RHIFencePoint m_LastAbortFence{};
 			FrameCaptureControlBase* m_CaptureControl = nullptr;
 			uint64_t m_ExportRequest = 0;
+			bool m_EnableDeferredCommits = false;
+			CommitEnqueueFault m_CommitEnqueueFault = CommitEnqueueFault::None;
+			std::optional<RGExecuteContext> m_RetainedExecuteContext;
+			std::array<CommitObservation, 64> m_CommitObservations{};
+			uint32_t m_CommitsRun = 0;
+			uint32_t m_CommitPayloadsDestroyed = 0;
+			uint32_t m_LateCommitsRun = 0;
+			bool m_CommitIdentityMatches = true;
+			RenderPresentationAccess* m_Presentation = nullptr;
 
 			void Record(std::string_view event) const
 			{
@@ -142,6 +168,46 @@ namespace gglab
 				}
 			}
 		};
+
+		void EnqueueFaultFrameCommits(RGExecuteContext& execute, LifetimeProbe& probe, uint64_t serial)
+		{
+			if (!probe.m_EnableDeferredCommits)
+			{
+				return;
+			}
+			if (probe.m_CommitEnqueueFault != CommitEnqueueFault::None)
+			{
+				// Deliberate contract violation: retain a value copy, never a dangling stack reference.
+				probe.m_RetainedExecuteContext.emplace(execute);
+			}
+			struct Payload
+			{
+				LifetimeProbe* m_Probe;
+				~Payload() noexcept { ++m_Probe->m_CommitPayloadsDestroyed; }
+			};
+			for (uint32_t order : { 1u, 2u })
+			{
+				execute.DeferCommit([&probe, serial, order, payload = std::make_unique<Payload>(&probe)]
+					(const RGCommitContext& commit) noexcept
+					{
+						const uint32_t index = probe.m_CommitsRun++;
+						if (index < probe.m_CommitObservations.size())
+						{
+							probe.m_CommitObservations[index] = { commit.m_FrameSerial, commit.m_Fence, order };
+						}
+						probe.m_CommitIdentityMatches &= index < probe.m_CommitObservations.size() &&
+							commit.m_FrameSerial == serial &&
+							probe.m_Presentation->GetLastSubmittedFencePoint() == commit.m_Fence;
+						if (order == 1 && probe.m_CommitEnqueueFault == CommitEnqueueFault::DuringSettlement)
+						{
+							probe.m_RetainedExecuteContext->DeferCommit([&probe](const RGCommitContext&) noexcept
+								{
+									++probe.m_LateCommitsRun;
+								});
+						}
+					});
+			}
+		}
 
 		class FaultDevice final : public RHIDevice
 		{
@@ -625,7 +691,7 @@ namespace gglab
 						builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(frame.GetDisplayViewId()).m_BackBuffer = data.m_Texture;
 					},
-					[this](RGExecuteContext& execute, Data& data)
+					[this, serial = frame.m_FrameSerial](RGExecuteContext& execute, Data& data)
 					{
 						++m_Probe.m_GraphExecutions;
 						const RHIRenderingAttachment attachment{ .m_View = execute.GetViewHandle(data.m_View) };
@@ -633,6 +699,7 @@ namespace gglab
 						commands->BeginRendering({ .m_ColorAttachments = std::span(&attachment, 1) });
 						commands->ClearColorAttachment(0, { 0, 0, 0, 1 });
 						commands->EndRendering();
+						EnqueueFaultFrameCommits(execute, m_Probe, serial);
 					});
 				m_IBL->AddPass(graph, frame, services);
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Scene);
@@ -775,6 +842,8 @@ namespace gglab
 				std::this_thread::yield();
 			}
 			probe.m_CaptureControl = runtime.GetRenderHost()->GetFrameCaptureControl();
+			probe.m_Presentation = runtime.GetRenderServices().m_Presentation;
+			probe.m_EnableDeferredCommits = true;
 			checks.Check(probe.m_GraphExecutions > 0 && probe.m_SubmittedCallbacks > 0,
 				"The outcome harness reaches its production content and submission hook before injection");
 			return probe.m_GraphExecutions > 0;
@@ -832,6 +901,13 @@ namespace gglab
 			if (action == HostFrameAction::DiscardAfterRecording)
 			{
 				return RHIFrameEndResult::Fatal();
+			}
+			if (probe.m_CommitEnqueueFault == CommitEnqueueFault::BeforeSubmission)
+			{
+				probe.m_RetainedExecuteContext->DeferCommit([&probe](const RGCommitContext&) noexcept
+					{
+						++probe.m_LateCommitsRun;
+					});
 			}
 			return host.EndFrame(frame);
 		}
@@ -891,6 +967,12 @@ namespace gglab
 				!temporal.m_HasActiveHistory &&
 					temporal.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission,
 				"Submitted commits temporal history on its fence; every EndFrame failure invalidates it");
+			checks.Check(probe.m_CommitsRun == (submitted ? 2u : 0u) &&
+				probe.m_CommitPayloadsDestroyed == 2 && probe.m_CommitIdentityMatches &&
+				(!submitted || (probe.m_CommitObservations[0].m_Order == 1 &&
+					probe.m_CommitObservations[1].m_Order == 2 &&
+					probe.m_CommitObservations[1].m_Fence == frameFence)),
+				"Production settlement commits once in order with its fence only on Submitted and drops Failed captures");
 			if (!submitted)
 			{
 				const uint32_t begins = probe.m_FrameBegins;
@@ -900,6 +982,8 @@ namespace gglab
 			runtime.Shutdown();
 			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0,
 				"Known-completion outcome teardown finalizes the backend once without early release");
+			checks.Check(probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2,
+				"No ended frame's CPU commit survives into teardown");
 		}
 
 		void RunDiscardOutcomeScenario(SelfTestContext& checks, const std::filesystem::path& root,
@@ -943,6 +1027,8 @@ namespace gglab
 				"Renderer abort preserves the previous fence, adopts a retirement fence, or retains unknown work");
 			std::vector<FrameCaptureResult> results;
 			probe.m_CaptureControl->ConsumeResults(results);
+			checks.Check(probe.m_CommitsRun == 0 && probe.m_CommitPayloadsDestroyed == (recorded ? 2u : 0u),
+				"Discarded and unknown-completion frames destroy recorded CPU commits without running them");
 			if (unknown)
 			{
 				checks.Check(results.size() == 1 && results[0].m_RequestId == capture &&
@@ -965,6 +1051,11 @@ namespace gglab
 				checks.Check(next.IsCompleted() && results.size() == 1 && results[0].m_RequestId == capture &&
 					results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Image,
 					"The next submitted frame fulfills the original requeued request exactly once");
+				checks.Check(probe.m_CommitsRun == 2 && probe.m_CommitIdentityMatches &&
+					probe.m_CommitPayloadsDestroyed == (recorded ? 4u : 2u) &&
+					probe.m_CommitObservations[0].m_Order == 1 && probe.m_CommitObservations[1].m_Order == 2 &&
+					probe.m_CommitObservations[1].m_Fence == next.GetSubmittedFence(),
+					"Only the follow-up frame's commits run; discarded callbacks do not leak into its submission");
 			}
 			runtime.Shutdown();
 			checks.Check(probe.m_ContextDestructions == 1 && probe.m_SafeToRelease &&
@@ -997,12 +1088,15 @@ namespace gglab
 			const uint32_t ends = probe.m_FrameEnds;
 			const uint32_t aborts = probe.m_FrameAborts;
 			const uint32_t callbacks = probe.m_SubmittedCallbacks;
+			const uint32_t commits = probe.m_CommitsRun;
 			probe.m_QueueExport = true;
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_ExportRequest != 0 &&
 				probe.m_GraphBuilds == builds + 1 && probe.m_GraphExecutions == executions &&
 				probe.m_FrameEnds == ends && probe.m_FrameAborts == aborts + 1 &&
 				probe.m_SubmittedCallbacks == callbacks,
 				"Production AppRuntime export deferral aborts after graph build without recording or submitting");
+			checks.Check(probe.m_CommitsRun == commits && probe.m_CommitPayloadsDestroyed == commits,
+				"The export-deferral abort carries no CPU commits from graph setup");
 			held.clear();
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_FrameEnds == ends + 1 &&
 				probe.m_SubmittedCallbacks == callbacks + 1,
@@ -1012,7 +1106,80 @@ namespace gglab
 			checks.Check(results.size() == 1 && results[0].m_RequestId == probe.m_ExportRequest &&
 				results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Resources,
 				"The deferred resource request is fulfilled by the follow-up frame exactly once");
+			checks.Check(probe.m_CommitsRun == commits + 2 && probe.m_CommitPayloadsDestroyed == commits + 2 &&
+				probe.m_CommitIdentityMatches,
+				"The post-deferral submission commits only its own state once");
 			runtime.Shutdown();
+		}
+
+		void RunLateCommitScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			CommitEnqueueFault fault, AbortInjection abort, bool throughRuntime = true)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			const auto previousFence = probe.m_Presentation->GetLastSubmittedFencePoint();
+			const auto previousTemporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			const uint32_t ends = probe.m_FrameEnds;
+			const uint32_t aborts = probe.m_FrameAborts;
+			const uint32_t callbacks = probe.m_SubmittedCallbacks;
+			const uint64_t capture = probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene);
+			probe.m_CommitEnqueueFault = fault;
+			probe.m_AbortInjection = abort;
+			const bool submitted = fault == CommitEnqueueFault::DuringSettlement;
+			if (submitted && throughRuntime)
+			{
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal,
+					"Settlement-time late enqueue makes the production AppRuntime stop with Fatal");
+			}
+			else
+			{
+				const auto result = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
+				checks.Check(!result.IsCompleted() && result.GetSubmittedFence() ==
+					(submitted ? probe.m_LastEndFence : probe.m_LastAbortFence),
+					"Late enqueue returns Fatal with the real submission or abort fence");
+			}
+			checks.Check(probe.m_FrameEnds == ends + (submitted ? 1u : 0u) &&
+				probe.m_FrameAborts == aborts + (submitted ? 0u : 1u) &&
+				probe.m_SubmittedCallbacks == callbacks && probe.m_LateCommitsRun == 0 &&
+				probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2 &&
+				probe.m_CommitIdentityMatches,
+				"Late enqueue never runs its callback, never resettles owners, and releases every CPU capture once");
+			const auto expectedFence = submitted ? probe.m_LastEndFence :
+				(probe.m_LastAbortFence.IsValid() ? probe.m_LastAbortFence : previousFence);
+			checks.Check(probe.m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
+				HasOutcomeTextureState(runtime, TransientPoolSlotState::PendingRetirement, expectedFence),
+				"Late enqueue preserves the actual submission or abort retirement fence");
+			const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			checks.Check(temporal.m_HistoryValid && (submitted ?
+				temporal.m_LastCommitted.m_GraphicsFence == expectedFence &&
+					probe.m_CommitObservations[0].m_Order == 1 && probe.m_CommitObservations[1].m_Order == 2 &&
+					probe.m_CommitObservations[1].m_Fence == expectedFence :
+				temporal.m_LastCommitted.m_GraphicsFence == previousTemporal.m_LastCommitted.m_GraphicsFence &&
+					temporal.m_ResetCount == previousTemporal.m_ResetCount),
+				"A settlement violation keeps Submitted history; a sealed-list abort preserves previous history");
+			std::vector<FrameCaptureResult> results;
+			probe.m_CaptureControl->ConsumeResults(results);
+			checks.Check(submitted ? results.size() == 1 && results[0].m_RequestId == capture &&
+				results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Image :
+				results.empty() && probe.m_CaptureControl->GetUnfinishedRequestCount() == 1,
+				"Late enqueue does not change the capture's original Submitted or Discarded outcome");
+			if (submitted && throughRuntime)
+			{
+				const uint32_t begins = probe.m_FrameBegins;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal && probe.m_FrameBegins == begins,
+					"AppRuntime begins no follow-up frame after settlement returns Fatal");
+			}
+			probe.m_RetainedExecuteContext.reset();
+			runtime.Shutdown();
+			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 &&
+				probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2,
+				"Late-enqueue teardown neither repeats commits nor releases GPU resources early");
 		}
 
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
@@ -1038,6 +1205,14 @@ namespace gglab
 			RunDiscardOutcomeScenario(checks, root / "abort-unknown", HostFrameAction::DiscardAfterRecording,
 				AbortInjection::CompletionUnknown);
 			RunExportDeferralOutcomeScenario(checks, root / "export-deferral");
+			RunLateCommitScenario(checks, root / "late-sealed-unfenced",
+				CommitEnqueueFault::BeforeSubmission, AbortInjection::Unfenced);
+			RunLateCommitScenario(checks, root / "late-sealed-fenced",
+				CommitEnqueueFault::BeforeSubmission, AbortInjection::Fenced);
+			RunLateCommitScenario(checks, root / "late-settling",
+				CommitEnqueueFault::DuringSettlement, AbortInjection::Unfenced);
+			RunLateCommitScenario(checks, root / "late-settling-host-fence",
+				CommitEnqueueFault::DuringSettlement, AbortInjection::Unfenced, false);
 		}
 
 		void RunScenario(SelfTestContext& checks, LifetimeProbe& probe, const std::filesystem::path& root)
@@ -1108,11 +1283,15 @@ namespace gglab
 						}));
 				});
 			const uint64_t capture = runtime.GetFrameCaptureCoordinator()->Submit({});
+			probe.m_Presentation = runtime.GetRenderServices().m_Presentation;
+			probe.m_EnableDeferredCommits = true;
 			probe.m_Inject = true;
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal && probe.m_Faulted && probe.m_QuarantinedPages > 0,
 				"An accepted submission without a signal quarantines actual frame uploads and fails the production runtime");
 			checks.Check(probe.m_CaptureCopies > 0 && probe.m_ReadbackMaps == 0 && probe.m_EarlyDestructions == 0,
 				"The retained production frame keeps graph, capture and IBL resources alive without reading GPU contents");
+			checks.Check(probe.m_CommitsRun == 0 && probe.m_CommitPayloadsDestroyed == 2,
+				"EndFrame CompletionUnknown drops plain CPU commits while retaining GPU-visible owners");
 			TransientResourcePoolSnapshot pool;
 			BuildTransientResourcePoolSnapshot(*runtime.GetRenderHost()->CreateRenderGraphCreateInfo().m_TransientResourcePool, pool);
 			const bool graphRetained = std::ranges::any_of(pool.m_Textures,
@@ -1144,6 +1323,8 @@ namespace gglab
 			checks.Check(probe.m_ContextDestructions == 1 && probe.m_SafeToRelease && held.expired() &&
 				probe.m_ReadyExecutions == 0 && probe.m_LateSubmits == 0,
 				"Production shutdown cancels retained ready work only after safe quiescence and finalizes the Renderer once");
+			checks.Check(probe.m_CommitsRun == 0 && probe.m_CommitPayloadsDestroyed == 2,
+				"Unknown-frame callbacks never run or survive to the shutdown boundary");
 			checks.Check(probe.m_EarlyDestructions == 0 && probe.m_ReadbackMaps == 0,
 				"Shutdown neither destroys resources early nor maps failed frame or IBL readbacks");
 			checks.Check(probe.m_UploadCallbacks == 1 && probe.m_UploadFailedSafely && pendingOwner.expired() && probe.m_ImageEncodes == 0,

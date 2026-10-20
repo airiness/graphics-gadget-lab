@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchTypes.h"
 #include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
@@ -245,9 +246,11 @@ namespace gglab
 				context.Check(prepared == FrameCaptureAvailability::Available && graph.HasNonFiniteScans() == (observed != 0),
 					"Opt-in scan and export observers extend one fixed GPU plan together");
 				service.BeginGraphRecording(100 + observed, graph);
-				RGExecuteContext execution({ .m_GraphicsCommandContext = &begin.GetFrame()->GetGraphicsContext(),
+				RGDeferredCommitList executionCommits;
+				RGExecuteContext execution(executionCommits, { .m_GraphicsCommandContext = &begin.GetFrame()->GetGraphicsContext(),
 					.m_DirectComputeCommandContext = &begin.GetFrame()->GetDirectComputeContext() });
 				graph.Execute(execution);
+				executionCommits.Discard();
 				service.EndGraphRecording(100 + observed, graph);
 				std::vector<FrameCaptureResult> early;
 				service.ConsumeResults(early);
@@ -493,8 +496,10 @@ namespace gglab
 				context.Check(std::ranges::any_of(snapshot.m_Passes, [](const auto& pass) { return pass.m_Name == "Fixture.Culled" && pass.m_Culled; }),
 					"Production counter writes do not revive a culled original producer");
 				service.BeginGraphRecording(501 + enabled, graph);
-				RGExecuteContext execution({ &begin.GetFrame()->GetGraphicsContext(), &begin.GetFrame()->GetDirectComputeContext() });
+				RGDeferredCommitList executionCommits;
+				RGExecuteContext execution(executionCommits, { &begin.GetFrame()->GetGraphicsContext(), &begin.GetFrame()->GetDirectComputeContext() });
 				graph.Execute(execution);
+				executionCommits.Discard();
 				service.EndGraphRecording(501 + enabled, graph);
 				service.CollectCompleted();
 				context.Check(!service.GetLatestNonFiniteProductionFrame(), "Unsubmitted production counters publish no evidence");

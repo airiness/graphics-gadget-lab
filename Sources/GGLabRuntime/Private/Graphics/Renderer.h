@@ -10,6 +10,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
@@ -310,6 +311,7 @@ namespace gglab
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			FramePhase m_Phase = FramePhase::Begun;
 			TemporalFrameTransaction m_TemporalTransaction{};
+			RGDeferredCommitList m_DeferredCommits;
 		};
 
 		void CreateCommonBindingLayout() noexcept;

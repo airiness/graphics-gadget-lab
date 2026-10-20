@@ -199,6 +199,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGCompiler.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGDeferredCommit.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetDependencyGraph.cpp" />
@@ -677,6 +678,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraph.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGCompileDiagnostic.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGDeferredCommit.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGCompiler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutionPlan.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.h" />

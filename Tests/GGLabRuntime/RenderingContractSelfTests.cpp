@@ -49,6 +49,7 @@
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameOutcome.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderMaterialFrameCache.h"
@@ -1938,7 +1939,8 @@ namespace gglab
 				graphics.m_LastInlineWords == std::vector<uint32_t>({ std::bit_cast<uint32_t>(1.5f), 0xabcdef01u }) &&
 				compute.m_LastInlineOffset == 3 && compute.m_LastInlineWords == std::vector<uint32_t>({ 11, 19 }),
 				"Public inline entry points preserve typed payload bits, span elements and word offsets");
-			RGExecuteContext execution({ &graphics, &compute, nullptr });
+			RGDeferredCommitList executionCommits;
+			RGExecuteContext execution(executionCommits, { &graphics, &compute, nullptr });
 			std::array<uint32_t, 24> payload{};
 			payload.fill(0x12345678u);
 			bool uploaded = true;
@@ -1966,6 +1968,7 @@ namespace gglab
 				});
 			context.Check(graph.Compile(), "Constant upload graph compiles");
 			graph.Execute(execution);
+			executionCommits.Discard();
 			context.Check(uploaded && graphics.m_ConstantBindings.size() == 1 &&
 				compute.m_ConstantBindings.size() == 6,
 				"Graphics and compute upload typed parameters larger than root constants");
@@ -1991,7 +1994,9 @@ namespace gglab
 					uploaded &= graphics.SetConstantBufferData(passIndex, payload);
 				});
 			context.Check(secondGraph.Compile(), "A second graph shares the recording batch");
+			executionCommits = RGDeferredCommitList{};
 			secondGraph.Execute(execution);
+			executionCommits.Discard();
 			const auto reusable = graphics.UploadConstants(std::span(payload));
 			context.Check(uploaded && reusable.m_SizeInBytes == sizeof(payload) &&
 				graphics.SetConstantBuffer(passIndex, reusable) && compute.SetConstantBuffer(passIndex, reusable),
@@ -2831,6 +2836,146 @@ namespace gglab
 					"A dependent stream without effect does not count as a join of its prerequisite");
 				device.m_CompletedFenceValue = independentFence.m_Value;
 				pool.ReclaimCompleted();
+			}
+		}
+
+		void RunDeferredCommitContractTests(SelfTestContext& context) noexcept
+		{
+			struct ThrowingCommit
+			{
+				void operator()(const RGCommitContext&) {}
+			};
+			static_assert(!std::is_default_constructible_v<RGExecuteContext>);
+			static_assert(!std::is_constructible_v<RGExecuteContext, RGBackendExecuteContext>);
+			static_assert(std::is_nothrow_constructible_v<RGExecuteContext, RGDeferredCommitList&>);
+			static_assert(!std::is_copy_constructible_v<RGDeferredCommit>);
+			static_assert(std::is_nothrow_move_constructible_v<RGDeferredCommit>);
+			static_assert(!std::is_constructible_v<RGDeferredCommit, ThrowingCommit>);
+			struct Payload
+			{
+				uint32_t& m_Destructions;
+				~Payload() noexcept { ++m_Destructions; }
+			};
+			const RGCommitContext submitted{ 71, { RHIFenceHandle{ 1, 1 }, 42 } };
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				std::vector<uint32_t> order;
+				uint32_t destroyed = 0;
+				bool identityMatches = true;
+				for (uint32_t index : { 1u, 2u })
+				{
+					execute.DeferCommit([&, index, payload = std::make_unique<Payload>(destroyed)]
+						(const RGCommitContext& commit) noexcept
+						{
+							identityMatches &= commit.m_FrameSerial == submitted.m_FrameSerial &&
+								commit.m_Fence == submitted.m_Fence;
+							order.push_back(index);
+						});
+				}
+				context.Check(order.empty() && destroyed == 0,
+					"Enqueue retains move-only CPU captures without committing during recording");
+				commits.Seal();
+				commits.CommitAll(submitted);
+				commits.CommitAll(submitted);
+				commits.Discard();
+				context.Check(order == std::vector<uint32_t>({ 1, 2 }) && identityMatches &&
+					destroyed == 2 && !commits.HasFailed(),
+					"Deferred commits run once in enqueue order with the real serial/fence and release CPU captures");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				uint32_t ran = 0;
+				uint32_t destroyed = 0;
+				execute.DeferCommit([&, payload = std::make_unique<Payload>(destroyed)]
+					(const RGCommitContext&) noexcept { ++ran; });
+				commits.Discard();
+				commits.CommitAll(submitted);
+				context.Check(ran == 0 && destroyed == 1 && !commits.HasFailed(),
+					"Discard drops unsubmitted CPU captures without invoking them or allowing a later commit");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				uint32_t ran = 0;
+				execute.DeferCommit([&](const RGCommitContext&) noexcept { ++ran; });
+				commits.CommitAll({ 71, {} });
+				commits.CommitAll(submitted);
+				context.Check(commits.HasFailed() && ran == 0,
+					"CommitAll rejects an invalid fence in every configuration and never invokes that batch");
+				RGDeferredCommitList empty;
+				empty.CommitAll({});
+				context.Check(empty.HasFailed(), "Even an empty commit list requires a valid submission fence");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				uint32_t ran = 0;
+				uint32_t destroyed = 0;
+				execute.DeferCommit([&](const RGCommitContext&) noexcept { ++ran; });
+				commits.Seal();
+				execute.DeferCommit([&, payload = std::make_unique<Payload>(destroyed)]
+					(const RGCommitContext&) noexcept { ++ran; });
+				commits.CommitAll(submitted);
+				context.Check(commits.HasFailed() && ran == 0 && destroyed == 1,
+					"A sealed list rejects and releases a late enqueue, and its failed batch cannot commit");
+			}
+			{
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits);
+				std::vector<uint32_t> order;
+				// Deliberately retain a still-live context to exercise the reentry guard.
+				execute.DeferCommit([&](const RGCommitContext&) noexcept
+					{
+						order.push_back(1);
+						execute.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(99); });
+					});
+				execute.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(2); });
+				commits.Seal();
+				commits.CommitAll(submitted);
+				commits.CommitAll(submitted);
+				context.Check(commits.HasFailed() && order == std::vector<uint32_t>({ 1, 2 }),
+					"Settlement rejects enqueue without invalidating iteration or skipping/repeating original commits");
+			}
+			{
+				RecordingDevice device;
+				TransientResourcePool pool(&device);
+				RecordingGraphicsCommandContext graphics;
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				RGDeferredCommitList commits;
+				RGExecuteContext execute(commits, { .m_GraphicsCommandContext = &graphics });
+				std::vector<uint32_t> order;
+				graph.AddTrivialSideEffectPass("Commit.First", [&](RGExecuteContext& execution)
+					{
+						execution.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(1); });
+					});
+				graph.AddPass<StorageAccessPassData>("Commit.Culled",
+					[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+					{
+						data.m_Buffer = builder.Write(builder.CreateBuffer("Commit.Unused", { .m_SizeInBytes = 4 }),
+							RGBufferAccess::StorageWrite);
+					},
+					[&](RGExecuteContext& execution, StorageAccessPassData&)
+					{
+						execution.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(99); });
+					});
+				graph.AddTrivialSideEffectPass("Commit.Last", [&](RGExecuteContext& execution)
+					{
+						execution.DeferCommit([&](const RGCommitContext&) noexcept { order.push_back(2); });
+					});
+				const bool compiled = graph.Compile();
+				context.Check(compiled, "Deferred-commit liveness fixture compiles");
+				if (compiled)
+				{
+					graph.Execute(execute);
+					commits.Seal();
+					context.Check(order.empty(), "Graph execution only enqueues its CPU state changes");
+					commits.CommitAll(submitted);
+					context.Check(order == std::vector<uint32_t>({ 1, 2 }),
+						"Culled passes enqueue nothing and live passes commit in execution order");
+					graph.Retire(submitted.m_Fence);
+				}
 			}
 		}
 
@@ -4499,10 +4644,12 @@ namespace gglab
 					snapshot.m_Passes[1].m_PostBarriers.size() == 1,
 					"RenderGraph snapshot publishes the inferred sampleable-depth contract");
 
-				RGExecuteContext executeContext({
+				RGDeferredCommitList executeContextCommits;
+				RGExecuteContext executeContext(executeContextCommits, {
 					.m_GraphicsCommandContext = &recordingGraphicsContext,
 				});
 				graph.Execute(executeContext);
+				executeContextCommits.Discard();
 				const auto isFullResourceBarrier = [](const RHITextureBarrier& barrier) noexcept
 				{
 					return !barrier.m_Subresources.has_value();
@@ -6745,12 +6892,14 @@ namespace gglab
 					encoderSnapshot.m_Passes[3].m_Culled,
 					"RenderGraph snapshots preserve encoder metadata for live and culled passes");
 
-				RGExecuteContext executeContext({
+				RGDeferredCommitList executeContextCommits;
+				RGExecuteContext executeContext(executeContextCommits, {
 					.m_GraphicsCommandContext = &graphicsContext,
 					.m_DirectComputeCommandContext = &directComputeContext,
 					.m_AsyncComputeCommandContext = nullptr,
 				});
 				encoderGraph.Execute(executeContext);
+				executeContextCommits.Discard();
 				context.Check(graphicsExecutions == 1 && computeExecutions == 1 &&
 					copyExecutions == 1 && culledComputeExecutions == 0 &&
 					graphicsContextSelected && directComputeContextSelected &&
@@ -6803,12 +6952,14 @@ namespace gglab
 			context.Check(barrierBatchingCompiled, "RenderGraph barrier batching fixture compiles");
 			if (barrierBatchingCompiled)
 			{
-				RGExecuteContext batchingExecuteContext({
+				RGDeferredCommitList batchingExecuteContextCommits;
+				RGExecuteContext batchingExecuteContext(batchingExecuteContextCommits, {
 					.m_GraphicsCommandContext = &batchingGraphicsContext,
 					.m_DirectComputeCommandContext = &batchingComputeContext,
 					.m_AsyncComputeCommandContext = nullptr,
 				});
 				barrierBatchingGraph.Execute(batchingExecuteContext);
+				batchingExecuteContextCommits.Discard();
 				context.Check(batchingComputeContext.m_TextureBarrierCount == 1 &&
 					batchingComputeContext.m_BufferBarrierCount == 1 &&
 					batchingComputeContext.m_FlushBarrierCount == 1,
@@ -8184,8 +8335,10 @@ namespace gglab
 					});
 				context.Check(snapshotGraph.Compile(), "Execution snapshot allocation fixture compiles");
 				snapshotGraph.EnableExecutionRecord();
-				RGExecuteContext execute({ .m_DirectComputeCommandContext = &snapshotCommands });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { .m_DirectComputeCommandContext = &snapshotCommands });
 				snapshotGraph.Execute(execute);
+				executeCommits.Discard();
 				RGSnapshot snapshot;
 				BuildRenderGraphSnapshot(snapshotGraph, snapshot);
 				context.Check(snapshot.m_Execution.m_Recorded && snapshot.m_Execution.m_Allocations.size() == 1 &&
@@ -8219,8 +8372,10 @@ namespace gglab
 					});
 				context.Check(barrierGraph.Compile(), "Failed barrier resolution fixture compiles");
 				barrierGraph.EnableExecutionRecord();
-				RGExecuteContext execute({ .m_DirectComputeCommandContext = &commands });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { .m_DirectComputeCommandContext = &commands });
 				barrierGraph.Execute(execute);
+				executeCommits.Discard();
 				auto first = barrierGraph.TakeExecutionRecord();
 				context.Check(first && first->m_Barriers.size() == 2 &&
 					std::ranges::all_of(first->m_Barriers, [](const auto& b) { return b.m_Barrier.m_HasPhysicalHandle; }),
@@ -8229,7 +8384,9 @@ namespace gglab
 				resource->m_ImportedHandle = {};
 				commands.m_TextureBarrierCount = 0;
 				barrierGraph.EnableExecutionRecord();
+				executeCommits = RGDeferredCommitList{};
 				barrierGraph.Execute(execute);
+				executeCommits.Discard();
 				auto failed = barrierGraph.TakeExecutionRecord();
 				context.Check(failed && failed->m_Recorded && failed->m_Barriers.size() == 2 &&
 					commands.m_TextureBarrierCount == 0 &&
@@ -9828,8 +9985,10 @@ namespace gglab
 			const bool snapshotCompiled = snapshotGraph.Compile();
 			if (snapshotCompiled)
 			{
-				RGExecuteContext execute({ &snapshotGraphics, &snapshotCompute, nullptr });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { &snapshotGraphics, &snapshotCompute, nullptr });
 				snapshotGraph.Execute(execute);
+				executeCommits.Discard();
 			}
 			const auto atmosphereContract = scene_bindings::ComposeAtmosphereLayout(
 				scene_bindings::GetCommonLayoutContract());
@@ -9942,8 +10101,10 @@ namespace gglab
 			const bool missingCompiled = unavailableGraph.Compile();
 			if (missingCompiled)
 			{
-				RGExecuteContext execute({ &missingGraphics, &missingCompute, nullptr });
+				RGDeferredCommitList executeCommits;
+				RGExecuteContext execute(executeCommits, { &missingGraphics, &missingCompute, nullptr });
 				unavailableGraph.Execute(execute);
+				executeCommits.Discard();
 			}
 			context.Check(missingCompiled && missingGraphics.HasRecordingError() && uploadBatch->HasFailed(),
 				"Missing enabled live data fails the frame even when no Forward draw is emitted");
@@ -12316,6 +12477,7 @@ namespace gglab
 		RunDX12TransferCompletionTests(context);
 		RunFrameSubmissionContractTests(context);
 		RunRenderFrameOutcomeContractTests(context);
+		RunDeferredCommitContractTests(context);
 		RunFrameConstantUploadTests(context);
 		RunScopedConstantRecordingTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);

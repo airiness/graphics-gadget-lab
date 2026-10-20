@@ -32,6 +32,22 @@ outcome derivation table, including abort without an RHI frame, belongs to
 is reviewed against the documented Renderer settlement order; no general
 Runtime Private include access or production test hook is added here.
 
+The same matrix enqueues move-only CPU payloads through each executed pass's
+`RGExecuteContext`. It checks that only Submitted runs the original callbacks,
+once in execution order with the frame serial and real fence, after participant
+settlement. Every other outcome destroys the captures without running them;
+discard/retry and export deferral cannot leak callbacks into the next frame.
+
+Late-enqueue cases deliberately keep a value copy of the execute context while
+its list remains alive, rather than dereferencing the stack context after
+`Render` returns. The direct RenderHost path checks sealed-list rejection before
+submission with fenced and unfenced aborts. A settlement-time violation finishes
+both original commits and keeps graph retirement, capture and temporal history
+Submitted. Direct EndFrame checks its `Fatal(realFence)` result; production
+`AppRuntime::Tick` checks fatal propagation and suppression of post-submission
+hooks and subsequent frames. No participant is settled twice. Normal consumers
+must never retain the context, list or any enqueue capability.
+
 After production IBL has queued a pending readback, a frame submission is
 accepted without a completion signal and idle verification fails. The suite
 checks upload quarantine, retained graph/capture/IBL owners, terminal runtime

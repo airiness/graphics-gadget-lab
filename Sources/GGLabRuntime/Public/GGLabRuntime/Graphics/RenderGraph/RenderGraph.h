@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGPass.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
@@ -45,9 +46,16 @@ namespace gglab
 
 	struct RGExecuteContext
 	{
-		explicit RGExecuteContext(RGBackendExecuteContext backend = {}) noexcept :
-			m_Backend(backend)
+		explicit RGExecuteContext(RGDeferredCommitList& deferredCommits,
+			RGBackendExecuteContext backend = {}) noexcept :
+			m_Backend(backend), m_DeferredCommits(deferredCommits)
 		{
+		}
+		// Only execute lambdas may enqueue. Never retain this context, its copy or an
+		// enqueue handle beyond execution, including in a deferred commit's captures.
+		void DeferCommit(RGDeferredCommit commit) noexcept
+		{
+			m_DeferredCommits.Enqueue(std::move(commit));
 		}
 
 		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
@@ -63,6 +71,7 @@ namespace gglab
 
 	private:
 		RGBackendExecuteContext m_Backend{};
+		RGDeferredCommitList& m_DeferredCommits;
 		const RGExecutionPlan* m_ExecutionPlan = nullptr;
 		RHIDevice* m_Device = nullptr;
 		std::optional<RGPassEncoderType> m_ActiveEncoderType = std::nullopt;

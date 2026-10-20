@@ -460,6 +460,12 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == m_ActiveFrame.m_FrameSlotIndex);
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == m_ActiveFrame.m_BackBufferIndex);
 		GGLAB_ASSERT(renderContext.m_FrameSerial == m_ActiveFrame.m_Serial);
+		struct DeferredCommitSeal
+		{
+			RGDeferredCommitList& m_Commits;
+			~DeferredCommitSeal() noexcept { m_Commits.Seal(); }
+		};
+		const DeferredCommitSeal commitSeal{ m_ActiveFrame.m_DeferredCommits };
 
 		m_ActiveFrame.m_RenderGraph = &rg;
 
@@ -484,7 +490,7 @@ namespace gglab
 			return;
 		}
 
-		RGExecuteContext executeContext{ RGBackendExecuteContext{
+		RGExecuteContext executeContext{ m_ActiveFrame.m_DeferredCommits, RGBackendExecuteContext{
 			.m_GraphicsCommandContext = &m_ActiveFrame.m_RHIFrame->GetGraphicsContext(),
 			.m_DirectComputeCommandContext = &m_ActiveFrame.m_RHIFrame->GetDirectComputeContext(),
 			.m_AsyncComputeCommandContext = nullptr,
@@ -502,7 +508,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial,
 			"Renderer::EndFrame called without the matching active render host frame.");
 
-		if (m_ActiveFrame.m_Phase != FramePhase::Recorded)
+		if (m_ActiveFrame.m_Phase != FramePhase::Recorded || m_ActiveFrame.m_DeferredCommits.HasFailed())
 		{
 			return AbortActiveFrame(frame.GetSerial());
 		}
@@ -513,8 +519,11 @@ namespace gglab
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
 		SettleFrame(ResolveRenderFrameOutcome(
 			RenderFrameEndPath::EndFrame, m_ActiveFrame.m_Serial, result));
+		// Settlement-time violations cannot undo submitted work or settle participants twice.
+		const RHIFrameEndResult settledResult = result.IsCompleted() && m_ActiveFrame.m_DeferredCommits.HasFailed() ?
+			RHIFrameEndResult::Fatal(result.GetSubmittedFence()) : result;
 		EndFrameLifetime();
-		return result;
+		return settledResult;
 	}
 
 	void Renderer::AbortFrame(uint64_t frameSerial) noexcept
@@ -652,6 +661,15 @@ namespace gglab
 			break;
 		}
 		}
+		// Plain CPU commits settle after every GPU-owning participant, in enqueue order.
+		if (outcome.m_Kind == RenderFrameOutcomeKind::Submitted)
+		{
+			m_ActiveFrame.m_DeferredCommits.CommitAll({ outcome.m_FrameSerial, fence });
+		}
+		else
+		{
+			m_ActiveFrame.m_DeferredCommits.Discard();
+		}
 	}
 
 	void Renderer::AbandonGpuOwners() noexcept
@@ -683,6 +701,7 @@ namespace gglab
 
 	void Renderer::EndFrameLifetime() noexcept
 	{
+		m_ActiveFrame.m_DeferredCommits.Discard();
 		m_ActiveFrame = {};
 		m_HasActiveFrame = false;
 	}
