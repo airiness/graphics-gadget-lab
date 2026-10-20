@@ -60,6 +60,7 @@ namespace gglab
 		std::shared_ptr<CaptureJob> m_Job;
 		std::optional<CaptureJobResult> m_Result;
 		CaptureJobSnapshot m_FinalSnapshot;
+		bool m_PublishedToHost = false;
 	};
 
 	struct FrameCaptureCoordinator::DrainingWrite
@@ -278,7 +279,49 @@ namespace gglab
 		return { CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, slot->m_JobId };
 	}
 
+	void FrameCaptureCoordinator::SetAppRuntimeJobResultOwner() noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_AppRuntimeOwnsJobResults &&
+			std::ranges::all_of(m_JobReceipts, [](const JobReceipt& slot) { return slot.m_JobId == 0; }),
+			"AppRuntime must claim job results before admission and cannot replace their owner.");
+		m_AppRuntimeOwnsJobResults = true;
+	}
+
+	void FrameCaptureCoordinator::PublishAppRuntimeJobResults() noexcept
+	{
+		GGLAB_ASSERT(m_AppRuntimeOwnsJobResults);
+		for (JobReceipt& slot : m_JobReceipts)
+		{
+			// Do not move the result into a second host queue or return its credit.
+			// Every non-consuming observer borrows the same frozen terminal receipt.
+			if (slot.m_Result)
+			{
+				slot.m_PublishedToHost = true;
+			}
+		}
+	}
+
+	const CaptureJobResult* FrameCaptureCoordinator::FindPublishedJobResult(uint64_t jobId) const noexcept
+	{
+		if (jobId == 0)
+		{
+			return nullptr;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		return slot != m_JobReceipts.end() && slot->m_PublishedToHost ? &*slot->m_Result : nullptr;
+	}
+
+	std::optional<CaptureJobResult> FrameCaptureCoordinator::TakePublishedJobResult(uint64_t jobId) noexcept
+	{
+		return FindPublishedJobResult(jobId) ? ConsumeJobReceipt(jobId) : std::nullopt;
+	}
+
 	std::optional<CaptureJobResult> FrameCaptureCoordinator::TakeJobResult(uint64_t jobId) noexcept
+	{
+		return m_AppRuntimeOwnsJobResults ? std::nullopt : ConsumeJobReceipt(jobId);
+	}
+
+	std::optional<CaptureJobResult> FrameCaptureCoordinator::ConsumeJobReceipt(uint64_t jobId) noexcept
 	{
 		if (jobId == 0)
 		{
@@ -309,6 +352,11 @@ namespace gglab
 		{
 			snapshot.m_ReservedReceipts += slot.m_JobId != 0;
 			snapshot.m_TerminalReceipts += slot.m_Result.has_value();
+			if (m_AppRuntimeOwnsJobResults && slot.m_Result)
+			{
+				snapshot.m_AppRuntimeUnpublishedResults += !slot.m_PublishedToHost;
+				snapshot.m_AppRuntimePublishedResults += slot.m_PublishedToHost;
+			}
 		}
 		for (const CaptureOutput& output : m_Outputs)
 		{

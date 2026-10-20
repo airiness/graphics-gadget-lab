@@ -21,6 +21,7 @@
 namespace gglab
 {
 	class FrameCaptureControlBase;
+	class GGLabAppRuntime;
 	class NonFiniteWatchCoordinator;
 	class CapturePublicationFileSystemBase;
 	class CaptureWriter;
@@ -167,6 +168,7 @@ namespace gglab
 		[[nodiscard]] CaptureAdmission TrySubmit(CapturePlan&& plan) noexcept;
 		// All methods run on the AppRuntime owner thread. Receipts do not expire:
 		// consumption releases the reserved slot; polling an active/unknown job does not.
+		// Standalone use only: a composed coordinator leaves consumption to AppRuntime.
 		[[nodiscard]] std::optional<CaptureJobResult> TakeJobResult(uint64_t jobId) noexcept;
 		[[nodiscard]] std::optional<CaptureJobSnapshot> GetJobSnapshot(uint64_t jobId) const noexcept;
 		[[nodiscard]] CaptureIntakeSnapshot GetIntakeSnapshot() const noexcept;
@@ -248,6 +250,16 @@ namespace gglab
 		void FinalizeAfterRenderHost() noexcept;
 
 	private:
+		friend class GGLabAppRuntime;
+
+		// Bound once during composition, before admission. Published receipts stay in
+		// their original slots until the host consumes them through AppRuntime.
+		void SetAppRuntimeJobResultOwner() noexcept;
+		void PublishAppRuntimeJobResults() noexcept;
+		[[nodiscard]] const CaptureJobResult* FindPublishedJobResult(uint64_t jobId) const noexcept;
+		[[nodiscard]] std::optional<CaptureJobResult> TakePublishedJobResult(uint64_t jobId) noexcept;
+		[[nodiscard]] std::optional<CaptureJobResult> ConsumeJobReceipt(uint64_t jobId) noexcept;
+
 		struct FrameAttempt;
 		struct ProductAttempt;
 		struct CaptureJob;
@@ -312,6 +324,7 @@ namespace gglab
 		// Fixed at construction. Each accepted job reserves one slot until consumed,
 		// including while active. Rejected submissions never create failure receipts.
 		std::vector<JobReceipt> m_JobReceipts;
+		bool m_AppRuntimeOwnsJobResults = false;
 		uint32_t m_ActiveJobs = 0;
 		uint64_t m_NextJobId = 1;
 		uint64_t m_NextRequestId = 1;

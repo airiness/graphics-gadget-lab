@@ -54,6 +54,9 @@ namespace gglab
 			m_FrameSequence->OnCaptureResults(
 				std::span<const FrameCaptureRequestResult>(m_FrameCaptureResults).subspan(firstResult));
 		}
+		// One owner establishes host visibility after internal result routing. The
+		// reserved receipt remains in the coordinator until explicit host consumption.
+		m_FrameCapture->PublishAppRuntimeJobResults();
 	}
 
 	void GGLabAppRuntime::ConsumeFrameCaptureResults(
@@ -62,6 +65,52 @@ namespace gglab
 		outResults.insert(outResults.end(), std::make_move_iterator(m_FrameCaptureResults.begin()),
 			std::make_move_iterator(m_FrameCaptureResults.end()));
 		m_FrameCaptureResults.clear();
+	}
+
+	CaptureAdmission GGLabAppRuntime::TrySubmitCaptureJob(CapturePlan&& plan) noexcept
+	{
+		if (m_LifecycleState == AppRuntimeLifecycleState::ExitRequested ||
+			m_LifecycleState == AppRuntimeLifecycleState::Failed ||
+			m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown ||
+			m_LifecycleState == AppRuntimeLifecycleState::Stopped)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ShuttingDown };
+		}
+		if (!m_ServicesInitialized || !m_FrameCapture)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ServicesUnavailable };
+		}
+		return m_FrameCapture->TrySubmit(std::move(plan));
+	}
+
+	CaptureCancelResult GGLabAppRuntime::CancelCaptureJob(uint64_t jobId) noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->CancelJob(jobId) : CaptureCancelResult::NotFound;
+	}
+
+	std::optional<CaptureJobSnapshot> GGLabAppRuntime::GetCaptureJobSnapshot(uint64_t jobId) const noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->GetJobSnapshot(jobId) : std::nullopt;
+	}
+
+	CaptureIntakeSnapshot GGLabAppRuntime::GetCaptureIntakeSnapshot() const noexcept
+	{
+		auto snapshot = m_FrameCapture ?
+			m_FrameCapture->GetIntakeSnapshot() :
+			CaptureIntakeSnapshot{ .m_Limits = m_CaptureJobLimits };
+		// This legacy queue is not covered by unified admission; do not hide it.
+		snapshot.m_LegacyRetainedResults += m_FrameCaptureResults.size();
+		return snapshot;
+	}
+
+	const CaptureJobResult* GGLabAppRuntime::FindCaptureJobResult(uint64_t jobId) const noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->FindPublishedJobResult(jobId) : nullptr;
+	}
+
+	std::optional<CaptureJobResult> GGLabAppRuntime::TakeCaptureJobResult(uint64_t jobId) noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->TakePublishedJobResult(jobId) : std::nullopt;
 	}
 
 	DiagnosticsView* GGLabAppRuntime::GetDiagnosticsView() const noexcept
@@ -211,7 +260,9 @@ namespace gglab
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
 				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
 				.m_NonFiniteWatch = m_NonFiniteWatch.get(),
+				.m_JobLimits = m_CaptureJobLimits,
 			});
+		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),

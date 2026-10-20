@@ -34,6 +34,7 @@ namespace gglab
 		m_Config = createInfo.m_Config;
 		m_Paths = createInfo.m_Paths;
 		m_HostServices = createInfo.m_HostServices;
+		m_CaptureJobLimits = createInfo.m_CaptureJobLimits;
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
 		return AppRuntimeInitializeResult::Succeeded;

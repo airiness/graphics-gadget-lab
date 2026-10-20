@@ -36,6 +36,7 @@ namespace gglab
 		ShuttingDown,
 		IdentityExhausted,
 		IdentityUnavailable,
+		ServicesUnavailable,
 	};
 
 	// Busy/rejected admission consumes no identity, receipt or caller-owned plan.
@@ -108,6 +109,9 @@ namespace gglab
 		uint32_t m_ActiveJobs = 0;
 		uint32_t m_ReservedReceipts = 0;
 		uint32_t m_TerminalReceipts = 0;
+		// AppRuntime publication changes visibility, not reservation ownership.
+		uint32_t m_AppRuntimeUnpublishedResults = 0;
+		uint32_t m_AppRuntimePublishedResults = 0;
 		// Cancelled jobs may have a terminal receipt while these owners still drain.
 		uint32_t m_DrainingRuntimeRequests = 0;
 		uint32_t m_DrainingWriterJobs = 0;
