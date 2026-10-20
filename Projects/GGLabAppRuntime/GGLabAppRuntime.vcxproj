@@ -131,6 +131,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePublisher.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureWriter.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePlan.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureJobTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureImageEncoder.h" />

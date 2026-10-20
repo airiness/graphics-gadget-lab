@@ -21,6 +21,10 @@
 
 #include <nlohmann/json.hpp>
 
+#if defined(_DEBUG)
+#include <crtdbg.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -51,6 +55,16 @@ namespace gglab
 {
 	namespace
 	{
+#if defined(_DEBUG)
+		thread_local uint64_t AdmissionAllocations = 0;
+		int __cdecl CountAdmissionAllocations(int operation, void*, size_t, int, long,
+			const unsigned char*, int)
+		{
+			AdmissionAllocations += operation == _HOOK_ALLOC;
+			return true;
+		}
+#endif
+
 		class FakeCaptureControl final : public FrameCaptureControlBase
 		{
 		public:
@@ -2774,6 +2788,288 @@ namespace gglab
 			};
 		}
 
+		void RunJobAdmissionTests(SelfTestContext& context) noexcept
+		{
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control, .m_WriteOnCallingThread = true,
+				.m_JobLimits = { .m_MaxActiveJobs = 1, .m_MaxReceipts = 2,
+					.m_MaxProductsPerJob = 3, .m_MaxResourceTargetsPerJob = 1 } });
+			const auto single = []() { return CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{} } }; };
+			std::vector<CapturePlan> invalid{
+				{},
+				{ .m_RequiredProducts = { UnsupportedCaptureProduct{} } },
+				{ .m_RequiredProducts = { DiagnosticCaptureProduct{} } },
+				{ .m_RequiredProducts = { ResourceCaptureProduct{} } },
+				{ .m_RequiredProducts = { GraphCaptureProduct{}, GraphCaptureProduct{} } },
+				{ .m_RequiredProducts = { ResourceCaptureProduct{ { { .m_Resource = "A" } } },
+					GraphCaptureProduct{ true } } },
+				{ .m_RequiredProducts = { ResourceCaptureProduct{ { { .m_Resource = "A" } } },
+					ResourceCaptureProduct{ { { .m_Resource = "B" } } } } },
+				{ .m_RequiredProducts = { ImageCaptureProduct{ static_cast<CaptureImageSource>(255) } } },
+				{ .m_RequiredProducts = { ImageCaptureProduct{} }, .m_Timing = static_cast<FrameCaptureTiming>(255) },
+			};
+			for (auto& plan : invalid)
+			{
+				const auto size = plan.m_RequiredProducts.size();
+				const auto admission = coordinator.TrySubmit(std::move(plan));
+				context.Check(admission.m_Status == CaptureAdmissionStatus::Rejected && admission.m_JobId == 0 &&
+					admission.m_Reason == CaptureAdmissionReason::InvalidPlan && plan.m_RequiredProducts.size() == size,
+					"Invalid job plans are rejected without identity, receipt or plan consumption");
+			}
+			for (auto plan : { CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{}, ImageCaptureProduct{},
+				ImageCaptureProduct{}, ImageCaptureProduct{} } },
+				CapturePlan{ .m_RequiredProducts = { ResourceCaptureProduct{ { { .m_Resource = "A" }, { .m_Resource = "B" } } } } } })
+			{
+				const auto admission = coordinator.TrySubmit(std::move(plan));
+				context.Check(admission.m_Status == CaptureAdmissionStatus::Rejected && admission.m_JobId == 0 &&
+					admission.m_Reason == CaptureAdmissionReason::PlanTooLarge && !plan.m_RequiredProducts.empty(),
+					"Configured product and resource-target limits reject oversized plans before admission");
+			}
+			const auto first = coordinator.TrySubmit(single());
+			const auto waiting = coordinator.GetJobSnapshot(first.m_JobId);
+			context.Check(first.m_Status == CaptureAdmissionStatus::Accepted && first.m_JobId == 1 &&
+				waiting && waiting->m_Stage == CaptureJobStage::Waiting && waiting->m_RequiredProducts == 1 &&
+				!coordinator.TakeJobResult(first.m_JobId) && coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1,
+				"Acceptance reserves one active job and its future receipt; polling cannot release either");
+			auto retry = single();
+			CapturePlan invalidRetry;
+			bool busy = true;
+#if defined(_DEBUG)
+			AdmissionAllocations = 0;
+			const auto previousHook = _CrtSetAllocHook(&CountAdmissionAllocations);
+#endif
+			for (uint32_t index = 0; index < 1024; ++index)
+			{
+				const auto admission = coordinator.TrySubmit(std::move(retry));
+				busy &= admission.m_Status == CaptureAdmissionStatus::Busy && admission.m_JobId == 0 &&
+					admission.m_Reason == CaptureAdmissionReason::ActiveJobLimit;
+				const auto rejected = coordinator.TrySubmit(std::move(invalidRetry));
+				busy &= rejected.m_Status == CaptureAdmissionStatus::Rejected && rejected.m_JobId == 0;
+			}
+#if defined(_DEBUG)
+			_CrtSetAllocHook(previousHook);
+			context.Check(AdmissionAllocations == 0, "Busy and invalid admission perform no Debug CRT allocation");
+#endif
+			context.Check(busy && retry.m_RequiredProducts.size() == 1 &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1 && Consume(coordinator).empty(),
+				"Repeated Busy preserves the caller's plan and creates no IDs or retained failure receipts");
+			context.Check(coordinator.CancelWaitingJob(first.m_JobId) == CaptureWaitingCancelResult::Cancelled &&
+				coordinator.CancelWaitingJob(first.m_JobId) == CaptureWaitingCancelResult::Finished &&
+				coordinator.GetIntakeSnapshot().m_ActiveJobs == 0 &&
+				coordinator.GetIntakeSnapshot().m_TerminalReceipts == 1,
+				"Waiting cancellation returns active credit while retaining its one terminal receipt");
+			const auto second = coordinator.TrySubmit(std::move(retry));
+			GGLAB_UNUSED(coordinator.CancelWaitingJob(second.m_JobId));
+			const auto retained = coordinator.GetJobSnapshot(first.m_JobId);
+			const auto full = coordinator.TrySubmit(single());
+			context.Check(second.m_JobId == 2 && full.m_Status == CaptureAdmissionStatus::Busy &&
+				full.m_Reason == CaptureAdmissionReason::ReceiptLimit && retained &&
+				retained->m_Stage == CaptureJobStage::Finished && retained->m_FinishedProducts == 1 &&
+				!coordinator.TakeJobResult(999) && coordinator.GetIntakeSnapshot().m_ReservedReceipts == 2,
+				"Unconsumed terminal results apply backpressure independently of active-job capacity");
+			const auto cancelled = coordinator.TakeJobResult(first.m_JobId);
+			context.Check(cancelled && cancelled->m_Status == CaptureJobStatus::Cancelled &&
+				cancelled->m_Publication == CaptureJobPublication::NotPublished &&
+				!coordinator.TakeJobResult(first.m_JobId) && !coordinator.GetJobSnapshot(first.m_JobId) &&
+				waiting->m_Stage == CaptureJobStage::Waiting && Consume(coordinator).empty(),
+				"Consumption transfers one receipt exactly once; copied progress stays immutable and legacy results stay empty");
+			bool conserved = true;
+			for (uint64_t expected = 3; expected < 131; ++expected)
+			{
+				const auto admission = coordinator.TrySubmit(single());
+				conserved &= admission.m_JobId == expected;
+				GGLAB_UNUSED(coordinator.CancelWaitingJob(admission.m_JobId));
+				conserved &= coordinator.TakeJobResult(admission.m_JobId).has_value() &&
+					coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1;
+			}
+			context.Check(conserved, "Repeated accept/cancel/consume cycles conserve receipt capacity and monotonic job IDs");
+			GGLAB_UNUSED(coordinator.TakeJobResult(second.m_JobId));
+			coordinator.PrepareForShutdown();
+			const auto stopped = coordinator.TrySubmit(single());
+			context.Check(stopped.m_Status == CaptureAdmissionStatus::Rejected && stopped.m_JobId == 0 &&
+				stopped.m_Reason == CaptureAdmissionReason::ShuttingDown &&
+				coordinator.CancelWaitingJob(0) == CaptureWaitingCancelResult::NotFound &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0,
+				"Stopped intake rejects without a new terminal receipt");
+			coordinator.FinalizeAfterRenderHost();
+			FrameCaptureCoordinator disabled({ .m_WriteOnCallingThread = true,
+				.m_JobLimits = { .m_MaxActiveJobs = 0, .m_MaxReceipts = 0 } });
+			const auto legacy = disabled.Submit({});
+			const auto disabledAdmission = disabled.TrySubmit(single());
+			context.Check(disabledAdmission.m_Status == CaptureAdmissionStatus::Busy && legacy != 0 &&
+				disabled.GetIntakeSnapshot().m_LegacyUnfinishedOutputs == 1,
+				"Opt-in job limits do not silently change the legacy unconditional Submit contract");
+			disabled.FinalizeAfterRenderHost();
+		}
+
+		void RunConcurrentJobReceiptTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("capture-concurrent-jobs");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true, .m_JobLimits = { .m_MaxActiveJobs = 2, .m_MaxReceipts = 2 } });
+			const auto first = coordinator.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } });
+			const auto second = coordinator.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } });
+			coordinator.BeginFrame(MakeFrameState(true));
+			control.Complete(control.m_Issued[1].m_Id);
+			coordinator.Update();
+			const auto full = coordinator.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } });
+			context.Check(full.m_Reason == CaptureAdmissionReason::ReceiptLimit &&
+				coordinator.GetIntakeSnapshot().m_ActiveJobs == 1 &&
+				coordinator.GetIntakeSnapshot().m_TerminalReceipts == 1 &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 2 && !coordinator.TakeJobResult(first.m_JobId),
+				"Active and terminal jobs share the receipt bound even when later jobs finish first");
+			const auto secondResult = coordinator.TakeJobResult(second.m_JobId);
+			control.Complete(control.m_Issued[0].m_Id);
+			coordinator.Update();
+			const auto firstResult = coordinator.TakeJobResult(first.m_JobId);
+			context.Check(secondResult && firstResult && secondResult->m_JobId == second.m_JobId &&
+				firstResult->m_JobId == first.m_JobId && firstResult->m_Status == CaptureJobStatus::Completed &&
+				secondResult->m_Status == CaptureJobStatus::Completed &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0 && Consume(coordinator).empty(),
+				"Out-of-order completion keeps receipts isolated despite identical product and frame provenance");
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunJobResultTests(SelfTestContext& context) noexcept
+		{
+			for (const bool failWrite : { false, true })
+			{
+				TemporaryDirectory directory("capture-job-results");
+				FakeCaptureControl control;
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				files->m_FailWrite = failWrite ? 3 : 0;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true, .m_PublicationFileSystem = files });
+				const auto admission = coordinator.TrySubmit({ .m_RequiredProducts = { GraphCaptureProduct{},
+					ImageCaptureProduct{}, ResourceCaptureProduct{ { { .m_Resource = "Values" } } } } });
+				coordinator.BeginFrame(MakeFrameState(true));
+				context.Check(coordinator.CancelWaitingJob(admission.m_JobId) == CaptureWaitingCancelResult::TooLate &&
+					coordinator.GetJobSnapshot(admission.m_JobId)->m_AttemptCount == 1,
+					"An issued job reports TooLate through the explicitly waiting-only cancellation seam");
+				control.Complete(control.m_Issued[0].m_Id);
+				coordinator.Update();
+				context.Check(!coordinator.TakeJobResult(admission.m_JobId) &&
+					coordinator.GetIntakeSnapshot().m_ActiveJobs == 1,
+					"One required product cannot complete the logical job or release its reservation");
+				control.Complete(control.m_Issued[1].m_Id);
+				coordinator.Update();
+				const auto final = coordinator.GetJobSnapshot(admission.m_JobId);
+				const auto result = coordinator.TakeJobResult(admission.m_JobId);
+				context.Check(result && result->m_JobId == admission.m_JobId && result->m_Products.size() == 3 &&
+					result->m_Status == (failWrite ? CaptureJobStatus::Failed : CaptureJobStatus::Completed) &&
+					result->m_Publication == (failWrite ? CaptureJobPublication::PartiallyPublished : CaptureJobPublication::Published),
+					"One terminal job distinguishes full publication from a published sibling followed by file failure");
+				context.Check(final && final->m_Stage == CaptureJobStage::Finished && final->m_FinishedProducts == 3 &&
+					final->m_FrameSerial == 17 && result && std::ranges::all_of(result->m_Products, [](const auto& product)
+					{
+						return product.m_Metadata && product.m_Metadata->m_FrameSerial == 17;
+					}) && Consume(coordinator).empty(),
+					"Product receipts preserve final actual-frame provenance without leaking legacy results");
+				if (result)
+				{
+					context.Check(result->m_Products[0].m_ProductIndex == 0 && result->m_Products[1].m_ProductIndex == 1 &&
+						result->m_Products[2].m_ProductIndex == 2 && result->m_Products[1].m_Files.size() == 2 &&
+						result->m_Products[0].m_Files.size() == (failWrite ? 0u : 1u) &&
+						result->m_Products[2].m_Files.size() == (failWrite ? 0u : 2u),
+						"Graph-first plans retain plan order and separate graph, image and resource file records");
+				}
+				coordinator.Update();
+				context.Check(!coordinator.TakeJobResult(admission.m_JobId) &&
+					coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0 && coordinator.GetUnfinishedRequestCount() == 0,
+					"Publication completion produces no duplicate job result or orphan reservation");
+				coordinator.FinalizeAfterRenderHost();
+			}
+			TemporaryDirectory directory("capture-job-retry");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true });
+			const auto admission = coordinator.TrySubmit(MakeRequiredTestPlan());
+			for (uint64_t serial = 17; serial < 20; ++serial)
+			{
+				auto state = MakeFrameState(true);
+				state.m_FrameSerial = serial;
+				coordinator.BeginFrame(std::move(state));
+				const auto first = control.m_Issued.size() - 2;
+				if (serial < 19)
+				{
+					control.Busy(control.m_Issued[first + 1].m_Id);
+					control.Complete(control.m_Issued[first].m_Id);
+					coordinator.Update();
+					const auto retry = coordinator.GetJobSnapshot(admission.m_JobId);
+					context.Check(retry && retry->m_Stage == CaptureJobStage::Waiting && !retry->m_FrameSerial &&
+						retry->m_AttemptCount == serial - 16 && !coordinator.TakeJobResult(admission.m_JobId) &&
+						coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1,
+						"Busy retries retain the accepted job and receipt while retiring every old product association");
+				}
+				else
+				{
+					control.Complete(control.m_Issued[first].m_Id);
+					control.Complete(control.m_Issued[first + 1].m_Id);
+					coordinator.Update();
+				}
+			}
+			const auto result = coordinator.TakeJobResult(admission.m_JobId);
+			context.Check(result && result->m_Status == CaptureJobStatus::Completed &&
+				std::ranges::all_of(result->m_Products, [](const auto& product)
+				{
+					return product.m_Metadata && product.m_Metadata->m_FrameSerial == 19;
+				}) && Consume(coordinator).empty(),
+				"The sole terminal receipt contains only the successful retry's provenance");
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunJobShutdownTests(SelfTestContext& context) noexcept
+		{
+			for (const auto block : { CapturePublicationTestFileSystem::Block::TemporaryWrite,
+				CapturePublicationTestFileSystem::Block::Publication })
+			{
+				TemporaryDirectory directory("capture-job-shutdown");
+				FakeCaptureControl control;
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				files->m_Block = block;
+				const bool claimed = block == CapturePublicationTestFileSystem::Block::Publication;
+				{
+					FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+						.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+						.m_ShutdownWriteTimeout = std::chrono::milliseconds(50), .m_PublicationFileSystem = files });
+					const auto admission = coordinator.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } });
+					coordinator.BeginFrame(MakeFrameState(true));
+					control.Complete(control.m_Issued[0].m_Id);
+					coordinator.Update();
+					context.Check(files->WaitEntered() && !coordinator.TakeJobResult(admission.m_JobId),
+						"A blocked writer keeps the job active with its reserved receipt");
+					coordinator.FinalizeAfterRenderHost();
+					const auto result = coordinator.TakeJobResult(admission.m_JobId);
+					context.Check(result && result->m_Status == CaptureJobStatus::Failed &&
+						result->m_Publication == (claimed ? CaptureJobPublication::Indeterminate : CaptureJobPublication::NotPublished) &&
+						!control.m_LastImage.expired() && coordinator.GetIntakeSnapshot().m_ActiveJobs == 0,
+						"Terminal failure reports publication uncertainty without releasing the detached writer's product");
+					files->Release();
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (!control.m_LastImage.expired() && std::chrono::steady_clock::now() < deadline)
+					{
+						std::this_thread::yield();
+					}
+					coordinator.Update();
+					context.Check(control.m_LastImage.expired() && !coordinator.TakeJobResult(admission.m_JobId) &&
+						Consume(coordinator).empty() && coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0,
+						"Late worker completion cannot resurrect a consumed job or duplicate its terminal result");
+				}
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+				while (files.use_count() > 1 && std::chrono::steady_clock::now() < deadline)
+				{
+					std::this_thread::yield();
+				}
+				context.Check(files.use_count() == 1 && !HasPartialFile(directory.GetPath()) &&
+					HasAnyFile(directory.GetPath()) == claimed,
+					"The detached writer settles its real files independently of job receipt retention");
+			}
+		}
+
 		void RunRequiredPlanLifecycleTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("required-plan-lifecycle");
@@ -3442,6 +3738,10 @@ namespace gglab
 
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
+		RunJobAdmissionTests(context);
+		RunConcurrentJobReceiptTests(context);
+		RunJobResultTests(context);
+		RunJobShutdownTests(context);
 		RunResourceWritingTests(context);
 		RunResourceSequenceTests(context);
 		RunSequenceGroupAdmissionTests(context);

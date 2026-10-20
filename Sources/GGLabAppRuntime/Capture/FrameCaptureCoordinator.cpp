@@ -37,6 +37,10 @@ namespace gglab
 	struct FrameCaptureCoordinator::CaptureJob
 	{
 		CapturePlan m_Plan;
+		std::optional<size_t> m_ReceiptSlot;
+		CaptureJobResult m_Result;
+		uint64_t m_AttemptCount = 0;
+		uint32_t m_FinishedProducts = 0;
 		// Transitional delivery identities, not inferred product membership.
 		std::vector<uint64_t> m_OutputIds;
 		size_t m_RemainingOutputs = 0;
@@ -48,6 +52,14 @@ namespace gglab
 		{
 			return m_Plan.m_Sequence || m_OutputIds.size() > 1 ? m_OutputIds.front() : 0;
 		}
+	};
+
+	struct FrameCaptureCoordinator::JobReceipt
+	{
+		uint64_t m_JobId = 0;
+		std::shared_ptr<CaptureJob> m_Job;
+		std::optional<CaptureJobResult> m_Result;
+		CaptureJobSnapshot m_FinalSnapshot;
 	};
 
 	// Legacy output routing survives until the versioned request/result migration.
@@ -161,7 +173,9 @@ namespace gglab
 		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
 		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
-			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem))
+			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
+		m_JobLimits(createInfo.m_JobLimits),
+		m_JobReceipts(m_JobLimits.m_MaxReceipts)
 	{
 		static_assert(MaxInFlightCaptures == CaptureWriter::MaxInFlightJobs);
 	}
@@ -169,6 +183,192 @@ namespace gglab
 	FrameCaptureCoordinator::~FrameCaptureCoordinator()
 	{
 		FinishWriting();
+	}
+
+	CaptureAdmission FrameCaptureCoordinator::TrySubmit(CapturePlan&& plan) noexcept
+	{
+		if (m_IsShuttingDown)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ShuttingDown };
+		}
+		if (plan.m_RequiredProducts.empty() ||
+			(plan.m_Timing != FrameCaptureTiming::NextFrame && plan.m_Timing != FrameCaptureTiming::AfterReady))
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		if (plan.m_RequiredProducts.size() > m_JobLimits.m_MaxProductsPerJob)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::PlanTooLarge };
+		}
+		uint32_t resources = 0;
+		uint32_t graphs = 0;
+		bool graphSummary = false;
+		for (const auto& product : plan.m_RequiredProducts)
+		{
+			if (const auto* resource = std::get_if<ResourceCaptureProduct>(&product))
+			{
+				++resources;
+				if (resource->m_Targets.empty())
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+				}
+				if (resource->m_Targets.size() > m_JobLimits.m_MaxResourceTargetsPerJob)
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::PlanTooLarge };
+				}
+			}
+			else if (const auto* graph = std::get_if<GraphCaptureProduct>(&product))
+			{
+				++graphs;
+				graphSummary = graph->m_Summary;
+			}
+			else if (const auto* image = std::get_if<ImageCaptureProduct>(&product))
+			{
+				if (image->m_Source != CaptureImageSource::Scene && image->m_Source != CaptureImageSource::Composited)
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+				}
+			}
+			else if (const auto* diagnostic = std::get_if<DiagnosticCaptureProduct>(&product))
+			{
+				if (!diagnostic->m_Tap)
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+				}
+			}
+			else
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+			}
+		}
+		if (resources > 1 || graphs > 1 || (resources != 0 && graphs != 0 && graphSummary))
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		if (m_NextJobId == 0)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityExhausted };
+		}
+		if (m_ActiveJobs >= m_JobLimits.m_MaxActiveJobs)
+		{
+			return { CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ActiveJobLimit };
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, uint64_t{ 0 }, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return { CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ReceiptLimit };
+		}
+		RemoveFinishedJobs();
+		slot->m_JobId = m_NextJobId++;
+		++m_ActiveJobs;
+		slot->m_Job = EnqueuePlan(std::move(plan),
+			static_cast<size_t>(std::distance(m_JobReceipts.begin(), slot)), slot->m_JobId);
+		return { CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, slot->m_JobId };
+	}
+
+	std::optional<CaptureJobResult> FrameCaptureCoordinator::TakeJobResult(uint64_t jobId) noexcept
+	{
+		if (jobId == 0)
+		{
+			return std::nullopt;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end() || !slot->m_Result)
+		{
+			return std::nullopt;
+		}
+		auto result = std::move(slot->m_Result);
+		*slot = {};
+		RemoveFinishedJobs();
+		return result;
+	}
+
+	CaptureIntakeSnapshot FrameCaptureCoordinator::GetIntakeSnapshot() const noexcept
+	{
+		CaptureIntakeSnapshot snapshot{ .m_Limits = m_JobLimits, .m_ActiveJobs = m_ActiveJobs,
+			.m_LegacyRetainedResults = m_Results.size() };
+		for (const JobReceipt& slot : m_JobReceipts)
+		{
+			snapshot.m_ReservedReceipts += slot.m_JobId != 0;
+			snapshot.m_TerminalReceipts += slot.m_Result.has_value();
+		}
+		for (const CaptureOutput& output : m_Outputs)
+		{
+			snapshot.m_LegacyUnfinishedOutputs += !output.m_Job->m_ReceiptSlot && output.m_Phase != Phase::Finished;
+		}
+		return snapshot;
+	}
+
+	std::optional<CaptureJobSnapshot> FrameCaptureCoordinator::GetJobSnapshot(uint64_t jobId) const noexcept
+	{
+		if (jobId == 0)
+		{
+			return std::nullopt;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return std::nullopt;
+		}
+		if (slot->m_Result)
+		{
+			return slot->m_FinalSnapshot;
+		}
+		const CaptureJob& job = *slot->m_Job;
+		CaptureJobSnapshot snapshot{ .m_JobId = jobId, .m_AttemptCount = job.m_AttemptCount,
+			.m_RequiredProducts = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()),
+			.m_FinishedProducts = job.m_FinishedProducts };
+		if (job.m_Attempt)
+		{
+			snapshot.m_FrameSerial = job.m_Attempt->m_FrameSerial;
+		}
+		Phase first = Phase::Finished;
+		for (const CaptureOutput& output : m_Outputs)
+		{
+			if (output.m_Job.get() == &job)
+			{
+				first = std::min(first, output.m_Phase);
+			}
+		}
+		switch (first)
+		{
+		case Phase::Waiting:
+			snapshot.m_Stage = CaptureJobStage::Waiting;
+			break;
+		case Phase::Issued:
+			snapshot.m_Stage = CaptureJobStage::AwaitingProducts;
+			break;
+		case Phase::AwaitingWatch:
+			snapshot.m_Stage = CaptureJobStage::AwaitingCoverage;
+			break;
+		case Phase::Encoding:
+			snapshot.m_Stage = CaptureJobStage::Encoding;
+			break;
+		case Phase::Finished:
+			snapshot.m_Stage = CaptureJobStage::Finished;
+			break;
+		}
+		return snapshot;
+	}
+
+	CaptureWaitingCancelResult FrameCaptureCoordinator::CancelWaitingJob(uint64_t jobId) noexcept
+	{
+		if (jobId == 0)
+		{
+			return CaptureWaitingCancelResult::NotFound;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return CaptureWaitingCancelResult::NotFound;
+		}
+		if (slot->m_Result)
+		{
+			return CaptureWaitingCancelResult::Finished;
+		}
+		return Cancel(slot->m_Job->m_OutputIds.front()) ?
+			CaptureWaitingCancelResult::Cancelled :
+			CaptureWaitingCancelResult::TooLate;
 	}
 
 	CapturePlan FrameCaptureCoordinator::MakeCapturePlan(FrameCaptureRequest request) noexcept
@@ -219,6 +419,12 @@ namespace gglab
 
 	std::vector<uint64_t> FrameCaptureCoordinator::SubmitPlan(CapturePlan plan) noexcept
 	{
+		return EnqueuePlan(std::move(plan))->m_OutputIds;
+	}
+
+	std::shared_ptr<FrameCaptureCoordinator::CaptureJob> FrameCaptureCoordinator::EnqueuePlan(
+		CapturePlan plan, std::optional<size_t> receiptSlot, uint64_t jobId) noexcept
+	{
 		GGLAB_ASSERT_MSG(!plan.m_RequiredProducts.empty(),
 			"An internal capture plan must require a product.");
 		const bool resources = HasResources(plan);
@@ -239,6 +445,12 @@ namespace gglab
 		GGLAB_ASSERT_MSG(resourceCount <= 1, "An internal plan permits one resource product.");
 
 		auto job = std::make_shared<CaptureJob>();
+		job->m_ReceiptSlot = receiptSlot;
+		if (receiptSlot)
+		{
+			job->m_Result.m_JobId = jobId;
+			job->m_Result.m_Products.resize(plan.m_RequiredProducts.size());
+		}
 		job->m_RemainingOutputs = GetOutputCount(plan);
 		job->m_Plan = std::move(plan);
 		for (size_t index = 0; index < job->m_RemainingOutputs; ++index)
@@ -269,7 +481,7 @@ namespace gglab
 				Finish(*entry, FrameCaptureRequestStatus::Cancelled, "The runtime is shutting down.");
 			}
 		}
-		return job->m_OutputIds;
+		return job;
 	}
 
 	std::vector<FrameCaptureCoordinator::CaptureOutput*> FrameCaptureCoordinator::GetOutputs(
@@ -931,6 +1143,7 @@ namespace gglab
 		}
 		if (!job.m_Attempt)
 		{
+			++job.m_AttemptCount;
 			job.m_Attempt = FrameAttempt{
 				state.m_FrameSerial, m_NonFiniteWatch ? m_NonFiniteWatch->OpenCoverage() : 0 };
 		}
@@ -1261,19 +1474,130 @@ namespace gglab
 			result.m_Metadata = metadata;
 		}
 		result.m_ResourceFailure = entry.m_ResourceFailure;
-		m_Results.push_back(std::move(result));
+		if (job.m_ReceiptSlot)
+		{
+			RecordJobOutput(entry, result);
+		}
+		else
+		{
+			m_Results.push_back(std::move(result));
+		}
 		entry.m_Attempt.reset();
 		entry.m_WriteJob.reset();
 		entry.m_Phase = Phase::Finished;
 		GGLAB_ASSERT_MSG(job.m_RemainingOutputs != 0, "A plan must retain every unfinished output.");
 		if (--job.m_RemainingOutputs == 0)
 		{
+			if (job.m_ReceiptSlot)
+			{
+				CompleteJob(job);
+			}
 			if (m_NonFiniteWatch && job.m_Attempt)
 			{
 				m_NonFiniteWatch->ReleaseCoverage(job.m_Attempt->m_WatchCoverageId);
 			}
 			job.m_Attempt.reset();
 		}
+	}
+
+	void FrameCaptureCoordinator::RecordJobOutput(
+		CaptureOutput& entry, const FrameCaptureRequestResult& result) noexcept
+	{
+		CaptureJob& job = *entry.m_Job;
+		const auto record = [&](size_t index, bool graph) noexcept
+			{
+				CaptureProductResult& product = job.m_Result.m_Products[index];
+				product.m_ProductIndex = static_cast<uint32_t>(index);
+				switch (result.m_Status)
+				{
+				case FrameCaptureRequestStatus::Completed:
+					product.m_Status = CaptureJobStatus::Completed;
+					break;
+				case FrameCaptureRequestStatus::Failed:
+					product.m_Status = CaptureJobStatus::Failed;
+					job.m_Result.m_Status = CaptureJobStatus::Failed;
+					break;
+				case FrameCaptureRequestStatus::Cancelled:
+					product.m_Status = CaptureJobStatus::Cancelled;
+					if (job.m_Result.m_Status != CaptureJobStatus::Failed)
+					{
+						job.m_Result.m_Status = CaptureJobStatus::Cancelled;
+					}
+					break;
+				}
+				if (entry.m_WriteReceipt)
+				{
+					switch (entry.m_WriteReceipt->m_Publication)
+					{
+					case CapturePublicationOutcome::Published:
+						product.m_Publication = CaptureJobPublication::Published;
+						break;
+					case CapturePublicationOutcome::Indeterminate:
+						product.m_Publication = CaptureJobPublication::Indeterminate;
+						break;
+					case CapturePublicationOutcome::NotPublished:
+						break;
+					}
+				}
+				if (graph)
+				{
+					if (!result.m_GraphPath.empty())
+					{
+						product.m_Files.push_back(result.m_GraphPath);
+					}
+				}
+				else
+				{
+					for (const auto& path : { result.m_ImagePath, result.m_MetadataPath })
+					{
+						if (!path.empty())
+						{
+							product.m_Files.push_back(path);
+						}
+					}
+					product.m_Files.insert(product.m_Files.end(),
+						result.m_ResourcePaths.begin(), result.m_ResourcePaths.end());
+				}
+				product.m_ResourceFailure = result.m_ResourceFailure;
+				product.m_Failure = result.m_Failure;
+				product.m_Metadata = result.m_Metadata;
+				++job.m_FinishedProducts;
+			};
+		record(entry.m_ProductIndex, entry.GetSource() == FrameCaptureSource::RenderGraph);
+		if (entry.m_GraphIndex)
+		{
+			record(*entry.m_GraphIndex, true);
+		}
+	}
+
+	void FrameCaptureCoordinator::CompleteJob(CaptureJob& job) noexcept
+	{
+		JobReceipt& slot = m_JobReceipts[*job.m_ReceiptSlot];
+		GGLAB_ASSERT_MSG(!slot.m_Result && slot.m_JobId == job.m_Result.m_JobId,
+			"Every accepted job owns exactly one reserved terminal receipt.");
+		uint32_t published = 0;
+		bool indeterminate = false;
+		for (const CaptureProductResult& product : job.m_Result.m_Products)
+		{
+			published += product.m_Publication == CaptureJobPublication::Published;
+			indeterminate |= product.m_Publication == CaptureJobPublication::Indeterminate;
+		}
+		job.m_Result.m_Publication = indeterminate ?
+			CaptureJobPublication::Indeterminate :
+			published == job.m_Result.m_Products.size() ?
+				CaptureJobPublication::Published :
+				published != 0 ?
+					CaptureJobPublication::PartiallyPublished :
+					CaptureJobPublication::NotPublished;
+		slot.m_FinalSnapshot = { .m_JobId = slot.m_JobId, .m_Stage = CaptureJobStage::Finished,
+			.m_AttemptCount = job.m_AttemptCount,
+			.m_FrameSerial = job.m_Attempt ? std::optional(job.m_Attempt->m_FrameSerial) : std::nullopt,
+			.m_RequiredProducts = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()),
+			.m_FinishedProducts = job.m_FinishedProducts };
+		slot.m_Result = std::move(job.m_Result);
+		slot.m_Job.reset();
+		GGLAB_ASSERT_MSG(m_ActiveJobs != 0, "A terminal job returns one active-job credit.");
+		--m_ActiveJobs;
 	}
 
 	void FrameCaptureCoordinator::RemoveFinishedJobs() noexcept

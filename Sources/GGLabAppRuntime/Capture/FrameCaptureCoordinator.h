@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "Capture/CapturePlan.h"
+#include "Capture/CaptureJobTypes.h"
 #include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/FrameCaptureReadiness.h"
@@ -151,11 +152,24 @@ namespace gglab
 			NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
 			// Optional host-neutral file capability; the writer retains it independently.
 			std::shared_ptr<CapturePublicationFileSystemBase> m_PublicationFileSystem;
+			CaptureJobLimits m_JobLimits;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
 		~FrameCaptureCoordinator();
 		GGLAB_DELETE_COPYABLE_MOVABLE(FrameCaptureCoordinator);
+
+		// Host-neutral opt-in seam; it is not yet a versioned control protocol.
+		// Admission reserves a terminal receipt before moving the plan. Busy and
+		// rejection allocate no storage and leave the supplied plan available to retry.
+		[[nodiscard]] CaptureAdmission TrySubmit(CapturePlan&& plan) noexcept;
+		// All methods run on the AppRuntime owner thread. Receipts do not expire:
+		// consumption releases the reserved slot; polling an active/unknown job does not.
+		[[nodiscard]] std::optional<CaptureJobResult> TakeJobResult(uint64_t jobId) noexcept;
+		[[nodiscard]] std::optional<CaptureJobSnapshot> GetJobSnapshot(uint64_t jobId) const noexcept;
+		[[nodiscard]] CaptureIntakeSnapshot GetIntakeSnapshot() const noexcept;
+		// Issued cancellation remains a separate external-contract migration gate.
+		[[nodiscard]] CaptureWaitingCancelResult CancelWaitingJob(uint64_t jobId) noexcept;
 
 		// Returns the non-zero request id.
 		[[nodiscard]] uint64_t Submit(FrameCaptureRequest request) noexcept;
@@ -233,6 +247,7 @@ namespace gglab
 		struct ProductAttempt;
 		struct CaptureJob;
 		struct CaptureOutput;
+		struct JobReceipt;
 
 		enum class Phase : uint8_t
 		{
@@ -245,6 +260,10 @@ namespace gglab
 
 		// Transitional input adapter; accepted jobs retain only the typed plan.
 		[[nodiscard]] static CapturePlan MakeCapturePlan(FrameCaptureRequest request) noexcept;
+		[[nodiscard]] std::shared_ptr<CaptureJob> EnqueuePlan(CapturePlan plan,
+			std::optional<size_t> receiptSlot = std::nullopt, uint64_t jobId = 0) noexcept;
+		void RecordJobOutput(CaptureOutput& entry, const FrameCaptureRequestResult& result) noexcept;
+		void CompleteJob(CaptureJob& job) noexcept;
 		[[nodiscard]] static bool MatchesRequiredContent(
 			const CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(
@@ -277,6 +296,12 @@ namespace gglab
 		std::filesystem::path m_DefaultOutputDirectory;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 		std::unique_ptr<CaptureWriter> m_Writer;
+		CaptureJobLimits m_JobLimits;
+		// Fixed at construction. Each accepted job reserves one slot until consumed,
+		// including while active. Rejected submissions never create failure receipts.
+		std::vector<JobReceipt> m_JobReceipts;
+		uint32_t m_ActiveJobs = 0;
+		uint64_t m_NextJobId = 1;
 		uint64_t m_NextRequestId = 1;
 		std::vector<CaptureOutput> m_Outputs;
 		std::vector<FrameCaptureRequestResult> m_Results;

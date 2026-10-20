@@ -1379,6 +1379,77 @@ namespace gglab
 				"Required-product teardown adds no duplicate terminal result and releases GPU owners only after safe settlement");
 		}
 
+		void RunAdmittedJobScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool missingResource)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root,
+				[&](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					++probe.m_ImageEncodes;
+					return std::vector<uint8_t>{ 0x89, 'P', 'N', 'G', 13, 10, 26, 10 };
+				}))
+			{
+				return;
+			}
+			auto& capture = *runtime.GetFrameCaptureCoordinator();
+			const auto admission = capture.TrySubmit({ .m_RequiredProducts = {
+				ImageCaptureProduct{}, ResourceCaptureProduct{ { {
+					.m_Resource = missingResource ? "Missing.AdmittedResource" : "FaultLifecycle.Color" } } },
+				GraphCaptureProduct{} } });
+			checks.Check(admission.m_Status == CaptureAdmissionStatus::Accepted && admission.m_JobId != 0,
+				"The production AppRuntime accepts one logical job for image, resource and graph products");
+			const auto maps = probe.m_ReadbackMaps;
+			const auto aborts = probe.m_FrameAborts;
+			if (!missingResource)
+			{
+				probe.m_RequiredPlanDeferrals = 2;
+				GGLAB_UNUSED(runtime.Tick());
+				GGLAB_UNUSED(runtime.Tick());
+				const auto snapshot = capture.GetJobSnapshot(admission.m_JobId);
+				checks.Check(snapshot && snapshot->m_AttemptCount == 2 &&
+					snapshot->m_Stage == CaptureJobStage::Waiting && probe.m_FrameAborts == aborts + 2 &&
+					probe.m_ReadbackMaps == maps && !capture.TakeJobResult(admission.m_JobId) &&
+					capture.GetIntakeSnapshot().m_ReservedReceipts == 1,
+					"Production late deferral safely aborts twice while retaining one accepted job and receipt");
+			}
+			std::optional<CaptureJobResult> result;
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (!result && std::chrono::steady_clock::now() < deadline)
+			{
+				GGLAB_UNUSED(runtime.Tick());
+				result = capture.TakeJobResult(admission.m_JobId);
+				std::this_thread::yield();
+			}
+			checks.Check(result && result->m_Products.size() == 3 &&
+				result->m_Status == (missingResource ? CaptureJobStatus::Failed : CaptureJobStatus::Completed) &&
+				result->m_Publication == (missingResource ? CaptureJobPublication::NotPublished : CaptureJobPublication::Published),
+				"Production compiled failure or successful GPU transport reaches exactly one logical job result");
+			if (result && result->m_Products.front().m_Metadata)
+			{
+				const auto serial = result->m_Products.front().m_Metadata->m_FrameSerial;
+				checks.Check(std::ranges::all_of(result->m_Products, [&](const auto& product)
+					{
+						return product.m_Metadata && product.m_Metadata->m_FrameSerial == serial;
+					}) && probe.m_ImageEncodes == (missingResource ? 0u : 1u) &&
+					(!missingResource || (probe.m_ReadbackMaps == maps && probe.m_FrameAborts == aborts + 1)),
+					"Job product provenance comes from one actual attempt; compiled failure maps and encodes nothing");
+			}
+			std::vector<FrameCaptureRequestResult> legacy;
+			runtime.ConsumeFrameCaptureResults(legacy);
+			checks.Check(legacy.empty() && capture.GetIntakeSnapshot().m_ReservedReceipts == 0 &&
+				capture.GetUnfinishedRequestCount() == 0 && probe.m_CaptureControl->GetUnfinishedRequestCount() == 0,
+				"Production result fan-out does not duplicate job receipts into the legacy stream");
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(!capture.TakeJobResult(admission.m_JobId), "A later production tick cannot repeat the terminal receipt");
+			runtime.Shutdown();
+			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0,
+				"Admitted-job teardown preserves the production GPU ownership settlement order");
+		}
+
 		void RunPreviewChangeScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -1816,6 +1887,8 @@ namespace gglab
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		RunFrameOutcomeScenarios(context, root / "outcomes");
+		RunAdmittedJobScenario(context, root / "admitted-job", false);
+		RunAdmittedJobScenario(context, root / "admitted-job-missing", true);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-late", 0, false);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-reference", 3, false);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-missing", 0, true);
