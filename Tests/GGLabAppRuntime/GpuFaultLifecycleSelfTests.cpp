@@ -119,6 +119,7 @@ namespace gglab
 			bool m_HoldUploads = false;
 			uint32_t m_EarlyDestructions = 0;
 			uint32_t m_ReadbackMaps = 0;
+			uint32_t m_LiveReadbackBuffers = 0;
 			uint32_t m_Readbacks = 0;
 			uint32_t m_CaptureCopies = 0;
 			uint32_t m_LateSubmits = 0;
@@ -137,6 +138,10 @@ namespace gglab
 			bool m_RejectUploadWait = false;
 			bool m_QueueExport = false;
 			uint32_t m_RequiredPlanDeferrals = 0;
+			FrameCaptureCoordinator* m_CaptureCoordinator = nullptr;
+			uint64_t m_CancelJobDuringBuild = 0;
+			std::optional<CaptureCancelResult> m_CancellationResult;
+			bool m_HoldCaptureFence = false;
 			bool m_EnableTemporalHistory = false;
 			uint32_t m_FrameBegins = 0;
 			uint32_t m_FrameEnds = 0;
@@ -251,6 +256,7 @@ namespace gglab
 			{
 				const RHIBufferHandle handle{ m_Next++, 1 };
 				m_Buffers.emplace(handle, Buffer{ desc,{} });
+				m_Probe.m_LiveReadbackBuffers += desc.m_MemoryUsage == RHIMemoryUsage::GpuToCpu;
 				return handle;
 			}
 			RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override { return { m_Next++, 1 }; }
@@ -264,6 +270,11 @@ namespace gglab
 			void DestroyBuffer(RHIBufferHandle handle) noexcept override
 			{
 				m_Probe.Destroy();
+				const auto found = m_Buffers.find(handle);
+				if (found != m_Buffers.end() && found->second.m_Desc.m_MemoryUsage == RHIMemoryUsage::GpuToCpu)
+				{
+					--m_Probe.m_LiveReadbackBuffers;
+				}
 				m_Buffers.erase(handle);
 			}
 			void DestroyTextureView(RHITextureViewHandle) noexcept override { m_Probe.Destroy(); }
@@ -323,6 +334,7 @@ namespace gglab
 					return RHIFenceQueryResult::DeviceLost;
 				}
 				const bool pending = point == m_Probe.m_ReadbackFence ||
+					(m_Probe.m_HoldCaptureFence && point == m_Probe.m_LastEndFence) ||
 					(m_Probe.m_HoldUploads && point.m_Fence == RHIFenceHandle{ 2, 1 });
 				return pending ? RHIFenceQueryResult::Pending : RHIFenceQueryResult::Completed;
 			}
@@ -822,6 +834,11 @@ namespace gglab
 							GGLAB_ASSERT(exported);
 							GGLAB_UNUSED(exported);
 						});
+				}
+				if (m_Probe.m_CancelJobDuringBuild != 0)
+				{
+					m_Probe.m_CancellationResult = m_Probe.m_CaptureCoordinator->CancelJob(m_Probe.m_CancelJobDuringBuild);
+					m_Probe.m_CancelJobDuringBuild = 0;
 				}
 				if (m_Probe.m_RequiredPlanDeferrals != 0 &&
 					m_Probe.m_CaptureControl->GetUnfinishedRequestCount() >= 2)
@@ -1452,6 +1469,90 @@ namespace gglab
 				"Admitted-job teardown preserves the production GPU ownership settlement order");
 		}
 
+		void RunJobCancellationScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool beforeSubmit)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root,
+				[&](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					++probe.m_ImageEncodes;
+					return std::vector<uint8_t>{ 0x89, 'P', 'N', 'G', 13, 10, 26, 10 };
+				}))
+			{
+				return;
+			}
+			auto& capture = *runtime.GetFrameCaptureCoordinator();
+			probe.m_CaptureCoordinator = &capture;
+			const auto cancelled = capture.TrySubmit(beforeSubmit ?
+				CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{},
+					ResourceCaptureProduct{ { { .m_Resource = "FaultLifecycle.Color" } } }, GraphCaptureProduct{} } } :
+				CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{} } });
+			checks.Check(cancelled.m_Status == CaptureAdmissionStatus::Accepted,
+				"The production cancellation harness accepts its logical job");
+			const auto maps = probe.m_ReadbackMaps;
+			const auto aborts = probe.m_FrameAborts;
+			const auto ends = probe.m_FrameEnds;
+			const auto copies = probe.m_CaptureCopies;
+			if (beforeSubmit)
+			{
+				probe.m_CancelJobDuringBuild = cancelled.m_JobId;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue &&
+					probe.m_CancellationResult == CaptureCancelResult::Cancelled &&
+					probe.m_FrameAborts == aborts + 1 && probe.m_FrameEnds == ends &&
+					probe.m_CaptureCopies == copies && probe.m_ReadbackMaps == maps,
+					"Cancelling after image binding aborts through real frame RAII before graph execution, mapping or submission");
+				capture.Update();
+				checks.Check(capture.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0 &&
+					probe.m_CaptureControl->GetUnfinishedRequestCount() == 0 && probe.m_ImageEncodes == 0,
+					"The real abort drains provisional cancelled capture owners without encoding a partial bundle");
+			}
+			else
+			{
+				const auto surviving = capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } });
+				probe.m_HoldCaptureFence = true;
+				GGLAB_UNUSED(runtime.Tick());
+				const auto buffers = probe.m_LiveReadbackBuffers;
+				checks.Check(capture.GetJobSnapshot(cancelled.m_JobId)->m_Stage == CaptureJobStage::AwaitingProducts &&
+					probe.m_FrameEnds == ends + 1 && probe.m_CaptureCopies == copies + 1 && buffers != 0 &&
+					probe.m_ReadbackMaps == maps && probe.m_CaptureControl->GetUnfinishedRequestCount() == 2,
+					"Two production subscribers share one image copy while its certified submission remains pending");
+				checks.Check(capture.CancelJob(cancelled.m_JobId) == CaptureCancelResult::Cancelled,
+					"The submitted production job accepts delivery cancellation");
+				capture.Update();
+				checks.Check(probe.m_LiveReadbackBuffers == buffers && probe.m_ReadbackMaps == maps &&
+					capture.GetIntakeSnapshot().m_DrainingRuntimeRequests == 1 &&
+					!capture.TakeJobResult(surviving.m_JobId),
+					"Cancelling one subscriber neither maps nor retires its pending shared GPU buffer");
+				probe.m_HoldCaptureFence = false;
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+				std::optional<CaptureJobResult> result;
+				while (!result && std::chrono::steady_clock::now() < deadline)
+				{
+					capture.Update();
+					result = capture.TakeJobResult(surviving.m_JobId);
+					std::this_thread::yield();
+				}
+				checks.Check(result && result->m_Status == CaptureJobStatus::Completed &&
+					std::filesystem::exists(result->m_ManifestPath) && probe.m_ImageEncodes == 1 &&
+					capture.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0,
+					"Certified completion delivers and publishes only the surviving subscriber and returns cancelled drain credit");
+			}
+			const auto result = capture.TakeJobResult(cancelled.m_JobId);
+			checks.Check(result && result->m_Status == CaptureJobStatus::Cancelled &&
+				result->m_Publication == CaptureJobPublication::NotPublished && result->m_ManifestPath.empty(),
+				"Production draining preserves exactly the original cancelled, unpublished job receipt");
+			runtime.Shutdown();
+			std::vector<FrameCaptureRequestResult> legacy;
+			runtime.ConsumeFrameCaptureResults(legacy);
+			checks.Check(legacy.empty() && !capture.TakeJobResult(cancelled.m_JobId) &&
+				probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 && probe.m_LiveReadbackBuffers == 0,
+				"Cancellation shutdown preserves GPU ownership and emits no duplicate or legacy terminal result");
+		}
+
 		void RunPreviewChangeScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -1891,6 +1992,8 @@ namespace gglab
 		RunFrameOutcomeScenarios(context, root / "outcomes");
 		RunAdmittedJobScenario(context, root / "admitted-job", false);
 		RunAdmittedJobScenario(context, root / "admitted-job-missing", true);
+		RunJobCancellationScenario(context, root / "cancel-before-submit", true);
+		RunJobCancellationScenario(context, root / "cancel-shared-submission", false);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-late", 0, false);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-reference", 3, false);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-missing", 0, true);

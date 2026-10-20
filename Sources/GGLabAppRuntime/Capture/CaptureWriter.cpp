@@ -43,6 +43,12 @@ namespace gglab
 		return m_Receipt;
 	}
 
+	bool CaptureWriteJob::TryCancel() noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+		return !m_Receipt && m_Publication.TryAbandon();
+	}
+
 	void CaptureWriteJob::WaitUntil(std::chrono::steady_clock::time_point deadline) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
@@ -124,7 +130,7 @@ namespace gglab
 			return std::move(*receipt);
 		}
 		const auto stage = job.m_Publication.m_Stage.load();
-		if (job.m_Publication.TryAbandon())
+		if (job.m_Publication.TryAbandon() || job.m_Publication.IsAbandoned())
 		{
 			m_HasAbandonedJobs = true;
 			return { .m_Failure = std::format(
@@ -173,7 +179,7 @@ namespace gglab
 			CaptureEncodedBundle bundle;
 			if (job.m_Publication.IsAbandoned())
 			{
-				receipt.m_Failure = "The capture was abandoned at shutdown.";
+				receipt.m_Failure = "The capture publication was abandoned.";
 			}
 			else
 			{

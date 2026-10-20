@@ -170,7 +170,10 @@ namespace gglab
 		[[nodiscard]] std::optional<CaptureJobResult> TakeJobResult(uint64_t jobId) noexcept;
 		[[nodiscard]] std::optional<CaptureJobSnapshot> GetJobSnapshot(uint64_t jobId) const noexcept;
 		[[nodiscard]] CaptureIntakeSnapshot GetIntakeSnapshot() const noexcept;
-		// Issued cancellation remains a separate external-contract migration gate.
+		// Cancels the whole job's delivery, including issued work. Runtime/readback
+		// and writer owners drain independently; a claimed publication is TooLate.
+		[[nodiscard]] CaptureCancelResult CancelJob(uint64_t jobId) noexcept;
+		// Transitional waiting-only entry point; its behavior remains unchanged.
 		[[nodiscard]] CaptureWaitingCancelResult CancelWaitingJob(uint64_t jobId) noexcept;
 
 		// Returns the non-zero request id.
@@ -250,6 +253,7 @@ namespace gglab
 		struct CaptureJob;
 		struct CaptureOutput;
 		struct JobReceipt;
+		struct DrainingWrite;
 
 		enum class Phase : uint8_t
 		{
@@ -291,6 +295,7 @@ namespace gglab
 		// Publishes the result of a written output; false while it is unfinished.
 		[[nodiscard]] bool TryFinishWritten(CaptureOutput& entry) noexcept;
 		void CollectWrittenJobs() noexcept;
+		void CollectDrainingWrites() noexcept;
 		// Waits for unfinished writing until the shutdown write timeout, then
 		// fails what remains and abandons jobs that have not claimed publication.
 		void FinishWriting() noexcept;
@@ -315,6 +320,10 @@ namespace gglab
 		// Runtime retains and retires these payloads normally after a plan has failed
 		// or retried; their late results must not reach a new attempt.
 		std::vector<uint64_t> m_DiscardedCaptureResults;
+		// Cancelled delivery never returns reservations still held by Runtime or a
+		// writer. These drain records outlive consumption/reuse of the job receipt.
+		std::vector<uint64_t> m_DrainingCaptureRequests;
+		std::vector<DrainingWrite> m_DrainingWrites;
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		uint32_t m_SettledFrames = 0;
 		// Every frame of the current settle key so far had every gate ready.

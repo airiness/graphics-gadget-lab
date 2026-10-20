@@ -48,6 +48,9 @@ namespace gglab
 		bool m_StallReported = false;
 
 		[[nodiscard]] std::optional<CaptureWriteReceipt> GetReceipt() const noexcept;
+		// Shares the receipt lock so an already finished pre-claim failure cannot
+		// be reclassified as cancelled. Publication itself arbitrates via its claim.
+		[[nodiscard]] bool TryCancel() noexcept;
 		void WaitUntil(std::chrono::steady_clock::time_point deadline) noexcept;
 
 	private:

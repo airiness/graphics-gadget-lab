@@ -108,8 +108,22 @@ namespace gglab
 		uint32_t m_ActiveJobs = 0;
 		uint32_t m_ReservedReceipts = 0;
 		uint32_t m_TerminalReceipts = 0;
+		// Cancelled jobs may have a terminal receipt while these owners still drain.
+		uint32_t m_DrainingRuntimeRequests = 0;
+		uint32_t m_DrainingWriterJobs = 0;
+		uint32_t m_DrainingWriteReservations = 0;
 		uint32_t m_LegacyUnfinishedOutputs = 0;
 		size_t m_LegacyRetainedResults = 0;
+	};
+
+	// Cancelled guarantees no publication for the job, not immediate resource
+	// retirement. TooLate leaves the job's eventual status/publication unchanged.
+	enum class CaptureCancelResult : uint8_t
+	{
+		Cancelled,
+		TooLate,
+		Finished,
+		NotFound,
 	};
 
 	enum class CaptureWaitingCancelResult : uint8_t

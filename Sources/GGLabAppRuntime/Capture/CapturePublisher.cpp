@@ -188,6 +188,10 @@ namespace gglab
 			};
 		try
 		{
+			if (control.IsAbandoned())
+			{
+				return failure("The capture publication was abandoned.");
+			}
 			if (content.m_Files.empty())
 			{
 				return failure("The capture has no files to publish.");
@@ -230,7 +234,7 @@ namespace gglab
 			}
 			if (!control.TryClaim())
 			{
-				return failure("The capture was abandoned at shutdown.");
+				return failure("The capture publication was abandoned.");
 			}
 			constexpr uint32_t MaxPublishAttempts = 1000;
 			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)

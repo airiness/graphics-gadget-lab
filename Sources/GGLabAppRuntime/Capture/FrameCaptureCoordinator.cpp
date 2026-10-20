@@ -62,6 +62,13 @@ namespace gglab
 		CaptureJobSnapshot m_FinalSnapshot;
 	};
 
+	struct FrameCaptureCoordinator::DrainingWrite
+	{
+		std::shared_ptr<CaptureWriteJob> m_Job;
+		uint32_t m_Reservations = 0;
+		bool m_AbandonedAtShutdown = false;
+	};
+
 	// Legacy output routing survives until the versioned request/result migration.
 	// Product readiness, frame retry and watch coverage belong to the shared job.
 	struct FrameCaptureCoordinator::CaptureOutput
@@ -291,7 +298,13 @@ namespace gglab
 	CaptureIntakeSnapshot FrameCaptureCoordinator::GetIntakeSnapshot() const noexcept
 	{
 		CaptureIntakeSnapshot snapshot{ .m_Limits = m_JobLimits, .m_ActiveJobs = m_ActiveJobs,
+			.m_DrainingRuntimeRequests = static_cast<uint32_t>(m_DrainingCaptureRequests.size()),
+			.m_DrainingWriterJobs = static_cast<uint32_t>(m_DrainingWrites.size()),
 			.m_LegacyRetainedResults = m_Results.size() };
+		for (const DrainingWrite& write : m_DrainingWrites)
+		{
+			snapshot.m_DrainingWriteReservations += write.m_Reservations;
+		}
 		for (const JobReceipt& slot : m_JobReceipts)
 		{
 			snapshot.m_ReservedReceipts += slot.m_JobId != 0;
@@ -354,6 +367,58 @@ namespace gglab
 			break;
 		}
 		return snapshot;
+	}
+
+	CaptureCancelResult FrameCaptureCoordinator::CancelJob(uint64_t jobId) noexcept
+	{
+		if (jobId == 0)
+		{
+			return CaptureCancelResult::NotFound;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return CaptureCancelResult::NotFound;
+		}
+		if (slot->m_Result)
+		{
+			return CaptureCancelResult::Finished;
+		}
+		// Keep the job alive when Finish releases its receipt's active reference.
+		const auto job = slot->m_Job;
+		const auto outputs = GetOutputs(*job);
+		GGLAB_ASSERT_MSG(!outputs.empty(), "An active job retains its required outputs.");
+		if (outputs.front()->m_Phase == Phase::Encoding)
+		{
+			if (TryFinishWritten(*outputs.front()))
+			{
+				return CaptureCancelResult::Finished;
+			}
+			const auto write = outputs.front()->m_WriteJob;
+			if (!write->TryCancel())
+			{
+				return TryFinishWritten(*outputs.front()) ?
+					CaptureCancelResult::Finished : CaptureCancelResult::TooLate;
+			}
+			// The cancelled receipt may be consumed before this worker unwinds.
+			// Retain every reservation independently until its real receipt arrives.
+			m_DrainingWrites.push_back({ write, static_cast<uint32_t>(outputs.size()) });
+		}
+		else if (job->m_Attempt && !job->m_Attempt->m_Submitted)
+		{
+			// A graph may still borrow provisional resources. Request the normal
+			// pre-submit RAII abort; never destroy Runtime owners from CancelJob.
+			m_AbortFrameSerial = job->m_Attempt->m_FrameSerial;
+		}
+		for (CaptureOutput* member : outputs)
+		{
+			if (member->m_Phase == Phase::Issued && member->m_Attempt->m_CaptureRequestId != 0)
+			{
+				m_DrainingCaptureRequests.push_back(member->m_Attempt->m_CaptureRequestId);
+			}
+			Finish(*member, FrameCaptureRequestStatus::Cancelled, "Cancelled by request.");
+		}
+		return CaptureCancelResult::Cancelled;
 	}
 
 	CaptureWaitingCancelResult FrameCaptureCoordinator::CancelWaitingJob(uint64_t jobId) noexcept
@@ -566,11 +631,16 @@ namespace gglab
 			return FrameCaptureAvailability::Finalized;
 		}
 		// Reservations cover GPU issue through writer completion, not just queued jobs.
-		const auto reserved = std::ranges::count_if(m_Outputs, [](const CaptureOutput& entry)
+		auto reserved = std::ranges::count_if(m_Outputs, [](const CaptureOutput& entry)
 			{
 				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch ||
 					entry.m_Phase == Phase::Encoding;
 			});
+		reserved += m_DrainingCaptureRequests.size();
+		for (const DrainingWrite& write : m_DrainingWrites)
+		{
+			reserved += write.m_Reservations;
+		}
 		if (requestCount > MaxInFlightCaptures)
 		{
 			return FrameCaptureAvailability::TooLarge;
@@ -1213,6 +1283,10 @@ namespace gglab
 			});
 		if (entry == m_Outputs.end())
 		{
+			if (std::erase(m_DrainingCaptureRequests, result.m_RequestId) != 0)
+			{
+				return;
+			}
 			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0)
 			{
 				return;
@@ -1492,6 +1566,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::CollectWrittenJobs() noexcept
 	{
+		CollectDrainingWrites();
 		for (CaptureOutput& entry : m_Outputs)
 		{
 			if (entry.m_Phase != Phase::Encoding || TryFinishWritten(entry))
@@ -1509,6 +1584,14 @@ namespace gglab
 					GetCaptureWriteStageName(job.m_Publication.m_Stage));
 			}
 		}
+	}
+
+	void FrameCaptureCoordinator::CollectDrainingWrites() noexcept
+	{
+		std::erase_if(m_DrainingWrites, [](const DrainingWrite& write)
+			{
+				return write.m_Job->GetReceipt().has_value();
+			});
 	}
 
 	void FrameCaptureCoordinator::FinishWriting() noexcept
@@ -1543,6 +1626,20 @@ namespace gglab
 				Finish(entry, FrameCaptureRequestStatus::Failed, entry.m_WriteReceipt->m_Failure);
 			}
 		}
+		for (DrainingWrite& write : m_DrainingWrites)
+		{
+			if (write.m_AbandonedAtShutdown)
+			{
+				continue;
+			}
+			write.m_Job->WaitUntil(deadline);
+			if (!write.m_Job->GetReceipt())
+			{
+				GGLAB_UNUSED(m_Writer->Abandon(*write.m_Job, m_ShutdownWriteTimeout));
+				write.m_AbandonedAtShutdown = true;
+			}
+		}
+		CollectDrainingWrites();
 	}
 
 	void FrameCaptureCoordinator::Finish(
