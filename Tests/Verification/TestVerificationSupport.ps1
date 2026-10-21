@@ -29,6 +29,11 @@ try {
         Command='result';Session='invalid-job-binding';JobId=0 }
     $bindingResult = $binding.output | ConvertFrom-Json
     Check ($binding.exitCode -eq 1 -and -not $bindingResult.ok -and $bindingResult.error -match 'positive -JobId') 'real-session-client-binds-job-parameters-without-gpu'
+    # Transport failures remain one JSON control result, so audit cleanup can act on them.
+    $missingSession = 'verification-missing-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+    $missingStop = Stop-VerificationSession $missingSession -AllowFailure
+    Check (-not $missingStop.ok -and $missingStop.session -eq $missingSession -and
+        $missingStop.error -match 'not running') 'real-session-client-reports-missing-session-as-json'
     # Exercise the real waiting client with deterministic transport outcomes.
     & {
         $tokens = $null; $parseErrors = $null

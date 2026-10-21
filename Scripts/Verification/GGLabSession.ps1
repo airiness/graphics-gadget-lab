@@ -192,7 +192,9 @@ function Test-SessionPipe([string]$Id) {
     return [bool]($pipes | Where-Object { $_ -ieq "\\.\pipe\$(Get-PipeName $Id)" })
 }
 
-# Sends one request and returns the parsed response object.
+# Sends one request and returns the parsed response object. Transport failures
+# throw so a waiting client can retain an accepted jobId; commands report them
+# through Invoke-SessionCommand.
 function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
     $Request['protocol'] = $ProtocolVersion
     $Request['id'] = Get-Random -Minimum 1 -Maximum 2147483647
@@ -228,6 +230,17 @@ function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseT
     }
     finally {
         $client.Dispose()
+    }
+}
+
+# Every command prints one JSON result, including when the session is missing,
+# does not answer or returns an incompatible response.
+function Invoke-SessionCommand([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+    try {
+        return Invoke-SessionRequest $Id $Request $ResponseTimeoutSeconds
+    }
+    catch {
+        Fail $_.Exception.Message @{ session = $Id }
     }
 }
 
@@ -427,7 +440,7 @@ switch ($Command) {
     }
     'status' {
         Require-Session
-        $response = Invoke-SessionRequest $Session @{ command = 'status' } 30
+        $response = Invoke-SessionCommand $Session @{ command = 'status' } 30
         Complete-SessionResponse $response $Session
     }
     'capture' {
@@ -440,7 +453,7 @@ switch ($Command) {
             $request.Remove('source')
             $request['products'] = (Read-JsonArray $Products $ProductsFile 'Products')
         }
-        $response = Invoke-SessionRequest $Session $request ([Math]::Max(30, $TimeoutSeconds))
+        $response = Invoke-SessionCommand $Session $request ([Math]::Max(30, $TimeoutSeconds))
         if (-not $NoWait) { $response = Wait-CaptureJob $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds)) }
         Complete-SessionResponse $response $Session
     }
@@ -450,7 +463,7 @@ switch ($Command) {
         $request['command'] = 'graph'
         $request.Remove('source')
         $request['summary'] = [bool]$Summary
-        $response = Invoke-SessionRequest $Session $request ([Math]::Max(30, $TimeoutSeconds))
+        $response = Invoke-SessionCommand $Session $request ([Math]::Max(30, $TimeoutSeconds))
         if (-not $NoWait) { $response = Wait-CaptureJob $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds)) }
         Complete-SessionResponse $response $Session
     }
@@ -462,7 +475,7 @@ switch ($Command) {
         $request.Remove('diagnosticTap')
         $request['targets'] = (Read-JsonArray $Targets $TargetsFile 'Targets')
         $request['graph'] = [bool]$IncludeGraph
-        $response = Invoke-SessionRequest $Session $request ([Math]::Max(30, $TimeoutSeconds))
+        $response = Invoke-SessionCommand $Session $request ([Math]::Max(30, $TimeoutSeconds))
         if (-not $NoWait) { $response = Wait-CaptureJob $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds)) }
         Complete-SessionResponse $response $Session
     }
@@ -475,7 +488,7 @@ switch ($Command) {
             # Content registers its reference views while it loads, so the view
             # list is taken once the session reports ready content.
             while ($true) {
-                $status = Invoke-SessionRequest $Session @{ command = 'status' } 30
+                $status = Invoke-SessionCommand $Session @{ command = 'status' } 30
                 $frame = Get-Field $status 'frame'
                 $reported = @(Get-Field $frame 'referenceViews' | Where-Object { $_ })
                 if ((Get-Field $frame 'ready') -and $reported.Count -gt 0) {
@@ -496,7 +509,7 @@ switch ($Command) {
         $captures = @()
         $completed = 0
         foreach ($viewId in $Views) {
-            $admission = Invoke-SessionRequest $Session (New-CaptureRequest $viewId) ([Math]::Max(30, $TimeoutSeconds))
+            $admission = Invoke-SessionCommand $Session (New-CaptureRequest $viewId) ([Math]::Max(30, $TimeoutSeconds))
             $response = Wait-CaptureJob $admission $deadline.ToUniversalTime()
             if (-not $response.ok) { Complete-SessionResponse $response $Session }
             if ($response.status -eq 'completed') { ++$completed }
@@ -510,13 +523,13 @@ switch ($Command) {
     'result' {
         Require-Session
         if ($JobId -eq 0) { Fail "Command 'result' requires a positive -JobId." }
-        $response = Invoke-SessionRequest $Session @{ command = 'result'; jobId = $JobId; consume = [bool]$Consume } 30
+        $response = Invoke-SessionCommand $Session @{ command = 'result'; jobId = $JobId; consume = [bool]$Consume } 30
         Complete-SessionResponse $response $Session
     }
     'capture-cancel' {
         Require-Session
         if ($JobId -eq 0) { Fail "Command 'capture-cancel' requires a positive -JobId." }
-        $response = Invoke-SessionRequest $Session @{ command = 'capture-cancel'; jobId = $JobId } 30
+        $response = Invoke-SessionCommand $Session @{ command = 'capture-cancel'; jobId = $JobId } 30
         Complete-SessionResponse $response $Session
     }
     'sequence' {
@@ -539,13 +552,13 @@ switch ($Command) {
         if ($GpuTiming) { $request['gpuTiming'] = $true }
         if ($Label) { $request['label'] = $Label }
         if ($Note) { $request['note'] = $Note }
-        $response = Invoke-SessionRequest $Session $request 30
+        $response = Invoke-SessionCommand $Session $request 30
         if ($NoWait -or -not $response.ok) { Complete-SessionResponse $response $Session }
 
         $sequenceId = $response.sequence.id
         $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
         while ($true) {
-            $status = Invoke-SessionRequest $Session @{ command = 'status' } 30
+            $status = Invoke-SessionCommand $Session @{ command = 'status' } 30
             $sequence = Get-Field $status 'sequence'
             if ($null -eq $sequence -or $sequence.id -ne $sequenceId) {
                 Fail "Session '$Session' no longer reports sequence $sequenceId." @{ session = $Session }
@@ -575,12 +588,12 @@ switch ($Command) {
                 try { $request['inject'] = ($Inject | ConvertFrom-Json) } catch { Fail "-Inject is not a JSON object: $($_.Exception.Message)" }
             }
         }
-        $response = Invoke-SessionRequest $Session $request 30
+        $response = Invoke-SessionCommand $Session $request 30
         Complete-SessionResponse $response $Session
     }
     'sequence-cancel' {
         Require-Session
-        $response = Invoke-SessionRequest $Session @{ command = 'sequence-cancel' } 30
+        $response = Invoke-SessionCommand $Session @{ command = 'sequence-cancel' } 30
         Complete-SessionResponse $response $Session
     }
     'stop' {
@@ -595,7 +608,7 @@ switch ($Command) {
                 $null = $process.Handle
             }
         }
-        $response = Invoke-SessionRequest $Session @{ command = 'stop' } 30
+        $response = Invoke-SessionCommand $Session @{ command = 'stop' } 30
         $exitCode = $null
         if ($process) {
             if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {

@@ -67,6 +67,9 @@ Wire query: `{"protocol":3,"id":7,"command":"result","jobId":1,"consume":false}`
 does not consume a pending job. Terminal query returns the immutable receipt;
 only terminal `consume: true` releases it. Unknown or consumed IDs return
 `ok: false`, `status: not-found`. IDs are process-local, not durable identities.
+`result` and `capture-cancel` reach only jobs admitted through this session's
+pipe. Interactive, startup and sequence jobs share the ID counter but are
+`not-found`/`NotFound` here, so a client cannot observe, consume or cancel them.
 
 Waiting script commands explicitly consume the final receipt by default. Use
 `-KeepResult` to retain it, then `result -Consume` when finished. `-NoWait` returns
@@ -81,6 +84,8 @@ session activity; stored receipts do not.
 Session termination cancels/drains work and ends receipt retention; artifacts
 are not deleted. A lost response to a consume request is not replayable. The
 client must tolerate an unknown/consumed result after transport failure.
+Transport failures (missing session, no answer, incompatible response) still print
+one JSON result with `ok: false`, `error` and `session`, and exit 1.
 
 ## Interpret a terminal result
 
@@ -139,7 +144,7 @@ own receipts into a bounded newest-16 metadata/file history. Capture All Views
 snapshots business input and owns at most one accepted job at a time. Startup
 one-shot independently owns one plan/job/terminal receipt through exit and shutdown;
 it never depends on UI history. Neither frontend consumes session or sequence
-receipts. These record counts do not bound authored input, submitted-range watch
+receipts, and the session owner answers only for its own jobs. These record counts do not bound authored input, submitted-range watch
 evidence, timing series or all process bytes. All first-party frontends use this
 contract; retired host request/result adapters and waiting-only cancellation
 paths are removed. Runtime producer transport identities and saved artifact

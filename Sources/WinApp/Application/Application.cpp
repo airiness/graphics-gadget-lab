@@ -2,6 +2,7 @@
 #include "AppRuntimeLog.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Capture/CaptureOnReady.h"
+#include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Application/Platform/Windows/Win32Shell.h"
@@ -507,6 +508,7 @@ namespace gglab
 			m_ControlServer.reset();
 			return false;
 		}
+		m_ControlCaptureJobs = std::make_unique<ApplicationControlCaptureJobs>(*m_AppRuntime);
 		m_LastControlActivity = std::chrono::steady_clock::now();
 		GGLAB_LOG_INFO_ALWAYS("Session '{}' accepts control requests (protocol {}).",
 			m_SessionId, ApplicationControlProtocolVersion);
@@ -590,39 +592,15 @@ namespace gglab
 		case ApplicationControlCommand::Capture:
 		case ApplicationControlCommand::Graph:
 		case ApplicationControlCommand::Export:
-		{
-			const CaptureAdmission admission = m_AppRuntime ?
-				m_AppRuntime->TrySubmitCaptureJob(std::move(request.m_Capture)) :
-				CaptureAdmission{ .m_Reason = CaptureAdmissionReason::ServicesUnavailable };
-			pipeRequest->Respond(SerializeApplicationControlCaptureAdmission(request.m_Id, admission));
+			pipeRequest->Respond(
+				m_ControlCaptureJobs->Submit(request.m_Id, std::move(request.m_Capture)));
 			return;
-		}
 		case ApplicationControlCommand::Result:
-		{
-			const CaptureJobResult* result = m_AppRuntime ?
-				m_AppRuntime->FindCaptureJobResult(request.m_JobId) : nullptr;
-			if (result)
-			{
-				// Serialize while borrowed. Consume only after the complete response exists;
-				// a disconnected client can still lose a response, but cannot duplicate a receipt.
-				auto response = SerializeApplicationControlCaptureResult(request.m_Id, *result, request.m_Consume);
-				if (request.m_Consume)
-				{
-					(void)m_AppRuntime->TakeCaptureJobResult(request.m_JobId);
-				}
-				pipeRequest->Respond(std::move(response));
-				return;
-			}
-			const auto snapshot = m_AppRuntime ?
-				m_AppRuntime->GetCaptureJobSnapshot(request.m_JobId) : std::nullopt;
-			pipeRequest->Respond(snapshot ?
-				SerializeApplicationControlCapturePending(request.m_Id, *snapshot) :
-				SerializeApplicationControlCaptureNotFound(request.m_Id, request.m_JobId));
+			pipeRequest->Respond(
+				m_ControlCaptureJobs->Query(request.m_Id, request.m_JobId, request.m_Consume));
 			return;
-		}
 		case ApplicationControlCommand::CaptureCancel:
-			pipeRequest->Respond(SerializeApplicationControlCaptureCancellation(request.m_Id,
-				request.m_JobId, m_AppRuntime ? m_AppRuntime->CancelCaptureJob(request.m_JobId) : CaptureCancelResult::NotFound));
+			pipeRequest->Respond(m_ControlCaptureJobs->Cancel(request.m_Id, request.m_JobId));
 			return;
 		case ApplicationControlCommand::Stop:
 			pipeRequest->Respond(SerializeApplicationControlStopping(request.m_Id));
@@ -705,6 +683,7 @@ namespace gglab
 				m_CaptureOnReadyJob->CollectResult();
 				m_CaptureOnReadyJob.reset();
 			}
+			m_ControlCaptureJobs.reset();
 			m_AppRuntime.reset();
 		}
 		if (m_ControlServer)

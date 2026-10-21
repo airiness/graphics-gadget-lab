@@ -1,10 +1,12 @@
 #include "Application/SelfTest/ApplicationControlSelfTests.h"
 
+#include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -413,6 +415,129 @@ namespace gglab
 				Json::parse(SerializeApplicationControlStopping(15))["status"] == "stopping", "NotFound and stop acknowledgements are distinct");
 		}
 
+		// AppRuntime-like receipt store shared by the session and every other host owner.
+		struct SharedCaptureJobs
+		{
+			uint64_t m_NextJobId = 1;
+			bool m_Busy = false;
+			std::vector<uint64_t> m_Active;
+			std::vector<CaptureJobResult> m_Published;
+			std::vector<uint64_t> m_Cancelled;
+
+			CaptureAdmission Submit() noexcept
+			{
+				if (m_Busy)
+				{
+					return { CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ReceiptLimit };
+				}
+				m_Active.push_back(m_NextJobId);
+				return { CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, m_NextJobId++ };
+			}
+			void Finish(uint64_t jobId, CaptureJobStatus status = CaptureJobStatus::Completed) noexcept
+			{
+				if (std::erase(m_Active, jobId) != 0)
+				{
+					m_Published.push_back({ .m_JobId = jobId, .m_Status = status,
+						.m_Publication = status == CaptureJobStatus::Completed ?
+							CaptureJobPublication::Published :
+							CaptureJobPublication::NotPublished });
+				}
+			}
+			[[nodiscard]] const CaptureJobResult* Find(uint64_t jobId) const noexcept
+			{
+				const auto result = std::ranges::find(m_Published, jobId, &CaptureJobResult::m_JobId);
+				return result != m_Published.end() ? &*result : nullptr;
+			}
+			[[nodiscard]] std::optional<CaptureJobResult> Take(uint64_t jobId) noexcept
+			{
+				const auto result = std::ranges::find(m_Published, jobId, &CaptureJobResult::m_JobId);
+				if (result == m_Published.end())
+				{
+					return std::nullopt;
+				}
+				CaptureJobResult taken = std::move(*result);
+				m_Published.erase(result);
+				return taken;
+			}
+			[[nodiscard]] std::optional<CaptureJobSnapshot> GetSnapshot(uint64_t jobId) const noexcept
+			{
+				const bool active = std::ranges::find(m_Active, jobId) != m_Active.end();
+				if (!active && !Find(jobId))
+				{
+					return std::nullopt;
+				}
+				return CaptureJobSnapshot{ .m_JobId = jobId,
+					.m_Stage = active ? CaptureJobStage::AwaitingProducts : CaptureJobStage::Finished };
+			}
+			CaptureCancelResult Cancel(uint64_t jobId) noexcept
+			{
+				if (std::ranges::find(m_Active, jobId) == m_Active.end())
+				{
+					return Find(jobId) ? CaptureCancelResult::Finished : CaptureCancelResult::NotFound;
+				}
+				m_Cancelled.push_back(jobId);
+				Finish(jobId, CaptureJobStatus::Cancelled);
+				return CaptureCancelResult::Cancelled;
+			}
+		};
+
+		void RunCaptureJobOwnershipTests(SelfTestContext& context) noexcept
+		{
+			SharedCaptureJobs jobs;
+			ApplicationControlCaptureJobs session({
+				.m_TrySubmit = [&](CapturePlan&&) { return jobs.Submit(); },
+				.m_Cancel = [&](uint64_t jobId) { return jobs.Cancel(jobId); },
+				.m_FindResult = [&](uint64_t jobId) { return jobs.Find(jobId); },
+				.m_TakeResult = [&](uint64_t jobId) { return jobs.Take(jobId); },
+				.m_GetSnapshot = [&](uint64_t jobId) { return jobs.GetSnapshot(jobId); },
+			});
+			// Interactive, startup and sequence jobs share the job counter but not ownership.
+			const uint64_t foreign = jobs.Submit().m_JobId;
+			const auto admitted = Json::parse(session.Submit(1, CapturePlan{}));
+			const uint64_t owned = admitted["jobId"].get<uint64_t>();
+			const auto foreignPending = Json::parse(session.Query(2, foreign, true));
+			const auto foreignCancel = Json::parse(session.Cancel(3, foreign));
+			context.Check(admitted["ok"] == true && owned != foreign &&
+				session.GetOwnedJobCount() == 1 && foreignPending["ok"] == false &&
+				foreignPending["status"] == "not-found" &&
+				foreignCancel["cancellation"] == "NotFound" && jobs.m_Cancelled.empty() &&
+				jobs.GetSnapshot(foreign).has_value(),
+				"A session client can neither observe nor cancel another owner's active job");
+			const auto ownedPending = Json::parse(session.Query(4, owned, true));
+			context.Check(ownedPending["status"] == "pending" && session.GetOwnedJobCount() == 1,
+				"A session client observes its own pending job without consuming it");
+
+			jobs.Finish(foreign);
+			jobs.Finish(owned);
+			const auto foreignTerminal = Json::parse(session.Query(5, foreign, true));
+			context.Check(foreignTerminal["status"] == "not-found" && jobs.Find(foreign),
+				"A session client cannot consume another owner's terminal receipt");
+			const auto borrowed = Json::parse(session.Query(6, owned, false));
+			const auto consumed = Json::parse(session.Query(7, owned, true));
+			const auto released = Json::parse(session.Query(8, owned, false));
+			context.Check(borrowed["status"] == "completed" && borrowed["consumed"] == false &&
+				consumed["status"] == "completed" && consumed["consumed"] == true &&
+				!jobs.Find(owned) && session.GetOwnedJobCount() == 0 &&
+				released["status"] == "not-found",
+				"A session client borrows, then consumes its own receipt once and releases the identity");
+			context.Check(jobs.Take(foreign).has_value(),
+				"The foreign owner still consumes its own receipt");
+
+			jobs.m_Busy = true;
+			const auto busy = Json::parse(session.Submit(9, CapturePlan{}));
+			jobs.m_Busy = false;
+			const auto accepted = Json::parse(session.Submit(10, CapturePlan{}));
+			const uint64_t cancelled = accepted["jobId"].get<uint64_t>();
+			const auto cancellation = Json::parse(session.Cancel(11, cancelled));
+			const uint32_t retained = session.GetOwnedJobCount();
+			const auto cancelledResult = Json::parse(session.Query(12, cancelled, true));
+			context.Check(busy["ok"] == false && busy["jobId"].is_null() &&
+				cancellation["cancellation"] == "Cancelled" &&
+				jobs.m_Cancelled == std::vector<uint64_t>{ cancelled } && retained == 1 &&
+				cancelledResult["status"] == "cancelled" && session.GetOwnedJobCount() == 0,
+				"Busy creates no session identity; cancelling an owned job keeps it until its receipt is consumed");
+		}
+
 		[[nodiscard]] std::optional<std::string> SendPipeLine(const std::wstring& pipeName, std::string_view line) noexcept
 		{
 			HANDLE pipe = INVALID_HANDLE_VALUE;
@@ -533,6 +658,7 @@ namespace gglab
 	{
 		RunParseTests(context);
 		RunSerializeTests(context);
+		RunCaptureJobOwnershipTests(context);
 		RunPipeServerTests(context);
 	}
 }

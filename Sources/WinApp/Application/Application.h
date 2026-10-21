@@ -19,6 +19,7 @@ namespace gglab
 	class RHIContextFactoryBase;
 	class InputManager;
 	class ApplicationFrameCapture;
+	class ApplicationControlCaptureJobs;
 	class CaptureOnReady;
 	class ApplicationToolingIntegrationBase;
 	class PlatformHost;
@@ -127,6 +128,8 @@ namespace gglab
 		std::string m_SessionId;
 		std::chrono::duration<double> m_IdleTimeout{ 900.0 };
 		std::unique_ptr<win32::NamedPipeServer> m_ControlServer;
+		// Session-admitted job identities; other owners' jobs are not-found to clients.
+		std::unique_ptr<ApplicationControlCaptureJobs> m_ControlCaptureJobs;
 		std::chrono::steady_clock::time_point m_StartTime{};
 		std::chrono::steady_clock::time_point m_LastControlActivity{};
 		bool m_StopRequested = false;

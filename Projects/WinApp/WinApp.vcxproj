@@ -249,6 +249,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Shell.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
@@ -375,6 +376,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Shell.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextGraphics.h" />
