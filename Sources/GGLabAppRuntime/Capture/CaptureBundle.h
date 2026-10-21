@@ -38,6 +38,15 @@ namespace gglab
 		std::vector<size_t> m_FileIndices;
 	};
 
+	// Sequence-owned immutable CPU data. It never enters a SameFrame CapturePlan.
+	struct SequenceTimingBundleInput
+	{
+		std::string m_RunIdentity;
+		std::string m_Environment;
+		uint64_t m_SequenceId = 0;
+		std::string m_ProductJson;
+	};
+
 	struct CaptureEncodedBundle
 	{
 		CapturePublicationContent m_Content;
@@ -51,6 +60,10 @@ namespace gglab
 	[[nodiscard]] std::string CreateCaptureRunIdentity() noexcept;
 	[[nodiscard]] std::string MakeCaptureBundleId(std::string_view runIdentity,
 		uint64_t jobId, uint64_t attempt);
+	[[nodiscard]] std::string MakeSequenceTimingBundleId(
+		std::string_view runIdentity, uint64_t sequenceId);
 	[[nodiscard]] CaptureEncodedBundle EncodeCaptureBundle(const CaptureBundleInput& input,
 		const FrameCaptureImageEncoder& imageEncoder, std::atomic<CaptureWriteStage>& stage) noexcept;
+	[[nodiscard]] CaptureEncodedBundle EncodeSequenceTimingBundle(
+		const SequenceTimingBundleInput& input) noexcept;
 }

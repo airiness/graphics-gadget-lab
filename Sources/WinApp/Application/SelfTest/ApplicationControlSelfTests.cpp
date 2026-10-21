@@ -32,12 +32,12 @@ namespace gglab
 
 		void RunParseTests(SelfTestContext& context) noexcept
 		{
-			const auto status = ParseApplicationControlRequest(R"({"protocol":3,"id":7,"command":"status"})");
+			const auto status = ParseApplicationControlRequest(R"({"protocol":4,"id":7,"command":"status"})");
 			context.Check(status.m_Request && status.m_Request->m_Id == 7 &&
 				status.m_Request->m_Command == ApplicationControlCommand::Status,
-				"A v3 status request parses with its id");
+				"A v4 status request parses with its id");
 			const auto capture = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":8,"command":"capture","source":"composited",)"
+				R"({"protocol":4,"id":8,"command":"capture","source":"composited",)"
 				R"("timing":"next-frame","settleFrames":3,"requiredContentId":"gglab.lab.culling",)"
 				R"("view":"CAM_Courtyard","outputDirectory":"D:/captures","label":"a","note":"b"})");
 			context.Check(capture.m_Request && capture.m_Request->m_Capture.m_RequiredProducts.size() == 1 &&
@@ -49,46 +49,46 @@ namespace gglab
 				capture.m_Request->m_Capture.m_OutputDirectory == std::filesystem::path("D:/captures") &&
 				capture.m_Request->m_Capture.m_Label == "a" && capture.m_Request->m_Capture.m_Note == "b",
 				"Capture directly builds a typed plan and preserves every admission field");
-			const auto defaults = ParseApplicationControlRequest(R"({"protocol":3,"id":9,"command":"capture"})");
+			const auto defaults = ParseApplicationControlRequest(R"({"protocol":4,"id":9,"command":"capture"})");
 			context.Check(defaults.m_Request && defaults.m_Request->m_Capture.m_Timing == FrameCaptureTiming::AfterReady &&
 				defaults.m_Request->m_Capture.m_SettleFrames == 8 &&
 				std::get<ImageCaptureProduct>(defaults.m_Request->m_Capture.m_RequiredProducts[0]).m_Source == CaptureImageSource::Scene &&
 				defaults.m_Request->m_Capture.m_WaitForCapacity,
 				"Bare capture builds one settled scene product that waits for temporary execution capacity");
 			const auto diagnostic = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":14,"command":"capture","source":"diagnostic","diagnosticTap":"temporal-history-weight"})");
+				R"({"protocol":4,"id":14,"command":"capture","source":"diagnostic","diagnosticTap":"temporal-history-weight"})");
 			context.Check(diagnostic.m_Request &&
 				std::get<DiagnosticCaptureProduct>(diagnostic.m_Request->m_Capture.m_RequiredProducts[0]).m_Tap == PostProcessDebugTap::TemporalHistoryWeight,
 				"Diagnostic convenience capture directly builds its typed tap");
-			const auto graph = ParseApplicationControlRequest(R"({"protocol":3,"id":50,"command":"graph","summary":true})");
+			const auto graph = ParseApplicationControlRequest(R"({"protocol":4,"id":50,"command":"graph","summary":true})");
 			context.Check(graph.m_Request && graph.m_Request->m_Command == ApplicationControlCommand::Graph &&
 				std::get<GraphCaptureProduct>(graph.m_Request->m_Capture.m_RequiredProducts[0]).m_Summary,
 				"Graph builds a required graph product with a typed summary flag");
 			const auto resource = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":60,"command":"export","targets":[{"resource":"Color","at":{"before":"Repeated"},"occurrence":2,"mip":1,"slices":[2,3]}],"graph":true})");
+				R"({"protocol":4,"id":60,"command":"export","targets":[{"resource":"Color","at":{"before":"Repeated"},"occurrence":2,"mip":1,"slices":[2,3]}],"graph":true})");
 			context.Check(resource.m_Request && resource.m_Request->m_Capture.m_RequiredProducts.size() == 2 &&
 				std::holds_alternative<GraphCaptureProduct>(resource.m_Request->m_Capture.m_RequiredProducts[1]) &&
 				std::get<ResourceCaptureProduct>(resource.m_Request->m_Capture.m_RequiredProducts[0]).m_Targets[0].m_Occurrence == 2 &&
 				std::get<ResourceCaptureProduct>(resource.m_Request->m_Capture.m_RequiredProducts[0]).m_Targets[0].m_SliceCount == 3,
 				"Export builds two required products instead of reconstructing a legacy group");
 			const auto multi = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":100,"command":"capture","products":[{"kind":"image","source":"scene"},{"kind":"diagnostic","diagnosticTap":"temporal-rejection"},{"kind":"graph"},{"kind":"resource","targets":[{"resource":"Color"}]}]})");
+				R"({"protocol":4,"id":100,"command":"capture","products":[{"kind":"image","source":"scene"},{"kind":"diagnostic","diagnosticTap":"temporal-rejection"},{"kind":"graph"},{"kind":"resource","targets":[{"resource":"Color"}]}]})");
 			context.Check(multi.m_Request && multi.m_Request->m_Capture.m_RequiredProducts.size() == 4 &&
 				std::holds_alternative<ImageCaptureProduct>(multi.m_Request->m_Capture.m_RequiredProducts[0]) &&
 				std::holds_alternative<DiagnosticCaptureProduct>(multi.m_Request->m_Capture.m_RequiredProducts[1]) &&
 				std::holds_alternative<GraphCaptureProduct>(multi.m_Request->m_Capture.m_RequiredProducts[2]) &&
 				std::holds_alternative<ResourceCaptureProduct>(multi.m_Request->m_Capture.m_RequiredProducts[3]),
 				"Explicit required products retain plan order across all supported kinds");
-			const auto query = ParseApplicationControlRequest(R"({"protocol":3,"id":10,"command":"result","jobId":4})");
-			const auto consume = ParseApplicationControlRequest(R"({"protocol":3,"id":11,"command":"result","jobId":4,"consume":true})");
-			const auto cancel = ParseApplicationControlRequest(R"({"protocol":3,"id":12,"command":"capture-cancel","jobId":4})");
+			const auto query = ParseApplicationControlRequest(R"({"protocol":4,"id":10,"command":"result","jobId":4})");
+			const auto consume = ParseApplicationControlRequest(R"({"protocol":4,"id":11,"command":"result","jobId":4,"consume":true})");
+			const auto cancel = ParseApplicationControlRequest(R"({"protocol":4,"id":12,"command":"capture-cancel","jobId":4})");
 			context.Check(query.m_Request && query.m_Request->m_JobId == 4 && !query.m_Request->m_Consume &&
 				consume.m_Request && consume.m_Request->m_Consume && cancel.m_Request &&
 				cancel.m_Request->m_Command == ApplicationControlCommand::CaptureCancel,
 				"Query, explicit consumption and delivery cancellation share a job identity");
 
 			const auto sequence = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":11,"command":"sequence","path":"SEQ_DollyDoorway","requiredContentId":"Demo.CoastalAtrium","captureFrames":[0,90,179],"source":"composited","outputDirectory":"D:/captures","label":"dolly","note":"baseline","exports":[{"frame":1,"targets":[{"resource":"Depth","aspect":"stencil"}],"graph":true}]})");
+				R"({"protocol":4,"id":11,"command":"sequence","path":"SEQ_DollyDoorway","requiredContentId":"Demo.CoastalAtrium","captureFrames":[0,90,179],"source":"composited","outputDirectory":"D:/captures","label":"dolly","note":"baseline","exports":[{"frame":1,"targets":[{"resource":"Depth","aspect":"stencil"}],"graph":true}]})");
 			context.Check(sequence.m_Request && sequence.m_Request->m_Sequence.m_CameraPathId == "SEQ_DollyDoorway" &&
 				sequence.m_Request->m_Sequence.m_RequiredContentId == "Demo.CoastalAtrium" &&
 				sequence.m_Request->m_Sequence.m_CaptureFrames == std::vector<uint32_t>{ 0, 90, 179 } &&
@@ -98,13 +98,13 @@ namespace gglab
 				sequence.m_Request->m_Sequence.m_Exports[0].m_Frame == 1 && sequence.m_Request->m_Sequence.m_Exports[0].m_IncludeGraph,
 				"Sequence business fields and complete export groups remain available during migration");
 			const auto reference = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic","diagnosticTap":"temporal-rejection","referenceSamples":64,"referenceTextureLodBias":-3})");
+				R"({"protocol":4,"id":13,"command":"sequence","path":"SEQ_A","source":"diagnostic","diagnosticTap":"temporal-rejection","referenceSamples":64,"referenceTextureLodBias":-3})");
 			context.Check(reference.m_Request && reference.m_Request->m_Sequence.m_CaptureSource == FrameCaptureSource::Diagnostic &&
 				reference.m_Request->m_Sequence.m_DiagnosticTap == PostProcessDebugTap::TemporalRejection &&
 				reference.m_Request->m_Sequence.m_ReferenceSamples == 64 && reference.m_Request->m_Sequence.m_ReferenceTextureLodBias == -3.0f,
 				"Sequence diagnostic and supersampled reference controls remain intact");
 			const auto evaluation = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,"temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,"historyFilter":"bilinear","currentFilter":"point","motionSelection":"center","postTemporalView":"jittered","resolutionPreset":"quality","historyRectification":"variance-clip","varianceClipGamma":1.25,"historyAccumulation":"compatibility-age","historyRelaxation":2,"textureLodBiasOffset":-1.5,"enabled":false},"gtao":{"temporal":true,"temporalMaxSamples":24,"directionCount":1,"stepCount":8}})");
+				R"({"protocol":4,"id":15,"command":"sequence","path":"SEQ_A","gpuTiming":true,"temporalAA":{"neighborhoodClampExpansion":1,"maxHistoryFeedback":0.9,"historyFilter":"bilinear","currentFilter":"point","motionSelection":"center","postTemporalView":"jittered","resolutionPreset":"quality","historyRectification":"variance-clip","varianceClipGamma":1.25,"historyAccumulation":"compatibility-age","historyRelaxation":2,"textureLodBiasOffset":-1.5,"enabled":false},"gtao":{"temporal":true,"temporalMaxSamples":24,"directionCount":1,"stepCount":8}})");
 			const auto* overrides = evaluation.m_Request ? &evaluation.m_Request->m_Sequence.m_TemporalAAOverrides : nullptr;
 			context.Check(overrides && evaluation.m_Request->m_Sequence.m_GpuTiming &&
 				overrides->m_NeighborhoodClampExpansion == 1.0f && overrides->m_MaxHistoryFeedback == 0.9f &&
@@ -119,14 +119,14 @@ namespace gglab
 				evaluation.m_Request->m_Sequence.m_GTAOOverrides.m_TemporalMaxSamples == 24u &&
 				evaluation.m_Request->m_Sequence.m_GTAOOverrides.m_DirectionCount == 1u && evaluation.m_Request->m_Sequence.m_GTAOOverrides.m_StepCount == 8u,
 				"Sequence GTAO overrides preserve exact values");
-			context.Check(ParseApplicationControlRequest(R"({"protocol":3,"id":12,"command":"sequence-cancel"})").m_Request.has_value(),
+			context.Check(ParseApplicationControlRequest(R"({"protocol":4,"id":12,"command":"sequence-cancel"})").m_Request.has_value(),
 				"Sequence cancellation remains a distinct business command");
 			const auto watch = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":70,"command":"watch","mode":"report","claims":["boundary"],"targets":[{"resource":"Motion","at":{"before":"TAA"},"occurrence":2,"slices":[2,1]}]})");
+				R"({"protocol":4,"id":70,"command":"watch","mode":"report","claims":["boundary"],"targets":[{"resource":"Motion","at":{"before":"TAA"},"occurrence":2,"slices":[2,1]}]})");
 			const auto buffer = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":71,"command":"watch","targets":[{"resource":"Values","buffer":{"stride":16,"validElementCount":3,"fields":[{"offset":0,"type":"uint32"},{"offset":4,"type":"float32","count":2},{"offset":12,"type":"float16","count":2}]}}]})");
-			const auto off = ParseApplicationControlRequest(R"({"protocol":3,"id":72,"command":"watch","enabled":false})");
-			const auto production = ParseApplicationControlRequest(R"({"protocol":3,"id":73,"command":"watch","claims":["production"]})");
+				R"({"protocol":4,"id":71,"command":"watch","targets":[{"resource":"Values","buffer":{"stride":16,"validElementCount":3,"fields":[{"offset":0,"type":"uint32"},{"offset":4,"type":"float32","count":2},{"offset":12,"type":"float16","count":2}]}}]})");
+			const auto off = ParseApplicationControlRequest(R"({"protocol":4,"id":72,"command":"watch","enabled":false})");
+			const auto production = ParseApplicationControlRequest(R"({"protocol":4,"id":73,"command":"watch","claims":["production"]})");
 			context.Check(watch.m_Request && !watch.m_Request->m_Watch.m_Production &&
 				watch.m_Request->m_Watch.m_Targets[0].m_Address.m_Occurrence == 2u && buffer.m_Request &&
 				buffer.m_Request->m_Watch.m_Targets[0].m_BufferLayout.m_Components.size() == 4 &&
@@ -134,7 +134,7 @@ namespace gglab
 				!off.m_Request->m_Watch.m_Enabled && production.m_Request && !production.m_Request->m_Watch.m_Boundary && production.m_Request->m_Watch.m_Production,
 				"Watch preserves typed addresses, valid floating buffer fields, disabled and production-only modes");
 			const auto injection = ParseApplicationControlRequest(
-				R"({"protocol":3,"id":74,"command":"watch","mode":"fail","inject":{"point":"pass-temporal-aa.csmain.history","value":"NegativeInfinity","x":12,"y":34,"component":3}})");
+				R"({"protocol":4,"id":74,"command":"watch","mode":"fail","inject":{"point":"pass-temporal-aa.csmain.history","value":"NegativeInfinity","x":12,"y":34,"component":3}})");
 #if GGLAB_DEVELOPMENT_BUILD
 			context.Check(injection.m_Request && injection.m_Request->m_Watch.m_Injection &&
 				injection.m_Request->m_Watch.m_Injection->m_Value == NonFiniteInjectionValue::NegativeInfinity &&
@@ -150,93 +150,94 @@ namespace gglab
 			{
 				R"({"protocol":1,"id":3,"command":"status"})",
 				R"({"protocol":2,"id":3,"command":"capture"})",
-				R"({"protocol":4,"id":3,"command":"status"})",
-				R"({"protocol":3,"id":75,"command":"watch","inject":{"point":"unknown.point","value":"NaN","x":0,"y":0}})",
-				R"({"protocol":3,"id":76,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"nan","x":0,"y":0}})",
-				R"({"protocol":3,"id":77,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0,"y":0,"component":4}})",
-				R"({"protocol":3,"id":78,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0}})",
-				R"({"protocol":3,"id":80,"command":"watch","claims":[]})",
-				R"({"protocol":3,"id":81,"command":"watch","claims":["boundary","boundary"]})",
-				R"({"protocol":3,"id":82,"command":"watch","claims":["other"]})",
-				R"({"protocol":3,"id":83,"command":"watch","mode":"fatal"})",
-				R"({"protocol":3,"id":84,"command":"watch","enabled":1})",
-				R"({"protocol":3,"id":85,"command":"watch","enabled":false,"targets":[]})",
-				R"({"protocol":3,"id":86,"command":"watch","target":[]})",
-				R"({"protocol":3,"id":87,"command":"watch","targets":[null]})",
-				R"({"protocol":3,"id":88,"command":"watch","targets":[{"resource":"A","buffer":{}}]})",
-				R"({"protocol":3,"id":89,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":2,"fields":[{"offset":0,"type":"uint32"}]}}]})",
-				R"({"protocol":3,"id":90,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":-1,"fields":[{"offset":0,"type":"float32"}]}}]})",
-				R"({"protocol":3,"id":91,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":1,"fields":[{"offset":0,"type":"float32","count":4294967295}]}}]})",
-				R"({"protocol":3,"id":92,"command":"watch","targets":[{"resource":"A","buffer":{"stride":8,"validElementCount":1,"fields":[{"offset":0,"type":"float32","count":2},{"offset":4,"type":"float32"}]}}]})",
-				R"({"protocol":3,"id":93,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":1,"fields":[{"offset":0,"type":"float32","extra":1}]}}]})",
-				R"({"protocol":3,"id":62,"command":"export","targets":[]})",
-				R"({"protocol":3,"id":63,"command":"export","targets":[{"resource":"A","at":{"before":"P","after":"P"}}]})",
-				R"({"protocol":3,"id":64,"command":"export","targets":[{"resource":"A","occurrence":0}]})",
-				R"({"protocol":3,"id":65,"command":"export","targets":[{"resource":"A","slices":[0,0]}]})",
-				R"({"protocol":3,"id":66,"command":"export","targets":[{"resource":"A","mipp":1}]})",
-				R"({"protocol":3,"id":67,"command":"export","targets":[{"resource":"A","aspect":"all"}]})",
-				R"({"protocol":3,"id":68,"command":"export","targets":[{"resource":"A"}],"graph":1})",
-				R"({"protocol":3,"command":"status"})",
-				R"({"protocol":3,"id":4,"command":"reboot"})",
-				R"({"protocol":3,"id":5,"command":"status","extra":1})",
-				R"({"protocol":3,"id":6,"command":"capture","source":"hud"})",
-				R"({"protocol":3,"id":7,"command":"capture","settleFrames":-1})",
-				R"({"protocol":3,"id":8,"command":"capture","outputDirectory":"relative"})",
-				R"({"protocol":3,"id":9,"command":"capture","lable":"typo"})",
-				R"({"protocol":3,"id":10,"command":"result"})",
-				R"({"protocol":3,"id":11,"command":"result","jobId":0})",
-				R"({"protocol":3,"id":12,"command":"sequence"})",
-				R"({"protocol":3,"id":13,"command":"sequence","path":"A","captureFrames":[-1]})",
-				R"({"protocol":3,"id":14,"command":"sequence","path":"A","captureFrames":3})",
-				R"({"protocol":3,"id":15,"command":"sequence","path":"A","frames":[1]})",
-				R"({"protocol":3,"id":16,"command":"sequence-cancel","path":"A"})",
-				R"({"protocol":3,"id":17,"command":"capture","source":"diagnostic"})",
-				R"({"protocol":3,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})",
-				R"({"protocol":3,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})",
-				R"({"protocol":3,"id":20,"command":"sequence","path":"A","referenceSamples":5000})",
-				R"({"protocol":3,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})",
-				R"({"protocol":3,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})",
-				R"({"protocol":3,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})",
-				R"({"protocol":3,"id":24,"command":"sequence","path":"A","temporalAA":[]})",
-				R"({"protocol":3,"id":25,"command":"sequence","path":"A","gpuTiming":1})",
-				R"({"protocol":3,"id":26,"command":"sequence","path":"A","temporalAA":{"historyFilter":"bicubic"}})",
-				R"({"protocol":3,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})",
-				R"({"protocol":3,"id":28,"command":"sequence","path":"A","temporalAA":{"currentFilter":"box"}})",
-				R"({"protocol":3,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})",
-				R"({"protocol":3,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})",
-				R"({"protocol":3,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})",
-				R"({"protocol":3,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})",
-				R"({"protocol":3,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})",
-				R"({"protocol":3,"id":34,"command":"sequence","path":"A","temporalAA":{"enabled":0}})",
-				R"({"protocol":3,"id":35,"command":"sequence","path":"A","temporalAA":{"postTemporalView":"none"}})",
-				R"({"protocol":3,"id":36,"command":"sequence","path":"A","temporalAA":{"resolutionPreset":"balanced"}})",
-				R"({"protocol":3,"id":37,"command":"sequence","path":"A","temporalAA":{"historyRectification":"variance"}})",
-				R"({"protocol":3,"id":38,"command":"sequence","path":"A","temporalAA":{"varianceClipGamma":8}})",
-				R"({"protocol":3,"id":39,"command":"sequence","path":"A","temporalAA":{"historyAccumulation":"age"}})",
-				R"({"protocol":3,"id":40,"command":"sequence","path":"A","temporalAA":{"historyRelaxation":5}})",
-				R"({"protocol":3,"id":41,"command":"sequence","path":"A","gtao":{"temporal":1}})",
-				R"({"protocol":3,"id":42,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":0}})",
-				R"({"protocol":3,"id":43,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":2.5}})",
-				R"({"protocol":3,"id":44,"command":"sequence","path":"A","gtao":{"radius":2}})",
-				R"({"protocol":3,"id":45,"command":"sequence","path":"A","gtao":{"directionCount":9}})",
-				R"({"protocol":3,"id":51,"command":"graph","summary":1})",
-				R"({"protocol":3,"id":52,"command":"graph","source":"scene"})",
-				R"({"protocol":3,"id":53,"command":"graph","extra":true})",
-				R"({"protocol":3,"id":54,"command":"capture","summary":true})",
-				R"({"protocol":3,"id":101,"command":"capture","wait":false})",
-				R"({"protocol":3,"id":102,"command":"result","requestId":1})",
-				R"({"protocol":3,"id":103,"command":"result","jobId":1,"consume":1})",
-				R"({"protocol":3,"id":104,"command":"capture-cancel","jobId":1,"consume":true})",
-				R"({"protocol":3,"id":105,"command":"result","jobId":1,"extra":1})",
-				R"({"protocol":3,"id":106,"command":"capture","products":[]})",
-				R"({"protocol":3,"id":107,"command":"capture","products":[{"kind":"image","source":"diagnostic"}]})",
-				R"({"protocol":3,"id":108,"command":"capture","products":[{"kind":"image","source":"scene","optional":true}]})",
-				R"({"protocol":3,"id":109,"command":"capture","products":[{"kind":"diagnostic"}]})",
-				R"({"protocol":3,"id":110,"command":"capture","products":[{"kind":"graph","summary":1}]})",
-				R"({"protocol":3,"id":111,"command":"capture","products":[{"kind":"resource","targets":[]}]})",
-				R"({"protocol":3,"id":112,"command":"capture","products":[{"kind":"other"}]})",
-				R"({"protocol":3,"id":113,"command":"capture","products":[{"kind":"graph"}],"source":"scene"})",
-				R"({"protocol":3,"id":114,"command":"graph","products":[{"kind":"graph"}]})",
+				R"({"protocol":3,"id":116,"command":"status"})",
+				R"({"protocol":5,"id":3,"command":"status"})",
+				R"({"protocol":4,"id":75,"command":"watch","inject":{"point":"unknown.point","value":"NaN","x":0,"y":0}})",
+				R"({"protocol":4,"id":76,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"nan","x":0,"y":0}})",
+				R"({"protocol":4,"id":77,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0,"y":0,"component":4}})",
+				R"({"protocol":4,"id":78,"command":"watch","inject":{"point":"pass-temporal-aa.csmain.history","value":"NaN","x":0}})",
+				R"({"protocol":4,"id":80,"command":"watch","claims":[]})",
+				R"({"protocol":4,"id":81,"command":"watch","claims":["boundary","boundary"]})",
+				R"({"protocol":4,"id":82,"command":"watch","claims":["other"]})",
+				R"({"protocol":4,"id":83,"command":"watch","mode":"fatal"})",
+				R"({"protocol":4,"id":84,"command":"watch","enabled":1})",
+				R"({"protocol":4,"id":85,"command":"watch","enabled":false,"targets":[]})",
+				R"({"protocol":4,"id":86,"command":"watch","target":[]})",
+				R"({"protocol":4,"id":87,"command":"watch","targets":[null]})",
+				R"({"protocol":4,"id":88,"command":"watch","targets":[{"resource":"A","buffer":{}}]})",
+				R"({"protocol":4,"id":89,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":2,"fields":[{"offset":0,"type":"uint32"}]}}]})",
+				R"({"protocol":4,"id":90,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":-1,"fields":[{"offset":0,"type":"float32"}]}}]})",
+				R"({"protocol":4,"id":91,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":1,"fields":[{"offset":0,"type":"float32","count":4294967295}]}}]})",
+				R"({"protocol":4,"id":92,"command":"watch","targets":[{"resource":"A","buffer":{"stride":8,"validElementCount":1,"fields":[{"offset":0,"type":"float32","count":2},{"offset":4,"type":"float32"}]}}]})",
+				R"({"protocol":4,"id":93,"command":"watch","targets":[{"resource":"A","buffer":{"stride":4,"validElementCount":1,"fields":[{"offset":0,"type":"float32","extra":1}]}}]})",
+				R"({"protocol":4,"id":62,"command":"export","targets":[]})",
+				R"({"protocol":4,"id":63,"command":"export","targets":[{"resource":"A","at":{"before":"P","after":"P"}}]})",
+				R"({"protocol":4,"id":64,"command":"export","targets":[{"resource":"A","occurrence":0}]})",
+				R"({"protocol":4,"id":65,"command":"export","targets":[{"resource":"A","slices":[0,0]}]})",
+				R"({"protocol":4,"id":66,"command":"export","targets":[{"resource":"A","mipp":1}]})",
+				R"({"protocol":4,"id":67,"command":"export","targets":[{"resource":"A","aspect":"all"}]})",
+				R"({"protocol":4,"id":68,"command":"export","targets":[{"resource":"A"}],"graph":1})",
+				R"({"protocol":4,"command":"status"})",
+				R"({"protocol":4,"id":4,"command":"reboot"})",
+				R"({"protocol":4,"id":5,"command":"status","extra":1})",
+				R"({"protocol":4,"id":6,"command":"capture","source":"hud"})",
+				R"({"protocol":4,"id":7,"command":"capture","settleFrames":-1})",
+				R"({"protocol":4,"id":8,"command":"capture","outputDirectory":"relative"})",
+				R"({"protocol":4,"id":9,"command":"capture","lable":"typo"})",
+				R"({"protocol":4,"id":10,"command":"result"})",
+				R"({"protocol":4,"id":11,"command":"result","jobId":0})",
+				R"({"protocol":4,"id":12,"command":"sequence"})",
+				R"({"protocol":4,"id":13,"command":"sequence","path":"A","captureFrames":[-1]})",
+				R"({"protocol":4,"id":14,"command":"sequence","path":"A","captureFrames":3})",
+				R"({"protocol":4,"id":15,"command":"sequence","path":"A","frames":[1]})",
+				R"({"protocol":4,"id":16,"command":"sequence-cancel","path":"A"})",
+				R"({"protocol":4,"id":17,"command":"capture","source":"diagnostic"})",
+				R"({"protocol":4,"id":18,"command":"capture","diagnosticTap":"temporal-rejection"})",
+				R"({"protocol":4,"id":19,"command":"sequence","path":"A","source":"diagnostic","diagnosticTap":"bloom-result"})",
+				R"({"protocol":4,"id":20,"command":"sequence","path":"A","referenceSamples":5000})",
+				R"({"protocol":4,"id":21,"command":"sequence","path":"A","temporalAA":{"maxHistoryFeedback":1.5}})",
+				R"({"protocol":4,"id":22,"command":"sequence","path":"A","temporalAA":{"historyFilter":1}})",
+				R"({"protocol":4,"id":23,"command":"sequence","path":"A","temporalAA":{"velocityWeightScale":"x"}})",
+				R"({"protocol":4,"id":24,"command":"sequence","path":"A","temporalAA":[]})",
+				R"({"protocol":4,"id":25,"command":"sequence","path":"A","gpuTiming":1})",
+				R"({"protocol":4,"id":26,"command":"sequence","path":"A","temporalAA":{"historyFilter":"bicubic"}})",
+				R"({"protocol":4,"id":27,"command":"sequence","path":"A","temporalAA":{"historyFilter":"catmull-rom"}})",
+				R"({"protocol":4,"id":28,"command":"sequence","path":"A","temporalAA":{"currentFilter":"box"}})",
+				R"({"protocol":4,"id":29,"command":"sequence","path":"A","temporalAA":{"currentFilter":"gaussian-narrow"}})",
+				R"({"protocol":4,"id":30,"command":"sequence","path":"A","temporalAA":{"motionSelection":"dilated"}})",
+				R"({"protocol":4,"id":31,"command":"sequence","path":"A","temporalAA":{"motionSelection":"closest-depth-correspondence"}})",
+				R"({"protocol":4,"id":32,"command":"sequence","path":"A","temporalAA":{"textureLodBiasOffset":-3}})",
+				R"({"protocol":4,"id":33,"command":"sequence","path":"A","referenceTextureLodBias":"low"})",
+				R"({"protocol":4,"id":34,"command":"sequence","path":"A","temporalAA":{"enabled":0}})",
+				R"({"protocol":4,"id":35,"command":"sequence","path":"A","temporalAA":{"postTemporalView":"none"}})",
+				R"({"protocol":4,"id":36,"command":"sequence","path":"A","temporalAA":{"resolutionPreset":"balanced"}})",
+				R"({"protocol":4,"id":37,"command":"sequence","path":"A","temporalAA":{"historyRectification":"variance"}})",
+				R"({"protocol":4,"id":38,"command":"sequence","path":"A","temporalAA":{"varianceClipGamma":8}})",
+				R"({"protocol":4,"id":39,"command":"sequence","path":"A","temporalAA":{"historyAccumulation":"age"}})",
+				R"({"protocol":4,"id":40,"command":"sequence","path":"A","temporalAA":{"historyRelaxation":5}})",
+				R"({"protocol":4,"id":41,"command":"sequence","path":"A","gtao":{"temporal":1}})",
+				R"({"protocol":4,"id":42,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":0}})",
+				R"({"protocol":4,"id":43,"command":"sequence","path":"A","gtao":{"temporalMaxSamples":2.5}})",
+				R"({"protocol":4,"id":44,"command":"sequence","path":"A","gtao":{"radius":2}})",
+				R"({"protocol":4,"id":45,"command":"sequence","path":"A","gtao":{"directionCount":9}})",
+				R"({"protocol":4,"id":51,"command":"graph","summary":1})",
+				R"({"protocol":4,"id":52,"command":"graph","source":"scene"})",
+				R"({"protocol":4,"id":53,"command":"graph","extra":true})",
+				R"({"protocol":4,"id":54,"command":"capture","summary":true})",
+				R"({"protocol":4,"id":101,"command":"capture","wait":false})",
+				R"({"protocol":4,"id":102,"command":"result","requestId":1})",
+				R"({"protocol":4,"id":103,"command":"result","jobId":1,"consume":1})",
+				R"({"protocol":4,"id":104,"command":"capture-cancel","jobId":1,"consume":true})",
+				R"({"protocol":4,"id":105,"command":"result","jobId":1,"extra":1})",
+				R"({"protocol":4,"id":106,"command":"capture","products":[]})",
+				R"({"protocol":4,"id":107,"command":"capture","products":[{"kind":"image","source":"diagnostic"}]})",
+				R"({"protocol":4,"id":108,"command":"capture","products":[{"kind":"image","source":"scene","optional":true}]})",
+				R"({"protocol":4,"id":109,"command":"capture","products":[{"kind":"diagnostic"}]})",
+				R"({"protocol":4,"id":110,"command":"capture","products":[{"kind":"graph","summary":1}]})",
+				R"({"protocol":4,"id":111,"command":"capture","products":[{"kind":"resource","targets":[]}]})",
+				R"({"protocol":4,"id":112,"command":"capture","products":[{"kind":"other"}]})",
+				R"({"protocol":4,"id":113,"command":"capture","products":[{"kind":"graph"}],"source":"scene"})",
+				R"({"protocol":4,"id":114,"command":"graph","products":[{"kind":"graph"}]})",
 				"not json", "[1,2]",
 			};
 			for (const auto line : rejected)
@@ -247,7 +248,7 @@ namespace gglab
 				context.Check(!parsed.m_Request && !parsed.m_Error.empty() && parsed.m_Id == id,
 					std::format("Malformed, retired or unsupported request is rejected with its id: {}", line));
 			}
-			Json oversized = { { "protocol", 3 }, { "id", 115 }, { "command", "capture" }, { "products", Json::array() } };
+			Json oversized = { { "protocol", 4 }, { "id", 115 }, { "command", "capture" }, { "products", Json::array() } };
 			for (uint32_t index = 0; index < 9; ++index)
 			{
 				oversized["products"].push_back({ { "kind", "image" }, { "source", "scene" } });
@@ -258,7 +259,7 @@ namespace gglab
 		void RunSerializeTests(SelfTestContext& context) noexcept
 		{
 			const auto error = Json::parse(SerializeApplicationControlError(3, "bad \"input\""));
-			context.Check(error["protocol"] == 3 && error["id"] == 3 && error["ok"] == false && error["error"] == "bad \"input\"",
+			context.Check(error["protocol"] == 4 && error["id"] == 3 && error["ok"] == false && error["error"] == "bad \"input\"",
 				"Errors carry v3, correlation and correctly escaped text");
 			NonFiniteWatchStatus watch{ .m_ConfigurationVersion = 4, .m_Enabled = true,
 				.m_BoundaryRequested = true, .m_ProductionRequested = false, .m_BoundaryFrameSerial = 123,
@@ -346,6 +347,19 @@ namespace gglab
 				timing["scopes"][0]["occurrence"] == 2 && timing["scopes"][1]["kind"] == "other" &&
 				timing["scopes"][1]["occurrence"].is_null(),
 				"Sequence GPU timing exposes pass instance identities separately from other scopes");
+			sequence.m_State = FrameSequenceState::Failed;
+			sequence.m_TimingPublication = FrameSequenceTimingPublication{
+				.m_Outcome = CapturePublicationOutcome::Indeterminate, .m_Failure = "Publication is uncertain." };
+			const auto tooLate = Json::parse(SerializeApplicationControlSequenceCancellation(
+				13, &sequence, FrameSequenceCancelVerdict::TooLate));
+			context.Check(tooLate["cancellation"] == "TooLate" && tooLate["sequence"]["state"] == "failed" &&
+				tooLate["sequence"]["timingPublication"]["outcome"] == "Indeterminate" &&
+				tooLate["sequence"]["timingPublication"]["pending"] == false,
+				"TooLate responses retain the actual timing publication failure and outcome");
+			const auto noSequence = Json::parse(SerializeApplicationControlSequenceCancellation(
+				14, nullptr, FrameSequenceCancelVerdict::NotFound));
+			context.Check(noSequence["ok"] == true && noSequence["cancellation"] == "NotFound" &&
+				noSequence["sequence"].is_null(), "Sequence cancellation reports NotFound without inventing a sequence");
 			const auto accepted = Json::parse(SerializeApplicationControlCaptureAdmission(8, { CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, 12 }));
 			context.Check(accepted["ok"] == true && accepted["admission"] == "Accepted" && accepted["jobId"] == 12,
 				"Accepted admission exposes one job identity");

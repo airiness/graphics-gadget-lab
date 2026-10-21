@@ -48,6 +48,8 @@ namespace gglab
 		uint64_t m_RenderFrameSerial = 0;
 		double m_FrameMilliseconds = 0.0;
 		std::vector<GpuProfileSample> m_Samples;
+		// Frozen at recording completion, independent of later profiler controls.
+		bool m_ProfilingStateChanged = false;
 
 		[[nodiscard]] bool IsValid() const noexcept { return m_FrameIndex != 0; }
 	};

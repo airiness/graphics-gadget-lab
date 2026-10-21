@@ -630,15 +630,12 @@ namespace gglab
 			return;
 		}
 		case ApplicationControlCommand::SequenceCancel:
-			if (!frameSequence || !frameSequence->Cancel())
-			{
-				pipeRequest->Respond(SerializeApplicationControlError(
-					request.m_Id, "No sequence is active."));
-				return;
-			}
-			pipeRequest->Respond(
-				SerializeApplicationControlSequence(request.m_Id, *frameSequence->GetStatus()));
+		{
+			const auto verdict = frameSequence ? frameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
+			pipeRequest->Respond(SerializeApplicationControlSequenceCancellation(request.m_Id,
+				frameSequence ? frameSequence->GetStatus() : nullptr, verdict));
 			return;
+		}
 		}
 	}
 

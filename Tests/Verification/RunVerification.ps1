@@ -34,6 +34,7 @@ $catalog = @(
     @{ name = 'nonfinite-coverage-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateNonFiniteCoverage.py'; arguments = @('--self-test') }) },
     @{ name = 'capture-comparison'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestCompareCaptures.ps1' }) },
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
+    @{ name = 'gpu-timing-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateGpuTiming.py'; arguments = @('--self-test') }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },
     @{ name = 'capture-on-ready'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureOnReady.ps1' }) },
     @{ name = 'pass-profile-identity'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestPassProfileIdentity.ps1' }) },

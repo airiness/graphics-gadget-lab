@@ -451,7 +451,7 @@ namespace gglab
 		// publication outcome. Runtime and writer owners drain during shutdown.
 		if (m_FrameSequence)
 		{
-			m_FrameSequence->Cancel();
+			GGLAB_UNUSED(m_FrameSequence->Cancel());
 		}
 		if (m_FrameCapture)
 		{

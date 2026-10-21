@@ -466,6 +466,26 @@ namespace gglab
 		{
 			return m_CompileDiagnostics;
 		}
+		[[nodiscard]] RGObservationActivity GetObservationActivity() const noexcept
+		{
+			RGObservationActivity activity;
+			for (const auto& [index, target] : m_ObservationPasses)
+			{
+				switch (target.m_Kind)
+				{
+				case RGObservationKind::ResourceExport:
+					activity.m_ResourceExport = true;
+					break;
+				case RGObservationKind::NonFiniteScan:
+					activity.m_NonFiniteScan = true;
+					break;
+				case RGObservationKind::ProductionCounters:
+					activity.m_ProductionCounters = true;
+					break;
+				}
+			}
+			return activity;
+		}
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }

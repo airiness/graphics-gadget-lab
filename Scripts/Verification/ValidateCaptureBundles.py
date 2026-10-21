@@ -1,4 +1,4 @@
-"""Validate final bundle manifests, required files and same-frame provenance."""
+"""Validate final bundles, required files, frame provenance and sequence timing."""
 
 import argparse
 import copy
@@ -14,6 +14,7 @@ from jsonschema import Draft202012Validator, ValidationError
 import ValidateNonFiniteCoverage as coverage
 import ValidateRenderGraphExports as graphs
 import ValidateResourceExports as resources
+import ValidateGpuTiming as timing
 
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "Schemas"
@@ -40,6 +41,8 @@ def local_file(root, name):
 def validate(path, bundle_validator=None):
 	document = json.loads(path.read_text(encoding="utf-8"))
 	(bundle_validator or validator("CaptureBundle.schema.json")).validate(document)
+	if document["consistency"] == "sequence-range":
+		return validate_sequence(path, document)
 	identity = f'{document["runIdentity"]}-j{document["jobId"]}-a{document["attempt"]}'
 	if document["bundleId"] != identity:
 		raise ValueError("Bundle identity disagrees with its qualified job/attempt")
@@ -131,6 +134,26 @@ def validate(path, bundle_validator=None):
 	return document
 
 
+def validate_sequence(path, document):
+	sequence, environment = document["sequence"], document["environment"]
+	if document["bundleId"] != f'{document["runIdentity"]}-s{sequence["id"]}-timing':
+		raise ValueError("Sequence bundle identity disagrees with its qualified sequence")
+	if environment["process"]["runIdentity"] not in (None, document["runIdentity"]):
+		raise ValueError("Environment run identity disagrees with the sequence bundle")
+	product = document["products"][0]
+	if product["files"] != [product["metadata"]] or product["metadata"] == path.name:
+		raise ValueError("A timing bundle requires exactly one owning timing product")
+	metadata = json.loads(local_file(path.parent, product["metadata"]).read_text(encoding="utf-8"))
+	timing.validate(metadata)
+	if metadata["sequence"] != sequence or metadata["watch"] != document["watch"]:
+		raise ValueError("Timing product disagrees with its bundle sequence range or watch coverage")
+	if metadata["measurement"]["validation"] != environment["validation"]:
+		raise ValueError("Timing measurement validation disagrees with its environment")
+	if environment["device"] is not None and metadata["context"]["backend"] != environment["device"]["backend"]:
+		raise ValueError("Timing backend disagrees with its environment")
+	return document
+
+
 def self_test(bundle_validator):
 	with tempfile.TemporaryDirectory(prefix="gglab-bundle-schema-") as directory:
 		root = Path(directory)
@@ -208,6 +231,26 @@ def self_test(bundle_validator):
 		invalid = copy.deepcopy(document)
 		invalid["products"].append(dict(product, index=1))
 		cases.append(invalid)
+		measurement = timing.fixture()
+		measurement["measurement"]["validation"] = environment["validation"]
+		(root / "timing.json").write_text(json.dumps(measurement), encoding="utf-8")
+		sequence_bundle = dict(schema="gglab.capture-bundle", schemaVersion=2,
+			bundleId=f"{run}-s3-timing", runIdentity=run, consistency="sequence-range",
+			environment=environment, sequence=measurement["sequence"], watch=None,
+			products=[dict(index=0, source="gpu-timing", diagnosticTap=None, schema="gglab.gpu-timing",
+				schemaVersion=1, metadata="timing.json", files=["timing.json"])])
+		check(sequence_bundle)
+		for key, value in (("bundleId", f"{run}-j3-a1"), ("schemaVersion", 1),
+			("jobId", 3), ("attempt", 1), ("consistency", "same-frame")):
+			bad = copy.deepcopy(sequence_bundle)
+			bad[key] = value
+			cases.append(bad)
+		bad = copy.deepcopy(sequence_bundle)
+		bad["sequence"]["lastFrameSerial"] += 1
+		cases.append(bad)
+		bad = copy.deepcopy(sequence_bundle)
+		bad["environment"]["validation"]["effective"] = "off"
+		cases.append(bad)
 		for invalid in cases:
 			try:
 				check(invalid)

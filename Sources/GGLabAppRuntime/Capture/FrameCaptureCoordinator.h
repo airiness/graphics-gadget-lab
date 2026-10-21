@@ -12,11 +12,13 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -28,6 +30,8 @@ namespace gglab
 	class CaptureWriter;
 	struct CaptureProductEncodeInput;
 	struct CaptureWriteReceipt;
+	struct CaptureWriteJob;
+	struct SequenceTimingBundleInput;
 
 	// Runtime owns temporal compatibility; AppRuntime adds the active content.
 	// A changed identity or unreadable previous history restarts settling.
@@ -125,6 +129,7 @@ namespace gglab
 		// and writer owners drain independently; a claimed publication is TooLate.
 		[[nodiscard]] CaptureCancelResult CancelJob(uint64_t jobId) noexcept;
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
+		[[nodiscard]] bool HasFrameGraphExports() const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
 		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatch() const noexcept { return m_NonFiniteWatch; }
 		[[nodiscard]] std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return m_Capture ? m_Capture->GetLatestNonFiniteProductionFrame() : nullptr; }
@@ -186,6 +191,16 @@ namespace gglab
 
 	private:
 		friend class GGLabAppRuntime;
+		friend class FrameSequenceCoordinator;
+
+		// Shares the writer and one of the same nine write reservations. Busy leaves
+		// the immutable sequence product with its owner for a later poll.
+		[[nodiscard]] std::shared_ptr<CaptureWriteJob> TryPublishSequenceTiming(
+			const SequenceTimingBundleInput& input, const std::filesystem::path& directory,
+			std::string_view label, std::string& error) noexcept;
+		[[nodiscard]] std::optional<CaptureWriteReceipt> GetSequenceTimingReceipt(
+			const CaptureWriteJob& job) const noexcept;
+		[[nodiscard]] size_t GetWriteReservationCount() const noexcept;
 
 		// Bound once during composition, before admission. Published receipts stay in
 		// their original slots until the host consumes them through AppRuntime.
@@ -250,6 +265,8 @@ namespace gglab
 		std::filesystem::path m_DefaultOutputDirectory;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 		std::unique_ptr<CaptureWriter> m_Writer;
+		std::shared_ptr<CaptureWriteJob> m_SequenceTimingWrite;
+		std::shared_ptr<const CaptureWriteReceipt> m_SequenceTimingShutdownReceipt;
 		std::string m_RunIdentity;
 		// Serialized once after the run identity it records.
 		std::string m_EnvironmentJson;

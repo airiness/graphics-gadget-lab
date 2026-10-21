@@ -14,6 +14,12 @@ namespace gglab
 	struct RGExecuteContext;
 	enum class RGObservationKind : uint8_t { ResourceExport, NonFiniteScan, ProductionCounters };
 	enum class RGObservationPosition : uint8_t { Before, After, Final };
+	struct RGObservationActivity
+	{
+		bool m_ResourceExport = false;
+		bool m_NonFiniteScan = false;
+		bool m_ProductionCounters = false;
+	};
 	enum class RGObservationFailure : uint8_t
 	{
 		None, UnknownResource, UnknownPass, AmbiguousPass, NotAccessedByPass,

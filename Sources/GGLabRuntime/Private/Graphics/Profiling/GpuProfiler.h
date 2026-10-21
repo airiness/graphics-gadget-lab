@@ -5,12 +5,36 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <iterator>
 #include <string>
 
 namespace gglab
 {
+	// One atomic value orders enable changes with frame recording. Equal requests
+	// do not create a measurement change; every actual toggle changes the value.
+	class GpuProfilingState
+	{
+	public:
+		void RequestEnabled(bool enabled) noexcept
+		{
+			uint64_t state = m_State.load(std::memory_order_relaxed);
+			while (bool(state & 1) != enabled)
+			{
+				if (m_State.compare_exchange_weak(state, state + 1, std::memory_order_relaxed))
+				{
+					return;
+				}
+			}
+		}
+		[[nodiscard]] uint64_t Read() const noexcept { return m_State.load(std::memory_order_relaxed); }
+		[[nodiscard]] bool IsEnabled() const noexcept { return bool(Read() & 1); }
+
+	private:
+		std::atomic_uint64_t m_State{ 1 };
+	};
+
 	// Shared by native profilers: a same-name non-pass scope must never merge
 	// with a graph pass, nor may distinct declaration occurrences merge.
 	inline void AccumulateGpuProfileSample(

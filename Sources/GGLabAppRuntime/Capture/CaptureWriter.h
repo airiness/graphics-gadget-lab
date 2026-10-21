@@ -34,6 +34,7 @@ namespace gglab
 	struct CaptureWriteJob
 	{
 		CaptureBundleInput m_Bundle;
+		std::optional<SequenceTimingBundleInput> m_SequenceTiming;
 		std::filesystem::path m_Directory;
 		std::string m_BaseStem;
 		CapturePublicationControl m_Publication;

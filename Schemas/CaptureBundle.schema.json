@@ -1,18 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.capture-bundle",
-  "title": "GGLab same-frame capture bundle v1 and v2",
+  "title": "GGLab same-frame and sequence-range capture bundles v1 and v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "schemaVersion", "bundleId", "runIdentity", "jobId", "attempt", "consistency", "provenance", "submission", "watch", "products"],
+  "required": ["schema", "schemaVersion", "bundleId", "runIdentity", "consistency", "watch", "products"],
   "properties": {
     "schema": {"const": "gglab.capture-bundle"},
     "schemaVersion": {"enum": [1, 2]},
-    "bundleId": {"type": "string", "pattern": "^[0-9a-f]{32}-j[1-9][0-9]*-a[1-9][0-9]*$"},
+    "bundleId": {"type": "string", "pattern": "^[0-9a-f]{32}-(j[1-9][0-9]*-a[1-9][0-9]*|s[1-9][0-9]*-timing)$"},
     "runIdentity": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "jobId": {"type": "integer", "minimum": 1},
     "attempt": {"type": "integer", "minimum": 1},
-    "consistency": {"const": "same-frame"},
+    "consistency": {"enum": ["same-frame", "sequence-range"]},
+    "sequence": {"$ref": "#/$defs/sequenceRange"},
     "environment": {"$ref": "#/$defs/environment"},
     "provenance": {
       "type": "object",
@@ -52,9 +53,155 @@
       "if": {"properties": {"schemaVersion": {"const": 1}}},
       "then": {"not": {"required": ["environment"]}},
       "else": {"required": ["environment"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "consistency": {
+            "const": "same-frame"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "jobId",
+          "attempt",
+          "provenance",
+          "submission"
+        ],
+        "not": {
+          "required": [
+            "sequence"
+          ]
+        },
+        "properties": {
+          "bundleId": {
+            "pattern": "^[0-9a-f]{32}-j[1-9][0-9]*-a[1-9][0-9]*$"
+          },
+          "products": {
+            "items": {
+              "properties": {
+                "source": {
+                  "enum": [
+                    "scene",
+                    "composited",
+                    "diagnostic",
+                    "graph",
+                    "resource-export"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "sequence",
+          "environment"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": 2
+          },
+          "bundleId": {
+            "pattern": "^[0-9a-f]{32}-s[1-9][0-9]*-timing$"
+          },
+          "products": {
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "properties": {
+                "index": {
+                  "const": 0
+                },
+                "source": {
+                  "const": "gpu-timing"
+                },
+                "diagnosticTap": {
+                  "type": "null"
+                },
+                "schema": {
+                  "const": "gglab.gpu-timing"
+                },
+                "schemaVersion": {
+                  "const": 1
+                }
+              }
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "jobId"
+              ]
+            },
+            {
+              "required": [
+                "attempt"
+              ]
+            },
+            {
+              "required": [
+                "provenance"
+              ]
+            },
+            {
+              "required": [
+                "submission"
+              ]
+            }
+          ]
+        }
+      }
     }
   ],
   "$defs": {
+    "sequenceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "pathVersion",
+        "frameCount",
+        "referenceSamples",
+        "firstFrameSerial",
+        "lastFrameSerial"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pathVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "referenceSamples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstFrameSerial": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lastFrameSerial": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "file": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\:]+$"},
     "text": {"type": ["string", "null"], "minLength": 1},
     "validationLevel": {"enum": ["off", "standard", "gpu", null]},
@@ -132,9 +279,9 @@
       "required": ["index", "source", "diagnosticTap", "schema", "schemaVersion", "metadata", "files"],
       "properties": {
         "index": {"type": "integer", "minimum": 0},
-        "source": {"enum": ["scene", "composited", "diagnostic", "graph", "resource-export"]},
+        "source": {"enum": ["scene", "composited", "diagnostic", "graph", "resource-export", "gpu-timing"]},
         "diagnosticTap": {"type": ["string", "null"], "minLength": 1},
-        "schema": {"enum": ["gglab.frame-capture", "gglab.render-graph", "gglab.resource-export"]},
+        "schema": {"enum": ["gglab.frame-capture", "gglab.render-graph", "gglab.resource-export", "gglab.gpu-timing"]},
         "schemaVersion": {"type": "integer", "minimum": 1},
         "metadata": {"$ref": "#/$defs/file"},
         "files": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/file"}}

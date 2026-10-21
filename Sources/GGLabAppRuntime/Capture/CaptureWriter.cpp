@@ -182,7 +182,9 @@ namespace gglab
 			}
 			else
 			{
-				bundle = EncodeCaptureBundle(job.m_Bundle, state.m_Encoder, job.m_Publication.m_Stage);
+				bundle = job.m_SequenceTiming ?
+					EncodeSequenceTimingBundle(*job.m_SequenceTiming) :
+					EncodeCaptureBundle(job.m_Bundle, state.m_Encoder, job.m_Publication.m_Stage);
 				receipt.m_BundleId = bundle.m_BundleId;
 				receipt.m_Failure = std::move(bundle.m_Failure);
 				if (receipt.m_Failure.empty())
@@ -210,6 +212,7 @@ namespace gglab
 			}
 		}
 		job.m_Bundle = {};
+		job.m_SequenceTiming.reset();
 		job.m_Publication.m_Stage = CaptureWriteStage::Done;
 		{
 			std::scoped_lock lock(job.m_Mutex);

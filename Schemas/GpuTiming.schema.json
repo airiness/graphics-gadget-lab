@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.gpu-timing",
+  "title": "GGLab complete sequence GPU timing v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "sequence",
+    "context",
+    "coverage",
+    "frame",
+    "scopes",
+    "stablePassSet",
+    "measurement",
+    "watch"
+  ],
+  "properties": {
+    "schema": {
+      "const": "gglab.gpu-timing"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "sequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "pathVersion",
+        "frameCount",
+        "referenceSamples",
+        "firstFrameSerial",
+        "lastFrameSerial"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pathVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "referenceSamples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstFrameSerial": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lastFrameSerial": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "content",
+        "fixedDeltaTime",
+        "initialTemporal"
+      ],
+      "properties": {
+        "backend": {
+          "enum": [
+            "dx12",
+            "vulkan"
+          ]
+        },
+        "content": {
+          "type": "object"
+        },
+        "fixedDeltaTime": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "initialTemporal": {
+          "type": "object"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestedSamples",
+        "recordedSamples",
+        "samples"
+      ],
+      "properties": {
+        "requestedSamples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recordedSamples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "frameSerial",
+              "sequenceFrame",
+              "referenceSample",
+              "firstFrame",
+              "cameraCut",
+              "conditions"
+            ],
+            "properties": {
+              "frameSerial": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sequenceFrame": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "referenceSample": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "firstFrame": {
+                "type": "boolean"
+              },
+              "cameraCut": {
+                "type": "boolean"
+              },
+              "conditions": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gpuProfiling",
+                  "profilingStateChanged",
+                  "developmentTools",
+                  "graph",
+                  "resourceExport",
+                  "nonFiniteScan",
+                  "productionCounters"
+                ],
+                "properties": {
+                  "gpuProfiling": {
+                    "type": "boolean"
+                  },
+                  "profilingStateChanged": {
+                    "type": "boolean"
+                  },
+                  "developmentTools": {
+                    "type": "boolean"
+                  },
+                  "graph": {
+                    "type": "boolean"
+                  },
+                  "resourceExport": {
+                    "type": "boolean"
+                  },
+                  "nonFiniteScan": {
+                    "type": "boolean"
+                  },
+                  "productionCounters": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "milliseconds",
+        "statistics"
+      ],
+      "properties": {
+        "milliseconds": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 1
+        },
+        "statistics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "meanMs",
+            "medianMs",
+            "p90Ms",
+            "minMs",
+            "maxMs"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "p90Ms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "minMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maxMs": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "name",
+          "occurrence",
+          "sampleIndices",
+          "milliseconds",
+          "statistics"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "pass",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occurrence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "sampleIndices": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "milliseconds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "minItems": 1
+          },
+          "statistics": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "count",
+              "meanMs",
+              "medianMs",
+              "p90Ms",
+              "minMs",
+              "maxMs"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "meanMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "medianMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "p90Ms": {
+                "type": "number",
+                "minimum": 0
+              },
+              "minMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxMs": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "pass"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "occurrence": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "occurrence": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "stablePassSet": {
+      "type": "boolean"
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gpuProfilingRequested",
+        "validation",
+        "profilingStateChanged"
+      ],
+      "properties": {
+        "gpuProfilingRequested": {
+          "const": true
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requested",
+            "effective"
+          ],
+          "properties": {
+            "requested": {
+              "enum": [
+                "off",
+                "standard",
+                "gpu",
+                null
+              ]
+            },
+            "effective": {
+              "enum": [
+                "off",
+                "standard",
+                "gpu",
+                null
+              ]
+            }
+          }
+        },
+        "profilingStateChanged": {
+          "type": "boolean"
+        }
+      }
+    },
+    "watch": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
+}

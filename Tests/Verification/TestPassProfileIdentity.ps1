@@ -60,6 +60,38 @@ try {
                 if ($response.sequence.state -ne 'completed' -or $response.sequence.gpuTiming.frames -ne 180) {
                     throw 'The sequence did not complete all requested GPU timing samples.'
                 }
+                $publication = $response.sequence.timingPublication
+                if ($publication.outcome -ne 'Published' -or $publication.pending -or -not $publication.manifest) {
+                    throw 'A completed timing sequence requires its published timing bundle receipt.'
+                }
+                $timingManifest = Get-Content -LiteralPath $publication.manifest -Raw | ConvertFrom-Json
+                if ($timingManifest.consistency -ne 'sequence-range' -or $timingManifest.products.Count -ne 1) {
+                    throw 'Sequence timing must be discovered through a sequence-range bundle.'
+                }
+                $timingPath = Join-Path (Split-Path -Parent $publication.manifest) $timingManifest.products[0].metadata
+                $timing = Get-Content -LiteralPath $timingPath -Raw | ConvertFrom-Json
+                if ($timing.coverage.requestedSamples -ne 180 -or $timing.coverage.recordedSamples -ne 180 -or
+                    $timing.coverage.samples.Count -ne 180 -or $timing.scopes.Count -ne $response.sequence.gpuTiming.scopes.Count) {
+                    throw 'Published timing does not cover every requested sample and scope.'
+                }
+                foreach ($key in @('count', 'meanMs', 'medianMs', 'p90Ms', 'minMs', 'maxMs')) {
+                    if ($timing.frame.statistics.$key -ne $response.sequence.gpuTiming.frame.$key) {
+                        throw "Published frame statistics differ from the response summary: $key"
+                    }
+                }
+                for ($index = 0; $index -lt $timing.scopes.Count; ++$index) {
+                    $series = $timing.scopes[$index]
+                    $responseScope = $response.sequence.gpuTiming.scopes[$index]
+                    if ($series.name -cne $responseScope.name -or $series.kind -ne $responseScope.kind -or
+                        $series.occurrence -ne $responseScope.occurrence) {
+                        throw 'Published scope identity differs from the response summary.'
+                    }
+                    foreach ($key in @('count', 'meanMs', 'medianMs', 'p90Ms', 'minMs', 'maxMs')) {
+                        if ($series.statistics.$key -ne $responseScope.$key) {
+                            throw "Published scope statistics differ from the response summary: $key"
+                        }
+                    }
+                }
                 $graphKeys = @()
                 $graphs = @()
                 foreach ($manifestFile in Get-ChildItem -LiteralPath $sequenceDirectory -Filter '*.capture-bundle.json') {
@@ -106,7 +138,8 @@ try {
                 $previousKeys = $keys
                 Write-VerificationJson "$directory/identities.json" $keys
                 $cases += @{ configuration = $config; backend = $backend; passed = $true
-                    frames = 180; scopes = $keys.Count; graphs = $graphs; directory = $directory }
+                    frames = 180; scopes = $keys.Count; graphs = $graphs; directory = $directory
+                    timingManifest = $publication.manifest; timingProduct = $timingPath }
             } finally {
                 if ($start) {
                     $null = Stop-VerificationSession $sessionId -StartedSession $start `

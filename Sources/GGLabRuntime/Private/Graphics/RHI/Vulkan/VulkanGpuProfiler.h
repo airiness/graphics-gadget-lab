@@ -72,6 +72,8 @@ namespace gglab
 			VkQueryPool m_QueryPool = VK_NULL_HANDLE;
 			uint64_t m_FrameIndex = 0;
 			uint64_t m_RenderFrameSerial = 0;
+			uint64_t m_ProfilingStateAtBegin = 0;
+			bool m_ProfilingStateChanged = false;
 			uint32_t m_TimestampCount = 0;
 			uint32_t m_FrameBeginQuery = InvalidQueryIndex;
 			uint32_t m_FrameEndQuery = InvalidQueryIndex;
@@ -87,7 +89,7 @@ namespace gglab
 
 		VulkanDevice* m_Device = nullptr;
 		mutable std::mutex m_SnapshotMutex;
-		std::atomic_bool m_Enabled = true;
+		GpuProfilingState m_ProfilingState;
 		std::vector<FrameResource> m_Frames;
 		GpuProfileFrameSnapshot m_LatestFrame;
 		FrameResource* m_ActiveFrame = nullptr;

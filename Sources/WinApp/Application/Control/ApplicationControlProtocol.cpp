@@ -1343,6 +1343,26 @@ namespace gglab
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
 			}
+			if (status.m_TimingPublication)
+			{
+				const auto& publication = *status.m_TimingPublication;
+				Json files = Json::array();
+				for (const auto& path : publication.m_Files)
+				{
+					files.push_back(GetFrameCapturePathText(path));
+				}
+				sequence["timingPublication"] = {
+					{ "outcome", publication.m_Outcome == CapturePublicationOutcome::Published ?
+						"Published" :
+						publication.m_Outcome == CapturePublicationOutcome::Indeterminate ?
+							"Indeterminate" :
+							"NotPublished" },
+					{ "pending", publication.m_Pending },
+					{ "bundleId", publication.m_BundleId },
+					{ "manifest", GetFrameCapturePathText(publication.m_Manifest) },
+					{ "files", std::move(files) },
+					{ "failure", publication.m_Failure } };
+			}
 			if (status.m_WatchCoverage)
 			{
 				sequence["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*status.m_WatchCoverage));
@@ -1477,7 +1497,11 @@ namespace gglab
 			{ "bundleSchemaVersion", CaptureBundleSchemaVersion },
 			{ "resultConsumption", "explicit" },
 			{ "resultRetention", "until-consumed-or-session-end" },
-			{ "sequenceCaptureJobs", true } };
+			{ "sequenceCaptureJobs", true },
+			{ "sequenceTimingProducts", true },
+			{ "sequenceCancelVerdicts", true },
+			{ "gpuTimingSchema", "gglab.gpu-timing" },
+			{ "gpuTimingSchemaVersion", 1 } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },
@@ -1491,6 +1515,7 @@ namespace gglab
 			{ "publishedResults", intake.m_AppRuntimePublishedResults },
 			{ "drainingRuntimeRequests", intake.m_DrainingRuntimeRequests },
 			{ "drainingWriterJobs", intake.m_DrainingWriterJobs },
+			{ "sequenceTimingWrites", intake.m_SequenceTimingWrites },
 			{ "drainingWriteReservations", intake.m_DrainingWriteReservations } };
 		const auto claimName = [](NonFiniteClaimStatus value)
 			{
@@ -1798,6 +1823,15 @@ namespace gglab
 	{
 		Json response = MakeResponse(id, true);
 		response["sequence"] = SerializeSequence(status);
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlSequenceCancellation(uint64_t id,
+		const FrameSequenceStatus* status, FrameSequenceCancelVerdict cancellation) noexcept
+	{
+		Json response = MakeResponse(id, true);
+		response["sequence"] = status ? SerializeSequence(*status) : Json(nullptr);
+		response["cancellation"] = GetFrameSequenceCancelVerdictName(cancellation);
 		return Dump(response);
 	}
 }

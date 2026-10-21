@@ -45,12 +45,12 @@ try {
             }, $true)
             . ([scriptblock]::Create($definition.Extent.Text))
         }
-        $Session = 'client-contract'; $ProtocolVersion = 3; $KeepResult = $false
+        $Session = 'client-contract'; $ProtocolVersion = 4; $KeepResult = $false
         $state = @{ calls=0; timeout=0; fail=$true; status='completed' }
         function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
             $state.calls++; $state.timeout = $ResponseTimeoutSeconds
             if ($state.fail) { throw 'lost transport response' }
-            return [pscustomobject]@{ protocol=3;ok=$true;jobId=$Request.jobId;status=$state.status
+            return [pscustomobject]@{ protocol=4;ok=$true;jobId=$Request.jobId;status=$state.status
                 consumed=($Request.consume -and $state.status -ne 'pending') }
         }
         $admission = [pscustomobject]@{ok=$true;jobId=17}
@@ -179,7 +179,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
-    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 15 -and
+    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 16 -and
         @($items.suites | Where-Object name -eq 'capture-on-ready').Count -eq 1 -and
         @($items.suites | Where-Object name -eq 'coastal-assets').Count -eq 1 -and
         -not (Test-Path $unused) -and @($items.suites | Where-Object { $_.group -eq 'contracts' })[0].configurations.Count -eq 0) 'list-without-launch-or-output'
