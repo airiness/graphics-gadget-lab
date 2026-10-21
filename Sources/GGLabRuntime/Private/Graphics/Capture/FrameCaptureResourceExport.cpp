@@ -8,8 +8,6 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 
 #include <algorithm>
-#include <bit>
-#include <cstring>
 #include <format>
 #include <limits>
 #include <numeric>
@@ -249,76 +247,12 @@ namespace gglab
 
 	std::pair<uint64_t, uint32_t> FrameCaptureService::GetPayloadUsage(bool includeProduction) const noexcept
 	{
-		uint64_t bytes = 0;
-		uint32_t slots = 0;
-		for (const auto& tap : m_Taps)
+		auto [bytes, slots] = m_PayloadBudget.GetUsage();
+		if (includeProduction)
 		{
-			if (tap.m_ProductionCounters)
-			{
-				if (includeProduction)
-				{
-					bytes += ProductionPayloadBytes;
-					++slots;
-				}
-				continue;
-			}
-			if (tap.m_Source == FrameCaptureSource::RenderGraph)
-			{
-				continue;
-			}
-			if (tap.m_Source == FrameCaptureSource::NonFiniteScan)
-			{
-				for (const auto& readback : tap.m_ScanReadbacks)
-				{
-					bytes += readback.GetPayloadBytes();
-				}
-				slots += tap.m_ScanReadbacks.empty() ? 0u : 1u;
-			}
-			else if (tap.m_Source == FrameCaptureSource::ResourceExport)
-			{
-				for (const auto& readback : tap.m_ExportReadbacks)
-				{
-					bytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
-					++slots;
-				}
-			}
-			else
-			{
-				bytes += tap.m_Footprint.m_SizeInBytes + tap.m_Footprint.m_RowSizeInBytes * tap.m_Footprint.m_Height;
-				++slots;
-			}
-		}
-		for (const auto& production : m_RetainedProduction)
-		{
-			if (includeProduction && !production.expired())
-			{
-				bytes += ProductionCpuBytes;
-				++slots;
-			}
-		}
-		for (const auto& image : m_RetainedImages)
-		{
-			if (!image.m_Image.expired())
-			{
-				bytes += image.m_Bytes;
-				++slots;
-			}
-		}
-		for (const auto& payload : m_RetainedExports)
-		{
-			if (!payload.m_Payload.expired())
-			{
-				bytes += payload.m_Bytes;
-				slots += payload.m_Slots;
-			}
-		}
-		for (const auto& payload : m_RetainedScans)
-		{
-			if (!payload.m_Payload.expired())
-			{
-				bytes += payload.m_Bytes;
-				slots += payload.m_Slots;
-			}
+			const auto [productionBytes, productionSlots] = m_ProductionBudget.GetUsage();
+			bytes += productionBytes;
+			slots += productionSlots;
 		}
 		return { bytes, slots };
 	}
@@ -374,7 +308,7 @@ namespace gglab
 			};
 		std::erase_if(m_Taps, [&](const Tap& tap)
 			{
-				if (tap.m_FrameSerial != frameSerial || tap.m_Submitted)
+				if (tap.m_FrameSerial != frameSerial || tap.m_Readback.IsSubmitted())
 				{
 					return false;
 				}
@@ -409,9 +343,9 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::Available;
 		}
-		std::erase_if(m_RetainedProduction, [](const auto& entry) { return entry.expired(); });
-		std::erase_if(m_RetainedExports, [](const auto& entry) { return entry.m_Payload.expired(); });
-		std::erase_if(m_RetainedScans, [](const auto& entry) { return entry.m_Payload.expired(); });
+		const uint64_t productionMinimumBytes = m_ProductionEnabled ?
+			ProductionCaptureProducer::MinimumBytes : 0u;
+		const uint32_t productionMinimumSlots = m_ProductionEnabled ? 2u : 0u;
 		std::vector<Tap> prepared;
 		auto [usedBytes, usedSlots] = GetPayloadUsage();
 		Tap production;
@@ -420,13 +354,15 @@ namespace gglab
 		{
 			CollectCompleted();
 			std::tie(usedBytes, usedSlots) = GetPayloadUsage();
-			if (usedSlots == m_Limits.m_MaxPayloads || ProductionPayloadBytes > m_Limits.m_MaxPayloadBytes - usedBytes ||
+			if (usedSlots >= m_Limits.m_MaxPayloads || usedBytes > m_Limits.m_MaxPayloadBytes ||
+				ProductionCaptureProducer::PayloadBytes > m_Limits.m_MaxPayloadBytes - usedBytes ||
 				!PrepareProductionCounters(frameSerial, production, counters))
 			{
 				DeferFrameCaptures(frameSerial);
 				return FrameCaptureAvailability::Busy;
 			}
-			usedBytes += ProductionPayloadBytes;
+			production.m_PayloadLease = m_ProductionBudget.Reserve(ProductionCaptureProducer::PayloadBytes, 1);
+			usedBytes += ProductionCaptureProducer::PayloadBytes;
 			++usedSlots;
 		}
 		bool deferFrame = false;
@@ -438,12 +374,12 @@ namespace gglab
 		uint64_t boundImageBytes = 0;
 		for (const auto& image : m_Taps)
 		{
-			if (image.m_FrameSerial == frameSerial && !image.m_Submitted &&
+			if (image.m_FrameSerial == frameSerial && !image.m_Readback.IsSubmitted() &&
 				(image.m_Source == FrameCaptureSource::Scene || image.m_Source == FrameCaptureSource::Composited ||
 					image.m_Source == FrameCaptureSource::Diagnostic) && !image.m_ProductionCounters)
 			{
 				++boundImageSlots;
-				boundImageBytes += image.m_Footprint.m_SizeInBytes + image.m_Footprint.m_RowSizeInBytes * image.m_Footprint.m_Height;
+				boundImageBytes += image.m_PayloadLease.GetBytes();
 			}
 		}
 		for (const auto& request : m_Queued)
@@ -479,7 +415,7 @@ namespace gglab
 						imageTap.m_Source != FrameCaptureSource::NonFiniteScan &&
 						std::ranges::any_of(imageTap.m_Requests, [&](const auto& imageRequest) { return imageRequest.m_GroupId == request.m_GroupId; }))
 					{
-						pairedBytes += imageTap.m_Footprint.m_SizeInBytes + imageTap.m_Footprint.m_RowSizeInBytes * imageTap.m_Footprint.m_Height;
+						pairedBytes += imageTap.m_PayloadLease.GetBytes();
 						++pairedSlots;
 					}
 				}
@@ -487,7 +423,7 @@ namespace gglab
 				RGObservationFailure failure = RGObservationFailure::None;
 				for (const auto& address : request.m_ResourceTargets)
 				{
-					ExportReadback readback;
+					ResourceCaptureReadback readback;
 					readback.m_Copy.m_Target = graph.ResolveObservation(address);
 					failure = readback.m_Copy.m_Target.m_Failure;
 					if (failure != RGObservationFailure::None)
@@ -549,11 +485,11 @@ namespace gglab
 						break;
 					}
 					bytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
-					tap.m_ExportReadbacks.push_back(std::move(readback));
+					tap.m_Resources.m_Readbacks.push_back(std::move(readback));
 				}
 				for (const auto& scanTarget : request.m_ScanTargets)
 				{
-					ScanReadback readback;
+					ScanCaptureReadback readback;
 					failure = PrepareScanTarget(graph, scanTarget, readback);
 					if (failure != RGObservationFailure::None)
 					{
@@ -566,27 +502,22 @@ namespace gglab
 						break;
 					}
 					bytes += scanBytes;
-					tap.m_ScanReadbacks.push_back(std::move(readback));
+					tap.m_Scans.m_Readbacks.push_back(std::move(readback));
 				}
 				// Exports take a slot per array; a scan group shares one slot for all records.
-				const auto slots = tap.m_ExportReadbacks.size() + (tap.m_ScanReadbacks.empty() ? 0u : 1u);
+				const auto slots = tap.m_Resources.GetPayloadCost().second + tap.m_Scans.GetPayloadCost().second;
 				const bool strictScan = request.m_Source == FrameCaptureSource::NonFiniteScan && request.m_DeferFrameOnBusy;
 				const size_t imageSlots = strictScan ? frameImages.size() : 0;
 				if (failure == RGObservationFailure::None && strictScan)
 				{
-					size_t required = slots + imageSlots + boundImageSlots + (m_ProductionEnabled ? 2u : 0u);
-					uint64_t requiredBytes = bytes + boundImageBytes + (m_ProductionEnabled ? ProductionPayloadBytes + ProductionCpuBytes : 0u);
+					size_t required = slots + imageSlots + boundImageSlots + productionMinimumSlots;
+					uint64_t requiredBytes = bytes + boundImageBytes + productionMinimumBytes;
 					for (const auto& observation : prepared)
 					{
-						required += observation.m_ExportReadbacks.size() + (observation.m_ScanReadbacks.empty() ? 0u : 1u);
-						for (const auto& readback : observation.m_ExportReadbacks)
-						{
-							requiredBytes += readback.m_Copy.m_ReadbackBytes + readback.m_CpuBytes;
-						}
-						for (const auto& readback : observation.m_ScanReadbacks)
-						{
-							requiredBytes += readback.GetPayloadBytes();
-						}
+						const auto [exportBytes, exportSlots] = observation.m_Resources.GetPayloadCost();
+						const auto [scanBytes, scanSlots] = observation.m_Scans.GetPayloadCost();
+						required += exportSlots + scanSlots;
+						requiredBytes += exportBytes + scanBytes;
 					}
 					if (required > m_Limits.m_MaxPayloads || requiredBytes > m_Limits.m_MaxPayloadBytes)
 					{
@@ -605,17 +536,15 @@ namespace gglab
 						if (observation.m_Source == FrameCaptureSource::NonFiniteScan &&
 							std::ranges::any_of(observation.m_Requests, [](const auto& scan) { return scan.m_DeferFrameOnBusy; }))
 						{
-							++requiredScanSlots;
-							for (const auto& readback : observation.m_ScanReadbacks)
-							{
-								requiredScanBytes += readback.GetPayloadBytes();
-							}
+							const auto [scanBytes, scanSlots] = observation.m_Scans.GetPayloadCost();
+							requiredScanSlots += scanSlots;
+							requiredScanBytes += scanBytes;
 						}
 					}
 				}
 				if (failure == RGObservationFailure::None &&
-					(slots + pairedSlots + requiredScanSlots + (m_ProductionEnabled ? 2u : 0u) > m_Limits.m_MaxPayloads ||
-						bytes + pairedBytes + requiredScanBytes + (m_ProductionEnabled ? ProductionPayloadBytes + ProductionCpuBytes : 0u) > m_Limits.m_MaxPayloadBytes))
+					(slots + pairedSlots + requiredScanSlots + productionMinimumSlots > m_Limits.m_MaxPayloads ||
+						bytes + pairedBytes + requiredScanBytes + productionMinimumBytes > m_Limits.m_MaxPayloadBytes))
 				{
 					failure = RGObservationFailure::TooLarge;
 				}
@@ -625,6 +554,7 @@ namespace gglab
 					failure = RGObservationFailure::TooLarge;
 				}
 				if (failure == RGObservationFailure::None && (usedSlots + slots + imageSlots > m_Limits.m_MaxPayloads ||
+					usedBytes > m_Limits.m_MaxPayloadBytes ||
 					bytes > m_Limits.m_MaxPayloadBytes - usedBytes))
 				{
 					failure = RGObservationFailure::Busy;
@@ -642,6 +572,7 @@ namespace gglab
 						.m_Failure = std::format("{}: observation group could not bind the selected frame.", GetRGObservationFailureName(failure)) });
 					return true;
 				}
+				tap.m_PayloadLease = m_PayloadBudget.Reserve(bytes, static_cast<uint32_t>(slots));
 				usedBytes += bytes;
 				usedSlots += static_cast<uint32_t>(slots);
 				tap.m_AdapterCompatibilityIdentity = m_Device->GetAdapterCompatibilityIdentity();
@@ -664,21 +595,10 @@ namespace gglab
 		std::vector<RGObservationScan> scans;
 		for (auto& tap : prepared)
 		{
-			bool allocated = true;
-			for (auto& readback : tap.m_ExportReadbacks)
+			bool allocated = tap.m_Resources.Allocate(*m_Device, tap.m_Readback);
+			for (auto& readback : tap.m_Scans.m_Readbacks)
 			{
-				readback.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = readback.m_Copy.m_ReadbackBytes,
-					.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu, .m_DebugName = "ResourceExport.Readback" }));
-				if (!readback.m_Buffer)
-				{
-					allocated = false;
-					break;
-				}
-				readback.m_Copy.m_Readback = readback.m_Buffer.Get();
-			}
-			for (auto& readback : tap.m_ScanReadbacks)
-			{
-				if (!AllocateScanReadback(readback))
+				if (!allocated || !AllocateScanReadback(readback, tap.m_Readback))
 				{
 					allocated = false;
 					break;
@@ -687,15 +607,15 @@ namespace gglab
 			if (!allocated)
 			{
 				FailTap(tap, frameSerial, "Observation readback allocation or scan program resolution failed.");
-				tap.m_ExportReadbacks.clear();
-				tap.m_ScanReadbacks.clear();
+				tap.m_Resources.m_Readbacks.clear();
+				tap.m_Scans.m_Readbacks.clear();
 				continue;
 			}
-			for (const auto& readback : tap.m_ExportReadbacks)
+			for (const auto& readback : tap.m_Resources.m_Readbacks)
 			{
 				copies.push_back(readback.m_Copy);
 			}
-			for (const auto& readback : tap.m_ScanReadbacks)
+			for (const auto& readback : tap.m_Scans.m_Readbacks)
 			{
 				scans.push_back(readback.m_Scan);
 			}
@@ -734,7 +654,7 @@ namespace gglab
 			}
 			tap.m_ResourceExportActive = !copies.empty();
 			tap.m_NonFiniteScanActive = !scans.empty() || m_ProductionEnabled;
-			for (auto& readback : tap.m_ExportReadbacks)
+			for (auto& readback : tap.m_Resources.m_Readbacks)
 			{
 				readback.m_Array.m_ObservedLastUse = graph.GetExecutionPlan()->GetResources()[
 					readback.m_Copy.m_Target.m_VirtualResource.Value()].m_LastUser.Value();
@@ -746,64 +666,26 @@ namespace gglab
 
 	void FrameCaptureService::PublishResourceTap(Tap& tap) noexcept
 	{
-		if (tap.m_Graph && !tap.m_Graph->m_Execution.m_Recorded)
+		if (tap.m_Graph && !tap.m_Graph->IsRecorded())
 		{
 			FailTap(tap, tap.m_FrameSerial, "The resource export's paired graph did not execute.");
 			return;
 		}
-		static_assert(std::endian::native == std::endian::little);
-		auto payload = std::make_shared<ResourceExportPayload>();
-		uint64_t retainedBytes = 0;
-		for (auto& readback : tap.m_ExportReadbacks)
+		const auto payload = tap.m_Resources.ReadProduct(*m_Device, tap.m_Readback, tap.m_PayloadLease);
+		if (!payload)
 		{
-			const auto* mapped = static_cast<const uint8_t*>(m_Device->MapBuffer(readback.m_Buffer.Get(),
-				{ .m_Begin = 0, .m_End = readback.m_Copy.m_ReadbackBytes }));
-			if (!mapped)
-			{
-				FailTap(tap, tap.m_FrameSerial, "Resource export readback mapping failed.");
-				return;
-			}
-			auto& array = readback.m_Array;
-			array.m_Data.resize(static_cast<size_t>(readback.m_CpuBytes));
-			if (array.m_Type == RGResourceType::RGBuffer)
-			{
-				std::memcpy(array.m_Data.data(), mapped, array.m_Data.size());
-			}
-			else
-			{
-				const auto& footprint = readback.m_Copy.m_Footprint;
-				for (uint32_t slice = 0; slice < array.m_Shape[0]; ++slice)
-				{
-					for (uint32_t row = 0; row < footprint.m_Height; ++row)
-					{
-						std::memcpy(array.m_Data.data() + (slice * footprint.m_Height + row) * footprint.m_RowSizeInBytes,
-							mapped + slice * readback.m_Copy.m_SlicePitch + row * footprint.m_RowPitch, footprint.m_RowSizeInBytes);
-					}
-				}
-				if (array.m_PhysicalFormat == RHIFormat::D24UnormS8Uint && array.m_Address.m_Aspect == RHITextureAspect::Depth)
-				{
-					for (size_t offset = 0; offset < array.m_Data.size(); offset += 4)
-					{
-						uint32_t packed;
-						std::memcpy(&packed, array.m_Data.data() + offset, 4);
-						const float depth = static_cast<float>(packed & 0x00ffffffu) / 16777215.0f;
-						std::memcpy(array.m_Data.data() + offset, &depth, 4);
-					}
-				}
-			}
-			m_Device->UnmapBuffer(readback.m_Buffer.Get(), {});
-			retainedBytes += array.m_Data.size();
-			payload->m_Arrays.push_back(std::move(array));
+			FailTap(tap, tap.m_FrameSerial, "Resource export readback mapping failed.");
+			return;
 		}
-		m_RetainedExports.push_back({ payload, retainedBytes, static_cast<uint32_t>(payload->m_Arrays.size()) });
 		for (const auto& request : tap.m_Requests)
 		{
 			m_Results.push_back({ .m_RequestId = request.m_Id, .m_Source = FrameCaptureSource::ResourceExport,
-				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial, .m_Graph = tap.m_Graph, .m_Resources = payload,
+				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = tap.m_FrameSerial, .m_Graph = tap.m_Graph ? tap.m_Graph->GetProduct() : nullptr, .m_Resources = payload,
 				.m_GraphExportActive = tap.m_GraphExportActive, .m_ResourceExportActive = true,
 				.m_NonFiniteScanActive = tap.m_NonFiniteScanActive,
-				.m_SubmissionFenceIndex = tap.m_Fence.m_Fence.Index(),
-				.m_SubmissionFenceGeneration = tap.m_Fence.m_Fence.Generation(), .m_SubmissionFenceValue = tap.m_Fence.m_Value,
+				.m_SubmissionFenceIndex = tap.m_Readback.GetFence().m_Fence.Index(),
+				.m_SubmissionFenceGeneration = tap.m_Readback.GetFence().m_Fence.Generation(),
+				.m_SubmissionFenceValue = tap.m_Readback.GetFence().m_Value,
 				.m_AdapterCompatibilityIdentity = tap.m_AdapterCompatibilityIdentity });
 		}
 		tap.m_Requests.clear();

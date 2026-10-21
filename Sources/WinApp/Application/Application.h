@@ -2,20 +2,16 @@
 #include "ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
-#include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/CapturePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "RuntimePaths.h"
 
 #include <chrono>
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
-#include <span>
 #include <string_view>
-#include <unordered_set>
-#include <vector>
 
 namespace gglab
 {
@@ -23,6 +19,8 @@ namespace gglab
 	class RHIContextFactoryBase;
 	class InputManager;
 	class ApplicationFrameCapture;
+	class ApplicationControlCaptureJobs;
+	class CaptureOnReady;
 	class ApplicationToolingIntegrationBase;
 	class PlatformHost;
 	class LabRuntimeLocatorBase;
@@ -62,7 +60,7 @@ namespace gglab
 			// The main window is never shown or activated and input is ignored.
 			bool m_Hidden = false;
 			// One capture submitted at startup; the application exits with its result.
-			std::optional<FrameCaptureRequest> m_CaptureOnReady;
+			std::optional<CapturePlan> m_CaptureOnReady;
 			double m_CaptureTimeoutSeconds = 120.0;
 			// Non-empty serves the session control protocol under this id.
 			std::string m_SessionId;
@@ -98,8 +96,7 @@ namespace gglab
 		// Answers control requests; returns false when the session should end.
 		[[nodiscard]] bool UpdateControlSession() noexcept;
 		void HandleControlRequest(const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
-			const ApplicationControlRequest& request) noexcept;
-		void ResolveControlCaptures(std::span<const FrameCaptureRequestResult> results) noexcept;
+			ApplicationControlRequest&& request) noexcept;
 
 		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
@@ -123,27 +120,16 @@ namespace gglab
 		std::unique_ptr<DevelopmentShaderHotReloadSystem> m_ShaderHotReload;
 #endif
 
-		std::optional<FrameCaptureRequest> m_CaptureOnReady;
+		std::optional<CapturePlan> m_CaptureOnReady;
 		std::chrono::duration<double> m_CaptureTimeout{ 120.0 };
-		uint64_t m_CaptureOnReadyRequestId = 0;
-		std::optional<std::chrono::steady_clock::time_point> m_CaptureDeadline;
+		std::unique_ptr<CaptureOnReady> m_CaptureOnReadyJob;
 		std::chrono::steady_clock::time_point m_NextHiddenFrameTime{};
-
-		struct ControlCaptureWait
-		{
-			std::shared_ptr<win32::NamedPipeRequest> m_PipeRequest;
-			uint64_t m_ControlId = 0;
-			uint64_t m_CaptureRequestId = 0;
-		};
 
 		std::string m_SessionId;
 		std::chrono::duration<double> m_IdleTimeout{ 900.0 };
 		std::unique_ptr<win32::NamedPipeServer> m_ControlServer;
-		std::vector<ControlCaptureWait> m_ControlCaptureWaits;
-		// Captures submitted through the control channel: unfinished ids and the
-		// most recent finished results, kept for later 'result' queries.
-		std::unordered_set<uint64_t> m_ControlCaptureIds;
-		std::map<uint64_t, FrameCaptureRequestResult> m_ControlCaptureResults;
+		// Session-admitted job identities; other owners' jobs are not-found to clients.
+		std::unique_ptr<ApplicationControlCaptureJobs> m_ControlCaptureJobs;
 		std::chrono::steady_clock::time_point m_StartTime{};
 		std::chrono::steady_clock::time_point m_LastControlActivity{};
 		bool m_StopRequested = false;

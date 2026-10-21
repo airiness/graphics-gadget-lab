@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "Capture/CapturePlan.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Lab/LabTypes.h"
 
@@ -33,7 +33,7 @@ namespace gglab
 	struct ApplicationCaptureOnReadyOptions
 	{
 		std::filesystem::path m_OutputDirectory;
-		FrameCaptureSource m_Source = FrameCaptureSource::Scene;
+		CaptureImageSource m_Source = CaptureImageSource::Scene;
 		uint32_t m_SettleFrames = 8;
 		std::string m_Label;
 		// Camera reference view of the startup content; empty keeps its camera.

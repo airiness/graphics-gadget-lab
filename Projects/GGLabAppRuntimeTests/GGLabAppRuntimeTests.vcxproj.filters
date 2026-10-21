@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\CapturePublicationTestFileSystem.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\GpuFaultLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\NonFiniteWatchCoordinatorSelfTests.h" />

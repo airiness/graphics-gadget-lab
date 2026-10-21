@@ -4,10 +4,18 @@ Use this workflow when the owner requests a visible launch or is already using
 the app. In an ordinary/F5 launch, open DevTools **Application > Frame Capture**;
 no session connection is required. `--no-devtools` removes the panel.
 
-- **Capture (F9)** saves the selected Scene/Composited PNG and metadata. When
+- **Capture (F9)** submits the selected Scene/Composited image as one job with
+  a final bundle manifest, PNG and metadata. Busy/rejected admission has no job
+  ID or history record; the panel, notification and log report the reason.
+  Manual actions are not retried automatically. When
   ImGui owns keyboard input, use the button or focus the rendered view first.
-- **Capture All Views** queues authored views in order. Temporary pressure
-  waits before the next view; it does not limit the total number of views.
+- **Capture All Views** snapshots authored views/settings and processes them in
+  order, owning one accepted job at a time. Busy retries without changing the
+  view. Consuming the terminal receipt allows the next view; rejection/failure
+  stops the batch. The total authored view count is not limited by receipt
+  capacity. **Cancel views** stops new admission and reports the whole current
+  job's cancellation verdict. TooLate preserves the eventual publication.
+  An unresolved batch cannot be replaced.
 - **Screenshot**, **Render Graph** and **Resources** share Timing, Settle Frames,
   Reference View, Output Directory, Label and Note. Timing defaults to **Next
   frame**, meaning the next rendered frame. Select **After ready** for settled
@@ -21,12 +29,17 @@ no session connection is required. `--no-devtools` removes the panel.
 - **Export Resources** writes NPY arrays plus a sidecar; **Include graph** pairs
   the same frame. Discovery support does not guarantee current contents,
   liveness or capacity; the actual frame resolves addresses again and reports
-  explicit failures. Editing a target later does not alter a queued request.
+  explicit failures. Editing a target later does not alter an admitted plan. Resource + graph is
+  one required bundle with per-product status and a final manifest.
 - **Current Frame** gates/pending counts explain waits. **History** retains the
-  latest 16 results, including actual frame serials and paths/failures. Click a
-  filename to copy its full path; resource results list arrays and paired graph.
-- **Open folder** opens a successful result's actual directory only on an
-  explicit click. Editing Output Directory afterward does not redirect it.
+  latest 16 consumed job metadata/file records, including actual frame serials,
+  independent status/publication, per-product paths/failures and the manifest.
+  Click a filename to copy its full path. History owns no raw payload or reserved
+  receipt; eviction removes display data only, leaving artifacts on disk.
+  Pending IDs are bounded by shared job/receipt admission, while the authored
+  view list is separate business input. These are record bounds, not byte bounds.
+- **Open folder** requires Completed + Published and opens the retained manifest's
+  actual directory only on an explicit click. Editing Output Directory afterward does not redirect it.
   Shell failure does not change capture completion; hidden launches never
   open folders automatically.
 

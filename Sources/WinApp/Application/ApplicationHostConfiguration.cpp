@@ -71,7 +71,7 @@ namespace gglab
 		return config;
 	}
 
-	std::optional<FrameCaptureRequest> TranslateCaptureOnReadyOptions(
+	std::optional<CapturePlan> TranslateCaptureOnReadyOptions(
 		const ApplicationLaunchOptions& options) noexcept
 	{
 		if (!options.m_CaptureOnReady)
@@ -79,8 +79,8 @@ namespace gglab
 			return std::nullopt;
 		}
 		const ApplicationCaptureOnReadyOptions& capture = *options.m_CaptureOnReady;
-		return FrameCaptureRequest{
-			.m_Source = capture.m_Source,
+		return CapturePlan{
+			.m_RequiredProducts = { ImageCaptureProduct{ capture.m_Source } },
 			.m_Timing = FrameCaptureTiming::AfterReady,
 			.m_SettleFrames = capture.m_SettleFrames,
 			.m_RequiredContentId = options.m_StartupLabId.value_or(std::string{}),

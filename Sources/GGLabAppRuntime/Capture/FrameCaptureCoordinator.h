@@ -1,5 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "Capture/CapturePlan.h"
+#include "Capture/CaptureJobTypes.h"
 #include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/FrameCaptureReadiness.h"
@@ -14,69 +16,17 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace gglab
 {
 	class FrameCaptureControlBase;
+	class GGLabAppRuntime;
 	class NonFiniteWatchCoordinator;
-
-	struct FrameCaptureRequest
-	{
-		FrameCaptureSource m_Source = FrameCaptureSource::Scene;
-		FrameCaptureTiming m_Timing = FrameCaptureTiming::NextFrame;
-		// AfterReady only: frames rendered with every gate ready and an unchanged
-		// settle key before the captured frame. The settle key's temporal history
-		// must begin on a ready frame, so the capture never accumulates frames of
-		// content that was still loading.
-		uint32_t m_SettleFrames = 0;
-		// AfterReady only: when set, the capture also waits until the active Demo
-		// id or Lab id equals this id.
-		std::string m_RequiredContentId;
-		// When set, the runtime restores this camera reference view of the active
-		// content before the capture. The view is applied only after every earlier
-		// request was issued, and its camera cut restarts settling.
-		std::string m_ReferenceViewId;
-		// Flexible batches may wait for temporary capacity before applying a view
-		// or issuing a capture. Once issued, the frame is fixed. Exact sequence
-		// frames ignore this option; permanent capacity errors still fail.
-		bool m_WaitForCapacity = false;
-		// Empty selects the coordinator's default output directory.
-		std::filesystem::path m_OutputDirectory;
-		std::string m_Label;
-		std::string m_Note;
-		// RenderGraph requests only: write the discovery summary instead of full records.
-		bool m_GraphSummary = false;
-		std::vector<RGResourceAddress> m_ResourceTargets;
-		bool m_IncludeGraph = false;
-		// Set by a camera-path sequence for the frame it captures.
-		std::optional<FrameCaptureSequenceInfo> m_Sequence;
-		// Required for Diagnostic captures and ignored by other sources.
-		std::optional<PostProcessDebugTap> m_DiagnosticTap;
-	};
-
-	enum class FrameCaptureRequestStatus : uint8_t
-	{
-		// The PNG and its metadata sidecar are completely written.
-		Completed,
-		Failed,
-		Cancelled,
-	};
-
-	struct FrameCaptureRequestResult
-	{
-		uint64_t m_RequestId = 0;
-		FrameCaptureRequestStatus m_Status = FrameCaptureRequestStatus::Failed;
-		std::filesystem::path m_ImagePath;
-		std::filesystem::path m_MetadataPath;
-		std::vector<std::filesystem::path> m_ResourcePaths;
-		std::filesystem::path m_GraphPath;
-		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
-		std::string m_Failure;
-		// Present once the capture was issued to a frame.
-		std::optional<FrameCaptureMetadata> m_Metadata;
-	};
+	class CapturePublicationFileSystemBase;
+	class CaptureWriter;
+	struct CaptureProductEncodeInput;
+	struct CaptureWriteReceipt;
 
 	// Runtime owns temporal compatibility; AppRuntime adds the active content.
 	// A changed identity or unreadable previous history restarts settling.
@@ -116,18 +66,16 @@ namespace gglab
 		FrameCaptureTemporalState m_Temporal{};
 	};
 
-	// A camera reference view the runtime restores for a waiting request.
+	// A camera reference view the runtime restores for a waiting job.
 	struct FrameCaptureViewChange
 	{
-		uint64_t m_RequestId = 0;
+		uint64_t m_JobId = 0;
 		std::string m_ReferenceViewId;
 	};
 
-	// Turns host capture requests into Runtime frame captures at the requested
-	// time, then encodes the PNG and writes the metadata sidecar on a dedicated
-	// writer thread, so slow or blocked file I/O never occupies the shared task
-	// system. Nine write slots cover issued GPU captures through writing: one
-	// running writer and eight pending jobs. Every request finishes with one result.
+	// Schedules required SameFrame products, then hands immutable CPU products to
+	// a dedicated writer. Nine delivery reservations cover GPU issue through writing.
+	// Every successful job publishes one bundle; every accepted job retains one receipt.
 	class FrameCaptureCoordinator final
 	{
 	public:
@@ -148,20 +96,31 @@ namespace gglab
 			// result is published by the Update that collected the capture.
 			bool m_WriteOnCallingThread = false;
 			NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
+			// Optional host-neutral file capability; the writer retains it independently.
+			std::shared_ptr<CapturePublicationFileSystemBase> m_PublicationFileSystem;
+			CaptureJobLimits m_JobLimits;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
 		~FrameCaptureCoordinator();
 		GGLAB_DELETE_COPYABLE_MOVABLE(FrameCaptureCoordinator);
 
-		// Returns the non-zero request id.
-		[[nodiscard]] uint64_t Submit(FrameCaptureRequest request) noexcept;
-		// Cancels a request that has not been issued to a frame yet.
-		bool Cancel(uint64_t requestId) noexcept;
-		// Appends finished results in completion order. When composed by
-		// GGLabAppRuntime, only that owner drains this stream; hosts consume the
-		// runtime's published results after it has notified the sequence.
-		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
+		// Host-neutral job admission; protocol frontends build this same typed plan.
+		// Admission reserves a terminal receipt before moving the plan. Busy and
+		// rejection allocate no storage and leave the supplied plan available to retry.
+		[[nodiscard]] CaptureAdmission TrySubmit(CapturePlan&& plan) noexcept;
+		// Advisory preflight with the same validation/pressure ordering. Accepted
+		// reserves nothing and has no job ID; only TrySubmit creates an accepted job.
+		[[nodiscard]] CaptureAdmission CheckJobAdmission(const CapturePlan& plan) const noexcept;
+		// All methods run on the AppRuntime owner thread. Receipts do not expire:
+		// consumption releases the reserved slot; polling an active/unknown job does not.
+		// Standalone use only: a composed coordinator leaves consumption to AppRuntime.
+		[[nodiscard]] std::optional<CaptureJobResult> TakeJobResult(uint64_t jobId) noexcept;
+		[[nodiscard]] std::optional<CaptureJobSnapshot> GetJobSnapshot(uint64_t jobId) const noexcept;
+		[[nodiscard]] CaptureIntakeSnapshot GetIntakeSnapshot() const noexcept;
+		// Cancels the whole job's delivery, including issued work. Runtime/readback
+		// and writer owners drain independently; a claimed publication is TooLate.
+		[[nodiscard]] CaptureCancelResult CancelJob(uint64_t jobId) noexcept;
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
 		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatch() const noexcept { return m_NonFiniteWatch; }
@@ -170,8 +129,7 @@ namespace gglab
 		// Checks Runtime payload capacity and the write slots reserved by issued
 		// captures, using the last frame's display target. Busy sequences defer before
 		// simulation; permanent errors proceed to an explicit failed capture result.
-		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source, uint32_t requestCount = 1)
-			const noexcept;
+		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(const CapturePlan& plan) const noexcept;
 		// State of the most recent frame passed to BeginFrame; null before the
 		// first rendered frame.
 		[[nodiscard]] const FrameCaptureFrameState* GetLastFrameState() const noexcept;
@@ -183,8 +141,8 @@ namespace gglab
 		// frame. Returns the reference view to restore on the active content's
 		// main camera; the runtime reports the outcome to OnReferenceViewApplied.
 		[[nodiscard]] std::optional<FrameCaptureViewChange> GetPendingViewChange() const noexcept;
-		// A view that could not be restored fails its request.
-		void OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept;
+		// A view that could not be restored fails its job.
+		void OnReferenceViewApplied(uint64_t jobId, bool restored) noexcept;
 		// Called before the next frame is planned, after any reference view was
 		// restored. True when a waiting after-ready request cannot settle because
 		// the temporal history of the ready previous frame includes frames rendered
@@ -222,8 +180,22 @@ namespace gglab
 		void FinalizeAfterRenderHost() noexcept;
 
 	private:
-		struct EncodeJob;
-		struct WriterState;
+		friend class GGLabAppRuntime;
+
+		// Bound once during composition, before admission. Published receipts stay in
+		// their original slots until the host consumes them through AppRuntime.
+		void SetAppRuntimeJobResultOwner() noexcept;
+		void PublishAppRuntimeJobResults() noexcept;
+		[[nodiscard]] const CaptureJobResult* FindPublishedJobResult(uint64_t jobId) const noexcept;
+		[[nodiscard]] std::optional<CaptureJobResult> TakePublishedJobResult(uint64_t jobId) noexcept;
+		[[nodiscard]] std::optional<CaptureJobResult> ConsumeJobReceipt(uint64_t jobId) noexcept;
+
+		struct FrameAttempt;
+		struct ProductAttempt;
+		struct CaptureJob;
+		struct ProductDelivery;
+		struct JobReceipt;
+		struct DrainingWrite;
 
 		enum class Phase : uint8_t
 		{
@@ -234,78 +206,69 @@ namespace gglab
 			Finished,
 		};
 
-		struct Entry
-		{
-			uint64_t m_Id = 0;
-			FrameCaptureRequest m_Request{};
-			Phase m_Phase = Phase::Waiting;
-			uint64_t m_CaptureRequestId = 0;
-			// Transient Runtime association for the outputs of one sequence frame.
-			uint64_t m_GroupId = 0;
-			// The requested reference view was restored, and the camera reset
-			// serial of the first frame rendered with it. A different serial later
-			// means another camera cut replaced the view, which is then restored again.
-			bool m_ViewApplied = false;
-			std::optional<uint64_t> m_ViewCameraResetSerial;
-			FrameCaptureMetadata m_Metadata{};
-			RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
-			std::shared_ptr<EncodeJob> m_Job;
-			uint64_t m_WatchCoverageId = 0;
-			std::optional<FrameCaptureResult> m_PendingResult;
-		};
-
+		[[nodiscard]] std::shared_ptr<CaptureJob> EnqueuePlan(CapturePlan plan,
+			size_t receiptSlot, uint64_t jobId) noexcept;
+		void CompleteJob(CaptureJob& job) noexcept;
 		[[nodiscard]] static bool MatchesRequiredContent(
-			const Entry& entry, const FrameCaptureFrameState& state) noexcept;
+			const CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(
-			const Entry& entry, const FrameCaptureFrameState& state) const noexcept;
+			const CaptureJob& job, const FrameCaptureFrameState& state) const noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
 			const FrameCaptureFrameState& state, uint32_t requestCount = 1) const noexcept;
-		void IssueSequenceGroups(const FrameCaptureFrameState& state, std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
-		void Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept;
+		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(
+			const CapturePlan& plan, const FrameCaptureFrameState& state) const noexcept;
+		[[nodiscard]] std::vector<ProductDelivery*> GetDeliveries(const CaptureJob& job) noexcept;
+		void IssueRequiredPlans(const FrameCaptureFrameState& state,
+			std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
+		void Issue(ProductDelivery& entry, const FrameCaptureFrameState& state,
+			bool preAdmitted = false) noexcept;
+		void FailPlan(CaptureJob& job, std::string failure) noexcept;
+		void RetryPlan(CaptureJob& job, uint64_t consumedRequestId) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void PollWatchCaptures() noexcept;
-		void StartEncoding(Entry& entry, const FrameCaptureResult& result) noexcept;
-		// Publishes the result of a written job; false while it is unfinished.
-		[[nodiscard]] bool TryFinishWritten(Entry& entry) noexcept;
+		[[nodiscard]] static CaptureProductEncodeInput MakeEncodeInput(
+			ProductDelivery& entry, const FrameCaptureResult& result) noexcept;
+		void StartBundleEncoding(CaptureJob& job) noexcept;
+		void FinishBundleWriting(CaptureJob& job, const CaptureWriteReceipt& receipt) noexcept;
+		// Settles a written bundle; false while the writer is unfinished.
+		[[nodiscard]] bool TryFinishWritten(ProductDelivery& entry) noexcept;
 		void CollectWrittenJobs() noexcept;
+		void CollectDrainingWrites() noexcept;
 		// Waits for unfinished writing until the shutdown write timeout, then
 		// fails what remains and abandons jobs that have not claimed publication.
 		void FinishWriting() noexcept;
-		void StopWriter() noexcept;
-		void Finish(Entry& entry, FrameCaptureRequestStatus status, std::string failure) noexcept;
-		void RemoveFinishedEntries() noexcept;
-		static void RunWriter(std::shared_ptr<WriterState> state,
-			FrameCaptureImageEncoder encoder) noexcept;
-		static void RunEncodeJob(EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
-		[[nodiscard]] static std::string WriteAndPublish(
-			EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept;
+		void Finish(ProductDelivery& entry, CaptureJobStatus status, std::string failure) noexcept;
+		void RemoveFinishedJobs() noexcept;
 
 		FrameCaptureControlBase* m_Capture = nullptr;
 		NonFiniteWatchCoordinator* m_NonFiniteWatch = nullptr;
 		std::filesystem::path m_DefaultOutputDirectory;
-		FrameCaptureImageEncoder m_ImageEncoder;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
-		bool m_WriteOnCallingThread = false;
-		// Shared with the writer thread, which keeps its own reference.
-		std::shared_ptr<WriterState> m_Writer;
-		std::thread m_WriterThread;
-		// A writer with jobs unfinished at the shutdown timeout may be blocked in
-		// file I/O; shutdown then leaves it to finish on its own.
-		bool m_HasAbandonedJobs = false;
-		uint64_t m_NextRequestId = 1;
-		std::vector<Entry> m_Entries;
-		std::vector<FrameCaptureRequestResult> m_Results;
-		// Runtime retains and retires these payloads normally; only publication was
-		// cancelled by a watch failure before the capture result arrived.
+		std::unique_ptr<CaptureWriter> m_Writer;
+		std::string m_RunIdentity;
+		CaptureJobLimits m_JobLimits;
+		// Fixed at construction. Each accepted job reserves one slot until consumed,
+		// including while active. Rejected submissions never create failure receipts.
+		std::vector<JobReceipt> m_JobReceipts;
+		bool m_AppRuntimeOwnsJobResults = false;
+		uint32_t m_ActiveJobs = 0;
+		uint64_t m_NextJobId = 1;
+		uint64_t m_NextArtifactRequestId = 1;
+		std::vector<ProductDelivery> m_Deliveries;
+		// Runtime retains and retires these payloads normally after a plan has failed
+		// or retried; their late results must not reach a new attempt.
 		std::vector<uint64_t> m_DiscardedCaptureResults;
-		// Names this coordinator's temporary files apart from those of other
-		// processes writing to the same directory.
-		std::string m_TemporaryTag;
+		// Cancelled delivery never returns reservations still held by Runtime or a
+		// writer. These drain records outlive consumption/reuse of the job receipt.
+		std::vector<uint64_t> m_DrainingCaptureRequests;
+		std::vector<DrainingWrite> m_DrainingWrites;
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		uint32_t m_SettledFrames = 0;
 		// Every frame of the current settle key so far had every gate ready.
 		bool m_HistoryReady = false;
 		bool m_HasOpenFrame = false;
+		// A partially issued plan must abort through the normal pre-submit path.
+		std::optional<uint64_t> m_AbortFrameSerial;
 		bool m_IsShuttingDown = false;
 	};
 }

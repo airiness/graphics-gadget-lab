@@ -489,6 +489,15 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CapturePayloadBudget.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CaptureProducers.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FencedReadback.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureNonFinite.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
@@ -1198,6 +1207,18 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Private\Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CapturePayloadBudget.h">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CaptureProducers.h">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CaptureProduct.h">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FencedReadback.h">
+      <Filter>Private\Graphics\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.h">
       <Filter>Private\Graphics\Capture</Filter>

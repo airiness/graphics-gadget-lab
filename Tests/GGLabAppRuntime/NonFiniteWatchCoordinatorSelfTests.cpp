@@ -215,16 +215,16 @@ namespace gglab
 			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error),
 				"Production-only fail mode configures for consumer lifecycle checks");
 			FrameCaptureCoordinator capture({ .m_Capture = &control, .m_WriteOnCallingThread = true, .m_NonFiniteWatch = &watch });
-			const auto id = capture.Submit({});
+			const auto id = capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } }).m_JobId;
 			capture.BeginFrame({ .m_FrameSerial = 1 });
 			watch.OnFrameSubmitted(1);
 			capture.OnFrameSubmitted();
 			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = 1, .m_Image = std::make_shared<FrameCaptureImage>() });
 			capture.Update();
-			std::vector<FrameCaptureRequestResult> results;
-			capture.ConsumeResults(results);
-			context.Check(results.empty() && capture.GetUnfinishedRequestCount() == 1,
+			std::optional<CaptureJobResult> result;
+			result = capture.TakeJobResult(id);
+			context.Check(!result && capture.GetUnfinishedRequestCount() == 1,
 				"A completed image does not publish before its watch result arrives");
 			NonFiniteProductionFrame production{ .m_FrameSerial = 1,
 				.m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced },
@@ -232,16 +232,17 @@ namespace gglab
 					.m_Claim = { NonFiniteClaimStatus::Failed, NonFiniteWatchFailure::NonFiniteReplaced } } } };
 			control.m_Production.push_back(std::make_shared<NonFiniteProductionFrame>(production));
 			capture.Update();
-			capture.ConsumeResults(results);
-			context.Check(results.size() == 1 && results[0].m_RequestId == id && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
-				results[0].m_ImagePath.empty() && results[0].m_Metadata->m_WatchCoverage->Fails() &&
-				results[0].m_Failure.find("NonFiniteReplaced: frame 1, program 2, site 3") != std::string::npos,
+			result = capture.TakeJobResult(id);
+			context.Check(result.has_value() && result->m_JobId == id && result->m_Status == CaptureJobStatus::Failed &&
+				result->m_Products.front().m_Files.empty() && result->m_Products.front().m_Metadata->m_WatchCoverage->Fails() &&
+				result->m_Products.front().m_Failure.find("NonFiniteReplaced: frame 1, program 2, site 3") != std::string::npos,
 				"A sanitized production anomaly fails the waiting capture before any image publication");
-			const auto pending = capture.Submit({ .m_Timing = FrameCaptureTiming::AfterReady });
+			const auto pending = capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} },
+				.m_Timing = FrameCaptureTiming::AfterReady }).m_JobId;
 			capture.Update();
-			results.clear();
-			capture.ConsumeResults(results);
-			context.Check(results.size() == 1 && results[0].m_RequestId == pending && results[0].m_Status == FrameCaptureRequestStatus::Failed,
+			result.reset();
+			result = capture.TakeJobResult(pending);
+			context.Check(result.has_value() && result->m_JobId == pending && result->m_Status == CaptureJobStatus::Failed,
 				"Fail mode also fails an after-ready capture still waiting for readiness");
 
 			FrameSequenceCoordinator sequence(capture);
@@ -255,7 +256,7 @@ namespace gglab
 				state.m_SettleKey.m_Temporal.m_HasCompatiblePreviousHistory = true;
 				const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
 				sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
-				sequence.BeginFrame(state);
+				context.Check(sequence.BeginFrame(state), "The watched sequence begins its submitted frame");
 				capture.BeginFrame(state);
 				watch.OnFrameSubmitted(serial);
 				capture.OnFrameSubmitted();
@@ -278,7 +279,7 @@ namespace gglab
 				FrameCaptureFrameState state{ .m_FrameSerial = serial };
 				const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
 				sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
-				sequence.BeginFrame(state);
+				context.Check(sequence.BeginFrame(state), "The watched reference begins its submitted sample");
 				capture.BeginFrame(state);
 				watch.OnFrameSubmitted(serial);
 				capture.OnFrameSubmitted();
@@ -299,7 +300,7 @@ namespace gglab
 			FrameCaptureFrameState state{ .m_FrameSerial = 10 };
 			const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
 			sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
-			sequence.BeginFrame(state);
+			context.Check(sequence.BeginFrame(state), "The cancellable watched sequence begins its frame");
 			capture.BeginFrame(state);
 			watch.OnFrameSubmitted(10);
 			capture.OnFrameSubmitted();
@@ -312,38 +313,38 @@ namespace gglab
 			context.Check(sequence.GetStatus()->m_State == FrameSequenceState::Cancelled,
 				"A cancelled sequence cannot be revived or failed by its late counter result");
 			context.Check(watch.Configure({ .m_Boundary = false }, error), "Transport failure reporting configures");
-			const auto transport = capture.Submit({});
+			const auto transport = capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } }).m_JobId;
 			capture.BeginFrame({ .m_FrameSerial = 11 });
 			watch.OnFrameSubmitted(11);
 			capture.OnFrameSubmitted();
 			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
 				.m_Status = FrameCaptureStatus::Failed, .m_FrameSerial = 11, .m_Failure = "Readback mapping failed" });
 			capture.Update();
-			results.clear();
-			capture.ConsumeResults(results);
-			context.Check(results.size() == 1 && results[0].m_RequestId == transport && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
-				results[0].m_Metadata->m_WatchCoverage && results[0].m_Metadata->m_WatchCoverage->m_Production.m_Status == NonFiniteClaimStatus::Incomplete,
+			result.reset();
+			result = capture.TakeJobResult(transport);
+			context.Check(result.has_value() && result->m_JobId == transport && result->m_Status == CaptureJobStatus::Failed &&
+				result->m_Products.front().m_Metadata->m_WatchCoverage && result->m_Products.front().m_Metadata->m_WatchCoverage->m_Production.m_Status == NonFiniteClaimStatus::Incomplete,
 				"A capture transport failure retains the unresolved watch claims in its response metadata");
 			context.Check(watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error),
 				"Watch can fail an issued capture independently of image completion");
-			const auto early = capture.Submit({});
+			const auto early = capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} } }).m_JobId;
 			capture.BeginFrame({ .m_FrameSerial = 12 });
 			watch.OnFrameSubmitted(12);
 			capture.OnFrameSubmitted();
 			production.m_FrameSerial = 12;
 			watch.OnProductionFrame(production);
 			capture.Update();
-			results.clear();
-			capture.ConsumeResults(results);
-			context.Check(results.size() == 1 && results[0].m_RequestId == early && results[0].m_Status == FrameCaptureRequestStatus::Failed &&
-				results[0].m_Failure.starts_with("NonFiniteReplaced"),
+			result.reset();
+			result = capture.TakeJobResult(early);
+			context.Check(result.has_value() && result->m_JobId == early && result->m_Status == CaptureJobStatus::Failed &&
+				result->m_Products.front().m_Failure.starts_with("NonFiniteReplaced"),
 				"An issued capture fails promptly when its watch fails before any image result");
 			control.m_Results.push_back({ .m_RequestId = control.m_CaptureId, .m_Source = FrameCaptureSource::Scene,
 				.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = 12, .m_Image = std::make_shared<FrameCaptureImage>() });
 			capture.Update();
-			results.clear();
-			capture.ConsumeResults(results);
-			context.Check(results.empty(), "Late payloads of a watch-failed capture drain without a second result or publication");
+			result.reset();
+			result = capture.TakeJobResult(early);
+			context.Check(!result, "Late payloads of a watch-failed capture drain without a second result or publication");
 		}
 
 		void RunInjectionTests(SelfTestContext& context)

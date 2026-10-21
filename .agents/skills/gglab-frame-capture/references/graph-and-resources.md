@@ -2,7 +2,8 @@
 
 Use `$session = 'Scripts/Verification/GGLabSession.ps1'` with a running session `atrium`.
 Commands share capture view/timing/settling/output options and `-NoWait`.
-Require `status: completed` and use returned paths.
+Require `status: completed` and `publication: Published`; use the final manifest
+and ordered product file lists described in [session jobs](session-jobs.md).
 
 ## Discover a graph
 
@@ -61,8 +62,9 @@ Failures such as `Culled`, `UndefinedContent`, `UnsupportedFormat`,
 
 A resource group publishes NPY arrays and a `.resource-export.json` sidecar;
 `-IncludeGraph` pairs the exact same submitted frame. Discover groups through
-completed sidecars, which publish last. The response has `exports`, `metadata`,
-optional `graph` and `frameSerial`.
+the final bundle manifest, published after all required files. An export response
+has resource files in `products[0].files`; `-IncludeGraph` adds graph files at
+`products[1].files`. The manifest records their common submitted frame.
 
 - NPY v1 values are little-endian, C order. Textures are
   `[slices, height, width, channels]`; cubes use the existing face order.
@@ -98,6 +100,7 @@ Validate schema, version/writer consistency, NPY data and paired frame identitie
 with Python `jsonschema` and `numpy` available:
 
 ```powershell
+python Scripts/Verification/ValidateCaptureBundles.py Build/Sessions/atrium/Captures
 python Scripts/Verification/ValidateResourceExports.py Build/Sessions/atrium/Captures
 python Scripts/Verification/ValidateRenderGraphExports.py Build/Sessions/atrium/Captures
 ```

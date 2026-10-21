@@ -1,5 +1,5 @@
 #include "Capture/FrameCaptureCoordinator.h"
-#include "Capture/ResourceExportWriter.h"
+#include "Capture/CaptureWriter.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 
 #include "AppRuntimeLog.h"
@@ -7,130 +7,134 @@
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
-#include <atomic>
 #include <chrono>
-#include <condition_variable>
-#include <deque>
+#include <cstddef>
 #include <format>
-#include <fstream>
+#include <iterator>
 #include <limits>
-#include <mutex>
-#include <random>
-#include <span>
-#include <system_error>
-#include <thread>
+#include <string_view>
 #include <utility>
+#include <variant>
 
 namespace gglab
 {
-	namespace
+	// One shared SameFrame attempt. Runtime still owns GPU resources and settlement.
+	struct FrameCaptureCoordinator::FrameAttempt
 	{
-		enum class EncodeStage : uint32_t
-		{
-			Queued,
-			Encoding,
-			SerializingGraph,
-			WritingGraph,
-			WritingImage,
-			WritingMetadata,
-			Publishing,
-			Done,
-		};
+		uint64_t m_FrameSerial = 0;
+		uint64_t m_WatchCoverageId = 0;
+		bool m_Submitted = false;
+	};
 
-		[[nodiscard]] const char* GetEncodeStageName(EncodeStage stage) noexcept
+	struct FrameCaptureCoordinator::ProductAttempt
+	{
+		uint64_t m_CaptureRequestId = 0;
+		FrameCaptureMetadata m_Metadata{};
+		std::optional<FrameCaptureResult> m_PendingResult;
+	};
+
+	struct FrameCaptureCoordinator::CaptureJob
+	{
+		CapturePlan m_Plan;
+		size_t m_ReceiptSlot = 0;
+		CaptureJobResult m_Result;
+		uint64_t m_AttemptCount = 0;
+		uint32_t m_FinishedProducts = 0;
+		// A resource and its graph share one Runtime delivery and capacity reservation.
+		size_t m_DeliveryCount = 0;
+		size_t m_RemainingDeliveries = 0;
+		bool m_ViewApplied = false;
+		std::optional<uint64_t> m_ViewCameraResetSerial;
+		std::optional<FrameAttempt> m_Attempt;
+
+		[[nodiscard]] uint64_t GetRuntimeGroupId() const noexcept
 		{
-			switch (stage)
-			{
-			case EncodeStage::Queued:
-				return "queued";
-			case EncodeStage::Encoding:
-				return "encoding";
-			case EncodeStage::SerializingGraph:
-				return "serializing graph";
-			case EncodeStage::WritingGraph:
-				return "writing graph";
-			case EncodeStage::WritingImage:
-				return "writing image";
-			case EncodeStage::WritingMetadata:
-				return "writing metadata";
-			case EncodeStage::Publishing:
-				return "publishing";
-			case EncodeStage::Done:
-				return "done";
-			}
-			return "unknown";
+			return m_Plan.m_Sequence || m_DeliveryCount > 1 ? m_Result.m_JobId : 0;
+		}
+	};
+
+	struct FrameCaptureCoordinator::JobReceipt
+	{
+		uint64_t m_JobId = 0;
+		std::shared_ptr<CaptureJob> m_Job;
+		std::optional<CaptureJobResult> m_Result;
+		CaptureJobSnapshot m_FinalSnapshot;
+		bool m_PublishedToHost = false;
+	};
+
+	struct FrameCaptureCoordinator::DrainingWrite
+	{
+		std::shared_ptr<CaptureWriteJob> m_Job;
+		uint32_t m_Reservations = 0;
+		bool m_AbandonedAtShutdown = false;
+	};
+
+	// One producer delivery may carry both a resource product and its graph.
+	// Artifact identity is provenance only; job identity owns admission and results.
+	struct FrameCaptureCoordinator::ProductDelivery
+	{
+		uint64_t m_ArtifactRequestId = 0;
+		std::shared_ptr<CaptureJob> m_Job;
+		size_t m_ProductIndex = 0;
+		std::optional<size_t> m_GraphIndex;
+		Phase m_Phase = Phase::Waiting;
+		std::optional<ProductAttempt> m_Attempt;
+		RGObservationFailure m_ResourceFailure = RGObservationFailure::None;
+		std::shared_ptr<CaptureWriteJob> m_WriteJob;
+		std::optional<CaptureWriteReceipt> m_WriteReceipt;
+
+		[[nodiscard]] const CaptureProductSpec& GetProduct() const noexcept
+		{
+			return m_Job->m_Plan.m_RequiredProducts[m_ProductIndex];
 		}
 
-		// Decides whether a job's files may appear. Shutdown can abandon a job
-		// only before the writer claims publication; abandoned jobs never publish.
-		// If the writer claims publication first, its files may already exist or
-		// appear later even when shutdown reports the unfinished job as failed.
-		enum class PublicationClaim : uint8_t
+		[[nodiscard]] FrameCaptureSource GetSource() const noexcept
 		{
-			Open,
-			Publishing,
-			Abandoned,
-		};
-	}
+			return GetCaptureProductSource(GetProduct());
+		}
 
-	struct FrameCaptureCoordinator::EncodeJob
-	{
-		std::shared_ptr<const FrameCaptureImage> m_Image;
-		// Immutable JSON prepared from the fenced Runtime record on the writer thread.
-		std::shared_ptr<const RGSnapshot> m_Graph;
-		std::shared_ptr<const ResourceExportPayload> m_Resources;
-		bool m_ResourceExportActive = false;
-		bool m_GraphSummary = false;
-		uint32_t m_SubmissionFenceIndex = 0;
-		uint32_t m_SubmissionFenceGeneration = 0;
-		uint64_t m_SubmissionFenceValue = 0;
-		std::string m_AdapterCompatibilityIdentity;
-		std::filesystem::path m_Directory;
-		// Preferred file stem; the writer appends a suffix when it is taken.
-		std::string m_BaseStem;
-		// Unique across processes, so concurrent writers never share a
-		// temporary file.
-		std::string m_TemporaryStem;
-		// The writer records the published image file name before serializing.
-		FrameCaptureMetadata m_Metadata;
-		// Published paths, set by the writer before it marks the job done.
-		std::filesystem::path m_ImagePath;
-		std::filesystem::path m_MetadataPath;
-		std::vector<std::filesystem::path> m_ResourcePaths;
-		std::filesystem::path m_GraphPath;
+		[[nodiscard]] std::optional<PostProcessDebugTap> GetDiagnosticTap() const noexcept
+		{
+			const auto* diagnostic = std::get_if<DiagnosticCaptureProduct>(&GetProduct());
+			return diagnostic ? diagnostic->m_Tap : std::nullopt;
+		}
 
-		// Progress is published by the writer for stall and shutdown reports.
-		std::atomic<EncodeStage> m_Stage = EncodeStage::Queued;
-		std::atomic<PublicationClaim> m_Claim = PublicationClaim::Open;
-		std::chrono::steady_clock::time_point m_SubmittedAt{};
-		bool m_StallReported = false;
-
-		std::mutex m_Mutex;
-		std::condition_variable m_Condition;
-		bool m_IsDone = false;
-		std::string m_Failure;
-	};
-
-	// The writer thread holds its own reference, so a writer left blocked in file
-	// I/O at shutdown never touches the destroyed coordinator.
-	struct FrameCaptureCoordinator::WriterState
-	{
-		std::mutex m_Mutex;
-		std::condition_variable m_Condition;
-		std::deque<std::shared_ptr<EncodeJob>> m_Queue;
-		bool m_Stopping = false;
+		[[nodiscard]] bool IsGraphSummary() const noexcept
+		{
+			const auto* graph = std::get_if<GraphCaptureProduct>(&GetProduct());
+			return graph && graph->m_Summary;
+		}
 	};
 
 	namespace
 	{
-		// An encode normally finishes well within a second; a longer one is reported.
 		constexpr std::chrono::seconds EncodeStallReportTime{ 10 };
 		constexpr size_t MaxFileStemComponentLength = 64;
 
-		// Empty when no gate failed.
+		[[nodiscard]] bool HasResources(const CapturePlan& plan) noexcept
+		{
+			return std::ranges::any_of(plan.m_RequiredProducts, [](const auto& product)
+				{
+					return std::holds_alternative<ResourceCaptureProduct>(product);
+				});
+		}
+
+		[[nodiscard]] uint32_t GetDeliveryCount(const CapturePlan& plan) noexcept
+		{
+			const bool resources = HasResources(plan);
+			return static_cast<uint32_t>(std::ranges::count_if(plan.m_RequiredProducts,
+				[resources](const auto& product)
+				{
+					return !resources || !std::holds_alternative<GraphCaptureProduct>(product);
+				}));
+		}
+
+		[[nodiscard]] bool NeedsGroupAdmission(const CapturePlan& plan) noexcept
+		{
+			return GetDeliveryCount(plan) > 1 || (plan.m_Sequence && HasResources(plan));
+		}
+
 		[[nodiscard]] std::string DescribeFailedGates(const FrameCaptureReadiness& readiness)
 		{
 			std::string failure;
@@ -150,87 +154,6 @@ namespace gglab
 				failure += '.';
 			}
 			return failure;
-		}
-
-		// A capture keeps its preferred name unless another capture, possibly of
-		// another process, already published it.
-		constexpr uint32_t MaxPublishAttempts = 1000;
-
-		[[nodiscard]] std::string CreateTemporaryTag() noexcept
-		{
-			uint64_t value = static_cast<uint64_t>(
-				std::chrono::steady_clock::now().time_since_epoch().count());
-			try
-			{
-				std::random_device device;
-				value ^= (static_cast<uint64_t>(device()) << 32) | device();
-			}
-			catch (...)
-			{
-			}
-			return std::format("{:016x}", value);
-		}
-
-		// Writes the whole file, which is published only once it is complete.
-		[[nodiscard]] std::string WriteFileContents(
-			const std::filesystem::path& path, std::span<const uint8_t> bytes,
-			std::span<const uint8_t> tail = {}) noexcept
-		{
-			std::error_code errorCode;
-			std::filesystem::create_directories(path.parent_path(), errorCode);
-			if (!std::filesystem::is_directory(path.parent_path(), errorCode))
-			{
-				return std::format("The output directory '{}' could not be created.",
-					GetFrameCapturePathText(path.parent_path()));
-			}
-
-			std::ofstream file(path, std::ios::binary | std::ios::trunc);
-			file.write(reinterpret_cast<const char*>(bytes.data()),
-				static_cast<std::streamsize>(bytes.size()));
-			if (!tail.empty())
-			{
-				file.write(reinterpret_cast<const char*>(tail.data()), static_cast<std::streamsize>(tail.size()));
-			}
-			file.close();
-			if (!file)
-			{
-				std::filesystem::remove(path, errorCode);
-				return std::format("Writing '{}' failed.", GetFrameCapturePathText(path));
-			}
-			return {};
-		}
-
-		enum class PublishOutcome : uint8_t
-		{
-			Published,
-			NameTaken,
-			Failed,
-		};
-
-		// Publishes a complete temporary file under a name that must not exist yet.
-		// A hard link creates the name only if it is free, so a file of another
-		// writer is never replaced. File systems without hard links fall back to a
-		// rename after checking the name, which a concurrent writer can still race.
-		[[nodiscard]] PublishOutcome PublishNewFile(
-			const std::filesystem::path& temporaryPath, const std::filesystem::path& path) noexcept
-		{
-			std::error_code errorCode;
-			std::filesystem::create_hard_link(temporaryPath, path, errorCode);
-			if (!errorCode)
-			{
-				return PublishOutcome::Published;
-			}
-			if (errorCode == std::errc::file_exists)
-			{
-				return PublishOutcome::NameTaken;
-			}
-			std::error_code existsError;
-			if (std::filesystem::exists(path, existsError))
-			{
-				return PublishOutcome::NameTaken;
-			}
-			std::filesystem::rename(temporaryPath, path, errorCode);
-			return errorCode ? PublishOutcome::Failed : PublishOutcome::Published;
 		}
 
 		[[nodiscard]] std::string SanitizeFileStemComponent(std::string_view value) noexcept
@@ -256,93 +179,368 @@ namespace gglab
 		m_Capture(createInfo.m_Capture),
 		m_NonFiniteWatch(createInfo.m_NonFiniteWatch),
 		m_DefaultOutputDirectory(createInfo.m_DefaultOutputDirectory),
-		m_ImageEncoder(createInfo.m_ImageEncoder),
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
-		m_WriteOnCallingThread(createInfo.m_WriteOnCallingThread),
-		m_TemporaryTag(CreateTemporaryTag())
+		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
+			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
+		m_RunIdentity(CreateCaptureRunIdentity()),
+		m_JobLimits(createInfo.m_JobLimits),
+		m_JobReceipts(m_JobLimits.m_MaxReceipts)
 	{
-		if (m_WriteOnCallingThread)
-		{
-			return;
-		}
-		try
-		{
-			m_Writer = std::make_shared<WriterState>();
-			m_WriterThread = std::thread(&FrameCaptureCoordinator::RunWriter, m_Writer, m_ImageEncoder);
-		}
-		catch (...)
-		{
-			GGLAB_LOG_WARN_ALWAYS(
-				"The frame capture writer thread could not start; captures are written on the frame thread.");
-			m_Writer.reset();
-			m_WriteOnCallingThread = true;
-		}
+		static_assert(MaxInFlightCaptures == CaptureWriter::MaxInFlightJobs);
 	}
 
 	FrameCaptureCoordinator::~FrameCaptureCoordinator()
 	{
 		FinishWriting();
-		StopWriter();
 	}
 
-	uint64_t FrameCaptureCoordinator::Submit(FrameCaptureRequest request) noexcept
+	CaptureAdmission FrameCaptureCoordinator::CheckJobAdmission(const CapturePlan& plan) const noexcept
 	{
-		Entry& entry = m_Entries.emplace_back();
-		entry.m_Id = m_NextRequestId++;
-		entry.m_Request = std::move(request);
-		if (entry.m_Request.m_Sequence)
-		{
-			const auto& sequence = *entry.m_Request.m_Sequence;
-			const auto first = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
-				{
-					return candidate.m_GroupId != 0 && candidate.m_Request.m_Sequence &&
-						candidate.m_Request.m_Sequence->m_SequenceId == sequence.m_SequenceId &&
-						candidate.m_Request.m_Sequence->m_Frame == sequence.m_Frame;
-				});
-			entry.m_GroupId = first == m_Entries.end() ? entry.m_Id : first->m_GroupId;
-		}
 		if (m_IsShuttingDown)
 		{
-			Finish(entry, FrameCaptureRequestStatus::Cancelled,
-				"The runtime is shutting down.");
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ShuttingDown };
 		}
-		return entry.m_Id;
-	}
-
-	bool FrameCaptureCoordinator::Cancel(uint64_t requestId) noexcept
-	{
-		for (Entry& entry : m_Entries)
+		if (plan.m_RequiredProducts.empty() ||
+			(plan.m_Timing != FrameCaptureTiming::NextFrame && plan.m_Timing != FrameCaptureTiming::AfterReady))
 		{
-			if (entry.m_Id == requestId && entry.m_Phase == Phase::Waiting)
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		if (plan.m_RequiredProducts.size() > m_JobLimits.m_MaxProductsPerJob)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::PlanTooLarge };
+		}
+		uint32_t resources = 0;
+		uint32_t graphs = 0;
+		bool graphSummary = false;
+		for (const auto& product : plan.m_RequiredProducts)
+		{
+			if (const auto* resource = std::get_if<ResourceCaptureProduct>(&product))
 			{
-				const uint64_t groupId = entry.m_GroupId;
-				for (Entry& member : m_Entries)
+				++resources;
+				if (resource->m_Targets.empty())
 				{
-					if (member.m_Phase == Phase::Waiting &&
-						(member.m_Id == requestId || (groupId != 0 && member.m_GroupId == groupId)))
-					{
-						Finish(member, FrameCaptureRequestStatus::Cancelled, "Cancelled by request.");
-					}
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 				}
-				return true;
+				if (resource->m_Targets.size() > m_JobLimits.m_MaxResourceTargetsPerJob)
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::PlanTooLarge };
+				}
+			}
+			else if (const auto* graph = std::get_if<GraphCaptureProduct>(&product))
+			{
+				++graphs;
+				graphSummary = graph->m_Summary;
+			}
+			else if (const auto* image = std::get_if<ImageCaptureProduct>(&product))
+			{
+				if (image->m_Source != CaptureImageSource::Scene && image->m_Source != CaptureImageSource::Composited)
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+				}
+			}
+			else if (const auto* diagnostic = std::get_if<DiagnosticCaptureProduct>(&product))
+			{
+				if (!diagnostic->m_Tap)
+				{
+					return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+				}
+			}
+			else
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 			}
 		}
-		return false;
+		if (resources > 1 || graphs > 1 || (resources != 0 && graphs != 0 && graphSummary))
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		if (m_NextJobId == 0)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityExhausted };
+		}
+		if (m_RunIdentity.empty())
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityUnavailable };
+		}
+		if (m_ActiveJobs >= m_JobLimits.m_MaxActiveJobs)
+		{
+			return { CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ActiveJobLimit };
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, uint64_t{ 0 }, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return { CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ReceiptLimit };
+		}
+		return { CaptureAdmissionStatus::Accepted };
 	}
 
-	void FrameCaptureCoordinator::ConsumeResults(
-		std::vector<FrameCaptureRequestResult>& outResults) noexcept
+	CaptureAdmission FrameCaptureCoordinator::TrySubmit(CapturePlan&& plan) noexcept
 	{
-		RemoveFinishedEntries();
-		outResults.insert(outResults.end(), std::make_move_iterator(m_Results.begin()),
-			std::make_move_iterator(m_Results.end()));
-		m_Results.clear();
+		const CaptureAdmission admission = CheckJobAdmission(plan);
+		if (admission.m_Status != CaptureAdmissionStatus::Accepted)
+		{
+			return admission;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, uint64_t{ 0 }, &JobReceipt::m_JobId);
+		RemoveFinishedJobs();
+		slot->m_JobId = m_NextJobId++;
+		++m_ActiveJobs;
+		slot->m_Job = EnqueuePlan(std::move(plan),
+			static_cast<size_t>(std::distance(m_JobReceipts.begin(), slot)), slot->m_JobId);
+		return { CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, slot->m_JobId };
+	}
+
+	void FrameCaptureCoordinator::SetAppRuntimeJobResultOwner() noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_AppRuntimeOwnsJobResults &&
+			std::ranges::all_of(m_JobReceipts, [](const JobReceipt& slot) { return slot.m_JobId == 0; }),
+			"AppRuntime must claim job results before admission and cannot replace their owner.");
+		m_AppRuntimeOwnsJobResults = true;
+	}
+
+	void FrameCaptureCoordinator::PublishAppRuntimeJobResults() noexcept
+	{
+		GGLAB_ASSERT(m_AppRuntimeOwnsJobResults);
+		for (JobReceipt& slot : m_JobReceipts)
+		{
+			// Do not move the result into a second host queue or return its credit.
+			// Every non-consuming observer borrows the same frozen terminal receipt.
+			if (slot.m_Result)
+			{
+				slot.m_PublishedToHost = true;
+			}
+		}
+	}
+
+	const CaptureJobResult* FrameCaptureCoordinator::FindPublishedJobResult(uint64_t jobId) const noexcept
+	{
+		if (jobId == 0)
+		{
+			return nullptr;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		return slot != m_JobReceipts.end() && slot->m_PublishedToHost ? &*slot->m_Result : nullptr;
+	}
+
+	std::optional<CaptureJobResult> FrameCaptureCoordinator::TakePublishedJobResult(uint64_t jobId) noexcept
+	{
+		return FindPublishedJobResult(jobId) ? ConsumeJobReceipt(jobId) : std::nullopt;
+	}
+
+	std::optional<CaptureJobResult> FrameCaptureCoordinator::TakeJobResult(uint64_t jobId) noexcept
+	{
+		return m_AppRuntimeOwnsJobResults ? std::nullopt : ConsumeJobReceipt(jobId);
+	}
+
+	std::optional<CaptureJobResult> FrameCaptureCoordinator::ConsumeJobReceipt(uint64_t jobId) noexcept
+	{
+		if (jobId == 0)
+		{
+			return std::nullopt;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end() || !slot->m_Result)
+		{
+			return std::nullopt;
+		}
+		auto result = std::move(slot->m_Result);
+		*slot = {};
+		RemoveFinishedJobs();
+		return result;
+	}
+
+	CaptureIntakeSnapshot FrameCaptureCoordinator::GetIntakeSnapshot() const noexcept
+	{
+		CaptureIntakeSnapshot snapshot{ .m_Limits = m_JobLimits, .m_ActiveJobs = m_ActiveJobs,
+			.m_DrainingRuntimeRequests = static_cast<uint32_t>(m_DrainingCaptureRequests.size()),
+			.m_DrainingWriterJobs = static_cast<uint32_t>(m_DrainingWrites.size()) };
+		for (const DrainingWrite& write : m_DrainingWrites)
+		{
+			snapshot.m_DrainingWriteReservations += write.m_Reservations;
+		}
+		for (const JobReceipt& slot : m_JobReceipts)
+		{
+			snapshot.m_ReservedReceipts += slot.m_JobId != 0;
+			snapshot.m_TerminalReceipts += slot.m_Result.has_value();
+			if (m_AppRuntimeOwnsJobResults && slot.m_Result)
+			{
+				snapshot.m_AppRuntimeUnpublishedResults += !slot.m_PublishedToHost;
+				snapshot.m_AppRuntimePublishedResults += slot.m_PublishedToHost;
+			}
+		}
+		return snapshot;
+	}
+
+	std::optional<CaptureJobSnapshot> FrameCaptureCoordinator::GetJobSnapshot(uint64_t jobId) const noexcept
+	{
+		if (jobId == 0)
+		{
+			return std::nullopt;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return std::nullopt;
+		}
+		if (slot->m_Result)
+		{
+			return slot->m_FinalSnapshot;
+		}
+		const CaptureJob& job = *slot->m_Job;
+		CaptureJobSnapshot snapshot{ .m_JobId = jobId, .m_AttemptCount = job.m_AttemptCount,
+			.m_RequiredProducts = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()),
+			.m_FinishedProducts = job.m_FinishedProducts };
+		if (job.m_Attempt)
+		{
+			snapshot.m_FrameSerial = job.m_Attempt->m_FrameSerial;
+		}
+		Phase first = Phase::Finished;
+		for (const ProductDelivery& output : m_Deliveries)
+		{
+			if (output.m_Job.get() == &job)
+			{
+				first = std::min(first, output.m_Phase);
+			}
+		}
+		switch (first)
+		{
+		case Phase::Waiting:
+			snapshot.m_Stage = CaptureJobStage::Waiting;
+			break;
+		case Phase::Issued:
+			snapshot.m_Stage = CaptureJobStage::AwaitingProducts;
+			break;
+		case Phase::AwaitingWatch:
+			snapshot.m_Stage = CaptureJobStage::AwaitingCoverage;
+			break;
+		case Phase::Encoding:
+			snapshot.m_Stage = CaptureJobStage::Encoding;
+			break;
+		case Phase::Finished:
+			snapshot.m_Stage = CaptureJobStage::Finished;
+			break;
+		}
+		return snapshot;
+	}
+
+	CaptureCancelResult FrameCaptureCoordinator::CancelJob(uint64_t jobId) noexcept
+	{
+		if (jobId == 0)
+		{
+			return CaptureCancelResult::NotFound;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, jobId, &JobReceipt::m_JobId);
+		if (slot == m_JobReceipts.end())
+		{
+			return CaptureCancelResult::NotFound;
+		}
+		if (slot->m_Result)
+		{
+			return CaptureCancelResult::Finished;
+		}
+		// Keep the job alive when Finish releases its receipt's active reference.
+		const auto job = slot->m_Job;
+		const auto outputs = GetDeliveries(*job);
+		GGLAB_ASSERT_MSG(!outputs.empty(), "An active job retains its required producer deliveries.");
+		if (outputs.front()->m_Phase == Phase::Encoding)
+		{
+			if (TryFinishWritten(*outputs.front()))
+			{
+				return CaptureCancelResult::Finished;
+			}
+			const auto write = outputs.front()->m_WriteJob;
+			if (!write->TryCancel())
+			{
+				return TryFinishWritten(*outputs.front()) ?
+					CaptureCancelResult::Finished : CaptureCancelResult::TooLate;
+			}
+			// The cancelled receipt may be consumed before this worker unwinds.
+			// Retain every reservation independently until its real receipt arrives.
+			m_DrainingWrites.push_back({ write, static_cast<uint32_t>(outputs.size()) });
+		}
+		else if (job->m_Attempt && !job->m_Attempt->m_Submitted)
+		{
+			// A graph may still borrow provisional resources. Request the normal
+			// pre-submit RAII abort; never destroy Runtime owners from CancelJob.
+			m_AbortFrameSerial = job->m_Attempt->m_FrameSerial;
+		}
+		for (ProductDelivery* member : outputs)
+		{
+			if (member->m_Phase == Phase::Issued && member->m_Attempt->m_CaptureRequestId != 0)
+			{
+				m_DrainingCaptureRequests.push_back(member->m_Attempt->m_CaptureRequestId);
+			}
+			Finish(*member, CaptureJobStatus::Cancelled, "Cancelled by request.");
+		}
+		return CaptureCancelResult::Cancelled;
+	}
+
+	std::shared_ptr<FrameCaptureCoordinator::CaptureJob> FrameCaptureCoordinator::EnqueuePlan(
+		CapturePlan plan, size_t receiptSlot, uint64_t jobId) noexcept
+	{
+		GGLAB_ASSERT_MSG(!plan.m_RequiredProducts.empty(),
+			"An internal capture plan must require a product.");
+		const bool resources = HasResources(plan);
+		std::optional<size_t> graphIndex;
+		size_t resourceCount = 0;
+		for (size_t index = 0; index < plan.m_RequiredProducts.size(); ++index)
+		{
+			const auto& product = plan.m_RequiredProducts[index];
+			resourceCount += std::holds_alternative<ResourceCaptureProduct>(product);
+			if (const auto* graph = std::get_if<GraphCaptureProduct>(&product))
+			{
+				GGLAB_ASSERT_MSG(!graphIndex, "An internal plan permits one graph product.");
+				GGLAB_ASSERT_MSG(!resources || !graph->m_Summary,
+					"A resource delivery requires the existing full graph format.");
+				graphIndex = index;
+			}
+		}
+		GGLAB_ASSERT_MSG(resourceCount <= 1, "An internal plan permits one resource product.");
+
+		auto job = std::make_shared<CaptureJob>();
+		job->m_ReceiptSlot = receiptSlot;
+		job->m_Result.m_JobId = jobId;
+		job->m_Result.m_Products.resize(plan.m_RequiredProducts.size());
+		job->m_RemainingDeliveries = GetDeliveryCount(plan);
+		job->m_Plan = std::move(plan);
+		job->m_DeliveryCount = job->m_RemainingDeliveries;
+		for (size_t index = 0; index < job->m_Plan.m_RequiredProducts.size(); ++index)
+		{
+			const auto& product = job->m_Plan.m_RequiredProducts[index];
+			if (resources && std::holds_alternative<GraphCaptureProduct>(product))
+			{
+				continue;
+			}
+			ProductDelivery& entry = m_Deliveries.emplace_back();
+			entry.m_ArtifactRequestId = m_NextArtifactRequestId++;
+			entry.m_Job = job;
+			entry.m_ProductIndex = index;
+			if (std::holds_alternative<ResourceCaptureProduct>(product))
+			{
+				entry.m_GraphIndex = graphIndex;
+			}
+		}
+		return job;
+	}
+
+	std::vector<FrameCaptureCoordinator::ProductDelivery*> FrameCaptureCoordinator::GetDeliveries(
+		const CaptureJob& job) noexcept
+	{
+		std::vector<ProductDelivery*> outputs;
+		for (ProductDelivery& entry : m_Deliveries)
+		{
+			if (entry.m_Job.get() == &job && entry.m_Phase != Phase::Finished)
+			{
+				outputs.push_back(&entry);
+			}
+		}
+		return outputs;
 	}
 
 	uint32_t FrameCaptureCoordinator::GetUnfinishedRequestCount() const noexcept
 	{
-		return static_cast<uint32_t>(std::ranges::count_if(m_Entries,
-			[](const Entry& entry) { return entry.m_Phase != Phase::Finished; }));
+		return static_cast<uint32_t>(std::ranges::count_if(m_Deliveries,
+			[](const ProductDelivery& entry) { return entry.m_Phase != Phase::Finished; }));
 	}
 
 	const FrameCaptureFrameState* FrameCaptureCoordinator::GetLastFrameState() const noexcept
@@ -350,18 +548,12 @@ namespace gglab
 		return m_LastFrameState ? &*m_LastFrameState : nullptr;
 	}
 
-	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source, uint32_t requestCount)
-		const noexcept
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(
+		const CapturePlan& plan) const noexcept
 	{
-		if (!m_Capture || m_IsShuttingDown)
-		{
-			return FrameCaptureAvailability::Finalized;
-		}
-		if (m_LastFrameState)
-		{
-			return GetCaptureAvailability(source, *m_LastFrameState, requestCount);
-		}
-		return GetCaptureAvailability(source, FrameCaptureFrameState{}, requestCount);
+		return m_LastFrameState ?
+			GetCaptureAvailability(plan, *m_LastFrameState) :
+			GetCaptureAvailability(plan, FrameCaptureFrameState{});
 	}
 
 	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source,
@@ -371,12 +563,17 @@ namespace gglab
 		{
 			return FrameCaptureAvailability::Finalized;
 		}
-		// A write slot is reserved before GPU work and stays reserved through encoding.
-		// Counting only queued writer jobs misses issued captures still on the GPU.
-		const auto reserved = std::ranges::count_if(m_Entries, [](const Entry& entry)
+		// Reservations cover GPU issue through writer completion, not just queued jobs.
+		auto reserved = std::ranges::count_if(m_Deliveries, [](const ProductDelivery& entry)
 			{
-				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch || entry.m_Phase == Phase::Encoding;
+				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch ||
+					entry.m_Phase == Phase::Encoding;
 			});
+		reserved += m_DrainingCaptureRequests.size();
+		for (const DrainingWrite& write : m_DrainingWrites)
+		{
+			reserved += write.m_Reservations;
+		}
 		if (requestCount > MaxInFlightCaptures)
 		{
 			return FrameCaptureAvailability::TooLarge;
@@ -407,81 +604,91 @@ namespace gglab
 			extent.m_Width, extent.m_Height);
 	}
 
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(
+		const CapturePlan& plan, const FrameCaptureFrameState& state) const noexcept
+	{
+		const uint32_t count = GetDeliveryCount(plan);
+		FrameCaptureAvailability availability = FrameCaptureAvailability::Available;
+		for (const auto& product : plan.m_RequiredProducts)
+		{
+			const auto current = GetCaptureAvailability(GetCaptureProductSource(product), state, count);
+			// A temporary blocker must not hide an impossible required product.
+			if (current != FrameCaptureAvailability::Available && current != FrameCaptureAvailability::Busy)
+			{
+				return current;
+			}
+			if (current == FrameCaptureAvailability::Busy)
+			{
+				availability = current;
+			}
+		}
+		return availability;
+	}
+
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
 		const bool ready = state.m_Readiness.IsReady();
 		const bool historyRestarted =
 			!m_LastFrameState || !state.m_SettleKey.Continues(m_LastFrameState->m_SettleKey);
-		// Temporal history keeps accumulating while gates are pending, so frames of
-		// content still loading stay in it until the settle key changes.
 		m_HistoryReady = historyRestarted ? ready : m_HistoryReady && ready;
 		if (!m_HistoryReady || historyRestarted)
 		{
 			m_SettledFrames = 0;
 		}
-		for (Entry& entry : m_Entries)
+		for (ProductDelivery& entry : m_Deliveries)
 		{
-			if (entry.m_Phase != Phase::Waiting || !entry.m_ViewApplied)
+			CaptureJob& job = *entry.m_Job;
+			if (entry.m_Phase != Phase::Waiting || !job.m_ViewApplied)
 			{
 				continue;
 			}
-			if (!entry.m_ViewCameraResetSerial)
+			if (!job.m_ViewCameraResetSerial)
 			{
-				entry.m_ViewCameraResetSerial = state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
+				job.m_ViewCameraResetSerial = state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
 			}
-			else if (*entry.m_ViewCameraResetSerial != state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity)
+			else if (*job.m_ViewCameraResetSerial != state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity)
 			{
-				entry.m_ViewApplied = false;
-				entry.m_ViewCameraResetSerial.reset();
+				job.m_ViewApplied = false;
+				job.m_ViewCameraResetSerial.reset();
 			}
 		}
 		m_HasOpenFrame = true;
-
+		m_AbortFrameSerial.reset();
 		if (!m_IsShuttingDown)
 		{
 			std::optional<PostProcessDebugTap> diagnosticTap =
 				m_Capture ? m_Capture->GetPendingDiagnosticTap() : std::nullopt;
 			const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
-			// Check every member's share together, then issue the group contiguously
-			// on the frame-driving thread before ordinary requests consume any slots.
-			IssueSequenceGroups(state, diagnosticTap);
-			for (Entry& entry : m_Entries)
+			IssueRequiredPlans(state, diagnosticTap);
+			for (ProductDelivery& entry : m_Deliveries)
 			{
-				const bool scheduledGroup = entry.m_GroupId != 0 && std::ranges::any_of(m_Entries, [&](const Entry& member)
-					{
-						return member.m_GroupId == entry.m_GroupId && member.m_Request.m_Source == FrameCaptureSource::ResourceExport;
-					});
-				if (entry.m_Phase != Phase::Waiting || scheduledGroup)
+				CaptureJob& job = *entry.m_Job;
+				const CapturePlan& plan = job.m_Plan;
+				if (entry.m_Phase != Phase::Waiting || NeedsGroupAdmission(plan))
 				{
 					continue;
 				}
-				// A failed gate does not become ready by waiting; the request fails
-				// now instead of at the caller's timeout. Content still to come is
-				// not judged by the failure of the content it replaces.
-				if (!readinessFailure.empty() &&
-					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
-					MatchesRequiredContent(entry, state))
+				if (!readinessFailure.empty() && plan.m_Timing == FrameCaptureTiming::AfterReady &&
+					MatchesRequiredContent(job, state))
 				{
-					Finish(entry, FrameCaptureRequestStatus::Failed, readinessFailure);
+					FailPlan(job, readinessFailure);
 				}
-				else if (IsDue(entry, state))
+				else if (IsDue(job, state))
 				{
-					const FrameCaptureRequest& request = entry.m_Request;
-					if (request.m_Source == FrameCaptureSource::Diagnostic && request.m_DiagnosticTap &&
-						!GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty() &&
-						diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+					const auto tap = entry.GetDiagnosticTap();
+					if (entry.GetSource() == FrameCaptureSource::Diagnostic && tap &&
+						!GetFrameCaptureDiagnosticTapName(*tap).empty() && diagnosticTap && diagnosticTap != tap)
 					{
-						if (request.m_Sequence)
+						if (plan.m_Sequence)
 						{
-							Finish(entry, FrameCaptureRequestStatus::Failed,
-								"A different diagnostic tap occupies the requested sequence frame.");
+							FailPlan(job, "A different diagnostic tap occupies the requested sequence frame.");
 						}
 						continue;
 					}
 					Issue(entry, state);
-					if (entry.m_Phase == Phase::Issued && request.m_Source == FrameCaptureSource::Diagnostic)
+					if (entry.m_Phase == Phase::Issued && entry.GetSource() == FrameCaptureSource::Diagnostic)
 					{
-						diagnosticTap = request.m_DiagnosticTap;
+						diagnosticTap = tap;
 					}
 				}
 			}
@@ -489,69 +696,58 @@ namespace gglab
 		m_LastFrameState = std::move(state);
 	}
 
-	void FrameCaptureCoordinator::IssueSequenceGroups(const FrameCaptureFrameState& state,
+	void FrameCaptureCoordinator::IssueRequiredPlans(const FrameCaptureFrameState& state,
 		std::optional<PostProcessDebugTap>& diagnosticTap) noexcept
 	{
-		std::vector<uint64_t> visited;
 		const std::string readinessFailure = DescribeFailedGates(state.m_Readiness);
-		for (Entry& entry : m_Entries)
+		std::vector<CaptureJob*> visited;
+		for (ProductDelivery& entry : m_Deliveries)
 		{
-			if (entry.m_Phase != Phase::Waiting || entry.m_GroupId == 0 ||
-				std::ranges::find(visited, entry.m_GroupId) != visited.end())
+			CaptureJob& job = *entry.m_Job;
+			const CapturePlan& plan = job.m_Plan;
+			if (entry.m_Phase != Phase::Waiting || !NeedsGroupAdmission(plan) ||
+				std::ranges::find(visited, &job) != visited.end())
 			{
 				continue;
 			}
-			visited.push_back(entry.m_GroupId);
-			std::vector<Entry*> members;
-			for (Entry& member : m_Entries)
+			visited.push_back(&job);
+			if (!readinessFailure.empty() && plan.m_Timing == FrameCaptureTiming::AfterReady &&
+				MatchesRequiredContent(job, state))
 			{
-				if (member.m_Phase == Phase::Waiting && member.m_GroupId == entry.m_GroupId)
-				{
-					members.push_back(&member);
-				}
+				FailPlan(job, readinessFailure);
+				continue;
 			}
-			if (!std::ranges::any_of(members, [](const Entry* member) { return member->m_Request.m_Source == FrameCaptureSource::ResourceExport; }))
+			if (!IsDue(job, state))
 			{
 				continue;
 			}
-			if (!readinessFailure.empty() && std::ranges::any_of(members, [&](const Entry* member)
-				{
-					return member->m_Request.m_Timing == FrameCaptureTiming::AfterReady && MatchesRequiredContent(*member, state);
-				}))
-			{
-				for (Entry* member : members)
-				{
-					Finish(*member, FrameCaptureRequestStatus::Failed, readinessFailure);
-				}
-				continue;
-			}
-			if (!std::ranges::all_of(members, [&](const Entry* member) { return IsDue(*member, state); }))
-			{
-				continue;
-			}
-			FrameCaptureAvailability availability = FrameCaptureAvailability::Available;
+			const auto outputs = GetDeliveries(job);
+			GGLAB_ASSERT_MSG(outputs.size() == job.m_DeliveryCount &&
+				std::ranges::all_of(outputs, [](const auto* output) { return output->m_Phase == Phase::Waiting; }),
+				"A required-product plan must enter admission as a whole.");
 			std::string failure;
-			for (const Entry* member : members)
+			std::optional<PostProcessDebugTap> planTap = diagnosticTap;
+			for (const auto* member : outputs)
 			{
-				const auto& request = member->m_Request;
-				if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
-					GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+				if (member->GetSource() != FrameCaptureSource::Diagnostic)
+				{
+					continue;
+				}
+				const auto tap = member->GetDiagnosticTap();
+				if (!tap || GetFrameCaptureDiagnosticTapName(*tap).empty())
 				{
 					failure = "A diagnostic capture requires a supported diagnostic tap.";
 					break;
 				}
-				if (request.m_Source == FrameCaptureSource::Diagnostic && diagnosticTap && diagnosticTap != request.m_DiagnosticTap)
+				if (planTap && planTap != tap)
 				{
-					failure = "A different diagnostic tap occupies the requested sequence frame.";
+					failure = "A different diagnostic tap occupies the requested same-frame plan.";
 					break;
 				}
-				availability = GetCaptureAvailability(request.m_Source, state, static_cast<uint32_t>(members.size()));
-				if (availability != FrameCaptureAvailability::Available)
-				{
-					break;
-				}
+				planTap = tap;
 			}
-			if (availability == FrameCaptureAvailability::Busy)
+			const auto availability = GetCaptureAvailability(plan, state);
+			if (failure.empty() && availability == FrameCaptureAvailability::Busy)
 			{
 				continue;
 			}
@@ -560,73 +756,65 @@ namespace gglab
 				if (failure.empty())
 				{
 					failure = availability == FrameCaptureAvailability::TooLarge ?
-						"The sequence capture group exceeds the capture capacity budget." :
-						"The sequence capture group is unavailable.";
+						"The same-frame capture plan exceeds the capture capacity budget." :
+						"The same-frame capture plan is unavailable.";
 				}
-				for (Entry* member : members)
+				for (ProductDelivery* member : outputs)
 				{
-					if (member->m_Request.m_Source == FrameCaptureSource::ResourceExport && availability == FrameCaptureAvailability::TooLarge)
+					if (member->GetSource() == FrameCaptureSource::ResourceExport &&
+						availability == FrameCaptureAvailability::TooLarge)
 					{
 						member->m_ResourceFailure = RGObservationFailure::TooLarge;
 					}
-					Finish(*member, FrameCaptureRequestStatus::Failed, failure);
 				}
+				FailPlan(job, std::move(failure));
 				continue;
 			}
-			for (Entry* member : members)
+			// Advisory checks covered every required delivery. Issue contiguously on
+			// the frame thread; an unexpected rejection aborts accepted siblings.
+			for (ProductDelivery* member : outputs)
 			{
-				Issue(*member, state);
-				if (member->m_Phase == Phase::Issued && member->m_Request.m_Source == FrameCaptureSource::Diagnostic)
+				Issue(*member, state, true);
+				if (member->m_Phase != Phase::Issued)
 				{
-					diagnosticTap = member->m_Request.m_DiagnosticTap;
-				}
-				if (member->m_Phase == Phase::Finished)
-				{
-					for (Entry* remaining : members)
-					{
-						if (remaining->m_Phase == Phase::Waiting)
-						{
-							Finish(*remaining, FrameCaptureRequestStatus::Failed, "The same-frame capture group could not be issued.");
-						}
-					}
 					break;
 				}
+			}
+			if (job.m_Attempt && m_AbortFrameSerial != state.m_FrameSerial)
+			{
+				diagnosticTap = planTap;
 			}
 		}
 	}
 
-	std::optional<FrameCaptureViewChange> FrameCaptureCoordinator::GetPendingViewChange()
-		const noexcept
+	std::optional<FrameCaptureViewChange> FrameCaptureCoordinator::GetPendingViewChange() const noexcept
 	{
 		if (m_IsShuttingDown || !m_LastFrameState)
 		{
 			return std::nullopt;
 		}
-		// Views apply in submission order, so earlier requests keep the camera
-		// they were submitted against until they are issued.
-		const auto head = std::ranges::find(m_Entries, Phase::Waiting, &Entry::m_Phase);
-		if (head == m_Entries.end() || head->m_Request.m_ReferenceViewId.empty() ||
-			head->m_ViewApplied || !MatchesRequiredContent(*head, *m_LastFrameState))
+		const auto head = std::ranges::find(m_Deliveries, Phase::Waiting, &ProductDelivery::m_Phase);
+		if (head == m_Deliveries.end())
 		{
 			return std::nullopt;
 		}
-		// An after-ready view waits for loaded content, which registers its views.
-		if (head->m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
-			!m_LastFrameState->m_Readiness.IsReady())
+		const CaptureJob& job = *head->m_Job;
+		const CapturePlan& plan = job.m_Plan;
+		if (plan.m_ReferenceViewId.empty() || job.m_ViewApplied ||
+			!MatchesRequiredContent(job, *m_LastFrameState))
 		{
 			return std::nullopt;
 		}
-		// A flexible batch keeps its current camera while earlier images retain
-		// GPU/readback or writer capacity. The actual frame rechecks before issue.
-		if (head->m_Request.m_WaitForCapacity && !head->m_Request.m_Sequence &&
-			GetCaptureAvailability(head->m_Request.m_Source, *m_LastFrameState) == FrameCaptureAvailability::Busy)
+		if (plan.m_Timing == FrameCaptureTiming::AfterReady && !m_LastFrameState->m_Readiness.IsReady())
 		{
 			return std::nullopt;
 		}
-		return FrameCaptureViewChange{
-			.m_RequestId = head->m_Id,
-			.m_ReferenceViewId = head->m_Request.m_ReferenceViewId,
-		};
+		if (plan.m_WaitForCapacity && !plan.m_Sequence &&
+			GetCaptureAvailability(plan, *m_LastFrameState) == FrameCaptureAvailability::Busy)
+		{
+			return std::nullopt;
+		}
+		return FrameCaptureViewChange{ job.m_Result.m_JobId, plan.m_ReferenceViewId };
 	}
 
 	bool FrameCaptureCoordinator::ShouldRestartTemporalHistory() const noexcept
@@ -636,14 +824,14 @@ namespace gglab
 		{
 			return false;
 		}
-		return std::ranges::any_of(m_Entries, [this](const Entry& entry)
+		return std::ranges::any_of(m_Deliveries, [this](const ProductDelivery& entry)
 			{
-				// A view restored for this frame is already a camera cut.
-				const bool viewSettling = entry.m_Request.m_ReferenceViewId.empty() ||
-					entry.m_ViewCameraResetSerial.has_value();
+				const CaptureJob& job = *entry.m_Job;
+				const bool viewSettling = job.m_Plan.m_ReferenceViewId.empty() ||
+					job.m_ViewCameraResetSerial.has_value();
 				return entry.m_Phase == Phase::Waiting &&
-					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady &&
-					viewSettling && MatchesRequiredContent(entry, *m_LastFrameState);
+					job.m_Plan.m_Timing == FrameCaptureTiming::AfterReady &&
+					viewSettling && MatchesRequiredContent(job, *m_LastFrameState);
 			});
 	}
 
@@ -653,30 +841,30 @@ namespace gglab
 		{
 			return false;
 		}
-		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+		return std::ranges::any_of(m_Deliveries, [](const ProductDelivery& entry)
 			{
 				return entry.m_Phase == Phase::Waiting &&
-					entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady;
+					entry.m_Job->m_Plan.m_Timing == FrameCaptureTiming::AfterReady;
 			});
 	}
 
-	void FrameCaptureCoordinator::OnReferenceViewApplied(uint64_t requestId, bool restored) noexcept
+	void FrameCaptureCoordinator::OnReferenceViewApplied(uint64_t jobId, bool restored) noexcept
 	{
-		const auto entry = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+		const auto entry = std::ranges::find_if(m_Deliveries, [&](const ProductDelivery& candidate)
 			{
-				return candidate.m_Id == requestId && candidate.m_Phase == Phase::Waiting;
+				return candidate.m_Job->m_Result.m_JobId == jobId && candidate.m_Phase == Phase::Waiting;
 			});
-		if (entry == m_Entries.end())
+		if (entry == m_Deliveries.end())
 		{
 			return;
 		}
+		CaptureJob& job = *entry->m_Job;
 		if (restored)
 		{
-			entry->m_ViewApplied = true;
-			entry->m_ViewCameraResetSerial.reset();
+			job.m_ViewApplied = true;
+			job.m_ViewCameraResetSerial.reset();
 			return;
 		}
-
 		std::string available;
 		std::string content;
 		if (m_LastFrameState)
@@ -689,40 +877,42 @@ namespace gglab
 				m_LastFrameState->m_LabId :
 				m_LastFrameState->m_DemoId;
 		}
-		Finish(*entry, FrameCaptureRequestStatus::Failed,
-			std::format("Reference view '{}' is not registered by '{}' (available: {}).",
-				entry->m_Request.m_ReferenceViewId, content,
-				available.empty() ? "none" : available));
+		FailPlan(job, std::format("Reference view '{}' is not registered by '{}' (available: {}).",
+			job.m_Plan.m_ReferenceViewId, content, available.empty() ? "none" : available));
 	}
 
 	void FrameCaptureCoordinator::SetFrameSceneInputs(
 		uint64_t frameSerial, const FrameCaptureSceneInputs& inputs) noexcept
 	{
-		for (Entry& entry : m_Entries)
+		for (ProductDelivery& entry : m_Deliveries)
 		{
-			if (entry.m_Phase == Phase::Issued && entry.m_Metadata.m_FrameSerial == frameSerial)
+			if (entry.m_Phase == Phase::Issued && entry.m_Attempt->m_Metadata.m_FrameSerial == frameSerial)
 			{
-				entry.m_Metadata.m_SceneInputs = inputs;
+				entry.m_Attempt->m_Metadata.m_SceneInputs = inputs;
 			}
 		}
 	}
 
 	void FrameCaptureCoordinator::OnFrameSubmitted() noexcept
 	{
-		if (m_NonFiniteWatch && m_LastFrameState)
+		if (m_LastFrameState)
 		{
-			for (auto& entry : m_Entries)
+			for (ProductDelivery& entry : m_Deliveries)
 			{
-				if (entry.m_Phase == Phase::Issued && entry.m_WatchCoverageId != 0 &&
-					entry.m_Metadata.m_FrameSerial == m_LastFrameState->m_FrameSerial)
+				auto& attempt = entry.m_Job->m_Attempt;
+				if (attempt && !attempt->m_Submitted &&
+					attempt->m_FrameSerial == m_LastFrameState->m_FrameSerial)
 				{
-					m_NonFiniteWatch->TrackCoverageFrame(entry.m_WatchCoverageId, m_LastFrameState->m_FrameSerial);
-					m_NonFiniteWatch->CloseCoverage(entry.m_WatchCoverageId);
+					attempt->m_Submitted = true;
+					if (m_NonFiniteWatch && attempt->m_WatchCoverageId != 0)
+					{
+						m_NonFiniteWatch->TrackCoverageFrame(attempt->m_WatchCoverageId, attempt->m_FrameSerial);
+						m_NonFiniteWatch->CloseCoverage(attempt->m_WatchCoverageId);
+					}
 				}
 			}
 		}
-		if (m_HasOpenFrame && m_HistoryReady &&
-			m_SettledFrames < std::numeric_limits<uint32_t>::max())
+		if (m_HasOpenFrame && m_HistoryReady && m_SettledFrames < std::numeric_limits<uint32_t>::max())
 		{
 			++m_SettledFrames;
 		}
@@ -763,12 +953,11 @@ namespace gglab
 	void FrameCaptureCoordinator::PrepareForShutdown() noexcept
 	{
 		m_IsShuttingDown = true;
-		for (Entry& entry : m_Entries)
+		for (ProductDelivery& entry : m_Deliveries)
 		{
 			if (entry.m_Phase == Phase::Waiting)
 			{
-				Finish(entry, FrameCaptureRequestStatus::Cancelled,
-					"The runtime shut down before the capture was due.");
+				Finish(entry, CaptureJobStatus::Cancelled, "The runtime shut down before the capture was due.");
 			}
 		}
 		Update();
@@ -777,8 +966,7 @@ namespace gglab
 	void FrameCaptureCoordinator::FinalizeAfterRenderHost() noexcept
 	{
 		m_IsShuttingDown = true;
-		// Render-host finalization publishes the last fence-completed readbacks.
-		// Drain them before closing only the coverage that still lacks evidence.
+		// Drain certified readbacks before finalizing coverage that lacks evidence.
 		Update();
 		if (m_NonFiniteWatch)
 		{
@@ -786,50 +974,45 @@ namespace gglab
 		}
 		Update();
 		FinishWriting();
-		for (Entry& entry : m_Entries)
+		for (ProductDelivery& entry : m_Deliveries)
 		{
 			if (entry.m_Phase == Phase::Waiting)
 			{
-				Finish(entry, FrameCaptureRequestStatus::Cancelled,
-					"The runtime shut down before the capture was due.");
+				Finish(entry, CaptureJobStatus::Cancelled, "The runtime shut down before the capture was due.");
 			}
-			else if (entry.m_Phase == Phase::Issued)
+			else if (entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch)
 			{
-				Finish(entry, FrameCaptureRequestStatus::Failed,
-					"The render host finalized without a capture result.");
+				FailPlan(*entry.m_Job, "The render host finalized without every required capture product.");
 			}
 		}
 		m_Capture = nullptr;
 	}
 
 	bool FrameCaptureCoordinator::MatchesRequiredContent(
-		const Entry& entry, const FrameCaptureFrameState& state) noexcept
+		const CaptureJob& job, const FrameCaptureFrameState& state) noexcept
 	{
-		const std::string& required = entry.m_Request.m_RequiredContentId;
+		const std::string& required = job.m_Plan.m_RequiredContentId;
 		return required.empty() || required == state.m_DemoId || required == state.m_LabId;
 	}
 
 	bool FrameCaptureCoordinator::IsDue(
-		const Entry& entry, const FrameCaptureFrameState& state) const noexcept
+		const CaptureJob& job, const FrameCaptureFrameState& state) const noexcept
 	{
-		const FrameCaptureRequest& request = entry.m_Request;
-		if (!request.m_ReferenceViewId.empty() && !entry.m_ViewApplied)
+		const CapturePlan& plan = job.m_Plan;
+		if (!plan.m_ReferenceViewId.empty() && !job.m_ViewApplied)
 		{
 			return false;
 		}
-		if (request.m_Timing == FrameCaptureTiming::NextFrame)
-		{
-			return true;
-		}
-		return m_HistoryReady && MatchesRequiredContent(entry, state) &&
-			m_SettledFrames >= request.m_SettleFrames;
+		return plan.m_Timing == FrameCaptureTiming::NextFrame ||
+			(m_HistoryReady && MatchesRequiredContent(job, state) && m_SettledFrames >= plan.m_SettleFrames);
 	}
 
 	bool FrameCaptureCoordinator::HasFrameResourceExports() const noexcept
 	{
-		return std::ranges::any_of(m_Entries, [](const Entry& entry)
+		return std::ranges::any_of(m_Deliveries, [](const ProductDelivery& entry)
 			{
-				return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) && entry.m_Request.m_Source == FrameCaptureSource::ResourceExport;
+				return (entry.m_Phase == Phase::Waiting || entry.m_Phase == Phase::Issued) &&
+					entry.GetSource() == FrameCaptureSource::ResourceExport;
 			});
 	}
 
@@ -840,52 +1023,69 @@ namespace gglab
 		{
 			return true;
 		}
+		// Graph build may already have deferred an image belonging to a required
+		// plan. Drain that outcome before deciding whether this frame may submit.
+		Update();
 		const bool strictWatch = m_NonFiniteWatch && m_NonFiniteWatch->GetStatus().m_Enabled &&
 			m_NonFiniteWatch->GetStatus().m_Mode == NonFiniteWatchMode::Fail;
-		const bool waitingExactExport = m_LastFrameState && std::ranges::any_of(m_Entries, [&](const Entry& entry)
+		const bool waitingExactExport = m_LastFrameState &&
+			std::ranges::any_of(m_Deliveries, [&](const ProductDelivery& entry)
 			{
-				return entry.m_Phase == Phase::Waiting && (entry.m_Request.m_Sequence || strictWatch) &&
-					entry.m_Request.m_Source == FrameCaptureSource::ResourceExport && IsDue(entry, *m_LastFrameState);
+				const CaptureJob& job = *entry.m_Job;
+				return entry.m_Phase == Phase::Waiting && (job.m_Plan.m_Sequence || strictWatch) &&
+					entry.GetSource() == FrameCaptureSource::ResourceExport &&
+					IsDue(job, *m_LastFrameState);
 			});
-		if (waitingExactExport)
+		bool prepared = false;
+		if (!waitingExactExport && m_AbortFrameSerial != frameSerial)
 		{
-			m_Capture->DeferFrameCaptures(frameSerial);
-		}
-		const bool prepared = !waitingExactExport &&
-			m_Capture->PrepareResourceExports(frameSerial, graph, context) != FrameCaptureAvailability::Busy;
-		if (!prepared)
-		{
-			m_HasOpenFrame = false;
+			prepared = m_Capture->PrepareResourceExports(frameSerial, graph, context) !=
+				FrameCaptureAvailability::Busy;
+			// A permanent resource failure must fail its required image before any
+			// sibling can submit. Runtime still retires provisional GPU owners.
 			Update();
 		}
-		return prepared;
+		if (!prepared || m_AbortFrameSerial == frameSerial)
+		{
+			m_Capture->DeferFrameCaptures(frameSerial);
+			m_AbortFrameSerial.reset();
+			m_HasOpenFrame = false;
+			Update();
+			return false;
+		}
+		return true;
 	}
 
-	void FrameCaptureCoordinator::Issue(Entry& entry, const FrameCaptureFrameState& state) noexcept
+	void FrameCaptureCoordinator::Issue(ProductDelivery& entry,
+		const FrameCaptureFrameState& state, bool preAdmitted) noexcept
 	{
+		CaptureJob& job = *entry.m_Job;
+		const CapturePlan& plan = job.m_Plan;
 		if (!m_Capture)
 		{
-			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture is unavailable.");
+			FailPlan(job, "Frame capture is unavailable.");
 			return;
 		}
 		if (state.m_FrameSerial == 0)
 		{
-			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture requires a live render frame serial.");
+			FailPlan(job, "Frame capture requires a live render frame serial.");
 			return;
 		}
-		const FrameCaptureRequest& request = entry.m_Request;
-		if (request.m_Source == FrameCaptureSource::Diagnostic && (!request.m_DiagnosticTap ||
-			GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap).empty()))
+		const auto tap = entry.GetDiagnosticTap();
+		if (entry.GetSource() == FrameCaptureSource::Diagnostic &&
+			(!tap || GetFrameCaptureDiagnosticTapName(*tap).empty()))
 		{
-			Finish(entry, FrameCaptureRequestStatus::Failed, "A diagnostic capture requires a supported diagnostic tap.");
+			FailPlan(job, "A diagnostic capture requires a supported diagnostic tap.");
 			return;
 		}
-		const FrameCaptureAvailability availability = GetCaptureAvailability(entry.m_Request.m_Source, state);
+		const auto availability = preAdmitted ?
+			FrameCaptureAvailability::Available :
+			GetCaptureAvailability(entry.GetSource(), state);
 		if (availability != FrameCaptureAvailability::Available)
 		{
 			if (availability == FrameCaptureAvailability::Busy &&
-				(request.m_Source == FrameCaptureSource::ResourceExport ||
-					(request.m_WaitForCapacity && !request.m_Sequence)))
+				(entry.GetSource() == FrameCaptureSource::ResourceExport ||
+					(plan.m_WaitForCapacity && !plan.m_Sequence)))
 			{
 				return;
 			}
@@ -898,18 +1098,18 @@ namespace gglab
 			{
 				failure = "The display target has no capture footprint.";
 			}
-			Finish(entry, FrameCaptureRequestStatus::Failed, failure);
+			FailPlan(job, failure);
 			return;
 		}
-
-		FrameCaptureMetadata& metadata = entry.m_Metadata;
-		metadata.m_RequestId = entry.m_Id;
-		metadata.m_Label = request.m_Label;
-		metadata.m_Note = request.m_Note;
-		metadata.m_Source = request.m_Source;
-		metadata.m_Timing = request.m_Timing;
-		metadata.m_SettleFrames =
-			request.m_Timing == FrameCaptureTiming::AfterReady ? request.m_SettleFrames : 0;
+		GGLAB_ASSERT_MSG(!entry.m_Attempt, "A waiting capture output must not retain a product attempt.");
+		ProductAttempt attempt;
+		FrameCaptureMetadata& metadata = attempt.m_Metadata;
+		metadata.m_RequestId = entry.m_ArtifactRequestId;
+		metadata.m_Label = plan.m_Label;
+		metadata.m_Note = plan.m_Note;
+		metadata.m_Source = entry.GetSource();
+		metadata.m_Timing = plan.m_Timing;
+		metadata.m_SettleFrames = plan.m_Timing == FrameCaptureTiming::AfterReady ? plan.m_SettleFrames : 0;
 		metadata.m_SettledFrames = m_SettledFrames;
 		metadata.m_Backend = state.m_Backend;
 		metadata.m_DemoId = state.m_DemoId;
@@ -918,164 +1118,209 @@ namespace gglab
 		metadata.m_FrameSerial = state.m_FrameSerial;
 		metadata.m_FrameIndex = state.m_FrameIndex;
 		metadata.m_Camera = state.m_Camera;
-		metadata.m_Camera.m_ReferenceViewId = request.m_ReferenceViewId;
+		metadata.m_Camera.m_ReferenceViewId = plan.m_ReferenceViewId;
 		metadata.m_FixedDeltaTime = state.m_FixedDeltaTime;
 		metadata.m_TotalTime = state.m_TotalTime;
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
 		metadata.m_Readiness = state.m_Readiness;
 		metadata.m_Temporal = state.m_Temporal;
-		metadata.m_Sequence = request.m_Sequence;
-		metadata.m_DiagnosticTap = request.m_Source == FrameCaptureSource::Diagnostic &&
-			request.m_DiagnosticTap ?
-				std::string(GetFrameCaptureDiagnosticTapName(*request.m_DiagnosticTap)) :
-				std::string();
+		metadata.m_Sequence = plan.m_Sequence;
+		metadata.m_DiagnosticTap = tap ? std::string(GetFrameCaptureDiagnosticTapName(*tap)) : std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
 			std::chrono::floor<std::chrono::milliseconds>(std::chrono::system_clock::now()));
-
-		if (request.m_Source == FrameCaptureSource::ResourceExport)
+		if (const auto* resources = std::get_if<ResourceCaptureProduct>(&entry.GetProduct()))
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestResourceExport(request.m_ResourceTargets,
-				state.m_FrameSerial, request.m_Sequence.has_value(), request.m_IncludeGraph, entry.m_GroupId);
+			attempt.m_CaptureRequestId = m_Capture->RequestResourceExport(resources->m_Targets,
+				state.m_FrameSerial, plan.m_Sequence.has_value() || job.m_DeliveryCount > 1,
+				entry.m_GraphIndex.has_value(), job.GetRuntimeGroupId());
 		}
-		else if (request.m_Source == FrameCaptureSource::Diagnostic)
+		else if (entry.GetSource() == FrameCaptureSource::Diagnostic)
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
-				*request.m_DiagnosticTap, state.m_FrameSerial, entry.m_GroupId);
+			attempt.m_CaptureRequestId = m_Capture->RequestDiagnosticCapture(
+				*tap, state.m_FrameSerial, job.GetRuntimeGroupId());
 		}
 		else
 		{
-			entry.m_CaptureRequestId = m_Capture->RequestCapture(request.m_Source, state.m_FrameSerial, entry.m_GroupId);
+			attempt.m_CaptureRequestId = m_Capture->RequestCapture(
+				entry.GetSource(), state.m_FrameSerial, job.GetRuntimeGroupId());
 		}
-		if (entry.m_CaptureRequestId == 0)
+		if (attempt.m_CaptureRequestId == 0)
 		{
-			Finish(entry, FrameCaptureRequestStatus::Failed, "Frame capture request capacity is exhausted.");
+			FailPlan(job, "Frame capture request capacity is exhausted.");
 			return;
 		}
+		if (!job.m_Attempt)
+		{
+			++job.m_AttemptCount;
+			job.m_Attempt = FrameAttempt{
+				state.m_FrameSerial, m_NonFiniteWatch ? m_NonFiniteWatch->OpenCoverage() : 0 };
+		}
+		GGLAB_ASSERT_MSG(job.m_Attempt->m_FrameSerial == state.m_FrameSerial,
+			"Required products must bind to the same frame attempt.");
+		entry.m_Attempt = std::move(attempt);
 		entry.m_Phase = Phase::Issued;
-		entry.m_WatchCoverageId = m_NonFiniteWatch ? m_NonFiniteWatch->OpenCoverage() : 0;
+	}
+
+	void FrameCaptureCoordinator::FailPlan(CaptureJob& job, std::string failure) noexcept
+	{
+		if (job.m_Attempt && !job.m_Attempt->m_Submitted && job.m_DeliveryCount > 1)
+		{
+			m_AbortFrameSerial = job.m_Attempt->m_FrameSerial;
+		}
+		for (ProductDelivery* member : GetDeliveries(job))
+		{
+			GGLAB_ASSERT_MSG(member->m_Phase != Phase::Encoding,
+				"Every required product and watch verdict must be ready before writing starts.");
+			if (member->m_Phase == Phase::Issued && member->m_Attempt->m_CaptureRequestId != 0)
+			{
+				m_DiscardedCaptureResults.push_back(member->m_Attempt->m_CaptureRequestId);
+			}
+			Finish(*member, CaptureJobStatus::Failed, failure);
+		}
+	}
+
+	void FrameCaptureCoordinator::RetryPlan(CaptureJob& job, uint64_t consumedRequestId) noexcept
+	{
+		GGLAB_ASSERT_MSG(job.m_Attempt && !job.m_Attempt->m_Submitted,
+			"Busy may retry only an unsubmitted SameFrame attempt.");
+		if (job.m_Plan.m_Sequence || job.m_DeliveryCount > 1)
+		{
+			m_AbortFrameSerial = job.m_Attempt->m_FrameSerial;
+		}
+		for (ProductDelivery* member : GetDeliveries(job))
+		{
+			GGLAB_ASSERT_MSG(member->m_Phase == Phase::Issued || member->m_Phase == Phase::AwaitingWatch,
+				"A deferred required-product plan must not have started writing.");
+			if (member->m_Phase == Phase::Issued && member->m_Attempt->m_CaptureRequestId != consumedRequestId &&
+				member->m_Attempt->m_CaptureRequestId != 0)
+			{
+				m_DiscardedCaptureResults.push_back(member->m_Attempt->m_CaptureRequestId);
+			}
+			member->m_Attempt.reset();
+			member->m_ResourceFailure = RGObservationFailure::None;
+			member->m_Phase = Phase::Waiting;
+		}
+		if (m_NonFiniteWatch)
+		{
+			m_NonFiniteWatch->ReleaseCoverage(job.m_Attempt->m_WatchCoverageId);
+		}
+		job.m_Attempt.reset();
 	}
 
 	void FrameCaptureCoordinator::HandleCaptureResult(FrameCaptureResult result) noexcept
 	{
-		const auto entry = std::ranges::find_if(m_Entries, [&](const Entry& candidate)
+		const auto entry = std::ranges::find_if(m_Deliveries, [&](const ProductDelivery& candidate)
 			{
 				return candidate.m_Phase == Phase::Issued &&
-					candidate.m_CaptureRequestId == result.m_RequestId;
+					candidate.m_Attempt->m_CaptureRequestId == result.m_RequestId;
 			});
-		if (entry == m_Entries.end())
+		if (entry == m_Deliveries.end())
 		{
+			if (std::erase(m_DrainingCaptureRequests, result.m_RequestId) != 0)
+			{
+				return;
+			}
 			if (std::erase(m_DiscardedCaptureResults, result.m_RequestId) != 0)
 			{
 				return;
 			}
-			GGLAB_LOG_WARN("Frame capture result {} has no coordinator request.",
-				result.m_RequestId);
+			GGLAB_LOG_WARN("Frame capture result {} has no coordinator request.", result.m_RequestId);
 			return;
 		}
-
-		const bool graph = entry->m_Request.m_Source == FrameCaptureSource::RenderGraph;
+		CaptureJob& job = *entry->m_Job;
+		ProductAttempt& attempt = *entry->m_Attempt;
+		const FrameCaptureSource source = entry->GetSource();
+		attempt.m_CaptureRequestId = 0;
 		if (result.m_Status == FrameCaptureStatus::Busy)
 		{
-			if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial || result.m_Source != entry->m_Request.m_Source)
+			if (result.m_FrameSerial != attempt.m_Metadata.m_FrameSerial ||
+				result.m_Source != source || job.m_Attempt->m_Submitted)
 			{
-				Finish(*entry, FrameCaptureRequestStatus::Failed, "The deferred capture result does not match its requested frame or source.");
+				FailPlan(job,
+					"The deferred capture result does not match an unsubmitted requested frame and source.");
 				return;
 			}
-			entry->m_Phase = Phase::Waiting;
-			if (m_NonFiniteWatch)
-			{
-				m_NonFiniteWatch->ReleaseCoverage(entry->m_WatchCoverageId);
-			}
-			entry->m_WatchCoverageId = 0;
-			entry->m_CaptureRequestId = 0;
-			entry->m_Metadata = {};
+			// End every product association together; late sibling results belong
+			// to this discarded attempt, never to the next frame's metadata.
+			RetryPlan(job, result.m_RequestId);
 			return;
 		}
-		const bool resources = entry->m_Request.m_Source == FrameCaptureSource::ResourceExport;
+		const bool resources = source == FrameCaptureSource::ResourceExport;
+		const bool graph = source == FrameCaptureSource::RenderGraph;
 		entry->m_ResourceFailure = result.m_ResourceFailure;
 		if (result.m_Status != FrameCaptureStatus::Completed ||
 			(resources ?
 				(!result.m_Resources || result.m_Resources->m_Arrays.empty() ||
-					(entry->m_Request.m_IncludeGraph && !result.m_Graph)) :
+					(entry->m_GraphIndex && !result.m_Graph)) :
 				graph ? !result.m_Graph : !result.m_Image))
 		{
-			Finish(*entry, FrameCaptureRequestStatus::Failed,
-				result.m_Failure.empty() ?
-					std::string("The frame capture failed.") :
-					std::move(result.m_Failure));
+			FailPlan(job, result.m_Failure.empty() ?
+				std::string("The frame capture failed.") :
+				std::move(result.m_Failure));
 			return;
 		}
-		const std::optional<PostProcessDebugTap> expectedTap =
-			entry->m_Request.m_Source == FrameCaptureSource::Diagnostic ?
-				entry->m_Request.m_DiagnosticTap :
-				std::nullopt;
-		if (result.m_FrameSerial != entry->m_Metadata.m_FrameSerial ||
-			result.m_Source != entry->m_Request.m_Source || result.m_DiagnosticTap != expectedTap)
+		const auto expectedTap = source == FrameCaptureSource::Diagnostic ?
+			entry->GetDiagnosticTap() :
+			std::nullopt;
+		if (result.m_FrameSerial != attempt.m_Metadata.m_FrameSerial ||
+			result.m_Source != source || result.m_DiagnosticTap != expectedTap)
 		{
-			Finish(*entry, FrameCaptureRequestStatus::Failed,
+			FailPlan(job,
 				"The capture result does not match its requested render frame, source or diagnostic tap.");
 			return;
 		}
-		entry->m_PendingResult = std::move(result);
+		attempt.m_PendingResult = std::move(result);
 		entry->m_Phase = Phase::AwaitingWatch;
 	}
 
 	void FrameCaptureCoordinator::PollWatchCaptures() noexcept
 	{
-		const std::string failure = m_NonFiniteWatch ? m_NonFiniteWatch->GetFailModeFailure() : std::string{};
-		for (auto& entry : m_Entries)
+		const std::string failure =
+			m_NonFiniteWatch ? m_NonFiniteWatch->GetFailModeFailure() : std::string{};
+		std::vector<CaptureJob*> visited;
+		for (ProductDelivery& entry : m_Deliveries)
 		{
-			if (entry.m_Phase == Phase::Waiting && entry.m_Request.m_Timing == FrameCaptureTiming::AfterReady && !failure.empty())
-			{
-				Finish(entry, FrameCaptureRequestStatus::Failed, failure);
-			}
-			if (entry.m_Phase == Phase::Issued && m_NonFiniteWatch)
-			{
-				const auto coverage = m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId);
-				if (coverage && coverage->Fails())
-				{
-					m_DiscardedCaptureResults.push_back(entry.m_CaptureRequestId);
-					entry.m_Metadata.m_WatchCoverage = coverage;
-					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
-					continue;
-				}
-			}
-			if (entry.m_Phase != Phase::AwaitingWatch)
+			CaptureJob& job = *entry.m_Job;
+			if (entry.m_Phase == Phase::Finished || entry.m_Phase == Phase::Encoding ||
+				std::ranges::find(visited, &job) != visited.end())
 			{
 				continue;
 			}
-			entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch ? m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId) : nullptr;
-			if (const auto& coverage = entry.m_Metadata.m_WatchCoverage; coverage)
+			visited.push_back(&job);
+			if (entry.m_Phase == Phase::Waiting)
 			{
-				if (coverage->Fails())
+				if (job.m_Plan.m_Timing == FrameCaptureTiming::AfterReady && !failure.empty())
 				{
-					Finish(entry, FrameCaptureRequestStatus::Failed, coverage->m_Failure);
-					continue;
+					FailPlan(job, failure);
 				}
-				if (!coverage->m_Complete)
-				{
-					continue;
-				}
+				continue;
 			}
-			StartEncoding(entry, *entry.m_PendingResult);
-			entry.m_PendingResult.reset();
+			const auto outputs = GetDeliveries(job);
+			const auto coverage = m_NonFiniteWatch ?
+				m_NonFiniteWatch->GetCoverage(job.m_Attempt->m_WatchCoverageId) :
+				nullptr;
+			for (ProductDelivery* member : outputs)
+			{
+				member->m_Attempt->m_Metadata.m_WatchCoverage = coverage;
+			}
+			if (coverage && coverage->Fails())
+			{
+				FailPlan(job, coverage->m_Failure);
+				continue;
+			}
+			if ((coverage && !coverage->m_Complete) ||
+				!std::ranges::all_of(outputs, [](const auto* member) { return member->m_Phase == Phase::AwaitingWatch; }))
+			{
+				continue;
+			}
+			StartBundleEncoding(job);
 		}
 	}
 
-	void FrameCaptureCoordinator::StartEncoding(
-		Entry& entry, const FrameCaptureResult& result) noexcept
+	CaptureProductEncodeInput FrameCaptureCoordinator::MakeEncodeInput(
+		ProductDelivery& entry, const FrameCaptureResult& result) noexcept
 	{
-		const std::filesystem::path directory = entry.m_Request.m_OutputDirectory.empty() ?
-			m_DefaultOutputDirectory :
-			entry.m_Request.m_OutputDirectory;
-		if (directory.empty())
-		{
-			Finish(entry, FrameCaptureRequestStatus::Failed,
-				"No capture output directory is configured.");
-			return;
-		}
-
-		FrameCaptureMetadata& metadata = entry.m_Metadata;
+		FrameCaptureMetadata& metadata = entry.m_Attempt->m_Metadata;
 		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
 		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
 		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
@@ -1086,556 +1331,266 @@ namespace gglab
 			metadata.m_Height = image.m_Height;
 			metadata.m_DisplayFormat = GetRHIFormatInfo(image.m_Format).m_Name;
 		}
-
-		const std::string_view subject = !entry.m_Request.m_Label.empty() ?
-			std::string_view(entry.m_Request.m_Label) :
-			!metadata.m_LabId.empty() ?
-				std::string_view(metadata.m_LabId) :
-				std::string_view(metadata.m_DemoId);
-		const std::string timestamp = metadata.m_CapturedAtUtc.size() >= 19 ?
-			std::format("{}{}{}-{}{}{}", metadata.m_CapturedAtUtc.substr(0, 4),
-				metadata.m_CapturedAtUtc.substr(5, 2), metadata.m_CapturedAtUtc.substr(8, 2),
-				metadata.m_CapturedAtUtc.substr(11, 2), metadata.m_CapturedAtUtc.substr(14, 2),
-				metadata.m_CapturedAtUtc.substr(17, 2)) :
-			std::string("unknown-time");
-		const std::string view = metadata.m_Camera.m_ReferenceViewId.empty() ?
-			std::string{} :
-			"-" + SanitizeFileStemComponent(metadata.m_Camera.m_ReferenceViewId);
-		const std::string baseStem = std::format("{}{}-{}-{}-{}-r{}",
-			SanitizeFileStemComponent(subject), view,
-			GetFrameCaptureSourceName(metadata.m_Source),
-			SanitizeFileStemComponent(metadata.m_Backend), timestamp, entry.m_Id);
-
-		auto job = std::make_shared<EncodeJob>();
-		job->m_SubmittedAt = std::chrono::steady_clock::now();
-		job->m_Image = result.m_Image;
-		job->m_Graph = result.m_Graph;
-		job->m_Resources = result.m_Resources;
-		job->m_ResourceExportActive = result.m_ResourceExportActive;
-		job->m_GraphSummary = entry.m_Request.m_GraphSummary;
-		job->m_SubmissionFenceIndex = result.m_SubmissionFenceIndex;
-		job->m_SubmissionFenceGeneration = result.m_SubmissionFenceGeneration;
-		job->m_SubmissionFenceValue = result.m_SubmissionFenceValue;
-		job->m_AdapterCompatibilityIdentity = result.m_AdapterCompatibilityIdentity;
-		job->m_Directory = directory;
-		job->m_BaseStem = result.m_Resources ?
-			std::format("{}.{}.resource-export", SanitizeFileStemComponent(subject), metadata.m_FrameSerial) :
-			result.m_Graph ?
-				std::format("{}.{}.graph{}", SanitizeFileStemComponent(subject), metadata.m_FrameSerial,
-					entry.m_Request.m_GraphSummary ? "-summary" : "") :
-				baseStem;
-		job->m_TemporaryStem = std::format("{}.{}.{}", job->m_BaseStem, m_TemporaryTag, entry.m_Id);
-		job->m_Metadata = metadata;
-		entry.m_Job = job;
-		entry.m_Phase = Phase::Encoding;
-
-		if (m_WriteOnCallingThread)
-		{
-			RunEncodeJob(*job, m_ImageEncoder);
-			return;
-		}
-		{
-			std::scoped_lock lock(m_Writer->m_Mutex);
-			// Slots were reserved before capture. All nine may enter the queue before
-			// the writer starts; once it claims one, at most eight remain pending.
-			if (m_Writer->m_Queue.size() >= MaxInFlightCaptures)
-			{
-				Finish(entry, FrameCaptureRequestStatus::Failed, "Capture writer queue is full.");
-				return;
-			}
-			m_Writer->m_Queue.push_back(std::move(job));
-		}
-		m_Writer->m_Condition.notify_one();
+		return {
+			.m_Image = result.m_Image,
+			.m_Graph = result.m_Graph,
+			.m_Resources = result.m_Resources,
+			.m_ResourceExportActive = result.m_ResourceExportActive,
+			.m_GraphSummary = entry.IsGraphSummary(),
+			.m_Submission = { result.m_SubmissionFenceIndex, result.m_SubmissionFenceGeneration,
+				result.m_SubmissionFenceValue, result.m_AdapterCompatibilityIdentity },
+			.m_Metadata = metadata,
+		};
 	}
 
-	bool FrameCaptureCoordinator::TryFinishWritten(Entry& entry) noexcept
+	void FrameCaptureCoordinator::StartBundleEncoding(CaptureJob& job) noexcept
 	{
-		EncodeJob& job = *entry.m_Job;
-		std::unique_lock lock(job.m_Mutex);
-		if (!job.m_IsDone)
+		const auto directory = job.m_Plan.m_OutputDirectory.empty() ?
+			m_DefaultOutputDirectory :
+			job.m_Plan.m_OutputDirectory;
+		if (directory.empty())
+		{
+			FailPlan(job, "No capture output directory is configured.");
+			return;
+		}
+		const auto outputs = GetDeliveries(job);
+		auto write = std::make_shared<CaptureWriteJob>();
+		write->m_Bundle = CaptureBundleInput{ .m_RunIdentity = m_RunIdentity,
+			.m_JobId = job.m_Result.m_JobId, .m_Attempt = job.m_AttemptCount,
+			.m_ProductCount = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()) };
+		for (ProductDelivery* member : outputs)
+		{
+			const FrameCaptureResult result = std::move(*member->m_Attempt->m_PendingResult);
+			member->m_Attempt->m_PendingResult.reset();
+			write->m_Bundle.m_Deliveries.push_back({
+				.m_ProductIndex = static_cast<uint32_t>(member->m_ProductIndex),
+				.m_GraphProductIndex = member->m_GraphIndex ?
+					std::optional(static_cast<uint32_t>(*member->m_GraphIndex)) : std::nullopt,
+				.m_Input = MakeEncodeInput(*member, result),
+			});
+		}
+		job.m_Result.m_BundleId = MakeCaptureBundleId(m_RunIdentity, job.m_Result.m_JobId, job.m_AttemptCount);
+		std::string subject = job.m_Plan.m_Label.empty() ? "capture" : SanitizeFileStemComponent(job.m_Plan.m_Label);
+		subject.resize(std::min(subject.size(), size_t{ 32 }));
+		write->m_BaseStem = std::format("{}.{}", subject, job.m_Result.m_BundleId);
+		write->m_Directory = directory;
+		for (ProductDelivery* member : outputs)
+		{
+			member->m_Phase = Phase::Encoding;
+			member->m_WriteJob = write;
+		}
+		if (!m_Writer->Submit(std::move(write)))
+		{
+			FinishBundleWriting(job, { .m_Failure = "Capture writer queue is full." });
+		}
+	}
+
+	void FrameCaptureCoordinator::FinishBundleWriting(
+		CaptureJob& job, const CaptureWriteReceipt& receipt) noexcept
+	{
+		job.m_Result.m_ManifestPath = receipt.m_ManifestPath;
+		for (ProductDelivery* member : GetDeliveries(job))
+		{
+			member->m_WriteReceipt = receipt;
+			if (receipt.m_Publication == CapturePublicationOutcome::Published)
+			{
+				const auto product = std::ranges::find(receipt.m_BundleProducts,
+					member->m_ProductIndex, &CaptureBundleProductReceipt::m_ProductIndex);
+				GGLAB_ASSERT_MSG(product != receipt.m_BundleProducts.end(), "A published bundle retains every required product.");
+				for (const auto& path : product->m_Files)
+				{
+					if (path.extension() == ".png")
+					{
+						member->m_Attempt->m_Metadata.m_ImageFile = GetFrameCapturePathText(path.filename());
+					}
+				}
+			}
+			Finish(*member, receipt.m_Publication == CapturePublicationOutcome::Published ?
+				CaptureJobStatus::Completed : CaptureJobStatus::Failed, receipt.m_Failure);
+		}
+	}
+
+	bool FrameCaptureCoordinator::TryFinishWritten(ProductDelivery& entry) noexcept
+	{
+		auto receipt = entry.m_WriteJob->GetReceipt();
+		if (!receipt)
 		{
 			return false;
 		}
-		std::string failure = std::move(job.m_Failure);
-		// Decided before the failure moves into Finish: argument evaluation order
-		// is unspecified, so testing it in the same call could see the moved-from text.
-		const FrameCaptureRequestStatus status = failure.empty() ?
-			FrameCaptureRequestStatus::Completed :
-			FrameCaptureRequestStatus::Failed;
-		if (status == FrameCaptureRequestStatus::Completed)
-		{
-			entry.m_Metadata.m_ImageFile = job.m_Metadata.m_ImageFile;
-		}
-		lock.unlock();
-		Finish(entry, status, std::move(failure));
+		FinishBundleWriting(*entry.m_Job, *receipt);
 		return true;
 	}
 
 	void FrameCaptureCoordinator::CollectWrittenJobs() noexcept
 	{
-		for (Entry& entry : m_Entries)
+		CollectDrainingWrites();
+		for (ProductDelivery& entry : m_Deliveries)
 		{
 			if (entry.m_Phase != Phase::Encoding || TryFinishWritten(entry))
 			{
 				continue;
 			}
-			EncodeJob& job = *entry.m_Job;
+			CaptureWriteJob& job = *entry.m_WriteJob;
 			if (!job.m_StallReported &&
 				std::chrono::steady_clock::now() - job.m_SubmittedAt >= EncodeStallReportTime)
 			{
 				job.m_StallReported = true;
 				GGLAB_LOG_WARN_ALWAYS(
 					"Frame capture {} has not finished encoding after {} seconds (stage: {}).",
-					entry.m_Id, EncodeStallReportTime.count(), GetEncodeStageName(job.m_Stage));
+					entry.m_ArtifactRequestId, EncodeStallReportTime.count(),
+					GetCaptureWriteStageName(job.m_Publication.m_Stage));
 			}
 		}
 	}
 
+	void FrameCaptureCoordinator::CollectDrainingWrites() noexcept
+	{
+		std::erase_if(m_DrainingWrites, [](const DrainingWrite& write)
+			{
+				return write.m_Job->GetReceipt().has_value();
+			});
+	}
+
 	void FrameCaptureCoordinator::FinishWriting() noexcept
 	{
-		// One deadline bounds the whole wait, however many captures are unfinished.
+		// One deadline bounds all unfinished outputs, not one timeout per writer job.
 		const auto deadline = std::chrono::steady_clock::now() + m_ShutdownWriteTimeout;
-		for (Entry& entry : m_Entries)
+		for (ProductDelivery& entry : m_Deliveries)
 		{
 			if (entry.m_Phase != Phase::Encoding)
 			{
 				continue;
 			}
-			EncodeJob& job = *entry.m_Job;
-			{
-				std::unique_lock lock(job.m_Mutex);
-				job.m_Condition.wait_until(lock, deadline, [&job]() { return job.m_IsDone; });
-			}
+			entry.m_WriteJob->WaitUntil(deadline);
 			if (TryFinishWritten(entry))
 			{
 				continue;
 			}
-
-			const EncodeStage stage = job.m_Stage;
-			PublicationClaim expected = PublicationClaim::Open;
-			if (job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Abandoned))
-			{
-				m_HasAbandonedJobs = true;
-				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
-					"Writing did not finish within {} ms of shutdown (stage: {}); the capture "
-					"was abandoned and its files are not published.",
-					m_ShutdownWriteTimeout.count(), GetEncodeStageName(stage)));
-			}
-			else if (!TryFinishWritten(entry))
-			{
-				// Publication started before the timeout. Its outcome is indeterminate:
-				// files may already exist or appear after this failure is reported.
-				m_HasAbandonedJobs = true;
-				Finish(entry, FrameCaptureRequestStatus::Failed, std::format(
-					"Publishing did not finish within {} ms of shutdown; capture publication "
-					"is indeterminate and files may already exist or appear later.",
-					m_ShutdownWriteTimeout.count()));
-			}
+			auto receipt = m_Writer->Abandon(*entry.m_WriteJob, m_ShutdownWriteTimeout);
+			FinishBundleWriting(*entry.m_Job, receipt);
 		}
-	}
-
-	void FrameCaptureCoordinator::StopWriter() noexcept
-	{
-		if (!m_WriterThread.joinable())
+		for (DrainingWrite& write : m_DrainingWrites)
 		{
-			return;
-		}
-		{
-			std::scoped_lock lock(m_Writer->m_Mutex);
-			m_Writer->m_Stopping = true;
-		}
-		m_Writer->m_Condition.notify_all();
-		// File I/O cannot be interrupted. Every capture unfinished at the timeout
-		// already has its failed result, and the writer owns all state it still uses.
-		// A blocked writer is left to finish on its own; jobs that already claimed
-		// publication may still publish files after shutdown reports their failure.
-		if (m_HasAbandonedJobs)
-		{
-			m_WriterThread.detach();
-		}
-		else
-		{
-			m_WriterThread.join();
-		}
-	}
-
-	void FrameCaptureCoordinator::Finish(
-		Entry& entry, FrameCaptureRequestStatus status, std::string failure) noexcept
-	{
-		FrameCaptureRequestResult result{
-			.m_RequestId = entry.m_Id,
-			.m_Status = status,
-			.m_Failure = std::move(failure),
-		};
-		if (entry.m_Job)
-		{
-			if (status == FrameCaptureRequestStatus::Completed)
-			{
-				result.m_ImagePath = entry.m_Job->m_ImagePath;
-				result.m_MetadataPath = entry.m_Job->m_MetadataPath;
-				result.m_ResourcePaths = entry.m_Job->m_ResourcePaths;
-				result.m_GraphPath = entry.m_Job->m_GraphPath;
-			}
-		}
-		if (entry.m_Phase != Phase::Waiting)
-		{
-			if (m_NonFiniteWatch && entry.m_WatchCoverageId != 0 && !entry.m_Metadata.m_WatchCoverage)
-			{
-				entry.m_Metadata.m_WatchCoverage = m_NonFiniteWatch->GetCoverage(entry.m_WatchCoverageId);
-			}
-			result.m_Metadata = entry.m_Metadata;
-		}
-		result.m_ResourceFailure = entry.m_ResourceFailure;
-		m_Results.push_back(std::move(result));
-		if (m_NonFiniteWatch)
-		{
-			m_NonFiniteWatch->ReleaseCoverage(entry.m_WatchCoverageId);
-		}
-		entry.m_WatchCoverageId = 0;
-		entry.m_PendingResult.reset();
-		entry.m_Job.reset();
-		entry.m_Phase = Phase::Finished;
-	}
-
-	void FrameCaptureCoordinator::RemoveFinishedEntries() noexcept
-	{
-		std::erase_if(m_Entries,
-			[](const Entry& entry) { return entry.m_Phase == Phase::Finished; });
-	}
-
-	void FrameCaptureCoordinator::RunWriter(
-		std::shared_ptr<WriterState> state, FrameCaptureImageEncoder encoder) noexcept
-	{
-		while (true)
-		{
-			std::shared_ptr<EncodeJob> job;
-			{
-				std::unique_lock lock(state->m_Mutex);
-				state->m_Condition.wait(lock,
-					[&state]() { return state->m_Stopping || !state->m_Queue.empty(); });
-				if (state->m_Queue.empty())
-				{
-					return;
-				}
-				job = std::move(state->m_Queue.front());
-				state->m_Queue.pop_front();
-			}
-			RunEncodeJob(*job, encoder);
-		}
-	}
-
-	void FrameCaptureCoordinator::RunEncodeJob(
-		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept
-	{
-		// A job abandoned while it was queued is not written at all.
-		std::string failure = job.m_Claim == PublicationClaim::Abandoned ?
-			std::string("The capture was abandoned at shutdown.") :
-			WriteAndPublish(job, encoder);
-		// Release Runtime payload capacity on the writer thread before reporting
-		// completion. No frame-thread state or RHI resource is touched here.
-		job.m_Image.reset();
-		job.m_Graph.reset();
-		job.m_Resources.reset();
-		job.m_Stage = EncodeStage::Done;
-		{
-			std::scoped_lock lock(job.m_Mutex);
-			job.m_Failure = std::move(failure);
-			job.m_IsDone = true;
-		}
-		job.m_Condition.notify_all();
-	}
-
-	std::string FrameCaptureCoordinator::WriteAndPublish(
-		EncodeJob& job, const FrameCaptureImageEncoder& encoder) noexcept try
-	{
-		const ResourceExportSubmission submission{ job.m_SubmissionFenceIndex, job.m_SubmissionFenceGeneration,
-			job.m_SubmissionFenceValue, job.m_AdapterCompatibilityIdentity };
-		if (job.m_Resources)
-		{
-			job.m_Stage = EncodeStage::SerializingGraph;
-			std::vector<std::vector<uint8_t>> headers;
-			std::vector<std::filesystem::path> temporary;
-			for (size_t i = 0; i < job.m_Resources->m_Arrays.size(); ++i)
-			{
-				headers.push_back(MakeResourceExportNpyHeader(job.m_Resources->m_Arrays[i]));
-				temporary.push_back(job.m_Directory / std::format("{}.{}.npy.partial", job.m_TemporaryStem, i));
-			}
-			const auto metadataTemporary = job.m_Directory / (job.m_TemporaryStem + ".json.partial");
-			const auto graphTemporary = job.m_Directory / (job.m_TemporaryStem + ".graph.json.partial");
-			const std::string graphJson = job.m_Graph ?
-				SerializeFrameGraphExport(*job.m_Graph,
-					job.m_Metadata, submission, false, true) :
-				std::string{};
-			const auto names = [&](std::string_view stem)
-				{
-					std::vector<std::filesystem::path> result;
-					for (size_t i = 0; i < temporary.size(); ++i)
-					{
-						result.push_back(job.m_Directory / std::format("{}.{}.npy", stem, i));
-					}
-					return result;
-				};
-			// Parse/validate metadata before producing any files, including invalid UTF-8.
-			const auto firstNames = names(job.m_BaseStem);
-			(void)SerializeResourceExportMetadata(*job.m_Resources, job.m_Metadata, submission, firstNames,
-				job.m_Graph ? job.m_Directory / (job.m_BaseStem + ".graph.json") : std::filesystem::path{});
-			const auto cleanup = [&]()
-				{
-					std::error_code error;
-					for (const auto& path : temporary)
-					{
-						std::filesystem::remove(path, error);
-					}
-					std::filesystem::remove(metadataTemporary, error);
-					std::filesystem::remove(graphTemporary, error);
-				};
-			job.m_Stage = EncodeStage::WritingGraph;
-			for (size_t i = 0; i < temporary.size(); ++i)
-			{
-				const std::string failure = WriteFileContents(temporary[i], headers[i], job.m_Resources->m_Arrays[i].m_Data);
-				if (!failure.empty())
-				{
-					cleanup();
-					return failure;
-				}
-			}
-			if (job.m_Graph)
-			{
-				const std::string failure = WriteFileContents(graphTemporary,
-					{ reinterpret_cast<const uint8_t*>(graphJson.data()), graphJson.size() });
-				if (!failure.empty())
-				{
-					cleanup();
-					return failure;
-				}
-			}
-			PublicationClaim expected = PublicationClaim::Open;
-			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
-			{
-				cleanup();
-				return "The resource export was abandoned at shutdown.";
-			}
-			job.m_Stage = EncodeStage::Publishing;
-			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
-			{
-				const std::string stem = attempt == 1 ? job.m_BaseStem : std::format("{}-{}", job.m_BaseStem, attempt);
-				const auto files = names(stem);
-				const auto graphPath = job.m_Graph ? job.m_Directory / (stem + ".graph.json") : std::filesystem::path{};
-				const auto metadataPath = job.m_Directory / (stem + ".json");
-				const std::string json = SerializeResourceExportMetadata(*job.m_Resources, job.m_Metadata, submission, files, graphPath);
-				std::vector<std::pair<std::filesystem::path, std::filesystem::path>> published;
-				PublishOutcome outcome = PublishOutcome::Published;
-				for (size_t i = 0; i < files.size(); ++i)
-				{
-					outcome = PublishNewFile(temporary[i], files[i]);
-					if (outcome != PublishOutcome::Published)
-					{
-						break;
-					}
-					published.emplace_back(temporary[i], files[i]);
-				}
-				if (outcome == PublishOutcome::Published && job.m_Graph)
-				{
-					outcome = PublishNewFile(graphTemporary, graphPath);
-					if (outcome == PublishOutcome::Published)
-					{
-						published.emplace_back(graphTemporary, graphPath);
-					}
-				}
-				std::string failure;
-				if (outcome == PublishOutcome::Published)
-				{
-					failure = WriteFileContents(metadataTemporary, { reinterpret_cast<const uint8_t*>(json.data()), json.size() });
-					outcome = failure.empty() ? PublishNewFile(metadataTemporary, metadataPath) : PublishOutcome::Failed;
-				}
-				if (outcome == PublishOutcome::Published)
-				{
-					job.m_MetadataPath = metadataPath;
-					job.m_ResourcePaths = files;
-					job.m_GraphPath = graphPath;
-					cleanup();
-					return {};
-				}
-				// Withdraw only files this attempt created. Restore renamed temporary
-				// files on volumes without hard links before trying the next group name.
-				for (const auto& [partial, path] : published)
-				{
-					std::error_code error;
-					if (std::filesystem::exists(partial, error))
-					{
-						std::filesystem::remove(path, error);
-					}
-					else
-					{
-						std::filesystem::rename(path, partial, error);
-					}
-					if (error)
-					{
-						cleanup();
-						return "Resource export rollback failed; publication is indeterminate.";
-					}
-				}
-				if (outcome == PublishOutcome::Failed)
-				{
-					cleanup();
-					return failure.empty() ? "Publishing the resource export group failed." : failure;
-				}
-			}
-			cleanup();
-			return "No unused group file name was found for the resource export.";
-		}
-		if (job.m_Graph)
-		{
-			job.m_Stage = EncodeStage::SerializingGraph;
-			const std::string json = SerializeFrameGraphExport(*job.m_Graph, job.m_Metadata,
-				submission, job.m_GraphSummary, job.m_ResourceExportActive);
-			const auto temporary = job.m_Directory / (job.m_TemporaryStem + ".json.partial");
-			const auto* bytes = reinterpret_cast<const uint8_t*>(json.data());
-			job.m_Stage = EncodeStage::WritingGraph;
-			std::string failure = WriteFileContents(temporary, { bytes, json.size() });
-			if (!failure.empty())
-			{
-				return failure;
-			}
-			PublicationClaim expected = PublicationClaim::Open;
-			if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
-			{
-				std::error_code error;
-				std::filesystem::remove(temporary, error);
-				return "The graph export was abandoned at shutdown.";
-			}
-			job.m_Stage = EncodeStage::Publishing;
-			for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
-			{
-				const auto path = job.m_Directory / ((attempt == 1 ?
-					job.m_BaseStem :
-					std::format("{}-{}", job.m_BaseStem, attempt)) + ".json");
-				const PublishOutcome outcome = PublishNewFile(temporary, path);
-				if (outcome == PublishOutcome::NameTaken)
-				{
-					continue;
-				}
-				std::error_code error;
-				std::filesystem::remove(temporary, error);
-				if (outcome == PublishOutcome::Failed)
-				{
-					return std::format("Publishing '{}' failed.", GetFrameCapturePathText(path));
-				}
-				job.m_MetadataPath = path;
-				return {};
-			}
-			std::error_code error;
-			std::filesystem::remove(temporary, error);
-			return "No unused file name was found for the graph export.";
-		}
-		if (!encoder)
-		{
-			return "No capture image encoder is configured.";
-		}
-		job.m_Stage = EncodeStage::Encoding;
-		const std::optional<std::vector<uint8_t>> encoded =
-			job.m_Image ? encoder(*job.m_Image) : std::nullopt;
-		if (!encoded)
-		{
-			return "The captured image could not be encoded as PNG.";
-		}
-
-		const std::filesystem::path temporaryImage =
-			job.m_Directory / (job.m_TemporaryStem + ".png.partial");
-		const std::filesystem::path temporaryMetadata =
-			job.m_Directory / (job.m_TemporaryStem + ".json.partial");
-		const auto removeTemporaryFiles = [&]() noexcept
-			{
-				std::error_code errorCode;
-				std::filesystem::remove(temporaryImage, errorCode);
-				std::filesystem::remove(temporaryMetadata, errorCode);
-			};
-		job.m_Stage = EncodeStage::WritingImage;
-		std::string failure = WriteFileContents(temporaryImage, *encoded);
-		if (!failure.empty())
-		{
-			return failure;
-		}
-
-		// Shutdown may have abandoned the job before publication started. Only
-		// that claim guarantees that its files never appear after a failed result.
-		PublicationClaim expected = PublicationClaim::Open;
-		if (!job.m_Claim.compare_exchange_strong(expected, PublicationClaim::Publishing))
-		{
-			removeTemporaryFiles();
-			return "The capture was abandoned at shutdown.";
-		}
-
-		job.m_Stage = EncodeStage::Publishing;
-		for (uint32_t attempt = 1; attempt <= MaxPublishAttempts; ++attempt)
-		{
-			const std::string stem = attempt == 1 ?
-				job.m_BaseStem :
-				std::format("{}-{}", job.m_BaseStem, attempt);
-			const std::filesystem::path imagePath = job.m_Directory / (stem + ".png");
-			const std::filesystem::path metadataPath = job.m_Directory / (stem + ".json");
-			const PublishOutcome image = PublishNewFile(temporaryImage, imagePath);
-			if (image == PublishOutcome::NameTaken)
+			if (write.m_AbandonedAtShutdown)
 			{
 				continue;
 			}
-			if (image == PublishOutcome::Failed)
+			write.m_Job->WaitUntil(deadline);
+			if (!write.m_Job->GetReceipt())
 			{
-				removeTemporaryFiles();
-				return std::format("Publishing '{}' failed.", GetFrameCapturePathText(imagePath));
+				GGLAB_UNUSED(m_Writer->Abandon(*write.m_Job, m_ShutdownWriteTimeout));
+				write.m_AbandonedAtShutdown = true;
 			}
-
-			// The sidecar names the image file, so it is written once the name is fixed.
-			job.m_Stage = EncodeStage::WritingMetadata;
-			job.m_Metadata.m_ImageFile = GetFrameCapturePathText(imagePath.filename());
-			const std::string json = SerializeFrameCaptureMetadata(job.m_Metadata);
-			const auto* jsonBytes = reinterpret_cast<const uint8_t*>(json.data());
-			failure = WriteFileContents(
-				temporaryMetadata, std::span<const uint8_t>(jsonBytes, json.size()));
-			const PublishOutcome metadata = failure.empty() ?
-				PublishNewFile(temporaryMetadata, metadataPath) :
-				PublishOutcome::Failed;
-			if (metadata == PublishOutcome::Published)
-			{
-				removeTemporaryFiles();
-				job.m_ImagePath = imagePath;
-				job.m_MetadataPath = metadataPath;
-				return {};
-			}
-
-			// A capture is complete only with both files. This image was created
-			// above, so withdrawing it never touches another writer's file; after a
-			// rename fallback it moves back to be published under the next name.
-			std::error_code errorCode;
-			if (std::filesystem::exists(temporaryImage, errorCode))
-			{
-				std::filesystem::remove(imagePath, errorCode);
-			}
-			else
-			{
-				std::filesystem::rename(imagePath, temporaryImage, errorCode);
-			}
-			if (metadata == PublishOutcome::Failed)
-			{
-				removeTemporaryFiles();
-				return failure.empty() ?
-					std::format("Publishing '{}' failed.", GetFrameCapturePathText(metadataPath)) :
-					failure;
-			}
-			job.m_Stage = EncodeStage::Publishing;
 		}
-		removeTemporaryFiles();
-		return std::format("No unused file name was found for '{}' after {} attempts.",
-			job.m_BaseStem, MaxPublishAttempts);
+		CollectDrainingWrites();
 	}
-	catch (const nlohmann::json::exception& error)
+
+	void FrameCaptureCoordinator::Finish(
+		ProductDelivery& entry, CaptureJobStatus status, std::string failure) noexcept
 	{
-		// Invalid UTF-8 or malformed metadata must fail the request, not terminate
-		// the noexcept writer. Serialization finishes before any graph file is written.
-		return std::format("Serializing the {} export failed: {}", job.m_Resources ? "resource" : "graph", error.what());
+		GGLAB_ASSERT_MSG(entry.m_Phase != Phase::Finished, "A producer delivery must finish exactly once.");
+		CaptureJob& job = *entry.m_Job;
+		if (entry.m_Attempt && m_NonFiniteWatch && job.m_Attempt &&
+			!entry.m_Attempt->m_Metadata.m_WatchCoverage)
+		{
+			entry.m_Attempt->m_Metadata.m_WatchCoverage =
+				m_NonFiniteWatch->GetCoverage(job.m_Attempt->m_WatchCoverageId);
+		}
+		const auto settle = [&](size_t index) noexcept
+			{
+				CaptureProductResult& product = job.m_Result.m_Products[index];
+				product.m_ProductIndex = static_cast<uint32_t>(index);
+				const auto& specification = job.m_Plan.m_RequiredProducts[index];
+				product.m_Kind = std::holds_alternative<GraphCaptureProduct>(specification) ?
+					CaptureProductKind::Graph :
+					std::holds_alternative<ResourceCaptureProduct>(specification) ?
+						CaptureProductKind::Resource :
+						std::holds_alternative<DiagnosticCaptureProduct>(specification) ?
+							CaptureProductKind::Diagnostic :
+							CaptureProductKind::Image;
+				product.m_Status = status;
+				if (status == CaptureJobStatus::Failed ||
+					(status == CaptureJobStatus::Cancelled && job.m_Result.m_Status != CaptureJobStatus::Failed))
+				{
+					job.m_Result.m_Status = status;
+				}
+				if (entry.m_WriteReceipt)
+				{
+					const CaptureWriteReceipt& receipt = *entry.m_WriteReceipt;
+					product.m_Publication = receipt.m_Publication == CapturePublicationOutcome::Published ?
+						CaptureJobPublication::Published :
+						receipt.m_Publication == CapturePublicationOutcome::Indeterminate ?
+							CaptureJobPublication::Indeterminate :
+							CaptureJobPublication::NotPublished;
+					if (!receipt.m_BundleProducts.empty())
+					{
+						const auto files = std::ranges::find(receipt.m_BundleProducts,
+							index, &CaptureBundleProductReceipt::m_ProductIndex);
+						GGLAB_ASSERT_MSG(files != receipt.m_BundleProducts.end(),
+							"A bundle receipt retains every product's files.");
+						product.m_Files = files->m_Files;
+					}
+				}
+				product.m_ResourceFailure = entry.m_ResourceFailure;
+				product.m_Failure = failure;
+				if (entry.m_Attempt)
+				{
+					product.m_Metadata = entry.m_Attempt->m_Metadata;
+				}
+				++job.m_FinishedProducts;
+			};
+		settle(entry.m_ProductIndex);
+		if (entry.m_GraphIndex)
+		{
+			settle(*entry.m_GraphIndex);
+		}
+		entry.m_Attempt.reset();
+		entry.m_WriteJob.reset();
+		entry.m_Phase = Phase::Finished;
+		GGLAB_ASSERT_MSG(job.m_RemainingDeliveries != 0, "A job retains every unfinished delivery.");
+		if (--job.m_RemainingDeliveries == 0)
+		{
+			CompleteJob(job);
+			if (m_NonFiniteWatch && job.m_Attempt)
+			{
+				m_NonFiniteWatch->ReleaseCoverage(job.m_Attempt->m_WatchCoverageId);
+			}
+			job.m_Attempt.reset();
+		}
 	}
-	catch (const std::exception& error)
+
+	void FrameCaptureCoordinator::CompleteJob(CaptureJob& job) noexcept
 	{
-		return std::format("Serializing the resource export failed: {}", error.what());
+		JobReceipt& slot = m_JobReceipts[job.m_ReceiptSlot];
+		GGLAB_ASSERT_MSG(!slot.m_Result && slot.m_JobId == job.m_Result.m_JobId,
+			"Every accepted job owns exactly one reserved terminal receipt.");
+		uint32_t published = 0;
+		bool indeterminate = false;
+		for (const CaptureProductResult& product : job.m_Result.m_Products)
+		{
+			published += product.m_Publication == CaptureJobPublication::Published;
+			indeterminate |= product.m_Publication == CaptureJobPublication::Indeterminate;
+		}
+		job.m_Result.m_Publication = indeterminate ?
+			CaptureJobPublication::Indeterminate :
+			published == job.m_Result.m_Products.size() ?
+				CaptureJobPublication::Published :
+				published != 0 ?
+					CaptureJobPublication::PartiallyPublished :
+					CaptureJobPublication::NotPublished;
+		slot.m_FinalSnapshot = { .m_JobId = slot.m_JobId, .m_Stage = CaptureJobStage::Finished,
+			.m_AttemptCount = job.m_AttemptCount,
+			.m_FrameSerial = job.m_Attempt ? std::optional(job.m_Attempt->m_FrameSerial) : std::nullopt,
+			.m_RequiredProducts = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()),
+			.m_FinishedProducts = job.m_FinishedProducts };
+		slot.m_Result = std::move(job.m_Result);
+		slot.m_Job.reset();
+		GGLAB_ASSERT_MSG(m_ActiveJobs != 0, "A terminal job returns one active-job credit.");
+		--m_ActiveJobs;
+	}
+
+	void FrameCaptureCoordinator::RemoveFinishedJobs() noexcept
+	{
+		std::erase_if(m_Deliveries, [](const ProductDelivery& entry) { return entry.m_Phase == Phase::Finished; });
 	}
 }

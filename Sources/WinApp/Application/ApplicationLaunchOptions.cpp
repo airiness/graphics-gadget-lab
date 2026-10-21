@@ -414,11 +414,11 @@ namespace gglab
 				}
 				if (utils::EqualsAsciiIgnoreCase(arguments[index], "scene"))
 				{
-					capture.m_Source = FrameCaptureSource::Scene;
+					capture.m_Source = CaptureImageSource::Scene;
 				}
 				else if (utils::EqualsAsciiIgnoreCase(arguments[index], "composited"))
 				{
-					capture.m_Source = FrameCaptureSource::Composited;
+					capture.m_Source = CaptureImageSource::Composited;
 				}
 				else
 				{

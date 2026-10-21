@@ -96,6 +96,10 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureProductEncoder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePublisher.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureBundle.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureWriter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.cpp" />
@@ -124,6 +128,12 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureProductEncoder.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePublisher.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureWriter.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePlan.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureJobTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureBundle.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureImageEncoder.h" />

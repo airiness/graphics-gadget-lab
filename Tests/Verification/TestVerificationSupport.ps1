@@ -25,6 +25,50 @@ function Reject([scriptblock]$Action, [string]$Pattern, [string]$Name) {
     throw "Expected rejection: $Name"
 }
 try {
+    $binding = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='result';Session='invalid-job-binding';JobId=0 }
+    $bindingResult = $binding.output | ConvertFrom-Json
+    Check ($binding.exitCode -eq 1 -and -not $bindingResult.ok -and $bindingResult.error -match 'positive -JobId') 'real-session-client-binds-job-parameters-without-gpu'
+    # Transport failures remain one JSON control result, so audit cleanup can act on them.
+    $missingSession = 'verification-missing-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+    $missingStop = Stop-VerificationSession $missingSession -AllowFailure
+    Check (-not $missingStop.ok -and $missingStop.session -eq $missingSession -and
+        $missingStop.error -match 'not running') 'real-session-client-reports-missing-session-as-json'
+    # Exercise the real waiting client with deterministic transport outcomes.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $root 'Scripts/Verification/GGLabSession.ps1'), [ref]$tokens, [ref]$parseErrors)
+        foreach ($name in @('Wait-CaptureJob','ConvertTo-Hashtable')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $Session = 'client-contract'; $ProtocolVersion = 3; $KeepResult = $false
+        $state = @{ calls=0; timeout=0; fail=$true; status='completed' }
+        function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+            $state.calls++; $state.timeout = $ResponseTimeoutSeconds
+            if ($state.fail) { throw 'lost transport response' }
+            return [pscustomobject]@{ protocol=3;ok=$true;jobId=$Request.jobId;status=$state.status
+                consumed=($Request.consume -and $state.status -ne 'pending') }
+        }
+        $admission = [pscustomobject]@{ok=$true;jobId=17}
+        $lost = Wait-CaptureJob $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check (-not $lost.ok -and $lost.jobId -eq 17 -and $lost.error -match 'lost transport' -and
+            -not ($lost.PSObject.Properties.Name -contains 'status') -and $state.calls -eq 1 -and
+            $state.timeout -gt 30) 'client-query-failure-retains-id-without-inventing-outcome-or-retrying'
+        $state.fail = $false; $KeepResult = $true
+        $borrowed = Wait-CaptureJob $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check ($borrowed.ok -and -not $borrowed.consumed) 'client-keep-result-borrows-terminal-receipt'
+        $KeepResult = $false
+        $consumed = Wait-CaptureJob $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check ($consumed.ok -and $consumed.consumed) 'client-default-explicitly-consumes-terminal-receipt'
+        $state.status = 'pending'
+        $pending = Wait-CaptureJob $admission ([DateTime]::UtcNow.AddSeconds(-1))
+        Check (-not $pending.ok -and $pending.status -eq 'pending' -and $pending.jobId -eq 17 -and
+            -not $pending.consumed -and $state.calls -eq 4) 'client-deadline-retains-pending-job-without-cancellation'
+    }
     $standaloneRoot = Join-Path $output 'standalone'
     $firstRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'first'
     $secondRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'second'
@@ -77,6 +121,13 @@ switch ($Command) {
     Reject { Wait-VerificationCondition -Poll { 'last-evidence' } -Until { $false } -TimeoutSeconds 0 -OnTimeout { param($last) throw "Timeout: $last" } } 'last-evidence' 'timeout-keeps-last-evidence'
     Reject { Wait-VerificationCondition -Poll { throw 'poll-failure' } -Until { $true } -TimeoutSeconds 1 } 'poll-failure' 'poll-errors-propagate'
     Check ((Wait-VerificationCondition -Poll { 'pending' } -Until { $false } -TimeoutSeconds 0 -OnTimeout { param($last) $last }) -eq 'pending') 'report-only-timeout-policy'
+    $capture = [pscustomobject]@{status='completed';publication='Published';manifest='bundle.json';products=@(
+        [pscustomobject]@{index=0;files=@('a.png','a.json')}, [pscustomobject]@{index=1;files=@('b.graph.json')})}
+    Check ((Get-VerificationCaptureFile $capture '.png') -eq 'a.png' -and
+        (Get-VerificationCaptureFile $capture '.json' 1) -eq 'b.graph.json') 'capture-files-are-selected-by-product'
+    Reject { Get-VerificationCaptureFile $capture '.npy' } 'Expected one' 'missing-capture-file'
+    $capture.publication = 'Indeterminate'
+    Reject { Get-VerificationCaptureFile $capture '.png' } 'published bundle' 'partial-files-are-not-completed-capture'
     $path = Join-Path $output 'empty.json'
     Write-VerificationJson $path @()
     Check (([IO.File]::ReadAllText($path) -replace '\s', '') -eq '[]' -and [IO.File]::ReadAllBytes($path)[0] -eq 91) 'empty-array-without-bom'
@@ -114,12 +165,12 @@ Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
 [Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi } | ConvertTo-Json -Compress))
 '@
-    foreach ($leaf in @('TestNonFiniteCoverage.ps1', 'TestNonFiniteGenerations.ps1', 'TestNonFiniteInjection.ps1', 'TestTemporalAACounters.ps1')) {
+    foreach ($leaf in @('TestCaptureJobs.ps1', 'TestCaptureOnReady.ps1', 'TestNonFiniteCoverage.ps1', 'TestNonFiniteGenerations.ps1', 'TestNonFiniteInjection.ps1', 'TestTemporalAACounters.ps1')) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
     $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{ Group='gpu'; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
-    Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and $gpuResult.suites.Count -eq 4) 'runner-gpu-leaf-handoff'
+    Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and $gpuResult.suites.Count -eq 6) 'runner-gpu-leaf-handoff'
     foreach ($suiteResult in $gpuResult.suites) {
         $leafResult = $suiteResult.steps[0].receipt
         Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
@@ -128,7 +179,8 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
-    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 11 -and
+    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 14 -and
+        @($items.suites | Where-Object name -eq 'capture-on-ready').Count -eq 1 -and
         @($items.suites | Where-Object name -eq 'coastal-assets').Count -eq 1 -and
         -not (Test-Path $unused) -and @($items.suites | Where-Object { $_.group -eq 'contracts' })[0].configurations.Count -eq 0) 'list-without-launch-or-output'
     foreach ($case in @(

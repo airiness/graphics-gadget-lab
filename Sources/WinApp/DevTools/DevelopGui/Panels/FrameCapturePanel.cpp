@@ -37,7 +37,7 @@ namespace gglab
 			std::array<char, 512> m_OutputDirectory{};
 			std::array<char, 128> m_Label{};
 			std::array<char, 512> m_Note{};
-			uint64_t m_OpenFolderRequestId = 0;
+			uint64_t m_OpenFolderJobId = 0;
 			std::string m_OpenFolderFailure;
 			std::vector<ResourceExportTarget> m_ResourceTargets;
 			uint32_t m_NextTargetId = 1;
@@ -46,6 +46,7 @@ namespace gglab
 			bool m_IncludeGraph = false;
 			bool m_GraphSummary = false;
 			bool m_Initialized = false;
+			std::optional<CaptureCancelResult> m_BatchCancellation;
 		};
 
 		template <size_t SIZE>
@@ -70,15 +71,15 @@ namespace gglab
 			return ImVec4(0.95f, 0.80f, 0.35f, 1.0f);
 		}
 
-		[[nodiscard]] std::string_view GetStatusName(FrameCaptureRequestStatus status) noexcept
+		[[nodiscard]] std::string_view GetStatusName(CaptureJobStatus status) noexcept
 		{
 			switch (status)
 			{
-			case FrameCaptureRequestStatus::Completed:
+			case CaptureJobStatus::Completed:
 				return "completed";
-			case FrameCaptureRequestStatus::Cancelled:
+			case CaptureJobStatus::Cancelled:
 				return "cancelled";
-			case FrameCaptureRequestStatus::Failed:
+			case CaptureJobStatus::Failed:
 				break;
 			}
 			return "failed";
@@ -454,7 +455,7 @@ namespace gglab
 					int source = static_cast<int>(settings.m_Source);
 					if (ImGui::Combo("Source", &source, "Scene\0Composited\0"))
 					{
-						settings.m_Source = static_cast<FrameCaptureSource>(source);
+						settings.m_Source = static_cast<CaptureImageSource>(source);
 					}
 					ImGui::SetItemTooltip("Scene excludes tooling overlays; Composited includes them.");
 					if (ImGui::Button("Capture (F9)"))
@@ -463,10 +464,13 @@ namespace gglab
 					}
 					ImGui::SameLine();
 					const size_t viewCount = frameState ? frameState->m_ReferenceViewIds.size() : 0;
-					ImGui::BeginDisabled(viewCount == 0);
+					const auto& batch = frameCapture.GetReferenceViewBatch();
+					ImGui::BeginDisabled(viewCount == 0 ||
+						batch.m_State == ApplicationFrameCapture::ReferenceViewBatchState::Running || batch.m_JobId != 0);
 					if (ImGui::Button(std::format("Capture All Views ({})", viewCount).c_str()))
 					{
 						frameCapture.CaptureReferenceViews();
+						state.m_BatchCancellation.reset();
 					}
 					ImGui::EndDisabled();
 					ImGui::EndTabItem();
@@ -490,7 +494,32 @@ namespace gglab
 				ImGui::EndTabBar();
 			}
 			ImGui::Spacing();
-			ImGui::TextDisabled("%u pending", frameCapture.GetUnfinishedRequestCount());
+			ImGui::TextDisabled("%u pending jobs", frameCapture.GetPendingJobCount());
+			const CaptureAdmission admission = frameCapture.GetLastAdmission();
+			if (admission.m_Status != CaptureAdmissionStatus::Accepted)
+			{
+				ImGui::TextColored(GetGateColor(FrameCaptureGateState::Pending), "Admission %s: %s",
+					admission.m_Status == CaptureAdmissionStatus::Busy ? "busy" : "rejected",
+					ApplicationFrameCapture::GetAdmissionReasonName(admission.m_Reason).data());
+			}
+			const auto& batch = frameCapture.GetReferenceViewBatch();
+			if (batch.m_State != ApplicationFrameCapture::ReferenceViewBatchState::Idle)
+			{
+				const char* status = batch.m_State == ApplicationFrameCapture::ReferenceViewBatchState::Running ? "running" :
+					batch.m_State == ApplicationFrameCapture::ReferenceViewBatchState::Completed ? "completed" :
+					batch.m_State == ApplicationFrameCapture::ReferenceViewBatchState::Cancelled ? "cancelled" : "failed";
+				ImGui::Text("Reference views: %s, %u/%u published (%u admitted)", status,
+					batch.m_CompletedViews, batch.m_TotalViews, batch.m_AcceptedViews);
+				if (batch.m_State == ApplicationFrameCapture::ReferenceViewBatchState::Running && ImGui::Button("Cancel views"))
+				{
+					state.m_BatchCancellation = frameCapture.CancelReferenceViews();
+				}
+				if (state.m_BatchCancellation)
+				{
+					ImGui::TextDisabled("Cancellation: %s",
+						ApplicationFrameCapture::GetCancellationName(*state.m_BatchCancellation).data());
+				}
+			}
 		}
 
 		void DrawFrameState(const ApplicationFrameCapture& frameCapture) noexcept
@@ -570,61 +599,52 @@ namespace gglab
 			if (history.empty())
 			{
 				ImGui::TextDisabled("No finished captures.");
-				return;
 			}
 			for (auto entry = history.rbegin(); entry != history.rend(); ++entry)
 			{
-				const FrameCaptureRequestResult& result = entry->m_Result;
-				ImGui::PushID(static_cast<int>(result.m_RequestId));
-				const bool completed = result.m_Status == FrameCaptureRequestStatus::Completed;
-				const std::string source = result.m_Metadata ?
-					std::string(GetFrameCaptureSourceName(result.m_Metadata->m_Source)) :
-					"Request";
-				const std::string frame = result.m_Metadata ?
-					std::format(" / frame {}", result.m_Metadata->m_FrameSerial) :
-					"";
-				ImGui::PushStyleColor(ImGuiCol_Text, GetGateColor(completed ?
-					FrameCaptureGateState::Ready :
-					FrameCaptureGateState::Failed));
+				const CaptureJobResult& result = entry->m_Result;
+				ImGui::PushID(std::to_string(result.m_JobId).c_str());
+				const bool completed = ApplicationFrameCapture::IsPublished(result);
+				const auto* metadata = ApplicationFrameCapture::GetMetadata(result);
+				const std::string frame = metadata ? std::format(" / frame {}", metadata->m_FrameSerial) : "";
 				const ImGuiTreeNodeFlags flags = entry == history.rbegin() ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-				const bool open = ImGui::TreeNodeEx("##Result", flags, "#%llu %s / %s%s",
-					static_cast<unsigned long long>(result.m_RequestId), source.c_str(),
-					GetStatusName(result.m_Status).data(), frame.c_str());
-				ImGui::PopStyleColor();
+				const bool open = ImGui::TreeNodeEx("##Result", flags, "Job #%llu / %s / %s%s",
+					static_cast<unsigned long long>(result.m_JobId), GetStatusName(result.m_Status).data(),
+					ApplicationFrameCapture::GetPublicationName(result.m_Publication).data(), frame.c_str());
 				if (open)
 				{
-					if (completed)
+					DrawOutputPath(result.m_ManifestPath);
+					for (const auto& product : result.m_Products)
 					{
-						DrawOutputPath(result.m_ImagePath);
-						DrawOutputPath(result.m_MetadataPath);
-						for (const auto& path : result.m_ResourcePaths)
+						const char* kind = product.m_Kind == CaptureProductKind::Image ? "Image" :
+							product.m_Kind == CaptureProductKind::Diagnostic ? "Diagnostic" :
+							product.m_Kind == CaptureProductKind::Resource ? "Resource" : "Graph";
+						ImGui::Text("%u: %s / %s / %s", product.m_ProductIndex, kind,
+							GetStatusName(product.m_Status).data(),
+							ApplicationFrameCapture::GetPublicationName(product.m_Publication).data());
+						for (const auto& path : product.m_Files)
 						{
 							DrawOutputPath(path);
 						}
-						DrawOutputPath(result.m_GraphPath);
-						ImGui::BeginDisabled(!frameCapture.CanOpenOutputFolder(result));
-						if (ImGui::Button("Open folder"))
+						if (product.m_ResourceFailure != RGObservationFailure::None)
 						{
-							state.m_OpenFolderRequestId = result.m_RequestId;
-							frameCapture.OpenOutputFolder(result.m_RequestId, state.m_OpenFolderFailure);
+							ImGui::TextDisabled("%s", GetRGObservationFailureName(product.m_ResourceFailure).data());
 						}
-						ImGui::EndDisabled();
-						if (state.m_OpenFolderRequestId == result.m_RequestId && !state.m_OpenFolderFailure.empty())
+						if (!product.m_Failure.empty())
 						{
-							ImGui::PushTextWrapPos();
-							ImGui::TextColored(GetGateColor(FrameCaptureGateState::Failed), "%s", state.m_OpenFolderFailure.c_str());
-							ImGui::PopTextWrapPos();
+							ImGui::TextWrapped("%s", product.m_Failure.c_str());
 						}
 					}
-					else
+					ImGui::BeginDisabled(!completed || !frameCapture.CanOpenOutputFolder(result));
+					if (ImGui::Button("Open folder"))
 					{
-						ImGui::PushTextWrapPos();
-						if (result.m_ResourceFailure != RGObservationFailure::None)
-						{
-							ImGui::TextDisabled("%s", GetRGObservationFailureName(result.m_ResourceFailure).data());
-						}
-						ImGui::TextUnformatted(result.m_Failure.c_str());
-						ImGui::PopTextWrapPos();
+						state.m_OpenFolderJobId = result.m_JobId;
+						frameCapture.OpenOutputFolder(result.m_JobId, state.m_OpenFolderFailure);
+					}
+					ImGui::EndDisabled();
+					if (state.m_OpenFolderJobId == result.m_JobId && !state.m_OpenFolderFailure.empty())
+					{
+						ImGui::TextWrapped("%s", state.m_OpenFolderFailure.c_str());
 					}
 					ImGui::TreePop();
 				}
@@ -662,14 +682,20 @@ namespace gglab
 	{
 		const auto& history = frameCapture.GetHistory();
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
-		if (history.empty() || !viewport ||
-			std::chrono::steady_clock::now() - history.back().m_FinishedAt > NotificationDuration)
+		const CaptureAdmission admission = frameCapture.GetLastAdmission();
+		const bool showAdmission = admission.m_Status != CaptureAdmissionStatus::Accepted &&
+			(history.empty() || frameCapture.GetLastAdmissionTime() > history.back().m_FinishedAt);
+		if (!showAdmission && history.empty())
+		{
+			return;
+		}
+		const auto timestamp = showAdmission ? frameCapture.GetLastAdmissionTime() :
+			history.back().m_FinishedAt;
+		if (!viewport || std::chrono::steady_clock::now() - timestamp > NotificationDuration)
 		{
 			return;
 		}
 
-		const FrameCaptureRequestResult& result = history.back().m_Result;
-		const bool completed = result.m_Status == FrameCaptureRequestStatus::Completed;
 		const ImVec2 position(viewport->WorkPos.x + viewport->WorkSize.x - 16.0f,
 			viewport->WorkPos.y + viewport->WorkSize.y - 16.0f);
 		ImGui::SetNextWindowPos(position, ImGuiCond_Always, ImVec2(1.0f, 1.0f));
@@ -680,21 +706,25 @@ namespace gglab
 			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
 		if (ImGui::Begin("##FrameCaptureNotification", nullptr, flags))
 		{
-			ImGui::TextColored(GetGateColor(completed ?
-				FrameCaptureGateState::Ready :
-				FrameCaptureGateState::Failed),
-				"%s #%llu %s", result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::ResourceExport ?
-					"Resource export" :
-					result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph ?
-						"Graph export" :
-						"Capture",
-				static_cast<unsigned long long>(result.m_RequestId),
-				GetStatusName(result.m_Status).data());
 			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
-			ImGui::TextUnformatted(completed ?
-				ApplicationFrameCapture::GetPathText(
-					ApplicationFrameCapture::GetOutputPath(result)).c_str() :
-				result.m_Failure.c_str());
+			if (showAdmission)
+			{
+				ImGui::Text("Capture admission %s: %s",
+					admission.m_Status == CaptureAdmissionStatus::Busy ? "busy" : "rejected",
+					ApplicationFrameCapture::GetAdmissionReasonName(admission.m_Reason).data());
+			}
+			else
+			{
+				const CaptureJobResult& result = history.back().m_Result;
+				const bool completed = ApplicationFrameCapture::IsPublished(result);
+				ImGui::TextColored(GetGateColor(completed ? FrameCaptureGateState::Ready : FrameCaptureGateState::Failed),
+					"Job #%llu %s / %s", static_cast<unsigned long long>(result.m_JobId),
+					GetStatusName(result.m_Status).data(),
+					ApplicationFrameCapture::GetPublicationName(result.m_Publication).data());
+				ImGui::TextUnformatted(completed ?
+					ApplicationFrameCapture::GetPathText(ApplicationFrameCapture::GetOutputPath(result)).c_str() :
+					std::string(ApplicationFrameCapture::GetFailure(result)).c_str());
+			}
 			ImGui::PopTextWrapPos();
 		}
 		ImGui::End();

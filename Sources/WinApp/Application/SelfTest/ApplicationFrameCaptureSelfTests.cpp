@@ -1,5 +1,6 @@
 #include "Application/SelfTest/ApplicationFrameCaptureSelfTests.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
+#include "Application/Capture/CaptureOnReady.h"
 #include "Application/Platform/Windows/Win32FrameCaptureImageEncoder.h"
 #include "Application/Platform/Windows/Win32Shell.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -24,6 +25,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -47,7 +49,8 @@ namespace gglab
 			uint64_t RequestCapture(FrameCaptureSource source, uint64_t frameSerial, uint64_t = 0) noexcept override
 			{
 				m_Issued.push_back({ .m_RequestId = m_NextId++, .m_Source = source,
-					.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = frameSerial });
+					.m_Status = FrameCaptureStatus::Completed, .m_FrameSerial = frameSerial,
+					.m_SubmissionFenceValue = 23 });
 				return m_Issued.back().m_RequestId;
 			}
 			uint64_t RequestDiagnosticCapture(PostProcessDebugTap, uint64_t, uint64_t = 0) noexcept override { return 0; }
@@ -196,103 +199,288 @@ namespace gglab
 			return nlohmann::json::parse(file, nullptr, false);
 		}
 
-		void RunReferenceViewBatchTests(SelfTestContext& context, const std::filesystem::path& directory, FrameCaptureSource source) noexcept
+		const std::filesystem::path& ProductFile(const CaptureJobResult& result,
+			CaptureProductKind kind, std::string_view extension) noexcept
+		{
+			for (const auto& product : result.m_Products)
+			{
+				if (product.m_Kind == kind)
+				{
+					for (const auto& file : product.m_Files)
+					{
+						if (file.extension() == extension)
+						{
+							return file;
+						}
+					}
+				}
+			}
+			static const std::filesystem::path empty;
+			return empty;
+		}
+
+		uint32_t ArrayCount(const CaptureJobResult& result) noexcept
+		{
+			uint32_t count = 0;
+			for (const auto& product : result.m_Products)
+			{
+				for (const auto& file : product.m_Files)
+				{
+					count += file.extension() == ".npy";
+				}
+			}
+			return count;
+		}
+
+		ApplicationFrameCapture::CreateInfo MakeFrontEndInfo(FrameCaptureCoordinator& coordinator,
+			const std::filesystem::path& directory) noexcept
+		{
+			return {
+				.m_Coordinator = &coordinator,
+				.m_DefaultOutputDirectory = directory,
+				.m_TrySubmit = [&coordinator](CapturePlan&& plan) { return coordinator.TrySubmit(std::move(plan)); },
+				.m_Cancel = [&coordinator](uint64_t id) { return coordinator.CancelJob(id); },
+				.m_TakeResult = [&coordinator](uint64_t id) { return coordinator.TakeJobResult(id); },
+			};
+		}
+
+		void RunReferenceViewBatchTests(SelfTestContext& context, const std::filesystem::path& directory,
+			CaptureImageSource source) noexcept
 		{
 			FakeCaptureControl control;
-			control.m_HoldResults = true;
 			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
 				.m_DefaultOutputDirectory = directory,
-				.m_ImageEncoder = &win32::EncodeFrameCapturePng, .m_WriteOnCallingThread = true });
-			ApplicationFrameCapture frontEnd({ .m_Coordinator = &coordinator,
-				.m_DefaultOutputDirectory = directory,
-				.m_ConsumeResults = [&coordinator](std::vector<FrameCaptureRequestResult>& results)
-				{
-					coordinator.ConsumeResults(results);
-				} });
+				.m_ImageEncoder = &win32::EncodeFrameCapturePng, .m_WriteOnCallingThread = true,
+				.m_JobLimits = { .m_MaxActiveJobs = 1, .m_MaxReceipts = 1 } });
+			ApplicationFrameCapture frontEnd(MakeFrontEndInfo(coordinator, directory));
 			frontEnd.GetSettings().m_Source = source;
+			frontEnd.GetSettings().m_Label = "batch-snapshot";
 			auto state = MakeFrameState(1);
 			state.m_ReferenceViewIds.clear();
-			constexpr uint32_t ViewCount = 14;
+			constexpr uint32_t ViewCount = 20;
 			for (uint32_t index = 0; index < ViewCount; ++index)
 			{
 				state.m_ReferenceViewIds.push_back(std::format("CAM_Batch{}", index));
 			}
 			coordinator.BeginFrame(state);
 			coordinator.OnFrameSubmitted();
-			context.Check(frontEnd.CaptureReferenceViews() == ViewCount &&
-				frontEnd.GetUnfinishedRequestCount() == ViewCount,
-				"Capture All Views submits fourteen views with the interactive screenshot settings");
-			std::vector<uint64_t> issuedFrames;
-			bool viewsInOrder = true;
-			const auto captureView = [&](uint32_t index)
+			CapturePlan foreignPlan{ .m_RequiredProducts = { GraphCaptureProduct{} } };
+			const auto foreign = coordinator.TrySubmit(std::move(foreignPlan));
+			(void)coordinator.CancelJob(foreign.m_JobId);
+			context.Check(frontEnd.CaptureReferenceViews() == ViewCount && frontEnd.GetPendingJobCount() == 0 &&
+				frontEnd.GetLastAdmission().m_Status == CaptureAdmissionStatus::Busy &&
+				frontEnd.GetLastAdmission().m_JobId == 0 && frontEnd.CaptureReferenceViews() == 0,
+				"One active batch waits on a foreign reserved receipt without accepting a job or a duplicate batch");
+			frontEnd.Update();
+			frontEnd.Update();
+			context.Check(frontEnd.GetHistory().empty() && coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1 &&
+				!coordinator.GetPendingViewChange(), "Busy retries neither consume foreign results nor change the camera");
+			(void)coordinator.TakeJobResult(foreign.m_JobId);
+			frontEnd.Update();
+			frontEnd.GetSettings().m_Label = "edited-after-batch";
+			frontEnd.GetSettings().m_Source = source == CaptureImageSource::Scene ?
+				CaptureImageSource::Composited : CaptureImageSource::Scene;
+			bool matching = true;
+			for (uint32_t index = 0; index < ViewCount; ++index)
 			{
+				const uint64_t jobId = frontEnd.GetReferenceViewBatch().m_JobId;
 				const auto change = coordinator.GetPendingViewChange();
+				matching = matching && change && change->m_ReferenceViewId == state.m_ReferenceViewIds[index] &&
+					frontEnd.GetPendingJobCount() == 1 && coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1;
 				if (!change)
 				{
-					viewsInOrder = false;
-					return;
+					break;
 				}
-				viewsInOrder = viewsInOrder && change->m_ReferenceViewId == state.m_ReferenceViewIds[index];
-				coordinator.OnReferenceViewApplied(change->m_RequestId, true);
+				coordinator.OnReferenceViewApplied(change->m_JobId, true);
 				++state.m_FrameSerial;
 				++state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
 				state.m_Camera.m_Position = { static_cast<float>(index), 0.0f, 0.0f };
-				issuedFrames.push_back(state.m_FrameSerial);
 				coordinator.BeginFrame(state);
 				coordinator.OnFrameSubmitted();
-			};
-			for (uint32_t index = 0; index < control.m_MaxPendingCaptures; ++index)
-			{
-				captureView(index);
+				coordinator.Update();
+				matching = matching && frontEnd.Update() == 1;
+				const auto* result = frontEnd.FindResult(jobId);
+				const auto* metadata = result ? ApplicationFrameCapture::GetMetadata(*result) : nullptr;
+				matching = matching && result && ApplicationFrameCapture::IsPublished(*result) && metadata &&
+					metadata->m_Label == "batch-snapshot" && metadata->m_FrameSerial == state.m_FrameSerial &&
+					metadata->m_Source == (source == CaptureImageSource::Scene ? FrameCaptureSource::Scene : FrameCaptureSource::Composited) &&
+					metadata->m_Camera.m_ReferenceViewId == state.m_ReferenceViewIds[index] &&
+					metadata->m_Camera.m_Position[0] == static_cast<float>(index) &&
+					std::filesystem::exists(result->m_ManifestPath) &&
+					std::filesystem::exists(ProductFile(*result, CaptureProductKind::Image, ".png"));
 			}
-			context.Check(viewsInOrder && control.m_Issued.size() == 8 &&
-				!coordinator.GetPendingViewChange() && frontEnd.GetUnfinishedRequestCount() == ViewCount,
-				"The batch reaches eight retained images and keeps the remaining views waiting without a camera cut");
-			for (uint32_t index = 0; index < 2; ++index)
+			context.Check(matching && frontEnd.GetPendingJobCount() == 0 &&
+				frontEnd.GetReferenceViewBatch().m_State == ApplicationFrameCapture::ReferenceViewBatchState::Completed &&
+				frontEnd.GetReferenceViewBatch().m_CompletedViews == ViewCount &&
+				frontEnd.GetHistory().size() == ApplicationFrameCapture::MaxHistoryEntries &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0,
+				"Twenty views publish in order under one receipt credit with frozen settings and bounded display history");
+
+			control.m_HoldResults = true;
+			frontEnd.CaptureReferenceViews();
+			const auto change = coordinator.GetPendingViewChange();
+			if (change)
 			{
+				coordinator.OnReferenceViewApplied(change->m_JobId, true);
 				++state.m_FrameSerial;
 				coordinator.BeginFrame(state);
 				coordinator.OnFrameSubmitted();
-				coordinator.Update();
 			}
-			context.Check(frontEnd.Update().empty() && control.m_Issued.size() == 8 &&
-				!coordinator.GetPendingViewChange() && frontEnd.GetUnfinishedRequestCount() == ViewCount,
-				"Repeated Busy frames produce no failed batch results or excess Runtime requests");
-
+			context.Check(change && frontEnd.CancelReferenceViews() == CaptureCancelResult::Cancelled &&
+				frontEnd.CaptureReferenceViews() == 0, "Batch cancellation covers issued work and retains receipt ownership until consumption");
+			frontEnd.Update(false);
 			control.m_HoldResults = false;
 			coordinator.Update();
-			std::vector<FrameCaptureRequestResult> completed = frontEnd.Update();
-			for (uint32_t index = 8; index < ViewCount; ++index)
-			{
-				captureView(index);
-				coordinator.Update();
-				const auto results = frontEnd.Update();
-				completed.insert(completed.end(), results.begin(), results.end());
-			}
-			context.Check(viewsInOrder && completed.size() == ViewCount && issuedFrames.size() == ViewCount &&
-				frontEnd.GetUnfinishedRequestCount() == 0 && control.m_Issued.empty(),
-				"All fourteen Scene or Composited views finish after capacity drains");
-			bool matchingFiles = completed.size() == ViewCount && issuedFrames.size() == ViewCount;
-			for (size_t index = 0; matchingFiles && index < completed.size(); ++index)
-			{
-				const auto& result = completed[index];
-				matchingFiles = result.m_Status == FrameCaptureRequestStatus::Completed && result.m_Metadata &&
-					result.m_RequestId == index + 1 && result.m_Metadata->m_Source == source &&
-					result.m_Metadata->m_FrameSerial == issuedFrames[index] &&
-					result.m_Metadata->m_Camera.m_ReferenceViewId == state.m_ReferenceViewIds[index] &&
-					result.m_Metadata->m_Camera.m_Position[0] == static_cast<float>(index) &&
-					std::filesystem::exists(result.m_ImagePath) && std::filesystem::exists(result.m_MetadataPath);
-				if (matchingFiles)
-				{
-					const auto json = ReadJson(result.m_MetadataPath);
-					matchingFiles = !json.is_discarded() && json["frame"]["serial"] == issuedFrames[index] &&
-						json["camera"]["referenceView"] == state.m_ReferenceViewIds[index];
-				}
-			}
-			context.Check(matchingFiles,
-				"Each batch view publishes one PNG and sidecar with its own admitted frame and camera");
+			frontEnd.Update(false);
+			context.Check(frontEnd.GetPendingJobCount() == 0 &&
+				frontEnd.GetReferenceViewBatch().m_State == ApplicationFrameCapture::ReferenceViewBatchState::Cancelled &&
+				!coordinator.GetPendingViewChange() && coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0,
+				"Cancelled batch stops admitting views while its Runtime owner drains independently");
 			coordinator.FinalizeAfterRenderHost();
 		}
+
+		void RunAdmissionTests(SelfTestContext& context, const std::filesystem::path& directory) noexcept
+		{
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory,
+				.m_ImageEncoder = &win32::EncodeFrameCapturePng, .m_WriteOnCallingThread = true,
+				.m_JobLimits = { .m_MaxActiveJobs = 1, .m_MaxReceipts = 1 } });
+			ApplicationFrameCapture frontEnd(MakeFrontEndInfo(coordinator, directory));
+			const auto invalid = frontEnd.ExportResources({});
+			context.Check(invalid.m_Status == CaptureAdmissionStatus::Rejected && invalid.m_JobId == 0 &&
+				frontEnd.GetPendingJobCount() == 0 && frontEnd.GetHistory().empty(),
+				"Rejected panel input creates neither a pending identity nor fabricated history");
+			CapturePlan foreignPlan{ .m_RequiredProducts = {
+				ImageCaptureProduct{}, ImageCaptureProduct{ CaptureImageSource::Composited } } };
+			const auto foreign = coordinator.TrySubmit(std::move(foreignPlan));
+			const auto busy = frontEnd.ExportGraph();
+			context.Check(busy.m_Status == CaptureAdmissionStatus::Busy && busy.m_JobId == 0 &&
+				frontEnd.GetPendingJobCount() == 0, "Manual Busy returns admission instead of queueing a retry");
+			(void)coordinator.CancelJob(foreign.m_JobId);
+			frontEnd.Update();
+			context.Check(coordinator.GetIntakeSnapshot().m_TerminalReceipts == 1 && frontEnd.GetHistory().empty() &&
+				frontEnd.Cancel(foreign.m_JobId) == CaptureCancelResult::NotFound,
+				"Interactive ownership cannot cancel or consume a foreign job");
+			(void)coordinator.TakeJobResult(foreign.m_JobId);
+			const auto accepted = frontEnd.ExportResources({ { .m_Resource = "Test.Buffer" } }, true);
+			coordinator.BeginFrame(MakeFrameState(1));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			frontEnd.Update();
+			const auto* result = frontEnd.FindResult(accepted.m_JobId);
+			const auto* metadata = result ? ApplicationFrameCapture::GetMetadata(*result) : nullptr;
+			context.Check(result && ApplicationFrameCapture::IsPublished(*result) && result->m_Products.size() == 2 &&
+				metadata && metadata->m_RequestId != result->m_JobId &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0 && !coordinator.TakeJobResult(accepted.m_JobId),
+				"A resource/graph job consumes once by job identity even when artifact request identity differs");
+
+			control.m_HoldResults = true;
+			const auto issued = frontEnd.Capture();
+			coordinator.BeginFrame(MakeFrameState(2));
+			coordinator.OnFrameSubmitted();
+			context.Check(frontEnd.Cancel(issued.m_JobId) == CaptureCancelResult::Cancelled && frontEnd.Update() == 1 &&
+				frontEnd.FindResult(issued.m_JobId)->m_Status == CaptureJobStatus::Cancelled &&
+				coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 1 &&
+				coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0,
+				"Issued interactive cancellation consumes its terminal receipt while GPU ownership drains separately");
+			control.m_HoldResults = false;
+			coordinator.Update();
+			context.Check(frontEnd.Update() == 0 && coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0 &&
+				coordinator.GetIntakeSnapshot().m_TerminalReceipts == 0,
+				"Draining issued work creates no duplicate terminal result or legacy output record");
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunCaptureOnReadyTests(SelfTestContext& context) noexcept
+		{
+			const auto now = std::chrono::steady_clock::now();
+			uint32_t submissions = 0;
+			uint32_t consumptions = 0;
+			bool ready = false;
+			bool validPlan = true;
+			CaptureOnReady capture({
+				.m_Plan = { .m_RequiredProducts = { ImageCaptureProduct{} }, .m_Label = "startup" },
+				.m_Timeout = std::chrono::seconds(1),
+				.m_TrySubmit = [&](CapturePlan&& plan)
+				{
+					validPlan = validPlan && plan.m_Label == "startup" && plan.m_RequiredProducts.size() == 1;
+					++submissions;
+					if (submissions < 3)
+					{
+						return CaptureAdmission{ CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ReceiptLimit };
+					}
+					plan = {};
+					return CaptureAdmission{ CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, 41 };
+				},
+				.m_Cancel = [](uint64_t) { return CaptureCancelResult::TooLate; },
+				.m_TakeResult = [&](uint64_t id) -> std::optional<CaptureJobResult>
+				{
+					if (!ready || id != 41)
+					{
+						return std::nullopt;
+					}
+					++consumptions;
+					return CaptureJobResult{ .m_JobId = id, .m_Publication = CaptureJobPublication::Published };
+				},
+			});
+			capture.TryAdmit();
+			context.Check(capture.GetJobId() == 0 && capture.Poll(now) == CaptureOnReady::State::Pending,
+				"Startup Busy has no identity and remains pending under the original wall-clock deadline");
+			capture.TryAdmit();
+			capture.TryAdmit();
+			capture.TryAdmit();
+			context.Check(validPlan && submissions == 3 && capture.GetJobId() == 41 &&
+				capture.Poll(now + std::chrono::seconds(1)) == CaptureOnReady::State::TimedOut &&
+				capture.GetCancellation() == CaptureCancelResult::TooLate,
+				"Startup retries the unchanged plan, admits once and reports TooLate separately from timeout");
+			ready = true;
+			capture.CollectResult();
+			capture.CollectResult();
+			capture.TryAdmit();
+			context.Check(consumptions == 1 && submissions == 3 && capture.GetResult() &&
+				capture.GetResult()->m_Publication == CaptureJobPublication::Published &&
+				capture.Poll(now) == CaptureOnReady::State::TimedOut,
+				"Shutdown consumes a late publication once without turning a timeout into success");
+
+			uint32_t cancellations = 0;
+			for (const auto admission : { CaptureAdmissionStatus::Busy, CaptureAdmissionStatus::Rejected })
+			{
+				CaptureOnReady noJob({
+					.m_Timeout = std::chrono::seconds(1),
+					.m_TrySubmit = [admission](CapturePlan&&)
+					{
+						return CaptureAdmission{ admission, CaptureAdmissionReason::ServicesUnavailable };
+					},
+					.m_Cancel = [&](uint64_t) { ++cancellations; return CaptureCancelResult::NotFound; },
+				});
+				noJob.TryAdmit();
+				(void)noJob.Poll(now);
+				context.Check(noJob.GetJobId() == 0 &&
+					noJob.Poll(now + std::chrono::seconds(1)) == (admission == CaptureAdmissionStatus::Busy ?
+						CaptureOnReady::State::TimedOut : CaptureOnReady::State::Rejected) && cancellations == 0,
+					"Startup admission failure never queries or cancels an invented job");
+			}
+			for (const auto publication : { CaptureJobPublication::Published, CaptureJobPublication::NotPublished,
+				CaptureJobPublication::PartiallyPublished, CaptureJobPublication::Indeterminate })
+			{
+				CaptureOnReady completed({
+					.m_TrySubmit = [](CapturePlan&&)
+					{
+						return CaptureAdmission{ CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, 99 };
+					},
+					.m_TakeResult = [publication](uint64_t id) -> std::optional<CaptureJobResult>
+					{
+						return CaptureJobResult{ .m_JobId = id, .m_Publication = publication };
+					},
+				});
+				completed.TryAdmit();
+				context.Check(completed.Poll(now) == (publication == CaptureJobPublication::Published ?
+					CaptureOnReady::State::Completed : CaptureOnReady::State::Failed),
+					"Startup success requires Completed and Published independently of file presence");
+			}
+		}
+
 	}
 
 	void RunApplicationFrameCaptureSelfTests(SelfTestContext& context) noexcept
@@ -319,10 +507,9 @@ namespace gglab
 			ApplicationFrameCapture frontEnd({
 				.m_Coordinator = &coordinator,
 				.m_DefaultOutputDirectory = directory,
-				.m_ConsumeResults = [&coordinator](std::vector<FrameCaptureRequestResult>& results)
-				{
-					coordinator.ConsumeResults(results);
-				},
+				.m_TrySubmit = [&coordinator](CapturePlan&& plan) { return coordinator.TrySubmit(std::move(plan)); },
+				.m_Cancel = [&coordinator](uint64_t id) { return coordinator.CancelJob(id); },
+				.m_TakeResult = [&coordinator](uint64_t id) { return coordinator.TakeJobResult(id); },
 				.m_OpenDirectory = [&](const std::filesystem::path& path, std::string& failure)
 				{
 					++openCount;
@@ -339,19 +526,22 @@ namespace gglab
 			coordinator.BeginFrame(MakeFrameState(16));
 			coordinator.OnFrameSubmitted();
 			auto& settings = frontEnd.GetSettings();
-			settings.m_Source = FrameCaptureSource::Composited;
+			settings.m_Source = CaptureImageSource::Composited;
 			settings.m_SettleFrames = 7;
 			settings.m_Label = "interactive";
 			settings.m_Note = "shared settings";
 			settings.m_ReferenceViewId = "CAM_Test";
-			const uint64_t fullId = frontEnd.ExportGraph();
+			const uint64_t fullId = frontEnd.ExportGraph().m_JobId;
 			const auto view = coordinator.GetPendingViewChange();
-			context.Check(view && view->m_RequestId == fullId && view->m_ReferenceViewId == "CAM_Test",
+			context.Check(view && view->m_ReferenceViewId == "CAM_Test",
 				"The graph button uses the existing queued reference-view path");
-			coordinator.OnReferenceViewApplied(fullId, true);
+			if (view)
+			{
+				coordinator.OnReferenceViewApplied(view->m_JobId, true);
+			}
 			settings.m_ReferenceViewId.clear();
-			const uint64_t summaryId = frontEnd.ExportGraph(true);
-			const uint64_t imageId = frontEnd.Capture();
+			const uint64_t summaryId = frontEnd.ExportGraph(true).m_JobId;
+			const uint64_t imageId = frontEnd.Capture().m_JobId;
 			std::string failure;
 			context.Check(!frontEnd.OpenOutputFolder(fullId, failure) && !failure.empty() && openCount == 0,
 				"An unfinished export cannot launch the Shell");
@@ -360,7 +550,7 @@ namespace gglab
 				control.m_Issued[0].m_Source == FrameCaptureSource::RenderGraph &&
 				control.m_Issued[1].m_Source == FrameCaptureSource::RenderGraph &&
 				control.m_Issued[2].m_Source == FrameCaptureSource::Composited &&
-				settings.m_Source == FrameCaptureSource::Composited,
+				settings.m_Source == CaptureImageSource::Composited,
 				"Both graph buttons leave Capture/F9's selected screenshot source unchanged");
 			coordinator.OnFrameSubmitted();
 			coordinator.Update();
@@ -368,30 +558,33 @@ namespace gglab
 			const auto* full = frontEnd.FindResult(fullId);
 			const auto* summary = frontEnd.FindResult(summaryId);
 			const auto* image = frontEnd.FindResult(imageId);
-			context.Check(results.size() == 3 && full && summary && image &&
-				full->m_Status == FrameCaptureRequestStatus::Completed &&
-				summary->m_Status == FrameCaptureRequestStatus::Completed &&
-				image->m_Status == FrameCaptureRequestStatus::Completed,
+			context.Check(results == 3 && full && summary && image &&
+				full->m_Status == CaptureJobStatus::Completed &&
+				summary->m_Status == CaptureJobStatus::Completed &&
+				image->m_Status == CaptureJobStatus::Completed,
 				"Interactive full, summary and screenshot requests publish through the existing writer");
-			if (full && summary && image && full->m_Status == FrameCaptureRequestStatus::Completed &&
-				summary->m_Status == FrameCaptureRequestStatus::Completed &&
-				image->m_Status == FrameCaptureRequestStatus::Completed)
+			if (full && summary && image && full->m_Status == CaptureJobStatus::Completed &&
+				summary->m_Status == CaptureJobStatus::Completed &&
+				image->m_Status == CaptureJobStatus::Completed)
 			{
-				const auto fullJson = ReadJson(full->m_MetadataPath);
-				const auto summaryJson = ReadJson(summary->m_MetadataPath);
+				const auto& fullPath = ProductFile(*full, CaptureProductKind::Graph, ".json");
+				const auto* fullMetadata = ApplicationFrameCapture::GetMetadata(*full);
+				const auto fullJson = ReadJson(fullPath);
+				const auto summaryJson = ReadJson(ProductFile(*summary, CaptureProductKind::Graph, ".json"));
 				context.Check(!fullJson.is_discarded() && !summaryJson.is_discarded() &&
 					fullJson["mode"] == "full" && fullJson.contains("execution") &&
 					summaryJson["mode"] == "summary" && !summaryJson.contains("execution") &&
-					full->m_Metadata->m_Label == "interactive" && full->m_Metadata->m_Note == "shared settings" &&
-					full->m_Metadata->m_SettleFrames == 0 && full->m_Metadata->m_FrameSerial == 17 &&
-					full->m_Metadata->m_Camera.m_ReferenceViewId == "CAM_Test",
+					fullMetadata->m_Label == "interactive" &&
+					fullMetadata->m_Note == "shared settings" &&
+					fullMetadata->m_SettleFrames == 0 && fullMetadata->m_FrameSerial == 17 &&
+					fullMetadata->m_Camera.m_ReferenceViewId == "CAM_Test",
 					"The interactive path preserves graph mode, shared output settings and next-frame metadata");
-				context.Check(ApplicationFrameCapture::GetOutputPath(*full) == full->m_MetadataPath &&
-					ApplicationFrameCapture::GetOutputPath(*image) == image->m_ImagePath &&
-					std::filesystem::path(full->m_MetadataPath.u8string()) == full->m_MetadataPath &&
-					ApplicationFrameCapture::GetPathText(full->m_MetadataPath).find("\xE4\xB8\xAD\xE6\x96\x87") != std::string::npos,
-					"Graph notifications select JSON, screenshots select PNG, and path text preserves Unicode");
-				context.Check(frontEnd.Update().empty() && openCount == 0 &&
+				context.Check(ApplicationFrameCapture::GetOutputPath(*full) == full->m_ManifestPath &&
+					ApplicationFrameCapture::GetOutputPath(*image) == ProductFile(*image, CaptureProductKind::Image, ".png") &&
+					std::filesystem::path(fullPath.u8string()) == fullPath &&
+					ApplicationFrameCapture::GetPathText(fullPath).find("\xE4\xB8\xAD\xE6\x96\x87") != std::string::npos,
+					"Graph notifications select the manifest, screenshots select PNG, and path text preserves Unicode");
+				context.Check(frontEnd.Update() == 0 && openCount == 0 &&
 					frontEnd.CanOpenOutputFolder(*full) && frontEnd.CanOpenOutputFolder(*image),
 					"Completion is consumed once and never automatically opens a folder");
 				// Draw the actual panel without a native window to check its first-use layout.
@@ -431,20 +624,23 @@ namespace gglab
 					"Graph folder opening uses the published path rather than the edited output setting");
 				rejectOpen = true;
 				context.Check(!frontEnd.OpenOutputFolder(imageId, failure) && failure == "Injected Shell rejection." &&
-					openedDirectory == directory && image->m_Status == FrameCaptureRequestStatus::Completed,
+					openedDirectory == directory && image->m_Status == CaptureJobStatus::Completed,
 					"Shell failure is reported separately and leaves the successful screenshot unchanged");
 				rejectOpen = false;
 				context.Check(frontEnd.OpenOutputFolder(imageId, failure) && failure.empty(),
 					"A later successful folder action clears the previous error");
 
-				ApplicationFrameCapture unavailable({ .m_Coordinator = &coordinator,
-					.m_ConsumeResults = [result = *full, pending = true](std::vector<FrameCaptureRequestResult>& output) mutable
+				auto unavailableInfo = MakeFrontEndInfo(coordinator, directory);
+				unavailableInfo.m_TrySubmit = [fullId](CapturePlan&&)
 					{
-						if (std::exchange(pending, false))
-						{
-							output.push_back(result);
-						}
-					} });
+						return CaptureAdmission{ CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, fullId };
+					};
+				unavailableInfo.m_TakeResult = [result = *full, pending = true](uint64_t) mutable -> std::optional<CaptureJobResult>
+					{
+						return std::exchange(pending, false) ? std::optional(result) : std::nullopt;
+					};
+				ApplicationFrameCapture unavailable(std::move(unavailableInfo));
+				unavailable.ExportGraph();
 				unavailable.Update();
 				context.Check(!unavailable.CanOpenOutputFolder(*full) &&
 					!unavailable.OpenOutputFolder(fullId, failure) && !failure.empty(),
@@ -454,7 +650,7 @@ namespace gglab
 			settings.m_OutputDirectory.clear();
 			settings.m_Timing = FrameCaptureTiming::AfterReady;
 			settings.m_SettleFrames = 2;
-			const uint64_t settledId = frontEnd.ExportGraph(true);
+			const uint64_t settledId = frontEnd.ExportGraph(true).m_JobId;
 			for (uint64_t serial = 18; serial < 20; ++serial)
 			{
 				coordinator.BeginFrame(MakeFrameState(serial, 2));
@@ -466,9 +662,9 @@ namespace gglab
 			coordinator.Update();
 			frontEnd.Update();
 			const auto* settled = frontEnd.FindResult(settledId);
-			context.Check(settled && settled->m_Status == FrameCaptureRequestStatus::Completed &&
-				settled->m_Metadata->m_Timing == FrameCaptureTiming::AfterReady &&
-				settled->m_Metadata->m_SettleFrames == 2 && settled->m_Metadata->m_FrameSerial == 20,
+			context.Check(settled && settled->m_Status == CaptureJobStatus::Completed &&
+				ApplicationFrameCapture::GetMetadata(*settled)->m_Timing == FrameCaptureTiming::AfterReady &&
+				ApplicationFrameCapture::GetMetadata(*settled)->m_SettleFrames == 2 && ApplicationFrameCapture::GetMetadata(*settled)->m_FrameSerial == 20,
 				"Graph buttons honor the selected after-ready timing rather than forcing next-frame");
 
 			settings.m_Timing = FrameCaptureTiming::NextFrame;
@@ -480,13 +676,16 @@ namespace gglab
 					.m_SliceCount = 3, .m_Aspect = RHITextureAspect::Depth },
 				{ .m_Resource = "Test.Buffer" },
 			};
-			const uint64_t resourceId = frontEnd.ExportResources(targets, true);
+			const uint64_t resourceId = frontEnd.ExportResources(targets, true).m_JobId;
 			targets.front().m_Resource = "Edited.After.Submission";
 			const auto resourceView = coordinator.GetPendingViewChange();
-			context.Check(resourceView && resourceView->m_RequestId == resourceId &&
-				resourceView->m_ReferenceViewId == "CAM_Test" && settings.m_Source == FrameCaptureSource::Composited,
+			context.Check(resourceView &&
+				resourceView->m_ReferenceViewId == "CAM_Test" && settings.m_Source == CaptureImageSource::Composited,
 				"Interactive resource exports share the queued camera path without changing the screenshot source");
-			coordinator.OnReferenceViewApplied(resourceId, true);
+			if (resourceView)
+			{
+				coordinator.OnReferenceViewApplied(resourceView->m_JobId, true);
+			}
 			coordinator.BeginFrame(MakeFrameState(21, 2));
 			context.Check(control.m_Exports.size() == 1 && control.m_Exports[0].m_IncludeGraph &&
 				control.m_Exports[0].m_Targets.size() == 2 && control.m_Exports[0].m_Targets[0].m_Resource == "Test.Depth" &&
@@ -499,20 +698,20 @@ namespace gglab
 			coordinator.Update();
 			frontEnd.Update();
 			const auto* resources = frontEnd.FindResult(resourceId);
-			context.Check(resources && resources->m_Status == FrameCaptureRequestStatus::Completed &&
-				resources->m_ResourcePaths.size() == 2 && !resources->m_GraphPath.empty() && resources->m_ImagePath.empty() &&
-				ApplicationFrameCapture::GetOutputPath(*resources) == resources->m_MetadataPath,
+			context.Check(resources && resources->m_Status == CaptureJobStatus::Completed &&
+				ArrayCount(*resources) == 2 && !ProductFile(*resources, CaptureProductKind::Graph, ".json").empty() && ProductFile(*resources, CaptureProductKind::Image, ".png").empty() &&
+				ApplicationFrameCapture::GetOutputPath(*resources) == resources->m_ManifestPath,
 				"Manual resource groups publish arrays, sidecar and paired graph through the existing writer");
-			if (resources && resources->m_Status == FrameCaptureRequestStatus::Completed)
+			if (resources && resources->m_Status == CaptureJobStatus::Completed)
 			{
-				const auto json = ReadJson(resources->m_MetadataPath);
-				const auto graph = ReadJson(resources->m_GraphPath);
+				const auto json = ReadJson(ProductFile(*resources, CaptureProductKind::Resource, ".json"));
+				const auto graph = ReadJson(ProductFile(*resources, CaptureProductKind::Graph, ".json"));
 				context.Check(!json.is_discarded() && !graph.is_discarded() &&
 					json["frameSerial"] == 21 && graph["frameSerial"] == 21 && json["targets"].size() == 2 &&
 					json["observation"]["graph"] == true && json["observation"]["resourceExport"] == true &&
-					resources->m_Metadata->m_Label == "interactive" && resources->m_Metadata->m_Note == "shared settings" &&
-					resources->m_Metadata->m_Camera.m_ReferenceViewId == "CAM_Test" &&
-					std::filesystem::exists(resources->m_ResourcePaths.front()),
+					ApplicationFrameCapture::GetMetadata(*resources)->m_Label == "interactive" && ApplicationFrameCapture::GetMetadata(*resources)->m_Note == "shared settings" &&
+					ApplicationFrameCapture::GetMetadata(*resources)->m_Camera.m_ReferenceViewId == "CAM_Test" &&
+					std::filesystem::exists(ProductFile(*resources, CaptureProductKind::Resource, ".npy")),
 					"Manual export results retain the actual captured frame, shared settings and paired graph identity");
 				settings.m_OutputDirectory = directory / "later setting";
 				context.Check(frontEnd.OpenOutputFolder(resourceId, failure) && failure.empty() &&
@@ -522,7 +721,7 @@ namespace gglab
 			settings.m_ReferenceViewId.clear();
 			settings.m_Timing = FrameCaptureTiming::AfterReady;
 			settings.m_SettleFrames = 2;
-			const uint64_t readyResourceId = frontEnd.ExportResources({ { .m_Resource = "Test.Buffer" } });
+			const uint64_t readyResourceId = frontEnd.ExportResources({ { .m_Resource = "Test.Buffer" } }).m_JobId;
 			for (uint64_t serial = 22; serial < 24; ++serial)
 			{
 				coordinator.BeginFrame(MakeFrameState(serial, 3));
@@ -534,21 +733,22 @@ namespace gglab
 			coordinator.Update();
 			frontEnd.Update();
 			const auto* readyResources = frontEnd.FindResult(readyResourceId);
-			context.Check(readyResources && readyResources->m_Status == FrameCaptureRequestStatus::Completed &&
-				readyResources->m_Metadata->m_FrameSerial == 24 && readyResources->m_Metadata->m_SettleFrames == 2 &&
-				readyResources->m_GraphPath.empty(),
+			const auto* readyMetadata = readyResources ? ApplicationFrameCapture::GetMetadata(*readyResources) : nullptr;
+			context.Check(readyResources && readyResources->m_Status == CaptureJobStatus::Completed &&
+				readyMetadata && readyMetadata->m_FrameSerial == 24 && readyMetadata->m_SettleFrames == 2 &&
+				ProductFile(*readyResources, CaptureProductKind::Graph, ".json").empty(),
 				"Manual resource export honors after-ready timing and can omit the paired graph");
 			settings.m_Timing = FrameCaptureTiming::NextFrame;
 			control.m_FailResourceExport = true;
-			const uint64_t failedResourceId = frontEnd.ExportResources({ { .m_Resource = "Missing" } });
+			const uint64_t failedResourceId = frontEnd.ExportResources({ { .m_Resource = "Missing" } }).m_JobId;
 			coordinator.BeginFrame(MakeFrameState(25, 3));
 			coordinator.OnFrameSubmitted();
 			coordinator.Update();
 			frontEnd.Update();
 			const auto* failedResources = frontEnd.FindResult(failedResourceId);
-			context.Check(failedResources && failedResources->m_Status == FrameCaptureRequestStatus::Failed &&
-				failedResources->m_ResourceFailure == RGObservationFailure::UnknownResource &&
-				!failedResources->m_Failure.empty() && failedResources->m_ResourcePaths.empty() &&
+			context.Check(failedResources && failedResources->m_Status == CaptureJobStatus::Failed &&
+				failedResources->m_Products.front().m_ResourceFailure == RGObservationFailure::UnknownResource &&
+				!failedResources->m_Products.front().m_Failure.empty() && ArrayCount(*failedResources) == 0 &&
 				!frontEnd.CanOpenOutputFolder(*failedResources),
 				"An address missing in the actual frame retains its typed failure in manual export history");
 
@@ -620,10 +820,10 @@ namespace gglab
 					context.Check(selected, "A plus-added target exposes its own pass and declaration occurrence controls");
 					ImGui::ActivateItemByID(plusId);
 					draw();
-					const uint32_t pendingBefore = frontEnd.GetUnfinishedRequestCount();
+					const uint32_t pendingBefore = frontEnd.GetPendingJobCount();
 					ImGui::ActivateItemByID(ImHashStr("Export Resources", 0, resourceTabId));
 					draw();
-					context.Check(frontEnd.GetUnfinishedRequestCount() == pendingBefore + 1,
+					context.Check(frontEnd.GetPendingJobCount() == pendingBefore + 1,
 						"The actual Export Resources button submits the added target through the front end");
 					coordinator.BeginFrame(MakeFrameState(26, 3));
 					context.Check(control.m_Exports.size() == 1 && control.m_Exports[0].m_Targets.size() == 2 &&
@@ -637,7 +837,7 @@ namespace gglab
 					coordinator.Update();
 					frontEnd.Update();
 					draw();
-					context.Check(frontEnd.GetHistory().back().m_Result.m_Status == FrameCaptureRequestStatus::Completed,
+					context.Check(frontEnd.GetHistory().back().m_Result.m_Status == CaptureJobStatus::Completed,
 						"The real resource tab draws completed array history without opening the Shell");
 					diagnostics.AddResources(40);
 					draw();
@@ -678,7 +878,7 @@ namespace gglab
 			const uint32_t countBeforeCancellation = openCount;
 			for (size_t index = 0; index < ApplicationFrameCapture::MaxHistoryEntries; ++index)
 			{
-				const uint64_t id = frontEnd.ExportGraph();
+				const uint64_t id = frontEnd.ExportGraph().m_JobId;
 				frontEnd.Cancel(id);
 				frontEnd.Update();
 			}
@@ -690,8 +890,11 @@ namespace gglab
 			coordinator.FinalizeAfterRenderHost();
 		}
 
-		RunReferenceViewBatchTests(context, directory / "batch-scene", FrameCaptureSource::Scene);
-		RunReferenceViewBatchTests(context, directory / "batch-composited", FrameCaptureSource::Composited);
+		RunReferenceViewBatchTests(context, directory / "batch-scene", CaptureImageSource::Scene);
+		RunReferenceViewBatchTests(context, directory / "batch-composited", CaptureImageSource::Composited);
+
+		RunCaptureOnReadyTests(context);
+		RunAdmissionTests(context, directory / "admission");
 
 		// Invalid inputs are rejected before Shell/COM use, so headless tests do
 		// not create Explorer windows. Successful desktop launch is a manual gate.

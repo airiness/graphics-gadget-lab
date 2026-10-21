@@ -503,7 +503,7 @@ namespace gglab
 		if (const std::optional<FrameCaptureViewChange> viewChange =
 			m_FrameCapture->GetPendingViewChange())
 		{
-			m_FrameCapture->OnReferenceViewApplied(viewChange->m_RequestId,
+			m_FrameCapture->OnReferenceViewApplied(viewChange->m_JobId,
 				cameraRig.RestoreReferenceView(viewChange->m_ReferenceViewId));
 		}
 		// A running sequence poses the main camera after content updates and capture
@@ -628,7 +628,11 @@ namespace gglab
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
-		m_FrameSequence->BeginFrame(captureFrameState);
+		if (!m_FrameSequence->BeginFrame(captureFrameState))
+		{
+			toolingFrame.Complete();
+			return AppRuntimeTickResult::Continue;
+		}
 		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		RenderFrameBuildResult frame;
 		{

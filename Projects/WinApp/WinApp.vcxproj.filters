@@ -138,11 +138,17 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp">
       <Filter>Application\Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.cpp">
+      <Filter>Application\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.cpp">
       <Filter>Application\Content</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\RuntimeAssetBundle.cpp">
       <Filter>Application\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.cpp">
+      <Filter>Application\Control</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp">
       <Filter>Application\Control</Filter>
@@ -497,11 +503,17 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h">
       <Filter>Application\Capture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.h">
+      <Filter>Application\Capture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.h">
       <Filter>Application\Content</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Content\RuntimeAssetBundle.h">
       <Filter>Application\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.h">
+      <Filter>Application\Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h">
       <Filter>Application\Control</Filter>

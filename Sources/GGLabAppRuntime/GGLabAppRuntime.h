@@ -3,6 +3,8 @@
 #include "ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
+#include "Capture/CaptureJobTypes.h"
+#include "Capture/CapturePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "RuntimePaths.h"
@@ -83,6 +85,8 @@ namespace gglab
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
+		// Internal count policy, not a session protocol or total-memory limit.
+		CaptureJobLimits m_CaptureJobLimits{};
 	};
 
 	class ApplicationInput;
@@ -104,7 +108,6 @@ namespace gglab
 	class TaskSystem;
 	class Time;
 	struct LoadingProgress;
-	struct FrameCaptureRequestResult;
 
 	struct AppRuntimeServiceCreateInfo
 	{
@@ -210,17 +213,27 @@ namespace gglab
 		{
 			return m_DebugDrawService.get();
 		}
-		// Non-owning; null before runtime services are composed. It outlives
-		// Shutdown so hosts can inspect the final capture state. AppRuntime owns
-		// its result stream; hosts drain ConsumeFrameCaptureResults instead.
+		// Non-owning; null before runtime services are composed. They outlive
+		// Shutdown so hosts can inspect final capture state. Hosts submit and consume
+		// jobs through AppRuntime; standalone coordinator consumption is disabled.
 		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatchCoordinator() const noexcept { return m_NonFiniteWatch.get(); }
 		[[nodiscard]] FrameCaptureCoordinator* GetFrameCaptureCoordinator() const noexcept
 		{
 			return m_FrameCapture.get();
 		}
-		// Appends published results in completion order, once per result. Tick and
-		// Shutdown notify the sequence before publication, independently of host polling.
-		void ConsumeFrameCaptureResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
+		// Owner-thread unified job API. Rejected/Busy admission leaves the plan intact.
+		// Tick and Shutdown publish terminal receipts at the result-routing boundary;
+		// publication retains the original reserved slot, with no second result queue.
+		[[nodiscard]] CaptureAdmission TrySubmitCaptureJob(CapturePlan&& plan) noexcept;
+		[[nodiscard]] CaptureCancelResult CancelCaptureJob(uint64_t jobId) noexcept;
+		[[nodiscard]] std::optional<CaptureJobSnapshot> GetCaptureJobSnapshot(uint64_t jobId) const noexcept;
+		[[nodiscard]] CaptureIntakeSnapshot GetCaptureIntakeSnapshot() const noexcept;
+		// Borrowed immutable receipt, valid until this job is consumed or AppRuntime
+		// is destroyed. Multiple observers may inspect it without returning credit.
+		[[nodiscard]] const CaptureJobResult* FindCaptureJobResult(uint64_t jobId) const noexcept;
+		// The host's sole consuming operation. Unknown, active or not-yet-published
+		// jobs return no result and release no capacity. Receipts survive Shutdown.
+		[[nodiscard]] std::optional<CaptureJobResult> TakeCaptureJobResult(uint64_t jobId) noexcept;
 		// Non-owning; null before runtime services are composed.
 		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
 		{
@@ -254,6 +267,7 @@ namespace gglab
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
+		CaptureJobLimits m_CaptureJobLimits{};
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
 		RenderServices m_RenderServices{};
@@ -271,7 +285,6 @@ namespace gglab
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		// Results already routed to the sequence, awaiting host publication.
-		std::vector<FrameCaptureRequestResult> m_FrameCaptureResults;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		// Profiling request in effect before a timed sequence enabled profiling.

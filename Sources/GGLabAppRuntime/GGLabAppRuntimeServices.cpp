@@ -46,22 +46,60 @@ namespace gglab
 		{
 			return;
 		}
-		const size_t firstResult = m_FrameCaptureResults.size();
-		m_FrameCapture->ConsumeResults(m_FrameCaptureResults);
 		if (m_FrameSequence)
 		{
 			m_FrameSequence->UpdateWatchCoverage();
-			m_FrameSequence->OnCaptureResults(
-				std::span<const FrameCaptureRequestResult>(m_FrameCaptureResults).subspan(firstResult));
+			m_FrameSequence->UpdateCaptureJobs([this](uint64_t jobId)
+			{
+				return m_FrameCapture->ConsumeJobReceipt(jobId);
+			});
 		}
+		// One owner establishes host visibility after internal result routing. The
+		// reserved receipt remains in the coordinator until explicit host consumption.
+		m_FrameCapture->PublishAppRuntimeJobResults();
 	}
 
-	void GGLabAppRuntime::ConsumeFrameCaptureResults(
-		std::vector<FrameCaptureRequestResult>& outResults) noexcept
+	CaptureAdmission GGLabAppRuntime::TrySubmitCaptureJob(CapturePlan&& plan) noexcept
 	{
-		outResults.insert(outResults.end(), std::make_move_iterator(m_FrameCaptureResults.begin()),
-			std::make_move_iterator(m_FrameCaptureResults.end()));
-		m_FrameCaptureResults.clear();
+		if (m_LifecycleState == AppRuntimeLifecycleState::ExitRequested ||
+			m_LifecycleState == AppRuntimeLifecycleState::Failed ||
+			m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown ||
+			m_LifecycleState == AppRuntimeLifecycleState::Stopped)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ShuttingDown };
+		}
+		if (!m_ServicesInitialized || !m_FrameCapture)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ServicesUnavailable };
+		}
+		return m_FrameCapture->TrySubmit(std::move(plan));
+	}
+
+	CaptureCancelResult GGLabAppRuntime::CancelCaptureJob(uint64_t jobId) noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->CancelJob(jobId) : CaptureCancelResult::NotFound;
+	}
+
+	std::optional<CaptureJobSnapshot> GGLabAppRuntime::GetCaptureJobSnapshot(uint64_t jobId) const noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->GetJobSnapshot(jobId) : std::nullopt;
+	}
+
+	CaptureIntakeSnapshot GGLabAppRuntime::GetCaptureIntakeSnapshot() const noexcept
+	{
+		return m_FrameCapture ?
+			m_FrameCapture->GetIntakeSnapshot() :
+			CaptureIntakeSnapshot{ .m_Limits = m_CaptureJobLimits };
+	}
+
+	const CaptureJobResult* GGLabAppRuntime::FindCaptureJobResult(uint64_t jobId) const noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->FindPublishedJobResult(jobId) : nullptr;
+	}
+
+	std::optional<CaptureJobResult> GGLabAppRuntime::TakeCaptureJobResult(uint64_t jobId) noexcept
+	{
+		return m_FrameCapture ? m_FrameCapture->TakePublishedJobResult(jobId) : std::nullopt;
 	}
 
 	DiagnosticsView* GGLabAppRuntime::GetDiagnosticsView() const noexcept
@@ -211,7 +249,9 @@ namespace gglab
 				.m_DefaultOutputDirectory = m_Paths.m_CaptureRoot,
 				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
 				.m_NonFiniteWatch = m_NonFiniteWatch.get(),
+				.m_JobLimits = m_CaptureJobLimits,
 			});
+		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
@@ -402,8 +442,8 @@ namespace gglab
 			m_FrameCapture->Update();
 			CollectFrameCaptureResults();
 		}
-		// Captures that are not due yet are cancelled; recorded captures keep being
-		// written and are awaited after the render host finalized.
+		// Sequence jobs cancel delivery as a whole; claimed writes keep their real
+		// publication outcome. Runtime and writer owners drain during shutdown.
 		if (m_FrameSequence)
 		{
 			m_FrameSequence->Cancel();

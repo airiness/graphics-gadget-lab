@@ -91,6 +91,16 @@ try {
                     $reported = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/Reported"; TimeoutSeconds = $TimeoutSeconds }
                     Write-VerificationJson "$directory/reported-capture.json" $reported
                     if ($reported.status -ne 'completed' -or -not $reported.watch.complete -or $reported.watch.boundary -ne 'Incomplete') { throw 'Report mode lost its incomplete claim' }
+                    $reportedSequence = Invoke-VerificationSession sequence $session @{ CameraPath = 'SEQ_TemporalAALab_MovingObject';
+                        CaptureFrames = '0'; Exports = '[{"frame":0,"targets":[{"resource":"TAA.ResolvedSceneColor"}],"graph":true}]';
+                        OutputDirectory = "$directory/ReportedSequence"; Label = 'reported'; TimeoutSeconds = $TimeoutSeconds }
+                    Write-VerificationJson "$directory/reported-sequence.json" $reportedSequence
+                    if ($reportedSequence.sequence.state -ne 'completed' -or $reportedSequence.sequence.completedCaptures -ne 2 -or
+                        $reportedSequence.sequence.acceptedCaptureJobs -ne 1 -or $reportedSequence.sequence.pendingCaptureJobs -ne 0 -or
+                        -not $reportedSequence.sequence.watch.complete -or $reportedSequence.sequence.watch.frames -ne 180 -or
+                        $reportedSequence.sequence.watch.boundary -ne 'Incomplete') { throw 'Report-mode sequence lost its required bundle or incomplete range claim' }
+                    $reportedBundles = @(Get-ChildItem -LiteralPath "$directory/ReportedSequence" -Filter '*.capture-bundle.json')
+                    if ($reportedBundles.Count -ne 1) { throw 'Report-mode sequence did not publish exactly one required-product bundle' }
                     $null = Invoke-VerificationSession watch $session @{ WatchOff = $true }
                     $recovered = Invoke-VerificationSession capture $session @{ OutputDirectory = "$directory/Recovered"; TimeoutSeconds = $TimeoutSeconds }
                     Write-VerificationJson "$directory/recovered-capture.json" $recovered

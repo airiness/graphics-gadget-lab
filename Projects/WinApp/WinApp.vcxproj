@@ -219,6 +219,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
@@ -248,6 +249,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Shell.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
@@ -344,6 +346,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h" />
@@ -373,6 +376,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32NamedPipeServer.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32FrameCaptureImageEncoder.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Shell.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextGraphics.h" />

@@ -177,7 +177,7 @@ namespace gglab
 				const bool captureValid = capture.IsValid() && capture.m_Options.m_CaptureOnReady;
 				context.Check(captureValid &&
 					capture.m_Options.m_CaptureOnReady->m_OutputDirectory == std::filesystem::path("C:/gglab-captures") &&
-					capture.m_Options.m_CaptureOnReady->m_Source == FrameCaptureSource::Composited &&
+					capture.m_Options.m_CaptureOnReady->m_Source == CaptureImageSource::Composited &&
 					capture.m_Options.m_CaptureOnReady->m_SettleFrames == 16 &&
 					capture.m_Options.m_CaptureOnReady->m_Label == "culling" &&
 					capture.m_Options.m_CaptureOnReady->m_ReferenceViewId == "CAM_Overview" &&
@@ -185,7 +185,7 @@ namespace gglab
 					"Capture-on-ready collects its output directory, source, settling, view and timeout");
 				const auto defaults = parse({ "--capture-on-ready", "C:/gglab-captures" });
 				context.Check(defaults.IsValid() && defaults.m_Options.m_CaptureOnReady &&
-					defaults.m_Options.m_CaptureOnReady->m_Source == FrameCaptureSource::Scene &&
+					defaults.m_Options.m_CaptureOnReady->m_Source == CaptureImageSource::Scene &&
 					defaults.m_Options.m_CaptureOnReady->m_SettleFrames == 8,
 					"Capture-on-ready defaults to a settled scene capture");
 				context.Check(!parse({ "--capture-on-ready", "relative/captures" }).IsValid() &&

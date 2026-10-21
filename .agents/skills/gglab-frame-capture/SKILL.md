@@ -14,7 +14,7 @@ on Windows with a supported GPU and the matching application build.
 | Need | Workflow / reference |
 | --- | --- |
 | One screenshot, or capture settings and image comparison | [Captures and comparison](references/captures.md) |
-| Several captures or settings from one process | Session example below |
+| Several captures or settings from one process | Session example below; [job admission and receipts](references/session-jobs.md) |
 | Every authored reference view | Session `batch`; discover views with `status` |
 | Temporal behavior, supersampled references or GPU timing | [Sequences](references/sequences.md) |
 | Pass order, barriers or exact texture/buffer values | [Graph and resource exports](references/graph-and-resources.md) |
@@ -23,7 +23,7 @@ on Windows with a supported GPU and the matching application build.
 
 Read only the reference needed for the current verification. Keep script options
 authoritative in [GGLabSession.ps1](../../../Scripts/Verification/GGLabSession.ps1), and use
-the script and executable from the same revision (control protocol v2).
+the script and executable from the same revision (control protocol v3).
 
 ## Prepare a run
 
@@ -43,7 +43,8 @@ the script and executable from the same revision (control protocol v2).
 ## Capture from a session
 
 This example captures the GTAO Lab on DX12; change the content and backend to
-match the task. The returned `image` and `metadata` paths are the evidence.
+match the task. The returned `manifest` and `products[].files` identify the evidence;
+see [session jobs](references/session-jobs.md) for explicit receipt consumption.
 
 ```powershell
 $session = 'Scripts/Verification/GGLabSession.ps1'
@@ -103,7 +104,8 @@ see [Non-finite diagnostics](references/nonfinite.md) for their evidence contrac
 - A session command's exit code 0 and `ok: true` describe the control request.
   Also require capture `status: completed`, sequence `state: completed`, and
   the requested watch claims. Failed/cancelled work can still exit 0.
-  With `-NoWait`, use `result -RequestId` for captures or `status` for sequences.
+  With `-NoWait`, use `result -JobId` for captures, then `-Consume` when finished;
+  use `status` for sequences. Waiting capture commands consume explicitly by default.
 - Open the PNG with the harness's image-viewing tool. Inspect its JSON sidecar
   for content, camera, source, frame, time, resolution, readiness and temporal
   settings. Inspect `Build/Sessions/<id>/output.log` for assertions, shader
