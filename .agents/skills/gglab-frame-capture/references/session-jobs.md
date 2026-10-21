@@ -134,7 +134,11 @@ keeps its eventual real outcome. Terminal sequences keep consuming pending
 receipts, while Runtime/writer resources drain independently. A new sequence
 cannot replace unresolved prior sequence job ownership.
 
-Interactive UI and startup one-shot callers still await migration and CAP-S5
-adapter retirement. Their intake is outside these job/receipt limits. Those
-record counts are not bounds on submitted-range watch evidence, timing series
-or all process bytes. Final adapter-free parity remains a separate gate.
+Interactive F9/panel exports use the same job admission and consume only their
+own receipts into a bounded newest-16 metadata/file history. Capture All Views
+snapshots business input and owns at most one accepted job at a time. Startup
+one-shot independently owns one plan/job/terminal receipt through exit and shutdown;
+it never depends on UI history. Neither frontend consumes session or sequence
+receipts. These record counts do not bound authored input, submitted-range watch
+evidence, timing series or all process bytes. CAP-S5 legacy mechanism retirement
+and final adapter-free parity remain separate gates.

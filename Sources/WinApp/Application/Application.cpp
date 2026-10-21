@@ -1,6 +1,7 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
+#include "Application/Capture/CaptureOnReady.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Application/Platform/Windows/Win32Shell.h"
@@ -300,7 +301,17 @@ namespace gglab
 				GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready requires the frame capture service.");
 				return FailInitialization();
 			}
-			m_CaptureOnReadyRequestId = m_FrameCapture->Submit(std::move(*m_CaptureOnReady));
+			m_CaptureOnReadyJob = std::make_unique<CaptureOnReady>(CaptureOnReady::CreateInfo{
+				.m_Plan = std::move(*m_CaptureOnReady),
+				.m_Timeout = m_CaptureTimeout,
+				.m_TrySubmit = [this](CapturePlan&& plan)
+				{
+					return m_AppRuntime->TrySubmitCaptureJob(std::move(plan));
+				},
+				.m_Cancel = [this](uint64_t id) { return m_AppRuntime->CancelCaptureJob(id); },
+				.m_TakeResult = [this](uint64_t id) { return m_AppRuntime->TakeCaptureJobResult(id); },
+				});
+			m_CaptureOnReadyJob->TryAdmit();
 			m_CaptureOnReady.reset();
 		}
 		m_StartTime = std::chrono::steady_clock::now();
@@ -350,6 +361,10 @@ namespace gglab
 		{
 			m_FrameCapture->Capture();
 		}
+		if (m_CaptureOnReadyJob)
+		{
+			m_CaptureOnReadyJob->TryAdmit();
+		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
@@ -362,7 +377,7 @@ namespace gglab
 		{
 			return false;
 		}
-		if (m_CaptureOnReadyRequestId != 0 && tickResult == AppRuntimeTickResult::Continue &&
+		if (m_CaptureOnReadyJob && tickResult == AppRuntimeTickResult::Continue &&
 			!UpdateCaptureOnReady())
 		{
 			return false;
@@ -402,72 +417,81 @@ namespace gglab
 
 	bool Application::UpdateCaptureOnReady() noexcept
 	{
-		const auto now = std::chrono::steady_clock::now();
-		if (!m_CaptureDeadline)
+		const CaptureOnReady::State state = m_CaptureOnReadyJob->Poll();
+		if (state == CaptureOnReady::State::Pending)
 		{
-			m_CaptureDeadline =
-				now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_CaptureTimeout);
+			return true;
 		}
-
-		// Machine-readable outcome lines on stdout for unattended callers.
 		const auto printLine = [](std::string_view key, std::string_view value) noexcept
 			{
 				std::fprintf(stdout, "%.*s: %.*s\n", static_cast<int>(key.size()), key.data(),
 					static_cast<int>(value.size()), value.data());
 			};
-		const auto toUtf8 = [](const std::filesystem::path& path)
-			{
-				const std::u8string text = path.u8string();
-				return std::string(text.begin(), text.end());
-			};
-
-		if (const FrameCaptureRequestResult* result =
-			m_FrameCapture->FindResult(m_CaptureOnReadyRequestId))
+		const CaptureAdmission admission = m_CaptureOnReadyJob->GetAdmission();
+		printLine("capture-admission", admission.m_Status == CaptureAdmissionStatus::Accepted ?
+			"accepted" : admission.m_Status == CaptureAdmissionStatus::Busy ? "busy" : "rejected");
+		printLine("capture-admission-reason", ApplicationFrameCapture::GetAdmissionReasonName(admission.m_Reason));
+		if (admission.m_JobId != 0)
 		{
-			if (result->m_Status == FrameCaptureRequestStatus::Completed)
+			printLine("capture-job", std::to_string(admission.m_JobId));
+		}
+		if (const auto& result = m_CaptureOnReadyJob->GetResult())
+		{
+			printLine("capture-status", state == CaptureOnReady::State::Completed ? "completed" :
+				state == CaptureOnReady::State::Cancelled ? "cancelled" : "failed");
+			printLine("capture-publication", ApplicationFrameCapture::GetPublicationName(result->m_Publication));
+			printLine("capture-manifest", ApplicationFrameCapture::GetPathText(result->m_ManifestPath));
+			if (state == CaptureOnReady::State::Completed)
 			{
-				printLine("capture-status", "completed");
-				printLine("capture-image", toUtf8(result->m_ImagePath));
-				printLine("capture-metadata", toUtf8(result->m_MetadataPath));
+				// Convenience output for existing one-shot scripts, derived from the job product.
+				for (const auto& product : result->m_Products)
+				{
+					if (product.m_Kind == CaptureProductKind::Image)
+					{
+						for (const auto& file : product.m_Files)
+						{
+							printLine(file.extension() == ".png" ? "capture-image" : "capture-metadata",
+								ApplicationFrameCapture::GetPathText(file));
+						}
+					}
+				}
 				m_ExitCode = 0;
 			}
 			else
 			{
-				printLine("capture-status", result->m_Status == FrameCaptureRequestStatus::Cancelled ?
-					"cancelled" :
-					"failed");
-				printLine("capture-failure", result->m_Failure);
+				printLine("capture-failure", ApplicationFrameCapture::GetFailure(*result));
 				m_ExitCode = 2;
 			}
-			std::fflush(stdout);
-			m_CaptureOnReadyRequestId = 0;
-			return false;
 		}
-		if (now < *m_CaptureDeadline)
+		else if (state == CaptureOnReady::State::Rejected)
 		{
-			return true;
+			printLine("capture-status", "failed");
+			printLine("capture-failure", ApplicationFrameCapture::GetAdmissionReasonName(admission.m_Reason));
+			m_ExitCode = 2;
 		}
-
-		m_FrameCapture->Cancel(m_CaptureOnReadyRequestId);
-		printLine("capture-status", "timeout");
-		if (const FrameCaptureFrameState* frameState = m_FrameCapture->GetLastFrameState())
+		else
 		{
-			for (const FrameCaptureGate& gate : frameState->m_Readiness.m_Gates)
+			printLine("capture-status", "timeout");
+			if (const auto cancellation = m_CaptureOnReadyJob->GetCancellation())
 			{
-				if (gate.m_State != FrameCaptureGateState::Ready)
-				{
-					printLine("capture-pending-gate", std::format("{} ({}): {}", gate.m_Name,
-						GetFrameCaptureGateStateName(gate.m_State), gate.m_Detail));
-				}
+				printLine("capture-cancellation", ApplicationFrameCapture::GetCancellationName(*cancellation));
 			}
-			printLine("capture-settled-frames",
-				std::to_string(m_FrameCapture->GetSettledFrameCount()));
+			if (const FrameCaptureFrameState* frameState = m_FrameCapture->GetLastFrameState())
+			{
+				for (const FrameCaptureGate& gate : frameState->m_Readiness.m_Gates)
+				{
+					if (gate.m_State != FrameCaptureGateState::Ready)
+					{
+						printLine("capture-pending-gate", std::format("{} ({}): {}", gate.m_Name,
+							GetFrameCaptureGateStateName(gate.m_State), gate.m_Detail));
+					}
+				}
+				printLine("capture-settled-frames", std::to_string(m_FrameCapture->GetSettledFrameCount()));
+			}
+			GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready timed out after {} seconds.", m_CaptureTimeout.count());
+			m_ExitCode = 3;
 		}
 		std::fflush(stdout);
-		GGLAB_LOG_ERROR_ALWAYS("Capture-on-ready timed out after {} seconds.",
-			m_CaptureTimeout.count());
-		m_ExitCode = 3;
-		m_CaptureOnReadyRequestId = 0;
 		return false;
 	}
 
@@ -673,8 +697,13 @@ namespace gglab
 			// Unconsumed job receipts end with this session; they are not cached by WinApp.
 			if (m_FrameCapture)
 			{
-				(void)m_FrameCapture->Update();
+				(void)m_FrameCapture->Update(false);
 				m_FrameCapture.reset();
+			}
+			if (m_CaptureOnReadyJob)
+			{
+				m_CaptureOnReadyJob->CollectResult();
+				m_CaptureOnReadyJob.reset();
 			}
 			m_AppRuntime.reset();
 		}

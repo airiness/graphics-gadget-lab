@@ -138,6 +138,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp">
       <Filter>Application\Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.cpp">
+      <Filter>Application\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.cpp">
       <Filter>Application\Content</Filter>
     </ClCompile>
@@ -495,6 +498,9 @@
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h">
+      <Filter>Application\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.h">
       <Filter>Application\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.h">

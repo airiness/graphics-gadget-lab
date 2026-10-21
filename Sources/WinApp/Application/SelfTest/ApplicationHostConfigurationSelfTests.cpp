@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <variant>
 
 namespace gglab
 {
@@ -53,14 +54,15 @@ namespace gglab
 		ApplicationLaunchOptions captureOptions = options;
 		captureOptions.m_CaptureOnReady = ApplicationCaptureOnReadyOptions{
 			.m_OutputDirectory = "C:/gglab-captures",
-			.m_Source = FrameCaptureSource::Composited,
+			.m_Source = CaptureImageSource::Composited,
 			.m_SettleFrames = 12,
 			.m_Label = "culling",
 		};
-		const std::optional<FrameCaptureRequest> captureRequest = TranslateCaptureOnReadyOptions(captureOptions);
+		const std::optional<CapturePlan> captureRequest = TranslateCaptureOnReadyOptions(captureOptions);
 		context.Check(!TranslateCaptureOnReadyOptions(options) && captureRequest &&
 			captureRequest->m_Timing == FrameCaptureTiming::AfterReady &&
-			captureRequest->m_Source == FrameCaptureSource::Composited &&
+			captureRequest->m_RequiredProducts.size() == 1 &&
+			std::get<ImageCaptureProduct>(captureRequest->m_RequiredProducts.front()).m_Source == CaptureImageSource::Composited &&
 			captureRequest->m_SettleFrames == 12 &&
 			captureRequest->m_RequiredContentId == "gglab.lab.culling" &&
 			captureRequest->m_OutputDirectory == std::filesystem::path("C:/gglab-captures") &&

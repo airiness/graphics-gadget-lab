@@ -11,9 +11,19 @@ Build/Output/x64/Develop/GraphicsGadgetLab.exe --rhi vulkan --demo atrium --hidd
 ```
 
 `--capture-on-ready` requires an absolute directory. One-shot output
-reports `capture-status`, `capture-image` and `capture-metadata`, or failure and
-pending-gate details. Exit codes are 0 written, 2 failed and 3 timed out.
-`--capture-timeout` defaults to 120 seconds. `--capture-view` is optional.
+reports `capture-status`, `capture-image` and `capture-metadata`, plus
+`capture-admission`, `capture-admission-reason`, accepted `capture-job`, independent
+`capture-publication` and `capture-manifest`. Success requires Completed + Published
+with the final manifest. Convenience image/sidecar paths come from that typed
+product. Failure and pending-gate details remain available. Exit codes are 0
+published, 2 failed/cancelled/rejected and 3 timed out. Busy retries the original
+plan under the same deadline without inventing a job ID. Timeout after acceptance
+requests whole-job cancellation and reports `capture-cancellation`; TooLate does
+not imply publication was prevented. The startup owner consumes its own receipt,
+including any late result at shutdown, independently of UI history.
+`--capture-timeout` defaults to 120 seconds from the first rendered frame.
+`--capture-view` is optional. Hidden native regression coverage is available via
+`Tests/Verification/RunVerification.ps1 -Suite capture-on-ready` (Debug/Develop/Release, both RHIs).
 
 ## Session settings
 
@@ -56,22 +66,25 @@ ordinary capture, so compare the recorded frame/time rather than queue order.
 Session v3 results identify a final `manifest` and ordered `products[].files`,
 not flattened `image`/`metadata` fields. Require `publication: Published` as well
 as `status: completed`; [session jobs](session-jobs.md) defines admission,
-retention, cancellation and the remaining sequence/interactive migration.
+retention, cancellation and ownership across session, sequence and frontend callers.
 
 Each PNG has a same-stem JSON sidecar (`schemaVersion: 1`). Use the paths returned
 by the command, rather than predicting filenames. The sidecar records the PNG
 name, source, content, backend, reference view, camera, frame serial/index, size,
 fixed step/total time, readiness, DevTools, temporal settings and optional sequence
-and watch metadata. Existing files receive a free suffix instead of replacement.
+and watch metadata. Qualified bundle identities prevent replacing existing artifacts.
 
-PNG and sidecar publish separately after temporary `.partial` writes. Wait for
-the command's completed result before consuming them; file existence alone is
-insufficient. Shutdown bounds pending writing to 30 seconds; a late file does
-not turn a failed result into a successful capture.
+The final `gglab.capture-bundle` v1 manifest commits all required product files.
+Wait for Completed + Published before consuming the bundle; PNG or sidecar
+existence alone is insufficient. Shutdown bounds pending writing to 30 seconds;
+late publication does not rewrite a one-shot timeout outcome.
 
 Captures and diagnostic exports share bounded requests, payload slots and bytes.
 Session batches submit and consume one view at a time; admission Busy is explicit.
-Sequences still use their transitional capacity-wait path before advancing a frame. Unsupported or oversized requests fail explicitly; reduce
+Sequences admit one required-product job per due frame and consume their own
+receipts; pressure preserves the pose/sample and simulation instant. Interactive
+batches likewise keep one accepted job. Unsupported or oversized plans fail
+explicitly; reduce
 resolution or split an optional group rather than retrying the same oversize
 request. An issued capture never substitutes a later frame after an abort.
 

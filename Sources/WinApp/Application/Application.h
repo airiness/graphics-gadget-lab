@@ -2,7 +2,7 @@
 #include "ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
-#include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/CapturePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "RuntimePaths.h"
 
@@ -19,6 +19,7 @@ namespace gglab
 	class RHIContextFactoryBase;
 	class InputManager;
 	class ApplicationFrameCapture;
+	class CaptureOnReady;
 	class ApplicationToolingIntegrationBase;
 	class PlatformHost;
 	class LabRuntimeLocatorBase;
@@ -58,7 +59,7 @@ namespace gglab
 			// The main window is never shown or activated and input is ignored.
 			bool m_Hidden = false;
 			// One capture submitted at startup; the application exits with its result.
-			std::optional<FrameCaptureRequest> m_CaptureOnReady;
+			std::optional<CapturePlan> m_CaptureOnReady;
 			double m_CaptureTimeoutSeconds = 120.0;
 			// Non-empty serves the session control protocol under this id.
 			std::string m_SessionId;
@@ -118,10 +119,9 @@ namespace gglab
 		std::unique_ptr<DevelopmentShaderHotReloadSystem> m_ShaderHotReload;
 #endif
 
-		std::optional<FrameCaptureRequest> m_CaptureOnReady;
+		std::optional<CapturePlan> m_CaptureOnReady;
 		std::chrono::duration<double> m_CaptureTimeout{ 120.0 };
-		uint64_t m_CaptureOnReadyRequestId = 0;
-		std::optional<std::chrono::steady_clock::time_point> m_CaptureDeadline;
+		std::unique_ptr<CaptureOnReady> m_CaptureOnReadyJob;
 		std::chrono::steady_clock::time_point m_NextHiddenFrameTime{};
 
 		std::string m_SessionId;

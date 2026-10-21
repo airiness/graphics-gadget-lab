@@ -2,19 +2,21 @@
 #include "AppRuntimeLog.h"
 #include "GGLabAppRuntime.h"
 
+#include <algorithm>
 #include <utility>
-#include <vector>
 
 namespace gglab
 {
 	ApplicationFrameCapture::ApplicationFrameCapture(CreateInfo createInfo) noexcept :
 		m_Coordinator(createInfo.m_Coordinator),
-		m_ConsumeResults(std::move(createInfo.m_ConsumeResults)),
+		m_TrySubmit(std::move(createInfo.m_TrySubmit)),
+		m_Cancel(std::move(createInfo.m_Cancel)),
+		m_TakeResult(std::move(createInfo.m_TakeResult)),
 		m_OpenDirectory(std::move(createInfo.m_OpenDirectory)),
 		m_DefaultOutputDirectory(std::move(createInfo.m_DefaultOutputDirectory))
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Coordinator);
-		GGLAB_ASSERT(m_ConsumeResults);
+		GGLAB_ASSERT(m_TrySubmit && m_Cancel && m_TakeResult);
 	}
 
 	ApplicationFrameCapture::ApplicationFrameCapture(GGLabAppRuntime& runtime,
@@ -22,22 +24,19 @@ namespace gglab
 		ApplicationFrameCapture(CreateInfo{
 			.m_Coordinator = runtime.GetFrameCaptureCoordinator(),
 			.m_DefaultOutputDirectory = std::move(defaultOutputDirectory),
-			.m_ConsumeResults = [&runtime](std::vector<FrameCaptureRequestResult>& results)
-			{
-				runtime.ConsumeFrameCaptureResults(results);
-			},
+			.m_TrySubmit = [&runtime](CapturePlan&& plan) { return runtime.TrySubmitCaptureJob(std::move(plan)); },
+			.m_Cancel = [&runtime](uint64_t id) { return runtime.CancelCaptureJob(id); },
+			.m_TakeResult = [&runtime](uint64_t id) { return runtime.TakeCaptureJobResult(id); },
 			.m_OpenDirectory = std::move(openDirectory),
 			})
 	{
 	}
 
-	FrameCaptureRequest ApplicationFrameCapture::MakeRequest(FrameCaptureSource source) const noexcept
+	CapturePlan ApplicationFrameCapture::MakePlan() const noexcept
 	{
-		const bool afterReady = m_Settings.m_Timing == FrameCaptureTiming::AfterReady;
 		return {
-			.m_Source = source,
 			.m_Timing = m_Settings.m_Timing,
-			.m_SettleFrames = afterReady ? m_Settings.m_SettleFrames : 0,
+			.m_SettleFrames = m_Settings.m_Timing == FrameCaptureTiming::AfterReady ? m_Settings.m_SettleFrames : 0,
 			.m_ReferenceViewId = m_Settings.m_ReferenceViewId,
 			.m_OutputDirectory = m_Settings.m_OutputDirectory,
 			.m_Label = m_Settings.m_Label,
@@ -45,68 +44,125 @@ namespace gglab
 		};
 	}
 
-	uint64_t ApplicationFrameCapture::Capture() noexcept
+	CaptureAdmission ApplicationFrameCapture::Capture() noexcept
 	{
-		return Submit(MakeRequest(m_Settings.m_Source));
+		CapturePlan plan = MakePlan();
+		plan.m_RequiredProducts.emplace_back(ImageCaptureProduct{ m_Settings.m_Source });
+		return Submit(std::move(plan));
 	}
 
-	uint64_t ApplicationFrameCapture::ExportGraph(bool summary) noexcept
+	CaptureAdmission ApplicationFrameCapture::ExportGraph(bool summary) noexcept
 	{
-		FrameCaptureRequest request = MakeRequest(FrameCaptureSource::RenderGraph);
-		request.m_GraphSummary = summary;
-		return Submit(std::move(request));
+		CapturePlan plan = MakePlan();
+		plan.m_RequiredProducts.emplace_back(GraphCaptureProduct{ summary });
+		return Submit(std::move(plan));
 	}
 
-	uint64_t ApplicationFrameCapture::ExportResources(std::vector<RGResourceAddress> targets,
+	CaptureAdmission ApplicationFrameCapture::ExportResources(std::vector<RGResourceAddress> targets,
 		bool includeGraph) noexcept
 	{
-		FrameCaptureRequest request = MakeRequest(FrameCaptureSource::ResourceExport);
-		request.m_ResourceTargets = std::move(targets);
-		request.m_IncludeGraph = includeGraph;
-		return Submit(std::move(request));
+		CapturePlan plan = MakePlan();
+		plan.m_RequiredProducts.emplace_back(ResourceCaptureProduct{ std::move(targets) });
+		if (includeGraph)
+		{
+			plan.m_RequiredProducts.emplace_back(GraphCaptureProduct{});
+		}
+		return Submit(std::move(plan));
+	}
+
+	CaptureAdmission ApplicationFrameCapture::Submit(CapturePlan&& plan) noexcept
+	{
+		const CaptureAdmission previous = m_LastAdmission;
+		m_LastAdmission = m_TrySubmit(std::move(plan));
+		m_LastAdmissionTime = std::chrono::steady_clock::now();
+		if (m_LastAdmission.m_Status == CaptureAdmissionStatus::Accepted)
+		{
+			m_PendingJobs.push_back(m_LastAdmission.m_JobId);
+			GGLAB_LOG_INFO_ALWAYS("Interactive capture job {} accepted.", m_LastAdmission.m_JobId);
+		}
+		else if (previous.m_Status != m_LastAdmission.m_Status || previous.m_Reason != m_LastAdmission.m_Reason)
+		{
+			GGLAB_LOG_WARN_ALWAYS("Interactive capture admission {}: {}.",
+				m_LastAdmission.m_Status == CaptureAdmissionStatus::Busy ? "busy" : "rejected",
+				GetAdmissionReasonName(m_LastAdmission.m_Reason));
+		}
+		return m_LastAdmission;
+	}
+
+	CaptureCancelResult ApplicationFrameCapture::Cancel(uint64_t jobId) noexcept
+	{
+		if (FindResult(jobId))
+		{
+			return CaptureCancelResult::Finished;
+		}
+		return std::ranges::find(m_PendingJobs, jobId) == m_PendingJobs.end() ?
+			CaptureCancelResult::NotFound : m_Cancel(jobId);
 	}
 
 	uint32_t ApplicationFrameCapture::CaptureReferenceViews() noexcept
 	{
-		const FrameCaptureFrameState* frameState = m_Coordinator->GetLastFrameState();
-		if (!frameState)
+		const FrameCaptureFrameState* frameState = GetLastFrameState();
+		if (!frameState || frameState->m_ReferenceViewIds.empty() ||
+			m_Batch.m_State == ReferenceViewBatchState::Running || m_Batch.m_JobId != 0)
 		{
 			return 0;
 		}
-		const std::vector<std::string>& viewIds = frameState->m_ReferenceViewIds;
-		for (const std::string& viewId : viewIds)
+		m_BatchViews = frameState->m_ReferenceViewIds;
+		m_BatchPlan = MakePlan();
+		m_BatchPlan.m_RequiredProducts.emplace_back(ImageCaptureProduct{ m_Settings.m_Source });
+		m_BatchPlan.m_WaitForCapacity = true;
+		m_Batch = { ReferenceViewBatchState::Running, static_cast<uint32_t>(m_BatchViews.size()) };
+		AdvanceReferenceViews();
+		return m_Batch.m_TotalViews;
+	}
+
+	void ApplicationFrameCapture::AdvanceReferenceViews() noexcept
+	{
+		if (m_Batch.m_State != ReferenceViewBatchState::Running || m_Batch.m_JobId != 0)
 		{
-			FrameCaptureRequest request = MakeRequest(m_Settings.m_Source);
-			request.m_ReferenceViewId = viewId;
-			request.m_WaitForCapacity = true;
-			Submit(std::move(request));
+			return;
 		}
-		return static_cast<uint32_t>(viewIds.size());
+		if (m_Batch.m_AcceptedViews == m_Batch.m_TotalViews)
+		{
+			m_Batch.m_State = ReferenceViewBatchState::Completed;
+			m_BatchViews.clear();
+			m_BatchPlan = {};
+			return;
+		}
+		m_BatchPlan.m_ReferenceViewId = m_BatchViews[m_Batch.m_AcceptedViews];
+		// Keep the template after Accepted moves its argument and after Busy.
+		CapturePlan plan = m_BatchPlan;
+		const CaptureAdmission admission = Submit(std::move(plan));
+		if (admission.m_Status == CaptureAdmissionStatus::Accepted)
+		{
+			m_Batch.m_JobId = admission.m_JobId;
+			++m_Batch.m_AcceptedViews;
+		}
+		else if (admission.m_Status == CaptureAdmissionStatus::Rejected)
+		{
+			m_Batch.m_State = ReferenceViewBatchState::Failed;
+			m_BatchViews.clear();
+			m_BatchPlan = {};
+		}
 	}
 
-	uint64_t ApplicationFrameCapture::Submit(FrameCaptureRequest request) noexcept
+	CaptureCancelResult ApplicationFrameCapture::CancelReferenceViews() noexcept
 	{
-		const FrameCaptureSource source = request.m_Source;
-		const FrameCaptureTiming timing = request.m_Timing;
-		const std::string viewId = request.m_ReferenceViewId;
-		const uint64_t requestId = m_Coordinator->Submit(std::move(request));
-		GGLAB_LOG_INFO_ALWAYS("Frame capture {} requested (source={}, timing={}{}{}).", requestId,
-			GetFrameCaptureSourceName(source), GetFrameCaptureTimingName(timing),
-			viewId.empty() ? "" : ", view=", viewId);
-		return requestId;
+		if (m_Batch.m_State != ReferenceViewBatchState::Running)
+		{
+			return CaptureCancelResult::Finished;
+		}
+		m_Batch.m_State = ReferenceViewBatchState::Cancelled;
+		m_BatchViews.clear();
+		m_BatchPlan = {};
+		return m_Batch.m_JobId == 0 ? CaptureCancelResult::Cancelled : Cancel(m_Batch.m_JobId);
 	}
 
-	bool ApplicationFrameCapture::Cancel(uint64_t requestId) noexcept
-	{
-		return m_Coordinator->Cancel(requestId);
-	}
-
-	const FrameCaptureRequestResult* ApplicationFrameCapture::FindResult(
-		uint64_t requestId) const noexcept
+	const CaptureJobResult* ApplicationFrameCapture::FindResult(uint64_t jobId) const noexcept
 	{
 		for (const HistoryEntry& entry : m_History)
 		{
-			if (entry.m_Result.m_RequestId == requestId)
+			if (entry.m_Result.m_JobId == jobId)
 			{
 				return &entry.m_Result;
 			}
@@ -114,41 +170,92 @@ namespace gglab
 		return nullptr;
 	}
 
-	std::vector<FrameCaptureRequestResult> ApplicationFrameCapture::Update() noexcept
+	uint32_t ApplicationFrameCapture::Update(bool admitReferenceViews) noexcept
 	{
-		std::vector<FrameCaptureRequestResult> results;
-		m_ConsumeResults(results);
-		for (const FrameCaptureRequestResult& result : results)
+		uint32_t finished = 0;
+		for (auto pending = m_PendingJobs.begin(); pending != m_PendingJobs.end();)
 		{
-			if (result.m_Status == FrameCaptureRequestStatus::Completed)
+			auto result = m_TakeResult(*pending);
+			if (!result)
 			{
-				GGLAB_LOG_INFO_ALWAYS("Frame capture {} written to '{}'.", result.m_RequestId,
-					GetPathText(GetOutputPath(result)));
+				++pending;
+				continue;
 			}
-			else
+			if (result->m_JobId == m_Batch.m_JobId)
 			{
-				GGLAB_LOG_WARN_ALWAYS("Frame capture {} {}: {}", result.m_RequestId,
-					result.m_Status == FrameCaptureRequestStatus::Cancelled ?
-						"cancelled" :
-						"failed",
-					result.m_Failure);
+				m_Batch.m_JobId = 0;
+				if (IsPublished(*result))
+				{
+					++m_Batch.m_CompletedViews;
+				}
+				else if (m_Batch.m_State == ReferenceViewBatchState::Running)
+				{
+					m_Batch.m_State = ReferenceViewBatchState::Failed;
+					m_BatchViews.clear();
+					m_BatchPlan = {};
+				}
 			}
-			m_History.push_back({
-				.m_Result = result,
-				.m_FinishedAt = std::chrono::steady_clock::now(),
-				});
+			GGLAB_LOG_INFO_ALWAYS("Interactive capture job {} finished (published={}): {}.",
+				result->m_JobId, IsPublished(*result), GetPathText(result->m_ManifestPath));
+			if (!IsPublished(*result))
+			{
+				GGLAB_LOG_WARN_ALWAYS("Interactive capture job {}: {}.", result->m_JobId, GetFailure(*result));
+			}
+			m_History.push_back({ std::move(*result), std::chrono::steady_clock::now() });
 			if (m_History.size() > MaxHistoryEntries)
 			{
 				m_History.pop_front();
 			}
+			pending = m_PendingJobs.erase(pending);
+			++finished;
 		}
-		return results;
+		if (admitReferenceViews)
+		{
+			AdvanceReferenceViews();
+		}
+		return finished;
 	}
 
-	const std::filesystem::path& ApplicationFrameCapture::GetOutputPath(
-		const FrameCaptureRequestResult& result) noexcept
+	bool ApplicationFrameCapture::IsPublished(const CaptureJobResult& result) noexcept
 	{
-		return result.m_ImagePath.empty() ? result.m_MetadataPath : result.m_ImagePath;
+		return result.m_Status == CaptureJobStatus::Completed &&
+			result.m_Publication == CaptureJobPublication::Published;
+	}
+
+	const std::filesystem::path& ApplicationFrameCapture::GetOutputPath(const CaptureJobResult& result) noexcept
+	{
+		for (const auto& product : result.m_Products)
+		{
+			if (product.m_Kind == CaptureProductKind::Image && !product.m_Files.empty())
+			{
+				return product.m_Files.front();
+			}
+		}
+		return result.m_ManifestPath;
+	}
+
+	const FrameCaptureMetadata* ApplicationFrameCapture::GetMetadata(const CaptureJobResult& result) noexcept
+	{
+		for (const auto& product : result.m_Products)
+		{
+			if (product.m_Metadata)
+			{
+				return &*product.m_Metadata;
+			}
+		}
+		return nullptr;
+	}
+
+	std::string_view ApplicationFrameCapture::GetFailure(const CaptureJobResult& result) noexcept
+	{
+		for (const auto& product : result.m_Products)
+		{
+			if (!product.m_Failure.empty())
+			{
+				return product.m_Failure;
+			}
+		}
+		return "No completed published bundle.";
 	}
 
 	std::string ApplicationFrameCapture::GetPathText(const std::filesystem::path& path) noexcept
@@ -156,21 +263,76 @@ namespace gglab
 		return GetFrameCapturePathText(path);
 	}
 
-	bool ApplicationFrameCapture::CanOpenOutputFolder(
-		const FrameCaptureRequestResult& result) const noexcept
+	std::string_view ApplicationFrameCapture::GetAdmissionReasonName(CaptureAdmissionReason reason) noexcept
 	{
-		return m_OpenDirectory && result.m_Status == FrameCaptureRequestStatus::Completed &&
-			!GetOutputPath(result).empty();
+		switch (reason)
+		{
+		case CaptureAdmissionReason::None:
+			return "None";
+		case CaptureAdmissionReason::ActiveJobLimit:
+			return "ActiveJobLimit";
+		case CaptureAdmissionReason::ReceiptLimit:
+			return "ReceiptLimit";
+		case CaptureAdmissionReason::InvalidPlan:
+			return "InvalidPlan";
+		case CaptureAdmissionReason::PlanTooLarge:
+			return "PlanTooLarge";
+		case CaptureAdmissionReason::ShuttingDown:
+			return "ShuttingDown";
+		case CaptureAdmissionReason::IdentityExhausted:
+			return "IdentityExhausted";
+		case CaptureAdmissionReason::IdentityUnavailable:
+			return "IdentityUnavailable";
+		case CaptureAdmissionReason::ServicesUnavailable:
+			return "ServicesUnavailable";
+		}
+		return "Unknown";
 	}
 
-	bool ApplicationFrameCapture::OpenOutputFolder(uint64_t requestId, std::string& failure) const noexcept
+	std::string_view ApplicationFrameCapture::GetPublicationName(CaptureJobPublication publication) noexcept
+	{
+		switch (publication)
+		{
+		case CaptureJobPublication::NotPublished:
+			return "NotPublished";
+		case CaptureJobPublication::Published:
+			return "Published";
+		case CaptureJobPublication::PartiallyPublished:
+			return "PartiallyPublished";
+		case CaptureJobPublication::Indeterminate:
+			return "Indeterminate";
+		}
+		return "Unknown";
+	}
+
+	std::string_view ApplicationFrameCapture::GetCancellationName(CaptureCancelResult cancellation) noexcept
+	{
+		switch (cancellation)
+		{
+		case CaptureCancelResult::Cancelled:
+			return "Cancelled";
+		case CaptureCancelResult::TooLate:
+			return "TooLate";
+		case CaptureCancelResult::Finished:
+			return "Finished";
+		case CaptureCancelResult::NotFound:
+			return "NotFound";
+		}
+		return "Unknown";
+	}
+
+	bool ApplicationFrameCapture::CanOpenOutputFolder(const CaptureJobResult& result) const noexcept
+	{
+		return m_OpenDirectory && IsPublished(result) && !result.m_ManifestPath.empty();
+	}
+
+	bool ApplicationFrameCapture::OpenOutputFolder(uint64_t jobId, std::string& failure) const noexcept
 	{
 		failure.clear();
-		const FrameCaptureRequestResult* result = FindResult(requestId);
-		if (!result || result->m_Status != FrameCaptureRequestStatus::Completed ||
-			GetOutputPath(*result).empty())
+		const CaptureJobResult* result = FindResult(jobId);
+		if (!result || !IsPublished(*result) || result->m_ManifestPath.empty())
 		{
-			failure = "No completed output is retained for this request.";
+			failure = "No completed published bundle is retained for this job.";
 			return false;
 		}
 		if (!m_OpenDirectory)
@@ -178,8 +340,7 @@ namespace gglab
 			failure = "Opening output folders is unavailable in this host.";
 			return false;
 		}
-		const std::filesystem::path directory = GetOutputPath(*result).parent_path();
-		const bool accepted = m_OpenDirectory(directory.empty() ? "." : directory, failure);
+		const bool accepted = m_OpenDirectory(result->m_ManifestPath.parent_path(), failure);
 		if (!accepted && failure.empty())
 		{
 			failure = "The host did not accept the request to open the output folder.";
@@ -187,16 +348,14 @@ namespace gglab
 		return accepted;
 	}
 
-	uint32_t ApplicationFrameCapture::GetUnfinishedRequestCount() const noexcept
+	uint32_t ApplicationFrameCapture::GetPendingJobCount() const noexcept
 	{
-		return m_Coordinator->GetUnfinishedRequestCount();
+		return static_cast<uint32_t>(m_PendingJobs.size());
 	}
-
 	const FrameCaptureFrameState* ApplicationFrameCapture::GetLastFrameState() const noexcept
 	{
 		return m_Coordinator->GetLastFrameState();
 	}
-
 	uint32_t ApplicationFrameCapture::GetSettledFrameCount() const noexcept
 	{
 		return m_Coordinator->GetSettledFrameCount();
