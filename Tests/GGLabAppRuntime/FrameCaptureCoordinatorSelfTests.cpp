@@ -2678,6 +2678,40 @@ namespace gglab
 		void RunFrameSequenceGpuTimingTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-sequence-gpu-timing");
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				for (uint32_t frame = 0; frame < 2; ++frame)
+				{
+					harness.Frame();
+					auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial);
+					profile.m_Samples = {
+						{ "Repeated", 1.0, 1, GpuProfileScopeKind::RenderGraphPass, 2 },
+						{ "Repeated", 3.0, 1, GpuProfileScopeKind::RenderGraphPass, 4 },
+						{ "Repeated", 5.0, 2 },
+					};
+					if (frame == 1)
+					{
+						std::reverse(profile.m_Samples.begin(), profile.m_Samples.end());
+					}
+					harness.m_Sequence.UpdateGpuTiming(profile, true);
+				}
+				const auto& status = *harness.m_Sequence.GetStatus();
+				const auto& scopes = status.m_GpuTiming->m_Scopes;
+				context.Check(status.m_State == FrameSequenceState::Completed && scopes.size() == 3 &&
+					scopes[0].m_Kind == GpuProfileScopeKind::RenderGraphPass && scopes[0].m_Occurrence == 2 &&
+					scopes[0].m_Milliseconds == std::vector<double>{ 1.0, 1.0 } &&
+					scopes[1].m_Kind == GpuProfileScopeKind::RenderGraphPass && scopes[1].m_Occurrence == 4 &&
+					scopes[1].m_Milliseconds == std::vector<double>{ 3.0, 3.0 } &&
+					scopes[2].m_Kind == GpuProfileScopeKind::Other && scopes[2].m_Occurrence == 0 &&
+					scopes[2].m_Milliseconds == std::vector<double>{ 5.0, 5.0 },
+					"Sequence series retain same-name pass and other identities when sample order changes");
+			}
 			for (uint32_t delay : { 0u, 1u, 3u, 7u })
 			{
 				SequenceHarness harness(directory.GetPath());

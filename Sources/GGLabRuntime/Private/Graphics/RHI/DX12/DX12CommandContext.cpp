@@ -901,11 +901,11 @@ namespace gglab
 			vertexCount, instanceCount, startVertexLocation, startInstanceLocation);
 	}
 
-	void DX12GraphicsCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	void DX12GraphicsCommandContext::BeginGpuProfileScope(GpuProfileScope scope) noexcept
 	{
 		if (m_GpuProfiler)
 		{
-			m_GpuProfiler->BeginScope(*m_Backend.GetCommandList(), name);
+			m_GpuProfiler->BeginScope(*m_Backend.GetCommandList(), scope);
 		}
 	}
 
@@ -1144,11 +1144,11 @@ namespace gglab
 			parameterIndex, descriptor.m_GpuHandle);
 	}
 
-	void DX12ComputeCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	void DX12ComputeCommandContext::BeginGpuProfileScope(GpuProfileScope scope) noexcept
 	{
 		if (m_GpuProfiler)
 		{
-			m_GpuProfiler->BeginScope(*m_Backend->GetCommandList(), name);
+			m_GpuProfiler->BeginScope(*m_Backend->GetCommandList(), scope);
 		}
 	}
 

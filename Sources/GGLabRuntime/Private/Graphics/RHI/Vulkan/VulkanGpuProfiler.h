@@ -46,7 +46,7 @@ namespace gglab
 		void BeginFrame(uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept;
 		void EndFrame(uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept;
 		void AbortFrame(uint32_t frameSlotIndex) noexcept;
-		void BeginScope(VkCommandBuffer commandBuffer, std::string_view name) noexcept;
+		void BeginScope(VkCommandBuffer commandBuffer, GpuProfileScope identity) noexcept;
 		void EndScope(VkCommandBuffer commandBuffer) noexcept;
 
 		[[nodiscard]] bool IsAvailable() const noexcept { return m_Available; }
@@ -62,7 +62,7 @@ namespace gglab
 
 		struct ScopeRecord
 		{
-			std::string m_Name;
+			GpuProfileSample m_Sample;
 			uint32_t m_BeginQuery = InvalidQueryIndex;
 			uint32_t m_EndQuery = InvalidQueryIndex;
 		};

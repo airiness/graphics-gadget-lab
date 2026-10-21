@@ -333,11 +333,19 @@ namespace gglab
 				Json::parse(SerializeApplicationControlStatus(11, { .m_Sequence = &sequence }))["sequence"] == sequenceJson,
 				"Sequence progress remains available without exposing legacy output ids as job identities");
 			sequence.m_GpuTiming = FrameSequenceGpuTiming{ .m_FrameMilliseconds = { 4.0, 2.0 },
-				.m_Scopes = { { .m_Name = "PostProcess.TemporalAA", .m_Milliseconds = { 0.25 } } } };
+				.m_Scopes = {
+					{ .m_Name = "PostProcess.TemporalAA", .m_Milliseconds = { 0.25 },
+						.m_Kind = GpuProfileScopeKind::RenderGraphPass, .m_Occurrence = 2 },
+					{ .m_Name = "PostProcess.TemporalAA", .m_Milliseconds = { 0.5 } },
+				} };
 			const auto timing = Json::parse(SerializeApplicationControlSequence(12, sequence))["sequence"]["gpuTiming"];
 			context.Check(timing["frames"] == 2 && timing["frame"]["medianMs"] == 2.0 &&
 				timing["scopes"][0]["name"] == "PostProcess.TemporalAA" && timing["scopes"][0]["p90Ms"] == 0.25,
 				"Sequence GPU timing retains per-scope summaries");
+			context.Check(timing["scopes"][0]["kind"] == "pass" &&
+				timing["scopes"][0]["occurrence"] == 2 && timing["scopes"][1]["kind"] == "other" &&
+				timing["scopes"][1]["occurrence"].is_null(),
+				"Sequence GPU timing exposes pass instance identities separately from other scopes");
 			const auto accepted = Json::parse(SerializeApplicationControlCaptureAdmission(8, { CaptureAdmissionStatus::Accepted, CaptureAdmissionReason::None, 12 }));
 			context.Check(accepted["ok"] == true && accepted["admission"] == "Accepted" && accepted["jobId"] == 12,
 				"Accepted admission exposes one job identity");

@@ -96,9 +96,24 @@ or cancelled sequences is not a complete-run measurement.
 
 Use Release, validation off, no DevTools and observation tools off for ordinary
 performance runs. Compare configurations within the same backend/session where
-possible; repeat small differences to assess noise. Graph exports cannot provide
-identity-preserving per-pass GPU timing; use sequence scope statistics for the
-claims they actually support.
+possible; repeat small differences to assess noise.
+
+Each scope summary carries `kind: pass|other` and `occurrence`. A pass uses the
+same `{name, occurrence}` as graph declarations: occurrence is assigned once in
+declaration order and includes culled declarations. Equal names with different
+occurrences remain separate series. An `other` scope has null occurrence and is
+never joined to a graph pass. Identity is local to one graph, not a stable
+semantic identity across versions. A scope counts only frames that recorded it.
+
+Single-frame graph exports keep `execution.gpuTiming` unavailable. Use the
+sequence response's scope statistics for measurement; these statistics are not
+yet a separately published timing product. Check graph joins, sample counts and
+backend identity parity with the hidden regression:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite pass-profile-identity -Configuration Release -Rhi dx12,vulkan
+```
 
 Develop uses standard validation; `start -Validation gpu` opts into DX12 GPU-based
 validation, while `-Validation off` disables it. One-shot launches use

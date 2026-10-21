@@ -1312,6 +1312,9 @@ namespace gglab
 			{
 				Json scope = SerializeTimingSummary(series.m_Milliseconds);
 				scope["name"] = series.m_Name;
+				scope["kind"] = series.m_Kind == GpuProfileScopeKind::RenderGraphPass ? "pass" : "other";
+				scope["occurrence"] = series.m_Kind == GpuProfileScopeKind::RenderGraphPass ?
+					Json(series.m_Occurrence) : Json(nullptr);
 				scopes.push_back(std::move(scope));
 			}
 			return Json{

@@ -196,7 +196,7 @@ namespace gglab
 	}
 
 	void VulkanGpuProfiler::BeginScope(
-		VkCommandBuffer commandBuffer, std::string_view name) noexcept
+		VkCommandBuffer commandBuffer, GpuProfileScope identity) noexcept
 	{
 		if (!m_ActiveFrame || !m_ActiveFrame->m_Recording || commandBuffer == VK_NULL_HANDLE)
 		{
@@ -212,7 +212,8 @@ namespace gglab
 		}
 
 		ScopeRecord scope{};
-		scope.m_Name = name.empty() ? "Unnamed Pass" : std::string(name);
+		scope.m_Sample = { .m_Name = identity.m_Name.empty() ? "Unnamed Scope" : std::string(identity.m_Name),
+			.m_Kind = identity.m_Kind, .m_Occurrence = identity.m_Occurrence };
 		scope.m_BeginQuery = WriteTimestamp(frame, commandBuffer);
 		frame.m_Scopes.push_back(std::move(scope));
 		frame.m_ScopeStack.push_back(static_cast<int32_t>(frame.m_Scopes.size() - 1));
@@ -293,18 +294,7 @@ namespace gglab
 			}
 			const double elapsed = milliseconds(
 				frame.m_Timestamps[scope.m_BeginQuery], frame.m_Timestamps[scope.m_EndQuery]);
-			auto sample = std::ranges::find_if(snapshot.m_Samples,
-				[&scope](const GpuProfileSample& candidate)
-				{
-					return candidate.m_Name == scope.m_Name;
-				});
-			if (sample == snapshot.m_Samples.end())
-			{
-				snapshot.m_Samples.push_back({ .m_Name = scope.m_Name });
-				sample = std::prev(snapshot.m_Samples.end());
-			}
-			sample->m_Milliseconds += elapsed;
-			++sample->m_CallCount;
+			AccumulateGpuProfileSample(snapshot, scope.m_Sample.GetScope(), elapsed);
 		}
 
 		frame.m_PendingResults = false;

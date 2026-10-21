@@ -48,6 +48,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameOutcome.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "Graphics/RenderSceneBuilder.h"
@@ -1175,7 +1176,11 @@ namespace gglab
 			{
 				GGLAB_ASSERT(!m_IsRendering);
 			}
-			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
+			void BeginGpuProfileScope(GpuProfileScope scope) noexcept override
+			{
+				++m_BeginProfileCount;
+				AccumulateGpuProfileSample(m_Profile, scope, 1.0);
+			}
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle pipeline) noexcept override
 			{
@@ -1248,6 +1253,7 @@ namespace gglab
 			std::vector<uint32_t> m_LastInlineWords;
 			uint32_t m_LastInlineParameter = 0;
 			uint32_t m_LastInlineOffset = 0;
+			GpuProfileFrameSnapshot m_Profile;
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
 			uint32_t m_FlushBarrierCount = 0;
@@ -1282,7 +1288,11 @@ namespace gglab
 			{
 			}
 			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
-			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
+			void BeginGpuProfileScope(GpuProfileScope scope) noexcept override
+			{
+				++m_BeginProfileCount;
+				AccumulateGpuProfileSample(m_Profile, scope, 1.0);
+			}
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle pipeline) noexcept override
 			{
@@ -1328,6 +1338,7 @@ namespace gglab
 			std::vector<uint32_t> m_LastInlineWords;
 			uint32_t m_LastInlineParameter = 0;
 			uint32_t m_LastInlineOffset = 0;
+			GpuProfileFrameSnapshot m_Profile;
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
 			uint32_t m_FlushBarrierCount = 0;
@@ -2847,6 +2858,80 @@ namespace gglab
 				device.m_CompletedFenceValue = independentFence.m_Value;
 				pool.ReclaimCompleted();
 			}
+		}
+
+		void RunPassProfileIdentityContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			TransientResourcePool pool(&device);
+			RecordingGraphicsCommandContext graphics;
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			const auto culled = [](RenderGraph::RGBuilder&, Data&) {};
+			graph.AddPass<Data>("Repeated", culled);
+			graph.AddTrivialSideEffectPass("Repeated", [](RGExecuteContext&) {});
+			graph.AddTrivialSideEffectPass("Separator", [](RGExecuteContext&) {});
+			graph.AddPass<Data>("Repeated", culled);
+			graph.AddTrivialSideEffectPass("Repeated", [](RGExecuteContext&) {});
+
+			RGSnapshot declared;
+			BuildRenderGraphSnapshot(graph, declared);
+			context.Check(declared.m_Passes.size() == 5 &&
+				declared.m_Passes[0].m_Occurrence == 1 &&
+				declared.m_Passes[1].m_Occurrence == 2 &&
+				declared.m_Passes[2].m_Occurrence == 1 &&
+				declared.m_Passes[3].m_Occurrence == 3 &&
+				declared.m_Passes[4].m_Occurrence == 4,
+				"Pass identity exists before compilation and counts every same-name declaration");
+			const bool compiled = graph.Compile();
+			context.Check(compiled, "Same-name profiling fixture compiles with culled declarations");
+			if (!compiled)
+			{
+				return;
+			}
+			RGDeferredCommitList commits;
+			RGExecuteContext execute(commits, { .m_GraphicsCommandContext = &graphics });
+			graph.Execute(execute);
+			commits.Discard();
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const auto& samples = graphics.m_Profile.m_Samples;
+			context.Check(snapshot.m_Passes[0].m_Culled && snapshot.m_Passes[3].m_Culled &&
+				samples.size() == 3 &&
+				samples[0].GetScope() == GpuProfileScope{ "Repeated", GpuProfileScopeKind::RenderGraphPass, 2 } &&
+				samples[1].GetScope() == GpuProfileScope{ "Separator", GpuProfileScopeKind::RenderGraphPass, 1 } &&
+				samples[2].GetScope() == GpuProfileScope{ "Repeated", GpuProfileScopeKind::RenderGraphPass, 4 } &&
+				graphics.m_BeginProfileCount == graphics.m_EndProfileCount,
+				"Non-contiguous live passes retain declaration identity through execution and scope recording");
+			bool matchesGraph = true;
+			for (const auto& sample : samples)
+			{
+				matchesGraph &= std::ranges::any_of(snapshot.m_Passes,
+					[&sample](const RGSnapshotPassInfo& pass)
+					{
+						return !pass.m_Culled && pass.m_Name == sample.m_Name &&
+							pass.m_Occurrence == sample.m_Occurrence;
+					});
+			}
+			context.Check(matchesGraph && snapshot.m_DuplicatePassNames ==
+				std::vector<std::string>{ "Repeated" },
+				"Graph diagnostics and GPU scopes consume the same identity without recounting executed passes");
+
+			AccumulateGpuProfileSample(graphics.m_Profile, { "Repeated" }, 3.0);
+			AccumulateGpuProfileSample(graphics.m_Profile, { "IBL.Bake" }, 4.0);
+			AccumulateGpuProfileSample(graphics.m_Profile, { "Repeated" }, 5.0);
+			AccumulateGpuProfileSample(graphics.m_Profile, { "Upload" }, 6.0);
+			context.Check(samples.size() == 6 && samples[0].m_Milliseconds == 1.0 &&
+				samples[2].m_Milliseconds == 1.0 && samples[3].m_Milliseconds == 8.0 &&
+				samples[3].m_CallCount == 2 && samples[3].GetScope() == GpuProfileScope{ "Repeated" } &&
+				samples[4].GetScope() == GpuProfileScope{ "IBL.Bake" } &&
+				samples[5].GetScope() == GpuProfileScope{ "Upload" },
+				"Native profiler accumulation separates pass occurrences and same-name other scopes");
+			context.Check(graph.Compile(), "Recompilation preserves the declaration-owned pass identities");
+			RGSnapshot recompiled;
+			BuildRenderGraphSnapshot(graph, recompiled);
+			context.Check(recompiled.m_Passes[4].m_Occurrence == declared.m_Passes[4].m_Occurrence,
+				"Recompilation never advances occurrence counters");
 		}
 
 		void RunDeferredCommitContractTests(SelfTestContext& context) noexcept
@@ -7289,6 +7374,12 @@ namespace gglab
 					directComputeContext.m_BeginProfileCount == 1 &&
 					directComputeContext.m_EndProfileCount == 1,
 					"RenderGraph profiles Graphics, Compute, and Copy on their selected command contexts");
+				context.Check(graphicsContext.m_Profile.m_Samples.size() == 2 &&
+					directComputeContext.m_Profile.m_Samples.size() == 1 &&
+					directComputeContext.m_Profile.m_Samples[0].m_Kind == GpuProfileScopeKind::RenderGraphPass &&
+					directComputeContext.m_Profile.m_Samples[0].m_Name == encoderSnapshot.m_Passes[1].m_Name &&
+					directComputeContext.m_Profile.m_Samples[0].m_Occurrence == encoderSnapshot.m_Passes[1].m_Occurrence,
+					"Compute encoder routing preserves the graph's profiling identity");
 			}
 
 			RecordingGraphicsCommandContext batchingGraphicsContext;
@@ -12853,6 +12944,7 @@ namespace gglab
 		RunFrameSubmissionContractTests(context);
 		RunRenderFrameOutcomeContractTests(context);
 		RunDeferredCommitContractTests(context);
+		RunPassProfileIdentityContractTests(context);
 		RunPreviewSubmissionContractTests(context);
 		RunPreviewPassContractTests(context);
 		RunFrameConstantUploadTests(context);

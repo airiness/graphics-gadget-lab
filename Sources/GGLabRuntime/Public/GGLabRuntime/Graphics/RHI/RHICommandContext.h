@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
@@ -401,7 +402,7 @@ namespace gglab
 		virtual void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept = 0;
 		virtual void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept = 0;
-		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
+		virtual void BeginGpuProfileScope(GpuProfileScope scope) noexcept { GGLAB_UNUSED(scope); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};
 

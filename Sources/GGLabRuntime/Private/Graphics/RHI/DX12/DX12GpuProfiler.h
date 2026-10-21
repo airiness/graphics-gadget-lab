@@ -35,7 +35,7 @@ namespace gglab
 		void BeginFrame(uint32_t frameSlot, DX12CommandList& commandList) noexcept;
 		void EndFrame(uint32_t frameSlot, DX12CommandList& commandList) noexcept;
 		void AbortFrame(uint32_t frameSlot) noexcept;
-		void BeginScope(DX12CommandList& commandList, std::string_view name) noexcept;
+		void BeginScope(DX12CommandList& commandList, GpuProfileScope identity) noexcept;
 		void EndScope(DX12CommandList& commandList) noexcept;
 
 	private:
@@ -45,7 +45,7 @@ namespace gglab
 
 		struct ScopeRecord
 		{
-			std::string m_Name;
+			GpuProfileSample m_Sample;
 			uint32_t m_BeginQuery = InvalidQueryIndex;
 			uint32_t m_EndQuery = InvalidQueryIndex;
 		};

@@ -125,7 +125,6 @@ namespace gglab
 
 			void BuildPasses() noexcept
 			{
-				std::unordered_map<std::string, uint32_t> occurrences;
 				for (uint32_t passIndex = 0; passIndex < m_PassNodes.size(); ++passIndex)
 				{
 					const auto& declaration = m_PassNodes[passIndex];
@@ -138,7 +137,7 @@ namespace gglab
 					passInfo.m_Index = passIndex;
 					passInfo.m_ExecutionOrder = compiledPass ? compiledPass->m_ExecutionOrder : -1;
 					passInfo.m_Name = ToSnapshotName(declaration.m_NameId);
-					passInfo.m_Occurrence = ++occurrences[passInfo.m_Name];
+					passInfo.m_Occurrence = declaration.m_NameOccurrence;
 					if (passInfo.m_Occurrence == 2)
 					{
 						m_OutSnapshot.m_DuplicatePassNames.push_back(passInfo.m_Name);

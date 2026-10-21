@@ -459,11 +459,11 @@ namespace gglab
 		TrackBufferUse(copy.m_Destination);
 	}
 
-	void VulkanGraphicsCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	void VulkanGraphicsCommandContext::BeginGpuProfileScope(GpuProfileScope scope) noexcept
 	{
 		if (m_GpuProfiler)
 		{
-			m_GpuProfiler->BeginScope(m_CommandBuffer, name);
+			m_GpuProfiler->BeginScope(m_CommandBuffer, scope);
 		}
 	}
 
@@ -1122,9 +1122,9 @@ namespace gglab
 		m_GraphicsContext->CopyTextureToBuffer(copy);
 	}
 
-	void VulkanComputeCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	void VulkanComputeCommandContext::BeginGpuProfileScope(GpuProfileScope scope) noexcept
 	{
-		m_GraphicsContext->BeginGpuProfileScope(name);
+		m_GraphicsContext->BeginGpuProfileScope(scope);
 	}
 
 	void VulkanComputeCommandContext::EndGpuProfileScope() noexcept

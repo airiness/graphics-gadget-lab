@@ -36,6 +36,7 @@ $catalog = @(
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },
     @{ name = 'capture-on-ready'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureOnReady.ps1' }) },
+    @{ name = 'pass-profile-identity'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestPassProfileIdentity.ps1' }) },
     @{ name = 'nonfinite-coverage'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestNonFiniteCoverage.ps1' }) },
     @{ name = 'nonfinite-generations'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestNonFiniteGenerations.ps1' }) },
     @{ name = 'nonfinite-injection'; group = 'gpu'; configurations = @('Debug', 'Develop'); steps = @(@{ path = 'Tests/Verification/TestNonFiniteInjection.ps1' }) },

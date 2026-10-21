@@ -163,7 +163,7 @@ namespace gglab
 		m_ActiveFrame = nullptr;
 	}
 
-	void DX12GpuProfiler::BeginScope(DX12CommandList& commandList, std::string_view name) noexcept
+	void DX12GpuProfiler::BeginScope(DX12CommandList& commandList, GpuProfileScope identity) noexcept
 	{
 		if (!m_ActiveFrame || !m_ActiveFrame->m_Recording)
 		{
@@ -179,7 +179,8 @@ namespace gglab
 		}
 
 		ScopeRecord scope{};
-		scope.m_Name = name.empty() ? "Unnamed Pass" : std::string(name);
+		scope.m_Sample = { .m_Name = identity.m_Name.empty() ? "Unnamed Scope" : std::string(identity.m_Name),
+			.m_Kind = identity.m_Kind, .m_Occurrence = identity.m_Occurrence };
 		scope.m_BeginQuery = WriteTimestamp(frame, commandList);
 		frame.m_Scopes.push_back(std::move(scope));
 		frame.m_ScopeStack.push_back(static_cast<int32_t>(frame.m_Scopes.size() - 1));
@@ -301,15 +302,7 @@ namespace gglab
 
 			const double milliseconds = static_cast<double>(end - begin) * 1000.0 /
 				static_cast<double>(m_TimestampFrequency);
-			auto sampleIter = std::ranges::find_if(snapshot.m_Samples,
-				[&scope](const GpuProfileSample& sample) { return sample.m_Name == scope.m_Name; });
-			if (sampleIter == snapshot.m_Samples.end())
-			{
-				snapshot.m_Samples.push_back({ .m_Name = scope.m_Name });
-				sampleIter = std::prev(snapshot.m_Samples.end());
-			}
-			sampleIter->m_Milliseconds += milliseconds;
-			++sampleIter->m_CallCount;
+			AccumulateGpuProfileSample(snapshot, scope.m_Sample.GetScope(), milliseconds);
 		}
 
 		frame.m_PendingResults = false;

@@ -669,11 +669,16 @@ namespace gglab
 			timing.m_FrameMilliseconds.push_back(profile.m_FrameMilliseconds);
 			for (const GpuProfileSample& sample : profile.m_Samples)
 			{
-				auto series = std::ranges::find(
-					timing.m_Scopes, sample.m_Name, &FrameSequenceGpuTimingSeries::m_Name);
+				auto series = std::ranges::find_if(timing.m_Scopes,
+					[&sample](const FrameSequenceGpuTimingSeries& candidate)
+					{
+						return GpuProfileScope{ candidate.m_Name, candidate.m_Kind,
+							candidate.m_Occurrence } == sample.GetScope();
+					});
 				if (series == timing.m_Scopes.end())
 				{
-					timing.m_Scopes.push_back({ .m_Name = sample.m_Name });
+					timing.m_Scopes.push_back({ .m_Name = sample.m_Name,
+						.m_Kind = sample.m_Kind, .m_Occurrence = sample.m_Occurrence });
 					series = std::prev(timing.m_Scopes.end());
 				}
 				series->m_Milliseconds.push_back(sample.m_Milliseconds);

@@ -330,7 +330,8 @@ namespace gglab
 			const std::string_view passName = pass.m_NameId.Name();
 			if (passCommandContext)
 			{
-				passCommandContext->BeginGpuProfileScope(passName);
+				passCommandContext->BeginGpuProfileScope({
+					passName, GpuProfileScopeKind::RenderGraphPass, pass.m_NameOccurrence });
 			}
 			for (const auto resourceIndex : pass.m_AcquireResources)
 			{

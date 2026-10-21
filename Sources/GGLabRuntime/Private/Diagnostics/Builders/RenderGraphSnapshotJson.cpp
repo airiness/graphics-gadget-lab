@@ -295,7 +295,7 @@ namespace gglab
 				{ "resolvedBarriers", Json::array() },
 				{ "observationNodes", Json::array() },
 				{ "gpuTiming",{ { "status", "unavailable" },
-					{ "reason", "Backend scopes aggregate by name without individual pass identity." } } } };
+					{ "reason", "GPU timing is collected over a sequence, not a single graph export." } } } };
 			for (const auto& allocation : record.m_Allocations)
 			{
 				execution["allocations"].push_back({

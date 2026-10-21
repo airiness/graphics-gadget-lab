@@ -50,7 +50,7 @@ namespace gglab
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override;
 		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override;
-		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void BeginGpuProfileScope(GpuProfileScope scope) noexcept override;
 		void EndGpuProfileScope() noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
@@ -159,7 +159,7 @@ namespace gglab
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override;
 		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override;
-		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void BeginGpuProfileScope(GpuProfileScope scope) noexcept override;
 		void EndGpuProfileScope() noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;

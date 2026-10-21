@@ -119,6 +119,8 @@ namespace gglab
 	{
 		std::string m_Name;
 		std::vector<double> m_Milliseconds;
+		GpuProfileScopeKind m_Kind = GpuProfileScopeKind::Other;
+		uint32_t m_Occurrence = 0;
 	};
 
 	struct FrameSequenceGpuTiming
