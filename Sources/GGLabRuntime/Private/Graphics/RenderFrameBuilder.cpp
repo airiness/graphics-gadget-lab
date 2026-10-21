@@ -321,6 +321,10 @@ namespace gglab
 		result.m_FrameConstants = sceneBuildResult.m_Constants;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
 		result.m_RenderSceneStatus = sceneBuildResult.m_Status;
+		// Publication is independent of scene upload success. Submission feedback
+		// separately decides whether this scene could consume the published state.
+		result.m_RenderScene.m_WorldLightingGeneration =
+			info.m_Renderer.GetBakingStatus().m_ActiveGeneration;
 
 		const auto* objectBuffer = info.m_Renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = info.m_Renderer.GetMaterialStructuredBuffer();

@@ -2,9 +2,12 @@
 
 #include "AssetPreparationTracker.h"
 #include "Lab/LabSessionBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <entt/entity/entity.hpp>
+
+#include <optional>
 
 namespace gglab
 {
@@ -22,6 +25,8 @@ namespace gglab
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
+		[[nodiscard]] std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
+			const LabParameterId& id) const noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
@@ -54,5 +59,9 @@ namespace gglab
 		entt::entity m_StepOccluder = entt::null;
 		bool m_EnableCameraInput = false;
 		bool m_FixtureConfigured = false;
+		bool m_HasLightingOverride = false;
+		EnvironmentLightingSettings m_PreviousLighting{};
+		LabLightingParameterRequest m_LightingRequest{};
+		uint32_t m_LastRequestedSamples = 0;
 	};
 }

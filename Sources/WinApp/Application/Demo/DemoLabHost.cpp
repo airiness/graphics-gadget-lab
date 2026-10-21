@@ -139,9 +139,9 @@ namespace gglab
 		m_Runtime.OnFrameReady(serial);
 	}
 
-	void DemoLabHost::OnFrameBuilt(uint64_t serial) noexcept
+	void DemoLabHost::OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept
 	{
-		m_Runtime.OnFrameBuilt(serial);
+		m_Runtime.OnFrameBuilt(serial, lightingGeneration);
 	}
 
 	void DemoLabHost::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept

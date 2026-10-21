@@ -9,6 +9,9 @@
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 
+#include <cstdint>
+#include <optional>
+
 namespace gglab
 {
 	class Camera;
@@ -31,6 +34,14 @@ namespace gglab
 		}
 	};
 
+	// Evidence from a synchronous owning-domain control call, not a predicted generation.
+	// A present zero-initialized value registers the binding before its first change.
+	struct LabLightingParameterRequest
+	{
+		uint64_t m_PreviousGeneration = 0;
+		uint64_t m_Generation = 0;
+	};
+
 	class LabSessionBase
 	{
 	public:
@@ -45,6 +56,14 @@ namespace gglab
 		[[nodiscard]] std::optional<LabParameterBatchResult> SetParameters(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		LabChangeImpact ResetParameters() noexcept;
+		// Only explicitly bound Deferred lighting parameters are admitted. After the
+		// handler, evidence must cover exactly its one actual generation advance.
+		[[nodiscard]] virtual std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
+			const LabParameterId& id) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			return std::nullopt;
+		}
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
 

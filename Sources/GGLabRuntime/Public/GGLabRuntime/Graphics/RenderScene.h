@@ -42,6 +42,8 @@ namespace gglab
 	{
 		std::optional<AtmosphereSettings> m_Atmosphere;
 		std::optional<ResolvedWorldSun> m_WorldSun;
+		// Published lighting state frozen by the frame builder after its publication tick.
+		uint64_t m_WorldLightingGeneration = 0;
 		uint32_t m_ObjectBaseIndex = 0;
 		uint32_t m_ObjectCount = 0;
 

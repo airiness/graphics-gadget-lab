@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-Exercises Immediate Lab session batches, receipt ownership and native GTAO changes.
-No deferred effects, GPU fault injection or sequence event qualification is claimed.
+Exercises Immediate batches and bound Deferred lighting publication/consumption.
+Use -Scope lighting for the two lighting fixtures only. No GPU fault injection or
+sequence event qualification is claimed.
 #>
 [CmdletBinding()]
 param(
@@ -9,7 +10,9 @@ param(
     [string[]]$Rhi = @('dx12', 'vulkan'),
     [string]$OutputDirectory,
     [string]$RunDirectory,
-    [int]$TimeoutSeconds = 300
+    [int]$TimeoutSeconds = 300,
+    [ValidateSet('all','lighting')]
+    [string]$Scope = 'all'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
@@ -52,11 +55,109 @@ function Capture-AO([string]$Label, [double]$Radius) {
         -not $metadata.temporal.gtao.temporalAccumulation) "$backend-$Label-built-settings"
     return Get-VerificationCaptureFile $capture '.png'
 }
+function Test-LightingParameters([string]$Config, [string]$Backend, [string]$Parent) {
+    foreach ($fixture in @(
+        @{lab='gglab.lab.gtao';parameter='gtao.ibl.sample_count';immediate='gtao.radius';type='float';value=2.0;name='texture'},
+        @{lab='gglab.lab.atmosphere_range';parameter='atmosphere_range.ibl.sample_count';immediate='atmosphere_range.aerial_perspective';type='bool';value=$false;name='physical'}
+    )) {
+        $directory=Join-Path $Parent $fixture.name
+        $null=New-Item -ItemType Directory -Path $directory
+        $session="lighting-$runId-$Config-$Backend-$($fixture.name)"
+        $start=$null; $caseFailure=$null; $arms=@()
+        try {
+            $start=Invoke-VerificationSession start $session @{Configuration=$Config;Rhi=$Backend;Lab=$fixture.lab;
+                WindowSize='640x360';NoDevTools=$true;Validation='standard';StateRoot="$directory/state";
+                StartTimeoutSeconds=$TimeoutSeconds}
+            Write-VerificationJson "$directory/start.json" $start
+            $status=Wait-VerificationCondition -Poll {Invoke-VerificationSession status $session} `
+                -Until {param($r) $r.frame -and $r.frame.ready} -TimeoutSeconds $TimeoutSeconds
+            Check ($status.capabilities.labParameterControl.effectClasses -contains 'Deferred' -and
+                $status.capabilities.labParameterControl.maxLightingItemsPerBatch -eq 1) "$Backend-$($fixture.name)-deferred-capability"
+            $before=Invoke-VerificationSession parameters $session
+            $desc=@($before.parameters | Where-Object id -eq $fixture.parameter)[0]
+            Check ($desc.declaredClass -eq 'Deferred' -and $desc.type -eq 'uint' -and $desc.setSupported) "$Backend-$($fixture.name)-bound-descriptor"
+            $rejected=Set-Values @(@{id=$fixture.immediate;type=$fixture.type;value=$fixture.value},
+                @{id=$fixture.parameter;type='uint';value=4097}) -AllowFailure
+            $after=Invoke-VerificationSession parameters $session
+            Check (-not $rejected.ok -and $after.revision -eq $before.revision -and
+                @($after.parameters | Where-Object id -eq $fixture.immediate)[0].current -eq
+                @($before.parameters | Where-Object id -eq $fixture.immediate)[0].current) "$Backend-$($fixture.name)-invalid-mixed-batch-is-atomic"
+            $first=if ($desc.current -eq 32) {64} else {32}
+            $second=if ($first -eq 32) {64} else {32}
+            foreach ($samples in @($first,$second,$first)) {
+                $index=$arms.Count
+                $items=@(@{id=$fixture.parameter;type='uint';value=$samples})
+                if ($index -eq 0) { $items+=@{id=$fixture.immediate;type=$fixture.type;value=$fixture.value} }
+                $options=if ($index -eq 0) {@{KeepResult=$true}} else {@{WaitConsumed=$true;KeepResult=$true}}
+                $applied=Set-Values $items $options
+                Write-VerificationJson "$directory/arm-$index-applied.json" $applied
+                $lighting=@($applied.batch.items | Where-Object id -eq $fixture.parameter)[0]
+                Check ($null -ne $lighting.applied -and $lighting.identity.domain -eq 'lighting' -and
+                    $lighting.identity.generation -gt 0) "$Backend-$($fixture.name)-$index-default-application-has-real-identity"
+                $done=Wait-VerificationCondition -Poll {Invoke-VerificationSession parameter-result $session @{BatchId=$applied.batchId}} `
+                    -Until {param($r) $r.batch.terminal} -TimeoutSeconds $TimeoutSeconds
+                Write-VerificationJson "$directory/arm-$index-result.json" $done
+                $lighting=@($done.batch.items | Where-Object id -eq $fixture.parameter)[0]
+                Check ($done.batch.succeeded -and $lighting.state -eq 'Consumed' -and
+                    $lighting.requested -eq $lighting.applied -and $lighting.published -ge $lighting.applied -and
+                    $lighting.firstConsumed -ge $lighting.published -and $lighting.identity.revision -eq $done.batch.revision) "$Backend-$($fixture.name)-$index-deferred-stamps"
+                if ($index -eq 0) {
+                    $immediate=@($done.batch.items | Where-Object id -eq $fixture.immediate)[0]
+                    Check ($immediate.state -eq 'Consumed' -and $immediate.published -eq $immediate.applied -and
+                        $immediate.identity.domain -eq '' -and $immediate.firstConsumed -le $lighting.firstConsumed) "$Backend-$($fixture.name)-mixed-items-retain-their-own-classes"
+                }
+                $capture=Invoke-VerificationSession capture $session @{SettleFrames=8;OutputDirectory=$directory;Label="arm-$index"}
+                Write-VerificationJson "$directory/arm-$index-capture.json" $capture
+                $metadata=Get-Content (Get-VerificationCaptureFile $capture '.json') -Raw | ConvertFrom-Json
+                Check ($metadata.sceneInputs.environment.activeIBLGeneration -eq $lighting.identity.generation -and
+                    $metadata.sceneInputs.environment.iblConfig.specularSamples -eq $samples -and
+                    $capture.frameSerial -ge $lighting.firstConsumed) "$Backend-$($fixture.name)-$index-captured-frame-uses-published-generation"
+                $taken=Invoke-VerificationSession parameter-result $session @{BatchId=$done.batchId;Consume=$true}
+                Check $taken.consumed "$Backend-$($fixture.name)-$index-explicit-terminal-consumption"
+                $revision=$done.batch.revision
+                $same=Set-Values @(@{id=$fixture.parameter;type='uint';value=$samples}) @{WaitConsumed=$true}
+                Check ($same.consumed -and $same.batch.succeeded -and $same.batch.revision -eq $revision -and
+                    $same.batch.items[0].state -eq 'NoChange' -and $null -eq $same.batch.items[0].published -and
+                    $null -eq $same.batch.items[0].firstConsumed) "$Backend-$($fixture.name)-$index-nochange-keeps-generation-and-revision"
+                $arms+=@{samples=$samples;generation=$lighting.identity.generation;revision=$revision}
+            }
+        } catch {$caseFailure=$_;throw}
+        finally {
+            if ($start) {
+                try {$null=Stop-VerificationSession $session -StartedSession $start -ReceiptPath "$directory/stop.json" -RequireCleanExit}
+                catch {
+                    if ($null -eq $caseFailure) {throw}
+                    [Console]::Error.WriteLine("Cleanup also failed: $($_.Exception.Message)")
+                }
+            }
+        }
+        $log=Get-Content -LiteralPath $start.outputLog -Raw
+        if ($log -match '\[(error|critical)\]|VUID-|GPU_BASED_VALIDATION_|assertion failed') {throw "Native validation errors: $($start.outputLog)"}
+        foreach ($arm in $arms) {
+            $pattern='IBL bake generation '+$arm.generation+' published atomically \(cacheStages=(\d+), gpuStages=(\d+)'
+            $match=[regex]::Match($log,$pattern)
+            Check $match.Success "$Backend-$($fixture.name)-publication-log-matches-identity"
+            $arm.cacheStages=[int]$match.Groups[1].Value; $arm.gpuStages=[int]$match.Groups[2].Value
+        }
+        if ($fixture.name -eq 'texture') {
+            Check ($arms[0].gpuStages -gt 0 -and $arms[2].cacheStages -eq 4 -and $arms[2].gpuStages -eq 0 -and
+                $arms[2].generation -gt $arms[0].generation) "$Backend-cache-restoration-publishes-a-new-generation-without-gpu-build-stages"
+        } else {
+            Check (@($arms | Where-Object {$_.cacheStages -ne 0 -or $_.gpuStages -eq 0}).Count -eq 0) "$Backend-physical-sky-uses-actual-uncached-gpu-bakes"
+        }
+        Write-VerificationJson "$directory/lighting-arms.json" $arms
+    }
+}
 try {
     foreach ($config in $Configuration) {
         foreach ($backend in $Rhi) {
             $directory = Join-Path $output "$config-$backend"
             $null = New-Item -ItemType Directory -Path $directory
+            if ($Scope -eq 'lighting') {
+                Test-LightingParameters $config $backend $directory
+                $cases += @{configuration=$config;backend=$backend;scope=$Scope;passed=$true;directory=$directory}
+                continue
+            }
             $session = "params-$runId-$config-$backend"
             $start = $null; $caseFailure = $null
             try {
@@ -150,10 +251,11 @@ try {
             }
             $log=Get-Content -LiteralPath $start.outputLog -Raw
             if ($log -match '\[(error|critical)\]|VUID-|GPU_BASED_VALIDATION_|assertion failed') { throw "Native validation errors: $($start.outputLog)" }
+            Test-LightingParameters $config $backend $directory
             $cases += @{configuration=$config;backend=$backend;passed=$true;directory=$directory}
         }
     }
-    $result=@{ok=$true;directory=$output;checks=$checks;cases=$cases}
+    $result=@{ok=$true;directory=$output;scope=$Scope;checks=$checks;cases=$cases}
 } catch { $result=@{ok=$false;directory=$output;checks=$checks;cases=$cases;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result
 [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 12))

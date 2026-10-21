@@ -1526,7 +1526,9 @@ namespace gglab
 		response["capabilities"] = {
 			{ "labParameterControl", {
 				{ "sources", Json::array({ "lab" }) },
-				{ "effectClasses", Json::array({ "Immediate" }) },
+				{ "effectClasses", Json::array({ "Immediate", "Deferred" }) },
+				{ "deferredDomains", Json::array({ "lighting" }) },
+				{ "maxLightingItemsPerBatch", 1 },
 				{ "maxBatches", 1 },
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "resultConsumption", "explicit" },

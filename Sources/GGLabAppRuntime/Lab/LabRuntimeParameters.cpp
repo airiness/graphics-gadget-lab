@@ -1,6 +1,8 @@
 #include "Lab/LabRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/IBLBakeTypes.h"
+#include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 
 #include <algorithm>
 #include <limits>
@@ -8,6 +10,14 @@
 
 namespace gglab
 {
+	bool LabRuntime::SupportsParameterEffect(const LabParameterDesc& desc) const noexcept
+	{
+		const auto effect = GetParameterEffectClass(desc);
+		return effect == ParameterEffectClass::Immediate ||
+			(effect == ParameterEffectClass::Deferred && m_ActiveSession &&
+				m_ActiveSession->GetLightingParameterRequest(desc.m_Id).has_value());
+	}
+
 	uint64_t LabRuntime::RequestParameterBatch(
 		std::span<const LabParameterValue> values, std::string& error) noexcept
 	{
@@ -33,12 +43,14 @@ namespace gglab
 		{
 			return 0;
 		}
+		size_t lightingItems = 0;
 		for (const LabParameterValue& value : values)
 		{
-			if (GetParameterEffectClass(candidate.Find(value.m_Id)->m_Desc) !=
-				ParameterEffectClass::Immediate)
+			const auto& desc = candidate.Find(value.m_Id)->m_Desc;
+			lightingItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
+			if (!SupportsParameterEffect(desc) || lightingItems > 1)
 			{
-				error = "This Lab transaction path supports only Immediate effects; deferred/rebuild domain integration is pending.";
+				error = "Unsupported effect: a batch accepts Immediate items and at most one explicitly bound Deferred lighting item; rebuild effects remain unsupported.";
 				return 0;
 			}
 		}
@@ -76,21 +88,31 @@ namespace gglab
 			return;
 		}
 		auto& batch = *m_ParameterBatch;
-		batch.m_Status.m_Items.clear();
-		bool terminal = !batch.m_Receipts.empty();
+		// A failed item ends the complete wait. Close unresolved siblings while
+		// preserving every stamp already reached; never leave pending items in a terminal batch.
 		for (const auto& receipt : batch.m_Receipts)
 		{
-			batch.m_Status.m_Items.push_back(receipt.GetSnapshot());
-			terminal &= receipt.GetSnapshot().IsTerminal();
 			if (receipt.GetSnapshot().m_State == ParameterEffectState::Failed)
 			{
-				batch.m_Status.m_State = LabParameterBatchState::Failed;
 				batch.m_Status.m_Failure = receipt.GetSnapshot().m_Failure;
+				break;
 			}
 		}
-		if (terminal && batch.m_Status.m_State != LabParameterBatchState::Failed)
+		const bool failed = !batch.m_Status.m_Failure.empty();
+		batch.m_Status.m_Items.clear();
+		bool terminal = !batch.m_Receipts.empty();
+		for (auto& receipt : batch.m_Receipts)
 		{
-			batch.m_Status.m_State = LabParameterBatchState::Finished;
+			if (failed && !receipt.GetSnapshot().IsTerminal())
+			{
+				(void)receipt.Fail("BatchEffectFailed: " + batch.m_Status.m_Failure);
+			}
+			batch.m_Status.m_Items.push_back(receipt.GetSnapshot());
+			terminal &= receipt.GetSnapshot().IsTerminal();
+		}
+		if (terminal)
+		{
+			batch.m_Status.m_State = failed ? LabParameterBatchState::Failed : LabParameterBatchState::Finished;
 		}
 	}
 
@@ -190,7 +212,8 @@ namespace gglab
 		for (const auto& value : batch.m_Status.m_Values)
 		{
 			auto receipt = ParameterEffectReceipt::Begin(value.m_Id,
-				ParameterEffectClass::Immediate, m_ParameterRevision, serial);
+				GetParameterEffectClass(m_ActiveSession->GetParameters().Find(value.m_Id)->m_Desc),
+				m_ParameterRevision, serial);
 			GGLAB_ASSERT(receipt);
 			if (std::ranges::find(applied->m_Changed, value.m_Id) == applied->m_Changed.end())
 			{
@@ -205,11 +228,29 @@ namespace gglab
 			const uint64_t requested =
 				m_CreateInfo.m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
 			batch.m_ApplyBakeGeneration = requested != batch.m_FrameBakeRequestGeneration ? requested : 0;
+			for (auto& receipt : batch.m_Receipts)
+			{
+				if (receipt.GetSnapshot().IsTerminal() ||
+					receipt.GetSnapshot().m_DeclaredClass != ParameterEffectClass::Deferred)
+				{
+					continue;
+				}
+				const auto evidence = m_ActiveSession->GetLightingParameterRequest(receipt.GetSnapshot().m_Parameter);
+				if (!evidence || evidence->m_PreviousGeneration != batch.m_FrameBakeRequestGeneration ||
+					evidence->m_Generation != requested || requested == 0 ||
+					requested - batch.m_FrameBakeRequestGeneration != 1)
+				{
+					(void)receipt.Fail("LightingEffectUnproven: the bound handler did not account for exactly one Runtime request.");
+					continue;
+				}
+				batch.m_AttributedLightingRequest = receipt.RecordApplied(ParameterEffectClass::Deferred,
+					{ batch.m_Status.m_Revision, "lighting", requested }, serial);
+			}
 		}
 		RefreshParameterBatchStatus();
 	}
 
-	void LabRuntime::OnFrameBuilt(uint64_t serial) noexcept
+	void LabRuntime::OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept
 	{
 		if (!m_ParameterBatch || m_ParameterBatch->m_Status.IsTerminal() ||
 			serial != m_ParameterBatch->m_FrameSerial || !m_ActiveSession)
@@ -234,7 +275,27 @@ namespace gglab
 				(void)receipt.Supersede();
 				continue;
 			}
-			if (batch.m_ApplyBakeGeneration != 0)
+			if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Deferred)
+			{
+				const auto identity = receipt.GetSnapshot().m_Identity;
+				if (lightingGeneration != 0 && lightingGeneration == identity.m_Generation)
+				{
+					// This generation came from the immutable built scene, not a later live query.
+					(void)receipt.RecordPublished(identity, serial);
+					batch.m_Consumed.push_back({ index, identity });
+				}
+				else if (bakeRequest != identity.m_Generation)
+				{
+					(void)receipt.Supersede();
+				}
+				else if (m_CreateInfo.m_Services.m_RenderServices.m_Environment->GetBakingStatus().m_Stage ==
+					IBLBakeStage::Failed)
+				{
+					(void)receipt.Fail("LightingPublicationFailed");
+				}
+				continue;
+			}
+			if (batch.m_ApplyBakeGeneration != 0 && !batch.m_AttributedLightingRequest)
 			{
 				// Preserve actual application evidence even though it contradicts the
 				// declaration. The owning Runtime supplied this request generation.
@@ -242,7 +303,8 @@ namespace gglab
 					{ batch.m_Status.m_Revision, "lighting", batch.m_ApplyBakeGeneration }, serial);
 				continue;
 			}
-			if (bakeRequest != batch.m_FrameBakeRequestGeneration)
+			if (bakeRequest != batch.m_FrameBakeRequestGeneration &&
+				(!batch.m_AttributedLightingRequest || bakeRequest != batch.m_ApplyBakeGeneration))
 			{
 				// A later change has no proven attribution to the batch.
 				(void)receipt.Fail("UnexpectedLightingTransition: effect attribution is unavailable for this frame.");
@@ -263,6 +325,11 @@ namespace gglab
 			feedback.m_RenderFrameSerial != m_ParameterBatch->m_FrameSerial ||
 			!feedback.m_SubmittedFence.IsValid())
 		{
+			return;
+		}
+		if (feedback.m_RenderSceneStatus != RenderSceneBuildStatus::Ready)
+		{
+			m_ParameterBatch->m_Consumed.clear();
 			return;
 		}
 		for (const auto& consumed : m_ParameterBatch->m_Consumed)

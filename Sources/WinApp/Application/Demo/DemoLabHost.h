@@ -29,7 +29,7 @@ namespace gglab
 		void Update() noexcept override;
 		void OnRuntimeFailed(std::string_view reason) noexcept override;
 		void OnFrameReady(uint64_t serial) noexcept override;
-		void OnFrameBuilt(uint64_t serial) noexcept override;
+		void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept override;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override;
 		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
 

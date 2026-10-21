@@ -52,15 +52,17 @@ namespace gglab
 			m_CommandQueue.RequestRunConfig(config);
 		}
 		// One accepted owner-held transaction/result at a time. Admission validates
-		// without mutating live state; only Immediate effects are supported here.
+		// without mutating live state. One explicitly bound Deferred lighting item
+		// may share a batch with Immediate items; rebuild effects are unsupported.
 		[[nodiscard]] uint64_t RequestParameterBatch(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
 		[[nodiscard]] const LabParameterBatchStatus* GetParameterBatchStatus() const noexcept;
 		[[nodiscard]] std::optional<LabParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
 		void OnRuntimeFailed(std::string_view reason) noexcept;
 		void OnFrameReady(uint64_t serial) noexcept;
-		void OnFrameBuilt(uint64_t serial) noexcept;
+		void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept;
 		void ProcessPendingCommands() noexcept;
 		void TickTransitions() noexcept;
 		LabSnapshot GetLabSnapshot(
@@ -122,6 +124,7 @@ namespace gglab
 			uint64_t m_FrameSerial = 0;
 			uint64_t m_FrameBakeRequestGeneration = 0;
 			uint64_t m_ApplyBakeGeneration = 0;
+			bool m_AttributedLightingRequest = false;
 		};
 		std::optional<ParameterBatch> m_ParameterBatch;
 		uint64_t m_NextParameterBatchId = 1;

@@ -6,6 +6,7 @@
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
+#include "Parameters/ParameterEffectReceipt.h"
 
 #include <nlohmann/json.hpp>
 
@@ -123,7 +124,32 @@ namespace gglab
 			context.Check(status["capabilities"]["labParameterControl"]["maxBatches"] == 1 &&
 				status["capabilities"]["labParameterControl"]["maxItems"] == 128 &&
 				status["parameterControl"]["batch"] == superseded && status["parameterControl"]["revision"] == 7,
-				"Status advertises bounded Immediate-only support and borrows the actual receipt");
+				"Status advertises bounded parameter support and borrows the actual receipt");
+		}
+
+		void RunDeferredParameterSerializationTests(SelfTestContext& context) noexcept
+		{
+			LabParameterBatchStatus batch{ .m_BatchId = 10, .m_Revision = 8,
+				.m_Lab = LabId("gglab.lab.fixture"), .m_State = LabParameterBatchState::Applying };
+			auto receipt = ParameterEffectReceipt::Begin(LabParameterId("lighting"), ParameterEffectClass::Deferred, 8, 30);
+			const ParameterStateIdentity identity{ 8, "lighting", 11 };
+			(void)receipt->RecordApplied(ParameterEffectClass::Deferred, identity, 30);
+			batch.m_Items.push_back(receipt->GetSnapshot());
+			const Json pending = SerializeApplicationControlParameterBatch(batch);
+			context.Check(!pending["terminal"] && pending["succeeded"].is_null() &&
+				pending["items"][0]["declaredClass"] == "Deferred" && pending["items"][0]["state"] == "Applied" &&
+				pending["items"][0]["identity"]["domain"] == "lighting" &&
+				pending["items"][0]["identity"]["generation"] == 11 &&
+				pending["items"][0]["published"].is_null() && pending["items"][0]["firstConsumed"].is_null(),
+				"An applied Deferred wire receipt retains domain identity without claiming publication or consumption");
+			(void)receipt->RecordPublished(identity, 34);
+			(void)receipt->RecordSubmittedFrame(identity, 35);
+			batch.m_State = LabParameterBatchState::Finished;
+			batch.m_Items[0] = receipt->GetSnapshot();
+			const Json consumed = SerializeApplicationControlParameterBatch(batch);
+			context.Check(consumed["succeeded"] && consumed["items"][0]["applied"] == 30 &&
+				consumed["items"][0]["published"] == 34 && consumed["items"][0]["firstConsumed"] == 35,
+				"Deferred serialization preserves distinct application, publication and actual consuming frames");
 		}
 
 		void RunParseTests(SelfTestContext& context) noexcept
@@ -783,6 +809,7 @@ namespace gglab
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
 	{
 		RunParameterControlTests(context);
+		RunDeferredParameterSerializationTests(context);
 		RunParseTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);

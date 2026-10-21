@@ -5,10 +5,17 @@ Use the script and application from the same revision. Check
 older v4 application. The extension adds commands and status fields; existing
 capture/result/sequence fields and their v4 meanings are unchanged.
 
-This path controls only the active Lab's declared **Immediate** parameters.
-Host `view.*` / `environment.*`, named profiles, deferred lighting publication,
-rebuild transactions, sequence events and parameter metadata in saved frame
-artifacts are not implemented. `set` rejects during an active sequence; a new
+This path controls the active Lab's Immediate parameters and **one explicitly
+bound Deferred lighting parameter per batch**, optionally mixed with Immediate
+items. Current bindings are `gtao.ibl.sample_count` and
+`atmosphere_range.ibl.sample_count` (uint, 1–4096). They change IBL specular sample
+count through the owning Runtime control, preserving generation attribution.
+The GTAO fixture covers texture-IBL cache restoration; Atmosphere Range covers
+Physical Sky, whose current producer deliberately skips texture caches.
+
+Host `view.*` / `environment.*`, named profiles, arbitrary authored sun/atmosphere
+parameter bindings, rebuild transactions, sequence events and parameter metadata
+in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
 sequence rejects while a parameter batch is pending. Do not use external `set`
 as a substitute for scheduled events.
 
@@ -46,7 +53,9 @@ Every item takes exactly `id`, `type`, `value`. Types must match the descriptor:
 
 Integer types reject fractional/exponent JSON numbers even when mathematically
 integral. Float inputs use float storage, without range clamping. A batch has
-1–128 items with distinct ids (1–128 UTF-8 bytes each). Unknown ids, mismatched
+1–128 items with distinct ids (1–128 UTF-8 bytes each). Capability fields additionally
+advertise `effectClasses`, `deferredDomains: ["lighting"]` and
+`maxLightingItemsPerBatch: 1`. Unbound Deferred declarations reject. Unknown ids, mismatched
 types, invalid enums/ranges, unsupported effects and any invalid item reject the
 whole batch without changing live values or revision. String parsing for Debug
 startup `-LabParameters` is a separate path.
@@ -88,15 +97,33 @@ does not expose the inactive Lab owner. Process termination ends retention.
 
 `batch` includes source/content, state (`Queued`, `Applying`, `Finished`,
 `Failed`), revision (null until application), fixed supported impact `Immediate`,
-owned `values`, `items`, failure and terminal/success indicators. Each effect item
+owned `values`, `items`, failure and terminal/success indicators. The impact
+means no Lab rebuild; it is independent of the per-item effect class. Each effect item
 reports its declared class, actual revision/domain/generation identity, state,
 requested/applied/published/firstConsumed stamps and failure. Immediate
 `published == applied`; only the exact successfully submitted frame state can
 supply `firstConsumed`. `NoChange` records requested/applied confirmation but no
 publication/consumption and introduces no revision or handler/bake request.
 Superseded, failed and unreached effects are terminal without successful
-consumption. An apply handler that actually starts a lighting transition fails
-the receipt rather than claiming Immediate qualification.
+consumption. The bound handler must report one actual Runtime generation advance,
+with the previous and resulting generation matching the apply boundary. Unsupported
+or unproven attribution fails; it is never predicted from the descriptor or the
+`ibl` readiness gate. A mixed batch retains per-item classes and stamps.
+
+The Runtime frame builder freezes the published lighting generation in its
+`RenderScene`. That immutable scene state, followed by successful submission,
+establishes Deferred consumption. Publication observed in an aborted build stays
+recorded, while retry alone can supply firstConsumed. New requests/values can
+supersede pending states; a post-build request cannot relabel an already built
+frame. A terminal failed batch closes unresolved siblings without erasing their
+existing evidence. Accepted application/effect failure does not roll back live
+values or pretend already-started GPU work was cancelled.
+
+NoChange lighting causes no new request; an all-NoChange batch invokes no handler.
+The fixtures change global bake quality only while entered and restore the owned
+override on exit. If no sample override was used, they do not restore unrelated
+quality edits. Declared Immediate behavior contradicting an actual lighting
+request continues to fail as EffectMismatch.
 
 Timeout and polling transport failure preserve `batchId` without resubmitting,
 cancelling or inventing an outcome. A lost consuming response may already have
@@ -108,10 +135,17 @@ resubmit. File/transport failures still print one JSON error result.
 ## Verify on native backends
 
 `Tests/Verification/RunVerification.ps1 -Suite session-parameters` runs the hidden
-GTAO Lab on both RHIs by default and accepts Debug/Develop/Release. It exercises
-atomic rejection, NoWait/KeepResult/wait/explicit consumption, NoChange, identity
-and sequence exclusion; captures final-AO diagnostics for two radii, checks the
-actual built settings, and measures sampled pixel changes. Native standard
-validation is requested. Inspect the capture PNGs and logs as well. It is scoped
-GTAO parameter qualification, not all-Lab/Deferred/event, cross-backend identity,
-performance or real driver-fault proof.
+GTAO and Atmosphere Range Labs on both RHIs by default and accepts
+Debug/Develop/Release. For a focused rerun, invoke
+`TestSessionParameters.ps1 -Scope lighting` directly with typed `-Rhi` arrays;
+the default scope includes both Immediate and Deferred coverage. Immediate
+regression covers atomic rejection, result
+ownership, NoChange, identity and sequence exclusion, plus final-AO diagnostics
+for two radii. Deferred regression changes sample count in three arms, verifies
+mixed classes and four stamps, matches the actual captured generation/config,
+and checks publication logs: a restored texture configuration must publish a
+new generation with four cached stages and no GPU build stages; Physical Sky
+must use uncached GPU bakes. Native standard validation is requested. Inspect
+the capture PNGs and logs as well. These are scoped fixture parameter contracts,
+not arbitrary sun/profile, scheduled-event, cross-backend identity, performance
+or real driver-fault proof.

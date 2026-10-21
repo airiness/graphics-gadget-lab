@@ -5,6 +5,8 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -14,6 +16,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include <variant>
 
 namespace gglab
 {
@@ -23,6 +26,7 @@ namespace gglab
 		const LabParameterId PreviewTapId("gtao.preview_tap");
 		const LabParameterId FinalAOFormatId("gtao.final_ao_format");
 		const LabParameterId RadiusId("gtao.radius");
+		const LabParameterId IBLSamplesId("gtao.ibl.sample_count");
 		const LabParameterId FalloffStartId("gtao.falloff_start");
 		const LabParameterId FalloffEndId("gtao.falloff_end");
 		const LabParameterId PowerId("gtao.power");
@@ -252,6 +256,17 @@ namespace gglab
 			.m_MinValue = LabValue(100.0f),
 			.m_MaxValue = LabValue(10000.0f),
 			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = IBLSamplesId,
+			.m_Name = "IBL Specular Samples",
+			.m_Group = "Lighting Publication Fixture",
+			.m_Type = LabParameterType::UInt,
+			.m_DefaultValue = createInfo.m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+				.m_BakeConfig.m_PrefilteredSpecularSampleCount,
+			.m_MinValue = LabValue(uint32_t(1)),
+			.m_MaxValue = LabValue(uint32_t(4096)),
+			.m_EffectClass = ParameterEffectClass::Deferred,
+			}));
 		ApplyImmediateParameters();
 	}
 
@@ -291,17 +306,38 @@ namespace gglab
 
 	void GTAOLabSession::OnEnter() noexcept
 	{
+		m_PreviousLighting = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+		m_HasLightingOverride = true;
+		m_LightingRequest = {};
+		const auto* samples = GetParameters().Find(IBLSamplesId);
+		// Explicit startup/restored values must be re-established after the old
+		// session restores its override, even when equal to this descriptor's default.
+		m_LastRequestedSamples = samples->m_Dirty ? 0 : std::get<uint32_t>(samples->m_Desc.m_DefaultValue);
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
 			PostProcessPreviewChannel::AmbientOcclusion);
 		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount(
 			PostProcessPreviewChannel::AmbientOcclusion);
-		RequestSelectedPreview();
+		// Save the previous preview before the apply handler selects this Lab's tap.
+		ApplyImmediateParameters();
 	}
 
 	void GTAOLabSession::OnExit() noexcept
 	{
+		if (m_HasLightingOverride && m_LightingRequest.m_Generation != 0)
+		{
+			auto& control = *m_Services.m_EnvironmentLightingControl;
+			if (m_PreviousLighting.m_QualityPreset == IBLQualityPreset::Custom)
+			{
+				control.SetPrefilteredSpecularSampleCount(m_PreviousLighting.m_BakeConfig.m_PrefilteredSpecularSampleCount);
+			}
+			else
+			{
+				control.SetQualityPreset(m_PreviousLighting.m_QualityPreset);
+			}
+		}
+		m_HasLightingOverride = false;
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
@@ -330,9 +366,31 @@ namespace gglab
 		m_ViewportHeight = height;
 	}
 
+	std::optional<LabLightingParameterRequest> GTAOLabSession::GetLightingParameterRequest(
+		const LabParameterId& id) const noexcept
+	{
+		return id == IBLSamplesId ? std::optional(m_LightingRequest) : std::nullopt;
+	}
+
 	void GTAOLabSession::ApplyImmediateParameters() noexcept
 	{
 		const auto& parameters = GetParameters();
+		if (m_HasLightingOverride)
+		{
+			const uint32_t samples = parameters.Get(IBLSamplesId, uint32_t(1));
+			const auto current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+			const bool requestedChange = samples != m_LastRequestedSamples;
+			m_LastRequestedSamples = samples;
+			// Other Immediate edits must not replay an unused/default lighting override.
+			if (requestedChange && samples != current.m_BakeConfig.m_PrefilteredSpecularSampleCount)
+			{
+				m_LightingRequest.m_PreviousGeneration =
+					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				m_Services.m_EnvironmentLightingControl->SetPrefilteredSpecularSampleCount(samples);
+				m_LightingRequest.m_Generation =
+					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+			}
+		}
 		GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Enabled =
 			parameters.Get(EnabledId, true);
 		m_SelectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
@@ -684,7 +742,7 @@ namespace gglab
 				"Validates deterministic GTAO surface selection, depth-derived normals, "
 				"bilateral denoise, and depth-aware upsample.",
 			.m_Kind = LabKind::Pipeline,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 

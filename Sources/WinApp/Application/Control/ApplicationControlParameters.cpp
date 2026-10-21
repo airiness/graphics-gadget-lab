@@ -300,7 +300,7 @@ namespace gglab
 				{ "type", ParameterTypes[static_cast<size_t>(desc.m_Type)] },
 				{ "impact", Impact(desc.m_Impact) },
 				{ "declaredClass", EffectClass(GetParameterEffectClass(desc)) },
-				{ "setSupported", GetParameterEffectClass(desc) == ParameterEffectClass::Immediate },
+				{ "setSupported", runtime->SupportsParameterEffect(desc) },
 				{ "editPolicy", desc.m_EditPolicy == LabParameterEditPolicy::Continuous ? "Continuous" : "CommitOnEditEnd" },
 				{ "default", Value(desc.m_DefaultValue) },
 				{ "current", Value(parameter.m_Value) },

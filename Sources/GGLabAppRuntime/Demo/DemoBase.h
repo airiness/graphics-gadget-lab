@@ -72,7 +72,11 @@ namespace gglab
 		// before settings/planning, then freeze consumed identities after scene build.
 		virtual void OnRuntimeFailed(std::string_view reason) noexcept { GGLAB_UNUSED(reason); }
 		virtual void OnFrameReady(uint64_t serial) noexcept { GGLAB_UNUSED(serial); }
-		virtual void OnFrameBuilt(uint64_t serial) noexcept { GGLAB_UNUSED(serial); }
+		virtual void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept
+		{
+			GGLAB_UNUSED(serial);
+			GGLAB_UNUSED(lightingGeneration);
+		}
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);

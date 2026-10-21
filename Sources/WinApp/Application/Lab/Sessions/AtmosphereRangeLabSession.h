@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
 #include <memory>
+#include <optional>
 
 namespace gglab
 {
@@ -22,6 +23,8 @@ namespace gglab
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
+		[[nodiscard]] std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
+			const LabParameterId& id) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -34,5 +37,7 @@ namespace gglab
 		LoadingProgress m_LoadingProgress{};
 		EnvironmentLightingSettings m_PreviousEnvironment{};
 		bool m_HasEnvironmentOverride = false;
+		LabLightingParameterRequest m_LightingRequest{};
+		uint32_t m_LastRequestedSamples = 0;
 	};
 }

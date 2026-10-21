@@ -647,7 +647,7 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
-		demo->OnFrameBuilt(frame.m_FrameSerial);
+		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
 		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
@@ -655,7 +655,7 @@ namespace gglab
 			.m_PostProcess = capturedView.m_PostProcess,
 			.m_Shadows = frame.m_DirectionalShadowSettings,
 			.m_Environment = m_RenderServices.m_Environment->GetEnvironmentLightingSettings(),
-			.m_ActiveIBLGeneration = m_RenderServices.m_Environment->GetBakingStatus().m_ActiveGeneration,
+			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
 			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
 			.m_Sun = frame.m_RenderScene.m_WorldSun,
 			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,

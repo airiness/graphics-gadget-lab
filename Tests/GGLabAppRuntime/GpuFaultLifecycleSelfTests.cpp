@@ -123,6 +123,8 @@ namespace gglab
 			uint64_t m_ParameterBuiltSerial = 0;
 			float m_ParameterBuiltRadius = 0.0f;
 			bool m_SkipParameterFrame = false;
+			bool m_SkipLightingPublication = false;
+			bool m_RebakeAfterParameterBuild = false;
 			bool m_UnrelatedLightingChange = false;
 			EnvironmentLightingControlBase* m_ParameterEnvironment = nullptr;
 			bool m_ChangeParameterAfterBuild = false;
@@ -759,6 +761,10 @@ namespace gglab
 				{
 					m_Probe.m_ParameterBuiltRadius = frame.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Radius;
 					m_Probe.m_ParameterBuiltSerial = frame.m_FrameSerial;
+					if (std::exchange(m_Probe.m_RebakeAfterParameterBuild, false))
+					{
+						m_Probe.m_ParameterEnvironment->RequestRebake();
+					}
 					if (std::exchange(m_Probe.m_ChangeParameterAfterBuild, false))
 					{
 						auto* session = m_Probe.m_ParameterRuntime->GetActiveSession();
@@ -909,6 +915,22 @@ namespace gglab
 					.m_EffectClass = ParameterEffectClass::Deferred }));
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("rebake"),
 					.m_Name = "Misdeclared rebake", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
+				for (const auto id : { "lighting", "broken-lighting" })
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId(id),
+						.m_Name = id, .m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(1),
+						.m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(4096)),
+						.m_EffectClass = ParameterEffectClass::Deferred }));
+				}
+			}
+			std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
+				const LabParameterId& id) const noexcept override
+			{
+				if (id == LabParameterId("lighting") || id == LabParameterId("broken-lighting"))
+				{
+					return m_LightingRequest;
+				}
+				return std::nullopt;
 			}
 			void Update(float) noexcept override { GetCamera().Update(); }
 
@@ -916,6 +938,23 @@ namespace gglab
 			void ApplyImmediateParameters() noexcept override
 			{
 				++m_Probe.m_ParameterApplications;
+				const auto samples = GetParameters().Get(LabParameterId("lighting"), uint32_t(1));
+				const auto broken = GetParameters().Get(LabParameterId("broken-lighting"), uint32_t(1));
+				if (samples != m_Samples || broken != m_Broken)
+				{
+					m_LightingRequest.m_PreviousGeneration =
+						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+					m_Services.m_EnvironmentLightingControl->RequestRebake();
+					m_LightingRequest.m_Generation =
+						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+					if (broken != m_Broken)
+					{
+						// Deliberately misreport owner evidence; admission remains valid.
+						m_LightingRequest.m_PreviousGeneration = 0;
+					}
+					m_Samples = samples;
+					m_Broken = broken;
+				}
 				GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Radius =
 					GetParameters().Get(LabParameterId("radius"), 1.0f);
 				const bool rebake = GetParameters().Get(LabParameterId("rebake"), false);
@@ -927,6 +966,9 @@ namespace gglab
 			}
 			LifetimeProbe& m_Probe;
 			bool m_Rebake = false;
+			uint32_t m_Samples = 1;
+			uint32_t m_Broken = 1;
+			LabLightingParameterRequest m_LightingRequest{};
 		};
 
 		std::unique_ptr<LabSessionBase> CreateParameterTestLab(const LabSessionCreateInfo& info) noexcept
@@ -999,11 +1041,21 @@ namespace gglab
 					}
 				}
 			}
-			void OnFrameBuilt(uint64_t serial) noexcept override
+			void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept override
 			{
 				if (m_Lab)
 				{
-					m_Lab->OnFrameBuilt(serial);
+					m_Lab->OnFrameBuilt(serial, lightingGeneration);
+					const auto* batch = m_Lab->GetParameterBatchStatus();
+					if (batch && m_Probe.m_SkipLightingPublication && std::ranges::any_of(batch->m_Items,
+						[](const auto& item)
+						{
+							return item.m_DeclaredClass == ParameterEffectClass::Deferred && item.m_Published.has_value();
+						}))
+					{
+						m_Probe.m_SkipLightingPublication = false;
+						m_Probe.m_SkipParameterFrame = true;
+					}
 				}
 			}
 			World& GetWorld() noexcept override
@@ -2354,6 +2406,141 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunLightingParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& lab = *probe.m_ParameterRuntime;
+			std::string error;
+			const auto request = [&](uint32_t value, bool mixed = false)
+				{
+					std::vector<LabParameterValue> values{ { LabParameterId("lighting"), value } };
+					if (mixed)
+					{
+						values.push_back({ LabParameterId("radius"), 2.0f });
+					}
+					return lab.RequestParameterBatch(values, error);
+				};
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						// This fault backend deliberately holds cache-readback fences. This
+						// success scenario explicitly delivers completion so a later bake can start.
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					}
+					return condition();
+				};
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration != 0; }),
+				"Deferred fixture establishes an actual published production bake before its experiment");
+			const std::array tooMany{ LabParameterValue{ LabParameterId("lighting"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("broken-lighting"), uint32_t(2) } };
+			checks.Check(lab.RequestParameterBatch(tooMany, error) == 0 && !lab.GetParameterBatchStatus(),
+				"Multiple lighting bindings reject atomically before any owner handler runs");
+			const auto applications = probe.m_ParameterApplications;
+			const auto id = request(2, true);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto first = *lab.GetParameterBatchStatus();
+			checks.Check(id != 0 && first.m_Items.size() == 2 && !first.IsTerminal() &&
+				first.m_Items[0].m_State == ParameterEffectState::Applied && !first.m_Items[0].m_Published &&
+				first.m_Items[1].m_State == ParameterEffectState::Consumed &&
+				first.m_Items[0].m_Identity.m_Domain == "lighting" &&
+				first.m_Items[0].m_Identity.m_Generation == environment.GetBakeRequestGeneration(),
+				"A mixed real frame consumes Immediate state while Deferred state keeps its own applied generation pending");
+			checks.Check(!lab.TakeParameterBatchResult(id) && request(3) == 0,
+				"Pending Deferred effects retain their one result slot and cannot be consumed early");
+			checks.Check(tickUntil([&]() { return lab.GetParameterBatchStatus()->IsTerminal(); }),
+				"The production scheduler eventually publishes the exact Deferred generation");
+			const auto done = lab.TakeParameterBatchResult(id);
+			checks.Check(done && done->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				done->m_Items[0].m_Applied == first.m_Items[0].m_Applied &&
+				done->m_Items[0].m_Published > done->m_Items[0].m_Applied &&
+				done->m_Items[0].m_FirstConsumed == done->m_Items[0].m_Published &&
+				probe.m_ParameterApplications == applications + 1,
+				"Deferred stamps distinguish application from actual publication and successful first consumption without reapplying");
+			const auto generation = environment.GetBakeRequestGeneration();
+			const auto revision = lab.GetParameterRevision();
+			const auto nochange = request(2);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = lab.TakeParameterBatchResult(nochange);
+			checks.Check(unchanged && unchanged->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				!unchanged->m_Items[0].m_Published && !unchanged->m_Items[0].m_FirstConsumed &&
+				lab.GetParameterRevision() == revision && environment.GetBakeRequestGeneration() == generation &&
+				probe.m_ParameterApplications == applications + 1,
+				"Deferred NoChange makes no bake request, handler call, publication or revision");
+			const auto replacedId = request(3);
+			GGLAB_UNUSED(runtime.Tick());
+			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(4));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto replaced = lab.TakeParameterBatchResult(replacedId);
+			checks.Check(replaced && replaced->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!replaced->m_Items[0].m_Published && !replaced->m_Items[0].m_FirstConsumed,
+				"A later UI lighting request supersedes an unpublished exact generation without consuming its replacement");
+			const auto retryId = request(5);
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]() { return lab.GetParameterBatchStatus()->m_Items.size() == 1 &&
+				lab.GetParameterBatchStatus()->m_Items[0].m_Published.has_value(); }),
+				"A publication can be observed in a frame subsequently aborted by the real RAII path");
+			const auto aborted = *lab.GetParameterBatchStatus();
+			checks.Check(!aborted.IsTerminal() && !aborted.m_Items[0].m_FirstConsumed,
+				"An aborted publication frame is never Deferred firstConsumed");
+			lab.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed,
+				.m_SubmittedFence = probe.m_LastEndFence,
+				.m_RenderFrameSerial = *aborted.m_Items[0].m_Published });
+			checks.Check(!lab.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed &&
+				lab.GetParameterBatchStatus()->m_Items[0].m_Published == aborted.m_Items[0].m_Published,
+				"A failed scene upload cannot consume a lighting publication even with a valid fence and matching serial");
+			probe.m_RebakeAfterParameterBuild = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto retried = lab.TakeParameterBatchResult(retryId);
+			checks.Check(retried && retried->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				retried->m_Items[0].m_Published == aborted.m_Items[0].m_Published &&
+				retried->m_Items[0].m_FirstConsumed > retried->m_Items[0].m_Published &&
+				environment.GetBakeRequestGeneration() != retried->m_Items[0].m_Identity.m_Generation,
+				"Retry consumes the frozen built lighting generation even when a later live request advances after build");
+			const auto supersededAfterPublication = request(6);
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]() { return lab.GetParameterBatchStatus()->m_Items.size() == 1 &&
+				lab.GetParameterBatchStatus()->m_Items[0].m_Published.has_value(); }),
+				"Deferred publication is retained before a later UI replacement");
+			const auto oldPublished = lab.GetParameterBatchStatus()->m_Items[0].m_Published;
+			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(7));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto overwritten = lab.TakeParameterBatchResult(supersededAfterPublication);
+			checks.Check(overwritten && overwritten->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				overwritten->m_Items[0].m_Published == oldPublished && !overwritten->m_Items[0].m_FirstConsumed,
+				"A published but aborted Deferred state keeps publication evidence when superseded before consumption");
+			const std::array broken{ LabParameterValue{ LabParameterId("broken-lighting"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("radius"), 3.0f } };
+			const auto brokenId = lab.RequestParameterBatch(broken, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto failed = lab.TakeParameterBatchResult(brokenId);
+			checks.Check(failed && failed->m_State == LabParameterBatchState::Failed &&
+				std::ranges::all_of(failed->m_Items, [](const auto& item) { return item.IsTerminal(); }) &&
+				failed->m_Failure.find("LightingEffectUnproven") != std::string::npos,
+				"Unproven domain attribution closes every pending sibling instead of returning a terminal batch with unfinished items");
+			const auto fatalId = request(8);
+			probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+			checks.Check(fatalId != 0 && runtime.Tick() == AppRuntimeTickResult::Fatal &&
+				lab.GetParameterBatchStatus()->IsTerminal() && !lab.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed,
+				"Fatal submission closes an applied Deferred wait without inventing publication or consumption");
+			runtime.Shutdown();
+		}
+
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
@@ -2543,6 +2730,7 @@ namespace gglab
 		const auto root = std::filesystem::temp_directory_path() /
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);
 		RunFrameOutcomeScenarios(context, root / "outcomes");

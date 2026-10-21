@@ -9,12 +9,15 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <variant>
+
 namespace gglab
 {
 	namespace
 	{
 		const LabParameterId AerialPerspectiveId("atmosphere_range.aerial_perspective");
 		const LabParameterId TemporalAAId("atmosphere_range.temporal_aa");
+		const LabParameterId IBLSamplesId("atmosphere_range.ibl.sample_count");
 		constexpr const char* AtmosphereRangeModelPath =
 			"Assets/Models/GGLabAtmosphereRange/GGLabAtmosphereRange.gltf";
 	}
@@ -37,6 +40,18 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = false,
+			}));
+		GGLAB_UNUSED(GetMutableParameters().Add({
+			.m_Id = IBLSamplesId,
+			.m_Name = "IBL Specular Samples",
+			.m_Group = "Lighting",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = createInfo.m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+				.m_BakeConfig.m_PrefilteredSpecularSampleCount,
+			.m_MinValue = LabValue(uint32_t(1)),
+			.m_MaxValue = LabValue(uint32_t(4096)),
+			.m_EffectClass = ParameterEffectClass::Deferred,
 			}));
 		auto& profile = GetMutableViewRenderProfile();
 		profile.m_EnableScenePreExposure = true;
@@ -62,6 +77,30 @@ namespace gglab
 		}
 		profile.m_Lighting.m_EnableAerialPerspective = aerial;
 		profile.m_TemporalAA.m_Enabled = temporal;
+		// Preparation can run beside another active Lab. Only the entered owner
+		// may change the process lighting service.
+		if (m_HasEnvironmentOverride)
+		{
+			const uint32_t samples = GetParameters().Get(IBLSamplesId, uint32_t(1));
+			const auto current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+			const bool requestedChange = samples != m_LastRequestedSamples;
+			m_LastRequestedSamples = samples;
+			// Other Immediate edits must not replay an unused/default lighting override.
+			if (requestedChange && samples != current.m_BakeConfig.m_PrefilteredSpecularSampleCount)
+			{
+				m_LightingRequest.m_PreviousGeneration =
+					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				m_Services.m_EnvironmentLightingControl->SetPrefilteredSpecularSampleCount(samples);
+				m_LightingRequest.m_Generation =
+					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+			}
+		}
+	}
+
+	std::optional<LabLightingParameterRequest> AtmosphereRangeLabSession::GetLightingParameterRequest(
+		const LabParameterId& id) const noexcept
+	{
+		return id == IBLSamplesId ? std::optional(m_LightingRequest) : std::nullopt;
 	}
 
 	void AtmosphereRangeLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
@@ -145,11 +184,17 @@ namespace gglab
 		// Loading sessions must not change the active Lab's environment.
 		m_PreviousEnvironment = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
 		m_HasEnvironmentOverride = true;
+		m_LightingRequest = {};
+		const auto* samples = GetParameters().Find(IBLSamplesId);
+		// Explicit startup/restored values must be re-established after the old
+		// session restores its override, even when equal to this descriptor's default.
+		m_LastRequestedSamples = samples->m_Dirty ? 0 : std::get<uint32_t>(samples->m_Desc.m_DefaultValue);
 		auto& control = *m_Services.m_EnvironmentLightingControl;
 		control.SetIntensity(1.0f);
 		control.SetRotationRadians(0.0f);
 		control.SetSkyboxEnabled(true);
 		control.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+		ApplyImmediateParameters();
 	}
 
 	void AtmosphereRangeLabSession::OnExit() noexcept
@@ -163,6 +208,18 @@ namespace gglab
 		control.SetRotationRadians(m_PreviousEnvironment.m_RotationRadians);
 		control.SetSkyboxEnabled(m_PreviousEnvironment.m_EnableSkybox);
 		control.SetBackgroundMode(m_PreviousEnvironment.m_BackgroundMode);
+		if (m_LightingRequest.m_Generation != 0)
+		{
+			if (m_PreviousEnvironment.m_QualityPreset == IBLQualityPreset::Custom)
+			{
+				control.SetPrefilteredSpecularSampleCount(
+					m_PreviousEnvironment.m_BakeConfig.m_PrefilteredSpecularSampleCount);
+			}
+			else
+			{
+				control.SetQualityPreset(m_PreviousEnvironment.m_QualityPreset);
+			}
+		}
 		m_HasEnvironmentOverride = false;
 		// Asset scope remains owned by this session until LabRuntime's last-use fence retires it.
 	}
@@ -177,7 +234,7 @@ namespace gglab
 			.m_Category = "Lighting",
 			.m_Description = "Known-distance contrast targets with physical sun, sky and independent aerial-perspective baseline.",
 			.m_Kind = LabKind::Scene,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 	std::unique_ptr<LabSessionBase> AtmosphereRangeLabSession::Create(const LabSessionCreateInfo& createInfo) noexcept
