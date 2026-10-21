@@ -3258,9 +3258,12 @@ namespace gglab
 			observedGraph.m_ObservationNodes.emplace_back(0, RGObservationTarget{
 				.m_Address = { .m_Resource = "Observed" }, .m_Kind = RGObservationKind::NonFiniteScan });
 			const auto graphJson = nlohmann::json::parse(SerializeFrameGraphExport(observedGraph, observedMetadata, {}, false, false));
-			context.Check(graphJson["schemaVersion"] == 3 && graphJson["observation"]["nonFiniteWatch"] == true &&
-				graphJson["observation"]["resourceExport"] == false && graphJson["execution"]["observationNodes"][0]["kind"] == "NonFiniteScan",
-				"Scan-only graphs use v3 and distinguish scan activity from resource-copy observation");
+			context.Check(graphJson["schemaVersion"] == RenderGraphExportSchemaVersion &&
+				graphJson["observation"]["nonFiniteWatch"] == true &&
+				graphJson["observation"]["resourceExport"] == false &&
+				graphJson["observation"]["nodeKinds"] == nlohmann::json::array({ "NonFiniteScan" }) &&
+				graphJson["execution"]["observationNodes"][0]["kind"] == "NonFiniteScan",
+				"Scan-only graphs list their node kinds and distinguish scan activity from resource-copy observation");
 			const auto resourceJson = nlohmann::json::parse(SerializeResourceExportMetadata({}, observedMetadata, {}, {}, {}));
 			context.Check(resourceJson["schemaVersion"] == 2 && resourceJson["observation"]["nonFiniteWatch"] == true,
 				"Resource sidecars with concurrent scans use v2 without asserting production coverage");
@@ -4817,6 +4820,7 @@ namespace gglab
 					full["frame"]["frame"]["serial"] == 17 && full["submission"]["fenceValue"] == 19 &&
 					full["submission"]["completed"] == true && full["observation"]["graph"] == true &&
 					full["frame"]["adapterDriverIdentity"] == "Capture.TestAdapter" &&
+					full["observation"]["nodeKinds"].empty() && summary["observation"]["nodeKinds"].empty() &&
 					summary["mode"] == "summary" && !summary.contains("execution"),
 					"Graph JSON embeds the same frame block and completed submission identity in both modes");
 			}

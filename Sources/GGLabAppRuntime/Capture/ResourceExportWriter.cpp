@@ -6,6 +6,7 @@
 #include <format>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 #include <nlohmann/json.hpp>
 
 namespace gglab
@@ -217,13 +218,17 @@ namespace gglab
 		const ResourceExportSubmission& submission, bool summary, bool resourceExportActive)
 	{
 		Json root = Json::parse(SerializeRenderGraphSnapshot(snapshot, summary));
+		// Request-level activity joins the node kinds the graph serializer derived.
+		Json nodeKinds = std::move(root.at("observation").at("nodeKinds"));
+		root.erase("observation");
 		root["frame"] = Frame(metadata, submission);
 		root["frameSerial"] = metadata.m_FrameSerial;
 		root["submission"] = Submission(submission);
 		root["observation"] = {
 			{ "graph", true },
 			{ "resourceExport", resourceExportActive },
-			{ "nonFiniteWatch", metadata.m_NonFiniteScanActive } };
+			{ "nonFiniteWatch", metadata.m_NonFiniteScanActive },
+			{ "nodeKinds", std::move(nodeKinds) } };
 		return root.dump(2, ' ', false, Json::error_handler_t::replace);
 	}
 }

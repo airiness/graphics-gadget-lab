@@ -134,6 +134,11 @@ namespace gglab
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
+		RHIAllocationFacts QueryTextureAllocationFacts(
+			RHITextureHandle texture) const noexcept override;
+		RHIAllocationFacts QueryBufferAllocationFacts(
+			RHIBufferHandle buffer) const noexcept override;
+		RHIAllocatorTotals QueryAllocatorTotals() const noexcept override;
 		RHIDescriptorHandle GetTextureViewDescriptor(
 			RHITextureViewHandle view) const noexcept override;
 		RHIDescriptorHandle GetBufferViewDescriptor(

@@ -2,7 +2,10 @@
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -91,6 +94,64 @@ namespace gglab
 		const RHITextureDesc& desc) noexcept
 	{
 		return GetRHIFormatInfo(desc.m_Format).m_PlaneCount;
+	}
+
+	// Bytes of the data a texture description holds: every mip of every array slice and sample
+	// in whole blocks of the given format description. It describes the data, not allocator
+	// padding, tiling or compression. Without a block description, or when the total does not
+	// fit in 64 bits, there is no logical size.
+	[[nodiscard]] constexpr inline std::optional<uint64_t> GetRHITextureLogicalBytes(
+		const RHITextureDesc& desc, const RHIFormatInfo& format) noexcept
+	{
+		if (format.m_BytesPerBlock == 0 || format.m_BlockWidth == 0 || format.m_BlockHeight == 0)
+		{
+			return std::nullopt;
+		}
+		constexpr uint64_t MaxBytes = std::numeric_limits<uint64_t>::max();
+		const auto multiply = [](uint64_t& value, uint64_t factor) noexcept
+			{
+				if (factor != 0 && value > MaxBytes / factor)
+				{
+					return false;
+				}
+				value *= factor;
+				return true;
+			};
+		const bool volume = desc.m_Dimension == RHITextureDimension::Texture3D;
+		const uint32_t mipCount = std::max<uint32_t>(desc.m_MipLevels, 1u);
+		uint64_t total = 0;
+		for (uint32_t mip = 0; mip < mipCount; ++mip)
+		{
+			const auto level = [mip](uint32_t extent) noexcept
+				{
+					return mip < 32 ? std::max<uint64_t>(uint64_t{ extent } >> mip, 1u) : 1u;
+				};
+			const uint64_t blockColumns =
+				(level(desc.m_Extent.m_Width) + format.m_BlockWidth - 1) / format.m_BlockWidth;
+			const uint64_t blockRows =
+				(level(desc.m_Extent.m_Height) + format.m_BlockHeight - 1) / format.m_BlockHeight;
+			uint64_t bytes = blockColumns;
+			if (!multiply(bytes, blockRows) ||
+				!multiply(bytes, volume ? level(desc.m_Extent.m_Depth) : 1u) ||
+				!multiply(bytes, format.m_BytesPerBlock) || bytes > MaxBytes - total)
+			{
+				return std::nullopt;
+			}
+			total += bytes;
+		}
+		const uint64_t slices = volume ? 1u : std::max<uint32_t>(desc.m_ArraySize, 1u);
+		if (!multiply(total, slices) ||
+			!multiply(total, std::max<uint32_t>(desc.m_SampleCount, 1u)))
+		{
+			return std::nullopt;
+		}
+		return total;
+	}
+
+	[[nodiscard]] constexpr inline std::optional<uint64_t> GetRHITextureLogicalBytes(
+		const RHITextureDesc& desc) noexcept
+	{
+		return GetRHITextureLogicalBytes(desc, GetRHIFormatInfo(desc.m_Format));
 	}
 
 	struct RHIImportedTextureDesc

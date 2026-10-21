@@ -500,6 +500,41 @@ namespace gglab
 		return m_DescriptorCache && m_DescriptorCache->IsSamplerAlive(sampler);
 	}
 
+	RHIAllocationFacts DX12Device::QueryTextureAllocationFacts(
+		RHITextureHandle texture) const noexcept
+	{
+		const DX12Texture* resource = m_ResourceManager.ResolveTexture(texture);
+		return resource ?
+			resource->GetAllocationFacts() :
+			RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+	}
+
+	RHIAllocationFacts DX12Device::QueryBufferAllocationFacts(
+		RHIBufferHandle buffer) const noexcept
+	{
+		const DX12Buffer* resource = m_ResourceManager.ResolveBuffer(buffer);
+		return resource ?
+			resource->GetAllocationFacts() :
+			RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+	}
+
+	RHIAllocatorTotals DX12Device::QueryAllocatorTotals() const noexcept
+	{
+		if (!m_MemAllocator)
+		{
+			return {};
+		}
+		// Budget statistics are maintained counters and cover every memory segment group.
+		D3D12MA::Budget local{};
+		D3D12MA::Budget nonLocal{};
+		m_MemAllocator->GetBudget(&local, &nonLocal);
+		return {
+			.m_Known = true,
+			.m_BlockBytes = local.Stats.BlockBytes + nonLocal.Stats.BlockBytes,
+			.m_AllocationBytes = local.Stats.AllocationBytes + nonLocal.Stats.AllocationBytes,
+		};
+	}
+
 	RHIDescriptorHandle DX12Device::GetTextureViewDescriptor(
 		RHITextureViewHandle view) const noexcept
 	{

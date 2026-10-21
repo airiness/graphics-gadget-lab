@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 
 #include <format>
@@ -221,12 +222,14 @@ namespace gglab
 							static_cast<const RGVirtualResource<RGTextureResource>*>(
 								virtualResource);
 						resourceInfo.m_ResourceExportSupport = GetResourceExportSupport(texture->m_Desc, virtualResource->m_Imported);
+						resourceInfo.m_TextureDimension = texture->m_Desc.m_Dimension;
 						resourceInfo.m_TextureFormat = texture->m_Desc.m_Format;
 						resourceInfo.m_TextureExtent = texture->m_Desc.m_Extent;
 						resourceInfo.m_TextureMipLevels = texture->m_Desc.m_MipLevels;
 						resourceInfo.m_TextureArraySize = texture->m_Desc.m_ArraySize;
 						resourceInfo.m_TextureSampleCount = texture->m_Desc.m_SampleCount;
 						resourceInfo.m_TextureClearValue = texture->m_Desc.m_ClearValue;
+						resourceInfo.m_LogicalBytes = GetRHITextureLogicalBytes(texture->m_Desc);
 					}
 					else
 					{
@@ -234,6 +237,7 @@ namespace gglab
 						resourceInfo.m_ResourceExportSupport = GetResourceExportSupport(buffer->m_Desc, virtualResource->m_Imported);
 						resourceInfo.m_BufferSizeInBytes = buffer->m_Desc.m_SizeInBytes;
 						resourceInfo.m_BufferStrideInBytes = buffer->m_Desc.m_StrideInBytes;
+						resourceInfo.m_LogicalBytes = buffer->m_Desc.m_SizeInBytes;
 					}
 					resourceInfo.m_ExportPassIndex = compiledResource ?
 						ToSnapshotPassIndex(compiledResource->m_ExportPass) :

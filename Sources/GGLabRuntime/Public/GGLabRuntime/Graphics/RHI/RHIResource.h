@@ -31,6 +31,47 @@ namespace gglab
 		const char* m_DebugName = nullptr;
 	};
 
+	enum class RHIAllocationFactsStatus : uint8_t
+	{
+		Known,
+		// The resource adopted a native object that GGLab's allocator did not allocate.
+		External,
+		// No live resource was behind the handle when the facts were read.
+		Unowned,
+		// The backend does not report allocator facts.
+		Unsupported,
+	};
+
+	enum class RHIMemoryClass : uint8_t
+	{
+		Unknown,
+		DeviceLocal,
+		Other,
+	};
+
+	// Allocator facts of one live resource, read on the device owner thread. Known facts are
+	// reported by the backend allocator and never estimated; other statuses carry no values.
+	struct RHIAllocationFacts
+	{
+		RHIAllocationFactsStatus m_Status = RHIAllocationFactsStatus::Unsupported;
+		uint64_t m_AllocatedBytes = 0;
+		uint64_t m_AlignmentBytes = 0;
+		RHIMemoryClass m_MemoryClass = RHIMemoryClass::Unknown;
+		// Offset of the resource within its native allocation.
+		uint64_t m_OffsetBytes = 0;
+		// Process-local identity of the native allocator allocation. It is never reused or
+		// persisted, resources placed in one allocation share it, and it is zero unless known.
+		uint64_t m_NativeAllocationId = 0;
+	};
+
+	// Allocator-wide bytes; context for a frame, not scoped to any one owner.
+	struct RHIAllocatorTotals
+	{
+		bool m_Known = false;
+		uint64_t m_BlockBytes = 0;
+		uint64_t m_AllocationBytes = 0;
+	};
+
 	struct RHISubresourceRange
 	{
 		static constexpr uint32_t Remaining = std::numeric_limits<uint32_t>::max();

@@ -299,6 +299,18 @@ def self_test(bundle_validator):
 			dict(index=2, source="resource-export", diagnosticTap=None, schema="gglab.resource-export", schemaVersion=1,
 				metadata="group.resource-export.json", files=["group.resource-export.json", "values.npy"])]
 		check(multi)
+		# Bundles carry graph products of every supported content version.
+		modern = copy.deepcopy(graph)
+		modern["schemaVersion"] = 5
+		modern["observation"]["nodeKinds"] = ["ResourceExport"]
+		modern["execution"]["totals"] = dict(logicalBytes=0, unavailableLogicalResources=0, allocationBytes=0,
+			unavailableAllocations=0, uniquePhysicalAllocationBytes=0, allocatorBlockBytes=None,
+			allocatorAllocationBytes=None)
+		(root / "paired.graph.json").write_text(json.dumps(modern), encoding="utf-8")
+		modern_bundle = copy.deepcopy(multi)
+		modern_bundle["products"][1]["schemaVersion"] = 5
+		check(modern_bundle)
+		(root / "paired.graph.json").write_text(json.dumps(graph), encoding="utf-8")
 		rejections = len(cases) + 1
 		for name, key, value in (("paired.graph.json", "submission", dict(submission, fenceValue=2)),
 			("paired.graph.json", "frame", dict(owned_frame, camera=dict(position=[1, 2, 3]))),

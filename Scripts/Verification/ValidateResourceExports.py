@@ -68,8 +68,14 @@ def validate(path, validator):
 		graph = json.loads((path.parent / document["graph"]).read_text(encoding="utf-8"))
 		if graph["frameSerial"] != document["frameSerial"] or graph["submission"] != document["submission"]:
 			raise ValueError("The paired graph belongs to a different submitted frame")
-		versions = (3, 4) if document["observation"]["nonFiniteWatch"] else (2,)
-		if graph["schemaVersion"] not in versions or not graph["observation"]["resourceExport"] or graph["observation"]["nonFiniteWatch"] != document["observation"]["nonFiniteWatch"]:
+		scanning = document["observation"]["nonFiniteWatch"]
+		if graph["schemaVersion"] == 5:
+			# Content versions no longer encode observation variants; the node kinds do.
+			kinds = set(graph["observation"].get("nodeKinds") or ())
+			observed = "ResourceExport" in kinds and bool(kinds & {"NonFiniteScan", "ProductionCounters"}) == scanning
+		else:
+			observed = graph["schemaVersion"] in ((3, 4) if scanning else (2,))
+		if not observed or not graph["observation"]["resourceExport"] or graph["observation"]["nonFiniteWatch"] != scanning:
 			raise ValueError("Paired graphs must include resource observation nodes")
 	return document
 
@@ -98,16 +104,22 @@ def self_test(validator):
 		path.write_text(json.dumps(scanned), encoding="utf-8")
 		validate(path, validator)
 		paired_path = path.parent / "paired.graph.json"
-		for version, active in [(2, False), (3, True), (4, True)]:
+		for version, active, kinds in [(2, False, None), (3, True, None), (4, True, None),
+			(5, False, ["ResourceExport"]), (5, True, ["NonFiniteScan", "ResourceExport"])]:
 			paired = copy.deepcopy(scanned if active else document)
 			paired["graph"] = paired_path.name
 			paired["observation"]["graph"] = True
 			graph = dict(schemaVersion=version, frameSerial=1, submission=paired["submission"],
 				observation=dict(resourceExport=True, nonFiniteWatch=active))
+			if kinds is not None:
+				graph["observation"]["nodeKinds"] = kinds
 			path.write_text(json.dumps(paired), encoding="utf-8")
 			paired_path.write_text(json.dumps(graph), encoding="utf-8")
 			validate(path, validator)
-		paired_cases = [("schemaVersion", 1), ("schemaVersion", 2), ("schemaVersion", 5),
+		paired_cases = [("schemaVersion", 1), ("schemaVersion", 2), ("schemaVersion", 6),
+			("observation", dict(resourceExport=True, nonFiniteWatch=True)),
+			("observation", dict(resourceExport=True, nonFiniteWatch=True, nodeKinds=["NonFiniteScan"])),
+			("observation", dict(resourceExport=True, nonFiniteWatch=True, nodeKinds=["ResourceExport"])),
 			("frameSerial", 2), ("submission", dict(graph["submission"], fenceValue=2)),
 			("observation", dict(resourceExport=False, nonFiniteWatch=True)),
 			("observation", dict(resourceExport=True, nonFiniteWatch=False))]

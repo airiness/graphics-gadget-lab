@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.render-graph",
-  "title": "GGLab render graph frame export v1/v2/v3/v4",
+  "title": "GGLab render graph frame export v1/v2/v3/v4/v5",
   "type": "object",
   "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
   "properties": {
     "schema": { "const": "gglab.render-graph" },
-    "schemaVersion": { "enum": [1, 2, 3, 4] },
+    "schemaVersion": { "enum": [1, 2, 3, 4, 5] },
     "mode": { "enum": ["full", "summary"] },
     "frameSerial": { "type": "integer", "minimum": 1 },
     "frame": {
@@ -43,7 +43,8 @@
       "properties": {
         "graph": { "const": true },
         "resourceExport": { "type": "boolean" },
-        "nonFiniteWatch": { "type": "boolean" }
+        "nonFiniteWatch": { "type": "boolean" },
+        "nodeKinds": { "type": "array", "items": { "enum": ["NonFiniteScan", "ProductionCounters", "ResourceExport"] }, "uniqueItems": true }
       },
       "additionalProperties": false
     },
@@ -106,6 +107,7 @@
         },
         "resolvedBarriers": { "type": "array", "items": { "allOf": [{ "$ref": "#/$defs/barrier" }, { "required": ["physical", "passIndex", "phase"] }] } },
         "observationNodes": {"type": "array", "items": {"type": "object", "required": ["passIndex", "kind", "resource", "resourceIndex", "resourceNodeIndex", "originalInsertionPosition"], "properties": {"kind": {"enum": ["ResourceExport", "NonFiniteScan", "ProductionCounters"]}, "resource": {"type": "string"}, "passIndex": {"type": "integer", "minimum": 0}, "resourceIndex": {"type": "integer", "minimum": 0}, "resourceNodeIndex": {"type": "integer", "minimum": 0}, "originalInsertionPosition": {"type": "integer", "minimum": 0}}, "additionalProperties": false}},
+        "totals": { "$ref": "#/$defs/totals" },
         "gpuTiming": { "$ref": "#/$defs/unavailable" }
       }
     }
@@ -127,13 +129,75 @@
         "properties": { "compile": { "properties": { "passes": { "items": { "required": ["reads", "writes"] } } } } }
       }
     },
-    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"resourceExport": {"const": false}, "nonFiniteWatch": {"const": false}}}, "execution": {"properties": {"observationNodes": {"maxItems": 0}}}, "compile": {"properties": {"passes": {"items": {"properties": {"observation": {"const": false}}}}, "dependencyEdges": {"items": {"properties": {"reason": {"not": {"const": "ObservationOrder"}}}}}}}}}, "else": {"properties": {"execution": {"properties": {"observationNodes": {"minItems": 1}}}}}},
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"resourceExport": {"const": false}, "nonFiniteWatch": {"const": false}}}, "execution": {"properties": {"observationNodes": {"maxItems": 0}}}, "compile": {"properties": {"passes": {"items": {"properties": {"observation": {"const": false}}}}, "dependencyEdges": {"items": {"properties": {"reason": {"not": {"const": "ObservationOrder"}}}}}}}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [2, 3, 4]}}}, "then": {"properties": {"execution": {"properties": {"observationNodes": {"minItems": 1}}}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [1, 2, 3, 4]}}}, "then": {"properties": {"observation": {"not": {"required": ["nodeKinds"]}}}}},
     {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"properties": {"observation": {"properties": {"resourceExport": {"const": true}, "nonFiniteWatch": {"const": false}}}, "execution": {"properties": {"observationNodes": {"items": {"properties": {"kind": {"const": "ResourceExport"}}}}}}}}},
     {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "NonFiniteScan"}}}, "items": {"properties": {"kind": {"enum": ["ResourceExport", "NonFiniteScan"]}}}}}}}}},
-    {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "ProductionCounters"}}}}}}}}}
+    {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "ProductionCounters"}}}}}}}}},
+    {
+      "if": { "properties": { "schemaVersion": { "const": 5 } } },
+      "then": {
+        "properties": { "observation": { "required": ["nodeKinds"] } },
+        "allOf": [{
+          "if": { "properties": { "mode": { "const": "full" } } },
+          "then": {
+            "properties": {
+              "compile": { "properties": { "resources": { "items": { "$ref": "#/$defs/resourceLogicalSize" } } } },
+              "execution": { "required": ["totals"], "properties": { "allocations": { "items": { "$ref": "#/$defs/allocationFacts" } } } }
+            }
+          },
+          "else": { "properties": { "compile": { "not": { "required": ["resources"] } } } }
+        }]
+      }
+    }
   ],
   "$defs": {
     "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },
+    "bytes": { "type": "integer", "minimum": 0 },
+    "nullableBytes": { "type": ["integer", "null"], "minimum": 0 },
+    "resourceLogicalSize": {
+      "type": "object",
+      "required": ["logicalBytes", "logicalBytesReason"],
+      "properties": {
+        "logicalBytes": { "$ref": "#/$defs/nullableBytes" },
+        "logicalBytesReason": { "enum": [null, "unsupported-format", "size-overflow"] },
+        "texture": { "type": "object", "required": ["dimension"], "properties": { "dimension": { "enum": ["Texture1D", "Texture2D", "Texture3D"] } } }
+      },
+      "if": { "properties": { "logicalBytes": { "type": "integer" } } },
+      "then": { "properties": { "logicalBytesReason": { "const": null } } },
+      "else": { "properties": { "logicalBytesReason": { "type": "string" } } }
+    },
+    "allocationFacts": {
+      "type": "object",
+      "required": ["allocationFacts", "unavailableReason", "allocatedBytes", "alignmentBytes", "memoryClass", "nativeAllocation", "offsetBytes"],
+      "properties": {
+        "allocationFacts": { "enum": ["known", "unavailable"] },
+        "unavailableReason": { "enum": [null, "external", "unowned", "unsupported"] },
+        "allocatedBytes": { "$ref": "#/$defs/nullableBytes" },
+        "alignmentBytes": { "$ref": "#/$defs/nullableBytes" },
+        "memoryClass": { "enum": [null, "device-local", "other"] },
+        "nativeAllocation": { "type": ["integer", "null"], "minimum": 0 },
+        "offsetBytes": { "$ref": "#/$defs/nullableBytes" }
+      },
+      "if": { "properties": { "allocationFacts": { "const": "known" } } },
+      "then": { "properties": { "unavailableReason": { "const": null }, "allocatedBytes": { "type": "integer" }, "alignmentBytes": { "type": "integer" }, "nativeAllocation": { "type": "integer" }, "offsetBytes": { "type": "integer" } } },
+      "else": { "properties": { "unavailableReason": { "type": "string" }, "allocatedBytes": { "const": null }, "alignmentBytes": { "const": null }, "memoryClass": { "const": null }, "nativeAllocation": { "const": null }, "offsetBytes": { "const": null } } }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["logicalBytes", "unavailableLogicalResources", "allocationBytes", "unavailableAllocations", "uniquePhysicalAllocationBytes", "allocatorBlockBytes", "allocatorAllocationBytes"],
+      "properties": {
+        "logicalBytes": { "$ref": "#/$defs/bytes" },
+        "unavailableLogicalResources": { "type": "integer", "minimum": 0 },
+        "allocationBytes": { "$ref": "#/$defs/bytes" },
+        "unavailableAllocations": { "type": "integer", "minimum": 0 },
+        "uniquePhysicalAllocationBytes": { "$ref": "#/$defs/bytes" },
+        "allocatorBlockBytes": { "$ref": "#/$defs/nullableBytes" },
+        "allocatorAllocationBytes": { "$ref": "#/$defs/nullableBytes" }
+      },
+      "additionalProperties": false
+    },
     "physical": { "type": ["object", "null"], "required": ["index", "generation"], "properties": { "index": { "type": "integer", "minimum": 0 }, "generation": { "type": "integer", "minimum": 0 } } },
     "resourceType": { "enum": ["Texture", "Buffer"] },
     "rangeCount": { "oneOf": [{ "type": "integer", "minimum": 0, "maximum": 4294967294 }, { "const": "remaining" }] },
