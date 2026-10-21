@@ -4,7 +4,7 @@ Starts, queries, captures from and stops GraphicsGadgetLab control sessions.
 
 .DESCRIPTION
 A session is a GraphicsGadgetLab process started with --session <id>. It serves
-the session control protocol (version 2) on \\.\pipe\gglab-session-<id>: one
+the session control protocol (version 3) on \\.\pipe\gglab-session-<id>: one
 JSON request line per connection, answered by one JSON response line.
 
 Every command prints one JSON object on stdout and exits 0 when the command
@@ -16,7 +16,9 @@ Commands:
            -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
   status   Report readiness gates, settled frames, camera and pending captures.
-  capture  Capture a frame; waits for the PNG and metadata unless -NoWait.
+  capture  Submit required SameFrame products; waits and explicitly consumes the
+           terminal receipt unless -NoWait or -KeepResult. -Products/-ProductsFile
+           accepts typed products instead of the default single image.
            -View restores a camera reference view of the active content first.
   graph    Export the full frame graph, or discovery addresses with -Summary.
   export   Export one frame's resource group as NPY arrays and JSON metadata.
@@ -30,7 +32,9 @@ Commands:
            to inject at a registered point; it needs -WatchNonFinite at start.
   batch    Capture every reference view of the active content (or -Views) in
            order and wait for all of them.
-  result   Report a capture submitted with -NoWait.
+  result   Query -JobId without consuming; -Consume releases a terminal receipt.
+  capture-cancel
+           Cancel delivery for -JobId; query its actual terminal result separately.
   sequence Play a camera path registered by the active content (-CameraPath),
            capturing -CaptureFrames ("0,10,20-23"); waits until the sequence
            and its captures finish unless -NoWait. Poll with 'status'.
@@ -59,7 +63,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -103,6 +107,9 @@ param(
     [string]$Label,
     [string]$Note,
     [switch]$NoWait,
+    [switch]$KeepResult,
+    [string]$Products,
+    [string]$ProductsFile,
     # graph: only executed passes with resource-version addresses.
     [switch]$Summary,
     # export: a JSON array of resource addresses, directly or from a UTF-8 file.
@@ -118,8 +125,9 @@ param(
     # watch (Debug and Develop builds): one non-finite injection request as a JSON object.
     [string]$Inject,
 
-    # result
-    [long]$RequestId,
+    # result / capture-cancel
+    [uint64]$JobId,
+    [switch]$Consume,
 
     # sequence: camera path id and frames to capture, as numbers and ranges.
     [string]$CameraPath,
@@ -140,14 +148,14 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-$ProtocolVersion = 2
+$ProtocolVersion = 3
 $RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'
 }
 
 function Write-Result([hashtable]$Result, [int]$ExitCode = 0) {
-    [Console]::Out.WriteLine(($Result | ConvertTo-Json -Compress -Depth 10))
+    [Console]::Out.WriteLine(($Result | ConvertTo-Json -Compress -Depth 32))
     exit $ExitCode
 }
 
@@ -195,23 +203,28 @@ function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseT
             $client.Connect(5000)
         }
         catch {
-            Fail "Session '$Id' is not running or does not accept requests." @{ session = $Id }
+            throw "Session '$Id' is not running or does not accept requests."
         }
         $encoding = New-Object System.Text.UTF8Encoding($false)
         $writer = New-Object System.IO.StreamWriter($client, $encoding, 4096, $true)
         $writer.NewLine = "`n"
-        $writer.WriteLine(($Request | ConvertTo-Json -Compress -Depth 10))
+        $writer.WriteLine(($Request | ConvertTo-Json -Compress -Depth 32))
         $writer.Flush()
         $reader = New-Object System.IO.StreamReader($client, $encoding, $false, 4096, $true)
         $readTask = $reader.ReadLineAsync()
         if (-not $readTask.Wait([TimeSpan]::FromSeconds($ResponseTimeoutSeconds))) {
-            Fail "Session '$Id' did not answer within $ResponseTimeoutSeconds seconds." @{ session = $Id }
+            throw "Session '$Id' did not answer within $ResponseTimeoutSeconds seconds."
         }
         $line = $readTask.Result
         if (-not $line) {
-            Fail "Session '$Id' closed the connection without a response." @{ session = $Id }
+            throw "Session '$Id' closed the connection without a response."
         }
-        return ($line | ConvertFrom-Json)
+        $response = $line | ConvertFrom-Json
+        if ((Get-Field $response 'protocol') -ne $ProtocolVersion -or
+            (Get-Field $response 'id') -ne $Request.id) {
+            throw 'The session response has an incompatible protocol or correlation id.'
+        }
+        return $response
     }
     finally {
         $client.Dispose()
@@ -226,7 +239,6 @@ function ConvertTo-Hashtable($Object) {
 
 function Complete-SessionResponse($Response, [string]$Id) {
     $result = ConvertTo-Hashtable $Response
-    $result.Remove('protocol')
     $result.Remove('id')
     $result['session'] = if ($result.ContainsKey('session')) { $result['session'] } else { $Id }
     if ($Response.ok) { Write-Result $result 0 } else { Write-Result $result 1 }
@@ -248,10 +260,10 @@ function Get-CaptureOutputDirectory {
     return [System.IO.Path]::GetFullPath($directory)
 }
 
-function New-CaptureRequest([string]$ViewId, [bool]$Wait) {
+function New-CaptureRequest([string]$ViewId) {
     $request = @{
         command = 'capture'; source = $Source; timing = $Timing; settleFrames = $SettleFrames
-        outputDirectory = (Get-CaptureOutputDirectory); wait = $Wait
+        outputDirectory = (Get-CaptureOutputDirectory)
     }
     if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
     if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
@@ -259,6 +271,37 @@ function New-CaptureRequest([string]$ViewId, [bool]$Wait) {
     if ($Label) { $request['label'] = $Label }
     if ($Note) { $request['note'] = $Note }
     return $request
+}
+
+# The server never waits or moves a receipt into a transport-owned cache.
+# Waiting clients explicitly consume the terminal result. A timeout does not
+# cancel or consume pending work; the returned jobId remains recoverable.
+function Wait-CaptureJob($Admission, [DateTime]$Deadline) {
+    if (-not $Admission.ok) { return $Admission }
+    do {
+        $remaining = [Math]::Max(1, [int][Math]::Ceiling(($Deadline - [DateTime]::UtcNow).TotalSeconds))
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'result'; jobId = $Admission.jobId; consume = (-not $KeepResult)
+            } $remaining
+        }
+        catch {
+            # Do not invent a terminal outcome or lose the accepted identity.
+            # A consuming query's response can be lost after consumption.
+            return [pscustomobject]@{
+                protocol = $ProtocolVersion; ok = $false; jobId = $Admission.jobId
+                error = "$($_.Exception.Message) Query jobId explicitly; a consuming response may have been lost."
+            }
+        }
+        if (-not $response.ok -or $response.status -ne 'pending') { return $response }
+        if ([DateTime]::UtcNow -ge $Deadline) {
+            $result = ConvertTo-Hashtable $response
+            $result.ok = $false
+            $result.error = 'Capture job timed out; query or cancel jobId explicitly.'
+            return [pscustomobject]$result
+        }
+        Start-Sleep -Milliseconds 100
+    } while ($true)
 }
 
 # Expands "0,10,20-23" into frame numbers.
@@ -389,27 +432,38 @@ switch ($Command) {
     }
     'capture' {
         Require-Session
-        $response = Invoke-SessionRequest $Session (New-CaptureRequest $View (-not $NoWait)) $TimeoutSeconds
+        $request = New-CaptureRequest $View
+        if ($Products -or $ProductsFile) {
+            if ($PSBoundParameters.ContainsKey('Source') -or $DiagnosticTap) {
+                Fail '-Products cannot be combined with -Source or -DiagnosticTap.'
+            }
+            $request.Remove('source')
+            $request['products'] = (Read-JsonArray $Products $ProductsFile 'Products')
+        }
+        $response = Invoke-SessionRequest $Session $request ([Math]::Max(30, $TimeoutSeconds))
+        if (-not $NoWait) { $response = Wait-CaptureJob $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds)) }
         Complete-SessionResponse $response $Session
     }
     'graph' {
         Require-Session
-        $request = New-CaptureRequest $View (-not $NoWait)
+        $request = New-CaptureRequest $View
         $request['command'] = 'graph'
         $request.Remove('source')
         $request['summary'] = [bool]$Summary
-        $response = Invoke-SessionRequest $Session $request $TimeoutSeconds
+        $response = Invoke-SessionRequest $Session $request ([Math]::Max(30, $TimeoutSeconds))
+        if (-not $NoWait) { $response = Wait-CaptureJob $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds)) }
         Complete-SessionResponse $response $Session
     }
     'export' {
         Require-Session
-        $request = New-CaptureRequest $View (-not $NoWait)
+        $request = New-CaptureRequest $View
         $request['command'] = 'export'
         $request.Remove('source')
         $request.Remove('diagnosticTap')
         $request['targets'] = (Read-JsonArray $Targets $TargetsFile 'Targets')
         $request['graph'] = [bool]$IncludeGraph
-        $response = Invoke-SessionRequest $Session $request $TimeoutSeconds
+        $response = Invoke-SessionRequest $Session $request ([Math]::Max(30, $TimeoutSeconds))
+        if (-not $NoWait) { $response = Wait-CaptureJob $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds)) }
         Complete-SessionResponse $response $Session
     }
     'batch' {
@@ -437,31 +491,16 @@ switch ($Command) {
             }
         }
 
-        # Every view is queued first; the session applies them in this order.
-        $queued = @()
-        foreach ($viewId in $Views) {
-            $response = Invoke-SessionRequest $Session (New-CaptureRequest $viewId $false) 30
-            if (-not $response.ok) { Complete-SessionResponse $response $Session }
-            $queued += @{ view = $viewId; requestId = $response.requestId }
-        }
-
+        # Admit one view at a time. Do not hide Busy or create an unbounded set of
+        # retained receipts just because the authored view list is large.
         $captures = @()
         $completed = 0
-        foreach ($entry in $queued) {
-            $response = $null
-            while ($true) {
-                $response = Invoke-SessionRequest $Session @{ command = 'result'; requestId = $entry.requestId } 30
-                if (-not $response.ok) { Complete-SessionResponse $response $Session }
-                if ($response.status -ne 'queued' -or (Get-Date) -ge $deadline) { break }
-                Start-Sleep -Milliseconds 250
-            }
-            $status = if ($response.status -eq 'queued') { 'timeout' } else { $response.status }
-            if ($status -eq 'completed') { ++$completed }
-            $captures += @{
-                view = $entry.view; requestId = $entry.requestId; status = $status
-                image = (Get-Field $response 'image'); metadata = (Get-Field $response 'metadata')
-                failure = (Get-Field $response 'failure')
-            }
+        foreach ($viewId in $Views) {
+            $admission = Invoke-SessionRequest $Session (New-CaptureRequest $viewId) ([Math]::Max(30, $TimeoutSeconds))
+            $response = Wait-CaptureJob $admission $deadline.ToUniversalTime()
+            if (-not $response.ok) { Complete-SessionResponse $response $Session }
+            if ($response.status -eq 'completed') { ++$completed }
+            $captures += @{ view = $viewId; result = $response }
         }
         Write-Result @{
             ok = $true; session = $Session; outputDirectory = (Get-CaptureOutputDirectory)
@@ -470,10 +509,14 @@ switch ($Command) {
     }
     'result' {
         Require-Session
-        if ($RequestId -le 0) {
-            Fail "Command 'result' requires a positive -RequestId."
-        }
-        $response = Invoke-SessionRequest $Session @{ command = 'result'; requestId = $RequestId } 30
+        if ($JobId -eq 0) { Fail "Command 'result' requires a positive -JobId." }
+        $response = Invoke-SessionRequest $Session @{ command = 'result'; jobId = $JobId; consume = [bool]$Consume } 30
+        Complete-SessionResponse $response $Session
+    }
+    'capture-cancel' {
+        Require-Session
+        if ($JobId -eq 0) { Fail "Command 'capture-cancel' requires a positive -JobId." }
+        $response = Invoke-SessionRequest $Session @{ command = 'capture-cancel'; jobId = $JobId } 30
         Complete-SessionResponse $response $Session
     }
     'sequence' {

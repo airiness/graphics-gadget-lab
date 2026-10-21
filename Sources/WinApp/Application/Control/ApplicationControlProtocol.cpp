@@ -79,6 +79,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Result;
 			}
+			if (command == "capture-cancel")
+			{
+				return ApplicationControlCommand::CaptureCancel;
+			}
 			if (command == "stop")
 			{
 				return ApplicationControlCommand::Stop;
@@ -827,22 +831,85 @@ namespace gglab
 			return ValidateDiagnosticTap(sequence.m_CaptureSource, sequence.m_DiagnosticTap);
 		}
 
-		// Fills the capture request from optional fields; returns an error text.
+		[[nodiscard]] std::string ParseCaptureProduct(const Json& value, CapturePlan& plan)
+		{
+			if (!value.is_object() || !value.contains("kind") || !value["kind"].is_string())
+			{
+				return "Each required product must be an object with a string 'kind'.";
+			}
+			const auto kind = value["kind"].get<std::string>();
+			if (kind == "image")
+			{
+				if (value.size() != 2 || !value.contains("source") ||
+					(value["source"] != "scene" && value["source"] != "composited"))
+				{
+					return "An image product takes exactly 'kind' and 'source' (scene or composited).";
+				}
+				plan.m_RequiredProducts.push_back(ImageCaptureProduct{
+					value["source"] == "scene" ? CaptureImageSource::Scene : CaptureImageSource::Composited });
+			}
+			else if (kind == "diagnostic")
+			{
+				std::optional<PostProcessDebugTap> tap;
+				if (value.size() != 2 || !value.contains("diagnosticTap"))
+				{
+					return "A diagnostic product takes exactly 'kind' and 'diagnosticTap'.";
+				}
+				if (auto error = ParseDiagnosticTap(value["diagnosticTap"], tap); !error.empty())
+				{
+					return error;
+				}
+				plan.m_RequiredProducts.push_back(DiagnosticCaptureProduct{ tap });
+			}
+			else if (kind == "graph")
+			{
+				if (value.size() > 2 || (value.size() == 2 &&
+					(!value.contains("summary") || !value["summary"].is_boolean())))
+				{
+					return "A graph product takes 'kind' and an optional boolean 'summary'.";
+				}
+				plan.m_RequiredProducts.push_back(GraphCaptureProduct{ value.value("summary", false) });
+			}
+			else if (kind == "resource")
+			{
+				ResourceCaptureProduct resource;
+				if (value.size() != 2 || !value.contains("targets"))
+				{
+					return "A resource product takes exactly 'kind' and 'targets'.";
+				}
+				if (auto error = ParseResourceAddresses(value["targets"], resource.m_Targets); !error.empty())
+				{
+					return error;
+				}
+				plan.m_RequiredProducts.push_back(std::move(resource));
+			}
+			else
+			{
+				return "Product 'kind' must be image, diagnostic, graph or resource.";
+			}
+			return {};
+		}
+
+		// Direct typed builders; no legacy request adapter or server-side waiting.
 		[[nodiscard]] std::string ParseCaptureFields(
 			const Json& document, ApplicationControlRequest& request)
 		{
-			FrameCaptureRequest& capture = request.m_Capture;
+			CapturePlan& capture = request.m_Capture;
+			FrameCaptureSource source = FrameCaptureSource::Scene;
+			std::optional<PostProcessDebugTap> tap;
+			GraphCaptureProduct graphProduct;
+			ResourceCaptureProduct resourceProduct;
+			bool includeGraph = false;
+			const bool explicitProducts = document.contains("products");
 			capture.m_Timing = FrameCaptureTiming::AfterReady;
 			capture.m_SettleFrames = 8;
+			capture.m_WaitForCapacity = true;
 			const bool graph = request.m_Command == ApplicationControlCommand::Graph;
 			const bool resources = request.m_Command == ApplicationControlCommand::Export;
-			if (graph)
+			if (explicitProducts && (graph || resources || document.contains("source") ||
+				document.contains("diagnosticTap")))
 			{
-				capture.m_Source = FrameCaptureSource::RenderGraph;
-			}
-			if (resources)
-			{
-				capture.m_Source = FrameCaptureSource::ResourceExport;
+				return "Explicit 'products' cannot be combined with convenience product fields.";
 			}
 			for (const auto& [key, value] : document.items())
 			{
@@ -850,17 +917,32 @@ namespace gglab
 				{
 					continue;
 				}
-				if (key == "summary" && graph)
+				if (key == "products" && !graph && !resources)
+				{
+					if (!value.is_array() || value.empty() ||
+						value.size() > CaptureJobLimits{}.m_MaxProductsPerJob)
+					{
+						return "Field 'products' must contain one to eight required SameFrame products.";
+					}
+					for (const auto& product : value)
+					{
+						if (auto error = ParseCaptureProduct(product, capture); !error.empty())
+						{
+							return error;
+						}
+					}
+				}
+				else if (key == "summary" && graph)
 				{
 					if (!value.is_boolean())
 					{
 						return "Field 'summary' must be a boolean.";
 					}
-					capture.m_GraphSummary = value.get<bool>();
+					graphProduct.m_Summary = value.get<bool>();
 				}
 				else if (key == "targets" && resources)
 				{
-					if (auto error = ParseResourceAddresses(value, capture.m_ResourceTargets); !error.empty())
+					if (auto error = ParseResourceAddresses(value, resourceProduct.m_Targets); !error.empty())
 					{
 						return error;
 					}
@@ -871,22 +953,22 @@ namespace gglab
 					{
 						return "Field 'graph' must be a boolean.";
 					}
-					capture.m_IncludeGraph = value.get<bool>();
+					includeGraph = value.get<bool>();
 				}
 				else if (key == "source" && !graph && !resources)
 				{
-					const std::string source = value.is_string() ? value.get<std::string>() : "";
-					if (source == "scene")
+					const std::string sourceName = value.is_string() ? value.get<std::string>() : "";
+					if (sourceName == "scene")
 					{
-						capture.m_Source = FrameCaptureSource::Scene;
+						source = FrameCaptureSource::Scene;
 					}
-					else if (source == "composited")
+					else if (sourceName == "composited")
 					{
-						capture.m_Source = FrameCaptureSource::Composited;
+						source = FrameCaptureSource::Composited;
 					}
-					else if (source == "diagnostic")
+					else if (sourceName == "diagnostic")
 					{
-						capture.m_Source = FrameCaptureSource::Diagnostic;
+						source = FrameCaptureSource::Diagnostic;
 					}
 					else
 					{
@@ -895,7 +977,7 @@ namespace gglab
 				}
 				else if (key == "diagnosticTap" && !graph && !resources)
 				{
-					if (std::string error = ParseDiagnosticTap(value, capture.m_DiagnosticTap);
+					if (std::string error = ParseDiagnosticTap(value, tap);
 						!error.empty())
 					{
 						return error;
@@ -949,24 +1031,48 @@ namespace gglab
 						return error;
 					}
 				}
-				else if (key == "wait")
-				{
-					if (!value.is_boolean())
-					{
-						return "Field 'wait' must be a boolean.";
-					}
-					request.m_Wait = value.get<bool>();
-				}
 				else
 				{
 					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : resources ? "export" : "capture");
 				}
 			}
-			if (resources && capture.m_ResourceTargets.empty())
+			if (explicitProducts)
 			{
-				return "Command 'export' requires 'targets'.";
+				return {};
 			}
-			return ValidateDiagnosticTap(capture.m_Source, capture.m_DiagnosticTap);
+			if (resources)
+			{
+				if (resourceProduct.m_Targets.empty())
+				{
+					return "Command 'export' requires 'targets'.";
+				}
+				capture.m_RequiredProducts.push_back(std::move(resourceProduct));
+				if (includeGraph)
+				{
+					capture.m_RequiredProducts.push_back(graphProduct);
+				}
+			}
+			else if (graph)
+			{
+				capture.m_RequiredProducts.push_back(graphProduct);
+			}
+			else
+			{
+				if (auto error = ValidateDiagnosticTap(source, tap); !error.empty())
+				{
+					return error;
+				}
+				if (source == FrameCaptureSource::Diagnostic)
+				{
+					capture.m_RequiredProducts.push_back(DiagnosticCaptureProduct{ tap });
+				}
+				else
+				{
+					capture.m_RequiredProducts.push_back(ImageCaptureProduct{
+						source == FrameCaptureSource::Scene ? CaptureImageSource::Scene : CaptureImageSource::Composited });
+				}
+			}
+			return {};
 		}
 
 		[[nodiscard]] const char* ClaimName(NonFiniteClaimStatus status)
@@ -1224,7 +1330,6 @@ namespace gglab
 				{ "frameCount", status.m_FrameCount },
 				{ "referenceSamples", status.m_ReferenceSamples },
 				{ "submittedFrames", status.m_SubmittedFrames },
-				{ "captureRequestIds", status.m_CaptureRequestIds },
 				{ "completedCaptures", status.m_CompletedCaptures },
 			};
 			if (status.m_GpuTiming)
@@ -1278,7 +1383,7 @@ namespace gglab
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
-				"'watch', 'sequence' or 'sequence-cancel'.";
+				"'capture-cancel', 'watch', 'sequence' or 'sequence-cancel'.";
 			return result;
 		}
 
@@ -1295,15 +1400,19 @@ namespace gglab
 			error = ParseWatchFields(document, request.m_Watch);
 			break;
 		case ApplicationControlCommand::Result:
+		case ApplicationControlCommand::CaptureCancel:
 		{
-			const auto requestId = document.find("requestId");
-			if (requestId == document.end() || !requestId->is_number_unsigned() ||
-				requestId->get<uint64_t>() == 0 || document.size() != 4)
+			const auto jobId = document.find("jobId");
+			const bool consume = document.contains("consume");
+			if (jobId == document.end() || !jobId->is_number_unsigned() ||
+				jobId->get<uint64_t>() == 0 || document.size() != (consume ? 5u : 4u) ||
+				(consume && (*command != ApplicationControlCommand::Result || !document["consume"].is_boolean())))
 			{
-				error = "Command 'result' takes exactly one non-zero unsigned 'requestId'.";
+				error = "A job command takes a non-zero unsigned 'jobId'; only 'result' accepts boolean 'consume'.";
 				break;
 			}
-			request.m_CaptureRequestId = requestId->get<uint64_t>();
+			request.m_JobId = jobId->get<uint64_t>();
+			request.m_Consume = document.value("consume", false);
 			break;
 		}
 		case ApplicationControlCommand::Sequence:
@@ -1347,8 +1456,35 @@ namespace gglab
 			{ "width", status.m_Width },
 			{ "height", status.m_Height },
 		};
+		const auto& intake = status.m_CaptureIntake;
+		response["capabilities"] = {
+			{ "captureJobs", true },
+			{ "requiredProducts", Json::array({ "image", "diagnostic", "graph", "resource" }) },
+			{ "consistency", "SameFrame" },
+			{ "resourceProductsPerJob", 1 },
+			{ "graphProductsPerJob", 1 },
+			{ "resourceGraphSummary", false },
+			{ "bundleSchema", "gglab.capture-bundle" },
+			{ "bundleSchemaVersion", 1 },
+			{ "resultConsumption", "explicit" },
+			{ "resultRetention", "until-consumed-or-session-end" },
+			{ "sequenceCaptureJobs", false } };
 		response["capture"] = {
-			{ "unfinished", status.m_UnfinishedCaptures } };
+			{ "limits", {
+				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },
+				{ "receipts", intake.m_Limits.m_MaxReceipts },
+				{ "productsPerJob", intake.m_Limits.m_MaxProductsPerJob },
+				{ "resourceTargetsPerJob", intake.m_Limits.m_MaxResourceTargetsPerJob } } },
+			{ "activeJobs", intake.m_ActiveJobs },
+			{ "reservedReceipts", intake.m_ReservedReceipts },
+			{ "terminalReceipts", intake.m_TerminalReceipts },
+			{ "unpublishedResults", intake.m_AppRuntimeUnpublishedResults },
+			{ "publishedResults", intake.m_AppRuntimePublishedResults },
+			{ "drainingRuntimeRequests", intake.m_DrainingRuntimeRequests },
+			{ "drainingWriterJobs", intake.m_DrainingWriterJobs },
+			{ "drainingWriteReservations", intake.m_DrainingWriteReservations },
+			{ "legacyUnfinishedOutputs", intake.m_LegacyUnfinishedOutputs },
+			{ "legacyRetainedResults", intake.m_LegacyRetainedResults } };
 		const auto claimName = [](NonFiniteClaimStatus value)
 			{
 				switch (value)
@@ -1436,67 +1572,201 @@ namespace gglab
 		return Dump(response);
 	}
 
-	std::string SerializeApplicationControlCaptureQueued(
-		uint64_t id, uint64_t captureRequestId) noexcept
+	std::string SerializeApplicationControlCaptureAdmission(
+		uint64_t id, const CaptureAdmission& admission) noexcept
+	{
+		const bool accepted = admission.m_Status == CaptureAdmissionStatus::Accepted;
+		Json response = MakeResponse(id, accepted);
+		response["admission"] = accepted ?
+			"Accepted" :
+			admission.m_Status == CaptureAdmissionStatus::Busy ? "Busy" : "Rejected";
+		const char* reason = "None";
+		switch (admission.m_Reason)
+		{
+		case CaptureAdmissionReason::None:
+			break;
+		case CaptureAdmissionReason::ActiveJobLimit:
+			reason = "ActiveJobLimit";
+			break;
+		case CaptureAdmissionReason::ReceiptLimit:
+			reason = "ReceiptLimit";
+			break;
+		case CaptureAdmissionReason::InvalidPlan:
+			reason = "InvalidPlan";
+			break;
+		case CaptureAdmissionReason::PlanTooLarge:
+			reason = "PlanTooLarge";
+			break;
+		case CaptureAdmissionReason::ShuttingDown:
+			reason = "ShuttingDown";
+			break;
+		case CaptureAdmissionReason::IdentityExhausted:
+			reason = "IdentityExhausted";
+			break;
+		case CaptureAdmissionReason::IdentityUnavailable:
+			reason = "IdentityUnavailable";
+			break;
+		case CaptureAdmissionReason::ServicesUnavailable:
+			reason = "ServicesUnavailable";
+			break;
+		}
+		response["reason"] = reason;
+		response["jobId"] = accepted ? Json(admission.m_JobId) : Json();
+		if (!accepted)
+		{
+			response["error"] = std::format("Capture admission {}: {}.",
+				response["admission"].get<std::string>(), reason);
+		}
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlCaptureNotFound(uint64_t id, uint64_t jobId) noexcept
+	{
+		Json response = MakeResponse(id, false);
+		response["jobId"] = jobId;
+		response["status"] = "not-found";
+		response["error"] = "The job is unknown or its receipt has been consumed.";
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlCapturePending(
+		uint64_t id, const CaptureJobSnapshot& snapshot) noexcept
 	{
 		Json response = MakeResponse(id, true);
-		response["requestId"] = captureRequestId;
-		response["status"] = "queued";
+		response["jobId"] = snapshot.m_JobId;
+		response["status"] = "pending";
+		response["consumed"] = false;
+		const char* stage = "Waiting";
+		switch (snapshot.m_Stage)
+		{
+		case CaptureJobStage::Waiting:
+			break;
+		case CaptureJobStage::AwaitingProducts:
+			stage = "AwaitingProducts";
+			break;
+		case CaptureJobStage::AwaitingCoverage:
+			stage = "AwaitingCoverage";
+			break;
+		case CaptureJobStage::Encoding:
+			stage = "Encoding";
+			break;
+		case CaptureJobStage::Finished:
+			stage = "Finished";
+			break;
+		}
+		response["stage"] = stage;
+		response["attemptCount"] = snapshot.m_AttemptCount;
+		response["frameSerial"] = snapshot.m_FrameSerial ? Json(*snapshot.m_FrameSerial) : Json();
+		response["requiredProducts"] = snapshot.m_RequiredProducts;
+		response["finishedProducts"] = snapshot.m_FinishedProducts;
 		return Dump(response);
 	}
 
 	std::string SerializeApplicationControlCaptureResult(
-		uint64_t id, const FrameCaptureRequestResult& result) noexcept
+		uint64_t id, const CaptureJobResult& result, bool consumed) noexcept
+	{
+		const auto statusName = [](CaptureJobStatus status)
+			{
+				return status == CaptureJobStatus::Completed ?
+					"completed" :
+					status == CaptureJobStatus::Cancelled ? "cancelled" : "failed";
+			};
+		const auto publicationName = [](CaptureJobPublication publication)
+			{
+				switch (publication)
+				{
+				case CaptureJobPublication::Published:
+					return "Published";
+				case CaptureJobPublication::PartiallyPublished:
+					return "PartiallyPublished";
+				case CaptureJobPublication::Indeterminate:
+					return "Indeterminate";
+				default:
+					return "NotPublished";
+				}
+			};
+		Json response = MakeResponse(id, true);
+		response["jobId"] = result.m_JobId;
+		response["status"] = statusName(result.m_Status);
+		response["publication"] = publicationName(result.m_Publication);
+		response["consumed"] = consumed;
+		response["bundleId"] = result.m_BundleId.empty() ? Json() : Json(result.m_BundleId);
+		response["manifest"] = result.m_ManifestPath.empty() ? Json() : Json(ToUtf8(result.m_ManifestPath));
+		response["products"] = Json::array();
+		response["frameSerial"] = Json();
+		response["watch"] = Json();
+		response["failure"] = "";
+		for (const auto& product : result.m_Products)
+		{
+			Json files = Json::array();
+			for (const auto& path : product.m_Files)
+			{
+				files.push_back(ToUtf8(path));
+			}
+			if (response["failure"] == "" && !product.m_Failure.empty())
+			{
+				response["failure"] = product.m_Failure;
+			}
+			if (product.m_Metadata && response["frameSerial"].is_null())
+			{
+				response["frameSerial"] = product.m_Metadata->m_FrameSerial;
+				if (product.m_Metadata->m_WatchCoverage)
+				{
+					response["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*product.m_Metadata->m_WatchCoverage));
+				}
+			}
+			const char* kind = "image";
+			switch (product.m_Kind)
+			{
+			case CaptureProductKind::Image:
+				break;
+			case CaptureProductKind::Diagnostic:
+				kind = "diagnostic";
+				break;
+			case CaptureProductKind::Graph:
+				kind = "graph";
+				break;
+			case CaptureProductKind::Resource:
+				kind = "resource";
+				break;
+			}
+			response["products"].push_back({
+				{ "index", product.m_ProductIndex },
+				{ "kind", kind },
+				{ "status", statusName(product.m_Status) },
+				{ "publication", publicationName(product.m_Publication) },
+				{ "files", std::move(files) },
+				{ "failure", product.m_Failure },
+				{ "failureCode", GetRGObservationFailureName(product.m_ResourceFailure) },
+				{ "metadata", product.m_Metadata ?
+					Json::parse(SerializeFrameCaptureMetadata(*product.m_Metadata)) :
+					Json() } });
+		}
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlCaptureCancellation(
+		uint64_t id, uint64_t jobId, CaptureCancelResult cancellation) noexcept
 	{
 		Json response = MakeResponse(id, true);
-		response["requestId"] = result.m_RequestId;
-		switch (result.m_Status)
+		response["jobId"] = jobId;
+		const char* outcome = "NotFound";
+		switch (cancellation)
 		{
-		case FrameCaptureRequestStatus::Completed:
-			response["status"] = "completed";
-			if (result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::ResourceExport)
-			{
-				response["exports"] = Json::array();
-				for (const auto& path : result.m_ResourcePaths)
-				{
-					response["exports"].push_back(ToUtf8(path));
-				}
-				if (!result.m_GraphPath.empty())
-				{
-					response["graph"] = ToUtf8(result.m_GraphPath);
-				}
-			}
-			else if (result.m_Metadata && result.m_Metadata->m_Source == FrameCaptureSource::RenderGraph)
-			{
-				response["graph"] = ToUtf8(result.m_MetadataPath);
-			}
-			else
-			{
-				response["image"] = ToUtf8(result.m_ImagePath);
-			}
-			response["metadata"] = ToUtf8(result.m_MetadataPath);
+		case CaptureCancelResult::Cancelled:
+			outcome = "Cancelled";
 			break;
-		case FrameCaptureRequestStatus::Cancelled:
-			response["status"] = "cancelled";
-			response["failure"] = result.m_Failure;
+		case CaptureCancelResult::TooLate:
+			outcome = "TooLate";
 			break;
-		case FrameCaptureRequestStatus::Failed:
-			response["status"] = "failed";
-			response["failure"] = result.m_Failure;
-			if (result.m_ResourceFailure != RGObservationFailure::None)
-			{
-				response["failureCode"] = GetRGObservationFailureName(result.m_ResourceFailure);
-			}
+		case CaptureCancelResult::Finished:
+			outcome = "Finished";
+			break;
+		case CaptureCancelResult::NotFound:
 			break;
 		}
-		if (result.m_Metadata)
-		{
-			response["frameSerial"] = result.m_Metadata->m_FrameSerial;
-			if (result.m_Metadata->m_WatchCoverage)
-			{
-				response["watch"] = Json::parse(SerializeNonFiniteWatchCoverage(*result.m_Metadata->m_WatchCoverage));
-			}
-		}
+		// This answers delivery cancellation only; query the unmodified terminal receipt.
+		response["cancellation"] = outcome;
 		return Dump(response);
 	}
 

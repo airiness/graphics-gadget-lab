@@ -61,9 +61,19 @@ namespace gglab
 		Indeterminate,
 	};
 
+	enum class CaptureProductKind : uint8_t
+	{
+		Image,
+		Diagnostic,
+		Graph,
+		Resource,
+	};
+
 	struct CaptureProductResult
 	{
 		uint32_t m_ProductIndex = 0;
+		// Plan identity survives failure/cancellation before any frame metadata exists.
+		CaptureProductKind m_Kind = CaptureProductKind::Image;
 		CaptureJobStatus m_Status = CaptureJobStatus::Failed;
 		CaptureJobPublication m_Publication = CaptureJobPublication::NotPublished;
 		std::vector<std::filesystem::path> m_Files;

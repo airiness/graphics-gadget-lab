@@ -810,6 +810,7 @@ namespace gglab
 						});
 				}
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Scene);
+				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Composited);
 				m_IBL->AddFinishPass(graph);
 				if (m_Probe.m_EnableTemporalHistory)
 				{
@@ -1625,7 +1626,7 @@ namespace gglab
 		}
 
 		void RunAdmittedJobScenario(SelfTestContext& checks, const std::filesystem::path& root,
-			bool missingResource)
+			bool missingResource, bool multipleImages = false)
 		{
 			LifetimeProbe probe;
 			FaultFactory factory(probe);
@@ -1641,10 +1642,15 @@ namespace gglab
 				return;
 			}
 			auto& capture = *runtime.GetFrameCaptureCoordinator();
-			const auto admission = runtime.TrySubmitCaptureJob({ .m_RequiredProducts = {
+			CapturePlan plan{ .m_RequiredProducts = {
 				ImageCaptureProduct{}, ResourceCaptureProduct{ { {
 					.m_Resource = missingResource ? "Missing.AdmittedResource" : "FaultLifecycle.Color" } } },
-				GraphCaptureProduct{} } });
+				GraphCaptureProduct{} } };
+			if (multipleImages)
+			{
+				plan.m_RequiredProducts.push_back(ImageCaptureProduct{ CaptureImageSource::Composited });
+			}
+			const auto admission = runtime.TrySubmitCaptureJob(std::move(plan));
 			checks.Check(admission.m_Status == CaptureAdmissionStatus::Accepted && admission.m_JobId != 0,
 				"The production AppRuntime accepts one logical job for image, resource and graph products");
 			const auto maps = probe.m_ReadbackMaps;
@@ -1669,7 +1675,7 @@ namespace gglab
 				result = runtime.TakeCaptureJobResult(admission.m_JobId);
 				std::this_thread::yield();
 			}
-			checks.Check(result && result->m_Products.size() == 3 &&
+			checks.Check(result && result->m_Products.size() == (multipleImages ? 4u : 3u) &&
 				result->m_Status == (missingResource ? CaptureJobStatus::Failed : CaptureJobStatus::Completed) &&
 				result->m_Publication == (missingResource ? CaptureJobPublication::NotPublished : CaptureJobPublication::Published) &&
 				result->m_ManifestPath.empty() == missingResource,
@@ -1681,9 +1687,18 @@ namespace gglab
 				checks.Check(std::ranges::all_of(result->m_Products, [&](const auto& product)
 					{
 						return product.m_Metadata && product.m_Metadata->m_FrameSerial == serial;
-					}) && probe.m_ImageEncodes == (missingResource ? 0u : 1u) &&
+					}) && probe.m_ImageEncodes == (missingResource ? 0u : multipleImages ? 2u : 1u) &&
 					(!missingResource || (probe.m_ReadbackMaps == maps && probe.m_FrameAborts == aborts + 1)),
 					"Job product provenance comes from one actual attempt; compiled failure maps and encodes nothing");
+			}
+			if (multipleImages)
+			{
+				checks.Check(result && result->m_Products.size() == 4 &&
+					result->m_Products[0].m_Metadata && result->m_Products[3].m_Metadata &&
+					result->m_Products[0].m_Metadata->m_Source == FrameCaptureSource::Scene &&
+					result->m_Products[3].m_Metadata->m_Source == FrameCaptureSource::Composited &&
+					result->m_Products[0].m_Files != result->m_Products[3].m_Files,
+					"Distinct same-frame image sources compile separate graph imports and publish separate product files");
 			}
 			std::vector<FrameCaptureRequestResult> legacy;
 			runtime.ConsumeFrameCaptureResults(legacy);
@@ -2235,6 +2250,7 @@ namespace gglab
 		RunOwnedWriterDrainScenario(context, root / "owned-writer-drain");
 		RunAdmittedJobScenario(context, root / "admitted-job", false);
 		RunAdmittedJobScenario(context, root / "admitted-job-missing", true);
+		RunAdmittedJobScenario(context, root / "admitted-job-multiple-images", false, true);
 		RunJobCancellationScenario(context, root / "cancel-before-submit", true);
 		RunJobCancellationScenario(context, root / "cancel-shared-submission", false);
 		RunRequiredPlanOutcomeScenario(context, root / "required-plan-late", 0, false);

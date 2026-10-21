@@ -2974,7 +2974,11 @@ namespace gglab
 				if (result)
 				{
 					context.Check(result->m_Products[0].m_ProductIndex == 0 && result->m_Products[1].m_ProductIndex == 1 &&
-						result->m_Products[2].m_ProductIndex == 2 && result->m_Products[1].m_Files.size() == (failWrite ? 0u : 2u) &&
+						result->m_Products[2].m_ProductIndex == 2 &&
+						result->m_Products[0].m_Kind == CaptureProductKind::Graph &&
+						result->m_Products[1].m_Kind == CaptureProductKind::Image &&
+						result->m_Products[2].m_Kind == CaptureProductKind::Resource &&
+						result->m_Products[1].m_Files.size() == (failWrite ? 0u : 2u) &&
 						result->m_Products[0].m_Files.size() == (failWrite ? 0u : 1u) &&
 						result->m_Products[2].m_Files.size() == (failWrite ? 0u : 2u),
 						"Graph-first plans retain plan order and separate graph, image and resource file records");
@@ -3049,6 +3053,10 @@ namespace gglab
 			const auto cancelled = coordinator.TakeJobResult(waiting.m_JobId);
 			context.Check(cancelled && cancelled->m_Status == CaptureJobStatus::Cancelled &&
 				cancelled->m_Publication == CaptureJobPublication::NotPublished &&
+				cancelled->m_Products[0].m_Kind == CaptureProductKind::Image &&
+				cancelled->m_Products[1].m_Kind == CaptureProductKind::Resource &&
+				cancelled->m_Products[2].m_Kind == CaptureProductKind::Graph &&
+				!cancelled->m_Products[2].m_Metadata &&
 				std::ranges::all_of(cancelled->m_Products, [](const auto& product)
 				{
 					return product.m_Status == CaptureJobStatus::Cancelled && product.m_Files.empty();

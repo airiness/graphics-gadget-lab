@@ -9,6 +9,7 @@
 #include "Graphics/RenderPass/DiagnosticCaptureGraphResources.h"
 
 #include <optional>
+#include <string>
 
 namespace gglab
 {
@@ -107,8 +108,11 @@ namespace gglab
 		}
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		// SameFrame jobs can require several image sources. Their distinct backing
+		// buffers must not collide in the graph's imported-resource namespace.
+		const std::string readbackName = MakeRenderGraphPassName("Readback");
 		rg.AddPass<PassData>(GetRenderGraphPassName(), RGPassEncoderType::Copy,
-			[displayViewId, diagnosticTarget, &target = *target](
+			[displayViewId, diagnosticTarget, readbackName, &target = *target](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -126,7 +130,7 @@ namespace gglab
 					data.m_DisplayTarget =
 						builder.Read(targets.m_BackBuffer, RGTextureAccess::CopySource);
 				}
-				data.m_Readback = builder.ImportBuffer("FrameCapture.Readback", target.m_Buffer,
+				data.m_Readback = builder.ImportBuffer(readbackName.c_str(), target.m_Buffer,
 					target.m_BufferDesc, RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_Footprint = target.m_Footprint;

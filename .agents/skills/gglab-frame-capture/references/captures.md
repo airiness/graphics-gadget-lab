@@ -32,7 +32,9 @@ in order; each view change is a camera cut and restarts settling.
 | `-RequiredContentId <id>` | Also require the specified active Lab or Demo. |
 | `-OutputDirectory <path>` | Override `Build/Sessions/<id>/Captures/`. |
 | `-Label`, `-Note` | File subject and metadata annotation. |
-| `-NoWait` | Retrieve the eventual capture with `result -RequestId <id>`. |
+| `-NoWait` | Retrieve with `result -JobId <id>`; release a terminal receipt with `-Consume`. |
+| `-KeepResult` | Wait without consuming; otherwise a waiting client explicitly consumes the terminal receipt. |
+| `-Products` / `-ProductsFile` | Ordered typed required products; see [session jobs](session-jobs.md). |
 
 Hidden runs use a fixed 1/60 s simulation step unless overridden. Settling
 restarts after camera cuts or temporal-history resets; loading history is reset
@@ -51,6 +53,11 @@ ordinary capture, so compare the recorded frame/time rather than queue order.
 
 ## Output and completion
 
+Session v3 results identify a final `manifest` and ordered `products[].files`,
+not flattened `image`/`metadata` fields. Require `publication: Published` as well
+as `status: completed`; [session jobs](session-jobs.md) defines admission,
+retention, cancellation and the remaining sequence/interactive migration.
+
 Each PNG has a same-stem JSON sidecar (`schemaVersion: 1`). Use the paths returned
 by the command, rather than predicting filenames. The sidecar records the PNG
 name, source, content, backend, reference view, camera, frame serial/index, size,
@@ -63,8 +70,8 @@ insufficient. Shutdown bounds pending writing to 30 seconds; a late file does
 not turn a failed result into a successful capture.
 
 Captures and diagnostic exports share bounded requests, payload slots and bytes.
-Batches/sequences wait for temporary capacity before advancing their next
-requested view/frame. Unsupported or oversized requests fail explicitly; reduce
+Session batches submit and consume one view at a time; admission Busy is explicit.
+Sequences still use their transitional capacity-wait path before advancing a frame. Unsupported or oversized requests fail explicitly; reduce
 resolution or split an optional group rather than retrying the same oversize
 request. An issued capture never substitutes a later frame after an abort.
 

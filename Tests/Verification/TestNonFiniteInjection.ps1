@@ -153,9 +153,9 @@ try {
                 $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
                 Write-VerificationJson "$directory/control.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Passed' -and $null -eq $image.watch.injection) 'Control capture did not pass' $image
-                $script:controlHash = Get-PixelHash $image.image
+                $script:controlHash = Get-PixelHash (Get-VerificationCaptureFile $image '.png')
                 $graph = Invoke-VerificationSession graph $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/control"; Label = 'control'; TimeoutSeconds = $TimeoutSeconds }
-                Assert ($graph.status -eq 'completed' -and -not (Select-String -LiteralPath $graph.graph -SimpleMatch 'NonFiniteProbe' -Quiet)) 'Probe work exists without injection' $graph
+                Assert ($graph.status -eq 'completed' -and -not (Select-String -LiteralPath (Get-VerificationCaptureFile $graph '.json') -SimpleMatch 'NonFiniteProbe' -Quiet)) 'Probe work exists without injection' $graph
                 Add-Case $backend 'compute-control'
 
                 foreach ($value in @(@{ Name = 'NaN'; Field = 'nan' }, @{ Name = 'PositiveInfinity'; Field = 'positiveInf' }, @{ Name = 'NegativeInfinity'; Field = 'negativeInf' })) {
@@ -199,7 +199,7 @@ try {
                 $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-NaN"; Label = 'reported'; TimeoutSeconds = $TimeoutSeconds }
                 Write-VerificationJson "$directory/sanitized-NaN-image.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Failed' -and $image.watch.reason -eq 'NonFiniteReplaced') 'Report-mode capture lost the production failure' $image
-                Assert ((Get-PixelHash $image.image) -eq $script:controlHash) 'The sanitized NaN changed the PNG pixels' $image
+                Assert ((Get-PixelHash (Get-VerificationCaptureFile $image '.png')) -eq $script:controlHash) 'The sanitized NaN changed the PNG pixels' $image
                 Assert-Stamp $status.watch.report (Get-Coverage $image) $previewPoint 'NaN'
                 $null = Invoke-VerificationSession watch $session @{ WatchMode = 'fail'; WatchClaims = @('production'); Inject = $inject }
                 $failed = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-NaN"; Label = 'fail'; TimeoutSeconds = $TimeoutSeconds }
@@ -217,7 +217,7 @@ try {
                 $image = Invoke-VerificationSession capture $session @{ Timing = 'next-frame'; OutputDirectory = "$directory/sanitized-Negative"; Label = 'expected'; TimeoutSeconds = $TimeoutSeconds }
                 Write-VerificationJson "$directory/sanitized-Negative-image.json" $image
                 Assert ($image.status -eq 'completed' -and $image.watch.production -eq 'Passed') 'Expected clamp failed the capture' $image
-                Assert ((Get-PixelHash $image.image) -eq $script:controlHash) 'The clamped negative value changed the PNG pixels' $image
+                Assert ((Get-PixelHash (Get-VerificationCaptureFile $image '.png')) -eq $script:controlHash) 'The clamped negative value changed the PNG pixels' $image
                 Assert-Stamp $status.watch.report (Get-Coverage $image) $previewPoint 'Negative'
                 Add-Case $backend 'compute-sanitized-Negative'
 

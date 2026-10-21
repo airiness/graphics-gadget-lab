@@ -72,6 +72,18 @@ function Invoke-VerificationSession {
     return $receipt
 }
 
+function Get-VerificationCaptureFile {
+    param($Result, [string]$Suffix, [int]$ProductIndex = 0)
+    if ($Result.status -ne 'completed' -or $Result.publication -ne 'Published' -or -not $Result.manifest) {
+        throw 'A capture file requires a completed job with a published bundle manifest.'
+    }
+    $products = @($Result.products | Where-Object index -eq $ProductIndex)
+    if ($products.Count -ne 1) { throw "Expected one capture product at index $ProductIndex." }
+    $files = @($products[0].files | Where-Object { $_.EndsWith($Suffix, [StringComparison]::OrdinalIgnoreCase) })
+    if ($files.Count -ne 1) { throw "Expected one '$Suffix' file for capture product $ProductIndex." }
+    return $files[0]
+}
+
 function Wait-VerificationCondition {
     param([scriptblock]$Poll, [scriptblock]$Until, [double]$TimeoutSeconds,
         [int]$IntervalMilliseconds = 100, [switch]$DelayFirstPoll,
@@ -113,4 +125,4 @@ function Stop-VerificationSession {
 }
 
 Export-ModuleMember -Function New-VerificationRunDirectory, Write-VerificationJson, Invoke-VerificationScript, Invoke-VerificationSession,
-    Wait-VerificationCondition, Stop-VerificationSession
+    Wait-VerificationCondition, Stop-VerificationSession, Get-VerificationCaptureFile

@@ -356,7 +356,7 @@ namespace gglab
 			});
 		if (m_FrameCapture)
 		{
-			ResolveControlCaptures(m_FrameCapture->Update());
+			(void)m_FrameCapture->Update();
 		}
 		if (m_ControlServer && !UpdateControlSession())
 		{
@@ -497,14 +497,14 @@ namespace gglab
 		for (const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest : m_ControlServer->Poll())
 		{
 			m_LastControlActivity = now;
-			const ApplicationControlParseResult parsed =
+			ApplicationControlParseResult parsed =
 				ParseApplicationControlRequest(pipeRequest->GetLine());
 			if (!parsed.m_Request)
 			{
 				pipeRequest->Respond(SerializeApplicationControlError(parsed.m_Id, parsed.m_Error));
 				continue;
 			}
-			HandleControlRequest(pipeRequest, *parsed.m_Request);
+			HandleControlRequest(pipeRequest, std::move(*parsed.m_Request));
 		}
 		if (m_StopRequested)
 		{
@@ -512,9 +512,8 @@ namespace gglab
 			return false;
 		}
 
-		// Only requests and finished captures count as activity. A capture that can
-		// never become due, such as one waiting for content that is not loaded,
-		// must not keep an abandoned session alive; shutdown still answers it.
+		// Client polling counts as activity, retained receipts do not. Waiting for
+		// content that never loads must not keep an abandoned session alive.
 		if (now - m_LastControlActivity > m_IdleTimeout)
 		{
 			GGLAB_LOG_INFO_ALWAYS("Session '{}' exits after {} idle seconds.", m_SessionId,
@@ -526,7 +525,7 @@ namespace gglab
 
 	void Application::HandleControlRequest(
 		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
-		const ApplicationControlRequest& request) noexcept
+		ApplicationControlRequest&& request) noexcept
 	{
 		FrameSequenceCoordinator* frameSequence =
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
@@ -542,8 +541,7 @@ namespace gglab
 				.m_Hidden = m_Hidden,
 				.m_Width = m_WindowWidth,
 				.m_Height = m_WindowHeight,
-				.m_UnfinishedCaptures =
-					m_FrameCapture ? m_FrameCapture->GetUnfinishedRequestCount() : 0,
+				.m_CaptureIntake = m_AppRuntime ? m_AppRuntime->GetCaptureIntakeSnapshot() : CaptureIntakeSnapshot{},
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
@@ -569,50 +567,39 @@ namespace gglab
 		case ApplicationControlCommand::Graph:
 		case ApplicationControlCommand::Export:
 		{
-			if (!m_FrameCapture)
-			{
-				pipeRequest->Respond(SerializeApplicationControlError(
-					request.m_Id, "Frame capture is unavailable in this session."));
-				return;
-			}
-			const uint64_t captureRequestId = m_FrameCapture->Submit(request.m_Capture);
-			m_ControlCaptureIds.insert(captureRequestId);
-			if (request.m_Wait)
-			{
-				m_ControlCaptureWaits.push_back({
-					.m_PipeRequest = pipeRequest,
-					.m_ControlId = request.m_Id,
-					.m_CaptureRequestId = captureRequestId,
-					});
-			}
-			else
-			{
-				pipeRequest->Respond(
-					SerializeApplicationControlCaptureQueued(request.m_Id, captureRequestId));
-			}
+			const CaptureAdmission admission = m_AppRuntime ?
+				m_AppRuntime->TrySubmitCaptureJob(std::move(request.m_Capture)) :
+				CaptureAdmission{ .m_Reason = CaptureAdmissionReason::ServicesUnavailable };
+			pipeRequest->Respond(SerializeApplicationControlCaptureAdmission(request.m_Id, admission));
 			return;
 		}
 		case ApplicationControlCommand::Result:
 		{
-			const auto finished = m_ControlCaptureResults.find(request.m_CaptureRequestId);
-			if (finished != m_ControlCaptureResults.end())
+			const CaptureJobResult* result = m_AppRuntime ?
+				m_AppRuntime->FindCaptureJobResult(request.m_JobId) : nullptr;
+			if (result)
 			{
-				pipeRequest->Respond(
-					SerializeApplicationControlCaptureResult(request.m_Id, finished->second));
+				// Serialize while borrowed. Consume only after the complete response exists;
+				// a disconnected client can still lose a response, but cannot duplicate a receipt.
+				auto response = SerializeApplicationControlCaptureResult(request.m_Id, *result, request.m_Consume);
+				if (request.m_Consume)
+				{
+					(void)m_AppRuntime->TakeCaptureJobResult(request.m_JobId);
+				}
+				pipeRequest->Respond(std::move(response));
+				return;
 			}
-			else if (m_ControlCaptureIds.contains(request.m_CaptureRequestId))
-			{
-				pipeRequest->Respond(SerializeApplicationControlCaptureQueued(
-					request.m_Id, request.m_CaptureRequestId));
-			}
-			else
-			{
-				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
-					std::format("Capture request {} is unknown to this session.",
-						request.m_CaptureRequestId)));
-			}
+			const auto snapshot = m_AppRuntime ?
+				m_AppRuntime->GetCaptureJobSnapshot(request.m_JobId) : std::nullopt;
+			pipeRequest->Respond(snapshot ?
+				SerializeApplicationControlCapturePending(request.m_Id, *snapshot) :
+				SerializeApplicationControlCaptureNotFound(request.m_Id, request.m_JobId));
 			return;
 		}
+		case ApplicationControlCommand::CaptureCancel:
+			pipeRequest->Respond(SerializeApplicationControlCaptureCancellation(request.m_Id,
+				request.m_JobId, m_AppRuntime ? m_AppRuntime->CancelCaptureJob(request.m_JobId) : CaptureCancelResult::NotFound));
+			return;
 		case ApplicationControlCommand::Stop:
 			pipeRequest->Respond(SerializeApplicationControlStopping(request.m_Id));
 			m_StopRequested = true;
@@ -645,36 +632,6 @@ namespace gglab
 			pipeRequest->Respond(
 				SerializeApplicationControlSequence(request.m_Id, *frameSequence->GetStatus()));
 			return;
-		}
-	}
-
-	void Application::ResolveControlCaptures(
-		std::span<const FrameCaptureRequestResult> results) noexcept
-	{
-		// Finished results stay queryable for a bounded number of captures.
-		constexpr size_t maxRetainedResults = 256;
-		for (const FrameCaptureRequestResult& result : results)
-		{
-			if (m_ControlCaptureIds.erase(result.m_RequestId) == 0)
-			{
-				continue;
-			}
-			m_LastControlActivity = std::chrono::steady_clock::now();
-			m_ControlCaptureResults[result.m_RequestId] = result;
-			if (m_ControlCaptureResults.size() > maxRetainedResults)
-			{
-				m_ControlCaptureResults.erase(m_ControlCaptureResults.begin());
-			}
-			std::erase_if(m_ControlCaptureWaits, [&](const ControlCaptureWait& wait)
-				{
-					if (wait.m_CaptureRequestId != result.m_RequestId)
-					{
-						return false;
-					}
-					wait.m_PipeRequest->Respond(
-						SerializeApplicationControlCaptureResult(wait.m_ControlId, result));
-					return true;
-				});
 		}
 	}
 
@@ -712,23 +669,17 @@ namespace gglab
 			m_AppRuntime->Shutdown({
 				.m_ApplicationTooling = m_ApplicationTooling.get(),
 				});
-			// Shutdown finished every capture request; log and answer the final
-			// results before the coordinator is destroyed with the runtime.
+			// Shutdown drains capture work before either facade or runtime is destroyed.
+			// Unconsumed job receipts end with this session; they are not cached by WinApp.
 			if (m_FrameCapture)
 			{
-				ResolveControlCaptures(m_FrameCapture->Update());
+				(void)m_FrameCapture->Update();
 				m_FrameCapture.reset();
 			}
 			m_AppRuntime.reset();
 		}
 		if (m_ControlServer)
 		{
-			for (const ControlCaptureWait& wait : m_ControlCaptureWaits)
-			{
-				wait.m_PipeRequest->Respond(SerializeApplicationControlError(
-					wait.m_ControlId, "The session stopped before the capture finished."));
-			}
-			m_ControlCaptureWaits.clear();
 			m_ControlServer->Stop(SerializeApplicationControlError(
 				0, "The session stopped before the request was answered."));
 			m_ControlServer.reset();

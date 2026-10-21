@@ -1751,6 +1751,14 @@ namespace gglab
 			{
 				CaptureProductResult& product = job.m_Result.m_Products[index];
 				product.m_ProductIndex = static_cast<uint32_t>(index);
+				const auto& specification = job.m_Plan.m_RequiredProducts[index];
+				product.m_Kind = std::holds_alternative<GraphCaptureProduct>(specification) ?
+					CaptureProductKind::Graph :
+					std::holds_alternative<ResourceCaptureProduct>(specification) ?
+						CaptureProductKind::Resource :
+						std::holds_alternative<DiagnosticCaptureProduct>(specification) ?
+							CaptureProductKind::Diagnostic :
+							CaptureProductKind::Image;
 				switch (result.m_Status)
 				{
 				case FrameCaptureRequestStatus::Completed:
