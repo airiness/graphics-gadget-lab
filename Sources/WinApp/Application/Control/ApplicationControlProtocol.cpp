@@ -1330,6 +1330,9 @@ namespace gglab
 				{ "frameCount", status.m_FrameCount },
 				{ "referenceSamples", status.m_ReferenceSamples },
 				{ "submittedFrames", status.m_SubmittedFrames },
+				{ "acceptedCaptureJobs", status.m_AcceptedCaptureJobs },
+				{ "finishedCaptureJobs", status.m_FinishedCaptureJobs },
+				{ "pendingCaptureJobs", status.m_PendingCaptureJobs },
 				{ "completedCaptures", status.m_CompletedCaptures },
 			};
 			if (status.m_GpuTiming)
@@ -1468,7 +1471,7 @@ namespace gglab
 			{ "bundleSchemaVersion", 1 },
 			{ "resultConsumption", "explicit" },
 			{ "resultRetention", "until-consumed-or-session-end" },
-			{ "sequenceCaptureJobs", false } };
+			{ "sequenceCaptureJobs", true } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },

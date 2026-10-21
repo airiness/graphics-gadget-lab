@@ -117,12 +117,24 @@ job's terminal status/publication. Query and explicitly consume the real result.
 publication but GPU payloads/writer reservations may still be draining after its
 receipt is consumed; `status.capture` exposes those owners separately.
 
-## Migration boundary
+## Sequence ownership and remaining migration
 
-`capabilities.sequenceCaptureJobs` is currently false. Sequence commands retain
-business progress/coverage fields, but do not expose legacy `captureRequestIds`
-as if they were job IDs. `completedCaptures` counts successful image/resource
-deliveries, not manifest-bearing jobs. Sequence, interactive UI and one-shot
-capture internals still await migration and CAP-S5 adapter retirement. This
-session cutover does not establish their intake/retention bounds or final-tree
-parity gates.
+`capabilities.sequenceCaptureJobs` is true. Each due sequence frame submits one
+required-product plan through the same bounded job admission. AppRuntime consumes
+sequence receipts automatically after internal result routing; they do not enter
+the host result cache and are not separate session `result` handles. Bundles stay
+on disk. Sequence status reports `acceptedCaptureJobs`, `finishedCaptureJobs` and
+`pendingCaptureJobs`. `completedCaptures` counts successful image/resource
+deliveries: an image + resource + graph bundle is one job and two deliveries.
+
+Capacity pressure preserves the pose/sample and simulation instant. Sequence
+completion also waits for submitted-range watch coverage and GPU timing tails.
+Cancellation/failure uses whole-job delivery cancellation; a claimed publication
+keeps its eventual real outcome. Terminal sequences keep consuming pending
+receipts, while Runtime/writer resources drain independently. A new sequence
+cannot replace unresolved prior sequence job ownership.
+
+Interactive UI and startup one-shot callers still await migration and CAP-S5
+adapter retirement. Their intake is outside these job/receipt limits. Those
+record counts are not bounds on submitted-range watch evidence, timing series
+or all process bytes. Final adapter-free parity remains a separate gate.

@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -169,7 +170,9 @@ namespace gglab
 		uint32_t m_ReferenceSamples = 0;
 		// Sequence frames completed so far: every sample of a reference frame submitted.
 		uint32_t m_SubmittedFrames = 0;
-		std::vector<uint64_t> m_CaptureRequestIds;
+		uint32_t m_AcceptedCaptureJobs = 0;
+		uint32_t m_FinishedCaptureJobs = 0;
+		uint32_t m_PendingCaptureJobs = 0;
 		uint32_t m_CompletedCaptures = 0;
 		// Set when the request records GPU timing.
 		std::optional<FrameSequenceGpuTiming> m_GpuTiming;
@@ -246,7 +249,8 @@ namespace gglab
 		// Called with the state of the posed frame before the capture coordinator's
 		// BeginFrame: checks readiness and temporal continuity, then submits this
 		// frame's capture when requested.
-		void BeginFrame(const FrameCaptureFrameState& state) noexcept;
+		// False aborts this frame before rendering when admission must retry or fails.
+		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state) noexcept;
 		// Called for every successful runtime submission, including ordinary frames
 		// that publish remaining profiles while the sequence is Finishing.
 		void OnFrameSubmitted(uint64_t renderFrameSerial) noexcept;
@@ -257,11 +261,20 @@ namespace gglab
 		// Liveness budget, not a frames-in-flight assumption or warmup policy.
 		// Deferred/aborted frames consume no budget. Missing results fail explicitly.
 		static constexpr uint32_t MaxPendingGpuTimingSubmissions = 64;
-		// Counts finished captures of the sequence; a failed capture fails it.
-		void OnCaptureResults(std::span<const FrameCaptureRequestResult> results) noexcept;
+		// The AppRuntime owner consumes each sequence receipt directly from its reserved
+		// slot. Terminal sequences continue draining; no result history is retained here.
+		void UpdateCaptureJobs(
+			const std::function<std::optional<CaptureJobResult>(uint64_t)>& takeResult) noexcept;
 		void UpdateWatchCoverage() noexcept;
 
 	private:
+		struct PendingCaptureJob
+		{
+			uint64_t m_JobId = 0;
+			uint32_t m_Frame = 0;
+			uint32_t m_Deliveries = 0;
+		};
+
 		struct PendingGpuTimingFrame
 		{
 			uint64_t m_RenderFrameSerial = 0;
@@ -271,6 +284,7 @@ namespace gglab
 		};
 
 		void Fail(std::string failure) noexcept;
+		void CancelCaptureJobs() noexcept;
 		void CompleteIfFinished() noexcept;
 		// The posed frame is a requested frame, at its last reference sample, and has
 		// not been captured yet.
@@ -292,7 +306,8 @@ namespace gglab
 		uint64_t m_BegunRenderFrameSerial = 0;
 		std::optional<uint32_t> m_CapturedFrame;
 		std::optional<uint32_t> m_ExportedFrame;
-		std::vector<uint32_t> m_CaptureRequestFrames;
+		std::vector<PendingCaptureJob> m_CaptureJobs;
+		bool m_AdmissionDeferred = false;
 		std::optional<FrameCaptureSettleKey> m_LastSettleKey;
 		std::vector<PendingGpuTimingFrame> m_PendingGpuTimingFrames;
 		uint64_t m_GpuTimingSubmissionCount = 0;

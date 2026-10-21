@@ -46,13 +46,14 @@ namespace gglab
 		{
 			return;
 		}
-		const size_t firstResult = m_FrameCaptureResults.size();
 		m_FrameCapture->ConsumeResults(m_FrameCaptureResults);
 		if (m_FrameSequence)
 		{
 			m_FrameSequence->UpdateWatchCoverage();
-			m_FrameSequence->OnCaptureResults(
-				std::span<const FrameCaptureRequestResult>(m_FrameCaptureResults).subspan(firstResult));
+			m_FrameSequence->UpdateCaptureJobs([this](uint64_t jobId)
+			{
+				return m_FrameCapture->ConsumeJobReceipt(jobId);
+			});
 		}
 		// One owner establishes host visibility after internal result routing. The
 		// reserved receipt remains in the coordinator until explicit host consumption.
@@ -453,8 +454,8 @@ namespace gglab
 			m_FrameCapture->Update();
 			CollectFrameCaptureResults();
 		}
-		// Captures that are not due yet are cancelled; recorded captures keep being
-		// written and are awaited after the render host finalized.
+		// Sequence jobs cancel delivery as a whole; claimed writes keep their real
+		// publication outcome. Runtime and writer owners drain during shutdown.
 		if (m_FrameSequence)
 		{
 			m_FrameSequence->Cancel();

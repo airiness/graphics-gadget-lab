@@ -18,14 +18,26 @@ cuts permit their history reset. Unexpected history loss, readiness loss or
 content/configuration changes fail the sequence.
 
 Requested frames are exact next-frame captures labelled `<label>-f<frame>`.
-Capacity pressure waits before advancing the pose/sample. An issued capture on
-an aborted frame fails; another diagnostic tap cannot silently move an exact
-capture to a later path frame. Avoid submitting view changes during a sequence.
+Capacity pressure waits before advancing the pose/sample. Admission Busy consumes
+no identity or receipt; a supported late capacity deferral retries the same
+simulation instant with fresh actual-frame metadata. Other frame failures remain
+explicit; another diagnostic tap cannot silently move an exact capture to a
+later path frame. Avoid submitting view changes during a sequence.
+
+Each due frame submits one required-product job and publishes its final bundle
+manifest after all required products. AppRuntime automatically consumes sequence
+receipts. Status exposes accepted/finished/pending job counts; `completedCaptures`
+keeps image/resource delivery counting, so a paired graph adds no delivery.
+These jobs share session admission limits and do not accumulate terminal receipts
+or legacy output IDs for the full replay. Published files remain on disk.
 
 One sequence runs at a time. `sequence` waits by default; with `-NoWait`, poll
 `status`. Require `sequence.state: completed`; failed/cancelled sequences also
 return a successful control response. `finishing` waits for writes, watch
-coverage and requested GPU profiles. `sequence-cancel` stops a run.
+coverage and requested GPU profiles. `sequence-cancel` stops a run and cancels
+whole-job delivery. Already claimed publication can finish later. Pending job
+receipts and GPU/writer owners keep draining after cancellation; a new sequence
+waits until prior sequence receipts are consumed.
 
 Choose one evidence channel per replay: scene, or
 `-Source diagnostic -DiagnosticTap temporal-history-weight` (for example).

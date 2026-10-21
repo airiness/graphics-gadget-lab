@@ -298,7 +298,7 @@ namespace gglab
 				status["frame"]["ready"] == false && status["frame"]["settledFrames"] == 5 &&
 				status["frame"]["gates"][0]["state"] == "pending" && status["frame"]["fixedDeltaTime"].is_null() &&
 				status["frame"]["referenceViews"] == Json::array({ "CAM_A", "CAM_B" }), "Status preserves session and frame readiness");
-			context.Check(status["capabilities"]["captureJobs"] == true && status["capabilities"]["sequenceCaptureJobs"] == false &&
+			context.Check(status["capabilities"]["captureJobs"] == true && status["capabilities"]["sequenceCaptureJobs"] == true &&
 				status["capabilities"]["resultConsumption"] == "explicit" && status["capture"]["activeJobs"] == 2 &&
 				status["capture"]["reservedReceipts"] == 3 && status["capture"]["limits"]["receipts"] == 128 &&
 				status["capture"]["limits"]["activeJobs"] == 64 && status["capture"]["limits"]["productsPerJob"] == 8 &&
@@ -309,11 +309,14 @@ namespace gglab
 				available["watch"]["production"] == "Incomplete", "Missing frame and production capability do not imply completed coverage");
 			FrameSequenceStatus sequence{ .m_SequenceId = 3, .m_State = FrameSequenceState::Failed,
 				.m_CameraPathId = "SEQ_DollyDoorway", .m_CameraPathVersion = 1, .m_FrameCount = 180,
-				.m_SubmittedFrames = 12, .m_CaptureRequestIds = { 21, 22 }, .m_CompletedCaptures = 1, .m_Failure = "Lost continuity." };
+				.m_SubmittedFrames = 12, .m_AcceptedCaptureJobs = 2, .m_FinishedCaptureJobs = 1,
+				.m_PendingCaptureJobs = 1, .m_CompletedCaptures = 1, .m_Failure = "Lost continuity." };
 			const auto sequenceJson = Json::parse(SerializeApplicationControlSequence(10, sequence))["sequence"];
 			context.Check(sequenceJson["state"] == "failed" && sequenceJson["path"] == "SEQ_DollyDoorway" &&
 				sequenceJson["frameCount"] == 180 && sequenceJson["submittedFrames"] == 12 && sequenceJson["failure"] == "Lost continuity." &&
 				!sequenceJson.contains("captureRequestIds") && !sequenceJson.contains("gpuTiming") &&
+				sequenceJson["acceptedCaptureJobs"] == 2 && sequenceJson["finishedCaptureJobs"] == 1 &&
+				sequenceJson["pendingCaptureJobs"] == 1 &&
 				Json::parse(SerializeApplicationControlStatus(11, { .m_Sequence = &sequence }))["sequence"] == sequenceJson,
 				"Sequence progress remains available without exposing legacy output ids as job identities");
 			sequence.m_GpuTiming = FrameSequenceGpuTiming{ .m_FrameMilliseconds = { 4.0, 2.0 },

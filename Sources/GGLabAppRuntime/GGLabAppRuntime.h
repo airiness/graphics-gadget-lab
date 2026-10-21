@@ -223,8 +223,8 @@ namespace gglab
 		{
 			return m_FrameCapture.get();
 		}
-		// Appends published results in completion order, once per result. Tick and
-		// Shutdown notify the sequence before publication, independently of host polling.
+		// Appends legacy frontend results in completion order, once per result.
+		// Sequence jobs consume their own reserved receipts independently of host polling.
 		void ConsumeFrameCaptureResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
 		// Owner-thread unified job API. Rejected/Busy admission leaves the plan intact.
 		// Tick and Shutdown publish terminal receipts at the result-routing boundary;

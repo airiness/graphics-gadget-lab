@@ -65,7 +65,7 @@ try {
                     StateRoot="$output/$backend-state"; StartTimeoutSeconds=$TimeoutSeconds }
                 Write-VerificationJson "$directory/start.json" $start
                 $status = Send-Control @{command='status'}
-                Check ($status.capabilities.captureJobs -and -not $status.capabilities.sequenceCaptureJobs -and
+                Check ($status.capabilities.captureJobs -and $status.capabilities.sequenceCaptureJobs -and
                     $status.capture.limits.activeJobs -eq 64 -and $status.capture.limits.receipts -eq 128 -and
                     $status.capture.limits.productsPerJob -eq 8 -and $status.capture.limits.resourceTargetsPerJob -eq 64) "$backend-capabilities"
                 foreach ($old in @(1, 2, 4)) {
@@ -151,9 +151,33 @@ try {
                 $full = Send-Control @{command='status'}
                 Check (-not $busy.ok -and $busy.admission -eq 'Busy' -and $busy.reason -eq 'ReceiptLimit' -and $null -eq $busy.jobId -and
                     $full.capture.reservedReceipts -eq 128 -and $full.capture.activeJobs -eq 0) "$backend-unconsumed-receipts-backpressure"
+                # Sequence jobs share those slots and consume only their own receipts.
+                $sequenceDirectory = Join-Path $directory 'Sequence'
+                $sequenceStart = Send-Control @{command='sequence';path='SEQ_TemporalAALab_MovingObject';
+                    captureFrames=@(0..179);outputDirectory=$sequenceDirectory;label='bounded';
+                    exports=@(@{frame=179;targets=@(@{resource='TAA.ResolvedSceneColor'});graph=$true})}
+                Check ($sequenceStart.ok) "$backend-sequence-starts-under-receipt-pressure"
+                $blocked = Send-Control @{command='status'}
+                Write-VerificationJson "$directory/sequence-blocked.json" $blocked
+                Check ($blocked.sequence.submittedFrames -eq 0 -and $blocked.sequence.acceptedCaptureJobs -eq 0 -and
+                    $blocked.capture.reservedReceipts -eq 128) "$backend-sequence-defers-before-admission"
                 $last = Await-Result $ids[-1] $true
+                $sequenceFinal = Wait-VerificationCondition -Poll { Send-Control @{command='status'} } `
+                    -Until { param($r) $r.sequence.state -in @('completed','failed','cancelled') } -TimeoutSeconds $TimeoutSeconds
+                Write-VerificationJson "$directory/sequence-completed.json" $sequenceFinal
+                Check ($sequenceFinal.sequence.state -eq 'completed' -and $sequenceFinal.sequence.submittedFrames -eq 180 -and
+                    $sequenceFinal.sequence.acceptedCaptureJobs -eq 180 -and $sequenceFinal.sequence.finishedCaptureJobs -eq 180 -and
+                    $sequenceFinal.sequence.pendingCaptureJobs -eq 0 -and $sequenceFinal.sequence.completedCaptures -eq 181 -and
+                    $sequenceFinal.capture.reservedReceipts -eq 127 -and $sequenceFinal.capture.activeJobs -eq 0 -and
+                    $sequenceFinal.capture.legacyRetainedResults -eq 0) "$backend-long-sequence-reuses-one-receipt-without-consuming-foreign-results"
+                $manifests = @(Get-ChildItem -LiteralPath $sequenceDirectory -Filter '*.capture-bundle.json')
+                $paired = @($manifests | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } |
+                    Where-Object { $_.products.Count -eq 3 })
+                Check ($manifests.Count -eq 180 -and $paired.Count -eq 1 -and
+                    $paired[0].provenance.sequence.frame -eq 179) "$backend-sequence-publishes-manifest-per-frame-and-required-resource-graph"
                 $replacement = Submit-Waiting
-                Check ($last.consumed -and $replacement.ok -and $replacement.jobId -eq ($ids[-1]+1)) "$backend-out-of-order-consumption-slot-reuse-without-busy-identity-loss"
+                Check ($last.consumed -and $replacement.ok -and
+                    $replacement.jobId -eq ($ids[-1]+$sequenceFinal.sequence.acceptedCaptureJobs+1)) "$backend-out-of-order-consumption-slot-reuse-without-busy-identity-loss"
                 $null = Send-Control @{command='capture-cancel';jobId=$replacement.jobId}
                 $null = Await-Result $replacement.jobId $true
                 foreach ($id in $ids[0..126]) {

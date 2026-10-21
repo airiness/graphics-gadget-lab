@@ -194,7 +194,7 @@ namespace gglab
 		FinishWriting();
 	}
 
-	CaptureAdmission FrameCaptureCoordinator::TrySubmit(CapturePlan&& plan) noexcept
+	CaptureAdmission FrameCaptureCoordinator::CheckJobAdmission(const CapturePlan& plan) const noexcept
 	{
 		if (m_IsShuttingDown)
 		{
@@ -271,6 +271,17 @@ namespace gglab
 		{
 			return { CaptureAdmissionStatus::Busy, CaptureAdmissionReason::ReceiptLimit };
 		}
+		return { CaptureAdmissionStatus::Accepted };
+	}
+
+	CaptureAdmission FrameCaptureCoordinator::TrySubmit(CapturePlan&& plan) noexcept
+	{
+		const CaptureAdmission admission = CheckJobAdmission(plan);
+		if (admission.m_Status != CaptureAdmissionStatus::Accepted)
+		{
+			return admission;
+		}
+		const auto slot = std::ranges::find(m_JobReceipts, uint64_t{ 0 }, &JobReceipt::m_JobId);
 		RemoveFinishedJobs();
 		slot->m_JobId = m_NextJobId++;
 		++m_ActiveJobs;

@@ -39,6 +39,8 @@
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -1331,14 +1333,12 @@ namespace gglab
 				std::vector<FrameCaptureRequestResult> results;
 				runtime.ConsumeFrameCaptureResults(results);
 				checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
-					sequence.GetStatus()->m_SubmittedFrames == 0 && results.size() == 2 &&
-					std::ranges::all_of(results, [](const auto& result)
-					{
-						return result.m_Status == FrameCaptureRequestStatus::Failed && result.m_ImagePath.empty() &&
-							result.m_ResourcePaths.empty() && !result.m_Failure.empty();
-					}) && capture.GetUnfinishedRequestCount() == 0 &&
+					sequence.GetStatus()->m_SubmittedFrames == 0 && results.empty() &&
+					sequence.GetStatus()->m_AcceptedCaptureJobs == 1 && sequence.GetStatus()->m_FinishedCaptureJobs == 1 &&
+					sequence.GetStatus()->m_Failure.find("UnknownResource") != std::string::npos &&
+					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 && capture.GetUnfinishedRequestCount() == 0 &&
 					probe.m_CaptureControl->GetUnfinishedRequestCount() == 0 && probe.m_ImageEncodes == 0,
-					"The permanent failure fans out exactly once and drains every Runtime request without encoding its image");
+					"The permanent failure consumes one sequence receipt without a legacy fan-out, encoding or leaked reservation");
 			}
 			else
 			{
@@ -1349,22 +1349,23 @@ namespace gglab
 				}
 				const double time = runtime.GetTime()->GetTotalTime();
 				const auto serial = capture.GetLastFrameState()->m_FrameSerial;
-				const auto ids = sequence.GetStatus()->m_CaptureRequestIds;
+				const auto accepted = sequence.GetStatus()->m_AcceptedCaptureJobs;
 				const auto executions = probe.m_GraphExecutions;
 				const auto ends = probe.m_FrameEnds;
 				const auto aborts = probe.m_FrameAborts;
 				const auto maps = probe.m_ReadbackMaps;
-				checks.Check(probe.m_RequiredPlanDeferrals == 1 && ids.size() == 2 &&
+				checks.Check(probe.m_RequiredPlanDeferrals == 1 && accepted == 1 &&
 					sequence.GetStatus()->m_State == FrameSequenceState::Running &&
 					sequence.GetStatus()->m_SubmittedFrames == 0 && capture.GetUnfinishedRequestCount() == 2 &&
 					sequence.ShouldHoldTime() && probe.m_CaptureControl->GetUnfinishedRequestCount() == 0,
 					"Late production deferral retires bound Runtime owners but preserves "
-					"both IDs and the unsubmitted sequence sample");
+					"the accepted job and unsubmitted sequence sample");
 				checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_RequiredPlanDeferrals == 0 &&
 					probe.m_GraphExecutions == executions && probe.m_FrameEnds == ends && probe.m_FrameAborts == aborts + 1 &&
 					probe.m_ReadbackMaps == maps && runtime.GetTime()->GetTotalTime() == time &&
 					capture.GetLastFrameState()->m_FrameSerial == serial + 1 &&
-					sequence.GetStatus()->m_CaptureRequestIds == ids && sequence.GetStatus()->m_SubmittedFrames == 0,
+					sequence.GetStatus()->m_AcceptedCaptureJobs == accepted && sequence.GetStatus()->m_SubmittedFrames == 0 &&
+					capture.GetJobSnapshot(1).has_value(),
 					"A second real RAII abort records no GPU work, maps no payload "
 					"and repeats the same simulation instant with fresh provenance");
 				checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_FrameEnds == ends + 1 &&
@@ -1374,19 +1375,34 @@ namespace gglab
 					"at the preserved simulation instant");
 				const auto successfulSerial = capture.GetLastFrameState()->m_FrameSerial;
 				std::vector<FrameCaptureRequestResult> results;
-				for (uint32_t attempt = 0; attempt < 100 && results.size() < 2; ++attempt)
+				for (uint32_t attempt = 0; attempt < 100 && sequence.IsActive(); ++attempt)
 				{
 					GGLAB_UNUSED(runtime.Tick());
 					runtime.ConsumeFrameCaptureResults(results);
 					std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				}
-				checks.Check(results.size() == 2 && std::ranges::all_of(results, [&](const auto& result)
+				std::vector<nlohmann::json> manifests;
+				if (std::filesystem::exists(root / "Captures"))
+				{
+					for (const auto& entry : std::filesystem::recursive_directory_iterator(root / "Captures"))
 					{
-						return result.m_Status == FrameCaptureRequestStatus::Completed && result.m_Metadata &&
-							result.m_Metadata->m_FrameSerial == successfulSerial && result.m_Metadata->m_TotalTime == time &&
-							result.m_Metadata->m_Sequence && result.m_Metadata->m_Sequence->m_Frame == 0 &&
-							std::ranges::find(ids, result.m_RequestId) != ids.end();
-					}) && probe.m_ImageEncodes == 1 && capture.GetUnfinishedRequestCount() == 0 &&
+						if (entry.path().filename().string().ends_with(".capture-bundle.json"))
+						{
+							std::ifstream file(entry.path());
+							manifests.push_back(nlohmann::json::parse(file));
+						}
+					}
+				}
+				checks.Check(results.empty() && manifests.size() == 1 &&
+					manifests.front()["products"].size() == 3 &&
+					manifests.front()["provenance"]["frame"]["serial"] == successfulSerial &&
+					manifests.front()["provenance"]["time"]["totalTime"] == time &&
+					manifests.front()["provenance"]["sequence"]["frame"] == 0 &&
+					sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					sequence.GetStatus()->m_CompletedCaptures == 2 && sequence.GetStatus()->m_FinishedCaptureJobs == 1 &&
+					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 &&
+					runtime.GetCaptureIntakeSnapshot().m_LegacyRetainedResults == 0 &&
+					probe.m_ImageEncodes == 1 && capture.GetUnfinishedRequestCount() == 0 &&
 					probe.m_CaptureControl->GetUnfinishedRequestCount() == 0 &&
 					probe.m_CaptureControl->GetResourceExportFrameAvailability() == FrameCaptureAvailability::Available,
 					"Production image, graph and NPY publication uses only the successful attempt "

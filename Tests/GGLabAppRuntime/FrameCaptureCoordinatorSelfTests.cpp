@@ -36,12 +36,14 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <latch>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -1634,16 +1636,36 @@ namespace gglab
 		// issues captures, submits it and completes every issued Runtime capture.
 		struct SequenceHarness
 		{
-			explicit SequenceHarness(const std::filesystem::path& directory) noexcept :
+			explicit SequenceHarness(const std::filesystem::path& directory,
+				CaptureJobLimits limits = {}) noexcept :
 				m_Capture({
 					.m_Capture = &m_Control,
 					.m_DefaultOutputDirectory = directory,
 					.m_ImageEncoder = &EncodeTestPng,
 					.m_WriteOnCallingThread = true,
+					.m_JobLimits = limits,
 				}),
 					m_Sequence(m_Capture)
 			{
 				m_Paths.push_back(MakeSequenceTestPath());
+			}
+
+			void CollectCaptureJobs()
+			{
+				if (!m_CollectJobs)
+				{
+					return;
+				}
+				m_Sequence.UpdateCaptureJobs([this](uint64_t jobId)
+				{
+					auto result = m_Capture.TakeJobResult(jobId);
+					if (result)
+					{
+						m_JobResults.push_back(*result);
+						m_Results.insert(m_Results.end(), result->m_Products.begin(), result->m_Products.end());
+					}
+					return result;
+				});
 			}
 
 			// Renders one frame; returns the posed sequence frame, if any.
@@ -1655,7 +1677,7 @@ namespace gglab
 					// The runtime neither simulates nor renders a deferred frame.
 					m_Deferred = true;
 					m_Capture.Update();
-					m_Sequence.OnCaptureResults(Consume(m_Capture));
+					CollectCaptureJobs();
 					return std::nullopt;
 				}
 				if (!m_Sequence.ShouldHoldTime())
@@ -1689,7 +1711,16 @@ namespace gglab
 					state.m_SettleKey.m_Temporal.m_Services = TemporalService::ProjectionJitter;
 					state.m_SettleKey.m_Temporal.m_ReferenceActive = true;
 				}
-				m_Sequence.BeginFrame(state);
+				if (m_BeforeBeginFrame)
+				{
+					m_BeforeBeginFrame();
+				}
+				if (!m_Sequence.BeginFrame(state))
+				{
+					m_Deferred = true;
+					CollectCaptureJobs();
+					return std::nullopt;
+				}
 				m_Capture.BeginFrame(std::move(state));
 				if (m_LateDeferrals != 0 && std::ranges::any_of(m_Control.m_Issued, [&](const auto& issued)
 					{
@@ -1705,7 +1736,7 @@ namespace gglab
 						}
 					}
 					m_Capture.Update();
-					m_Sequence.OnCaptureResults(Consume(m_Capture));
+					CollectCaptureJobs();
 					m_Completed = m_Control.m_Issued.size();
 					m_Deferred = true;
 					return pose ? std::optional<uint32_t>(pose->m_Frame) : std::nullopt;
@@ -1720,9 +1751,7 @@ namespace gglab
 					m_Control.Complete(m_Control.m_Issued[m_Completed].m_Id);
 				}
 				m_Capture.Update();
-				std::vector<FrameCaptureRequestResult> results = Consume(m_Capture);
-				m_Sequence.OnCaptureResults(results);
-				m_Results.insert(m_Results.end(), results.begin(), results.end());
+				CollectCaptureJobs();
 				return pose ? std::optional<uint32_t>(pose->m_Frame) : std::nullopt;
 			}
 
@@ -1741,10 +1770,13 @@ namespace gglab
 			bool m_Ready = true;
 			bool m_AutoComplete = true;
 			bool m_Deferred = false;
+			bool m_CollectJobs = true;
 			std::optional<TemporalReferenceSample> m_LastSample;
 			std::optional<FrameSequenceTemporalAAOverrides> m_LastTemporalAAOverrides;
 			std::optional<FrameSequenceGTAOOverrides> m_LastGTAOOverrides;
-			std::vector<FrameCaptureRequestResult> m_Results;
+			std::vector<CaptureProductResult> m_Results;
+			std::vector<CaptureJobResult> m_JobResults;
+			std::function<void()> m_BeforeBeginFrame;
 		};
 
 		void RunFrameSequenceTests(SelfTestContext& context) noexcept
@@ -1797,11 +1829,11 @@ namespace gglab
 			std::error_code errorCode;
 			for (const auto& entry : std::filesystem::directory_iterator(directory.GetPath(), errorCode))
 			{
-				labelled |= entry.path().filename().string().starts_with("run-f0005-");
+				labelled |= entry.path().filename().string().starts_with("run-f0005.");
 			}
 			context.Check(labelled, "Sequence captures are labelled with their sequence frame");
 			const auto lastCapture = std::ranges::find_if(harness.m_Results,
-				[](const FrameCaptureRequestResult& result)
+				[](const CaptureProductResult& result)
 				{
 					return result.m_Metadata && result.m_Metadata->m_Sequence &&
 						result.m_Metadata->m_Sequence->m_Frame == 5;
@@ -1909,6 +1941,126 @@ namespace gglab
 			context.Check(!impossible.m_Deferred && impossible.m_Control.m_Issued.empty() &&
 				impossible.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
 				"An oversized target fails its sequence instead of waiting forever for impossible capacity");
+		}
+
+		void RunSequenceJobOwnershipTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("sequence-job-ownership");
+			{
+				SequenceHarness harness(directory.GetPath(), { .m_MaxActiveJobs = 1, .m_MaxReceipts = 1 });
+				harness.m_Paths.front().m_Keys.back().m_Frame = 179;
+				std::vector<uint32_t> frames(180);
+				std::iota(frames.begin(), frames.end(), 0u);
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = frames }, error));
+				for (uint32_t tick = 0; tick < 190 && harness.m_Sequence.IsActive(); ++tick)
+				{
+					GGLAB_UNUSED(harness.Frame());
+				}
+				const auto& status = *harness.m_Sequence.GetStatus();
+				const auto intake = harness.m_Capture.GetIntakeSnapshot();
+				context.Check(status.m_State == FrameSequenceState::Completed && status.m_CompletedCaptures == 180 &&
+					status.m_AcceptedCaptureJobs == 180 && status.m_FinishedCaptureJobs == 180 && status.m_PendingCaptureJobs == 0 &&
+					intake.m_ActiveJobs == 0 && intake.m_ReservedReceipts == 0 && intake.m_LegacyRetainedResults == 0,
+					"A 180-job sequence reuses one receipt slot without a legacy output queue or retained job history");
+				context.Check(harness.m_JobResults.size() == 180 &&
+					std::ranges::all_of(harness.m_JobResults, [](const auto& result)
+					{
+						return result.m_Publication == CaptureJobPublication::Published &&
+							std::filesystem::exists(result.m_ManifestPath);
+					}), "Every sequence job finishes behind a real bundle manifest before its receipt is released");
+			}
+			for (uint32_t samples : { 0u, 3u })
+			{
+				SequenceHarness harness(directory.GetPath(), { .m_MaxActiveJobs = 1, .m_MaxReceipts = 1 });
+				GGLAB_UNUSED(harness.Frame());
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 },
+					.m_ReferenceSamples = samples }, error));
+				uint64_t blocker = 0;
+				harness.m_BeforeBeginFrame = [&]()
+					{
+						if (blocker == 0 && (!harness.m_LastSample || harness.m_LastSample->m_Index + 1 == samples))
+						{
+							blocker = harness.m_Capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} },
+								.m_Timing = FrameCaptureTiming::AfterReady, .m_RequiredContentId = "Missing.Content" }).m_JobId;
+						}
+					};
+				for (uint32_t attempt = 0; attempt < 4 && !harness.m_Deferred; ++attempt)
+				{
+					GGLAB_UNUSED(harness.Frame());
+				}
+				harness.m_BeforeBeginFrame = {};
+				const auto time = harness.m_SimulationTime;
+				const auto serial = harness.m_RenderSerial;
+				context.Check(blocker != 0 && harness.m_Deferred && harness.m_Sequence.ShouldHoldTime() &&
+					harness.m_Sequence.GetStatus()->m_AcceptedCaptureJobs == 0 && harness.m_Control.m_Issued.empty(),
+					"Late Busy admission aborts without accepting a job, issuing work or advancing a sequence sample");
+				GGLAB_UNUSED(harness.m_Capture.CancelJob(blocker));
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_Deferred && harness.m_RenderSerial == serial && harness.m_SimulationTime == time &&
+					harness.m_Capture.GetIntakeSnapshot().m_ActiveJobs == 0,
+					"An unconsumed terminal receipt alone blocks admission before simulation or posing");
+				GGLAB_UNUSED(harness.m_Capture.TakeJobResult(blocker));
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(!harness.m_Deferred && harness.m_SimulationTime == time && harness.m_JobResults.size() == 1 &&
+					harness.m_JobResults.front().m_JobId == blocker + 1 &&
+					harness.m_Results.front().m_Metadata->m_TotalTime == time &&
+					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 1,
+					"Receipt release resumes the exact frame/sample and Busy admission consumes no job identity");
+				GGLAB_UNUSED(harness.m_Sequence.Cancel());
+			}
+			for (bool published : { false, true })
+			{
+				SequenceHarness harness(directory.GetPath(), { .m_MaxActiveJobs = 1, .m_MaxReceipts = 1 });
+				harness.m_AutoComplete = published;
+				harness.m_CollectJobs = false;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 } }, error));
+				GGLAB_UNUSED(harness.Frame());
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_Sequence.Cancel() && harness.m_Sequence.GetStatus()->m_PendingCaptureJobs == 1 &&
+					harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error) == 0,
+					"Cancellation keeps pending job ownership and prevents a new sequence from replacing its drain state");
+				harness.m_CollectJobs = true;
+				harness.CollectCaptureJobs();
+				const auto intake = harness.m_Capture.GetIntakeSnapshot();
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
+					harness.m_Sequence.GetStatus()->m_PendingCaptureJobs == 0 && intake.m_ReservedReceipts == 0 &&
+					harness.m_Sequence.GetStatus()->m_CompletedCaptures == (published ? 1u : 0u) &&
+					harness.m_JobResults.size() == 1 &&
+					harness.m_JobResults.front().m_Publication == (published ?
+						CaptureJobPublication::Published : CaptureJobPublication::NotPublished) &&
+					intake.m_DrainingRuntimeRequests == (published ? 0u : 1u),
+					"A cancelled sequence consumes the real job receipt without rewriting publication or releasing pending Runtime work");
+				if (!published)
+				{
+					harness.m_Control.Complete(harness.m_Control.m_Issued.front().m_Id);
+					harness.m_Capture.Update();
+					harness.CollectCaptureJobs();
+				}
+				context.Check(harness.m_Capture.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0 &&
+					harness.m_JobResults.size() == 1 && harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled,
+					"Late completion drains cancelled owners once and cannot revive the sequence or emit another receipt");
+			}
+			{
+				SequenceHarness harness(directory.GetPath(), { .m_MaxActiveJobs = 1, .m_MaxReceipts = 1,
+					.m_MaxProductsPerJob = 1 });
+				GGLAB_UNUSED(harness.Frame());
+				const auto blocker = harness.m_Capture.TrySubmit({ .m_RequiredProducts = { ImageCaptureProduct{} },
+					.m_Timing = FrameCaptureTiming::AfterReady, .m_RequiredContentId = "Missing.Content" });
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 },
+					.m_Exports = { { .m_Frame = 0, .m_Targets = { { .m_Resource = "A" } } } } }, error));
+				GGLAB_UNUSED(harness.Frame());
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					harness.m_Sequence.GetStatus()->m_AcceptedCaptureJobs == 0 &&
+					harness.m_Capture.GetIntakeSnapshot().m_ReservedReceipts == 1 &&
+					harness.m_Capture.GetJobSnapshot(blocker.m_JobId).has_value(),
+					"Invalid sequence plans are rejected before pressure checks without consuming an identity or foreign receipt");
+				GGLAB_UNUSED(harness.m_Capture.CancelJob(blocker.m_JobId));
+				GGLAB_UNUSED(harness.m_Capture.TakeJobResult(blocker.m_JobId));
+			}
 		}
 
 		void RunDiagnosticCaptureTests(SelfTestContext& context) noexcept
@@ -2237,7 +2389,7 @@ namespace gglab
 				"A reference sequence renders every frame as consecutive samples with time held "
 				"after the first");
 			const auto capture = std::ranges::find_if(harness.m_Results,
-				[](const FrameCaptureRequestResult& result)
+				[](const CaptureProductResult& result)
 				{
 					return result.m_Metadata && result.m_Metadata->m_Sequence;
 				});
@@ -2556,7 +2708,7 @@ namespace gglab
 				{
 					harness.m_Control.Complete(harness.m_Control.m_Issued.front().m_Id);
 					harness.m_Capture.Update();
-					harness.m_Sequence.OnCaptureResults(Consume(harness.m_Capture));
+					harness.CollectCaptureJobs();
 				};
 				if (completeCaptureFirst)
 				{
@@ -3967,8 +4119,8 @@ namespace gglab
 				}
 				const double time = harness.m_SimulationTime;
 				const auto serial = harness.m_RenderSerial;
-				const auto ids = harness.m_Sequence.GetStatus()->m_CaptureRequestIds;
-				context.Check(harness.m_Deferred && ids.size() == 2 && harness.m_Results.empty() &&
+				const auto accepted = harness.m_Sequence.GetStatus()->m_AcceptedCaptureJobs;
+				context.Check(harness.m_Deferred && accepted == 1 && harness.m_Results.empty() &&
 					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 0 && harness.m_Sequence.ShouldHoldTime() &&
 					(samples == 0 || (harness.m_LastSample && harness.m_LastSample->m_Index == samples - 1)),
 					"Late Busy preserves the exact sequence frame and reference sample without a terminal result");
@@ -3980,16 +4132,17 @@ namespace gglab
 				harness.m_Control.m_ResourceFrameAvailability = FrameCaptureAvailability::Available;
 				GGLAB_UNUSED(harness.Frame());
 				context.Check(harness.m_Deferred && harness.m_SimulationTime == time &&
-					harness.m_Sequence.GetStatus()->m_CaptureRequestIds == ids && harness.m_Results.empty() &&
+					harness.m_Sequence.GetStatus()->m_AcceptedCaptureJobs == accepted && harness.m_Results.empty() &&
+					harness.m_Capture.GetJobSnapshot(1).has_value() &&
 					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 0,
-					"A second late Busy reuses both accepted IDs and the simulation instant instead of advancing sample or time");
+					"A second late Busy reuses the accepted job and simulation instant without advancing sample or time");
 				GGLAB_UNUSED(harness.Frame());
-				context.Check(!harness.m_Deferred && harness.m_SimulationTime == time && harness.m_Results.size() == 2 &&
-					harness.m_Sequence.GetStatus()->m_CaptureRequestIds == ids &&
+				context.Check(!harness.m_Deferred && harness.m_SimulationTime == time && harness.m_Results.size() == 3 &&
+					harness.m_Sequence.GetStatus()->m_AcceptedCaptureJobs == accepted &&
 					harness.m_Sequence.GetStatus()->m_SubmittedFrames == 1 &&
 					std::ranges::all_of(harness.m_Results, [&](const auto& result)
 					{
-						return result.m_Status == FrameCaptureRequestStatus::Completed && result.m_Metadata &&
+						return result.m_Status == CaptureJobStatus::Completed && result.m_Metadata &&
 							result.m_Metadata->m_FrameSerial == harness.m_RenderSerial &&
 							result.m_Metadata->m_TotalTime == time &&
 							result.m_Metadata->m_Sequence && result.m_Metadata->m_Sequence->m_Frame == 0;
@@ -3997,7 +4150,7 @@ namespace gglab
 					"Only the successful retry advances the sequence, "
 					"with fresh render provenance for the same simulation instant");
 				GGLAB_UNUSED(harness.Frame());
-				context.Check(harness.m_SimulationTime == time + 1.0 / 60.0 && harness.m_Results.size() == 2 &&
+				context.Check(harness.m_SimulationTime == time + 1.0 / 60.0 && harness.m_Results.size() == 3 &&
 					harness.m_Capture.GetUnfinishedRequestCount() == 0 && harness.m_Control.GetUnfinishedRequestCount() == 0,
 					"The next sequence frame advances time exactly once and leaves no orphan reservation or duplicate result");
 				harness.m_Capture.FinalizeAfterRenderHost();
@@ -4170,8 +4323,8 @@ namespace gglab
 			{
 				GGLAB_UNUSED(harness.Frame());
 			}
-			const auto image = std::ranges::find_if(harness.m_Results, [](const auto& result) { return !result.m_ImagePath.empty(); });
-			const auto resources = std::ranges::find_if(harness.m_Results, [](const auto& result) { return !result.m_ResourcePaths.empty(); });
+			const auto image = std::ranges::find(harness.m_Results, CaptureProductKind::Image, &CaptureProductResult::m_Kind);
+			const auto resources = std::ranges::find(harness.m_Results, CaptureProductKind::Resource, &CaptureProductResult::m_Kind);
 			context.Check(image != harness.m_Results.end() && resources != harness.m_Results.end() && image->m_Metadata && resources->m_Metadata &&
 				image->m_Metadata->m_FrameSerial == resources->m_Metadata->m_FrameSerial && resources->m_Metadata->m_Sequence->m_Frame == 1 &&
 				harness.m_Control.m_Issued.back().m_Defer,
@@ -4401,6 +4554,7 @@ namespace gglab
 		RunMetadataSerializationTests(context);
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
+		RunSequenceJobOwnershipTests(context);
 		RunDiagnosticCaptureTests(context);
 		RunDiagnosticSchedulingTests(context);
 		RunFrameResultIdentityTests(context);

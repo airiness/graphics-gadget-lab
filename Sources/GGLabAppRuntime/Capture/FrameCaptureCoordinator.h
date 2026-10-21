@@ -166,6 +166,9 @@ namespace gglab
 		// Admission reserves a terminal receipt before moving the plan. Busy and
 		// rejection allocate no storage and leave the supplied plan available to retry.
 		[[nodiscard]] CaptureAdmission TrySubmit(CapturePlan&& plan) noexcept;
+		// Advisory preflight with the same validation/pressure ordering. Accepted
+		// reserves nothing and has no job ID; only TrySubmit creates an accepted job.
+		[[nodiscard]] CaptureAdmission CheckJobAdmission(const CapturePlan& plan) const noexcept;
 		// All methods run on the AppRuntime owner thread. Receipts do not expire:
 		// consumption releases the reserved slot; polling an active/unknown job does not.
 		// Standalone use only: a composed coordinator leaves consumption to AppRuntime.
@@ -187,7 +190,7 @@ namespace gglab
 		bool Cancel(uint64_t requestId) noexcept;
 		// Appends finished results in completion order. When composed by
 		// GGLabAppRuntime, only that owner drains this stream; hosts consume the
-		// runtime's published results after it has notified the sequence.
+		// runtime's published legacy results. Sequence jobs use reserved receipts.
 		void ConsumeResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }

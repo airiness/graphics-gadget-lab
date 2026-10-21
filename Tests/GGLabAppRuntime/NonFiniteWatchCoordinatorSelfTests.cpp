@@ -255,7 +255,7 @@ namespace gglab
 				state.m_SettleKey.m_Temporal.m_HasCompatiblePreviousHistory = true;
 				const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
 				sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
-				sequence.BeginFrame(state);
+				context.Check(sequence.BeginFrame(state), "The watched sequence begins its submitted frame");
 				capture.BeginFrame(state);
 				watch.OnFrameSubmitted(serial);
 				capture.OnFrameSubmitted();
@@ -278,7 +278,7 @@ namespace gglab
 				FrameCaptureFrameState state{ .m_FrameSerial = serial };
 				const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
 				sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
-				sequence.BeginFrame(state);
+				context.Check(sequence.BeginFrame(state), "The watched reference begins its submitted sample");
 				capture.BeginFrame(state);
 				watch.OnFrameSubmitted(serial);
 				capture.OnFrameSubmitted();
@@ -299,7 +299,7 @@ namespace gglab
 			FrameCaptureFrameState state{ .m_FrameSerial = 10 };
 			const auto pose = sequence.PrepareFrame(capture.GetLastFrameState(), std::span(&path, 1));
 			sequence.OnPoseApplied(pose ? EvaluateCameraPath(path, pose->m_Frame) : std::nullopt);
-			sequence.BeginFrame(state);
+			context.Check(sequence.BeginFrame(state), "The cancellable watched sequence begins its frame");
 			capture.BeginFrame(state);
 			watch.OnFrameSubmitted(10);
 			capture.OnFrameSubmitted();

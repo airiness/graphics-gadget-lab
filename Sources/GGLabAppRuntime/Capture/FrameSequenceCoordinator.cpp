@@ -172,6 +172,11 @@ namespace gglab
 				GetFrameSequenceStateName(m_Status->m_State));
 			return 0;
 		}
+		if (!m_CaptureJobs.empty())
+		{
+			outError = "The previous sequence's capture jobs are still draining.";
+			return 0;
+		}
 		if (request.m_CameraPathId.empty())
 		{
 			outError = "A sequence requires a camera path id.";
@@ -247,7 +252,7 @@ namespace gglab
 		m_FrameBegun = false;
 		m_CapturedFrame.reset();
 		m_ExportedFrame.reset();
-		m_CaptureRequestFrames.clear();
+		m_AdmissionDeferred = false;
 		m_LastSettleKey.reset();
 		m_BegunRenderFrameSerial = 0;
 		m_PendingGpuTimingFrames.clear();
@@ -264,10 +269,7 @@ namespace gglab
 			return false;
 		}
 		m_Status->m_State = FrameSequenceState::Cancelled;
-		for (uint64_t requestId : m_Status->m_CaptureRequestIds)
-		{
-			GGLAB_UNUSED(m_Capture->Cancel(requestId));
-		}
+		CancelCaptureJobs();
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
 		if (auto* watch = m_Capture->GetNonFiniteWatch())
@@ -301,9 +303,13 @@ namespace gglab
 		{
 			return false;
 		}
-		// Query the same required products that BeginFrame submits. Already
-		// accepted IDs survive a late deferral, but the sample has not advanced.
 		const CapturePlan plan = MakeFrameCapturePlan();
+		if ((IsCaptureDue() || GetDueExport()) &&
+			m_Capture->CheckJobAdmission(plan).m_Status == CaptureAdmissionStatus::Busy)
+		{
+			return true;
+		}
+		// Already accepted jobs survive a late deferral without another admission.
 		return !plan.m_RequiredProducts.empty() &&
 			m_Capture->GetCaptureAvailability(plan) == FrameCaptureAvailability::Busy;
 	}
@@ -313,7 +319,7 @@ namespace gglab
 		// A begun frame without matching submission is the same simulation instant
 		// on retry, including sample zero and non-reference sequences.
 		return m_Status && m_Status->m_State == FrameSequenceState::Running &&
-			(m_Sample > 0 || m_FrameBegun);
+			(m_Sample > 0 || m_FrameBegun || m_AdmissionDeferred);
 	}
 
 	bool FrameSequenceCoordinator::WantsGpuTiming() const noexcept
@@ -503,39 +509,55 @@ namespace gglab
 		m_AppliedPose = pose;
 	}
 
-	void FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state) noexcept
+	bool FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state) noexcept
 	{
 		if (!m_Status || m_Status->m_State != FrameSequenceState::Running || !m_AppliedPose)
 		{
-			return;
+			return true;
 		}
 		if (!state.m_Readiness.IsReady())
 		{
 			Fail(std::format("A readiness gate left Ready at sequence frame {}: {}", m_Frame,
 				DescribePendingGates(state.m_Readiness)));
-			return;
+			return false;
 		}
 		if (m_LastSettleKey &&
 			!state.m_SettleKey.Continues(*m_LastSettleKey, m_AppliedPose->m_Cut))
 		{
 			Fail(std::format("Temporal continuity changed at sequence frame {} outside a camera "
 				"path cut (effective temporal identity, history availability or content).", m_Frame));
-			return;
+			return false;
 		}
 		m_LastSettleKey = state.m_SettleKey;
 		if (WantsGpuTiming() && state.m_FrameSerial == 0)
 		{
 			Fail("GPU timing requires a non-zero RenderFrame serial.");
-			return;
+			return false;
 		}
 
 		const bool imageDue = IsCaptureDue();
 		const bool resourcesDue = GetDueExport() != nullptr;
 		if (imageDue || resourcesDue)
 		{
-			const auto ids = m_Capture->SubmitPlan(MakeFrameCapturePlan());
-			m_Status->m_CaptureRequestIds.insert(m_Status->m_CaptureRequestIds.end(), ids.begin(), ids.end());
-			m_CaptureRequestFrames.insert(m_CaptureRequestFrames.end(), ids.size(), m_Frame);
+			CapturePlan plan = MakeFrameCapturePlan();
+			const CaptureAdmission admission = m_Capture->TrySubmit(std::move(plan));
+			if (admission.m_Status == CaptureAdmissionStatus::Busy)
+			{
+				// Admission can change after the early preflight. Preserve this simulation
+				// instant on retry and never mark a delivery accepted without an identity.
+				m_AdmissionDeferred = true;
+				return false;
+			}
+			if (admission.m_Status != CaptureAdmissionStatus::Accepted)
+			{
+				Fail(std::format("Capture admission rejected sequence frame {} (reason {}).",
+					m_Frame, static_cast<uint32_t>(admission.m_Reason)));
+				return false;
+			}
+			m_CaptureJobs.push_back({ admission.m_JobId, m_Frame,
+				static_cast<uint32_t>(imageDue) + static_cast<uint32_t>(resourcesDue) });
+			++m_Status->m_AcceptedCaptureJobs;
+			m_Status->m_PendingCaptureJobs = static_cast<uint32_t>(m_CaptureJobs.size());
 			if (imageDue)
 			{
 				m_CapturedFrame = m_Frame;
@@ -545,6 +567,7 @@ namespace gglab
 				m_ExportedFrame = m_Frame;
 			}
 		}
+		m_AdmissionDeferred = false;
 		if (!m_WatchStarted)
 		{
 			m_WatchStarted = true;
@@ -555,6 +578,7 @@ namespace gglab
 		}
 		m_BegunRenderFrameSerial = state.m_FrameSerial;
 		m_FrameBegun = true;
+		return true;
 	}
 
 	void FrameSequenceCoordinator::OnFrameSubmitted(uint64_t renderFrameSerial) noexcept
@@ -670,35 +694,51 @@ namespace gglab
 		}
 	}
 
-	void FrameSequenceCoordinator::OnCaptureResults(
-		std::span<const FrameCaptureRequestResult> results) noexcept
+	void FrameSequenceCoordinator::UpdateCaptureJobs(
+		const std::function<std::optional<CaptureJobResult>(uint64_t)>& takeResult) noexcept
 	{
-		if (!m_Status)
+		for (size_t index = 0; index < m_CaptureJobs.size();)
 		{
-			return;
-		}
-		const std::vector<uint64_t>& ids = m_Status->m_CaptureRequestIds;
-		for (const FrameCaptureRequestResult& result : results)
-		{
-			const auto id = std::ranges::find(ids, result.m_RequestId);
-			if (id == ids.end())
+			const PendingCaptureJob pending = m_CaptureJobs[index];
+			auto result = takeResult(pending.m_JobId);
+			if (!result)
+			{
+				++index;
+				continue;
+			}
+			m_CaptureJobs.erase(m_CaptureJobs.begin() + index);
+			++m_Status->m_FinishedCaptureJobs;
+			m_Status->m_PendingCaptureJobs = static_cast<uint32_t>(m_CaptureJobs.size());
+			if (result->m_Status == CaptureJobStatus::Completed &&
+				result->m_Publication == CaptureJobPublication::Published)
+			{
+				m_Status->m_CompletedCaptures += pending.m_Deliveries;
+				continue;
+			}
+			if (!IsActive())
 			{
 				continue;
 			}
-			if (result.m_Status == FrameCaptureRequestStatus::Completed)
-			{
-				++m_Status->m_CompletedCaptures;
-				continue;
-			}
-			const uint32_t frame =
-				m_CaptureRequestFrames[static_cast<size_t>(std::distance(ids.begin(), id))];
-			Fail(std::format("Capture of sequence frame {} {}: {}", frame,
-				result.m_Status == FrameCaptureRequestStatus::Cancelled ?
+			const auto failure = std::ranges::find_if(result->m_Products,
+				[](const auto& product) { return !product.m_Failure.empty(); });
+			Fail(std::format("Capture job {} of sequence frame {} {}: {}", pending.m_JobId,
+				pending.m_Frame, result->m_Status == CaptureJobStatus::Cancelled ?
 					"was cancelled" :
 					"failed",
-				result.m_Failure));
+				failure == result->m_Products.end() ? "No complete bundle was published." : failure->m_Failure));
 		}
 		CompleteIfFinished();
+	}
+
+	void FrameSequenceCoordinator::CancelCaptureJobs() noexcept
+	{
+		for (const PendingCaptureJob& job : m_CaptureJobs)
+		{
+			// TooLate preserves the writer's real result. Terminal sequences still
+			// consume that receipt later without changing their own terminal state.
+			GGLAB_UNUSED(m_Capture->CancelJob(job.m_JobId));
+		}
+		m_AdmissionDeferred = false;
 	}
 
 	void FrameSequenceCoordinator::Fail(std::string failure) noexcept
@@ -709,10 +749,7 @@ namespace gglab
 		}
 		m_Status->m_State = FrameSequenceState::Failed;
 		m_Status->m_Failure = std::move(failure);
-		for (uint64_t requestId : m_Status->m_CaptureRequestIds)
-		{
-			GGLAB_UNUSED(m_Capture->Cancel(requestId));
-		}
+		CancelCaptureJobs();
 		m_PendingGpuTimingFrames.clear();
 		m_FrameBegun = false;
 		if (auto* watch = m_Capture->GetNonFiniteWatch())
@@ -743,7 +780,7 @@ namespace gglab
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
-			m_Status->m_CompletedCaptures == m_Status->m_CaptureRequestIds.size() &&
+			m_CaptureJobs.empty() &&
 			m_PendingGpuTimingFrames.empty() &&
 			(!m_Status->m_WatchCoverage || m_Status->m_WatchCoverage->m_Complete))
 		{
