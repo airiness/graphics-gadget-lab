@@ -76,6 +76,8 @@ namespace gglab
 		bool m_NonFiniteInstrumentation = false;
 		std::shared_ptr<const NonFiniteProductionFrame> m_NonFiniteProduction;
 		const NonFiniteWatchStatus* m_Watch = nullptr;
+		// The process environment record as JSON; empty before the runtime services exist.
+		std::string_view m_Environment;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

@@ -21,7 +21,8 @@ namespace gglab
 			frame["adapterDriverIdentity"] = submission.m_AdapterIdentity;
 			frame["codeIdentity"] = {
 				{ "status", "unavailable" },
-				{ "reason", "The capture metadata service has no build identity source." } };
+				{ "reason", "The executable's identity is not recorded; the bundle manifest's "
+					"environment declares the build's source state." } };
 			frame["shaderIdentity"] = {
 				{ "status", "unavailable" },
 				{ "reason", "The graph does not retain per-pass shader artifact identities." } };

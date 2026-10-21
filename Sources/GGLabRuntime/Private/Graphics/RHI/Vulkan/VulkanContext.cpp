@@ -1,13 +1,16 @@
 #include "Graphics/RHI/Vulkan/VulkanContext.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "Graphics/RHI/Vulkan/VulkanAdapter.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
+#include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanParameterBindings.h"
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
+#include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <array>
@@ -653,6 +656,36 @@ namespace gglab
 	uint32_t VulkanContext::GetFrameSlotCount() const noexcept
 	{
 		return static_cast<uint32_t>(m_Frames.size());
+	}
+
+	RHIDeviceIdentity VulkanContext::GetDeviceIdentity() const noexcept
+	{
+		if (!m_Bootstrap || !m_Bootstrap->m_Device)
+		{
+			return {};
+		}
+		const VulkanAdapterIdentity& adapter = m_Bootstrap->m_SelectedSnapshot.m_Identity;
+		RHIDeviceIdentity identity{
+			.m_Available = true,
+			.m_Backend = RHIBackendType::Vulkan,
+			.m_AdapterName = adapter.m_DeviceName,
+			.m_VendorId = adapter.m_VendorId,
+			.m_DeviceId = adapter.m_DeviceId,
+			.m_DriverVersion = FormatVulkanDriverVersion(adapter.m_VendorId, adapter.m_DriverVersion),
+			.m_DriverVersionRaw = std::format("0x{:08x}", adapter.m_DriverVersion),
+			.m_ApiVersion = FormatVkVersion(adapter.m_ApiVersion),
+			.m_CompatibilityIdentity =
+				std::string(m_Bootstrap->m_Device->GetAdapterCompatibilityIdentity()),
+			.m_RequestedValidation =
+				m_ValidationRequested ? RHIValidationLevel::Standard : RHIValidationLevel::Off,
+			// The debug messenger exists only while the validation layer is active.
+			.m_EffectiveValidation =
+				m_Bootstrap->m_HasDebugMessenger ? RHIValidationLevel::Standard : RHIValidationLevel::Off,
+		};
+#if defined(USE_PIX)
+		identity.m_PixIntegration = true;
+#endif
+		return identity;
 	}
 
 	VulkanDevice& VulkanContext::GetVulkanDevice() noexcept

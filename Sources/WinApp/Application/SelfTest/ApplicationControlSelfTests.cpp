@@ -3,6 +3,8 @@
 #include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
+#include "Capture/CaptureBundle.h"
+#include "Capture/CaptureEnvironment.h"
 
 #include <nlohmann/json.hpp>
 
@@ -312,6 +314,12 @@ namespace gglab
 			const auto available = Json::parse(SerializeApplicationControlStatus(6, { .m_NonFiniteInstrumentation = true }));
 			context.Check(noFrame["frame"].is_null() && noFrame["sequence"].is_null() && noFrame["watch"]["production"] == "Unavailable" &&
 				available["watch"]["production"] == "Incomplete", "Missing frame and production capability do not imply completed coverage");
+			const std::string environment = SerializeCaptureEnvironment({}, "0123456789abcdef0123456789abcdef");
+			const auto withEnvironment = Json::parse(SerializeApplicationControlStatus(7, { .m_Environment = environment }));
+			context.Check(noFrame["environment"].is_null() && withEnvironment["environment"] == Json::parse(environment) &&
+				Json::parse(SerializeApplicationControlStatus(8, { .m_Environment = "not json" }))["environment"].is_null() &&
+				withEnvironment["capabilities"]["bundleSchemaVersion"] == CaptureBundleSchemaVersion,
+				"Status carries the runtime's environment record unchanged, or null before the runtime has one");
 			FrameSequenceStatus sequence{ .m_SequenceId = 3, .m_State = FrameSequenceState::Failed,
 				.m_CameraPathId = "SEQ_DollyDoorway", .m_CameraPathVersion = 1, .m_FrameCount = 180,
 				.m_SubmittedFrames = 12, .m_AcceptedCaptureJobs = 2, .m_FinishedCaptureJobs = 1,

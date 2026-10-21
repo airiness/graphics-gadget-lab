@@ -250,6 +250,11 @@ namespace gglab
 				.m_ImageEncoder = m_HostServices.m_FrameCaptureImageEncoder,
 				.m_NonFiniteWatch = m_NonFiniteWatch.get(),
 				.m_JobLimits = m_CaptureJobLimits,
+				.m_Environment = {
+					.m_Host = m_HostEnvironment,
+					.m_Device = m_RenderHost->GetRHIContext()->GetDeviceIdentity(),
+					.m_StartedAt = m_StartedAt,
+				},
 			});
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);

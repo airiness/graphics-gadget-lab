@@ -183,6 +183,7 @@ namespace gglab
 		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
 			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
 		m_RunIdentity(CreateCaptureRunIdentity()),
+		m_EnvironmentJson(SerializeCaptureEnvironment(createInfo.m_Environment, m_RunIdentity)),
 		m_JobLimits(createInfo.m_JobLimits),
 		m_JobReceipts(m_JobLimits.m_MaxReceipts)
 	{
@@ -1356,6 +1357,7 @@ namespace gglab
 		const auto outputs = GetDeliveries(job);
 		auto write = std::make_shared<CaptureWriteJob>();
 		write->m_Bundle = CaptureBundleInput{ .m_RunIdentity = m_RunIdentity,
+			.m_Environment = m_EnvironmentJson,
 			.m_JobId = job.m_Result.m_JobId, .m_Attempt = job.m_AttemptCount,
 			.m_ProductCount = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()) };
 		for (ProductDelivery* member : outputs)

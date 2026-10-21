@@ -1,4 +1,5 @@
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
@@ -1459,6 +1460,8 @@ namespace gglab
 			{ "width", status.m_Width },
 			{ "height", status.m_Height },
 		};
+		const Json environment = Json::parse(status.m_Environment, nullptr, false);
+		response["environment"] = environment.is_object() ? environment : Json(nullptr);
 		const auto& intake = status.m_CaptureIntake;
 		response["capabilities"] = {
 			{ "captureJobs", true },
@@ -1468,7 +1471,7 @@ namespace gglab
 			{ "graphProductsPerJob", 1 },
 			{ "resourceGraphSummary", false },
 			{ "bundleSchema", "gglab.capture-bundle" },
-			{ "bundleSchemaVersion", 1 },
+			{ "bundleSchemaVersion", CaptureBundleSchemaVersion },
 			{ "resultConsumption", "explicit" },
 			{ "resultRetention", "until-consumed-or-session-end" },
 			{ "sequenceCaptureJobs", true } };

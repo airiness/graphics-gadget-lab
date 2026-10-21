@@ -1,6 +1,7 @@
 #include "FrameCaptureCoordinatorSelfTests.h"
 #include "CapturePublicationTestFileSystem.h"
 #include "Capture/CaptureBundle.h"
+#include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureWriter.h"
 
 #include "Capture/FrameCaptureCoordinator.h"
@@ -1489,7 +1490,9 @@ namespace gglab
 			files->m_FailPublish = 2;
 			files->m_FailWithdraw = true;
 			auto job = std::make_shared<CaptureWriteJob>();
-			job->m_Bundle = { .m_RunIdentity = CreateCaptureRunIdentity(), .m_JobId = 1,
+			const std::string runIdentity = CreateCaptureRunIdentity();
+			job->m_Bundle = { .m_RunIdentity = runIdentity,
+				.m_Environment = SerializeCaptureEnvironment({}, runIdentity), .m_JobId = 1,
 				.m_Attempt = 1, .m_ProductCount = 1,
 				.m_Deliveries = { { .m_Input = { .m_Image = std::make_shared<FrameCaptureImage>(),
 					.m_Submission = { 3, 1, 19, "Capture.TestAdapter" },
@@ -3625,7 +3628,9 @@ namespace gglab
 			};
 			image.m_Metadata.m_Backend = "dx12";
 			image.m_Metadata.m_FrameSerial = 17;
-			CaptureBundleInput input{ .m_RunIdentity = "0123456789abcdef0123456789abcdef",
+			const std::string run = "0123456789abcdef0123456789abcdef";
+			CaptureBundleInput input{ .m_RunIdentity = run,
+				.m_Environment = SerializeCaptureEnvironment({}, run),
 				.m_JobId = 1, .m_Attempt = 2, .m_ProductCount = 2,
 				.m_Deliveries = { { .m_ProductIndex = 0, .m_Input = image },
 					{ .m_ProductIndex = 1, .m_Input = image } } };
@@ -3633,7 +3638,7 @@ namespace gglab
 			const auto valid = EncodeCaptureBundle(input, &EncodeTestPng, stage);
 			context.Check(valid.m_Failure.empty() && valid.m_Content.m_Files.size() == 5 &&
 				valid.m_Products.size() == 2, "Matched completed image products form one required bundle");
-			for (uint32_t change = 0; change < 10; ++change)
+			for (uint32_t change = 0; change < 12; ++change)
 			{
 				auto invalid = input;
 				auto& second = invalid.m_Deliveries[1];
@@ -3669,10 +3674,16 @@ namespace gglab
 				case 9:
 					second.m_GraphProductIndex = 0;
 					break;
+				case 10:
+					invalid.m_Environment.clear();
+					break;
+				case 11:
+					invalid.m_Environment = "[]";
+					break;
 				}
 				const auto rejected = EncodeCaptureBundle(invalid, &EncodeTestPng, stage);
 				context.Check(!rejected.m_Failure.empty() && rejected.m_Content.m_Files.empty(),
-					"Inconsistent provenance, incomplete products or unqualified identity cannot reach publication");
+					"Inconsistent provenance, incomplete products, unqualified identity or a missing environment cannot reach publication");
 			}
 			NonFiniteWatchCoverage coverage{ .m_ConfigurationVersion = 1,
 				.m_ProductionRequested = true, .m_InstrumentationAvailable = true,
@@ -3713,6 +3724,53 @@ namespace gglab
 				context.Check(encoded.m_Failure.empty() == accepted,
 					"Bundles preserve report/fail claim semantics and require complete identical submitted-frame coverage");
 			}
+		}
+
+		void RunCaptureEnvironmentTests(SelfTestContext& context) noexcept
+		{
+			using Json = nlohmann::json;
+			const std::string run = "0123456789abcdef0123456789abcdef";
+			const auto unknown = Json::parse(SerializeCaptureEnvironment({}, run));
+			context.Check(unknown["schemaVersion"] == CaptureEnvironmentSchemaVersion &&
+				unknown["build"]["source"] == "unavailable" && unknown["build"]["revision"].is_null() &&
+				unknown["build"]["dirty"].is_null() && unknown["build"]["pixIntegration"].is_null() &&
+				unknown["process"]["runIdentity"] == run && unknown["process"]["startedAtUtc"].is_null() &&
+				unknown["process"]["os"].is_null() && unknown["device"].is_null() &&
+				unknown["validation"]["requested"].is_null() && unknown["validation"]["effective"].is_null(),
+				"An environment without build or device facts reports them as null rather than estimating them");
+
+			using namespace std::chrono;
+			CaptureEnvironment environment{
+				.m_Host = {
+					.m_Build = { .m_Available = true, .m_Revision = std::string(40, 'a'), .m_Dirty = true,
+						.m_Configuration = "Release", .m_Compiler = "MSVC 19.51.36231" },
+					.m_OperatingSystem = "Windows 10.0.26200",
+					.m_Presentation = "hidden",
+				},
+				.m_Device = { .m_Available = true, .m_Backend = RHIBackendType::Vulkan, .m_AdapterName = "Adapter",
+					.m_VendorId = 0x10de, .m_DeviceId = 2, .m_DriverVersion = "581.57",
+					.m_DriverVersionRaw = "0x9150c000", .m_ApiVersion = "1.3.290",
+					.m_CompatibilityIdentity = "vulkan:test", .m_RequestedValidation = RHIValidationLevel::Standard,
+					.m_EffectiveValidation = RHIValidationLevel::Off, .m_PixIntegration = true },
+				.m_StartedAt = sys_days{ year{ 2026 } / 10 / 21 } + hours{ 12 } + seconds{ 5 },
+			};
+			const auto known = Json::parse(SerializeCaptureEnvironment(environment, run));
+			context.Check(known["build"]["source"] == "build-stamp" &&
+				known["build"]["revision"] == std::string(40, 'a') && known["build"]["dirty"] == true &&
+				known["build"]["pixIntegration"] == true && known["process"]["startedAtUtc"] == "2026-10-21T12:00:05Z" &&
+				known["process"]["os"] == "Windows 10.0.26200" && known["process"]["host"] == "hidden" &&
+				known["device"]["backend"] == "vulkan" && known["device"]["driverVersion"] == "581.57" &&
+				known["device"]["subsystemId"].is_null() && known["device"]["dedicatedVideoMemoryBytes"].is_null() &&
+				known["device"]["api"] == Json{ { "apiVersion", "1.3.290" } } &&
+				known["device"]["compatibilityIdentity"] == "vulkan:test" &&
+				known["validation"]["requested"] == "standard" && known["validation"]["effective"] == "off",
+				"An environment records build, process, device and requested/effective validation facts as given");
+
+			environment.m_Host.m_Build.m_Available = false;
+			const auto withdrawn = Json::parse(SerializeCaptureEnvironment(environment, run));
+			context.Check(withdrawn["build"]["source"] == "unavailable" && withdrawn["build"]["revision"].is_null() &&
+				withdrawn["build"]["dirty"].is_null() && withdrawn["build"]["configuration"] == "Release",
+				"An unavailable build stamp never reports a revision or dirty state");
 		}
 
 		void RunBundlePublicationTests(SelfTestContext& context) noexcept
@@ -3772,8 +3830,10 @@ namespace gglab
 				if (result && !result->m_ManifestPath.empty())
 				{
 					const auto manifest = nlohmann::json::parse(ReadText(result->m_ManifestPath));
-					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 1 &&
-						manifest["schema"] == "gglab.capture-bundle" && manifest["products"].size() == 3;
+					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 2 &&
+						manifest["schema"] == "gglab.capture-bundle" && manifest["products"].size() == 3 &&
+						manifest["environment"]["schemaVersion"] == 1 &&
+						manifest["environment"]["process"]["runIdentity"] == manifest["runIdentity"];
 					for (const auto& product : manifest["products"])
 					{
 						const auto metadataName = product["metadata"].get<std::string>();
@@ -4676,6 +4736,7 @@ namespace gglab
 		RunJobEncoderCancellationTests(context);
 		RunJobPublicationCancellationTests(context);
 		RunBundleProvenanceTests(context);
+		RunCaptureEnvironmentTests(context);
 		RunBundlePublicationTests(context);
 		RunBundleSingleProductTests(context);
 		RunBundleManifestShutdownTests(context);

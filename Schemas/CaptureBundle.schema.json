@@ -1,18 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.capture-bundle",
-  "title": "GGLab same-frame capture bundle v1",
+  "title": "GGLab same-frame capture bundle v1 and v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "schemaVersion", "bundleId", "runIdentity", "jobId", "attempt", "consistency", "provenance", "submission", "watch", "products"],
   "properties": {
     "schema": {"const": "gglab.capture-bundle"},
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"enum": [1, 2]},
     "bundleId": {"type": "string", "pattern": "^[0-9a-f]{32}-j[1-9][0-9]*-a[1-9][0-9]*$"},
     "runIdentity": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "jobId": {"type": "integer", "minimum": 1},
     "attempt": {"type": "integer", "minimum": 1},
     "consistency": {"const": "same-frame"},
+    "environment": {"$ref": "#/$defs/environment"},
     "provenance": {
       "type": "object",
       "additionalProperties": false,
@@ -46,8 +47,86 @@
     "watch": {"type": ["object", "null"]},
     "products": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/product"}}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schemaVersion": {"const": 1}}},
+      "then": {"not": {"required": ["environment"]}},
+      "else": {"required": ["environment"]}
+    }
+  ],
   "$defs": {
     "file": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\:]+$"},
+    "text": {"type": ["string", "null"], "minLength": 1},
+    "validationLevel": {"enum": ["off", "standard", "gpu", null]},
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "build", "process", "device", "validation"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "build": {
+          "type": "object", "additionalProperties": false,
+          "required": ["source", "revision", "dirty", "configuration", "compiler", "pixIntegration"],
+          "properties": {
+            "source": {"enum": ["build-stamp", "unavailable"]},
+            "revision": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+            "dirty": {"type": ["boolean", "null"]},
+            "configuration": {"$ref": "#/$defs/text"},
+            "compiler": {"$ref": "#/$defs/text"},
+            "pixIntegration": {"type": ["boolean", "null"]}
+          },
+          "if": {"properties": {"source": {"const": "unavailable"}}},
+          "then": {"properties": {"revision": {"const": null}, "dirty": {"const": null}}},
+          "else": {"properties": {"revision": {"type": "string"}}}
+        },
+        "process": {
+          "type": "object", "additionalProperties": false,
+          "required": ["runIdentity", "startedAtUtc", "os", "host"],
+          "properties": {
+            "runIdentity": {"type": ["string", "null"], "pattern": "^[0-9a-f]{32}$"},
+            "startedAtUtc": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+            "os": {"$ref": "#/$defs/text"},
+            "host": {"$ref": "#/$defs/text"}
+          }
+        },
+        "device": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["backend", "adapterName", "vendorId", "deviceId", "subsystemId", "revision", "driverVersion", "driverVersionRaw", "api", "dedicatedVideoMemoryBytes", "compatibilityIdentity"],
+              "properties": {
+                "backend": {"enum": ["dx12", "vulkan"]},
+                "adapterName": {"type": "string"},
+                "vendorId": {"type": "integer", "minimum": 0},
+                "deviceId": {"type": "integer", "minimum": 0},
+                "subsystemId": {"type": ["integer", "null"], "minimum": 0},
+                "revision": {"type": ["integer", "null"], "minimum": 0},
+                "driverVersion": {"$ref": "#/$defs/text"},
+                "driverVersionRaw": {"$ref": "#/$defs/text"},
+                "api": {
+                  "type": "object", "additionalProperties": false,
+                  "properties": {
+                    "featureLevel": {"type": "string", "pattern": "^[0-9]+_[0-9]+$"},
+                    "shaderModel": {"type": "string", "pattern": "^[0-9]+_[0-9]+$"},
+                    "apiVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+                  }
+                },
+                "dedicatedVideoMemoryBytes": {"type": ["integer", "null"], "minimum": 0},
+                "compatibilityIdentity": {"type": "string"}
+              }
+            }
+          ]
+        },
+        "validation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["requested", "effective"],
+          "properties": {
+            "requested": {"$ref": "#/$defs/validationLevel"},
+            "effective": {"$ref": "#/$defs/validationLevel"}
+          }
+        }
+      }
+    },
     "product": {
       "type": "object", "additionalProperties": false,
       "required": ["index", "source", "diagnosticTap", "schema", "schemaVersion", "metadata", "files"],

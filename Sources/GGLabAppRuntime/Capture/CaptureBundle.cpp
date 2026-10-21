@@ -78,6 +78,11 @@ namespace gglab
 		{
 			return { .m_Failure = "A bundle requires qualified job/attempt identity and required products." };
 		}
+		const Json environment = Json::parse(input.m_Environment, nullptr, false);
+		if (!environment.is_object())
+		{
+			return { .m_Failure = "A bundle requires the process environment record." };
+		}
 		CaptureEncodedBundle bundle;
 		bundle.m_BundleId = MakeCaptureBundleId(input.m_RunIdentity, input.m_JobId, input.m_Attempt);
 		const auto& first = input.m_Deliveries.front().m_Input;
@@ -211,7 +216,7 @@ namespace gglab
 		bundle.m_Content.m_Files.push_back({ .m_Suffix = ".capture-bundle.json",
 			.m_Stage = CaptureWriteStage::WritingMetadata });
 		bundle.m_Content.m_MakeMarker = [records = std::move(records), versions = std::move(versions),
-			provenance, submission, watch, run = input.m_RunIdentity, id = input.m_JobId,
+			environment, provenance, submission, watch, run = input.m_RunIdentity, id = input.m_JobId,
 			attempt = input.m_Attempt, identity = bundle.m_BundleId](std::span<const std::filesystem::path> paths)
 			{
 				Json products = Json::array();
@@ -236,6 +241,7 @@ namespace gglab
 					{ "jobId", id },
 					{ "attempt", attempt },
 					{ "consistency", "same-frame" },
+					{ "environment", environment },
 					{ "provenance", provenance },
 					{ "submission", submission },
 					{ "watch", watch },

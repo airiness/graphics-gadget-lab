@@ -2282,6 +2282,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDevice.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDeviceIdentity.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFence.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>

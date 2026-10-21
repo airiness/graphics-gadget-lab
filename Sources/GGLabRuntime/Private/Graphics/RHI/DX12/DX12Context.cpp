@@ -539,6 +539,11 @@ namespace gglab
 		return static_cast<uint32_t>(m_Frames.size());
 	}
 
+	RHIDeviceIdentity DX12Context::GetDeviceIdentity() const noexcept
+	{
+		return m_Device ? m_Device->GetDeviceIdentity() : RHIDeviceIdentity{};
+	}
+
 	DX12ComputeCommandContext* DX12Context::AcquireComputeContext(DX12FrameContext& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(&frame == m_ActiveFrame && frame.m_Active,

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "Capture/CaptureEnvironment.h"
 #include "Capture/CapturePlan.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/FrameCaptureImageEncoder.h"
@@ -99,6 +100,8 @@ namespace gglab
 			// Optional host-neutral file capability; the writer retains it independently.
 			std::shared_ptr<CapturePublicationFileSystemBase> m_PublicationFileSystem;
 			CaptureJobLimits m_JobLimits;
+			// Recorded in every bundle manifest; unknown values stay null.
+			CaptureEnvironment m_Environment;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -133,6 +136,8 @@ namespace gglab
 		// State of the most recent frame passed to BeginFrame; null before the
 		// first rendered frame.
 		[[nodiscard]] const FrameCaptureFrameState* GetLastFrameState() const noexcept;
+		// The process environment record as JSON; empty only if it could not be serialized.
+		[[nodiscard]] const std::string& GetEnvironmentJson() const noexcept { return m_EnvironmentJson; }
 		// Consecutive submitted frames with every gate ready and an unchanged
 		// settle key whose temporal history began on a ready frame.
 		[[nodiscard]] uint32_t GetSettledFrameCount() const noexcept { return m_SettledFrames; }
@@ -246,6 +251,8 @@ namespace gglab
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 		std::unique_ptr<CaptureWriter> m_Writer;
 		std::string m_RunIdentity;
+		// Serialized once after the run identity it records.
+		std::string m_EnvironmentJson;
 		CaptureJobLimits m_JobLimits;
 		// Fixed at construction. Each accepted job reserves one slot until consumed,
 		// including while active. Rejected submissions never create failure receipts.

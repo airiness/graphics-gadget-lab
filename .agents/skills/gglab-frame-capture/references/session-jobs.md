@@ -103,7 +103,7 @@ are summaries from the first available product metadata; `failure` is the first
 non-empty product failure. Product records remain authoritative.
 
 Require both `status: completed` and `publication: Published`, then validate the
-final `gglab.capture-bundle` v1 manifest and its required files. Individual file
+final `gglab.capture-bundle` v2 manifest and its required files. Individual file
 existence is not job completion. Select images from `products[index].files`, not
 legacy `image`/`metadata`/`graph`/`exports` response fields. For verification:
 

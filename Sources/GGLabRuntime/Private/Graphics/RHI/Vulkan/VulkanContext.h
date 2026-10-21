@@ -82,6 +82,7 @@ namespace gglab
 		void RetireCompletedWork() noexcept override;
 		bool IsPoisoned() const noexcept override;
 		uint32_t GetFrameSlotCount() const noexcept override;
+		RHIDeviceIdentity GetDeviceIdentity() const noexcept override;
 
 		// Backend-specific integration surface. These borrowed views keep
 		// presentation resources owned by Vulkan while allowing Vulkan-only

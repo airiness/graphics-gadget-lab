@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDeviceIdentity.h"
 #include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 
@@ -212,6 +213,8 @@ namespace gglab
 
 		[[nodiscard]] virtual uint32_t GetFrameSlotCount() const noexcept = 0;
 		[[nodiscard]] virtual RHIUploadStatistics GetUploadStatistics() const noexcept { return {}; }
+		// Fixed once the device exists. Contexts without a native adapter report it unavailable.
+		[[nodiscard]] virtual RHIDeviceIdentity GetDeviceIdentity() const noexcept { return {}; }
 	};
 
 	// What teardown may do with GPU-visible resources once no further frames are produced.

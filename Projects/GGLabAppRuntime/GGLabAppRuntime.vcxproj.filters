@@ -21,6 +21,9 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureBundle.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureEnvironment.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureProductEncoder.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
@@ -85,6 +88,9 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureBundle.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureEnvironment.h">
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureJobTypes.h">

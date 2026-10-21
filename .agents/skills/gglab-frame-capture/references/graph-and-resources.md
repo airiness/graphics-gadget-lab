@@ -22,7 +22,8 @@ Full `compile` and `execution` are separate evidence. Physical handles are
 session-local; a transient pool slot establishes pool reuse, not native heap
 aliasing. Null handle resolution remains explicit. `submission` identifies the
 completed frame fence. Build/shader identities and per-pass GPU timing remain
-explicitly unavailable where the export has no authoritative evidence.
+explicitly unavailable where the export has no authoritative evidence; the bundle
+manifest's `environment` declares the build's tracked source state instead.
 
 Graph requests alone add no GPU observation nodes/queries, but do add CPU/file
 work. Active copies/scans/counters appear under observation records. Schemas v1,

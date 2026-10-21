@@ -11,7 +11,8 @@
 
 namespace gglab
 {
-	inline constexpr uint32_t CaptureBundleSchemaVersion = 1;
+	// Version 2 adds the process environment record.
+	inline constexpr uint32_t CaptureBundleSchemaVersion = 2;
 
 	struct CaptureBundleDelivery
 	{
@@ -23,6 +24,8 @@ namespace gglab
 	struct CaptureBundleInput
 	{
 		std::string m_RunIdentity;
+		// The serialized process environment record (SerializeCaptureEnvironment).
+		std::string m_Environment;
 		uint64_t m_JobId = 0;
 		uint64_t m_Attempt = 0;
 		uint32_t m_ProductCount = 0;

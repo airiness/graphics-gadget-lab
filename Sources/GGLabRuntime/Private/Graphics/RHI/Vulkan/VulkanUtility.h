@@ -2,6 +2,7 @@
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -31,6 +32,11 @@ namespace gglab
 	// as "0x%08x" (driver encoding is vendor-specific).
 	[[nodiscard]] std::string FormatAdapterVersions(
 		uint32_t apiVersion, uint32_t driverVersion) noexcept;
+
+	// Decodes the driver version with its vendor's packing (NVIDIA, Intel on Windows, and
+	// the standard packing AMD uses); empty for vendors whose packing is unknown.
+	[[nodiscard]] std::optional<std::string> FormatVulkanDriverVersion(
+		uint32_t vendorId, uint32_t driverVersion) noexcept;
 
 	// Applies a debug name to a Vulkan object when VK_EXT_debug_utils is
 	// available on the device; a no-op otherwise. objectType and objectHandle

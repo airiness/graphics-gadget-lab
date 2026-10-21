@@ -43,6 +43,17 @@ def validate(path, bundle_validator=None):
 	identity = f'{document["runIdentity"]}-j{document["jobId"]}-a{document["attempt"]}'
 	if document["bundleId"] != identity:
 		raise ValueError("Bundle identity disagrees with its qualified job/attempt")
+	environment = document.get("environment")
+	if environment is not None:
+		run = environment["process"]["runIdentity"]
+		if run is not None and run != document["runIdentity"]:
+			raise ValueError("Environment run identity disagrees with the bundle")
+		device = environment["device"]
+		if device is not None:
+			if device["backend"] != document["provenance"]["backend"]:
+				raise ValueError("Environment backend disagrees with the captured frame")
+			if device["compatibilityIdentity"] != document["submission"]["adapterDriverIdentity"]:
+				raise ValueError("Environment adapter disagrees with the bundle submission")
 	products = document["products"]
 	if any(sum(product["source"] == source for product in products) > 1 for source in ("graph", "resource-export")):
 		raise ValueError("A bundle supports one required graph and one resource group")
@@ -136,8 +147,16 @@ def self_test(bundle_validator):
 		run = "0123456789abcdef" * 2
 		product = dict(index=0, source="scene", diagnosticTap=None, schema="gglab.frame-capture",
 			schemaVersion=1, metadata="image.json", files=["image.png", "image.json"])
-		document = dict(schema="gglab.capture-bundle", schemaVersion=1, bundleId=f"{run}-j1-a1",
-			runIdentity=run, jobId=1, attempt=1, consistency="same-frame", provenance=frame,
+		environment = dict(schemaVersion=1,
+			build=dict(source="build-stamp", revision="0123456789abcdef" * 2 + "01234567", dirty=False,
+				configuration="Release", compiler="MSVC 19.0.0", pixIntegration=False),
+			process=dict(runIdentity=run, startedAtUtc="2026-01-01T00:00:00Z", os="Windows 10.0.1", host="hidden"),
+			device=dict(backend="dx12", adapterName="Fixture adapter", vendorId=1, deviceId=2, subsystemId=None,
+				revision=None, driverVersion=None, driverVersionRaw=None, api=dict(featureLevel="12_2"),
+				dedicatedVideoMemoryBytes=None, compatibilityIdentity="test"),
+			validation=dict(requested="off", effective=None))
+		document = dict(schema="gglab.capture-bundle", schemaVersion=2, bundleId=f"{run}-j1-a1",
+			runIdentity=run, jobId=1, attempt=1, consistency="same-frame", environment=environment, provenance=frame,
 			submission=dict(fenceIndex=1, fenceGeneration=1, fenceValue=1, adapterDriverIdentity="test"),
 			watch=None, products=[product])
 		path = root / "fixture.capture-bundle.json"
@@ -145,11 +164,34 @@ def self_test(bundle_validator):
 			path.write_text(json.dumps(value), encoding="utf-8")
 			validate(path, bundle_validator)
 		check(document)
+		# Version 1 manifests predate the environment record and remain readable.
+		legacy = copy.deepcopy(document)
+		legacy["schemaVersion"] = 1
+		del legacy["environment"]
+		check(legacy)
+		# Unknown build and device facts are reported as null, never estimated.
+		unknown = copy.deepcopy(document)
+		unknown["environment"]["build"] = dict(source="unavailable", revision=None, dirty=None,
+			configuration=None, compiler=None, pixIntegration=None)
+		unknown["environment"]["device"] = None
+		unknown["environment"]["validation"] = dict(requested=None, effective=None)
+		check(unknown)
 		cases = []
-		for key, value in (("schemaVersion", 2), ("jobId", 0), ("attempt", 2),
+		for key, value in (("schemaVersion", 3), ("jobId", 0), ("attempt", 2),
 			("runIdentity", "old-crc"), ("consistency", "mixed-frame"), ("products", [])):
 			invalid = copy.deepcopy(document)
 			invalid[key] = value
+			cases.append(invalid)
+		invalid = copy.deepcopy(document)
+		del invalid["environment"]
+		cases.append(invalid)
+		cases.append(dict(copy.deepcopy(document), schemaVersion=1))
+		for section, key, value in (("build", "revision", "not-a-revision"), ("build", "source", "unavailable"),
+			("process", "runIdentity", "f" * 32), ("process", "startedAtUtc", "yesterday"),
+			("device", "backend", "vulkan"), ("device", "compatibilityIdentity", "other"),
+			("validation", "requested", "full")):
+			invalid = copy.deepcopy(document)
+			invalid["environment"][section][key] = value
 			cases.append(invalid)
 		for key, value in (("index", 1), ("source", "diagnostic"), ("schemaVersion", 2),
 			("metadata", "../image.json"), ("metadata", "C:other.json"),

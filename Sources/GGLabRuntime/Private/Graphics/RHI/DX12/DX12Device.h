@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDeviceIdentity.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 
@@ -35,6 +36,8 @@ namespace gglab
 			bool m_TearingSupported = false;
 			bool m_EnhancedBarriers = false;
 			RHIShaderWaveCapabilities m_ShaderWaveCapabilities{};
+			D3D_FEATURE_LEVEL m_MaxFeatureLevel = D3D_FEATURE_LEVEL_12_0;
+			D3D_SHADER_MODEL m_HighestShaderModel = D3D_SHADER_MODEL_6_0;
 		};
 
 		struct CreateInfo
@@ -61,6 +64,7 @@ namespace gglab
 		IDXGIFactory7* GetDXGIFactory() const noexcept { return m_DxgiFactory.Get(); }
 		IDXGIAdapter1* GetDXGIAdapter() const noexcept { return m_DxgiAdapter.Get(); }
 		std::string_view GetAdapterName() const noexcept { return m_AdapterName; }
+		const RHIDeviceIdentity& GetDeviceIdentity() const noexcept { return m_DeviceIdentity; }
 
 		D3D12MA::Allocator* GetMemAllocator() const noexcept { return m_MemAllocator.Get(); }
 
@@ -160,11 +164,13 @@ namespace gglab
 		void InitializeWinPIX() noexcept;
 		void InitializeDXGIFactory(bool enableDebugValidation) noexcept;
 		void InitializeDXGIAdapter() noexcept;
-		void InitializeDebugLayer(bool enableGpuBasedValidation) noexcept;
+		// False when the debug layer is not installed; validation then stays off.
+		[[nodiscard]] bool InitializeDebugLayer(bool enableGpuBasedValidation) noexcept;
 		void InitializeD3D12Device() noexcept;
 		void InitializeInfoQueue() noexcept;
 		void InitializeMemAllocator() noexcept;
 		void CheckFeatureSupport() noexcept;
+		void BuildDeviceIdentity(const CreateInfo& createInfo, bool debugLayerEnabled) noexcept;
 
 	private:
 		static std::wstring GetLatestWinPixGpuCapturerPath() noexcept;
@@ -180,6 +186,7 @@ namespace gglab
 		FeatureSupport m_FeatureSupport;
 		std::string m_AdapterCompatibilityIdentity;
 		std::string m_AdapterName;
+		RHIDeviceIdentity m_DeviceIdentity;
 
 		DX12ResourceManager m_ResourceManager;
 		DX12QueueSystem* m_QueueSystem = nullptr;
