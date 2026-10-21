@@ -129,7 +129,8 @@ namespace gglab
 		// and writer owners drain independently; a claimed publication is TooLate.
 		[[nodiscard]] CaptureCancelResult CancelJob(uint64_t jobId) noexcept;
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
-		[[nodiscard]] bool HasFrameGraphExports() const noexcept;
+		// Issued deliveries from earlier frames may still be awaiting readback.
+		[[nodiscard]] bool HasFrameGraphExports(uint64_t frameSerial) const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
 		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatch() const noexcept { return m_NonFiniteWatch; }
 		[[nodiscard]] std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return m_Capture ? m_Capture->GetLatestNonFiniteProductionFrame() : nullptr; }

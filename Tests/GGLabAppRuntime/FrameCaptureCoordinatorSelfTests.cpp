@@ -1844,7 +1844,10 @@ namespace gglab
 						watch->OnFrameSubmitted(m_RenderSerial);
 					}
 					m_Capture.OnFrameSubmitted();
-					m_Sequence.OnFrameSubmitted(m_RenderSerial);
+					const FrameSequenceObservation observation = m_Sequence.WantsGpuTiming() ?
+						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {} } :
+						FrameSequenceObservation{};
+					m_Sequence.OnFrameSubmitted(m_RenderSerial, observation);
 				}
 				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
 				{
@@ -2712,6 +2715,70 @@ namespace gglab
 			for (const uint64_t serial : serials)
 			{
 				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(serial), true);
+			}
+		}
+
+		void RunSequenceTimingGraphObservationTests(SelfTestContext& context) noexcept
+		{
+			for (uint32_t variant = 0; variant < 3; ++variant)
+			{
+				TemporaryDirectory directory("timing-graph-observation");
+				SequenceHarness harness(directory.GetPath());
+				CaptureTestJobs graphJobs(harness.m_Capture, context);
+				harness.m_AutoComplete = false;
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				GGLAB_UNUSED(harness.Frame());
+				CapturePlan plan{ .m_RequiredProducts = { GraphCaptureProduct{ variant == 1 } } };
+				if (variant == 2)
+				{
+					plan.m_RequiredProducts.insert(plan.m_RequiredProducts.begin(),
+						ResourceCaptureProduct{ { { .m_Resource = "A" } } });
+				}
+				const uint64_t graphJob = graphJobs.Admit(std::move(plan));
+				std::string error;
+				const uint64_t sequence = harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error);
+				const auto firstFrame = harness.Frame();
+				const uint64_t firstSerial = harness.m_RenderSerial;
+				const auto secondFrame = harness.Frame();
+				const uint64_t secondSerial = harness.m_RenderSerial;
+				context.Check(sequence != 0 && firstFrame == 0u && secondFrame == 1u &&
+					harness.m_Control.m_Issued.size() == 1 &&
+					harness.m_Control.m_Issued.front().m_FrameSerial == firstSerial &&
+					harness.m_Control.GetUnfinishedRequestCount() == 1 && graphJobs.TakeResults().empty(),
+					"A graph delivery remains outstanding while the next frame submits without an export");
+				if (harness.m_Control.m_Issued.size() != 1)
+				{
+					continue;
+				}
+				// Retire the graph only after the next submission, then deliver profiles
+				// out of order. Conditions must stay bound to each submitted frame.
+				harness.m_Control.Complete(harness.m_Control.m_Issued.front().m_Id);
+				harness.m_Capture.Update();
+				const auto results = graphJobs.TakeResults();
+				context.Check(results.size() == 1 && results.front().m_JobId == graphJob &&
+					results.front().m_Status == CaptureJobStatus::Completed,
+					"Delayed full, summary and resource-paired graphs retain their normal completion");
+				const std::array serials{ secondSerial, firstSerial };
+				DeliverTimingProfiles(harness, serials);
+				const auto& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Completed &&
+					status.m_TimingPublication->m_Files.size() == 1,
+					"Delayed graph retirement still permits complete sequence timing publication");
+				if (status.m_TimingPublication->m_Files.size() != 1)
+				{
+					continue;
+				}
+				const auto product = nlohmann::json::parse(
+					ReadText(status.m_TimingPublication->m_Files.front()));
+				const auto& samples = product["coverage"]["samples"];
+				context.Check(samples.size() == 2 && samples[0]["frameSerial"] == secondSerial &&
+					samples[0]["conditions"]["graph"] == false,
+					"An earlier unretired graph must not mark the next timing sample as a graph export");
+				context.Check(samples.size() == 2 && samples[1]["frameSerial"] == firstSerial &&
+					samples[1]["conditions"]["graph"] == true,
+					"The exporting frame keeps its graph condition after delivery and late GPU timing");
 			}
 		}
 
@@ -5020,6 +5087,7 @@ namespace gglab
 		RunReferenceSequenceTests(context);
 		RunFrameSequenceEvaluationTests(context);
 		RunFrameSequenceGpuTimingTests(context);
+		RunSequenceTimingGraphObservationTests(context);
 		RunSequenceTimingPublicationTests(context);
 		RunFrameSequenceContinuityTests(context);
 		RunFrameSequenceFailureTests(context);

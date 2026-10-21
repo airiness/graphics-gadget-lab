@@ -1068,11 +1068,12 @@ namespace gglab
 			(m_HistoryReady && MatchesRequiredContent(job, state) && m_SettledFrames >= plan.m_SettleFrames);
 	}
 
-	bool FrameCaptureCoordinator::HasFrameGraphExports() const noexcept
+	bool FrameCaptureCoordinator::HasFrameGraphExports(uint64_t frameSerial) const noexcept
 	{
-		return std::ranges::any_of(m_Deliveries, [](const ProductDelivery& entry)
+		return std::ranges::any_of(m_Deliveries, [frameSerial](const ProductDelivery& entry)
 			{
 				return entry.m_Phase == Phase::Issued &&
+					entry.m_Attempt->m_Metadata.m_FrameSerial == frameSerial &&
 					(entry.GetSource() == FrameCaptureSource::RenderGraph || entry.m_GraphIndex.has_value());
 			});
 	}
