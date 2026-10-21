@@ -55,6 +55,7 @@ namespace gglab
 		// without mutating live state; only Immediate effects are supported here.
 		[[nodiscard]] uint64_t RequestParameterBatch(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
 		[[nodiscard]] const LabParameterBatchStatus* GetParameterBatchStatus() const noexcept;
 		[[nodiscard]] std::optional<LabParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
 		void OnRuntimeFailed(std::string_view reason) noexcept;
@@ -110,7 +111,6 @@ namespace gglab
 		struct ParameterBatch
 		{
 			LabParameterBatchStatus m_Status;
-			std::vector<LabParameterValue> m_Values;
 			std::vector<ParameterEffectReceipt> m_Receipts;
 			struct ConsumedState
 			{

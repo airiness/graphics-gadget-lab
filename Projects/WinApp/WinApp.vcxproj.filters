@@ -153,6 +153,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.cpp">
       <Filter>Application\Control</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlParameters.cpp">
+      <Filter>Application\Control</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp">
       <Filter>Application\Control</Filter>
     </ClCompile>
@@ -519,6 +522,9 @@
       <Filter>Application\Content</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlParameters.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h">

@@ -60,6 +60,18 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Status;
 			}
+			if (command == "parameters")
+			{
+				return ApplicationControlCommand::Parameters;
+			}
+			if (command == "set")
+			{
+				return ApplicationControlCommand::Set;
+			}
+			if (command == "parameter-result")
+			{
+				return ApplicationControlCommand::ParameterResult;
+			}
 			if (command == "capture")
 			{
 				return ApplicationControlCommand::Capture;
@@ -1410,7 +1422,7 @@ namespace gglab
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
-				"'capture-cancel', 'watch', 'sequence' or 'sequence-cancel'.";
+				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set' or 'parameter-result'.";
 			return result;
 		}
 
@@ -1442,9 +1454,34 @@ namespace gglab
 			request.m_Consume = document.value("consume", false);
 			break;
 		}
+		case ApplicationControlCommand::Set:
+			if (document.size() != 4 || !document.contains("changes"))
+			{
+				error = "Command 'set' takes only a 'changes' array.";
+			}
+			else
+			{
+				error = ParseApplicationControlParameterChanges(document["changes"], request.m_ParameterChanges);
+			}
+			break;
+		case ApplicationControlCommand::ParameterResult:
+		{
+			const auto batch = document.find("batchId");
+			const bool consume = document.contains("consume");
+			if (batch == document.end() || !batch->is_number_unsigned() || batch->get<uint64_t>() == 0 ||
+				document.size() != (consume ? 5u : 4u) || (consume && !document["consume"].is_boolean()))
+			{
+				error = "Command 'parameter-result' takes a non-zero unsigned 'batchId' and optional boolean 'consume'.";
+				break;
+			}
+			request.m_ParameterBatchId = batch->get<uint64_t>();
+			request.m_Consume = document.value("consume", false);
+			break;
+		}
 		case ApplicationControlCommand::Sequence:
 			error = ParseSequenceFields(document, request);
 			break;
+		case ApplicationControlCommand::Parameters:
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
 		case ApplicationControlCommand::SequenceCancel:
@@ -1487,6 +1524,13 @@ namespace gglab
 		response["environment"] = environment.is_object() ? environment : Json(nullptr);
 		const auto& intake = status.m_CaptureIntake;
 		response["capabilities"] = {
+			{ "labParameterControl", {
+				{ "sources", Json::array({ "lab" }) },
+				{ "effectClasses", Json::array({ "Immediate" }) },
+				{ "maxBatches", 1 },
+				{ "maxItems", ApplicationControlMaxParameterItems },
+				{ "resultConsumption", "explicit" },
+				{ "scheduledEvents", false } } },
 			{ "captureJobs", true },
 			{ "requiredProducts", Json::array({ "image", "diagnostic", "graph", "resource" }) },
 			{ "consistency", "SameFrame" },
@@ -1575,6 +1619,10 @@ namespace gglab
 		{
 			response["watch"]["report"] = SerializeWatchReport(*status.m_Watch);
 		}
+		response["parameterControl"] = {
+			{ "available", status.m_LabParametersAvailable },
+			{ "revision", status.m_LabParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
+			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() } };
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{

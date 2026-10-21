@@ -47,7 +47,7 @@ namespace gglab
 		m_ParameterBatch->m_Status.m_BatchId = id;
 		m_ParameterBatch->m_Status.m_Lab = m_ActiveSession->GetDescriptor().m_Id;
 		m_ParameterBatch->m_Session = m_TemporalSessionSerial;
-		m_ParameterBatch->m_Values.assign(values.begin(), values.end());
+		m_ParameterBatch->m_Status.m_Values.assign(values.begin(), values.end());
 		m_CommandQueue.RequestParameterBatch(id);
 		return id;
 	}
@@ -174,7 +174,7 @@ namespace gglab
 			return;
 		}
 		std::string error;
-		const auto applied = m_ActiveSession->SetParameters(batch.m_Values, error);
+		const auto applied = m_ActiveSession->SetParameters(batch.m_Status.m_Values, error);
 		if (!applied)
 		{
 			batch.m_Status.m_State = LabParameterBatchState::Failed;
@@ -187,7 +187,7 @@ namespace gglab
 		}
 		batch.m_Status.m_Revision = m_ParameterRevision;
 		batch.m_Status.m_State = LabParameterBatchState::Applying;
-		for (const auto& value : batch.m_Values)
+		for (const auto& value : batch.m_Status.m_Values)
 		{
 			auto receipt = ParameterEffectReceipt::Begin(value.m_Id,
 				ParameterEffectClass::Immediate, m_ParameterRevision, serial);
@@ -227,7 +227,7 @@ namespace gglab
 			{
 				continue;
 			}
-			const auto& requested = batch.m_Values[index];
+			const auto& requested = batch.m_Status.m_Values[index];
 			const auto* current = m_ActiveSession->GetParameters().Find(requested.m_Id);
 			if (!current || !LabValuesEqual(current->m_Value, requested.m_Value))
 			{

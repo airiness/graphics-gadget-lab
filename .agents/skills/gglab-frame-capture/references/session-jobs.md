@@ -4,6 +4,8 @@ Use `Scripts/Verification/GGLabSession.ps1` and the executable from the same
 revision. The pipe accepts only protocol **4**; retired v1/v2/v3 and unknown
 versions are rejected, not translated. v4 adds sequence timing publication and
 explicit sequence-cancellation verdicts; v3 cancellation semantics are not reused.
+The additive [Lab parameter extension](session-parameters.md) keeps v4 capture
+semantics and uses its own `batchId` / `parameter-result` namespace.
 Every request/response has `protocol`, unsigned `id` (transport correlation), and
 the response has boolean `ok`.
 

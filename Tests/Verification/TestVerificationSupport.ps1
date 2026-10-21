@@ -69,6 +69,55 @@ try {
         Check (-not $pending.ok -and $pending.status -eq 'pending' -and $pending.jobId -eq 17 -and
             -not $pending.consumed -and $state.calls -eq 4) 'client-deadline-retains-pending-job-without-cancellation'
     }
+    # Exercise the actual parameter wait loop across failures and lifecycle boundaries.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $root 'Scripts/Verification/GGLabSession.ps1'), [ref]$tokens, [ref]$parseErrors)
+        foreach ($name in @('Wait-ParameterBatch','ConvertTo-Hashtable')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $Session = 'parameter-contract'; $ProtocolVersion = 4; $KeepResult = $false; $WaitConsumed = $false
+        $state = @{ calls=0; fail=$true; terminal=$false; revision=$null; items=@(); consumed=$false }
+        function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+            $state.calls++
+            if ($state.fail) { throw 'lost parameter query' }
+            $state.consumed = $Request.consume -and $state.terminal
+            return [pscustomobject]@{ protocol=4;ok=$true;batchId=$Request.batchId;consumed=$state.consumed
+                batch=[pscustomobject]@{ terminal=$state.terminal;revision=$state.revision;items=$state.items } }
+        }
+        $admission = [pscustomobject]@{ok=$true;batchId=23}
+        $lost = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check (-not $lost.ok -and $lost.batchId -eq 23 -and $state.calls -eq 1 -and
+            $null -eq $lost.PSObject.Properties['batch']) 'parameter-query-loss-retains-identity-without-resubmission'
+        $state.fail=$false
+        $pending = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(-1))
+        Check (-not $pending.ok -and $pending.batchId -eq 23 -and -not $pending.consumed -and
+            $state.calls -eq 2) 'parameter-deadline-keeps-queued-ownership'
+        $state.revision=8; $state.items=@([pscustomobject]@{applied=20;state='Published'})
+        $applied = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check ($applied.ok -and -not $applied.batch.terminal -and -not $applied.consumed) 'parameter-default-waits-for-application-without-consuming-pending-effect'
+        $WaitConsumed=$true
+        $waiting = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(-1))
+        Check (-not $waiting.ok -and -not $waiting.consumed) 'parameter-wait-consumed-does-not-stop-at-publication'
+        $state.terminal=$true; $KeepResult=$true
+        $kept = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check ($kept.ok -and -not $kept.consumed) 'parameter-keep-result-preserves-terminal-slot'
+        $KeepResult=$false
+        $taken = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
+        Check ($taken.ok -and $taken.consumed -and $state.calls -eq 6) 'parameter-terminal-wait-explicitly-releases-slot'
+    }
+    $invalidParameter = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='set';Session='parameter-invalid';Changes='[]';NoWait=$true;WaitConsumed=$true }
+    $invalidResult = $invalidParameter.output | ConvertFrom-Json
+    Check ($invalidParameter.exitCode -eq 1 -and -not $invalidResult.ok) 'parameter-incompatible-wait-flags-return-json'
+    $missingChanges = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='set';Session='parameter-invalid';ChangesFile=(Join-Path $output 'missing-changes.json') }
+    $missingChangesResult = $missingChanges.output | ConvertFrom-Json
+    Check ($missingChanges.exitCode -eq 1 -and -not $missingChangesResult.ok) 'parameter-missing-input-file-returns-json'
     $standaloneRoot = Join-Path $output 'standalone'
     $firstRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'first'
     $secondRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'second'
@@ -165,12 +214,12 @@ Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
 [Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi } | ConvertTo-Json -Compress))
 '@
-    foreach ($leaf in @('TestCaptureJobs.ps1', 'TestCaptureOnReady.ps1', 'TestPassProfileIdentity.ps1', 'TestGraphAllocationFacts.ps1', 'TestNonFiniteCoverage.ps1', 'TestNonFiniteGenerations.ps1', 'TestNonFiniteInjection.ps1', 'TestTemporalAACounters.ps1')) {
+    foreach ($leaf in @('TestSessionParameters.ps1', 'TestCaptureJobs.ps1', 'TestCaptureOnReady.ps1', 'TestPassProfileIdentity.ps1', 'TestGraphAllocationFacts.ps1', 'TestNonFiniteCoverage.ps1', 'TestNonFiniteGenerations.ps1', 'TestNonFiniteInjection.ps1', 'TestTemporalAACounters.ps1')) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
     $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{ Group='gpu'; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
-    Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and $gpuResult.suites.Count -eq 8) 'runner-gpu-leaf-handoff'
+    Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and $gpuResult.suites.Count -eq 9) 'runner-gpu-leaf-handoff'
     foreach ($suiteResult in $gpuResult.suites) {
         $leafResult = $suiteResult.steps[0].receipt
         Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
@@ -179,7 +228,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
-    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 17 -and
+    Check ($list.exitCode -eq 0 -and $items.suites.Count -eq 18 -and
         @($items.suites | Where-Object name -eq 'capture-on-ready').Count -eq 1 -and
         @($items.suites | Where-Object name -eq 'coastal-assets').Count -eq 1 -and
         -not (Test-Path $unused) -and @($items.suites | Where-Object { $_.group -eq 'contracts' })[0].configurations.Count -eq 0) 'list-without-launch-or-output'

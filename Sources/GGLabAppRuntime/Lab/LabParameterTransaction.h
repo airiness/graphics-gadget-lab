@@ -1,4 +1,5 @@
 #pragma once
+#include "Lab/LabParameter.h"
 #include "Lab/LabTypes.h"
 #include "Parameters/ParameterEffectReceipt.h"
 
@@ -17,6 +18,8 @@ namespace gglab
 		uint64_t m_Revision = 0;
 		LabId m_Lab;
 		LabParameterBatchState m_State = LabParameterBatchState::Queued;
+		// Owned admission values remain queryable before application or after session replacement.
+		std::vector<LabParameterValue> m_Values;
 		std::vector<ParameterEffectSnapshot> m_Items;
 		std::string m_Failure;
 

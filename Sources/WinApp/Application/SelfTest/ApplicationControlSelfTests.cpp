@@ -2,6 +2,7 @@
 
 #include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Application/Control/ApplicationControlParameters.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
@@ -29,6 +30,101 @@ namespace gglab
 	namespace
 	{
 		using Json = nlohmann::json;
+
+		void RunParameterControlTests(SelfTestContext& context) noexcept
+		{
+			const auto parameters = ParseApplicationControlRequest(R"({"protocol":4,"id":700,"command":"parameters"})");
+			context.Check(parameters.m_Request && parameters.m_Request->m_Command == ApplicationControlCommand::Parameters,
+				"Parameter discovery is an additive v4 command");
+			const auto changes = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":701,"command":"set","changes":[{"id":"b","type":"bool","value":false},{"id":"i","type":"int","value":-2147483648},{"id":"u","type":"uint","value":4294967295},{"id":"f","type":"float","value":2},{"id":"e","type":"enum","value":2},{"id":"v","type":"vector3","value":[1,2,3]},{"id":"c","type":"color","value":[0,0.5,1,1]}]})");
+			const auto* parsed = changes.m_Request ? &changes.m_Request->m_ParameterChanges : nullptr;
+			context.Check(parsed && parsed->size() == 7 && std::get<bool>((*parsed)[0].m_Value.m_Value) == false &&
+				std::get<int32_t>((*parsed)[1].m_Value.m_Value) == INT32_MIN &&
+				std::get<uint32_t>((*parsed)[2].m_Value.m_Value) == UINT32_MAX &&
+				std::get<float>((*parsed)[3].m_Value.m_Value) == 2.0f && (*parsed)[4].m_Type == LabParameterType::Enum &&
+				std::get<Vector3>((*parsed)[5].m_Value.m_Value).m_Z == 3.0f &&
+				std::get<Color>((*parsed)[6].m_Value.m_Value).G() == 0.5f,
+				"All seven wire types retain strict owned 32-bit Lab values without string coercion");
+			const std::vector<std::string> invalidChanges =
+			{
+				R"([])", R"({})", R"([{"id":"x","type":"bool","value":1}])",
+				R"([{"id":"x","type":"bool","value":"true"}])",
+				R"([{"id":"x","type":"int","value":2147483648}])",
+				R"([{"id":"x","type":"int","value":1.0}])",
+				R"([{"id":"x","type":"int","value":18446744073709551615}])",
+				R"([{"id":"x","type":"uint","value":-1}])",
+				R"([{"id":"x","type":"uint","value":4294967296}])",
+				R"([{"id":"x","type":"float","value":1e100}])",
+				R"([{"id":"x","type":"float","value":null}])",
+				R"([{"id":"x","type":"vector3","value":[1,2]}])",
+				R"([{"id":"x","type":"color","value":[1,2,3,"4"]}])",
+				R"([{"id":"x","type":"vector3","value":[1,2,1e100]}])",
+				R"([{"id":"x","type":"float","value":1},{"id":"x","type":"float","value":2}])",
+				R"([{"id":"","type":"float","value":1}])",
+				R"([{"id":"x","type":"unknown","value":1}])",
+				R"([{"id":"x","type":"float","value":1,"clamp":true}])",
+				R"([{"id":"x","type":"enum","value":"named"}])",
+			};
+			for (const auto& invalid : invalidChanges)
+			{
+				const auto rejected = ParseApplicationControlRequest(
+					R"({"protocol":4,"id":702,"command":"set","changes":)" + invalid + "}");
+				context.Check(!rejected.m_Request && rejected.m_Id == 702 && !rejected.m_Error.empty(),
+					"Malformed typed batches reject completely and retain correlation");
+			}
+			Json oversized = Json::array();
+			for (size_t i = 0; i <= ApplicationControlMaxParameterItems; ++i)
+			{
+				oversized.push_back({ { "id", std::to_string(i) }, { "type", "bool" }, { "value", true } });
+			}
+			context.Check(!ParseApplicationControlRequest(Json({ { "protocol", 4 }, { "id", 703 },
+				{ "command", "set" }, { "changes", oversized } }).dump()).m_Request,
+				"Session batches have a fixed admission item bound");
+			for (const auto& invalid : { R"({"jobId":1})", R"({"batchId":0})",
+				R"({"batchId":1,"consume":1})", R"({"batchId":1,"jobId":1})" })
+			{
+				Json request = Json::parse(invalid);
+				request.update({ { "protocol", 4 }, { "id", 704 }, { "command", "parameter-result" } });
+				context.Check(!ParseApplicationControlRequest(request.dump()).m_Request,
+					"Parameter results cannot reinterpret capture job identities or consumption types");
+			}
+			const auto query = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":705,"command":"parameter-result","batchId":9,"consume":true})");
+			context.Check(query.m_Request && query.m_Request->m_ParameterBatchId == 9 &&
+				query.m_Request->m_JobId == 0 && query.m_Request->m_Consume,
+				"Parameter query preserves its independent batch identity");
+			context.Check(!Json::parse(SerializeApplicationControlParameters(706, nullptr))["ok"] &&
+				!Json::parse(SubmitApplicationControlParameters(707, {}, nullptr, false))["ok"],
+				"A missing parameter source rejects discovery and admission");
+			const Json missing = Json::parse(QueryApplicationControlParameters(708, 9, true, nullptr));
+			context.Check(!missing["ok"] && missing["batchId"] == 9 && missing["status"] == "not-found",
+				"Missing parameter ownership never yields a fabricated receipt");
+			LabParameterBatchStatus batch{ .m_BatchId = 9, .m_Revision = 7,
+				.m_Lab = LabId("gglab.lab.fixture"), .m_State = LabParameterBatchState::Finished };
+			batch.m_Values.push_back({ LabParameterId("f"), 2.0f });
+			auto receipt = ParameterEffectReceipt::Begin(LabParameterId("f"), ParameterEffectClass::Immediate, 7, 20);
+			(void)receipt->RecordApplied(ParameterEffectClass::Immediate, { .m_Revision = 7 }, 20);
+			(void)receipt->RecordSubmittedFrame({ .m_Revision = 7 }, 21);
+			batch.m_Items.push_back(receipt->GetSnapshot());
+			const Json wire = SerializeApplicationControlParameterBatch(batch);
+			context.Check(wire["terminal"] && wire["succeeded"] && wire["values"][0]["value"] == 2.0f &&
+				wire["items"][0]["requested"] == 20 && wire["items"][0]["applied"] == 20 &&
+				wire["items"][0]["published"] == 20 && wire["items"][0]["firstConsumed"] == 21 &&
+				wire["items"][0]["identity"]["revision"] == 7,
+				"Serialization preserves values, exact identities and all four authoritative stamps");
+			batch.m_Items[0].m_State = ParameterEffectState::Superseded;
+			batch.m_Items[0].m_FirstConsumed.reset();
+			const Json superseded = SerializeApplicationControlParameterBatch(batch);
+			context.Check(!superseded["succeeded"] && superseded["items"][0]["firstConsumed"].is_null(),
+				"A terminal superseded effect is not successful consumption");
+			const Json status = Json::parse(SerializeApplicationControlStatus(709, {
+				.m_LabParametersAvailable = true, .m_ParameterRevision = 7, .m_ParameterBatch = &batch }));
+			context.Check(status["capabilities"]["labParameterControl"]["maxBatches"] == 1 &&
+				status["capabilities"]["labParameterControl"]["maxItems"] == 128 &&
+				status["parameterControl"]["batch"] == superseded && status["parameterControl"]["revision"] == 7,
+				"Status advertises bounded Immediate-only support and borrows the actual receipt");
+		}
 
 		void RunParseTests(SelfTestContext& context) noexcept
 		{
@@ -686,6 +782,7 @@ namespace gglab
 
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
 	{
+		RunParameterControlTests(context);
 		RunParseTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);
