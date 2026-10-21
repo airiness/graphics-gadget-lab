@@ -135,11 +135,13 @@ namespace gglab
 			return false;
 		}
 
+		m_ParameterIntakeFailed = false;
 		return BeginSessionTransition(startupLab, {}, startupParameters);
 	}
 
 	void LabRuntime::Shutdown() noexcept
 	{
+		EndParameterBatch(false, "The Lab shut down before the parameter frame.");
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
@@ -171,6 +173,7 @@ namespace gglab
 
 	void LabRuntime::OnExit() noexcept
 	{
+		EndParameterBatch(false, "The Lab became inactive before the parameter frame.");
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
@@ -221,6 +224,7 @@ namespace gglab
 
 	void LabRuntime::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
+		ConsumeParameterFrame(feedback);
 		m_LastFrameFeedback = feedback;
 		m_HasFrameFeedback = true;
 		if (m_ActiveSession)
@@ -314,6 +318,7 @@ namespace gglab
 			return;
 		}
 
+		++m_ParameterRevision;
 		if (impact != LabChangeImpact::Immediate)
 		{
 			const std::vector<LabParameterValue> values =
@@ -559,6 +564,7 @@ namespace gglab
 
 		m_ActiveSession = std::move(m_PendingSession);
 		++m_TemporalSessionSerial;
+		++m_ParameterRevision;
 		GGLAB_ASSERT_MSG(m_TemporalSessionSerial != 0,
 			"Lab temporal session serial overflowed its valid range.");
 		m_ActiveSession->OnResize(m_CreateInfo.m_WindowWidth, m_CreateInfo.m_WindowHeight);

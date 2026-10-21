@@ -48,6 +48,12 @@ namespace gglab
 		return m_Parameters.Set(id, value, impact);
 	}
 
+	std::optional<LabParameterBatchResult> LabSessionBase::SetParameters(
+		std::span<const LabParameterValue> values, std::string& error) noexcept
+	{
+		return m_Parameters.ApplyBatch(values, error);
+	}
+
 	LabChangeImpact LabSessionBase::ResetParameters() noexcept
 	{
 		return m_Parameters.ResetAll();

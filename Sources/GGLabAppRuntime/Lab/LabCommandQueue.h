@@ -26,10 +26,15 @@ namespace gglab
 		void RequestResetParameters() noexcept;
 		void RequestRebuildScene() noexcept;
 		void RequestRunConfig(const LabRunConfig& config) noexcept;
+		// Strict transactions share the safe command owner, but survive the UI's
+		// Update-time consume until a real Ready render frame supplies its serial.
+		void RequestParameterBatch(uint64_t id) noexcept;
+		[[nodiscard]] std::optional<uint64_t> ConsumeParameterBatch() noexcept;
 		LabCommandBatch Consume() noexcept;
 		bool IsEmpty() const noexcept;
 
 	private:
 		LabCommandBatch m_Pending;
+		std::optional<uint64_t> m_ParameterBatch;
 	};
 }

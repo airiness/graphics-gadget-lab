@@ -1,4 +1,8 @@
 #include "Lab/LabCommandQueue.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+
+#include <algorithm>
+#include <utility>
 
 namespace gglab
 {
@@ -54,6 +58,17 @@ namespace gglab
 		m_Pending.m_RunConfig = config;
 	}
 
+	void LabCommandQueue::RequestParameterBatch(uint64_t id) noexcept
+	{
+		GGLAB_ASSERT(id != 0 && !m_ParameterBatch);
+		m_ParameterBatch = id;
+	}
+
+	std::optional<uint64_t> LabCommandQueue::ConsumeParameterBatch() noexcept
+	{
+		return std::exchange(m_ParameterBatch, std::nullopt);
+	}
+
 	LabCommandBatch LabCommandQueue::Consume() noexcept
 	{
 		LabCommandBatch result = std::move(m_Pending);
@@ -63,7 +78,7 @@ namespace gglab
 
 	bool LabCommandQueue::IsEmpty() const noexcept
 	{
-		return !m_Pending.m_SwitchTarget.has_value() && !m_Pending.m_RunConfig.has_value() &&
+		return !m_ParameterBatch && !m_Pending.m_SwitchTarget.has_value() && !m_Pending.m_RunConfig.has_value() &&
 			m_Pending.m_ParameterChanges.empty() && !m_Pending.m_RestartRequested &&
 			!m_Pending.m_ResetParametersRequested && !m_Pending.m_RebuildSceneRequested;
 	}

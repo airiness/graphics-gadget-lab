@@ -117,6 +117,7 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntimeParameters.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
@@ -154,6 +155,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabInterfaces.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameterTransaction.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.h" />

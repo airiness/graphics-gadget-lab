@@ -42,6 +42,8 @@ namespace gglab
 		bool IsValid() const noexcept;
 		bool SetParameter(const LabParameterId& id, const LabValue& value,
 			LabChangeImpact* impact = nullptr) noexcept;
+		[[nodiscard]] std::optional<LabParameterBatchResult> SetParameters(
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		LabChangeImpact ResetParameters() noexcept;
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;

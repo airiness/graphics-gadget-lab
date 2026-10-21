@@ -42,16 +42,25 @@ namespace gglab
 		{
 			return false;
 		}
-		if (actualClass != m_Snapshot.m_DeclaredClass)
-		{
-			(void)Fail("EffectMismatch");
-			return false;
-		}
 		const bool immediate = actualClass == ParameterEffectClass::Immediate;
 		const bool hasDomain = !identity.m_Domain.empty() && identity.m_Generation != 0;
 		const bool noDomain = identity.m_Domain.empty() && identity.m_Generation == 0;
 		if ((immediate && !noDomain) || (!immediate && !hasDomain))
 		{
+			return false;
+		}
+		if (actualClass != m_Snapshot.m_DeclaredClass)
+		{
+			if (!m_Snapshot.m_Applied)
+			{
+				m_Snapshot.m_Identity = identity;
+				m_Snapshot.m_Applied = frame;
+				if (immediate)
+				{
+					m_Snapshot.m_Published = frame;
+				}
+			}
+			(void)Fail("EffectMismatch");
 			return false;
 		}
 		if (m_Snapshot.m_Applied)

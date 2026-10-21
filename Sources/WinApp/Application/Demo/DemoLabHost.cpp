@@ -129,6 +129,21 @@ namespace gglab
 		m_Runtime.Update();
 	}
 
+	void DemoLabHost::OnRuntimeFailed(std::string_view reason) noexcept
+	{
+		m_Runtime.OnRuntimeFailed(reason);
+	}
+
+	void DemoLabHost::OnFrameReady(uint64_t serial) noexcept
+	{
+		m_Runtime.OnFrameReady(serial);
+	}
+
+	void DemoLabHost::OnFrameBuilt(uint64_t serial) noexcept
+	{
+		m_Runtime.OnFrameBuilt(serial);
+	}
+
 	void DemoLabHost::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
 		m_Runtime.OnFrameSubmitted(feedback);

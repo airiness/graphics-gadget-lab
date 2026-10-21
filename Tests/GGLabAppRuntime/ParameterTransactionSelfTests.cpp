@@ -213,7 +213,9 @@ namespace gglab
 			auto mismatch = BeginReceipt(ParameterEffectClass::Immediate);
 			context.Check(!mismatch.RecordApplied(ParameterEffectClass::Deferred, lighting, 10) &&
 				mismatch.GetSnapshot().m_State == ParameterEffectState::Failed &&
-				mismatch.GetSnapshot().m_Failure == "EffectMismatch",
+				mismatch.GetSnapshot().m_Failure == "EffectMismatch" &&
+			mismatch.GetSnapshot().m_Applied == 10 && mismatch.GetSnapshot().m_Identity == lighting &&
+			!mismatch.GetSnapshot().m_Published,
 				"Actual deferred work contradicting an Immediate declaration fails explicitly");
 			auto notReached = BeginReceipt(ParameterEffectClass::Deferred);
 			context.Check(notReached.RecordApplied(ParameterEffectClass::Deferred, lighting, 10) &&

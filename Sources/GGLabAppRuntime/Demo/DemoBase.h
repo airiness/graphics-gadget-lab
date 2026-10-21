@@ -5,6 +5,7 @@
 #include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -67,6 +68,11 @@ namespace gglab
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}
 		virtual void OnExit() noexcept {}
 		virtual void Update() noexcept = 0;
+		// Content may apply safe in-place parameter changes after RHI readiness and
+		// before settings/planning, then freeze consumed identities after scene build.
+		virtual void OnRuntimeFailed(std::string_view reason) noexcept { GGLAB_UNUSED(reason); }
+		virtual void OnFrameReady(uint64_t serial) noexcept { GGLAB_UNUSED(serial); }
+		virtual void OnFrameBuilt(uint64_t serial) noexcept { GGLAB_UNUSED(serial); }
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);

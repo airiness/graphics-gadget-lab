@@ -75,6 +75,9 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.cpp">
       <Filter>Lab</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntimeParameters.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.cpp">
       <Filter>Lab</Filter>
     </ClCompile>
@@ -161,6 +164,9 @@
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameterTransaction.h">
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h">

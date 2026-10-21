@@ -2,9 +2,16 @@
 #include "Lab/LabCatalog.h"
 #include "Lab/LabCommandQueue.h"
 #include "Lab/LabInterfaces.h"
+#include "Lab/LabParameterTransaction.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+
+#include <cstddef>
+#include <optional>
+#include <span>
+#include <string>
+#include <vector>
 
 namespace gglab
 {
@@ -44,6 +51,15 @@ namespace gglab
 		{
 			m_CommandQueue.RequestRunConfig(config);
 		}
+		// One accepted owner-held transaction/result at a time. Admission validates
+		// without mutating live state; only Immediate effects are supported here.
+		[[nodiscard]] uint64_t RequestParameterBatch(
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		[[nodiscard]] const LabParameterBatchStatus* GetParameterBatchStatus() const noexcept;
+		[[nodiscard]] std::optional<LabParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
+		void OnRuntimeFailed(std::string_view reason) noexcept;
+		void OnFrameReady(uint64_t serial) noexcept;
+		void OnFrameBuilt(uint64_t serial) noexcept;
 		void ProcessPendingCommands() noexcept;
 		void TickTransitions() noexcept;
 		LabSnapshot GetLabSnapshot(
@@ -87,6 +103,30 @@ namespace gglab
 		void PollRetiringSessions() noexcept;
 		void SetError(std::string message) noexcept;
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;
+
+		void RefreshParameterBatchStatus() noexcept;
+		void EndParameterBatch(bool superseded, std::string reason) noexcept;
+		void ConsumeParameterFrame(const DemoFrameFeedback& feedback) noexcept;
+		struct ParameterBatch
+		{
+			LabParameterBatchStatus m_Status;
+			std::vector<LabParameterValue> m_Values;
+			std::vector<ParameterEffectReceipt> m_Receipts;
+			struct ConsumedState
+			{
+				size_t m_Item = 0;
+				ParameterStateIdentity m_Identity;
+			};
+			std::vector<ConsumedState> m_Consumed;
+			uint32_t m_Session = 0;
+			uint64_t m_FrameSerial = 0;
+			uint64_t m_FrameBakeRequestGeneration = 0;
+			uint64_t m_ApplyBakeGeneration = 0;
+		};
+		std::optional<ParameterBatch> m_ParameterBatch;
+		uint64_t m_NextParameterBatchId = 1;
+		uint64_t m_ParameterRevision = 1;
+		bool m_ParameterIntakeFailed = false;
 
 		LabSessionCreateInfo m_CreateInfo{};
 		LabCatalog m_Catalog;

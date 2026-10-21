@@ -353,6 +353,13 @@ namespace gglab
 	{
 		GGLAB_LOG_CRITICAL_ALWAYS("Fatal runtime failure: {}", failure);
 		m_LifecycleState = AppRuntimeLifecycleState::Failed;
+		if (m_DemoManager)
+		{
+			if (DemoBase* demo = m_DemoManager->GetActiveDemo())
+			{
+				demo->OnRuntimeFailed(failure);
+			}
+		}
 		return AppRuntimeTickResult::Fatal;
 	}
 
@@ -476,6 +483,7 @@ namespace gglab
 				AppRuntimeTickResult::Continue :
 				FailRuntime("The render host failed to begin a frame.");
 		}
+		demo->OnFrameReady(rendererFrame.GetSerial());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
 		services.m_TextureAssets = m_AssetManager.get();
@@ -639,6 +647,7 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
+		demo->OnFrameBuilt(frame.m_FrameSerial);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
 		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
