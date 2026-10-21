@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "Capture/CaptureEnvironment.h"
 #include "Capture/CapturePlan.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/FrameCaptureImageEncoder.h"
@@ -11,11 +12,13 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -27,6 +30,8 @@ namespace gglab
 	class CaptureWriter;
 	struct CaptureProductEncodeInput;
 	struct CaptureWriteReceipt;
+	struct CaptureWriteJob;
+	struct SequenceTimingBundleInput;
 
 	// Runtime owns temporal compatibility; AppRuntime adds the active content.
 	// A changed identity or unreadable previous history restarts settling.
@@ -99,6 +104,8 @@ namespace gglab
 			// Optional host-neutral file capability; the writer retains it independently.
 			std::shared_ptr<CapturePublicationFileSystemBase> m_PublicationFileSystem;
 			CaptureJobLimits m_JobLimits;
+			// Recorded in every bundle manifest; unknown values stay null.
+			CaptureEnvironment m_Environment;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -122,6 +129,8 @@ namespace gglab
 		// and writer owners drain independently; a claimed publication is TooLate.
 		[[nodiscard]] CaptureCancelResult CancelJob(uint64_t jobId) noexcept;
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
+		// Issued deliveries from earlier frames may still be awaiting readback.
+		[[nodiscard]] bool HasFrameGraphExports(uint64_t frameSerial) const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
 		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatch() const noexcept { return m_NonFiniteWatch; }
 		[[nodiscard]] std::shared_ptr<const NonFiniteProductionFrame> GetLatestNonFiniteProductionFrame() const noexcept { return m_Capture ? m_Capture->GetLatestNonFiniteProductionFrame() : nullptr; }
@@ -133,6 +142,8 @@ namespace gglab
 		// State of the most recent frame passed to BeginFrame; null before the
 		// first rendered frame.
 		[[nodiscard]] const FrameCaptureFrameState* GetLastFrameState() const noexcept;
+		// The process environment record as JSON; empty only if it could not be serialized.
+		[[nodiscard]] const std::string& GetEnvironmentJson() const noexcept { return m_EnvironmentJson; }
 		// Consecutive submitted frames with every gate ready and an unchanged
 		// settle key whose temporal history began on a ready frame.
 		[[nodiscard]] uint32_t GetSettledFrameCount() const noexcept { return m_SettledFrames; }
@@ -181,6 +192,16 @@ namespace gglab
 
 	private:
 		friend class GGLabAppRuntime;
+		friend class FrameSequenceCoordinator;
+
+		// Shares the writer and one of the same nine write reservations. Busy leaves
+		// the immutable sequence product with its owner for a later poll.
+		[[nodiscard]] std::shared_ptr<CaptureWriteJob> TryPublishSequenceTiming(
+			const SequenceTimingBundleInput& input, const std::filesystem::path& directory,
+			std::string_view label, std::string& error) noexcept;
+		[[nodiscard]] std::optional<CaptureWriteReceipt> GetSequenceTimingReceipt(
+			const CaptureWriteJob& job) const noexcept;
+		[[nodiscard]] size_t GetWriteReservationCount() const noexcept;
 
 		// Bound once during composition, before admission. Published receipts stay in
 		// their original slots until the host consumes them through AppRuntime.
@@ -245,7 +266,11 @@ namespace gglab
 		std::filesystem::path m_DefaultOutputDirectory;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 		std::unique_ptr<CaptureWriter> m_Writer;
+		std::shared_ptr<CaptureWriteJob> m_SequenceTimingWrite;
+		std::shared_ptr<const CaptureWriteReceipt> m_SequenceTimingShutdownReceipt;
 		std::string m_RunIdentity;
+		// Serialized once after the run identity it records.
+		std::string m_EnvironmentJson;
 		CaptureJobLimits m_JobLimits;
 		// Fixed at construction. Each accepted job reserves one slot until consumed,
 		// including while active. Rejected submissions never create failure receipts.

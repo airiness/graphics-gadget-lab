@@ -7,7 +7,9 @@
 
 #include <format>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -35,6 +37,73 @@ namespace gglab
 			return buffer->m_Imported ?
 				buffer->m_ImportedHandle :
 				buffer->m_PhysicalAllocation.m_Buffer;
+		}
+
+		// Freezes the physical identity and allocator facts while the resource is valid. Ordinals
+		// number distinct native allocations in first-use order; the process-local identities in
+		// nativeAllocations never leave this execution.
+		RGSnapshotAllocation RecordAllocation(const RHIDevice& device,
+			const RGCompiledResource& resource, uint32_t resourceIndex, uint32_t passIndex,
+			std::vector<uint64_t>& nativeAllocations) noexcept
+		{
+			RGSnapshotAllocation allocation{
+				.m_VirtualResourceIndex = resourceIndex,
+				.m_PassIndex = passIndex,
+				.m_Imported = resource.m_Imported,
+			};
+			RHIAllocationFacts facts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			{
+				const auto* texture =
+					static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
+				const RHITextureHandle handle = ResolveTextureHandle(resource);
+				allocation.m_PoolSlot = texture->m_PhysicalAllocation.m_PoolSlot;
+				allocation.m_HasPhysicalHandle = handle.IsValid();
+				allocation.m_PhysicalHandleIndex = handle.Index();
+				allocation.m_PhysicalHandleGeneration = handle.Generation();
+				if (handle.IsValid())
+				{
+					facts = device.QueryTextureAllocationFacts(handle);
+				}
+			}
+			else
+			{
+				const auto* buffer =
+					static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
+				const RHIBufferHandle handle = ResolveBufferHandle(resource);
+				allocation.m_PoolSlot = buffer->m_PhysicalAllocation.m_PoolSlot;
+				allocation.m_HasPhysicalHandle = handle.IsValid();
+				allocation.m_PhysicalHandleIndex = handle.Index();
+				allocation.m_PhysicalHandleGeneration = handle.Generation();
+				if (handle.IsValid())
+				{
+					facts = device.QueryBufferAllocationFacts(handle);
+				}
+			}
+
+			allocation.m_AllocationFacts = facts.m_Status;
+			if (facts.m_Status != RHIAllocationFactsStatus::Known)
+			{
+				return allocation;
+			}
+			allocation.m_AllocatedBytes = facts.m_AllocatedBytes;
+			allocation.m_AlignmentBytes = facts.m_AlignmentBytes;
+			allocation.m_MemoryClass = facts.m_MemoryClass;
+			allocation.m_OffsetBytes = facts.m_OffsetBytes;
+			// Handle indices are recycled and placed resources share memory, so only the native
+			// allocation identity can join records. An identity-less record is never merged.
+			GGLAB_ASSERT_MSG(facts.m_NativeAllocationId != 0,
+				"Known allocation facts require a native allocation identity.");
+			const auto found = facts.m_NativeAllocationId != 0 ?
+				std::ranges::find(nativeAllocations, facts.m_NativeAllocationId) :
+				nativeAllocations.end();
+			allocation.m_NativeAllocation =
+				static_cast<uint32_t>(found - nativeAllocations.begin());
+			if (found == nativeAllocations.end())
+			{
+				nativeAllocations.push_back(facts.m_NativeAllocationId);
+			}
+			return allocation;
 		}
 
 		RHICommandContext* SelectPassCommandContext(
@@ -314,6 +383,7 @@ namespace gglab
 		{
 			*runtime.m_ExecutionRecord = {};
 		}
+		std::vector<uint64_t> nativeAllocations;
 		for (const auto passIndex : plan.GetExecutionOrder())
 		{
 			const auto& pass = plan.GetPasses()[passIndex.Value()];
@@ -330,7 +400,8 @@ namespace gglab
 			const std::string_view passName = pass.m_NameId.Name();
 			if (passCommandContext)
 			{
-				passCommandContext->BeginGpuProfileScope(passName);
+				passCommandContext->BeginGpuProfileScope({
+					passName, GpuProfileScopeKind::RenderGraphPass, pass.m_NameOccurrence });
 			}
 			for (const auto resourceIndex : pass.m_AcquireResources)
 			{
@@ -339,30 +410,9 @@ namespace gglab
 					runtime.m_TransientResourcePool, resource.m_UsageBits);
 				if (runtime.m_ExecutionRecord)
 				{
-					RGSnapshotAllocation allocation{
-						.m_VirtualResourceIndex = resourceIndex.Value(),
-						.m_PassIndex = passIndex.Value(),
-						.m_Imported = resource.m_Imported,
-					};
-					if (resource.m_ResourceType == RGResourceType::RGTexture)
-					{
-						const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
-						const auto handle = ResolveTextureHandle(resource);
-						allocation.m_PoolSlot = texture->m_PhysicalAllocation.m_PoolSlot;
-						allocation.m_HasPhysicalHandle = handle.IsValid();
-						allocation.m_PhysicalHandleIndex = handle.Index();
-						allocation.m_PhysicalHandleGeneration = handle.Generation();
-					}
-					else
-					{
-						const auto* buffer = static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
-						const auto handle = ResolveBufferHandle(resource);
-						allocation.m_PoolSlot = buffer->m_PhysicalAllocation.m_PoolSlot;
-						allocation.m_HasPhysicalHandle = handle.IsValid();
-						allocation.m_PhysicalHandleIndex = handle.Index();
-						allocation.m_PhysicalHandleGeneration = handle.Generation();
-					}
-					runtime.m_ExecutionRecord->m_Allocations.push_back(allocation);
+					runtime.m_ExecutionRecord->m_Allocations.push_back(RecordAllocation(
+						*runtime.m_Device, resource, resourceIndex.Value(), passIndex.Value(),
+						nativeAllocations));
 				}
 			}
 
@@ -409,6 +459,9 @@ namespace gglab
 
 		if (runtime.m_ExecutionRecord)
 		{
+			// Released resources retire only after this frame's fence, so every recorded
+			// allocation is still counted by the allocator here.
+			runtime.m_ExecutionRecord->m_AllocatorTotals = runtime.m_Device->QueryAllocatorTotals();
 			runtime.m_ExecutionRecord->m_Recorded = true;
 		}
 		executeContext.m_ExecutionPlan = previousPlan;

@@ -1,17 +1,163 @@
 #include "Capture/FrameSequenceCoordinator.h"
+
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <format>
 #include <iterator>
 #include <numeric>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 
+#include <nlohmann/json.hpp>
+
 namespace gglab
 {
+	const char* GetFrameSequenceCancelVerdictName(FrameSequenceCancelVerdict verdict) noexcept
+	{
+		switch (verdict)
+		{
+		case FrameSequenceCancelVerdict::Cancelled:
+			return "Cancelled";
+		case FrameSequenceCancelVerdict::TooLate:
+			return "TooLate";
+		case FrameSequenceCancelVerdict::Finished:
+			return "Finished";
+		case FrameSequenceCancelVerdict::NotFound:
+			return "NotFound";
+		}
+		return "NotFound";
+	}
+
+	std::string FrameSequenceCoordinator::SerializeTimingProduct() const
+	{
+		using Json = nlohmann::ordered_json;
+		const auto summary = [](std::span<const double> values)
+			{
+				const auto result = SummarizeFrameSequenceTiming(values);
+				return Json{
+					{ "count", result.m_Count },
+					{ "meanMs", result.m_Mean },
+					{ "medianMs", result.m_Median },
+					{ "p90Ms", result.m_P90 },
+					{ "minMs", result.m_Min },
+					{ "maxMs", result.m_Max } };
+			};
+		const FrameSequenceGpuTiming& timing = *m_Status->m_GpuTiming;
+		const uint64_t requested = uint64_t(m_Status->m_FrameCount) *
+			std::max(1u, m_Status->m_ReferenceSamples);
+		if (timing.m_Samples.empty() || timing.m_Samples.size() != requested)
+		{
+			throw std::runtime_error("A timing product requires every submitted sequence sample.");
+		}
+		Json samples = Json::array();
+		uint64_t first = timing.m_Samples.front().m_FrameSerial;
+		uint64_t last = first;
+		bool profilingChanged = false;
+		for (const auto& sample : timing.m_Samples)
+		{
+			first = std::min(first, sample.m_FrameSerial);
+			last = std::max(last, sample.m_FrameSerial);
+			profilingChanged |= sample.m_ProfilingStateChanged;
+			samples.push_back({
+				{ "frameSerial", sample.m_FrameSerial },
+				{ "sequenceFrame", sample.m_SequenceFrame },
+				{ "referenceSample", sample.m_ReferenceSample },
+				{ "firstFrame", sample.m_FirstFrame },
+				{ "cameraCut", sample.m_CameraCut },
+				{ "conditions", {
+					{ "gpuProfiling", true },
+					{ "profilingStateChanged", sample.m_ProfilingStateChanged },
+					{ "developmentTools", sample.m_DevelopmentTools },
+					{ "graph", sample.m_Observation.m_Graph },
+					{ "resourceExport", sample.m_Observation.m_Nodes.m_ResourceExport },
+					{ "nonFiniteScan", sample.m_Observation.m_Nodes.m_NonFiniteScan },
+					{ "productionCounters", sample.m_Observation.m_Nodes.m_ProductionCounters } } } });
+		}
+		Json scopes = Json::array();
+		bool stable = true;
+		for (const auto& series : timing.m_Scopes)
+		{
+			const bool pass = series.m_Kind == GpuProfileScopeKind::RenderGraphPass;
+			stable &= !pass || series.m_SampleIndices.size() == timing.m_Samples.size();
+			scopes.push_back({
+				{ "kind", pass ? "pass" : "other" },
+				{ "name", series.m_Name },
+				{ "occurrence", pass ? Json(series.m_Occurrence) : Json(nullptr) },
+				{ "sampleIndices", series.m_SampleIndices },
+				{ "milliseconds", series.m_Milliseconds },
+				{ "statistics", summary(series.m_Milliseconds) } });
+		}
+		const Json environment = Json::parse(m_Capture->GetEnvironmentJson());
+		return Json{
+			{ "schema", "gglab.gpu-timing" },
+			{ "schemaVersion", 1 },
+			{ "sequence", {
+				{ "id", m_Status->m_SequenceId },
+				{ "path", m_Status->m_CameraPathId },
+				{ "pathVersion", m_Status->m_CameraPathVersion },
+				{ "frameCount", m_Status->m_FrameCount },
+				{ "referenceSamples", m_Status->m_ReferenceSamples },
+				{ "firstFrameSerial", first },
+				{ "lastFrameSerial", last } } },
+			{ "context", Json::parse(m_TimingContext) },
+			{ "coverage", {
+				{ "requestedSamples", requested },
+				{ "recordedSamples", timing.m_Samples.size() },
+				{ "samples", std::move(samples) } } },
+			{ "frame", {
+				{ "milliseconds", timing.m_FrameMilliseconds },
+				{ "statistics", summary(timing.m_FrameMilliseconds) } } },
+			{ "scopes", std::move(scopes) },
+			{ "stablePassSet", stable },
+			{ "measurement", {
+				{ "gpuProfilingRequested", true },
+				{ "validation", environment.at("validation") },
+				{ "profilingStateChanged", profilingChanged } } },
+			{ "watch", m_Status->m_WatchCoverage ?
+				Json::parse(SerializeNonFiniteWatchCoverage(*m_Status->m_WatchCoverage)) : Json(nullptr) } }.dump(2);
+	}
+
+	void FrameSequenceCoordinator::CollectTimingPublication() noexcept
+	{
+		if (!m_TimingWrite || !m_Status || m_Status->IsTerminal())
+		{
+			return;
+		}
+		const auto receipt = m_Capture->GetSequenceTimingReceipt(*m_TimingWrite);
+		if (!receipt)
+		{
+			return;
+		}
+		auto& publication = *m_Status->m_TimingPublication;
+		publication.m_Outcome = receipt->m_Publication;
+		publication.m_Pending = false;
+		publication.m_BundleId = receipt->m_BundleId;
+		publication.m_Manifest = receipt->m_ManifestPath;
+		publication.m_Failure = receipt->m_Failure;
+		for (const auto& product : receipt->m_BundleProducts)
+		{
+			publication.m_Files.insert(publication.m_Files.end(), product.m_Files.begin(), product.m_Files.end());
+		}
+		if (receipt->m_Publication == CapturePublicationOutcome::Published)
+		{
+			m_Status->m_State = FrameSequenceState::Completed;
+			if (auto* watch = m_Capture->GetNonFiniteWatch())
+			{
+				watch->ReleaseCoverage(m_WatchCoverageId);
+			}
+			m_WatchCoverageId = 0;
+		}
+		else
+		{
+			Fail(receipt->m_Failure.empty() ? "Required sequence timing was not published." : receipt->m_Failure);
+		}
+	}
+
 	bool FrameSequenceTemporalAAOverrides::IsEmpty() const noexcept
 	{
 		return !m_Enabled && !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
@@ -172,7 +318,7 @@ namespace gglab
 				GetFrameSequenceStateName(m_Status->m_State));
 			return 0;
 		}
-		if (!m_CaptureJobs.empty())
+		if (!m_CaptureJobs.empty() || (m_TimingWrite && !m_TimingWrite->GetReceipt()))
 		{
 			outError = "The previous sequence's capture jobs are still draining.";
 			return 0;
@@ -253,6 +399,14 @@ namespace gglab
 				std::optional<FrameSequenceGpuTiming>(std::in_place) :
 				std::nullopt,
 		};
+		if (m_Request.m_GpuTiming)
+		{
+			m_Status->m_TimingPublication.emplace();
+		}
+		m_TimingContext.clear();
+		m_TimingProduct.reset();
+		m_TimingWrite.reset();
+
 		m_Frame = 0;
 		m_Sample = 0;
 		m_AppliedPose.reset();
@@ -269,12 +423,23 @@ namespace gglab
 		return m_Status->m_SequenceId;
 	}
 
-	bool FrameSequenceCoordinator::Cancel() noexcept
+	FrameSequenceCancelVerdict FrameSequenceCoordinator::Cancel() noexcept
 	{
+		CollectTimingPublication();
 		if (!IsActive())
 		{
-			return false;
+			return m_Status ? FrameSequenceCancelVerdict::Finished : FrameSequenceCancelVerdict::NotFound;
 		}
+		if (m_TimingWrite && !m_TimingWrite->TryCancel())
+		{
+			CollectTimingPublication();
+			return FrameSequenceCancelVerdict::TooLate;
+		}
+		if (m_Status->m_TimingPublication)
+		{
+			m_Status->m_TimingPublication->m_Pending = false;
+		}
+
 		m_Status->m_State = FrameSequenceState::Cancelled;
 		CancelCaptureJobs();
 		m_PendingGpuTimingFrames.clear();
@@ -284,7 +449,7 @@ namespace gglab
 			watch->ReleaseCoverage(m_WatchCoverageId);
 		}
 		m_WatchCoverageId = 0;
-		return true;
+		return FrameSequenceCancelVerdict::Cancelled;
 	}
 
 	const FrameSequenceStatus* FrameSequenceCoordinator::GetStatus() const noexcept
@@ -577,12 +742,27 @@ namespace gglab
 				m_WatchCoverageId = watch->OpenCoverage();
 			}
 		}
+		m_BegunCameraCut = m_AppliedPose->m_Cut;
+		m_BegunDevelopmentTools = state.m_DevelopmentTools;
+		if (m_Request.m_GpuTiming && m_TimingContext.empty())
+		{
+			const auto metadata = nlohmann::ordered_json::parse(SerializeFrameCaptureMetadata({
+				.m_Backend = state.m_Backend, .m_DemoId = state.m_DemoId, .m_LabId = state.m_LabId,
+				.m_AssetBundle = state.m_AssetBundle, .m_FixedDeltaTime = state.m_FixedDeltaTime,
+				.m_Temporal = state.m_Temporal }));
+			m_TimingContext = nlohmann::ordered_json{
+				{ "backend", metadata.at("backend") },
+				{ "content", metadata.at("content") },
+				{ "fixedDeltaTime", metadata.at("time").at("fixedDeltaTime") },
+				{ "initialTemporal", metadata.at("temporal") } }.dump();
+		}
 		m_BegunRenderFrameSerial = state.m_FrameSerial;
 		m_FrameBegun = true;
 		return true;
 	}
 
-	void FrameSequenceCoordinator::OnFrameSubmitted(uint64_t renderFrameSerial) noexcept
+	void FrameSequenceCoordinator::OnFrameSubmitted(uint64_t renderFrameSerial,
+		FrameSequenceObservation observation) noexcept
 	{
 		if (WantsGpuTiming())
 		{
@@ -612,7 +792,9 @@ namespace gglab
 		{
 			m_PendingGpuTimingFrames.push_back({ .m_RenderFrameSerial = renderFrameSerial,
 				.m_SubmissionOrdinal = m_GpuTimingSubmissionCount,
-				.m_SequenceFrame = m_Frame, .m_ReferenceSample = m_Sample });
+				.m_SequenceFrame = m_Frame, .m_ReferenceSample = m_Sample,
+				.m_CameraCut = m_BegunCameraCut, .m_DevelopmentTools = m_BegunDevelopmentTools,
+				.m_Observation = observation });
 		}
 		m_AppliedPose.reset();
 		if (m_Request.m_ReferenceSamples > 0 && ++m_Sample < m_Request.m_ReferenceSamples)
@@ -666,17 +848,43 @@ namespace gglab
 				return;
 			}
 			FrameSequenceGpuTiming& timing = *m_Status->m_GpuTiming;
+			for (size_t index = 0; index < profile.m_Samples.size(); ++index)
+			{
+				const auto& sample = profile.m_Samples[index];
+				const bool pass = sample.m_Kind == GpuProfileScopeKind::RenderGraphPass;
+				if (sample.m_Name.empty() || (pass ? sample.m_Occurrence == 0 : sample.m_Occurrence != 0) ||
+					std::ranges::any_of(std::span(profile.m_Samples).first(index),
+						[&sample](const GpuProfileSample& prior) { return prior.GetScope() == sample.GetScope(); }))
+				{
+					Fail("GPU timing contained an invalid or duplicate scope identity.");
+					return;
+				}
+			}
+			const uint32_t sampleIndex = static_cast<uint32_t>(timing.m_Samples.size());
+			timing.m_Samples.push_back({ .m_FrameSerial = pending->m_RenderFrameSerial,
+				.m_SequenceFrame = pending->m_SequenceFrame, .m_ReferenceSample = pending->m_ReferenceSample,
+				.m_FirstFrame = pending->m_SequenceFrame == 0, .m_CameraCut = pending->m_CameraCut,
+				.m_DevelopmentTools = pending->m_DevelopmentTools,
+				.m_ProfilingStateChanged = profile.m_ProfilingStateChanged,
+				.m_Observation = pending->m_Observation });
+
 			timing.m_FrameMilliseconds.push_back(profile.m_FrameMilliseconds);
 			for (const GpuProfileSample& sample : profile.m_Samples)
 			{
-				auto series = std::ranges::find(
-					timing.m_Scopes, sample.m_Name, &FrameSequenceGpuTimingSeries::m_Name);
+				auto series = std::ranges::find_if(timing.m_Scopes,
+					[&sample](const FrameSequenceGpuTimingSeries& candidate)
+					{
+						return GpuProfileScope{ candidate.m_Name, candidate.m_Kind,
+							candidate.m_Occurrence } == sample.GetScope();
+					});
 				if (series == timing.m_Scopes.end())
 				{
-					timing.m_Scopes.push_back({ .m_Name = sample.m_Name });
+					timing.m_Scopes.push_back({ .m_Name = sample.m_Name,
+						.m_Kind = sample.m_Kind, .m_Occurrence = sample.m_Occurrence });
 					series = std::prev(timing.m_Scopes.end());
 				}
 				series->m_Milliseconds.push_back(sample.m_Milliseconds);
+				series->m_SampleIndices.push_back(sampleIndex);
 			}
 			// Membership, not the unrelated profiler counter or readback delay,
 			// identifies a sample and rejects its subsequent publications.
@@ -766,7 +974,7 @@ namespace gglab
 		{
 			return;
 		}
-		if (auto* watch = m_Capture->GetNonFiniteWatch())
+		if (auto* watch = m_Capture->GetNonFiniteWatch(); watch && m_WatchCoverageId != 0)
 		{
 			m_Status->m_WatchCoverage = watch->GetCoverage(m_WatchCoverageId);
 			if (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->Fails())
@@ -780,11 +988,47 @@ namespace gglab
 
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
+		CollectTimingPublication();
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
 			m_CaptureJobs.empty() &&
 			m_PendingGpuTimingFrames.empty() &&
-			(!m_Status->m_WatchCoverage || m_Status->m_WatchCoverage->m_Complete))
+			(!m_WatchCoverageId || (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->m_Complete)))
 		{
+			if (m_Request.m_GpuTiming)
+			{
+				if (m_TimingWrite)
+				{
+					return;
+				}
+				try
+				{
+					if (!m_TimingProduct)
+					{
+						m_TimingProduct = SequenceTimingBundleInput{
+							.m_SequenceId = m_Status->m_SequenceId, .m_ProductJson = SerializeTimingProduct() };
+					}
+					std::string error;
+					m_TimingWrite = m_Capture->TryPublishSequenceTiming(*m_TimingProduct,
+						m_Request.m_OutputDirectory, m_Request.m_Label, error);
+					if (!error.empty())
+					{
+						Fail(std::move(error));
+						return;
+					}
+					if (m_TimingWrite)
+					{
+						m_Status->m_TimingPublication->m_Pending = true;
+						m_TimingProduct.reset();
+						CollectTimingPublication();
+					}
+				}
+				catch (const std::exception& error)
+				{
+					Fail(std::format("Serializing sequence GPU timing failed: {}", error.what()));
+				}
+				return;
+			}
+
 			m_Status->m_State = FrameSequenceState::Completed;
 			if (auto* watch = m_Capture->GetNonFiniteWatch())
 			{

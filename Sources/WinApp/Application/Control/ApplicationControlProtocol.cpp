@@ -1,4 +1,5 @@
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
@@ -1311,6 +1312,9 @@ namespace gglab
 			{
 				Json scope = SerializeTimingSummary(series.m_Milliseconds);
 				scope["name"] = series.m_Name;
+				scope["kind"] = series.m_Kind == GpuProfileScopeKind::RenderGraphPass ? "pass" : "other";
+				scope["occurrence"] = series.m_Kind == GpuProfileScopeKind::RenderGraphPass ?
+					Json(series.m_Occurrence) : Json(nullptr);
 				scopes.push_back(std::move(scope));
 			}
 			return Json{
@@ -1338,6 +1342,26 @@ namespace gglab
 			if (status.m_GpuTiming)
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
+			}
+			if (status.m_TimingPublication)
+			{
+				const auto& publication = *status.m_TimingPublication;
+				Json files = Json::array();
+				for (const auto& path : publication.m_Files)
+				{
+					files.push_back(GetFrameCapturePathText(path));
+				}
+				sequence["timingPublication"] = {
+					{ "outcome", publication.m_Outcome == CapturePublicationOutcome::Published ?
+						"Published" :
+						publication.m_Outcome == CapturePublicationOutcome::Indeterminate ?
+							"Indeterminate" :
+							"NotPublished" },
+					{ "pending", publication.m_Pending },
+					{ "bundleId", publication.m_BundleId },
+					{ "manifest", GetFrameCapturePathText(publication.m_Manifest) },
+					{ "files", std::move(files) },
+					{ "failure", publication.m_Failure } };
 			}
 			if (status.m_WatchCoverage)
 			{
@@ -1459,6 +1483,8 @@ namespace gglab
 			{ "width", status.m_Width },
 			{ "height", status.m_Height },
 		};
+		const Json environment = Json::parse(status.m_Environment, nullptr, false);
+		response["environment"] = environment.is_object() ? environment : Json(nullptr);
 		const auto& intake = status.m_CaptureIntake;
 		response["capabilities"] = {
 			{ "captureJobs", true },
@@ -1468,10 +1494,14 @@ namespace gglab
 			{ "graphProductsPerJob", 1 },
 			{ "resourceGraphSummary", false },
 			{ "bundleSchema", "gglab.capture-bundle" },
-			{ "bundleSchemaVersion", 1 },
+			{ "bundleSchemaVersion", CaptureBundleSchemaVersion },
 			{ "resultConsumption", "explicit" },
 			{ "resultRetention", "until-consumed-or-session-end" },
-			{ "sequenceCaptureJobs", true } };
+			{ "sequenceCaptureJobs", true },
+			{ "sequenceTimingProducts", true },
+			{ "sequenceCancelVerdicts", true },
+			{ "gpuTimingSchema", "gglab.gpu-timing" },
+			{ "gpuTimingSchemaVersion", 1 } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },
@@ -1485,6 +1515,7 @@ namespace gglab
 			{ "publishedResults", intake.m_AppRuntimePublishedResults },
 			{ "drainingRuntimeRequests", intake.m_DrainingRuntimeRequests },
 			{ "drainingWriterJobs", intake.m_DrainingWriterJobs },
+			{ "sequenceTimingWrites", intake.m_SequenceTimingWrites },
 			{ "drainingWriteReservations", intake.m_DrainingWriteReservations } };
 		const auto claimName = [](NonFiniteClaimStatus value)
 			{
@@ -1792,6 +1823,15 @@ namespace gglab
 	{
 		Json response = MakeResponse(id, true);
 		response["sequence"] = SerializeSequence(status);
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlSequenceCancellation(uint64_t id,
+		const FrameSequenceStatus* status, FrameSequenceCancelVerdict cancellation) noexcept
+	{
+		Json response = MakeResponse(id, true);
+		response["sequence"] = status ? SerializeSequence(*status) : Json(nullptr);
+		response["cancellation"] = GetFrameSequenceCancelVerdictName(cancellation);
 		return Dump(response);
 	}
 }

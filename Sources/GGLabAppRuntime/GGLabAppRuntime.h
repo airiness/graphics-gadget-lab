@@ -3,6 +3,7 @@
 #include "ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
+#include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -10,6 +11,7 @@
 #include "RuntimePaths.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -87,6 +89,8 @@ namespace gglab
 		AppRuntimeHostServices m_HostServices{};
 		// Internal count policy, not a session protocol or total-memory limit.
 		CaptureJobLimits m_CaptureJobLimits{};
+		// Host facts recorded in the capture environment.
+		CaptureHostEnvironment m_HostEnvironment{};
 	};
 
 	class ApplicationInput;
@@ -268,6 +272,8 @@ namespace gglab
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
 		CaptureJobLimits m_CaptureJobLimits{};
+		CaptureHostEnvironment m_HostEnvironment{};
+		std::chrono::system_clock::time_point m_StartedAt{};
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
 		RenderServices m_RenderServices{};

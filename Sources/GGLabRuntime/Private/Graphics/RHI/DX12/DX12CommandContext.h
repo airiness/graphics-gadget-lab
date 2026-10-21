@@ -181,7 +181,7 @@ namespace gglab
 			uint32_t startInstanceLocation = 0) noexcept override;
 		void Draw(uint32_t vertexCount, uint32_t instanceCount = 1,
 			uint32_t startVertexLocation = 0, uint32_t startInstanceLocation = 0) noexcept override;
-		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void BeginGpuProfileScope(GpuProfileScope scope) noexcept override;
 		void EndGpuProfileScope() noexcept override;
 		void SetGpuProfiler(DX12GpuProfiler* profiler) noexcept { m_GpuProfiler = profiler; }
 
@@ -294,7 +294,7 @@ namespace gglab
 			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
 		void Dispatch(
 			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept override;
-		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void BeginGpuProfileScope(GpuProfileScope scope) noexcept override;
 		void EndGpuProfileScope() noexcept override;
 		void SetGpuProfiler(DX12GpuProfiler* profiler) noexcept { m_GpuProfiler = profiler; }
 

@@ -7,24 +7,85 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, ValidationError
 
+SCAN_KINDS = {"NonFiniteScan", "ProductionCounters"}
+
+
+def validate_allocations(document):
+	"""Recompute v5 frame totals from the frozen allocation records."""
+	resources = document["compile"]["resources"]
+	execution = document["execution"]
+	for resource in resources:
+		if resource["type"] == "Buffer" and resource["logicalBytes"] != resource["buffer"]["sizeBytes"]:
+			raise ValueError("A buffer's logical size is its byte size")
+	counted = set()
+	sizes = []
+	logical = unavailable_logical = allocation_bytes = unavailable = unique = 0
+	for entry in execution["allocations"]:
+		resource = resources[entry["resourceIndex"]]
+		if entry["imported"] != resource["imported"]:
+			raise ValueError("Allocation and resource disagree on import ownership")
+		if entry["resourceIndex"] not in counted:
+			counted.add(entry["resourceIndex"])
+			logical += resource["logicalBytes"] or 0
+			unavailable_logical += resource["logicalBytes"] is None
+		if entry["allocationFacts"] != "known":
+			unavailable += 1
+			if entry["unavailableReason"] == "external" and not entry["imported"]:
+				raise ValueError("Only imported resources can adopt external native objects")
+			continue
+		allocation_bytes += entry["allocatedBytes"]
+		ordinal = entry["nativeAllocation"]
+		if ordinal == len(sizes):
+			sizes.append(entry["allocatedBytes"])
+			unique += entry["allocatedBytes"]
+		elif ordinal > len(sizes):
+			raise ValueError("Native allocation ordinals must be numbered in first-use order")
+		elif sizes[ordinal] != entry["allocatedBytes"]:
+			raise ValueError("Records sharing a native allocation disagree on its size")
+	totals = execution["totals"]
+	expected = dict(logicalBytes=logical, unavailableLogicalResources=unavailable_logical,
+		allocationBytes=allocation_bytes, unavailableAllocations=unavailable,
+		uniquePhysicalAllocationBytes=unique)
+	if any(totals[key] != value for key, value in expected.items()):
+		raise ValueError("Frame totals disagree with the allocation records")
+	blocks, allocator = totals["allocatorBlockBytes"], totals["allocatorAllocationBytes"]
+	if (blocks is None) != (allocator is None) or (allocator is not None and allocator > blocks):
+		raise ValueError("Allocator totals must be known together and fit in their blocks")
+	if allocator is not None and unique > allocator:
+		raise ValueError("Unique physical allocation bytes exceed the allocator's allocation bytes")
+
 
 def validate(document, validator):
 	validator.validate(document)
 	passes = document["compile"]["passes"]
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
 		raise ValueError("Frame serials disagree")
-	observed = document["schemaVersion"] != 1
 	flags = document["observation"]
+	modern = document["schemaVersion"] >= 5
+	if modern:
+		# Capabilities come from the listed node kinds, never from the version number.
+		kinds = flags["nodeKinds"]
+		if kinds != sorted(set(kinds)):
+			raise ValueError("Observation node kinds must be sorted and unique")
+		if flags["resourceExport"] != ("ResourceExport" in kinds) or flags["nonFiniteWatch"] != bool(SCAN_KINDS & set(kinds)):
+			raise ValueError("Observation node kinds and activity flags disagree")
+		observed = bool(kinds)
+	else:
+		observed = document["schemaVersion"] != 1
 	if observed != (flags["resourceExport"] or flags["nonFiniteWatch"]):
 		raise ValueError("Graph schema version and observation flags disagree")
 	if document["mode"] == "full":
 		markers = {entry["index"] for entry in passes if entry.get("observation", False)}
 		observers = document["execution"]["observationNodes"]
 		nodes = {entry["passIndex"] for entry in observers}
-		if flags["resourceExport"] != any(entry["kind"] == "ResourceExport" for entry in observers) or flags["nonFiniteWatch"] != any(entry["kind"] in {"NonFiniteScan", "ProductionCounters"} for entry in observers):
+		if flags["resourceExport"] != any(entry["kind"] == "ResourceExport" for entry in observers) or flags["nonFiniteWatch"] != any(entry["kind"] in SCAN_KINDS for entry in observers):
 			raise ValueError("Observation kinds and activity flags disagree")
 		if markers != nodes or len(nodes) != len(observers) or bool(markers) != observed:
 			raise ValueError("Observation pass markers and execution nodes disagree")
+		if modern:
+			if sorted({entry["kind"] for entry in observers}) != flags["nodeKinds"]:
+				raise ValueError("Observation node kinds disagree with execution nodes")
+			validate_allocations(document)
 	if document["mode"] == "summary":
 		orders = [entry["executionOrder"] for entry in passes]
 		if orders != list(range(len(passes))):
@@ -126,6 +187,56 @@ def self_test(validator):
 	counters["execution"]["observationNodes"][0]["kind"] = "ProductionCounters"
 	validate(counters, validator)
 
+	# v5 separates the content version from observation variants and freezes allocator facts.
+	def revise(fixture, kinds):
+		revised = copy.deepcopy(fixture)
+		revised["schemaVersion"] = 5
+		revised["observation"]["nodeKinds"] = kinds
+		if revised["mode"] == "full":
+			for item in revised["compile"]["resources"]:
+				item.update(logicalBytes=64 if item["type"] == "Texture" else item["buffer"]["sizeBytes"],
+					logicalBytesReason=None)
+				if item["type"] == "Texture":
+					item["texture"]["dimension"] = "Texture2D"
+			revised["execution"]["allocations"] = [dict(resourceIndex=0, passIndex=0, imported=True,
+				poolSlot=None, physical=dict(index=1, generation=1), allocationFacts="known",
+				unavailableReason=None, allocatedBytes=65536, alignmentBytes=65536,
+				memoryClass="device-local", nativeAllocation=0, offsetBytes=0)]
+			revised["execution"]["totals"] = dict(logicalBytes=64, unavailableLogicalResources=0,
+				allocationBytes=65536, unavailableAllocations=0, uniquePhysicalAllocationBytes=65536,
+				allocatorBlockBytes=1 << 21, allocatorAllocationBytes=1 << 20)
+		return revised
+
+	full5 = revise(full, [])
+	validate(full5, validator)
+	summary5 = revise(summary, [])
+	validate(summary5, validator)
+	observed5 = revise(observed, ["ResourceExport"])
+	validate(observed5, validator)
+	mixed5 = revise(mixed, ["NonFiniteScan", "ResourceExport"])
+	validate(mixed5, validator)
+	counters5 = revise(counters, ["ProductionCounters"])
+	validate(counters5, validator)
+	buffer5 = revise(buffer, [])
+	buffer5["compile"]["resources"][0]["logicalBytes"] = 65536
+	buffer5["execution"]["totals"]["logicalBytes"] = 65536
+	validate(buffer5, validator)
+	external5 = copy.deepcopy(full5)
+	external5["execution"]["allocations"][0].update(allocationFacts="unavailable",
+		unavailableReason="external", allocatedBytes=None, alignmentBytes=None, memoryClass=None,
+		nativeAllocation=None, offsetBytes=None)
+	external5["execution"]["totals"].update(allocationBytes=0, unavailableAllocations=1,
+		uniquePhysicalAllocationBytes=0, allocatorBlockBytes=None, allocatorAllocationBytes=None)
+	validate(external5, validator)
+	shared5 = copy.deepcopy(full5)
+	shared5["execution"]["allocations"].append(dict(shared5["execution"]["allocations"][0], passIndex=0))
+	shared5["execution"]["totals"].update(allocationBytes=131072)
+	validate(shared5, validator)
+	unsized5 = copy.deepcopy(full5)
+	unsized5["compile"]["resources"][0].update(logicalBytes=None, logicalBytesReason="unsupported-format")
+	unsized5["execution"]["totals"].update(logicalBytes=0, unavailableLogicalResources=1)
+	validate(unsized5, validator)
+
 	cases = [
 		(counters, ("schemaVersion",), 3),
 		(counters, ("observation", "nonFiniteWatch"), False),
@@ -151,6 +262,34 @@ def self_test(validator):
 		(full, ("frameSerial",), 2),
 		(buffer, ("compile", "resources", 0, "buffer", "strideBytes"), "32"),
 		(summary, ("compile", "passes", 0, "executionOrder"), -1),
+		(full, ("observation", "nodeKinds"), []),
+		(observed, ("schemaVersion",), 5),
+		(full5, ("observation", "nodeKinds"), ["ResourceExport"]),
+		(observed5, ("observation", "nodeKinds"), []),
+		(counters5, ("observation", "nodeKinds"), ["NonFiniteScan"]),
+		(mixed5, ("observation", "nodeKinds"), ["ResourceExport", "NonFiniteScan"]),
+		(mixed5, ("observation", "nodeKinds"), ["NonFiniteScan", "NonFiniteScan", "ResourceExport"]),
+		(summary5, ("observation", "nodeKinds"), None),
+		(summary5, ("compile", "resources"), []),
+		(full5, ("schemaVersion",), 6),
+		(full5, ("execution", "totals"), None),
+		(full5, ("execution", "totals", "uniquePhysicalAllocationBytes"), 1),
+		(full5, ("execution", "totals", "logicalBytes"), 65),
+		(full5, ("execution", "totals", "allocatorAllocationBytes"), 1),
+		(full5, ("execution", "totals", "allocatorBlockBytes"), None),
+		(full5, ("execution", "allocations", 0, "nativeAllocation"), 1),
+		(full5, ("execution", "allocations", 0, "allocatedBytes"), None),
+		(full5, ("execution", "allocations", 0, "unavailableReason"), "external"),
+		(full5, ("execution", "allocations", 0, "memoryClass"), "host"),
+		(full5, ("execution", "allocations", 0, "imported"), False),
+		(shared5, ("execution", "allocations", 1, "allocatedBytes"), 4096),
+		(external5, ("execution", "allocations", 0, "allocatedBytes"), 4096),
+		(external5, ("execution", "allocations", 0, "unavailableReason"), None),
+		(external5, ("execution", "allocations", 0, "unavailableReason"), "evicted"),
+		(full5, ("compile", "resources", 0, "logicalBytesReason"), "unsupported-format"),
+		(unsized5, ("compile", "resources", 0, "logicalBytesReason"), None),
+		(full5, ("compile", "resources", 0, "texture", "dimension"), "Cube"),
+		(buffer5, ("compile", "resources", 0, "logicalBytes"), 64),
 	]
 	for fixture, path, value in cases:
 		invalid = copy.deepcopy(fixture)

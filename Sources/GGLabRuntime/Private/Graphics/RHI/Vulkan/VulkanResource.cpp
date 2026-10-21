@@ -2,8 +2,46 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
+#include <atomic>
+
 namespace gglab
 {
+	namespace
+	{
+		std::atomic<uint64_t> g_NextNativeAllocationId{ 1 };
+	}
+
+	RHIAllocationFacts VulkanResource::GetAllocationFacts() const noexcept
+	{
+		if (!IsValid() || (!m_Borrowed && m_Allocation == VK_NULL_HANDLE))
+		{
+			return { .m_Status = RHIAllocationFactsStatus::Unowned };
+		}
+		if (m_Borrowed)
+		{
+			return { .m_Status = RHIAllocationFactsStatus::External };
+		}
+		VmaAllocationInfo allocation{};
+		vmaGetAllocationInfo(m_Allocator, m_Allocation, &allocation);
+		VkMemoryPropertyFlags memoryFlags = 0;
+		vmaGetAllocationMemoryProperties(m_Allocator, m_Allocation, &memoryFlags);
+		return {
+			.m_Status = RHIAllocationFactsStatus::Known,
+			.m_AllocatedBytes = allocation.size,
+			.m_AlignmentBytes = GetMemoryAlignment(),
+			.m_MemoryClass = (memoryFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0 ?
+				RHIMemoryClass::DeviceLocal :
+				RHIMemoryClass::Other,
+			.m_OffsetBytes = 0,
+			.m_NativeAllocationId = m_NativeAllocationId,
+		};
+	}
+
+	void VulkanResource::AssignNativeAllocationId() noexcept
+	{
+		m_NativeAllocationId = g_NextNativeAllocationId.fetch_add(1, std::memory_order_relaxed);
+	}
+
 	void VulkanBuffer::Create(const CreateInfo& createInfo) noexcept
 	{
 		GGLAB_ASSERT_MSG(createInfo.m_Allocator != VK_NULL_HANDLE,
@@ -51,6 +89,7 @@ namespace gglab
 			return;
 		}
 		m_AllocationSizeInBytes = allocationInfoStorage.size;
+		AssignNativeAllocationId();
 		if ((allocationCreateInfo.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0)
 		{
 			// VMA keeps this mapping for the allocation lifetime; it must
@@ -74,6 +113,7 @@ namespace gglab
 		m_Allocator = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
 		m_AllocationSizeInBytes = 0;
+		m_NativeAllocationId = 0;
 		m_Borrowed = true;
 		m_Buffer = buffer;
 		m_SizeInBytes = sizeInBytes;
@@ -104,6 +144,7 @@ namespace gglab
 		m_Buffer = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
 		m_AllocationSizeInBytes = 0;
+		m_NativeAllocationId = 0;
 		m_Allocator = VK_NULL_HANDLE;
 		m_Borrowed = false;
 		m_CreateInfo = {};
@@ -111,6 +152,13 @@ namespace gglab
 		m_InitialState = {};
 		m_Mapping = VulkanBufferMapping::None;
 		m_MappedData = nullptr;
+	}
+
+	VkDeviceSize VulkanBuffer::GetMemoryAlignment() const noexcept
+	{
+		VkMemoryRequirements requirements{};
+		vkGetBufferMemoryRequirements(m_Device, m_Buffer, &requirements);
+		return requirements.alignment;
 	}
 
 	void VulkanBuffer::SetDebugName(const char* name) noexcept
@@ -245,6 +293,7 @@ namespace gglab
 			return;
 		}
 		m_AllocationSizeInBytes = allocationInfo.size;
+		AssignNativeAllocationId();
 	}
 
 	void VulkanTexture::AdoptExternal(
@@ -259,6 +308,7 @@ namespace gglab
 		m_Allocator = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
 		m_AllocationSizeInBytes = 0;
+		m_NativeAllocationId = 0;
 		m_Borrowed = true;
 		m_Image = image;
 		m_InitialState = initialState;
@@ -282,10 +332,18 @@ namespace gglab
 		m_Image = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
 		m_AllocationSizeInBytes = 0;
+		m_NativeAllocationId = 0;
 		m_Allocator = VK_NULL_HANDLE;
 		m_Borrowed = false;
 		m_CreateInfo = {};
 		m_InitialState = {};
+	}
+
+	VkDeviceSize VulkanTexture::GetMemoryAlignment() const noexcept
+	{
+		VkMemoryRequirements requirements{};
+		vkGetImageMemoryRequirements(m_Device, m_Image, &requirements);
+		return requirements.alignment;
 	}
 
 	void VulkanTexture::SetDebugName(const char* name) noexcept

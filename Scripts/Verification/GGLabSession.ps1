@@ -4,7 +4,7 @@ Starts, queries, captures from and stops GraphicsGadgetLab control sessions.
 
 .DESCRIPTION
 A session is a GraphicsGadgetLab process started with --session <id>. It serves
-the session control protocol (version 3) on \\.\pipe\gglab-session-<id>: one
+the session control protocol (version 4) on \\.\pipe\gglab-session-<id>: one
 JSON request line per connection, answered by one JSON response line.
 
 Every command prints one JSON object on stdout and exits 0 when the command
@@ -148,7 +148,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-$ProtocolVersion = 3
+$ProtocolVersion = 4
 $RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'

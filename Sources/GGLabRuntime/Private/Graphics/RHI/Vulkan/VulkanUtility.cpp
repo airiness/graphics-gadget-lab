@@ -159,6 +159,27 @@ namespace gglab
 		return std::format("API {} / driver 0x{:08x}", FormatVkVersion(apiVersion), driverVersion);
 	}
 
+	std::optional<std::string> FormatVulkanDriverVersion(
+		uint32_t vendorId, uint32_t driverVersion) noexcept
+	{
+		constexpr uint32_t NvidiaVendorId = 0x10de;
+		constexpr uint32_t IntelVendorId = 0x8086;
+		constexpr uint32_t AmdVendorId = 0x1002;
+		switch (vendorId)
+		{
+		case NvidiaVendorId:
+			return std::format("{}.{:02}",
+				(driverVersion >> 22) & 0x3ffu, (driverVersion >> 14) & 0xffu);
+		case IntelVendorId:
+			return std::format("{}.{}", driverVersion >> 14, driverVersion & 0x3fffu);
+		case AmdVendorId:
+			return std::format("{}.{}.{}",
+				driverVersion >> 22, (driverVersion >> 12) & 0x3ffu, driverVersion & 0xfffu);
+		default:
+			return std::nullopt;
+		}
+	}
+
 	void SetVulkanObjectDebugName(
 		VkDevice device, VkObjectType objectType, uint64_t objectHandle,
 		const char* name) noexcept

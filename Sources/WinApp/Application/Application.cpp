@@ -1,5 +1,6 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
+#include "Application/ApplicationEnvironment.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Capture/CaptureOnReady.h"
 #include "Application/Control/ApplicationControlCaptureJobs.h"
@@ -122,6 +123,7 @@ namespace gglab
 			.m_Config = m_RuntimeConfig,
 			.m_Paths = m_RuntimePaths,
 			.m_HostServices = m_HostServices,
+			.m_HostEnvironment = MakeApplicationHostEnvironment(m_Hidden),
 			});
 		if (runtimeInitializeResult != AppRuntimeInitializeResult::Succeeded)
 		{
@@ -555,6 +557,8 @@ namespace gglab
 	{
 		FrameSequenceCoordinator* frameSequence =
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
+		const FrameCaptureCoordinator* frameCapture =
+			m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator() : nullptr;
 		switch (request.m_Command)
 		{
 		case ApplicationControlCommand::Status:
@@ -574,6 +578,7 @@ namespace gglab
 				.m_NonFiniteInstrumentation = m_AppRuntime && m_AppRuntime->GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation(),
 				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
 				.m_Watch = m_AppRuntime && m_AppRuntime->GetNonFiniteWatchCoordinator() ? &m_AppRuntime->GetNonFiniteWatchCoordinator()->GetStatus() : nullptr,
+				.m_Environment = frameCapture ? std::string_view(frameCapture->GetEnvironmentJson()) : std::string_view{},
 				}));
 			return;
 		case ApplicationControlCommand::Watch:
@@ -625,15 +630,12 @@ namespace gglab
 			return;
 		}
 		case ApplicationControlCommand::SequenceCancel:
-			if (!frameSequence || !frameSequence->Cancel())
-			{
-				pipeRequest->Respond(SerializeApplicationControlError(
-					request.m_Id, "No sequence is active."));
-				return;
-			}
-			pipeRequest->Respond(
-				SerializeApplicationControlSequence(request.m_Id, *frameSequence->GetStatus()));
+		{
+			const auto verdict = frameSequence ? frameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
+			pipeRequest->Respond(SerializeApplicationControlSequenceCancellation(request.m_Id,
+				frameSequence ? frameSequence->GetStatus() : nullptr, verdict));
 			return;
+		}
 		}
 	}
 

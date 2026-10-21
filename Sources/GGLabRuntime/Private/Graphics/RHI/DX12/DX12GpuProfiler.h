@@ -35,7 +35,7 @@ namespace gglab
 		void BeginFrame(uint32_t frameSlot, DX12CommandList& commandList) noexcept;
 		void EndFrame(uint32_t frameSlot, DX12CommandList& commandList) noexcept;
 		void AbortFrame(uint32_t frameSlot) noexcept;
-		void BeginScope(DX12CommandList& commandList, std::string_view name) noexcept;
+		void BeginScope(DX12CommandList& commandList, GpuProfileScope identity) noexcept;
 		void EndScope(DX12CommandList& commandList) noexcept;
 
 	private:
@@ -45,7 +45,7 @@ namespace gglab
 
 		struct ScopeRecord
 		{
-			std::string m_Name;
+			GpuProfileSample m_Sample;
 			uint32_t m_BeginQuery = InvalidQueryIndex;
 			uint32_t m_EndQuery = InvalidQueryIndex;
 		};
@@ -57,6 +57,8 @@ namespace gglab
 			const uint64_t* m_MappedTimestamps = nullptr;
 			uint64_t m_FrameIndex = 0;
 			uint64_t m_RenderFrameSerial = 0;
+			uint64_t m_ProfilingStateAtBegin = 0;
+			bool m_ProfilingStateChanged = false;
 			uint32_t m_TimestampCount = 0;
 			uint32_t m_FrameBeginQuery = InvalidQueryIndex;
 			uint32_t m_FrameEndQuery = InvalidQueryIndex;
@@ -73,7 +75,7 @@ namespace gglab
 	private:
 		DX12Device* m_Device = nullptr;
 		mutable std::mutex m_SnapshotMutex;
-		std::atomic_bool m_Enabled = true;
+		GpuProfilingState m_ProfilingState;
 		std::vector<FrameResource> m_Frames;
 		GpuProfileFrameSnapshot m_LatestFrame;
 		FrameResource* m_ActiveFrame = nullptr;

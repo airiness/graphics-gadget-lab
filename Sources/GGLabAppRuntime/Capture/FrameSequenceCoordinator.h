@@ -1,5 +1,6 @@
 #pragma once
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/CaptureWriter.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
@@ -7,6 +8,7 @@
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -119,6 +121,27 @@ namespace gglab
 	{
 		std::string m_Name;
 		std::vector<double> m_Milliseconds;
+		GpuProfileScopeKind m_Kind = GpuProfileScopeKind::Other;
+		uint32_t m_Occurrence = 0;
+		std::vector<uint32_t> m_SampleIndices;
+	};
+
+	struct FrameSequenceObservation
+	{
+		bool m_Graph = false;
+		RGObservationActivity m_Nodes;
+	};
+
+	struct FrameSequenceGpuTimingSample
+	{
+		uint64_t m_FrameSerial = 0;
+		uint32_t m_SequenceFrame = 0;
+		uint32_t m_ReferenceSample = 0;
+		bool m_FirstFrame = false;
+		bool m_CameraCut = false;
+		bool m_DevelopmentTools = false;
+		bool m_ProfilingStateChanged = false;
+		FrameSequenceObservation m_Observation;
 	};
 
 	struct FrameSequenceGpuTiming
@@ -128,6 +151,7 @@ namespace gglab
 		std::vector<double> m_FrameMilliseconds;
 		// Scopes in first-recorded order.
 		std::vector<FrameSequenceGpuTimingSeries> m_Scopes;
+		std::vector<FrameSequenceGpuTimingSample> m_Samples;
 	};
 
 	struct FrameSequenceTimingSummary
@@ -149,7 +173,7 @@ namespace gglab
 		// Waiting for ready content before frame 0.
 		Waiting,
 		Running,
-		// Every frame was submitted; captures and/or GPU profiles are still pending.
+		// Every frame was submitted; captures, GPU profiles or timing publication are pending.
 		Finishing,
 		Completed,
 		Failed,
@@ -157,6 +181,19 @@ namespace gglab
 	};
 
 	[[nodiscard]] const char* GetFrameSequenceStateName(FrameSequenceState state) noexcept;
+
+	enum class FrameSequenceCancelVerdict : uint8_t { Cancelled, TooLate, Finished, NotFound };
+	[[nodiscard]] const char* GetFrameSequenceCancelVerdictName(FrameSequenceCancelVerdict verdict) noexcept;
+
+	struct FrameSequenceTimingPublication
+	{
+		CapturePublicationOutcome m_Outcome = CapturePublicationOutcome::NotPublished;
+		bool m_Pending = false;
+		std::string m_BundleId;
+		std::filesystem::path m_Manifest;
+		std::vector<std::filesystem::path> m_Files;
+		std::string m_Failure;
+	};
 
 	struct FrameSequenceStatus
 	{
@@ -177,6 +214,7 @@ namespace gglab
 		// Set when the request records GPU timing.
 		std::optional<FrameSequenceGpuTiming> m_GpuTiming;
 		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
+		std::optional<FrameSequenceTimingPublication> m_TimingPublication;
 		std::string m_Failure;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
@@ -219,8 +257,8 @@ namespace gglab
 		// Returns the non-zero sequence id, or zero with an error when another
 		// sequence is active or the request is incomplete.
 		[[nodiscard]] uint64_t Start(FrameSequenceRequest request, std::string& outError) noexcept;
-		// Cancels the active sequence; returns false when none is active.
-		bool Cancel() noexcept;
+		// A publication claim is too late to cancel; keep its real terminal receipt.
+		[[nodiscard]] FrameSequenceCancelVerdict Cancel() noexcept;
 		// Status of the active or most recent sequence.
 		[[nodiscard]] const FrameSequenceStatus* GetStatus() const noexcept;
 		[[nodiscard]] bool IsActive() const noexcept;
@@ -253,7 +291,8 @@ namespace gglab
 		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state) noexcept;
 		// Called for every successful runtime submission, including ordinary frames
 		// that publish remaining profiles while the sequence is Finishing.
-		void OnFrameSubmitted(uint64_t renderFrameSerial) noexcept;
+		void OnFrameSubmitted(uint64_t renderFrameSerial,
+			FrameSequenceObservation observation = {}) noexcept;
 		// Polled independently of sequence posing and host status queries. Only a
 		// profile bound to a pending successful sequence submission is accepted.
 		void UpdateGpuTiming(const GpuProfileFrameSnapshot& profile, bool profilingEnabled) noexcept;
@@ -281,11 +320,16 @@ namespace gglab
 			uint64_t m_SubmissionOrdinal = 0;
 			uint32_t m_SequenceFrame = 0;
 			uint32_t m_ReferenceSample = 0;
+			bool m_CameraCut = false;
+			bool m_DevelopmentTools = false;
+			FrameSequenceObservation m_Observation;
 		};
 
 		void Fail(std::string failure) noexcept;
 		void CancelCaptureJobs() noexcept;
 		void CompleteIfFinished() noexcept;
+		[[nodiscard]] std::string SerializeTimingProduct() const;
+		void CollectTimingPublication() noexcept;
 		// The posed frame is a requested frame, at its last reference sample, and has
 		// not been captured yet.
 		[[nodiscard]] bool IsCaptureDue() const noexcept;
@@ -314,5 +358,10 @@ namespace gglab
 		uint64_t m_LastTimingSubmissionSerial = 0;
 		uint64_t m_WatchCoverageId = 0;
 		bool m_WatchStarted = false;
+		bool m_BegunCameraCut = false;
+		bool m_BegunDevelopmentTools = false;
+		std::string m_TimingContext;
+		std::optional<SequenceTimingBundleInput> m_TimingProduct;
+		std::shared_ptr<CaptureWriteJob> m_TimingWrite;
 	};
 }

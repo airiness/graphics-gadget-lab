@@ -1,5 +1,6 @@
 #include "GpuFaultLifecycleSelfTests.h"
 #include "CapturePublicationTestFileSystem.h"
+#include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureWriter.h"
 #include "ApplicationInput.h"
 #include "Capture/FrameCaptureCoordinator.h"
@@ -1995,7 +1996,9 @@ namespace gglab
 			for (size_t i = 0; i < jobs.size(); ++i)
 			{
 				jobs[i] = std::make_shared<CaptureWriteJob>();
-				jobs[i]->m_Bundle = { .m_RunIdentity = CreateCaptureRunIdentity(),
+				const std::string runIdentity = CreateCaptureRunIdentity();
+				jobs[i]->m_Bundle = { .m_RunIdentity = runIdentity,
+					.m_Environment = SerializeCaptureEnvironment({}, runIdentity),
 					.m_JobId = i + 1, .m_Attempt = 1, .m_ProductCount = 1,
 					.m_Deliveries = { { .m_Input = { .m_Image = products[i].m_Image,
 						.m_Submission = { products[i].m_SubmissionFenceIndex, products[i].m_SubmissionFenceGeneration,

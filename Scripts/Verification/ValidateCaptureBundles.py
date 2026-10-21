@@ -1,4 +1,4 @@
-"""Validate final bundle manifests, required files and same-frame provenance."""
+"""Validate final bundles, required files, frame provenance and sequence timing."""
 
 import argparse
 import copy
@@ -14,6 +14,7 @@ from jsonschema import Draft202012Validator, ValidationError
 import ValidateNonFiniteCoverage as coverage
 import ValidateRenderGraphExports as graphs
 import ValidateResourceExports as resources
+import ValidateGpuTiming as timing
 
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "Schemas"
@@ -40,9 +41,22 @@ def local_file(root, name):
 def validate(path, bundle_validator=None):
 	document = json.loads(path.read_text(encoding="utf-8"))
 	(bundle_validator or validator("CaptureBundle.schema.json")).validate(document)
+	if document["consistency"] == "sequence-range":
+		return validate_sequence(path, document)
 	identity = f'{document["runIdentity"]}-j{document["jobId"]}-a{document["attempt"]}'
 	if document["bundleId"] != identity:
 		raise ValueError("Bundle identity disagrees with its qualified job/attempt")
+	environment = document.get("environment")
+	if environment is not None:
+		run = environment["process"]["runIdentity"]
+		if run is not None and run != document["runIdentity"]:
+			raise ValueError("Environment run identity disagrees with the bundle")
+		device = environment["device"]
+		if device is not None:
+			if device["backend"] != document["provenance"]["backend"]:
+				raise ValueError("Environment backend disagrees with the captured frame")
+			if device["compatibilityIdentity"] != document["submission"]["adapterDriverIdentity"]:
+				raise ValueError("Environment adapter disagrees with the bundle submission")
 	products = document["products"]
 	if any(sum(product["source"] == source for product in products) > 1 for source in ("graph", "resource-export")):
 		raise ValueError("A bundle supports one required graph and one resource group")
@@ -120,6 +134,26 @@ def validate(path, bundle_validator=None):
 	return document
 
 
+def validate_sequence(path, document):
+	sequence, environment = document["sequence"], document["environment"]
+	if document["bundleId"] != f'{document["runIdentity"]}-s{sequence["id"]}-timing':
+		raise ValueError("Sequence bundle identity disagrees with its qualified sequence")
+	if environment["process"]["runIdentity"] not in (None, document["runIdentity"]):
+		raise ValueError("Environment run identity disagrees with the sequence bundle")
+	product = document["products"][0]
+	if product["files"] != [product["metadata"]] or product["metadata"] == path.name:
+		raise ValueError("A timing bundle requires exactly one owning timing product")
+	metadata = json.loads(local_file(path.parent, product["metadata"]).read_text(encoding="utf-8"))
+	timing.validate(metadata)
+	if metadata["sequence"] != sequence or metadata["watch"] != document["watch"]:
+		raise ValueError("Timing product disagrees with its bundle sequence range or watch coverage")
+	if metadata["measurement"]["validation"] != environment["validation"]:
+		raise ValueError("Timing measurement validation disagrees with its environment")
+	if environment["device"] is not None and metadata["context"]["backend"] != environment["device"]["backend"]:
+		raise ValueError("Timing backend disagrees with its environment")
+	return document
+
+
 def self_test(bundle_validator):
 	with tempfile.TemporaryDirectory(prefix="gglab-bundle-schema-") as directory:
 		root = Path(directory)
@@ -136,8 +170,16 @@ def self_test(bundle_validator):
 		run = "0123456789abcdef" * 2
 		product = dict(index=0, source="scene", diagnosticTap=None, schema="gglab.frame-capture",
 			schemaVersion=1, metadata="image.json", files=["image.png", "image.json"])
-		document = dict(schema="gglab.capture-bundle", schemaVersion=1, bundleId=f"{run}-j1-a1",
-			runIdentity=run, jobId=1, attempt=1, consistency="same-frame", provenance=frame,
+		environment = dict(schemaVersion=1,
+			build=dict(source="build-stamp", revision="0123456789abcdef" * 2 + "01234567", dirty=False,
+				configuration="Release", compiler="MSVC 19.0.0", pixIntegration=False),
+			process=dict(runIdentity=run, startedAtUtc="2026-01-01T00:00:00Z", os="Windows 10.0.1", host="hidden"),
+			device=dict(backend="dx12", adapterName="Fixture adapter", vendorId=1, deviceId=2, subsystemId=None,
+				revision=None, driverVersion=None, driverVersionRaw=None, api=dict(featureLevel="12_2"),
+				dedicatedVideoMemoryBytes=None, compatibilityIdentity="test"),
+			validation=dict(requested="off", effective=None))
+		document = dict(schema="gglab.capture-bundle", schemaVersion=2, bundleId=f"{run}-j1-a1",
+			runIdentity=run, jobId=1, attempt=1, consistency="same-frame", environment=environment, provenance=frame,
 			submission=dict(fenceIndex=1, fenceGeneration=1, fenceValue=1, adapterDriverIdentity="test"),
 			watch=None, products=[product])
 		path = root / "fixture.capture-bundle.json"
@@ -145,11 +187,34 @@ def self_test(bundle_validator):
 			path.write_text(json.dumps(value), encoding="utf-8")
 			validate(path, bundle_validator)
 		check(document)
+		# Version 1 manifests predate the environment record and remain readable.
+		legacy = copy.deepcopy(document)
+		legacy["schemaVersion"] = 1
+		del legacy["environment"]
+		check(legacy)
+		# Unknown build and device facts are reported as null, never estimated.
+		unknown = copy.deepcopy(document)
+		unknown["environment"]["build"] = dict(source="unavailable", revision=None, dirty=None,
+			configuration=None, compiler=None, pixIntegration=None)
+		unknown["environment"]["device"] = None
+		unknown["environment"]["validation"] = dict(requested=None, effective=None)
+		check(unknown)
 		cases = []
-		for key, value in (("schemaVersion", 2), ("jobId", 0), ("attempt", 2),
+		for key, value in (("schemaVersion", 3), ("jobId", 0), ("attempt", 2),
 			("runIdentity", "old-crc"), ("consistency", "mixed-frame"), ("products", [])):
 			invalid = copy.deepcopy(document)
 			invalid[key] = value
+			cases.append(invalid)
+		invalid = copy.deepcopy(document)
+		del invalid["environment"]
+		cases.append(invalid)
+		cases.append(dict(copy.deepcopy(document), schemaVersion=1))
+		for section, key, value in (("build", "revision", "not-a-revision"), ("build", "source", "unavailable"),
+			("process", "runIdentity", "f" * 32), ("process", "startedAtUtc", "yesterday"),
+			("device", "backend", "vulkan"), ("device", "compatibilityIdentity", "other"),
+			("validation", "requested", "full")):
+			invalid = copy.deepcopy(document)
+			invalid["environment"][section][key] = value
 			cases.append(invalid)
 		for key, value in (("index", 1), ("source", "diagnostic"), ("schemaVersion", 2),
 			("metadata", "../image.json"), ("metadata", "C:other.json"),
@@ -166,6 +231,26 @@ def self_test(bundle_validator):
 		invalid = copy.deepcopy(document)
 		invalid["products"].append(dict(product, index=1))
 		cases.append(invalid)
+		measurement = timing.fixture()
+		measurement["measurement"]["validation"] = environment["validation"]
+		(root / "timing.json").write_text(json.dumps(measurement), encoding="utf-8")
+		sequence_bundle = dict(schema="gglab.capture-bundle", schemaVersion=2,
+			bundleId=f"{run}-s3-timing", runIdentity=run, consistency="sequence-range",
+			environment=environment, sequence=measurement["sequence"], watch=None,
+			products=[dict(index=0, source="gpu-timing", diagnosticTap=None, schema="gglab.gpu-timing",
+				schemaVersion=1, metadata="timing.json", files=["timing.json"])])
+		check(sequence_bundle)
+		for key, value in (("bundleId", f"{run}-j3-a1"), ("schemaVersion", 1),
+			("jobId", 3), ("attempt", 1), ("consistency", "same-frame")):
+			bad = copy.deepcopy(sequence_bundle)
+			bad[key] = value
+			cases.append(bad)
+		bad = copy.deepcopy(sequence_bundle)
+		bad["sequence"]["lastFrameSerial"] += 1
+		cases.append(bad)
+		bad = copy.deepcopy(sequence_bundle)
+		bad["environment"]["validation"]["effective"] = "off"
+		cases.append(bad)
 		for invalid in cases:
 			try:
 				check(invalid)
@@ -214,6 +299,18 @@ def self_test(bundle_validator):
 			dict(index=2, source="resource-export", diagnosticTap=None, schema="gglab.resource-export", schemaVersion=1,
 				metadata="group.resource-export.json", files=["group.resource-export.json", "values.npy"])]
 		check(multi)
+		# Bundles carry graph products of every supported content version.
+		modern = copy.deepcopy(graph)
+		modern["schemaVersion"] = 5
+		modern["observation"]["nodeKinds"] = ["ResourceExport"]
+		modern["execution"]["totals"] = dict(logicalBytes=0, unavailableLogicalResources=0, allocationBytes=0,
+			unavailableAllocations=0, uniquePhysicalAllocationBytes=0, allocatorBlockBytes=None,
+			allocatorAllocationBytes=None)
+		(root / "paired.graph.json").write_text(json.dumps(modern), encoding="utf-8")
+		modern_bundle = copy.deepcopy(multi)
+		modern_bundle["products"][1]["schemaVersion"] = 5
+		check(modern_bundle)
+		(root / "paired.graph.json").write_text(json.dumps(graph), encoding="utf-8")
 		rejections = len(cases) + 1
 		for name, key, value in (("paired.graph.json", "submission", dict(submission, fenceValue=2)),
 			("paired.graph.json", "frame", dict(owned_frame, camera=dict(position=[1, 2, 3]))),

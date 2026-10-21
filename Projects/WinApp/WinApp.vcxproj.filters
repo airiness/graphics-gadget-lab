@@ -126,6 +126,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Application.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationEnvironment.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp">
       <Filter>Application</Filter>
     </ClCompile>
@@ -489,6 +492,9 @@
       <Filter>ThirdParty\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Application.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationEnvironment.h">
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.h">

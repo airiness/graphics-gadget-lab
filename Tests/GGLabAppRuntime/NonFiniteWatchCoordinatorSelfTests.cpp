@@ -306,7 +306,8 @@ namespace gglab
 			capture.OnFrameSubmitted();
 			sequence.OnFrameSubmitted(10);
 			sequence.UpdateWatchCoverage();
-			context.Check(sequence.Cancel(), "Cancelling a sequence releases its unresolved watch range");
+			context.Check(sequence.Cancel() == FrameSequenceCancelVerdict::Cancelled,
+				"Cancelling a sequence releases its unresolved watch range");
 			production.m_FrameSerial = 10;
 			watch.OnProductionFrame(production);
 			sequence.UpdateWatchCoverage();

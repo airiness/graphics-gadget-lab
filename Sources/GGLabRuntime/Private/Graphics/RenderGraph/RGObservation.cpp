@@ -22,17 +22,9 @@ namespace gglab
 		{
 			return {};
 		}
-		const auto name = m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_NameId.Name();
-		uint32_t occurrence = 1;
-		for (uint32_t i = 0; i < m_PassNodeIndex.Value(); ++i)
-		{
-			if (m_RG.m_PassNodes[i].m_NameId.Name() == name)
-			{
-				++occurrence;
-			}
-		}
+		const auto& pass = m_RG.m_PassNodes[m_PassNodeIndex.Value()];
 		return { .m_Resource = std::string(virtualResource->m_NameId.Name()), .m_Position = position,
-			.m_Pass = std::string(name), .m_Occurrence = occurrence };
+			.m_Pass = std::string(pass.m_NameId.Name()), .m_Occurrence = pass.m_NameOccurrence };
 	}
 
 	std::string_view GetRGObservationFailureName(RGObservationFailure failure) noexcept
@@ -107,7 +99,7 @@ namespace gglab
 					continue;
 				}
 				++count;
-				if (!address.m_Occurrence || count == *address.m_Occurrence)
+				if (!address.m_Occurrence || m_PassNodes[i].m_NameOccurrence == *address.m_Occurrence)
 				{
 					selected = RGPassNodeIndex{ i };
 				}
@@ -168,13 +160,7 @@ namespace gglab
 				return fail(RGObservationFailure::Culled);
 			}
 			result.m_WriterName = m_PassNodes[node.m_Writer.Value()].m_NameId.Name();
-			for (uint32_t i = 0; i <= node.m_Writer.Value(); ++i)
-			{
-				if (m_PassNodes[i].m_NameId.Name() == result.m_WriterName)
-				{
-					++result.m_WriterOccurrence;
-				}
-			}
+			result.m_WriterOccurrence = m_PassNodes[node.m_Writer.Value()].m_NameOccurrence;
 		}
 		if (result.m_Type == RGResourceType::RGBuffer)
 		{

@@ -220,6 +220,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
@@ -347,6 +348,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Capture\ApplicationFrameCapture.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Capture\CaptureOnReady.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationEnvironment.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h" />
@@ -596,6 +598,7 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\PropertySheets\GGLabBuildStamp.targets" />
     <Import Project="..\..\PropertySheets\LinkAssetDirectory.targets" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1' and Exists('..\..\PropertySheets\LinkAssetDirectory.targets')" />
     <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1' and Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
     <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />

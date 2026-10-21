@@ -219,6 +219,7 @@ namespace gglab
 			RGCompiledPass compiledPass{};
 			compiledPass.m_Declaration = RGPassNodeIndex{ passIndex };
 			compiledPass.m_NameId = declaration.m_NameId;
+			compiledPass.m_NameOccurrence = declaration.m_NameOccurrence;
 			compiledPass.m_Executor = declaration.m_Pass;
 			compiledPass.m_EncoderType = declaration.m_EncoderType;
 			compiledPass.m_SideEffect = declaration.m_SideEffect;

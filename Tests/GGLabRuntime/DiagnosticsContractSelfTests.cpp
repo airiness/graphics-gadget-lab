@@ -182,6 +182,15 @@ namespace gglab
 
 		void RunGpuProfilingContractSelfTests(SelfTestContext& context) noexcept
 		{
+			GpuProfilingState state;
+			const uint64_t initial = state.Read();
+			state.RequestEnabled(true);
+			context.Check(state.IsEnabled() && state.Read() == initial,
+				"An unchanged profiler request does not invent a measurement condition change");
+			state.RequestEnabled(false);
+			state.RequestEnabled(true);
+			context.Check(state.IsEnabled() && state.Read() != initial,
+				"A disable/enable pair remains observable even when the final profiling state matches");
 			GpuProfileFrameSnapshot retainedFrame;
 			{
 				ContractGpuProfiler profiler;

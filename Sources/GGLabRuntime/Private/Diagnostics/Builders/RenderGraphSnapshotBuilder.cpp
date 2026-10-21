@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 
 #include <format>
@@ -125,7 +126,6 @@ namespace gglab
 
 			void BuildPasses() noexcept
 			{
-				std::unordered_map<std::string, uint32_t> occurrences;
 				for (uint32_t passIndex = 0; passIndex < m_PassNodes.size(); ++passIndex)
 				{
 					const auto& declaration = m_PassNodes[passIndex];
@@ -138,7 +138,7 @@ namespace gglab
 					passInfo.m_Index = passIndex;
 					passInfo.m_ExecutionOrder = compiledPass ? compiledPass->m_ExecutionOrder : -1;
 					passInfo.m_Name = ToSnapshotName(declaration.m_NameId);
-					passInfo.m_Occurrence = ++occurrences[passInfo.m_Name];
+					passInfo.m_Occurrence = declaration.m_NameOccurrence;
 					if (passInfo.m_Occurrence == 2)
 					{
 						m_OutSnapshot.m_DuplicatePassNames.push_back(passInfo.m_Name);
@@ -222,12 +222,14 @@ namespace gglab
 							static_cast<const RGVirtualResource<RGTextureResource>*>(
 								virtualResource);
 						resourceInfo.m_ResourceExportSupport = GetResourceExportSupport(texture->m_Desc, virtualResource->m_Imported);
+						resourceInfo.m_TextureDimension = texture->m_Desc.m_Dimension;
 						resourceInfo.m_TextureFormat = texture->m_Desc.m_Format;
 						resourceInfo.m_TextureExtent = texture->m_Desc.m_Extent;
 						resourceInfo.m_TextureMipLevels = texture->m_Desc.m_MipLevels;
 						resourceInfo.m_TextureArraySize = texture->m_Desc.m_ArraySize;
 						resourceInfo.m_TextureSampleCount = texture->m_Desc.m_SampleCount;
 						resourceInfo.m_TextureClearValue = texture->m_Desc.m_ClearValue;
+						resourceInfo.m_LogicalBytes = GetRHITextureLogicalBytes(texture->m_Desc);
 					}
 					else
 					{
@@ -235,6 +237,7 @@ namespace gglab
 						resourceInfo.m_ResourceExportSupport = GetResourceExportSupport(buffer->m_Desc, virtualResource->m_Imported);
 						resourceInfo.m_BufferSizeInBytes = buffer->m_Desc.m_SizeInBytes;
 						resourceInfo.m_BufferStrideInBytes = buffer->m_Desc.m_StrideInBytes;
+						resourceInfo.m_LogicalBytes = buffer->m_Desc.m_SizeInBytes;
 					}
 					resourceInfo.m_ExportPassIndex = compiledResource ?
 						ToSnapshotPassIndex(compiledResource->m_ExportPass) :

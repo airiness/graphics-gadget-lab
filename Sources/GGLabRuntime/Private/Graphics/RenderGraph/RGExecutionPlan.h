@@ -55,6 +55,7 @@ namespace gglab
 		uint32_t m_PassStorageBinding = 0;
 		RGPassNodeIndex m_Declaration = InvalidRGPassNodeIndex;
 		StringID m_NameId;
+		uint32_t m_NameOccurrence = 0;
 		RGPassBase* m_Executor = nullptr;
 		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;

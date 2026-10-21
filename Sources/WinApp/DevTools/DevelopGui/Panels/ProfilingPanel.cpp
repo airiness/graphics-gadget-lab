@@ -52,7 +52,14 @@ namespace gglab
 				profiledMilliseconds += sample.m_Milliseconds;
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(sample.m_Name.c_str());
+				if (sample.m_Kind == GpuProfileScopeKind::RenderGraphPass)
+				{
+					ImGui::Text("%s [%u]", sample.m_Name.c_str(), sample.m_Occurrence);
+				}
+				else
+				{
+					ImGui::Text("%s (other)", sample.m_Name.c_str());
+				}
 				ImGui::TableSetColumnIndex(1);
 				ImGui::Text("%.3f ms", sample.m_Milliseconds);
 				ImGui::TableSetColumnIndex(2);

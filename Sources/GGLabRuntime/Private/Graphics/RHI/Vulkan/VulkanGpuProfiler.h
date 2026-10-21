@@ -46,7 +46,7 @@ namespace gglab
 		void BeginFrame(uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept;
 		void EndFrame(uint32_t frameSlotIndex, VkCommandBuffer commandBuffer) noexcept;
 		void AbortFrame(uint32_t frameSlotIndex) noexcept;
-		void BeginScope(VkCommandBuffer commandBuffer, std::string_view name) noexcept;
+		void BeginScope(VkCommandBuffer commandBuffer, GpuProfileScope identity) noexcept;
 		void EndScope(VkCommandBuffer commandBuffer) noexcept;
 
 		[[nodiscard]] bool IsAvailable() const noexcept { return m_Available; }
@@ -62,7 +62,7 @@ namespace gglab
 
 		struct ScopeRecord
 		{
-			std::string m_Name;
+			GpuProfileSample m_Sample;
 			uint32_t m_BeginQuery = InvalidQueryIndex;
 			uint32_t m_EndQuery = InvalidQueryIndex;
 		};
@@ -72,6 +72,8 @@ namespace gglab
 			VkQueryPool m_QueryPool = VK_NULL_HANDLE;
 			uint64_t m_FrameIndex = 0;
 			uint64_t m_RenderFrameSerial = 0;
+			uint64_t m_ProfilingStateAtBegin = 0;
+			bool m_ProfilingStateChanged = false;
 			uint32_t m_TimestampCount = 0;
 			uint32_t m_FrameBeginQuery = InvalidQueryIndex;
 			uint32_t m_FrameEndQuery = InvalidQueryIndex;
@@ -87,7 +89,7 @@ namespace gglab
 
 		VulkanDevice* m_Device = nullptr;
 		mutable std::mutex m_SnapshotMutex;
-		std::atomic_bool m_Enabled = true;
+		GpuProfilingState m_ProfilingState;
 		std::vector<FrameResource> m_Frames;
 		GpuProfileFrameSnapshot m_LatestFrame;
 		FrameResource* m_ActiveFrame = nullptr;

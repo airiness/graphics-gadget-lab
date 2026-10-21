@@ -3,6 +3,8 @@
 #include "Demo/DemoManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 
+#include <chrono>
+
 namespace gglab
 {
 	AppRuntimeInitializeResult GGLabAppRuntime::Initialize(
@@ -35,6 +37,8 @@ namespace gglab
 		m_Paths = createInfo.m_Paths;
 		m_HostServices = createInfo.m_HostServices;
 		m_CaptureJobLimits = createInfo.m_CaptureJobLimits;
+		m_HostEnvironment = createInfo.m_HostEnvironment;
+		m_StartedAt = std::chrono::system_clock::now();
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
 		return AppRuntimeInitializeResult::Succeeded;

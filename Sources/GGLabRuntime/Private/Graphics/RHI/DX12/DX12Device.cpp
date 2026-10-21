@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -43,6 +44,19 @@ namespace gglab
 			return SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
 				&multisampleSupport, sizeof(multisampleSupport))) &&
 				multisampleSupport.NumQualityLevels > 0;
+		}
+
+		// The user-mode driver version in the four-part form Windows displays.
+		[[nodiscard]] std::optional<std::string> QueryDriverVersion(IDXGIAdapter1* adapter) noexcept
+		{
+			LARGE_INTEGER version{};
+			if (!adapter || FAILED(adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &version)))
+			{
+				return std::nullopt;
+			}
+			const auto high = static_cast<uint32_t>(version.HighPart);
+			const auto low = static_cast<uint32_t>(version.LowPart);
+			return std::format("{}.{}.{}.{}", high >> 16, high & 0xffffu, low >> 16, low & 0xffffu);
 		}
 	}
 
@@ -72,9 +86,10 @@ namespace gglab
 
 		const bool enableValidation =
 			createInfo.m_EnableDebugValidation || createInfo.m_EnableGpuBasedValidation;
+		bool debugLayerEnabled = false;
 		if (enableValidation)
 		{
-			InitializeDebugLayer(createInfo.m_EnableGpuBasedValidation);
+			debugLayerEnabled = InitializeDebugLayer(createInfo.m_EnableGpuBasedValidation);
 		}
 		InitializeDXGIFactory(enableValidation);
 		InitializeDXGIAdapter();
@@ -83,10 +98,12 @@ namespace gglab
 		{
 			InitializeInfoQueue();
 		}
-		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("DX12 validation requested: layer={}, gpuBased={}",
-			enableValidation, createInfo.m_EnableGpuBasedValidation);
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
+			"DX12 validation requested: layer={}, gpuBased={}; layer enabled={}",
+			enableValidation, createInfo.m_EnableGpuBasedValidation, debugLayerEnabled);
 		CheckFeatureSupport();
 		InitializeMemAllocator();
+		BuildDeviceIdentity(createInfo, debugLayerEnabled);
 		m_ResourceManager.Initialize(this);
 
 		m_IsInitialized = true;
@@ -109,6 +126,7 @@ namespace gglab
 		m_DxgiAdapter.Reset();
 		m_AdapterCompatibilityIdentity.clear();
 		m_AdapterName.clear();
+		m_DeviceIdentity = {};
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
@@ -482,6 +500,41 @@ namespace gglab
 		return m_DescriptorCache && m_DescriptorCache->IsSamplerAlive(sampler);
 	}
 
+	RHIAllocationFacts DX12Device::QueryTextureAllocationFacts(
+		RHITextureHandle texture) const noexcept
+	{
+		const DX12Texture* resource = m_ResourceManager.ResolveTexture(texture);
+		return resource ?
+			resource->GetAllocationFacts() :
+			RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+	}
+
+	RHIAllocationFacts DX12Device::QueryBufferAllocationFacts(
+		RHIBufferHandle buffer) const noexcept
+	{
+		const DX12Buffer* resource = m_ResourceManager.ResolveBuffer(buffer);
+		return resource ?
+			resource->GetAllocationFacts() :
+			RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+	}
+
+	RHIAllocatorTotals DX12Device::QueryAllocatorTotals() const noexcept
+	{
+		if (!m_MemAllocator)
+		{
+			return {};
+		}
+		// Budget statistics are maintained counters and cover every memory segment group.
+		D3D12MA::Budget local{};
+		D3D12MA::Budget nonLocal{};
+		m_MemAllocator->GetBudget(&local, &nonLocal);
+		return {
+			.m_Known = true,
+			.m_BlockBytes = local.Stats.BlockBytes + nonLocal.Stats.BlockBytes,
+			.m_AllocationBytes = local.Stats.AllocationBytes + nonLocal.Stats.AllocationBytes,
+		};
+	}
+
 	RHIDescriptorHandle DX12Device::GetTextureViewDescriptor(
 		RHITextureViewHandle view) const noexcept
 	{
@@ -598,21 +651,23 @@ namespace gglab
 		m_ResourceManager.RetireCompletedResources();
 	}
 
-	void DX12Device::InitializeDebugLayer(bool enableGpuBasedValidation) noexcept
+	bool DX12Device::InitializeDebugLayer(bool enableGpuBasedValidation) noexcept
 	{
 		// Validate Debug Layer
 		ComPtr<ID3D12Debug1> debugController;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+		if (FAILED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
-			debugController->EnableDebugLayer();
-			debugController->SetEnableGPUBasedValidation(enableGpuBasedValidation);
-
-			ComPtr<ID3D12Debug5> debugController5;
-			if (SUCCEEDED(debugController.As(&debugController5)))
-			{
-				debugController5->SetEnableAutoName(true);
-			}
+			return false;
 		}
+		debugController->EnableDebugLayer();
+		debugController->SetEnableGPUBasedValidation(enableGpuBasedValidation);
+
+		ComPtr<ID3D12Debug5> debugController5;
+		if (SUCCEEDED(debugController.As(&debugController5)))
+		{
+			debugController5->SetEnableAutoName(true);
+		}
+		return true;
 	}
 
 	void DX12Device::InitializeWinPIX() noexcept
@@ -708,6 +763,10 @@ namespace gglab
 			m_AdapterCompatibilityIdentity = std::format(
 				"dx12:{:08x}:{:08x}:{:08x}:{:08x}:driver-{:016x}", desc.VendorId, desc.DeviceId,
 				desc.SubSysId, desc.Revision, static_cast<uint64_t>(driverVersion.QuadPart));
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
+				"DX12 selected adapter: {} (vendor 0x{:04x}, device 0x{:04x}, driver {})",
+				m_AdapterName, desc.VendorId, desc.DeviceId,
+				QueryDriverVersion(m_DxgiAdapter.Get()).value_or("unknown"));
 		}
 	}
 
@@ -787,6 +846,8 @@ namespace gglab
 
 		// Enhanced Barrier
 		m_FeatureSupport.m_EnhancedBarriers = featureSupport.EnhancedBarriersSupported();
+		m_FeatureSupport.m_MaxFeatureLevel = featureSupport.MaxSupportedFeatureLevel();
+		m_FeatureSupport.m_HighestShaderModel = featureSupport.HighestShaderModel();
 
 		D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1{};
 		if (SUCCEEDED(m_D3D12Device->CheckFeatureSupport(
@@ -806,6 +867,49 @@ namespace gglab
 		{
 			m_FeatureSupport.m_TearingSupported = tearSupport;
 		}
+	}
+
+	void DX12Device::BuildDeviceIdentity(const CreateInfo& createInfo, bool debugLayerEnabled) noexcept
+	{
+		m_DeviceIdentity = {};
+		DXGI_ADAPTER_DESC1 desc{};
+		if (!m_DxgiAdapter || !m_D3D12Device || FAILED(m_DxgiAdapter->GetDesc1(&desc)))
+		{
+			return;
+		}
+		RHIDeviceIdentity& identity = m_DeviceIdentity;
+		identity.m_Available = true;
+		identity.m_Backend = RHIBackendType::DX12;
+		identity.m_AdapterName = m_AdapterName;
+		identity.m_VendorId = desc.VendorId;
+		identity.m_DeviceId = desc.DeviceId;
+		identity.m_SubsystemId = desc.SubSysId;
+		identity.m_Revision = desc.Revision;
+		identity.m_DriverVersion = QueryDriverVersion(m_DxgiAdapter.Get());
+		LARGE_INTEGER driverVersion{};
+		if (SUCCEEDED(m_DxgiAdapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driverVersion)))
+		{
+			identity.m_DriverVersionRaw =
+				std::format("0x{:016x}", static_cast<uint64_t>(driverVersion.QuadPart));
+		}
+		const auto featureLevel = static_cast<uint32_t>(m_FeatureSupport.m_MaxFeatureLevel);
+		identity.m_FeatureLevel =
+			std::format("{}_{}", (featureLevel >> 12) & 0xfu, (featureLevel >> 8) & 0xfu);
+		const auto shaderModel = static_cast<uint32_t>(m_FeatureSupport.m_HighestShaderModel);
+		identity.m_ShaderModel = std::format("{}_{}", shaderModel >> 4, shaderModel & 0xfu);
+		identity.m_DedicatedVideoMemoryBytes = desc.DedicatedVideoMemory;
+		identity.m_CompatibilityIdentity = m_AdapterCompatibilityIdentity;
+		identity.m_RequestedValidation = createInfo.m_EnableGpuBasedValidation ?
+			RHIValidationLevel::Gpu :
+			createInfo.m_EnableDebugValidation ? RHIValidationLevel::Standard : RHIValidationLevel::Off;
+		// GPU-based validation is a setting of the debug layer, so it takes effect only
+		// with the layer.
+		identity.m_EffectiveValidation = !debugLayerEnabled ?
+			RHIValidationLevel::Off :
+			createInfo.m_EnableGpuBasedValidation ? RHIValidationLevel::Gpu : RHIValidationLevel::Standard;
+#if defined(USE_PIX)
+		identity.m_PixIntegration = true;
+#endif
 	}
 
 	std::wstring DX12Device::GetLatestWinPixGpuCapturerPath() noexcept

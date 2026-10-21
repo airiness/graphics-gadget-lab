@@ -11,7 +11,8 @@
 
 namespace gglab
 {
-	inline constexpr uint32_t CaptureBundleSchemaVersion = 1;
+	// Version 2 adds the process environment record.
+	inline constexpr uint32_t CaptureBundleSchemaVersion = 2;
 
 	struct CaptureBundleDelivery
 	{
@@ -23,6 +24,8 @@ namespace gglab
 	struct CaptureBundleInput
 	{
 		std::string m_RunIdentity;
+		// The serialized process environment record (SerializeCaptureEnvironment).
+		std::string m_Environment;
 		uint64_t m_JobId = 0;
 		uint64_t m_Attempt = 0;
 		uint32_t m_ProductCount = 0;
@@ -33,6 +36,15 @@ namespace gglab
 	{
 		uint32_t m_ProductIndex = 0;
 		std::vector<size_t> m_FileIndices;
+	};
+
+	// Sequence-owned immutable CPU data. It never enters a SameFrame CapturePlan.
+	struct SequenceTimingBundleInput
+	{
+		std::string m_RunIdentity;
+		std::string m_Environment;
+		uint64_t m_SequenceId = 0;
+		std::string m_ProductJson;
 	};
 
 	struct CaptureEncodedBundle
@@ -48,6 +60,10 @@ namespace gglab
 	[[nodiscard]] std::string CreateCaptureRunIdentity() noexcept;
 	[[nodiscard]] std::string MakeCaptureBundleId(std::string_view runIdentity,
 		uint64_t jobId, uint64_t attempt);
+	[[nodiscard]] std::string MakeSequenceTimingBundleId(
+		std::string_view runIdentity, uint64_t sequenceId);
 	[[nodiscard]] CaptureEncodedBundle EncodeCaptureBundle(const CaptureBundleInput& input,
 		const FrameCaptureImageEncoder& imageEncoder, std::atomic<CaptureWriteStage>& stage) noexcept;
+	[[nodiscard]] CaptureEncodedBundle EncodeSequenceTimingBundle(
+		const SequenceTimingBundleInput& input) noexcept;
 }

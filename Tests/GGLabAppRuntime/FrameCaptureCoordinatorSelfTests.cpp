@@ -1,6 +1,7 @@
 #include "FrameCaptureCoordinatorSelfTests.h"
 #include "CapturePublicationTestFileSystem.h"
 #include "Capture/CaptureBundle.h"
+#include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureWriter.h"
 
 #include "Capture/FrameCaptureCoordinator.h"
@@ -1489,7 +1490,9 @@ namespace gglab
 			files->m_FailPublish = 2;
 			files->m_FailWithdraw = true;
 			auto job = std::make_shared<CaptureWriteJob>();
-			job->m_Bundle = { .m_RunIdentity = CreateCaptureRunIdentity(), .m_JobId = 1,
+			const std::string runIdentity = CreateCaptureRunIdentity();
+			job->m_Bundle = { .m_RunIdentity = runIdentity,
+				.m_Environment = SerializeCaptureEnvironment({}, runIdentity), .m_JobId = 1,
 				.m_Attempt = 1, .m_ProductCount = 1,
 				.m_Deliveries = { { .m_Input = { .m_Image = std::make_shared<FrameCaptureImage>(),
 					.m_Submission = { 3, 1, 19, "Capture.TestAdapter" },
@@ -1724,15 +1727,21 @@ namespace gglab
 		struct SequenceHarness
 		{
 			explicit SequenceHarness(const std::filesystem::path& directory,
-				CaptureJobLimits limits = {}) noexcept :
+				CaptureJobLimits limits = {},
+				std::shared_ptr<CapturePublicationFileSystemBase> files = {},
+				bool writeOnCallingThread = true, bool withWatch = false,
+				std::chrono::milliseconds shutdownTimeout = std::chrono::seconds(30)) noexcept :
 				m_Capture({
 					.m_Capture = &m_Control,
 					.m_DefaultOutputDirectory = directory,
 					.m_ImageEncoder = &EncodeTestPng,
-					.m_WriteOnCallingThread = true,
+					.m_ShutdownWriteTimeout = shutdownTimeout,
+					.m_WriteOnCallingThread = writeOnCallingThread,
+					.m_NonFiniteWatch = withWatch ? &m_Watch : nullptr,
+					.m_PublicationFileSystem = std::move(files),
 					.m_JobLimits = limits,
 				}),
-					m_Sequence(m_Capture)
+				m_Sequence(m_Capture)
 			{
 				m_Paths.push_back(MakeSequenceTestPath());
 			}
@@ -1830,8 +1839,15 @@ namespace gglab
 				}
 				if (submit)
 				{
+					if (auto* watch = m_Capture.GetNonFiniteWatch())
+					{
+						watch->OnFrameSubmitted(m_RenderSerial);
+					}
 					m_Capture.OnFrameSubmitted();
-					m_Sequence.OnFrameSubmitted(m_RenderSerial);
+					const FrameSequenceObservation observation = m_Sequence.WantsGpuTiming() ?
+						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {} } :
+						FrameSequenceObservation{};
+					m_Sequence.OnFrameSubmitted(m_RenderSerial, observation);
 				}
 				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
 				{
@@ -1843,6 +1859,7 @@ namespace gglab
 			}
 
 			FakeCaptureControl m_Control;
+			NonFiniteWatchCoordinator m_Watch{ &m_Control };
 			FrameCaptureCoordinator m_Capture;
 			FrameSequenceCoordinator m_Sequence;
 			std::vector<CameraPath> m_Paths;
@@ -2106,7 +2123,7 @@ namespace gglab
 				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test", .m_CaptureFrames = { 0 } }, error));
 				GGLAB_UNUSED(harness.Frame());
 				GGLAB_UNUSED(harness.Frame());
-				context.Check(harness.m_Sequence.Cancel() && harness.m_Sequence.GetStatus()->m_PendingCaptureJobs == 1 &&
+				context.Check(harness.m_Sequence.Cancel() == FrameSequenceCancelVerdict::Cancelled && harness.m_Sequence.GetStatus()->m_PendingCaptureJobs == 1 &&
 					harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error) == 0,
 					"Cancellation keeps pending job ownership and prevents a new sequence from replacing its drain state");
 				harness.m_CollectJobs = true;
@@ -2672,9 +2689,300 @@ namespace gglab
 				.m_Samples = { { "PostProcess.TemporalAA", 0.5, 1 } } };
 		}
 
+		std::vector<uint64_t> SubmitShortTimingSequence(SequenceHarness& harness,
+			FrameSequenceRequest request = {})
+		{
+			harness.m_Paths.front().m_Keys.resize(2);
+			harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+			harness.m_Paths.front().m_Keys.back().m_Cut = true;
+			request.m_CameraPathId = "SEQ_Test";
+			request.m_GpuTiming = true;
+			const uint32_t samples = 2 * std::max(1u, request.m_ReferenceSamples);
+			std::string error;
+			GGLAB_UNUSED(harness.m_Sequence.Start(std::move(request), error));
+			harness.Frame();
+			std::vector<uint64_t> serials;
+			for (uint32_t index = 0; index < samples; ++index)
+			{
+				harness.Frame();
+				serials.push_back(harness.m_RenderSerial);
+			}
+			return serials;
+		}
+
+		void DeliverTimingProfiles(SequenceHarness& harness, std::span<const uint64_t> serials)
+		{
+			for (const uint64_t serial : serials)
+			{
+				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(serial), true);
+			}
+		}
+
+		void RunSequenceTimingGraphObservationTests(SelfTestContext& context) noexcept
+		{
+			for (uint32_t variant = 0; variant < 3; ++variant)
+			{
+				TemporaryDirectory directory("timing-graph-observation");
+				SequenceHarness harness(directory.GetPath());
+				CaptureTestJobs graphJobs(harness.m_Capture, context);
+				harness.m_AutoComplete = false;
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				GGLAB_UNUSED(harness.Frame());
+				CapturePlan plan{ .m_RequiredProducts = { GraphCaptureProduct{ variant == 1 } } };
+				if (variant == 2)
+				{
+					plan.m_RequiredProducts.insert(plan.m_RequiredProducts.begin(),
+						ResourceCaptureProduct{ { { .m_Resource = "A" } } });
+				}
+				const uint64_t graphJob = graphJobs.Admit(std::move(plan));
+				std::string error;
+				const uint64_t sequence = harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error);
+				const auto firstFrame = harness.Frame();
+				const uint64_t firstSerial = harness.m_RenderSerial;
+				const auto secondFrame = harness.Frame();
+				const uint64_t secondSerial = harness.m_RenderSerial;
+				context.Check(sequence != 0 && firstFrame == 0u && secondFrame == 1u &&
+					harness.m_Control.m_Issued.size() == 1 &&
+					harness.m_Control.m_Issued.front().m_FrameSerial == firstSerial &&
+					harness.m_Control.GetUnfinishedRequestCount() == 1 && graphJobs.TakeResults().empty(),
+					"A graph delivery remains outstanding while the next frame submits without an export");
+				if (harness.m_Control.m_Issued.size() != 1)
+				{
+					continue;
+				}
+				// Retire the graph only after the next submission, then deliver profiles
+				// out of order. Conditions must stay bound to each submitted frame.
+				harness.m_Control.Complete(harness.m_Control.m_Issued.front().m_Id);
+				harness.m_Capture.Update();
+				const auto results = graphJobs.TakeResults();
+				context.Check(results.size() == 1 && results.front().m_JobId == graphJob &&
+					results.front().m_Status == CaptureJobStatus::Completed,
+					"Delayed full, summary and resource-paired graphs retain their normal completion");
+				const std::array serials{ secondSerial, firstSerial };
+				DeliverTimingProfiles(harness, serials);
+				const auto& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Completed &&
+					status.m_TimingPublication->m_Files.size() == 1,
+					"Delayed graph retirement still permits complete sequence timing publication");
+				if (status.m_TimingPublication->m_Files.size() != 1)
+				{
+					continue;
+				}
+				const auto product = nlohmann::json::parse(
+					ReadText(status.m_TimingPublication->m_Files.front()));
+				const auto& samples = product["coverage"]["samples"];
+				context.Check(samples.size() == 2 && samples[0]["frameSerial"] == secondSerial &&
+					samples[0]["conditions"]["graph"] == false,
+					"An earlier unretired graph must not mark the next timing sample as a graph export");
+				context.Check(samples.size() == 2 && samples[1]["frameSerial"] == firstSerial &&
+					samples[1]["conditions"]["graph"] == true,
+					"The exporting frame keeps its graph condition after delivery and late GPU timing");
+			}
+		}
+
+		void RunSequenceTimingPublicationTests(SelfTestContext& context) noexcept
+		{
+			{
+				TemporaryDirectory directory("timing-membership");
+				SequenceHarness harness(directory.GetPath());
+				const auto serials = SubmitShortTimingSequence(harness, { .m_ReferenceSamples = 2 });
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
+					harness.m_Sequence.GetStatus()->m_TimingPublication->m_Manifest.empty(),
+					"Submitted reference frames cannot publish before their GPU timing arrives");
+				for (size_t index : { 3u, 1u, 0u, 2u })
+				{
+					auto profile = MakeSequenceGpuProfile(serials[index]);
+					profile.m_Samples = { { "Repeated", 1.0, 1, GpuProfileScopeKind::RenderGraphPass, 2 } };
+					if (index == 1)
+					{
+						profile.m_Samples.push_back({ "Repeated", 3.0, 1, GpuProfileScopeKind::RenderGraphPass, 4 });
+						profile.m_Samples.push_back({ "Repeated", 2.0, 1 });
+						profile.m_ProfilingStateChanged = true;
+					}
+					harness.m_Sequence.UpdateGpuTiming(profile, true);
+				}
+				const auto& status = *harness.m_Sequence.GetStatus();
+				context.Check(status.m_State == FrameSequenceState::Completed &&
+					status.m_TimingPublication->m_Outcome == CapturePublicationOutcome::Published &&
+					status.m_TimingPublication->m_Files.size() == 1,
+					"A complete timing product reaches Completed only with its publication receipt");
+				if (status.m_TimingPublication->m_Files.empty())
+				{
+					return;
+				}
+				const auto product = nlohmann::json::parse(ReadText(status.m_TimingPublication->m_Files.front()));
+				const auto manifest = nlohmann::json::parse(ReadText(status.m_TimingPublication->m_Manifest));
+				context.Check(product["coverage"]["requestedSamples"] == 4 && product["coverage"]["recordedSamples"] == 4 &&
+					product["coverage"]["samples"][0]["sequenceFrame"] == 1 &&
+					product["coverage"]["samples"][0]["referenceSample"] == 1 &&
+					product["coverage"]["samples"][2]["firstFrame"] == true &&
+					product["coverage"]["samples"][0]["cameraCut"] == true &&
+					product["scopes"][1]["sampleIndices"] == nlohmann::json::array({ 1 }) &&
+					product["scopes"][2]["kind"] == "other" && !product["stablePassSet"].get<bool>() &&
+					product["measurement"]["profilingStateChanged"] == true,
+					"Timing preserves cuts, first/reference samples, arrival membership, varying pass sets and measurement changes");
+				context.Check(manifest["consistency"] == "sequence-range" && manifest["sequence"] == product["sequence"] &&
+					!manifest.contains("submission") && !manifest.contains("jobId") &&
+					manifest["bundleId"].get<std::string>().ends_with("-s1-timing") &&
+					manifest["products"][0]["files"].size() == 1,
+					"Sequence bundles use a disjoint identity and discover their one product without SameFrame provenance");
+				context.Check(harness.m_Sequence.Cancel() == FrameSequenceCancelVerdict::Finished,
+					"Cancellation after terminal publication returns Finished without rewriting its receipt");
+			}
+			for (bool failCapture : { false, true })
+			{
+				TemporaryDirectory directory("timing-required-job");
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				SequenceHarness harness(directory.GetPath(), {}, files);
+				harness.m_AutoComplete = false;
+				const auto serials = SubmitShortTimingSequence(harness, { .m_CaptureFrames = { 0 } });
+				DeliverTimingProfiles(harness, serials);
+				context.Check(files->GetWriteCount() == 0 && harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+					"Complete GPU timing cannot publish while a required capture job remains pending");
+				const uint64_t request = harness.m_Control.m_Issued.front().m_Id;
+				if (failCapture)
+				{
+					harness.m_Control.Fail(request, "Injected required capture failure.");
+				}
+				else
+				{
+					harness.m_Control.Complete(request);
+				}
+				harness.m_Capture.Update();
+				harness.CollectCaptureJobs();
+				context.Check(harness.m_Sequence.GetStatus()->m_State == (failCapture ? FrameSequenceState::Failed : FrameSequenceState::Completed) &&
+					harness.m_Sequence.GetStatus()->m_TimingPublication->m_Outcome == (failCapture ?
+						CapturePublicationOutcome::NotPublished : CapturePublicationOutcome::Published),
+					"Required job failure prevents timing publication; success permits the shared publisher");
+			}
+			for (bool failWatch : { false, true })
+			{
+				TemporaryDirectory directory("timing-watch");
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				SequenceHarness harness(directory.GetPath(), {}, files, true, true);
+				harness.m_Control.m_Instrumentation = true;
+				std::string error;
+				context.Check(harness.m_Watch.Configure({ .m_Mode = NonFiniteWatchMode::Fail, .m_Boundary = false }, error),
+					"Timing coverage fixture configures required production evidence");
+				const auto serials = SubmitShortTimingSequence(harness);
+				DeliverTimingProfiles(harness, serials);
+				harness.m_Sequence.UpdateWatchCoverage();
+				context.Check(files->GetWriteCount() == 0 && harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing,
+					"Timing cannot publish while submitted-range watch coverage remains pending");
+				for (uint64_t serial : serials)
+				{
+					harness.m_Watch.OnProductionFrame({ .m_FrameSerial = serial,
+						.m_Claim = { failWatch ? NonFiniteClaimStatus::Failed : NonFiniteClaimStatus::Passed,
+							failWatch ? NonFiniteWatchFailure::NonFiniteReplaced : NonFiniteWatchFailure::None } });
+				}
+				harness.m_Sequence.UpdateWatchCoverage();
+				context.Check(harness.m_Sequence.GetStatus()->m_State == (failWatch ? FrameSequenceState::Failed : FrameSequenceState::Completed) &&
+					harness.m_Sequence.GetStatus()->m_TimingPublication->m_Outcome == (failWatch ?
+						CapturePublicationOutcome::NotPublished : CapturePublicationOutcome::Published),
+					"Required watch failure prevents publication and complete clean coverage permits it");
+			}
+			for (uint32_t scenario = 0; scenario < 5; ++scenario)
+			{
+				TemporaryDirectory directory("timing-publication-cancel");
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				files->m_Block = scenario == 0 ? CapturePublicationTestFileSystem::Block::TemporaryWrite :
+					CapturePublicationTestFileSystem::Block::Publication;
+				files->m_FailPublish = scenario == 2 ? 1 : scenario == 3 ? 2 : 0;
+				files->m_FailWithdraw = scenario == 3;
+				SequenceHarness harness(directory.GetPath(), {}, files, false, false, std::chrono::milliseconds(1));
+				const auto serials = SubmitShortTimingSequence(harness);
+				DeliverTimingProfiles(harness, serials);
+				context.Check(files->WaitEntered() && harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
+					harness.m_Sequence.GetStatus()->m_TimingPublication->m_Pending,
+					"Eligibility hands immutable timing to the common writer while the sequence stays Finishing");
+				const auto cancellation = harness.m_Sequence.Cancel();
+				context.Check(cancellation == (scenario == 0 ? FrameSequenceCancelVerdict::Cancelled : FrameSequenceCancelVerdict::TooLate),
+					"Pre-claim cancellation withdraws timing; a claimed publication is explicitly TooLate");
+				if (scenario == 0)
+				{
+					std::string error;
+					context.Check(harness.m_Capture.GetIntakeSnapshot().m_SequenceTimingWrites == 1 &&
+						harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error) == 0,
+						"Cancelled timing keeps the writer reservation and blocks replacement until draining finishes");
+				}
+				if (scenario == 4)
+				{
+					harness.m_Capture.PrepareForShutdown();
+					harness.m_Capture.FinalizeAfterRenderHost();
+					harness.m_Sequence.UpdateWatchCoverage();
+					context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+						harness.m_Sequence.GetStatus()->m_TimingPublication->m_Outcome == CapturePublicationOutcome::Indeterminate,
+						"A claimed shutdown timeout keeps the indeterminate receipt instead of reporting Cancelled");
+				}
+				files->Release();
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+				while ((harness.m_Sequence.IsActive() || harness.m_Capture.GetIntakeSnapshot().m_SequenceTimingWrites != 0) &&
+					std::chrono::steady_clock::now() < deadline)
+				{
+					harness.m_Sequence.UpdateWatchCoverage();
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+				const auto& status = *harness.m_Sequence.GetStatus();
+				const auto expected = scenario == 0 ? FrameSequenceState::Cancelled :
+					scenario == 1 ? FrameSequenceState::Completed : FrameSequenceState::Failed;
+				const auto publication = scenario == 1 ? CapturePublicationOutcome::Published :
+					scenario >= 3 ? CapturePublicationOutcome::Indeterminate : CapturePublicationOutcome::NotPublished;
+				context.Check(status.m_State == expected && status.m_TimingPublication->m_Outcome == publication &&
+					harness.m_Capture.GetIntakeSnapshot().m_SequenceTimingWrites == 0,
+					"Real publication success, failure and indeterminate outcomes settle once, including late shutdown receipts");
+			}
+			{
+				TemporaryDirectory directory("timing-cancel-before-eligibility");
+				SequenceHarness harness(directory.GetPath());
+				const auto serials = SubmitShortTimingSequence(harness);
+				context.Check(harness.m_Sequence.Cancel() == FrameSequenceCancelVerdict::Cancelled,
+					"Cancellation before timing eligibility returns Cancelled");
+				DeliverTimingProfiles(harness, serials);
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
+					harness.m_Sequence.GetStatus()->m_TimingPublication->m_Outcome == CapturePublicationOutcome::NotPublished,
+					"Late profiles cannot publish a cancelled sequence as a complete measurement");
+			}
+		}
+
 		void RunFrameSequenceGpuTimingTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-sequence-gpu-timing");
+			{
+				SequenceHarness harness(directory.GetPath());
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start(
+					{ .m_CameraPathId = "SEQ_Test", .m_GpuTiming = true }, error));
+				harness.Frame();
+				for (uint32_t frame = 0; frame < 2; ++frame)
+				{
+					harness.Frame();
+					auto profile = MakeSequenceGpuProfile(harness.m_RenderSerial);
+					profile.m_Samples = {
+						{ "Repeated", 1.0, 1, GpuProfileScopeKind::RenderGraphPass, 2 },
+						{ "Repeated", 3.0, 1, GpuProfileScopeKind::RenderGraphPass, 4 },
+						{ "Repeated", 5.0, 2 },
+					};
+					if (frame == 1)
+					{
+						std::reverse(profile.m_Samples.begin(), profile.m_Samples.end());
+					}
+					harness.m_Sequence.UpdateGpuTiming(profile, true);
+				}
+				const auto& status = *harness.m_Sequence.GetStatus();
+				const auto& scopes = status.m_GpuTiming->m_Scopes;
+				context.Check(status.m_State == FrameSequenceState::Completed && scopes.size() == 3 &&
+					scopes[0].m_Kind == GpuProfileScopeKind::RenderGraphPass && scopes[0].m_Occurrence == 2 &&
+					scopes[0].m_Milliseconds == std::vector<double>{ 1.0, 1.0 } &&
+					scopes[1].m_Kind == GpuProfileScopeKind::RenderGraphPass && scopes[1].m_Occurrence == 4 &&
+					scopes[1].m_Milliseconds == std::vector<double>{ 3.0, 3.0 } &&
+					scopes[2].m_Kind == GpuProfileScopeKind::Other && scopes[2].m_Occurrence == 0 &&
+					scopes[2].m_Milliseconds == std::vector<double>{ 5.0, 5.0 },
+					"Sequence series retain same-name pass and other identities when sample order changes");
+			}
 			for (uint32_t delay : { 0u, 1u, 3u, 7u })
 			{
 				SequenceHarness harness(directory.GetPath());
@@ -2738,7 +3046,7 @@ namespace gglab
 				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(last), true);
 				context.Check(harness.m_Sequence.GetStatus()->m_GpuTiming->m_FrameMilliseconds.empty(),
 					"A consecutive sequence rejects a retained profile from the preceding sequence");
-				context.Check(harness.m_Sequence.Cancel() && !harness.m_Sequence.WantsGpuTiming(),
+				context.Check(harness.m_Sequence.Cancel() == FrameSequenceCancelVerdict::Cancelled && !harness.m_Sequence.WantsGpuTiming(),
 					"Cancellation releases pending timing work and profiling ownership");
 				harness.m_Sequence.UpdateGpuTiming(MakeSequenceGpuProfile(harness.m_RenderSerial), true);
 				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
@@ -3017,9 +3325,12 @@ namespace gglab
 			observedGraph.m_ObservationNodes.emplace_back(0, RGObservationTarget{
 				.m_Address = { .m_Resource = "Observed" }, .m_Kind = RGObservationKind::NonFiniteScan });
 			const auto graphJson = nlohmann::json::parse(SerializeFrameGraphExport(observedGraph, observedMetadata, {}, false, false));
-			context.Check(graphJson["schemaVersion"] == 3 && graphJson["observation"]["nonFiniteWatch"] == true &&
-				graphJson["observation"]["resourceExport"] == false && graphJson["execution"]["observationNodes"][0]["kind"] == "NonFiniteScan",
-				"Scan-only graphs use v3 and distinguish scan activity from resource-copy observation");
+			context.Check(graphJson["schemaVersion"] == RenderGraphExportSchemaVersion &&
+				graphJson["observation"]["nonFiniteWatch"] == true &&
+				graphJson["observation"]["resourceExport"] == false &&
+				graphJson["observation"]["nodeKinds"] == nlohmann::json::array({ "NonFiniteScan" }) &&
+				graphJson["execution"]["observationNodes"][0]["kind"] == "NonFiniteScan",
+				"Scan-only graphs list their node kinds and distinguish scan activity from resource-copy observation");
 			const auto resourceJson = nlohmann::json::parse(SerializeResourceExportMetadata({}, observedMetadata, {}, {}, {}));
 			context.Check(resourceJson["schemaVersion"] == 2 && resourceJson["observation"]["nonFiniteWatch"] == true,
 				"Resource sidecars with concurrent scans use v2 without asserting production coverage");
@@ -3625,7 +3936,9 @@ namespace gglab
 			};
 			image.m_Metadata.m_Backend = "dx12";
 			image.m_Metadata.m_FrameSerial = 17;
-			CaptureBundleInput input{ .m_RunIdentity = "0123456789abcdef0123456789abcdef",
+			const std::string run = "0123456789abcdef0123456789abcdef";
+			CaptureBundleInput input{ .m_RunIdentity = run,
+				.m_Environment = SerializeCaptureEnvironment({}, run),
 				.m_JobId = 1, .m_Attempt = 2, .m_ProductCount = 2,
 				.m_Deliveries = { { .m_ProductIndex = 0, .m_Input = image },
 					{ .m_ProductIndex = 1, .m_Input = image } } };
@@ -3633,7 +3946,7 @@ namespace gglab
 			const auto valid = EncodeCaptureBundle(input, &EncodeTestPng, stage);
 			context.Check(valid.m_Failure.empty() && valid.m_Content.m_Files.size() == 5 &&
 				valid.m_Products.size() == 2, "Matched completed image products form one required bundle");
-			for (uint32_t change = 0; change < 10; ++change)
+			for (uint32_t change = 0; change < 12; ++change)
 			{
 				auto invalid = input;
 				auto& second = invalid.m_Deliveries[1];
@@ -3669,10 +3982,16 @@ namespace gglab
 				case 9:
 					second.m_GraphProductIndex = 0;
 					break;
+				case 10:
+					invalid.m_Environment.clear();
+					break;
+				case 11:
+					invalid.m_Environment = "[]";
+					break;
 				}
 				const auto rejected = EncodeCaptureBundle(invalid, &EncodeTestPng, stage);
 				context.Check(!rejected.m_Failure.empty() && rejected.m_Content.m_Files.empty(),
-					"Inconsistent provenance, incomplete products or unqualified identity cannot reach publication");
+					"Inconsistent provenance, incomplete products, unqualified identity or a missing environment cannot reach publication");
 			}
 			NonFiniteWatchCoverage coverage{ .m_ConfigurationVersion = 1,
 				.m_ProductionRequested = true, .m_InstrumentationAvailable = true,
@@ -3713,6 +4032,53 @@ namespace gglab
 				context.Check(encoded.m_Failure.empty() == accepted,
 					"Bundles preserve report/fail claim semantics and require complete identical submitted-frame coverage");
 			}
+		}
+
+		void RunCaptureEnvironmentTests(SelfTestContext& context) noexcept
+		{
+			using Json = nlohmann::json;
+			const std::string run = "0123456789abcdef0123456789abcdef";
+			const auto unknown = Json::parse(SerializeCaptureEnvironment({}, run));
+			context.Check(unknown["schemaVersion"] == CaptureEnvironmentSchemaVersion &&
+				unknown["build"]["source"] == "unavailable" && unknown["build"]["revision"].is_null() &&
+				unknown["build"]["dirty"].is_null() && unknown["build"]["pixIntegration"].is_null() &&
+				unknown["process"]["runIdentity"] == run && unknown["process"]["startedAtUtc"].is_null() &&
+				unknown["process"]["os"].is_null() && unknown["device"].is_null() &&
+				unknown["validation"]["requested"].is_null() && unknown["validation"]["effective"].is_null(),
+				"An environment without build or device facts reports them as null rather than estimating them");
+
+			using namespace std::chrono;
+			CaptureEnvironment environment{
+				.m_Host = {
+					.m_Build = { .m_Available = true, .m_Revision = std::string(40, 'a'), .m_Dirty = true,
+						.m_Configuration = "Release", .m_Compiler = "MSVC 19.51.36231" },
+					.m_OperatingSystem = "Windows 10.0.26200",
+					.m_Presentation = "hidden",
+				},
+				.m_Device = { .m_Available = true, .m_Backend = RHIBackendType::Vulkan, .m_AdapterName = "Adapter",
+					.m_VendorId = 0x10de, .m_DeviceId = 2, .m_DriverVersion = "581.57",
+					.m_DriverVersionRaw = "0x9150c000", .m_ApiVersion = "1.3.290",
+					.m_CompatibilityIdentity = "vulkan:test", .m_RequestedValidation = RHIValidationLevel::Standard,
+					.m_EffectiveValidation = RHIValidationLevel::Off, .m_PixIntegration = true },
+				.m_StartedAt = sys_days{ year{ 2026 } / 10 / 21 } + hours{ 12 } + seconds{ 5 },
+			};
+			const auto known = Json::parse(SerializeCaptureEnvironment(environment, run));
+			context.Check(known["build"]["source"] == "build-stamp" &&
+				known["build"]["revision"] == std::string(40, 'a') && known["build"]["dirty"] == true &&
+				known["build"]["pixIntegration"] == true && known["process"]["startedAtUtc"] == "2026-10-21T12:00:05Z" &&
+				known["process"]["os"] == "Windows 10.0.26200" && known["process"]["host"] == "hidden" &&
+				known["device"]["backend"] == "vulkan" && known["device"]["driverVersion"] == "581.57" &&
+				known["device"]["subsystemId"].is_null() && known["device"]["dedicatedVideoMemoryBytes"].is_null() &&
+				known["device"]["api"] == Json{ { "apiVersion", "1.3.290" } } &&
+				known["device"]["compatibilityIdentity"] == "vulkan:test" &&
+				known["validation"]["requested"] == "standard" && known["validation"]["effective"] == "off",
+				"An environment records build, process, device and requested/effective validation facts as given");
+
+			environment.m_Host.m_Build.m_Available = false;
+			const auto withdrawn = Json::parse(SerializeCaptureEnvironment(environment, run));
+			context.Check(withdrawn["build"]["source"] == "unavailable" && withdrawn["build"]["revision"].is_null() &&
+				withdrawn["build"]["dirty"].is_null() && withdrawn["build"]["configuration"] == "Release",
+				"An unavailable build stamp never reports a revision or dirty state");
 		}
 
 		void RunBundlePublicationTests(SelfTestContext& context) noexcept
@@ -3772,8 +4138,10 @@ namespace gglab
 				if (result && !result->m_ManifestPath.empty())
 				{
 					const auto manifest = nlohmann::json::parse(ReadText(result->m_ManifestPath));
-					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 1 &&
-						manifest["schema"] == "gglab.capture-bundle" && manifest["products"].size() == 3;
+					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 2 &&
+						manifest["schema"] == "gglab.capture-bundle" && manifest["products"].size() == 3 &&
+						manifest["environment"]["schemaVersion"] == 1 &&
+						manifest["environment"]["process"]["runIdentity"] == manifest["runIdentity"];
 					for (const auto& product : manifest["products"])
 					{
 						const auto metadataName = product["metadata"].get<std::string>();
@@ -4519,6 +4887,7 @@ namespace gglab
 					full["frame"]["frame"]["serial"] == 17 && full["submission"]["fenceValue"] == 19 &&
 					full["submission"]["completed"] == true && full["observation"]["graph"] == true &&
 					full["frame"]["adapterDriverIdentity"] == "Capture.TestAdapter" &&
+					full["observation"]["nodeKinds"].empty() && summary["observation"]["nodeKinds"].empty() &&
 					summary["mode"] == "summary" && !summary.contains("execution"),
 					"Graph JSON embeds the same frame block and completed submission identity in both modes");
 			}
@@ -4656,10 +5025,10 @@ namespace gglab
 				const uint64_t id = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test" }, error);
 				harness.Frame();
 				harness.Frame();
-				const bool cancelled = harness.m_Sequence.Cancel();
+				const bool cancelled = harness.m_Sequence.Cancel() == FrameSequenceCancelVerdict::Cancelled;
 				context.Check(id != 0 && cancelled && !harness.Frame() &&
 					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Cancelled &&
-					!harness.m_Sequence.Cancel(),
+					harness.m_Sequence.Cancel() == FrameSequenceCancelVerdict::Finished,
 					"Cancelling stops posing frames; only an active sequence can be cancelled");
 			}
 		}
@@ -4676,6 +5045,7 @@ namespace gglab
 		RunJobEncoderCancellationTests(context);
 		RunJobPublicationCancellationTests(context);
 		RunBundleProvenanceTests(context);
+		RunCaptureEnvironmentTests(context);
 		RunBundlePublicationTests(context);
 		RunBundleSingleProductTests(context);
 		RunBundleManifestShutdownTests(context);
@@ -4717,6 +5087,8 @@ namespace gglab
 		RunReferenceSequenceTests(context);
 		RunFrameSequenceEvaluationTests(context);
 		RunFrameSequenceGpuTimingTests(context);
+		RunSequenceTimingGraphObservationTests(context);
+		RunSequenceTimingPublicationTests(context);
 		RunFrameSequenceContinuityTests(context);
 		RunFrameSequenceFailureTests(context);
 	}

@@ -85,6 +85,7 @@ namespace gglab
 		bool IsPoisoned() const noexcept override;
 		bool IsDeviceLost() const noexcept override;
 		uint32_t GetFrameSlotCount() const noexcept override;
+		RHIDeviceIdentity GetDeviceIdentity() const noexcept override;
 
 		[[nodiscard]] DX12Device& GetDX12Device() noexcept;
 		[[nodiscard]] const DX12Device& GetDX12Device() const noexcept;

@@ -19,6 +19,7 @@
 #include <memory>
 #include <span>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace gglab
@@ -154,6 +155,8 @@ namespace gglab
 		std::optional<RGBufferId> m_PassStorageBuffer;
 		uint32_t m_PassStorageBinding = 0;
 		StringID m_NameId;
+		// Assigned at declaration, before culling or execution-order selection.
+		uint32_t m_NameOccurrence = 0;
 		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;
 		std::vector<Access> m_Accesses;
@@ -463,6 +466,26 @@ namespace gglab
 		{
 			return m_CompileDiagnostics;
 		}
+		[[nodiscard]] RGObservationActivity GetObservationActivity() const noexcept
+		{
+			RGObservationActivity activity;
+			for (const auto& [index, target] : m_ObservationPasses)
+			{
+				switch (target.m_Kind)
+				{
+				case RGObservationKind::ResourceExport:
+					activity.m_ResourceExport = true;
+					break;
+				case RGObservationKind::NonFiniteScan:
+					activity.m_NonFiniteScan = true;
+					break;
+				case RGObservationKind::ProductionCounters:
+					activity.m_ProductionCounters = true;
+					break;
+				}
+			}
+			return activity;
+		}
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
@@ -545,6 +568,7 @@ namespace gglab
 		std::vector<TextureViewRecord> m_TextureViews;
 
 		std::unordered_map<StringID, RGResourceHandle> m_NameHandleMap;
+		std::unordered_map<StringID, uint32_t> m_PassNameOccurrences;
 
 		std::vector<TransientTextureAllocation> m_MarkedRetireTextures;
 		std::vector<TransientBufferAllocation> m_MarkedRetireBuffers;
@@ -584,6 +608,7 @@ namespace gglab
 
 		RGPassNode passNode = {};
 		passNode.m_NameId = StringID(passName);
+		passNode.m_NameOccurrence = ++m_PassNameOccurrences[passNode.m_NameId];
 		passNode.m_EncoderType = encoderType;
 		passNode.m_Pass = pass;
 

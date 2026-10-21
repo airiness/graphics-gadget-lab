@@ -23,7 +23,7 @@ on Windows with a supported GPU and the matching application build.
 
 Read only the reference needed for the current verification. Keep script options
 authoritative in [GGLabSession.ps1](../../../Scripts/Verification/GGLabSession.ps1), and use
-the script and executable from the same revision (control protocol v3).
+the script and executable from the same revision (control protocol v4).
 
 ## Prepare a run
 

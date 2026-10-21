@@ -87,6 +87,22 @@ namespace gglab
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
+		// Allocator facts of a live resource; callers read them while the handle is valid. A
+		// device without allocator queries reports Unsupported rather than estimated values.
+		[[nodiscard]] virtual RHIAllocationFacts QueryTextureAllocationFacts(
+			RHITextureHandle) const noexcept
+		{
+			return {};
+		}
+		[[nodiscard]] virtual RHIAllocationFacts QueryBufferAllocationFacts(
+			RHIBufferHandle) const noexcept
+		{
+			return {};
+		}
+		[[nodiscard]] virtual RHIAllocatorTotals QueryAllocatorTotals() const noexcept
+		{
+			return {};
+		}
 		// Routine release query: true when the GPU no longer uses work up to the point.
 		// An invalid point records no use. It must not accept GPU-written contents or
 		// verify quiescence; use QueryFencePoint for those decisions.

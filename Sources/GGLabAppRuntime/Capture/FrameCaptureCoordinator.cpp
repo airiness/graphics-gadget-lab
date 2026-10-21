@@ -183,6 +183,7 @@ namespace gglab
 		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
 			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
 		m_RunIdentity(CreateCaptureRunIdentity()),
+		m_EnvironmentJson(SerializeCaptureEnvironment(createInfo.m_Environment, m_RunIdentity)),
 		m_JobLimits(createInfo.m_JobLimits),
 		m_JobReceipts(m_JobLimits.m_MaxReceipts)
 	{
@@ -354,6 +355,7 @@ namespace gglab
 		CaptureIntakeSnapshot snapshot{ .m_Limits = m_JobLimits, .m_ActiveJobs = m_ActiveJobs,
 			.m_DrainingRuntimeRequests = static_cast<uint32_t>(m_DrainingCaptureRequests.size()),
 			.m_DrainingWriterJobs = static_cast<uint32_t>(m_DrainingWrites.size()) };
+		snapshot.m_SequenceTimingWrites = m_SequenceTimingWrite && !m_SequenceTimingWrite->GetReceipt();
 		for (const DrainingWrite& write : m_DrainingWrites)
 		{
 			snapshot.m_DrainingWriteReservations += write.m_Reservations;
@@ -556,14 +558,8 @@ namespace gglab
 			GetCaptureAvailability(plan, FrameCaptureFrameState{});
 	}
 
-	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source,
-		const FrameCaptureFrameState& state, uint32_t requestCount) const noexcept
+	size_t FrameCaptureCoordinator::GetWriteReservationCount() const noexcept
 	{
-		if (!m_Capture || m_IsShuttingDown)
-		{
-			return FrameCaptureAvailability::Finalized;
-		}
-		// Reservations cover GPU issue through writer completion, not just queued jobs.
 		auto reserved = std::ranges::count_if(m_Deliveries, [](const ProductDelivery& entry)
 			{
 				return entry.m_Phase == Phase::Issued || entry.m_Phase == Phase::AwaitingWatch ||
@@ -574,6 +570,71 @@ namespace gglab
 		{
 			reserved += write.m_Reservations;
 		}
+		reserved += m_SequenceTimingWrite && !m_SequenceTimingWrite->GetReceipt();
+		return static_cast<size_t>(reserved);
+	}
+
+	std::shared_ptr<CaptureWriteJob> FrameCaptureCoordinator::TryPublishSequenceTiming(
+		const SequenceTimingBundleInput& input, const std::filesystem::path& directory,
+		std::string_view label, std::string& error) noexcept
+	{
+		error.clear();
+		if (m_IsShuttingDown)
+		{
+			error = "The capture publisher is shutting down.";
+			return {};
+		}
+		if (GetWriteReservationCount() >= MaxInFlightCaptures)
+		{
+			return {};
+		}
+		const auto output = directory.empty() ? m_DefaultOutputDirectory : directory;
+		if (output.empty())
+		{
+			error = "No sequence timing output directory is configured.";
+			return {};
+		}
+		auto write = std::make_shared<CaptureWriteJob>();
+		write->m_SequenceTiming = input;
+		write->m_SequenceTiming->m_RunIdentity = m_RunIdentity;
+		write->m_SequenceTiming->m_Environment = m_EnvironmentJson;
+		write->m_Directory = output;
+		std::string subject = SanitizeFileStemComponent(std::string(label));
+		subject.resize(std::min(subject.size(), size_t{ 32 }));
+		write->m_BaseStem = std::format("{}.{}", subject,
+			MakeSequenceTimingBundleId(m_RunIdentity, input.m_SequenceId));
+		if (!m_Writer->Submit(write))
+		{
+			error = "The capture writer rejected the sequence timing product.";
+			return {};
+		}
+		m_SequenceTimingWrite = write;
+		m_SequenceTimingShutdownReceipt.reset();
+		return write;
+	}
+
+	std::optional<CaptureWriteReceipt> FrameCaptureCoordinator::GetSequenceTimingReceipt(
+		const CaptureWriteJob& job) const noexcept
+	{
+		if (auto receipt = job.GetReceipt())
+		{
+			return receipt;
+		}
+		if (m_SequenceTimingWrite.get() == &job && m_SequenceTimingShutdownReceipt)
+		{
+			return *m_SequenceTimingShutdownReceipt;
+		}
+		return std::nullopt;
+	}
+
+	FrameCaptureAvailability FrameCaptureCoordinator::GetCaptureAvailability(FrameCaptureSource source,
+		const FrameCaptureFrameState& state, uint32_t requestCount) const noexcept
+	{
+		if (!m_Capture || m_IsShuttingDown)
+		{
+			return FrameCaptureAvailability::Finalized;
+		}
+		const auto reserved = GetWriteReservationCount();
 		if (requestCount > MaxInFlightCaptures)
 		{
 			return FrameCaptureAvailability::TooLarge;
@@ -1007,6 +1068,16 @@ namespace gglab
 			(m_HistoryReady && MatchesRequiredContent(job, state) && m_SettledFrames >= plan.m_SettleFrames);
 	}
 
+	bool FrameCaptureCoordinator::HasFrameGraphExports(uint64_t frameSerial) const noexcept
+	{
+		return std::ranges::any_of(m_Deliveries, [frameSerial](const ProductDelivery& entry)
+			{
+				return entry.m_Phase == Phase::Issued &&
+					entry.m_Attempt->m_Metadata.m_FrameSerial == frameSerial &&
+					(entry.GetSource() == FrameCaptureSource::RenderGraph || entry.m_GraphIndex.has_value());
+			});
+	}
+
 	bool FrameCaptureCoordinator::HasFrameResourceExports() const noexcept
 	{
 		return std::ranges::any_of(m_Deliveries, [](const ProductDelivery& entry)
@@ -1356,6 +1427,7 @@ namespace gglab
 		const auto outputs = GetDeliveries(job);
 		auto write = std::make_shared<CaptureWriteJob>();
 		write->m_Bundle = CaptureBundleInput{ .m_RunIdentity = m_RunIdentity,
+			.m_Environment = m_EnvironmentJson,
 			.m_JobId = job.m_Result.m_JobId, .m_Attempt = job.m_AttemptCount,
 			.m_ProductCount = static_cast<uint32_t>(job.m_Plan.m_RequiredProducts.size()) };
 		for (ProductDelivery* member : outputs)
@@ -1469,6 +1541,13 @@ namespace gglab
 			auto receipt = m_Writer->Abandon(*entry.m_WriteJob, m_ShutdownWriteTimeout);
 			FinishBundleWriting(*entry.m_Job, receipt);
 		}
+		if (m_SequenceTimingWrite)
+		{
+			m_SequenceTimingWrite->WaitUntil(deadline);
+			m_SequenceTimingShutdownReceipt = std::make_shared<CaptureWriteReceipt>(
+				m_Writer->Abandon(*m_SequenceTimingWrite, m_ShutdownWriteTimeout));
+		}
+
 		for (DrainingWrite& write : m_DrainingWrites)
 		{
 			if (write.m_AbandonedAtShutdown)

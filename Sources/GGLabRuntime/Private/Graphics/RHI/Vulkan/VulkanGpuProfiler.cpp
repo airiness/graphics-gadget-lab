@@ -19,7 +19,7 @@ namespace gglab
 			"VulkanGpuProfiler requires at least one frame slot.");
 		if (!device || frameSlotCount == 0)
 		{
-			m_Enabled.store(false, std::memory_order_relaxed);
+			m_ProfilingState.RequestEnabled(false);
 			return;
 		}
 
@@ -38,7 +38,7 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_WARN_ALWAYS(
 				"Vulkan GPU profiling is unavailable on the selected graphics queue family.");
-			m_Enabled.store(false, std::memory_order_relaxed);
+			m_ProfilingState.RequestEnabled(false);
 			return;
 		}
 		m_TimestampValidBits = families[familyIndex].timestampValidBits;
@@ -58,7 +58,7 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 					"Vulkan GPU profiler failed to create a timestamp query pool: {}.",
 					ToString(createResult)));
-				m_Enabled.store(false, std::memory_order_relaxed);
+				m_ProfilingState.RequestEnabled(false);
 				return;
 			}
 			const std::string debugName =
@@ -90,12 +90,12 @@ namespace gglab
 
 	void VulkanGpuProfiler::RequestEnabled(bool enabled) noexcept
 	{
-		m_Enabled.store(enabled && m_Available, std::memory_order_relaxed);
+		m_ProfilingState.RequestEnabled(enabled && m_Available);
 	}
 
 	bool VulkanGpuProfiler::IsEnabled() const noexcept
 	{
-		return m_Available && m_Enabled.load(std::memory_order_relaxed);
+		return m_Available && m_ProfilingState.IsEnabled();
 	}
 
 	GpuProfileFrameSnapshot VulkanGpuProfiler::GetLatestFrame() const
@@ -129,11 +129,14 @@ namespace gglab
 		ResolveCompletedFrame(frame);
 		++m_NextFrameIndex;
 		frame.m_RenderFrameSerial = 0;
-		if (!IsEnabled())
+		const uint64_t profilingState = m_ProfilingState.Read();
+		if (!(profilingState & 1))
 		{
 			return;
 		}
 
+		frame.m_ProfilingStateAtBegin = profilingState;
+		frame.m_ProfilingStateChanged = false;
 		frame.m_FrameIndex = m_NextFrameIndex;
 		frame.m_TimestampCount = 0;
 		frame.m_FrameBeginQuery = InvalidQueryIndex;
@@ -168,6 +171,7 @@ namespace gglab
 			EndScope(commandBuffer);
 		}
 		frame.m_FrameEndQuery = WriteTimestamp(frame, commandBuffer);
+		frame.m_ProfilingStateChanged = frame.m_ProfilingStateAtBegin != m_ProfilingState.Read();
 		frame.m_PendingResults = frame.m_TimestampCount > 0;
 		frame.m_Recording = false;
 		m_ActiveFrame = nullptr;
@@ -196,7 +200,7 @@ namespace gglab
 	}
 
 	void VulkanGpuProfiler::BeginScope(
-		VkCommandBuffer commandBuffer, std::string_view name) noexcept
+		VkCommandBuffer commandBuffer, GpuProfileScope identity) noexcept
 	{
 		if (!m_ActiveFrame || !m_ActiveFrame->m_Recording || commandBuffer == VK_NULL_HANDLE)
 		{
@@ -212,7 +216,8 @@ namespace gglab
 		}
 
 		ScopeRecord scope{};
-		scope.m_Name = name.empty() ? "Unnamed Pass" : std::string(name);
+		scope.m_Sample = { .m_Name = identity.m_Name.empty() ? "Unnamed Scope" : std::string(identity.m_Name),
+			.m_Kind = identity.m_Kind, .m_Occurrence = identity.m_Occurrence };
 		scope.m_BeginQuery = WriteTimestamp(frame, commandBuffer);
 		frame.m_Scopes.push_back(std::move(scope));
 		frame.m_ScopeStack.push_back(static_cast<int32_t>(frame.m_Scopes.size() - 1));
@@ -265,13 +270,14 @@ namespace gglab
 				"Vulkan GPU timestamp readback failed: {}.", ToString(result)));
 			frame.m_PendingResults = false;
 			m_Available = false;
-			m_Enabled.store(false, std::memory_order_relaxed);
+			m_ProfilingState.RequestEnabled(false);
 			return;
 		}
 
 		GpuProfileFrameSnapshot snapshot{};
 		snapshot.m_FrameIndex = frame.m_FrameIndex;
 		snapshot.m_RenderFrameSerial = frame.m_RenderFrameSerial;
+		snapshot.m_ProfilingStateChanged = frame.m_ProfilingStateChanged;
 		const auto milliseconds = [this](uint64_t begin, uint64_t end) noexcept
 			{
 				return static_cast<double>(VulkanTimestampDelta(
@@ -293,18 +299,7 @@ namespace gglab
 			}
 			const double elapsed = milliseconds(
 				frame.m_Timestamps[scope.m_BeginQuery], frame.m_Timestamps[scope.m_EndQuery]);
-			auto sample = std::ranges::find_if(snapshot.m_Samples,
-				[&scope](const GpuProfileSample& candidate)
-				{
-					return candidate.m_Name == scope.m_Name;
-				});
-			if (sample == snapshot.m_Samples.end())
-			{
-				snapshot.m_Samples.push_back({ .m_Name = scope.m_Name });
-				sample = std::prev(snapshot.m_Samples.end());
-			}
-			sample->m_Milliseconds += elapsed;
-			++sample->m_CallCount;
+			AccumulateGpuProfileSample(snapshot, scope.m_Sample.GetScope(), elapsed);
 		}
 
 		frame.m_PendingResults = false;

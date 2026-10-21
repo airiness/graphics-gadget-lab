@@ -34,10 +34,14 @@ or legacy output IDs for the full replay. Published files remain on disk.
 One sequence runs at a time. `sequence` waits by default; with `-NoWait`, poll
 `status`. Require `sequence.state: completed`; failed/cancelled sequences also
 return a successful control response. `finishing` waits for writes, watch
-coverage and requested GPU profiles. `sequence-cancel` stops a run and cancels
-whole-job delivery. Already claimed publication can finish later. Pending job
+coverage, requested GPU profiles and the requested timing publication receipt.
+`sequence-cancel` returns `cancellation: Cancelled | TooLate | Finished | NotFound`.
+Before eligibility or a timing publication claim it cancels whole-sequence
+delivery. After that claim, `TooLate` keeps the sequence active until its real
+receipt: `Published` completes it; `NotPublished` or `Indeterminate` fails it.
+`Finished` preserves terminal status; `NotFound` has no sequence. Pending capture
 receipts and GPU/writer owners keep draining after cancellation; a new sequence
-waits until prior sequence receipts are consumed.
+waits until prior receipts and the timing writer have drained.
 
 Choose one evidence channel per replay: scene, or
 `-Source diagnostic -DiagnosticTap temporal-history-weight` (for example).
@@ -96,9 +100,48 @@ or cancelled sequences is not a complete-run measurement.
 
 Use Release, validation off, no DevTools and observation tools off for ordinary
 performance runs. Compare configurations within the same backend/session where
-possible; repeat small differences to assess noise. Graph exports cannot provide
-identity-preserving per-pass GPU timing; use sequence scope statistics for the
-claims they actually support.
+possible; repeat small differences to assess noise.
+
+Each scope summary carries `kind: pass|other` and `occurrence`. A pass uses the
+same `{name, occurrence}` as graph declarations: occurrence is assigned once in
+declaration order and includes culled declarations. Equal names with different
+occurrences remain separate series. An `other` scope has null occurrence and is
+never joined to a graph pass. Identity is local to one graph, not a stable
+semantic identity across versions. A scope counts only frames that recorded it.
+
+The published `gglab.gpu-timing` v1 product is the measurement authority; the
+response summary remains a convenience. Require `sequence.state: completed` and
+`sequence.timingPublication.outcome: Published`, read its `manifest`, then discover
+the timing file from the product with `schema: gglab.gpu-timing`. The bundle is
+v2 with `consistency: sequence-range` and identity `<run>-s<sequence>-timing`. It
+has no SameFrame job/attempt or single-frame provenance/submission fields.
+
+The product records the sequence range, context, every render serial and
+frame/reference index, first-frame/cut flags and per-sample profiling, DevTools
+and observation conditions. `frame.milliseconds` follows `coverage.samples`
+order. Each scope's `sampleIndices` indexes that array; its `milliseconds` follows
+those indices. Sample order is result arrival order, so use the recorded serials
+for submission order. `stablePassSet` reports whether every sample recorded the
+same pass identities. No cold/cut/reference samples are silently filtered.
+Validate both discovery and sample/statistics semantics:
+
+```powershell
+$publication = $response.sequence.timingPublication
+$manifest = Get-Content -LiteralPath $publication.manifest -Raw | ConvertFrom-Json
+$product = @($manifest.products | Where-Object schema -eq 'gglab.gpu-timing')[0]
+$timingFile = Join-Path (Split-Path -Parent $publication.manifest) $product.metadata
+python Scripts/Verification/ValidateCaptureBundles.py $publication.manifest
+python Scripts/Verification/ValidateGpuTiming.py $timingFile
+```
+
+Single-frame graph exports keep `execution.gpuTiming` unavailable. Check graph
+joins, sample coverage, published-versus-response statistics and backend identity
+parity with the hidden regression:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite pass-profile-identity -Configuration Release -Rhi dx12,vulkan
+```
 
 Develop uses standard validation; `start -Validation gpu` opts into DX12 GPU-based
 validation, while `-Validation off` disables it. One-shot launches use

@@ -24,7 +24,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(frameCount > 0, "DX12GpuProfiler requires at least one frame slot.");
 		if (!device || !graphicsQueue || frameCount == 0)
 		{
-			m_Enabled.store(false, std::memory_order_relaxed);
+			m_ProfilingState.RequestEnabled(false);
 			return;
 		}
 
@@ -52,12 +52,12 @@ namespace gglab
 
 	void DX12GpuProfiler::RequestEnabled(bool enabled) noexcept
 	{
-		m_Enabled.store(enabled, std::memory_order_relaxed);
+		m_ProfilingState.RequestEnabled(enabled);
 	}
 
 	bool DX12GpuProfiler::IsEnabled() const noexcept
 	{
-		return m_Enabled.load(std::memory_order_relaxed);
+		return m_ProfilingState.IsEnabled();
 	}
 
 	GpuProfileFrameSnapshot DX12GpuProfiler::GetLatestFrame() const
@@ -89,11 +89,14 @@ namespace gglab
 		ResolveCompletedFrame(frame);
 		++m_NextFrameIndex;
 		frame.m_RenderFrameSerial = 0;
-		if (!IsEnabled() || m_TimestampFrequency == 0)
+		const uint64_t profilingState = m_ProfilingState.Read();
+		if (!(profilingState & 1) || m_TimestampFrequency == 0)
 		{
 			return;
 		}
 
+		frame.m_ProfilingStateAtBegin = profilingState;
+		frame.m_ProfilingStateChanged = false;
 		frame.m_FrameIndex = m_NextFrameIndex;
 		frame.m_TimestampCount = 0;
 		frame.m_FrameBeginQuery = InvalidQueryIndex;
@@ -126,6 +129,7 @@ namespace gglab
 			EndScope(commandList);
 		}
 		frame.m_FrameEndQuery = WriteTimestamp(frame, commandList);
+		frame.m_ProfilingStateChanged = frame.m_ProfilingStateAtBegin != m_ProfilingState.Read();
 		if (frame.m_TimestampCount > 0)
 		{
 			DX12Buffer* readbackBuffer = m_Device->ResolveBuffer(frame.m_ReadbackBuffer.Get());
@@ -163,7 +167,7 @@ namespace gglab
 		m_ActiveFrame = nullptr;
 	}
 
-	void DX12GpuProfiler::BeginScope(DX12CommandList& commandList, std::string_view name) noexcept
+	void DX12GpuProfiler::BeginScope(DX12CommandList& commandList, GpuProfileScope identity) noexcept
 	{
 		if (!m_ActiveFrame || !m_ActiveFrame->m_Recording)
 		{
@@ -179,7 +183,8 @@ namespace gglab
 		}
 
 		ScopeRecord scope{};
-		scope.m_Name = name.empty() ? "Unnamed Pass" : std::string(name);
+		scope.m_Sample = { .m_Name = identity.m_Name.empty() ? "Unnamed Scope" : std::string(identity.m_Name),
+			.m_Kind = identity.m_Kind, .m_Occurrence = identity.m_Occurrence };
 		scope.m_BeginQuery = WriteTimestamp(frame, commandList);
 		frame.m_Scopes.push_back(std::move(scope));
 		frame.m_ScopeStack.push_back(static_cast<int32_t>(frame.m_Scopes.size() - 1));
@@ -238,7 +243,7 @@ namespace gglab
 				"DX12GpuProfiler failed to create a timestamp readback buffer.");
 			if (!readbackBuffer.IsValid())
 			{
-				m_Enabled.store(false, std::memory_order_relaxed);
+				m_ProfilingState.RequestEnabled(false);
 				continue;
 			}
 			frame.m_ReadbackBuffer = RHIBufferOwner(&device, readbackBuffer);
@@ -248,7 +253,7 @@ namespace gglab
 				"DX12GpuProfiler failed to map a timestamp readback buffer.");
 			if (!frame.m_MappedTimestamps)
 			{
-				m_Enabled.store(false, std::memory_order_relaxed);
+				m_ProfilingState.RequestEnabled(false);
 			}
 
 			frame.m_Scopes.reserve(MaxScopeCount);
@@ -274,6 +279,7 @@ namespace gglab
 		GpuProfileFrameSnapshot snapshot{};
 		snapshot.m_FrameIndex = frame.m_FrameIndex;
 		snapshot.m_RenderFrameSerial = frame.m_RenderFrameSerial;
+		snapshot.m_ProfilingStateChanged = frame.m_ProfilingStateChanged;
 		if (frame.m_FrameBeginQuery != InvalidQueryIndex &&
 			frame.m_FrameEndQuery != InvalidQueryIndex)
 		{
@@ -301,15 +307,7 @@ namespace gglab
 
 			const double milliseconds = static_cast<double>(end - begin) * 1000.0 /
 				static_cast<double>(m_TimestampFrequency);
-			auto sampleIter = std::ranges::find_if(snapshot.m_Samples,
-				[&scope](const GpuProfileSample& sample) { return sample.m_Name == scope.m_Name; });
-			if (sampleIter == snapshot.m_Samples.end())
-			{
-				snapshot.m_Samples.push_back({ .m_Name = scope.m_Name });
-				sampleIter = std::prev(snapshot.m_Samples.end());
-			}
-			sampleIter->m_Milliseconds += milliseconds;
-			++sampleIter->m_CallCount;
+			AccumulateGpuProfileSample(snapshot, scope.m_Sample.GetScope(), milliseconds);
 		}
 
 		frame.m_PendingResults = false;

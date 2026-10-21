@@ -22,13 +22,42 @@ Full `compile` and `execution` are separate evidence. Physical handles are
 session-local; a transient pool slot establishes pool reuse, not native heap
 aliasing. Null handle resolution remains explicit. `submission` identifies the
 completed frame fence. Build/shader identities and per-pass GPU timing remain
-explicitly unavailable where the export has no authoritative evidence.
+explicitly unavailable where the export has no authoritative evidence; the bundle
+manifest's `environment` declares the build's tracked source state instead.
 
 Graph requests alone add no GPU observation nodes/queries, but do add CPU/file
-work. Active copies/scans/counters appear under observation records. Schemas v1,
-v2, v3 and v4 cover graph-only, resource copies, boundary scans and production
-counters respectively. Do not interpret an observation flag as completed
-numerical coverage.
+work. Active copies/scans/counters appear under observation records. New exports
+use `schemaVersion: 5` for every variant and list the present node kinds in
+`observation.nodeKinds` (`NonFiniteScan`, `ProductionCounters`, `ResourceExport`;
+empty for graph-only). Read capabilities from those kinds and field presence,
+never from a version number. Older exports keep their meaning: v1 has no
+observation nodes, and v2, v3 and v4 record only the highest variant present
+(resource copies, boundary scans, production counters). Do not interpret an
+observation flag as completed numerical coverage.
+
+## Memory facts in full exports
+
+Version 5 full exports add memory facts; summaries carry none of them.
+
+- Each resource has `logicalBytes`, computed by GGLab from its description: every
+  mip, slice and sample in whole format blocks, with volumes shrinking in depth.
+  It describes the data, not allocator padding, tiling or compression. When it is
+  null, `logicalBytesReason` is `unsupported-format` or `size-overflow`.
+- Each `execution.allocations` record freezes allocator facts at devirtualization,
+  before release. `allocationFacts: known` carries D3D12MA/VMA `allocatedBytes`,
+  `alignmentBytes`, `memoryClass` (`device-local` or `other`), `offsetBytes` and
+  `nativeAllocation`. `unavailable` carries null values and an `unavailableReason`:
+  `external` (an adopted native object such as a swap-chain image), `unowned` (no
+  live resource behind the handle) or `unsupported` (the backend reports none).
+- `nativeAllocation` is a frame-local ordinal of the native allocator allocation
+  in first-use order. Records sharing one allocation share it; equal physical
+  handle indices do not imply it. Ordinals are not persisted identities.
+- `execution.totals` keeps distinct meanings: `logicalBytes` (resources used this
+  frame), `allocationBytes` with `unavailableAllocations`,
+  `uniquePhysicalAllocationBytes` (each native allocation once), and the
+  allocator-wide `allocatorBlockBytes` and `allocatorAllocationBytes` sampled after
+  the last pass. The allocator values are process context, not RenderGraph-scoped.
+  Resident bytes are not reported.
 
 ## Address a resource
 

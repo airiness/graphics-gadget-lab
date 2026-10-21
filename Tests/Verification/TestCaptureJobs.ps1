@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Exercises protocol v3 admission, bounded receipts, bundle publication and cancellation
+Exercises protocol v4 admission, bounded receipts, bundle publication and cancellation
 through a real hidden session. This is not GPU/device-loss fault qualification.
 #>
 [CmdletBinding()]
@@ -25,7 +25,7 @@ function Check([bool]$Condition, [string]$Name) {
     if (-not $Condition) { throw "Failed: $Name" }
     $script:checks += $Name
 }
-function Send-Control([hashtable]$Request, [int]$Protocol = 3) {
+function Send-Control([hashtable]$Request, [int]$Protocol = 4) {
     $Request.protocol = $Protocol
     $Request.id = ++$script:controlId
     $client = New-Object IO.Pipes.NamedPipeClientStream('.', "gglab-session-$session", [IO.Pipes.PipeDirection]::InOut)
@@ -40,7 +40,7 @@ function Send-Control([hashtable]$Request, [int]$Protocol = 3) {
         $task = $reader.ReadLineAsync()
         if (-not $task.Wait([TimeSpan]::FromSeconds(30))) { throw 'Control response timeout' }
         $response = $task.Result | ConvertFrom-Json
-        if ($response.protocol -ne 3 -or $response.id -ne $Request.id) { throw 'Unversioned or uncorrelated control response' }
+        if ($response.protocol -ne 4 -or $response.id -ne $Request.id) { throw 'Unversioned or uncorrelated control response' }
         return $response
     } finally { $client.Dispose() }
 }
@@ -68,7 +68,7 @@ try {
                 Check ($status.capabilities.captureJobs -and $status.capabilities.sequenceCaptureJobs -and
                     $status.capture.limits.activeJobs -eq 64 -and $status.capture.limits.receipts -eq 128 -and
                     $status.capture.limits.productsPerJob -eq 8 -and $status.capture.limits.resourceTargetsPerJob -eq 64) "$backend-capabilities"
-                foreach ($old in @(1, 2, 4)) {
+                foreach ($old in @(1, 2, 3, 5)) {
                     $bad = Send-Control @{command='capture'} $old
                     Check (-not $bad.ok -and $bad.error -match 'protocol') "$backend-reject-version-$old"
                 }
@@ -78,7 +78,7 @@ try {
                 Check (-not $invalid.ok -and $invalid.admission -eq 'Rejected' -and $invalid.reason -eq 'InvalidPlan' -and $null -eq $invalid.jobId) "$backend-rejected-plan"
                 $image = Invoke-VerificationSession capture $session @{ SettleFrames=2; OutputDirectory=$directory; Label='image' }
                 Write-VerificationJson "$directory/image-receipt.json" $image
-                Check ($image.protocol -eq 3 -and $image.status -eq 'completed' -and $image.publication -eq 'Published' -and $image.consumed -and
+                Check ($image.protocol -eq 4 -and $image.status -eq 'completed' -and $image.publication -eq 'Published' -and $image.consumed -and
                     (Test-Path (Get-VerificationCaptureFile $image '.png')) -and (Test-Path $image.manifest)) "$backend-script-consumes-completed-bundle"
                 $missing = Send-Control @{command='result';jobId=$image.jobId}
                 Check (-not $missing.ok -and $missing.status -eq 'not-found') "$backend-consumed-job-not-found"

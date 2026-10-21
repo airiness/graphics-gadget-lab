@@ -184,6 +184,15 @@ namespace gglab
 				return {};
 			}
 			void RetireCompletedWork() noexcept override {}
+			RHIAllocationFacts QueryTextureAllocationFacts(RHITextureHandle texture) const noexcept override
+			{
+				return FindAllocationFacts(m_TextureAllocationFacts, texture);
+			}
+			RHIAllocationFacts QueryBufferAllocationFacts(RHIBufferHandle buffer) const noexcept override
+			{
+				return FindAllocationFacts(m_BufferAllocationFacts, buffer);
+			}
+			RHIAllocatorTotals QueryAllocatorTotals() const noexcept override { return m_AllocatorTotals; }
 
 			// Simulates the GPU copy: row y, byte x holds (y * 16 + x) in the row
 			// payload and 0xEE in the pitch padding.
@@ -226,6 +235,11 @@ namespace gglab
 			uint32_t m_FailBufferCreationAt = 0;
 			uint32_t m_ReadbackMapAttempts = 0;
 			uint32_t m_FailReadbackMapAt = 0;
+			// Unreported handles have no live allocator record; without reporting, facts are unsupported.
+			bool m_ReportAllocationFacts = false;
+			std::unordered_map<RHITextureHandle, RHIAllocationFacts> m_TextureAllocationFacts;
+			std::unordered_map<RHIBufferHandle, RHIAllocationFacts> m_BufferAllocationFacts;
+			RHIAllocatorTotals m_AllocatorTotals{};
 
 		private:
 			struct Buffer
@@ -233,6 +247,20 @@ namespace gglab
 				RHIBufferDesc m_Desc{};
 				std::vector<uint8_t> m_Bytes;
 			};
+
+			template <typename Handle>
+			[[nodiscard]] RHIAllocationFacts FindAllocationFacts(
+				const std::unordered_map<Handle, RHIAllocationFacts>& facts, Handle handle) const noexcept
+			{
+				if (!m_ReportAllocationFacts)
+				{
+					return {};
+				}
+				const auto found = facts.find(handle);
+				return found != facts.end() ?
+					found->second :
+					RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+			}
 
 			std::unordered_map<RHIBufferHandle, Buffer> m_Buffers;
 			uint32_t m_NextBufferIndex = 0;
@@ -1529,7 +1557,9 @@ namespace gglab
 			using Json = nlohmann::json;
 			const Json full = Json::parse(SerializeRenderGraphSnapshot(snapshot));
 			const Json summary = Json::parse(SerializeRenderGraphSnapshot(snapshot, true));
-			context.Check(full["schema"] == "gglab.render-graph" && full["schemaVersion"] == 1 &&
+			context.Check(full["schema"] == "gglab.render-graph" &&
+				full["schemaVersion"] == RenderGraphExportSchemaVersion &&
+				full["observation"]["nodeKinds"].empty() && summary["observation"]["nodeKinds"].empty() &&
 				full["compile"]["passes"][0]["occurrence"] == 1 &&
 				full["compile"]["passes"][1]["occurrence"] == 2 &&
 				full["compile"]["duplicatePassNames"] == Json::array({ "Repeated" }) &&
@@ -1681,6 +1711,240 @@ namespace gglab
 				"Generic compile-only JSON retains diagnostics without claiming execution");
 		}
 
+		void RunTextureLogicalSizeTests(SelfTestContext& context) noexcept
+		{
+			const RHITextureDesc color{ .m_Format = RHIFormat::R8G8B8A8Unorm, .m_Extent = { 7, 5, 1 } };
+			RHITextureDesc chain = color;
+			chain.m_MipLevels = 3;
+			RHITextureDesc multisampled = color;
+			multisampled.m_SampleCount = 4;
+			const RHITextureDesc cube{ .m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_CreateFlags = RHITextureCreateFlags::CubeCompatible, .m_Extent = { 8, 8, 1 },
+				.m_ArraySize = 6, .m_MipLevels = 4 };
+			const RHITextureDesc volume{ .m_Dimension = RHITextureDimension::Texture3D,
+				.m_Format = RHIFormat::R16Float, .m_Extent = { 8, 4, 4 }, .m_MipLevels = 3 };
+			context.Check(GetRHITextureLogicalBytes(color) == 140u &&
+				GetRHITextureLogicalBytes(chain) == 168u &&
+				GetRHITextureLogicalBytes(multisampled) == 560u &&
+				GetRHITextureLogicalBytes(cube) == 2040u && GetRHITextureLogicalBytes(volume) == 292u,
+				"Logical sizes count every mip, slice, cube face and sample and shrink volumes in depth");
+
+			// RHIFormat has no block-compressed entry yet. The block description comes from the
+			// format record, so a fixture record exercises compressed layouts through the same rule.
+			const RHIFormatInfo blocks{ .m_Name = "BlockCompressedFixture", .m_PlaneCount = 1,
+				.m_BytesPerBlock = 16, .m_BlockWidth = 4, .m_BlockHeight = 4 };
+			const RHITextureDesc compressed{ .m_Extent = { 10, 6, 1 }, .m_MipLevels = 3 };
+			RHITextureDesc compressedArray = compressed;
+			compressedArray.m_ArraySize = 2;
+			context.Check(GetRHITextureLogicalBytes(compressed, blocks) == 144u &&
+				GetRHITextureLogicalBytes(compressedArray, blocks) == 288u,
+				"Block layouts round partial edge blocks up and count sub-block mips as whole blocks");
+
+			const RHITextureDesc unknown{ .m_Format = RHIFormat::Unknown, .m_Extent = { 4, 4, 1 } };
+			const RHITextureDesc huge{ .m_Dimension = RHITextureDimension::Texture3D,
+				.m_Format = RHIFormat::R32G32B32A32Float,
+				.m_Extent = { UINT32_MAX, UINT32_MAX, UINT32_MAX } };
+			context.Check(!GetRHITextureLogicalBytes(unknown) && !GetRHITextureLogicalBytes(huge),
+				"Formats without a block description and unrepresentable totals have no logical size");
+
+			RGSnapshot snapshot;
+			snapshot.m_Resources = {
+				{ .m_Index = 0, .m_Name = "Unknown", .m_TextureFormat = RHIFormat::Unknown },
+				{ .m_Index = 1, .m_Name = "Huge", .m_TextureDimension = RHITextureDimension::Texture3D,
+					.m_TextureFormat = RHIFormat::R32G32B32A32Float },
+				{ .m_Index = 2, .m_Name = "Words", .m_ResourceType = RGResourceType::RGBuffer,
+					.m_BufferSizeInBytes = 48, .m_LogicalBytes = 48 },
+			};
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			const auto& resources = json["compile"]["resources"];
+			const auto& totals = json["execution"]["totals"];
+			context.Check(resources[0]["logicalBytes"].is_null() &&
+				resources[0]["logicalBytesReason"] == "unsupported-format" &&
+				resources[1]["logicalBytesReason"] == "size-overflow" &&
+				resources[1]["texture"]["dimension"] == "Texture3D" &&
+				resources[2]["logicalBytes"] == 48 && resources[2]["logicalBytesReason"].is_null() &&
+				totals["logicalBytes"] == 0 && totals["allocatorBlockBytes"].is_null() &&
+				totals["allocatorAllocationBytes"].is_null(),
+				"Missing logical sizes carry their reason and unrecorded executions claim no allocator bytes");
+		}
+
+		void RunGraphAllocationFactsTests(SelfTestContext& context) noexcept
+		{
+			CaptureTestDevice device;
+			TransientResourcePool pool(&device);
+			device.m_ReportAllocationFacts = true;
+			const auto known = [](uint64_t bytes, uint64_t identity)
+				{
+					return RHIAllocationFacts{
+						.m_Status = RHIAllocationFactsStatus::Known,
+						.m_AllocatedBytes = bytes,
+						.m_AlignmentBytes = 65536,
+						.m_MemoryClass = RHIMemoryClass::DeviceLocal,
+						.m_NativeAllocationId = identity,
+					};
+				};
+			const auto bufferDesc = [](uint64_t bytes)
+				{
+					return RHIBufferDesc{ .m_SizeInBytes = bytes, .m_Usage = RHIBufferUsage::CopySource };
+				};
+			RHIBufferOwner placedFirst(&device, device.CreateBuffer(bufferDesc(1024), {}));
+			RHIBufferOwner placedSecond(&device, device.CreateBuffer(bufferDesc(512), {}));
+			RHIBufferOwner unowned(&device, device.CreateBuffer(bufferDesc(256), {}));
+			// The pool's first texture takes index 0; the import reuses that index with a new
+			// generation and a different native allocation.
+			const RHITextureHandle pooled{ 0, 1 };
+			const RHITextureHandle recycled{ 0, 2 };
+			const RHITextureHandle backBuffer{ 30, 1 };
+			device.m_TextureAllocationFacts = {
+				{ pooled, known(65536, 7) },
+				{ recycled, known(131072, 8) },
+				{ backBuffer, { .m_Status = RHIAllocationFactsStatus::External } },
+			};
+			// Two buffers placed in one native allocation share its identity.
+			device.m_BufferAllocationFacts = {
+				{ placedFirst.Get(), known(1u << 20, 9) },
+				{ placedSecond.Get(), known(1u << 20, 9) },
+			};
+			device.m_AllocatorTotals = {
+				.m_Known = true, .m_BlockBytes = 1u << 24, .m_AllocationBytes = 1u << 22 };
+
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data {};
+			graph.AddPass<Data>("Scene", RGPassEncoderType::Copy, [](auto& builder, Data&)
+				{
+					auto scene = builder.CreateTexture("Scene", { .m_Format = RHIFormat::R16G16B16A16Float,
+						.m_Extent = { 6, 5, 1 }, .m_MipLevels = 3 });
+					builder.WriteInPlace(scene, RGTextureAccess::CopyDest);
+					builder.SideEffect();
+				});
+			graph.AddPass<Data>("History", RGPassEncoderType::Copy, [&](auto& builder, Data&)
+				{
+					const auto history = builder.ImportTexture("History", recycled,
+						{ .m_Format = RHIFormat::R8G8B8A8Unorm, .m_Usage = RHITextureUsage::CopySource,
+							.m_CreateFlags = RHITextureCreateFlags::CubeCompatible,
+							.m_Extent = { 8, 8, 1 }, .m_ArraySize = 6 },
+						RGTextureAccess::CopySource, RGContentValidity::Defined);
+					GGLAB_UNUSED(builder.Read(history, RGTextureAccess::CopySource));
+					builder.SideEffect();
+				});
+			graph.AddPass<Data>("Present", RGPassEncoderType::Copy, [&](auto& builder, Data&)
+				{
+					auto present = builder.ImportTexture("BackBuffer", backBuffer,
+						{ .m_Format = RHIFormat::B8G8R8A8Unorm, .m_Usage = RHITextureUsage::CopyDest,
+							.m_Extent = { 8, 8, 1 } },
+						RGTextureAccess::CopyDest, RGContentValidity::Undefined);
+					builder.WriteInPlace(present, RGTextureAccess::CopyDest);
+					builder.SideEffect();
+				});
+			const auto read = [&](const char* name, RHIBufferHandle buffer, uint64_t bytes)
+				{
+					graph.AddPass<Data>(name, RGPassEncoderType::Copy, [=](auto& builder, Data&)
+						{
+							const auto imported = builder.ImportBuffer(name, buffer, bufferDesc(bytes),
+								RGBufferAccess::CopySource, RGContentValidity::Defined);
+							GGLAB_UNUSED(builder.Read(imported, RGBufferAccess::CopySource));
+							builder.SideEffect();
+						});
+				};
+			read("PlacedFirst", placedFirst.Get(), 1024);
+			read("PlacedSecond", placedSecond.Get(), 512);
+			read("Unowned", unowned.Get(), 256);
+			const bool compiled = graph.Compile();
+			context.Check(compiled, "Allocation-facts graph fixture compiles");
+			if (!compiled)
+			{
+				return;
+			}
+			graph.EnableExecutionRecord();
+			ExportTestCommands commands(device);
+			RGDeferredCommitList commits;
+			RGExecuteContext execution(commits, { .m_GraphicsCommandContext = &commands });
+			graph.Execute(execution);
+			commits.Discard();
+			// Retiring the resources and losing their allocator records must not change the
+			// evidence frozen while they were valid.
+			graph.Retire(MakeFence(5));
+			device.m_TextureAllocationFacts.clear();
+			device.m_BufferAllocationFacts.clear();
+			device.m_AllocatorTotals = {};
+
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const auto& records = snapshot.m_Execution.m_Allocations;
+			context.Check(records.size() == 6 &&
+				records[0].m_AllocationFacts == RHIAllocationFactsStatus::Known &&
+				records[0].m_AllocatedBytes == 65536 && records[0].m_NativeAllocation == 0u &&
+				records[1].m_PhysicalHandleIndex == records[0].m_PhysicalHandleIndex &&
+				records[1].m_PhysicalHandleGeneration != records[0].m_PhysicalHandleGeneration &&
+				records[1].m_NativeAllocation == 1u &&
+				records[2].m_AllocationFacts == RHIAllocationFactsStatus::External &&
+				!records[2].m_NativeAllocation && records[3].m_NativeAllocation == 2u &&
+				records[4].m_NativeAllocation == 2u &&
+				records[5].m_AllocationFacts == RHIAllocationFactsStatus::Unowned &&
+				!records[5].m_NativeAllocation &&
+				snapshot.m_Execution.m_AllocatorTotals.m_AllocationBytes == (1u << 22),
+				"Execution freezes allocator facts and joins records by native allocation, not handle index");
+
+			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
+			const auto& allocations = json["execution"]["allocations"];
+			const auto& totals = json["execution"]["totals"];
+			const auto& resources = json["compile"]["resources"];
+			context.Check(json["schemaVersion"] == RenderGraphExportSchemaVersion &&
+				json["observation"]["nodeKinds"].empty() &&
+				allocations[0]["allocationFacts"] == "known" &&
+				allocations[0]["memoryClass"] == "device-local" &&
+				allocations[0]["alignmentBytes"] == 65536 && allocations[0]["offsetBytes"] == 0 &&
+				allocations[2]["allocationFacts"] == "unavailable" &&
+				allocations[2]["unavailableReason"] == "external" &&
+				allocations[2]["allocatedBytes"].is_null() &&
+				allocations[2]["nativeAllocation"].is_null() &&
+				allocations[3]["nativeAllocation"] == 2 && allocations[4]["nativeAllocation"] == 2 &&
+				allocations[5]["unavailableReason"] == "unowned" &&
+				resources[0]["logicalBytes"] == 296 && resources[0]["texture"]["dimension"] == "Texture2D" &&
+				resources[1]["logicalBytes"] == 1536 && resources[3]["logicalBytes"] == 1024,
+				"Allocation records serialize known facts and unavailable reasons without estimates");
+			context.Check(totals["logicalBytes"] == 3880 && totals["unavailableLogicalResources"] == 0 &&
+				totals["allocationBytes"] == 2293760 && totals["unavailableAllocations"] == 2 &&
+				totals["uniquePhysicalAllocationBytes"] == 1245184 &&
+				totals["allocatorBlockBytes"] == (1u << 24) &&
+				totals["allocatorAllocationBytes"] == (1u << 22),
+				"Graph totals separate logical, allocator-reported, unique physical and allocator-wide bytes");
+			const auto summary = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot, true));
+			context.Check(summary["schemaVersion"] == RenderGraphExportSchemaVersion &&
+				summary["observation"]["nodeKinds"].empty() && !summary.contains("execution") &&
+				!summary["compile"].contains("resources") &&
+				std::ranges::none_of(summary["compile"]["passes"],
+					[](const auto& pass) { return pass.contains("logicalBytes"); }),
+				"Summary exports require node kinds and carry no full-only size or allocation fields");
+
+			device.m_ReportAllocationFacts = false;
+			RenderGraph unsupported({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			unsupported.AddPass<Data>("Scene", RGPassEncoderType::Copy, [](auto& builder, Data&)
+				{
+					auto scene = builder.CreateTexture("Scene",
+						{ .m_Format = RHIFormat::R8Unorm, .m_Extent = { 4, 4, 1 } });
+					builder.WriteInPlace(scene, RGTextureAccess::CopyDest);
+					builder.SideEffect();
+				});
+			context.Check(unsupported.Compile(), "Unsupported-facts graph fixture compiles");
+			unsupported.EnableExecutionRecord();
+			RGDeferredCommitList unsupportedCommits;
+			RGExecuteContext unsupportedExecution(
+				unsupportedCommits, { .m_GraphicsCommandContext = &commands });
+			unsupported.Execute(unsupportedExecution);
+			unsupportedCommits.Discard();
+			unsupported.Retire(MakeFence(6));
+			RGSnapshot plainSnapshot;
+			BuildRenderGraphSnapshot(unsupported, plainSnapshot);
+			const auto plain = nlohmann::json::parse(SerializeRenderGraphSnapshot(plainSnapshot));
+			const auto& plainTotals = plain["execution"]["totals"];
+			context.Check(plain["execution"]["allocations"][0]["unavailableReason"] == "unsupported" &&
+				plainTotals["logicalBytes"] == 16 && plainTotals["unavailableAllocations"] == 1 &&
+				plainTotals["allocationBytes"] == 0 && plainTotals["uniquePhysicalAllocationBytes"] == 0 &&
+				plainTotals["allocatorBlockBytes"].is_null(),
+				"A device without allocator queries reports unsupported facts instead of estimates");
+		}
+
 		void RunResourceExportTests(SelfTestContext& context) noexcept
 		{
 			CaptureTestDevice device;
@@ -1738,7 +2002,8 @@ namespace gglab
 			RGSnapshot snapshot;
 			BuildRenderGraphSnapshot(graph, snapshot);
 			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
-			context.Check(json["schemaVersion"] == 2 && json["compile"]["passes"][0]["culled"] == true &&
+			context.Check(json["observation"]["nodeKinds"] == nlohmann::json::array({ "ResourceExport" }) &&
+				json["compile"]["passes"][0]["culled"] == true &&
 				json["compile"]["passes"][1]["executionOrder"] == 0 && json["compile"]["passes"][2]["executionOrder"] == 2,
 				"Observers preserve original liveness/order and occupy the exact version cut");
 			service.BeginGraphRecording(7, graph);
@@ -2010,7 +2275,9 @@ namespace gglab
 			RGSnapshot snapshot;
 			BuildRenderGraphSnapshot(graph, snapshot);
 			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
-			context.Check(json["schemaVersion"] == 3 && json["compile"]["passes"][0]["culled"] == true &&
+			context.Check(json["observation"]["nodeKinds"] ==
+				nlohmann::json::array({ "NonFiniteScan", "ResourceExport" }) &&
+				json["compile"]["passes"][0]["culled"] == true &&
 				json["compile"]["passes"][1]["executionOrder"] == 0 && json["compile"]["passes"][2]["executionOrder"] == 5,
 				"Mixed observers preserve original culling and exact version-cut ordering");
 			bool uav = false, copyTransition = false;
@@ -2301,7 +2568,8 @@ namespace gglab
 				RGObservationFailure::UnsupportedResource,
 				"The imported preview hidden by discovery is rejected by actual address resolution for the same reason");
 			const auto json = nlohmann::json::parse(SerializeRenderGraphSnapshot(snapshot));
-			context.Check(json["schemaVersion"] == 1 && std::ranges::none_of(json["compile"]["resources"],
+			context.Check(json["observation"]["nodeKinds"].empty() &&
+				std::ranges::none_of(json["compile"]["resources"],
 				[](const auto& resource) { return resource.contains("resourceExportSupport"); }),
 				"UI export capability diagnostics leave the persisted graph schema unchanged");
 		}
@@ -2708,6 +2976,8 @@ namespace gglab
 		RunGraphCaptureTests(context);
 		RunGraphEnumTests(context);
 		RunGraphVersionTests(context);
+		RunTextureLogicalSizeTests(context);
+		RunGraphAllocationFactsTests(context);
 		RunGraphRequestCapacityTests(context);
 		RunFixedTimeStepTests(context);
 		RunFootprintTests(context);

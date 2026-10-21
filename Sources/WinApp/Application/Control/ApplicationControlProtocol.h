@@ -15,7 +15,7 @@ namespace gglab
 	// Version of the session control protocol: one UTF-8 JSON request line per
 	// connection answered by one JSON response line. Increment it for every
 	// change that renames, removes or reinterprets a field or command.
-	inline constexpr uint32_t ApplicationControlProtocolVersion = 3;
+	inline constexpr uint32_t ApplicationControlProtocolVersion = 4;
 
 	enum class ApplicationControlCommand : uint8_t
 	{
@@ -76,6 +76,8 @@ namespace gglab
 		bool m_NonFiniteInstrumentation = false;
 		std::shared_ptr<const NonFiniteProductionFrame> m_NonFiniteProduction;
 		const NonFiniteWatchStatus* m_Watch = nullptr;
+		// The process environment record as JSON; empty before the runtime services exist.
+		std::string_view m_Environment;
 	};
 
 	// Response serializers. Every response carries the protocol version, the
@@ -99,4 +101,6 @@ namespace gglab
 		const NonFiniteWatchStatus& status, bool instrumentation) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlSequence(
 		uint64_t id, const FrameSequenceStatus& status) noexcept;
+	[[nodiscard]] std::string SerializeApplicationControlSequenceCancellation(uint64_t id,
+		const FrameSequenceStatus* status, FrameSequenceCancelVerdict cancellation) noexcept;
 }

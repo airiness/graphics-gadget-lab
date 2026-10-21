@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <D3D12MemAlloc.h>
 #include <cstdint>
@@ -43,6 +44,8 @@ namespace gglab
 		bool IsValid() const noexcept;
 		bool IsExternal() const noexcept;
 		bool OwnsAllocation() const noexcept;
+		// Reads the D3D12MA allocation while the resource is alive.
+		RHIAllocationFacts GetAllocationFacts() const noexcept;
 
 		const D3D12_CLEAR_VALUE* GetClearValue() const noexcept;
 
@@ -53,5 +56,6 @@ namespace gglab
 		std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
 		ComPtr<D3D12MA::Allocation> m_Allocation;
 		ComPtr<ID3D12Resource> m_Resource;
+		uint64_t m_NativeAllocationId = 0;
 	};
 }

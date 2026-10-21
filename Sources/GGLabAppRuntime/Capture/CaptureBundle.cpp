@@ -69,6 +69,68 @@ namespace gglab
 		return std::format("{}-j{}-a{}", runIdentity, jobId, attempt);
 	}
 
+	std::string MakeSequenceTimingBundleId(std::string_view runIdentity, uint64_t sequenceId)
+	{
+		return std::format("{}-s{}-timing", runIdentity, sequenceId);
+	}
+
+	CaptureEncodedBundle EncodeSequenceTimingBundle(const SequenceTimingBundleInput& input) noexcept try
+	{
+		const Json environment = Json::parse(input.m_Environment);
+		const Json product = Json::parse(input.m_ProductJson);
+		const auto& sequence = product.at("sequence");
+		const uint64_t requested = product.at("coverage").at("requestedSamples");
+		if (input.m_RunIdentity.size() != 32 || !std::ranges::all_of(input.m_RunIdentity,
+			[](char value) { return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'); }) ||
+			input.m_SequenceId == 0 || !environment.is_object() ||
+			product.at("schema") != "gglab.gpu-timing" || product.at("schemaVersion") != 1 ||
+			product.at("sequence").at("id") != input.m_SequenceId ||
+			requested == 0 || product.at("coverage").at("recordedSamples") != requested ||
+			product.at("coverage").at("samples").size() != requested ||
+			product.at("frame").at("milliseconds").size() != requested ||
+			requested != sequence.at("frameCount").get<uint64_t>() *
+				std::max(uint64_t{ 1 }, sequence.at("referenceSamples").get<uint64_t>()))
+		{
+			return { .m_Failure = "A timing bundle requires environment, sequence identity and complete samples." };
+		}
+		CaptureEncodedBundle bundle;
+		bundle.m_BundleId = MakeSequenceTimingBundleId(input.m_RunIdentity, input.m_SequenceId);
+		bundle.m_Content.m_Files.push_back({ .m_Suffix = ".gpu-timing.json",
+			.m_Bytes = std::vector<uint8_t>(input.m_ProductJson.begin(), input.m_ProductJson.end()),
+			.m_Stage = CaptureWriteStage::WritingMetadata });
+		bundle.m_Products.push_back({ 0, { 0 } });
+		bundle.m_Content.m_Files.push_back({ .m_Suffix = ".capture-bundle.json",
+			.m_Stage = CaptureWriteStage::WritingMetadata });
+		bundle.m_Content.m_MakeMarker = [identity = bundle.m_BundleId, run = input.m_RunIdentity,
+			environment, sequence = product.at("sequence"), watch = product.at("watch")]
+			(std::span<const std::filesystem::path> paths)
+			{
+				const std::string file = GetFrameCapturePathText(paths[0].filename());
+				return Json{
+					{ "schema", "gglab.capture-bundle" },
+					{ "schemaVersion", CaptureBundleSchemaVersion },
+					{ "bundleId", identity },
+					{ "runIdentity", run },
+					{ "consistency", "sequence-range" },
+					{ "environment", environment },
+					{ "sequence", sequence },
+					{ "watch", watch },
+					{ "products", Json::array({ Json{
+						{ "index", 0 },
+						{ "source", "gpu-timing" },
+						{ "diagnosticTap", nullptr },
+						{ "schema", "gglab.gpu-timing" },
+						{ "schemaVersion", 1 },
+						{ "metadata", file },
+						{ "files", Json::array({ file }) } } }) } }.dump(2);
+			};
+		return bundle;
+	}
+	catch (const std::exception& error)
+	{
+		return { .m_Failure = std::format("Encoding the timing bundle failed: {}", error.what()) };
+	}
+
 	CaptureEncodedBundle EncodeCaptureBundle(const CaptureBundleInput& input,
 		const FrameCaptureImageEncoder& imageEncoder, std::atomic<CaptureWriteStage>& stage) noexcept try
 	{
@@ -77,6 +139,11 @@ namespace gglab
 			input.m_JobId == 0 || input.m_Attempt == 0 || input.m_ProductCount == 0 || input.m_Deliveries.empty())
 		{
 			return { .m_Failure = "A bundle requires qualified job/attempt identity and required products." };
+		}
+		const Json environment = Json::parse(input.m_Environment, nullptr, false);
+		if (!environment.is_object())
+		{
+			return { .m_Failure = "A bundle requires the process environment record." };
 		}
 		CaptureEncodedBundle bundle;
 		bundle.m_BundleId = MakeCaptureBundleId(input.m_RunIdentity, input.m_JobId, input.m_Attempt);
@@ -211,7 +278,7 @@ namespace gglab
 		bundle.m_Content.m_Files.push_back({ .m_Suffix = ".capture-bundle.json",
 			.m_Stage = CaptureWriteStage::WritingMetadata });
 		bundle.m_Content.m_MakeMarker = [records = std::move(records), versions = std::move(versions),
-			provenance, submission, watch, run = input.m_RunIdentity, id = input.m_JobId,
+			environment, provenance, submission, watch, run = input.m_RunIdentity, id = input.m_JobId,
 			attempt = input.m_Attempt, identity = bundle.m_BundleId](std::span<const std::filesystem::path> paths)
 			{
 				Json products = Json::array();
@@ -236,6 +303,7 @@ namespace gglab
 					{ "jobId", id },
 					{ "attempt", attempt },
 					{ "consistency", "same-frame" },
+					{ "environment", environment },
 					{ "provenance", provenance },
 					{ "submission", submission },
 					{ "watch", watch },

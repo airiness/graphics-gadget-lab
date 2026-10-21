@@ -74,10 +74,17 @@ name, source, content, backend, reference view, camera, frame serial/index, size
 fixed step/total time, readiness, DevTools, temporal settings and optional sequence
 and watch metadata. Qualified bundle identities prevent replacing existing artifacts.
 
-The final `gglab.capture-bundle` v1 manifest commits all required product files.
+The final `gglab.capture-bundle` v2 manifest commits all required product files.
 Wait for Completed + Published before consuming the bundle; PNG or sidecar
 existence alone is insufficient. Shutdown bounds pending writing to 30 seconds;
 late publication does not rewrite a one-shot timeout outcome.
+
+The manifest's `environment` (also returned by `status`) records process-constant
+provenance: the build's stamped source revision, dirty state and configuration;
+the backend, adapter, driver and API level; requested and effective validation.
+Unknown values are null, never estimated. The build stamp declares the tracked
+source state; it does not prove which bytes the executable contains. Version 1
+manifests, which predate the record, remain valid.
 
 Captures and diagnostic exports share bounded requests, payload slots and bytes.
 Session batches submit and consume one view at a time; admission Busy is explicit.

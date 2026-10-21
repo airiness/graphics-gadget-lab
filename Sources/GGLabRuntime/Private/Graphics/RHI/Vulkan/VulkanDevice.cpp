@@ -481,6 +481,53 @@ namespace gglab
 			m_ResourceManager.IsSamplerAlive(sampler);
 	}
 
+	RHIAllocationFacts VulkanDevice::QueryTextureAllocationFacts(
+		RHITextureHandle texture) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryTextureAllocationFacts"))
+		{
+			return {};
+		}
+		const VulkanTexture* resource = m_ResourceManager.ResolveTexture(texture);
+		return resource ?
+			resource->GetAllocationFacts() :
+			RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+	}
+
+	RHIAllocationFacts VulkanDevice::QueryBufferAllocationFacts(
+		RHIBufferHandle buffer) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryBufferAllocationFacts"))
+		{
+			return {};
+		}
+		const VulkanBuffer* resource = m_ResourceManager.ResolveBuffer(buffer);
+		return resource ?
+			resource->GetAllocationFacts() :
+			RHIAllocationFacts{ .m_Status = RHIAllocationFactsStatus::Unowned };
+	}
+
+	RHIAllocatorTotals VulkanDevice::QueryAllocatorTotals() const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryAllocatorTotals") ||
+			m_MemAllocator == VK_NULL_HANDLE)
+		{
+			return {};
+		}
+		// Heap budget statistics are maintained counters; their sum covers every heap.
+		const VkPhysicalDeviceMemoryProperties* memory = nullptr;
+		vmaGetMemoryProperties(m_MemAllocator, &memory);
+		VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+		vmaGetHeapBudgets(m_MemAllocator, budgets);
+		RHIAllocatorTotals totals{ .m_Known = true };
+		for (uint32_t heap = 0; heap < memory->memoryHeapCount; ++heap)
+		{
+			totals.m_BlockBytes += budgets[heap].statistics.blockBytes;
+			totals.m_AllocationBytes += budgets[heap].statistics.allocationBytes;
+		}
+		return totals;
+	}
+
 	RHIDescriptorHandle VulkanDevice::GetTextureViewDescriptor(
 		RHITextureViewHandle view) const noexcept
 	{

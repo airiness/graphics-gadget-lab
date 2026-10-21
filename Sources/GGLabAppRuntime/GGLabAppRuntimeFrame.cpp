@@ -796,7 +796,11 @@ namespace gglab
 		}
 		m_NonFiniteWatch->OnFrameSubmitted(frame.m_FrameSerial);
 		m_FrameCapture->OnFrameSubmitted();
-		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial);
+		const FrameSequenceObservation sequenceObservation = m_FrameSequence->WantsGpuTiming() ?
+			FrameSequenceObservation{ m_FrameCapture->HasFrameGraphExports(frame.m_FrameSerial),
+				renderGraph.GetObservationActivity() } :
+			FrameSequenceObservation{};
+		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
 
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,

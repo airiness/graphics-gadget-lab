@@ -34,6 +34,8 @@ namespace gglab
 		{
 			return m_AllocationSizeInBytes;
 		}
+		// Reads the VMA allocation while the resource is alive.
+		[[nodiscard]] RHIAllocationFacts GetAllocationFacts() const noexcept;
 
 		// Applies the debug name through VK_EXT_debug_utils when available.
 		virtual void SetDebugName(const char* name) noexcept = 0;
@@ -42,10 +44,16 @@ namespace gglab
 		virtual void Release() noexcept = 0;
 
 	protected:
+		// Alignment the native object requires of its memory.
+		[[nodiscard]] virtual VkDeviceSize GetMemoryAlignment() const noexcept = 0;
+		// Each created resource owns its allocation, so the identity is assigned with it.
+		void AssignNativeAllocationId() noexcept;
+
 		VkDevice m_Device = VK_NULL_HANDLE;
 		VmaAllocator m_Allocator = VK_NULL_HANDLE;
 		VmaAllocation m_Allocation = VK_NULL_HANDLE;
 		VkDeviceSize m_AllocationSizeInBytes = 0;
+		uint64_t m_NativeAllocationId = 0;
 		bool m_Borrowed = false;
 	};
 
@@ -114,6 +122,9 @@ namespace gglab
 		bool Unmap(RHIMappedBufferRange writtenRange) noexcept;
 		[[nodiscard]] VulkanBufferMapping GetMapping() const noexcept { return m_Mapping; }
 
+	protected:
+		[[nodiscard]] VkDeviceSize GetMemoryAlignment() const noexcept override;
+
 	private:
 		VkBuffer m_Buffer = VK_NULL_HANDLE;
 		VkBufferCreateInfo m_CreateInfo{};
@@ -159,6 +170,9 @@ namespace gglab
 		}
 		[[nodiscard]] VkFormat GetVkFormat() const noexcept { return m_CreateInfo.format; }
 		[[nodiscard]] RHIResourceState GetInitialState() const noexcept { return m_InitialState; }
+
+	protected:
+		[[nodiscard]] VkDeviceSize GetMemoryAlignment() const noexcept override;
 
 	private:
 		VkImage m_Image = VK_NULL_HANDLE;

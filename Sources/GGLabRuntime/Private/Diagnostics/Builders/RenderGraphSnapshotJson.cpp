@@ -3,6 +3,10 @@
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
 #include <nlohmann/json.hpp>
 
 namespace gglab
@@ -108,6 +112,154 @@ namespace gglab
 				{ "occurrence", pass.m_Occurrence } };
 		}
 
+		std::string_view ObservationKind(RGObservationKind kind)
+		{
+			switch (kind)
+			{
+			case RGObservationKind::ResourceExport:
+				return "ResourceExport";
+			case RGObservationKind::NonFiniteScan:
+				return "NonFiniteScan";
+			case RGObservationKind::ProductionCounters:
+				return "ProductionCounters";
+			}
+			return "Unknown";
+		}
+
+		// Capabilities are read from the kinds present, never from the schema version.
+		Json NodeKinds(const RGSnapshot& snapshot)
+		{
+			std::vector<std::string> kinds;
+			for (const auto& entry : snapshot.m_ObservationNodes)
+			{
+				kinds.emplace_back(ObservationKind(entry.second.m_Kind));
+			}
+			std::ranges::sort(kinds);
+			kinds.erase(std::unique(kinds.begin(), kinds.end()), kinds.end());
+			return kinds;
+		}
+
+		std::string_view Dimension(RHITextureDimension dimension)
+		{
+			switch (dimension)
+			{
+			case RHITextureDimension::Texture1D:
+				return "Texture1D";
+			case RHITextureDimension::Texture2D:
+				return "Texture2D";
+			case RHITextureDimension::Texture3D:
+				return "Texture3D";
+			}
+			return "Unknown";
+		}
+
+		Json LogicalBytesReason(const RGSnapshotResourceInfo& resource)
+		{
+			if (resource.m_LogicalBytes)
+			{
+				return nullptr;
+			}
+			const RHIFormatInfo& format = GetRHIFormatInfo(resource.m_TextureFormat);
+			const bool described = format.m_BytesPerBlock != 0 && format.m_BlockWidth != 0 &&
+				format.m_BlockHeight != 0;
+			return described ? "size-overflow" : "unsupported-format";
+		}
+
+		std::string_view UnavailableReason(RHIAllocationFactsStatus status)
+		{
+			switch (status)
+			{
+			case RHIAllocationFactsStatus::Known:
+				break;
+			case RHIAllocationFactsStatus::External:
+				return "external";
+			case RHIAllocationFactsStatus::Unowned:
+				return "unowned";
+			case RHIAllocationFactsStatus::Unsupported:
+				return "unsupported";
+			}
+			return "unsupported";
+		}
+
+		Json MemoryClass(RHIMemoryClass memoryClass)
+		{
+			switch (memoryClass)
+			{
+			case RHIMemoryClass::Unknown:
+				break;
+			case RHIMemoryClass::DeviceLocal:
+				return "device-local";
+			case RHIMemoryClass::Other:
+				return "other";
+			}
+			return nullptr;
+		}
+
+		Json Allocation(const RGSnapshotAllocation& allocation)
+		{
+			const bool known = allocation.m_AllocationFacts == RHIAllocationFactsStatus::Known;
+			const auto bytes = [known](uint64_t value) { return known ? Json(value) : Json(nullptr); };
+			return {
+				{ "resourceIndex", allocation.m_VirtualResourceIndex },
+				{ "passIndex", allocation.m_PassIndex },
+				{ "imported", allocation.m_Imported },
+				{ "poolSlot", allocation.m_PoolSlot.IsValid() ? Json(allocation.m_PoolSlot.Value()) : Json(nullptr) },
+				{ "physical", Physical(allocation.m_HasPhysicalHandle, allocation.m_PhysicalHandleIndex, allocation.m_PhysicalHandleGeneration) },
+				{ "allocationFacts", known ? "known" : "unavailable" },
+				{ "unavailableReason", known ? Json(nullptr) : Json(UnavailableReason(allocation.m_AllocationFacts)) },
+				{ "allocatedBytes", bytes(allocation.m_AllocatedBytes) },
+				{ "alignmentBytes", bytes(allocation.m_AlignmentBytes) },
+				{ "memoryClass", known ? MemoryClass(allocation.m_MemoryClass) : Json(nullptr) },
+				{ "nativeAllocation", known && allocation.m_NativeAllocation ? Json(*allocation.m_NativeAllocation) : Json(nullptr) },
+				{ "offsetBytes", bytes(allocation.m_OffsetBytes) } };
+		}
+
+		// Derived from the frozen records only: logical sizes describe the data, allocation
+		// bytes are allocator reports, and allocator bytes are process-wide context.
+		Json Totals(const RGSnapshot& snapshot)
+		{
+			const auto& record = snapshot.m_Execution;
+			uint64_t logicalBytes = 0;
+			uint32_t unavailableLogical = 0;
+			uint64_t allocationBytes = 0;
+			uint32_t unavailableAllocations = 0;
+			uint64_t uniqueBytes = 0;
+			std::vector<bool> countedResources(snapshot.m_Resources.size());
+			std::vector<bool> countedNativeAllocations(record.m_Allocations.size());
+			for (const auto& allocation : record.m_Allocations)
+			{
+				const uint32_t resourceIndex = allocation.m_VirtualResourceIndex;
+				if (resourceIndex < countedResources.size() && !countedResources[resourceIndex])
+				{
+					countedResources[resourceIndex] = true;
+					const auto& logical = snapshot.m_Resources[resourceIndex].m_LogicalBytes;
+					logicalBytes += logical.value_or(0);
+					unavailableLogical += logical ? 0u : 1u;
+				}
+				if (allocation.m_AllocationFacts != RHIAllocationFactsStatus::Known)
+				{
+					++unavailableAllocations;
+					continue;
+				}
+				allocationBytes += allocation.m_AllocatedBytes;
+				const uint32_t ordinal = allocation.m_NativeAllocation.value_or(UINT32_MAX);
+				if (ordinal < countedNativeAllocations.size() && !countedNativeAllocations[ordinal])
+				{
+					countedNativeAllocations[ordinal] = true;
+					uniqueBytes += allocation.m_AllocatedBytes;
+				}
+			}
+			const auto& allocator = record.m_AllocatorTotals;
+			return {
+				{ "logicalBytes", logicalBytes },
+				{ "unavailableLogicalResources", unavailableLogical },
+				{ "allocationBytes", allocationBytes },
+				{ "unavailableAllocations", unavailableAllocations },
+				{ "uniquePhysicalAllocationBytes", uniqueBytes },
+				{ "allocatorBlockBytes", allocator.m_Known ? Json(allocator.m_BlockBytes) : Json(nullptr) },
+				{ "allocatorAllocationBytes", allocator.m_Known ? Json(allocator.m_AllocationBytes) : Json(nullptr) } };
+		}
+
 		std::string_view Severity(RGCompileDiagnosticSeverity severity)
 		{
 			switch (severity)
@@ -143,10 +295,9 @@ namespace gglab
 	{
 		Json root = {
 			{ "schema", "gglab.render-graph" },
-			{ "schemaVersion", std::ranges::any_of(snapshot.m_ObservationNodes,
-				[](const auto& entry) { return entry.second.m_Kind == RGObservationKind::ProductionCounters; }) ? 4 : std::ranges::any_of(snapshot.m_ObservationNodes,
-					[](const auto& entry) { return entry.second.m_Kind == RGObservationKind::NonFiniteScan; }) ? 3 : snapshot.m_ObservationNodes.empty() ? 1 : 2 },
-			{ "mode", summary ? "summary" : "full" } };
+			{ "schemaVersion", RenderGraphExportSchemaVersion },
+			{ "mode", summary ? "summary" : "full" },
+			{ "observation",{ { "nodeKinds", NodeKinds(snapshot) } } } };
 		Json compile = { { "duplicatePassNames", snapshot.m_DuplicatePassNames } };
 		Json passes = Json::array();
 		for (const auto& pass : snapshot.m_Passes)
@@ -236,10 +387,13 @@ namespace gglab
 					{ "initialState", State(resource.m_InitialBarrierState) },
 					{ "finalState", resource.m_HasFinalBarrierState ? State(resource.m_FinalBarrierState) : Json(nullptr) },
 					{ "finalSubresources", Subresources(resource.m_FinalBarrierSubresources) },
-					{ "exportPass", resource.m_ExportPassIndex } };
+					{ "exportPass", resource.m_ExportPassIndex },
+					{ "logicalBytes", resource.m_LogicalBytes ? Json(*resource.m_LogicalBytes) : Json(nullptr) },
+					{ "logicalBytesReason", LogicalBytesReason(resource) } };
 				if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					item["texture"] = {
+						{ "dimension", Dimension(resource.m_TextureDimension) },
 						{ "format", GetRHIFormatInfo(resource.m_TextureFormat).m_Name },
 						{ "extent",{ resource.m_TextureExtent.m_Width, resource.m_TextureExtent.m_Height, resource.m_TextureExtent.m_Depth } },
 						{ "mips", resource.m_TextureMipLevels },
@@ -292,24 +446,20 @@ namespace gglab
 				{ "status", record.m_Recorded ? "recorded" : "unavailable" },
 				{ "executedPassIndices", record.m_ExecutedPassIndices },
 				{ "allocations", Json::array() },
+				{ "totals", Totals(snapshot) },
 				{ "resolvedBarriers", Json::array() },
 				{ "observationNodes", Json::array() },
 				{ "gpuTiming",{ { "status", "unavailable" },
-					{ "reason", "Backend scopes aggregate by name without individual pass identity." } } } };
+					{ "reason", "GPU timing is collected over a sequence, not a single graph export." } } } };
 			for (const auto& allocation : record.m_Allocations)
 			{
-				execution["allocations"].push_back({
-					{ "resourceIndex", allocation.m_VirtualResourceIndex },
-					{ "passIndex", allocation.m_PassIndex },
-					{ "imported", allocation.m_Imported },
-					{ "poolSlot", allocation.m_PoolSlot.IsValid() ? Json(allocation.m_PoolSlot.Value()) : Json(nullptr) },
-					{ "physical", Physical(allocation.m_HasPhysicalHandle, allocation.m_PhysicalHandleIndex, allocation.m_PhysicalHandleGeneration) } });
+				execution["allocations"].push_back(Allocation(allocation));
 			}
 			for (const auto& [index, target] : snapshot.m_ObservationNodes)
 			{
 				execution["observationNodes"].push_back({
 					{ "passIndex", index },
-					{ "kind", target.m_Kind == RGObservationKind::ResourceExport ? "ResourceExport" : target.m_Kind == RGObservationKind::NonFiniteScan ? "NonFiniteScan" : "ProductionCounters" },
+					{ "kind", ObservationKind(target.m_Kind) },
 					{ "resource", target.m_Address.m_Resource },
 					{ "resourceIndex", target.m_VirtualResource.Value() },
 					{ "resourceNodeIndex", target.m_Node.Value() },

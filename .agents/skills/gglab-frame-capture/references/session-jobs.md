@@ -1,9 +1,11 @@
-# Session capture jobs (protocol v3)
+# Session capture jobs (protocol v4)
 
 Use `Scripts/Verification/GGLabSession.ps1` and the executable from the same
-revision. The pipe accepts only protocol **3**; retired v1/v2 and unknown versions
-are rejected, not translated. Every request/response has `protocol`, unsigned
-`id` (transport correlation), and the response has boolean `ok`.
+revision. The pipe accepts only protocol **4**; retired v1/v2/v3 and unknown
+versions are rejected, not translated. v4 adds sequence timing publication and
+explicit sequence-cancellation verdicts; v3 cancellation semantics are not reused.
+Every request/response has `protocol`, unsigned `id` (transport correlation), and
+the response has boolean `ok`.
 
 ## Submit and wait
 
@@ -60,7 +62,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session result -Session che
 powershell -NoProfile -ExecutionPolicy Bypass -File $session result -Session check -JobId $queued.jobId -Consume
 ```
 
-Wire query: `{"protocol":3,"id":7,"command":"result","jobId":1,"consume":false}`.
+Wire query: `{"protocol":4,"id":7,"command":"result","jobId":1,"consume":false}`.
 `consume` is optional and defaults to false. Pending work returns
 `status: pending`, `consumed: false`, `stage`, `attemptCount`, nullable
 `frameSerial`, `requiredProducts` and `finishedProducts`. Even `consume: true`
@@ -103,7 +105,7 @@ are summaries from the first available product metadata; `failure` is the first
 non-empty product failure. Product records remain authoritative.
 
 Require both `status: completed` and `publication: Published`, then validate the
-final `gglab.capture-bundle` v1 manifest and its required files. Individual file
+final `gglab.capture-bundle` v2 manifest and its required files. Individual file
 existence is not job completion. Select images from `products[index].files`, not
 legacy `image`/`metadata`/`graph`/`exports` response fields. For verification:
 
@@ -133,11 +135,15 @@ on disk. Sequence status reports `acceptedCaptureJobs`, `finishedCaptureJobs` an
 deliveries: an image + resource + graph bundle is one job and two deliveries.
 
 Capacity pressure preserves the pose/sample and simulation instant. Sequence
-completion also waits for submitted-range watch coverage and GPU timing tails.
-Cancellation/failure uses whole-job delivery cancellation; a claimed publication
-keeps its eventual real outcome. Terminal sequences keep consuming pending
-receipts, while Runtime/writer resources drain independently. A new sequence
-cannot replace unresolved prior sequence job ownership.
+completion also waits for submitted-range watch coverage, GPU timing tails and
+requested timing publication. `sequence.timingPublication` reports `pending`,
+`outcome`, `bundleId`, `manifest`, `files` and `failure`; require `Published` for
+a completed timing run. Timing uses the common writer without a SameFrame job.
+`status.capture.sequenceTimingWrites` counts its outstanding writer reservation.
+See [sequences](sequences.md) for discovery and cancellation rules. Terminal
+sequences keep consuming pending capture receipts, while Runtime/writer resources
+drain independently. A new sequence cannot replace unresolved prior capture or
+timing-writer ownership.
 
 Interactive F9/panel exports use the same job admission and consume only their
 own receipts into a bounded newest-16 metadata/file history. Capture All Views
