@@ -175,7 +175,6 @@ namespace gglab
 		{
 			// Encoded scratch, aliased array storage and path serializers all die
 			// before the input products are released and completion becomes visible.
-			CaptureEncodedProduct encoded;
 			CaptureEncodedBundle bundle;
 			if (job.m_Publication.IsAbandoned())
 			{
@@ -183,60 +182,34 @@ namespace gglab
 			}
 			else
 			{
-				if (job.m_Bundle)
-				{
-					bundle = EncodeCaptureBundle(*job.m_Bundle, state.m_Encoder, job.m_Publication.m_Stage);
-					receipt.m_BundleId = bundle.m_BundleId;
-					receipt.m_Failure = std::move(bundle.m_Failure);
-				}
-				else
-				{
-					encoded = EncodeCaptureProduct(job.m_Products, state.m_Encoder, job.m_Publication.m_Stage);
-					receipt.m_Failure = std::move(encoded.m_Failure);
-				}
+				bundle = EncodeCaptureBundle(job.m_Bundle, state.m_Encoder, job.m_Publication.m_Stage);
+				receipt.m_BundleId = bundle.m_BundleId;
+				receipt.m_Failure = std::move(bundle.m_Failure);
 				if (receipt.m_Failure.empty())
 				{
 					const std::string temporaryStem = std::format("{}.{}.{}",
-						job.m_BaseStem, state.m_TemporaryTag, job.m_RequestId);
-					auto publication = PublishCaptureFiles(job.m_Bundle ? bundle.m_Content : encoded.m_Content,
+						job.m_BaseStem, state.m_TemporaryTag, job.m_Bundle.m_JobId);
+					auto publication = PublishCaptureFiles(bundle.m_Content,
 						job.m_Directory, job.m_BaseStem, temporaryStem, job.m_Publication, *state.m_Files);
 					receipt.m_Publication = publication.m_Outcome;
 					receipt.m_Failure = std::move(publication.m_Failure);
 					if (publication.m_Outcome == CapturePublicationOutcome::Published)
 					{
-						if (job.m_Bundle)
+						receipt.m_ManifestPath = publication.m_Files.back();
+						for (const auto& product : bundle.m_Products)
 						{
-							receipt.m_ManifestPath = publication.m_Files.back();
-							for (const auto& product : bundle.m_Products)
+							CaptureBundleProductReceipt record{ .m_ProductIndex = product.m_ProductIndex };
+							for (const size_t index : product.m_FileIndices)
 							{
-								CaptureBundleProductReceipt record{ .m_ProductIndex = product.m_ProductIndex };
-								for (const size_t index : product.m_FileIndices)
-								{
-									record.m_Files.push_back(publication.m_Files[index]);
-								}
-								receipt.m_BundleProducts.push_back(std::move(record));
+								record.m_Files.push_back(publication.m_Files[index]);
 							}
-						}
-						else
-						{
-							receipt.m_MetadataPath = publication.m_Files.back();
-							if (encoded.m_ImageIndex)
-							{
-								receipt.m_ImagePath = publication.m_Files[*encoded.m_ImageIndex];
-							}
-							if (encoded.m_GraphIndex)
-							{
-								receipt.m_GraphPath = publication.m_Files[*encoded.m_GraphIndex];
-							}
-							receipt.m_ResourcePaths.assign(publication.m_Files.begin(),
-								publication.m_Files.begin() + encoded.m_ResourceCount);
+							receipt.m_BundleProducts.push_back(std::move(record));
 						}
 					}
 				}
 			}
 		}
-		job.m_Products = {};
-		job.m_Bundle.reset();
+		job.m_Bundle = {};
 		job.m_Publication.m_Stage = CaptureWriteStage::Done;
 		{
 			std::scoped_lock lock(job.m_Mutex);

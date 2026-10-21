@@ -46,7 +46,6 @@ namespace gglab
 		{
 			return;
 		}
-		m_FrameCapture->ConsumeResults(m_FrameCaptureResults);
 		if (m_FrameSequence)
 		{
 			m_FrameSequence->UpdateWatchCoverage();
@@ -58,14 +57,6 @@ namespace gglab
 		// One owner establishes host visibility after internal result routing. The
 		// reserved receipt remains in the coordinator until explicit host consumption.
 		m_FrameCapture->PublishAppRuntimeJobResults();
-	}
-
-	void GGLabAppRuntime::ConsumeFrameCaptureResults(
-		std::vector<FrameCaptureRequestResult>& outResults) noexcept
-	{
-		outResults.insert(outResults.end(), std::make_move_iterator(m_FrameCaptureResults.begin()),
-			std::make_move_iterator(m_FrameCaptureResults.end()));
-		m_FrameCaptureResults.clear();
 	}
 
 	CaptureAdmission GGLabAppRuntime::TrySubmitCaptureJob(CapturePlan&& plan) noexcept
@@ -96,12 +87,9 @@ namespace gglab
 
 	CaptureIntakeSnapshot GGLabAppRuntime::GetCaptureIntakeSnapshot() const noexcept
 	{
-		auto snapshot = m_FrameCapture ?
+		return m_FrameCapture ?
 			m_FrameCapture->GetIntakeSnapshot() :
 			CaptureIntakeSnapshot{ .m_Limits = m_CaptureJobLimits };
-		// This legacy queue is not covered by unified admission; do not hide it.
-		snapshot.m_LegacyRetainedResults += m_FrameCaptureResults.size();
-		return snapshot;
 	}
 
 	const CaptureJobResult* GGLabAppRuntime::FindCaptureJobResult(uint64_t jobId) const noexcept

@@ -291,7 +291,7 @@ namespace gglab
 				{
 					break;
 				}
-				coordinator.OnReferenceViewApplied(change->m_RequestId, true);
+				coordinator.OnReferenceViewApplied(change->m_JobId, true);
 				++state.m_FrameSerial;
 				++state.m_SettleKey.m_Temporal.m_Identity.m_ResetIdentity;
 				state.m_Camera.m_Position = { static_cast<float>(index), 0.0f, 0.0f };
@@ -321,7 +321,7 @@ namespace gglab
 			const auto change = coordinator.GetPendingViewChange();
 			if (change)
 			{
-				coordinator.OnReferenceViewApplied(change->m_RequestId, true);
+				coordinator.OnReferenceViewApplied(change->m_JobId, true);
 				++state.m_FrameSerial;
 				coordinator.BeginFrame(state);
 				coordinator.OnFrameSubmitted();
@@ -387,7 +387,7 @@ namespace gglab
 			control.m_HoldResults = false;
 			coordinator.Update();
 			context.Check(frontEnd.Update() == 0 && coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0 &&
-				coordinator.GetIntakeSnapshot().m_LegacyRetainedResults == 0,
+				coordinator.GetIntakeSnapshot().m_TerminalReceipts == 0,
 				"Draining issued work creates no duplicate terminal result or legacy output record");
 			coordinator.FinalizeAfterRenderHost();
 		}
@@ -537,7 +537,7 @@ namespace gglab
 				"The graph button uses the existing queued reference-view path");
 			if (view)
 			{
-				coordinator.OnReferenceViewApplied(view->m_RequestId, true);
+				coordinator.OnReferenceViewApplied(view->m_JobId, true);
 			}
 			settings.m_ReferenceViewId.clear();
 			const uint64_t summaryId = frontEnd.ExportGraph(true).m_JobId;
@@ -684,7 +684,7 @@ namespace gglab
 				"Interactive resource exports share the queued camera path without changing the screenshot source");
 			if (resourceView)
 			{
-				coordinator.OnReferenceViewApplied(resourceView->m_RequestId, true);
+				coordinator.OnReferenceViewApplied(resourceView->m_JobId, true);
 			}
 			coordinator.BeginFrame(MakeFrameState(21, 2));
 			context.Check(control.m_Exports.size() == 1 && control.m_Exports[0].m_IncludeGraph &&

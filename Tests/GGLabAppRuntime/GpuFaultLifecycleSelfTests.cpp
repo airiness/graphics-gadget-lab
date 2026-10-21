@@ -1330,10 +1330,8 @@ namespace gglab
 					probe.m_GraphExecutions == executions && probe.m_FrameEnds == ends &&
 					probe.m_FrameAborts == aborts + 1 && probe.m_ReadbackMaps == maps,
 					"A permanent compiled-resource failure aborts before image recording, readback or partial submission");
-				std::vector<FrameCaptureRequestResult> results;
-				runtime.ConsumeFrameCaptureResults(results);
 				checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
-					sequence.GetStatus()->m_SubmittedFrames == 0 && results.empty() &&
+					sequence.GetStatus()->m_SubmittedFrames == 0 && runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 &&
 					sequence.GetStatus()->m_AcceptedCaptureJobs == 1 && sequence.GetStatus()->m_FinishedCaptureJobs == 1 &&
 					sequence.GetStatus()->m_Failure.find("UnknownResource") != std::string::npos &&
 					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 && capture.GetUnfinishedRequestCount() == 0 &&
@@ -1374,11 +1372,9 @@ namespace gglab
 					"Only the successful complete-plan retry submits and advances the sequence "
 					"at the preserved simulation instant");
 				const auto successfulSerial = capture.GetLastFrameState()->m_FrameSerial;
-				std::vector<FrameCaptureRequestResult> results;
 				for (uint32_t attempt = 0; attempt < 100 && sequence.IsActive(); ++attempt)
 				{
 					GGLAB_UNUSED(runtime.Tick());
-					runtime.ConsumeFrameCaptureResults(results);
 					std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				}
 				std::vector<nlohmann::json> manifests;
@@ -1393,7 +1389,7 @@ namespace gglab
 						}
 					}
 				}
-				checks.Check(results.empty() && manifests.size() == 1 &&
+				checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && manifests.size() == 1 &&
 					manifests.front()["products"].size() == 3 &&
 					manifests.front()["provenance"]["frame"]["serial"] == successfulSerial &&
 					manifests.front()["provenance"]["time"]["totalTime"] == time &&
@@ -1401,7 +1397,6 @@ namespace gglab
 					sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
 					sequence.GetStatus()->m_CompletedCaptures == 2 && sequence.GetStatus()->m_FinishedCaptureJobs == 1 &&
 					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 &&
-					runtime.GetCaptureIntakeSnapshot().m_LegacyRetainedResults == 0 &&
 					probe.m_ImageEncodes == 1 && capture.GetUnfinishedRequestCount() == 0 &&
 					probe.m_CaptureControl->GetUnfinishedRequestCount() == 0 &&
 					probe.m_CaptureControl->GetResourceExportFrameAvailability() == FrameCaptureAvailability::Available,
@@ -1409,9 +1404,7 @@ namespace gglab
 					"and releases all payload/write reservations");
 			}
 			runtime.Shutdown();
-			std::vector<FrameCaptureRequestResult> late;
-			runtime.ConsumeFrameCaptureResults(late);
-			checks.Check(late.empty() && probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0,
+			checks.Check(runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 && probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0,
 				"Required-product teardown adds no duplicate terminal result and releases GPU owners only after safe settlement");
 		}
 
@@ -1494,8 +1487,6 @@ namespace gglab
 				runtime.FindCaptureJobResult(first.m_JobId) == borrowed &&
 				runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 2,
 				"Out-of-order consumption returns exactly one slot; reuse preserves another observer's borrowed receipt");
-			const auto legacy = capture.Submit({ .m_Timing = FrameCaptureTiming::AfterReady,
-				.m_RequiredContentId = "Missing.RoutingContent" });
 			runtime.HandleHostEvent({ .m_Type = AppHostEventType::ExitRequested });
 			plan = waitingPlan();
 			const auto exiting = runtime.TrySubmitCaptureJob(std::move(plan));
@@ -1508,10 +1499,10 @@ namespace gglab
 			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 &&
 				runtime.FindCaptureJobResult(first.m_JobId) == borrowed && runtime.FindCaptureJobResult(third.m_JobId) &&
 				stopped.m_ActiveJobs == 0 && stopped.m_ReservedReceipts == 2 &&
-				stopped.m_AppRuntimePublishedResults == 2 && stopped.m_LegacyRetainedResults == 1 &&
+				stopped.m_AppRuntimePublishedResults == 2 &&
 				runtime.CancelCaptureJob(first.m_JobId) == CaptureCancelResult::Finished,
 				"Repeated shutdown retains and publishes each reserved receipt after device teardown, "
-				"with legacy retention visible separately");
+				"with every receipt retaining its original bounded slot");
 			const auto firstResult = runtime.TakeCaptureJobResult(first.m_JobId);
 			const auto thirdResult = runtime.TakeCaptureJobResult(third.m_JobId);
 			checks.Check(firstResult && thirdResult && thirdResult->m_Status == CaptureJobStatus::Cancelled &&
@@ -1519,13 +1510,6 @@ namespace gglab
 				runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 &&
 				runtime.TrySubmitCaptureJob(std::move(plan)).m_Reason == CaptureAdmissionReason::ShuttingDown,
 				"The host can consume final results exactly once after shutdown without reopening intake");
-			std::vector<FrameCaptureRequestResult> results;
-			runtime.ConsumeFrameCaptureResults(results);
-			checks.Check(results.size() == 1 && results.front().m_RequestId == legacy &&
-				results.front().m_Status == FrameCaptureRequestStatus::Cancelled &&
-				runtime.GetCaptureIntakeSnapshot().m_LegacyRetainedResults == 0,
-				"Unified routing neither duplicates results into legacy publication "
-				"nor hides its independently retained stream");
 		}
 
 		void RunOwnedJobFailureScenario(SelfTestContext& checks, const std::filesystem::path& root,
@@ -1558,14 +1542,12 @@ namespace gglab
 				"its AppRuntime owner after safe GPU retirement");
 			const auto result = runtime.TakeCaptureJobResult(admitted.m_JobId);
 			runtime.Shutdown();
-			std::vector<FrameCaptureRequestResult> legacy;
-			runtime.ConsumeFrameCaptureResults(legacy);
 			checks.Check(result && result->m_Products.size() == 1 && !result->m_Products.front().m_Failure.empty() &&
-				!runtime.TakeCaptureJobResult(admitted.m_JobId) && legacy.empty() &&
+				!runtime.TakeCaptureJobResult(admitted.m_JobId) && runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 &&
 				runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 &&
 				runtime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Post-shutdown host consumption returns failure credit once "
-				"and never duplicates a job into the legacy stream");
+				"and leaves no published receipt after consumption");
 		}
 
 		void RunOwnedWriterDrainScenario(SelfTestContext& checks, const std::filesystem::path& root)
@@ -1716,11 +1698,9 @@ namespace gglab
 					result->m_Products[0].m_Files != result->m_Products[3].m_Files,
 					"Distinct same-frame image sources compile separate graph imports and publish separate product files");
 			}
-			std::vector<FrameCaptureRequestResult> legacy;
-			runtime.ConsumeFrameCaptureResults(legacy);
-			checks.Check(legacy.empty() && capture.GetIntakeSnapshot().m_ReservedReceipts == 0 &&
+			checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && capture.GetIntakeSnapshot().m_ReservedReceipts == 0 &&
 				capture.GetUnfinishedRequestCount() == 0 && probe.m_CaptureControl->GetUnfinishedRequestCount() == 0,
-				"Production result fan-out does not duplicate job receipts into the legacy stream");
+				"Production receipt consumption releases all host and transport reservations");
 			GGLAB_UNUSED(runtime.Tick());
 			checks.Check(!runtime.TakeCaptureJobResult(admission.m_JobId), "A later production tick cannot repeat the terminal receipt");
 			runtime.Shutdown();
@@ -1815,11 +1795,9 @@ namespace gglab
 				cancelledResult->m_Publication == CaptureJobPublication::NotPublished && cancelledResult->m_ManifestPath.empty(),
 				"Production draining preserves exactly the original cancelled, unpublished job receipt");
 			runtime.Shutdown();
-			std::vector<FrameCaptureRequestResult> legacy;
-			runtime.ConsumeFrameCaptureResults(legacy);
-			checks.Check(legacy.empty() && !runtime.TakeCaptureJobResult(cancelled.m_JobId) &&
+			checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && !runtime.TakeCaptureJobResult(cancelled.m_JobId) &&
 				probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 && probe.m_LiveReadbackBuffers == 0,
-				"Cancellation shutdown preserves GPU ownership and emits no duplicate or legacy terminal result");
+				"Cancellation shutdown preserves GPU ownership and emits no duplicate terminal result");
 		}
 
 		void RunPreviewChangeScenario(SelfTestContext& checks, const std::filesystem::path& root)
@@ -2017,10 +1995,15 @@ namespace gglab
 			for (size_t i = 0; i < jobs.size(); ++i)
 			{
 				jobs[i] = std::make_shared<CaptureWriteJob>();
-				jobs[i]->m_Products.m_Image = products[i].m_Image;
+				jobs[i]->m_Bundle = { .m_RunIdentity = CreateCaptureRunIdentity(),
+					.m_JobId = i + 1, .m_Attempt = 1, .m_ProductCount = 1,
+					.m_Deliveries = { { .m_Input = { .m_Image = products[i].m_Image,
+						.m_Submission = { products[i].m_SubmissionFenceIndex, products[i].m_SubmissionFenceGeneration,
+							products[i].m_SubmissionFenceValue, products[i].m_AdapterCompatibilityIdentity },
+						.m_Metadata = { .m_RequestId = i + 1, .m_Backend = "dx12",
+							.m_FrameSerial = products[i].m_FrameSerial, .m_Width = 32, .m_Height = 32 } } } } };
 				jobs[i]->m_Directory = root / "Published";
 				jobs[i]->m_BaseStem = i == 0 ? "running" : "queued";
-				jobs[i]->m_RequestId = i + 1;
 				checks.Check(writer->Submit(jobs[i]), "The production product enters the independent writer");
 			}
 			products.clear();
@@ -2064,8 +2047,8 @@ namespace gglab
 					CapturePublicationOutcome::NotPublished) &&
 				skipped->m_Publication == CapturePublicationOutcome::NotPublished && image.expired() &&
 				probe.m_ReadbackMaps == maps &&
-				std::filesystem::exists(root / "Published/running.json") == claimed &&
-				!std::filesystem::exists(root / "Published/queued.json"),
+				std::filesystem::exists(root / "Published/running.capture-bundle.json") == claimed &&
+				!std::filesystem::exists(root / "Published/queued.capture-bundle.json"),
 				"Late worker completion releases the last CPU lease without touching a destroyed device or publishing abandoned work");
 		}
 
@@ -2170,7 +2153,8 @@ namespace gglab
 								completion.m_Status == AssetUploadStatus::Failed;
 						}));
 				});
-			const uint64_t capture = runtime.GetFrameCaptureCoordinator()->Submit({});
+			const auto capture = runtime.TrySubmitCaptureJob({
+				.m_RequiredProducts = { ImageCaptureProduct{} } }).m_JobId;
 			probe.m_Presentation = runtime.GetRenderServices().m_Presentation;
 			probe.m_EnableDeferredCommits = true;
 			probe.m_Inject = true;
@@ -2230,10 +2214,9 @@ namespace gglab
 			}
 			checks.Check(!iblCachePublished,
 				"The pending IBL readback never publishes GPU contents to derived data");
-			std::vector<FrameCaptureRequestResult> results;
-			runtime.ConsumeFrameCaptureResults(results);
-			checks.Check(results.size() == 1 && results[0].m_RequestId == capture &&
-				results[0].m_Status == FrameCaptureRequestStatus::Failed && results[0].m_ImagePath.empty(),
+			const auto result = runtime.TakeCaptureJobResult(capture);
+			checks.Check(result && result->m_JobId == capture &&
+				result->m_Status == CaptureJobStatus::Failed && result->m_Products.front().m_Files.empty(),
 				"The failed production capture completes exactly once without an image");
 			runtime.Shutdown();
 			checks.Check(probe.m_ContextDestructions == 1 && runtime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,

@@ -1485,9 +1485,7 @@ namespace gglab
 			{ "publishedResults", intake.m_AppRuntimePublishedResults },
 			{ "drainingRuntimeRequests", intake.m_DrainingRuntimeRequests },
 			{ "drainingWriterJobs", intake.m_DrainingWriterJobs },
-			{ "drainingWriteReservations", intake.m_DrainingWriteReservations },
-			{ "legacyUnfinishedOutputs", intake.m_LegacyUnfinishedOutputs },
-			{ "legacyRetainedResults", intake.m_LegacyRetainedResults } };
+			{ "drainingWriteReservations", intake.m_DrainingWriteReservations } };
 		const auto claimName = [](NonFiniteClaimStatus value)
 			{
 				switch (value)

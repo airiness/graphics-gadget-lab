@@ -182,6 +182,13 @@ namespace gglab
 			outError = "A sequence requires a camera path id.";
 			return 0;
 		}
+		if (request.m_CaptureSource != FrameCaptureSource::Scene &&
+			request.m_CaptureSource != FrameCaptureSource::Composited &&
+			request.m_CaptureSource != FrameCaptureSource::Diagnostic)
+		{
+			outError = "A sequence capture requires an image source or diagnostic tap.";
+			return 0;
+		}
 		if ((request.m_CaptureSource == FrameCaptureSource::Diagnostic) !=
 			request.m_DiagnosticTap.has_value())
 		{
@@ -380,14 +387,8 @@ namespace gglab
 			case FrameCaptureSource::Diagnostic:
 				plan.m_RequiredProducts.emplace_back(DiagnosticCaptureProduct{ m_Request.m_DiagnosticTap });
 				break;
-			case FrameCaptureSource::RenderGraph:
-				plan.m_RequiredProducts.emplace_back(GraphCaptureProduct{});
-				break;
-			case FrameCaptureSource::ResourceExport:
-				plan.m_RequiredProducts.emplace_back(ResourceCaptureProduct{});
-				break;
 			default:
-				plan.m_RequiredProducts.emplace_back(UnsupportedCaptureProduct{ m_Request.m_CaptureSource });
+				GGLAB_ASSERT_MSG(false, "Sequence admission validates the capture source.");
 				break;
 			}
 		}

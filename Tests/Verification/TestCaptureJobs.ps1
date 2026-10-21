@@ -169,7 +169,7 @@ try {
                     $sequenceFinal.sequence.acceptedCaptureJobs -eq 180 -and $sequenceFinal.sequence.finishedCaptureJobs -eq 180 -and
                     $sequenceFinal.sequence.pendingCaptureJobs -eq 0 -and $sequenceFinal.sequence.completedCaptures -eq 181 -and
                     $sequenceFinal.capture.reservedReceipts -eq 127 -and $sequenceFinal.capture.activeJobs -eq 0 -and
-                    $sequenceFinal.capture.legacyRetainedResults -eq 0) "$backend-long-sequence-reuses-one-receipt-without-consuming-foreign-results"
+                    $null -eq $sequenceFinal.capture.PSObject.Properties['legacyRetainedResults']) "$backend-long-sequence-reuses-one-receipt-without-consuming-foreign-results"
                 $manifests = @(Get-ChildItem -LiteralPath $sequenceDirectory -Filter '*.capture-bundle.json')
                 $paired = @($manifests | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } |
                     Where-Object { $_.products.Count -eq 3 })
@@ -189,7 +189,8 @@ try {
                 Check (-not $missing.ok -and $missing.status -eq 'not-found' -and $cancelMissing.cancellation -eq 'NotFound') "$backend-no-consumed-id-tombstone"
                 $empty = Send-Control @{command='status'}
                 Check ($empty.capture.reservedReceipts -eq 0 -and $empty.capture.activeJobs -eq 0 -and
-                    $empty.capture.legacyRetainedResults -eq 0) "$backend-no-host-result-cache"
+                    $null -eq $empty.capture.PSObject.Properties['legacyRetainedResults'] -and
+                    $null -eq $empty.capture.PSObject.Properties['legacyUnfinishedOutputs']) "$backend-no-host-result-cache"
                 $cancelOutcomes = @()
                 for ($index=0; $index -lt 8; ++$index) {
                     $a = Send-Control @{command='capture';timing='next-frame';settleFrames=0;outputDirectory=$directory;label='racing-cancel'}

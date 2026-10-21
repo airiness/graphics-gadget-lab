@@ -298,11 +298,14 @@ namespace gglab
 				status["frame"]["ready"] == false && status["frame"]["settledFrames"] == 5 &&
 				status["frame"]["gates"][0]["state"] == "pending" && status["frame"]["fixedDeltaTime"].is_null() &&
 				status["frame"]["referenceViews"] == Json::array({ "CAM_A", "CAM_B" }), "Status preserves session and frame readiness");
+			context.Check(!status["capture"].contains("legacyUnfinishedOutputs") &&
+				!status["capture"].contains("legacyRetainedResults"),
+				"Status exposes only current job ownership without retired output counters");
 			context.Check(status["capabilities"]["captureJobs"] == true && status["capabilities"]["sequenceCaptureJobs"] == true &&
 				status["capabilities"]["resultConsumption"] == "explicit" && status["capture"]["activeJobs"] == 2 &&
 				status["capture"]["reservedReceipts"] == 3 && status["capture"]["limits"]["receipts"] == 128 &&
 				status["capture"]["limits"]["activeJobs"] == 64 && status["capture"]["limits"]["productsPerJob"] == 8 &&
-				status["capture"]["limits"]["resourceTargetsPerJob"] == 64, "Capabilities advertise actual count policy without claiming legacy migration");
+				status["capture"]["limits"]["resourceTargetsPerJob"] == 64, "Capabilities advertise actual count policy for the final bounded job contract");
 			const auto noFrame = Json::parse(SerializeApplicationControlStatus(5, {}));
 			const auto available = Json::parse(SerializeApplicationControlStatus(6, { .m_NonFiniteInstrumentation = true }));
 			context.Check(noFrame["frame"].is_null() && noFrame["sequence"].is_null() && noFrame["watch"]["production"] == "Unavailable" &&

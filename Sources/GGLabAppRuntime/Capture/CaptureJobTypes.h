@@ -10,8 +10,7 @@
 
 namespace gglab
 {
-	// Coordinator-local policy for the opt-in job API. Legacy intake remains
-	// unchanged until its consumers migrate; these are record counts, not byte bounds.
+	// Admission policy for every accepted job; these are record counts, not byte bounds.
 	struct CaptureJobLimits
 	{
 		uint32_t m_MaxActiveJobs = 64;
@@ -126,8 +125,6 @@ namespace gglab
 		uint32_t m_DrainingRuntimeRequests = 0;
 		uint32_t m_DrainingWriterJobs = 0;
 		uint32_t m_DrainingWriteReservations = 0;
-		uint32_t m_LegacyUnfinishedOutputs = 0;
-		size_t m_LegacyRetainedResults = 0;
 	};
 
 	// Cancelled guarantees no publication for the job, not immediate resource
@@ -140,11 +137,4 @@ namespace gglab
 		NotFound,
 	};
 
-	enum class CaptureWaitingCancelResult : uint8_t
-	{
-		Cancelled,
-		TooLate,
-		Finished,
-		NotFound,
-	};
 }

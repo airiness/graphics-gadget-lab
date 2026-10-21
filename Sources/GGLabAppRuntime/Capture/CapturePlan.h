@@ -38,15 +38,8 @@ namespace gglab
 		std::vector<RGResourceAddress> m_Targets;
 	};
 
-	// The legacy adapter preserves Runtime rejection instead of treating an
-	// unsupported input source as an image.
-	struct UnsupportedCaptureProduct
-	{
-		FrameCaptureSource m_Source = FrameCaptureSource::Scene;
-	};
-
 	using CaptureProductSpec = std::variant<ImageCaptureProduct, DiagnosticCaptureProduct,
-		GraphCaptureProduct, ResourceCaptureProduct, UnsupportedCaptureProduct>;
+		GraphCaptureProduct, ResourceCaptureProduct>;
 
 	[[nodiscard]] inline FrameCaptureSource GetCaptureProductSource(
 		const CaptureProductSpec& product) noexcept
@@ -69,12 +62,12 @@ namespace gglab
 		{
 			return FrameCaptureSource::ResourceExport;
 		}
-		return std::get<UnsupportedCaptureProduct>(product).m_Source;
+		return FrameCaptureSource::ResourceExport;
 	}
 
-	// AppRuntime's internal SameFrame plan, not a versioned host/protocol request.
-	// Every listed product is required. One resource product and one graph product
-	// are supported; their legacy delivery shares one result and completion marker.
+	// Host-neutral SameFrame job plan. Every listed product is required and is
+	// represented in the final bundle. A resource and its graph share one producer
+	// delivery while retaining separate ordered product results.
 	struct CapturePlan
 	{
 		std::vector<CaptureProductSpec> m_RequiredProducts;

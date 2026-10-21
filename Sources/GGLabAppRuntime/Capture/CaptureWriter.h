@@ -25,10 +25,6 @@ namespace gglab
 	struct CaptureWriteReceipt
 	{
 		CapturePublicationOutcome m_Publication = CapturePublicationOutcome::NotPublished;
-		std::filesystem::path m_ImagePath;
-		std::filesystem::path m_MetadataPath;
-		std::vector<std::filesystem::path> m_ResourcePaths;
-		std::filesystem::path m_GraphPath;
 		std::string m_Failure;
 		std::string m_BundleId;
 		std::filesystem::path m_ManifestPath;
@@ -37,11 +33,9 @@ namespace gglab
 
 	struct CaptureWriteJob
 	{
-		CaptureProductEncodeInput m_Products;
-		std::optional<CaptureBundleInput> m_Bundle;
+		CaptureBundleInput m_Bundle;
 		std::filesystem::path m_Directory;
 		std::string m_BaseStem;
-		uint64_t m_RequestId = 0;
 		CapturePublicationControl m_Publication;
 		std::chrono::steady_clock::time_point m_SubmittedAt{};
 		// Frame-thread reporting only; the worker never touches this flag.

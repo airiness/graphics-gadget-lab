@@ -117,7 +117,7 @@ job's terminal status/publication. Query and explicitly consume the real result.
 publication but GPU payloads/writer reservations may still be draining after its
 receipt is consumed; `status.capture` exposes those owners separately.
 
-## Sequence ownership and remaining migration
+## Sequence and frontend ownership
 
 `capabilities.sequenceCaptureJobs` is true. Each due sequence frame submits one
 required-product plan through the same bounded job admission. AppRuntime consumes
@@ -140,5 +140,7 @@ snapshots business input and owns at most one accepted job at a time. Startup
 one-shot independently owns one plan/job/terminal receipt through exit and shutdown;
 it never depends on UI history. Neither frontend consumes session or sequence
 receipts. These record counts do not bound authored input, submitted-range watch
-evidence, timing series or all process bytes. CAP-S5 legacy mechanism retirement
-and final adapter-free parity remain separate gates.
+evidence, timing series or all process bytes. All first-party frontends use this
+contract; retired host request/result adapters and waiting-only cancellation
+paths are removed. Runtime producer transport identities and saved artifact
+requestId fields retain their separate owning-domain meanings.

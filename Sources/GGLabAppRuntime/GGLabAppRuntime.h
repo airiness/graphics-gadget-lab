@@ -108,7 +108,6 @@ namespace gglab
 	class TaskSystem;
 	class Time;
 	struct LoadingProgress;
-	struct FrameCaptureRequestResult;
 
 	struct AppRuntimeServiceCreateInfo
 	{
@@ -215,17 +214,13 @@ namespace gglab
 			return m_DebugDrawService.get();
 		}
 		// Non-owning; null before runtime services are composed. They outlive
-		// Shutdown so hosts can inspect final capture state. Legacy frontends use
-		// the coordinator but drain ConsumeFrameCaptureResults; unified jobs use
-		// the AppRuntime APIs below, never the coordinator's standalone result drain.
+		// Shutdown so hosts can inspect final capture state. Hosts submit and consume
+		// jobs through AppRuntime; standalone coordinator consumption is disabled.
 		[[nodiscard]] NonFiniteWatchCoordinator* GetNonFiniteWatchCoordinator() const noexcept { return m_NonFiniteWatch.get(); }
 		[[nodiscard]] FrameCaptureCoordinator* GetFrameCaptureCoordinator() const noexcept
 		{
 			return m_FrameCapture.get();
 		}
-		// Appends legacy frontend results in completion order, once per result.
-		// Sequence jobs consume their own reserved receipts independently of host polling.
-		void ConsumeFrameCaptureResults(std::vector<FrameCaptureRequestResult>& outResults) noexcept;
 		// Owner-thread unified job API. Rejected/Busy admission leaves the plan intact.
 		// Tick and Shutdown publish terminal receipts at the result-routing boundary;
 		// publication retains the original reserved slot, with no second result queue.
@@ -290,7 +285,6 @@ namespace gglab
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		// Results already routed to the sequence, awaiting host publication.
-		std::vector<FrameCaptureRequestResult> m_FrameCaptureResults;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		// Profiling request in effect before a timed sequence enabled profiling.
