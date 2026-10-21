@@ -10,6 +10,9 @@
     <Filter Include="Lab">
       <UniqueIdentifier>{CFE283C1-17BA-8AD4-F54D-B87C473B1758}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Parameters">
+      <UniqueIdentifier>{03C4C70C-3EF6-2753-9C5E-8A1345912D97}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationCameraInput.cpp" />
@@ -76,6 +79,9 @@
       <Filter>Lab</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -170,6 +176,9 @@
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />
   </ItemGroup>
 </Project>

@@ -117,6 +117,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\ParameterTransactionSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\NonFiniteWatchCoordinatorSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\GGLabAppRuntimeLifecycleSelfTests.cpp" />
@@ -124,6 +125,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\ParameterTransactionSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\GpuFaultLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\CapturePublicationTestFileSystem.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.h" />
