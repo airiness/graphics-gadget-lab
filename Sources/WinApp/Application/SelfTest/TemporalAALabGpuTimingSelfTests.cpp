@@ -1,6 +1,7 @@
 #include "Application/SelfTest/TemporalAALabGpuTimingSelfTests.h"
 
 #include "Application/Lab/Sessions/TemporalAALabGpuTiming.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Demo/DemoTypes.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -59,16 +60,16 @@ namespace gglab
 			window.GetSnapshot().m_FirstEligibleFrameSerial == 0 && !window.Capture(MakeProfile(25)),
 			"All sixteen Native warmup submissions are excluded, including the last one");
 		SubmitRange(window, feedback, 26, 27);
-		(void)window.Capture(MakeProfile(26, 0.5));
+		GGLAB_UNUSED(window.Capture(MakeProfile(26, 0.5)));
 		context.Check(window.GetSnapshot().m_FirstEligibleFrameSerial == 26 &&
 			window.GetSnapshot().m_SampleCount == 1 && window.GetSnapshot().m_LastGpuFrameIndex == 1026,
 			"The first post-warmup profile is accepted using its explicit RenderFrame serial");
-		(void)window.Capture(MakeProfile(26));
-		(void)window.Capture(MakeProfile(28));
-		(void)window.Capture(MakeProfile(0));
+		GGLAB_UNUSED(window.Capture(MakeProfile(26)));
+		GGLAB_UNUSED(window.Capture(MakeProfile(28)));
+		GGLAB_UNUSED(window.Capture(MakeProfile(0)));
 		context.Check(window.GetSnapshot().m_SampleCount == 1,
 			"Repeated, future and unbound profiles cannot enter the submitted window");
-		(void)window.Capture(MakeProfile(27, 1.5));
+		GGLAB_UNUSED(window.Capture(MakeProfile(27, 1.5)));
 		context.Check(window.GetSnapshot().m_SampleCount == 2 &&
 			window.GetSnapshot().m_SumMilliseconds == 2.0 &&
 			window.GetSnapshot().m_MinMilliseconds == 0.5 && window.GetSnapshot().m_MaxMilliseconds == 1.5,
@@ -76,12 +77,12 @@ namespace gglab
 
 		feedback.m_TemporalAASettings.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear;
 		SubmitRange(window, feedback, 28, 44);
-		(void)window.Capture(MakeProfile(27));
-		(void)window.Capture(MakeProfile(43));
+		GGLAB_UNUSED(window.Capture(MakeProfile(27)));
+		GGLAB_UNUSED(window.Capture(MakeProfile(43)));
 		context.Check(window.GetSnapshot().m_SampleCount == 0 &&
 			window.GetSnapshot().m_FirstEligibleFrameSerial == 44,
 			"A filter override resets timing and excludes delayed old-domain and warmup profiles");
-		(void)window.Capture(MakeProfile(44));
+		GGLAB_UNUSED(window.Capture(MakeProfile(44)));
 		context.Check(window.GetSnapshot().m_SampleCount == 1 &&
 			window.GetSnapshot().m_Domain->m_Settings.m_HistoryFilter == TemporalAAHistoryFilter::Bilinear,
 			"Timing records the submitted filter rather than the Lab authoring filter");
@@ -92,12 +93,12 @@ namespace gglab
 		feedback.m_TemporalFramePlan.m_TemporalAA.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
 		feedback.m_ViewResolution.m_Render = { 854, 480 };
 		SubmitRange(window, feedback, 100, 135);
-		(void)window.Capture(MakeProfile(135));
+		GGLAB_UNUSED(window.Capture(MakeProfile(135)));
 		context.Check(window.GetSnapshot().m_WarmupFrameCount == 36 &&
 			window.GetSnapshot().m_SampleCount == 0 && window.GetSnapshot().m_FirstEligibleFrameSerial == 0,
 			"Quality excludes two complete eighteen-phase jitter cycles");
 		SubmitRange(window, feedback, 136, 136);
-		(void)window.Capture(MakeProfile(136));
+		GGLAB_UNUSED(window.Capture(MakeProfile(136)));
 		context.Check(window.GetSnapshot().m_SampleCount == 1,
 			"Quality begins sampling on its thirty-seventh submitted frame");
 
@@ -121,7 +122,7 @@ namespace gglab
 		window.Reset();
 		feedback = MakeFeedback(300);
 		SubmitRange(window, feedback, 300, 316);
-		(void)window.Capture(MakeProfile(316));
+		GGLAB_UNUSED(window.Capture(MakeProfile(316)));
 		feedback.m_TemporalFramePlan.m_ResetIdentity = 1;
 		SubmitRange(window, feedback, 317, 317);
 		context.Check(window.GetSnapshot().m_SampleCount == 0 &&
@@ -166,17 +167,17 @@ namespace gglab
 		SubmitRange(window, feedback, 400, 420);
 		auto invalid = MakeProfile(416);
 		invalid.m_Samples.clear();
-		(void)window.Capture(invalid);
+		GGLAB_UNUSED(window.Capture(invalid));
 		invalid = MakeProfile(417, std::numeric_limits<double>::quiet_NaN());
-		(void)window.Capture(invalid);
+		GGLAB_UNUSED(window.Capture(invalid));
 		invalid = MakeProfile(418, -1.0);
-		(void)window.Capture(invalid);
+		GGLAB_UNUSED(window.Capture(invalid));
 		context.Check(window.GetSnapshot().m_SampleCount == 0,
 			"Missing scopes, non-finite durations and negative timings are excluded");
 		auto multiple = MakeProfile(419, 0.25);
 		multiple.m_Samples.push_back({ "PostProcess.TemporalAA", 0.75, 1 });
 		multiple.m_Samples.push_back({ "PostProcess.Other", 99.0, 1 });
-		(void)window.Capture(multiple);
+		GGLAB_UNUSED(window.Capture(multiple));
 		context.Check(window.GetSnapshot().m_SampleCount == 1 && window.GetSnapshot().m_SumMilliseconds == 1.0,
 			"Repeated named TAA scopes are summed without unrelated pass durations");
 
@@ -192,7 +193,7 @@ namespace gglab
 				++completions;
 			}
 		}
-		(void)window.Capture(MakeProfile(635));
+		GGLAB_UNUSED(window.Capture(MakeProfile(635)));
 		context.Check(completions == 1 && window.GetSnapshot().m_SampleCount == 120 &&
 			window.GetSnapshot().m_FirstSampleFrameSerial == 516 && window.GetSnapshot().m_LastSampleFrameSerial == 635,
 			"Exactly 120 completed profiles produce one completion with the measured serial range");

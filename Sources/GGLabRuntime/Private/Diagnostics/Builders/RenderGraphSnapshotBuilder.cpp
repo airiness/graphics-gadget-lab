@@ -1,4 +1,5 @@
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Graphics/Capture/ResourceExportTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -418,7 +419,7 @@ namespace gglab
 		outSnapshot.m_ObservationNodes = rg.m_ObservationPasses;
 		for (const auto& [index, target] : rg.m_ObservationPasses)
 		{
-			(void)target;
+			GGLAB_UNUSED(target);
 			outSnapshot.m_Passes[index].m_Observation = true;
 		}
 		if (rg.m_ExecutionRecord)

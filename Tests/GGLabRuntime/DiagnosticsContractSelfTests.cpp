@@ -1,4 +1,5 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Diagnostics/WorldTooling.h"
 #include "Diagnostics/CameraTooling.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
@@ -1340,7 +1341,7 @@ namespace gglab
 			ShadowTemporalDiagnostics history;
 			auto first = temporalFrame;
 			first.m_FrameSerial = 1;
-			(void)history.Record(first, 7, "CAM_ShadowStairs");
+			GGLAB_UNUSED(history.Record(first, 7, "CAM_ShadowStairs"));
 			changed.m_FrameSerial = 2;
 			const bool recorded = history.Record(changed, cameraId, referenceId);
 			return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&

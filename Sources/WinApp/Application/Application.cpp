@@ -1,5 +1,6 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/ApplicationEnvironment.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Capture/CaptureOnReady.h"
@@ -376,7 +377,7 @@ namespace gglab
 			});
 		if (m_FrameCapture)
 		{
-			(void)m_FrameCapture->Update();
+			GGLAB_UNUSED(m_FrameCapture->Update());
 		}
 		if (m_ControlServer && !UpdateControlSession())
 		{
@@ -700,7 +701,7 @@ namespace gglab
 			// Unconsumed job receipts end with this session; they are not cached by WinApp.
 			if (m_FrameCapture)
 			{
-				(void)m_FrameCapture->Update(false);
+				GGLAB_UNUSED(m_FrameCapture->Update(false));
 				m_FrameCapture.reset();
 			}
 			if (m_CaptureOnReadyJob)

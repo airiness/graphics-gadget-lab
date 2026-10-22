@@ -367,7 +367,7 @@ namespace gglab
 		m_CacheRootDir = utils::Canonical(root);
 		// Cache root creation failure is recoverable: it surfaces later as an
 		// ArtifactIOFailure result instead of aborting the host process.
-		(void)utils::CreateDirectoryIfNotExist(m_CacheRootDir);
+		GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_CacheRootDir));
 	}
 
 	ShaderResolvedRecipe ShaderCompiler::Resolve(const ShaderDesc& request) noexcept
@@ -809,7 +809,7 @@ namespace gglab
 
 		auto path = m_CacheRootDir / formatDirectory / keyHex.substr(0, 2) /
 			keyHex.substr(2, 2) / (keyHex + extension);
-		(void)utils::CreateParentDirectoryIfNotExist(path);
+		GGLAB_UNUSED(utils::CreateParentDirectoryIfNotExist(path));
 		return path;
 	}
 

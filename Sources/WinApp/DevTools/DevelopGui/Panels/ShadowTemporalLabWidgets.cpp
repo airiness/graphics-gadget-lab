@@ -1,5 +1,6 @@
 #include "DevTools/DevelopGui/Panels/ShadowTemporalLabWidgets.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/ShadowTemporalDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
@@ -67,8 +68,8 @@ namespace gglab
 		}
 		if (shadow && mainCamera)
 		{
-			(void)state.m_Temporal.Record(*shadow, mainCamera->m_Id,
-				cameras.m_LastRestoredReferenceId);
+			GGLAB_UNUSED(state.m_Temporal.Record(*shadow, mainCamera->m_Id,
+				cameras.m_LastRestoredReferenceId));
 		}
 		else
 		{
@@ -123,7 +124,7 @@ namespace gglab
 				sample.m_Position += state.m_ReplayRight * (0.8f * std::sin(phase)) +
 					state.m_ReplayForward * (0.35f * (1.0f - std::cos(phase)));
 				state.m_ReplayActive = context.m_CameraControl->SetCamera(mainCamera->m_Id, sample);
-				(void)context.m_CameraControl->ResetVelocity(mainCamera->m_Id);
+				GGLAB_UNUSED(context.m_CameraControl->ResetVelocity(mainCamera->m_Id));
 				if (state.m_ReplayStep++ == ReplayLastStep)
 				{
 					state.m_ReplayActive = false;

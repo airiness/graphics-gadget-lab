@@ -1,5 +1,6 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
@@ -523,8 +524,8 @@ namespace gglab
 				const auto& slot = bindingLayout->GetPlan().m_Set0Bindings[i];
 				if (location.IsSupported() && slot.m_Binding == location.m_Location.m_Binding && slot.m_DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
 				{
-					(void)SetBufferDescriptor(slot.m_LogicalParameterIndex, binding->m_Buffer, 0,
-						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess, "SetPassStorageBuffer");
+					GGLAB_UNUSED(SetBufferDescriptor(slot.m_LogicalParameterIndex, binding->m_Buffer, 0,
+						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess, "SetPassStorageBuffer"));
 				}
 			}
 		}
@@ -834,8 +835,8 @@ namespace gglab
 			Reject("SetReadOnlyBuffer", "upload storage requires a batch-scoped binding");
 			return;
 		}
-		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer");
+		GGLAB_UNUSED(SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer"));
 	}
 
 	void VulkanGraphicsCommandContext::SetInlineConstantWords(uint32_t parameterIndex,
@@ -1178,8 +1179,8 @@ namespace gglab
 				const auto& slot = bindingLayout->GetPlan().m_Set0Bindings[i];
 				if (location.IsSupported() && slot.m_Binding == location.m_Location.m_Binding && slot.m_DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
 				{
-					(void)SetBufferDescriptor(slot.m_LogicalParameterIndex, binding->m_Buffer, 0,
-						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess, "SetPassStorageBuffer");
+					GGLAB_UNUSED(SetBufferDescriptor(slot.m_LogicalParameterIndex, binding->m_Buffer, 0,
+						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess, "SetPassStorageBuffer"));
 				}
 			}
 		}
@@ -1247,8 +1248,8 @@ namespace gglab
 			Reject("SetReadOnlyBuffer", "upload storage requires a batch-scoped binding");
 			return;
 		}
-		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer");
+		GGLAB_UNUSED(SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer"));
 	}
 
 	void VulkanComputeCommandContext::SetReadWriteBuffer(
@@ -1259,9 +1260,9 @@ namespace gglab
 			Reject("SetReadWriteBuffer", "upload storage cannot be written through a handle");
 			return;
 		}
-		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
+		GGLAB_UNUSED(SetBufferDescriptor(parameterIndex, buffer, offset,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess,
-			"SetReadWriteBuffer");
+			"SetReadWriteBuffer"));
 	}
 
 	void VulkanComputeCommandContext::SetInlineConstantWords(uint32_t parameterIndex,
