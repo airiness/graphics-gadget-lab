@@ -287,6 +287,10 @@ namespace gglab
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
 
 		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost->GetRHIContext());
+		m_DemoManager->SetBeforeActiveDemoReleaseCallback([this]() noexcept
+		{
+			ReleaseContentBinding();
+		});
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services =
@@ -347,6 +351,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
 		}
 		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
+		SynchronizeContentBinding();
 		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
@@ -446,6 +451,11 @@ namespace gglab
 		if (m_ParameterControl)
 		{
 			m_ParameterControl->Finish();
+		}
+		ReleaseContentBinding();
+		if (m_DemoManager)
+		{
+			m_DemoManager->SetBeforeActiveDemoReleaseCallback({});
 		}
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;

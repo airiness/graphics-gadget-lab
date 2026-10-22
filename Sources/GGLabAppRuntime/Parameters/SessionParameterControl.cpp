@@ -23,19 +23,17 @@ namespace gglab
 	{
 	}
 
-	void SessionParameterControl::SynchronizeContent(DemoBase* demo, uint32_t demoSerial,
+	void SessionParameterControl::SynchronizeContent(DemoBase* demo, uint64_t contentIdentity,
 		std::string_view demoId, bool transitioning) noexcept
 	{
-		const auto* lab = demo ? demo->GetParameterLabRuntime() : nullptr;
-		const uint32_t contentSerial = lab ?
-			lab->GetTemporalSessionSerial() :
-			demo ? demo->GetTemporalSessionSerial() : 0;
-		const uint64_t serial = demo ? (static_cast<uint64_t>(demoSerial) << 32) | contentSerial : 0;
+		const uint64_t serial = demo ? contentIdentity : 0;
+		GGLAB_ASSERT_MSG(!demo || serial != 0, "Bound content requires its owner's frame identity.");
 		if (demo != m_Demo || serial != m_ContentSerial)
 		{
-			// The previous Lab may already be retired. Never dereference its borrowed pointer.
-			m_Lab = nullptr;
+			// The lifecycle owner releases Demo borrows before exit/retirement. A Lab
+			// session replacement retains the same live, command-owning LabRuntime.
 			EndParameterBatch(true, "The content changed before the parameter frame.");
+			m_Lab = nullptr;
 			m_HostOverrides.clear();
 			m_HostParameters = {};
 			m_LightingProfiles.clear();

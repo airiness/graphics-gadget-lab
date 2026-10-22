@@ -356,7 +356,7 @@ namespace gglab
 		m_LifecycleState = AppRuntimeLifecycleState::Failed;
 		if (m_ParameterControl)
 		{
-			GetParameterControl()->OnRuntimeFailed(failure);
+			m_ParameterControl->OnRuntimeFailed(failure);
 		}
 		if (m_DemoManager)
 		{
@@ -451,6 +451,8 @@ namespace gglab
 		{
 			m_DemoManager->BeginTransitionTick();
 		}
+		// Binding is a content lifecycle stage, including when no RHI frame is ready.
+		SynchronizeContentBinding();
 		if (!tickInfo.m_PreContentUpdate.Run())
 		{
 			return FailRuntime("Host pre-content update failed.");
@@ -477,6 +479,8 @@ namespace gglab
 		DemoBase* demo = m_DemoManager->GetActiveDemo();
 		GGLAB_ASSERT_NOT_NULL(demo);
 		demo->Update();
+		// Lab transitions may replace content during Update without replacing the Demo.
+		SynchronizeContentBinding();
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
 
@@ -490,7 +494,7 @@ namespace gglab
 		}
 		if (m_ParameterControl->IsEnabled())
 		{
-			GetParameterControl()->OnFrameReady(rendererFrame.GetSerial());
+			m_ParameterControl->OnFrameReady(rendererFrame.GetSerial());
 		}
 		demo->OnFrameReady(rendererFrame.GetSerial());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
@@ -582,9 +586,7 @@ namespace gglab
 					*sequenceGTAOOverrides, displayViewSettings.m_Lighting.m_GTAO);
 			}
 		}
-		const uint64_t temporalSessionIdentity =
-			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
-			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
+		const uint64_t temporalSessionIdentity = m_ActiveContentIdentity;
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({

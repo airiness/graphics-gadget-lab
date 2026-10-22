@@ -3,6 +3,15 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace gglab
 {
 	class RHIContext;
@@ -19,6 +28,10 @@ namespace gglab
 		DemoBase* GetDemo(uint32_t index) const noexcept;
 		std::string_view GetDemoName(uint32_t index) const noexcept;
 		DemoBase* GetActiveDemo() const noexcept { return m_ActiveDemo; }
+		[[nodiscard]] uint64_t GetActiveContentIdentity() const noexcept;
+		// Runs before the active Demo exits, while its borrowed services still live.
+		// The callback must not reenter Demo transitions.
+		void SetBeforeActiveDemoReleaseCallback(std::function<void()> callback) noexcept;
 		uint32_t RegisterDemo(std::string name, DemoFactory factory) noexcept;
 		void SetBootstrapDemo(std::unique_ptr<DemoBase> demo) noexcept;
 		void RequestActiveDemo(uint32_t index) noexcept;
@@ -51,6 +64,7 @@ namespace gglab
 		void BeginRequestedTransition() noexcept;
 		bool CommitPendingDemo() noexcept;
 		void PollRetiringDemos() noexcept;
+		void ExitActiveDemo() noexcept;
 
 		static constexpr uint32_t InvalidDemoIndex = std::numeric_limits<uint32_t>::max();
 
@@ -68,6 +82,7 @@ namespace gglab
 			RHIFencePoint m_RetireFence{};
 		};
 
+		std::function<void()> m_BeforeActiveDemoRelease;
 		RHIContext* m_RHIContext = nullptr;
 		std::vector<DemoSlot> m_DemoSlots;
 		std::unique_ptr<DemoBase> m_ActiveInstance;

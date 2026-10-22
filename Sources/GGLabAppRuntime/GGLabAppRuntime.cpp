@@ -45,16 +45,27 @@ namespace gglab
 		return AppRuntimeInitializeResult::Succeeded;
 	}
 
-	SessionParameterControl* GGLabAppRuntime::GetParameterControl() noexcept
+	void GGLabAppRuntime::SynchronizeContentBinding() noexcept
 	{
 		if (m_ParameterControl && m_DemoManager)
 		{
+			m_ActiveContentIdentity = m_DemoManager->GetActiveContentIdentity();
+			const uint32_t index = m_DemoManager->GetActiveIndex();
+			const std::string_view demoId = index < m_DemoManager->GetDemoCount() ?
+				m_DemoManager->GetDemoName(index) :
+				std::string_view{};
 			m_ParameterControl->SynchronizeContent(m_DemoManager->GetActiveDemo(),
-				m_DemoManager->GetTemporalSessionSerial(),
-				m_DemoManager->GetDemoName(m_DemoManager->GetActiveIndex()),
-				m_DemoManager->HasPendingActiveDemo());
+				m_ActiveContentIdentity, demoId, m_DemoManager->HasPendingActiveDemo());
 		}
-		return m_ParameterControl.get();
+	}
+
+	void GGLabAppRuntime::ReleaseContentBinding() noexcept
+	{
+		if (m_ParameterControl)
+		{
+			m_ParameterControl->SynchronizeContent(nullptr, 0, {}, true);
+		}
+		m_ActiveContentIdentity = 0;
 	}
 
 	void GGLabAppRuntime::HandleHostEvent(const AppHostEvent& event) noexcept

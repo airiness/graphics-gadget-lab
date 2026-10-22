@@ -30,12 +30,15 @@ namespace gglab
 		explicit SessionParameterControl(RenderEnvironmentAccess& environment,
 			WorldLightingControlBase* worldLighting = nullptr) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(SessionParameterControl);
-		void SynchronizeContent(DemoBase* demo, uint32_t demoSerial,
+		// Lifecycle owner releases a binding before destroying its Demo/LabRuntime.
+		// The identity is shared with frame planning, never recomputed by this source.
+		void SynchronizeContent(DemoBase* demo, uint64_t contentIdentity,
 			std::string_view demoId, bool transitioning) noexcept;
 		void Enable() noexcept;
 		[[nodiscard]] bool IsEnabled() const noexcept { return m_Enabled; }
 		[[nodiscard]] bool IsAvailable() const noexcept;
 		[[nodiscard]] const std::string& GetContentId() const noexcept { return m_ContentId; }
+		[[nodiscard]] uint64_t GetContentIdentity() const noexcept { return m_ContentSerial; }
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
 		[[nodiscard]] const LabParameterSet& GetHostParameters() const noexcept { return m_HostParameters; }
 		[[nodiscard]] const LabParameterSet* GetLabParameters() const noexcept;

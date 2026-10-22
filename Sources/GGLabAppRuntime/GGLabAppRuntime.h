@@ -240,7 +240,10 @@ namespace gglab
 		// jobs return no result and release no capacity. Receipts survive Shutdown.
 		[[nodiscard]] std::optional<CaptureJobResult> TakeCaptureJobResult(uint64_t jobId) noexcept;
 		// Non-owning; null before runtime services are composed.
-		[[nodiscard]] SessionParameterControl* GetParameterControl() noexcept;
+		[[nodiscard]] SessionParameterControl* GetParameterControl() const noexcept
+		{
+			return m_ParameterControl.get();
+		}
 		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
 		{
 			return m_FrameSequence.get();
@@ -258,6 +261,8 @@ namespace gglab
 	private:
 		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
 		void CollectFrameCaptureResults() noexcept;
+		void SynchronizeContentBinding() noexcept;
+		void ReleaseContentBinding() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult BeginInitialShaderPreload(
@@ -293,6 +298,8 @@ namespace gglab
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		std::unique_ptr<SessionParameterControl> m_ParameterControl;
+		// Frozen after content update; shared by parameters and this frame's planning.
+		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;

@@ -119,6 +119,12 @@ namespace gglab
 			TeardownOutcome m_Outcome = TeardownOutcome::Completed;
 			std::filesystem::path m_Receipt;
 			bool m_EnableParameterLab = false;
+			bool m_FrameBeginUnavailable = false;
+			uint32_t m_ContentSerialOffset = 0;
+			uint64_t m_PlannedContentIdentity = 0;
+			uint64_t m_ExpectedReleasedBatch = 0;
+			bool m_BindingReleasedBeforeExit = false;
+			uint32_t m_DemoDestructions = 0;
 			bool m_EnableLightingProfiles = false;
 			bool m_ProfileNamedLabBool = false;
 			bool m_InvalidLightingProfiles = false;
@@ -560,6 +566,10 @@ namespace gglab
 				{
 					return RHIFrameBeginResult::Fatal();
 				}
+				if (m_Probe.m_FrameBeginUnavailable)
+				{
+					return RHIFrameBeginResult::Unavailable();
+				}
 				m_Frame.m_Batch = m_Uploads.BeginBatch();
 				m_Frame.m_Batch->Attach(m_Frame.m_Writer);
 				m_Frame.m_Graphics.SetWriter(&m_Frame.m_Writer);
@@ -728,6 +738,7 @@ namespace gglab
 			std::string_view GetName() const noexcept override { return "FaultLifecycle.Pipeline"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
+				m_Probe.m_PlannedContentIdentity = info.m_SessionIdentity;
 				auto plan = RenderPipelineBase::ResolveTemporalFramePlan(info);
 				if (m_Probe.m_EnableTemporalHistory)
 				{
@@ -1065,6 +1076,10 @@ namespace gglab
 					m_Probe.m_ParameterEnvironment = info.m_Services.m_EnvironmentLightingControl;
 				}
 			}
+			~FaultDemo() override
+			{
+				++m_Probe.m_DemoDestructions;
+			}
 			std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept override
 			{
 				++m_Probe.m_LightingProfileQueries;
@@ -1115,6 +1130,17 @@ namespace gglab
 			}
 			void OnExit() noexcept override
 			{
+				if (const auto id = std::exchange(m_Probe.m_ExpectedReleasedBatch, uint64_t(0)))
+				{
+					const auto* control = m_Probe.m_ParameterControl;
+					const auto* batch = control ? control->GetParameterBatchStatus() : nullptr;
+					const std::array values{ LabParameterValue{ LabParameterId("radius"), 2.5f } };
+					std::string error;
+					m_Probe.m_BindingReleasedBeforeExit = control && batch && batch->m_BatchId == id &&
+						batch->IsTerminal() && control->GetContentIdentity() == 0 && !control->GetLabParameters() &&
+						control->GetHostParameters().CaptureValues().empty() && m_Lab &&
+						!m_Lab->PrepareParameterBatch(id, values, error);
+				}
 				if (m_Lab)
 				{
 					m_Lab->OnExit();
@@ -1137,7 +1163,7 @@ namespace gglab
 			{
 				// Match the production Lab host: frame build and Session parameter
 				// preparation must resolve lighting under the same content identity.
-				return m_Lab ? m_Lab->GetTemporalSessionSerial() : 0;
+				return (m_Lab ? m_Lab->GetTemporalSessionSerial() : 0) + m_Probe.m_ContentSerialOffset;
 			}
 			void OnFrameReady(uint64_t serial) noexcept override
 			{
@@ -2791,6 +2817,114 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunContentBindingScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool failBeforeShutdown)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			probe.m_EnableLightingProfiles = true;
+			// The Demo owns the nested content identity; it need not equal the raw Lab serial.
+			probe.m_ContentSerialOffset = 100;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			// Retain this borrow: subsequent owner transitions must not need a fresh getter.
+			auto& parameters = *runtime.GetParameterControl();
+			parameters.Enable();
+			probe.m_ParameterControl = &parameters;
+			auto& demos = *runtime.GetDemoManager();
+			checks.Check(parameters.GetContentIdentity() == demos.GetActiveContentIdentity() &&
+				probe.m_PlannedContentIdentity == parameters.GetContentIdentity(),
+				"Parameter binding and frame planning share the Demo owner's nested content identity");
+			const std::array overrideValues
+			{
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 3.0f },
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+			};
+			std::string error;
+			const auto initial = parameters.RequestParameterBatch(overrideValues, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(initial != 0 && parameters.TakeParameterBatchResult(initial).has_value() &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 3.0f,
+				"The binding fixture establishes an explicit Host override before content replacement");
+			const std::array pendingValues
+			{
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 4.0f },
+				LabParameterValue{ LabParameterId("radius"), 2.5f },
+			};
+			const auto oldIdentity = parameters.GetContentIdentity();
+			const auto staleLab = parameters.RequestParameterBatch(pendingValues, error);
+			probe.m_ParameterRuntime->RequestRestartSession();
+			probe.m_FrameBeginUnavailable = true;
+			const auto readyFrames = probe.m_FrameBegins;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto labResult = parameters.TakeParameterBatchResult(staleLab);
+			checks.Check(staleLab != 0 && labResult && labResult->IsTerminal() && labResult->m_Items.empty() &&
+				parameters.GetContentIdentity() != oldIdentity &&
+				parameters.GetContentIdentity() == demos.GetActiveContentIdentity() && probe.m_FrameBegins == readyFrames &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f,
+				"Lab replacement cancels the stale batch and clears Host overrides during an Unavailable frame");
+			auto* session = probe.m_ParameterRuntime->GetActiveSession();
+			GGLAB_UNUSED(session->SetParameter(LabParameterId("radius"), 2.75f));
+			session->ApplyParameterChanges(LabChangeImpact::Immediate);
+			const auto beforeQuery = parameters.GetParameterRevision();
+			checks.Check(runtime.GetParameterControl() == &parameters &&
+				static_cast<const GGLabAppRuntime&>(runtime).GetParameterControl() == &parameters &&
+				parameters.GetParameterRevision() == beforeQuery &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f,
+				"The parameter getter is a pure const accessor, without settings refresh or revision mutation");
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(parameters.GetParameterRevision() > beforeQuery &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.75f,
+				"The explicit content update stage refreshes inherited settings even without RHI readiness");
+			probe.m_FrameBeginUnavailable = false;
+			const auto restoredOverride = parameters.RequestParameterBatch(overrideValues, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(restoredOverride != 0 && parameters.TakeParameterBatchResult(restoredOverride).has_value() &&
+				probe.m_PlannedContentIdentity == parameters.GetContentIdentity(),
+				"The next Ready frame plans with the same refreshed identity as parameter control");
+			const auto pendingDemo = parameters.RequestParameterBatch(pendingValues, error);
+			const auto oldDestructions = probe.m_DemoDestructions;
+			const auto oldFrames = probe.m_FrameBegins;
+			probe.m_ExpectedReleasedBatch = pendingDemo;
+			probe.m_FrameBeginUnavailable = true;
+			probe.m_HoldCaptureFence = true;
+			demos.RequestActiveDemo(1);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(pendingDemo != 0 && probe.m_BindingReleasedBeforeExit &&
+				demos.GetRetiringDemoCount() == 1 && probe.m_DemoDestructions == oldDestructions &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 1.0f &&
+				parameters.GetContentIdentity() == demos.GetActiveContentIdentity(),
+				"Demo ownership cancels the old reservation and releases bindings before OnExit, independent of queries");
+			GGLAB_UNUSED(runtime.Tick());
+			probe.m_HoldCaptureFence = false;
+			probe.m_ReadbackFence = {};
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(demos.GetRetiringDemoCount() == 0 && probe.m_DemoDestructions == oldDestructions + 1 &&
+				probe.m_FrameBegins == oldFrames && parameters.TakeParameterBatchResult(pendingDemo).has_value(),
+				"The old Demo is destroyed behind its completed fence during repeated Unavailable frames without a control getter");
+			const auto shutdownBatch = parameters.RequestParameterBatch(pendingValues, error);
+			checks.Check(shutdownBatch != 0, "The current content accepts a new batch before teardown");
+			if (failBeforeShutdown)
+			{
+				probe.m_FrameBeginUnavailable = false;
+				probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal,
+					"Runtime failure terminates the new binding after the previous owner has been destroyed");
+			}
+			runtime.Shutdown();
+			const auto finished = parameters.TakeParameterBatchResult(shutdownBatch);
+			checks.Check(finished && finished->IsTerminal() &&
+				std::ranges::none_of(finished->m_Items, [](const auto& item) { return item.m_FirstConsumed.has_value(); }) &&
+				parameters.GetContentIdentity() == 0 && !parameters.GetLabParameters() &&
+				parameters.GetHostParameters().CaptureValues().empty(),
+				"Shutdown clears content borrows and overrides without revisiting the destroyed owner or inventing consumption");
+		}
+
 		void RunBatchPreparationScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -3321,6 +3455,8 @@ namespace gglab
 		RunHostParameterScenario(context, root / "host-lab", true);
 		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunBatchPreparationScenario(context, root / "batch-preparation");
+		RunContentBindingScenario(context, root / "content-binding-shutdown", false);
+		RunContentBindingScenario(context, root / "content-binding-failure", true);
 		RunLightingProfileRegistrationScenario(context, root / "profile-source-binding", true, false);
 		RunLightingProfileRegistrationScenario(context, root / "profile-invalid-registration", false, false);
 		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
