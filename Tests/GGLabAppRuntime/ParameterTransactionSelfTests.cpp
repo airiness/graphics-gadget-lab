@@ -2,6 +2,7 @@
 #include "Lab/LabParameter.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Parameters/ParameterEffectReceipt.h"
+#include "Parameters/HostViewParameters.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <array>
@@ -179,6 +180,90 @@ namespace gglab
 				"Ordinary Lab parameters retain the existing restart snapshot policy");
 		}
 
+		void RunHostViewProjectionTests(SelfTestContext& context) noexcept
+		{
+			ResolvedViewRenderSettings view;
+			view.m_TemporalAA.m_Enabled = true;
+			view.m_Lighting.m_GTAO.m_Power = 2.0f;
+			view.m_Lighting.m_EnableAerialPerspective = false;
+			view.m_PostProcess.m_Bloom.m_Intensity = 0.2f;
+			auto parameters = DescribeHostViewParameters(view);
+			const std::array values
+			{
+				LabParameterValue{ LabParameterId("view.taa.enabled"), false },
+				LabParameterValue{ LabParameterId("view.taa.max_history_feedback"), 0.8f },
+				LabParameterValue{ LabParameterId("view.taa.depth_absolute_threshold"), 0.1f },
+				LabParameterValue{ LabParameterId("view.taa.depth_relative_threshold"), 0.2f },
+				LabParameterValue{ LabParameterId("view.taa.velocity_weight_scale"), 0.3f },
+				LabParameterValue{ LabParameterId("view.taa.luminance_weight_scale"), 0.4f },
+				LabParameterValue{ LabParameterId("view.taa.neighborhood_clamp_expansion"), 0.5f },
+				LabParameterValue{ LabParameterId("view.taa.history_relaxation"), 0.0f },
+				LabParameterValue{ LabParameterId("view.taa.variance_clip_gamma"), 1.5f },
+				LabParameterValue{ LabParameterId("view.taa.texture_lod_bias_offset"), -0.5f },
+				LabParameterValue{ LabParameterId("view.taa.history_accumulation"), static_cast<int32_t>(TemporalAAHistoryAccumulation::CompatibilityAge) },
+				LabParameterValue{ LabParameterId("view.taa.history_rectification"), static_cast<int32_t>(TemporalAAHistoryRectification::BoundedVarianceClip) },
+				LabParameterValue{ LabParameterId("view.taa.history_filter"), static_cast<int32_t>(TemporalAAHistoryFilter::Bilinear) },
+				LabParameterValue{ LabParameterId("view.taa.current_filter"), static_cast<int32_t>(TemporalAACurrentFilter::Point) },
+				LabParameterValue{ LabParameterId("view.taa.motion_selection"), static_cast<int32_t>(TemporalAAMotionSelection::Center) },
+				LabParameterValue{ LabParameterId("view.taa.post_temporal_view"), static_cast<int32_t>(TemporalAAPostTemporalView::Jittered) },
+				LabParameterValue{ LabParameterId("view.taa.resolution_preset"), static_cast<int32_t>(TemporalAAResolutionPreset::Quality) },
+				LabParameterValue{ LabParameterId("view.gtao.enabled"), false },
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 0.5f },
+				LabParameterValue{ LabParameterId("view.gtao.direction_count"), uint32_t(3) },
+				LabParameterValue{ LabParameterId("view.gtao.step_count"), uint32_t(4) },
+				LabParameterValue{ LabParameterId("view.gtao.temporal_accumulation"), false },
+				LabParameterValue{ LabParameterId("view.gtao.temporal_max_samples"), uint32_t(7) },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 5.0f },
+				LabParameterValue{ LabParameterId("view.exposure.compensation"), 2.0f },
+			};
+			std::string error;
+			context.Check(parameters.CaptureValues().size() == values.size() &&
+				parameters.ApplyBatch(values, error).has_value(),
+				"Every Host view binding accepts a strictly validated typed value");
+			ApplyHostViewParameters(values, view, true);
+			const TemporalAASettings expectedTAA
+			{
+				.m_Enabled = false,
+				.m_DepthAbsoluteThreshold = 0.1f,
+				.m_DepthRelativeThreshold = 0.2f,
+				.m_MaxHistoryFeedback = 0.8f,
+				.m_VelocityWeightScale = 0.3f,
+				.m_LuminanceWeightScale = 0.4f,
+				.m_NeighborhoodClampExpansion = 0.5f,
+				.m_HistoryRelaxation = 0.0f,
+				.m_HistoryAccumulation = TemporalAAHistoryAccumulation::CompatibilityAge,
+				.m_HistoryRectification = TemporalAAHistoryRectification::BoundedVarianceClip,
+				.m_VarianceClipGamma = 1.5f,
+				.m_HistoryFilter = TemporalAAHistoryFilter::Bilinear,
+				.m_CurrentFilter = TemporalAACurrentFilter::Point,
+				.m_MotionSelection = TemporalAAMotionSelection::Center,
+				.m_PostTemporalView = TemporalAAPostTemporalView::Jittered,
+				.m_ResolutionPreset = TemporalAAResolutionPreset::Quality,
+				.m_TextureLodBiasOffset = -0.5f,
+			};
+			context.Check(view.m_TemporalAA == expectedTAA,
+				"Host names project all TAA fields into the shared typed settings semantics");
+			const auto& gtao = view.m_Lighting.m_GTAO;
+			context.Check(!gtao.m_Enabled && gtao.m_Radius == 0.5f &&
+				gtao.m_DirectionCount == 3 && gtao.m_StepCount == 4 &&
+				!gtao.m_TemporalAccumulation && gtao.m_TemporalMaxSamples == 7 &&
+				gtao.m_FalloffStart == 0.5f && gtao.m_FalloffEnd == 0.5f && gtao.m_Power == 2.0f &&
+				!view.m_Lighting.m_EnableAerialPerspective && view.m_PostProcess.m_Bloom.m_Intensity == 0.2f,
+				"Host GTAO patches resolve dependent falloff and preserve unrelated content settings");
+			context.Check(view.m_Exposure.m_ManualEV100 == 5.0f &&
+				view.m_Exposure.m_CompensationEV == 2.0f && view.m_Exposure.m_EffectiveEV100 == 3.0f &&
+				view.m_Exposure.m_ExposureScale == 1.0f / (1.2f * 8.0f) &&
+				view.m_Exposure.m_PreExposure == view.m_Exposure.m_ExposureScale,
+				"Host exposure inputs produce one consistent exposure and storage scale");
+			const auto projected = DescribeHostViewParameters(view);
+			for (const auto& value : values)
+			{
+				const auto* parameter = projected.Find(value.m_Id);
+				context.Check(parameter && LabValuesEqual(parameter->m_Value, value.m_Value),
+					"Host discovery reads back each effective typed field");
+			}
+		}
+
 		ParameterEffectReceipt BeginReceipt(ParameterEffectClass effectClass) noexcept
 		{
 			return *ParameterEffectReceipt::Begin(LabParameterId("test.parameter"), effectClass, 7, 10);
@@ -284,6 +369,7 @@ namespace gglab
 	{
 		RunBatchTests(context);
 		RunInheritedParameterTests(context);
+		RunHostViewProjectionTests(context);
 		RunReceiptTests(context);
 	}
 }

@@ -1,7 +1,8 @@
 #include "Parameters/HostViewParameters.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 
 #include <algorithm>
 #include <array>
@@ -19,7 +20,7 @@ namespace gglab
 		{
 			LabParameterDesc m_Desc;
 			LabValue (*m_Read)(const ResolvedViewRenderSettings&);
-			void (*m_Write)(ResolvedViewRenderSettings&, const LabValue&);
+			void (*m_Write)(ViewRenderSettingsPatch&, const LabValue&);
 		};
 
 		template<typename Accessor>
@@ -46,7 +47,7 @@ namespace gglab
 						return Accessor{}(settings);
 					}
 				},
-				[](ResolvedViewRenderSettings& settings, const LabValue& value)
+				[](ViewRenderSettingsPatch& settings, const LabValue& value)
 				{
 					if constexpr (std::is_enum_v<T>)
 					{
@@ -126,7 +127,7 @@ namespace gglab
 				MakeBinding("view.gtao.enabled", "GTAO",
 					[](auto& s) -> auto& { return s.m_Lighting.m_GTAO.m_Enabled; }),
 				MakeBinding("view.gtao.radius", "GTAO",
-					[](auto& s) -> auto& { return s.m_Lighting.m_GTAO.m_Radius; }, 0.01f, 10.0f),
+					[](auto& s) -> auto& { return s.m_Lighting.m_GTAO.m_Radius; }, GTAOMinRadius, GTAOMaxRadius),
 				MakeBinding("view.gtao.direction_count", "GTAO",
 					[](auto& s) -> auto& { return s.m_Lighting.m_GTAO.m_DirectionCount; }, 1u, GTAOMaxDirectionCount),
 				MakeBinding("view.gtao.step_count", "GTAO",
@@ -160,6 +161,7 @@ namespace gglab
 	void ApplyHostViewParameters(std::span<const LabParameterValue> values,
 		ResolvedViewRenderSettings& settings, bool enablePreExposure) noexcept
 	{
+		ViewRenderSettingsPatch patch;
 		for (const auto& value : values)
 		{
 			const auto& bindings = Bindings();
@@ -169,13 +171,9 @@ namespace gglab
 			});
 			if (binding != bindings.end())
 			{
-				binding->m_Write(settings, value.m_Value);
+				binding->m_Write(patch, value.m_Value);
 			}
 		}
-		auto& gtao = settings.m_Lighting.m_GTAO;
-		gtao.m_FalloffStart = std::clamp(gtao.m_FalloffStart, 0.0f, gtao.m_Radius);
-		gtao.m_FalloffEnd = std::clamp(gtao.m_FalloffEnd, gtao.m_FalloffStart, gtao.m_Radius);
-		settings.m_Exposure = ResolveManualExposureSettings(settings.m_Exposure.m_ManualEV100,
-			settings.m_Exposure.m_CompensationEV, enablePreExposure);
+		ApplyViewRenderSettingsPatch(patch, settings, enablePreExposure);
 	}
 }

@@ -2573,6 +2573,19 @@ namespace gglab
 		{
 			TemporaryDirectory directory("frame-sequence-evaluation");
 			{
+				GTAOSettings content;
+				content.m_Power = 2.0f;
+				content.m_DenoiseRadius = 4;
+				const auto patched = ApplyFrameSequenceGTAOOverrides({
+					.m_TemporalAccumulation = false, .m_TemporalMaxSamples = 0,
+					.m_DirectionCount = 999, .m_StepCount = 0 }, content);
+				context.Check(!patched.m_TemporalAccumulation && patched.m_TemporalMaxSamples == 1 &&
+					patched.m_DirectionCount == GTAOMaxDirectionCount && patched.m_StepCount == 1 &&
+					patched.m_Power == 2.0f && patched.m_DenoiseRadius == 4 &&
+					patched.m_Radius == content.m_Radius && patched.m_Enabled == content.m_Enabled,
+					"All four typed sequence GTAO fields retain shared bounds and inherited content");
+			}
+			{
 				TemporalAASettings content{};
 				content.m_Enabled = true;
 				content.m_DepthAbsoluteThreshold = 0.25f;

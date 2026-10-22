@@ -18,6 +18,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
@@ -28,6 +29,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/PipelineCache.h"
@@ -10943,6 +10945,131 @@ namespace gglab
 				"Invalid sun input resolves finite darkness, neutral chromaticity and a valid angular radius");
 		}
 
+		void RunViewSettingsPatchTests(SelfTestContext& context) noexcept
+		{
+			TemporalAASettings content;
+			content.m_Enabled = true;
+			content.m_DepthAbsoluteThreshold = 0.2f;
+			content.m_DepthRelativeThreshold = 0.3f;
+			content.m_HistoryRelaxation = 1.5f;
+			context.Check(TemporalAASettingsPatch{}.IsEmpty() &&
+				ApplyTemporalAASettingsPatch({}, content) == content,
+				"An empty typed TAA patch retains the resolved content settings");
+			const auto checkTAAField = [&](auto patchMember, auto settingsMember,
+				auto value, auto expectedValue)
+				{
+					TemporalAASettingsPatch patch;
+					patch.*patchMember = value;
+					auto expected = content;
+					expected.*settingsMember = expectedValue;
+					context.Check(!patch.IsEmpty() &&
+						ApplyTemporalAASettingsPatch(patch, content) == expected,
+						"A typed TAA field resolves its value without changing inherited fields");
+				};
+			checkTAAField(&TemporalAASettingsPatch::m_Enabled, &TemporalAASettings::m_Enabled,
+				false, false);
+			struct FloatField
+			{
+				std::optional<float> TemporalAASettingsPatch::* m_Patch;
+				float TemporalAASettings::* m_Settings;
+				float m_Min;
+				float m_Max;
+			};
+			const std::array floats
+			{
+				FloatField{ &TemporalAASettingsPatch::m_MaxHistoryFeedback, &TemporalAASettings::m_MaxHistoryFeedback, 0.0f, TemporalAAMaxHistoryFeedbackCeiling },
+				FloatField{ &TemporalAASettingsPatch::m_DepthAbsoluteThreshold, &TemporalAASettings::m_DepthAbsoluteThreshold, 0.0f, TemporalAAMaxDepthThreshold },
+				FloatField{ &TemporalAASettingsPatch::m_DepthRelativeThreshold, &TemporalAASettings::m_DepthRelativeThreshold, 0.0f, TemporalAAMaxDepthThreshold },
+				FloatField{ &TemporalAASettingsPatch::m_VelocityWeightScale, &TemporalAASettings::m_VelocityWeightScale, 0.0f, TemporalAAMaxVelocityWeightScale },
+				FloatField{ &TemporalAASettingsPatch::m_LuminanceWeightScale, &TemporalAASettings::m_LuminanceWeightScale, 0.0f, TemporalAAMaxLuminanceWeightScale },
+				FloatField{ &TemporalAASettingsPatch::m_NeighborhoodClampExpansion, &TemporalAASettings::m_NeighborhoodClampExpansion, 0.0f, TemporalAAMaxNeighborhoodClampExpansion },
+				FloatField{ &TemporalAASettingsPatch::m_HistoryRelaxation, &TemporalAASettings::m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation },
+				FloatField{ &TemporalAASettingsPatch::m_VarianceClipGamma, &TemporalAASettings::m_VarianceClipGamma, TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
+				FloatField{ &TemporalAASettingsPatch::m_TextureLodBiasOffset, &TemporalAASettings::m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
+			};
+			const TemporalAASettings defaults;
+			for (const auto& field : floats)
+			{
+				for (const float value : { 0.0f, -99.0f, 99.0f,
+					std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity() })
+				{
+					const float expected = std::isfinite(value) ?
+						std::clamp(value, field.m_Min, field.m_Max) :
+						defaults.*field.m_Settings;
+					checkTAAField(field.m_Patch, field.m_Settings, value, expected);
+				}
+			}
+			const auto checkTAAEnum = [&](auto patchMember, auto settingsMember, auto values)
+				{
+					for (const auto value : values)
+					{
+						checkTAAField(patchMember, settingsMember, value, value);
+					}
+					using T = std::remove_cvref_t<decltype(content.*settingsMember)>;
+					checkTAAField(patchMember, settingsMember, static_cast<T>(255), defaults.*settingsMember);
+				};
+			checkTAAEnum(&TemporalAASettingsPatch::m_HistoryAccumulation,
+				&TemporalAASettings::m_HistoryAccumulation,
+				std::array{ TemporalAAHistoryAccumulation::CompatibilityAge, TemporalAAHistoryAccumulation::EffectiveSamples });
+			checkTAAEnum(&TemporalAASettingsPatch::m_HistoryRectification,
+				&TemporalAASettings::m_HistoryRectification,
+				std::array{ TemporalAAHistoryRectification::MinMaxClamp, TemporalAAHistoryRectification::VarianceClip, TemporalAAHistoryRectification::BoundedVarianceClip });
+			checkTAAEnum(&TemporalAASettingsPatch::m_HistoryFilter, &TemporalAASettings::m_HistoryFilter,
+				std::array{ TemporalAAHistoryFilter::Bilinear, TemporalAAHistoryFilter::CatmullRomClamped });
+			checkTAAEnum(&TemporalAASettingsPatch::m_CurrentFilter, &TemporalAASettings::m_CurrentFilter,
+				std::array{ TemporalAACurrentFilter::Point, TemporalAACurrentFilter::Gaussian });
+			checkTAAEnum(&TemporalAASettingsPatch::m_MotionSelection, &TemporalAASettings::m_MotionSelection,
+				std::array{ TemporalAAMotionSelection::Center, TemporalAAMotionSelection::ClosestDepth });
+			checkTAAEnum(&TemporalAASettingsPatch::m_PostTemporalView, &TemporalAASettings::m_PostTemporalView,
+				std::array{ TemporalAAPostTemporalView::Jittered, TemporalAAPostTemporalView::Unjittered });
+			checkTAAEnum(&TemporalAASettingsPatch::m_ResolutionPreset, &TemporalAASettings::m_ResolutionPreset,
+				std::array{ TemporalAAResolutionPreset::Native, TemporalAAResolutionPreset::Quality });
+
+			GTAOSettings gtao;
+			gtao.m_Power = 2.0f;
+			gtao.m_DenoiseRadius = 4;
+			gtao.m_FinalAOFormatPreference = GTAOFinalAOFormatPreference::ForceR16Float;
+			const auto patchedGTAO = ApplyGTAOSettingsPatch({ .m_Enabled = false,
+				.m_Radius = 0.5f, .m_DirectionCount = 0, .m_StepCount = 999,
+				.m_TemporalAccumulation = false, .m_TemporalMaxSamples = 999 }, gtao);
+			context.Check(!patchedGTAO.m_Enabled && patchedGTAO.m_Radius == 0.5f &&
+				patchedGTAO.m_FalloffStart == 0.5f && patchedGTAO.m_FalloffEnd == 0.5f &&
+				patchedGTAO.m_DirectionCount == 1 && patchedGTAO.m_StepCount == GTAOMaxStepCount &&
+				!patchedGTAO.m_TemporalAccumulation &&
+				patchedGTAO.m_TemporalMaxSamples == GTAOMaxTemporalSamples &&
+				patchedGTAO.m_Power == 2.0f && patchedGTAO.m_DenoiseRadius == 4 &&
+				patchedGTAO.m_FinalAOFormatPreference == GTAOFinalAOFormatPreference::ForceR16Float,
+				"Typed GTAO patches clamp sampling and dependent falloff while preserving unrelated fields");
+			const auto minimumGTAO = ApplyGTAOSettingsPatch({ .m_Radius = -1.0f,
+				.m_DirectionCount = 999, .m_StepCount = 0, .m_TemporalMaxSamples = 0 }, gtao);
+			context.Check(minimumGTAO.m_Radius == GTAOMinRadius &&
+				minimumGTAO.m_DirectionCount == GTAOMaxDirectionCount && minimumGTAO.m_StepCount == 1 &&
+				minimumGTAO.m_TemporalMaxSamples == 1 &&
+				ApplyGTAOSettingsPatch({ .m_Radius = 99.0f }, gtao).m_Radius == GTAOMaxRadius,
+				"Typed GTAO patches preserve both sampling bounds and the radius limits");
+
+			ResolvedViewRenderSettings view;
+			view.m_TemporalAA = content;
+			view.m_Lighting.m_GTAO = gtao;
+			view.m_Lighting.m_EnableAerialPerspective = false;
+			view.m_PostProcess.m_Bloom.m_Intensity = 0.2f;
+			view.m_Exposure = ResolveManualExposureSettings(5.0f, 2.0f, true);
+			ApplyViewRenderSettingsPatch({ .m_Exposure = { .m_CompensationEV = 0.0f } }, view, true);
+			context.Check(view.m_Exposure.m_ManualEV100 == 5.0f && view.m_Exposure.m_CompensationEV == 0.0f &&
+				view.m_Exposure.m_EffectiveEV100 == 5.0f &&
+				NearlyEqual(view.m_Exposure.m_ExposureScale, 1.0f / (1.2f * 32.0f)) &&
+				view.m_Exposure.m_PreExposure == view.m_Exposure.m_ExposureScale &&
+				view.m_TemporalAA == content && view.m_Lighting.m_GTAO.m_Power == 2.0f &&
+				!view.m_Lighting.m_EnableAerialPerspective && view.m_PostProcess.m_Bloom.m_Intensity == 0.2f,
+				"A compensation-only patch derives exposure together and preserves the other view settings");
+			view.m_Exposure = ResolveManualExposureSettings(5.0f, 2.0f, true);
+			ApplyViewRenderSettingsPatch({ .m_Exposure = { .m_ManualEV100 = 0.0f } }, view, false);
+			context.Check(view.m_Exposure.m_ManualEV100 == 0.0f && view.m_Exposure.m_CompensationEV == 2.0f &&
+				view.m_Exposure.m_EffectiveEV100 == -2.0f && view.m_Exposure.m_PreExposure == 1.0f &&
+				NearlyEqual(view.m_Exposure.m_ExposureScale, 4.0f / 1.2f),
+				"A manual-only zero patch retains compensation and resolves disabled pre-exposure");
+		}
+
 		void RunExposureContractTests(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{});
@@ -13219,6 +13346,7 @@ namespace gglab
 		RunTemporalCaptureContinuityContractTests(context);
 		RunAtmosphereContractTests(context);
 		RunWorldSunContractTests(context);
+		RunViewSettingsPatchTests(context);
 		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);

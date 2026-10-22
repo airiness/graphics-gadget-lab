@@ -7,6 +7,8 @@
 namespace gglab
 {
 	// GTAOSettings clamp bounds enforced by view-settings sanitization.
+	inline constexpr float GTAOMinRadius = 0.01f;
+	inline constexpr float GTAOMaxRadius = 10.0f;
 	inline constexpr uint32_t GTAOMaxDirectionCount = 8;
 	inline constexpr uint32_t GTAOMaxStepCount = 8;
 	inline constexpr uint32_t GTAOMaxDenoiseRadius = 8;

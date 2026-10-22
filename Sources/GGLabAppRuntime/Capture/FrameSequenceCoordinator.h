@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
-#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
@@ -23,29 +23,7 @@ namespace gglab
 {
 	// Display-view Temporal AA settings a sequence evaluates instead of the content's.
 	// Unset fields keep the content's resolved values.
-	struct FrameSequenceTemporalAAOverrides
-	{
-		// False evaluates the same sequence with Temporal AA not requested.
-		std::optional<bool> m_Enabled;
-		std::optional<float> m_MaxHistoryFeedback;
-		std::optional<float> m_DepthAbsoluteThreshold;
-		std::optional<float> m_DepthRelativeThreshold;
-		std::optional<float> m_VelocityWeightScale;
-		std::optional<float> m_LuminanceWeightScale;
-		std::optional<float> m_NeighborhoodClampExpansion;
-		std::optional<float> m_HistoryRelaxation;
-		std::optional<TemporalAAHistoryAccumulation> m_HistoryAccumulation;
-		std::optional<TemporalAAHistoryRectification> m_HistoryRectification;
-		std::optional<float> m_VarianceClipGamma;
-		std::optional<TemporalAAHistoryFilter> m_HistoryFilter;
-		std::optional<TemporalAACurrentFilter> m_CurrentFilter;
-		std::optional<TemporalAAMotionSelection> m_MotionSelection;
-		std::optional<TemporalAAPostTemporalView> m_PostTemporalView;
-		std::optional<TemporalAAResolutionPreset> m_ResolutionPreset;
-		std::optional<float> m_TextureLodBiasOffset;
-
-		[[nodiscard]] bool IsEmpty() const noexcept;
-	};
+	using FrameSequenceTemporalAAOverrides = TemporalAASettingsPatch;
 
 	// Returns the settings with every set override applied and resolved to the
 	// settings' valid ranges.
