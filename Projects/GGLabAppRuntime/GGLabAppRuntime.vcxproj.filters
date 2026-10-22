@@ -88,6 +88,9 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionLightingProfiles.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>

@@ -117,6 +117,7 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionLightingProfiles.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntimeParameters.cpp" />

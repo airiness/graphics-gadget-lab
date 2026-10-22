@@ -4,9 +4,11 @@
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -67,6 +69,8 @@ namespace gglab
 
 		// Only the active content exposes its Lab source; Demo content returns null.
 		virtual LabRuntime* GetParameterLabRuntime() noexcept { return nullptr; }
+		// Stable for the active content lifetime; never registers profiles from pending content.
+		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}

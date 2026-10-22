@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -7,42 +8,85 @@ namespace gglab
 {
 	namespace
 	{
+		struct ParameterRange
+		{
+			float m_Min;
+			float m_Max;
+
+			bool Contains(float value) const noexcept
+			{
+				return math::IsInClosedRange(value, m_Min, m_Max);
+			}
+			bool Contains(const Vector3& value) const noexcept
+			{
+				return math::IsInClosedRange(value, m_Min, m_Max);
+			}
+			float Bound(float value, float fallback) const noexcept
+			{
+				return math::IsFinite(value) ? std::clamp(value, m_Min, m_Max) : fallback;
+			}
+		};
+
+		// Model support limits in authored units, shared by validation and resolution.
+		constexpr ParameterRange PlanetRadius{ 100000.0f, 100000000.0f };
+		constexpr ParameterRange Height{ 1000.0f, 1000000.0f };
+		constexpr ParameterRange PlanetCenter{ -100000000.0f, 100000000.0f };
+		constexpr ParameterRange WorldScale{ 0.0001f, 10000.0f };
+		constexpr ParameterRange Coefficient{ 0.0f, 0.001f };
+		constexpr ParameterRange ScaleHeight{ 100.0f, 100000.0f };
+		constexpr ParameterRange Anisotropy{ -0.95f, 0.95f };
+		constexpr ParameterRange AbsorptionHalfWidth{ 100.0f, 1000000.0f };
+		constexpr ParameterRange GroundAlbedo{ 0.0f, 0.95f };
+
 		float Bound(float value, float low, float high, float fallback) noexcept
 		{
-			return std::isfinite(value) ? std::clamp(value, low, high) : fallback;
+			return ParameterRange{ low, high }.Bound(value, fallback);
 		}
 		Vector3 Coefficients(const Vector3& value) noexcept
 		{
-			return Vector3(Bound(value.m_X, 0.0f, 0.001f, 0.0f),
-				Bound(value.m_Y, 0.0f, 0.001f, 0.0f), Bound(value.m_Z, 0.0f, 0.001f, 0.0f)) * 1000.0f;
+			return Vector3(Coefficient.Bound(value.m_X, 0.0f),
+				Coefficient.Bound(value.m_Y, 0.0f), Coefficient.Bound(value.m_Z, 0.0f)) * 1000.0f;
 		}
 	}
+
+	bool ValidateAtmosphereSettings(const AtmosphereSettings& s) noexcept
+	{
+		return PlanetRadius.Contains(s.m_PlanetRadiusMeters) && Height.Contains(s.m_HeightMeters) &&
+			PlanetCenter.Contains(s.m_PlanetCenterMeters) && WorldScale.Contains(s.m_WorldUnitsToMeters) &&
+			Coefficient.Contains(s.m_RayleighScattering) && ScaleHeight.Contains(s.m_RayleighScaleHeightMeters) &&
+			Coefficient.Contains(s.m_MieScattering) && Coefficient.Contains(s.m_MieExtinction) &&
+			s.m_MieExtinction >= s.m_MieScattering && ScaleHeight.Contains(s.m_MieScaleHeightMeters) &&
+			Anisotropy.Contains(s.m_MieAnisotropy) && Coefficient.Contains(s.m_Absorption) &&
+			math::IsInClosedRange(s.m_AbsorptionCenterMeters, 0.0f, s.m_HeightMeters) &&
+			AbsorptionHalfWidth.Contains(s.m_AbsorptionHalfWidthMeters) && GroundAlbedo.Contains(s.m_GroundAlbedo);
+	}
+
 	AtmosphereGPU ResolveAtmosphere(const AtmosphereSettings& s, const ResolvedWorldSun& sun,
 		const Vector3& camera) noexcept
 	{
 		AtmosphereGPU a{};
-		const float bottom = Bound(s.m_PlanetRadiusMeters, 100000.0f, 100000000.0f, 6360000.0f) * 0.001f;
-		const float height = Bound(s.m_HeightMeters, 1000.0f, 1000000.0f, 100000.0f) * 0.001f;
+		const float bottom = PlanetRadius.Bound(s.m_PlanetRadiusMeters, 6360000.0f) * 0.001f;
+		const float height = Height.Bound(s.m_HeightMeters, 100000.0f) * 0.001f;
 		a.m_Radii = Vector4(bottom, bottom + height, 0.0f, 0.0f);
 		const auto ray = Coefficients(s.m_RayleighScattering);
 		a.m_Rayleigh = Vector4(ray.m_X, ray.m_Y, ray.m_Z,
-			Bound(s.m_RayleighScaleHeightMeters, 100.0f, 100000.0f, 8000.0f) * 0.001f);
-		const float mie = Bound(s.m_MieScattering, 0.0f, 0.001f, 0.0f) * 1000.0f;
-		a.m_Mie = Vector4(mie, std::max(mie, Bound(s.m_MieExtinction, 0.0f, 0.001f, 0.0f) * 1000.0f),
-			Bound(s.m_MieScaleHeightMeters, 100.0f, 100000.0f, 1200.0f) * 0.001f,
-			Bound(s.m_MieAnisotropy, -0.95f, 0.95f, 0.8f));
+			ScaleHeight.Bound(s.m_RayleighScaleHeightMeters, 8000.0f) * 0.001f);
+		const float mie = Coefficient.Bound(s.m_MieScattering, 0.0f) * 1000.0f;
+		a.m_Mie = Vector4(mie, std::max(mie, Coefficient.Bound(s.m_MieExtinction, 0.0f) * 1000.0f),
+			ScaleHeight.Bound(s.m_MieScaleHeightMeters, 1200.0f) * 0.001f,
+			Anisotropy.Bound(s.m_MieAnisotropy, 0.8f));
 		const auto absorption = Coefficients(s.m_Absorption);
 		a.m_Absorption = Vector4(absorption.m_X, absorption.m_Y, absorption.m_Z,
 			Bound(s.m_AbsorptionCenterMeters, 0.0f, height * 1000.0f, 25000.0f) * 0.001f);
-		a.m_Ground = Vector4(Bound(s.m_GroundAlbedo.m_X, 0.0f, 0.95f, 0.3f),
-			Bound(s.m_GroundAlbedo.m_Y, 0.0f, 0.95f, 0.3f), Bound(s.m_GroundAlbedo.m_Z, 0.0f, 0.95f, 0.3f),
-			Bound(s.m_AbsorptionHalfWidthMeters, 100.0f, 1000000.0f, 15000.0f) * 0.001f);
+		a.m_Ground = Vector4(GroundAlbedo.Bound(s.m_GroundAlbedo.m_X, 0.3f),
+			GroundAlbedo.Bound(s.m_GroundAlbedo.m_Y, 0.3f), GroundAlbedo.Bound(s.m_GroundAlbedo.m_Z, 0.3f),
+			AbsorptionHalfWidth.Bound(s.m_AbsorptionHalfWidthMeters, 15000.0f) * 0.001f);
 		a.m_Sun = Vector4(sun.m_DirectIlluminance.m_X, sun.m_DirectIlluminance.m_Y,
 			sun.m_DirectIlluminance.m_Z, sun.m_AngularRadiusRadians);
-		const double scale = Bound(s.m_WorldUnitsToMeters, 0.0001f, 10000.0f, 1.0f);
-		const float centerX = Bound(s.m_PlanetCenterMeters.m_X, -100000000.0f, 100000000.0f, 0.0f);
-		const float centerY = Bound(s.m_PlanetCenterMeters.m_Y, -100000000.0f, 100000000.0f, -6360000.0f);
-		const float centerZ = Bound(s.m_PlanetCenterMeters.m_Z, -100000000.0f, 100000000.0f, 0.0f);
+		const double scale = WorldScale.Bound(s.m_WorldUnitsToMeters, 1.0f);
+		const float centerX = PlanetCenter.Bound(s.m_PlanetCenterMeters.m_X, 0.0f);
+		const float centerY = PlanetCenter.Bound(s.m_PlanetCenterMeters.m_Y, -6360000.0f);
+		const float centerZ = PlanetCenter.Bound(s.m_PlanetCenterMeters.m_Z, 0.0f);
 		a.m_World = Vector4(centerX * 0.001f, centerY * 0.001f, centerZ * 0.001f,
 			static_cast<float>(scale * 0.001));
 		const double x = static_cast<double>(camera.m_X) * scale - centerX;

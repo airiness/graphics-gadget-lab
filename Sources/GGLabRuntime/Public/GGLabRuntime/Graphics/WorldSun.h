@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
 namespace gglab
 {
@@ -25,6 +26,9 @@ namespace gglab
 		Vector3 m_DirectIlluminance = Vector3::Zero;
 	};
 
+	// Strict authoring validation is separate from the resolver's defensive fallback.
+	[[nodiscard]] bool ValidateWorldSunSettings(const WorldSunSettings& settings) noexcept;
+	[[nodiscard]] Vector3 ResolveWorldSunDirection(const Quaternion& rotation) noexcept;
 	[[nodiscard]] ResolvedWorldSun ResolveWorldSun(
 		const WorldSunSettings& settings, const Vector3& direction) noexcept;
 }

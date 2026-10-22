@@ -75,7 +75,7 @@ try {
                     Write-VerificationJson "$directory/before-discovery.json" $status
                     $parameters = Invoke-VerificationSession parameters $session
                     Write-VerificationJson "$directory/parameters.json" $parameters
-                    Check (@($parameters.parameters | Where-Object source -eq 'host').Count -eq 25 -and
+                    Check (@($parameters.parameters | Where-Object { $_.source -eq 'host' -and $_.id -like 'view.*' }).Count -eq 25 -and
                         @($parameters.parameters | Where-Object id -eq 'view.exposure.ev100')[0].setSupported -and
                         (@($parameters.parameters | Where-Object source -eq 'lab').Count -gt 0) -eq ($content -eq 'lab')) "$case-discovery"
                     $inheritedRadius = @($parameters.parameters | Where-Object id -eq 'view.gtao.radius')[0].current

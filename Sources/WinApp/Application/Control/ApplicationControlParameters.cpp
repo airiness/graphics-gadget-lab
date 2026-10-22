@@ -1,4 +1,6 @@
 #include "Application/Control/ApplicationControlParameters.h"
+#include "GGLabFoundation/Hash/Sha256.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Parameters/SessionParameterControl.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -275,6 +277,24 @@ namespace gglab
 			{ "failure", batch.m_Failure } };
 	}
 
+	Json SerializeApplicationControlLightingProfiles(const LightingProfilePublication* profiles)
+	{
+		const auto state = [](const std::optional<LightingProfileState>& value) -> Json
+			{
+				return value ?
+					Json{
+						{ "profileId", value->m_Id },
+						{ "profileHash", Sha256DigestToHex(value->m_Hash) },
+						{ "generation", value->m_Generation } } :
+					Json();
+			};
+		return profiles ?
+			Json{
+				{ "requested", state(profiles->m_Requested) },
+				{ "active", state(profiles->m_Active) } } :
+			Json();
+	}
+
 	std::string SerializeApplicationControlParameters(uint64_t id, SessionParameterControl* runtime) noexcept
 	{
 		if (!runtime || !runtime->IsAvailable())
@@ -286,6 +306,17 @@ namespace gglab
 		response["contentId"] = runtime->GetContentId();
 		response["revision"] = runtime->GetParameterRevision();
 		response["parameters"] = Json::array();
+		response["lighting"] = SerializeApplicationControlLightingProfiles(&runtime->GetLightingProfilePublication());
+		response["lightingProfileError"] = runtime->GetLightingProfileError();
+		response["lightingProfiles"] = Json::array();
+		for (const auto& profile : runtime->GetLightingProfiles())
+		{
+			response["lightingProfiles"].push_back({
+				{ "id", profile.m_Id },
+				{ "hashVersion", LightingProfileHashVersion },
+				{ "hash", Sha256DigestToHex(HashLightingProfile(profile)) },
+				{ "recommendedEV100", profile.m_RecommendedEV100 ? Json(*profile.m_RecommendedEV100) : Json() } });
+		}
 		const auto append = [&](const LabParameterSet& source, const char* sourceName)
 			{
 				for (const auto& parameter : source.GetParameters())

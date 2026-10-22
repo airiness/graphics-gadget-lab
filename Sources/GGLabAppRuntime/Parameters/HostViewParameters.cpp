@@ -1,4 +1,5 @@
 #include "Parameters/HostViewParameters.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 
@@ -135,7 +136,8 @@ namespace gglab
 				MakeBinding("view.gtao.temporal_accumulation", "GTAO",
 					[](auto& s) -> auto& { return s.m_Lighting.m_GTAO.m_TemporalAccumulation; }),
 				MakeBinding("view.exposure.ev100", "Exposure",
-					[](auto& s) -> auto& { return s.m_Exposure.m_ManualEV100; }, -16.0f, 24.0f),
+					[](auto& s) -> auto& { return s.m_Exposure.m_ManualEV100; },
+					Camera::MinimumManualEV100, Camera::MaximumManualEV100),
 				MakeBinding("view.exposure.compensation", "Exposure",
 					[](auto& s) -> auto& { return s.m_Exposure.m_CompensationEV; }, -10.0f, 10.0f),
 			};

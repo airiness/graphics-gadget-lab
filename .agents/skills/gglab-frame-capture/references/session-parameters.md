@@ -15,9 +15,9 @@ count through the owning Runtime control, preserving generation attribution.
 The GTAO fixture covers texture-IBL cache restoration; Atmosphere Range covers
 Physical Sky, whose current producer deliberately skips texture caches.
 
-Host `environment.*`, named profiles, arbitrary authored sun/atmosphere
-parameter bindings, rebuild transactions, sequence events and parameter metadata
-in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
+Host `environment.profile` selects content-registered Physical Sky inputs.
+Arbitrary authored sun/atmosphere parameter bindings, rebuild transactions,
+sequence events and parameter metadata in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
 sequence rejects while a parameter batch is pending. Do not use external `set`
 as a substitute for scheduled events.
 
@@ -46,6 +46,61 @@ legacy sequence overrides. Reference sampling continues to force temporal AA and
 temporal GTAO inactive. Legacy sequence values use the same field projection,
 are temporary, and do not replace session Host values. External `set` remains
 blocked throughout a sequence; scheduled events are still unimplemented.
+
+## Content-registered lighting profiles
+
+Discover `environment.profile` and its enum integers through `parameters`.
+The current enum matches Runtime's requested **effective** inputs; `-1` means
+no registered effective match and is read-only. Setting it rejects the batch.
+Registration rejects duplicate IDs/hashes and effective-equivalent aliases, so
+current selection is unambiguous. Source/type binding distinguishes this Host
+enum from a Lab-owned parameter with the same name when no Host profile exists.
+Only ready active content registers profiles; content replacement clears the
+registrations and requested/active identities. Coastal Atrium registers
+`coastal.daylight`; Atmosphere Range registers `atmosphere_range.baseline` and
+`atmosphere_range.oblique` as transition fixtures, not production Golden Hour values.
+
+`parameters.lightingProfiles` lists IDs, SHA-256 input hashes, `hashVersion: 2`
+and nullable `recommendedEV100`. Hash v2 encodes explicit little-endian float32
+fields, canonicalizes direction through the producer's rotation/extraction path,
+and normalizes signed zero; other authored fields remain raw. Profile ID and
+exposure advice are excluded. This supersedes the uncommitted v1 contract, which
+distinguished raw direction magnitudes even when the producer discarded them.
+The first contract supports Physical Sky with IBL intensity 1 and rotation 0.
+Profile application changes the designated sun and atmosphere, not manual exposure.
+Recommended exposure is advisory only. A profile requires an existing designated sun.
+Strict numerical validation belongs to WorldSun, Atmosphere and Camera; profiles
+compose it with producer support and the positive-illuminance profile policy.
+Registrations, prepared inputs, hashes and enum labels are cached for the content
+identity. Invalid registrations omit only this control: discovery's
+`lightingProfileError` and `status.parameterControl.lightingProfileError` explain
+the configuration error, while unrelated Host controls remain available.
+
+The same Session batch accepts one profile item, optionally with Host/Lab Immediate
+items; two Deferred lighting items reject atomically. Re-selecting current inputs
+is NoChange and does not rebake or rewrite equivalent authoring representations.
+Quaternion sign, direction magnitude and normalized chromaticity are not compared
+as arbitrary representation bytes when deciding effective equality. Profile
+application uses an explicit Runtime World Lighting control at the safe boundary,
+separate from frame/pipeline access. Existing authored edits settle **before** the
+batch's attribution baseline; a changed profile must then prove its own actual
+request. No generations are predicted and no redundant rebake is forced. Normal
+frame building revalidates/deduplicates.
+
+Both discovery and `status.parameterControl.lighting` expose separate `requested`
+and `active` records (`profileId`, `profileHash`, actual `generation`), or null when
+unknown/custom. The old active identity remains attached to its published generation
+while a newer request is pending; the new profile hash never relabels an old generation.
+Identity comes from immutable authored-input snapshots retained by the actual
+Runtime request/publication, not the current mutable World. Effective equality
+alone does not prove a profile's authored hash: an equivalent selection can be
+NoChange while its profile identity stays unknown, or retains the older request's
+proven identity. The persisted v2 hash still distinguishes other raw authored
+fields (such as chromaticity before normalization); it is not the Runtime
+effective-source identity.
+These records describe the published environment-lighting product, not a claim that
+every direct-light input is delayed until that publication. They are live control
+snapshots only; saved capture/sequence/export provenance is a later slice.
 
 ## Discover and set
 
@@ -96,6 +151,24 @@ before the actual Ready frame. There is one AppRuntime session-owned accepted ba
 slot; terminal results retain it until explicit consumption. Rejection allocates
 no batch id. IDs are process-local and **separate from capture `jobId`** and
 transport correlation `id`.
+
+At the Ready boundary, the Session prepares the complete current batch before
+committing any of its live values: source/type bindings, Host candidates and
+overrides, the Lab's queued reservation/candidate, World Lighting target and
+input plan, revision and receipt storage. Preparation does not invoke Lab
+handlers, consume the Lab command or start the batch's lighting request. A
+preparation rejection leaves those live values and revisions unchanged, including
+manual exposure when a designated sun disappeared after admission. Settling an
+already-authored external World edit happens before this batch's baseline and
+is not a request created by the rejected batch.
+
+Commit installs all source values without intervening content callbacks or
+fallible validation. Lab handlers execute afterward, so they cannot observe a
+half-committed mixed batch. Explicit Host display-view values still take
+precedence over Lab view changes; an inherited NoChange remains inherited unless
+the Lab effect actually changes that field. Post-commit effect failure,
+supersession and GPU publication/submission failure remain receipt outcomes, not
+a promise of GPU rollback.
 
 The script waits for application by default. `-NoWait` returns admission only;
 `-WaitConsumed` waits for every effect to become terminal (including failure or
@@ -163,6 +236,20 @@ resubmit. File/transport failures still print one JSON error result.
 
 ## Verify on native backends
 
+`Tests/Verification/RunVerification.ps1 -Suite lighting-profiles` checks Coastal
+Atrium registration and Atmosphere Range baseline/oblique/baseline transitions on
+both RHIs, atomic rejection, mixed profile/Lab Immediate/Host NoChange commits,
+exposure independence, actual generation receipts, captured generations and
+uncached Physical Sky publication logs. Headless
+AppRuntime coverage additionally checks prepare-time loss of a Lab reservation
+or designated sun, mutation-free rejection, complete commit visibility to Lab
+handlers, Host precedence after Lab effects, source/type collisions, registration
+errors/cache lifetime, effective equivalence, unresolved authored edits,
+requested/active separation, supersession, publication on abort/retry, shutdown
+and running content replacement. The synthetic headless
+producers exercise real scheduler/fence/receipt ownership, not native shader products.
+
+
 `Tests/Verification/RunVerification.ps1 -Suite session-host-parameters` checks
 Host discovery, atomic mixed-source rejection, submitted receipts, NoChange,
 result retention, captured settings, exposure image response, exact settling origin
@@ -186,5 +273,5 @@ and checks publication logs: a restored texture configuration must publish a
 new generation with four cached stages and no GPU build stages; Physical Sky
 must use uncached GPU bakes. Native standard validation is requested. Inspect
 the capture PNGs and logs as well. These are scoped fixture parameter contracts,
-not arbitrary sun/profile, scheduled-event, cross-backend identity, performance
+not arbitrary sun inputs, scheduled-event, cross-backend identity, performance
 or real driver-fault proof.

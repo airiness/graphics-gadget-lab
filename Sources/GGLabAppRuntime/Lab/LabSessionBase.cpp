@@ -5,6 +5,8 @@
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
+#include <utility>
+
 namespace gglab
 {
 	LabSessionBase::LabSessionBase(LabDescriptor descriptor, const LabSessionCreateInfo& createInfo,
@@ -52,6 +54,11 @@ namespace gglab
 		std::span<const LabParameterValue> values, std::string& error) noexcept
 	{
 		return m_Parameters.ApplyBatch(values, error);
+	}
+
+	void LabSessionBase::CommitPreparedParameters(LabParameterSet&& parameters) noexcept
+	{
+		m_Parameters = std::move(parameters);
 	}
 
 	LabChangeImpact LabSessionBase::ResetParameters() noexcept

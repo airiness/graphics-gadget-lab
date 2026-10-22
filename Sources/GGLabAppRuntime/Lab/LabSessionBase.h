@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "Lab/LabParameter.h"
@@ -11,6 +12,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 
 namespace gglab
 {
@@ -64,6 +66,7 @@ namespace gglab
 			GGLAB_UNUSED(id);
 			return std::nullopt;
 		}
+		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
 
@@ -137,6 +140,8 @@ namespace gglab
 		World m_World;
 
 	private:
+		friend class LabRuntime;
+		void CommitPreparedParameters(LabParameterSet&& parameters) noexcept;
 		LabDescriptor m_Descriptor;
 		std::unique_ptr<AssetOwnerScope> m_AssetOwnerScope;
 		LabParameterSet m_Parameters;

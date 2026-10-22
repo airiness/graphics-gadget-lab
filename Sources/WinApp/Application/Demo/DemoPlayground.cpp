@@ -1,6 +1,7 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
+#include "Application/Demo/CoastalSceneLightingProfiles.h"
 #include "ApplicationCameraInput.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Content/RuntimeAssetBundle.h"
@@ -83,6 +84,13 @@ namespace gglab
 			return DesktopCoastalAtriumDemoId;
 		}
 		return DesktopIslandDemoId;
+	}
+
+	std::span<const WorldLightingProfile> DemoPlayground::GetLightingProfiles() const noexcept
+	{
+		return m_Content == PlaygroundContent::CoastalAtrium ?
+			std::span<const WorldLightingProfile>(CoastalSceneLightingProfiles) :
+			std::span<const WorldLightingProfile>{};
 	}
 
 	void DemoPlayground::BeginPrepare() noexcept
@@ -296,7 +304,7 @@ namespace gglab
 			components::TransformComponent transComp{};
 			// Retreat's exported photon direction: 23 degree sun elevation, authored meters.
 			Vector3 direction = m_Content == PlaygroundContent::CoastalAtrium ?
-				Vector3(-0.6840816f, -0.3907311f, 0.6159450f) :
+				CoastalSceneLightingProfiles.front().m_Inputs.m_SunDirection :
 				Vector3(-0.6f, -1.6f, 0.4f);
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);

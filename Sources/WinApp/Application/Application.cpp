@@ -586,6 +586,8 @@ namespace gglab
 				.m_ParametersAvailable = parameters && parameters->IsAvailable(),
 				.m_ParameterRevision = parameters ? parameters->GetParameterRevision() : 0,
 				.m_ParameterBatch = parameters ? parameters->GetParameterBatchStatus() : nullptr,
+				.m_LightingProfiles = parameters ? &parameters->GetLightingProfilePublication() : nullptr,
+				.m_LightingProfileError = parameters ? parameters->GetLightingProfileError() : std::string{},
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:

@@ -77,6 +77,19 @@ namespace gglab::math
 			IsFinite(value.m_Z);
 	}
 
+	// Closed interval membership with finite input; no clamping or fallback.
+	[[nodiscard]] inline bool IsInClosedRange(float value, float lower, float upper) noexcept
+	{
+		return IsFinite(value) && value >= lower && value <= upper;
+	}
+
+	[[nodiscard]] inline bool IsInClosedRange(const Vector3& value, float lower, float upper) noexcept
+	{
+		return IsInClosedRange(value.m_X, lower, upper) &&
+			IsInClosedRange(value.m_Y, lower, upper) &&
+			IsInClosedRange(value.m_Z, lower, upper);
+	}
+
 	[[nodiscard]] inline bool IsFinite(const Vector4& value) noexcept
 	{
 		return

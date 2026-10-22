@@ -3,6 +3,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AtmosphereSystem.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -42,6 +43,7 @@ namespace gglab
 		instance.m_Services.m_Resources = renderer->GetRenderResourceRegistry();
 		instance.m_Services.m_FrameBuffers = renderer.get();
 		instance.m_Services.m_Environment = renderer.get();
+		instance.m_Services.m_WorldLighting = renderer->GetEnvironmentLightingSystemService();
 		instance.m_Services.m_Presentation = renderer.get();
 		instance.m_Services.m_BindingLayout = renderer.get();
 		instance.m_Services.m_Temporal = renderer.get();

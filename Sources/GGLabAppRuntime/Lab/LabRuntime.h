@@ -53,6 +53,35 @@ namespace gglab
 		// Session coordination owns the receipt; this source owns its queued mutation.
 		[[nodiscard]] bool QueueParameterBatch(uint64_t id,
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		class PreparedParameterBatch
+		{
+		public:
+			PreparedParameterBatch(PreparedParameterBatch&&) noexcept = default;
+			PreparedParameterBatch& operator=(PreparedParameterBatch&&) noexcept = default;
+			PreparedParameterBatch(const PreparedParameterBatch&) = delete;
+			PreparedParameterBatch& operator=(const PreparedParameterBatch&) = delete;
+			[[nodiscard]] bool HasChanges() const noexcept { return m_HasChanges; }
+
+		private:
+			friend class LabRuntime;
+			PreparedParameterBatch() = default;
+			const LabRuntime* m_Owner = nullptr;
+			LabSessionBase* m_Session = nullptr;
+			LabParameterSet m_Parameters;
+			uint64_t m_Id = 0;
+			uint64_t m_Revision = 0;
+			uint32_t m_SessionSerial = 0;
+			bool m_HasChanges = false;
+			bool m_Committed = false;
+		};
+
+		// Local to one safe boundary: preparation does not consume the command or
+		// mutate the session. Discarding a plan leaves that reservation unchanged.
+		// Commit installs values without invoking Lab callbacks.
+		[[nodiscard]] std::optional<PreparedParameterBatch> PrepareParameterBatch(uint64_t id,
+			std::span<const LabParameterValue> values, std::string& error) const noexcept;
+		void CommitParameterBatch(PreparedParameterBatch& prepared) noexcept;
+		void ApplyParameterBatchEffects(PreparedParameterBatch&& prepared) noexcept;
 		[[nodiscard]] bool ApplyParameterBatch(uint64_t id,
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		void CancelParameterBatch(uint64_t id) noexcept;
@@ -93,6 +122,8 @@ namespace gglab
 		RenderPipelineBase& GetRenderPipeline() noexcept;
 
 	private:
+		[[nodiscard]] std::optional<PreparedParameterBatch> PrepareParameterValues(
+			std::span<const LabParameterValue> values, std::string& error) const noexcept;
 		bool BeginSessionTransition(const LabId& id,
 			std::span<const LabParameterValue> values = {},
 			std::span<const LabParameterAssignment> assignments = {}) noexcept;

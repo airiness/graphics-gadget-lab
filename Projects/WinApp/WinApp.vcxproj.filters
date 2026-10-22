@@ -533,6 +533,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneCameraPaths.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneLightingProfiles.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneReferenceViews.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>

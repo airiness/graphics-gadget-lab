@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/EnvironmentSourceControl.h"
 #include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include <chrono>
 #include <cstdint>
 #include <optional>
@@ -21,11 +22,13 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		Vector3 m_ReferenceObserverWorld{};
 		AtmosphereGPU m_Parameters{};
+		std::optional<WorldLightingState> m_Provenance;
 	};
 
 	class EnvironmentLightingSystem : public EnvironmentLightingViewBase,
 		public EnvironmentLightingControlBase,
-		public EnvironmentSourceControl
+		public EnvironmentSourceControl,
+		public WorldLightingControlBase
 	{
 	public:
 		struct CreateInfo
@@ -74,7 +77,14 @@ namespace gglab
 		void SetBackgroundMode(EnvironmentBackgroundMode mode) noexcept override;
 		void ResolveWorldLighting(const std::optional<AtmosphereSettings>& atmosphere,
 			const std::optional<ResolvedWorldSun>& sun, uint64_t sunEntityKey,
-			uint64_t sessionIdentity = 0) noexcept;
+			uint64_t sessionIdentity = 0, const WorldSunSettings* authoredSun = nullptr) noexcept;
+		void SynchronizeWorldLighting(World& world, uint64_t sessionIdentity) noexcept override;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingInputs(
+			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
+			std::string& error) noexcept override;
+		[[nodiscard]] WorldLightingMutationResult ApplyWorldLightingInputs(
+			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept override;
+		[[nodiscard]] WorldLightingPublication GetWorldLightingPublication() const noexcept override;
 		[[nodiscard]] const std::optional<PhysicalSkySource>& GetRequestedPhysicalSky() const noexcept { return m_RequestedPhysicalSky; }
 		[[nodiscard]] const std::optional<PhysicalSkySource>& GetActivePhysicalSky() const noexcept { return m_ActivePhysicalSky; }
 		[[nodiscard]] const EnvironmentLightingSettings& GetRenderSettings() const noexcept { return m_RenderSettings; }
@@ -82,6 +92,8 @@ namespace gglab
 		[[nodiscard]] double GetPublicationMilliseconds() const noexcept { return m_PublicationMilliseconds; }
 
 	private:
+		class PreparedWorldLightingMutation;
+		void RefreshRenderSettings() noexcept;
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		EnvironmentTextureSource m_Source{};
 		EnvironmentLightingSettings m_Settings{};
@@ -89,6 +101,7 @@ namespace gglab
 		uint64_t m_IgnoreCacheGeneration = 0;
 		std::optional<PhysicalSkySource> m_RequestedPhysicalSky;
 		std::optional<PhysicalSkySource> m_ActivePhysicalSky;
+		uint64_t m_ActiveWorldLightingGeneration = 0;
 		EnvironmentLightingSettings m_RenderSettings{};
 		std::chrono::steady_clock::time_point m_RequestTime{};
 		double m_PublicationMilliseconds = 0.0;

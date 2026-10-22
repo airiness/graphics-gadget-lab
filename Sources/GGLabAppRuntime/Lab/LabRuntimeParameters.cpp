@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 
 #include <limits>
+#include <utility>
 
 namespace gglab
 {
@@ -13,30 +14,52 @@ namespace gglab
 				m_ActiveSession->GetLightingParameterRequest(desc.m_Id).has_value());
 	}
 
-	bool LabRuntime::QueueParameterBatch(uint64_t id,
-		std::span<const LabParameterValue> values, std::string& error) noexcept
+	std::optional<LabRuntime::PreparedParameterBatch> LabRuntime::PrepareParameterValues(
+		std::span<const LabParameterValue> values, std::string& error) const noexcept
 	{
-		if (!m_CommandQueue.IsEmpty() || !m_IsEntered || !IsReady() || m_PendingSession ||
+		if (!m_IsEntered || !IsReady() || m_PendingSession ||
 			m_ParameterRevision == std::numeric_limits<uint64_t>::max())
 		{
-			error = "Busy: a Lab batch requires a ready active Lab and no pending commands.";
-			return false;
+			error = "A Lab batch requires a ready entered owning session and available revision capacity.";
+			return std::nullopt;
 		}
-		auto candidate = m_ActiveSession->GetParameters();
-		if (!candidate.ApplyBatch(values, error))
+		PreparedParameterBatch prepared;
+		prepared.m_Owner = this;
+		prepared.m_Session = m_ActiveSession.get();
+		prepared.m_Revision = m_ParameterRevision;
+		prepared.m_SessionSerial = m_TemporalSessionSerial;
+		prepared.m_Parameters = m_ActiveSession->GetParameters();
+		const auto applied = prepared.m_Parameters.ApplyBatch(values, error);
+		if (!applied)
 		{
-			return false;
+			return std::nullopt;
 		}
 		size_t lightingItems = 0;
 		for (const auto& value : values)
 		{
-			const auto& desc = candidate.Find(value.m_Id)->m_Desc;
+			const auto& desc = prepared.m_Parameters.Find(value.m_Id)->m_Desc;
 			lightingItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
 			if (!SupportsParameterEffect(desc) || lightingItems > 1)
 			{
 				error = "Unsupported effect: at most one bound Deferred lighting item is supported; rebuild effects are unsupported.";
-				return false;
+				return std::nullopt;
 			}
+		}
+		prepared.m_HasChanges = !applied->m_Changed.empty();
+		return prepared;
+	}
+
+	bool LabRuntime::QueueParameterBatch(uint64_t id,
+		std::span<const LabParameterValue> values, std::string& error) noexcept
+	{
+		if (!m_CommandQueue.IsEmpty())
+		{
+			error = "Busy: a Lab batch requires no pending commands.";
+			return false;
+		}
+		if (!PrepareParameterValues(values, error))
+		{
+			return false;
 		}
 		m_CommandQueue.RequestParameterBatch(id);
 		return true;
@@ -47,26 +70,64 @@ namespace gglab
 		m_CommandQueue.CancelParameterBatch(id);
 	}
 
-	bool LabRuntime::ApplyParameterBatch(uint64_t id,
-		std::span<const LabParameterValue> values, std::string& error) noexcept
+	std::optional<LabRuntime::PreparedParameterBatch> LabRuntime::PrepareParameterBatch(uint64_t id,
+		std::span<const LabParameterValue> values, std::string& error) const noexcept
 	{
-		if (!m_CommandQueue.ConsumeParameterBatch(id) || !m_IsEntered || !IsReady() || m_PendingSession ||
-			m_ParameterRevision == std::numeric_limits<uint64_t>::max())
+		if (!m_CommandQueue.HasParameterBatch(id))
 		{
-			error = "The Lab parameter command lost its ready owning session.";
-			return false;
+			error = "The Lab parameter command lost its owning reservation.";
+			return std::nullopt;
 		}
-		const auto applied = m_ActiveSession->SetParameters(values, error);
-		if (!applied)
+		auto prepared = PrepareParameterValues(values, error);
+		if (prepared)
 		{
-			return false;
+			prepared->m_Id = id;
 		}
-		if (!applied->m_Changed.empty())
+		return prepared;
+	}
+
+	void LabRuntime::CommitParameterBatch(PreparedParameterBatch& prepared) noexcept
+	{
+		GGLAB_ASSERT_MSG(prepared.m_Owner == this && prepared.m_Session == m_ActiveSession.get() &&
+			prepared.m_SessionSerial == m_TemporalSessionSerial && prepared.m_Revision == m_ParameterRevision &&
+			!prepared.m_Committed && m_IsEntered && IsReady() && !m_PendingSession &&
+			m_CommandQueue.HasParameterBatch(prepared.m_Id),
+			"A prepared Lab batch must commit once, without intervening callbacks or session changes.");
+		const bool consumed = m_CommandQueue.ConsumeParameterBatch(prepared.m_Id);
+		GGLAB_ASSERT(consumed);
+		GGLAB_UNUSED(consumed);
+		m_ActiveSession->CommitPreparedParameters(std::move(prepared.m_Parameters));
+		if (prepared.m_HasChanges)
 		{
 			++m_ParameterRevision;
+		}
+		prepared.m_Committed = true;
+	}
+
+	void LabRuntime::ApplyParameterBatchEffects(PreparedParameterBatch&& prepared) noexcept
+	{
+		GGLAB_ASSERT(prepared.m_Owner == this && prepared.m_Session == m_ActiveSession.get() &&
+			prepared.m_SessionSerial == m_TemporalSessionSerial &&
+			m_ParameterRevision == prepared.m_Revision + (prepared.m_HasChanges ? 1 : 0) &&
+			prepared.m_Committed && prepared.m_Id != 0);
+		prepared.m_Id = 0;
+		if (prepared.m_HasChanges)
+		{
 			m_ActiveSession->ApplyParameterChanges(LabChangeImpact::Immediate);
 			m_ActiveSession->GetCamera().Update();
 		}
+	}
+
+	bool LabRuntime::ApplyParameterBatch(uint64_t id,
+		std::span<const LabParameterValue> values, std::string& error) noexcept
+	{
+		auto prepared = PrepareParameterBatch(id, values, error);
+		if (!prepared)
+		{
+			return false;
+		}
+		CommitParameterBatch(*prepared);
+		ApplyParameterBatchEffects(std::move(*prepared));
 		return true;
 	}
 }

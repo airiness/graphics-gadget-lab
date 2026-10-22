@@ -1,6 +1,8 @@
 #pragma once
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
@@ -27,6 +29,7 @@
 
 namespace gglab
 {
+	class World;
 	class ComposedLayout;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;
@@ -277,6 +280,8 @@ namespace gglab
 		RenderTextureAssetAccess* m_TextureAssets = nullptr;
 		RenderFrameBufferAccess* m_FrameBuffers = nullptr;
 		RenderEnvironmentAccess* m_Environment = nullptr;
+		// Optional authoring capability; not part of pipeline resource access.
+		WorldLightingControlBase* m_WorldLighting = nullptr;
 		RenderPresentationAccess* m_Presentation = nullptr;
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;

@@ -32,6 +32,7 @@ namespace gglab
 		// Update-time consume until a real Ready render frame supplies its serial.
 		void RequestParameterBatch(uint64_t id) noexcept;
 		void CancelParameterBatch(uint64_t id) noexcept;
+		[[nodiscard]] bool HasParameterBatch(uint64_t id) const noexcept { return m_ParameterBatch == id; }
 		[[nodiscard]] std::optional<uint64_t> ConsumeParameterBatch() noexcept;
 		[[nodiscard]] bool ConsumeParameterBatch(uint64_t id) noexcept;
 		LabCommandBatch Consume() noexcept;

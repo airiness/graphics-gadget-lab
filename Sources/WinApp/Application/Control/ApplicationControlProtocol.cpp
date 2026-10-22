@@ -2,6 +2,7 @@
 #include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
@@ -1545,7 +1546,9 @@ namespace gglab
 			{ "resultRetention", "until-consumed-or-session-end" },
 			{ "sessionParameterControl", {
 				{ "sources", { "host", "lab" } },
-				{ "hostGroups", { "view.taa", "view.gtao", "view.exposure" } },
+				{ "hostGroups", { "view.taa", "view.gtao", "view.exposure", "environment.profile" } },
+				{ "lightingProfiles", true },
+				{ "lightingProfileHashVersion", LightingProfileHashVersion },
 				{ "effectClasses", { "Immediate", "Deferred" } },
 				{ "maxBatches", 1 },
 				{ "maxItems", ApplicationControlMaxParameterItems },
@@ -1632,7 +1635,9 @@ namespace gglab
 		response["parameterControl"] = {
 			{ "available", status.m_ParametersAvailable },
 			{ "revision", status.m_ParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
-			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() } };
+			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() },
+			{ "lighting", SerializeApplicationControlLightingProfiles(status.m_LightingProfiles) },
+			{ "lightingProfileError", status.m_LightingProfileError } };
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{

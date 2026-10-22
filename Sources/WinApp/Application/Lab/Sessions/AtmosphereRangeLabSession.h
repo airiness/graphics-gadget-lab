@@ -15,6 +15,7 @@ namespace gglab
 		explicit AtmosphereRangeLabSession(const LabSessionCreateInfo& createInfo) noexcept;
 		~AtmosphereRangeLabSession() override = default;
 
+		std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept override;
 		void BeginPrepare() noexcept override;
 		void TickPrepare() noexcept override;
 		LoadingProgress GetPreparationProgress() const noexcept override { return m_LoadingProgress; }

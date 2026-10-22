@@ -50,6 +50,7 @@ namespace gglab
 	static_assert(offsetof(AtmosphereGPU, m_Observer) == 96);
 	static_assert(offsetof(AtmosphereGPU, m_World) == 112);
 
+	[[nodiscard]] bool ValidateAtmosphereSettings(const AtmosphereSettings& settings) noexcept;
 	[[nodiscard]] AtmosphereGPU ResolveAtmosphere(const AtmosphereSettings& settings,
 		const ResolvedWorldSun& sun, const Vector3& cameraWorldPosition) noexcept;
 	// Finite vacuum coefficients with valid radii and scale heights for disabled attenuation.

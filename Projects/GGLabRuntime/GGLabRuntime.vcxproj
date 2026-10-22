@@ -248,6 +248,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\ViewRenderSettings.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\WorldSun.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\LightingProfile.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Atmosphere.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAtmosphere.cpp" />
@@ -599,6 +600,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\WorldSun.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\LightingProfile.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\WorldLighting.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\WorldLightingControlBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Atmosphere.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAtmosphere.h" />

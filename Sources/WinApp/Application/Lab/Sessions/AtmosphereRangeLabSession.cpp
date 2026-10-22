@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <array>
 #include <variant>
 
 namespace gglab
@@ -20,6 +21,17 @@ namespace gglab
 		const LabParameterId IBLSamplesId("atmosphere_range.ibl.sample_count");
 		constexpr const char* AtmosphereRangeModelPath =
 			"Assets/Models/GGLabAtmosphereRange/GGLabAtmosphereRange.gltf";
+	}
+
+	std::span<const WorldLightingProfile> AtmosphereRangeLabSession::GetLightingProfiles() const noexcept
+	{
+		// Fixture inputs, not production Daylight/Golden Hour comparison profiles.
+		static const std::array profiles
+		{
+			WorldLightingProfile{ .m_Id = "atmosphere_range.baseline", .m_Inputs = { .m_SunDirection = Vector3(0.0f, -1.0f, 1.0f) } },
+			WorldLightingProfile{ .m_Id = "atmosphere_range.oblique", .m_Inputs = { .m_SunDirection = Vector3(-1.0f, -0.25f, 1.0f) } },
+		};
+		return profiles;
 	}
 
 	AtmosphereRangeLabSession::AtmosphereRangeLabSession(const LabSessionCreateInfo& createInfo) noexcept :

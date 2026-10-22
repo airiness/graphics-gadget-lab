@@ -89,6 +89,8 @@ namespace gglab
 		bool m_ParametersAvailable = false;
 		uint64_t m_ParameterRevision = 0;
 		const ParameterBatchStatus* m_ParameterBatch = nullptr;
+		const LightingProfilePublication* m_LightingProfiles = nullptr;
+		std::string m_LightingProfileError;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

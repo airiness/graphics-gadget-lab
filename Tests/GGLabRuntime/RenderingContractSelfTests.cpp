@@ -21,6 +21,7 @@
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -821,6 +822,143 @@ namespace gglab
 			context.Check(!environment.GetActivePhysicalSky() &&
 				environment.GetRenderSettings().m_Intensity == view.GetEnvironmentLightingSettings().m_Intensity,
 				"Texture mode restores its authored artistic intensity only after publication");
+		}
+
+		void RunLightingProfileContractTests(SelfTestContext& context) noexcept
+		{
+			WorldLightingProfile profile{ .m_Id = "test.daylight" };
+			const auto hash = HashLightingProfile(profile);
+			context.Check(ValidateLightingProfile(profile) && hash.IsValid() &&
+				Sha256DigestToHex(hash) ==
+					"04dc4b18a002e5a66f77d4b4558c3f7246b09bd9c4cb7e6899ceb52a403ad9d7",
+				std::format("Physical Sky profiles preserve the v2 explicit-field SHA-256 fixture ({})",
+					Sha256DigestToHex(hash)));
+			auto alias = profile;
+			alias.m_Id = "test.alias";
+			alias.m_RecommendedEV100 = 17.0f;
+			alias.m_Inputs.m_IBLRotationRadians = -0.0f;
+			context.Check(HashLightingProfile(alias) == hash,
+				"Profile identity excludes labels/exposure advice and canonicalizes signed zero");
+			alias.m_Inputs.m_Atmosphere.m_MieScattering *= 0.5f;
+			context.Check(HashLightingProfile(alias) != hash,
+				"Atmosphere transport inputs participate in the profile hash");
+			alias = profile;
+			alias.m_Inputs.m_Sun.m_PerpendicularIlluminanceLux = 1000001.0f;
+			context.Check(!ValidateLightingProfile(alias), "Profiles reject illuminance that Runtime would clamp");
+			alias = profile;
+			alias.m_Inputs.m_Atmosphere.m_MieAnisotropy = 0.99f;
+			context.Check(!ValidateLightingProfile(alias), "Profiles reject atmosphere inputs that Runtime would clamp");
+			alias = profile;
+			alias.m_Inputs.m_IBLIntensity = 2.0f;
+			context.Check(!ValidateLightingProfile(alias), "Physical Sky profiles reject unsupported artistic intensity");
+			World world;
+			context.Check(!ApplyWorldLightingInputsToWorld(world, profile.m_Inputs) && !world.m_Atmosphere,
+				"A profile cannot fabricate a missing designated sun");
+			auto& registry = world.GetRegistry();
+			const auto entity = registry.create();
+			registry.emplace<components::TransformComponent>(entity);
+			components::LightComponent light;
+			light.m_Type = LightType::Directional;
+			light.m_WorldSun.emplace();
+			registry.emplace<components::LightComponent>(entity, light);
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry resources({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &resources });
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+			context.Check(ApplyWorldLightingInputsToWorld(world, profile.m_Inputs),
+				"Profile input application uses the production designated-sun selection");
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto original = environment.GetWorldLightingPublication().m_Requested;
+			const auto prepared = PrepareWorldLightingInputs(profile.m_Inputs);
+			context.Check(original && EqualWorldLightingAuthoring(*original, prepared) &&
+				EqualWorldLightingEffect(*original, prepared) && original->m_SessionIdentity == 17,
+				"Actual requests retain authored inputs independently of profile metadata");
+			context.Check(environment.PublishWorldLighting(environment.GetRequestedPhysicalSky(), original->m_Generation),
+				"Profile provenance crosses the existing Runtime publication gate");
+
+			std::string preparationError;
+			auto pendingInputs = profile.m_Inputs;
+			pendingInputs.m_Sun.m_PerpendicularIlluminanceLux *= 0.5f;
+			auto plan = environment.PrepareWorldLightingInputs(world, 17, pendingInputs, preparationError);
+			context.Check(plan && plan->HasChanges() && preparationError.empty() &&
+				environment.GetBakeRequestGeneration() == original->m_Generation &&
+				registry.get<components::LightComponent>(entity).m_WorldSun->m_PerpendicularIlluminanceLux == 120000.0f,
+				"Preparing a lighting mutation creates neither live authoring nor a Runtime request");
+			plan.reset();
+			context.Check(environment.GetBakeRequestGeneration() == original->m_Generation &&
+				EqualWorldLightingAuthoring(*environment.GetWorldLightingPublication().m_Requested, prepared),
+				"Discarding a prepared lighting plan preserves request ownership and authored provenance");
+			World missingSun;
+			context.Check(!environment.PrepareWorldLightingInputs(missingSun, 17, pendingInputs, preparationError) &&
+				!preparationError.empty() && environment.GetBakeRequestGeneration() == original->m_Generation,
+				"Missing current World targets reject during preparation without mutation");
+
+			auto& rotation = registry.get<components::TransformComponent>(entity).m_Rotation;
+			rotation = Quaternion(-rotation.m_X, -rotation.m_Y, -rotation.m_Z, -rotation.m_W);
+			const auto unchanged = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
+			context.Check(unchanged.m_Outcome == WorldLightingMutationOutcome::Unchanged &&
+				unchanged.m_Generation == original->m_Generation,
+				"Quaternion sign equivalence neither requests a bake nor changes attribution");
+			auto equivalent = profile;
+			equivalent.m_Inputs.m_SunDirection *= 2.0f;
+			context.Check(HashLightingProfile(equivalent) == hash &&
+				EqualWorldLightingEffect(prepared, PrepareWorldLightingInputs(equivalent.m_Inputs)),
+				"Hash v2 and effect identity agree on producer-equivalent direction representations");
+			equivalent = profile;
+			equivalent.m_Inputs.m_Sun.m_Chromaticity *= 0.5f;
+			const auto gray = PrepareWorldLightingInputs(equivalent.m_Inputs);
+			context.Check(EqualWorldLightingEffect(prepared, gray) && !EqualWorldLightingAuthoring(prepared, gray),
+				"Chromaticity normalization does not conflate effective and authored identity");
+			registry.get<components::LightComponent>(entity).m_WorldSun->m_Chromaticity *= 0.5f;
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto deduplicated = environment.GetWorldLightingPublication();
+			context.Check(deduplicated.m_Requested && deduplicated.m_Active &&
+				EqualWorldLightingAuthoring(*deduplicated.m_Requested, prepared) &&
+				!EqualWorldLightingAuthoring(*deduplicated.m_Requested, gray) &&
+				EqualWorldLightingAuthoring(*deduplicated.m_Active, prepared),
+				"An effective-equivalent World edit cannot relabel an older requested or published generation");
+			const auto grayResult = environment.ApplyWorldLightingInputs(world, 17, equivalent.m_Inputs);
+			context.Check(grayResult.m_Outcome == WorldLightingMutationOutcome::Unchanged &&
+				grayResult.m_Generation == original->m_Generation,
+				"An effective-equivalent selection reports Unchanged without a forced rebake");
+
+			world.m_Atmosphere->m_RayleighScaleHeightMeters *= 2.0f;
+			context.Check(!environment.PrepareWorldLightingInputs(world, 17, profile.m_Inputs, preparationError) &&
+				environment.GetBakeRequestGeneration() == original->m_Generation &&
+				world.m_Atmosphere->m_RayleighScaleHeightMeters == 16000.0f,
+				"Preparation does not silently settle or overwrite a pre-existing unresolved edit");
+			const auto replacement = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
+			context.Check(replacement.m_Outcome == WorldLightingMutationOutcome::Requested &&
+				replacement.m_PreviousGeneration == original->m_Generation + 1 &&
+				replacement.m_Generation == replacement.m_PreviousGeneration + 1 &&
+				environment.GetWorldLightingPublication().m_Active->m_Generation == original->m_Generation,
+				"Pre-existing unresolved edits settle before a separately attributed profile mutation");
+			context.Check(!ApplyWorldLightingInputsToWorld(world, alias.m_Inputs) &&
+				world.m_Atmosphere->m_RayleighScaleHeightMeters == 8000.0f,
+				"Invalid profile inputs reject before mutating the World");
+
+			auto invalid = profile;
+			invalid.m_Inputs.m_SunDirection = Vector3(std::numeric_limits<float>::max(), 1.0f, 0.0f);
+			context.Check(!ValidateLightingProfile(invalid),
+				"Finite direction components still reject squared-length overflow");
+			invalid = profile;
+			invalid.m_RecommendedEV100 = 25.0f;
+			context.Check(!ValidateLightingProfile(invalid) && !Camera::IsValidManualEV100(25.0f),
+				"Exposure advice uses the Camera's strict supported EV100 range");
+			invalid = profile;
+			invalid.m_Inputs.m_Sun.m_PerpendicularIlluminanceLux = 0.0f;
+			context.Check(ValidateWorldSunSettings(invalid.m_Inputs.m_Sun) && !ValidateLightingProfile(invalid),
+				"Zero illuminance is valid in WorldSun but excluded by the named-profile policy");
+			invalid.m_Inputs.m_Atmosphere.m_MieExtinction = 0.0f;
+			context.Check(!ValidateAtmosphereSettings(invalid.m_Inputs.m_Atmosphere),
+				"Atmosphere owns the extinction/scattering relationship");
+			context.Check(math::IsInClosedRange(1.0f, 0.0f, 1.0f) &&
+				!math::IsInClosedRange(std::numeric_limits<float>::infinity(), 0.0f, 1.0f),
+				"Math's finite closed interval helper contains no domain policy");
 		}
 
 		void RunIBLPreviewContractTests(SelfTestContext& context) noexcept
@@ -12928,6 +13066,7 @@ namespace gglab
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
 		RunEnvironmentLightingSettingsTests(context);
+		RunLightingProfileContractTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);
 		RunRuntimePathConfigurationContractTests(context);
