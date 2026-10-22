@@ -14,7 +14,7 @@ on Windows with a supported GPU and the matching application build.
 | Need | Workflow / reference |
 | --- | --- |
 | One screenshot, or capture settings and image comparison | [Captures and comparison](references/captures.md) |
-| Live Lab parameters and Immediate/Deferred lighting receipts | [Session parameters](references/session-parameters.md) |
+| Live Host/Lab parameters and Immediate/Deferred lighting receipts | [Session parameters](references/session-parameters.md) |
 | Several captures or settings from one process | Session example below; [job admission and receipts](references/session-jobs.md) |
 | Every authored reference view | Session `batch`; discover views with `status` |
 | Temporal behavior, supersampled references or GPU timing | [Sequences](references/sequences.md) |

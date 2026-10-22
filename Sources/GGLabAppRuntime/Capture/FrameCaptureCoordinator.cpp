@@ -692,7 +692,11 @@ namespace gglab
 		const bool historyRestarted =
 			!m_LastFrameState || !state.m_SettleKey.Continues(m_LastFrameState->m_SettleKey);
 		m_HistoryReady = historyRestarted ? ready : m_HistoryReady && ready;
-		if (!m_HistoryReady || historyRestarted)
+		const bool parametersChanged = m_LastFrameState &&
+			state.m_ParameterRevision != m_LastFrameState->m_ParameterRevision;
+		// Parameter changes restart capture settling without clearing temporal history
+		// or skipping the transition frames that a later sequence event will measure.
+		if (!m_HistoryReady || historyRestarted || parametersChanged)
 		{
 			m_SettledFrames = 0;
 		}

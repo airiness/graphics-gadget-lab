@@ -64,6 +64,14 @@ namespace gglab
 		m_ParameterBatch = id;
 	}
 
+	void LabCommandQueue::CancelParameterBatch(uint64_t id) noexcept
+	{
+		if (m_ParameterBatch == id)
+		{
+			m_ParameterBatch.reset();
+		}
+	}
+
 	std::optional<uint64_t> LabCommandQueue::ConsumeParameterBatch() noexcept
 	{
 		return std::exchange(m_ParameterBatch, std::nullopt);
@@ -74,6 +82,16 @@ namespace gglab
 		LabCommandBatch result = std::move(m_Pending);
 		m_Pending = {};
 		return result;
+	}
+
+	bool LabCommandQueue::ConsumeParameterBatch(uint64_t id) noexcept
+	{
+		if (m_ParameterBatch != id)
+		{
+			return false;
+		}
+		m_ParameterBatch.reset();
+		return true;
 	}
 
 	bool LabCommandQueue::IsEmpty() const noexcept

@@ -1543,6 +1543,14 @@ namespace gglab
 			{ "bundleSchemaVersion", CaptureBundleSchemaVersion },
 			{ "resultConsumption", "explicit" },
 			{ "resultRetention", "until-consumed-or-session-end" },
+			{ "sessionParameterControl", {
+				{ "sources", { "host", "lab" } },
+				{ "hostGroups", { "view.taa", "view.gtao", "view.exposure" } },
+				{ "effectClasses", { "Immediate", "Deferred" } },
+				{ "maxBatches", 1 },
+				{ "maxItems", ApplicationControlMaxParameterItems },
+				{ "mixedSources", true },
+				{ "explicitConsumption", true } } },
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
@@ -1622,8 +1630,8 @@ namespace gglab
 			response["watch"]["report"] = SerializeWatchReport(*status.m_Watch);
 		}
 		response["parameterControl"] = {
-			{ "available", status.m_LabParametersAvailable },
-			{ "revision", status.m_LabParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
+			{ "available", status.m_ParametersAvailable },
+			{ "revision", status.m_ParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
 			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() } };
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
@@ -1639,6 +1647,7 @@ namespace gglab
 			{ "demoId", frame.m_DemoId },
 			{ "labId", frame.m_LabId },
 			{ "frameIndex", frame.m_FrameIndex },
+			{ "frameSerial", frame.m_FrameSerial },
 			{ "ready", frame.m_Readiness.IsReady() },
 			{ "settledFrames", status.m_SettledFrames },
 			{ "gates", SerializeGates(frame.m_Readiness) },

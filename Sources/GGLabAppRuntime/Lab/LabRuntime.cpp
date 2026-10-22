@@ -1,5 +1,6 @@
 #include "Lab/LabRuntime.h"
 #include "AppRuntimeLog.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
@@ -135,13 +136,12 @@ namespace gglab
 			return false;
 		}
 
-		m_ParameterIntakeFailed = false;
 		return BeginSessionTransition(startupLab, {}, startupParameters);
 	}
 
 	void LabRuntime::Shutdown() noexcept
 	{
-		EndParameterBatch(false, "The Lab shut down before the parameter frame.");
+		GGLAB_UNUSED(m_CommandQueue.ConsumeParameterBatch());
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
@@ -173,7 +173,7 @@ namespace gglab
 
 	void LabRuntime::OnExit() noexcept
 	{
-		EndParameterBatch(false, "The Lab became inactive before the parameter frame.");
+		GGLAB_UNUSED(m_CommandQueue.ConsumeParameterBatch());
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
@@ -224,7 +224,6 @@ namespace gglab
 
 	void LabRuntime::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
-		ConsumeParameterFrame(feedback);
 		m_LastFrameFeedback = feedback;
 		m_HasFrameFeedback = true;
 		if (m_ActiveSession)

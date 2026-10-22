@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
 
 #include "Demo/DemoManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
@@ -42,6 +43,18 @@ namespace gglab
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
 		return AppRuntimeInitializeResult::Succeeded;
+	}
+
+	SessionParameterControl* GGLabAppRuntime::GetParameterControl() noexcept
+	{
+		if (m_ParameterControl && m_DemoManager)
+		{
+			m_ParameterControl->SynchronizeContent(m_DemoManager->GetActiveDemo(),
+				m_DemoManager->GetTemporalSessionSerial(),
+				m_DemoManager->GetDemoName(m_DemoManager->GetActiveIndex()),
+				m_DemoManager->HasPendingActiveDemo());
+		}
+		return m_ParameterControl.get();
 	}
 
 	void GGLabAppRuntime::HandleHostEvent(const AppHostEvent& event) noexcept

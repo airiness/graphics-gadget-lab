@@ -555,6 +555,48 @@ namespace gglab
 				"A required content id holds the capture until that Demo or Lab is active");
 		}
 
+		void RunParameterSettlingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("parameter-settling");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			auto state = MakeFrameState(true);
+			state.m_ParameterRevision = 1;
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			context.Check(coordinator.GetSettledFrameCount() == 2,
+				"An unchanged parameter revision preserves settled submitted frames");
+			GGLAB_UNUSED(jobs.Admit({ .m_RequiredProducts = { ImageCaptureProduct{} },
+				.m_Timing = FrameCaptureTiming::AfterReady, .m_SettleFrames = 2 }));
+			++state.m_ParameterRevision;
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.empty() && coordinator.GetSettledFrameCount() == 0 &&
+				!coordinator.ShouldRestartTemporalHistory(),
+				"A new parameter revision restarts after-ready settling without resetting temporal history");
+			coordinator.BeginFrame(state);
+			context.Check(coordinator.GetSettledFrameCount() == 0,
+				"An aborted parameter frame cannot contribute a settled sample");
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.empty() && coordinator.GetSettledFrameCount() == 1,
+				"The capture waits for newly submitted frames of the changed parameter state");
+			coordinator.OnFrameSubmitted();
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1,
+				"The capture issues only after its requested new-state settling count");
+			if (!control.m_Issued.empty())
+			{
+				control.Complete(control.m_Issued.front().m_Id);
+				coordinator.Update();
+				GGLAB_UNUSED(jobs.TakeResults());
+			}
+		}
+
 		void RunHistoryContinuitySettlingTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-continuity");
@@ -5061,6 +5103,7 @@ namespace gglab
 		RunGraphFailureTests(context);
 		RunNextFrameTests(context);
 		RunAfterReadyTests(context);
+		RunParameterSettlingTests(context);
 		RunHistoryContinuitySettlingTests(context);
 		RunLoadingHistoryTests(context);
 		RunReferenceViewTests(context);

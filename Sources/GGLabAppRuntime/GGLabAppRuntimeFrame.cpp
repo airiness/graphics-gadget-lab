@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 
 #include "AppRuntimeLog.h"
@@ -353,6 +354,10 @@ namespace gglab
 	{
 		GGLAB_LOG_CRITICAL_ALWAYS("Fatal runtime failure: {}", failure);
 		m_LifecycleState = AppRuntimeLifecycleState::Failed;
+		if (m_ParameterControl)
+		{
+			GetParameterControl()->OnRuntimeFailed(failure);
+		}
 		if (m_DemoManager)
 		{
 			if (DemoBase* demo = m_DemoManager->GetActiveDemo())
@@ -483,6 +488,10 @@ namespace gglab
 				AppRuntimeTickResult::Continue :
 				FailRuntime("The render host failed to begin a frame.");
 		}
+		if (m_ParameterControl->IsEnabled())
+		{
+			GetParameterControl()->OnFrameReady(rendererFrame.GetSerial());
+		}
 		demo->OnFrameReady(rendererFrame.GetSerial());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
@@ -551,6 +560,8 @@ namespace gglab
 		ResolvedViewRenderSettings displayViewSettings =
 			ResolveViewRenderSettings(
 				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		m_ParameterControl->ApplyViewSettings(displayViewSettings,
+			effectiveViewRenderProfile.m_EnableScenePreExposure);
 		if (referenceSample)
 		{
 			// The reference owns jitter and accumulation; Temporal AA and temporal GTAO
@@ -636,6 +647,7 @@ namespace gglab
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
+		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
 		if (!m_FrameSequence->BeginFrame(captureFrameState))
 		{
 			toolingFrame.Complete();
@@ -647,6 +659,8 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
+		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
+			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)]);
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
@@ -811,6 +825,11 @@ namespace gglab
 			FrameSequenceObservation{};
 		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
 
+		m_ParameterControl->OnFrameSubmitted({
+			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
+			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
+			.m_RenderFrameSerial = frame.m_FrameSerial,
+		});
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),

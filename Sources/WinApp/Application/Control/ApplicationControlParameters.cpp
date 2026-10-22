@@ -1,6 +1,7 @@
 #include "Application/Control/ApplicationControlParameters.h"
 #include "Application/Control/ApplicationControlProtocol.h"
-#include "Lab/LabRuntime.h"
+#include "Parameters/SessionParameterControl.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <nlohmann/json.hpp>
 
@@ -16,6 +17,7 @@
 
 namespace gglab
 {
+	static_assert(ApplicationControlMaxParameterItems == SessionParameterMaxItems);
 	namespace
 	{
 		using Json = nlohmann::json;
@@ -219,24 +221,24 @@ namespace gglab
 		return {};
 	}
 
-	Json SerializeApplicationControlParameterBatch(const LabParameterBatchStatus& batch)
+	Json SerializeApplicationControlParameterBatch(const ParameterBatchStatus& batch)
 	{
 		const char* state = "Queued";
 		switch (batch.m_State)
 		{
-		case LabParameterBatchState::Applying:
+		case ParameterBatchState::Applying:
 			state = "Applying";
 			break;
-		case LabParameterBatchState::Finished:
+		case ParameterBatchState::Finished:
 			state = "Finished";
 			break;
-		case LabParameterBatchState::Failed:
+		case ParameterBatchState::Failed:
 			state = "Failed";
 			break;
 		default:
 			break;
 		}
-		bool succeeded = batch.m_State == LabParameterBatchState::Finished;
+		bool succeeded = batch.m_State == ParameterBatchState::Finished;
 		Json items = Json::array();
 		for (const auto& item : batch.m_Items)
 		{
@@ -261,8 +263,8 @@ namespace gglab
 		}
 		return {
 			{ "batchId", batch.m_BatchId },
-			{ "source", "lab" },
-			{ "contentId", batch.m_Lab.GetName() },
+			{ "source", batch.m_Source },
+			{ "contentId", batch.m_ContentId },
 			{ "state", state },
 			{ "terminal", batch.IsTerminal() },
 			{ "succeeded", batch.IsTerminal() ? Json(succeeded) : Json() },
@@ -273,59 +275,71 @@ namespace gglab
 			{ "failure", batch.m_Failure } };
 	}
 
-	std::string SerializeApplicationControlParameters(uint64_t id, const LabRuntime* runtime) noexcept
+	std::string SerializeApplicationControlParameters(uint64_t id, SessionParameterControl* runtime) noexcept
 	{
-		const auto* session = runtime ? runtime->GetActiveSession() : nullptr;
-		if (!session)
+		if (!runtime || !runtime->IsAvailable())
 		{
-			return SerializeApplicationControlError(id, "NoParameterSource: an active Lab is required.");
+			return SerializeApplicationControlError(id, "NoParameterSource: ready active content is required.");
 		}
+		runtime->Enable();
 		Json response = Response(id, true);
-		response["contentId"] = session->GetDescriptor().m_Id.GetName();
+		response["contentId"] = runtime->GetContentId();
 		response["revision"] = runtime->GetParameterRevision();
 		response["parameters"] = Json::array();
-		for (const auto& parameter : session->GetParameters().GetParameters())
-		{
-			const auto& desc = parameter.m_Desc;
-			Json enums = Json::array();
-			for (const auto& item : desc.m_EnumItems)
+		const auto append = [&](const LabParameterSet& source, const char* sourceName)
 			{
-				enums.push_back({ { "value", item.m_Value }, { "name", item.m_Name } });
-			}
-			response["parameters"].push_back({
-				{ "id", desc.m_Id.GetName() },
-				{ "source", "lab" },
-				{ "name", desc.m_Name },
-				{ "group", desc.m_Group },
-				{ "type", ParameterTypes[static_cast<size_t>(desc.m_Type)] },
-				{ "impact", Impact(desc.m_Impact) },
-				{ "declaredClass", EffectClass(GetParameterEffectClass(desc)) },
-				{ "setSupported", runtime->SupportsParameterEffect(desc) },
-				{ "editPolicy", desc.m_EditPolicy == LabParameterEditPolicy::Continuous ? "Continuous" : "CommitOnEditEnd" },
-				{ "default", Value(desc.m_DefaultValue) },
-				{ "current", Value(parameter.m_Value) },
-				{ "min", desc.m_MinValue ? Value(*desc.m_MinValue) : Json() },
-				{ "max", desc.m_MaxValue ? Value(*desc.m_MaxValue) : Json() },
-				{ "enumItems", std::move(enums) } });
+				for (const auto& parameter : source.GetParameters())
+				{
+					const auto& desc = parameter.m_Desc;
+					Json enums = Json::array();
+					for (const auto& item : desc.m_EnumItems)
+					{
+						enums.push_back({ { "value", item.m_Value }, { "name", item.m_Name } });
+					}
+					response["parameters"].push_back({
+						{ "id", desc.m_Id.GetName() },
+						{ "source", sourceName },
+						{ "name", desc.m_Name },
+						{ "group", desc.m_Group },
+						{ "type", ParameterTypes[static_cast<size_t>(desc.m_Type)] },
+						{ "impact", Impact(desc.m_Impact) },
+						{ "declaredClass", EffectClass(GetParameterEffectClass(desc)) },
+						{ "setSupported", runtime->SupportsParameterEffect(desc) },
+						{ "editPolicy", desc.m_EditPolicy == LabParameterEditPolicy::Continuous ? "Continuous" : "CommitOnEditEnd" },
+						{ "default", Value(desc.m_DefaultValue) },
+						{ "current", Value(parameter.m_Value) },
+						{ "min", desc.m_MinValue ? Value(*desc.m_MinValue) : Json() },
+						{ "max", desc.m_MaxValue ? Value(*desc.m_MaxValue) : Json() },
+						{ "enumItems", std::move(enums) } });
+				}
+			};
+		append(runtime->GetHostParameters(), "host");
+		if (const auto* lab = runtime->GetLabParameters())
+		{
+			append(*lab, "lab");
 		}
 		return Dump(response);
 	}
 
 	std::string SubmitApplicationControlParameters(uint64_t id,
-		std::span<const ApplicationControlParameterChange> changes, LabRuntime* runtime,
+		std::span<const ApplicationControlParameterChange> changes, SessionParameterControl* runtime,
 		bool sequenceActive) noexcept
 	{
-		const auto* session = runtime ? runtime->GetActiveSession() : nullptr;
-		if (!session || sequenceActive)
+		if (!runtime || !runtime->IsAvailable() || sequenceActive)
 		{
 			return SerializeApplicationControlError(id, sequenceActive ?
 				"Busy: session parameter changes are unavailable during a sequence." :
-				"NoParameterSource: an active Lab is required.");
+				"NoParameterSource: ready active content is required.");
 		}
+		runtime->Enable();
 		std::vector<LabParameterValue> values;
 		for (const auto& change : changes)
 		{
-			const auto* parameter = session->GetParameters().Find(change.m_Value.m_Id);
+			const auto* parameter = runtime->GetHostParameters().Find(change.m_Value.m_Id);
+			if (!parameter && runtime->GetLabParameters())
+			{
+				parameter = runtime->GetLabParameters()->Find(change.m_Value.m_Id);
+			}
 			if (!parameter || parameter->m_Desc.m_Type != change.m_Type)
 			{
 				return SerializeApplicationControlError(id, "Unknown parameter or a type different from its descriptor.");
@@ -347,7 +361,7 @@ namespace gglab
 	}
 
 	std::string QueryApplicationControlParameters(
-		uint64_t id, uint64_t batchId, bool consume, LabRuntime* runtime) noexcept
+		uint64_t id, uint64_t batchId, bool consume, SessionParameterControl* runtime) noexcept
 	{
 		const auto* batch = runtime ? runtime->GetParameterBatchStatus() : nullptr;
 		if (!batch || batch->m_BatchId != batchId)
@@ -355,7 +369,7 @@ namespace gglab
 			Json response = Response(id, false);
 			response["batchId"] = batchId;
 			response["status"] = "not-found";
-			response["error"] = "Unknown or consumed parameter batch id in the active Lab runtime.";
+			response["error"] = "Unknown or consumed parameter batch id in this session.";
 			return Dump(response);
 		}
 		Json response = Response(id, true);
@@ -366,7 +380,7 @@ namespace gglab
 		const std::string serialized = Dump(response);
 		if (consumed)
 		{
-			(void)runtime->TakeParameterBatchResult(batchId);
+			GGLAB_UNUSED(runtime->TakeParameterBatchResult(batchId));
 		}
 		return serialized;
 	}

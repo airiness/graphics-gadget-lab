@@ -17,7 +17,7 @@ Commands:
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
   status   Report readiness gates, settled frames, camera and pending captures.
   parameters
-           List the active Lab's descriptors, current/default values and revision.
+           List Host and active Lab descriptors, current/default values and revision.
   set      Submit -Changes/-ChangesFile as [{"id":"gtao.radius","type":"float","value":2.0}].
            Waits for application; -WaitConsumed waits for all terminal effects.
            -NoWait returns admission. Terminal results are consumed unless -KeepResult.

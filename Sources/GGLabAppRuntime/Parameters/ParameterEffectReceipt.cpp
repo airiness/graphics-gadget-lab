@@ -1,4 +1,5 @@
 #include "Parameters/ParameterEffectReceipt.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <utility>
 
@@ -60,7 +61,7 @@ namespace gglab
 					m_Snapshot.m_Published = frame;
 				}
 			}
-			(void)Fail("EffectMismatch");
+			GGLAB_UNUSED(Fail("EffectMismatch"));
 			return false;
 		}
 		if (m_Snapshot.m_Applied)

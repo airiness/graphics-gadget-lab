@@ -6,6 +6,7 @@
 #include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Application/Control/ApplicationControlParameters.h"
+#include "Parameters/SessionParameterControl.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Application/Platform/Windows/Win32Shell.h"
 #include "Capture/FrameCaptureCoordinator.h"
@@ -560,7 +561,7 @@ namespace gglab
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
 		const FrameCaptureCoordinator* frameCapture =
 			m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator() : nullptr;
-		LabRuntime* lab = m_LabRuntimeLocator ? m_LabRuntimeLocator->GetLabRuntimeIfCreated() : nullptr;
+		auto* parameters = m_AppRuntime ? m_AppRuntime->GetParameterControl() : nullptr;
 		switch (request.m_Command)
 		{
 		case ApplicationControlCommand::Status:
@@ -581,21 +582,21 @@ namespace gglab
 				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
 				.m_Watch = m_AppRuntime && m_AppRuntime->GetNonFiniteWatchCoordinator() ? &m_AppRuntime->GetNonFiniteWatchCoordinator()->GetStatus() : nullptr,
 				.m_Environment = frameCapture ? std::string_view(frameCapture->GetEnvironmentJson()) : std::string_view{},
-				.m_LabParametersAvailable = lab && lab->GetActiveSession(),
-				.m_ParameterRevision = lab ? lab->GetParameterRevision() : 0,
-				.m_ParameterBatch = lab ? lab->GetParameterBatchStatus() : nullptr,
+				.m_ParametersAvailable = parameters && parameters->IsAvailable(),
+				.m_ParameterRevision = parameters ? parameters->GetParameterRevision() : 0,
+				.m_ParameterBatch = parameters ? parameters->GetParameterBatchStatus() : nullptr,
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:
-			pipeRequest->Respond(SerializeApplicationControlParameters(request.m_Id, lab));
+			pipeRequest->Respond(SerializeApplicationControlParameters(request.m_Id, parameters));
 			return;
 		case ApplicationControlCommand::Set:
 			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
-				request.m_ParameterChanges, lab, frameSequence && frameSequence->IsActive()));
+				request.m_ParameterChanges, parameters, frameSequence && frameSequence->IsActive()));
 			return;
 		case ApplicationControlCommand::ParameterResult:
 			pipeRequest->Respond(QueryApplicationControlParameters(request.m_Id,
-				request.m_ParameterBatchId, request.m_Consume, lab));
+				request.m_ParameterBatchId, request.m_Consume, parameters));
 			return;
 		case ApplicationControlCommand::Watch:
 		{
@@ -635,7 +636,7 @@ namespace gglab
 					request.m_Id, "Frame sequences are unavailable in this session."));
 				return;
 			}
-			if (lab && lab->GetParameterBatchStatus() && !lab->GetParameterBatchStatus()->IsTerminal())
+			if (parameters && parameters->GetParameterBatchStatus() && !parameters->GetParameterBatchStatus()->IsTerminal())
 			{
 				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
 					"Busy: finish the pending parameter batch before starting a sequence."));

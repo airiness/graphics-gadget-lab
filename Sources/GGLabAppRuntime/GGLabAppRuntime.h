@@ -111,6 +111,7 @@ namespace gglab
 	class ShaderManager;
 	class TaskSystem;
 	class Time;
+	class SessionParameterControl;
 	struct LoadingProgress;
 
 	struct AppRuntimeServiceCreateInfo
@@ -239,6 +240,7 @@ namespace gglab
 		// jobs return no result and release no capacity. Receipts survive Shutdown.
 		[[nodiscard]] std::optional<CaptureJobResult> TakeCaptureJobResult(uint64_t jobId) noexcept;
 		// Non-owning; null before runtime services are composed.
+		[[nodiscard]] SessionParameterControl* GetParameterControl() noexcept;
 		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
 		{
 			return m_FrameSequence.get();
@@ -290,6 +292,7 @@ namespace gglab
 		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
+		std::unique_ptr<SessionParameterControl> m_ParameterControl;
 		// Results already routed to the sequence, awaiting host publication.
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;

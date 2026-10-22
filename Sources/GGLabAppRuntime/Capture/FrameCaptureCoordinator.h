@@ -58,6 +58,8 @@ namespace gglab
 		std::optional<FrameCaptureAssetBundle> m_AssetBundle;
 		FrameCaptureReadiness m_Readiness{};
 		FrameCaptureSettleKey m_SettleKey{};
+		// Internal settling provenance; persisted parameter snapshots are a separate contract.
+		uint64_t m_ParameterRevision = 0;
 		// Actual presentation format; Diagnostic captures use RGBA8 instead.
 		RHIFormat m_DisplayFormat = RHIFormat::Unknown;
 		uint64_t m_FrameSerial = 0;

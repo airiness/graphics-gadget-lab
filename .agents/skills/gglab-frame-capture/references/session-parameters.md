@@ -1,11 +1,13 @@
-# Session Lab parameters (additive protocol v4)
+# Session parameters (additive protocol v4)
 
 Use the script and application from the same revision. Check
-`status.capabilities.labParameterControl` before using these commands against an
-older v4 application. The extension adds commands and status fields; existing
+`status.capabilities.sessionParameterControl` for Host/mixed-source support.
+`labParameterControl` retains discovery for the earlier Lab-only extension. The extension adds commands and status fields; existing
 capture/result/sequence fields and their v4 meanings are unchanged.
 
-This path controls the active Lab's Immediate parameters and **one explicitly
+The session owns one batch/result slot shared by Host and active Lab sources.
+Host `view.taa.*`, `view.gtao.*` and `view.exposure.*` work on Demo and Lab content.
+The Lab source supports Immediate parameters and **one explicitly
 bound Deferred lighting parameter per batch**, optionally mixed with Immediate
 items. Current bindings are `gtao.ibl.sample_count` and
 `atmosphere_range.ibl.sample_count` (uint, 1–4096). They change IBL specular sample
@@ -13,11 +15,37 @@ count through the owning Runtime control, preserving generation attribution.
 The GTAO fixture covers texture-IBL cache restoration; Atmosphere Range covers
 Physical Sky, whose current producer deliberately skips texture caches.
 
-Host `view.*` / `environment.*`, named profiles, arbitrary authored sun/atmosphere
+Host `environment.*`, named profiles, arbitrary authored sun/atmosphere
 parameter bindings, rebuild transactions, sequence events and parameter metadata
 in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
 sequence rejects while a parameter batch is pending. Do not use external `set`
 as a substitute for scheduled events.
+
+## Host display-view overrides
+
+Host ids use snake-case fields. `view.taa.*` exposes the same fields as the
+existing sequence Temporal AA overrides. `view.gtao.*` exposes `enabled`, `radius`,
+`direction_count`, `step_count`, `temporal_accumulation` and `temporal_max_samples`.
+Manual exposure uses `view.exposure.ev100` and `view.exposure.compensation`.
+Discover exact ids, ranges and enum integers through `parameters`; enum names
+are descriptor labels, while `set` uses the typed integer value.
+
+Defaults inherit the active content's resolved display view. Only explicitly
+changed Host fields become overrides. NoChange leaves an inherited field
+inherited. Overrides last for the active content identity and clear on content
+replacement/restart; this extension has no unset/reset verb. A mixed batch may
+set Host and Lab values atomically; one invalid item rejects all sources.
+Lab values apply first, then Host display-view overrides take precedence.
+Other render views retain their content settings. Exposure and pre-exposure are
+resolved together before temporal planning, without editing the authored camera.
+Discovery and a first NoChange preserve capture settling. `status.frame.frameSerial`
+is the render clock used by receipt stamps; `frameIndex` remains the simulation clock.
+
+Frame precedence is content plus optional tooling settings, Host overrides, then
+legacy sequence overrides. Reference sampling continues to force temporal AA and
+temporal GTAO inactive. Legacy sequence values use the same field projection,
+are temporary, and do not replace session Host values. External `set` remains
+blocked throughout a sequence; scheduled events are still unimplemented.
 
 ## Discover and set
 
@@ -37,7 +65,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $script set -Session check `
 with `id`, `source`, display `name`/`group`, `type`, `impact`, `declaredClass`,
 `editPolicy`, `default`, `current`, nullable `min`/`max`, `enumItems` and
 `setSupported`. The latter describes the supported effect class; admission can
-still be Busy or require a ready Lab. No active Lab returns `NoParameterSource`.
+still be Busy or require a ready Lab. No ready active content returns `NoParameterSource`.
 
 Wire set: `{"protocol":4,"id":7,"command":"set","changes":[{"id":"gtao.radius","type":"float","value":2.0}]}`.
 Every item takes exactly `id`, `type`, `value`. Types must match the descriptor:
@@ -64,7 +92,7 @@ startup `-LabParameters` is a separate path.
 
 Wire submission immediately returns `admission: Accepted`, `batchId`,
 `consumed: false` and a `Queued` batch. No revision or receipt stamps are invented
-before the actual Ready frame. There is one Lab-owned accepted batch/result
+before the actual Ready frame. There is one AppRuntime session-owned accepted batch/result
 slot; terminal results retain it until explicit consumption. Rejection allocates
 no batch id. IDs are process-local and **separate from capture `jobId`** and
 transport correlation `id`.
@@ -91,11 +119,12 @@ Pending consumption never releases the slot. Wrong, consumed or unavailable
 owner ids return `status: not-found`. `status.parameterControl` reports current
 availability/revision and borrows the same batch. It has no second result cache
 or unbounded history. Retained batches preserve their owned admission values,
-even if application fails or a Lab session is replaced. The active Lab runtime
-locator must still be available to query its slot; switching to Demo content
-does not expose the inactive Lab owner. Process termination ends retention.
+even if application fails or content is replaced. Results remain queryable
+through the session owner after replacement and retain their original content id.
+Process termination ends retention. LabRuntime owns its safe queued mutation,
+without holding a second result or receipt cache.
 
-`batch` includes source/content, state (`Queued`, `Applying`, `Finished`,
+`batch` includes source (`host`, `lab` or `mixed`)/content, state (`Queued`, `Applying`, `Finished`,
 `Failed`), revision (null until application), fixed supported impact `Immediate`,
 owned `values`, `items`, failure and terminal/success indicators. The impact
 means no Lab rebuild; it is independent of the per-item effect class. Each effect item
@@ -133,6 +162,16 @@ recover. It is evidence for inspection, not an idempotency key. Do not blindly
 resubmit. File/transport failures still print one JSON error result.
 
 ## Verify on native backends
+
+`Tests/Verification/RunVerification.ps1 -Suite session-host-parameters` checks
+Host discovery, atomic mixed-source rejection, submitted receipts, NoChange,
+result retention, captured settings, exposure image response, exact settling origin
+across discovery/first NoChange, and sequence exclusion on Coastal Atrium Demo and
+GTAO Lab, using both RHIs by default. The suite primes clean ready history through
+an after-ready capture, then compares each content's authored exposure with +2 EV.
+Direct invocation accepts `-StateDirectory` to reuse task-owned verification caches;
+omit it for a new isolated state directory. Captures and receipts stay run-local.
+
 
 `Tests/Verification/RunVerification.ps1 -Suite session-parameters` runs the hidden
 GTAO and Atmosphere Range Labs on both RHIs by default and accepts

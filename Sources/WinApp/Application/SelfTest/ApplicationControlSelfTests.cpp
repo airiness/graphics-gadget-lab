@@ -7,6 +7,7 @@
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
 #include "Parameters/ParameterEffectReceipt.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <nlohmann/json.hpp>
 
@@ -101,12 +102,12 @@ namespace gglab
 			const Json missing = Json::parse(QueryApplicationControlParameters(708, 9, true, nullptr));
 			context.Check(!missing["ok"] && missing["batchId"] == 9 && missing["status"] == "not-found",
 				"Missing parameter ownership never yields a fabricated receipt");
-			LabParameterBatchStatus batch{ .m_BatchId = 9, .m_Revision = 7,
-				.m_Lab = LabId("gglab.lab.fixture"), .m_State = LabParameterBatchState::Finished };
+			ParameterBatchStatus batch{ .m_BatchId = 9, .m_Revision = 7,
+				.m_ContentId = "gglab.lab.fixture", .m_State = ParameterBatchState::Finished };
 			batch.m_Values.push_back({ LabParameterId("f"), 2.0f });
 			auto receipt = ParameterEffectReceipt::Begin(LabParameterId("f"), ParameterEffectClass::Immediate, 7, 20);
-			(void)receipt->RecordApplied(ParameterEffectClass::Immediate, { .m_Revision = 7 }, 20);
-			(void)receipt->RecordSubmittedFrame({ .m_Revision = 7 }, 21);
+			GGLAB_UNUSED(receipt->RecordApplied(ParameterEffectClass::Immediate, { .m_Revision = 7 }, 20));
+			GGLAB_UNUSED(receipt->RecordSubmittedFrame({ .m_Revision = 7 }, 21));
 			batch.m_Items.push_back(receipt->GetSnapshot());
 			const Json wire = SerializeApplicationControlParameterBatch(batch);
 			context.Check(wire["terminal"] && wire["succeeded"] && wire["values"][0]["value"] == 2.0f &&
@@ -120,20 +121,28 @@ namespace gglab
 			context.Check(!superseded["succeeded"] && superseded["items"][0]["firstConsumed"].is_null(),
 				"A terminal superseded effect is not successful consumption");
 			const Json status = Json::parse(SerializeApplicationControlStatus(709, {
-				.m_LabParametersAvailable = true, .m_ParameterRevision = 7, .m_ParameterBatch = &batch }));
+				.m_ParametersAvailable = true, .m_ParameterRevision = 7, .m_ParameterBatch = &batch }));
 			context.Check(status["capabilities"]["labParameterControl"]["maxBatches"] == 1 &&
 				status["capabilities"]["labParameterControl"]["maxItems"] == 128 &&
 				status["parameterControl"]["batch"] == superseded && status["parameterControl"]["revision"] == 7,
 				"Status advertises bounded parameter support and borrows the actual receipt");
+			context.Check(status["capabilities"]["sessionParameterControl"]["sources"] == Json::array({ "host", "lab" }) &&
+				status["capabilities"]["sessionParameterControl"]["mixedSources"] &&
+				status["capabilities"]["sessionParameterControl"]["maxBatches"] == 1,
+				"The additive session capability discovers host and mixed-source control without changing protocol v4");
+			batch.m_Source = "mixed";
+			context.Check(SerializeApplicationControlParameterBatch(batch)["source"] == "mixed" &&
+				SerializeApplicationControlParameterBatch(batch)["contentId"] == "gglab.lab.fixture",
+				"A mixed-source receipt retains its captured content identity");
 		}
 
 		void RunDeferredParameterSerializationTests(SelfTestContext& context) noexcept
 		{
-			LabParameterBatchStatus batch{ .m_BatchId = 10, .m_Revision = 8,
-				.m_Lab = LabId("gglab.lab.fixture"), .m_State = LabParameterBatchState::Applying };
+			ParameterBatchStatus batch{ .m_BatchId = 10, .m_Revision = 8,
+				.m_ContentId = "gglab.lab.fixture", .m_State = ParameterBatchState::Applying };
 			auto receipt = ParameterEffectReceipt::Begin(LabParameterId("lighting"), ParameterEffectClass::Deferred, 8, 30);
 			const ParameterStateIdentity identity{ 8, "lighting", 11 };
-			(void)receipt->RecordApplied(ParameterEffectClass::Deferred, identity, 30);
+			GGLAB_UNUSED(receipt->RecordApplied(ParameterEffectClass::Deferred, identity, 30));
 			batch.m_Items.push_back(receipt->GetSnapshot());
 			const Json pending = SerializeApplicationControlParameterBatch(batch);
 			context.Check(!pending["terminal"] && pending["succeeded"].is_null() &&
@@ -142,9 +151,9 @@ namespace gglab
 				pending["items"][0]["identity"]["generation"] == 11 &&
 				pending["items"][0]["published"].is_null() && pending["items"][0]["firstConsumed"].is_null(),
 				"An applied Deferred wire receipt retains domain identity without claiming publication or consumption");
-			(void)receipt->RecordPublished(identity, 34);
-			(void)receipt->RecordSubmittedFrame(identity, 35);
-			batch.m_State = LabParameterBatchState::Finished;
+			GGLAB_UNUSED(receipt->RecordPublished(identity, 34));
+			GGLAB_UNUSED(receipt->RecordSubmittedFrame(identity, 35));
+			batch.m_State = ParameterBatchState::Finished;
 			batch.m_Items[0] = receipt->GetSnapshot();
 			const Json consumed = SerializeApplicationControlParameterBatch(batch);
 			context.Check(consumed["succeeded"] && consumed["items"][0]["applied"] == 30 &&
@@ -416,7 +425,7 @@ namespace gglab
 				generation["targets"][0]["resourceIdentity"] == Json({ { "generation", 3 }, { "index", 12 } }),
 				"Watch retains fail mode, content generation, physical identity, tier and checked frame");
 			FrameCaptureFrameState frame{ .m_Backend = "vulkan", .m_DemoId = "Demo.LabHost", .m_LabId = "gglab.lab.culling",
-				.m_FrameIndex = 42, .m_ReferenceViewIds = { "CAM_A", "CAM_B" } };
+				.m_FrameSerial = 73, .m_FrameIndex = 42, .m_ReferenceViewIds = { "CAM_A", "CAM_B" } };
 			frame.m_Readiness.Add("lab", FrameCaptureGateState::Pending, "Warming up.");
 			const auto status = Json::parse(SerializeApplicationControlStatus(4, {
 				.m_SessionId = "s1", .m_ProcessId = 99, .m_Hidden = true, .m_Width = 640, .m_Height = 360,
@@ -425,6 +434,8 @@ namespace gglab
 				status["frame"]["ready"] == false && status["frame"]["settledFrames"] == 5 &&
 				status["frame"]["gates"][0]["state"] == "pending" && status["frame"]["fixedDeltaTime"].is_null() &&
 				status["frame"]["referenceViews"] == Json::array({ "CAM_A", "CAM_B" }), "Status preserves session and frame readiness");
+			context.Check(status["frame"]["frameSerial"] == 73 && status["frame"]["frameIndex"] == 42,
+				"Status preserves the render serial separately from the simulation frame index");
 			context.Check(!status["capture"].contains("legacyUnfinishedOutputs") &&
 				!status["capture"].contains("legacyRetainedResults"),
 				"Status exposes only current job ownership without retired output counters");

@@ -82,7 +82,13 @@
       <Filter>Lab</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
@@ -166,9 +172,6 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h">
       <Filter>Lab</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameterTransaction.h">
-      <Filter>Lab</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h">
       <Filter>Lab</Filter>
     </ClInclude>
@@ -182,7 +185,16 @@
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterBatch.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h">
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />

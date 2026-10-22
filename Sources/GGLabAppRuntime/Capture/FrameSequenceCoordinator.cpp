@@ -1,4 +1,5 @@
 #include "Capture/FrameSequenceCoordinator.h"
+#include "Parameters/HostViewParameters.h"
 
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
@@ -172,24 +173,30 @@ namespace gglab
 	GTAOSettings ApplyFrameSequenceGTAOOverrides(
 		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept
 	{
+		std::vector<LabParameterValue> values;
 		if (overrides.m_TemporalAccumulation)
 		{
-			settings.m_TemporalAccumulation = *overrides.m_TemporalAccumulation;
+			values.push_back({ LabParameterId("view.gtao.temporal_accumulation"), *overrides.m_TemporalAccumulation });
 		}
 		if (overrides.m_TemporalMaxSamples)
 		{
-			settings.m_TemporalMaxSamples =
-				std::clamp(*overrides.m_TemporalMaxSamples, 1u, GTAOMaxTemporalSamples);
+			values.push_back({ LabParameterId("view.gtao.temporal_max_samples"), *overrides.m_TemporalMaxSamples });
 		}
 		if (overrides.m_DirectionCount)
 		{
-			settings.m_DirectionCount =
-				std::clamp(*overrides.m_DirectionCount, 1u, GTAOMaxDirectionCount);
+			values.push_back({ LabParameterId("view.gtao.direction_count"), *overrides.m_DirectionCount });
 		}
 		if (overrides.m_StepCount)
 		{
-			settings.m_StepCount = std::clamp(*overrides.m_StepCount, 1u, GTAOMaxStepCount);
+			values.push_back({ LabParameterId("view.gtao.step_count"), *overrides.m_StepCount });
 		}
+		ResolvedViewRenderSettings view;
+		view.m_Lighting.m_GTAO = settings;
+		ApplyHostViewParameters(values, view, false);
+		settings = view.m_Lighting.m_GTAO;
+		settings.m_TemporalMaxSamples = std::clamp(settings.m_TemporalMaxSamples, 1u, GTAOMaxTemporalSamples);
+		settings.m_DirectionCount = std::clamp(settings.m_DirectionCount, 1u, GTAOMaxDirectionCount);
+		settings.m_StepCount = std::clamp(settings.m_StepCount, 1u, GTAOMaxStepCount);
 		return settings;
 	}
 
@@ -197,38 +204,79 @@ namespace gglab
 		const FrameSequenceTemporalAAOverrides& overrides,
 		TemporalAASettings settings) noexcept
 	{
-		settings.m_Enabled = overrides.m_Enabled.value_or(settings.m_Enabled);
-		settings.m_MaxHistoryFeedback =
-			overrides.m_MaxHistoryFeedback.value_or(settings.m_MaxHistoryFeedback);
-		settings.m_DepthAbsoluteThreshold =
-			overrides.m_DepthAbsoluteThreshold.value_or(settings.m_DepthAbsoluteThreshold);
-		settings.m_DepthRelativeThreshold =
-			overrides.m_DepthRelativeThreshold.value_or(settings.m_DepthRelativeThreshold);
-		settings.m_VelocityWeightScale =
-			overrides.m_VelocityWeightScale.value_or(settings.m_VelocityWeightScale);
-		settings.m_LuminanceWeightScale =
-			overrides.m_LuminanceWeightScale.value_or(settings.m_LuminanceWeightScale);
-		settings.m_NeighborhoodClampExpansion = overrides.m_NeighborhoodClampExpansion.value_or(
-			settings.m_NeighborhoodClampExpansion);
-		settings.m_HistoryRelaxation =
-			overrides.m_HistoryRelaxation.value_or(settings.m_HistoryRelaxation);
-		settings.m_HistoryAccumulation =
-			overrides.m_HistoryAccumulation.value_or(settings.m_HistoryAccumulation);
-		settings.m_HistoryRectification =
-			overrides.m_HistoryRectification.value_or(settings.m_HistoryRectification);
-		settings.m_VarianceClipGamma =
-			overrides.m_VarianceClipGamma.value_or(settings.m_VarianceClipGamma);
-		settings.m_HistoryFilter = overrides.m_HistoryFilter.value_or(settings.m_HistoryFilter);
-		settings.m_CurrentFilter = overrides.m_CurrentFilter.value_or(settings.m_CurrentFilter);
-		settings.m_MotionSelection =
-			overrides.m_MotionSelection.value_or(settings.m_MotionSelection);
-		settings.m_PostTemporalView =
-			overrides.m_PostTemporalView.value_or(settings.m_PostTemporalView);
-		settings.m_ResolutionPreset =
-			overrides.m_ResolutionPreset.value_or(settings.m_ResolutionPreset);
-		settings.m_TextureLodBiasOffset =
-			overrides.m_TextureLodBiasOffset.value_or(settings.m_TextureLodBiasOffset);
-		return ResolveTemporalAASettings(settings);
+		std::vector<LabParameterValue> values;
+		if (overrides.m_Enabled)
+		{
+			values.push_back({ LabParameterId("view.taa.enabled"), *overrides.m_Enabled });
+		}
+		if (overrides.m_MaxHistoryFeedback)
+		{
+			values.push_back({ LabParameterId("view.taa.max_history_feedback"), *overrides.m_MaxHistoryFeedback });
+		}
+		if (overrides.m_DepthAbsoluteThreshold)
+		{
+			values.push_back({ LabParameterId("view.taa.depth_absolute_threshold"), *overrides.m_DepthAbsoluteThreshold });
+		}
+		if (overrides.m_DepthRelativeThreshold)
+		{
+			values.push_back({ LabParameterId("view.taa.depth_relative_threshold"), *overrides.m_DepthRelativeThreshold });
+		}
+		if (overrides.m_VelocityWeightScale)
+		{
+			values.push_back({ LabParameterId("view.taa.velocity_weight_scale"), *overrides.m_VelocityWeightScale });
+		}
+		if (overrides.m_LuminanceWeightScale)
+		{
+			values.push_back({ LabParameterId("view.taa.luminance_weight_scale"), *overrides.m_LuminanceWeightScale });
+		}
+		if (overrides.m_NeighborhoodClampExpansion)
+		{
+			values.push_back({ LabParameterId("view.taa.neighborhood_clamp_expansion"), *overrides.m_NeighborhoodClampExpansion });
+		}
+		if (overrides.m_HistoryRelaxation)
+		{
+			values.push_back({ LabParameterId("view.taa.history_relaxation"), *overrides.m_HistoryRelaxation });
+		}
+		if (overrides.m_HistoryAccumulation)
+		{
+			values.push_back({ LabParameterId("view.taa.history_accumulation"), static_cast<int32_t>(*overrides.m_HistoryAccumulation) });
+		}
+		if (overrides.m_HistoryRectification)
+		{
+			values.push_back({ LabParameterId("view.taa.history_rectification"), static_cast<int32_t>(*overrides.m_HistoryRectification) });
+		}
+		if (overrides.m_VarianceClipGamma)
+		{
+			values.push_back({ LabParameterId("view.taa.variance_clip_gamma"), *overrides.m_VarianceClipGamma });
+		}
+		if (overrides.m_HistoryFilter)
+		{
+			values.push_back({ LabParameterId("view.taa.history_filter"), static_cast<int32_t>(*overrides.m_HistoryFilter) });
+		}
+		if (overrides.m_CurrentFilter)
+		{
+			values.push_back({ LabParameterId("view.taa.current_filter"), static_cast<int32_t>(*overrides.m_CurrentFilter) });
+		}
+		if (overrides.m_MotionSelection)
+		{
+			values.push_back({ LabParameterId("view.taa.motion_selection"), static_cast<int32_t>(*overrides.m_MotionSelection) });
+		}
+		if (overrides.m_PostTemporalView)
+		{
+			values.push_back({ LabParameterId("view.taa.post_temporal_view"), static_cast<int32_t>(*overrides.m_PostTemporalView) });
+		}
+		if (overrides.m_ResolutionPreset)
+		{
+			values.push_back({ LabParameterId("view.taa.resolution_preset"), static_cast<int32_t>(*overrides.m_ResolutionPreset) });
+		}
+		if (overrides.m_TextureLodBiasOffset)
+		{
+			values.push_back({ LabParameterId("view.taa.texture_lod_bias_offset"), *overrides.m_TextureLodBiasOffset });
+		}
+		ResolvedViewRenderSettings view;
+		view.m_TemporalAA = settings;
+		ApplyHostViewParameters(values, view, false);
+		return ResolveTemporalAASettings(view.m_TemporalAA);
 	}
 
 	FrameSequenceTimingSummary SummarizeFrameSequenceTiming(

@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
 
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
@@ -258,6 +259,7 @@ namespace gglab
 			});
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
+		m_ParameterControl = std::make_unique<SessionParameterControl>(*m_RenderServices.m_Environment);
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
@@ -440,6 +442,10 @@ namespace gglab
 			return;
 		}
 
+		if (m_ParameterControl)
+		{
+			m_ParameterControl->Finish();
+		}
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
 		if (m_FrameCapture)

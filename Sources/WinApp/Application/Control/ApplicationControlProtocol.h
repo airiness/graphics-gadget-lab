@@ -86,9 +86,9 @@ namespace gglab
 		const NonFiniteWatchStatus* m_Watch = nullptr;
 		// The process environment record as JSON; empty before the runtime services exist.
 		std::string_view m_Environment;
-		bool m_LabParametersAvailable = false;
+		bool m_ParametersAvailable = false;
 		uint64_t m_ParameterRevision = 0;
-		const LabParameterBatchStatus* m_ParameterBatch = nullptr;
+		const ParameterBatchStatus* m_ParameterBatch = nullptr;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

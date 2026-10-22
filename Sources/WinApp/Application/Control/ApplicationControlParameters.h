@@ -1,6 +1,6 @@
 #pragma once
 #include "Lab/LabParameter.h"
-#include "Lab/LabParameterTransaction.h"
+#include "Parameters/ParameterBatch.h"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -12,7 +12,7 @@
 
 namespace gglab
 {
-	class LabRuntime;
+	class SessionParameterControl;
 
 	inline constexpr size_t ApplicationControlMaxParameterItems = 128;
 
@@ -25,12 +25,12 @@ namespace gglab
 	[[nodiscard]] std::string ParseApplicationControlParameterChanges(
 		const nlohmann::json& changes, std::vector<ApplicationControlParameterChange>& result);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlParameterBatch(
-		const LabParameterBatchStatus& batch);
+		const ParameterBatchStatus& batch);
 	[[nodiscard]] std::string SerializeApplicationControlParameters(
-		uint64_t id, const LabRuntime* runtime) noexcept;
+		uint64_t id, SessionParameterControl* runtime) noexcept;
 	[[nodiscard]] std::string SubmitApplicationControlParameters(uint64_t id,
-		std::span<const ApplicationControlParameterChange> changes, LabRuntime* runtime,
+		std::span<const ApplicationControlParameterChange> changes, SessionParameterControl* runtime,
 		bool sequenceActive) noexcept;
 	[[nodiscard]] std::string QueryApplicationControlParameters(
-		uint64_t id, uint64_t batchId, bool consume, LabRuntime* runtime) noexcept;
+		uint64_t id, uint64_t batchId, bool consume, SessionParameterControl* runtime) noexcept;
 }

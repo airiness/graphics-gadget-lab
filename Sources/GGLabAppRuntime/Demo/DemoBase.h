@@ -13,6 +13,7 @@
 namespace gglab
 {
 	class World;
+	class LabRuntime;
 	class Camera;
 	class CameraController;
 	class CameraRig;
@@ -63,6 +64,9 @@ namespace gglab
 		{
 			return std::nullopt;
 		}
+
+		// Only the active content exposes its Lab source; Demo content returns null.
+		virtual LabRuntime* GetParameterLabRuntime() noexcept { return nullptr; }
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}
