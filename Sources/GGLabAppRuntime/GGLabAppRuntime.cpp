@@ -1,10 +1,12 @@
 #include "GGLabAppRuntime.h"
 #include "Parameters/SessionParameterControl.h"
+#include "Capture/FrameSequenceCoordinator.h"
 
 #include "Demo/DemoManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 
 #include <chrono>
+#include <utility>
 
 namespace gglab
 {
@@ -43,6 +45,85 @@ namespace gglab
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
 		return AppRuntimeInitializeResult::Succeeded;
+	}
+
+	bool GGLabAppRuntime::CanAcceptSessionCommands() const noexcept
+	{
+		return m_ServicesInitialized &&
+			(m_LifecycleState == AppRuntimeLifecycleState::Running ||
+				m_LifecycleState == AppRuntimeLifecycleState::Suspended);
+	}
+
+	uint64_t GGLabAppRuntime::StartFrameSequence(
+		FrameSequenceRequest request, std::string& error) noexcept
+	{
+		error.clear();
+		if (!CanAcceptSessionCommands() || !m_FrameSequence)
+		{
+			error = "Frame sequences are unavailable in this session.";
+			return 0;
+		}
+		const auto* batch = m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
+		if (batch && !batch->IsTerminal())
+		{
+			error = "Busy: finish the pending parameter batch before starting a sequence.";
+			return 0;
+		}
+		return m_FrameSequence->Start(std::move(request), error);
+	}
+
+	FrameSequenceCancelVerdict GGLabAppRuntime::CancelFrameSequence() noexcept
+	{
+		return m_FrameSequence ? m_FrameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
+	}
+
+	void GGLabAppRuntime::EnableParameterControl() noexcept
+	{
+		if (CanAcceptSessionCommands() && m_ParameterControl)
+		{
+			m_ParameterControl->Enable();
+		}
+	}
+
+	bool GGLabAppRuntime::CanRequestParameterBatch(std::string& error) const noexcept
+	{
+		error.clear();
+		if (!CanAcceptSessionCommands() || !m_ParameterControl)
+		{
+			error = "NoParameterSource: ready active content in a live runtime is required.";
+			return false;
+		}
+		if (m_FrameSequence && m_FrameSequence->IsActive())
+		{
+			error = "Busy: session parameter changes are unavailable during a sequence.";
+			return false;
+		}
+		if (m_ParameterControl->GetParameterBatchStatus())
+		{
+			error = "Busy: consume the previous parameter batch result first.";
+			return false;
+		}
+		if (!m_ParameterControl->IsAvailable())
+		{
+			error = "NoParameterSource: ready active content is required.";
+			return false;
+		}
+		return true;
+	}
+
+	uint64_t GGLabAppRuntime::RequestParameterBatch(
+		std::span<const LabParameterValue> values, std::string& error) noexcept
+	{
+		if (!CanRequestParameterBatch(error))
+		{
+			return 0;
+		}
+		return m_ParameterControl->RequestParameterBatch(values, error);
+	}
+
+	std::optional<ParameterBatchStatus> GGLabAppRuntime::TakeParameterBatchResult(uint64_t id) noexcept
+	{
+		return m_ParameterControl ? m_ParameterControl->TakeParameterBatchResult(id) : std::nullopt;
 	}
 
 	void GGLabAppRuntime::SynchronizeContentBinding() noexcept

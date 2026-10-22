@@ -12,7 +12,7 @@
 
 namespace gglab
 {
-	class SessionParameterControl;
+	class GGLabAppRuntime;
 	struct LightingProfilePublication;
 
 	inline constexpr size_t ApplicationControlMaxParameterItems = 128;
@@ -30,10 +30,9 @@ namespace gglab
 	[[nodiscard]] nlohmann::json SerializeApplicationControlLightingProfiles(
 		const LightingProfilePublication* profiles);
 	[[nodiscard]] std::string SerializeApplicationControlParameters(
-		uint64_t id, SessionParameterControl* runtime) noexcept;
+		uint64_t id, GGLabAppRuntime* runtime) noexcept;
 	[[nodiscard]] std::string SubmitApplicationControlParameters(uint64_t id,
-		std::span<const ApplicationControlParameterChange> changes, SessionParameterControl* runtime,
-		bool sequenceActive) noexcept;
+		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime) noexcept;
 	[[nodiscard]] std::string QueryApplicationControlParameters(
-		uint64_t id, uint64_t batchId, bool consume, SessionParameterControl* runtime) noexcept;
+		uint64_t id, uint64_t batchId, bool consume, GGLabAppRuntime* runtime) noexcept;
 }

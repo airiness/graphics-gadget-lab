@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Parameters/SessionParameterControl.h"
+#include "GGLabAppRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <nlohmann/json.hpp>
@@ -295,21 +296,22 @@ namespace gglab
 			Json();
 	}
 
-	std::string SerializeApplicationControlParameters(uint64_t id, SessionParameterControl* runtime) noexcept
+	std::string SerializeApplicationControlParameters(uint64_t id, GGLabAppRuntime* runtime) noexcept
 	{
-		if (!runtime || !runtime->IsAvailable())
+		const auto* parameterControl = runtime ? runtime->GetParameterControl() : nullptr;
+		if (!parameterControl || !parameterControl->IsAvailable())
 		{
 			return SerializeApplicationControlError(id, "NoParameterSource: ready active content is required.");
 		}
-		runtime->Enable();
+		runtime->EnableParameterControl();
 		Json response = Response(id, true);
-		response["contentId"] = runtime->GetContentId();
-		response["revision"] = runtime->GetParameterRevision();
+		response["contentId"] = parameterControl->GetContentId();
+		response["revision"] = parameterControl->GetParameterRevision();
 		response["parameters"] = Json::array();
-		response["lighting"] = SerializeApplicationControlLightingProfiles(&runtime->GetLightingProfilePublication());
-		response["lightingProfileError"] = runtime->GetLightingProfileError();
+		response["lighting"] = SerializeApplicationControlLightingProfiles(&parameterControl->GetLightingProfilePublication());
+		response["lightingProfileError"] = parameterControl->GetLightingProfileError();
 		response["lightingProfiles"] = Json::array();
-		for (const auto& profile : runtime->GetLightingProfiles())
+		for (const auto& profile : parameterControl->GetLightingProfiles())
 		{
 			response["lightingProfiles"].push_back({
 				{ "id", profile.m_Id },
@@ -335,7 +337,7 @@ namespace gglab
 						{ "type", ParameterTypes[static_cast<size_t>(desc.m_Type)] },
 						{ "impact", Impact(desc.m_Impact) },
 						{ "declaredClass", EffectClass(GetParameterEffectClass(desc)) },
-						{ "setSupported", runtime->SupportsParameterEffect(desc) },
+						{ "setSupported", parameterControl->SupportsParameterEffect(desc) },
 						{ "editPolicy", desc.m_EditPolicy == LabParameterEditPolicy::Continuous ? "Continuous" : "CommitOnEditEnd" },
 						{ "default", Value(desc.m_DefaultValue) },
 						{ "current", Value(parameter.m_Value) },
@@ -344,8 +346,8 @@ namespace gglab
 						{ "enumItems", std::move(enums) } });
 				}
 			};
-		append(runtime->GetHostParameters(), "host");
-		if (const auto* lab = runtime->GetLabParameters())
+		append(parameterControl->GetHostParameters(), "host");
+		if (const auto* lab = parameterControl->GetLabParameters())
 		{
 			append(*lab, "lab");
 		}
@@ -353,23 +355,22 @@ namespace gglab
 	}
 
 	std::string SubmitApplicationControlParameters(uint64_t id,
-		std::span<const ApplicationControlParameterChange> changes, SessionParameterControl* runtime,
-		bool sequenceActive) noexcept
+		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime) noexcept
 	{
-		if (!runtime || !runtime->IsAvailable() || sequenceActive)
+		std::string error = "NoParameterSource: ready active content is required.";
+		if (!runtime || !runtime->CanRequestParameterBatch(error))
 		{
-			return SerializeApplicationControlError(id, sequenceActive ?
-				"Busy: session parameter changes are unavailable during a sequence." :
-				"NoParameterSource: ready active content is required.");
+			return SerializeApplicationControlError(id, error);
 		}
-		runtime->Enable();
+		runtime->EnableParameterControl();
+		const auto* parameterControl = runtime->GetParameterControl();
 		std::vector<LabParameterValue> values;
 		for (const auto& change : changes)
 		{
-			const auto* parameter = runtime->GetHostParameters().Find(change.m_Value.m_Id);
-			if (!parameter && runtime->GetLabParameters())
+			const auto* parameter = parameterControl->GetHostParameters().Find(change.m_Value.m_Id);
+			if (!parameter && parameterControl->GetLabParameters())
 			{
-				parameter = runtime->GetLabParameters()->Find(change.m_Value.m_Id);
+				parameter = parameterControl->GetLabParameters()->Find(change.m_Value.m_Id);
 			}
 			if (!parameter || parameter->m_Desc.m_Type != change.m_Type)
 			{
@@ -377,7 +378,6 @@ namespace gglab
 			}
 			values.push_back(change.m_Value);
 		}
-		std::string error;
 		const uint64_t batchId = runtime->RequestParameterBatch(values, error);
 		if (batchId == 0)
 		{
@@ -387,14 +387,15 @@ namespace gglab
 		response["admission"] = "Accepted";
 		response["batchId"] = batchId;
 		response["consumed"] = false;
-		response["batch"] = SerializeApplicationControlParameterBatch(*runtime->GetParameterBatchStatus());
+		response["batch"] = SerializeApplicationControlParameterBatch(*parameterControl->GetParameterBatchStatus());
 		return Dump(response);
 	}
 
 	std::string QueryApplicationControlParameters(
-		uint64_t id, uint64_t batchId, bool consume, SessionParameterControl* runtime) noexcept
+		uint64_t id, uint64_t batchId, bool consume, GGLabAppRuntime* runtime) noexcept
 	{
-		const auto* batch = runtime ? runtime->GetParameterBatchStatus() : nullptr;
+		const auto* parameterControl = runtime ? runtime->GetParameterControl() : nullptr;
+		const auto* batch = parameterControl ? parameterControl->GetParameterBatchStatus() : nullptr;
 		if (!batch || batch->m_BatchId != batchId)
 		{
 			Json response = Response(id, false);

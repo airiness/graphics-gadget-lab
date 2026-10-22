@@ -97,7 +97,7 @@ namespace gglab
 				query.m_Request->m_JobId == 0 && query.m_Request->m_Consume,
 				"Parameter query preserves its independent batch identity");
 			context.Check(!Json::parse(SerializeApplicationControlParameters(706, nullptr))["ok"] &&
-				!Json::parse(SubmitApplicationControlParameters(707, {}, nullptr, false))["ok"],
+				!Json::parse(SubmitApplicationControlParameters(707, {}, nullptr))["ok"],
 				"A missing parameter source rejects discovery and admission");
 			const Json missing = Json::parse(QueryApplicationControlParameters(708, 9, true, nullptr));
 			context.Check(!missing["ok"] && missing["batchId"] == 9 && missing["status"] == "not-found",

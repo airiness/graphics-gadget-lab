@@ -558,7 +558,7 @@ namespace gglab
 		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
 		ApplicationControlRequest&& request) noexcept
 	{
-		FrameSequenceCoordinator* frameSequence =
+		const FrameSequenceCoordinator* frameSequence =
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
 		const FrameCaptureCoordinator* frameCapture =
 			m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator() : nullptr;
@@ -591,15 +591,15 @@ namespace gglab
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:
-			pipeRequest->Respond(SerializeApplicationControlParameters(request.m_Id, parameters));
+			pipeRequest->Respond(SerializeApplicationControlParameters(request.m_Id, m_AppRuntime.get()));
 			return;
 		case ApplicationControlCommand::Set:
 			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
-				request.m_ParameterChanges, parameters, frameSequence && frameSequence->IsActive()));
+				request.m_ParameterChanges, m_AppRuntime.get()));
 			return;
 		case ApplicationControlCommand::ParameterResult:
 			pipeRequest->Respond(QueryApplicationControlParameters(request.m_Id,
-				request.m_ParameterBatchId, request.m_Consume, parameters));
+				request.m_ParameterBatchId, request.m_Consume, m_AppRuntime.get()));
 			return;
 		case ApplicationControlCommand::Watch:
 		{
@@ -639,14 +639,8 @@ namespace gglab
 					request.m_Id, "Frame sequences are unavailable in this session."));
 				return;
 			}
-			if (parameters && parameters->GetParameterBatchStatus() && !parameters->GetParameterBatchStatus()->IsTerminal())
-			{
-				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
-					"Busy: finish the pending parameter batch before starting a sequence."));
-				return;
-			}
 			std::string error;
-			if (frameSequence->Start(request.m_Sequence, error) == 0)
+			if (m_AppRuntime->StartFrameSequence(std::move(request.m_Sequence), error) == 0)
 			{
 				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id, error));
 				return;
@@ -657,7 +651,9 @@ namespace gglab
 		}
 		case ApplicationControlCommand::SequenceCancel:
 		{
-			const auto verdict = frameSequence ? frameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
+			const auto verdict = m_AppRuntime ?
+				m_AppRuntime->CancelFrameSequence() :
+				FrameSequenceCancelVerdict::NotFound;
 			pipeRequest->Respond(SerializeApplicationControlSequenceCancellation(request.m_Id,
 				frameSequence ? frameSequence->GetStatus() : nullptr, verdict));
 			return;

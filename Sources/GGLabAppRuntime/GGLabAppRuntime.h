@@ -6,6 +6,7 @@
 #include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
+#include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "RuntimePaths.h"
@@ -15,6 +16,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -104,6 +107,8 @@ namespace gglab
 	class EnvironmentAssetController;
 	class FrameCaptureCoordinator;
 	class FrameSequenceCoordinator;
+	struct FrameSequenceRequest;
+	enum class FrameSequenceCancelVerdict : uint8_t;
 	class LabRuntimeLocatorBase;
 	class RenderCompositionAccess;
 	class RenderHost;
@@ -239,12 +244,25 @@ namespace gglab
 		// The host's sole consuming operation. Unknown, active or not-yet-published
 		// jobs return no result and release no capacity. Receipts survive Shutdown.
 		[[nodiscard]] std::optional<CaptureJobResult> TakeCaptureJobResult(uint64_t jobId) noexcept;
-		// Non-owning; null before runtime services are composed.
-		[[nodiscard]] SessionParameterControl* GetParameterControl() const noexcept
+		// Owner-thread session admission. Active sequences and unfinished parameter
+		// batches exclude one another. Retained terminal results remain queryable and
+		// do not reserve execution. Cancellation and result consumption survive Shutdown.
+		[[nodiscard]] uint64_t StartFrameSequence(FrameSequenceRequest request, std::string& error) noexcept;
+		[[nodiscard]] FrameSequenceCancelVerdict CancelFrameSequence() noexcept;
+		void EnableParameterControl() noexcept;
+		// Read-only preflight before a transport enables descriptors for type checks.
+		// Submission repeats admission and then validates the complete typed batch.
+		[[nodiscard]] bool CanRequestParameterBatch(std::string& error) const noexcept;
+		[[nodiscard]] uint64_t RequestParameterBatch(
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
+		// Borrowed read-only views; null before composition. Commands enter through
+		// AppRuntime so a C++ host cannot bypass admission or forge owner callbacks.
+		[[nodiscard]] const SessionParameterControl* GetParameterControl() const noexcept
 		{
 			return m_ParameterControl.get();
 		}
-		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
+		[[nodiscard]] const FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
 		{
 			return m_FrameSequence.get();
 		}
@@ -261,6 +279,7 @@ namespace gglab
 	private:
 		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
 		void CollectFrameCaptureResults() noexcept;
+		[[nodiscard]] bool CanAcceptSessionCommands() const noexcept;
 		void SynchronizeContentBinding() noexcept;
 		void ReleaseContentBinding() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
