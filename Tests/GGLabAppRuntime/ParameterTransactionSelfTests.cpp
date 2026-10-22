@@ -1,5 +1,6 @@
 #include "ParameterTransactionSelfTests.h"
 #include "Lab/LabParameter.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Parameters/ParameterEffectReceipt.h"
 #include "GGLabTestCore/SelfTest.h"
 
@@ -133,6 +134,51 @@ namespace gglab
 				"Color validation respects declared component ranges as well as normalized storage");
 		}
 
+		void RunInheritedParameterTests(SelfTestContext& context) noexcept
+		{
+			const LabParameterId id("samples");
+			const auto make = [&]()
+				{
+					LabParameterSet parameters;
+					context.Check(parameters.Add({ .m_Id = id, .m_Name = "Samples",
+						.m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(512),
+						.m_InheritOnEnter = true, .m_MinValue = LabValue(uint32_t(1)),
+						.m_MaxValue = LabValue(uint32_t(4096)) }), "Register an entered inherited parameter");
+					return parameters;
+				};
+			auto inherited = make();
+			context.Check(inherited.BindInheritedDefault(id, uint32_t(64)) &&
+				inherited.Get(id, uint32_t(0)) == 64 && !inherited.Find(id)->m_Dirty &&
+				inherited.CaptureRestoredValues().empty(),
+				"Entry binds the live baseline without converting inheritance into a restored override");
+			context.Check(!inherited.BindInheritedDefault(id, uint32_t(0)) &&
+				!inherited.BindInheritedDefault(LabParameterId("missing"), uint32_t(64)) &&
+				inherited.Get(id, uint32_t(0)) == 64,
+				"An invalid entered baseline is rejected without modifying the parameter");
+			auto explicitValue = make();
+			context.Check(explicitValue.Set(id, uint32_t(512)) &&
+				explicitValue.BindInheritedDefault(id, uint32_t(64)) &&
+				explicitValue.Get(id, uint32_t(0)) == 512 &&
+				std::get<uint32_t>(explicitValue.Find(id)->m_Desc.m_DefaultValue) == 64 &&
+				explicitValue.CaptureRestoredValues().size() == 1,
+				"An explicit startup value equal to the placeholder survives a different entered baseline");
+			context.Check(explicitValue.FollowInheritedValue(id, uint32_t(512)) &&
+				!explicitValue.Find(id)->m_Dirty && explicitValue.CaptureRestoredValues().empty() &&
+				!explicitValue.FollowInheritedValue(id, uint32_t(512)),
+				"Even a same-value external writer releases explicit intent exactly once");
+			context.Check(explicitValue.FollowInheritedValue(id, uint32_t(128)) &&
+				explicitValue.Get(id, uint32_t(0)) == 128 &&
+				std::get<uint32_t>(explicitValue.Find(id)->m_Desc.m_DefaultValue) == 64,
+				"Following an external writer updates current value while preserving the entered reset default");
+			GGLAB_UNUSED(explicitValue.ResetAll());
+			context.Check(explicitValue.Get(id, uint32_t(0)) == 64 &&
+				explicitValue.Find(id)->m_Dirty && explicitValue.CaptureRestoredValues().size() == 1,
+				"Reset explicitly requests the entered baseline and survives restart");
+			const auto ordinary = MakeParameters(context);
+			context.Check(ordinary.CaptureRestoredValues().size() == ordinary.CaptureValues().size(),
+				"Ordinary Lab parameters retain the existing restart snapshot policy");
+		}
+
 		ParameterEffectReceipt BeginReceipt(ParameterEffectClass effectClass) noexcept
 		{
 			return *ParameterEffectReceipt::Begin(LabParameterId("test.parameter"), effectClass, 7, 10);
@@ -237,6 +283,7 @@ namespace gglab
 	void RunParameterTransactionSelfTests(SelfTestContext& context) noexcept
 	{
 		RunBatchTests(context);
+		RunInheritedParameterTests(context);
 		RunReceiptTests(context);
 	}
 }

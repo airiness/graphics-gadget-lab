@@ -100,6 +100,7 @@ namespace gglab
 		class TestEnvironmentLightingControl final : public EnvironmentLightingControlBase
 		{
 		public:
+			std::unique_ptr<EnvironmentLightingOverrideBase> AcquireOverride() noexcept override { return {}; }
 			void SetIntensity(float) noexcept override {}
 			void SetRotationRadians(float) noexcept override {}
 			void SetQualityPreset(IBLQualityPreset) noexcept override {}

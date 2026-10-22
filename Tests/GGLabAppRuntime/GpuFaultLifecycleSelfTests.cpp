@@ -119,6 +119,8 @@ namespace gglab
 			TeardownOutcome m_Outcome = TeardownOutcome::Completed;
 			std::filesystem::path m_Receipt;
 			bool m_EnableParameterLab = false;
+			bool m_HoldLightingPreparation = false;
+			DemoServices m_ContentServices{};
 			bool m_FrameBeginUnavailable = false;
 			uint32_t m_ContentSerialOffset = 0;
 			uint64_t m_PlannedContentIdentity = 0;
@@ -1055,6 +1057,60 @@ namespace gglab
 			return std::make_unique<ParameterTestLab>(info);
 		}
 
+		class InheritedLightingTestLab final : public LabSessionBase
+		{
+		public:
+			explicit InheritedLightingTestLab(const LabSessionCreateInfo& info) noexcept :
+				LabSessionBase({ .m_Id = LabId("gglab.lab.test.inherited-lighting"),
+					.m_DisplayName = "Inherited lighting fixture" }, info,
+					std::make_unique<FaultPipeline>(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)),
+				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)
+			{
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("samples"),
+					.m_Name = "Samples", .m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(512),
+					.m_InheritOnEnter = true }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("toggle"),
+					.m_Name = "Toggle", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
+			}
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				return m_Probe.m_HoldLightingPreparation ?
+					LoadingProgress{ .m_Status = LoadingStatus::Preparing } : LoadingProgress::Ready();
+			}
+			void OnEnter() noexcept override
+			{
+				m_Override = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+				GGLAB_ASSERT_NOT_NULL(m_Override.get());
+				const uint32_t inherited = m_Override->GetInheritedSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount;
+				GGLAB_UNUSED(GetMutableParameters().BindInheritedDefault(LabParameterId("samples"), inherited));
+				ApplyImmediateParameters();
+			}
+			void OnExit() noexcept override { m_Override.reset(); }
+			void Update(float) noexcept override {}
+			static std::unique_ptr<LabSessionBase> Create(const LabSessionCreateInfo& info) noexcept
+			{
+				return std::make_unique<InheritedLightingTestLab>(info);
+			}
+		private:
+			bool RefreshInheritedParameters() noexcept override
+			{
+				return m_Override && !m_Override->OwnsBakeConfiguration() &&
+					GetMutableParameters().FollowInheritedValue(LabParameterId("samples"),
+						m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+							.m_BakeConfig.m_PrefilteredSpecularSampleCount);
+			}
+			void ApplyImmediateParameters() noexcept override
+			{
+				if (m_Override && GetParameters().Find(LabParameterId("samples"))->m_Dirty)
+				{
+					m_Override->Apply({ .m_PrefilteredSpecularSampleCount =
+						GetParameters().Get(LabParameterId("samples"), uint32_t(512)) });
+				}
+			}
+			LifetimeProbe& m_Probe;
+			std::unique_ptr<EnvironmentLightingOverrideBase> m_Override;
+		};
+
 		class FaultDemo final : public DemoBase
 		{
 		public:
@@ -1063,6 +1119,7 @@ namespace gglab
 				m_Pipeline(m_Probe)
 			{
 				m_Probe.m_ParameterEnvironment = info.m_Services.m_EnvironmentLightingControl;
+				m_Probe.m_ContentServices = info.m_Services;
 				if (m_Probe.m_EnableParameterLab)
 				{
 					m_Lab = std::make_unique<LabRuntime>(LabSessionCreateInfo{
@@ -2534,6 +2591,94 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunInheritedLightingScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			LabRuntime lab({ .m_Services = probe.m_ContentServices, .m_WindowWidth = 32,
+				.m_WindowHeight = 32, .m_RunConfig = { .m_WarmupFrames = 0 } });
+			const LabId labId("gglab.lab.test.inherited-lighting");
+			const LabParameterId samples("samples");
+			checks.Check(lab.RegisterLab({ .m_Id = labId, .m_DisplayName = "Inherited lighting fixture" },
+				&InheritedLightingTestLab::Create) && lab.Initialize(labId),
+				"The inherited lighting fixture initializes through the production LabRuntime");
+			lab.TickTransitions();
+			lab.OnEnter();
+			const auto settings = [&]()
+				{
+					return probe.m_ContentServices.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+				};
+			const auto generation = [&]()
+				{
+					return runtime.GetRenderServices().m_Environment->GetBakeRequestGeneration();
+				};
+			const auto baseline = settings().m_BakeConfig.m_PrefilteredSpecularSampleCount;
+			lab.RequestSetParameter(samples, uint32_t(64));
+			lab.ProcessPendingCommands();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64,
+				"An entered Lab establishes its explicit Runtime override");
+			probe.m_HoldLightingPreparation = true;
+			lab.RequestSwitchLab(labId);
+			const auto beforePrepare = generation();
+			lab.ProcessPendingCommands();
+			checks.Check(lab.HasPendingSession() && generation() == beforePrepare &&
+				settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64,
+				"Preparing replacement content leaves the active owner's lighting untouched");
+			probe.m_HoldLightingPreparation = false;
+			lab.TickTransitions();
+			checks.Check(lab.IsReady() && settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == baseline &&
+				lab.GetActiveSession()->GetParameters().Get(samples, uint32_t(0)) == baseline &&
+				!lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty && generation() == beforePrepare + 1,
+				"Replacement inherits after the old owner restores, without reapplying a stale pending default");
+			lab.RequestSetParameter(samples, uint32_t(128));
+			lab.ProcessPendingCommands();
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 128 &&
+				lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty &&
+				std::get<uint32_t>(lab.GetActiveSession()->GetParameters().Find(samples)->m_Desc.m_DefaultValue) == baseline,
+				"Restart preserves explicit intent while rebinding its entered reset default");
+			probe.m_ParameterEnvironment->SetPrefilteredSpecularSampleCount(256);
+			const auto externalGeneration = generation();
+			const auto revision = lab.GetParameterRevision();
+			lab.RequestSetParameter(LabParameterId("toggle"), true);
+			lab.ProcessPendingCommands();
+			checks.Check(lab.GetParameterRevision() > revision && generation() == externalGeneration &&
+				lab.GetActiveSession()->GetParameters().Get(samples, uint32_t(0)) == 256 &&
+				!lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty,
+				"A later ordinary writer is reflected before edits and is not replayed by unrelated Lab effects");
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(generation() == externalGeneration &&
+				lab.GetActiveSession()->GetParameters().Get(samples, uint32_t(0)) == 256 &&
+				!lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty,
+				"Restart leaves an inherited value inherited and schedules no redundant bake");
+			probe.m_HoldLightingPreparation = true;
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			lab.Shutdown();
+			checks.Check(generation() == externalGeneration && settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 256,
+				"Cancelling a pending session and exiting preserves the later writer's lighting");
+			probe.m_HoldLightingPreparation = false;
+			const std::array startup{ LabParameterAssignment{ "samples", "512" } };
+			checks.Check(lab.Initialize(labId, startup), "The lighting fixture accepts an explicit startup placeholder value");
+			lab.TickTransitions();
+			lab.OnEnter();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 512 &&
+				lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty,
+				"Explicit startup equal to the constructor placeholder wins over the actual entered baseline");
+			lab.Shutdown();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 256,
+				"The explicit startup override restores its actual entered baseline on exit");
+			runtime.Shutdown();
+		}
+
 		void RunParameterFrameScenario(SelfTestContext& checks, const std::filesystem::path& root,
 			bool fatalSubmission)
 		{
@@ -3461,6 +3606,7 @@ namespace gglab
 		RunLightingProfileRegistrationScenario(context, root / "profile-invalid-registration", false, false);
 		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
 		RunLightingProfileScenario(context, root / "lighting-profiles");
+		RunInheritedLightingScenario(context, root / "inherited-lighting");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);
 		RunFrameOutcomeScenarios(context, root / "outcomes");

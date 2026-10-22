@@ -89,6 +89,8 @@ namespace gglab
 		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
 		LabParameterEditPolicy m_EditPolicy = LabParameterEditPolicy::Continuous;
 		LabValue m_DefaultValue = false;
+		// The entered owning domain binds this default after the old session exits.
+		bool m_InheritOnEnter = false;
 		std::optional<LabValue> m_MinValue;
 		std::optional<LabValue> m_MaxValue;
 		std::vector<LabEnumItem> m_EnumItems;
@@ -138,6 +140,11 @@ namespace gglab
 		const LabParameter* Find(const LabParameterId& id) const noexcept;
 		std::span<const LabParameter> GetParameters() const noexcept { return m_Parameters; }
 		std::vector<LabParameterValue> CaptureValues() const noexcept;
+		// Inherited values are rebound on entry; explicit overrides survive restart.
+		std::vector<LabParameterValue> CaptureRestoredValues() const noexcept;
+		[[nodiscard]] bool BindInheritedDefault(const LabParameterId& id, const LabValue& value) noexcept;
+		// The domain lost its override: follow the effective value and release explicit intent.
+		[[nodiscard]] bool FollowInheritedValue(const LabParameterId& id, const LabValue& value) noexcept;
 
 		template<typename T>
 		T Get(const LabParameterId& id, const T& fallback) const noexcept

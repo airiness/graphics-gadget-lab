@@ -2003,6 +2003,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingControlBase.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingOverrideBase.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingSettings.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>

@@ -59,8 +59,8 @@ namespace gglab
 			.m_Group = "Lighting",
 			.m_Type = LabParameterType::UInt,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = createInfo.m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
-				.m_BakeConfig.m_PrefilteredSpecularSampleCount,
+			.m_DefaultValue = IBLBakeConfig{}.m_PrefilteredSpecularSampleCount,
+			.m_InheritOnEnter = true,
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(uint32_t(4096)),
 			.m_EffectClass = ParameterEffectClass::Deferred,
@@ -91,28 +91,43 @@ namespace gglab
 		profile.m_TemporalAA.m_Enabled = temporal;
 		// Preparation can run beside another active Lab. Only the entered owner
 		// may change the process lighting service.
-		if (m_HasEnvironmentOverride)
+		if (m_LightingOverride)
 		{
-			const uint32_t samples = GetParameters().Get(IBLSamplesId, uint32_t(1));
-			const auto current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
-			const bool requestedChange = samples != m_LastRequestedSamples;
-			m_LastRequestedSamples = samples;
-			// Other Immediate edits must not replay an unused/default lighting override.
-			if (requestedChange && samples != current.m_BakeConfig.m_PrefilteredSpecularSampleCount)
+			const auto* parameter = GetParameters().Find(IBLSamplesId);
+			const uint32_t samples = std::get<uint32_t>(parameter->m_Value);
+			const uint32_t current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+				.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+			if (parameter->m_Dirty && (samples != current || !m_LightingOverride->OwnsBakeConfiguration()))
 			{
-				m_LightingRequest.m_PreviousGeneration =
-					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-				m_Services.m_EnvironmentLightingControl->SetPrefilteredSpecularSampleCount(samples);
-				m_LightingRequest.m_Generation =
-					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				const uint64_t previous = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				m_LightingOverride->Apply({ .m_PrefilteredSpecularSampleCount = samples });
+				const uint64_t generation = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				if (generation != previous)
+				{
+					m_LightingRequest = { .m_PreviousGeneration = previous, .m_Generation = generation };
+				}
 			}
 		}
+	}
+
+	bool AtmosphereRangeLabSession::RefreshInheritedParameters() noexcept
+	{
+		if (!m_LightingOverride || m_LightingOverride->OwnsBakeConfiguration())
+		{
+			return false;
+		}
+		// An ordinary Runtime writer takes ownership. Follow its value before
+		// accepting new edits; unrelated Immediate changes must not reclaim it.
+		const uint32_t inherited = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		m_LightingRequest = {};
+		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
 	}
 
 	std::optional<LabLightingParameterRequest> AtmosphereRangeLabSession::GetLightingParameterRequest(
 		const LabParameterId& id) const noexcept
 	{
-		return id == IBLSamplesId ? std::optional(m_LightingRequest) : std::nullopt;
+		return id == IBLSamplesId && m_LightingOverride ? std::optional(m_LightingRequest) : std::nullopt;
 	}
 
 	void AtmosphereRangeLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
@@ -189,50 +204,28 @@ namespace gglab
 
 	void AtmosphereRangeLabSession::OnEnter() noexcept
 	{
-		if (m_HasEnvironmentOverride)
+		GGLAB_ASSERT(!m_LightingOverride);
+		m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+		GGLAB_ASSERT_NOT_NULL(m_LightingOverride.get());
+		if (!m_LightingOverride)
 		{
 			return;
 		}
-		// Loading sessions must not change the active Lab's environment.
-		m_PreviousEnvironment = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
-		m_HasEnvironmentOverride = true;
+		const uint32_t inherited = m_LightingOverride->GetInheritedSettings()
+			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		const bool bound = GetMutableParameters().BindInheritedDefault(IBLSamplesId, inherited);
+		GGLAB_ASSERT(bound);
+		GGLAB_UNUSED(bound);
 		m_LightingRequest = {};
-		const auto* samples = GetParameters().Find(IBLSamplesId);
-		// Explicit startup/restored values must be re-established after the old
-		// session restores its override, even when equal to this descriptor's default.
-		m_LastRequestedSamples = samples->m_Dirty ? 0 : std::get<uint32_t>(samples->m_Desc.m_DefaultValue);
-		auto& control = *m_Services.m_EnvironmentLightingControl;
-		control.SetIntensity(1.0f);
-		control.SetRotationRadians(0.0f);
-		control.SetSkyboxEnabled(true);
-		control.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+		m_LightingOverride->Apply({ .m_Intensity = 1.0f, .m_RotationRadians = 0.0f,
+			.m_EnableSkybox = true, .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
 		ApplyImmediateParameters();
 	}
 
 	void AtmosphereRangeLabSession::OnExit() noexcept
 	{
-		if (!m_HasEnvironmentOverride)
-		{
-			return;
-		}
-		auto& control = *m_Services.m_EnvironmentLightingControl;
-		control.SetIntensity(m_PreviousEnvironment.m_Intensity);
-		control.SetRotationRadians(m_PreviousEnvironment.m_RotationRadians);
-		control.SetSkyboxEnabled(m_PreviousEnvironment.m_EnableSkybox);
-		control.SetBackgroundMode(m_PreviousEnvironment.m_BackgroundMode);
-		if (m_LightingRequest.m_Generation != 0)
-		{
-			if (m_PreviousEnvironment.m_QualityPreset == IBLQualityPreset::Custom)
-			{
-				control.SetPrefilteredSpecularSampleCount(
-					m_PreviousEnvironment.m_BakeConfig.m_PrefilteredSpecularSampleCount);
-			}
-			else
-			{
-				control.SetQualityPreset(m_PreviousEnvironment.m_QualityPreset);
-			}
-		}
-		m_HasEnvironmentOverride = false;
+		m_LightingOverride.reset();
+		m_LightingRequest = {};
 		// Asset scope remains owned by this session until LabRuntime's last-use fence retires it.
 	}
 

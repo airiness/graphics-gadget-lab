@@ -130,6 +130,7 @@ namespace gglab
 		bool CommitPendingSession() noexcept;
 		bool RestartActiveSessionWithValues(std::span<const LabParameterValue> values) noexcept;
 		void PollRetiringSessions() noexcept;
+		void RefreshInheritedParameters() noexcept;
 		void SetError(std::string message) noexcept;
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;
 

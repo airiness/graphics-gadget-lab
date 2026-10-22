@@ -261,8 +261,8 @@ namespace gglab
 			.m_Name = "IBL Specular Samples",
 			.m_Group = "Lighting Publication Fixture",
 			.m_Type = LabParameterType::UInt,
-			.m_DefaultValue = createInfo.m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
-				.m_BakeConfig.m_PrefilteredSpecularSampleCount,
+			.m_DefaultValue = IBLBakeConfig{}.m_PrefilteredSpecularSampleCount,
+			.m_InheritOnEnter = true,
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(uint32_t(4096)),
 			.m_EffectClass = ParameterEffectClass::Deferred,
@@ -306,13 +306,19 @@ namespace gglab
 
 	void GTAOLabSession::OnEnter() noexcept
 	{
-		m_PreviousLighting = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
-		m_HasLightingOverride = true;
+		GGLAB_ASSERT(!m_LightingOverride);
+		m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+		GGLAB_ASSERT_NOT_NULL(m_LightingOverride.get());
+		if (!m_LightingOverride)
+		{
+			return;
+		}
+		const uint32_t inherited = m_LightingOverride->GetInheritedSettings()
+			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		const bool bound = GetMutableParameters().BindInheritedDefault(IBLSamplesId, inherited);
+		GGLAB_ASSERT(bound);
+		GGLAB_UNUSED(bound);
 		m_LightingRequest = {};
-		const auto* samples = GetParameters().Find(IBLSamplesId);
-		// Explicit startup/restored values must be re-established after the old
-		// session restores its override, even when equal to this descriptor's default.
-		m_LastRequestedSamples = samples->m_Dirty ? 0 : std::get<uint32_t>(samples->m_Desc.m_DefaultValue);
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
@@ -325,19 +331,8 @@ namespace gglab
 
 	void GTAOLabSession::OnExit() noexcept
 	{
-		if (m_HasLightingOverride && m_LightingRequest.m_Generation != 0)
-		{
-			auto& control = *m_Services.m_EnvironmentLightingControl;
-			if (m_PreviousLighting.m_QualityPreset == IBLQualityPreset::Custom)
-			{
-				control.SetPrefilteredSpecularSampleCount(m_PreviousLighting.m_BakeConfig.m_PrefilteredSpecularSampleCount);
-			}
-			else
-			{
-				control.SetQualityPreset(m_PreviousLighting.m_QualityPreset);
-			}
-		}
-		m_HasLightingOverride = false;
+		m_LightingOverride.reset();
+		m_LightingRequest = {};
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
@@ -366,29 +361,44 @@ namespace gglab
 		m_ViewportHeight = height;
 	}
 
+	bool GTAOLabSession::RefreshInheritedParameters() noexcept
+	{
+		if (!m_LightingOverride || m_LightingOverride->OwnsBakeConfiguration())
+		{
+			return false;
+		}
+		// An ordinary Runtime writer takes ownership. Follow its value before
+		// accepting new edits; unrelated Immediate changes must not reclaim it.
+		const uint32_t inherited = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		m_LightingRequest = {};
+		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
+	}
+
 	std::optional<LabLightingParameterRequest> GTAOLabSession::GetLightingParameterRequest(
 		const LabParameterId& id) const noexcept
 	{
-		return id == IBLSamplesId ? std::optional(m_LightingRequest) : std::nullopt;
+		return id == IBLSamplesId && m_LightingOverride ? std::optional(m_LightingRequest) : std::nullopt;
 	}
 
 	void GTAOLabSession::ApplyImmediateParameters() noexcept
 	{
 		const auto& parameters = GetParameters();
-		if (m_HasLightingOverride)
+		if (m_LightingOverride)
 		{
-			const uint32_t samples = parameters.Get(IBLSamplesId, uint32_t(1));
-			const auto current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
-			const bool requestedChange = samples != m_LastRequestedSamples;
-			m_LastRequestedSamples = samples;
-			// Other Immediate edits must not replay an unused/default lighting override.
-			if (requestedChange && samples != current.m_BakeConfig.m_PrefilteredSpecularSampleCount)
+			const auto* parameter = GetParameters().Find(IBLSamplesId);
+			const uint32_t samples = std::get<uint32_t>(parameter->m_Value);
+			const uint32_t current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+				.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+			if (parameter->m_Dirty && (samples != current || !m_LightingOverride->OwnsBakeConfiguration()))
 			{
-				m_LightingRequest.m_PreviousGeneration =
-					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-				m_Services.m_EnvironmentLightingControl->SetPrefilteredSpecularSampleCount(samples);
-				m_LightingRequest.m_Generation =
-					m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				const uint64_t previous = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				m_LightingOverride->Apply({ .m_PrefilteredSpecularSampleCount = samples });
+				const uint64_t generation = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				if (generation != previous)
+				{
+					m_LightingRequest = { .m_PreviousGeneration = previous, .m_Generation = generation };
+				}
 			}
 		}
 		GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Enabled =

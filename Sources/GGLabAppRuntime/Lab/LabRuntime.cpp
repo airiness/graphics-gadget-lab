@@ -202,6 +202,7 @@ namespace gglab
 
 	void LabRuntime::Update() noexcept
 	{
+		RefreshInheritedParameters();
 		GGLAB_ASSERT_MSG(m_ActiveSession, "LabRuntime requires an active session before update.");
 		if (m_ActiveSession)
 		{
@@ -249,6 +250,7 @@ namespace gglab
 
 	void LabRuntime::ProcessPendingCommands() noexcept
 	{
+		RefreshInheritedParameters();
 		const LabCommandBatch commands = m_CommandQueue.Consume();
 		if (commands.m_SwitchTarget)
 		{
@@ -262,7 +264,7 @@ namespace gglab
 			m_CreateInfo.m_RunConfig = *commands.m_RunConfig;
 			m_CreateInfo.m_RunConfig.Sanitize();
 			const std::vector<LabParameterValue> values =
-				m_ActiveSession->GetParameters().CaptureValues();
+				m_ActiveSession->GetParameters().CaptureRestoredValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 			TickTransitions();
 			return;
@@ -271,7 +273,7 @@ namespace gglab
 		if (commands.m_RestartRequested && m_ActiveSession)
 		{
 			const std::vector<LabParameterValue> values =
-				m_ActiveSession->GetParameters().CaptureValues();
+				m_ActiveSession->GetParameters().CaptureRestoredValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 			TickTransitions();
 			return;
@@ -321,7 +323,7 @@ namespace gglab
 		if (impact != LabChangeImpact::Immediate)
 		{
 			const std::vector<LabParameterValue> values =
-				m_ActiveSession->GetParameters().CaptureValues();
+				m_ActiveSession->GetParameters().CaptureRestoredValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 		}
 		else
@@ -606,6 +608,14 @@ namespace gglab
 				return !retiring.m_RetireFence.IsValid() ||
 					device->IsFencePointCompleted(retiring.m_RetireFence);
 			});
+	}
+
+	void LabRuntime::RefreshInheritedParameters() noexcept
+	{
+		if (m_IsEntered && m_ActiveSession && m_ActiveSession->RefreshInheritedParameters())
+		{
+			++m_ParameterRevision;
+		}
 	}
 
 	void LabRuntime::SetError(std::string message) noexcept

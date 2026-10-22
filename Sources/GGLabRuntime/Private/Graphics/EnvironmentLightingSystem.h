@@ -5,8 +5,11 @@
 #include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
+#include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 namespace gglab
@@ -67,13 +70,14 @@ namespace gglab
 		{
 			return generation == m_IgnoreCacheGeneration;
 		}
+		[[nodiscard]] std::unique_ptr<EnvironmentLightingOverrideBase> AcquireOverride() noexcept override;
 		void SetIntensity(float intensity) noexcept override;
 		void SetRotationRadians(float rotationRadians) noexcept override;
 		void SetQualityPreset(IBLQualityPreset preset) noexcept override;
 		void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept override;
 		void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept override;
 		void RequestRebake(bool ignoreCache = false) noexcept override;
-		void SetSkyboxEnabled(bool enabled) noexcept override { m_Settings.m_EnableSkybox = enabled; }
+		void SetSkyboxEnabled(bool enabled) noexcept override;
 		void SetBackgroundMode(EnvironmentBackgroundMode mode) noexcept override;
 		void ResolveWorldLighting(const std::optional<AtmosphereSettings>& atmosphere,
 			const std::optional<ResolvedWorldSun>& sun, uint64_t sunEntityKey,
@@ -93,7 +97,26 @@ namespace gglab
 
 	private:
 		class PreparedWorldLightingMutation;
+		class OverrideLease;
+		enum class OverrideField : uint8_t
+		{
+			Intensity,
+			Rotation,
+			Skybox,
+			Background,
+			BakeConfiguration,
+			Count,
+		};
+		struct OverrideLifetime
+		{
+			EnvironmentLightingSystem* m_Owner = nullptr;
+		};
+		void RecordSettingsWrite(OverrideField field) noexcept;
 		void RefreshRenderSettings() noexcept;
+		std::shared_ptr<OverrideLifetime> m_OverrideLifetime;
+		std::array<uint64_t, static_cast<size_t>(OverrideField::Count)> m_OverrideOwners{};
+		uint64_t m_NextOverrideOwner = 1;
+		uint64_t m_ActiveOverrideOwner = 0;
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		EnvironmentTextureSource m_Source{};
 		EnvironmentLightingSettings m_Settings{};

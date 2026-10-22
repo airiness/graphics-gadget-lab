@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Lab/LabSessionBase.h"
-#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
 #include <memory>
@@ -33,12 +33,11 @@ namespace gglab
 
 	private:
 		void ApplyImmediateParameters() noexcept override;
+		bool RefreshInheritedParameters() noexcept override;
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		ModelID m_PendingModelId{};
 		LoadingProgress m_LoadingProgress{};
-		EnvironmentLightingSettings m_PreviousEnvironment{};
-		bool m_HasEnvironmentOverride = false;
+		std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
 		LabLightingParameterRequest m_LightingRequest{};
-		uint32_t m_LastRequestedSamples = 0;
 	};
 }

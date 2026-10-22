@@ -129,6 +129,7 @@ namespace gglab
 		void ResetAssetInterests() noexcept;
 
 		virtual void ApplyImmediateParameters() noexcept {}
+		virtual bool RefreshInheritedParameters() noexcept { return false; }
 		virtual void RebuildScene() noexcept {}
 		virtual void RecreatePipeline() noexcept {}
 		virtual void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept;

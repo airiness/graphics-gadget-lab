@@ -643,6 +643,100 @@ namespace gglab
 			uint32_t m_NextSamplerIndex = 1;
 		};
 
+		void RunEnvironmentLightingOverrideTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
+			environment.SetPrefilteredSpecularMaxSampleLuminance(123.0f);
+			const auto baseline = environment.GetSettings();
+			const auto generation = environment.GetBakeRequestGeneration();
+			auto scope = environment.AcquireOverride();
+			context.Check(scope && !environment.AcquireOverride() && !scope->OwnsBakeConfiguration() &&
+				scope->GetInheritedSettings().m_BakeConfig == baseline.m_BakeConfig,
+				"An exclusive lighting scope snapshots the entered baseline without claiming inherited fields");
+			scope.reset();
+			context.Check(environment.GetBakeRequestGeneration() == generation,
+				"Releasing an unused lighting scope does not request a bake");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 2.0f, .m_RotationRadians = 0.5f,
+				.m_EnableSkybox = false, .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky,
+				.m_PrefilteredSpecularSampleCount = 64 });
+			context.Check(scope->OwnsBakeConfiguration() && environment.GetSettings().m_Intensity == 2.0f &&
+				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64 &&
+				environment.GetBakeRequestGeneration() == generation + 1,
+				"Lighting overrides claim only the typed fields they write and request one actual bake");
+			environment.SetIntensity(3.0f);
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalAtmospherePreview);
+			scope.reset();
+			const auto restored = environment.GetSettings();
+			context.Check(restored.m_Intensity == 3.0f &&
+				restored.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
+				restored.m_RotationRadians == baseline.m_RotationRadians &&
+				restored.m_EnableSkybox == baseline.m_EnableSkybox &&
+				restored.m_QualityPreset == baseline.m_QualityPreset &&
+				restored.m_BakeConfig == baseline.m_BakeConfig &&
+				environment.GetBakeRequestGeneration() == generation + 2,
+				"Release preserves later writers and restores the complete Custom bake recipe once");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 4.0f, .m_PrefilteredSpecularSampleCount = 64 });
+			const auto beforeSameValue = environment.GetBakeRequestGeneration();
+			environment.SetIntensity(4.0f);
+			environment.SetPrefilteredSpecularSampleCount(64);
+			context.Check(!scope->OwnsBakeConfiguration() &&
+				environment.GetBakeRequestGeneration() == beforeSameValue,
+				"A same-value ordinary write takes ownership without scheduling a redundant bake");
+			scope.reset();
+			context.Check(environment.GetSettings().m_Intensity == 4.0f &&
+				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64 &&
+				environment.GetBakeRequestGeneration() == beforeSameValue,
+				"Release never undoes a same-value write by another owner");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 5.0f, .m_PrefilteredSpecularSampleCount = 128 });
+			environment.SetIntensity(6.0f);
+			environment.SetPrefilteredSpecularMaxSampleLuminance(456.0f);
+			const auto external = environment.GetSettings();
+			scope->Apply({ .m_Intensity = 7.0f, .m_PrefilteredSpecularSampleCount = 256 });
+			const auto beforeRelease = environment.GetBakeRequestGeneration();
+			scope.reset();
+			context.Check(environment.GetSettings().m_Intensity == external.m_Intensity &&
+				environment.GetSettings().m_BakeConfig == external.m_BakeConfig &&
+				environment.GetBakeRequestGeneration() == beforeRelease + 1,
+				"Reclaiming an override restores the intervening writer's latest state on release");
+
+			environment.SetQualityPreset(IBLQualityPreset::Low);
+			const auto preset = environment.GetSettings();
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 8.0f, .m_PrefilteredSpecularSampleCount = 128 });
+			environment.SetIntensity(std::numeric_limits<float>::quiet_NaN());
+			environment.SetQualityPreset(static_cast<IBLQualityPreset>(255));
+			environment.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::infinity());
+			context.Check(scope->OwnsBakeConfiguration(),
+				"Rejected ordinary edits do not steal a lighting scope's ownership");
+			scope.reset();
+			context.Check(environment.GetSettings().m_QualityPreset == preset.m_QualityPreset &&
+				environment.GetSettings().m_BakeConfig == preset.m_BakeConfig &&
+				environment.GetSettings().m_Intensity == preset.m_Intensity,
+				"Release restores the original preset as well as its full recipe");
+
+			auto temporary = std::make_unique<EnvironmentLightingSystem>(
+				EnvironmentLightingSystem::CreateInfo{ .m_RenderResourceRegistry = &registry });
+			scope = temporary->AcquireOverride();
+			scope->Apply({ .m_Intensity = 2.0f });
+			temporary.reset();
+			scope->Apply({ .m_Intensity = 3.0f });
+			context.Check(!scope->OwnsBakeConfiguration(),
+				"A lighting scope may outlive its Runtime owner without accessing destroyed state");
+			scope.reset();
+		}
+
 		void RunEnvironmentLightingSettingsTests(SelfTestContext& context) noexcept
 		{
 			RecordingDevice device;
@@ -940,6 +1034,24 @@ namespace gglab
 			context.Check(!ApplyWorldLightingInputsToWorld(world, alias.m_Inputs) &&
 				world.m_Atmosphere->m_RayleighScaleHeightMeters == 8000.0f,
 				"Invalid profile inputs reject before mutating the World");
+
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
+			auto scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto sameProfile = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
+			scope.reset();
+			context.Check(sameProfile.m_Outcome == WorldLightingMutationOutcome::Unchanged &&
+				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment,
+				"A NoChange profile does not steal the entered owner's background override");
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto changedProfile = environment.ApplyWorldLightingInputs(world, 17, pendingInputs);
+			scope.reset();
+			context.Check(changedProfile.m_Outcome == WorldLightingMutationOutcome::Requested &&
+				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
+				"A committed profile mutation owns its background and survives the previous Lab's release");
 
 			auto invalid = profile;
 			invalid.m_Inputs.m_SunDirection = Vector3(std::numeric_limits<float>::max(), 1.0f, 0.0f);
@@ -13066,6 +13178,7 @@ namespace gglab
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
 		RunEnvironmentLightingSettingsTests(context);
+		RunEnvironmentLightingOverrideTests(context);
 		RunLightingProfileContractTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);

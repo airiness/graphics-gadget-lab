@@ -1,4 +1,5 @@
 #include "Lab/LabParameter.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/String/StringUtils.h"
 
@@ -277,6 +278,56 @@ namespace gglab
 				});
 		}
 		return values;
+	}
+
+	std::vector<LabParameterValue> LabParameterSet::CaptureRestoredValues() const noexcept
+	{
+		std::vector<LabParameterValue> values;
+		values.reserve(m_Parameters.size());
+		for (const auto& parameter : m_Parameters)
+		{
+			if (!parameter.m_Desc.m_InheritOnEnter || parameter.m_Dirty)
+			{
+				values.push_back({ parameter.m_Desc.m_Id, parameter.m_Value });
+			}
+		}
+		return values;
+	}
+
+	bool LabParameterSet::BindInheritedDefault(const LabParameterId& id, const LabValue& value) noexcept
+	{
+		const auto found = std::ranges::find_if(m_Parameters,
+			[&](const auto& parameter) { return parameter.m_Desc.m_Id == id; });
+		std::string error;
+		if (found == m_Parameters.end() || !found->m_Desc.m_InheritOnEnter ||
+			!ValidateValue(found->m_Desc, value, error))
+		{
+			return false;
+		}
+		found->m_Desc.m_DefaultValue = value;
+		if (!found->m_Dirty)
+		{
+			found->m_Value = value;
+		}
+		return true;
+	}
+
+	bool LabParameterSet::FollowInheritedValue(const LabParameterId& id, const LabValue& value) noexcept
+	{
+		const auto found = std::ranges::find_if(m_Parameters,
+			[&](const auto& parameter) { return parameter.m_Desc.m_Id == id; });
+		std::string error;
+		const bool valid = found != m_Parameters.end() && found->m_Desc.m_InheritOnEnter &&
+			ValidateValue(found->m_Desc, value, error);
+		GGLAB_ASSERT_MSG(valid, "Only an entered owning domain can resolve a valid inherited parameter.");
+		if (!valid)
+		{
+			return false;
+		}
+		const bool changed = found->m_Dirty || !LabValuesEqual(found->m_Value, value);
+		found->m_Value = value;
+		found->m_Dirty = false;
+		return changed;
 	}
 
 	bool LabParameterSet::IsValueCompatible(LabParameterType type, const LabValue& value) noexcept

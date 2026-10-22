@@ -49,7 +49,7 @@ namespace gglab
 			m_Target.m_Transform->m_Rotation = m_Rotation;
 			m_Target.m_Light->m_WorldSun = m_Inputs.m_Sun;
 			m_World.m_Atmosphere = m_Inputs.m_Atmosphere;
-			m_Owner.m_Settings.m_BackgroundMode = m_Inputs.m_BackgroundMode;
+			m_Owner.SetBackgroundMode(m_Inputs.m_BackgroundMode);
 			m_Owner.m_RequestedPhysicalSky = std::move(m_Source);
 			m_Owner.RequestRebake();
 			m_Owner.RefreshRenderSettings();
@@ -69,10 +69,181 @@ namespace gglab
 		bool m_Committed = false;
 	};
 
+	class EnvironmentLightingSystem::OverrideLease final : public EnvironmentLightingOverrideBase
+	{
+	public:
+		OverrideLease(EnvironmentLightingSystem& owner, uint64_t id) noexcept :
+			m_Lifetime(owner.m_OverrideLifetime), m_Id(id),
+			m_Inherited(owner.m_Settings), m_Restore(owner.m_Settings)
+		{
+		}
+
+		~OverrideLease() override
+		{
+			const auto lifetime = m_Lifetime.lock();
+			if (!lifetime)
+			{
+				return;
+			}
+			auto& owner = *lifetime->m_Owner;
+			GGLAB_ASSERT(owner.m_ActiveOverrideOwner == m_Id);
+			for (size_t index = 0; index < owner.m_OverrideOwners.size(); ++index)
+			{
+				if (owner.m_OverrideOwners[index] != m_Id)
+				{
+					continue;
+				}
+				switch (static_cast<OverrideField>(index))
+				{
+				case OverrideField::Intensity:
+					owner.SetIntensity(m_Restore.m_Intensity);
+					break;
+				case OverrideField::Rotation:
+					owner.SetRotationRadians(m_Restore.m_RotationRadians);
+					break;
+				case OverrideField::Skybox:
+					owner.SetSkyboxEnabled(m_Restore.m_EnableSkybox);
+					break;
+				case OverrideField::Background:
+					owner.SetBackgroundMode(m_Restore.m_BackgroundMode);
+					break;
+				case OverrideField::BakeConfiguration:
+				{
+					// Preset and its complete recipe form one ownership group. Restore it
+					// once, without replaying multiple public setters or losing Custom fields.
+					const bool changed = owner.m_Settings.m_BakeConfig != m_Restore.m_BakeConfig;
+					owner.m_Settings.m_BakeConfig = m_Restore.m_BakeConfig;
+					owner.m_Settings.m_QualityPreset = m_Restore.m_QualityPreset;
+					owner.RecordSettingsWrite(OverrideField::BakeConfiguration);
+					if (changed)
+					{
+						owner.RequestRebake();
+					}
+					break;
+				}
+				case OverrideField::Count:
+					GGLAB_ASSERT(false);
+					break;
+				}
+			}
+			owner.m_ActiveOverrideOwner = 0;
+		}
+
+		EnvironmentLightingSettings GetInheritedSettings() const noexcept override { return m_Inherited; }
+
+		bool OwnsBakeConfiguration() const noexcept override
+		{
+			const auto lifetime = m_Lifetime.lock();
+			return lifetime && lifetime->m_Owner->m_OverrideOwners[
+				static_cast<size_t>(OverrideField::BakeConfiguration)] == m_Id;
+		}
+
+		void Apply(const EnvironmentLightingOverrideValues& values) noexcept override
+		{
+			const auto lifetime = m_Lifetime.lock();
+			if (!lifetime)
+			{
+				return;
+			}
+			auto& owner = *lifetime->m_Owner;
+			GGLAB_ASSERT(owner.m_ActiveOverrideOwner == m_Id);
+			if (values.m_Intensity && std::isfinite(*values.m_Intensity))
+			{
+				Write(owner, OverrideField::Intensity, [&]() { owner.SetIntensity(*values.m_Intensity); });
+			}
+			if (values.m_RotationRadians && std::isfinite(*values.m_RotationRadians))
+			{
+				Write(owner, OverrideField::Rotation,
+					[&]() { owner.SetRotationRadians(*values.m_RotationRadians); });
+			}
+			if (values.m_EnableSkybox)
+			{
+				Write(owner, OverrideField::Skybox, [&]() { owner.SetSkyboxEnabled(*values.m_EnableSkybox); });
+			}
+			if (values.m_BackgroundMode &&
+				(*values.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment ||
+					*values.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview ||
+					*values.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky))
+			{
+				Write(owner, OverrideField::Background,
+					[&]() { owner.SetBackgroundMode(*values.m_BackgroundMode); });
+			}
+			if (values.m_PrefilteredSpecularSampleCount)
+			{
+				Write(owner, OverrideField::BakeConfiguration,
+					[&]() { owner.SetPrefilteredSpecularSampleCount(*values.m_PrefilteredSpecularSampleCount); });
+			}
+		}
+
+	private:
+		template<typename Apply>
+		void Write(EnvironmentLightingSystem& owner, OverrideField field, Apply apply) noexcept
+		{
+			const auto index = static_cast<size_t>(field);
+			if (owner.m_OverrideOwners[index] != m_Id)
+			{
+				// Reclaiming a field after another writer must restore that writer's latest
+				// state, rather than an obsolete snapshot from the start of this session.
+				switch (field)
+				{
+				case OverrideField::Intensity:
+					m_Restore.m_Intensity = owner.m_Settings.m_Intensity;
+					break;
+				case OverrideField::Rotation:
+					m_Restore.m_RotationRadians = owner.m_Settings.m_RotationRadians;
+					break;
+				case OverrideField::Skybox:
+					m_Restore.m_EnableSkybox = owner.m_Settings.m_EnableSkybox;
+					break;
+				case OverrideField::Background:
+					m_Restore.m_BackgroundMode = owner.m_Settings.m_BackgroundMode;
+					break;
+				case OverrideField::BakeConfiguration:
+					m_Restore.m_QualityPreset = owner.m_Settings.m_QualityPreset;
+					m_Restore.m_BakeConfig = owner.m_Settings.m_BakeConfig;
+					break;
+				case OverrideField::Count:
+					GGLAB_ASSERT(false);
+					break;
+				}
+			}
+			apply();
+			owner.m_OverrideOwners[index] = m_Id;
+		}
+
+		std::weak_ptr<OverrideLifetime> m_Lifetime;
+		uint64_t m_Id = 0;
+		EnvironmentLightingSettings m_Inherited;
+		EnvironmentLightingSettings m_Restore;
+	};
+
 	EnvironmentLightingSystem::EnvironmentLightingSystem(const CreateInfo& createInfo) noexcept :
+		m_OverrideLifetime(std::make_shared<OverrideLifetime>(OverrideLifetime{ this })),
 		m_RenderResourceRegistry(createInfo.m_RenderResourceRegistry)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_RenderResourceRegistry);
+	}
+
+	std::unique_ptr<EnvironmentLightingOverrideBase> EnvironmentLightingSystem::AcquireOverride() noexcept
+	{
+		if (m_ActiveOverrideOwner != 0 || m_NextOverrideOwner == std::numeric_limits<uint64_t>::max())
+		{
+			return {};
+		}
+		auto lease = std::make_unique<OverrideLease>(*this, m_NextOverrideOwner);
+		m_ActiveOverrideOwner = m_NextOverrideOwner++;
+		return lease;
+	}
+
+	void EnvironmentLightingSystem::RecordSettingsWrite(OverrideField field) noexcept
+	{
+		m_OverrideOwners[static_cast<size_t>(field)] = 0;
+	}
+
+	void EnvironmentLightingSystem::SetSkyboxEnabled(bool enabled) noexcept
+	{
+		RecordSettingsWrite(OverrideField::Skybox);
+		m_Settings.m_EnableSkybox = enabled;
 	}
 
 	void EnvironmentLightingSystem::CommitEnvironmentSource(
@@ -97,6 +268,7 @@ namespace gglab
 	{
 		if (std::isfinite(intensity))
 		{
+			RecordSettingsWrite(OverrideField::Intensity);
 			const float clampedIntensity = std::max(intensity, 0.0f);
 			if (m_Settings.m_Intensity != clampedIntensity)
 			{
@@ -110,6 +282,7 @@ namespace gglab
 	{
 		if (std::isfinite(rotationRadians))
 		{
+			RecordSettingsWrite(OverrideField::Rotation);
 			constexpr float FullRotation = 2.0f * std::numbers::pi_v<float>;
 			const float wrappedRotation = std::remainder(rotationRadians, FullRotation);
 			if (m_Settings.m_RotationRadians != wrappedRotation)
@@ -122,6 +295,7 @@ namespace gglab
 
 	void EnvironmentLightingSystem::SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept
 	{
+		RecordSettingsWrite(OverrideField::BakeConfiguration);
 		constexpr uint32_t MinSampleCount = 1;
 		constexpr uint32_t MaxSampleCount = 4096;
 		const uint32_t clampedSampleCount = std::clamp(sampleCount, MinSampleCount, MaxSampleCount);
@@ -143,6 +317,7 @@ namespace gglab
 			return;
 		}
 
+		RecordSettingsWrite(OverrideField::BakeConfiguration);
 		constexpr float MinLuminance = 1.0f;
 		constexpr float MaxLuminance = 65000.0f;
 		const float clampedLuminance = std::clamp(maxSampleLuminance, MinLuminance, MaxLuminance);
@@ -158,7 +333,12 @@ namespace gglab
 
 	void EnvironmentLightingSystem::SetQualityPreset(IBLQualityPreset preset) noexcept
 	{
-		if (preset >= IBLQualityPreset::Custom || m_Settings.m_QualityPreset == preset)
+		if (preset >= IBLQualityPreset::Custom)
+		{
+			return;
+		}
+		RecordSettingsWrite(OverrideField::BakeConfiguration);
+		if (m_Settings.m_QualityPreset == preset)
 		{
 			return;
 		}
@@ -184,6 +364,7 @@ namespace gglab
 			mode == EnvironmentBackgroundMode::PhysicalAtmospherePreview ||
 			mode == EnvironmentBackgroundMode::PhysicalSky)
 		{
+			RecordSettingsWrite(OverrideField::Background);
 			m_Settings.m_BackgroundMode = mode;
 		}
 	}
