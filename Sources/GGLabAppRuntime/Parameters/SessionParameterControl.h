@@ -1,6 +1,7 @@
 #pragma once
 #include "Parameters/ParameterBatch.h"
 #include "Parameters/ParameterSource.h"
+#include "Parameters/ParameterFrameState.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -85,6 +86,9 @@ namespace gglab
 		void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration,
 			const ResolvedViewRenderSettings& settings, const RenderView* view = nullptr) noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
+		[[nodiscard]] ParameterFrameState CaptureFrameState(uint64_t serial,
+			uint64_t requestedLightingGeneration, uint64_t activeLightingGeneration) const;
+		void CompleteFrameState(ParameterFrameState& frame) const noexcept;
 
 	private:
 		void RefreshSources() noexcept;

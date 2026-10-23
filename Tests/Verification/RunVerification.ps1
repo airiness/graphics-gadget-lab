@@ -35,6 +35,7 @@ $catalog = @(
     @{ name = 'capture-comparison'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestCompareCaptures.ps1' }) },
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'gpu-timing-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateGpuTiming.py'; arguments = @('--self-test') }) },
+    @{ name = 'parameter-frames-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateParameterFrames.py'; arguments = @('--self-test') }) },
     @{ name = 'lighting-profiles'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLightingProfiles.ps1' }) },
     @{ name = 'sequence-parameter-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSequenceParameterEvents.ps1' }) },
     @{ name = 'sequence-deferred-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestDeferredSequenceEvents.ps1' }) },

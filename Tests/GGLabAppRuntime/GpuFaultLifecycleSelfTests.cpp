@@ -1911,12 +1911,19 @@ namespace gglab
 						}
 					}
 				}
-				checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && manifests.size() == 1 &&
-					manifests.front()["products"].size() == 3 &&
-					manifests.front()["provenance"]["frame"]["serial"] == successfulSerial &&
-					manifests.front()["provenance"]["time"]["totalTime"] == time &&
-					manifests.front()["provenance"]["sequence"]["frame"] == 0 &&
+				const auto frameManifest = std::ranges::find_if(manifests,
+					[](const auto& manifest) { return manifest.at("consistency") == "same-frame"; });
+				const auto rangeManifest = std::ranges::find_if(manifests,
+					[](const auto& manifest) { return manifest.at("consistency") == "sequence-range"; });
+				checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && manifests.size() == 2 &&
+					frameManifest != manifests.end() && rangeManifest != manifests.end() &&
+					(*frameManifest)["products"].size() == 3 && (*rangeManifest)["products"].size() == 1 &&
+					(*frameManifest)["provenance"]["frame"]["serial"] == successfulSerial &&
+					(*frameManifest)["provenance"]["parameters"]["frameSerial"] == successfulSerial &&
+					(*frameManifest)["provenance"]["time"]["totalTime"] == time &&
+					(*frameManifest)["provenance"]["sequence"]["frame"] == 0 &&
 					sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					sequence.GetStatus()->m_ParameterPublication->m_Outcome == CapturePublicationOutcome::Published &&
 					sequence.GetStatus()->m_CompletedCaptures == 2 && sequence.GetStatus()->m_FinishedCaptureJobs == 1 &&
 					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 &&
 					probe.m_ImageEncodes == 1 && capture.GetUnfinishedRequestCount() == 0 &&
@@ -3284,9 +3291,9 @@ namespace gglab
 			const auto revision = parameters.GetParameterRevision();
 			checks.Check(waiting == 1 && sequence.GetStatus()->m_State == FrameSequenceState::Waiting &&
 				runtime.RequestParameterBatch(host, error) == 0 && error.find("sequence") != std::string::npos &&
-				runtime.RequestParameterBatch(mixed, error) == 0 && !parameters.IsEnabled() &&
+				runtime.RequestParameterBatch(mixed, error) == 0 && parameters.IsEnabled() &&
 				parameters.GetParameterRevision() == revision && !parameters.GetParameterBatchStatus(),
-				"Waiting sequences reject direct Host and mixed batches before enabling or reserving parameter state");
+				"Waiting sequences enable provenance discovery while rejecting direct batches without reserving parameter state");
 			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
 				!sequence.IsActive(), "Owner cancellation releases the sequence execution exclusion");
 			const auto first = runtime.RequestParameterBatch(host, error);
@@ -3520,7 +3527,19 @@ namespace gglab
 			const auto immediate = request("view.exposure.ev100", 9.0f);
 			begin();
 			build();
+			auto frozen = source.CaptureFrameState(serial, environment.GetBakeRequestGeneration(),
+				environment.GetBakingStatus().m_ActiveGeneration);
+			const auto builtJson = nlohmann::json::parse(SerializeParameterFrameState(frozen));
+			checks.Check(frozen.m_Receipts.size() == 2 &&
+				!frozen.m_Receipts.back().m_Item.m_FirstConsumed &&
+				!frozen.m_RequestedLighting.m_Profile && !frozen.m_ActiveLighting.m_Profile,
+				"Build-time parameter snapshots retain outstanding receipts and leave unknown profile identity null");
 			submit();
+			source.CompleteFrameState(frozen);
+			const auto submittedJson = SerializeParameterFrameState(frozen);
+			checks.Check(frozen.m_Receipts.back().m_Item.m_FirstConsumed == serial &&
+				nlohmann::json::parse(submittedJson)["values"] == builtJson["values"],
+				"Submission completes exact frozen receipts without resampling parameter inputs");
 			checks.Check(immediate && retained == status(first) && !retained->IsTerminal() &&
 				retained->m_Items[0].m_Applied == applied && status(immediate)->IsTerminal() &&
 				status(immediate)->m_Items[0].m_State == ParameterEffectState::Consumed &&
@@ -3536,6 +3555,9 @@ namespace gglab
 				"A foreign owner cannot cancel or acquire an occupied session lane");
 			checks.Check(source.TakeParameterBatchResult(immediate, owner).has_value() && retained == status(first),
 				"Collecting another record preserves borrowed status addresses");
+			source.CompleteFrameState(frozen);
+			checks.Check(SerializeParameterFrameState(frozen) == submittedJson,
+				"Collecting live receipts cannot change an owned submitted parameter snapshot");
 			const auto shared = request("lighting", uint32_t(2));
 			begin();
 			checks.Check(shared && !status(shared)->IsTerminal() &&
@@ -4505,6 +4527,14 @@ namespace gglab
 			GGLAB_UNUSED(runtime.Tick());
 			const auto first = *parameters.GetParameterBatchStatus();
 			const auto state = parameters.GetLightingProfilePublication();
+			const auto transitionFrame = parameters.CaptureFrameState(probe.m_ParameterBuiltSerial,
+				environment.GetBakeRequestGeneration(), environment.GetBakingStatus().m_ActiveGeneration);
+			const auto transitionBytes = SerializeParameterFrameState(transitionFrame);
+			checks.Check(transitionFrame.m_RequestedLighting.m_Profile && transitionFrame.m_ActiveLighting.m_Profile &&
+				transitionFrame.m_RequestedLighting.m_Profile->m_Id == "test.oblique" &&
+				transitionFrame.m_ActiveLighting.m_Profile->m_Id == "test.baseline" &&
+				transitionFrame.m_RequestedLighting.m_Generation != transitionFrame.m_ActiveLighting.m_Generation,
+				"A transition snapshot freezes separately identified requested and active lighting generations");
 			checks.Check(id != 0 && first.m_Items[0].m_State == ParameterEffectState::Applied &&
 				first.m_Items[0].m_Identity.m_Generation == environment.GetBakeRequestGeneration() &&
 				state.m_Requested && state.m_Requested->m_Id == "test.oblique" &&
@@ -4514,6 +4544,8 @@ namespace gglab
 			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
 				"Profile publication reaches its exact submitted generation");
 			const auto done = runtime.TakeParameterBatchResult(id);
+			checks.Check(SerializeParameterFrameState(transitionFrame) == transitionBytes,
+				"Later lighting publication and receipt collection cannot relabel a transition frame");
 			checks.Check(done && done->m_Items[0].m_State == ParameterEffectState::Consumed &&
 				done->m_Items[0].m_Published > done->m_Items[0].m_Applied &&
 				done->m_Items[0].m_FirstConsumed == done->m_Items[0].m_Published &&
@@ -4556,11 +4588,18 @@ namespace gglab
 					return !status->m_Items.empty() && status->m_Items[0].m_Published.has_value();
 				}), "Profile publication may be observed on an aborted frame");
 			const auto published = parameters.GetParameterBatchStatus()->m_Items[0].m_Published;
+			auto abortedFrame = parameters.CaptureFrameState(*published,
+				environment.GetBakeRequestGeneration(), environment.GetBakingStatus().m_ActiveGeneration);
+			const auto abortedBytes = SerializeParameterFrameState(abortedFrame);
 			checks.Check(!parameters.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed &&
 				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == generation + 2,
 				"An unresolved authored edit settles before profile attribution, and aborted publication is not consumed");
 			GGLAB_UNUSED(runtime.Tick());
 			const auto retried = runtime.TakeParameterBatchResult(retry);
+			parameters.CompleteFrameState(abortedFrame);
+			checks.Check(SerializeParameterFrameState(abortedFrame) == abortedBytes &&
+				!abortedFrame.m_Receipts.front().m_Item.m_FirstConsumed,
+				"A later retry cannot lend consumption to an aborted frame snapshot");
 			checks.Check(retried && retried->m_Items[0].m_Published == published &&
 				retried->m_Items[0].m_FirstConsumed > published,
 				"Retry preserves profile application/publication and supplies only first consumption");

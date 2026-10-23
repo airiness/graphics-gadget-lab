@@ -19,7 +19,7 @@ namespace gglab
 	{
 		using Json = nlohmann::ordered_json;
 		constexpr std::array ProvenanceKeys{ "backend", "content", "sceneInputs", "frame",
-			"camera", "time", "developmentTools", "readiness", "temporal", "sequence" };
+			"camera", "time", "developmentTools", "readiness", "temporal", "sequence", "parameters" };
 
 		Json Provenance(const FrameCaptureMetadata& metadata)
 		{
@@ -74,38 +74,132 @@ namespace gglab
 		return std::format("{}-s{}-timing", runIdentity, sequenceId);
 	}
 
-	CaptureEncodedBundle EncodeSequenceTimingBundle(const SequenceTimingBundleInput& input) noexcept try
+	std::string MakeSequenceArtifactBundleId(
+		std::string_view runIdentity, uint64_t sequenceId, bool parameters)
+	{
+		return parameters ? std::format("{}-s{}-range", runIdentity, sequenceId) :
+			MakeSequenceTimingBundleId(runIdentity, sequenceId);
+	}
+
+	CaptureEncodedBundle EncodeSequenceArtifactBundle(const SequenceArtifactBundleInput& input) noexcept try
 	{
 		const Json environment = Json::parse(input.m_Environment);
-		const Json product = Json::parse(input.m_ProductJson);
-		const auto& sequence = product.at("sequence");
-		const uint64_t requested = product.at("coverage").at("requestedSamples");
 		if (input.m_RunIdentity.size() != 32 || !std::ranges::all_of(input.m_RunIdentity,
 			[](char value) { return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'); }) ||
 			input.m_SequenceId == 0 || !environment.is_object() ||
-			product.at("schema") != "gglab.gpu-timing" || product.at("schemaVersion") != 1 ||
-			product.at("sequence").at("id") != input.m_SequenceId ||
-			requested == 0 || product.at("coverage").at("recordedSamples") != requested ||
-			product.at("coverage").at("samples").size() != requested ||
-			product.at("frame").at("milliseconds").size() != requested ||
-			requested != sequence.at("frameCount").get<uint64_t>() *
-				std::max(uint64_t{ 1 }, sequence.at("referenceSamples").get<uint64_t>()))
+			(input.m_TimingJson.empty() && input.m_ParameterFramesJson.empty()))
 		{
-			return { .m_Failure = "A timing bundle requires environment, sequence identity and complete samples." };
+			return { .m_Failure = "A sequence bundle requires environment, sequence identity and products." };
 		}
 		CaptureEncodedBundle bundle;
-		bundle.m_BundleId = MakeSequenceTimingBundleId(input.m_RunIdentity, input.m_SequenceId);
-		bundle.m_Content.m_Files.push_back({ .m_Suffix = ".gpu-timing.json",
-			.m_Bytes = std::vector<uint8_t>(input.m_ProductJson.begin(), input.m_ProductJson.end()),
-			.m_Stage = CaptureWriteStage::WritingMetadata });
-		bundle.m_Products.push_back({ 0, { 0 } });
+		bundle.m_BundleId = MakeSequenceArtifactBundleId(input.m_RunIdentity,
+			input.m_SequenceId, !input.m_ParameterFramesJson.empty());
+		Json sequence;
+		Json watch;
+		Json descriptions = Json::array();
+		std::vector<uint64_t> timingSerials;
+		const auto append = [&](const std::string& bytes, bool parameters)
+			{
+				if (bytes.empty())
+				{
+					return;
+				}
+				const Json product = Json::parse(bytes);
+				const auto& range = product.at("sequence");
+				const uint64_t requested = uint64_t(range.at("frameCount")) *
+					std::max(uint64_t{ 1 }, range.at("referenceSamples").get<uint64_t>());
+				const auto& samples = parameters ? product.at("frames") : product.at("coverage").at("samples");
+				if (product.at("schema") != (parameters ? "gglab.parameter-frames" : "gglab.gpu-timing") ||
+					product.at("schemaVersion") != 1 || range.at("id") != input.m_SequenceId ||
+					requested == 0 || samples.size() != requested ||
+					(!parameters && (product.at("coverage").at("requestedSamples") != requested ||
+						product.at("coverage").at("recordedSamples") != requested ||
+						product.at("frame").at("milliseconds").size() != requested)))
+				{
+					throw std::runtime_error("A sequence product requires complete submitted sample coverage.");
+				}
+				uint64_t previous = 0;
+				const uint64_t perFrame = std::max(uint64_t{ 1 }, range.at("referenceSamples").get<uint64_t>());
+				if (!parameters)
+				{
+					timingSerials.resize(samples.size());
+					for (const auto& sample : samples)
+					{
+						const uint64_t frame = sample.at("sequenceFrame");
+						const uint64_t reference = sample.at("referenceSample");
+						const uint64_t index = frame * perFrame + reference;
+						if (frame >= range.at("frameCount").get<uint64_t>() || reference >= perFrame ||
+							index >= timingSerials.size() || timingSerials[index] != 0)
+						{
+							throw std::runtime_error("Timing samples must cover distinct sequence samples.");
+						}
+						timingSerials[index] = sample.at("frameSerial");
+					}
+					for (const auto serial : timingSerials)
+					{
+						if (serial <= previous)
+						{
+							throw std::runtime_error("Timing sample serials must follow sequence submission order.");
+						}
+						previous = serial;
+					}
+					if (timingSerials.front() != range.at("firstFrameSerial") ||
+						timingSerials.back() != range.at("lastFrameSerial"))
+					{
+						throw std::runtime_error("Timing samples disagree with the sequence range.");
+					}
+					previous = 0;
+				}
+				for (size_t index = 0; parameters && index < samples.size(); ++index)
+				{
+					const auto& sample = samples[index];
+					const uint64_t serial = sample.at("parameters").at("frameSerial");
+					if (serial <= previous || sample.at("sequenceFrame") != index / perFrame ||
+						sample.at("referenceSample") != index % perFrame ||
+						(index == 0 && serial != range.at("firstFrameSerial")) ||
+						(index + 1 == samples.size() && serial != range.at("lastFrameSerial")) ||
+						(!timingSerials.empty() && (index >= timingSerials.size() || serial != timingSerials[index])))
+					{
+						throw std::runtime_error("Sequence products disagree on the submitted frame grid.");
+					}
+					previous = serial;
+				}
+				if (sequence.is_null())
+				{
+					sequence = range;
+					watch = product.at("watch");
+				}
+				else if (sequence != range || watch != product.at("watch"))
+				{
+					throw std::runtime_error("Sequence products disagree on range or watch coverage.");
+				}
+				const auto index = static_cast<uint32_t>(descriptions.size());
+				descriptions.push_back({
+					{ "index", index },
+					{ "source", parameters ? "parameter-frames" : "gpu-timing" },
+					{ "diagnosticTap", nullptr },
+					{ "schema", product.at("schema") },
+					{ "schemaVersion", 1 } });
+				bundle.m_Content.m_Files.push_back({
+					.m_Suffix = parameters ? ".parameter-frames.json" : ".gpu-timing.json",
+					.m_Bytes = std::vector<uint8_t>(bytes.begin(), bytes.end()),
+					.m_Stage = CaptureWriteStage::WritingMetadata });
+				bundle.m_Products.push_back({ index, { index } });
+			};
+		append(input.m_TimingJson, false);
+		append(input.m_ParameterFramesJson, true);
 		bundle.m_Content.m_Files.push_back({ .m_Suffix = ".capture-bundle.json",
 			.m_Stage = CaptureWriteStage::WritingMetadata });
 		bundle.m_Content.m_MakeMarker = [identity = bundle.m_BundleId, run = input.m_RunIdentity,
-			environment, sequence = product.at("sequence"), watch = product.at("watch")]
-			(std::span<const std::filesystem::path> paths)
+			environment, sequence, watch, descriptions](std::span<const std::filesystem::path> paths)
 			{
-				const std::string file = GetFrameCapturePathText(paths[0].filename());
+				Json products = descriptions;
+				for (size_t index = 0; index < products.size(); ++index)
+				{
+					const auto file = GetFrameCapturePathText(paths[index].filename());
+					products[index]["metadata"] = file;
+					products[index]["files"] = Json::array({ file });
+				}
 				return Json{
 					{ "schema", "gglab.capture-bundle" },
 					{ "schemaVersion", CaptureBundleSchemaVersion },
@@ -115,20 +209,13 @@ namespace gglab
 					{ "environment", environment },
 					{ "sequence", sequence },
 					{ "watch", watch },
-					{ "products", Json::array({ Json{
-						{ "index", 0 },
-						{ "source", "gpu-timing" },
-						{ "diagnosticTap", nullptr },
-						{ "schema", "gglab.gpu-timing" },
-						{ "schemaVersion", 1 },
-						{ "metadata", file },
-						{ "files", Json::array({ file }) } } }) } }.dump(2);
+					{ "products", std::move(products) } }.dump(2);
 			};
 		return bundle;
 	}
 	catch (const std::exception& error)
 	{
-		return { .m_Failure = std::format("Encoding the timing bundle failed: {}", error.what()) };
+		return { .m_Failure = std::format("Encoding the sequence bundle failed: {}", error.what()) };
 	}
 
 	CaptureEncodedBundle EncodeCaptureBundle(const CaptureBundleInput& input,

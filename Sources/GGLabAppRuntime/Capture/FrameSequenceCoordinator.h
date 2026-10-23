@@ -113,6 +113,9 @@ namespace gglab
 		FrameSequenceGTAOOverrides m_GTAOOverrides;
 		// Records the GPU timing of sequence frames while the sequence runs.
 		bool m_GpuTiming = false;
+		// AppRuntime enables this for every production sequence; direct contract tests
+		// may drive the coordinator without a Session parameter source.
+		bool m_ParameterProvenance = false;
 		std::vector<FrameSequenceParameterEvent> m_Events;
 	};
 
@@ -191,7 +194,7 @@ namespace gglab
 	};
 	[[nodiscard]] const char* GetFrameSequenceCancelVerdictName(FrameSequenceCancelVerdict verdict) noexcept;
 
-	struct FrameSequenceTimingPublication
+	struct FrameSequenceArtifactPublication
 	{
 		CapturePublicationOutcome m_Outcome = CapturePublicationOutcome::NotPublished;
 		bool m_Pending = false;
@@ -221,7 +224,9 @@ namespace gglab
 		// Set when the request records GPU timing.
 		std::optional<FrameSequenceGpuTiming> m_GpuTiming;
 		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
-		std::optional<FrameSequenceTimingPublication> m_TimingPublication;
+		std::optional<FrameSequenceArtifactPublication> m_TimingPublication;
+		uint32_t m_ParameterFrameCount = 0;
+		std::optional<FrameSequenceArtifactPublication> m_ParameterPublication;
 		std::string m_Failure;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
@@ -306,7 +311,8 @@ namespace gglab
 		// Called for every successful runtime submission, including ordinary frames
 		// that publish remaining profiles while the sequence is Finishing.
 		void OnFrameSubmitted(uint64_t renderFrameSerial,
-			FrameSequenceObservation observation = {}) noexcept;
+			FrameSequenceObservation observation = {},
+			std::shared_ptr<const ParameterFrameState> parameters = {}) noexcept;
 		// Polled independently of sequence posing and host status queries. Only a
 		// profile bound to a pending successful sequence submission is accepted.
 		void UpdateGpuTiming(const GpuProfileFrameSnapshot& profile, bool profilingEnabled) noexcept;
@@ -343,7 +349,8 @@ namespace gglab
 		void CancelCaptureJobs() noexcept;
 		void CompleteIfFinished() noexcept;
 		[[nodiscard]] std::string SerializeTimingProduct() const;
-		void CollectTimingPublication() noexcept;
+		[[nodiscard]] std::string SerializeParameterFramesProduct() const;
+		void CollectArtifactPublication() noexcept;
 		// The posed frame is a requested frame, at its last reference sample, and has
 		// not been captured yet.
 		[[nodiscard]] bool IsCaptureDue() const noexcept;
@@ -376,7 +383,14 @@ namespace gglab
 		bool m_BegunCameraCut = false;
 		bool m_BegunDevelopmentTools = false;
 		std::string m_TimingContext;
-		std::optional<SequenceTimingBundleInput> m_TimingProduct;
-		std::shared_ptr<CaptureWriteJob> m_TimingWrite;
+		struct ParameterSample
+		{
+			uint32_t m_Frame = 0;
+			uint32_t m_ReferenceSample = 0;
+			std::shared_ptr<const ParameterFrameState> m_Parameters;
+		};
+		std::vector<ParameterSample> m_ParameterFrames;
+		std::optional<SequenceArtifactBundleInput> m_ArtifactProduct;
+		std::shared_ptr<CaptureWriteJob> m_ArtifactWrite;
 	};
 }

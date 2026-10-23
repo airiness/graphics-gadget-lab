@@ -27,13 +27,19 @@ manifest's `environment` declares the build's tracked source state instead.
 
 Graph requests alone add no GPU observation nodes/queries, but do add CPU/file
 work. Active copies/scans/counters appear under observation records. New exports
-use `schemaVersion: 5` for every variant and list the present node kinds in
+use `schemaVersion: 6` for every variant, freeze `frame.parameters` and its
+`parameterRevision`, and list the present node kinds in
 `observation.nodeKinds` (`NonFiniteScan`, `ProductionCounters`, `ResourceExport`;
 empty for graph-only). Read capabilities from those kinds and field presence,
 never from a version number. Older exports keep their meaning: v1 has no
 observation nodes, and v2, v3 and v4 record only the highest variant present
 (resource copies, boundary scans, production counters). Do not interpret an
 observation flag as completed numerical coverage.
+
+Resource groups with frozen parameters use schema v3 independently of scan
+activity. Their `frame.parameters` and `parameterRevision` match the paired v6
+graph and image products of the same bundle. Legacy resource v1/v2 and graph
+v1 through v5 retain their null parameter revision and remain readable.
 
 ## Memory facts in full exports
 

@@ -212,6 +212,9 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h">
       <Filter>Parameters</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterFrameState.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSource.h">
       <Filter>Parameters</Filter>
     </ClInclude>

@@ -74,9 +74,11 @@ try {
                         (Test-Path -LiteralPath $fields['capture-metadata'])) "$config-$backend-$mode-published"
                     $manifest = Get-Content -LiteralPath $fields['capture-manifest'] -Raw -Encoding UTF8 | ConvertFrom-Json
                     $sidecar = Get-Content -LiteralPath $fields['capture-metadata'] -Raw -Encoding UTF8 | ConvertFrom-Json
-                    Check ($manifest.schema -eq 'gglab.capture-bundle' -and $manifest.schemaVersion -eq 2 -and
+                    Check ($manifest.schema -eq 'gglab.capture-bundle' -and $manifest.schemaVersion -eq 3 -and
                         $manifest.jobId -eq [uint64]$fields['capture-job'] -and $manifest.products.Count -eq 1 -and
                         $sidecar.source -eq $mode -and $sidecar.timing.mode -eq 'after-ready' -and
+                        $sidecar.parameters.frameSerial -eq $sidecar.frame.serial -and
+                        $sidecar.parameters.available -and
                         $sidecar.timing.settleFrames -eq 2) "$config-$backend-$mode-typed-product"
                     $environment = $manifest.environment
                     Check ($environment.process.runIdentity -eq $manifest.runIdentity -and $environment.process.host -eq 'hidden' -and

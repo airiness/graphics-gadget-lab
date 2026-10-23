@@ -1,5 +1,14 @@
 # Session parameters (additive protocol v4)
 
+`capabilities.parameterFrameProvenance` advertises frozen frame metadata. Capture
+sidecars carry `parameters` schema v1: revision, non-default typed values and their
+defaults/sources, separate requested/active lighting generations and nullable
+profile identities, plus relevant batch receipts. Build freezes inputs; only a
+successful matching submission adds `firstConsumed`. Inspect the artifact instead
+of querying current session state to explain an older capture. Every completed
+production sequence also requires a `gglab.parameter-frames` v1 range product;
+see [sequences](sequences.md) for publication and frame/reference joins.
+
 Use the script and application from the same revision. Check
 `status.capabilities.sessionParameterControl` for Host/mixed-source support.
 `labParameterControl` retains discovery for the earlier Lab-only extension. The extension adds commands and status fields; existing

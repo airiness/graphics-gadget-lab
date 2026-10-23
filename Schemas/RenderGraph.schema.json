@@ -6,7 +6,7 @@
   "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
   "properties": {
     "schema": { "const": "gglab.render-graph" },
-    "schemaVersion": { "enum": [1, 2, 3, 4, 5] },
+    "schemaVersion": { "enum": [1, 2, 3, 4, 5, 6] },
     "mode": { "enum": ["full", "summary"] },
     "frameSerial": { "type": "integer", "minimum": 1 },
     "frame": {
@@ -23,7 +23,8 @@
         "adapterDriverIdentity": { "type": "string" },
         "codeIdentity": { "$ref": "#/$defs/unavailable" },
         "shaderIdentity": { "$ref": "#/$defs/unavailable" },
-        "parameterRevision": { "type": "null" }
+        "parameterRevision": { "type": ["integer", "null"], "minimum": 0 },
+        "parameters": { "type": ["object", "null"] }
       }
     },
     "submission": {
@@ -136,7 +137,7 @@
     {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "NonFiniteScan"}}}, "items": {"properties": {"kind": {"enum": ["ResourceExport", "NonFiniteScan"]}}}}}}}}},
     {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "ProductionCounters"}}}}}}}}},
     {
-      "if": { "properties": { "schemaVersion": { "const": 5 } } },
+      "if": { "properties": { "schemaVersion": { "enum": [5, 6] } } },
       "then": {
         "properties": { "observation": { "required": ["nodeKinds"] } },
         "allOf": [{
@@ -150,7 +151,8 @@
           "else": { "properties": { "compile": { "not": { "required": ["resources"] } } } }
         }]
       }
-    }
+    },
+    {"if": {"properties": {"schemaVersion": {"const": 6}}}, "then": {"properties": {"frame": {"required": ["parameters"], "properties": {"parameters": {"type": "object"}, "parameterRevision": {"type": "integer"}}}}}, "else": {"properties": {"frame": {"properties": {"parameterRevision": {"type": "null"}, "parameters": {"type": "null"}}}}}}
   ],
   "$defs": {
     "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.resource-export",
-  "title": "GGLab resource export v1/v2",
+  "title": "GGLab resource export v1 through v3",
   "type": "object",
   "required": [
     "schema",
@@ -18,7 +18,7 @@
       "const": "gglab.resource-export"
     },
     "schemaVersion": {
-      "enum": [1, 2]
+      "enum": [1, 2, 3]
     },
     "frameSerial": {
       "type": "integer",
@@ -78,8 +78,9 @@
           "$ref": "#/$defs/unavailable"
         },
         "parameterRevision": {
-          "type": "null"
-        }
+          "type": ["integer", "null"], "minimum": 0
+        },
+        "parameters": {"type": ["object", "null"]}
       }
     },
     "submission": {
@@ -462,7 +463,8 @@
   },
   "additionalProperties": false,
   "allOf": [
-    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": false}}}}}, "else": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}}}}
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": false}}}}}, "else": {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}}}}},
+    {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"frame": {"required": ["parameters"], "properties": {"parameters": {"type": "object"}, "parameterRevision": {"type": "integer"}}}}}, "else": {"properties": {"frame": {"properties": {"parameterRevision": {"type": "null"}, "parameters": {"type": "null"}}}}}}
   ],
   "$defs": {
     "unavailable": {

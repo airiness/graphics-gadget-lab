@@ -80,7 +80,8 @@ try {
                         @{frame=100;set=@{'view.exposure.ev100'=$exposure}},
                         @{frame=$lastFrame;set=@{$effectId=$target};expectEffects=@('lighting')})
                     $done = Invoke-VerificationSession sequence $session @{CameraPath=$path;Events=(ConvertTo-Json -InputObject $events -Depth 10 -Compress);
-                        CaptureFrames="9,10,11,80,$lastFrame";OutputDirectory=$directory;Label='timeline';TimeoutSeconds=$TimeoutSeconds}
+                        CaptureFrames="9,10,11,80,$lastFrame";OutputDirectory=$directory;Label='timeline';TimeoutSeconds=$TimeoutSeconds;
+                        GpuTiming=($content -eq 'samples');Exports='[{"frame":10,"targets":[{"resource":"TAA.ResolvedSceneColor"}],"graph":true}]'}
                     Write-VerificationJson "$directory/timeline.json" $done
                     Check ($done.sequence.state -eq 'completed' -and $done.sequence.submittedFrames -eq ($lastFrame+1)) "$case-complete-range"
                     Check (@($done.sequence.events).Count -eq 6) "$case-event-reports"
@@ -112,6 +113,46 @@ try {
                     Check ($frames[9].temporal.status -eq 'active' -and $frames[10].temporal.status -eq 'active' -and
                         $frames[11].temporal.status -eq 'active' -and
                         $frames[11].frame.serial -eq $done.sequence.events[2].batch.items[0].firstConsumed) "$case-temporal-and-immediate-continuity"
+                    $publication = $done.sequence.parameterPublication
+                    Check ($publication.outcome -eq 'Published' -and @($publication.files).Count -eq 1 -and
+                        $done.sequence.parameterFrameCount -eq ($lastFrame+1)) "$case-required-parameter-publication"
+                    $range = Get-Content -LiteralPath $publication.files[0] -Raw | ConvertFrom-Json
+                    Check ($range.schema -eq 'gglab.parameter-frames' -and $range.schemaVersion -eq 1 -and
+                        @($range.frames).Count -eq ($lastFrame+1)) "$case-complete-parameter-range"
+                    foreach ($frame in @(9,10,11,80,$lastFrame)) {
+                        $parameters = $frames[$frame].parameters
+                        Check ($parameters.frameSerial -eq $frames[$frame].frame.serial -and
+                            (ConvertTo-Json -InputObject $parameters -Depth 32 -Compress) -ceq
+                            (ConvertTo-Json -InputObject $range.frames[$frame].parameters -Depth 32 -Compress)) "$case-frame-$frame-frozen-provenance"
+                    }
+                    $pending = $range.frames[10].parameters
+                    Check ($pending.lighting.requested.generation -eq $effect.identity.generation -and
+                        $pending.lighting.active.generation -ne $effect.identity.generation -and
+                        $range.frames[80].parameters.lighting.active.generation -eq $effect.identity.generation) "$case-requested-active-generations"
+                    $pendingReceipt = @($pending.receipts | Where-Object { $_.id -eq $effectId })[0]
+                    $consumedFrame = @($range.frames | Where-Object { $_.parameters.frameSerial -eq $effect.firstConsumed })[0]
+                    $consumedReceipt = @($consumedFrame.parameters.receipts | Where-Object { $_.batchId -eq $pendingReceipt.batchId -and $_.id -eq $effectId })[0]
+                    Check ($null -eq $pendingReceipt.firstConsumed -and $consumedReceipt.firstConsumed -eq $effect.firstConsumed -and
+                        $consumedReceipt.state -eq 'Consumed') "$case-consumption-stays-on-submitted-frame"
+                    if ($content -eq 'profiles') {
+                        Check ($pending.lighting.requested.profileId -ne $pending.lighting.active.profileId -and
+                            $pending.lighting.requested.profileHash -match '^[0-9a-f]{64}$' -and
+                            $pending.lighting.active.profileHash -match '^[0-9a-f]{64}$' -and
+                            $pending.lighting.requested.profileHashVersion -eq 2 -and
+                            $pending.lighting.active.profileHashVersion -eq 2) "$case-frozen-profile-identities"
+                    } else {
+                        Check ($done.sequence.timingPublication.manifest -eq $publication.manifest) "$case-timing-shares-publication"
+                    }
+                    $exports = @(Get-ChildItem -LiteralPath $directory -Filter 'timeline*.json' | ForEach-Object {
+                        Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+                    } | Where-Object { $_.PSObject.Properties['schema'] -and $_.schema -in @('gglab.render-graph','gglab.resource-export') })
+                    Check ($exports.Count -eq 2) "$case-required-graph-resource-pair"
+                    foreach ($export in $exports) {
+                        Check ($export.frameSerial -eq $frames[10].frame.serial -and
+                            $export.frame.parameterRevision -eq $pending.revision -and
+                            (ConvertTo-Json -InputObject $export.frame.parameters -Depth 32 -Compress) -ceq
+                            (ConvertTo-Json -InputObject $pending -Depth 32 -Compress)) "$case-$($export.schema)-provenance"
+                    }
                     # A newly requested generation on the final frame cannot consume outside the measurement range.
                     $unreachedTarget = if ($content -eq 'profiles') {0} else {128}
                     $lastEvent = @(@{frame=$lastFrame;set=@{$effectId=$unreachedTarget};expectEffects=@('lighting')})

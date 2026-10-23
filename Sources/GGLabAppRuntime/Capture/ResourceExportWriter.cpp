@@ -27,7 +27,8 @@ namespace gglab
 			frame["shaderIdentity"] = {
 				{ "status", "unavailable" },
 				{ "reason", "The graph does not retain per-pass shader artifact identities." } };
-			frame["parameterRevision"] = nullptr;
+			frame["parameterRevision"] = metadata.m_Parameters ?
+				Json(metadata.m_Parameters->m_Revision) : Json(nullptr);
 			return frame;
 		}
 		Json Submission(const ResourceExportSubmission& submission)
@@ -147,7 +148,7 @@ namespace gglab
 		}
 		Json root = {
 			{ "schema", "gglab.resource-export" },
-			{ "schemaVersion", metadata.m_NonFiniteScanActive ? 2 : 1 },
+			{ "schemaVersion", metadata.m_Parameters ? 3 : metadata.m_NonFiniteScanActive ? 2 : 1 },
 			{ "frameSerial", metadata.m_FrameSerial },
 			{ "frame", Frame(metadata, submission) },
 			{ "submission", Submission(submission) },
@@ -218,6 +219,10 @@ namespace gglab
 		const ResourceExportSubmission& submission, bool summary, bool resourceExportActive)
 	{
 		Json root = Json::parse(SerializeRenderGraphSnapshot(snapshot, summary));
+		if (metadata.m_Parameters)
+		{
+			root["schemaVersion"] = 6;
+		}
 		// Request-level activity joins the node kinds the graph serializer derived.
 		Json nodeKinds = std::move(root.at("observation").at("nodeKinds"));
 		root.erase("observation");

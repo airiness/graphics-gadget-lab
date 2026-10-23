@@ -107,7 +107,7 @@ are summaries from the first available product metadata; `failure` is the first
 non-empty product failure. Product records remain authoritative.
 
 Require both `status: completed` and `publication: Published`, then validate the
-final `gglab.capture-bundle` v2 manifest and its required files. Individual file
+final `gglab.capture-bundle` v3 manifest and its required files (v1/v2 remain readable). Individual file
 existence is not job completion. Select images from `products[index].files`, not
 legacy `image`/`metadata`/`graph`/`exports` response fields. For verification:
 
@@ -138,14 +138,16 @@ deliveries: an image + resource + graph bundle is one job and two deliveries.
 
 Capacity pressure preserves the pose/sample and simulation instant. Sequence
 completion also waits for submitted-range watch coverage, GPU timing tails and
-requested timing publication. `sequence.timingPublication` reports `pending`,
+required parameter-frame publication and requested timing publication.
+`sequence.parameterPublication` and `sequence.timingPublication` report `pending`,
 `outcome`, `bundleId`, `manifest`, `files` and `failure`; require `Published` for
-a completed timing run. Timing uses the common writer without a SameFrame job.
-`status.capture.sequenceTimingWrites` counts its outstanding writer reservation.
+a completed run. Parameters and optional timing share the common writer and one
+sequence-range manifest without a SameFrame job. `status.capture.sequenceArtifactWrites`
+counts this reservation; `sequenceTimingWrites` counts the subset containing timing.
 See [sequences](sequences.md) for discovery and cancellation rules. Terminal
 sequences keep consuming pending capture receipts, while Runtime/writer resources
 drain independently. A new sequence cannot replace unresolved prior capture or
-timing-writer ownership.
+range-writer ownership.
 
 Interactive F9/panel exports use the same job admission and consume only their
 own receipts into a bounded newest-16 metadata/file history. Capture All Views

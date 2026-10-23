@@ -508,7 +508,7 @@ namespace gglab
 				timing["scopes"][1]["occurrence"].is_null(),
 				"Sequence GPU timing exposes pass instance identities separately from other scopes");
 			sequence.m_State = FrameSequenceState::Failed;
-			sequence.m_TimingPublication = FrameSequenceTimingPublication{
+			sequence.m_TimingPublication = FrameSequenceArtifactPublication{
 				.m_Outcome = CapturePublicationOutcome::Indeterminate, .m_Failure = "Publication is uncertain." };
 			const auto tooLate = Json::parse(SerializeApplicationControlSequenceCancellation(
 				13, &sequence, FrameSequenceCancelVerdict::TooLate));

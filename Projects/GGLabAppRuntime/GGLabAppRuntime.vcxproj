@@ -163,6 +163,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabInterfaces.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterBatch.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterFrameState.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h" />

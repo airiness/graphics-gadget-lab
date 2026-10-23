@@ -34,14 +34,14 @@ or legacy output IDs for the full replay. Published files remain on disk.
 One sequence runs at a time. `sequence` waits by default; with `-NoWait`, poll
 `status`. Require `sequence.state: completed`; failed/cancelled sequences also
 return a successful control response. `finishing` waits for writes, watch
-coverage, requested GPU profiles and the requested timing publication receipt.
+coverage, requested GPU profiles and the required parameter/optional timing publication receipt.
 `sequence-cancel` returns `cancellation: Cancelled | TooLate | Finished | NotFound`.
-Before eligibility or a timing publication claim it cancels whole-sequence
+Before eligibility or a range publication claim it cancels whole-sequence
 delivery. After that claim, `TooLate` keeps the sequence active until its real
 receipt: `Published` completes it; `NotPublished` or `Indeterminate` fails it.
 `Finished` preserves terminal status; `NotFound` has no sequence. Pending capture
 receipts and GPU/writer owners keep draining after cancellation; a new sequence
-waits until prior receipts and the timing writer have drained.
+waits until prior receipts and the range writer have drained.
 
 Choose one evidence channel per replay: scene, or
 `-Source diagnostic -DiagnosticTap temporal-history-weight` (for example).
@@ -184,8 +184,28 @@ The published `gglab.gpu-timing` v1 product is the measurement authority; the
 response summary remains a convenience. Require `sequence.state: completed` and
 `sequence.timingPublication.outcome: Published`, read its `manifest`, then discover
 the timing file from the product with `schema: gglab.gpu-timing`. The bundle is
-v2 with `consistency: sequence-range` and identity `<run>-s<sequence>-timing`. It
+v3 with `consistency: sequence-range` and identity `<run>-s<sequence>-range`. It
 has no SameFrame job/attempt or single-frame provenance/submission fields.
+
+Every production sequence also publishes a required `gglab.parameter-frames` v1
+product, even with no capture frames or GPU timing. Require
+`sequence.parameterPublication.outcome: Published`; `parameterFrameCount` counts
+submitted samples, including each reference sample. Its `frames` follow submission
+order and contain `sequenceFrame`, `referenceSample` and frozen `parameters`.
+Timing and parameter products share one publication claim, manifest, sequence range
+and watch coverage. Join them by frame/reference index and render serial, since
+timing results may arrive out of order. Legacy v2 timing-only bundles retain their
+`-timing` identity and remain readable.
+
+`parameters` schema v1 records revision, content identity, non-default typed values
+with their source/default, separate requested/active lighting generations and nullable
+profile id/hash/hashVersion, and relevant batch receipts with all four stamps.
+Capture image sidecars and graph/resource frame metadata carry the same snapshot.
+Inputs and profile identities freeze after frame build; successful submission only
+adds that exact frame's `firstConsumed`. Later publication, receipt collection or
+parameter queries cannot relabel earlier artifacts. Custom/unidentified lighting
+keeps profile fields null. Failed/cancelled ranges retain status but do not publish
+a complete range product; already published frame bundles keep their own receipts.
 
 The product records the sequence range, context, every render serial and
 frame/reference index, first-frame/cut flags and per-sample profiling, DevTools

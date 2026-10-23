@@ -31,7 +31,7 @@ namespace gglab
 	struct CaptureProductEncodeInput;
 	struct CaptureWriteReceipt;
 	struct CaptureWriteJob;
-	struct SequenceTimingBundleInput;
+	struct SequenceArtifactBundleInput;
 
 	// Runtime owns temporal compatibility; AppRuntime adds the active content.
 	// A changed identity or unreadable previous history restarts settling.
@@ -173,6 +173,8 @@ namespace gglab
 		// Fails waiting after-ready requests for content with a failed gate.
 		void BeginFrame(FrameCaptureFrameState state) noexcept;
 		void SetFrameSceneInputs(uint64_t frameSerial, const FrameCaptureSceneInputs& inputs) noexcept;
+		void SetFrameParameters(uint64_t frameSerial,
+			std::shared_ptr<const ParameterFrameState> parameters) noexcept;
 		// Busy is handled before submission so a sequence keeps the same sample/frame.
 		[[nodiscard]] bool PrepareResourceExports(uint64_t frameSerial, RenderGraph& graph,
 			ResourceExportFrameContext context) noexcept;
@@ -198,10 +200,10 @@ namespace gglab
 
 		// Shares the writer and one of the same nine write reservations. Busy leaves
 		// the immutable sequence product with its owner for a later poll.
-		[[nodiscard]] std::shared_ptr<CaptureWriteJob> TryPublishSequenceTiming(
-			const SequenceTimingBundleInput& input, const std::filesystem::path& directory,
+		[[nodiscard]] std::shared_ptr<CaptureWriteJob> TryPublishSequenceArtifacts(
+			const SequenceArtifactBundleInput& input, const std::filesystem::path& directory,
 			std::string_view label, std::string& error) noexcept;
-		[[nodiscard]] std::optional<CaptureWriteReceipt> GetSequenceTimingReceipt(
+		[[nodiscard]] std::optional<CaptureWriteReceipt> GetSequenceArtifactReceipt(
 			const CaptureWriteJob& job) const noexcept;
 		[[nodiscard]] size_t GetWriteReservationCount() const noexcept;
 
@@ -268,8 +270,9 @@ namespace gglab
 		std::filesystem::path m_DefaultOutputDirectory;
 		std::chrono::milliseconds m_ShutdownWriteTimeout{ 30000 };
 		std::unique_ptr<CaptureWriter> m_Writer;
-		std::shared_ptr<CaptureWriteJob> m_SequenceTimingWrite;
-		std::shared_ptr<const CaptureWriteReceipt> m_SequenceTimingShutdownReceipt;
+		std::shared_ptr<CaptureWriteJob> m_SequenceArtifactWrite;
+		bool m_SequenceWriteHasTiming = false;
+		std::shared_ptr<const CaptureWriteReceipt> m_SequenceArtifactShutdownReceipt;
 		std::string m_RunIdentity;
 		// Serialized once after the run identity it records.
 		std::string m_EnvironmentJson;

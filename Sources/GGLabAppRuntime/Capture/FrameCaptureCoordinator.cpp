@@ -355,7 +355,8 @@ namespace gglab
 		CaptureIntakeSnapshot snapshot{ .m_Limits = m_JobLimits, .m_ActiveJobs = m_ActiveJobs,
 			.m_DrainingRuntimeRequests = static_cast<uint32_t>(m_DrainingCaptureRequests.size()),
 			.m_DrainingWriterJobs = static_cast<uint32_t>(m_DrainingWrites.size()) };
-		snapshot.m_SequenceTimingWrites = m_SequenceTimingWrite && !m_SequenceTimingWrite->GetReceipt();
+		snapshot.m_SequenceArtifactWrites = m_SequenceArtifactWrite && !m_SequenceArtifactWrite->GetReceipt();
+		snapshot.m_SequenceTimingWrites = snapshot.m_SequenceArtifactWrites && m_SequenceWriteHasTiming;
 		for (const DrainingWrite& write : m_DrainingWrites)
 		{
 			snapshot.m_DrainingWriteReservations += write.m_Reservations;
@@ -570,12 +571,12 @@ namespace gglab
 		{
 			reserved += write.m_Reservations;
 		}
-		reserved += m_SequenceTimingWrite && !m_SequenceTimingWrite->GetReceipt();
+		reserved += m_SequenceArtifactWrite && !m_SequenceArtifactWrite->GetReceipt();
 		return static_cast<size_t>(reserved);
 	}
 
-	std::shared_ptr<CaptureWriteJob> FrameCaptureCoordinator::TryPublishSequenceTiming(
-		const SequenceTimingBundleInput& input, const std::filesystem::path& directory,
+	std::shared_ptr<CaptureWriteJob> FrameCaptureCoordinator::TryPublishSequenceArtifacts(
+		const SequenceArtifactBundleInput& input, const std::filesystem::path& directory,
 		std::string_view label, std::string& error) noexcept
 	{
 		error.clear();
@@ -595,34 +596,35 @@ namespace gglab
 			return {};
 		}
 		auto write = std::make_shared<CaptureWriteJob>();
-		write->m_SequenceTiming = input;
-		write->m_SequenceTiming->m_RunIdentity = m_RunIdentity;
-		write->m_SequenceTiming->m_Environment = m_EnvironmentJson;
+		write->m_SequenceArtifacts = input;
+		write->m_SequenceArtifacts->m_RunIdentity = m_RunIdentity;
+		write->m_SequenceArtifacts->m_Environment = m_EnvironmentJson;
 		write->m_Directory = output;
 		std::string subject = SanitizeFileStemComponent(std::string(label));
 		subject.resize(std::min(subject.size(), size_t{ 32 }));
 		write->m_BaseStem = std::format("{}.{}", subject,
-			MakeSequenceTimingBundleId(m_RunIdentity, input.m_SequenceId));
+			MakeSequenceArtifactBundleId(m_RunIdentity, input.m_SequenceId, !input.m_ParameterFramesJson.empty()));
 		if (!m_Writer->Submit(write))
 		{
 			error = "The capture writer rejected the sequence timing product.";
 			return {};
 		}
-		m_SequenceTimingWrite = write;
-		m_SequenceTimingShutdownReceipt.reset();
+		m_SequenceArtifactWrite = write;
+		m_SequenceWriteHasTiming = !input.m_TimingJson.empty();
+		m_SequenceArtifactShutdownReceipt.reset();
 		return write;
 	}
 
-	std::optional<CaptureWriteReceipt> FrameCaptureCoordinator::GetSequenceTimingReceipt(
+	std::optional<CaptureWriteReceipt> FrameCaptureCoordinator::GetSequenceArtifactReceipt(
 		const CaptureWriteJob& job) const noexcept
 	{
 		if (auto receipt = job.GetReceipt())
 		{
 			return receipt;
 		}
-		if (m_SequenceTimingWrite.get() == &job && m_SequenceTimingShutdownReceipt)
+		if (m_SequenceArtifactWrite.get() == &job && m_SequenceArtifactShutdownReceipt)
 		{
-			return *m_SequenceTimingShutdownReceipt;
+			return *m_SequenceArtifactShutdownReceipt;
 		}
 		return std::nullopt;
 	}
@@ -954,6 +956,19 @@ namespace gglab
 			if (entry.m_Phase == Phase::Issued && entry.m_Attempt->m_Metadata.m_FrameSerial == frameSerial)
 			{
 				entry.m_Attempt->m_Metadata.m_SceneInputs = inputs;
+			}
+		}
+	}
+
+	void FrameCaptureCoordinator::SetFrameParameters(uint64_t frameSerial,
+		std::shared_ptr<const ParameterFrameState> parameters) noexcept
+	{
+		for (auto& delivery : m_Deliveries)
+		{
+			if (delivery.m_Phase == Phase::Issued &&
+				delivery.m_Attempt->m_Metadata.m_FrameSerial == frameSerial)
+			{
+				delivery.m_Attempt->m_Metadata.m_Parameters = parameters;
 			}
 		}
 	}
@@ -1545,11 +1560,11 @@ namespace gglab
 			auto receipt = m_Writer->Abandon(*entry.m_WriteJob, m_ShutdownWriteTimeout);
 			FinishBundleWriting(*entry.m_Job, receipt);
 		}
-		if (m_SequenceTimingWrite)
+		if (m_SequenceArtifactWrite)
 		{
-			m_SequenceTimingWrite->WaitUntil(deadline);
-			m_SequenceTimingShutdownReceipt = std::make_shared<CaptureWriteReceipt>(
-				m_Writer->Abandon(*m_SequenceTimingWrite, m_ShutdownWriteTimeout));
+			m_SequenceArtifactWrite->WaitUntil(deadline);
+			m_SequenceArtifactShutdownReceipt = std::make_shared<CaptureWriteReceipt>(
+				m_Writer->Abandon(*m_SequenceArtifactWrite, m_ShutdownWriteTimeout));
 		}
 
 		for (DrainingWrite& write : m_DrainingWrites)

@@ -122,27 +122,73 @@ namespace gglab
 				Json::parse(SerializeNonFiniteWatchCoverage(*m_Status->m_WatchCoverage)) : Json(nullptr) } }.dump(2);
 	}
 
-	void FrameSequenceCoordinator::CollectTimingPublication() noexcept
+	std::string FrameSequenceCoordinator::SerializeParameterFramesProduct() const
 	{
-		if (!m_TimingWrite || !m_Status || m_Status->IsTerminal())
+		using Json = nlohmann::ordered_json;
+		const uint64_t requested = uint64_t(m_Status->m_FrameCount) *
+			std::max(1u, m_Status->m_ReferenceSamples);
+		if (m_ParameterFrames.empty() || m_ParameterFrames.size() != requested)
+		{
+			throw std::runtime_error("A parameter-frames product requires every submitted sequence sample.");
+		}
+		Json frames = Json::array();
+		for (const auto& sample : m_ParameterFrames)
+		{
+			frames.push_back({
+				{ "sequenceFrame", sample.m_Frame },
+				{ "referenceSample", sample.m_ReferenceSample },
+				{ "parameters", Json::parse(SerializeParameterFrameState(*sample.m_Parameters)) } });
+		}
+		return Json{
+			{ "schema", "gglab.parameter-frames" },
+			{ "schemaVersion", 1 },
+			{ "sequence", {
+				{ "id", m_Status->m_SequenceId },
+				{ "path", m_Status->m_CameraPathId },
+				{ "pathVersion", m_Status->m_CameraPathVersion },
+				{ "frameCount", m_Status->m_FrameCount },
+				{ "referenceSamples", m_Status->m_ReferenceSamples },
+				{ "firstFrameSerial", m_ParameterFrames.front().m_Parameters->m_FrameSerial },
+				{ "lastFrameSerial", m_ParameterFrames.back().m_Parameters->m_FrameSerial } } },
+			{ "frames", std::move(frames) },
+			{ "watch", m_Status->m_WatchCoverage ?
+				Json::parse(SerializeNonFiniteWatchCoverage(*m_Status->m_WatchCoverage)) : Json(nullptr) } }.dump(2);
+	}
+
+	void FrameSequenceCoordinator::CollectArtifactPublication() noexcept
+	{
+		if (!m_ArtifactWrite || !m_Status || m_Status->IsTerminal())
 		{
 			return;
 		}
-		const auto receipt = m_Capture->GetSequenceTimingReceipt(*m_TimingWrite);
+		const auto receipt = m_Capture->GetSequenceArtifactReceipt(*m_ArtifactWrite);
 		if (!receipt)
 		{
 			return;
 		}
-		auto& publication = *m_Status->m_TimingPublication;
-		publication.m_Outcome = receipt->m_Publication;
-		publication.m_Pending = false;
-		publication.m_BundleId = receipt->m_BundleId;
-		publication.m_Manifest = receipt->m_ManifestPath;
-		publication.m_Failure = receipt->m_Failure;
-		for (const auto& product : receipt->m_BundleProducts)
-		{
-			publication.m_Files.insert(publication.m_Files.end(), product.m_Files.begin(), product.m_Files.end());
-		}
+		const auto collect = [&](std::optional<FrameSequenceArtifactPublication>& target, uint32_t index)
+			{
+				if (!target)
+				{
+					return;
+				}
+				auto& publication = *target;
+				publication.m_Outcome = receipt->m_Publication;
+				publication.m_Pending = false;
+				publication.m_BundleId = receipt->m_BundleId;
+				publication.m_Manifest = receipt->m_ManifestPath;
+				publication.m_Failure = receipt->m_Failure;
+				publication.m_Files.clear();
+				for (const auto& product : receipt->m_BundleProducts)
+				{
+					if (product.m_ProductIndex == index)
+					{
+						publication.m_Files = product.m_Files;
+					}
+				}
+			};
+		collect(m_Status->m_TimingPublication, 0);
+		collect(m_Status->m_ParameterPublication, m_Request.m_GpuTiming ? 1 : 0);
 		if (receipt->m_Publication == CapturePublicationOutcome::Published)
 		{
 			m_Status->m_State = FrameSequenceState::Completed;
@@ -154,7 +200,7 @@ namespace gglab
 		}
 		else
 		{
-			Fail(receipt->m_Failure.empty() ? "Required sequence timing was not published." : receipt->m_Failure);
+			Fail(receipt->m_Failure.empty() ? "Required sequence artifacts were not published." : receipt->m_Failure);
 		}
 	}
 
@@ -261,7 +307,7 @@ namespace gglab
 				GetFrameSequenceStateName(m_Status->m_State));
 			return 0;
 		}
-		if (!m_CaptureJobs.empty() || (m_TimingWrite && !m_TimingWrite->GetReceipt()))
+		if (!m_CaptureJobs.empty() || (m_ArtifactWrite && !m_ArtifactWrite->GetReceipt()))
 		{
 			outError = "The previous sequence's capture jobs are still draining.";
 			return 0;
@@ -392,9 +438,14 @@ namespace gglab
 		{
 			m_Status->m_TimingPublication.emplace();
 		}
+		if (m_Request.m_ParameterProvenance)
+		{
+			m_Status->m_ParameterPublication.emplace();
+		}
+		m_ParameterFrames.clear();
 		m_TimingContext.clear();
-		m_TimingProduct.reset();
-		m_TimingWrite.reset();
+		m_ArtifactProduct.reset();
+		m_ArtifactWrite.reset();
 
 		m_Frame = 0;
 		m_Sample = 0;
@@ -414,19 +465,23 @@ namespace gglab
 
 	FrameSequenceCancelVerdict FrameSequenceCoordinator::Cancel() noexcept
 	{
-		CollectTimingPublication();
+		CollectArtifactPublication();
 		if (!IsActive())
 		{
 			return m_Status ? FrameSequenceCancelVerdict::Finished : FrameSequenceCancelVerdict::NotFound;
 		}
-		if (m_TimingWrite && !m_TimingWrite->TryCancel())
+		if (m_ArtifactWrite && !m_ArtifactWrite->TryCancel())
 		{
-			CollectTimingPublication();
+			CollectArtifactPublication();
 			return FrameSequenceCancelVerdict::TooLate;
 		}
 		if (m_Status->m_TimingPublication)
 		{
 			m_Status->m_TimingPublication->m_Pending = false;
+		}
+		if (m_Status->m_ParameterPublication)
+		{
+			m_Status->m_ParameterPublication->m_Pending = false;
 		}
 
 		m_Status->m_State = FrameSequenceState::Cancelled;
@@ -850,7 +905,7 @@ namespace gglab
 	}
 
 	void FrameSequenceCoordinator::OnFrameSubmitted(uint64_t renderFrameSerial,
-		FrameSequenceObservation observation) noexcept
+		FrameSequenceObservation observation, std::shared_ptr<const ParameterFrameState> parameters) noexcept
 	{
 		if (WantsGpuTiming())
 		{
@@ -871,6 +926,17 @@ namespace gglab
 		{
 			Fail("Sequence submission did not match its begun RenderFrame serial.");
 			return;
+		}
+		if (m_Request.m_ParameterProvenance)
+		{
+			if (!parameters || parameters->m_FrameSerial != renderFrameSerial ||
+				(!m_ParameterFrames.empty() && renderFrameSerial <= m_ParameterFrames.back().m_Parameters->m_FrameSerial))
+			{
+				Fail("Sequence submission requires its matching frozen parameter frame.");
+				return;
+			}
+			m_ParameterFrames.push_back({ m_Frame, m_Sample, std::move(parameters) });
+			m_Status->m_ParameterFrameCount = static_cast<uint32_t>(m_ParameterFrames.size());
 		}
 		for (const auto& event : m_Status->m_Events)
 		{
@@ -1088,7 +1154,7 @@ namespace gglab
 
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
-		CollectTimingPublication();
+		CollectArtifactPublication();
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
 			std::ranges::all_of(m_Status->m_Events, [](const auto& event)
 			{
@@ -1098,37 +1164,46 @@ namespace gglab
 			m_PendingGpuTimingFrames.empty() &&
 			(!m_WatchCoverageId || (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->m_Complete)))
 		{
-			if (m_Request.m_GpuTiming)
+			if (m_Request.m_GpuTiming || m_Request.m_ParameterProvenance)
 			{
-				if (m_TimingWrite)
+				if (m_ArtifactWrite)
 				{
 					return;
 				}
 				try
 				{
-					if (!m_TimingProduct)
+					if (!m_ArtifactProduct)
 					{
-						m_TimingProduct = SequenceTimingBundleInput{
-							.m_SequenceId = m_Status->m_SequenceId, .m_ProductJson = SerializeTimingProduct() };
+						m_ArtifactProduct = SequenceArtifactBundleInput{
+							.m_SequenceId = m_Status->m_SequenceId,
+							.m_TimingJson = m_Request.m_GpuTiming ? SerializeTimingProduct() : "",
+							.m_ParameterFramesJson = m_Request.m_ParameterProvenance ? SerializeParameterFramesProduct() : "" };
 					}
 					std::string error;
-					m_TimingWrite = m_Capture->TryPublishSequenceTiming(*m_TimingProduct,
+					m_ArtifactWrite = m_Capture->TryPublishSequenceArtifacts(*m_ArtifactProduct,
 						m_Request.m_OutputDirectory, m_Request.m_Label, error);
 					if (!error.empty())
 					{
 						Fail(std::move(error));
 						return;
 					}
-					if (m_TimingWrite)
+					if (m_ArtifactWrite)
 					{
-						m_Status->m_TimingPublication->m_Pending = true;
-						m_TimingProduct.reset();
-						CollectTimingPublication();
+						if (m_Status->m_TimingPublication)
+						{
+							m_Status->m_TimingPublication->m_Pending = true;
+						}
+						if (m_Status->m_ParameterPublication)
+						{
+							m_Status->m_ParameterPublication->m_Pending = true;
+						}
+						m_ArtifactProduct.reset();
+						CollectArtifactPublication();
 					}
 				}
 				catch (const std::exception& error)
 				{
-					Fail(std::format("Serializing sequence GPU timing failed: {}", error.what()));
+					Fail(std::format("Serializing sequence artifacts failed: {}", error.what()));
 				}
 				return;
 			}

@@ -1403,15 +1403,21 @@ namespace gglab
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
 			}
-			if (status.m_TimingPublication)
+			sequence["parameterFrameCount"] = status.m_ParameterFrameCount;
+			for (const auto& [name, target] : { std::pair{ "timingPublication", &status.m_TimingPublication },
+				std::pair{ "parameterPublication", &status.m_ParameterPublication } })
 			{
-				const auto& publication = *status.m_TimingPublication;
+				if (!*target)
+				{
+					continue;
+				}
+				const auto& publication = **target;
 				Json files = Json::array();
 				for (const auto& path : publication.m_Files)
 				{
 					files.push_back(GetFrameCapturePathText(path));
 				}
-				sequence["timingPublication"] = {
+				sequence[name] = {
 					{ "outcome", publication.m_Outcome == CapturePublicationOutcome::Published ?
 						"Published" :
 						publication.m_Outcome == CapturePublicationOutcome::Indeterminate ?
@@ -1604,6 +1610,7 @@ namespace gglab
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceImmediateEvents", true },
 			{ "sequenceDeferredEvents", true },
+			{ "parameterFrameProvenance", true },
 			{ "sequenceEventDomains", Json::array({ "lighting" }) },
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
@@ -1623,6 +1630,7 @@ namespace gglab
 			{ "drainingRuntimeRequests", intake.m_DrainingRuntimeRequests },
 			{ "drainingWriterJobs", intake.m_DrainingWriterJobs },
 			{ "sequenceTimingWrites", intake.m_SequenceTimingWrites },
+			{ "sequenceArtifactWrites", intake.m_SequenceArtifactWrites },
 			{ "drainingWriteReservations", intake.m_DrainingWriteReservations } };
 		const auto claimName = [](NonFiniteClaimStatus value)
 			{

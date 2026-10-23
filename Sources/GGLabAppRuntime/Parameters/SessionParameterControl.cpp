@@ -847,6 +847,78 @@ namespace gglab
 		}
 	}
 
+	ParameterFrameState SessionParameterControl::CaptureFrameState(uint64_t serial,
+		uint64_t requestedLightingGeneration, uint64_t activeLightingGeneration) const
+	{
+		ParameterFrameState frame{ .m_FrameSerial = serial, .m_Revision = m_ParameterRevision,
+			.m_ContentId = m_ContentId, .m_Available = IsEnabled() && IsAvailable(),
+			.m_RequestedLighting = { requestedLightingGeneration },
+			.m_ActiveLighting = { activeLightingGeneration } };
+		const auto& publication = GetLightingProfilePublication();
+		if (publication.m_Requested && publication.m_Requested->m_Generation == requestedLightingGeneration)
+		{
+			frame.m_RequestedLighting.m_Profile = publication.m_Requested;
+		}
+		if (publication.m_Active && publication.m_Active->m_Generation == activeLightingGeneration)
+		{
+			frame.m_ActiveLighting.m_Profile = publication.m_Active;
+		}
+		if (frame.m_Available)
+		{
+			for (const auto* source : m_Sources->Ordered())
+			{
+				const auto* parameters = source->GetParameters();
+				if (!parameters)
+				{
+					continue;
+				}
+				for (const auto& value : parameters->GetParameters())
+				{
+					if (!LabValuesEqual(value.m_Value, value.m_Desc.m_DefaultValue))
+					{
+						frame.m_Values.push_back({ std::string(value.m_Desc.m_Id.GetName()),
+							source->IsHost() ? "host" : "lab",
+							value.m_Desc.m_Type, value.m_Value, value.m_Desc.m_DefaultValue });
+					}
+				}
+			}
+		}
+		for (const auto& batch : m_ParameterBatches)
+		{
+			if (batch->m_FrameSerial == serial)
+			{
+				for (const auto& receipt : batch->m_Receipts)
+				{
+					frame.m_Receipts.push_back({ batch->m_Status.m_BatchId, receipt.GetSnapshot() });
+				}
+			}
+		}
+		return frame;
+	}
+
+	void SessionParameterControl::CompleteFrameState(ParameterFrameState& frame) const noexcept
+	{
+		for (auto& receipt : frame.m_Receipts)
+		{
+			for (const auto& batch : m_ParameterBatches)
+			{
+				if (batch->m_Status.m_BatchId != receipt.m_BatchId || batch->m_FrameSerial != frame.m_FrameSerial)
+				{
+					continue;
+				}
+				for (const auto& current : batch->m_Receipts)
+				{
+					const auto& item = current.GetSnapshot();
+					if (item.m_Parameter == receipt.m_Item.m_Parameter && item.m_Identity == receipt.m_Item.m_Identity &&
+						item.m_FirstConsumed == frame.m_FrameSerial)
+					{
+						receipt.m_Item = item;
+					}
+				}
+			}
+		}
+	}
+
 	void SessionParameterControl::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
 		for (auto& entry : m_ParameterBatches)

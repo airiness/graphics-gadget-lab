@@ -1,0 +1,579 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.parameter-frames",
+  "title": "GGLab frozen sequence parameter frames v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "sequence",
+    "frames",
+    "watch"
+  ],
+  "properties": {
+    "schema": {
+      "const": "gglab.parameter-frames"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "sequence": {
+      "$ref": "#/$defs/sequenceRange"
+    },
+    "watch": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequenceFrame",
+          "referenceSample",
+          "parameters"
+        ],
+        "properties": {
+          "sequenceFrame": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "referenceSample": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "parameters": {
+            "$ref": "#/$defs/frame"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sequenceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "pathVersion",
+        "frameCount",
+        "referenceSamples",
+        "firstFrameSerial",
+        "lastFrameSerial"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pathVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "referenceSamples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstFrameSerial": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lastFrameSerial": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "frameSerial",
+        "revision",
+        "contentId",
+        "available",
+        "values",
+        "lighting",
+        "receipts"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "frameSerial": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contentId": {
+          "type": "string"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "source",
+              "type",
+              "value",
+              "default"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "enum": [
+                  "host",
+                  "lab"
+                ]
+              },
+              "type": {
+                "enum": [
+                  "bool",
+                  "int",
+                  "uint",
+                  "float",
+                  "enum",
+                  "vector3",
+                  "color"
+                ]
+              },
+              "value": {},
+              "default": {}
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "bool"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "boolean"
+                    },
+                    "default": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "int"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": -2147483648,
+                      "maximum": 2147483647
+                    },
+                    "default": {
+                      "type": "integer",
+                      "minimum": -2147483648,
+                      "maximum": 2147483647
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "uint"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "default": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "enum"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "integer"
+                    },
+                    "default": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "float"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "default": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "vector3"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "default": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "color"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "default": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "lighting": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requested",
+            "active"
+          ],
+          "properties": {
+            "requested": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "generation",
+                "profileId",
+                "profileHash",
+                "profileHashVersion"
+              ],
+              "properties": {
+                "generation": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "profileId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "profileHash": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "profileHashVersion": {
+                  "enum": [
+                    2,
+                    null
+                  ]
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "profileId": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "profileHash": {
+                        "type": "null"
+                      },
+                      "profileHashVersion": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "profileHash": {
+                        "type": "string"
+                      },
+                      "profileHashVersion": {
+                        "const": 2
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "active": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "generation",
+                "profileId",
+                "profileHash",
+                "profileHashVersion"
+              ],
+              "properties": {
+                "generation": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "profileId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "profileHash": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "profileHashVersion": {
+                  "enum": [
+                    2,
+                    null
+                  ]
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "profileId": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "profileHash": {
+                        "type": "null"
+                      },
+                      "profileHashVersion": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "profileHash": {
+                        "type": "string"
+                      },
+                      "profileHashVersion": {
+                        "const": 2
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "batchId",
+              "id",
+              "declaredClass",
+              "state",
+              "identity",
+              "requested",
+              "applied",
+              "published",
+              "firstConsumed",
+              "failure"
+            ],
+            "properties": {
+              "batchId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "declaredClass": {
+                "enum": [
+                  "Immediate",
+                  "Deferred",
+                  "Rebuild"
+                ]
+              },
+              "state": {
+                "enum": [
+                  "Requested",
+                  "Applied",
+                  "Published",
+                  "Consumed",
+                  "Superseded",
+                  "NoChange",
+                  "EffectNotReached",
+                  "Failed"
+                ]
+              },
+              "identity": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "revision",
+                  "domain",
+                  "generation"
+                ],
+                "properties": {
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "requested": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "applied": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "published": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "firstConsumed": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "failure": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

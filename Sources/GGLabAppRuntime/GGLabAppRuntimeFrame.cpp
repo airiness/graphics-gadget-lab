@@ -493,6 +493,10 @@ namespace gglab
 		SynchronizeContentBinding();
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
+		if (m_FrameCapture->GetUnfinishedRequestCount() || m_FrameSequence->IsActive())
+		{
+			m_ParameterControl->Enable();
+		}
 
 		World& world = demo->GetWorld();
 		RenderFrame rendererFrame = m_RenderHost->BeginFrame();
@@ -696,6 +700,10 @@ namespace gglab
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
+		auto parameterFrame = m_ParameterControl->IsEnabled() ?
+			std::make_shared<ParameterFrameState>(m_ParameterControl->CaptureFrameState(
+				frame.m_FrameSerial, m_RenderServices.m_Environment->GetBakeRequestGeneration(),
+				frame.m_RenderScene.m_WorldLightingGeneration)) : nullptr;
 		UpdateSequenceParameterEvents();
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
@@ -865,8 +873,13 @@ namespace gglab
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
 			.m_RenderFrameSerial = frame.m_FrameSerial,
 		});
+		if (parameterFrame)
+		{
+			m_ParameterControl->CompleteFrameState(*parameterFrame);
+			m_FrameCapture->SetFrameParameters(frame.m_FrameSerial, parameterFrame);
+		}
 		UpdateSequenceParameterEvents();
-		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
+		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation, parameterFrame);
 		UpdateSequenceParameterEvents();
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,

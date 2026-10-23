@@ -71,9 +71,9 @@ namespace gglab
 			error = "Busy: finish the pending parameter batch before starting a sequence.";
 			return 0;
 		}
-		const bool hasEvents = !request.m_Events.empty();
+		request.m_ParameterProvenance = true;
 		const auto id = m_FrameSequence->Start(std::move(request), error);
-		if (id && hasEvents)
+		if (id)
 		{
 			m_ParameterControl->Enable();
 		}

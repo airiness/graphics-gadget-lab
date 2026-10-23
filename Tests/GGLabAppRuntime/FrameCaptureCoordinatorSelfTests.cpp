@@ -1889,7 +1889,12 @@ namespace gglab
 					const FrameSequenceObservation observation = m_Sequence.WantsGpuTiming() ?
 						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {} } :
 						FrameSequenceObservation{};
-					m_Sequence.OnFrameSubmitted(m_RenderSerial, observation);
+					const auto parameters = m_FreezeParameters ?
+						std::make_shared<ParameterFrameState>(ParameterFrameState{
+							.m_FrameSerial = m_RenderSerial, .m_Revision = m_RenderSerial + 1,
+							.m_ContentId = "Fixture", .m_Available = true }) : nullptr;
+					m_Capture.SetFrameParameters(m_RenderSerial, parameters);
+					m_Sequence.OnFrameSubmitted(m_RenderSerial, observation, parameters);
 				}
 				for (; m_AutoComplete && m_Completed < m_Control.m_Issued.size(); ++m_Completed)
 				{
@@ -1909,6 +1914,7 @@ namespace gglab
 			uint64_t m_RenderSerial = 0;
 			double m_SimulationTime = 0.0;
 			uint32_t m_LateDeferrals = 0;
+			bool m_FreezeParameters = false;
 			ViewExtent m_RenderExtent{ 64, 32 };
 			TemporalAAHistoryAccumulation m_Accumulation = TemporalAAHistoryAccumulation::EffectiveSamples;
 			bool m_HistoryCompatible = true;
@@ -2837,6 +2843,69 @@ namespace gglab
 			}
 		}
 
+		void RunSequenceParameterPublicationTests(SelfTestContext& context) noexcept
+		{
+			for (bool timed : { false, true })
+			{
+				TemporaryDirectory directory("parameter-frame-membership");
+				SequenceHarness harness(directory.GetPath());
+				harness.m_FreezeParameters = true;
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				const auto id = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_GpuTiming = timed, .m_ParameterProvenance = true }, error);
+				harness.Frame();
+				harness.Frame(false);
+				const auto aborted = harness.m_RenderSerial;
+				const auto count = harness.m_Sequence.GetStatus()->m_ParameterFrameCount;
+				harness.Frame();
+				const auto first = harness.m_RenderSerial;
+				harness.Frame();
+				const auto last = harness.m_RenderSerial;
+				if (timed)
+				{
+					const std::array serials{ last, first };
+					DeliverTimingProfiles(harness, serials);
+				}
+				const auto& status = *harness.m_Sequence.GetStatus();
+				context.Check(id != 0 && count == 0 && status.m_State == FrameSequenceState::Completed &&
+					status.m_ParameterFrameCount == 2 && status.m_ParameterPublication->m_Files.size() == 1,
+					"Every submitted sequence frame requires parameter publication; aborted retries add no sample");
+				if (status.m_ParameterPublication->m_Files.empty())
+				{
+					continue;
+				}
+				const auto product = nlohmann::json::parse(ReadText(status.m_ParameterPublication->m_Files.front()));
+				const auto manifest = nlohmann::json::parse(ReadText(status.m_ParameterPublication->m_Manifest));
+				context.Check(product["frames"][0]["parameters"]["frameSerial"] == first &&
+					product["frames"][1]["parameters"]["frameSerial"] == last && first > aborted &&
+					manifest["products"].size() == (timed ? 2 : 1) &&
+					(!timed || status.m_ParameterPublication->m_Manifest == status.m_TimingPublication->m_Manifest),
+					"Parameters cover uncaptured frames and share one range publication with out-of-order timing results");
+			}
+			for (bool missing : { false, true })
+			{
+				TemporaryDirectory directory("parameter-frame-required");
+				auto files = std::make_shared<CapturePublicationTestFileSystem>();
+				files->m_FailWrite = missing ? 0 : 1;
+				SequenceHarness harness(directory.GetPath(), {}, files);
+				harness.m_FreezeParameters = !missing;
+				harness.m_Paths.front().m_Keys.resize(2);
+				harness.m_Paths.front().m_Keys.back().m_Frame = 1;
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_ParameterProvenance = true }, error));
+				for (uint32_t frame = 0; frame < 4 && harness.m_Sequence.IsActive(); ++frame)
+				{
+					harness.Frame();
+				}
+				context.Check(harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					harness.m_Sequence.GetStatus()->m_ParameterPublication->m_Manifest.empty(),
+					"Missing frame provenance or a failed required write cannot report a completed sequence");
+			}
+		}
+
 		void RunSequenceTimingPublicationTests(SelfTestContext& context) noexcept
 		{
 			{
@@ -2947,7 +3016,8 @@ namespace gglab
 				files->m_FailPublish = scenario == 2 ? 1 : scenario == 3 ? 2 : 0;
 				files->m_FailWithdraw = scenario == 3;
 				SequenceHarness harness(directory.GetPath(), {}, files, false, false, std::chrono::milliseconds(1));
-				const auto serials = SubmitShortTimingSequence(harness);
+				harness.m_FreezeParameters = true;
+				const auto serials = SubmitShortTimingSequence(harness, { .m_ParameterProvenance = true });
 				DeliverTimingProfiles(harness, serials);
 				context.Check(files->WaitEntered() && harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Finishing &&
 					harness.m_Sequence.GetStatus()->m_TimingPublication->m_Pending,
@@ -2985,8 +3055,9 @@ namespace gglab
 				const auto publication = scenario == 1 ? CapturePublicationOutcome::Published :
 					scenario >= 3 ? CapturePublicationOutcome::Indeterminate : CapturePublicationOutcome::NotPublished;
 				context.Check(status.m_State == expected && status.m_TimingPublication->m_Outcome == publication &&
+					status.m_ParameterPublication->m_Outcome == publication && !status.m_ParameterPublication->m_Pending &&
 					harness.m_Capture.GetIntakeSnapshot().m_SequenceTimingWrites == 0,
-					"Real publication success, failure and indeterminate outcomes settle once, including late shutdown receipts");
+					"Timing and parameters share cancellation, real publication outcomes and late shutdown receipts");
 			}
 			{
 				TemporaryDirectory directory("timing-cancel-before-eligibility");
@@ -4193,7 +4264,7 @@ namespace gglab
 				if (result && !result->m_ManifestPath.empty())
 				{
 					const auto manifest = nlohmann::json::parse(ReadText(result->m_ManifestPath));
-					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 2 &&
+					bool bound = manifest["bundleId"] == result->m_BundleId && manifest["schemaVersion"] == 3 &&
 						manifest["schema"] == "gglab.capture-bundle" && manifest["products"].size() == 3 &&
 						manifest["environment"]["schemaVersion"] == 1 &&
 						manifest["environment"]["process"]["runIdentity"] == manifest["runIdentity"];
@@ -5145,6 +5216,7 @@ namespace gglab
 		RunFrameSequenceGpuTimingTests(context);
 		RunSequenceTimingGraphObservationTests(context);
 		RunSequenceTimingPublicationTests(context);
+		RunSequenceParameterPublicationTests(context);
 		RunFrameSequenceContinuityTests(context);
 		RunFrameSequenceFailureTests(context);
 	}

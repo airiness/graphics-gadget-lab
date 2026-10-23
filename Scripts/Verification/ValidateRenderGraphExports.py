@@ -7,6 +7,8 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, ValidationError
 
+import ValidateParameterFrames as parameters
+
 SCAN_KINDS = {"NonFiniteScan", "ProductionCounters"}
 
 
@@ -56,6 +58,7 @@ def validate_allocations(document):
 
 
 def validate(document, validator):
+	parameters.validate_export(document["frame"], document["schemaVersion"], 6, document["frameSerial"])
 	validator.validate(document)
 	passes = document["compile"]["passes"]
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
