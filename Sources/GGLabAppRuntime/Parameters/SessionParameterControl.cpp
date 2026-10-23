@@ -1,5 +1,6 @@
 #include "Parameters/SessionParameterControl.h"
 #include "Parameters/ParameterSourceAdapters.h"
+#include "Capture/FrameCaptureReadiness.h"
 #include "Demo/DemoBase.h"
 #include "Lab/LabRuntime.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
@@ -186,16 +187,31 @@ namespace gglab
 		return true;
 	}
 
-	bool SessionParameterControl::ValidateImmediateAssignments(
-		std::span<LabParameterValue> values, std::string& error) const noexcept
+	bool SessionParameterControl::ValidateSequenceAssignments(std::span<LabParameterValue> values,
+		const std::optional<std::vector<std::string>>& expectedEffects, std::string& error) const noexcept
 	{
+		std::vector<std::string> domains;
 		for (auto& value : values)
 		{
 			const auto* parameter = Find(value.m_Id);
-			if (!parameter || GetParameterEffectClass(parameter->m_Desc) != ParameterEffectClass::Immediate)
+			if (!parameter || GetParameterEffectClass(parameter->m_Desc) == ParameterEffectClass::Rebuild)
 			{
-				error = "Sequence events currently require bound Immediate parameters.";
+				error = "Sequence events require bound Immediate or Deferred parameters without rebuild impact.";
 				return false;
+			}
+			if (GetParameterEffectClass(parameter->m_Desc) == ParameterEffectClass::Deferred)
+			{
+				const auto* source = m_Sources->Find(value.m_Id);
+				const auto domain = source ? source->GetDeferredEffectDomain() : std::string_view{};
+				if (domain.empty())
+				{
+					error = "The Deferred event source has no bound effect domain.";
+					return false;
+				}
+				if (std::ranges::find(domains, domain) == domains.end())
+				{
+					domains.emplace_back(domain);
+				}
 			}
 			// Untyped integer assignments resolve against their owning descriptor. Resolve only
 			// integer representations; booleans, arrays and fractional integers stay strict.
@@ -223,7 +239,49 @@ namespace gglab
 				}
 			}
 		}
-		return ValidateParameterBatch(values, error);
+		if (!ValidateParameterBatch(values, error))
+		{
+			return false;
+		}
+		if (expectedEffects && (expectedEffects->size() != domains.size() ||
+			!std::ranges::all_of(domains, [&](const auto& domain)
+			{
+				return std::ranges::find(*expectedEffects, domain) != expectedEffects->end();
+			})))
+		{
+			error = "EffectMismatch: expectEffects must match the event's bound Deferred domains.";
+			return false;
+		}
+		return true;
+	}
+
+	bool SessionParameterControl::CoversReadinessGate(ParameterBatchOwner owner,
+		const FrameCaptureGate& gate) const noexcept
+	{
+		if (owner.IsExternal() || gate.m_EffectDomain.empty() || gate.m_EffectGeneration == 0)
+		{
+			return false;
+		}
+		for (const auto& batch : m_ParameterBatches)
+		{
+			if (batch->m_Owner != owner || batch->m_Status.IsTerminal())
+			{
+				continue;
+			}
+			for (size_t index = 0; index < batch->m_Receipts.size(); ++index)
+			{
+				const auto& item = batch->m_Receipts[index].GetSnapshot();
+				if (!item.IsTerminal() && item.m_Applied && !item.m_Published &&
+					item.m_DeclaredClass == ParameterEffectClass::Deferred &&
+					item.m_Identity.m_Domain == gate.m_EffectDomain &&
+					item.m_Identity.m_Generation == gate.m_EffectGeneration &&
+					batch->m_Bindings[index]->CoversReadinessGate(item.m_Identity, gate.m_Name))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	uint64_t SessionParameterControl::RequestParameterBatch(std::span<const LabParameterValue> values,

@@ -9,6 +9,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -90,6 +91,14 @@ namespace gglab
 		[[nodiscard]] virtual bool IsHost() const noexcept = 0;
 		[[nodiscard]] virtual const LabParameterSet* GetParameters() const noexcept = 0;
 		[[nodiscard]] virtual bool Supports(const LabParameterDesc& desc) const noexcept = 0;
+		[[nodiscard]] virtual std::string_view GetDeferredEffectDomain() const noexcept { return {}; }
+		[[nodiscard]] virtual bool CoversReadinessGate(const ParameterStateIdentity& identity,
+			std::string_view gate) const noexcept
+		{
+			GGLAB_UNUSED(identity);
+			GGLAB_UNUSED(gate);
+			return false;
+		}
 		[[nodiscard]] virtual bool Validate(const LabParameterValue& value, std::string& error) const noexcept
 		{
 			GGLAB_UNUSED(value);

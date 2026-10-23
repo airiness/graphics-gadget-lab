@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/LightingMutationResult.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace gglab
 {
@@ -22,6 +23,8 @@ namespace gglab
 		[[nodiscard]] ParameterApplication Translate(const LightingMutationResult& evidence,
 			bool unchanged, ParameterDomainState& state) const noexcept;
 		[[nodiscard]] ParameterApplication ObserveImmediate(const ParameterDomainState& state) const noexcept;
+		[[nodiscard]] bool CoversReadinessGate(const ParameterStateIdentity& identity,
+			std::string_view gate) const noexcept;
 		[[nodiscard]] ParameterPublicationObservation ObservePublication(
 			const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept;
 

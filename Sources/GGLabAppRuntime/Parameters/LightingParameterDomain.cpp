@@ -65,6 +65,16 @@ namespace gglab
 		return {};
 	}
 
+	bool LightingParameterDomain::CoversReadinessGate(const ParameterStateIdentity& identity,
+		std::string_view gate) const noexcept
+	{
+		// Environment asset loading is external to these synchronous lighting mutations.
+		// Only the exact Runtime target attributed to this operation covers IBL Pending.
+		return gate == "ibl" && identity.m_Domain == "lighting" && identity.m_Generation != 0 &&
+			identity.m_Generation == m_Environment.GetBakeRequestGeneration() &&
+			m_Environment.GetBakingStatus().m_Stage != IBLBakeStage::Failed;
+	}
+
 	ParameterPublicationObservation LightingParameterDomain::ObservePublication(
 		const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept
 	{

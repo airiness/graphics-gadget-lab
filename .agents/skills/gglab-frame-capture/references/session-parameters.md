@@ -17,8 +17,10 @@ The GTAO fixture covers texture-IBL cache restoration; Atmosphere Range covers
 Physical Sky, whose current producer deliberately skips texture caches.
 
 Host `environment.profile` selects content-registered Physical Sky inputs.
-Arbitrary authored sun/atmosphere parameter bindings, rebuild transactions,
-deferred sequence events and parameter metadata in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
+Arbitrary authored sun/atmosphere parameter bindings, rebuild transactions and
+parameter metadata in saved frame artifacts remain separate work. Bound Deferred
+sequence events follow [Sequences](sequences.md#parameter-events).
+`set` rejects during an active sequence; a new
 sequence rejects while a parameter batch is pending. Do not use external `set`
 as a substitute for scheduled events.
 
@@ -179,7 +181,8 @@ A later unrelated revision does not supersede an older pending item. A committed
 different assignment to that item's ID, or a newer owning-domain target before
 build, supersedes it without inventing consumption. Owner termination closes every
 outstanding item and releases only the queued reservation. This storage capability
-does not enable Deferred sequence events or relax readiness policy.
+does not itself grant readiness exceptions. Deferred sequence events use the
+owner- and generation-bound policy in [Sequences](sequences.md#parameter-events).
 
 At the Ready boundary, the Session prepares the complete current batch before
 committing any of its live values: source/type bindings, Host candidates and

@@ -168,10 +168,11 @@ namespace gglab
 				}
 			};
 		publish();
-		if (!m_FrameSequence->IsActive())
+		if (!m_FrameSequence->IsActive() ||
+			m_FrameSequence->GetStatus()->m_State == FrameSequenceState::Finishing)
 		{
-			// Reporting one failed event can end the sequence. Close and publish every
-			// remaining receipt for that owner before allowing a replacement sequence.
+			// Consumption must occur within the submitted sequence range, even while
+			// captures/timing drain. Preserve reached stamps when closing the owner.
 			m_ParameterControl->FinishParameterBatches(owner);
 			publish();
 		}

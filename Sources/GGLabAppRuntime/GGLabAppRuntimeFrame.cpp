@@ -180,7 +180,7 @@ namespace gglab
 				iblPending ?
 					std::format("Baking {} ({:.0f}%).", GetIBLBakeStageName(bake.m_Stage),
 						bake.m_Progress * 100.0f) :
-					std::string{});
+					std::string{}, "lighting", environment.GetBakeRequestGeneration());
 
 			// A load reaches the upload queues only once its CPU work completes, so
 			// asset uploads alone would report Ready while a decode is in flight.
@@ -509,7 +509,8 @@ namespace gglab
 			{
 				for (auto& event : events)
 				{
-					if (!m_ParameterControl->ValidateImmediateAssignments(event.m_Values, error))
+					if (!m_ParameterControl->ValidateSequenceAssignments(
+						event.m_Values, event.m_ExpectEffects, error))
 					{
 						return false;
 					}
@@ -676,7 +677,11 @@ namespace gglab
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
 		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
-		if (!m_FrameSequence->BeginFrame(captureFrameState))
+		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
+			{
+				return m_ParameterControl->CoversReadinessGate(
+					ParameterBatchOwner{ m_FrameSequence->GetStatus()->m_SequenceId }, gate);
+			}))
 		{
 			UpdateSequenceParameterEvents();
 			toolingFrame.Complete();

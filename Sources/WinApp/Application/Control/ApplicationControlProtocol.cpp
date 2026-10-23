@@ -723,11 +723,16 @@ namespace gglab
 						if (item.contains("expectEffects"))
 						{
 							const auto& effects = item["expectEffects"];
-							if (!effects.is_array() || !effects.empty())
+							if (!effects.is_array() || effects.size() > 1 ||
+								(!effects.empty() && (!effects[0].is_string() || effects[0] != "lighting")))
 							{
-								return "Immediate events accept only an empty 'expectEffects' array.";
+								return "Event 'expectEffects' supports only [] or [\"lighting\"].";
 							}
 							event.m_ExpectEffects.emplace();
+							for (const auto& effect : effects)
+							{
+								event.m_ExpectEffects->push_back(effect.get<std::string>());
+							}
 						}
 						sequence.m_Events.push_back(std::move(event));
 					}
@@ -1598,6 +1603,8 @@ namespace gglab
 				{ "explicitConsumption", true } } },
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceImmediateEvents", true },
+			{ "sequenceDeferredEvents", true },
+			{ "sequenceEventDomains", Json::array({ "lighting" }) },
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
 			{ "gpuTimingSchema", "gglab.gpu-timing" },

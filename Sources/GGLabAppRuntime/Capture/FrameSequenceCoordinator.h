@@ -19,6 +19,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -247,8 +248,8 @@ namespace gglab
 	// path by exactly one frame, independent of wall-clock and simulation time.
 	// Frame 0 and cut keys are camera cuts that reset temporal history, so a replay
 	// starts from the same temporal state. Any other change of temporal continuity
-	// (temporal session, display view, size or content) or a readiness gate leaving
-	// Ready fails the sequence, because the remaining frames would no longer be
+	// (temporal session, display view, size or content) or an uncovered readiness gate
+	// leaving Ready fails the sequence, because the remaining frames would no longer be
 	// comparable. Requested frames are captured through the capture coordinator as
 	// next-frame requests issued on exactly that frame. When the capture writer
 	// cannot accept another capture, the runtime defers the next frame entirely
@@ -300,7 +301,8 @@ namespace gglab
 		// BeginFrame: checks readiness and temporal continuity, then submits this
 		// frame's capture when requested.
 		// False aborts this frame before rendering when admission must retry or fails.
-		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state) noexcept;
+		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state,
+			const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate = {}) noexcept;
 		// Called for every successful runtime submission, including ordinary frames
 		// that publish remaining profiles while the sequence is Finishing.
 		void OnFrameSubmitted(uint64_t renderFrameSerial,

@@ -8,6 +8,7 @@
 #include <array>
 #include <functional>
 #include <optional>
+#include <string_view>
 
 namespace gglab
 {
@@ -49,6 +50,12 @@ namespace gglab
 		[[nodiscard]] bool IsHost() const noexcept override { return false; }
 		[[nodiscard]] const LabParameterSet* GetParameters() const noexcept override;
 		[[nodiscard]] bool Supports(const LabParameterDesc& desc) const noexcept override;
+		[[nodiscard]] std::string_view GetDeferredEffectDomain() const noexcept override { return "lighting"; }
+		[[nodiscard]] bool CoversReadinessGate(const ParameterStateIdentity& identity,
+			std::string_view gate) const noexcept override
+		{
+			return m_Domain.CoversReadinessGate(identity, gate);
+		}
 		[[nodiscard]] bool Reserve(uint64_t id, std::span<const LabParameterValue> values,
 			std::string& error) noexcept override;
 		void Cancel(uint64_t id) noexcept override;
@@ -80,6 +87,12 @@ namespace gglab
 		[[nodiscard]] bool IsHost() const noexcept override { return true; }
 		[[nodiscard]] const LabParameterSet* GetParameters() const noexcept override { return &m_Parameters; }
 		[[nodiscard]] bool Supports(const LabParameterDesc&) const noexcept override { return true; }
+		[[nodiscard]] std::string_view GetDeferredEffectDomain() const noexcept override { return "lighting"; }
+		[[nodiscard]] bool CoversReadinessGate(const ParameterStateIdentity& identity,
+			std::string_view gate) const noexcept override
+		{
+			return m_Domain.CoversReadinessGate(identity, gate);
+		}
 		[[nodiscard]] bool Validate(const LabParameterValue& value, std::string& error) const noexcept override;
 		[[nodiscard]] bool ValidateMissing(const LabParameterId& id, std::string& error) const noexcept;
 		[[nodiscard]] std::unique_ptr<PreparedParameterSourceBase> Prepare(uint64_t id,

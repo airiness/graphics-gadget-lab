@@ -259,12 +259,20 @@ namespace gglab
 				events.m_Request->m_Sequence.m_Events[0].m_Values.size() == 2 &&
 				events.m_Request->m_Sequence.m_Events[0].m_ExpectEffects.has_value(),
 				"Sequence events retain exact frames, raw numeric assignments and explicit empty expectations");
+			const auto deferredEvent = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":82,"command":"sequence","path":"A","events":[{"frame":10,"set":{"environment.profile":1},"expectEffects":["lighting"]}]})");
+			context.Check(deferredEvent.m_Request &&
+				deferredEvent.m_Request->m_Sequence.m_Events[0].m_ExpectEffects ==
+					std::optional(std::vector<std::string>{ "lighting" }),
+				"Deferred event expectations retain their owning domain without granting readiness permission");
 			for (const auto* invalid : {
 				R"({"frame":-1,"set":{"a":1}})",
 				R"({"frame":0,"set":{}})",
 				R"({"frame":0,"set":{"a":"bad"}})",
 				R"({"frame":0,"set":{"a":1},"extra":true})",
-				R"({"frame":0,"set":{"a":1},"expectEffects":["lighting"]})",
+				R"({"frame":0,"set":{"a":1},"expectEffects":["unknown"]})",
+				R"({"frame":0,"set":{"a":1},"expectEffects":["lighting","lighting"]})",
+				R"({"frame":0,"set":{"a":1},"expectEffects":[true]})",
 				R"({"frame":0,"set":{"a":4294967296}})" })
 			{
 				context.Check(!ParseApplicationControlRequest(std::format(

@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
@@ -75,6 +76,24 @@ namespace gglab
 		GGLAB_ASSERT_MSG(registered, "Atmosphere range reference views must be valid.");
 		const bool restored = GetCameraRig().RestoreReferenceView(AtmosphereRangeReferenceViews.front().m_Id);
 		GGLAB_ASSERT_MSG(restored, "Atmosphere range must start at its reference view.");
+		const auto& overview = AtmosphereRangeReferenceViews.front();
+		const bool pathRegistered = GetCameraRig().SetCameraPaths({ {
+			.m_Id = "SEQ_AtmosphereRange_Static",
+			.m_Name = "Atmosphere Range Static",
+			.m_Purpose = "Hold the overview through asynchronous lighting transitions.",
+			.m_Version = 1,
+			.m_NearPlane = GetCamera().GetNear(),
+			.m_FarPlane = GetCamera().GetFar(),
+			.m_ManualEV100 = GetCamera().GetManualEV100(),
+			.m_ExposureCompensationEV = GetCamera().GetExposureCompensationEV(),
+			.m_Keys = {
+				{ .m_Frame = 0, .m_Position = overview.m_Position, .m_Target = overview.m_Target,
+					.m_VerticalFovDegrees = overview.m_VerticalFovDegrees },
+				{ .m_Frame = 239, .m_Position = overview.m_Position, .m_Target = overview.m_Target,
+					.m_VerticalFovDegrees = overview.m_VerticalFovDegrees },
+			},
+		} });
+		GGLAB_ASSERT_MSG(pathRegistered, "Atmosphere range must register its lighting timeline.");
 	}
 
 	void AtmosphereRangeLabSession::ApplyImmediateParameters() noexcept

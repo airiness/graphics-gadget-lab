@@ -49,7 +49,7 @@ Replay per channel/configuration. Confirm deterministic content by replaying the
 same path twice and checking the images and metadata before relying on paired
 frames from different runs.
 
-## Immediate parameter events
+## Parameter events
 
 Check `status.capabilities.sequenceImmediateEvents`. Pass `-Events` or `-EventsFile`
 with `{frame, set, expectEffects?}` objects. `set` maps discovered parameter ids to
@@ -62,15 +62,36 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session a
     -Events '[{"frame":10,"set":{"view.exposure.ev100":17},"expectEffects":[]}]'
 ```
 
-This extension supports bound Immediate parameters in ordinary sequences only.
-Deferred/Rebuild events and reference sequences with events reject. Omit
-`expectEffects` or use `[]`; nonempty expected domains are not implemented yet.
+Ordinary sequences support bound Immediate and Deferred lighting parameters.
+Check `sequenceDeferredEvents` and `sequenceEventDomains` before using Deferred
+events. Rebuild parameters and reference sequences with events reject. Omitted
+`expectEffects` infers the source domains; `[]` expects Immediate parameters only,
+and `["lighting"]` expects a bound Deferred lighting item, optionally mixed with
+Immediate items. NoChange is permitted for that bound domain and starts no
+publication or readiness allowance. Unsupported or mismatched domains reject.
 The complete plan is descriptor-validated after target readiness, before frame 0.
 A bad later event prevents all earlier event mutation. Duplicate frames reject:
 one frame has one atomic batch. Limits are 128 events, 128 items per event and
 1024 items total. A Host assignment overlapping the same legacy TAA/GTAO override field rejects;
-unrelated legacy overrides remain usable. Existing readiness and temporal
-continuity gates, including failures outside authored camera cuts, remain active.
+unrelated legacy overrides remain usable. Each event admits at most one Deferred
+lighting item. The actual receipts must also match any explicit expected domains.
+
+Deferred transitions continue rendering and recording every sequence frame. Only
+an applied outstanding receipt owned by this sequence, matching the Runtime's
+current lighting request generation, can cover `ibl` Pending. Failed gates,
+unrelated requests and other gates still fail. In particular, `environment` is
+external asset loading and is not owned by these synchronous profile/sample-count
+mutations. An expected domain alone grants no exception. Temporal continuity
+checks remain active outside authored camera cuts.
+
+The Atmosphere Range Lab registers `SEQ_AtmosphereRange_Static` (240 frames) for
+profile transitions between its authored baseline and oblique fixtures:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session range `
+    -CameraPath SEQ_AtmosphereRange_Static -CaptureFrames '9,10,80' `
+    -Events '[{"frame":10,"set":{"environment.profile":1},"expectEffects":["lighting"]}]'
+```
 
 Events apply before building their exact sequence frame. Abort/admission retries
 retain the same batch/revision without invoking effects twice. Only matching
@@ -82,13 +103,22 @@ rejects retained external results, including terminal ones; consume them first.
 Each report includes `frame`, `state`, `batch` and `failure`. Unexecuted events in a
 terminal sequence report `EffectNotReached` without invented batches/stamps.
 Cancel/content invalidation closes outstanding receipts and retains reached stamps.
+The last submitted frame closes every unresolved item as `EffectNotReached` and
+fails that sequence; later rendering while captures/timing drain cannot supply
+in-range consumption. Superseded/failed effects also fail explicitly. Independent
+receipts may share a pending target without requesting another bake; an unrelated
+later parameter revision does not supersede them. A different committed assignment
+to the same parameter does supersede the older unconsumed event.
 Committed values remain session settings after completion/cancel; normal content
 lifetime clears them, with no automatic sequence rollback. Full persisted parameter
 metadata remains separate work.
 
 The hidden `sequence-parameter-events` suite verifies Demo/Lab frame-ten exposure
-and GTAO changes on both RHIs. AppRuntime fault tests exercise abort/retry,
-whole-plan rejection, result ownership, cancellation and content invalidation.
+and GTAO changes. `sequence-deferred-events` covers texture IBL and Physical Sky
+profile timelines, captured old/active generations, four stamps, real temporal
+consumers and last-frame non-consumption on both RHIs. AppRuntime fault tests
+exercise abort/retry, whole-plan rejection, owner isolation, shared-target waits,
+supersession, unrelated readiness changes, cancellation and content invalidation.
 
 ## Supersampled reference
 

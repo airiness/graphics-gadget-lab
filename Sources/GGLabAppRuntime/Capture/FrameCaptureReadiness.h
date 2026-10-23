@@ -37,6 +37,9 @@ namespace gglab
 		std::string m_Name;
 		FrameCaptureGateState m_State = FrameCaptureGateState::Pending;
 		std::string m_Detail;
+		// Internal owning-domain target of this gate, not a client-declared exception.
+		std::string m_EffectDomain;
+		uint64_t m_EffectGeneration = 0;
 	};
 
 	// Content and runtime readiness of the frame being built. Readiness is about
@@ -46,12 +49,15 @@ namespace gglab
 	{
 		std::vector<FrameCaptureGate> m_Gates;
 
-		void Add(std::string name, FrameCaptureGateState state, std::string detail = {})
+		void Add(std::string name, FrameCaptureGateState state, std::string detail = {},
+			std::string effectDomain = {}, uint64_t effectGeneration = 0)
 		{
 			m_Gates.push_back({
 				.m_Name = std::move(name),
 				.m_State = state,
 				.m_Detail = std::move(detail),
+				.m_EffectDomain = std::move(effectDomain),
+				.m_EffectGeneration = effectGeneration,
 				});
 		}
 

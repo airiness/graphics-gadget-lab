@@ -28,6 +28,7 @@ namespace gglab
 	class WorldLightingControlBase;
 	struct DemoFrameFeedback;
 	struct RenderView;
+	struct FrameCaptureGate;
 
 	// Sole transaction/receipt owner across Host and Lab sources. One queued application
 	// is independent of bounded, owner-addressed records waiting for effects or collection.
@@ -56,8 +57,11 @@ namespace gglab
 		[[nodiscard]] const std::string& GetLightingProfileError() const noexcept;
 		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
 		// Descriptor validation without reservations, mutation or retained source borrows.
-		[[nodiscard]] bool ValidateImmediateAssignments(
-			std::span<LabParameterValue> values, std::string& error) const noexcept;
+		[[nodiscard]] bool ValidateSequenceAssignments(std::span<LabParameterValue> values,
+			const std::optional<std::vector<std::string>>& expectedEffects, std::string& error) const noexcept;
+		// A live source proves coverage for this owner's applied, outstanding effects only.
+		[[nodiscard]] bool CoversReadinessGate(ParameterBatchOwner owner,
+			const FrameCaptureGate& gate) const noexcept;
 		void FinishParameterBatch(uint64_t id, ParameterBatchOwner owner = {}) noexcept;
 		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
 		[[nodiscard]] uint64_t RequestParameterBatch(std::span<const LabParameterValue> values,

@@ -172,6 +172,9 @@ namespace gglab
 			ResolvedViewRenderSettings m_ParameterBuiltView{};
 			ResolvedViewRenderSettings m_ParameterValidationView{};
 			bool m_SkipParameterFrame = false;
+			bool m_HoldLightingStages = false;
+			std::string m_ExtraPendingGate;
+			std::function<void()> m_ParameterBuiltCallback;
 			bool m_SkipLightingPublication = false;
 			bool m_RebakeAfterParameterBuild = false;
 			bool m_UnrelatedLightingChange = false;
@@ -902,7 +905,7 @@ namespace gglab
 							});
 					}
 				}
-				else
+				else if (!m_Probe.m_HoldLightingStages)
 				{
 					m_IBL->AddPass(graph, frame, services);
 				}
@@ -938,7 +941,7 @@ namespace gglab
 				}
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Scene);
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Composited);
-				if (!m_Probe.m_EnableLightingProfiles)
+				if (!m_Probe.m_EnableLightingProfiles && !m_Probe.m_HoldLightingStages)
 				{
 					m_IBL->AddFinishPass(graph);
 				}
@@ -1301,6 +1304,15 @@ namespace gglab
 				}
 			}
 			LabRuntime* GetParameterLabRuntime() noexcept override { return m_Lab.get(); }
+			void AppendCaptureReadiness(FrameCaptureReadiness& readiness) const noexcept override
+			{
+				DemoBase::AppendCaptureReadiness(readiness);
+				if (!m_Probe.m_ExtraPendingGate.empty())
+				{
+					readiness.Add(m_Probe.m_ExtraPendingGate, FrameCaptureGateState::Pending,
+						"Unrelated readiness fixture");
+				}
+			}
 			uint32_t GetTemporalSessionSerial() const noexcept override
 			{
 				// Match the production Lab host: frame build and Session parameter
@@ -1320,6 +1332,10 @@ namespace gglab
 			}
 			void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept override
 			{
+				if (m_Probe.m_ParameterBuiltCallback)
+				{
+					m_Probe.m_ParameterBuiltCallback();
+				}
 				if (m_Lab || m_Probe.m_EnableLightingProfiles)
 				{
 					GGLAB_UNUSED(serial);
@@ -2893,7 +2909,7 @@ namespace gglab
 				event(2, LabParameterId("unknown.event"), true),
 				event(2, radius, true),
 				event(2, radius, 999.0f),
-				event(2, LabParameterId("lighting"), uint32_t(64)),
+				event(2, LabParameterId("deferred"), true),
 				event(2, LabParameterId("layout"), uint32_t(2)),
 				event(2, LabParameterId("unprojected"), 2.0f),
 				event(4, exposure, baseline + 1.0f) })
@@ -2994,6 +3010,217 @@ namespace gglab
 			checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
 				parameters.GetParameterBatchCount() == 0 && !sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
 				"Content invalidation releases the event reservation and never consumes against a replacement binding");
+			runtime.Shutdown();
+		}
+
+		void RunDeferredSequenceEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			probe.m_EnableTemporalHistory = false;
+			const auto& parameters = *runtime.GetParameterControl();
+			const auto& sequence = *runtime.GetFrameSequenceCoordinator();
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			probe.m_ParameterControl = &parameters;
+			const auto tick = [&]()
+				{
+					probe.m_ReadbackFence = {};
+					return runtime.Tick() == AppRuntimeTickResult::Continue;
+				};
+			const auto until = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						if (!tick())
+						{
+							return false;
+						}
+						std::this_thread::yield();
+					}
+					return condition();
+				};
+			const auto ready = [&]()
+				{
+					const auto* frame = runtime.GetFrameCaptureCoordinator()->GetLastFrameState();
+					return frame && frame->m_Readiness.IsReady();
+				};
+			checks.Check(until(ready), "Deferred events wait for an actually ready baseline");
+			runtime.EnableParameterControl();
+			runtime.GetTime()->SetFixedDeltaTime(1.0 / 60.0);
+			const std::array baseline{
+				LabParameterValue{ LabParameterId("view.taa.enabled"), false },
+				LabParameterValue{ LabParameterId("view.gtao.temporal_accumulation"), false },
+			};
+			std::string error;
+			const auto configured = runtime.RequestParameterBatch(baseline, error);
+			checks.Check(configured && until([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(configured).has_value() && until(ready),
+				"Deferred timeline uses supported temporal services and releases external ownership");
+			checks.Check(runtime.GetDemoManager()->GetActiveDemo()->GetCameraRig().SetCameraPaths({ {
+				.m_Id = "SEQ_Deferred", .m_Name = "Deferred events", .m_Version = 1,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+					{ .m_Frame = 63, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+				},
+			} }), "Deferred timeline registers one fixed 64-frame measurement range");
+			const auto lighting = [](uint32_t frame, uint32_t samples)
+				{
+					return FrameSequenceParameterEvent{ .m_Frame = frame,
+						.m_Values = { { LabParameterId("lighting"), samples } },
+						.m_ExpectEffects = std::vector<std::string>{ "lighting" } };
+				};
+			const auto start = [&](std::vector<FrameSequenceParameterEvent> events)
+				{
+					return runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Deferred",
+						.m_Events = std::move(events) }, error) != 0;
+				};
+			for (const bool deferred : { false, true })
+			{
+				auto invalid = lighting(1, 2);
+				if (deferred)
+				{
+					invalid.m_ExpectEffects = std::vector<std::string>{};
+				}
+				else
+				{
+					invalid.m_Values = { { LabParameterId("view.exposure.ev100"), 9.0f } };
+				}
+				const auto revision = parameters.GetParameterRevision();
+				checks.Check(start({ lighting(0, 2), invalid }) && until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+					sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					sequence.GetStatus()->m_SubmittedFrames == 0 && parameters.GetParameterRevision() == revision &&
+					probe.m_LightingParameterApplications == 0,
+					"A later domain expectation mismatch rejects every event before any mutation");
+			}
+			probe.m_HoldLightingStages = true;
+			auto mixed = lighting(0, 2);
+			mixed.m_Values.push_back({ LabParameterId("view.exposure.ev100"), 8.0f });
+			checks.Check(start({ mixed,
+				{ .m_Frame = 1, .m_Values = { { LabParameterId("radius"), 2.0f } } },
+				lighting(2, 2), lighting(63, 2) }), "Deferred and Immediate events share the existing Session owner");
+			probe.m_SkipParameterFrame = true;
+			checks.Check(tick() && sequence.GetStatus()->m_SubmittedFrames == 0 &&
+				probe.m_LightingParameterApplications == 1, "An aborted Deferred event applies exactly once");
+			const auto applied = sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_Applied;
+			checks.Check(tick() && tick() && tick() && sequence.GetStatus()->m_SubmittedFrames == 3 &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Running &&
+				parameters.GetParameterBatchCount() == 2,
+				"Transition frames and a later Immediate batch submit while two Deferred receipts remain outstanding");
+			const auto owner = ParameterBatchOwner{ sequence.GetStatus()->m_SequenceId };
+			const auto generation = environment.GetBakeRequestGeneration();
+			FrameCaptureGate gate{ .m_Name = "ibl", .m_State = FrameCaptureGateState::Pending,
+				.m_EffectDomain = "lighting", .m_EffectGeneration = generation };
+			checks.Check(parameters.CoversReadinessGate(owner, gate) &&
+				!parameters.CoversReadinessGate({}, gate) &&
+				!parameters.CoversReadinessGate(ParameterBatchOwner{ sequence.GetStatus()->m_SequenceId + 1 }, gate) &&
+				!parameters.CoversReadinessGate(owner, { .m_Name = "ibl", .m_State = FrameCaptureGateState::Pending }),
+				"Only this owner and its exact bound IBL target can cover a Pending gate");
+			gate.m_EffectGeneration = generation + 1;
+			checks.Check(!parameters.CoversReadinessGate(owner, gate),
+				"A gate with different frozen generation evidence cannot borrow the live receipt");
+			checks.Check(sequence.GetStatus()->m_Events[0].m_Batch->m_Items[1].m_State == ParameterEffectState::Consumed &&
+				sequence.GetStatus()->m_Events[1].m_Batch->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0].m_Identity.m_Generation == generation &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_Applied == applied,
+				"Unrelated revisions and same-target assignments preserve independent Deferred evidence");
+			bool abortedPublication = false;
+			probe.m_ParameterBuiltCallback = [&]()
+				{
+					const auto& item = sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0];
+					if (!abortedPublication && item.m_Published)
+					{
+						abortedPublication = true;
+						probe.m_SkipParameterFrame = true;
+					}
+				};
+			probe.m_HoldLightingStages = false;
+			checks.Check(until([&]() { return abortedPublication; }) &&
+				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+				"An aborted publication frame keeps its stamp without becoming firstConsumed");
+			probe.m_ParameterBuiltCallback = {};
+			checks.Check(until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+				sequence.GetStatus()->m_SubmittedFrames == 64 && parameters.GetParameterBatchCount() == 0,
+				"Deferred timeline completes every measurement frame and collects every internal result");
+			const auto& first = sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0];
+			const auto& shared = sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0];
+			checks.Check(first.m_State == ParameterEffectState::Consumed && first.m_Applied == applied &&
+				first.m_Published > applied && first.m_FirstConsumed > first.m_Published &&
+				shared.m_FirstConsumed == first.m_FirstConsumed &&
+				sequence.GetStatus()->m_Events[3].m_Batch->m_Items[0].m_State == ParameterEffectState::NoChange,
+				"Independent shared-target receipts consume the matching retry; final NoChange starts no transition");
+			uint32_t samples = 4;
+			for (const auto* pendingGate : { "environment", "asset-loads", "shaders", "ibl" })
+			{
+				checks.Check(until(ready) && start({ lighting(0, samples++) }) && tick(),
+					"An uncovered-gate case first establishes its own pending effect");
+				probe.m_ExtraPendingGate = pendingGate;
+				checks.Check(tick() && sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					parameters.GetParameterBatchCount() == 0 &&
+					!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+					"An unrelated Pending gate still fails and closes outstanding effects");
+				probe.m_ExtraPendingGate.clear();
+			}
+			checks.Check(until(ready) && start({ lighting(0, 8) }) && tick(),
+				"An external-target case establishes one pending generation");
+			probe.m_ParameterEnvironment->RequestRebake();
+			gate.m_EffectGeneration = environment.GetBakeRequestGeneration();
+			checks.Check(!parameters.CoversReadinessGate(
+				ParameterBatchOwner{ sequence.GetStatus()->m_SequenceId }, gate) && tick() &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Failed && parameters.GetParameterBatchCount() == 0,
+				"A newer unrelated Runtime target cannot borrow a sequence receipt's readiness allowance");
+			checks.Check(until(ready) && start({ lighting(0, 16), lighting(1, 32) }) && tick() && tick() &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				parameters.GetParameterBatchCount() == 0,
+				"An overlapping different assignment supersedes the first event and closes every sibling");
+			checks.Check(until(ready), "The last-frame case starts from Ready");
+			probe.m_HoldLightingStages = true;
+			checks.Check(start({ lighting(63, 64) }) && until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				sequence.GetStatus()->m_SubmittedFrames == 64 &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				parameters.GetParameterBatchCount() == 0,
+				"The last submitted frame closes unconsumed effects without waiting for post-range publication");
+			probe.m_HoldLightingStages = false;
+			checks.Check(until(ready) && start({ lighting(0, 128), lighting(1, 128), lighting(63, 256) }) && tick() && tick(),
+				"Cancellation admits two independently pending records");
+			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
+				parameters.GetParameterBatchCount() == 0 &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				sequence.GetStatus()->m_Events[1].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				!sequence.GetStatus()->m_Events[2].m_Batch,
+				"Cancellation closes all pending records and leaves future events unexecuted");
+			checks.Check(until(ready), "A masked Immediate failure starts from Ready");
+			const std::array mask{ LabParameterValue{ LabParameterId("view.gtao.radius"), 3.0f } };
+			const auto maskId = runtime.RequestParameterBatch(mask, error);
+			checks.Check(maskId && until([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(maskId).has_value(), "The failure fixture establishes a real Host override");
+			auto masked = lighting(0, 256);
+			masked.m_Values.push_back({ LabParameterId("radius"), 1.0f });
+			checks.Check(start({ masked }) && tick() && sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[1].m_State == ParameterEffectState::Superseded &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				parameters.GetParameterBatchCount() == 0,
+				"A failed Immediate sibling ends the event without waiting for its Deferred sibling");
+			checks.Check(until(ready) && start({ lighting(0, 512), lighting(1, 512) }) && tick() && tick(),
+				"Content invalidation starts with two pending Deferred records");
+			++probe.m_ContentSerialOffset;
+			probe.m_FrameBeginUnavailable = true;
+			checks.Check(tick() && sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				parameters.GetParameterBatchCount() == 0 &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				sequence.GetStatus()->m_Events[1].m_Batch->m_Items[0].m_State == ParameterEffectState::Superseded,
+				"Content replacement closes every Deferred record even while RHI BeginFrame is Unavailable");
+			probe.m_FrameBeginUnavailable = false;
 			runtime.Shutdown();
 		}
 
@@ -4578,6 +4805,7 @@ namespace gglab
 		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
 		RunLightingProfileScenario(context, root / "lighting-profiles");
 		RunSequenceParameterEventScenario(context, root / "sequence-events");
+		RunDeferredSequenceEventScenario(context, root / "deferred-sequence-events");
 		RunSessionAdmissionScenario(context, root / "session-admission");
 		RunSessionExitAdmissionScenario(context, root / "session-exit-admission");
 		RunParameterFeedbackScenario(context, root / "parameter-feedback");

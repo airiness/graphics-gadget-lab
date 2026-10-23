@@ -335,10 +335,15 @@ namespace gglab
 			const auto& event = request.m_Events[i];
 			eventItems += event.m_Values.size();
 			if (event.m_Values.empty() || event.m_Values.size() > 128 || eventItems > 1024 ||
-				(i != 0 && request.m_Events[i - 1].m_Frame == event.m_Frame) ||
-				(event.m_ExpectEffects && !event.m_ExpectEffects->empty()))
+				(i != 0 && request.m_Events[i - 1].m_Frame == event.m_Frame))
 			{
-				outError = "Events require distinct frames, 1-128 items each (1024 total), and no deferred expected effects.";
+				outError = "Events require distinct frames and 1-128 items each (1024 total).";
+				return 0;
+			}
+			if (event.m_ExpectEffects && (event.m_ExpectEffects->size() > 1 ||
+				(!event.m_ExpectEffects->empty() && event.m_ExpectEffects->front() != "lighting")))
+			{
+				outError = "Event expectEffects supports only [] or [\"lighting\"].";
 				return 0;
 			}
 			for (const auto& value : event.m_Values)
@@ -688,16 +693,29 @@ namespace gglab
 				(!event.m_Batch && event.m_Frame == m_Frame))
 			{
 				event.m_Batch = batch;
-				if (batch.IsTerminal() && (batch.m_State == ParameterBatchState::Failed ||
-					!std::ranges::all_of(batch.m_Items, [](const auto& item)
+				const auto index = static_cast<size_t>(&event - m_Status->m_Events.data());
+				const auto& expected = m_Request.m_Events[index].m_ExpectEffects;
+				if (expected && std::ranges::any_of(batch.m_Items, [&](const auto& item)
 					{
-						return item.m_State == ParameterEffectState::Consumed ||
-							item.m_State == ParameterEffectState::NoChange;
-					})))
+						return item.m_Applied && !item.m_Identity.m_Domain.empty() &&
+							std::ranges::find(*expected, item.m_Identity.m_Domain) == expected->end();
+					}))
+				{
+					event.m_Failure = "EffectMismatch: the actual receipt domain differs from expectEffects.";
+					Fail(event.m_Failure);
+					return;
+				}
+				if (batch.m_State == ParameterBatchState::Failed ||
+					std::ranges::any_of(batch.m_Items, [](const auto& item)
+					{
+						return item.IsTerminal() && item.m_State != ParameterEffectState::Consumed &&
+							item.m_State != ParameterEffectState::NoChange;
+					}))
 				{
 					event.m_Failure = batch.m_Failure.empty() ? "An event effect did not reach consumption." : batch.m_Failure;
 					Fail(event.m_Failure);
 				}
+				CompleteIfFinished();
 				return;
 			}
 		}
@@ -733,13 +751,19 @@ namespace gglab
 		m_AppliedPose = pose;
 	}
 
-	bool FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state) noexcept
+	bool FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state,
+		const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate) noexcept
 	{
 		if (!m_Status || m_Status->m_State != FrameSequenceState::Running || !m_AppliedPose)
 		{
 			return true;
 		}
-		if (!state.m_Readiness.IsReady())
+		if (!std::ranges::all_of(state.m_Readiness.m_Gates, [&](const auto& gate)
+			{
+				return gate.m_State == FrameCaptureGateState::Ready ||
+					(gate.m_State == FrameCaptureGateState::Pending && coversReadinessGate &&
+						coversReadinessGate(gate));
+			}))
 		{
 			Fail(std::format("A readiness gate left Ready at sequence frame {}: {}", m_Frame,
 				DescribePendingGates(state.m_Readiness)));
@@ -850,7 +874,11 @@ namespace gglab
 		}
 		for (const auto& event : m_Status->m_Events)
 		{
-			if (event.m_Frame == m_Frame && (!event.m_Batch || !event.m_Batch->IsTerminal()))
+			if (event.m_Frame == m_Frame && (!event.m_Batch ||
+				std::ranges::any_of(event.m_Batch->m_Items, [](const auto& item)
+				{
+					return item.m_DeclaredClass == ParameterEffectClass::Immediate && !item.IsTerminal();
+				})))
 			{
 				Fail("An Immediate event did not reach its terminal receipt in the submitted sequence frame.");
 				return;
@@ -1062,6 +1090,10 @@ namespace gglab
 	{
 		CollectTimingPublication();
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
+			std::ranges::all_of(m_Status->m_Events, [](const auto& event)
+			{
+				return event.m_Batch && event.m_Batch->IsTerminal();
+			}) &&
 			m_CaptureJobs.empty() &&
 			m_PendingGpuTimingFrames.empty() &&
 			(!m_WatchCoverageId || (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->m_Complete)))
