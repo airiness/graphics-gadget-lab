@@ -5,7 +5,7 @@ Use the script and application from the same revision. Check
 `labParameterControl` retains discovery for the earlier Lab-only extension. The extension adds commands and status fields; existing
 capture/result/sequence fields and their v4 meanings are unchanged.
 
-The session owns one batch/result slot shared by Host and active Lab sources.
+The external session client owns one batch/result slot shared by Host and active Lab sources.
 Host `view.taa.*`, `view.gtao.*` and `view.exposure.*` work on Demo and Lab content.
 The Lab source supports Immediate parameters with explicit frozen-frame projections
 and **one explicitly
@@ -164,10 +164,22 @@ startup `-LabParameters` is a separate path.
 
 Wire submission immediately returns `admission: Accepted`, `batchId`,
 `consumed: false` and a `Queued` batch. No revision or receipt stamps are invented
-before the actual Ready frame. There is one AppRuntime session-owned accepted batch/result
-slot; terminal results retain it until explicit consumption. Rejection allocates
+before the actual Ready frame. The external client retains one AppRuntime session-owned
+accepted batch/result slot; terminal results retain it until explicit consumption. Rejection allocates
 no batch id. IDs are process-local and **separate from capture `jobId`** and
 transport correlation `id`.
+
+Internally, Session separates one queued source reservation from a bounded set of
+128 retained transaction records, including terminal results. The same internal
+owner may admit another batch after application while older effects await domain
+publication or successful submission. Owner identity plus batch ID controls query,
+collection and cancellation; external commands cannot claim sequence records.
+Each batch retains its own revision, values, effect evidence and four stamps.
+A later unrelated revision does not supersede an older pending item. A committed
+different assignment to that item's ID, or a newer owning-domain target before
+build, supersedes it without inventing consumption. Owner termination closes every
+outstanding item and releases only the queued reservation. This storage capability
+does not enable Deferred sequence events or relax readiness policy.
 
 At the Ready boundary, the Session prepares the complete current batch before
 committing any of its live values: source/type bindings, Host candidates and

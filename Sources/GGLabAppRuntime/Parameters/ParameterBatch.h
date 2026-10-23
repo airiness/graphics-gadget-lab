@@ -8,6 +8,19 @@
 
 namespace gglab
 {
+	// Zero is the external session client. Internal owners use their stable nonzero identity.
+	class ParameterBatchOwner final
+	{
+	public:
+		constexpr ParameterBatchOwner() noexcept = default;
+		explicit constexpr ParameterBatchOwner(uint64_t identity) noexcept : m_Identity(identity) {}
+		[[nodiscard]] bool IsExternal() const noexcept { return m_Identity == 0; }
+		bool operator==(const ParameterBatchOwner&) const noexcept = default;
+
+	private:
+		uint64_t m_Identity = 0;
+	};
+
 	enum class ParameterBatchState : uint8_t
 	{
 		Queued,

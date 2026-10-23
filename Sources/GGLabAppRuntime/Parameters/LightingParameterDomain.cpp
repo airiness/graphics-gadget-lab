@@ -3,9 +3,23 @@
 
 namespace gglab
 {
-	void LightingParameterDomain::BeginFrame(ParameterDomainState& state) const noexcept
+	void LightingParameterDomain::BeginFrame() noexcept
 	{
-		state.m_Baseline = m_Environment.GetBakeRequestGeneration();
+		m_FrameBaseline = m_Environment.GetBakeRequestGeneration();
+		m_FrameAttributedGeneration = 0;
+	}
+
+	void LightingParameterDomain::BeginApplication(ParameterDomainState& state) const noexcept
+	{
+		state = { .m_Baseline = m_Environment.GetBakeRequestGeneration() };
+	}
+
+	void LightingParameterDomain::ObserveFrameEffects(const ParameterDomainState& state) noexcept
+	{
+		if (state.m_Attributed)
+		{
+			m_FrameAttributedGeneration = state.m_Applied;
+		}
 	}
 
 	void LightingParameterDomain::CompleteEffects(ParameterDomainState& state) const noexcept
@@ -44,7 +58,7 @@ namespace gglab
 				.m_Identity = { .m_Domain = "lighting", .m_Generation = state.m_Applied } };
 		}
 		const uint64_t requested = m_Environment.GetBakeRequestGeneration();
-		if (requested != state.m_Baseline && (!state.m_Attributed || requested != state.m_Applied))
+		if (requested != m_FrameBaseline && requested != m_FrameAttributedGeneration)
 		{
 			return { .m_Failure = "UnexpectedLightingTransition: effect attribution is unavailable for this frame." };
 		}
@@ -54,13 +68,15 @@ namespace gglab
 	ParameterPublicationObservation LightingParameterDomain::ObservePublication(
 		const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept
 	{
-		if (frame.m_LightingGeneration != 0 && frame.m_LightingGeneration == identity.m_Generation)
-		{
-			return { ParameterPublication::Published };
-		}
+		// A newer target observed before build supersedes this operation. A request
+		// after build cannot rewrite the frozen evidence retained for that submission.
 		if (m_Environment.GetBakeRequestGeneration() != identity.m_Generation)
 		{
 			return { ParameterPublication::Superseded };
+		}
+		if (frame.m_LightingGeneration != 0 && frame.m_LightingGeneration == identity.m_Generation)
+		{
+			return { ParameterPublication::Published };
 		}
 		if (m_Environment.GetBakingStatus().m_Stage == IBLBakeStage::Failed)
 		{

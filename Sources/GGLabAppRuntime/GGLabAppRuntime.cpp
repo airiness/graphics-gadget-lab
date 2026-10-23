@@ -5,6 +5,7 @@
 #include "Demo/DemoManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
@@ -63,8 +64,9 @@ namespace gglab
 			error = "Frame sequences are unavailable in this session.";
 			return 0;
 		}
-		const auto* batch = m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
-		if (batch && (!batch->IsTerminal() || !request.m_Events.empty()))
+		UpdateSequenceParameterEvents();
+		if (m_ParameterControl && (m_ParameterControl->HasPendingParameterBatches() ||
+			(!request.m_Events.empty() && m_ParameterControl->GetParameterBatchCount() != 0)))
 		{
 			error = "Busy: finish the pending parameter batch before starting a sequence.";
 			return 0;
@@ -81,7 +83,7 @@ namespace gglab
 	FrameSequenceCancelVerdict GGLabAppRuntime::CancelFrameSequence() noexcept
 	{
 		const auto verdict = m_FrameSequence ? m_FrameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
-		UpdateSequenceParameterEvent();
+		UpdateSequenceParameterEvents();
 		return verdict;
 	}
 
@@ -106,7 +108,7 @@ namespace gglab
 			error = "Busy: session parameter changes are unavailable during a sequence.";
 			return false;
 		}
-		if (m_ParameterControl->GetParameterBatchStatus())
+		if (m_ParameterControl->GetParameterBatchCount() != 0)
 		{
 			error = "Busy: consume the previous parameter batch result first.";
 			return false;
@@ -131,39 +133,53 @@ namespace gglab
 
 	const ParameterBatchStatus* GGLabAppRuntime::GetExternalParameterBatchStatus() const noexcept
 	{
-		const auto* batch = m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
-		return batch && batch->m_BatchId != m_SequenceParameterBatch ? batch : nullptr;
+		return m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
 	}
 
-	void GGLabAppRuntime::UpdateSequenceParameterEvent() noexcept
+	void GGLabAppRuntime::UpdateSequenceParameterEvents() noexcept
 	{
-		if (!m_SequenceParameterBatch || !m_ParameterControl || !m_FrameSequence)
+		const auto* sequence = m_FrameSequence ? m_FrameSequence->GetStatus() : nullptr;
+		if (!sequence || !m_ParameterControl)
 		{
 			return;
 		}
+		const ParameterBatchOwner owner{ sequence->m_SequenceId };
+		const auto publish = [&]()
+			{
+				const auto batches = m_ParameterControl->GetParameterBatchStatuses(owner);
+				for (const auto& event : m_FrameSequence->GetStatus()->m_Events)
+				{
+					if (event.m_Batch && !event.m_Batch->IsTerminal() &&
+						std::ranges::none_of(batches, [&](const auto& batch)
+						{
+							return batch.m_BatchId == event.m_Batch->m_BatchId;
+						}))
+					{
+						m_FrameSequence->OnParameterEventFailed("The sequence parameter receipt was lost.");
+					}
+				}
+				for (const auto& batch : batches)
+				{
+					m_FrameSequence->OnParameterEventBatch(batch);
+					if (batch.IsTerminal())
+					{
+						GGLAB_UNUSED(m_ParameterControl->TakeParameterBatchResult(batch.m_BatchId, owner));
+					}
+				}
+			};
+		publish();
 		if (!m_FrameSequence->IsActive())
 		{
-			m_ParameterControl->FinishParameterBatch(m_SequenceParameterBatch);
-		}
-		const auto* batch = m_ParameterControl->GetParameterBatchStatus();
-		if (!batch || batch->m_BatchId != m_SequenceParameterBatch)
-		{
-			m_FrameSequence->OnParameterEventFailed("The sequence parameter receipt was lost.");
-			m_SequenceParameterBatch = 0;
-			return;
-		}
-		m_FrameSequence->OnParameterEventBatch(*batch);
-		if (batch->IsTerminal())
-		{
-			GGLAB_UNUSED(m_ParameterControl->TakeParameterBatchResult(m_SequenceParameterBatch));
-			m_SequenceParameterBatch = 0;
+			// Reporting one failed event can end the sequence. Close and publish every
+			// remaining receipt for that owner before allowing a replacement sequence.
+			m_ParameterControl->FinishParameterBatches(owner);
+			publish();
 		}
 	}
 
 	std::optional<ParameterBatchStatus> GGLabAppRuntime::TakeParameterBatchResult(uint64_t id) noexcept
 	{
-		return m_ParameterControl && id != m_SequenceParameterBatch ?
-			m_ParameterControl->TakeParameterBatchResult(id) : std::nullopt;
+		return m_ParameterControl ? m_ParameterControl->TakeParameterBatchResult(id) : std::nullopt;
 	}
 
 	void GGLabAppRuntime::SynchronizeContentBinding() noexcept
@@ -180,7 +196,7 @@ namespace gglab
 			if (m_FrameSequence)
 			{
 				m_FrameSequence->OnContentBindingChanged(m_ActiveContentIdentity);
-				UpdateSequenceParameterEvent();
+				UpdateSequenceParameterEvents();
 			}
 		}
 	}
@@ -195,7 +211,7 @@ namespace gglab
 		if (m_FrameSequence)
 		{
 			m_FrameSequence->OnContentBindingChanged(0);
-			UpdateSequenceParameterEvent();
+			UpdateSequenceParameterEvents();
 		}
 	}
 

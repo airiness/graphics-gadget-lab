@@ -295,7 +295,7 @@ namespace gglab
 		// the previous request afterwards.
 		void SyncSequenceGpuProfiling() noexcept;
 		void CollectSequenceGpuTiming() noexcept;
-		void UpdateSequenceParameterEvent() noexcept;
+		void UpdateSequenceParameterEvents() noexcept;
 
 		ApplicationToolingFrameSettings m_ToolingFrameSettings;
 		AppRuntimeConfig m_Config{};
@@ -321,7 +321,6 @@ namespace gglab
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		std::unique_ptr<SessionParameterControl> m_ParameterControl;
-		uint64_t m_SequenceParameterBatch = 0;
 		// Frozen after content update; shared by parameters and this frame's planning.
 		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.

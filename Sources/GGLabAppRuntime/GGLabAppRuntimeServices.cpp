@@ -45,7 +45,7 @@ namespace gglab
 
 	void GGLabAppRuntime::CollectFrameCaptureResults() noexcept
 	{
-		UpdateSequenceParameterEvent();
+		UpdateSequenceParameterEvents();
 		if (!m_FrameCapture)
 		{
 			return;

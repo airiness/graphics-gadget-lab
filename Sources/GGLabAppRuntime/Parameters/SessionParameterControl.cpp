@@ -27,7 +27,10 @@ namespace gglab
 		if (demo != m_Demo || serial != m_ContentSerial)
 		{
 			// Release source reservations while their previous content owner is alive.
-			EndParameterBatch(true, "The content changed before the parameter frame.");
+			for (auto& batch : m_ParameterBatches)
+			{
+				EndParameterBatch(*batch, true, "The content changed before the parameter frame.");
+			}
 			m_Sources->Bind(demo, demo ? demo->GetParameterLabRuntime() : nullptr, serial);
 			if (m_Enabled && m_Demo && m_ParameterRevision != std::numeric_limits<uint64_t>::max())
 			{
@@ -223,16 +226,31 @@ namespace gglab
 		return ValidateParameterBatch(values, error);
 	}
 
-	uint64_t SessionParameterControl::RequestParameterBatch(
-		std::span<const LabParameterValue> values, std::string& error) noexcept
+	uint64_t SessionParameterControl::RequestParameterBatch(std::span<const LabParameterValue> values,
+		std::string& error, ParameterBatchOwner owner) noexcept
+	{
+		error.clear();
+		if (m_MutatingParameterBatch || m_QueuedParameterBatch ||
+			m_ParameterBatches.size() >= SessionParameterMaxBatches ||
+			std::ranges::any_of(m_ParameterBatches, [&](const auto& batch)
+			{
+				return owner.IsExternal() || batch->m_Owner != owner;
+			}))
+		{
+			error = "Busy: an application, another owner or retained result capacity blocks admission.";
+			return 0;
+		}
+		m_MutatingParameterBatch = true;
+		const auto id = AdmitParameterBatch(values, error, owner);
+		m_MutatingParameterBatch = false;
+		return id;
+	}
+
+	uint64_t SessionParameterControl::AdmitParameterBatch(
+		std::span<const LabParameterValue> values, std::string& error, ParameterBatchOwner owner) noexcept
 	{
 		Enable();
 		error.clear();
-		if (m_ParameterBatch)
-		{
-			error = "Busy: consume the previous parameter batch result first.";
-			return 0;
-		}
 		if (!IsAvailable() || values.empty() || values.size() > SessionParameterMaxItems)
 		{
 			error = "A parameter batch requires ready active content and 1-128 items.";
@@ -286,8 +304,10 @@ namespace gglab
 			reserved.push_back(source);
 		}
 		++m_NextParameterBatchId;
-		m_ParameterBatch.emplace();
-		auto& batch = *m_ParameterBatch;
+		m_ParameterBatches.push_back(std::make_unique<ParameterBatch>());
+		auto& batch = *m_ParameterBatches.back();
+		batch.m_Owner = owner;
+		m_QueuedParameterBatch = id;
 		batch.m_Status.m_BatchId = id;
 		batch.m_Status.m_ContentId = m_ContentId;
 		batch.m_Status.m_Source = hasHost ? (hasLab ? "mixed" : "host") : "lab";
@@ -299,36 +319,92 @@ namespace gglab
 
 	const ParameterBatchStatus* SessionParameterControl::GetParameterBatchStatus() const noexcept
 	{
-		return m_ParameterBatch ? &m_ParameterBatch->m_Status : nullptr;
+		const auto found = std::ranges::find_if(m_ParameterBatches,
+			[](const auto& batch) { return batch->m_Owner.IsExternal(); });
+		return found != m_ParameterBatches.end() ? &(*found)->m_Status : nullptr;
 	}
 
-	std::optional<ParameterBatchStatus> SessionParameterControl::TakeParameterBatchResult(uint64_t id) noexcept
+	const ParameterBatchStatus* SessionParameterControl::GetParameterBatchStatus(
+		uint64_t id, ParameterBatchOwner owner) const noexcept
 	{
-		if (!m_ParameterBatch || m_ParameterBatch->m_Status.m_BatchId != id ||
-			!m_ParameterBatch->m_Status.IsTerminal())
+		const auto found = std::ranges::find_if(m_ParameterBatches, [&](const auto& batch)
 		{
-			return std::nullopt;
+			return batch->m_Status.m_BatchId == id && batch->m_Owner == owner;
+		});
+		return found != m_ParameterBatches.end() ? &(*found)->m_Status : nullptr;
+	}
+
+	std::vector<ParameterBatchStatus> SessionParameterControl::GetParameterBatchStatuses(
+		ParameterBatchOwner owner) const
+	{
+		std::vector<ParameterBatchStatus> result;
+		for (const auto& batch : m_ParameterBatches)
+		{
+			if (batch->m_Owner == owner)
+			{
+				result.push_back(batch->m_Status);
+			}
 		}
-		auto result = std::move(m_ParameterBatch->m_Status);
-		m_ParameterBatch.reset();
 		return result;
 	}
 
-	void SessionParameterControl::FinishParameterBatch(uint64_t id) noexcept
+	bool SessionParameterControl::HasPendingParameterBatches() const noexcept
 	{
-		if (m_ParameterBatch && m_ParameterBatch->m_Status.m_BatchId == id)
+		return std::ranges::any_of(m_ParameterBatches,
+			[](const auto& batch) { return !batch->m_Status.IsTerminal(); });
+	}
+
+	std::optional<ParameterBatchStatus> SessionParameterControl::TakeParameterBatchResult(
+		uint64_t id, ParameterBatchOwner owner) noexcept
+	{
+		if (m_MutatingParameterBatch)
 		{
-			EndParameterBatch(false, "The sequence ended before parameter consumption.");
+			return std::nullopt;
+		}
+		const auto found = std::ranges::find_if(m_ParameterBatches, [&](const auto& batch)
+		{
+			return batch->m_Status.m_BatchId == id && batch->m_Owner == owner && batch->m_Status.IsTerminal();
+		});
+		if (found == m_ParameterBatches.end())
+		{
+			return std::nullopt;
+		}
+		auto result = std::move((*found)->m_Status);
+		m_ParameterBatches.erase(found);
+		return result;
+	}
+
+	void SessionParameterControl::FinishParameterBatch(uint64_t id, ParameterBatchOwner owner) noexcept
+	{
+		if (!m_MutatingParameterBatch)
+		{
+			for (auto& batch : m_ParameterBatches)
+			{
+				if (batch->m_Status.m_BatchId == id && batch->m_Owner == owner)
+				{
+					EndParameterBatch(*batch, false, "The owner ended before parameter consumption.");
+					return;
+				}
+			}
 		}
 	}
 
-	void SessionParameterControl::RefreshParameterBatchStatus() noexcept
+	void SessionParameterControl::FinishParameterBatches(ParameterBatchOwner owner) noexcept
 	{
-		if (!m_ParameterBatch)
+		if (!m_MutatingParameterBatch)
 		{
-			return;
+			for (auto& batch : m_ParameterBatches)
+			{
+				if (batch->m_Owner == owner)
+				{
+					EndParameterBatch(*batch, false, "The owner ended before parameter consumption.");
+				}
+			}
 		}
-		auto& batch = *m_ParameterBatch;
+	}
+
+	void SessionParameterControl::RefreshParameterBatchStatus(ParameterBatch& batch) noexcept
+	{
 		// A failed item ends the complete wait. Close unresolved siblings while
 		// preserving every stamp already reached; never leave pending items in a terminal batch.
 		for (const auto& receipt : batch.m_Receipts)
@@ -357,16 +433,20 @@ namespace gglab
 		}
 	}
 
-	void SessionParameterControl::EndParameterBatch(bool superseded, std::string reason) noexcept
+	void SessionParameterControl::EndParameterBatch(ParameterBatch& batch,
+		bool superseded, std::string reason) noexcept
 	{
-		if (!m_ParameterBatch || m_ParameterBatch->m_Status.IsTerminal())
+		if (batch.m_Status.IsTerminal())
 		{
 			return;
 		}
-		auto& batch = *m_ParameterBatch;
-		for (auto* source : m_Sources->Ordered())
+		if (m_QueuedParameterBatch == batch.m_Status.m_BatchId)
 		{
-			source->Cancel(batch.m_Status.m_BatchId);
+			for (auto* source : m_Sources->Ordered())
+			{
+				source->Cancel(batch.m_Status.m_BatchId);
+			}
+			m_QueuedParameterBatch = 0;
 		}
 		if (batch.m_Receipts.empty())
 		{
@@ -386,34 +466,44 @@ namespace gglab
 			}
 		}
 		batch.m_Consumed.clear();
-		RefreshParameterBatchStatus();
+		RefreshParameterBatchStatus(batch);
 	}
 
 	void SessionParameterControl::OnRuntimeFailed(std::string_view reason) noexcept
 	{
 		m_ParameterIntakeFailed = true;
-		if (m_ParameterBatch)
+		for (auto& entry : m_ParameterBatches)
 		{
-			for (auto* source : m_Sources->Ordered())
+			auto& batch = *entry;
+			if (batch.m_Status.IsTerminal())
 			{
-				source->Cancel(m_ParameterBatch->m_Status.m_BatchId);
+				continue;
 			}
-		}
-		if (m_ParameterBatch && !m_ParameterBatch->m_Status.IsTerminal())
-		{
-			for (auto& receipt : m_ParameterBatch->m_Receipts)
+			if (m_QueuedParameterBatch == batch.m_Status.m_BatchId)
+			{
+				for (auto* source : m_Sources->Ordered())
+				{
+					source->Cancel(batch.m_Status.m_BatchId);
+				}
+				m_QueuedParameterBatch = 0;
+			}
+			for (auto& receipt : batch.m_Receipts)
 			{
 				GGLAB_UNUSED(receipt.Fail(std::string(reason)));
 			}
-			RefreshParameterBatchStatus();
-			m_ParameterBatch->m_Status.m_State = ParameterBatchState::Failed;
-			m_ParameterBatch->m_Status.m_Failure = reason;
+			batch.m_Consumed.clear();
+			RefreshParameterBatchStatus(batch);
+			batch.m_Status.m_State = ParameterBatchState::Failed;
+			batch.m_Status.m_Failure = reason;
 		}
 	}
 
 	void SessionParameterControl::Finish() noexcept
 	{
-		EndParameterBatch(false, "The runtime shut down before parameter consumption.");
+		for (auto& batch : m_ParameterBatches)
+		{
+			EndParameterBatch(*batch, false, "The runtime shut down before parameter consumption.");
+		}
 		m_ParameterIntakeFailed = true;
 		m_Sources->Bind(nullptr, nullptr, 0);
 		m_Demo = nullptr;
@@ -422,33 +512,52 @@ namespace gglab
 
 	void SessionParameterControl::OnFrameReady(uint64_t serial) noexcept
 	{
-		if (!m_ParameterBatch || m_ParameterBatch->m_Status.IsTerminal() || serial == 0)
+		if (serial == 0 || serial <= m_LastReadyFrameSerial || m_MutatingParameterBatch)
 		{
 			return;
 		}
-		auto& batch = *m_ParameterBatch;
-		batch.m_Consumed.clear();
-		batch.m_FrameSerial = serial;
-		if (batch.m_Session != m_ContentSerial)
+		m_LastReadyFrameSerial = serial;
+		if (!HasPendingParameterBatches())
 		{
-			EndParameterBatch(true, "The content changed before parameter application.");
 			return;
 		}
+		m_MutatingParameterBatch = true;
 		m_Sources->m_Profiles.Synchronize();
 		RefreshSources();
-		m_Sources->m_Domain.BeginFrame(batch.m_Domain);
-		if (batch.m_Status.m_State != ParameterBatchState::Queued)
+		m_Sources->m_Domain.BeginFrame();
+		for (auto& batch : m_ParameterBatches)
 		{
-			return;
+			if (!batch->m_Status.IsTerminal())
+			{
+				batch->m_Consumed.clear();
+				batch->m_FrameSerial = serial;
+				if (batch->m_Session != m_ContentSerial)
+				{
+					EndParameterBatch(*batch, true, "The content changed before parameter application.");
+				}
+			}
 		}
+		if (m_QueuedParameterBatch)
+		{
+			const auto queued = std::ranges::find_if(m_ParameterBatches,
+				[&](const auto& batch) { return batch->m_Status.m_BatchId == m_QueuedParameterBatch; });
+			GGLAB_ASSERT(queued != m_ParameterBatches.end());
+			ApplyParameterBatch(**queued, serial);
+		}
+		m_MutatingParameterBatch = false;
+	}
+
+	void SessionParameterControl::ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept
+	{
+		m_Sources->m_Domain.BeginApplication(batch.m_Domain);
 		if (!IsAvailable() || m_ParameterRevision == std::numeric_limits<uint64_t>::max())
 		{
-			EndParameterBatch(false, "The content is unavailable at the safe parameter boundary.");
+			EndParameterBatch(batch, false, "The content is unavailable at the safe parameter boundary.");
 			return;
 		}
 		if (!m_Sources->m_View.HasDisplayView())
 		{
-			EndParameterBatch(false, "ParameterPreparationFailed: the display view is unavailable.");
+			EndParameterBatch(batch, false, "ParameterPreparationFailed: the display view is unavailable.");
 			return;
 		}
 		struct SourcePlan
@@ -466,13 +575,13 @@ namespace gglab
 			if (!current || batch.m_Bindings[index] != m_Sources->Find(value.m_Id) ||
 				!SupportsParameterEffect(current->m_Desc))
 			{
-				EndParameterBatch(false, "ParameterPreparationFailed: a source or supported effect changed.");
+				EndParameterBatch(batch, false, "ParameterPreparationFailed: a source or supported effect changed.");
 				return;
 			}
 			deferredItems += GetParameterEffectClass(current->m_Desc) == ParameterEffectClass::Deferred;
 			if (deferredItems > 1)
 			{
-				EndParameterBatch(false, "ParameterPreparationFailed: at most one bound lighting item is supported.");
+				EndParameterBatch(batch, false, "ParameterPreparationFailed: at most one bound lighting item is supported.");
 				return;
 			}
 		}
@@ -496,7 +605,7 @@ namespace gglab
 			auto prepared = source->Prepare(batch.m_Status.m_BatchId, values, error);
 			if (!prepared)
 			{
-				EndParameterBatch(false, std::move(error));
+				EndParameterBatch(batch, false, std::move(error));
 				return;
 			}
 			changed |= prepared->HasChanges();
@@ -512,7 +621,7 @@ namespace gglab
 				GetParameterEffectClass(Find(value.m_Id)->m_Desc), revision, serial);
 			if (!receipt)
 			{
-				EndParameterBatch(false, "ParameterPreparationFailed: receipt identity is unavailable.");
+				EndParameterBatch(batch, false, "ParameterPreparationFailed: receipt identity is unavailable.");
 				return;
 			}
 			receipts.push_back(std::move(*receipt));
@@ -524,6 +633,7 @@ namespace gglab
 		{
 			plan.m_Prepared->Commit();
 		}
+		m_QueuedParameterBatch = 0;
 		m_Sources->PublishHostParameters();
 		m_ParameterRevision = revision;
 		m_ObservedLabRevision = m_Lab ? m_Lab->GetParameterRevision() : 0;
@@ -531,7 +641,8 @@ namespace gglab
 		batch.m_NoChange = std::move(noChange);
 		batch.m_Status.m_Revision = revision;
 		batch.m_Status.m_State = ParameterBatchState::Applying;
-		RefreshParameterBatchStatus();
+		RefreshParameterBatchStatus(batch);
+		SupersedeOverwrittenItems(batch);
 
 		for (auto& plan : plans)
 		{
@@ -570,7 +681,30 @@ namespace gglab
 				GGLAB_UNUSED(receipt.RecordApplied(application.m_ActualClass, application.m_Identity, serial));
 			}
 		}
-		RefreshParameterBatchStatus();
+		m_Sources->m_Domain.ObserveFrameEffects(batch.m_Domain);
+		RefreshParameterBatchStatus(batch);
+	}
+
+	void SessionParameterControl::SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept
+	{
+		for (auto& entry : m_ParameterBatches)
+		{
+			auto& batch = *entry;
+			if (&batch == &applied || batch.m_Status.IsTerminal())
+			{
+				continue;
+			}
+			for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
+			{
+				const auto& previous = batch.m_Status.m_Values[index];
+				const auto found = std::ranges::find(applied.m_Status.m_Values, previous.m_Id, &LabParameterValue::m_Id);
+				if (found != applied.m_Status.m_Values.end() && !LabValuesEqual(found->m_Value, previous.m_Value))
+				{
+					GGLAB_UNUSED(batch.m_Receipts[index].Supersede());
+				}
+			}
+			RefreshParameterBatchStatus(batch);
+		}
 	}
 
 	void SessionParameterControl::ApplyViewSettings(ResolvedViewRenderSettings& settings,
@@ -586,88 +720,94 @@ namespace gglab
 		{
 			m_Sources->m_Profiles.ObservePublication(lightingGeneration);
 		}
-		if (!m_ParameterBatch || m_ParameterBatch->m_Status.IsTerminal() ||
-			serial != m_ParameterBatch->m_FrameSerial || !m_Demo)
+		if (!m_Demo)
 		{
 			return;
 		}
-		auto& batch = *m_ParameterBatch;
-		batch.m_Consumed.clear();
 		const ParameterSourceFrame frame{ settings, view, lightingGeneration };
-		for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
+		for (auto& entry : m_ParameterBatches)
 		{
-			auto& receipt = batch.m_Receipts[index];
-			if (receipt.GetSnapshot().IsTerminal())
+			auto& batch = *entry;
+			if (batch.m_Status.IsTerminal() || serial != batch.m_FrameSerial)
 			{
 				continue;
 			}
-			const auto& requested = batch.m_Status.m_Values[index];
-			auto* source = batch.m_Bindings[index];
-			if (source != m_Sources->Find(requested.m_Id) || !source->MatchesFrame(requested, frame))
+			batch.m_Consumed.clear();
+			for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
 			{
-				GGLAB_UNUSED(receipt.Supersede());
-				continue;
-			}
-			if (batch.m_NoChange[index])
-			{
-				GGLAB_UNUSED(receipt.RecordNoChange(serial));
-				continue;
-			}
-			if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Deferred)
-			{
-				const auto identity = receipt.GetSnapshot().m_Identity;
-				auto observation = source->ObservePublication(identity, frame);
-				switch (observation.m_State)
+				auto& receipt = batch.m_Receipts[index];
+				if (receipt.GetSnapshot().IsTerminal())
 				{
-				case ParameterPublication::Published:
-					GGLAB_UNUSED(receipt.RecordPublished(identity, serial));
-					batch.m_Consumed.push_back({ index, identity });
-					break;
-				case ParameterPublication::Superseded:
-					GGLAB_UNUSED(receipt.Supersede());
-					break;
-				case ParameterPublication::Failed:
-					GGLAB_UNUSED(receipt.Fail(std::move(observation.m_Failure)));
-					break;
-				case ParameterPublication::Pending:
-					break;
+					continue;
 				}
-				continue;
+				const auto& requested = batch.m_Status.m_Values[index];
+				auto* source = batch.m_Bindings[index];
+				if (source != m_Sources->Find(requested.m_Id) || !source->MatchesFrame(requested, frame))
+				{
+					GGLAB_UNUSED(receipt.Supersede());
+					continue;
+				}
+				if (batch.m_NoChange[index])
+				{
+					GGLAB_UNUSED(receipt.RecordNoChange(serial));
+					continue;
+				}
+				if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Deferred)
+				{
+					const auto identity = receipt.GetSnapshot().m_Identity;
+					auto observation = source->ObservePublication(identity, frame);
+					switch (observation.m_State)
+					{
+					case ParameterPublication::Published:
+						GGLAB_UNUSED(receipt.RecordPublished(identity, serial));
+						batch.m_Consumed.push_back({ index, identity });
+						break;
+					case ParameterPublication::Superseded:
+						GGLAB_UNUSED(receipt.Supersede());
+						break;
+					case ParameterPublication::Failed:
+						GGLAB_UNUSED(receipt.Fail(std::move(observation.m_Failure)));
+						break;
+					case ParameterPublication::Pending:
+						break;
+					}
+					continue;
+				}
+				auto application = m_Sources->m_Domain.ObserveImmediate(batch.m_Domain);
+				if (!application.m_Failure.empty())
+				{
+					GGLAB_UNUSED(receipt.Fail(std::move(application.m_Failure)));
+					continue;
+				}
+				application.m_Identity.m_Revision = batch.m_Status.m_Revision;
+				if (receipt.RecordApplied(application.m_ActualClass, application.m_Identity, serial))
+				{
+					batch.m_Consumed.push_back({ index, application.m_Identity });
+				}
 			}
-			auto application = m_Sources->m_Domain.ObserveImmediate(batch.m_Domain);
-			if (!application.m_Failure.empty())
-			{
-				GGLAB_UNUSED(receipt.Fail(std::move(application.m_Failure)));
-				continue;
-			}
-			application.m_Identity.m_Revision = batch.m_Status.m_Revision;
-			if (receipt.RecordApplied(application.m_ActualClass, application.m_Identity, serial))
-			{
-				batch.m_Consumed.push_back({ index, application.m_Identity });
-			}
+			RefreshParameterBatchStatus(batch);
 		}
-		RefreshParameterBatchStatus();
 	}
 
 	void SessionParameterControl::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
-		if (!m_ParameterBatch || m_ParameterBatch->m_Status.IsTerminal() ||
-			feedback.m_RenderFrameSerial != m_ParameterBatch->m_FrameSerial ||
-			!feedback.m_SubmittedFence.IsValid())
+		for (auto& entry : m_ParameterBatches)
 		{
-			return;
+			auto& batch = *entry;
+			if (batch.m_Status.IsTerminal() || feedback.m_RenderFrameSerial != batch.m_FrameSerial)
+			{
+				continue;
+			}
+			if (feedback.m_RenderSceneStatus == RenderSceneBuildStatus::Ready && feedback.m_SubmittedFence.IsValid())
+			{
+				for (const auto& consumed : batch.m_Consumed)
+				{
+					GGLAB_UNUSED(batch.m_Receipts[consumed.m_Item].RecordSubmittedFrame(
+						consumed.m_Identity, feedback.m_RenderFrameSerial));
+				}
+			}
+			batch.m_Consumed.clear();
+			RefreshParameterBatchStatus(batch);
 		}
-		if (feedback.m_RenderSceneStatus != RenderSceneBuildStatus::Ready)
-		{
-			m_ParameterBatch->m_Consumed.clear();
-			return;
-		}
-		for (const auto& consumed : m_ParameterBatch->m_Consumed)
-		{
-			GGLAB_UNUSED(m_ParameterBatch->m_Receipts[consumed.m_Item].RecordSubmittedFrame(
-				consumed.m_Identity, feedback.m_RenderFrameSerial));
-		}
-		m_ParameterBatch->m_Consumed.clear();
-		RefreshParameterBatchStatus();
 	}
 }

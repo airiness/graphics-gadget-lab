@@ -56,6 +56,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -165,6 +166,7 @@ namespace gglab
 			LabRuntime* m_ParameterRuntime = nullptr;
 			const SessionParameterControl* m_ParameterControl = nullptr;
 			uint32_t m_ParameterApplications = 0;
+			std::function<void()> m_ParameterEffectCallback;
 			uint64_t m_ParameterBuiltSerial = 0;
 			float m_ParameterBuiltRadius = 0.0f;
 			ResolvedViewRenderSettings m_ParameterBuiltView{};
@@ -1098,6 +1100,10 @@ namespace gglab
 			void ApplyImmediateParameters() noexcept override
 			{
 				++m_Probe.m_ParameterApplications;
+				if (auto callback = std::exchange(m_Probe.m_ParameterEffectCallback, {}))
+				{
+					callback();
+				}
 				if (std::exchange(m_Probe.m_ObserveParameterCommit, false))
 				{
 					const auto* control = m_Probe.m_ParameterControl;
@@ -1868,7 +1874,7 @@ namespace gglab
 					const auto& event = sequence.GetStatus()->m_Events[0].m_Batch;
 					checks.Check(event && event->IsTerminal() && event->m_Items[0].m_FirstConsumed ==
 						capture.GetLastFrameState()->m_FrameSerial && event->m_Items[0].m_Applied < event->m_Items[0].m_FirstConsumed &&
-						!runtime.GetParameterControl()->GetParameterBatchStatus(),
+						runtime.GetParameterControl()->GetParameterBatchCount() == 0,
 						"Repeated real capture-admission aborts preserve one event and only the successful retry consumes it");
 				}
 				const auto successfulSerial = capture.GetLastFrameState()->m_FrameSerial;
@@ -2900,7 +2906,7 @@ namespace gglab
 					sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
 					parameters.GetParameterRevision() == revision &&
 					parameters.GetHostParameters().Get(exposure, 0.0f) == baseline &&
-					!parameters.GetParameterBatchStatus() && probe.m_ParameterApplications == applications,
+					parameters.GetParameterBatchCount() == 0 && probe.m_ParameterApplications == applications,
 					"A bad later event rejects the whole plan before frame zero or any parameter mutation");
 			}
 			FrameSequenceRequest conflict{ .m_CameraPathId = "SEQ_Events",
@@ -2927,7 +2933,9 @@ namespace gglab
 				"Immediate Host and mixed events are admitted as one plan");
 			probe.m_SkipParameterFrame = true;
 			GGLAB_UNUSED(runtime.Tick());
-			const auto* aborted = parameters.GetParameterBatchStatus();
+			const auto* status = sequence.GetStatus();
+			const auto* aborted = parameters.GetParameterBatchStatus(
+				status->m_Events[0].m_Batch->m_BatchId, ParameterBatchOwner{ status->m_SequenceId });
 			checks.Check(aborted && aborted->m_Items[0].m_Published && !aborted->m_Items[0].m_FirstConsumed &&
 				sequence.GetStatus()->m_SubmittedFrames == 0 && !runtime.GetExternalParameterBatchStatus() &&
 				!runtime.TakeParameterBatchResult(aborted->m_BatchId),
@@ -2937,7 +2945,7 @@ namespace gglab
 			const auto& retried = sequence.GetStatus()->m_Events[0].m_Batch;
 			checks.Check(retried && retried->IsTerminal() && retried->m_Items[0].m_Applied == applied &&
 				retried->m_Items[0].m_FirstConsumed > applied && parameters.GetParameterRevision() == revision + 1 &&
-				sequence.GetStatus()->m_SubmittedFrames == 1 && !parameters.GetParameterBatchStatus(),
+				sequence.GetStatus()->m_SubmittedFrames == 1 && parameters.GetParameterBatchCount() == 0,
 				"Retry consumes the same event without reapplying it or allocating another revision");
 			for (uint32_t frame = 1; frame < 4; ++frame)
 			{
@@ -2961,7 +2969,7 @@ namespace gglab
 			checks.Check(tickUntil([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
 				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
 				sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0].m_State == ParameterEffectState::NoChange &&
-				parameters.GetParameterRevision() == revision + 3 && !parameters.GetParameterBatchStatus(),
+				parameters.GetParameterRevision() == revision + 3 && parameters.GetParameterBatchCount() == 0,
 				"Completed event reports retain all receipts and NoChange allocates no revision");
 			checks.Check(tickUntil(ready), "Ready baseline is restored before a cancellation case");
 			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
@@ -2970,7 +2978,7 @@ namespace gglab
 			probe.m_SkipParameterFrame = true;
 			GGLAB_UNUSED(runtime.Tick());
 			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
-				!parameters.GetParameterBatchStatus() && sequence.GetStatus()->m_Events[0].m_Batch->IsTerminal() &&
+				parameters.GetParameterBatchCount() == 0 && sequence.GetStatus()->m_Events[0].m_Batch->IsTerminal() &&
 				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed &&
 				!sequence.GetStatus()->m_Events[1].m_Batch,
 				"Cancel closes the owned event receipt without executing future events or inventing consumption");
@@ -2984,7 +2992,7 @@ namespace gglab
 			probe.m_FrameBeginUnavailable = true;
 			GGLAB_UNUSED(runtime.Tick());
 			checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
-				!parameters.GetParameterBatchStatus() && !sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+				parameters.GetParameterBatchCount() == 0 && !sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
 				"Content invalidation releases the event reservation and never consumes against a replacement binding");
 			runtime.Shutdown();
 		}
@@ -3214,6 +3222,251 @@ namespace gglab
 				done->m_Items.front().m_FirstConsumed > published,
 				"Only fresh built evidence and a successful matching submission complete the Deferred receipt");
 			source.Finish();
+			runtime.Shutdown();
+		}
+
+		void RunPendingParameterBatchScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			probe.m_EnableTemporalHistory = false;
+			GGLAB_UNUSED(runtime.Tick());
+			auto& environment = *runtime.GetRenderServices().m_Environment;
+			auto* demo = runtime.GetDemoManager()->GetActiveDemo();
+			const auto content = runtime.GetDemoManager()->GetActiveContentIdentity();
+			const ParameterBatchOwner owner{ 1 };
+			const ParameterBatchOwner other{ 2 };
+			SessionParameterControl source(environment);
+			source.SynchronizeContent(demo, content, "FaultLifecycle.Demo", false);
+			uint64_t serial = 0;
+			std::string error;
+			const auto request = [&](std::string_view name, LabValue value)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId(name), value } };
+					return source.RequestParameterBatch(values, error, owner);
+				};
+			const auto status = [&](uint64_t id) { return source.GetParameterBatchStatus(id, owner); };
+			const auto begin = [&]() { source.OnFrameReady(++serial); };
+			// This standalone coordinator test injects view/submission evidence, while
+			// domain requests and publication use the production lighting scheduler.
+			const auto build = [&]()
+				{
+					auto view = probe.m_ParameterBuiltView;
+					source.ApplyViewSettings(view, false);
+					source.OnFrameBuilt(serial, environment.GetBakingStatus().m_ActiveGeneration, view);
+				};
+			const auto submit = [&]()
+				{
+					source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::Ready,
+						.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = serial });
+				};
+			const auto waitForLighting = [&]()
+				{
+					const auto target = environment.GetBakeRequestGeneration();
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (environment.GetBakingStatus().m_ActiveGeneration != target &&
+						std::chrono::steady_clock::now() < deadline)
+					{
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::yield();
+					}
+					return environment.GetBakingStatus().m_ActiveGeneration == target;
+				};
+			const auto first = request("lighting", uint32_t(2));
+			checks.Check(first && !request("view.exposure.ev100", 9.0f),
+				"An unapplied transaction retains the single source reservation");
+			begin();
+			const auto* retained = status(first);
+			const auto applied = retained->m_Items[0].m_Applied;
+			const auto generation = retained->m_Items[0].m_Identity.m_Generation;
+			const auto immediate = request("view.exposure.ev100", 9.0f);
+			begin();
+			build();
+			submit();
+			checks.Check(immediate && retained == status(first) && !retained->IsTerminal() &&
+				retained->m_Items[0].m_Applied == applied && status(immediate)->IsTerminal() &&
+				status(immediate)->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				status(immediate)->m_Revision > retained->m_Revision,
+				"An unrelated later revision consumes Immediate work without superseding pending Deferred work");
+			checks.Check(!source.GetParameterBatchStatus() && !source.GetParameterBatchStatus(first, other) &&
+				!source.TakeParameterBatchResult(immediate) && !source.TakeParameterBatchResult(immediate, other),
+				"External and foreign owners cannot query or collect internal receipts");
+			source.FinishParameterBatches(other);
+			const std::array foreign{ LabParameterValue{ LabParameterId("radius"), 2.0f } };
+			checks.Check(!retained->IsTerminal() && !source.RequestParameterBatch(foreign, error, other) &&
+				!source.RequestParameterBatch(foreign, error),
+				"A foreign owner cannot cancel or acquire an occupied session lane");
+			checks.Check(source.TakeParameterBatchResult(immediate, owner).has_value() && retained == status(first),
+				"Collecting another record preserves borrowed status addresses");
+			const auto shared = request("lighting", uint32_t(2));
+			begin();
+			checks.Check(shared && !status(shared)->IsTerminal() &&
+				status(shared)->m_Items[0].m_Identity.m_Generation == generation &&
+				environment.GetBakeRequestGeneration() == generation,
+				"Two batches may independently wait on the same pending domain target without a redundant request");
+			checks.Check(waitForLighting(), "The shared target reaches actual Runtime publication");
+			begin();
+			build();
+			const auto publication = retained->m_Items[0].m_Published;
+			source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed,
+				.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = serial });
+			submit();
+			checks.Check(publication && !retained->IsTerminal() && !status(shared)->IsTerminal(),
+				"Failed submission discards candidates for all waiting batches and cannot be replayed");
+			begin();
+			build();
+			probe.m_ParameterEnvironment->RequestRebake();
+			submit();
+			const auto firstDone = source.TakeParameterBatchResult(first, owner);
+			const auto sharedDone = source.TakeParameterBatchResult(shared, owner);
+			checks.Check(firstDone && sharedDone && firstDone->m_BatchId != sharedDone->m_BatchId &&
+				firstDone->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				sharedDone->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				firstDone->m_Items[0].m_Published == publication &&
+				firstDone->m_Items[0].m_FirstConsumed == serial &&
+				sharedDone->m_Items[0].m_FirstConsumed == serial,
+				"Independent receipts consume frozen matching evidence despite a newer live request after build");
+
+			const auto aborted = request("view.exposure.ev100", 10.0f);
+			begin();
+			build();
+			const auto abortedPublication = status(aborted)->m_Items[0].m_Published;
+			const auto laterLighting = request("lighting", uint32_t(4));
+			begin();
+			build();
+			submit();
+			const auto retried = source.TakeParameterBatchResult(aborted, owner);
+			checks.Check(retried && retried->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				retried->m_Items[0].m_Published == abortedPublication &&
+				retried->m_Items[0].m_FirstConsumed > abortedPublication,
+				"A later proven Deferred operation is not misattributed to an older Immediate retry");
+			const auto replacement = request("lighting", uint32_t(8));
+			begin();
+			const auto superseded = source.TakeParameterBatchResult(laterLighting, owner);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				superseded->m_Items[0].m_Applied && !superseded->m_Items[0].m_FirstConsumed,
+				"A committed different assignment permanently supersedes an older unconsumed request");
+			checks.Check(waitForLighting(), "The replacement domain target becomes active");
+			const auto broken = request("broken-lighting", uint32_t(16));
+			begin();
+			build();
+			checks.Check(status(broken)->m_State == ParameterBatchState::Failed &&
+				status(replacement)->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!status(replacement)->m_Items[0].m_Published,
+				"A newer target before build supersedes an older still-active generation across parameter bindings");
+			GGLAB_UNUSED(source.TakeParameterBatchResult(broken, owner));
+			GGLAB_UNUSED(source.TakeParameterBatchResult(replacement, owner));
+
+			const auto old = request("view.exposure.ev100", 11.0f);
+			begin();
+			build();
+			const auto oldPublication = status(old)->m_Items[0].m_Published;
+			const auto away = request("view.exposure.ev100", 12.0f);
+			begin();
+			const auto back = request("view.exposure.ev100", 11.0f);
+			source.OnFrameReady(serial);
+			checks.Check(status(back)->m_State == ParameterBatchState::Queued,
+				"Repeating one Ready boundary cannot apply a second reservation in that frame");
+			begin();
+			build();
+			submit();
+			checks.Check(status(old)->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				status(old)->m_Items[0].m_Published == oldPublication &&
+				status(away)->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				status(back)->m_Items[0].m_State == ParameterEffectState::Consumed,
+				"An away-and-back assignment before build cannot resurrect either overwritten receipt");
+			GGLAB_UNUSED(source.TakeParameterBatchResult(old, owner));
+			GGLAB_UNUSED(source.TakeParameterBatchResult(away, owner));
+			GGLAB_UNUSED(source.TakeParameterBatchResult(back, owner));
+
+			std::vector<uint64_t> ids;
+			const auto revision = source.GetParameterRevision();
+			for (size_t index = 0; index < SessionParameterMaxBatches; ++index)
+			{
+				ids.push_back(request("view.exposure.ev100", 11.0f));
+				begin();
+				build();
+			}
+			const auto applications = probe.m_ParameterApplications;
+			checks.Check(source.GetParameterBatchCount() == SessionParameterMaxBatches &&
+				std::ranges::all_of(ids, [&](auto id)
+				{
+					return id && status(id)->m_Items[0].m_State == ParameterEffectState::NoChange;
+				}) && !request("radius", 2.0f) && source.GetParameterRevision() == revision &&
+				probe.m_ParameterApplications == applications,
+				"Retained terminal results count toward a hard bound; overflow neither reserves nor mutates");
+			GGLAB_UNUSED(source.TakeParameterBatchResult(ids.front(), owner));
+			const auto recovered = request("radius", 2.0f);
+			checks.Check(recovered == ids.back() + 1,
+				"Explicit collection restores capacity and rejected admission consumes no batch identity");
+			probe.m_ParameterEffectCallback = [&]()
+				{
+					checks.Check(!request("view.exposure.ev100", 13.0f) &&
+						!source.TakeParameterBatchResult(ids.back(), owner),
+						"Effect callbacks cannot reenter admission or invalidate records during transaction application");
+					source.FinishParameterBatches(owner);
+				};
+			begin();
+			checks.Check(status(recovered)->m_State == ParameterBatchState::Applying,
+				"A reentrant owner finish cannot partially cancel the committing transaction");
+			source.FinishParameterBatches(owner);
+			checks.Check(status(recovered)->IsTerminal() && !source.HasPendingParameterBatches() &&
+				source.GetParameterBatchStatuses(other).empty(),
+				"Owner finish closes unresolved work while retaining independently collectible results");
+			for (const auto& batch : source.GetParameterBatchStatuses(owner))
+			{
+				GGLAB_UNUSED(source.TakeParameterBatchResult(batch.m_BatchId, owner));
+			}
+			checks.Check(source.GetParameterBatchCount() == 0, "Every retained record is collected exactly once");
+			source.Finish();
+
+			for (uint32_t ending = 0; ending < 4; ++ending)
+			{
+				SessionParameterControl pending(environment);
+				pending.SynchronizeContent(demo, content, "FaultLifecycle.Demo", false);
+				const std::array lighting{ LabParameterValue{ LabParameterId("lighting"), uint32_t(32 + ending) } };
+				const auto waiting = pending.RequestParameterBatch(lighting, error, owner);
+				pending.OnFrameReady(1);
+				const auto queued = pending.RequestParameterBatch(foreign, error, owner);
+				const auto stamp = pending.GetParameterBatchStatus(waiting, owner)->m_Items[0].m_Applied;
+				if (ending == 0)
+				{
+					pending.FinishParameterBatches(owner);
+				}
+				else if (ending == 1)
+				{
+					pending.SynchronizeContent(nullptr, 0, {}, true);
+				}
+				else if (ending == 2)
+				{
+					pending.OnRuntimeFailed("Injected pending-transaction runtime failure.");
+				}
+				else
+				{
+					pending.Finish();
+				}
+				const auto closed = pending.TakeParameterBatchResult(waiting, owner);
+				const auto cancelled = pending.TakeParameterBatchResult(queued, owner);
+				const auto expected = ending == 1 ? ParameterEffectState::Superseded :
+					ending == 2 ? ParameterEffectState::Failed : ParameterEffectState::EffectNotReached;
+				checks.Check(waiting && queued && closed && cancelled &&
+					closed->m_Items[0].m_State == expected && closed->m_Items[0].m_Applied == stamp &&
+					!closed->m_Items[0].m_FirstConsumed && cancelled->m_State == ParameterBatchState::Failed &&
+					pending.GetParameterBatchCount() == 0,
+					"Owner/content/failure/shutdown closes all pending receipts and cancels only the queued reservation");
+				pending.Finish();
+			}
 			runtime.Shutdown();
 		}
 
@@ -4328,6 +4581,7 @@ namespace gglab
 		RunSessionAdmissionScenario(context, root / "session-admission");
 		RunSessionExitAdmissionScenario(context, root / "session-exit-admission");
 		RunParameterFeedbackScenario(context, root / "parameter-feedback");
+		RunPendingParameterBatchScenario(context, root / "pending-parameter-batches");
 		RunInheritedLightingScenario(context, root / "inherited-lighting");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);

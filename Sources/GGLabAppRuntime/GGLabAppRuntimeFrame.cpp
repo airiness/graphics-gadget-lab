@@ -357,13 +357,13 @@ namespace gglab
 		if (m_ParameterControl)
 		{
 			m_ParameterControl->OnRuntimeFailed(failure);
-			UpdateSequenceParameterEvent();
+			UpdateSequenceParameterEvents();
 		}
 		if (m_FrameSequence && m_FrameSequence->GetStatus() &&
 			!m_FrameSequence->GetStatus()->m_Events.empty())
 		{
 			m_FrameSequence->OnParameterEventFailed(std::string(failure));
-			UpdateSequenceParameterEvent();
+			UpdateSequenceParameterEvents();
 		}
 		if (m_DemoManager)
 		{
@@ -519,13 +519,14 @@ namespace gglab
 		if (const auto* event = m_FrameSequence->GetDueParameterEvent())
 		{
 			std::string error;
-			m_SequenceParameterBatch = m_ParameterControl->RequestParameterBatch(event->m_Values, error);
-			if (!m_SequenceParameterBatch)
+			const ParameterBatchOwner owner{ m_FrameSequence->GetStatus()->m_SequenceId };
+			const auto batch = m_ParameterControl->RequestParameterBatch(event->m_Values, error, owner);
+			if (!batch)
 			{
 				m_FrameSequence->OnParameterEventFailed(std::move(error));
 				return AppRuntimeTickResult::Continue;
 			}
-			UpdateSequenceParameterEvent();
+			UpdateSequenceParameterEvents();
 		}
 		if (m_ParameterControl->IsEnabled())
 		{
@@ -677,7 +678,7 @@ namespace gglab
 		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
 		if (!m_FrameSequence->BeginFrame(captureFrameState))
 		{
-			UpdateSequenceParameterEvent();
+			UpdateSequenceParameterEvents();
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
@@ -690,7 +691,7 @@ namespace gglab
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
-		UpdateSequenceParameterEvent();
+		UpdateSequenceParameterEvents();
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
@@ -859,9 +860,9 @@ namespace gglab
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
 			.m_RenderFrameSerial = frame.m_FrameSerial,
 		});
-		UpdateSequenceParameterEvent();
+		UpdateSequenceParameterEvents();
 		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
-		UpdateSequenceParameterEvent();
+		UpdateSequenceParameterEvents();
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),

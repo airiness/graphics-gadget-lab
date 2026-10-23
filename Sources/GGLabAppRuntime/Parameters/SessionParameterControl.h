@@ -6,12 +6,11 @@
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 
-#include <functional>
-#include <memory>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <optional>
-#include <span>
 #include <span>
 #include <string>
 #include <string_view>
@@ -20,6 +19,7 @@
 namespace gglab
 {
 	inline constexpr size_t SessionParameterMaxItems = 128;
+	inline constexpr size_t SessionParameterMaxBatches = 128;
 
 	struct ParameterSourceAdapters;
 	class DemoBase;
@@ -29,8 +29,8 @@ namespace gglab
 	struct DemoFrameFeedback;
 	struct RenderView;
 
-	// One session-owned transaction/result across host and Lab sources. LabRuntime
-	// retains the safe command and mutation boundary; it holds no second receipt.
+	// Sole transaction/receipt owner across Host and Lab sources. One queued application
+	// is independent of bounded, owner-addressed records waiting for effects or collection.
 	class SessionParameterControl final
 	{
 	public:
@@ -58,11 +58,22 @@ namespace gglab
 		// Descriptor validation without reservations, mutation or retained source borrows.
 		[[nodiscard]] bool ValidateImmediateAssignments(
 			std::span<LabParameterValue> values, std::string& error) const noexcept;
-		void FinishParameterBatch(uint64_t id) noexcept;
-		[[nodiscard]] uint64_t RequestParameterBatch(
-			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		void FinishParameterBatch(uint64_t id, ParameterBatchOwner owner = {}) noexcept;
+		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
+		[[nodiscard]] uint64_t RequestParameterBatch(std::span<const LabParameterValue> values,
+			std::string& error, ParameterBatchOwner owner = {}) noexcept;
+		// Internal owners may append after application; external admission retains one result slot.
+		// Status borrows survive other records' admission/collection, until their own collection.
+		// The compatibility view exposes only the external client's single retained result.
 		[[nodiscard]] const ParameterBatchStatus* GetParameterBatchStatus() const noexcept;
-		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
+		[[nodiscard]] const ParameterBatchStatus* GetParameterBatchStatus(
+			uint64_t id, ParameterBatchOwner owner = {}) const noexcept;
+		[[nodiscard]] std::vector<ParameterBatchStatus> GetParameterBatchStatuses(
+			ParameterBatchOwner owner) const;
+		[[nodiscard]] size_t GetParameterBatchCount() const noexcept { return m_ParameterBatches.size(); }
+		[[nodiscard]] bool HasPendingParameterBatches() const noexcept;
+		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(
+			uint64_t id, ParameterBatchOwner owner = {}) noexcept;
 		void OnRuntimeFailed(std::string_view reason) noexcept;
 		void Finish() noexcept;
 		void OnFrameReady(uint64_t serial) noexcept;
@@ -76,11 +87,17 @@ namespace gglab
 		[[nodiscard]] bool ValidateParameterBatch(
 			std::span<const LabParameterValue> values, std::string& error) const noexcept;
 		[[nodiscard]] const LabParameter* Find(const LabParameterId& id) const noexcept;
-		void RefreshParameterBatchStatus() noexcept;
-		void EndParameterBatch(bool superseded, std::string reason) noexcept;
+		struct ParameterBatch;
+		void RefreshParameterBatchStatus(ParameterBatch& batch) noexcept;
+		void EndParameterBatch(ParameterBatch& batch, bool superseded, std::string reason) noexcept;
+		void ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept;
+		[[nodiscard]] uint64_t AdmitParameterBatch(std::span<const LabParameterValue> values,
+			std::string& error, ParameterBatchOwner owner) noexcept;
+		void SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept;
 		struct ParameterBatch
 		{
 			ParameterBatchStatus m_Status;
+			ParameterBatchOwner m_Owner;
 			std::vector<ParameterEffectReceipt> m_Receipts;
 			std::vector<ParameterSourceBase*> m_Bindings;
 			std::vector<bool> m_NoChange;
@@ -100,7 +117,11 @@ namespace gglab
 		std::string m_ContentId;
 		uint64_t m_ContentSerial = 0;
 		uint64_t m_ObservedLabRevision = 0;
-		std::optional<ParameterBatch> m_ParameterBatch;
+		// Heap records keep query borrows stable when another record is added/collected.
+		std::vector<std::unique_ptr<ParameterBatch>> m_ParameterBatches;
+		uint64_t m_QueuedParameterBatch = 0;
+		uint64_t m_LastReadyFrameSerial = 0;
+		bool m_MutatingParameterBatch = false;
 		uint64_t m_NextParameterBatchId = 1;
 		uint64_t m_ParameterRevision = 1;
 		bool m_ParameterIntakeFailed = false;

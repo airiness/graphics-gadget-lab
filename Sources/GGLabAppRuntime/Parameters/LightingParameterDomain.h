@@ -2,6 +2,8 @@
 #include "Parameters/ParameterSource.h"
 #include "GGLabRuntime/Graphics/LightingMutationResult.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	class RenderEnvironmentAccess;
@@ -13,7 +15,9 @@ namespace gglab
 	public:
 		explicit LightingParameterDomain(RenderEnvironmentAccess& environment) noexcept :
 			m_Environment(environment) {}
-		void BeginFrame(ParameterDomainState& state) const noexcept;
+		void BeginFrame() noexcept;
+		void BeginApplication(ParameterDomainState& state) const noexcept;
+		void ObserveFrameEffects(const ParameterDomainState& state) noexcept;
 		void CompleteEffects(ParameterDomainState& state) const noexcept;
 		[[nodiscard]] ParameterApplication Translate(const LightingMutationResult& evidence,
 			bool unchanged, ParameterDomainState& state) const noexcept;
@@ -23,5 +27,7 @@ namespace gglab
 
 	private:
 		RenderEnvironmentAccess& m_Environment;
+		uint64_t m_FrameBaseline = 0;
+		uint64_t m_FrameAttributedGeneration = 0;
 	};
 }
