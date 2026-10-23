@@ -9,6 +9,8 @@
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
+#include "Demo/DemoBase.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Demo/DemoTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -260,7 +262,15 @@ namespace gglab
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_ParameterControl = std::make_unique<SessionParameterControl>(
-			*m_RenderServices.m_Environment, m_RenderServices.m_WorldLighting);
+			*m_RenderServices.m_Environment, m_RenderServices.m_WorldLighting,
+			[this](DemoBase& demo) -> std::optional<ApplicationViewSettingsResolution>
+			{
+				const auto view = demo.GetCameraRig().ResolveEffectiveDisplayView();
+				return view.IsValid() ?
+					std::optional(ResolveApplicationViewSettings(demo.GetViewRenderProfile(),
+						*view.m_CameraSlot->m_Camera, m_ToolingFrameSettings)) :
+					std::nullopt;
+			});
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),

@@ -7,7 +7,8 @@ capture/result/sequence fields and their v4 meanings are unchanged.
 
 The session owns one batch/result slot shared by Host and active Lab sources.
 Host `view.taa.*`, `view.gtao.*` and `view.exposure.*` work on Demo and Lab content.
-The Lab source supports Immediate parameters and **one explicitly
+The Lab source supports Immediate parameters with explicit frozen-frame projections
+and **one explicitly
 bound Deferred lighting parameter per batch**, optionally mixed with Immediate
 items. Current bindings are `gtao.ibl.sample_count` and
 `atmosphere_range.ibl.sample_count` (uint, 1–4096). They change IBL specular sample
@@ -30,7 +31,8 @@ Manual exposure uses `view.exposure.ev100` and `view.exposure.compensation`.
 Discover exact ids, ranges and enum integers through `parameters`; enum names
 are descriptor labels, while `set` uses the typed integer value.
 
-Defaults inherit the active content's resolved display view. Only explicitly
+Defaults inherit the active content plus the frame owner's copied tooling overrides.
+Host current values additionally include committed Host overrides. Only explicitly
 changed Host fields become overrides. NoChange leaves an inherited field
 inherited. Overrides last for the active content identity and clear on content
 replacement/restart; this extension has no unset/reset verb. A mixed batch may
@@ -43,9 +45,22 @@ is the render clock used by receipt stamps; `frameIndex` remains the simulation 
 
 Frame precedence is content plus optional tooling settings, Host overrides, then
 legacy sequence overrides. Reference sampling continues to force temporal AA and
-temporal GTAO inactive. Legacy sequence values use the same field projection,
+temporal GTAO inactive. Legacy sequence values use the shared Runtime typed settings operations,
 are temporary, and do not replace session Host values. External `set` remains
 blocked throughout a sequence; scheduled events are still unimplemented.
+
+Immediate NoChange is checked against frozen frame inputs before becoming
+terminal. A changed or unchanged stored Lab value masked by Host/tooling, or
+normalized to another value, reports `Superseded` with no `firstConsumed`.
+Inspect every item: a mixed batch can commit all source values while its masked
+Lab item prevents `batch.succeeded`. This does not roll back committed values.
+
+Check each descriptor's `setSupported`. GTAO projects its eleven GTAO settings
+and camera near/far from built view inputs; Atmosphere Range projects aerial
+perspective and TAA enabled. Preview tap, camera input/FOV and Immediate fields
+without a source projection are unavailable through session `set`. The existing
+Lab interactive controls retain their owning-domain behavior. Deferred lighting
+bindings retain their separate generation/publication evidence.
 
 ## Content-registered lighting profiles
 

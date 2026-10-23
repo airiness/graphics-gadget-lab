@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ApplicationContentRegistration.h"
+#include "ApplicationToolingIntegration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "Capture/CaptureEnvironment.h"
@@ -294,6 +295,7 @@ namespace gglab
 		void SyncSequenceGpuProfiling() noexcept;
 		void CollectSequenceGpuTiming() noexcept;
 
+		ApplicationToolingFrameSettings m_ToolingFrameSettings;
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};

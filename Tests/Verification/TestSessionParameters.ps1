@@ -234,6 +234,43 @@ try {
                     $nochange.batch.items[0].state -eq 'NoChange') "$backend-default-wait-consumes-nochange-without-revision"
                 Write-VerificationJson "$directory/nochange-result.json" $nochange
                 Check-Consumed $nochange "$backend-nochange"
+                # Every admitted Immediate binding must prove its distinct value from the frozen frame.
+                $projectedValues = @(
+                    @{id='gtao.enabled';type='bool';value=$true},
+                    @{id='gtao.final_ao_format';type='enum';value=1},
+                    @{id='gtao.radius';type='float';value=2.5},
+                    @{id='gtao.falloff_start';type='float';value=0.4},
+                    @{id='gtao.falloff_end';type='float';value=1.7},
+                    @{id='gtao.power';type='float';value=2.0},
+                    @{id='gtao.direction_count';type='uint';value=3},
+                    @{id='gtao.step_count';type='uint';value=4},
+                    @{id='gtao.denoise_radius';type='uint';value=2},
+                    @{id='gtao.temporal_accumulation';type='bool';value=$false},
+                    @{id='gtao.temporal_max_samples';type='uint';value=7},
+                    @{id='gtao.camera.near';type='float';value=0.1},
+                    @{id='gtao.camera.far';type='float';value=500.0}
+                )
+                $projected = Set-Values $projectedValues @{WaitConsumed=$true}
+                Write-VerificationJson "$directory/projected-bindings-result.json" $projected
+                Check-Consumed $projected "$backend-every-projected-binding"
+                $projectionState = Invoke-VerificationSession parameters $session
+                $preview = @($projectionState.parameters | Where-Object id -eq 'gtao.preview_tap')[0]
+                $unprojected = Set-Values @(@{id='gtao.radius';type='float';value=1.5},
+                    @{id=$preview.id;type='enum';value=$preview.current}) -AllowFailure
+                $afterUnprojected = Invoke-VerificationSession parameters $session
+                Check (-not $preview.setSupported -and -not $unprojected.ok -and
+                    $afterUnprojected.revision -eq $projectionState.revision -and
+                    @($afterUnprojected.parameters | Where-Object id -eq 'gtao.radius')[0].current -eq 2.5) "$backend-unprojected-binding-rejects-whole-batch"
+                # A normalized falloff differs from parameter storage, including a repeated unchanged request.
+                $masked = Set-Values @(@{id='gtao.falloff_start';type='float';value=4.0}) @{WaitConsumed=$true}
+                $maskedAgain = Set-Values @(@{id='gtao.falloff_start';type='float';value=4.0}) @{WaitConsumed=$true}
+                Write-VerificationJson "$directory/normalized-falloff-result.json" $masked
+                Write-VerificationJson "$directory/normalized-falloff-repeat.json" $maskedAgain
+                Check (-not $masked.batch.succeeded -and $masked.batch.items[0].state -eq 'Superseded' -and
+                    $null -eq $masked.batch.items[0].firstConsumed -and -not $maskedAgain.batch.succeeded -and
+                    $maskedAgain.batch.items[0].state -eq 'Superseded' -and
+                    $maskedAgain.batch.revision -eq $masked.batch.revision -and
+                    $null -eq $maskedAgain.batch.items[0].firstConsumed) "$backend-normalized-frame-value-cannot-report-consumed-or-nochange"
                 $waiting = Invoke-VerificationSession sequence $session @{CameraPath='SEQ_GTAOLab_Static';RequiredContentId='Missing.Parameters.Content';NoWait=$true}
                 $during = Set-Values @(@{id='gtao.radius';type='float';value=2}) -AllowFailure
                 Check (-not $during.ok -and $during.error -match 'sequence') "$backend-sequence-blocks-external-set"

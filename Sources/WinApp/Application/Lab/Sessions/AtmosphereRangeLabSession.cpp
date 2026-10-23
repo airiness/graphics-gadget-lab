@@ -124,6 +124,25 @@ namespace gglab
 		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
 	}
 
+	bool AtmosphereRangeLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
+	{
+		return id == AerialPerspectiveId || id == TemporalAAId;
+	}
+
+	std::optional<LabValue> AtmosphereRangeLabSession::ReadImmediateParameterFrameValue(
+		const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
+	{
+		if (id == AerialPerspectiveId)
+		{
+			return LabValue(frame.m_ViewSettings.m_Lighting.m_EnableAerialPerspective);
+		}
+		if (id == TemporalAAId)
+		{
+			return LabValue(frame.m_ViewSettings.m_TemporalAA.m_Enabled);
+		}
+		return std::nullopt;
+	}
+
 	std::optional<LabLightingParameterRequest> AtmosphereRangeLabSession::GetLightingParameterRequest(
 		const LabParameterId& id) const noexcept
 	{

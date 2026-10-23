@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "ApplicationToolingIntegration.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
@@ -70,6 +71,8 @@ namespace gglab
 		{
 			return m_ViewRenderSettingsOverrides;
 		}
+
+		[[nodiscard]] ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept;
 		[[nodiscard]] ViewRenderProfile ResolveViewRenderProfile(
 			const ViewRenderProfile& authoringProfile) const noexcept;
 

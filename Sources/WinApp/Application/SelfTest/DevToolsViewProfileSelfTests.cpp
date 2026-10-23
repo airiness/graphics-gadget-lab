@@ -346,6 +346,13 @@ namespace gglab
 			ProfilesMatch(authoringProfile, originalAuthoringProfile),
 			"All four overrides compose, counting blocks once and explicit false values as active");
 
+		const auto frozenTooling = devTools.CaptureFrameSettings();
+		overrides.m_GTAO.m_Settings.m_Radius = 9.0f;
+		context.Check(frozenTooling.m_GTAO && frozenTooling.m_GTAO->m_Radius == gtaoSettings.m_Radius &&
+			ProfilesMatch(frozenTooling.ResolveProfile(authoringProfile), expectedProfile),
+			"A captured tooling snapshot owns its active blocks and explicit scalar values");
+		overrides.m_GTAO.m_Settings = gtaoSettings;
+
 		// A different authoring source must not silently clear session overrides or
 		// re-seed the parameters of an already active settings block.
 		ViewRenderProfile nextAuthoringProfile = originalAuthoringProfile;

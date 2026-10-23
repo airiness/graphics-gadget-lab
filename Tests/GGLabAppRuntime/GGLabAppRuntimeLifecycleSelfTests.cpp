@@ -194,9 +194,7 @@ namespace gglab
 				return {};
 			}
 
-			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
-				const ViewRenderProfile&,
-				ShadowVisualizationSettings&, ViewRenderProfile&) const noexcept override
+			ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept override
 			{
 				return {};
 			}

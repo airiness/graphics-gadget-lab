@@ -115,9 +115,14 @@ try {
                     $done = Set-Values $values @{WaitConsumed=$true;KeepResult=$true}
                     Write-VerificationJson "$directory/mixed-result.json" $done
                     $expectedSource = if ($content -eq 'lab') {'mixed'} else {'host'}
-                    Check ($done.batch.terminal -and $done.batch.succeeded -and -not $done.consumed -and
+                    Check ($done.batch.terminal -and $done.batch.succeeded -eq ($content -eq 'demo') -and -not $done.consumed -and
                         $done.batch.source -eq $expectedSource) "$case-terminal-result"
                     foreach ($item in $done.batch.items) {
+                        if ($item.id -eq 'gtao.radius') {
+                            Check ($item.state -eq 'Superseded' -and $null -eq $item.firstConsumed -and
+                                $null -eq $item.published) "$case-masked-lab-has-no-consumption"
+                            continue
+                        }
                         Check ($item.state -eq 'NoChange' -or ($item.state -eq 'Consumed' -and
                             $item.requested -eq $item.applied -and $item.published -eq $item.applied -and
                             $item.firstConsumed -ge $item.published -and $item.identity.revision -eq $done.batch.revision)) "$case-four-stamps"
@@ -127,7 +132,8 @@ try {
                     $null = Invoke-VerificationSession parameter-result $session @{BatchId=$done.batchId;Consume=$true}
                     $same = Set-Values $values @{WaitConsumed=$true}
                     Check ($same.consumed -and $same.batch.revision -eq $done.batch.revision -and
-                        @($same.batch.items | Where-Object state -ne 'NoChange').Count -eq 0) "$case-nochange"
+                        @($same.batch.items | Where-Object { ($_.id -eq 'gtao.radius' -and $_.state -ne 'Superseded') -or
+                            ($_.id -ne 'gtao.radius' -and $_.state -ne 'NoChange') }).Count -eq 0) "$case-nochange"
                     $bright = Capture-View 'exposure-base' $baselineEv
                     $darker = Set-Values @(@{id='view.exposure.ev100';type='float';value=$darkerEv}) @{WaitConsumed=$true}
                     Check ($darker.batch.succeeded -and $darker.batch.items[0].state -eq 'Consumed') "$case-exposure-consumed"

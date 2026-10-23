@@ -389,6 +389,9 @@ namespace gglab
 			return AppRuntimeTickResult::Continue;
 		}
 
+		m_ToolingFrameSettings = tickInfo.m_ApplicationTooling ?
+			tickInfo.m_ApplicationTooling->CaptureFrameSettings() :
+			ApplicationToolingFrameSettings{};
 		m_FrameCapture->Update();
 		CollectFrameCaptureResults();
 		SyncSequenceGpuProfiling();
@@ -507,17 +510,8 @@ namespace gglab
 		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
 		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 
-		ShadowVisualizationSettings shadowVisualizationSettings =
-			DefaultShadowVisualizationSettings();
+		ShadowVisualizationSettings shadowVisualizationSettings = m_ToolingFrameSettings.m_Shadow;
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
-		ViewRenderProfile effectiveViewRenderProfile = authoringViewRenderProfile;
-		ApplicationToolingFrameSettingsResolution toolingSettingsResolution{};
-		if (applicationTooling)
-		{
-			toolingSettingsResolution = applicationTooling->ResolveFrameSettings(
-				authoringViewRenderProfile, shadowVisualizationSettings,
-				effectiveViewRenderProfile);
-		}
 		CameraRig& cameraRig = demo->GetCameraRig();
 		// A capture's reference view is restored before the frame is planned, so
 		// this frame already renders it.
@@ -561,9 +555,10 @@ namespace gglab
 		{
 			displayCameraSlot->m_Camera->RequestTemporalReset();
 		}
-		ResolvedViewRenderSettings displayViewSettings =
-			ResolveViewRenderSettings(
-				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		const auto inheritedView = ResolveApplicationViewSettings(
+			authoringViewRenderProfile, *displayCameraSlot->m_Camera, m_ToolingFrameSettings);
+		const auto& effectiveViewRenderProfile = inheritedView.m_Profile;
+		ResolvedViewRenderSettings displayViewSettings = inheritedView.m_View;
 		m_ParameterControl->ApplyViewSettings(displayViewSettings,
 			effectiveViewRenderProfile.m_EnableScenePreExposure);
 		if (referenceSample)
@@ -662,7 +657,8 @@ namespace gglab
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
-			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)]);
+			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
+			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
@@ -758,7 +754,7 @@ namespace gglab
 				.m_DisplayViewSettings =
 					&frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
-				.m_GTAOOverrideActive = toolingSettingsResolution.m_GTAOOverrideActive,
+				.m_GTAOOverrideActive = m_ToolingFrameSettings.m_GTAO.has_value(),
 			};
 			ScopedDiagnosticsFrame diagnosticsFrame(m_Diagnostics.get(), diagnosticsContext);
 			std::optional<LoadingProgress> loadingProgress;

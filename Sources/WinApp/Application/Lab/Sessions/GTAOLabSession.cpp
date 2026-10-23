@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
@@ -13,6 +14,8 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <string>
 #include <string_view>
@@ -39,6 +42,31 @@ namespace gglab
 		const LabParameterId FovId("gtao.camera.fov");
 		const LabParameterId NearPlaneId("gtao.camera.near");
 		const LabParameterId FarPlaneId("gtao.camera.far");
+
+		struct FrameBinding
+		{
+			LabParameterId m_Id;
+			LabValue (*m_Read)(const GTAOSettings&);
+		};
+
+		const auto& FrameBindings() noexcept
+		{
+			static const std::array bindings
+			{
+				FrameBinding{ EnabledId, [](const GTAOSettings& s) -> LabValue { return s.m_Enabled; } },
+				FrameBinding{ FinalAOFormatId, [](const GTAOSettings& s) -> LabValue { return static_cast<int32_t>(s.m_FinalAOFormatPreference); } },
+				FrameBinding{ RadiusId, [](const GTAOSettings& s) -> LabValue { return s.m_Radius; } },
+				FrameBinding{ FalloffStartId, [](const GTAOSettings& s) -> LabValue { return s.m_FalloffStart; } },
+				FrameBinding{ FalloffEndId, [](const GTAOSettings& s) -> LabValue { return s.m_FalloffEnd; } },
+				FrameBinding{ PowerId, [](const GTAOSettings& s) -> LabValue { return s.m_Power; } },
+				FrameBinding{ DirectionCountId, [](const GTAOSettings& s) -> LabValue { return s.m_DirectionCount; } },
+				FrameBinding{ StepCountId, [](const GTAOSettings& s) -> LabValue { return s.m_StepCount; } },
+				FrameBinding{ DenoiseRadiusId, [](const GTAOSettings& s) -> LabValue { return s.m_DenoiseRadius; } },
+				FrameBinding{ TemporalAccumulationId, [](const GTAOSettings& s) -> LabValue { return s.m_TemporalAccumulation; } },
+				FrameBinding{ TemporalMaxSamplesId, [](const GTAOSettings& s) -> LabValue { return s.m_TemporalMaxSamples; } },
+			};
+			return bindings;
+		}
 
 		const Vector3 PresetViewPosition(0.0f, 2.3f, -9.0f);
 		const Vector3 PresetViewTarget(0.0f, 0.0f, 6.5f);
@@ -373,6 +401,28 @@ namespace gglab
 			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
 		m_LightingRequest = {};
 		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
+	}
+
+	bool GTAOLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
+	{
+		return std::ranges::find(FrameBindings(), id, &FrameBinding::m_Id) != FrameBindings().end() ||
+			id == NearPlaneId || id == FarPlaneId;
+	}
+
+	std::optional<LabValue> GTAOLabSession::ReadImmediateParameterFrameValue(
+		const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
+	{
+		const auto found = std::ranges::find(FrameBindings(), id, &FrameBinding::m_Id);
+		if (found != FrameBindings().end())
+		{
+			return found->m_Read(frame.m_ViewSettings.m_Lighting.m_GTAO);
+		}
+		if (frame.m_View && frame.m_View->m_ViewId == RenderViewID::Main &&
+			(id == NearPlaneId || id == FarPlaneId))
+		{
+			return LabValue(id == NearPlaneId ? frame.m_View->m_Near : frame.m_View->m_Far);
+		}
+		return std::nullopt;
 	}
 
 	std::optional<LabLightingParameterRequest> GTAOLabSession::GetLightingParameterRequest(

@@ -1,9 +1,11 @@
 #pragma once
 #include "Parameters/ParameterBatch.h"
+#include "ApplicationToolingIntegration.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 
+#include <functional>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -21,6 +23,7 @@ namespace gglab
 	class RenderEnvironmentAccess;
 	class WorldLightingControlBase;
 	struct DemoFrameFeedback;
+	struct RenderView;
 
 	// One session-owned transaction/result across host and Lab sources. LabRuntime
 	// retains the safe command and mutation boundary; it holds no second receipt.
@@ -28,7 +31,8 @@ namespace gglab
 	{
 	public:
 		explicit SessionParameterControl(RenderEnvironmentAccess& environment,
-			WorldLightingControlBase* worldLighting = nullptr) noexcept;
+			WorldLightingControlBase* worldLighting = nullptr,
+			std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver = {}) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(SessionParameterControl);
 		// Lifecycle owner releases a binding before destroying its Demo/LabRuntime.
 		// The identity is shared with frame planning, never recomputed by this source.
@@ -55,10 +59,11 @@ namespace gglab
 		void OnFrameReady(uint64_t serial) noexcept;
 		void ApplyViewSettings(ResolvedViewRenderSettings& settings, bool enablePreExposure) noexcept;
 		void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration,
-			const ResolvedViewRenderSettings& settings) noexcept;
+			const ResolvedViewRenderSettings& settings, const RenderView* view = nullptr) noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
 
 	private:
+		[[nodiscard]] std::optional<ApplicationViewSettingsResolution> ResolveInheritedViewSettings() const noexcept;
 		void RefreshSources() noexcept;
 		void RefreshLightingProfiles(LabParameterSet& host) noexcept;
 		[[nodiscard]] bool IsLightingProfileParameter(const LabParameterId& id) const noexcept;
@@ -72,6 +77,7 @@ namespace gglab
 			ParameterBatchStatus m_Status;
 			std::vector<ParameterEffectReceipt> m_Receipts;
 			std::vector<LabParameterValue> m_LabValues;
+			std::vector<bool> m_NoChange;
 			struct ConsumedState
 			{
 				size_t m_Item = 0;
@@ -84,6 +90,7 @@ namespace gglab
 			uint64_t m_ApplyBakeGeneration = 0;
 			bool m_AttributedLightingRequest = false;
 		};
+		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> m_ViewResolver;
 		RenderEnvironmentAccess& m_Environment;
 		WorldLightingControlBase* m_WorldLighting = nullptr;
 		DemoBase* m_Demo = nullptr;

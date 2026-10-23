@@ -9,7 +9,8 @@ namespace gglab
 	bool LabRuntime::SupportsParameterEffect(const LabParameterDesc& desc) const noexcept
 	{
 		const auto effect = GetParameterEffectClass(desc);
-		return effect == ParameterEffectClass::Immediate ||
+		return (effect == ParameterEffectClass::Immediate && m_ActiveSession &&
+			m_ActiveSession->SupportsImmediateParameter(desc.m_Id)) ||
 			(effect == ParameterEffectClass::Deferred && m_ActiveSession &&
 				m_ActiveSession->GetLightingParameterRequest(desc.m_Id).has_value());
 	}
@@ -41,7 +42,8 @@ namespace gglab
 			lightingItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
 			if (!SupportsParameterEffect(desc) || lightingItems > 1)
 			{
-				error = "Unsupported effect: at most one bound Deferred lighting item is supported; rebuild effects are unsupported.";
+				error = "Unsupported effect: Immediate items require a frame projection; "
+					"at most one bound Deferred lighting item is supported; rebuild effects are unsupported.";
 				return std::nullopt;
 			}
 		}

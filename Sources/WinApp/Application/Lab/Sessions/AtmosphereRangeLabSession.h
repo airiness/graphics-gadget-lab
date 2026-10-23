@@ -24,6 +24,9 @@ namespace gglab
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
+		[[nodiscard]] bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] std::optional<LabValue> ReadImmediateParameterFrameValue(
+			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override;
 		[[nodiscard]] std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
 			const LabParameterId& id) const noexcept override;
 

@@ -147,6 +147,7 @@ namespace gglab
 			uint64_t m_ParameterBuiltSerial = 0;
 			float m_ParameterBuiltRadius = 0.0f;
 			ResolvedViewRenderSettings m_ParameterBuiltView{};
+			ResolvedViewRenderSettings m_ParameterValidationView{};
 			bool m_SkipParameterFrame = false;
 			bool m_SkipLightingPublication = false;
 			bool m_RebakeAfterParameterBuild = false;
@@ -758,6 +759,7 @@ namespace gglab
 			RenderFrameValidationResult ValidateRenderFrame(
 				const RenderFrameContext& frame, const RenderServices& services) noexcept override
 			{
+				m_Probe.m_ParameterValidationView = frame.GetDisplayViewRenderSettings();
 				if (std::exchange(m_Probe.m_SkipParameterFrame, false))
 				{
 					return RenderFrameValidationResult::Skip("Parameter retry fixture");
@@ -984,6 +986,8 @@ namespace gglab
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("deferred"),
 					.m_Name = "Deferred", .m_Type = LabParameterType::Bool, .m_DefaultValue = false,
 					.m_EffectClass = ParameterEffectClass::Deferred }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("unprojected"),
+					.m_Name = "Unprojected", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f }));
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("rebake"),
 					.m_Name = "Misdeclared rebake", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
 				if (m_Probe.m_ProfileNamedLabBool)
@@ -998,6 +1002,28 @@ namespace gglab
 						.m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(4096)),
 						.m_EffectClass = ParameterEffectClass::Deferred }));
 				}
+			}
+			bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override
+			{
+				return id == LabParameterId("radius") || id == LabParameterId("rebake") ||
+					id == LabParameterId("environment.profile");
+			}
+			std::optional<LabValue> ReadImmediateParameterFrameValue(
+				const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override
+			{
+				if (id == LabParameterId("radius"))
+				{
+					return LabValue(frame.m_ViewSettings.m_Lighting.m_GTAO.m_Radius);
+				}
+				if (id == LabParameterId("rebake"))
+				{
+					return LabValue(frame.m_ViewSettings.m_PostProcess.m_Bloom.m_Enabled);
+				}
+				if (id == LabParameterId("environment.profile"))
+				{
+					return LabValue(frame.m_ViewSettings.m_Lighting.m_EnableAerialPerspective);
+				}
+				return std::nullopt;
 			}
 			std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
 				const LabParameterId& id) const noexcept override
@@ -1045,6 +1071,12 @@ namespace gglab
 				GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Radius =
 					GetParameters().Get(LabParameterId("radius"), 1.0f);
 				const bool rebake = GetParameters().Get(LabParameterId("rebake"), false);
+				GetMutableViewRenderProfile().m_PostProcess.m_Bloom.m_Enabled = rebake;
+				if (m_Probe.m_ProfileNamedLabBool)
+				{
+					GetMutableViewRenderProfile().m_Lighting.m_EnableAerialPerspective =
+						GetParameters().Get(LabParameterId("environment.profile"), false);
+				}
 				if (rebake != m_Rebake)
 				{
 					m_Rebake = rebake;
@@ -2548,11 +2580,15 @@ namespace gglab
 			checks.Check(done && done->IsTerminal() && done->m_Revision == revision &&
 				std::ranges::all_of(done->m_Items, [](const auto& item)
 				{
+					if (item.m_Parameter == LabParameterId("radius"))
+					{
+						return item.m_State == ParameterEffectState::Superseded && !item.m_FirstConsumed;
+					}
 					return item.m_State == ParameterEffectState::Consumed &&
 						item.m_Identity.m_Revision != 0 && item.m_Published == item.m_Applied &&
 						item.m_FirstConsumed > item.m_Published;
 				}),
-				"A successful retry consumes the frozen host/mixed revision without applying a second time");
+				"A successful retry consumes the frozen Host revision while its masked Lab value stays Superseded");
 			const auto& view = probe.m_ParameterBuiltView;
 			const auto expectedExposure = ResolveManualExposureSettings(8.0f, 1.0f,
 				runtime.GetDemoManager()->GetActiveDemo()->GetViewRenderProfile().m_EnableScenePreExposure);
@@ -2570,8 +2606,13 @@ namespace gglab
 			GGLAB_UNUSED(runtime.Tick());
 			const auto same = runtime.TakeParameterBatchResult(nochange);
 			checks.Check(same && same->m_Revision == revision &&
-				std::ranges::all_of(same->m_Items, [](const auto& item) { return item.m_State == ParameterEffectState::NoChange; }),
-				"Repeating a host/mixed batch preserves its revision and introduces no effects");
+				std::ranges::all_of(same->m_Items, [](const auto& item)
+				{
+					return item.m_Parameter == LabParameterId("radius") ?
+						item.m_State == ParameterEffectState::Superseded && !item.m_FirstConsumed :
+						item.m_State == ParameterEffectState::NoChange;
+				}),
+				"Repeating a mixed batch keeps masked Lab state Superseded and creates no effects");
 			values.front().m_Value = 4.0f;
 			const auto stale = runtime.RequestParameterBatch(values, error);
 			if (withLab)
@@ -2593,6 +2634,132 @@ namespace gglab
 					parameters.GetParameterBatchStatus()->m_State == ParameterBatchState::Failed &&
 					!parameters.GetParameterBatchStatus()->m_Items.front().m_FirstConsumed,
 					"Fatal host-only submission fails its effects without fabricated consumption");
+			}
+			runtime.Shutdown();
+		}
+
+		class ParameterTestTooling final : public ApplicationToolingIntegrationBase
+		{
+		public:
+			ApplicationToolingFrameSettings m_Settings;
+			mutable uint32_t m_Captures = 0;
+			void PrepareForShutdown() noexcept override {}
+			ApplicationToolingInputCapture GetPreviousFrameInputCapture() const noexcept override { return {}; }
+			ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept override
+			{
+				++m_Captures;
+				return m_Settings;
+			}
+			bool BeginFrame() noexcept override { return false; }
+			void Draw(const ApplicationToolingFrameContext&) noexcept override {}
+			void EndFrame(ApplicationToolingFrameEndReason) noexcept override {}
+			RenderPipelineOverlayExtensionBase* GetOverlayExtension() noexcept override { return nullptr; }
+		};
+
+		void RunEffectiveParameterSettingsScenario(SelfTestContext& checks,
+			const std::filesystem::path& root, bool withLab)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = withLab;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			ParameterTestTooling tooling;
+			tooling.m_Settings.m_GTAO = GTAOSettings{ .m_Radius = 2.0f };
+			tooling.m_Settings.m_Bloom = BloomSettings{ .m_Intensity = 0.35f };
+			tooling.m_Settings.m_ScenePreExposure = false;
+			const auto tick = [&]()
+				{
+					return runtime.Tick({ .m_ApplicationTooling = &tooling });
+				};
+			GGLAB_UNUSED(tick());
+			runtime.EnableParameterControl();
+			const auto& control = *runtime.GetParameterControl();
+			const LabParameterId hostRadius("view.gtao.radius");
+			const LabParameterId labRadius("radius");
+			std::string error;
+			const auto requestHost = [&](float radius)
+				{
+					const std::array values{ LabParameterValue{ hostRadius, radius } };
+					return runtime.RequestParameterBatch(values, error);
+				};
+			checks.Check(control.GetHostParameters().Get(hostRadius, 0.0f) == 2.0f &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 2.0f &&
+				runtime.GetDemoManager()->GetActiveDemo()->GetViewRenderProfile().m_Lighting.m_GTAO.m_Radius == 1.0f,
+				"Discovery and frame planning share tooling inheritance while authored settings retain their value");
+			const auto sameId = requestHost(2.0f);
+			GGLAB_UNUSED(tick());
+			const auto same = runtime.TakeParameterBatchResult(sameId);
+			checks.Check(same && same->m_Items[0].m_State == ParameterEffectState::NoChange,
+				"A first Host request equal to complete inherited settings is NoChange");
+			tooling.m_Settings.m_GTAO->m_Radius = 4.0f;
+			runtime.EnableParameterControl();
+			checks.Check(control.GetHostParameters().Get(hostRadius, 0.0f) == 2.0f,
+				"Queries use an owned tooling snapshot rather than borrowing mutable UI state");
+			GGLAB_UNUSED(tick());
+			checks.Check(control.GetHostParameters().Get(hostRadius, 0.0f) == 4.0f &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 4.0f,
+				"NoChange does not pin a new Host override over later tooling edits");
+			if (withLab)
+			{
+				const std::array masked{ LabParameterValue{ labRadius, 2.5f } };
+				const auto maskedId = runtime.RequestParameterBatch(masked, error);
+				GGLAB_UNUSED(tick());
+				const auto result = runtime.TakeParameterBatchResult(maskedId);
+				checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::Superseded &&
+					!result->m_Items[0].m_FirstConsumed && probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 4.0f,
+					"Tooling alone can mask Lab authoring and must not produce false consumption");
+				const std::array unsupported{ LabParameterValue{ hostRadius, 1.5f },
+					LabParameterValue{ LabParameterId("unprojected"), 2.0f } };
+				checks.Check(runtime.RequestParameterBatch(unsupported, error) == 0 &&
+					!control.GetParameterBatchStatus() && control.GetHostParameters().Get(hostRadius, 0.0f) == 4.0f,
+					"An Immediate source without frame projection rejects the complete batch before mutation");
+			}
+			const auto id = requestHost(1.0f);
+			probe.m_SkipParameterFrame = true;
+			const auto captures = tooling.m_Captures;
+			GGLAB_UNUSED(tick());
+			const auto* aborted = control.GetParameterBatchStatus();
+			checks.Check(id != 0 && aborted && !aborted->IsTerminal() &&
+				aborted->m_Items[0].m_Published && !aborted->m_Items[0].m_FirstConsumed &&
+				tooling.m_Captures == captures + 1 && probe.m_ParameterValidationView.m_Lighting.m_GTAO.m_Radius == 1.0f,
+				"Host set overrides tooling and an aborted frame cannot consume it");
+			tooling.m_Settings.m_GTAO->m_Radius = 3.0f;
+			GGLAB_UNUSED(tick());
+			const auto done = runtime.TakeParameterBatchResult(id);
+			checks.Check(done && done->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 1.0f &&
+				probe.m_ParameterBuiltView.m_PostProcess.m_Bloom.m_Intensity == 0.35f &&
+				probe.m_ParameterBuiltView.m_Exposure.m_PreExposure == 1.0f,
+				"A successful retry keeps Host precedence and coherent inherited bloom and pre-exposure");
+			if (withLab)
+			{
+				const auto applications = probe.m_ParameterApplications;
+				const std::array masked{ LabParameterValue{ labRadius, 2.0f } };
+				const auto maskedId = runtime.RequestParameterBatch(masked, error);
+				GGLAB_UNUSED(tick());
+				const auto maskedResult = runtime.TakeParameterBatchResult(maskedId);
+				checks.Check(maskedResult && maskedResult->m_Items[0].m_State == ParameterEffectState::Superseded &&
+					!maskedResult->m_Items[0].m_FirstConsumed && probe.m_ParameterApplications == applications + 1 &&
+					probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 1.0f,
+					"A changed Lab value masked by Host cannot claim frame consumption");
+				const auto repeatId = runtime.RequestParameterBatch(masked, error);
+				GGLAB_UNUSED(tick());
+				const auto repeat = runtime.TakeParameterBatchResult(repeatId);
+				checks.Check(repeat && repeat->m_Items[0].m_State == ParameterEffectState::Superseded &&
+					!repeat->m_Items[0].m_FirstConsumed && probe.m_ParameterApplications == applications + 1,
+					"An unchanged stored Lab value still needs effective-frame proof instead of false NoChange");
+				const std::array matching{ LabParameterValue{ hostRadius, 3.5f }, LabParameterValue{ labRadius, 3.5f } };
+				const auto matchId = runtime.RequestParameterBatch(matching, error);
+				GGLAB_UNUSED(tick());
+				const auto match = runtime.TakeParameterBatchResult(matchId);
+				checks.Check(match && std::ranges::all_of(match->m_Items,
+					[](const auto& item) { return item.m_State == ParameterEffectState::Consumed; }),
+					"Matching mixed requests are both proven by the same submitted frame");
 			}
 			runtime.Shutdown();
 		}
@@ -3424,7 +3591,12 @@ namespace gglab
 					probe.m_ParameterApplications, applications + 1, parameters.GetParameterRevision(), revision + 1,
 					lab.GetParameterRevision(), labRevision + 1));
 			checks.Check(committed && committed->m_Items.size() == 4 &&
-				std::ranges::all_of(committed->m_Items, [](const auto& item) { return item.m_State == ParameterEffectState::Consumed; }) &&
+				std::ranges::all_of(committed->m_Items, [](const auto& item)
+				{
+					return item.m_Parameter == LabParameterId("radius") ?
+						item.m_State == ParameterEffectState::Superseded && !item.m_FirstConsumed :
+						item.m_State == ParameterEffectState::Consumed;
+				}) &&
 				committed->m_Items[1].m_Identity.m_Generation == probe.m_ExpectedCommitGeneration &&
 				probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == 11.0f &&
 				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 1.0f &&
@@ -3825,6 +3997,8 @@ namespace gglab
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		RunHostParameterScenario(context, root / "host-demo", false);
 		RunHostParameterScenario(context, root / "host-lab", true);
+		RunEffectiveParameterSettingsScenario(context, root / "tooling-host", false);
+		RunEffectiveParameterSettingsScenario(context, root / "tooling-lab", true);
 		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunBatchPreparationScenario(context, root / "batch-preparation");
 		RunContentBindingScenario(context, root / "content-binding-shutdown", false);

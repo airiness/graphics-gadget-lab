@@ -22,6 +22,7 @@ namespace gglab
 	class RenderPipelineBase;
 	struct LabDiagnosticsSnapshot;
 	struct LabDiagnosticsFrameContext;
+	struct RenderView;
 
 	struct LabSessionCreateInfo
 	{
@@ -44,6 +45,12 @@ namespace gglab
 		uint64_t m_Generation = 0;
 	};
 
+	struct LabParameterFrameContext
+	{
+		const ResolvedViewRenderSettings& m_ViewSettings;
+		const RenderView* m_View = nullptr;
+	};
+
 	class LabSessionBase
 	{
 	public:
@@ -64,6 +71,20 @@ namespace gglab
 			const LabParameterId& id) const noexcept
 		{
 			GGLAB_UNUSED(id);
+			return std::nullopt;
+		}
+		// Session Immediate controls require an explicit source-owned projection.
+		// Read only the frozen frame inputs, never substitute the live parameter set.
+		[[nodiscard]] virtual bool SupportsImmediateParameter(const LabParameterId& id) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			return false;
+		}
+		[[nodiscard]] virtual std::optional<LabValue> ReadImmediateParameterFrameValue(
+			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			GGLAB_UNUSED(frame);
 			return std::nullopt;
 		}
 		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }

@@ -18,8 +18,9 @@
 namespace gglab
 {
 	SessionParameterControl::SessionParameterControl(RenderEnvironmentAccess& environment,
-		WorldLightingControlBase* worldLighting) noexcept :
-		m_Environment(environment), m_WorldLighting(worldLighting)
+		WorldLightingControlBase* worldLighting,
+		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver) noexcept :
+		m_ViewResolver(std::move(viewResolver)), m_Environment(environment), m_WorldLighting(worldLighting)
 	{
 	}
 
@@ -106,19 +107,36 @@ namespace gglab
 		return m_HostParameters.Find(desc.m_Id) || (m_Lab && m_Lab->SupportsParameterEffect(desc));
 	}
 
+	std::optional<ApplicationViewSettingsResolution>
+	SessionParameterControl::ResolveInheritedViewSettings() const noexcept
+	{
+		if (!m_Demo)
+		{
+			return std::nullopt;
+		}
+		if (m_ViewResolver)
+		{
+			return m_ViewResolver(*m_Demo);
+		}
+		const auto view = m_Demo->GetCameraRig().ResolveEffectiveDisplayView();
+		return view.IsValid() ?
+			std::optional(ResolveApplicationViewSettings(m_Demo->GetViewRenderProfile(),
+				*view.m_CameraSlot->m_Camera, {})) :
+			std::nullopt;
+	}
+
 	void SessionParameterControl::RefreshSources() noexcept
 	{
 		if (!m_Demo || (m_Lab && !m_Lab->GetActiveSession()))
 		{
 			return;
 		}
-		const auto view = m_Demo->GetCameraRig().ResolveEffectiveDisplayView();
-		if (!view.IsValid())
+		const auto inherited = ResolveInheritedViewSettings();
+		if (!inherited)
 		{
 			return;
 		}
-		auto host = DescribeHostViewParameters(ResolveViewRenderSettings(
-			m_Demo->GetViewRenderProfile(), *view.m_CameraSlot->m_Camera));
+		auto host = DescribeHostViewParameters(inherited->m_View);
 		RefreshLightingProfiles(host);
 		std::string error;
 		if (!m_HostOverrides.empty())
@@ -359,8 +377,8 @@ namespace gglab
 		if (m_WorldLighting && m_Demo)
 		{
 			m_WorldLighting->SynchronizeWorldLighting(m_Demo->GetWorld(), m_ContentSerial);
-			RefreshSources();
 		}
+		RefreshSources();
 		batch.m_FrameBakeRequestGeneration = m_Environment.GetBakeRequestGeneration();
 		if (batch.m_Status.m_State != ParameterBatchState::Queued)
 		{
@@ -382,6 +400,7 @@ namespace gglab
 			std::vector<LabParameterId> m_NewOverrides;
 			std::vector<LabParameterId> m_Changed;
 			std::vector<ParameterEffectReceipt> m_Receipts;
+			std::vector<bool> m_NoChange;
 			std::optional<LabRuntime::PreparedParameterBatch> m_Lab;
 			std::unique_ptr<PreparedWorldLightingMutationBase> m_Lighting;
 			uint64_t m_Revision = 0;
@@ -398,6 +417,7 @@ namespace gglab
 		prepared.m_Overrides.reserve(m_HostOverrides.size() + batch.m_Status.m_Values.size());
 		prepared.m_Changed.reserve(batch.m_Status.m_Values.size());
 		prepared.m_Receipts.reserve(batch.m_Status.m_Values.size());
+		prepared.m_NoChange.resize(batch.m_Status.m_Values.size(), false);
 		size_t lightingItems = 0;
 		for (const auto& value : batch.m_Status.m_Values)
 		{
@@ -507,6 +527,7 @@ namespace gglab
 		m_ParameterRevision = prepared.m_Revision;
 		m_ObservedLabRevision = m_Lab ? m_Lab->GetParameterRevision() : 0;
 		batch.m_Receipts = std::move(prepared.m_Receipts);
+		batch.m_NoChange = std::move(prepared.m_NoChange);
 		batch.m_Status.m_Revision = prepared.m_Revision;
 		batch.m_Status.m_State = ParameterBatchState::Applying;
 		RefreshParameterBatchStatus();
@@ -517,13 +538,12 @@ namespace gglab
 		{
 			m_Lab->ApplyParameterBatchEffects(std::move(*prepared.m_Lab));
 		}
-		const auto view = m_Demo->GetCameraRig().ResolveEffectiveDisplayView();
-		if (view.IsValid())
+		const auto resolvedInherited = ResolveInheritedViewSettings();
+		if (resolvedInherited)
 		{
-			auto inheritedSettings = ResolveViewRenderSettings(
-				m_Demo->GetViewRenderProfile(), *view.m_CameraSlot->m_Camera);
+			auto inheritedSettings = resolvedInherited->m_View;
 			ApplyHostViewParameters(prepared.m_PreviousOverrides, inheritedSettings,
-				m_Demo->GetViewRenderProfile().m_EnableScenePreExposure);
+				resolvedInherited->m_Profile.m_EnableScenePreExposure);
 			const auto inherited = DescribeHostViewParameters(inheritedSettings);
 			for (const auto& value : prepared.m_HostValues)
 			{
@@ -545,11 +565,21 @@ namespace gglab
 				std::erase_if(m_HostOverrides, [&](const auto& value) { return value.m_Id == id; });
 			}
 		}
-		for (auto& receipt : batch.m_Receipts)
+		for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
 		{
+			auto& receipt = batch.m_Receipts[index];
 			if (std::ranges::find(prepared.m_Changed, receipt.GetSnapshot().m_Parameter) == prepared.m_Changed.end())
 			{
-				GGLAB_UNUSED(receipt.RecordNoChange(serial));
+				if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Immediate)
+				{
+					// Equal authoring values still require an effective-frame projection:
+					// tooling or Host precedence can mask an unchanged Lab request.
+					batch.m_NoChange[index] = true;
+				}
+				else
+				{
+					GGLAB_UNUSED(receipt.RecordNoChange(serial));
+				}
 			}
 		}
 		RefreshSources();
@@ -597,7 +627,7 @@ namespace gglab
 	}
 
 	void SessionParameterControl::OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration,
-		const ResolvedViewRenderSettings& settings) noexcept
+		const ResolvedViewRenderSettings& settings, const RenderView* view) noexcept
 	{
 		if (m_Enabled && m_Demo)
 		{
@@ -622,14 +652,29 @@ namespace gglab
 			const auto& requested = batch.m_Status.m_Values[index];
 			const auto* current = Find(requested.m_Id);
 			const bool isProfile = IsLightingProfileParameter(requested.m_Id);
+			std::optional<LabValue> frameValue;
 			if (m_HostParameters.Find(requested.m_Id) && !isProfile)
 			{
 				current = builtHost.Find(requested.m_Id);
 			}
+			else if (!isProfile && receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Immediate)
+			{
+				const auto* session = m_Lab ? m_Lab->GetActiveSession() : nullptr;
+				frameValue = session ?
+					session->ReadImmediateParameterFrameValue(requested.m_Id, { settings, view }) :
+					std::nullopt;
+				current = nullptr;
+			}
+			const LabValue* effective = frameValue ? &*frameValue : (current ? &current->m_Value : nullptr);
 			if ((isProfile && FindCurrentLightingProfile() != std::get<int32_t>(requested.m_Value)) ||
-				!current || !LabValuesEqual(current->m_Value, requested.m_Value))
+				!effective || !LabValuesEqual(*effective, requested.m_Value))
 			{
 				GGLAB_UNUSED(receipt.Supersede());
+				continue;
+			}
+			if (batch.m_NoChange[index])
+			{
+				GGLAB_UNUSED(receipt.RecordNoChange(serial));
 				continue;
 			}
 			if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Deferred)
