@@ -125,6 +125,10 @@ namespace gglab
 			TeardownOutcome m_Outcome = TeardownOutcome::Completed;
 			std::filesystem::path m_Receipt;
 			bool m_EnableParameterLab = false;
+			bool m_ReturnStaleLightingEvidence = false;
+			bool m_ReturnMissingLightingEvidence = false;
+			bool m_RequestLightingTwice = false;
+			uint32_t m_LightingParameterApplications = 0;
 			bool m_HoldLightingPreparation = false;
 			DemoServices m_ContentServices{};
 			bool m_FrameBeginUnavailable = false;
@@ -1025,15 +1029,52 @@ namespace gglab
 				}
 				return std::nullopt;
 			}
-			std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
-				const LabParameterId& id) const noexcept override
+			bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override
 			{
-				if (id == LabParameterId("lighting") || id == LabParameterId("broken-lighting"))
-				{
-					return m_LightingRequest;
-				}
-				return std::nullopt;
+				return m_LightingOverride &&
+					(id == LabParameterId("lighting") || id == LabParameterId("broken-lighting"));
 			}
+			LightingMutationResult ApplyDeferredLightingParameter(const LabParameterId& id) noexcept override
+			{
+				if (!SupportsDeferredLightingParameter(id))
+				{
+					return {};
+				}
+				++m_Probe.m_LightingParameterApplications;
+				if (std::exchange(m_Probe.m_ReturnStaleLightingEvidence, false))
+				{
+					return m_PreviousLightingEffect;
+				}
+				if (std::exchange(m_Probe.m_ReturnMissingLightingEvidence, false))
+				{
+					return {};
+				}
+				auto result = m_LightingOverride->ApplyPrefilteredSpecularSampleCount(
+					GetParameters().Get(id, uint32_t(1)));
+				if (std::exchange(m_Probe.m_RequestLightingTwice, false))
+				{
+					// This owning operation deliberately issues two real requests.
+					m_Services.m_EnvironmentLightingControl->RequestRebake();
+					result.m_Generation = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				}
+				if (id == LabParameterId("broken-lighting"))
+				{
+					// Deliberately misreport owner evidence; capability is still valid.
+					result.m_PreviousGeneration = 0;
+				}
+				if (result.m_Outcome == LightingMutationOutcome::Requested)
+				{
+					m_PreviousLightingEffect = result;
+				}
+				return result;
+			}
+			void OnEnter() noexcept override
+			{
+				m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+				GGLAB_ASSERT_NOT_NULL(m_LightingOverride.get());
+			}
+			void OnExit() noexcept override { m_LightingOverride.reset(); }
+
 			void Update(float) noexcept override { GetCamera().Update(); }
 
 		private:
@@ -1050,23 +1091,6 @@ namespace gglab
 						control->GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 1.0f &&
 						GetParameters().Get(LabParameterId("radius"), 0.0f) == 2.0f &&
 						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration() == m_Probe.m_ExpectedCommitGeneration;
-				}
-				const auto samples = GetParameters().Get(LabParameterId("lighting"), uint32_t(1));
-				const auto broken = GetParameters().Get(LabParameterId("broken-lighting"), uint32_t(1));
-				if (samples != m_Samples || broken != m_Broken)
-				{
-					m_LightingRequest.m_PreviousGeneration =
-						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-					m_Services.m_EnvironmentLightingControl->RequestRebake();
-					m_LightingRequest.m_Generation =
-						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-					if (broken != m_Broken)
-					{
-						// Deliberately misreport owner evidence; admission remains valid.
-						m_LightingRequest.m_PreviousGeneration = 0;
-					}
-					m_Samples = samples;
-					m_Broken = broken;
 				}
 				GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Radius =
 					GetParameters().Get(LabParameterId("radius"), 1.0f);
@@ -1085,9 +1109,8 @@ namespace gglab
 			}
 			LifetimeProbe& m_Probe;
 			bool m_Rebake = false;
-			uint32_t m_Samples = 1;
-			uint32_t m_Broken = 1;
-			LabLightingParameterRequest m_LightingRequest{};
+			std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
+			LightingMutationResult m_PreviousLightingEffect{};
 		};
 
 		std::unique_ptr<LabSessionBase> CreateParameterTestLab(const LabSessionCreateInfo& info) noexcept
@@ -3303,7 +3326,80 @@ namespace gglab
 				!unchanged->m_Items[0].m_Published && !unchanged->m_Items[0].m_FirstConsumed &&
 				parameters.GetParameterRevision() == revision && environment.GetBakeRequestGeneration() == generation &&
 				probe.m_ParameterApplications == applications + 1,
-				"Deferred NoChange makes no bake request, handler call, publication or revision");
+				"Deferred NoChange confirms the active target without a new request, Immediate handler, publication or revision");
+			const auto lightingCalls = probe.m_LightingParameterApplications;
+			const std::array immediate{ LabParameterValue{ LabParameterId("radius"), 2.5f } };
+			const auto immediateId = runtime.RequestParameterBatch(immediate, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto immediateResult = runtime.TakeParameterBatchResult(immediateId);
+			checks.Check(immediateResult && immediateResult->m_State == ParameterBatchState::Finished &&
+				probe.m_LightingParameterApplications == lightingCalls &&
+				environment.GetBakeRequestGeneration() == generation,
+				"An unrelated Immediate batch never calls the Deferred binding or reuses its previous result");
+
+			probe.m_ParameterEnvironment->SetPrefilteredSpecularSampleCount(3);
+			const auto existingGeneration = environment.GetBakeRequestGeneration();
+			const auto existingId = request(3);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto existing = *parameters.GetParameterBatchStatus();
+			checks.Check(existingId != 0 && !existing.IsTerminal() &&
+				existing.m_Items[0].m_State == ParameterEffectState::Applied &&
+				existing.m_Items[0].m_Identity.m_Generation == existingGeneration &&
+				environment.GetBakeRequestGeneration() == existingGeneration,
+				"A changed source value binds an existing pending Runtime target without issuing another request");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"An existing pending target reaches real publication and submitted consumption");
+			const auto existingDone = runtime.TakeParameterBatchResult(existingId);
+			checks.Check(existingDone && existingDone->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				existingDone->m_Items[0].m_FirstConsumed && environment.GetBakeRequestGeneration() == existingGeneration,
+				"Binding an existing target retains honest Deferred publication and first-consumption receipts");
+
+			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(4));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto pendingGeneration = environment.GetBakeRequestGeneration();
+			const auto pendingRevision = parameters.GetParameterRevision();
+			const auto pendingId = request(4);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(pendingId != 0 && !parameters.GetParameterBatchStatus()->IsTerminal() &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == pendingGeneration &&
+				parameters.GetParameterRevision() == pendingRevision &&
+				environment.GetBakeRequestGeneration() == pendingGeneration,
+				"Unchanged parameter storage cannot report NoChange while its actual target is pending");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"An unchanged pending target eventually terminates through the production scheduler");
+			const auto pendingDone = runtime.TakeParameterBatchResult(pendingId);
+			checks.Check(pendingDone && pendingDone->m_Items[0].m_State == ParameterEffectState::Consumed,
+				"An unchanged pending target is consumed with no new revision or generation");
+
+			probe.m_ReturnStaleLightingEvidence = true;
+			const auto staleId = request(4);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto stale = runtime.TakeParameterBatchResult(staleId);
+			checks.Check(stale && stale->m_State == ParameterBatchState::Failed &&
+				stale->m_Failure.find("LightingEffectUnproven") != std::string::npos,
+				"A stale earlier request is rejected even for unchanged parameter storage");
+			probe.m_ReturnMissingLightingEvidence = true;
+			const auto missingId = request(4);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto missing = runtime.TakeParameterBatchResult(missingId);
+			checks.Check(missing && missing->m_State == ParameterBatchState::Failed &&
+				missing->m_Failure.find("LightingEffectUnproven") != std::string::npos,
+				"A declared capability without this operation's evidence cannot confirm an unchanged target");
+
+			probe.m_RequestLightingTwice = true;
+			const auto beforeDouble = environment.GetBakeRequestGeneration();
+			const auto doubleId = request(5);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(doubleId != 0 && !parameters.GetParameterBatchStatus()->IsTerminal() &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_State == ParameterEffectState::Applied &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == beforeDouble + 2,
+				"Session accepts the target returned by one owning operation without assuming generation plus one");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"A target following multiple domain requests reaches actual publication");
+			const auto doubleDone = runtime.TakeParameterBatchResult(doubleId);
+			checks.Check(doubleDone && doubleDone->m_Items[0].m_State == ParameterEffectState::Consumed,
+				"The exact final target from a multiple-request operation is consumed");
+
 			const auto replacedId = request(3);
 			GGLAB_UNUSED(runtime.Tick());
 			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(4));
@@ -3349,6 +3445,15 @@ namespace gglab
 				std::ranges::all_of(failed->m_Items, [](const auto& item) { return item.IsTerminal(); }) &&
 				failed->m_Failure.find("LightingEffectUnproven") != std::string::npos,
 				"Unproven domain attribution closes every pending sibling instead of returning a terminal batch with unfinished items");
+			const std::array unrelated{ LabParameterValue{ LabParameterId("lighting"), uint32_t(7) },
+				LabParameterValue{ LabParameterId("rebake"), true } };
+			const auto unrelatedId = runtime.RequestParameterBatch(unrelated, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unattributed = runtime.TakeParameterBatchResult(unrelatedId);
+			checks.Check(unattributed && unattributed->m_State == ParameterBatchState::Failed &&
+				unattributed->m_Failure.find("LightingEffectUnproven") != std::string::npos &&
+				std::ranges::none_of(unattributed->m_Items, [](const auto& item) { return item.m_FirstConsumed.has_value(); }),
+				"An unchanged Deferred binding cannot absorb an unrelated Immediate handler's lighting request");
 			const auto fatalId = request(8);
 			probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
 			checks.Check(fatalId != 0 && runtime.Tick() == AppRuntimeTickResult::Fatal &&

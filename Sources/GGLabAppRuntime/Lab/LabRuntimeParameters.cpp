@@ -12,7 +12,7 @@ namespace gglab
 		return (effect == ParameterEffectClass::Immediate && m_ActiveSession &&
 			m_ActiveSession->SupportsImmediateParameter(desc.m_Id)) ||
 			(effect == ParameterEffectClass::Deferred && m_ActiveSession &&
-				m_ActiveSession->GetLightingParameterRequest(desc.m_Id).has_value());
+				m_ActiveSession->SupportsDeferredLightingParameter(desc.m_Id));
 	}
 
 	std::optional<LabRuntime::PreparedParameterBatch> LabRuntime::PrepareParameterValues(
@@ -39,7 +39,11 @@ namespace gglab
 		for (const auto& value : values)
 		{
 			const auto& desc = prepared.m_Parameters.Find(value.m_Id)->m_Desc;
-			lightingItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
+			if (GetParameterEffectClass(desc) == ParameterEffectClass::Deferred)
+			{
+				++lightingItems;
+				prepared.m_LightingParameter = value.m_Id;
+			}
 			if (!SupportsParameterEffect(desc) || lightingItems > 1)
 			{
 				error = "Unsupported effect: Immediate items require a frame projection; "
@@ -106,7 +110,8 @@ namespace gglab
 		prepared.m_Committed = true;
 	}
 
-	void LabRuntime::ApplyParameterBatchEffects(PreparedParameterBatch&& prepared) noexcept
+	std::optional<LabRuntime::LightingParameterEffect> LabRuntime::ApplyParameterBatchEffects(
+		PreparedParameterBatch&& prepared) noexcept
 	{
 		GGLAB_ASSERT(prepared.m_Owner == this && prepared.m_Session == m_ActiveSession.get() &&
 			prepared.m_SessionSerial == m_TemporalSessionSerial &&
@@ -115,9 +120,15 @@ namespace gglab
 		prepared.m_Id = 0;
 		if (prepared.m_HasChanges)
 		{
-			m_ActiveSession->ApplyParameterChanges(LabChangeImpact::Immediate);
+			m_ActiveSession->ApplyImmediateParameters();
 			m_ActiveSession->GetCamera().Update();
 		}
+		if (prepared.m_LightingParameter)
+		{
+			return LightingParameterEffect{ *prepared.m_LightingParameter,
+				m_ActiveSession->ApplyDeferredLightingParameter(*prepared.m_LightingParameter) };
+		}
+		return std::nullopt;
 	}
 
 	bool LabRuntime::ApplyParameterBatch(uint64_t id,
@@ -129,7 +140,7 @@ namespace gglab
 			return false;
 		}
 		CommitParameterBatch(*prepared);
-		ApplyParameterBatchEffects(std::move(*prepared));
+		GGLAB_UNUSED(ApplyParameterBatchEffects(std::move(*prepared)));
 		return true;
 	}
 }

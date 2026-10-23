@@ -69,6 +69,14 @@ namespace gglab
 	void LabSessionBase::ApplyParameterChanges(LabChangeImpact impact) noexcept
 	{
 		ApplyImmediateParameters();
+		for (const auto& parameter : m_Parameters.GetParameters())
+		{
+			if (parameter.m_Dirty && GetParameterEffectClass(parameter.m_Desc) == ParameterEffectClass::Deferred &&
+				SupportsDeferredLightingParameter(parameter.m_Desc.m_Id))
+			{
+				GGLAB_UNUSED(ApplyDeferredLightingParameter(parameter.m_Desc.m_Id));
+			}
+		}
 		switch (impact)
 		{
 		case LabChangeImpact::Immediate:

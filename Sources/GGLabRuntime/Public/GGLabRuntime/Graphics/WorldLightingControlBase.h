@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/WorldLighting.h"
+#include "GGLabRuntime/Graphics/LightingMutationResult.h"
 
 #include <cstdint>
 #include <memory>
@@ -7,20 +8,6 @@
 
 namespace gglab
 {
-	enum class WorldLightingMutationOutcome
-	{
-		Rejected,
-		Unchanged,
-		Requested,
-	};
-
-	struct WorldLightingMutationResult
-	{
-		WorldLightingMutationOutcome m_Outcome = WorldLightingMutationOutcome::Rejected;
-		uint64_t m_PreviousGeneration = 0;
-		uint64_t m_Generation = 0;
-	};
-
 	// Prepared only for one uninterrupted render-thread safe boundary. Dropping a
 	// plan has no effect. Commit cannot reject: no callbacks or World/control edits
 	// may intervene between preparation and commit.
@@ -29,7 +16,7 @@ namespace gglab
 	public:
 		virtual ~PreparedWorldLightingMutationBase() = default;
 		[[nodiscard]] virtual bool HasChanges() const noexcept = 0;
-		[[nodiscard]] virtual WorldLightingMutationResult Commit() noexcept = 0;
+		[[nodiscard]] virtual LightingMutationResult Commit() noexcept = 0;
 	};
 
 	// Render-thread authoring control, used only before frame planning/build. It
@@ -45,7 +32,7 @@ namespace gglab
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
 			std::string& error) noexcept = 0;
 		// Standalone convenience only; a multi-source batch must use prepared plans.
-		[[nodiscard]] virtual WorldLightingMutationResult ApplyWorldLightingInputs(
+		[[nodiscard]] virtual LightingMutationResult ApplyWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept = 0;
 		[[nodiscard]] virtual WorldLightingPublication GetWorldLightingPublication() const noexcept = 0;
 	};

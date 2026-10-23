@@ -513,7 +513,7 @@ namespace gglab
 
 		// Commit is uninterrupted and cannot reject. Install every source before
 		// callbacks: a Lab handler must never observe half-committed batch values.
-		std::optional<WorldLightingMutationResult> profileEvidence;
+		std::optional<LightingMutationResult> profileEvidence;
 		if (prepared.m_Lighting)
 		{
 			profileEvidence = prepared.m_Lighting->Commit();
@@ -534,9 +534,10 @@ namespace gglab
 
 		// Effects start only after commit. Their failures/supersession retain the
 		// existing asynchronous receipt semantics, not transactional GPU rollback.
+		std::optional<LabRuntime::LightingParameterEffect> labEvidence;
 		if (prepared.m_Lab)
 		{
-			m_Lab->ApplyParameterBatchEffects(std::move(*prepared.m_Lab));
+			labEvidence = m_Lab->ApplyParameterBatchEffects(std::move(*prepared.m_Lab));
 		}
 		const auto resolvedInherited = ResolveInheritedViewSettings();
 		if (resolvedInherited)
@@ -576,10 +577,6 @@ namespace gglab
 					// tooling or Host precedence can mask an unchanged Lab request.
 					batch.m_NoChange[index] = true;
 				}
-				else
-				{
-					GGLAB_UNUSED(receipt.RecordNoChange(serial));
-				}
 			}
 		}
 		RefreshSources();
@@ -593,26 +590,43 @@ namespace gglab
 			{
 				continue;
 			}
-			std::optional<WorldLightingMutationResult> evidence = profileEvidence;
-			if (!IsLightingProfileParameter(receipt.GetSnapshot().m_Parameter))
+			const auto& parameter = receipt.GetSnapshot().m_Parameter;
+			std::optional<LightingMutationResult> evidence = profileEvidence;
+			if (!IsLightingProfileParameter(parameter))
 			{
-				const auto labEvidence = m_Lab->GetActiveSession()->GetLightingParameterRequest(receipt.GetSnapshot().m_Parameter);
-				evidence = labEvidence ?
-					std::optional(WorldLightingMutationResult{ WorldLightingMutationOutcome::Requested,
-						labEvidence->m_PreviousGeneration, labEvidence->m_Generation }) :
+				evidence = labEvidence && labEvidence->m_Parameter == parameter ?
+					std::optional(labEvidence->m_Result) :
 					std::nullopt;
 			}
-			if (!evidence || evidence->m_Outcome != WorldLightingMutationOutcome::Requested ||
+			// The operation must cover the entire attribution boundary. Its own domain
+			// may issue multiple requests, or bind an existing target without a request.
+			const bool requestedTarget = evidence && evidence->m_Outcome == LightingMutationOutcome::Requested &&
+				evidence->m_Generation > evidence->m_PreviousGeneration;
+			const bool existingTarget = evidence && evidence->m_Outcome == LightingMutationOutcome::Unchanged &&
+				evidence->m_Generation == evidence->m_PreviousGeneration;
+			if ((!requestedTarget && !existingTarget) ||
 				evidence->m_PreviousGeneration != batch.m_FrameBakeRequestGeneration ||
-				evidence->m_Generation != requested || requested == 0 ||
-				requested - batch.m_FrameBakeRequestGeneration != 1)
+				evidence->m_Generation != requested || requested == 0)
 			{
 				GGLAB_UNUSED(receipt.Fail(
-					"LightingEffectUnproven: the bound handler did not account for exactly one Runtime request."));
+					"LightingEffectUnproven: the current operation did not bind the Runtime target at this boundary."));
 				continue;
 			}
-			batch.m_AttributedLightingRequest = receipt.RecordApplied(ParameterEffectClass::Deferred,
-				{ batch.m_Status.m_Revision, "lighting", requested }, serial);
+			if (existingTarget && m_Environment.GetBakingStatus().m_ActiveGeneration == requested &&
+				std::ranges::find(prepared.m_Changed, parameter) == prepared.m_Changed.end())
+			{
+				// Storage equality alone cannot terminate a pending bake as NoChange.
+				batch.m_AttributedLightingRequest = receipt.RecordNoChange(serial);
+			}
+			else
+			{
+				batch.m_AttributedLightingRequest = receipt.RecordApplied(ParameterEffectClass::Deferred,
+					{ batch.m_Status.m_Revision, "lighting", requested }, serial);
+			}
+			if (batch.m_AttributedLightingRequest)
+			{
+				batch.m_ApplyBakeGeneration = requested;
+			}
 		}
 		RefreshParameterBatchStatus();
 	}

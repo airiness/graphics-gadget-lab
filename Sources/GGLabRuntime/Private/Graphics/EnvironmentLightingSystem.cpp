@@ -34,7 +34,7 @@ namespace gglab
 
 		bool HasChanges() const noexcept override { return m_Changed; }
 
-		WorldLightingMutationResult Commit() noexcept override
+		LightingMutationResult Commit() noexcept override
 		{
 			const auto current = RenderWorldExtractor{}.Extract(m_World).m_MainDirectionalLight;
 			GGLAB_ASSERT_MSG(!m_Committed && m_Owner.GetBakeRequestGeneration() == m_PreviousGeneration &&
@@ -44,7 +44,7 @@ namespace gglab
 			m_Committed = true;
 			if (!m_Changed)
 			{
-				return { WorldLightingMutationOutcome::Unchanged, m_PreviousGeneration, m_PreviousGeneration };
+				return { LightingMutationOutcome::Unchanged, m_PreviousGeneration, m_PreviousGeneration };
 			}
 			m_Target.m_Transform->m_Rotation = m_Rotation;
 			m_Target.m_Light->m_WorldSun = m_Inputs.m_Sun;
@@ -53,7 +53,7 @@ namespace gglab
 			m_Owner.m_RequestedPhysicalSky = std::move(m_Source);
 			m_Owner.RequestRebake();
 			m_Owner.RefreshRenderSettings();
-			return { WorldLightingMutationOutcome::Requested, m_PreviousGeneration,
+			return { LightingMutationOutcome::Requested, m_PreviousGeneration,
 				m_Owner.GetBakeRequestGeneration() };
 		}
 
@@ -138,6 +138,23 @@ namespace gglab
 				static_cast<size_t>(OverrideField::BakeConfiguration)] == m_Id;
 		}
 
+		LightingMutationResult ApplyPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept override
+		{
+			const auto lifetime = m_Lifetime.lock();
+			if (!lifetime)
+			{
+				return {};
+			}
+			auto& owner = *lifetime->m_Owner;
+			GGLAB_ASSERT(owner.m_ActiveOverrideOwner == m_Id);
+			const uint64_t previous = owner.GetBakeRequestGeneration();
+			Write(owner, OverrideField::BakeConfiguration,
+				[&]() { owner.SetPrefilteredSpecularSampleCount(sampleCount); });
+			const uint64_t generation = owner.GetBakeRequestGeneration();
+			return { generation == previous ? LightingMutationOutcome::Unchanged : LightingMutationOutcome::Requested,
+				previous, generation };
+		}
+
 		void Apply(const EnvironmentLightingOverrideValues& values) noexcept override
 		{
 			const auto lifetime = m_Lifetime.lock();
@@ -170,8 +187,7 @@ namespace gglab
 			}
 			if (values.m_PrefilteredSpecularSampleCount)
 			{
-				Write(owner, OverrideField::BakeConfiguration,
-					[&]() { owner.SetPrefilteredSpecularSampleCount(*values.m_PrefilteredSpecularSampleCount); });
+				GGLAB_UNUSED(ApplyPrefilteredSpecularSampleCount(*values.m_PrefilteredSpecularSampleCount));
 			}
 		}
 
@@ -478,7 +494,7 @@ namespace gglab
 		return std::make_unique<PreparedWorldLightingMutation>(*this, world, target, inputs, std::move(state), changed);
 	}
 
-	WorldLightingMutationResult EnvironmentLightingSystem::ApplyWorldLightingInputs(
+	LightingMutationResult EnvironmentLightingSystem::ApplyWorldLightingInputs(
 		World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept
 	{
 		// Convenience for a standalone mutation; Session batches prepare every source
@@ -490,7 +506,7 @@ namespace gglab
 		SynchronizeWorldLighting(world, sessionIdentity);
 		std::string error;
 		auto prepared = PrepareWorldLightingInputs(world, sessionIdentity, inputs, error);
-		return prepared ? prepared->Commit() : WorldLightingMutationResult{};
+		return prepared ? prepared->Commit() : LightingMutationResult{};
 	}
 
 	WorldLightingPublication EnvironmentLightingSystem::GetWorldLightingPublication() const noexcept

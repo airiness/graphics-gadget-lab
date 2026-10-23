@@ -2057,6 +2057,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLPreviewViewBase.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\LightingMutationResult.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\LightingProfile.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>

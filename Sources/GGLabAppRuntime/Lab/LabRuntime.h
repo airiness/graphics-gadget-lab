@@ -68,6 +68,7 @@ namespace gglab
 			const LabRuntime* m_Owner = nullptr;
 			LabSessionBase* m_Session = nullptr;
 			LabParameterSet m_Parameters;
+			std::optional<LabParameterId> m_LightingParameter;
 			uint64_t m_Id = 0;
 			uint64_t m_Revision = 0;
 			uint32_t m_SessionSerial = 0;
@@ -81,7 +82,13 @@ namespace gglab
 		[[nodiscard]] std::optional<PreparedParameterBatch> PrepareParameterBatch(uint64_t id,
 			std::span<const LabParameterValue> values, std::string& error) const noexcept;
 		void CommitParameterBatch(PreparedParameterBatch& prepared) noexcept;
-		void ApplyParameterBatchEffects(PreparedParameterBatch&& prepared) noexcept;
+		struct LightingParameterEffect
+		{
+			LabParameterId m_Parameter;
+			LightingMutationResult m_Result;
+		};
+		[[nodiscard]] std::optional<LightingParameterEffect> ApplyParameterBatchEffects(
+			PreparedParameterBatch&& prepared) noexcept;
 		[[nodiscard]] bool ApplyParameterBatch(uint64_t id,
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		void CancelParameterBatch(uint64_t id) noexcept;

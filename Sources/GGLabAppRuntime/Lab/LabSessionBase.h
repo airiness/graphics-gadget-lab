@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/LightingProfile.h"
+#include "GGLabRuntime/Graphics/LightingMutationResult.h"
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "Lab/LabParameter.h"
@@ -37,14 +38,6 @@ namespace gglab
 		}
 	};
 
-	// Evidence from a synchronous owning-domain control call, not a predicted generation.
-	// A present zero-initialized value registers the binding before its first change.
-	struct LabLightingParameterRequest
-	{
-		uint64_t m_PreviousGeneration = 0;
-		uint64_t m_Generation = 0;
-	};
-
 	struct LabParameterFrameContext
 	{
 		const ResolvedViewRenderSettings& m_ViewSettings;
@@ -65,13 +58,18 @@ namespace gglab
 		[[nodiscard]] std::optional<LabParameterBatchResult> SetParameters(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		LabChangeImpact ResetParameters() noexcept;
-		// Only explicitly bound Deferred lighting parameters are admitted. After the
-		// handler, evidence must cover exactly its one actual generation advance.
-		[[nodiscard]] virtual std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
-			const LabParameterId& id) const noexcept
+		[[nodiscard]] virtual bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept
 		{
 			GGLAB_UNUSED(id);
-			return std::nullopt;
+			return false;
+		}
+		// Runs after the complete batch commits, even when parameter storage is unchanged.
+		// Return the current operation's result, never a cached earlier request.
+		[[nodiscard]] virtual LightingMutationResult ApplyDeferredLightingParameter(
+			const LabParameterId& id) noexcept
+		{
+			GGLAB_UNUSED(id);
+			return {};
 		}
 		// Session Immediate controls require an explicit source-owned projection.
 		// Read only the frozen frame inputs, never substitute the live parameter set.

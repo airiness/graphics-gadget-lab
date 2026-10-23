@@ -346,7 +346,6 @@ namespace gglab
 		const bool bound = GetMutableParameters().BindInheritedDefault(IBLSamplesId, inherited);
 		GGLAB_ASSERT(bound);
 		GGLAB_UNUSED(bound);
-		m_LightingRequest = {};
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
@@ -354,13 +353,12 @@ namespace gglab
 		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount(
 			PostProcessPreviewChannel::AmbientOcclusion);
 		// Save the previous preview before the apply handler selects this Lab's tap.
-		ApplyImmediateParameters();
+		ApplyParameterChanges(LabChangeImpact::Immediate);
 	}
 
 	void GTAOLabSession::OnExit() noexcept
 	{
 		m_LightingOverride.reset();
-		m_LightingRequest = {};
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
@@ -399,7 +397,6 @@ namespace gglab
 		// accepting new edits; unrelated Immediate changes must not reclaim it.
 		const uint32_t inherited = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
 			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-		m_LightingRequest = {};
 		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
 	}
 
@@ -425,32 +422,24 @@ namespace gglab
 		return std::nullopt;
 	}
 
-	std::optional<LabLightingParameterRequest> GTAOLabSession::GetLightingParameterRequest(
-		const LabParameterId& id) const noexcept
+	bool GTAOLabSession::SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept
 	{
-		return id == IBLSamplesId && m_LightingOverride ? std::optional(m_LightingRequest) : std::nullopt;
+		return id == IBLSamplesId && m_LightingOverride != nullptr;
+	}
+
+	LightingMutationResult GTAOLabSession::ApplyDeferredLightingParameter(const LabParameterId& id) noexcept
+	{
+		if (!SupportsDeferredLightingParameter(id))
+		{
+			return {};
+		}
+		return m_LightingOverride->ApplyPrefilteredSpecularSampleCount(
+			GetParameters().Get(IBLSamplesId, uint32_t(1)));
 	}
 
 	void GTAOLabSession::ApplyImmediateParameters() noexcept
 	{
 		const auto& parameters = GetParameters();
-		if (m_LightingOverride)
-		{
-			const auto* parameter = GetParameters().Find(IBLSamplesId);
-			const uint32_t samples = std::get<uint32_t>(parameter->m_Value);
-			const uint32_t current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
-				.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-			if (parameter->m_Dirty && (samples != current || !m_LightingOverride->OwnsBakeConfiguration()))
-			{
-				const uint64_t previous = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-				m_LightingOverride->Apply({ .m_PrefilteredSpecularSampleCount = samples });
-				const uint64_t generation = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-				if (generation != previous)
-				{
-					m_LightingRequest = { .m_PreviousGeneration = previous, .m_Generation = generation };
-				}
-			}
-		}
 		GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Enabled =
 			parameters.Get(EnabledId, true);
 		m_SelectedTap = static_cast<PostProcessDebugTap>(parameters.Get(

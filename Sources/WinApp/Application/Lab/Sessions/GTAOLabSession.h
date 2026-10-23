@@ -29,8 +29,9 @@ namespace gglab
 		[[nodiscard]] bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override;
 		[[nodiscard]] std::optional<LabValue> ReadImmediateParameterFrameValue(
 			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override;
-		[[nodiscard]] std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
-			const LabParameterId& id) const noexcept override;
+		[[nodiscard]] bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] LightingMutationResult ApplyDeferredLightingParameter(
+			const LabParameterId& id) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
@@ -65,6 +66,5 @@ namespace gglab
 		bool m_EnableCameraInput = false;
 		bool m_FixtureConfigured = false;
 		std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
-		LabLightingParameterRequest m_LightingRequest{};
 	};
 }

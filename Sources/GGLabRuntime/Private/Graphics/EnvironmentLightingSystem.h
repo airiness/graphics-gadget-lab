@@ -86,7 +86,7 @@ namespace gglab
 		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
 			std::string& error) noexcept override;
-		[[nodiscard]] WorldLightingMutationResult ApplyWorldLightingInputs(
+		[[nodiscard]] LightingMutationResult ApplyWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept override;
 		[[nodiscard]] WorldLightingPublication GetWorldLightingPublication() const noexcept override;
 		[[nodiscard]] const std::optional<PhysicalSkySource>& GetRequestedPhysicalSky() const noexcept { return m_RequestedPhysicalSky; }

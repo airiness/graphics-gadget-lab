@@ -89,25 +89,6 @@ namespace gglab
 		}
 		profile.m_Lighting.m_EnableAerialPerspective = aerial;
 		profile.m_TemporalAA.m_Enabled = temporal;
-		// Preparation can run beside another active Lab. Only the entered owner
-		// may change the process lighting service.
-		if (m_LightingOverride)
-		{
-			const auto* parameter = GetParameters().Find(IBLSamplesId);
-			const uint32_t samples = std::get<uint32_t>(parameter->m_Value);
-			const uint32_t current = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
-				.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-			if (parameter->m_Dirty && (samples != current || !m_LightingOverride->OwnsBakeConfiguration()))
-			{
-				const uint64_t previous = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-				m_LightingOverride->Apply({ .m_PrefilteredSpecularSampleCount = samples });
-				const uint64_t generation = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
-				if (generation != previous)
-				{
-					m_LightingRequest = { .m_PreviousGeneration = previous, .m_Generation = generation };
-				}
-			}
-		}
 	}
 
 	bool AtmosphereRangeLabSession::RefreshInheritedParameters() noexcept
@@ -120,7 +101,6 @@ namespace gglab
 		// accepting new edits; unrelated Immediate changes must not reclaim it.
 		const uint32_t inherited = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
 			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-		m_LightingRequest = {};
 		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
 	}
 
@@ -143,10 +123,19 @@ namespace gglab
 		return std::nullopt;
 	}
 
-	std::optional<LabLightingParameterRequest> AtmosphereRangeLabSession::GetLightingParameterRequest(
-		const LabParameterId& id) const noexcept
+	bool AtmosphereRangeLabSession::SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept
 	{
-		return id == IBLSamplesId && m_LightingOverride ? std::optional(m_LightingRequest) : std::nullopt;
+		return id == IBLSamplesId && m_LightingOverride != nullptr;
+	}
+
+	LightingMutationResult AtmosphereRangeLabSession::ApplyDeferredLightingParameter(const LabParameterId& id) noexcept
+	{
+		if (!SupportsDeferredLightingParameter(id))
+		{
+			return {};
+		}
+		return m_LightingOverride->ApplyPrefilteredSpecularSampleCount(
+			GetParameters().Get(IBLSamplesId, uint32_t(1)));
 	}
 
 	void AtmosphereRangeLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
@@ -235,16 +224,14 @@ namespace gglab
 		const bool bound = GetMutableParameters().BindInheritedDefault(IBLSamplesId, inherited);
 		GGLAB_ASSERT(bound);
 		GGLAB_UNUSED(bound);
-		m_LightingRequest = {};
 		m_LightingOverride->Apply({ .m_Intensity = 1.0f, .m_RotationRadians = 0.0f,
 			.m_EnableSkybox = true, .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
-		ApplyImmediateParameters();
+		ApplyParameterChanges(LabChangeImpact::Immediate);
 	}
 
 	void AtmosphereRangeLabSession::OnExit() noexcept
 	{
 		m_LightingOverride.reset();
-		m_LightingRequest = {};
 		// Asset scope remains owned by this session until LabRuntime's last-use fence retires it.
 	}
 

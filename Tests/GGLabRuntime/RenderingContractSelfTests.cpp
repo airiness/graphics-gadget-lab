@@ -728,12 +728,43 @@ namespace gglab
 				environment.GetSettings().m_Intensity == preset.m_Intensity,
 				"Release restores the original preset as well as its full recipe");
 
+			scope = environment.AcquireOverride();
+			const auto beforeOperation = environment.GetBakeRequestGeneration();
+			const auto requested = scope->ApplyPrefilteredSpecularSampleCount(13);
+			context.Check(requested.m_Outcome == LightingMutationOutcome::Requested &&
+				requested.m_PreviousGeneration == beforeOperation &&
+				requested.m_Generation == environment.GetBakeRequestGeneration() &&
+				requested.m_Generation > beforeOperation,
+				"A scoped sample operation returns its actual newly requested target directly");
+			const auto existing = scope->ApplyPrefilteredSpecularSampleCount(13);
+			context.Check(existing.m_Outcome == LightingMutationOutcome::Unchanged &&
+				existing.m_PreviousGeneration == requested.m_Generation &&
+				existing.m_Generation == requested.m_Generation,
+				"A matching scoped operation binds the existing target instead of replaying old request evidence");
+			environment.SetPrefilteredSpecularSampleCount(13);
+			const auto reclaimed = scope->ApplyPrefilteredSpecularSampleCount(13);
+			context.Check(scope->OwnsBakeConfiguration() && reclaimed.m_Outcome == LightingMutationOutcome::Unchanged &&
+				reclaimed.m_Generation == existing.m_Generation,
+				"Reclaiming an equal target returns this operation's unchanged identity without an unnecessary bake");
+			const auto clamped = scope->ApplyPrefilteredSpecularSampleCount(0);
+			context.Check(clamped.m_Outcome == LightingMutationOutcome::Requested &&
+				clamped.m_PreviousGeneration == existing.m_Generation &&
+				clamped.m_Generation == environment.GetBakeRequestGeneration() &&
+				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 1 &&
+				existing.m_Generation == requested.m_Generation,
+				"The domain sanitizes samples consistently and earlier returned evidence remains an owned value");
+			scope.reset();
+
 			auto temporary = std::make_unique<EnvironmentLightingSystem>(
 				EnvironmentLightingSystem::CreateInfo{ .m_RenderResourceRegistry = &registry });
 			scope = temporary->AcquireOverride();
 			scope->Apply({ .m_Intensity = 2.0f });
 			temporary.reset();
 			scope->Apply({ .m_Intensity = 3.0f });
+			const auto expired = scope->ApplyPrefilteredSpecularSampleCount(64);
+			context.Check(expired.m_Outcome == LightingMutationOutcome::Rejected &&
+				expired.m_PreviousGeneration == 0 && expired.m_Generation == 0,
+				"An expired lighting scope cannot return a current target or replay earlier evidence");
 			context.Check(!scope->OwnsBakeConfiguration(),
 				"A lighting scope may outlive its Runtime owner without accessing destroyed state");
 			scope.reset();
@@ -996,7 +1027,7 @@ namespace gglab
 			auto& rotation = registry.get<components::TransformComponent>(entity).m_Rotation;
 			rotation = Quaternion(-rotation.m_X, -rotation.m_Y, -rotation.m_Z, -rotation.m_W);
 			const auto unchanged = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
-			context.Check(unchanged.m_Outcome == WorldLightingMutationOutcome::Unchanged &&
+			context.Check(unchanged.m_Outcome == LightingMutationOutcome::Unchanged &&
 				unchanged.m_Generation == original->m_Generation,
 				"Quaternion sign equivalence neither requests a bake nor changes attribution");
 			auto equivalent = profile;
@@ -1018,7 +1049,7 @@ namespace gglab
 				EqualWorldLightingAuthoring(*deduplicated.m_Active, prepared),
 				"An effective-equivalent World edit cannot relabel an older requested or published generation");
 			const auto grayResult = environment.ApplyWorldLightingInputs(world, 17, equivalent.m_Inputs);
-			context.Check(grayResult.m_Outcome == WorldLightingMutationOutcome::Unchanged &&
+			context.Check(grayResult.m_Outcome == LightingMutationOutcome::Unchanged &&
 				grayResult.m_Generation == original->m_Generation,
 				"An effective-equivalent selection reports Unchanged without a forced rebake");
 
@@ -1028,7 +1059,7 @@ namespace gglab
 				world.m_Atmosphere->m_RayleighScaleHeightMeters == 16000.0f,
 				"Preparation does not silently settle or overwrite a pre-existing unresolved edit");
 			const auto replacement = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
-			context.Check(replacement.m_Outcome == WorldLightingMutationOutcome::Requested &&
+			context.Check(replacement.m_Outcome == LightingMutationOutcome::Requested &&
 				replacement.m_PreviousGeneration == original->m_Generation + 1 &&
 				replacement.m_Generation == replacement.m_PreviousGeneration + 1 &&
 				environment.GetWorldLightingPublication().m_Active->m_Generation == original->m_Generation,
@@ -1043,7 +1074,7 @@ namespace gglab
 			environment.SynchronizeWorldLighting(world, 17);
 			const auto sameProfile = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
 			scope.reset();
-			context.Check(sameProfile.m_Outcome == WorldLightingMutationOutcome::Unchanged &&
+			context.Check(sameProfile.m_Outcome == LightingMutationOutcome::Unchanged &&
 				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment,
 				"A NoChange profile does not steal the entered owner's background override");
 			scope = environment.AcquireOverride();
@@ -1051,7 +1082,7 @@ namespace gglab
 			environment.SynchronizeWorldLighting(world, 17);
 			const auto changedProfile = environment.ApplyWorldLightingInputs(world, 17, pendingInputs);
 			scope.reset();
-			context.Check(changedProfile.m_Outcome == WorldLightingMutationOutcome::Requested &&
+			context.Check(changedProfile.m_Outcome == LightingMutationOutcome::Requested &&
 				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
 				"A committed profile mutation owns its background and survives the previous Lab's release");
 

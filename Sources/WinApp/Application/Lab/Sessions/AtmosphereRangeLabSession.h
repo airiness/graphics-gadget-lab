@@ -27,8 +27,9 @@ namespace gglab
 		[[nodiscard]] bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override;
 		[[nodiscard]] std::optional<LabValue> ReadImmediateParameterFrameValue(
 			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override;
-		[[nodiscard]] std::optional<LabLightingParameterRequest> GetLightingParameterRequest(
-			const LabParameterId& id) const noexcept override;
+		[[nodiscard]] bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] LightingMutationResult ApplyDeferredLightingParameter(
+			const LabParameterId& id) noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -41,6 +42,5 @@ namespace gglab
 		ModelID m_PendingModelId{};
 		LoadingProgress m_LoadingProgress{};
 		std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
-		LabLightingParameterRequest m_LightingRequest{};
 	};
 }

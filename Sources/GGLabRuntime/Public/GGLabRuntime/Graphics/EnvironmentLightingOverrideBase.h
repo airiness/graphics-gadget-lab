@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
+#include "GGLabRuntime/Graphics/LightingMutationResult.h"
 
 #include <cstdint>
 #include <optional>
@@ -26,6 +27,9 @@ namespace gglab
 		virtual ~EnvironmentLightingOverrideBase() = default;
 		[[nodiscard]] virtual EnvironmentLightingSettings GetInheritedSettings() const noexcept = 0;
 		[[nodiscard]] virtual bool OwnsBakeConfiguration() const noexcept = 0;
+		// Claim this field and return only this operation's actual bake target.
+		[[nodiscard]] virtual LightingMutationResult ApplyPrefilteredSpecularSampleCount(
+			uint32_t sampleCount) noexcept = 0;
 		// Omitted fields are untouched; scalar sanitization matches the ordinary control.
 		virtual void Apply(const EnvironmentLightingOverrideValues& values) noexcept = 0;
 	};

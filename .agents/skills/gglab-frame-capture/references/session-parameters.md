@@ -93,7 +93,8 @@ the configuration error, while unrelated Host controls remain available.
 
 The same Session batch accepts one profile item, optionally with Host/Lab Immediate
 items; two Deferred lighting items reject atomically. Re-selecting current inputs
-is NoChange and does not rebake or rewrite equivalent authoring representations.
+does not rebake or rewrite equivalent authoring representations. An already active
+target confirms NoChange; a pending target still awaits publication and consumption.
 Quaternion sign, direction magnitude and normalized chromaticity are not compared
 as arbitrary representation bytes when deciding effective equality. Profile
 application uses an explicit Runtime World Lighting control at the safe boundary,
@@ -220,12 +221,16 @@ reports its declared class, actual revision/domain/generation identity, state,
 requested/applied/published/firstConsumed stamps and failure. Immediate
 `published == applied`; only the exact successfully submitted frame state can
 supply `firstConsumed`. `NoChange` records requested/applied confirmation but no
-publication/consumption and introduces no revision or handler/bake request.
+publication/consumption and introduces no revision or new bake request.
 Superseded, failed and unreached effects are terminal without successful
-consumption. The bound handler must report one actual Runtime generation advance,
-with the previous and resulting generation matching the apply boundary. Unsupported
-or unproven attribution fails; it is never predicted from the descriptor or the
-`ibl` readiness gate. A mixed batch retains per-item classes and stamps.
+consumption. Capability is declared independently from operation evidence. After
+all sources commit, the explicit Deferred handler returns this synchronous
+operation's Runtime outcome and target identity. A new request must cover the
+apply boundary; the owning operation may issue more than one request. An unchanged
+operation binds the existing requested target without another bake. Unsupported,
+missing or stale attribution fails; it is never inferred from an earlier cached
+request, the descriptor or the `ibl` readiness gate. A mixed batch retains per-item
+classes and stamps.
 
 The Runtime frame builder freezes the published lighting generation in its
 `RenderScene`. That immutable scene state, followed by successful submission,
@@ -236,8 +241,13 @@ frame. A terminal failed batch closes unresolved siblings without erasing their
 existing evidence. Accepted application/effect failure does not roll back live
 values or pretend already-started GPU work was cancelled.
 
-NoChange lighting causes no new request; an all-NoChange batch invokes no handler.
-The fixtures change global bake quality only while entered and restore the owned
+Deferred NoChange requires unchanged effective intent, a fresh operation result,
+and an already active matching Runtime target. It confirms without a new request
+or publication/firstConsumed stamp. Equal stored values whose target is still
+pending bind that target and await actual publication and submitted consumption.
+A Deferred operation runs even for equal stored values; an unrelated Immediate
+batch never invokes the Deferred binding. The fixtures change global bake quality
+only while entered and restore the owned
 override on exit. If no sample override was used, they do not restore unrelated
 quality edits. Declared Immediate behavior contradicting an actual lighting
 request continues to fail as EffectMismatch.
