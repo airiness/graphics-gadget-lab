@@ -262,7 +262,7 @@ namespace gglab
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_ParameterControl = std::make_unique<SessionParameterControl>(
-			*m_RenderServices.m_Environment, m_RenderServices.m_WorldLighting,
+			*m_RenderServices.m_Environment, m_RenderComposition->GetWorldLightingControl(),
 			[this](DemoBase& demo) -> std::optional<ApplicationViewSettingsResolution>
 			{
 				const auto view = demo.GetCameraRig().ResolveEffectiveDisplayView();

@@ -1,28 +1,23 @@
 #include "Parameters/SessionParameterControl.h"
-#include "Parameters/HostViewParameters.h"
+#include "Parameters/ParameterSourceAdapters.h"
 #include "Demo/DemoBase.h"
 #include "Lab/LabRuntime.h"
-#include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
-#include "GGLabRuntime/Graphics/RenderServices.h"
-#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 
 #include <algorithm>
 #include <limits>
-#include <memory>
 #include <utility>
-#include <string>
-#include <vector>
 
 namespace gglab
 {
 	SessionParameterControl::SessionParameterControl(RenderEnvironmentAccess& environment,
 		WorldLightingControlBase* worldLighting,
 		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver) noexcept :
-		m_ViewResolver(std::move(viewResolver)), m_Environment(environment), m_WorldLighting(worldLighting)
+		m_Sources(std::make_unique<ParameterSourceAdapters>(environment, worldLighting, std::move(viewResolver)))
 	{
 	}
+
+	SessionParameterControl::~SessionParameterControl() = default;
 
 	void SessionParameterControl::SynchronizeContent(DemoBase* demo, uint64_t contentIdentity,
 		std::string_view demoId, bool transitioning) noexcept
@@ -31,19 +26,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(!demo || serial != 0, "Bound content requires its owner's frame identity.");
 		if (demo != m_Demo || serial != m_ContentSerial)
 		{
-			// The lifecycle owner releases Demo borrows before exit/retirement. A Lab
-			// session replacement retains the same live, command-owning LabRuntime.
+			// Release source reservations while their previous content owner is alive.
 			EndParameterBatch(true, "The content changed before the parameter frame.");
-			m_Lab = nullptr;
-			m_HostOverrides.clear();
-			m_HostParameters = {};
-			m_LightingProfiles.clear();
-			m_PreparedLightingProfiles.clear();
-			m_LightingProfileHashes.clear();
-			m_ProfilesInitialized = false;
-			m_ProfileDescriptor.reset();
-			m_LightingProfilesState = {};
-			m_ProfileRegistrationError.clear();
+			m_Sources->Bind(demo, demo ? demo->GetParameterLabRuntime() : nullptr, serial);
 			if (m_Enabled && m_Demo && m_ParameterRevision != std::numeric_limits<uint64_t>::max())
 			{
 				++m_ParameterRevision;
@@ -86,67 +71,52 @@ namespace gglab
 		return !progress || progress->IsReady();
 	}
 
+	const LabParameterSet& SessionParameterControl::GetHostParameters() const noexcept
+	{
+		return m_Sources->m_HostParameters;
+	}
+
 	const LabParameterSet* SessionParameterControl::GetLabParameters() const noexcept
 	{
-		const auto* session = m_Lab ? m_Lab->GetActiveSession() : nullptr;
-		return session ? &session->GetParameters() : nullptr;
+		return m_Sources->m_Lab.GetParameters();
+	}
+
+	std::span<const WorldLightingProfile> SessionParameterControl::GetLightingProfiles() const noexcept
+	{
+		return m_Sources->m_Profiles.GetProfiles();
+	}
+
+	const LightingProfilePublication& SessionParameterControl::GetLightingProfilePublication() const noexcept
+	{
+		return m_Sources->m_Profiles.GetPublication();
+	}
+
+	const std::string& SessionParameterControl::GetLightingProfileError() const noexcept
+	{
+		return m_Sources->m_Profiles.GetError();
 	}
 
 	const LabParameter* SessionParameterControl::Find(const LabParameterId& id) const noexcept
 	{
-		if (const auto* host = m_HostParameters.Find(id))
-		{
-			return host;
-		}
-		const auto* lab = GetLabParameters();
-		return lab ? lab->Find(id) : nullptr;
+		const auto* source = m_Sources->Find(id);
+		return source ? source->GetParameters()->Find(id) : nullptr;
 	}
 
 	bool SessionParameterControl::SupportsParameterEffect(const LabParameterDesc& desc) const noexcept
 	{
-		return m_HostParameters.Find(desc.m_Id) || (m_Lab && m_Lab->SupportsParameterEffect(desc));
-	}
-
-	std::optional<ApplicationViewSettingsResolution>
-	SessionParameterControl::ResolveInheritedViewSettings() const noexcept
-	{
-		if (!m_Demo)
-		{
-			return std::nullopt;
-		}
-		if (m_ViewResolver)
-		{
-			return m_ViewResolver(*m_Demo);
-		}
-		const auto view = m_Demo->GetCameraRig().ResolveEffectiveDisplayView();
-		return view.IsValid() ?
-			std::optional(ResolveApplicationViewSettings(m_Demo->GetViewRenderProfile(),
-				*view.m_CameraSlot->m_Camera, {})) :
-			std::nullopt;
+		const auto* source = m_Sources->Find(desc.m_Id);
+		return source && source->Supports(desc);
 	}
 
 	void SessionParameterControl::RefreshSources() noexcept
 	{
-		if (!m_Demo || (m_Lab && !m_Lab->GetActiveSession()))
+		if (!m_Demo || (m_Lab && !m_Lab->GetActiveSession()) || !m_Sources->m_View.HasDisplayView())
 		{
 			return;
 		}
-		const auto inherited = ResolveInheritedViewSettings();
-		if (!inherited)
-		{
-			return;
-		}
-		auto host = DescribeHostViewParameters(inherited->m_View);
-		RefreshLightingProfiles(host);
-		std::string error;
-		if (!m_HostOverrides.empty())
-		{
-			const auto applied = host.ApplyBatch(m_HostOverrides, error);
-			GGLAB_ASSERT_MSG(applied.has_value(), "Committed Host overrides must match the fixed Host schema.");
-			GGLAB_UNUSED(applied);
-		}
-		const auto before = m_HostParameters.CaptureValues();
-		const auto after = host.CaptureValues();
+		const auto before = GetHostParameters().CaptureValues();
+		m_Sources->Refresh(IsAvailable());
+		const auto after = GetHostParameters().CaptureValues();
 		const bool hostChanged = !before.empty() && !std::ranges::equal(before, after,
 			[](const auto& a, const auto& b) { return a.m_Id == b.m_Id && LabValuesEqual(a.m_Value, b.m_Value); });
 		const uint64_t labRevision = m_Lab ? m_Lab->GetParameterRevision() : 0;
@@ -155,7 +125,6 @@ namespace gglab
 		{
 			++m_ParameterRevision;
 		}
-		m_HostParameters = std::move(host);
 		m_ObservedLabRevision = labRevision;
 	}
 
@@ -179,7 +148,7 @@ namespace gglab
 			error = "Parameter transaction identity capacity is exhausted.";
 			return 0;
 		}
-		LabParameterSet candidate = m_HostParameters;
+		LabParameterSet candidate = GetHostParameters();
 		if (const auto* lab = GetLabParameters())
 		{
 			for (const auto& parameter : lab->GetParameters())
@@ -193,10 +162,8 @@ namespace gglab
 		}
 		for (const auto& value : values)
 		{
-			if (value.m_Id.GetName() == "environment.profile" && !candidate.Find(value.m_Id) &&
-				!m_ProfileRegistrationError.empty())
+			if (!m_Sources->ValidateMissing(value.m_Id, error))
 			{
-				error = m_ProfileRegistrationError;
 				return 0;
 			}
 		}
@@ -204,47 +171,70 @@ namespace gglab
 		{
 			return 0;
 		}
-		std::vector<LabParameterValue> labValues;
-		size_t lightingItems = 0;
+		std::vector<ParameterSourceBase*> bindings;
+		bindings.reserve(values.size());
+		size_t deferredItems = 0;
 		bool hasHost = false;
+		bool hasLab = false;
 		for (const auto& value : values)
 		{
-			lightingItems += GetParameterEffectClass(candidate.Find(value.m_Id)->m_Desc) == ParameterEffectClass::Deferred;
-			if (lightingItems > 1)
+			auto* source = m_Sources->Find(value.m_Id);
+			const auto& desc = candidate.Find(value.m_Id)->m_Desc;
+			deferredItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
+			if (deferredItems > 1)
 			{
 				error = "At most one bound Deferred lighting item is supported per batch.";
 				return 0;
 			}
-			if (IsLightingProfileParameter(value.m_Id) &&
-				(!std::get_if<int32_t>(&value.m_Value) || std::get<int32_t>(value.m_Value) < 0 ||
-					!CanApplyWorldLightingInputs(m_Demo->GetWorld())))
+			if (!source || !source->Supports(desc) || !source->Validate(value, error))
 			{
-				error = "Select a registered lighting profile; custom is read-only and requires a designated World sun.";
+				if (error.empty())
+				{
+					error = "Unsupported effect: the owning parameter source has no binding.";
+				}
 				return 0;
 			}
-			if (m_HostParameters.Find(value.m_Id))
-			{
-				hasHost = true;
-			}
-			else
-			{
-				labValues.push_back(value);
-			}
+			bindings.push_back(source);
+			hasHost |= source->IsHost();
+			hasLab |= !source->IsHost();
 		}
 		const uint64_t id = m_NextParameterBatchId;
-		if (!labValues.empty() && !m_Lab->QueueParameterBatch(id, labValues, error))
+		std::vector<ParameterSourceBase*> reserved;
+		reserved.reserve(m_Sources->Ordered().size());
+		for (auto* source : m_Sources->Ordered())
 		{
-			return 0;
+			std::vector<LabParameterValue> group;
+			for (size_t index = 0; index < values.size(); ++index)
+			{
+				if (bindings[index] == source)
+				{
+					group.push_back(values[index]);
+				}
+			}
+			if (group.empty())
+			{
+				continue;
+			}
+			if (!source->Reserve(id, group, error))
+			{
+				// Failure does not transfer a source's existing reservation to us.
+				for (auto* acquired : reserved)
+				{
+					acquired->Cancel(id);
+				}
+				return 0;
+			}
+			reserved.push_back(source);
 		}
 		++m_NextParameterBatchId;
 		m_ParameterBatch.emplace();
 		auto& batch = *m_ParameterBatch;
 		batch.m_Status.m_BatchId = id;
 		batch.m_Status.m_ContentId = m_ContentId;
-		batch.m_Status.m_Source = hasHost ? (labValues.empty() ? "host" : "mixed") : "lab";
+		batch.m_Status.m_Source = hasHost ? (hasLab ? "mixed" : "host") : "lab";
 		batch.m_Session = m_ContentSerial;
 		batch.m_Status.m_Values.assign(values.begin(), values.end());
-		batch.m_LabValues = std::move(labValues);
+		batch.m_Bindings = std::move(bindings);
 		return id;
 	}
 
@@ -307,9 +297,9 @@ namespace gglab
 			return;
 		}
 		auto& batch = *m_ParameterBatch;
-		if (m_Lab)
+		for (auto* source : m_Sources->Ordered())
 		{
-			m_Lab->CancelParameterBatch(batch.m_Status.m_BatchId);
+			source->Cancel(batch.m_Status.m_BatchId);
 		}
 		if (batch.m_Receipts.empty())
 		{
@@ -335,9 +325,12 @@ namespace gglab
 	void SessionParameterControl::OnRuntimeFailed(std::string_view reason) noexcept
 	{
 		m_ParameterIntakeFailed = true;
-		if (m_Lab && m_ParameterBatch)
+		if (m_ParameterBatch)
 		{
-			m_Lab->CancelParameterBatch(m_ParameterBatch->m_Status.m_BatchId);
+			for (auto* source : m_Sources->Ordered())
+			{
+				source->Cancel(m_ParameterBatch->m_Status.m_BatchId);
+			}
 		}
 		if (m_ParameterBatch && !m_ParameterBatch->m_Status.IsTerminal())
 		{
@@ -355,6 +348,7 @@ namespace gglab
 	{
 		EndParameterBatch(false, "The runtime shut down before parameter consumption.");
 		m_ParameterIntakeFailed = true;
+		m_Sources->Bind(nullptr, nullptr, 0);
 		m_Demo = nullptr;
 		m_Lab = nullptr;
 	}
@@ -373,13 +367,9 @@ namespace gglab
 			EndParameterBatch(true, "The content changed before parameter application.");
 			return;
 		}
-		// Settle pre-existing authored edits before this batch's attribution boundary.
-		if (m_WorldLighting && m_Demo)
-		{
-			m_WorldLighting->SynchronizeWorldLighting(m_Demo->GetWorld(), m_ContentSerial);
-		}
+		m_Sources->m_Profiles.Synchronize();
 		RefreshSources();
-		batch.m_FrameBakeRequestGeneration = m_Environment.GetBakeRequestGeneration();
+		m_Sources->m_Domain.BeginFrame(batch.m_Domain);
 		if (batch.m_Status.m_State != ParameterBatchState::Queued)
 		{
 			return;
@@ -389,243 +379,128 @@ namespace gglab
 			EndParameterBatch(false, "The content is unavailable at the safe parameter boundary.");
 			return;
 		}
-		// Prepare the complete batch without changing values, consuming a Lab command,
-		// invoking content callbacks or creating this batch's lighting request.
-		struct PreparedBatch
-		{
-			LabParameterSet m_Host;
-			std::vector<LabParameterValue> m_HostValues;
-			std::vector<LabParameterValue> m_PreviousOverrides;
-			std::vector<LabParameterValue> m_Overrides;
-			std::vector<LabParameterId> m_NewOverrides;
-			std::vector<LabParameterId> m_Changed;
-			std::vector<ParameterEffectReceipt> m_Receipts;
-			std::vector<bool> m_NoChange;
-			std::optional<LabRuntime::PreparedParameterBatch> m_Lab;
-			std::unique_ptr<PreparedWorldLightingMutationBase> m_Lighting;
-			uint64_t m_Revision = 0;
-		};
-		PreparedBatch prepared;
-		if (!m_Demo->GetCameraRig().ResolveEffectiveDisplayView().IsValid())
+		if (!m_Sources->m_View.HasDisplayView())
 		{
 			EndParameterBatch(false, "ParameterPreparationFailed: the display view is unavailable.");
 			return;
 		}
-		prepared.m_Host = m_HostParameters;
-		prepared.m_PreviousOverrides = m_HostOverrides;
-		prepared.m_Overrides = m_HostOverrides;
-		prepared.m_Overrides.reserve(m_HostOverrides.size() + batch.m_Status.m_Values.size());
-		prepared.m_Changed.reserve(batch.m_Status.m_Values.size());
-		prepared.m_Receipts.reserve(batch.m_Status.m_Values.size());
-		prepared.m_NoChange.resize(batch.m_Status.m_Values.size(), false);
-		size_t lightingItems = 0;
-		for (const auto& value : batch.m_Status.m_Values)
+		struct SourcePlan
 		{
+			ParameterSourceBase* m_Source = nullptr;
+			std::unique_ptr<PreparedParameterSourceBase> m_Prepared;
+		};
+		std::vector<SourcePlan> plans;
+		plans.reserve(m_Sources->Ordered().size());
+		size_t deferredItems = 0;
+		for (size_t index = 0; index < batch.m_Status.m_Values.size(); ++index)
+		{
+			const auto& value = batch.m_Status.m_Values[index];
 			const auto* current = Find(value.m_Id);
-			const bool fromLab = std::ranges::any_of(batch.m_LabValues,
-				[&](const auto& item) { return item.m_Id == value.m_Id; });
-			const bool fromHost = m_HostParameters.Find(value.m_Id) != nullptr;
-			const auto* labParameters = GetLabParameters();
-			// The retained admission binding must still name exactly this source.
-			if (!current || fromLab == fromHost ||
-				(fromHost && labParameters && labParameters->Find(value.m_Id)) ||
+			if (!current || batch.m_Bindings[index] != m_Sources->Find(value.m_Id) ||
 				!SupportsParameterEffect(current->m_Desc))
 			{
 				EndParameterBatch(false, "ParameterPreparationFailed: a source or supported effect changed.");
 				return;
 			}
-			lightingItems += GetParameterEffectClass(current->m_Desc) == ParameterEffectClass::Deferred;
-			if (lightingItems > 1)
+			deferredItems += GetParameterEffectClass(current->m_Desc) == ParameterEffectClass::Deferred;
+			if (deferredItems > 1)
 			{
 				EndParameterBatch(false, "ParameterPreparationFailed: at most one bound lighting item is supported.");
 				return;
 			}
-			if (!LabValuesEqual(current->m_Value, value.m_Value))
-			{
-				prepared.m_Changed.push_back(value.m_Id);
-			}
-			if (m_HostParameters.Find(value.m_Id))
-			{
-				prepared.m_HostValues.push_back(value);
-			}
 		}
 		std::string error;
-		if (!prepared.m_HostValues.empty() && !prepared.m_Host.ApplyBatch(prepared.m_HostValues, error))
+		bool changed = false;
+		// Prepare every owning source before consuming reservations or mutating state.
+		for (auto* source : m_Sources->Ordered())
 		{
-			EndParameterBatch(false, std::move(error));
-			return;
-		}
-		if (!batch.m_LabValues.empty())
-		{
-			prepared.m_Lab = m_Lab->PrepareParameterBatch(batch.m_Status.m_BatchId, batch.m_LabValues, error);
-			if (!prepared.m_Lab)
+			std::vector<LabParameterValue> values;
+			for (size_t index = 0; index < batch.m_Status.m_Values.size(); ++index)
+			{
+				if (batch.m_Bindings[index] == source)
+				{
+					values.push_back(batch.m_Status.m_Values[index]);
+				}
+			}
+			if (values.empty())
+			{
+				continue;
+			}
+			auto prepared = source->Prepare(batch.m_Status.m_BatchId, values, error);
+			if (!prepared)
 			{
 				EndParameterBatch(false, std::move(error));
 				return;
 			}
+			changed |= prepared->HasChanges();
+			plans.push_back({ source, std::move(prepared) });
 		}
-		for (const auto& value : prepared.m_HostValues)
-		{
-			if (IsLightingProfileParameter(value.m_Id))
-			{
-				const auto* index = std::get_if<int32_t>(&value.m_Value);
-				if (!index || *index < 0 || static_cast<size_t>(*index) >= m_LightingProfiles.size())
-				{
-					EndParameterBatch(false, "ParameterPreparationFailed: select a registered lighting profile.");
-					return;
-				}
-				prepared.m_Lighting = m_WorldLighting->PrepareWorldLightingInputs(m_Demo->GetWorld(),
-					m_ContentSerial, m_LightingProfiles[*index].m_Inputs, error);
-				if (!prepared.m_Lighting)
-				{
-					EndParameterBatch(false, std::move(error));
-					return;
-				}
-				if (!prepared.m_Lighting->HasChanges())
-				{
-					std::erase(prepared.m_Changed, value.m_Id);
-				}
-				continue;
-			}
-			const auto found = std::ranges::find(prepared.m_Overrides, value.m_Id, &LabParameterValue::m_Id);
-			if (found == prepared.m_Overrides.end())
-			{
-				prepared.m_Overrides.push_back(value);
-				prepared.m_NewOverrides.push_back(value.m_Id);
-			}
-			else
-			{
-				*found = value;
-			}
-		}
-		prepared.m_Revision = m_ParameterRevision + (prepared.m_Changed.empty() ? 0 : 1);
+		const uint64_t revision = m_ParameterRevision + (changed ? 1 : 0);
+		std::vector<ParameterEffectReceipt> receipts;
+		receipts.reserve(batch.m_Status.m_Values.size());
+		std::vector<bool> noChange(batch.m_Status.m_Values.size(), false);
 		for (const auto& value : batch.m_Status.m_Values)
 		{
 			auto receipt = ParameterEffectReceipt::Begin(value.m_Id,
-				GetParameterEffectClass(Find(value.m_Id)->m_Desc), prepared.m_Revision, serial);
+				GetParameterEffectClass(Find(value.m_Id)->m_Desc), revision, serial);
 			if (!receipt)
 			{
 				EndParameterBatch(false, "ParameterPreparationFailed: receipt identity is unavailable.");
 				return;
 			}
-			prepared.m_Receipts.push_back(std::move(*receipt));
+			receipts.push_back(std::move(*receipt));
 		}
 
-		// Commit is uninterrupted and cannot reject. Install every source before
-		// callbacks: a Lab handler must never observe half-committed batch values.
-		std::optional<LightingMutationResult> profileEvidence;
-		if (prepared.m_Lighting)
+		// No callbacks or rejection in this region. Install every source and the
+		// unique receipt owner before allowing any content handler to observe state.
+		for (auto& plan : plans)
 		{
-			profileEvidence = prepared.m_Lighting->Commit();
+			plan.m_Prepared->Commit();
 		}
-		if (prepared.m_Lab)
-		{
-			m_Lab->CommitParameterBatch(*prepared.m_Lab);
-		}
-		m_HostParameters = std::move(prepared.m_Host);
-		m_HostOverrides = std::move(prepared.m_Overrides);
-		m_ParameterRevision = prepared.m_Revision;
+		m_Sources->PublishHostParameters();
+		m_ParameterRevision = revision;
 		m_ObservedLabRevision = m_Lab ? m_Lab->GetParameterRevision() : 0;
-		batch.m_Receipts = std::move(prepared.m_Receipts);
-		batch.m_NoChange = std::move(prepared.m_NoChange);
-		batch.m_Status.m_Revision = prepared.m_Revision;
+		batch.m_Receipts = std::move(receipts);
+		batch.m_NoChange = std::move(noChange);
+		batch.m_Status.m_Revision = revision;
 		batch.m_Status.m_State = ParameterBatchState::Applying;
 		RefreshParameterBatchStatus();
 
-		// Effects start only after commit. Their failures/supersession retain the
-		// existing asynchronous receipt semantics, not transactional GPU rollback.
-		std::optional<LabRuntime::LightingParameterEffect> labEvidence;
-		if (prepared.m_Lab)
+		for (auto& plan : plans)
 		{
-			labEvidence = m_Lab->ApplyParameterBatchEffects(std::move(*prepared.m_Lab));
+			plan.m_Prepared->ApplyEffects();
 		}
-		const auto resolvedInherited = ResolveInheritedViewSettings();
-		if (resolvedInherited)
+		for (auto& plan : plans)
 		{
-			auto inheritedSettings = resolvedInherited->m_View;
-			ApplyHostViewParameters(prepared.m_PreviousOverrides, inheritedSettings,
-				resolvedInherited->m_Profile.m_EnableScenePreExposure);
-			const auto inherited = DescribeHostViewParameters(inheritedSettings);
-			for (const auto& value : prepared.m_HostValues)
-			{
-				if (!IsLightingProfileParameter(value.m_Id) &&
-					!LabValuesEqual(inherited.Find(value.m_Id)->m_Value, value.m_Value) &&
-					std::ranges::find(prepared.m_Changed, value.m_Id) == prepared.m_Changed.end())
-				{
-					// A Lab effect can change an inherited field that initially matched
-					// the Host request. The explicit Host value still takes precedence.
-					GGLAB_ASSERT(prepared.m_Lab && prepared.m_Lab->HasChanges());
-					prepared.m_Changed.push_back(value.m_Id);
-				}
-			}
+			plan.m_Prepared->FinalizeEffects();
+			GGLAB_ASSERT_MSG(changed || !plan.m_Prepared->HasChanges(),
+				"Inherited values cannot change during an all-NoChange batch without an owning source effect.");
 		}
-		for (const auto& id : prepared.m_NewOverrides)
-		{
-			if (std::ranges::find(prepared.m_Changed, id) == prepared.m_Changed.end())
-			{
-				std::erase_if(m_HostOverrides, [&](const auto& value) { return value.m_Id == id; });
-			}
-		}
+		RefreshSources();
+		m_ParameterRevision = revision;
+		m_Sources->m_Domain.CompleteEffects(batch.m_Domain);
 		for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
 		{
 			auto& receipt = batch.m_Receipts[index];
-			if (std::ranges::find(prepared.m_Changed, receipt.GetSnapshot().m_Parameter) == prepared.m_Changed.end())
+			const auto found = std::ranges::find(plans, batch.m_Bindings[index], &SourcePlan::m_Source);
+			GGLAB_ASSERT(found != plans.end());
+			auto application = found->m_Prepared->DescribeApplication(receipt.GetSnapshot().m_Parameter, batch.m_Domain);
+			if (!application.m_Failure.empty())
 			{
-				if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Immediate)
-				{
-					// Equal authoring values still require an effective-frame projection:
-					// tooling or Host precedence can mask an unchanged Lab request.
-					batch.m_NoChange[index] = true;
-				}
+				GGLAB_UNUSED(receipt.Fail(std::move(application.m_Failure)));
 			}
-		}
-		RefreshSources();
-		m_ParameterRevision = prepared.m_Revision;
-		const uint64_t requested = m_Environment.GetBakeRequestGeneration();
-		batch.m_ApplyBakeGeneration = requested != batch.m_FrameBakeRequestGeneration ? requested : 0;
-		for (auto& receipt : batch.m_Receipts)
-		{
-			if (receipt.GetSnapshot().IsTerminal() ||
-				receipt.GetSnapshot().m_DeclaredClass != ParameterEffectClass::Deferred)
+			else if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Immediate)
 			{
-				continue;
+				batch.m_NoChange[index] = application.m_NoChange;
 			}
-			const auto& parameter = receipt.GetSnapshot().m_Parameter;
-			std::optional<LightingMutationResult> evidence = profileEvidence;
-			if (!IsLightingProfileParameter(parameter))
+			else if (application.m_NoChange)
 			{
-				evidence = labEvidence && labEvidence->m_Parameter == parameter ?
-					std::optional(labEvidence->m_Result) :
-					std::nullopt;
-			}
-			// The operation must cover the entire attribution boundary. Its own domain
-			// may issue multiple requests, or bind an existing target without a request.
-			const bool requestedTarget = evidence && evidence->m_Outcome == LightingMutationOutcome::Requested &&
-				evidence->m_Generation > evidence->m_PreviousGeneration;
-			const bool existingTarget = evidence && evidence->m_Outcome == LightingMutationOutcome::Unchanged &&
-				evidence->m_Generation == evidence->m_PreviousGeneration;
-			if ((!requestedTarget && !existingTarget) ||
-				evidence->m_PreviousGeneration != batch.m_FrameBakeRequestGeneration ||
-				evidence->m_Generation != requested || requested == 0)
-			{
-				GGLAB_UNUSED(receipt.Fail(
-					"LightingEffectUnproven: the current operation did not bind the Runtime target at this boundary."));
-				continue;
-			}
-			if (existingTarget && m_Environment.GetBakingStatus().m_ActiveGeneration == requested &&
-				std::ranges::find(prepared.m_Changed, parameter) == prepared.m_Changed.end())
-			{
-				// Storage equality alone cannot terminate a pending bake as NoChange.
-				batch.m_AttributedLightingRequest = receipt.RecordNoChange(serial);
+				GGLAB_UNUSED(receipt.RecordNoChange(serial));
 			}
 			else
 			{
-				batch.m_AttributedLightingRequest = receipt.RecordApplied(ParameterEffectClass::Deferred,
-					{ batch.m_Status.m_Revision, "lighting", requested }, serial);
-			}
-			if (batch.m_AttributedLightingRequest)
-			{
-				batch.m_ApplyBakeGeneration = requested;
+				application.m_Identity.m_Revision = revision;
+				GGLAB_UNUSED(receipt.RecordApplied(application.m_ActualClass, application.m_Identity, serial));
 			}
 		}
 		RefreshParameterBatchStatus();
@@ -634,10 +509,7 @@ namespace gglab
 	void SessionParameterControl::ApplyViewSettings(ResolvedViewRenderSettings& settings,
 		bool enablePreExposure) noexcept
 	{
-		if (!m_HostOverrides.empty())
-		{
-			ApplyHostViewParameters(m_HostOverrides, settings, enablePreExposure);
-		}
+		m_Sources->m_View.ApplyViewSettings(settings, enablePreExposure);
 	}
 
 	void SessionParameterControl::OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration,
@@ -645,7 +517,7 @@ namespace gglab
 	{
 		if (m_Enabled && m_Demo)
 		{
-			UpdateLightingProfilePublication(lightingGeneration);
+			m_Sources->m_Profiles.ObservePublication(lightingGeneration);
 		}
 		if (!m_ParameterBatch || m_ParameterBatch->m_Status.IsTerminal() ||
 			serial != m_ParameterBatch->m_FrameSerial || !m_Demo)
@@ -654,8 +526,7 @@ namespace gglab
 		}
 		auto& batch = *m_ParameterBatch;
 		batch.m_Consumed.clear();
-		const uint64_t bakeRequest = m_Environment.GetBakeRequestGeneration();
-		const auto builtHost = DescribeHostViewParameters(settings);
+		const ParameterSourceFrame frame{ settings, view, lightingGeneration };
 		for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
 		{
 			auto& receipt = batch.m_Receipts[index];
@@ -664,24 +535,8 @@ namespace gglab
 				continue;
 			}
 			const auto& requested = batch.m_Status.m_Values[index];
-			const auto* current = Find(requested.m_Id);
-			const bool isProfile = IsLightingProfileParameter(requested.m_Id);
-			std::optional<LabValue> frameValue;
-			if (m_HostParameters.Find(requested.m_Id) && !isProfile)
-			{
-				current = builtHost.Find(requested.m_Id);
-			}
-			else if (!isProfile && receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Immediate)
-			{
-				const auto* session = m_Lab ? m_Lab->GetActiveSession() : nullptr;
-				frameValue = session ?
-					session->ReadImmediateParameterFrameValue(requested.m_Id, { settings, view }) :
-					std::nullopt;
-				current = nullptr;
-			}
-			const LabValue* effective = frameValue ? &*frameValue : (current ? &current->m_Value : nullptr);
-			if ((isProfile && FindCurrentLightingProfile() != std::get<int32_t>(requested.m_Value)) ||
-				!effective || !LabValuesEqual(*effective, requested.m_Value))
+			auto* source = batch.m_Bindings[index];
+			if (source != m_Sources->Find(requested.m_Id) || !source->MatchesFrame(requested, frame))
 			{
 				GGLAB_UNUSED(receipt.Supersede());
 				continue;
@@ -694,43 +549,34 @@ namespace gglab
 			if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Deferred)
 			{
 				const auto identity = receipt.GetSnapshot().m_Identity;
-				if (lightingGeneration != 0 && lightingGeneration == identity.m_Generation)
+				auto observation = source->ObservePublication(identity, frame);
+				switch (observation.m_State)
 				{
-					// This generation came from the immutable built scene, not a later live query.
+				case ParameterPublication::Published:
 					GGLAB_UNUSED(receipt.RecordPublished(identity, serial));
 					batch.m_Consumed.push_back({ index, identity });
-				}
-				else if (bakeRequest != identity.m_Generation)
-				{
+					break;
+				case ParameterPublication::Superseded:
 					GGLAB_UNUSED(receipt.Supersede());
+					break;
+				case ParameterPublication::Failed:
+					GGLAB_UNUSED(receipt.Fail(std::move(observation.m_Failure)));
+					break;
+				case ParameterPublication::Pending:
+					break;
 				}
-				else if (m_Environment.GetBakingStatus().m_Stage ==
-					IBLBakeStage::Failed)
-				{
-					GGLAB_UNUSED(receipt.Fail("LightingPublicationFailed"));
-				}
 				continue;
 			}
-			if (batch.m_ApplyBakeGeneration != 0 && !batch.m_AttributedLightingRequest)
+			auto application = m_Sources->m_Domain.ObserveImmediate(batch.m_Domain);
+			if (!application.m_Failure.empty())
 			{
-				// Preserve actual application evidence even though it contradicts the
-				// declaration. The owning Runtime supplied this request generation.
-				GGLAB_UNUSED(receipt.RecordApplied(ParameterEffectClass::Deferred,
-					{ batch.m_Status.m_Revision, "lighting", batch.m_ApplyBakeGeneration }, serial));
+				GGLAB_UNUSED(receipt.Fail(std::move(application.m_Failure)));
 				continue;
 			}
-			if (bakeRequest != batch.m_FrameBakeRequestGeneration &&
-				(!batch.m_AttributedLightingRequest || bakeRequest != batch.m_ApplyBakeGeneration))
+			application.m_Identity.m_Revision = batch.m_Status.m_Revision;
+			if (receipt.RecordApplied(application.m_ActualClass, application.m_Identity, serial))
 			{
-				// A later change has no proven attribution to the batch.
-				GGLAB_UNUSED(receipt.Fail(
-					"UnexpectedLightingTransition: effect attribution is unavailable for this frame."));
-				continue;
-			}
-			const ParameterStateIdentity identity{ .m_Revision = batch.m_Status.m_Revision };
-			if (receipt.RecordApplied(ParameterEffectClass::Immediate, identity, serial))
-			{
-				batch.m_Consumed.push_back({ index, identity });
+				batch.m_Consumed.push_back({ index, application.m_Identity });
 			}
 		}
 		RefreshParameterBatchStatus();

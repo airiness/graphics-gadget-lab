@@ -10,6 +10,7 @@
 #include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
 #include "Parameters/SessionParameterControl.h"
+#include "Parameters/ParameterSourceAdapters.h"
 #include "Lab/LabRuntime.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -21,6 +22,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -112,6 +114,21 @@ namespace gglab
 			RHIFencePoint m_Fence{};
 			uint32_t m_Order = 0;
 		};
+
+		static_assert(!std::is_copy_constructible_v<HostViewParameterSource> &&
+			!std::is_move_constructible_v<HostViewParameterSource>);
+		static_assert(!std::is_copy_constructible_v<LabParameterSource> &&
+			!std::is_move_constructible_v<LabParameterSource>);
+		static_assert(!std::is_copy_constructible_v<LightingProfileParameterSource> &&
+			!std::is_move_constructible_v<LightingProfileParameterSource>);
+		static_assert(!std::is_copy_constructible_v<ParameterSourceAdapters> &&
+			!std::is_move_constructible_v<ParameterSourceAdapters>);
+
+		template<typename Services>
+		concept CarriesWorldLightingAuthoring = requires(Services services) { services.m_WorldLighting; };
+		static_assert(!CarriesWorldLightingAuthoring<RenderServices>);
+		static_assert(std::is_same_v<decltype(std::declval<RenderCompositionAccess&>().GetWorldLightingControl()),
+			WorldLightingControlBase*>);
 
 		static_assert(std::is_same_v<decltype(std::declval<GGLabAppRuntime&>().GetParameterControl()),
 			const SessionParameterControl*>);
@@ -1088,6 +1105,7 @@ namespace gglab
 					m_Probe.m_ParameterCommitWasComplete = batch && batch->m_State == ParameterBatchState::Applying &&
 						batch->m_Items.size() == 4 && batch->m_Revision == control->GetParameterRevision() &&
 						control->GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == 11.0f &&
+						control->GetHostParameters().Get(LabParameterId("environment.profile"), int32_t(-1)) == 1 &&
 						control->GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 1.0f &&
 						GetParameters().Get(LabParameterId("radius"), 0.0f) == 2.0f &&
 						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration() == m_Probe.m_ExpectedCommitGeneration;
@@ -3587,7 +3605,7 @@ namespace gglab
 			probe.m_ParameterControl = &parameters;
 			auto& lab = *probe.m_ParameterRuntime;
 			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
-			auto& lighting = *runtime.GetRenderServices().m_WorldLighting;
+			auto& lighting = *runtime.GetRenderComposition()->GetWorldLightingControl();
 			const auto& environment = *runtime.GetRenderServices().m_Environment;
 			const auto source = lighting.GetWorldLightingPublication().m_Requested;
 			std::optional<entt::entity> sun;
@@ -3625,10 +3643,20 @@ namespace gglab
 						probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == initialExposure;
 				};
 
+			const std::array labValues{ LabParameterValue{ LabParameterId("radius"), 2.0f } };
+			const uint64_t independentId = 1;
+			checks.Check(lab.QueueParameterBatch(independentId, labValues, error) &&
+				runtime.RequestParameterBatch(values, error) == 0 && !parameters.GetParameterBatchStatus() && unchanged(),
+				"Busy source admission never allocates a Session receipt or changes live values");
+			auto independentPlan = lab.PrepareParameterBatch(independentId, labValues, error);
+			checks.Check(independentPlan.has_value() && unchanged(),
+				"Failed admission preserves the source's pre-existing same-numbered reservation");
+			independentPlan.reset();
+			lab.CancelParameterBatch(independentId);
+
 			const auto cancelled = runtime.RequestParameterBatch(values, error);
 			const auto cancelledRevision = parameters.GetParameterRevision();
 			const auto cancelledGeneration = environment.GetBakeRequestGeneration();
-			const std::array labValues{ LabParameterValue{ LabParameterId("radius"), 2.0f } };
 			auto labPlan = lab.PrepareParameterBatch(cancelled, labValues, error);
 			checks.Check(labPlan && labPlan->HasChanges() && unchanged() &&
 				environment.GetBakeRequestGeneration() == cancelledGeneration,

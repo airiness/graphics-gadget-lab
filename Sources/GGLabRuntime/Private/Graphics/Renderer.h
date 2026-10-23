@@ -123,6 +123,7 @@ namespace gglab
 		}
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		EnvironmentSourceControl* GetEnvironmentSourceControl() const noexcept override;
+		WorldLightingControlBase* GetWorldLightingControl() const noexcept override;
 		EnvironmentLightingSystem* GetEnvironmentLightingSystemService() const noexcept
 		{
 			return m_EnvironmentLightingSystem.get();

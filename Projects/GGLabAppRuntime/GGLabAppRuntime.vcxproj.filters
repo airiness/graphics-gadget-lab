@@ -85,10 +85,22 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameterSource.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LabParameterSource.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingParameterDomain.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingProfileParameterSource.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionLightingProfiles.cpp">
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSourceAdapters.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp">
@@ -191,10 +203,19 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.h">
       <Filter>Parameters</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingParameterDomain.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterBatch.h">
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSource.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSourceAdapters.h">
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h">

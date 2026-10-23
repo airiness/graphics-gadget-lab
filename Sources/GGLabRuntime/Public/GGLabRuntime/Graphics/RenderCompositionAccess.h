@@ -3,6 +3,7 @@
 
 namespace gglab
 {
+	class WorldLightingControlBase;
 	class AssetManager;
 	class AssetUploadScheduling;
 	class EnvironmentSourceControl;
@@ -23,6 +24,9 @@ namespace gglab
 		[[nodiscard]] virtual RenderSamplerAccess* GetSamplerRegistry() const noexcept = 0;
 		[[nodiscard]] virtual EnvironmentSourceControl* GetEnvironmentSourceControl()
 			const noexcept = 0;
+
+		// Render-thread authoring before frame planning; never part of pipeline/pass services.
+		[[nodiscard]] virtual WorldLightingControlBase* GetWorldLightingControl() const noexcept = 0;
 
 		virtual void AttachAssetManager(AssetManager& assetManager) noexcept = 0;
 		virtual void DetachAssetManager() noexcept = 0;

@@ -158,6 +158,15 @@ namespace gglab
 		return result;
 	}
 
+	std::optional<LabValue> ReadHostViewParameter(const LabParameterId& id,
+		const ResolvedViewRenderSettings& settings) noexcept
+	{
+		const auto& bindings = Bindings();
+		const auto found = std::ranges::find_if(bindings,
+			[&](const auto& binding) { return binding.m_Desc.m_Id == id; });
+		return found != bindings.end() ? std::optional(found->m_Read(settings)) : std::nullopt;
+	}
+
 	void ApplyHostViewParameters(std::span<const LabParameterValue> values,
 		ResolvedViewRenderSettings& settings, bool enablePreExposure) noexcept
 	{

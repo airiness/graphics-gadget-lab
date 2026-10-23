@@ -184,7 +184,12 @@ half-committed mixed batch. Explicit Host display-view values still take
 precedence over Lab view changes; an inherited NoChange remains inherited unless
 the Lab effect actually changes that field. Post-commit effect failure,
 supersession and GPU publication/submission failure remain receipt outcomes, not
-a promise of GPU rollback.
+a promise of GPU rollback. Host view, Lab and lighting-profile source adapters
+own their candidate changes and evidence translation; Session alone owns the
+batch receipts/result. World authoring control is supplied through Runtime
+composition access, not ordinary pipeline RenderServices. Busy admission releases
+only reservations acquired by that attempt, preserving any pre-existing source
+reservation even if its numeric ID coincides.
 
 The script waits for application by default. `-NoWait` returns admission only;
 `-WaitConsumed` waits for every effect to become terminal (including failure or

@@ -43,7 +43,6 @@ namespace gglab
 		instance.m_Services.m_Resources = renderer->GetRenderResourceRegistry();
 		instance.m_Services.m_FrameBuffers = renderer.get();
 		instance.m_Services.m_Environment = renderer.get();
-		instance.m_Services.m_WorldLighting = renderer->GetEnvironmentLightingSystemService();
 		instance.m_Services.m_Presentation = renderer.get();
 		instance.m_Services.m_BindingLayout = renderer.get();
 		instance.m_Services.m_Temporal = renderer.get();

@@ -1,11 +1,13 @@
 #pragma once
 #include "Parameters/ParameterBatch.h"
+#include "Parameters/ParameterSource.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 
 #include <functional>
+#include <memory>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -18,6 +20,7 @@ namespace gglab
 {
 	inline constexpr size_t SessionParameterMaxItems = 128;
 
+	struct ParameterSourceAdapters;
 	class DemoBase;
 	class LabRuntime;
 	class RenderEnvironmentAccess;
@@ -33,6 +36,7 @@ namespace gglab
 		explicit SessionParameterControl(RenderEnvironmentAccess& environment,
 			WorldLightingControlBase* worldLighting = nullptr,
 			std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver = {}) noexcept;
+		~SessionParameterControl();
 		GGLAB_DELETE_COPYABLE_MOVABLE(SessionParameterControl);
 		// Lifecycle owner releases a binding before destroying its Demo/LabRuntime.
 		// The identity is shared with frame planning, never recomputed by this source.
@@ -44,11 +48,11 @@ namespace gglab
 		[[nodiscard]] const std::string& GetContentId() const noexcept { return m_ContentId; }
 		[[nodiscard]] uint64_t GetContentIdentity() const noexcept { return m_ContentSerial; }
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
-		[[nodiscard]] const LabParameterSet& GetHostParameters() const noexcept { return m_HostParameters; }
+		[[nodiscard]] const LabParameterSet& GetHostParameters() const noexcept;
 		[[nodiscard]] const LabParameterSet* GetLabParameters() const noexcept;
-		[[nodiscard]] std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return m_LightingProfiles; }
-		[[nodiscard]] const LightingProfilePublication& GetLightingProfilePublication() const noexcept { return m_LightingProfilesState; }
-		[[nodiscard]] const std::string& GetLightingProfileError() const noexcept { return m_ProfileRegistrationError; }
+		[[nodiscard]] std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept;
+		[[nodiscard]] const LightingProfilePublication& GetLightingProfilePublication() const noexcept;
+		[[nodiscard]] const std::string& GetLightingProfileError() const noexcept;
 		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
 		[[nodiscard]] uint64_t RequestParameterBatch(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
@@ -63,12 +67,7 @@ namespace gglab
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
 
 	private:
-		[[nodiscard]] std::optional<ApplicationViewSettingsResolution> ResolveInheritedViewSettings() const noexcept;
 		void RefreshSources() noexcept;
-		void RefreshLightingProfiles(LabParameterSet& host) noexcept;
-		[[nodiscard]] bool IsLightingProfileParameter(const LabParameterId& id) const noexcept;
-		[[nodiscard]] int32_t FindCurrentLightingProfile() const noexcept;
-		void UpdateLightingProfilePublication(uint64_t lightingGeneration) noexcept;
 		[[nodiscard]] const LabParameter* Find(const LabParameterId& id) const noexcept;
 		void RefreshParameterBatchStatus() noexcept;
 		void EndParameterBatch(bool superseded, std::string reason) noexcept;
@@ -76,7 +75,7 @@ namespace gglab
 		{
 			ParameterBatchStatus m_Status;
 			std::vector<ParameterEffectReceipt> m_Receipts;
-			std::vector<LabParameterValue> m_LabValues;
+			std::vector<ParameterSourceBase*> m_Bindings;
 			std::vector<bool> m_NoChange;
 			struct ConsumedState
 			{
@@ -86,27 +85,14 @@ namespace gglab
 			std::vector<ConsumedState> m_Consumed;
 			uint64_t m_Session = 0;
 			uint64_t m_FrameSerial = 0;
-			uint64_t m_FrameBakeRequestGeneration = 0;
-			uint64_t m_ApplyBakeGeneration = 0;
-			bool m_AttributedLightingRequest = false;
+			ParameterDomainState m_Domain;
 		};
-		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> m_ViewResolver;
-		RenderEnvironmentAccess& m_Environment;
-		WorldLightingControlBase* m_WorldLighting = nullptr;
+		std::unique_ptr<ParameterSourceAdapters> m_Sources;
 		DemoBase* m_Demo = nullptr;
 		LabRuntime* m_Lab = nullptr;
 		std::string m_ContentId;
 		uint64_t m_ContentSerial = 0;
 		uint64_t m_ObservedLabRevision = 0;
-		LabParameterSet m_HostParameters;
-		std::vector<LabParameterValue> m_HostOverrides;
-		std::vector<WorldLightingProfile> m_LightingProfiles;
-		std::vector<WorldLightingState> m_PreparedLightingProfiles;
-		std::vector<Sha256Digest> m_LightingProfileHashes;
-		bool m_ProfilesInitialized = false;
-		std::optional<LabParameterDesc> m_ProfileDescriptor;
-		LightingProfilePublication m_LightingProfilesState;
-		std::string m_ProfileRegistrationError;
 		std::optional<ParameterBatch> m_ParameterBatch;
 		uint64_t m_NextParameterBatchId = 1;
 		uint64_t m_ParameterRevision = 1;
