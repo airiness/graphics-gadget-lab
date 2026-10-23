@@ -21,6 +21,7 @@ namespace gglab
 			LabParameterDesc m_Desc;
 			LabValue (*m_Read)(const ResolvedViewRenderSettings&);
 			void (*m_Write)(ViewRenderSettingsPatch&, const LabValue&);
+			bool (*m_IsSet)(const ViewRenderSettingsPatch&);
 		};
 
 		template<typename Accessor>
@@ -58,6 +59,7 @@ namespace gglab
 						Accessor{}(settings) = std::get<T>(value);
 					}
 				},
+				[](const ViewRenderSettingsPatch& patch) { return Accessor{}(patch).has_value(); }
 			};
 		}
 
@@ -165,6 +167,15 @@ namespace gglab
 		const auto found = std::ranges::find_if(bindings,
 			[&](const auto& binding) { return binding.m_Desc.m_Id == id; });
 		return found != bindings.end() ? std::optional(found->m_Read(settings)) : std::nullopt;
+	}
+
+	bool HasHostViewParameterPatch(const LabParameterId& id,
+		const ViewRenderSettingsPatch& patch) noexcept
+	{
+		const auto& bindings = Bindings();
+		const auto found = std::ranges::find_if(bindings,
+			[&](const auto& binding) { return binding.m_Desc.m_Id == id; });
+		return found != bindings.end() && found->m_IsSet(patch);
 	}
 
 	void ApplyHostViewParameters(std::span<const LabParameterValue> values,

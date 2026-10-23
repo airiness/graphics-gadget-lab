@@ -18,7 +18,7 @@ Physical Sky, whose current producer deliberately skips texture caches.
 
 Host `environment.profile` selects content-registered Physical Sky inputs.
 Arbitrary authored sun/atmosphere parameter bindings, rebuild transactions,
-sequence events and parameter metadata in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
+deferred sequence events and parameter metadata in saved frame artifacts are not implemented. `set` rejects during an active sequence; a new
 sequence rejects while a parameter batch is pending. Do not use external `set`
 as a substitute for scheduled events.
 
@@ -47,7 +47,8 @@ Frame precedence is content plus optional tooling settings, Host overrides, then
 legacy sequence overrides. Reference sampling continues to force temporal AA and
 temporal GTAO inactive. Legacy sequence values use the shared Runtime typed settings operations,
 are temporary, and do not replace session Host values. External `set` remains
-blocked throughout a sequence; scheduled events are still unimplemented.
+blocked throughout a sequence. Immediate events use the same Session transaction owner;
+see [Sequences](sequences.md#immediate-parameter-events).
 
 Immediate NoChange is checked against frozen frame inputs before becoming
 terminal. A changed or unchanged stored Lab value masked by Host/tooling, or

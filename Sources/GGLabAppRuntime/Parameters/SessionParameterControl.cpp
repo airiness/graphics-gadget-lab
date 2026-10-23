@@ -128,6 +128,101 @@ namespace gglab
 		m_ObservedLabRevision = labRevision;
 	}
 
+	bool SessionParameterControl::ValidateParameterBatch(
+		std::span<const LabParameterValue> values, std::string& error) const noexcept
+	{
+		error.clear();
+		if (!IsAvailable() || values.empty() || values.size() > SessionParameterMaxItems)
+		{
+			error = "A parameter batch requires ready active content and 1-128 items.";
+			return false;
+		}
+		LabParameterSet candidate = GetHostParameters();
+		if (const auto* lab = GetLabParameters())
+		{
+			for (const auto& parameter : lab->GetParameters())
+			{
+				if (!candidate.Add(parameter.m_Desc))
+				{
+					error = "Host and Lab parameter ids must be distinct.";
+					return false;
+				}
+			}
+		}
+		for (const auto& value : values)
+		{
+			if (!m_Sources->ValidateMissing(value.m_Id, error))
+			{
+				return false;
+			}
+		}
+		if (!candidate.ApplyBatch(values, error))
+		{
+			return false;
+		}
+		size_t deferredItems = 0;
+		for (const auto& value : values)
+		{
+			auto* source = m_Sources->Find(value.m_Id);
+			const auto& desc = candidate.Find(value.m_Id)->m_Desc;
+			deferredItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
+			if (deferredItems > 1)
+			{
+				error = "At most one bound Deferred lighting item is supported per batch.";
+				return false;
+			}
+			if (!source || !source->Supports(desc) || !source->Validate(value, error))
+			{
+				if (error.empty())
+				{
+					error = "Unsupported effect: the owning parameter source has no binding.";
+				}
+				return false;
+			}
+		}
+		return true;
+	}
+
+	bool SessionParameterControl::ValidateImmediateAssignments(
+		std::span<LabParameterValue> values, std::string& error) const noexcept
+	{
+		for (auto& value : values)
+		{
+			const auto* parameter = Find(value.m_Id);
+			if (!parameter || GetParameterEffectClass(parameter->m_Desc) != ParameterEffectClass::Immediate)
+			{
+				error = "Sequence events currently require bound Immediate parameters.";
+				return false;
+			}
+			// Untyped integer assignments resolve against their owning descriptor. Resolve only
+			// integer representations; booleans, arrays and fractional integers stay strict.
+			if (const auto* number = std::get_if<uint32_t>(&value.m_Value))
+			{
+				if (parameter->m_Desc.m_Type == LabParameterType::Float)
+				{
+					value.m_Value = static_cast<float>(*number);
+				}
+				else if ((parameter->m_Desc.m_Type == LabParameterType::Int ||
+					parameter->m_Desc.m_Type == LabParameterType::Enum) && *number <= INT32_MAX)
+				{
+					value.m_Value = static_cast<int32_t>(*number);
+				}
+			}
+			else if (const auto* signedNumber = std::get_if<int32_t>(&value.m_Value))
+			{
+				if (parameter->m_Desc.m_Type == LabParameterType::Float)
+				{
+					value.m_Value = static_cast<float>(*signedNumber);
+				}
+				else if (parameter->m_Desc.m_Type == LabParameterType::UInt && *signedNumber >= 0)
+				{
+					value.m_Value = static_cast<uint32_t>(*signedNumber);
+				}
+			}
+		}
+		return ValidateParameterBatch(values, error);
+	}
+
 	uint64_t SessionParameterControl::RequestParameterBatch(
 		std::span<const LabParameterValue> values, std::string& error) noexcept
 	{
@@ -148,52 +243,16 @@ namespace gglab
 			error = "Parameter transaction identity capacity is exhausted.";
 			return 0;
 		}
-		LabParameterSet candidate = GetHostParameters();
-		if (const auto* lab = GetLabParameters())
-		{
-			for (const auto& parameter : lab->GetParameters())
-			{
-				if (!candidate.Add(parameter.m_Desc))
-				{
-					error = "Host and Lab parameter ids must be distinct.";
-					return 0;
-				}
-			}
-		}
-		for (const auto& value : values)
-		{
-			if (!m_Sources->ValidateMissing(value.m_Id, error))
-			{
-				return 0;
-			}
-		}
-		if (!candidate.ApplyBatch(values, error))
+		if (!ValidateParameterBatch(values, error))
 		{
 			return 0;
 		}
 		std::vector<ParameterSourceBase*> bindings;
-		bindings.reserve(values.size());
-		size_t deferredItems = 0;
 		bool hasHost = false;
 		bool hasLab = false;
 		for (const auto& value : values)
 		{
 			auto* source = m_Sources->Find(value.m_Id);
-			const auto& desc = candidate.Find(value.m_Id)->m_Desc;
-			deferredItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
-			if (deferredItems > 1)
-			{
-				error = "At most one bound Deferred lighting item is supported per batch.";
-				return 0;
-			}
-			if (!source || !source->Supports(desc) || !source->Validate(value, error))
-			{
-				if (error.empty())
-				{
-					error = "Unsupported effect: the owning parameter source has no binding.";
-				}
-				return 0;
-			}
 			bindings.push_back(source);
 			hasHost |= source->IsHost();
 			hasLab |= !source->IsHost();
@@ -253,6 +312,14 @@ namespace gglab
 		auto result = std::move(m_ParameterBatch->m_Status);
 		m_ParameterBatch.reset();
 		return result;
+	}
+
+	void SessionParameterControl::FinishParameterBatch(uint64_t id) noexcept
+	{
+		if (m_ParameterBatch && m_ParameterBatch->m_Status.m_BatchId == id)
+		{
+			EndParameterBatch(false, "The sequence ended before parameter consumption.");
+		}
 	}
 
 	void SessionParameterControl::RefreshParameterBatchStatus() noexcept

@@ -6,6 +6,9 @@
 
 namespace gglab
 {
+	struct ViewRenderSettingsPatch;
+	[[nodiscard]] bool HasHostViewParameterPatch(const LabParameterId& id,
+		const ViewRenderSettingsPatch& patch) noexcept;
 	// Defaults are inherited from the active content's resolved display view.
 	[[nodiscard]] LabParameterSet DescribeHostViewParameters(
 		const ResolvedViewRenderSettings& settings) noexcept;

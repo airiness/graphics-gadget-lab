@@ -701,6 +701,37 @@ namespace gglab
 								sequence.m_Note;
 					target = value.get<std::string>();
 				}
+				else if (key == "events")
+				{
+					if (!value.is_array() || value.size() > FrameSequenceMaxParameterEvents)
+					{
+						return "Sequence 'events' must be an array of at most 128 events.";
+					}
+					for (const auto& item : value)
+					{
+						if (!item.is_object() || !item.contains("frame") || !IsUint32(item["frame"]) ||
+							!item.contains("set") || item.size() != (item.contains("expectEffects") ? 3 : 2))
+						{
+							return "Each event takes 'frame', 'set' and optional 'expectEffects'.";
+						}
+						FrameSequenceParameterEvent event{ .m_Frame = item["frame"].get<uint32_t>() };
+						if (auto error = ParseApplicationControlParameterAssignments(item["set"], event.m_Values);
+							!error.empty())
+						{
+							return error;
+						}
+						if (item.contains("expectEffects"))
+						{
+							const auto& effects = item["expectEffects"];
+							if (!effects.is_array() || !effects.empty())
+							{
+								return "Immediate events accept only an empty 'expectEffects' array.";
+							}
+							event.m_ExpectEffects.emplace();
+						}
+						sequence.m_Events.push_back(std::move(event));
+					}
+				}
 				else if (key == "source")
 				{
 					const std::string source = value.is_string() ? value.get<std::string>() : "";
@@ -1352,6 +1383,17 @@ namespace gglab
 				{ "pendingCaptureJobs", status.m_PendingCaptureJobs },
 				{ "completedCaptures", status.m_CompletedCaptures },
 			};
+			sequence["events"] = Json::array();
+			for (const auto& event : status.m_Events)
+			{
+				sequence["events"].push_back({
+					{ "frame", event.m_Frame },
+					{ "batch", event.m_Batch ? SerializeApplicationControlParameterBatch(*event.m_Batch) : Json() },
+					{ "state", !event.m_Failure.empty() ? "Failed" :
+						event.m_Batch ? (event.m_Batch->IsTerminal() ? "Finished" : "Running") :
+							status.IsTerminal() ? "EffectNotReached" : "Pending" },
+					{ "failure", event.m_Failure } });
+			}
 			if (status.m_GpuTiming)
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
@@ -1555,6 +1597,7 @@ namespace gglab
 				{ "mixedSources", true },
 				{ "explicitConsumption", true } } },
 			{ "sequenceCaptureJobs", true },
+			{ "sequenceImmediateEvents", true },
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
 			{ "gpuTimingSchema", "gglab.gpu-timing" },

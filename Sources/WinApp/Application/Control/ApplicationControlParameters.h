@@ -25,6 +25,8 @@ namespace gglab
 
 	[[nodiscard]] std::string ParseApplicationControlParameterChanges(
 		const nlohmann::json& changes, std::vector<ApplicationControlParameterChange>& result);
+	[[nodiscard]] std::string ParseApplicationControlParameterAssignments(
+		const nlohmann::json& assignments, std::vector<LabParameterValue>& result);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlParameterBatch(
 		const ParameterBatchStatus& batch);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlLightingProfiles(

@@ -1,6 +1,7 @@
 #include "Capture/FrameSequenceCoordinator.h"
 
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "Parameters/HostViewParameters.h"
 
 #include <algorithm>
 #include <cmath>
@@ -313,6 +314,42 @@ namespace gglab
 				"overrides.";
 			return 0;
 		}
+		if (request.m_Events.size() > FrameSequenceMaxParameterEvents ||
+			(!request.m_Events.empty() && request.m_ReferenceSamples != 0))
+		{
+			outError = "A sequence supports at most 128 events; reference events are not supported yet.";
+			return 0;
+		}
+		std::ranges::sort(request.m_Events, {}, &FrameSequenceParameterEvent::m_Frame);
+		ViewRenderSettingsPatch legacy;
+		legacy.m_TemporalAA = request.m_TemporalAAOverrides;
+		legacy.m_Lighting.m_GTAO = {
+			.m_DirectionCount = request.m_GTAOOverrides.m_DirectionCount,
+			.m_StepCount = request.m_GTAOOverrides.m_StepCount,
+			.m_TemporalAccumulation = request.m_GTAOOverrides.m_TemporalAccumulation,
+			.m_TemporalMaxSamples = request.m_GTAOOverrides.m_TemporalMaxSamples,
+		};
+		size_t eventItems = 0;
+		for (size_t i = 0; i < request.m_Events.size(); ++i)
+		{
+			const auto& event = request.m_Events[i];
+			eventItems += event.m_Values.size();
+			if (event.m_Values.empty() || event.m_Values.size() > 128 || eventItems > 1024 ||
+				(i != 0 && request.m_Events[i - 1].m_Frame == event.m_Frame) ||
+				(event.m_ExpectEffects && !event.m_ExpectEffects->empty()))
+			{
+				outError = "Events require distinct frames, 1-128 items each (1024 total), and no deferred expected effects.";
+				return 0;
+			}
+			for (const auto& value : event.m_Values)
+			{
+				if (HasHostViewParameterPatch(value.m_Id, legacy))
+				{
+					outError = "An event parameter overlaps a legacy sequence override.";
+					return 0;
+				}
+			}
+		}
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
@@ -341,6 +378,11 @@ namespace gglab
 				std::optional<FrameSequenceGpuTiming>(std::in_place) :
 				std::nullopt,
 		};
+		m_EventContentIdentity = 0;
+		for (const auto& event : m_Request.m_Events)
+		{
+			m_Status->m_Events.push_back({ .m_Frame = event.m_Frame });
+		}
 		if (m_Request.m_GpuTiming)
 		{
 			m_Status->m_TimingPublication.emplace();
@@ -513,7 +555,8 @@ namespace gglab
 
 	std::optional<FrameSequencePoseRequest> FrameSequenceCoordinator::PrepareFrame(
 		const FrameCaptureFrameState* previousFrame,
-		std::span<const CameraPath> cameraPaths) noexcept
+		std::span<const CameraPath> cameraPaths, uint64_t contentIdentity,
+		const std::function<bool(std::span<FrameSequenceParameterEvent>, std::string&)>& validateEvents) noexcept
 	{
 		m_AppliedPose.reset();
 		m_FrameBegun = false;
@@ -574,6 +617,17 @@ namespace gglab
 				Fail("A resource export frame is outside the selected camera path.");
 				return std::nullopt;
 			}
+			if (!m_Request.m_Events.empty())
+			{
+				std::string error;
+				if (m_Request.m_Events.back().m_Frame >= frameCount || !validateEvents ||
+					contentIdentity == 0 || !validateEvents(m_Request.m_Events, error))
+				{
+					Fail(error.empty() ? "Invalid sequence event plan or frame outside camera path." : std::move(error));
+					return std::nullopt;
+				}
+				m_EventContentIdentity = contentIdentity;
+			}
 			m_Status->m_CameraPathVersion = path->m_Version;
 			m_Status->m_FrameCount = frameCount;
 			m_Status->m_State = FrameSequenceState::Running;
@@ -581,6 +635,11 @@ namespace gglab
 
 		if (m_Status->m_State != FrameSequenceState::Running)
 		{
+			return std::nullopt;
+		}
+		if (!m_Request.m_Events.empty() && contentIdentity != m_EventContentIdentity)
+		{
+			Fail("The content binding changed during a parameter event sequence.");
 			return std::nullopt;
 		}
 		return FrameSequencePoseRequest{
@@ -599,6 +658,63 @@ namespace gglab
 			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
 			.m_GTAOOverrides = m_Request.m_GTAOOverrides,
 		};
+	}
+
+	const FrameSequenceParameterEvent* FrameSequenceCoordinator::GetDueParameterEvent() const noexcept
+	{
+		if (!m_Status || m_Status->m_State != FrameSequenceState::Running)
+		{
+			return nullptr;
+		}
+		for (size_t i = 0; i < m_Request.m_Events.size(); ++i)
+		{
+			if (m_Request.m_Events[i].m_Frame == m_Frame && !m_Status->m_Events[i].m_Batch)
+			{
+				return &m_Request.m_Events[i];
+			}
+		}
+		return nullptr;
+	}
+
+	void FrameSequenceCoordinator::OnParameterEventBatch(const ParameterBatchStatus& batch) noexcept
+	{
+		if (!m_Status)
+		{
+			return;
+		}
+		for (auto& event : m_Status->m_Events)
+		{
+			if ((event.m_Batch && event.m_Batch->m_BatchId == batch.m_BatchId) ||
+				(!event.m_Batch && event.m_Frame == m_Frame))
+			{
+				event.m_Batch = batch;
+				if (batch.IsTerminal() && (batch.m_State == ParameterBatchState::Failed ||
+					!std::ranges::all_of(batch.m_Items, [](const auto& item)
+					{
+						return item.m_State == ParameterEffectState::Consumed ||
+							item.m_State == ParameterEffectState::NoChange;
+					})))
+				{
+					event.m_Failure = batch.m_Failure.empty() ? "An event effect did not reach consumption." : batch.m_Failure;
+					Fail(event.m_Failure);
+				}
+				return;
+			}
+		}
+	}
+
+	void FrameSequenceCoordinator::OnContentBindingChanged(uint64_t contentIdentity) noexcept
+	{
+		if (m_Status && m_Status->m_State == FrameSequenceState::Running &&
+			m_EventContentIdentity && contentIdentity != m_EventContentIdentity)
+		{
+			Fail("The content binding changed during a parameter event sequence.");
+		}
+	}
+
+	void FrameSequenceCoordinator::OnParameterEventFailed(std::string failure) noexcept
+	{
+		Fail(std::move(failure));
 	}
 
 	void FrameSequenceCoordinator::OnPoseApplied(
@@ -632,8 +748,14 @@ namespace gglab
 		if (m_LastSettleKey &&
 			!state.m_SettleKey.Continues(*m_LastSettleKey, m_AppliedPose->m_Cut))
 		{
-			Fail(std::format("Temporal continuity changed at sequence frame {} outside a camera "
-				"path cut (effective temporal identity, history availability or content).", m_Frame));
+			const auto& before = m_LastSettleKey->m_Temporal;
+			const auto& after = state.m_SettleKey.m_Temporal;
+			Fail(std::format("Temporal continuity changed at sequence frame {} outside a camera path cut "
+				"(reset {}->{}, session {}->{}, services {}->{}, history={}, identityEqual={}).", m_Frame,
+				before.m_Identity.m_ResetIdentity, after.m_Identity.m_ResetIdentity,
+				before.m_Identity.m_SessionIdentity, after.m_Identity.m_SessionIdentity,
+				static_cast<uint32_t>(before.m_Services), static_cast<uint32_t>(after.m_Services),
+				after.m_HasCompatiblePreviousHistory, before.m_Identity == after.m_Identity));
 			return false;
 		}
 		m_LastSettleKey = state.m_SettleKey;
@@ -725,6 +847,14 @@ namespace gglab
 		{
 			Fail("Sequence submission did not match its begun RenderFrame serial.");
 			return;
+		}
+		for (const auto& event : m_Status->m_Events)
+		{
+			if (event.m_Frame == m_Frame && (!event.m_Batch || !event.m_Batch->IsTerminal()))
+			{
+				Fail("An Immediate event did not reach its terminal receipt in the submitted sequence frame.");
+				return;
+			}
 		}
 		if (auto* watch = m_Capture->GetNonFiniteWatch())
 		{

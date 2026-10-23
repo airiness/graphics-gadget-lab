@@ -149,6 +149,9 @@ param(
     # sequence: [{frame: n, targets: [...], graph: true}], directly or from a file.
     [string]$Exports,
     [string]$ExportsFile,
+    # sequence: [{frame: n, set: {parameterId: value}, expectEffects: []}].
+    [string]$Events,
+    [string]$EventsFile,
     [ValidateRange(0, 4096)]
     [int]$ReferenceSamples = 0,
     [double]$ReferenceTextureLodBias = 0,
@@ -627,6 +630,7 @@ switch ($Command) {
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
+        if ($Events -or $EventsFile) { $request['events'] = (Read-JsonArray $Events $EventsFile 'Events') }
         if ($Exports -or $ExportsFile) { $request['exports'] = (Read-JsonArray $Exports $ExportsFile 'Exports') }
         if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
         if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-SettingOverrides $TemporalAA 'Temporal AA') }

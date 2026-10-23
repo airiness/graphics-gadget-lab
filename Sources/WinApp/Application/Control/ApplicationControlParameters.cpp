@@ -224,6 +224,37 @@ namespace gglab
 		return {};
 	}
 
+	std::string ParseApplicationControlParameterAssignments(
+		const Json& assignments, std::vector<LabParameterValue>& result)
+	{
+		if (!assignments.is_object() || assignments.empty() ||
+			assignments.size() > ApplicationControlMaxParameterItems)
+		{
+			return "Event 'set' must be an object with 1-128 parameter assignments.";
+		}
+		Json changes = Json::array();
+		for (const auto& [id, value] : assignments.items())
+		{
+			const char* type = value.is_boolean() ? "bool" :
+				value.is_number_unsigned() ? "uint" :
+					value.is_number_integer() ? "int" :
+						value.is_number_float() ? "float" :
+							value.is_array() && value.size() == 3 ? "vector3" :
+								value.is_array() && value.size() == 4 ? "color" : "invalid";
+			changes.push_back({ { "id", id }, { "type", type }, { "value", value } });
+		}
+		std::vector<ApplicationControlParameterChange> parsed;
+		if (auto error = ParseApplicationControlParameterChanges(changes, parsed); !error.empty())
+		{
+			return error;
+		}
+		for (auto& change : parsed)
+		{
+			result.push_back(std::move(change.m_Value));
+		}
+		return {};
+	}
+
 	Json SerializeApplicationControlParameterBatch(const ParameterBatchStatus& batch)
 	{
 		const char* state = "Queued";
@@ -394,8 +425,7 @@ namespace gglab
 	std::string QueryApplicationControlParameters(
 		uint64_t id, uint64_t batchId, bool consume, GGLabAppRuntime* runtime) noexcept
 	{
-		const auto* parameterControl = runtime ? runtime->GetParameterControl() : nullptr;
-		const auto* batch = parameterControl ? parameterControl->GetParameterBatchStatus() : nullptr;
+		const auto* batch = runtime ? runtime->GetExternalParameterBatchStatus() : nullptr;
 		if (!batch || batch->m_BatchId != batchId)
 		{
 			Json response = Response(id, false);

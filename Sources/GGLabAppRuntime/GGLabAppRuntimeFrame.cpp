@@ -357,6 +357,13 @@ namespace gglab
 		if (m_ParameterControl)
 		{
 			m_ParameterControl->OnRuntimeFailed(failure);
+			UpdateSequenceParameterEvent();
+		}
+		if (m_FrameSequence && m_FrameSequence->GetStatus() &&
+			!m_FrameSequence->GetStatus()->m_Events.empty())
+		{
+			m_FrameSequence->OnParameterEventFailed(std::string(failure));
+			UpdateSequenceParameterEvent();
 		}
 		if (m_DemoManager)
 		{
@@ -495,6 +502,31 @@ namespace gglab
 				AppRuntimeTickResult::Continue :
 				FailRuntime("The render host failed to begin a frame.");
 		}
+		const auto sequencePose = m_FrameSequence->PrepareFrame(
+			m_FrameCapture->GetLastFrameState(), demo->GetCameraRig().GetCameraPaths(),
+			m_ParameterControl->GetContentIdentity(),
+			[this](std::span<FrameSequenceParameterEvent> events, std::string& error)
+			{
+				for (auto& event : events)
+				{
+					if (!m_ParameterControl->ValidateImmediateAssignments(event.m_Values, error))
+					{
+						return false;
+					}
+				}
+				return true;
+			});
+		if (const auto* event = m_FrameSequence->GetDueParameterEvent())
+		{
+			std::string error;
+			m_SequenceParameterBatch = m_ParameterControl->RequestParameterBatch(event->m_Values, error);
+			if (!m_SequenceParameterBatch)
+			{
+				m_FrameSequence->OnParameterEventFailed(std::move(error));
+				return AppRuntimeTickResult::Continue;
+			}
+			UpdateSequenceParameterEvent();
+		}
 		if (m_ParameterControl->IsEnabled())
 		{
 			m_ParameterControl->OnFrameReady(rendererFrame.GetSerial());
@@ -526,9 +558,7 @@ namespace gglab
 		std::optional<TemporalReferenceSample> referenceSample;
 		std::optional<FrameSequenceTemporalAAOverrides> sequenceTemporalAAOverrides;
 		std::optional<FrameSequenceGTAOOverrides> sequenceGTAOOverrides;
-		if (const std::optional<FrameSequencePoseRequest> sequencePose =
-			m_FrameSequence->PrepareFrame(
-				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
+		if (sequencePose)
 		{
 			const std::optional<CameraPathPose> pose = cameraRig.ApplyCameraPathFrame(
 				sequencePose->m_CameraPathId, sequencePose->m_Frame);
@@ -647,6 +677,7 @@ namespace gglab
 		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
 		if (!m_FrameSequence->BeginFrame(captureFrameState))
 		{
+			UpdateSequenceParameterEvent();
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
@@ -659,6 +690,7 @@ namespace gglab
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
+		UpdateSequenceParameterEvent();
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
@@ -821,13 +853,15 @@ namespace gglab
 			FrameSequenceObservation{ m_FrameCapture->HasFrameGraphExports(frame.m_FrameSerial),
 				renderGraph.GetObservationActivity() } :
 			FrameSequenceObservation{};
-		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
 
 		m_ParameterControl->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
 			.m_RenderFrameSerial = frame.m_FrameSerial,
 		});
+		UpdateSequenceParameterEvent();
+		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
+		UpdateSequenceParameterEvent();
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),

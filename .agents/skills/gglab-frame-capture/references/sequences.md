@@ -49,6 +49,47 @@ Replay per channel/configuration. Confirm deterministic content by replaying the
 same path twice and checking the images and metadata before relying on paired
 frames from different runs.
 
+## Immediate parameter events
+
+Check `status.capabilities.sequenceImmediateEvents`. Pass `-Events` or `-EventsFile`
+with `{frame, set, expectEffects?}` objects. `set` maps discovered parameter ids to
+values; JSON integers resolve against the descriptor's integer/enum/float storage.
+Booleans, fractional integers and vector/color shapes remain strict. For example:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
+    -CameraPath SEQ_StaticRailings -CaptureFrames '9,10,95' `
+    -Events '[{"frame":10,"set":{"view.exposure.ev100":17},"expectEffects":[]}]'
+```
+
+This extension supports bound Immediate parameters in ordinary sequences only.
+Deferred/Rebuild events and reference sequences with events reject. Omit
+`expectEffects` or use `[]`; nonempty expected domains are not implemented yet.
+The complete plan is descriptor-validated after target readiness, before frame 0.
+A bad later event prevents all earlier event mutation. Duplicate frames reject:
+one frame has one atomic batch. Limits are 128 events, 128 items per event and
+1024 items total. A Host assignment overlapping the same legacy TAA/GTAO override field rejects;
+unrelated legacy overrides remain usable. Existing readiness and temporal
+continuity gates, including failures outside authored camera cuts, remain active.
+
+Events apply before building their exact sequence frame. Abort/admission retries
+retain the same batch/revision without invoking effects twice. Only matching
+successful submission supplies `firstConsumed`. Session owns live receipts;
+`sequence.events[]` reports snapshots and AppRuntime consumes internal results.
+`parameter-result` cannot claim or consume an event batch. An event sequence also
+rejects retained external results, including terminal ones; consume them first.
+
+Each report includes `frame`, `state`, `batch` and `failure`. Unexecuted events in a
+terminal sequence report `EffectNotReached` without invented batches/stamps.
+Cancel/content invalidation closes outstanding receipts and retains reached stamps.
+Committed values remain session settings after completion/cancel; normal content
+lifetime clears them, with no automatic sequence rollback. Full persisted parameter
+metadata remains separate work.
+
+The hidden `sequence-parameter-events` suite verifies Demo/Lab frame-ten exposure
+and GTAO changes on both RHIs. AppRuntime fault tests exercise abort/retry,
+whole-plan rejection, result ownership, cancellation and content invalidation.
+
 ## Supersampled reference
 
 ```powershell

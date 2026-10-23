@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -54,6 +55,10 @@ namespace gglab
 		[[nodiscard]] const LightingProfilePublication& GetLightingProfilePublication() const noexcept;
 		[[nodiscard]] const std::string& GetLightingProfileError() const noexcept;
 		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
+		// Descriptor validation without reservations, mutation or retained source borrows.
+		[[nodiscard]] bool ValidateImmediateAssignments(
+			std::span<LabParameterValue> values, std::string& error) const noexcept;
+		void FinishParameterBatch(uint64_t id) noexcept;
 		[[nodiscard]] uint64_t RequestParameterBatch(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		[[nodiscard]] const ParameterBatchStatus* GetParameterBatchStatus() const noexcept;
@@ -68,6 +73,8 @@ namespace gglab
 
 	private:
 		void RefreshSources() noexcept;
+		[[nodiscard]] bool ValidateParameterBatch(
+			std::span<const LabParameterValue> values, std::string& error) const noexcept;
 		[[nodiscard]] const LabParameter* Find(const LabParameterId& id) const noexcept;
 		void RefreshParameterBatchStatus() noexcept;
 		void EndParameterBatch(bool superseded, std::string reason) noexcept;

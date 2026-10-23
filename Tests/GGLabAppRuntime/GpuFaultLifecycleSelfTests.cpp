@@ -1807,7 +1807,10 @@ namespace gglab
 				.m_Exports = { { .m_Frame = 0,
 					.m_Targets = { { .m_Resource = missingResource ? "Missing.RequiredResource" : "FaultLifecycle.Color" } },
 					.m_IncludeGraph = true } },
-				.m_ReferenceSamples = referenceSamples }, error) != 0,
+				.m_ReferenceSamples = referenceSamples,
+				.m_Events = referenceSamples == 0 ? std::vector<FrameSequenceParameterEvent>{ {
+					.m_Frame = 0, .m_Values = { { LabParameterId("view.exposure.ev100"), 3.0f } },
+				} } : std::vector<FrameSequenceParameterEvent>{} }, error) != 0,
 				"The production sequence accepts image, arrays and graph as one required-product plan");
 			if (missingResource)
 			{
@@ -1860,6 +1863,14 @@ namespace gglab
 					sequence.GetStatus()->m_SubmittedFrames == 1,
 					"Only the successful complete-plan retry submits and advances the sequence "
 					"at the preserved simulation instant");
+				if (referenceSamples == 0)
+				{
+					const auto& event = sequence.GetStatus()->m_Events[0].m_Batch;
+					checks.Check(event && event->IsTerminal() && event->m_Items[0].m_FirstConsumed ==
+						capture.GetLastFrameState()->m_FrameSerial && event->m_Items[0].m_Applied < event->m_Items[0].m_FirstConsumed &&
+						!runtime.GetParameterControl()->GetParameterBatchStatus(),
+						"Repeated real capture-admission aborts preserve one event and only the successful retry consumes it");
+				}
 				const auto successfulSerial = capture.GetLastFrameState()->m_FrameSerial;
 				for (uint32_t attempt = 0; attempt < 100 && sequence.IsActive(); ++attempt)
 				{
@@ -2802,6 +2813,179 @@ namespace gglab
 					[](const auto& item) { return item.m_State == ParameterEffectState::Consumed; }),
 					"Matching mixed requests are both proven by the same submitted frame");
 			}
+			runtime.Shutdown();
+		}
+
+		void RunSequenceParameterEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root,
+				[](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					return std::vector<uint8_t>{ 0x89, 'P', 'N', 'G', 13, 10, 26, 10 };
+				}))
+			{
+				return;
+			}
+			// This scenario tests the ordinary custom-pipeline mode. The optional synthetic
+			// history producer is exercised by the dedicated history/fault scenarios.
+			probe.m_EnableTemporalHistory = false;
+			const auto& parameters = *runtime.GetParameterControl();
+			const auto& sequence = *runtime.GetFrameSequenceCoordinator();
+			probe.m_ParameterControl = &parameters;
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::yield();
+					}
+					return condition();
+				};
+			const auto ready = [&]()
+				{
+					const auto* frame = runtime.GetFrameCaptureCoordinator()->GetLastFrameState();
+					return frame && frame->m_Readiness.IsReady();
+				};
+			checks.Check(tickUntil(ready), "Event sequence starts from actually ready content");
+			checks.Check(runtime.GetDemoManager()->GetActiveDemo()->GetCameraRig().SetCameraPaths({ {
+				.m_Id = "SEQ_Events", .m_Name = "Parameter events", .m_Version = 1,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+					{ .m_Frame = 3, .m_Position = { 1, 1, 0 }, .m_Target = { 1, 1, 10 } },
+				},
+			} }), "Events use the production camera-path sequence");
+			runtime.GetTime()->SetFixedDeltaTime(1.0 / 60.0);
+			runtime.EnableParameterControl();
+			// Disable inactive temporal consumers before comparing ordinary event frames.
+			const std::array baselineSettings{
+				LabParameterValue{ LabParameterId("view.taa.enabled"), false },
+				LabParameterValue{ LabParameterId("view.gtao.temporal_accumulation"), false },
+			};
+			std::string baselineError;
+			const auto baselineBatch = runtime.RequestParameterBatch(baselineSettings, baselineError);
+			checks.Check(baselineBatch && tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(baselineBatch).has_value() && tickUntil(ready),
+				"The event fixture renders with supported temporal services");
+			const LabParameterId exposure("view.exposure.ev100");
+			const LabParameterId radius("view.gtao.radius");
+			const float baseline = parameters.GetHostParameters().Get(exposure, 0.0f);
+			std::string error;
+			const auto event = [](uint32_t frame, LabParameterId id, LabValue value)
+				{
+					return FrameSequenceParameterEvent{ .m_Frame = frame, .m_Values = { { id, value } } };
+				};
+			for (const auto& invalid : {
+				event(2, LabParameterId("unknown.event"), true),
+				event(2, radius, true),
+				event(2, radius, 999.0f),
+				event(2, LabParameterId("lighting"), uint32_t(64)),
+				event(2, LabParameterId("layout"), uint32_t(2)),
+				event(2, LabParameterId("unprojected"), 2.0f),
+				event(4, exposure, baseline + 1.0f) })
+			{
+				const auto revision = parameters.GetParameterRevision();
+				const auto applications = probe.m_ParameterApplications;
+				checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+					.m_Events = { event(0, exposure, baseline + 1.0f), invalid } }, error) != 0 &&
+					tickUntil([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+					sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					parameters.GetParameterRevision() == revision &&
+					parameters.GetHostParameters().Get(exposure, 0.0f) == baseline &&
+					!parameters.GetParameterBatchStatus() && probe.m_ParameterApplications == applications,
+					"A bad later event rejects the whole plan before frame zero or any parameter mutation");
+			}
+			FrameSequenceRequest conflict{ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, LabParameterId("view.taa.enabled"), false) } };
+			conflict.m_TemporalAAOverrides.m_Enabled = true;
+			checks.Check(runtime.StartFrameSequence(conflict, error) == 0,
+				"Legacy overrides cannot silently mask an event on the same field");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline), event(0, radius, 2.0f) } }, error) == 0,
+				"One sequence frame has one atomic event batch");
+			const std::array retained{ LabParameterValue{ exposure, baseline } };
+			const auto retainedId = runtime.RequestParameterBatch(retained, error);
+			checks.Check(retainedId && tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+					.m_Events = { event(0, exposure, baseline) } }, error) == 0 &&
+				runtime.TakeParameterBatchResult(retainedId).has_value(),
+				"An event sequence reserves no slot by discarding a retained external result");
+			const auto revision = parameters.GetParameterRevision();
+			FrameSequenceParameterEvent mixed = event(1, radius, 2.0f);
+			mixed.m_Values.push_back({ LabParameterId("radius"), 2.0f });
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline + 1.0f), mixed,
+					event(2, exposure, baseline + 1.0f), event(3, exposure, baseline + 2.0f) } }, error) != 0,
+				"Immediate Host and mixed events are admitted as one plan");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* aborted = parameters.GetParameterBatchStatus();
+			checks.Check(aborted && aborted->m_Items[0].m_Published && !aborted->m_Items[0].m_FirstConsumed &&
+				sequence.GetStatus()->m_SubmittedFrames == 0 && !runtime.GetExternalParameterBatchStatus() &&
+				!runtime.TakeParameterBatchResult(aborted->m_BatchId),
+				"An aborted frame-zero event preserves publication and excludes external result consumption");
+			const auto applied = aborted ? aborted->m_Items[0].m_Applied : std::nullopt;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto& retried = sequence.GetStatus()->m_Events[0].m_Batch;
+			checks.Check(retried && retried->IsTerminal() && retried->m_Items[0].m_Applied == applied &&
+				retried->m_Items[0].m_FirstConsumed > applied && parameters.GetParameterRevision() == revision + 1 &&
+				sequence.GetStatus()->m_SubmittedFrames == 1 && !parameters.GetParameterBatchStatus(),
+				"Retry consumes the same event without reapplying it or allocating another revision");
+			for (uint32_t frame = 1; frame < 4; ++frame)
+			{
+				const auto applications = probe.m_ParameterApplications;
+				if (frame == 1)
+				{
+					probe.m_SkipParameterFrame = true;
+					GGLAB_UNUSED(runtime.Tick());
+				}
+				GGLAB_UNUSED(runtime.Tick());
+				checks.Check(sequence.GetStatus()->m_SubmittedFrames == frame + 1 &&
+					probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == baseline + (frame == 3 ? 2.0f : 1.0f) &&
+					probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 2.0f &&
+					probe.m_ParameterApplications == applications + (frame == 1 ? 1 : 0),
+					std::format("Event frame {}: submitted={}, state={}, failure={}, EV={} expected={}, radius={}, applications={} expected={}",
+						frame, sequence.GetStatus()->m_SubmittedFrames, GetFrameSequenceStateName(sequence.GetStatus()->m_State),
+						sequence.GetStatus()->m_Failure, probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100,
+						baseline + (frame == 3 ? 2.0f : 1.0f), probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius,
+						probe.m_ParameterApplications, applications + (frame == 1 ? 1 : 0)));
+			}
+			checks.Check(tickUntil([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+				sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				parameters.GetParameterRevision() == revision + 3 && !parameters.GetParameterBatchStatus(),
+				"Completed event reports retain all receipts and NoChange allocates no revision");
+			checks.Check(tickUntil(ready), "Ready baseline is restored before a cancellation case");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline), event(2, radius, 3.0f) } }, error) != 0,
+				"Cancellation sequence is admitted");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
+				!parameters.GetParameterBatchStatus() && sequence.GetStatus()->m_Events[0].m_Batch->IsTerminal() &&
+				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed &&
+				!sequence.GetStatus()->m_Events[1].m_Batch,
+				"Cancel closes the owned event receipt without executing future events or inventing consumption");
+			checks.Check(tickUntil(ready), "Ready baseline is restored before a content replacement case");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline + 1.0f) } }, error) != 0,
+				"Content-bound event sequence is admitted");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			++probe.m_ContentSerialOffset;
+			probe.m_FrameBeginUnavailable = true;
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				!parameters.GetParameterBatchStatus() && !sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+				"Content invalidation releases the event reservation and never consumes against a replacement binding");
 			runtime.Shutdown();
 		}
 
@@ -4140,6 +4324,7 @@ namespace gglab
 		RunLightingProfileRegistrationScenario(context, root / "profile-invalid-registration", false, false);
 		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
 		RunLightingProfileScenario(context, root / "lighting-profiles");
+		RunSequenceParameterEventScenario(context, root / "sequence-events");
 		RunSessionAdmissionScenario(context, root / "session-admission");
 		RunSessionExitAdmissionScenario(context, root / "session-exit-admission");
 		RunParameterFeedbackScenario(context, root / "parameter-feedback");
