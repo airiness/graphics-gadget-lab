@@ -37,6 +37,7 @@ namespace gglab
 		std::string m_ContentId;
 		std::string m_Source = "lab";
 		ParameterBatchState m_State = ParameterBatchState::Queued;
+		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
 		// Owned admission values remain queryable before application or after session replacement.
 		std::vector<LabParameterValue> m_Values;
 		std::vector<ParameterEffectSnapshot> m_Items;

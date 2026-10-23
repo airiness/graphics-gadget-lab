@@ -21,6 +21,7 @@ namespace gglab
 		const ResolvedViewRenderSettings& m_ViewSettings;
 		const RenderView* m_View = nullptr;
 		uint64_t m_LightingGeneration = 0;
+		uint64_t m_ContentIdentity = 0;
 	};
 
 	// The coordinator retains only the observation boundary, not domain policy.
@@ -92,6 +93,21 @@ namespace gglab
 		[[nodiscard]] virtual const LabParameterSet* GetParameters() const noexcept = 0;
 		[[nodiscard]] virtual bool Supports(const LabParameterDesc& desc) const noexcept = 0;
 		[[nodiscard]] virtual std::string_view GetDeferredEffectDomain() const noexcept { return {}; }
+		[[nodiscard]] virtual bool ContinuesContentChange(uint64_t batch,
+			uint64_t previous, uint64_t current) const noexcept
+		{
+			GGLAB_UNUSED(batch);
+			GGLAB_UNUSED(previous);
+			GGLAB_UNUSED(current);
+			return false;
+		}
+		// Lifecycle failures must close receipts even when no RHI frame is available.
+		[[nodiscard]] virtual ParameterPublicationObservation ObserveLifetime(
+			const ParameterStateIdentity& identity) const noexcept
+		{
+			GGLAB_UNUSED(identity);
+			return {};
+		}
 		[[nodiscard]] virtual bool CoversReadinessGate(const ParameterStateIdentity& identity,
 			std::string_view gate) const noexcept
 		{

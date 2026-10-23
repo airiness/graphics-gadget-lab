@@ -1580,7 +1580,7 @@ namespace gglab
 		response["capabilities"] = {
 			{ "labParameterControl", {
 				{ "sources", Json::array({ "lab" }) },
-				{ "effectClasses", Json::array({ "Immediate", "Deferred" }) },
+				{ "effectClasses", Json::array({ "Immediate", "Deferred", "Rebuild" }) },
 				{ "deferredDomains", Json::array({ "lighting" }) },
 				{ "maxLightingItemsPerBatch", 1 },
 				{ "maxBatches", 1 },
@@ -1602,7 +1602,8 @@ namespace gglab
 				{ "hostGroups", { "view.taa", "view.gtao", "view.exposure", "environment.profile" } },
 				{ "lightingProfiles", true },
 				{ "lightingProfileHashVersion", LightingProfileHashVersion },
-				{ "effectClasses", { "Immediate", "Deferred" } },
+				{ "effectClasses", { "Immediate", "Deferred", "Rebuild" } },
+				{ "rebuildWithDeferred", false },
 				{ "maxBatches", 1 },
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "mixedSources", true },

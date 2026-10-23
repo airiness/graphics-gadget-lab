@@ -56,6 +56,10 @@ namespace gglab
 		[[nodiscard]] const LabParameterSet* GetParameters() const noexcept override;
 		[[nodiscard]] bool Supports(const LabParameterDesc& desc) const noexcept override;
 		[[nodiscard]] std::string_view GetDeferredEffectDomain() const noexcept override { return "lighting"; }
+		[[nodiscard]] bool ContinuesContentChange(uint64_t batch,
+			uint64_t previous, uint64_t current) const noexcept override;
+		[[nodiscard]] ParameterPublicationObservation ObserveLifetime(
+			const ParameterStateIdentity& identity) const noexcept override;
 		[[nodiscard]] bool CoversReadinessGate(const ParameterStateIdentity& identity,
 			std::string_view gate) const noexcept override
 		{
@@ -67,10 +71,7 @@ namespace gglab
 		[[nodiscard]] std::unique_ptr<PreparedParameterSourceBase> Prepare(uint64_t id,
 			std::span<const LabParameterValue> values, std::string& error) noexcept override;
 		[[nodiscard]] ParameterPublicationObservation ObservePublication(
-			const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept override
-		{
-			return m_Domain.ObservePublication(identity, frame);
-		}
+			const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept override;
 		[[nodiscard]] bool MatchesFrame(const LabParameterValue& value,
 			const ParameterSourceFrame& frame) const noexcept override;
 
@@ -138,7 +139,7 @@ namespace gglab
 		ParameterSourceAdapters(RenderEnvironmentAccess& environment, WorldLightingControlBase* worldLighting,
 			HostViewParameterSource::ViewResolver resolver) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ParameterSourceAdapters);
-		void Bind(DemoBase* demo, LabRuntime* lab, uint64_t identity) noexcept;
+		void Bind(DemoBase* demo, LabRuntime* lab, uint64_t identity, bool continueView = false) noexcept;
 		void Refresh(bool available) noexcept;
 		void PublishHostParameters() noexcept;
 		[[nodiscard]] ParameterSourceBase* Find(const LabParameterId& id) noexcept;

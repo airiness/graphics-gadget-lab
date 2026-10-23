@@ -27,18 +27,34 @@ namespace gglab
 		GGLAB_ASSERT_MSG(!demo || serial != 0, "Bound content requires its owner's frame identity.");
 		if (demo != m_Demo || serial != m_ContentSerial)
 		{
+			bool continuing = false;
 			// Release source reservations while their previous content owner is alive.
 			for (auto& batch : m_ParameterBatches)
 			{
-				EndParameterBatch(*batch, true, "The content changed before the parameter frame.");
+				if (!batch->m_Status.IsTerminal() && batch->m_WaitingForContent && demo == m_Demo &&
+					demo && demo->GetParameterLabRuntime() == m_Lab &&
+					std::ranges::any_of(batch->m_Bindings, [&](const auto* source)
+					{
+						return source->ContinuesContentChange(batch->m_Status.m_BatchId, m_ContentSerial, serial);
+					}))
+				{
+					batch->m_Session = serial;
+					batch->m_WaitingForContent = false;
+					continuing = true;
+				}
+				else
+				{
+					EndParameterBatch(*batch, true, "The content changed before the parameter frame.");
+				}
 			}
-			m_Sources->Bind(demo, demo ? demo->GetParameterLabRuntime() : nullptr, serial);
-			if (m_Enabled && m_Demo && m_ParameterRevision != std::numeric_limits<uint64_t>::max())
+			m_Sources->Bind(demo, demo ? demo->GetParameterLabRuntime() : nullptr, serial, continuing);
+			if (!continuing && m_Enabled && m_Demo &&
+				m_ParameterRevision != std::numeric_limits<uint64_t>::max())
 			{
 				++m_ParameterRevision;
 			}
 			m_ContentSerial = serial;
-			m_ObservedLabRevision = 0;
+			m_ObservedLabRevision = continuing && m_Lab ? m_Lab->GetParameterRevision() : 0;
 		}
 		m_Demo = demo;
 		m_Lab = demo ? demo->GetParameterLabRuntime() : nullptr;
@@ -55,6 +71,32 @@ namespace gglab
 		if (m_Enabled)
 		{
 			RefreshSources();
+		}
+		for (auto& batch : m_ParameterBatches)
+		{
+			if (batch->m_Status.IsTerminal())
+			{
+				continue;
+			}
+			for (size_t index = 0; index < batch->m_Receipts.size(); ++index)
+			{
+				auto& receipt = batch->m_Receipts[index];
+				if (receipt.GetSnapshot().IsTerminal())
+				{
+					continue;
+				}
+				const auto observation = batch->m_Bindings[index]->ObserveLifetime(receipt.GetSnapshot().m_Identity);
+				if (observation.m_State == ParameterPublication::Failed)
+				{
+					GGLAB_UNUSED(receipt.Fail(observation.m_Failure));
+				}
+				else if (observation.m_State == ParameterPublication::Superseded)
+				{
+					EndParameterBatch(*batch, true, "The owning effect was superseded.");
+					break;
+				}
+			}
+			RefreshParameterBatchStatus(*batch);
 		}
 	}
 
@@ -165,11 +207,13 @@ namespace gglab
 			return false;
 		}
 		size_t deferredItems = 0;
+		bool hasRebuild = false;
 		for (const auto& value : values)
 		{
 			auto* source = m_Sources->Find(value.m_Id);
 			const auto& desc = candidate.Find(value.m_Id)->m_Desc;
 			deferredItems += GetParameterEffectClass(desc) == ParameterEffectClass::Deferred;
+			hasRebuild |= GetParameterEffectClass(desc) == ParameterEffectClass::Rebuild;
 			if (deferredItems > 1)
 			{
 				error = "At most one bound Deferred lighting item is supported per batch.";
@@ -183,6 +227,11 @@ namespace gglab
 				}
 				return false;
 			}
+		}
+		if (hasRebuild && deferredItems != 0)
+		{
+			error = "Rebuild transactions cannot include Deferred lighting bound to the old content.";
+			return false;
 		}
 		return true;
 	}
@@ -737,6 +786,13 @@ namespace gglab
 			{
 				application.m_Identity.m_Revision = revision;
 				GGLAB_UNUSED(receipt.RecordApplied(application.m_ActualClass, application.m_Identity, serial));
+				batch.m_Rebuilding |= application.m_ActualClass == ParameterEffectClass::Rebuild;
+				batch.m_WaitingForContent = batch.m_Rebuilding;
+				if (application.m_ActualClass == ParameterEffectClass::Rebuild)
+				{
+					batch.m_Status.m_Impact = std::max(batch.m_Status.m_Impact,
+						Find(receipt.GetSnapshot().m_Parameter)->m_Desc.m_Impact);
+				}
 			}
 		}
 		m_Sources->m_Domain.ObserveFrameEffects(batch.m_Domain);
@@ -782,7 +838,7 @@ namespace gglab
 		{
 			return;
 		}
-		const ParameterSourceFrame frame{ settings, view, lightingGeneration };
+		const ParameterSourceFrame frame{ settings, view, lightingGeneration, m_ContentSerial };
 		for (auto& entry : m_ParameterBatches)
 		{
 			auto& batch = *entry;
@@ -800,6 +856,11 @@ namespace gglab
 				}
 				const auto& requested = batch.m_Status.m_Values[index];
 				auto* source = batch.m_Bindings[index];
+				if (batch.m_WaitingForContent && !source->IsHost())
+				{
+					// The candidate owns Lab inputs; old-session frames cannot prove them.
+					continue;
+				}
 				if (source != m_Sources->Find(requested.m_Id) || !source->MatchesFrame(requested, frame))
 				{
 					GGLAB_UNUSED(receipt.Supersede());
@@ -810,7 +871,7 @@ namespace gglab
 					GGLAB_UNUSED(receipt.RecordNoChange(serial));
 					continue;
 				}
-				if (receipt.GetSnapshot().m_DeclaredClass == ParameterEffectClass::Deferred)
+				if (receipt.GetSnapshot().m_DeclaredClass != ParameterEffectClass::Immediate)
 				{
 					const auto identity = receipt.GetSnapshot().m_Identity;
 					auto observation = source->ObservePublication(identity, frame);
@@ -831,7 +892,8 @@ namespace gglab
 					}
 					continue;
 				}
-				auto application = m_Sources->m_Domain.ObserveImmediate(batch.m_Domain);
+				auto application = batch.m_Rebuilding ? ParameterApplication{} :
+					m_Sources->m_Domain.ObserveImmediate(batch.m_Domain);
 				if (!application.m_Failure.empty())
 				{
 					GGLAB_UNUSED(receipt.Fail(std::move(application.m_Failure)));
@@ -863,7 +925,9 @@ namespace gglab
 		{
 			frame.m_ActiveLighting.m_Profile = publication.m_Active;
 		}
-		if (frame.m_Available)
+		// Edit availability can close during candidate preparation or warmup. The
+		// owning sources still provide requested inputs for those transition frames.
+		if (m_Enabled && m_Demo)
 		{
 			for (const auto* source : m_Sources->Ordered())
 			{

@@ -166,6 +166,10 @@ namespace gglab
 			LabRuntime* m_ParameterRuntime = nullptr;
 			const SessionParameterControl* m_ParameterControl = nullptr;
 			uint32_t m_ParameterApplications = 0;
+			uint32_t m_ParameterSessionCreations = 0;
+			bool m_HoldParameterPreparation = false;
+			bool m_FailParameterPreparation = false;
+			bool m_FailParameterCreation = false;
 			std::function<void()> m_ParameterEffectCallback;
 			uint64_t m_ParameterBuiltSerial = 0;
 			float m_ParameterBuiltRadius = 0.0f;
@@ -1003,17 +1007,29 @@ namespace gglab
 					std::make_unique<FaultPipeline>(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)),
 				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)
 			{
+				++m_Probe.m_ParameterSessionCreations;
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("radius"),
 					.m_Name = "Radius", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f,
 					.m_MinValue = LabValue(0.0f), .m_MaxValue = LabValue(4.0f) }));
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("layout"),
 					.m_Name = "Layout", .m_Type = LabParameterType::UInt,
 					.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = uint32_t(1) }));
+				for (const auto& [name, impact] : std::array{
+					std::pair{ "scene-layout", LabChangeImpact::RebuildScene },
+					std::pair{ "pipeline-layout", LabChangeImpact::RecreatePipeline } })
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId(name),
+						.m_Name = name, .m_Type = LabParameterType::UInt,
+						.m_Impact = impact, .m_DefaultValue = uint32_t(1) }));
+				}
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("deferred"),
 					.m_Name = "Deferred", .m_Type = LabParameterType::Bool, .m_DefaultValue = false,
 					.m_EffectClass = ParameterEffectClass::Deferred }));
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("unprojected"),
 					.m_Name = "Unprojected", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("unbound-rebuild"),
+					.m_Name = "Unbound Rebuild", .m_Type = LabParameterType::Bool, .m_DefaultValue = false,
+					.m_EffectClass = ParameterEffectClass::Rebuild }));
 				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("rebake"),
 					.m_Name = "Misdeclared rebake", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
 				if (m_Probe.m_ProfileNamedLabBool)
@@ -1035,6 +1051,18 @@ namespace gglab
 						.m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(4096)),
 						.m_EffectClass = ParameterEffectClass::Deferred }));
 				}
+			}
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				if (m_Probe.m_FailParameterPreparation)
+				{
+					return { .m_Status = LoadingStatus::Failed, .m_Detail = "Injected Lab preparation failure." };
+				}
+				if (m_Probe.m_HoldParameterPreparation)
+				{
+					return { .m_Status = LoadingStatus::Preparing };
+				}
+				return LoadingProgress::Ready();
 			}
 			bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override
 			{
@@ -1167,6 +1195,10 @@ namespace gglab
 
 		std::unique_ptr<LabSessionBase> CreateParameterTestLab(const LabSessionCreateInfo& info) noexcept
 		{
+			if (static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe.m_FailParameterCreation)
+			{
+				return {};
+			}
 			return std::make_unique<ParameterTestLab>(info);
 		}
 
@@ -3832,6 +3864,168 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunRebuildParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& control = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &control;
+			runtime.EnableParameterControl();
+			std::string error;
+			const auto request = [&](std::string_view name, uint32_t value)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId(name), value } };
+					return runtime.RequestParameterBatch(values, error);
+				};
+			const auto created = probe.m_ParameterSessionCreations;
+			const auto originalIdentity = control.GetContentIdentity();
+			const auto revision = control.GetParameterRevision();
+			for (const auto& invalid : std::array{
+				LabParameterValue{ LabParameterId("unknown"), true },
+				LabParameterValue{ LabParameterId("radius"), 5.0f },
+				LabParameterValue{ LabParameterId("lighting"), uint32_t(2) } })
+			{
+				const std::array values{ LabParameterValue{ LabParameterId("layout"), uint32_t(2) },
+					LabParameterValue{ LabParameterId("view.exposure.ev100"), 2.0f }, invalid };
+				checks.Check(runtime.RequestParameterBatch(values, error) == 0 &&
+					control.GetParameterRevision() == revision && probe.m_ParameterSessionCreations == created,
+					"Invalid or old-World Deferred mixed rebuild batches reject before any source mutation");
+			}
+			const auto same = request("layout", 1);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = runtime.TakeParameterBatchResult(same);
+			checks.Check(unchanged && unchanged->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				!unchanged->m_Items[0].m_Published && !unchanged->m_Items[0].m_FirstConsumed &&
+				probe.m_ParameterSessionCreations == created && control.GetContentIdentity() == originalIdentity,
+				"Re-setting a Rebuild value starts no transition and preserves content identity");
+			probe.m_HoldParameterPreparation = true;
+			const std::array mixed{
+				LabParameterValue{ LabParameterId("layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("scene-layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("pipeline-layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 2.0f },
+				};
+			const auto batchId = runtime.RequestParameterBatch(mixed, error);
+			checks.Check(batchId != 0 && lab.GetActiveSession()->GetParameters().Get(
+				LabParameterId("layout"), uint32_t(0)) == 1, "Rebuild admission reserves without mutating the active Lab");
+			{
+				auto prepared = lab.PrepareParameterBatch(batchId, std::span(mixed).first(4), error);
+				checks.Check(prepared && prepared->HasChanges() && prepared->GetRebuildGeneration() == 0 &&
+					!lab.GetParameterRebuild() && probe.m_ParameterSessionCreations == created,
+					"Preparing and dropping a Rebuild plan creates no operation, candidate or source mutation");
+			}
+			bool completeCommit = false;
+			probe.m_ParameterEffectCallback = [&]()
+				{
+					completeCommit = control.GetParameterBatchStatus()->m_State == ParameterBatchState::Applying &&
+						control.GetLabParameters()->Get(LabParameterId("layout"), uint32_t(0)) == 2 &&
+						control.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == 2.0f;
+				};
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* preparing = control.GetParameterBatchStatus();
+			checks.Check(completeCommit && preparing && !preparing->IsTerminal() && lab.HasPendingSession() &&
+				probe.m_ParameterSessionCreations == created + 1 &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 1.0f &&
+				control.GetLabParameters()->Get(LabParameterId("radius"), 0.0f) == 2.0f,
+				"One candidate owns all requested Lab values while the old active World retains its inputs");
+			const auto generation = preparing->m_Items[0].m_Identity;
+			const auto batchRevision = preparing->m_Revision;
+			const auto transitionFrame = control.CaptureFrameState(probe.m_ParameterBuiltSerial, 0, 0);
+			const auto requestedRadius = std::ranges::find(transitionFrame.m_Values,
+				std::string("radius"), &ParameterFrameValue::m_Id);
+			checks.Check(!transitionFrame.m_Available && requestedRadius != transitionFrame.m_Values.end() &&
+				std::get<float>(requestedRadius->m_Value) == 2.0f && probe.m_ParameterBuiltRadius == 1.0f,
+				"Closed edit admission does not erase the transition frame's requested candidate values");
+			checks.Check(generation.m_Domain == "lab-session" && generation.m_Generation != 0 &&
+				preparing->m_Items[0].m_Applied && !preparing->m_Items[0].m_Published &&
+				!preparing->m_Items[3].m_FirstConsumed && preparing->m_Items[4].m_FirstConsumed,
+				"Rebuild and Lab Immediate receipts await activation; Host Immediate consumption uses its actual old-session frame");
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(probe.m_ParameterSessionCreations == created + 1 &&
+				control.GetContentIdentity() == originalIdentity && !control.GetParameterBatchStatus()->IsTerminal(),
+				"Repeated old-session frames neither restart the operation nor consume its candidate");
+			probe.m_HoldParameterPreparation = false;
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* published = control.GetParameterBatchStatus();
+			checks.Check(published && !published->IsTerminal() && published->m_Revision == batchRevision &&
+				published->m_Items[0].m_Identity == generation && published->m_Items[0].m_Published &&
+				!published->m_Items[0].m_FirstConsumed && control.GetContentIdentity() != originalIdentity &&
+				probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == 2.0f,
+				"Owned activation continues the batch and Host overrides; an aborted target frame proves publication only");
+			const auto publishedFrame = published->m_Items[0].m_Published;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto consumed = runtime.TakeParameterBatchResult(batchId);
+			checks.Check(consumed && consumed->m_State == ParameterBatchState::Finished &&
+				std::ranges::all_of(consumed->m_Items, [](const auto& item)
+				{
+					return item.m_State == ParameterEffectState::Consumed;
+				}) && consumed->m_Items[0].m_Published == publishedFrame &&
+				consumed->m_Items[0].m_FirstConsumed == probe.m_ParameterBuiltSerial &&
+				consumed->m_Items[0].m_FirstConsumed > publishedFrame &&
+				probe.m_ParameterSessionCreations == created + 1 && probe.m_ParameterBuiltRadius == 2.0f,
+				"Retry consumption matches the target operation and retains first publication without recreating the session");
+			for (const auto name : { "scene-layout", "pipeline-layout", "layout" })
+			{
+				const auto id = request(name, 3);
+				GGLAB_UNUSED(runtime.Tick());
+				GGLAB_UNUSED(runtime.Tick());
+				const auto result = runtime.TakeParameterBatchResult(id);
+				checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::Consumed &&
+					result->m_Items[0].m_FirstConsumed == probe.m_ParameterBuiltSerial,
+					"Each Rebuild impact follows the owned session transition and matching successful submission");
+			}
+			probe.m_HoldParameterPreparation = true;
+			const auto failedId = request("layout", 4);
+			GGLAB_UNUSED(runtime.Tick());
+			probe.m_FailParameterPreparation = true;
+			probe.m_FrameBeginUnavailable = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto failed = runtime.TakeParameterBatchResult(failedId);
+			checks.Check(failed && failed->m_State == ParameterBatchState::Failed &&
+				!failed->m_Items[0].m_Published && !failed->m_Items[0].m_FirstConsumed &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("layout"), uint32_t(0)) == 3,
+				"Preparation failure closes the receipt without an RHI frame and preserves the old active Lab");
+			probe.m_FailParameterPreparation = false;
+			probe.m_FrameBeginUnavailable = false;
+			probe.m_FailParameterCreation = true;
+			const auto creationId = request("layout", 4);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto creationFailure = runtime.TakeParameterBatchResult(creationId);
+			checks.Check(creationFailure && creationFailure->m_State == ParameterBatchState::Failed &&
+				!creationFailure->m_Items[0].m_FirstConsumed && !lab.HasPendingSession() &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("layout"), uint32_t(0)) == 3,
+				"Candidate factory failure is an explicit failed effect and leaves the old Lab intact");
+			probe.m_FailParameterCreation = false;
+			const auto supersededId = request("layout", 5);
+			GGLAB_UNUSED(runtime.Tick());
+			probe.m_HoldParameterPreparation = false;
+			probe.m_FrameBeginUnavailable = true;
+			lab.RequestRestartSession();
+			GGLAB_UNUSED(runtime.Tick());
+			const auto superseded = runtime.TakeParameterBatchResult(supersededId);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!superseded->m_Items[0].m_FirstConsumed,
+				"An unrelated restart cannot inherit the operation even when no renderer frame is available");
+			probe.m_FrameBeginUnavailable = false;
+			probe.m_HoldParameterPreparation = true;
+			const auto shutdownId = request("layout", 6);
+			GGLAB_UNUSED(runtime.Tick());
+			runtime.Shutdown();
+			const auto stopped = runtime.TakeParameterBatchResult(shutdownId);
+			checks.Check(stopped && stopped->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				!stopped->m_Items[0].m_FirstConsumed, "Shutdown closes the pending operation without invented consumption");
+		}
+
 		void RunParameterFrameScenario(SelfTestContext& checks, const std::filesystem::path& root,
 			bool fatalSubmission)
 		{
@@ -3858,7 +4052,8 @@ namespace gglab
 				LabParameterValue{ LabParameterId("unknown"), true },
 				LabParameterValue{ LabParameterId("radius"), int32_t(2) },
 				LabParameterValue{ LabParameterId("radius"), 5.0f },
-				LabParameterValue{ LabParameterId("layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("unprojected"), 2.0f },
+				LabParameterValue{ LabParameterId("unbound-rebuild"), true },
 				LabParameterValue{ LabParameterId("deferred"), true } })
 			{
 				const std::array values{ LabParameterValue{ LabParameterId("radius"), 2.0f }, invalid };
@@ -5011,6 +5206,7 @@ namespace gglab
 		RunPendingParameterBatchScenario(context, root / "pending-parameter-batches");
 		RunInheritedLightingScenario(context, root / "inherited-lighting");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
+		RunRebuildParameterScenario(context, root / "parameter-rebuild");
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);
 		RunFrameOutcomeScenarios(context, root / "outcomes");
 		RunOwnedJobRoutingScenario(context, root / "owned-job-routing");

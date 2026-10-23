@@ -26,8 +26,8 @@ The GTAO fixture covers texture-IBL cache restoration; Atmosphere Range covers
 Physical Sky, whose current producer deliberately skips texture caches.
 
 Host `environment.profile` selects content-registered Physical Sky inputs.
-Arbitrary authored sun/atmosphere parameter bindings, rebuild transactions and
-parameter metadata in saved frame artifacts remain separate work. Bound Deferred
+The bounded authored sun fixture is described below. Frozen parameter metadata is
+saved with frame artifacts. Bound Deferred
 sequence events follow [Sequences](sequences.md#parameter-events).
 `set` rejects during an active sequence; a new
 sequence rejects while a parameter batch is pending. Do not use external `set`
@@ -46,7 +46,8 @@ Defaults inherit the active content plus the frame owner's copied tooling overri
 Host current values additionally include committed Host overrides. Only explicitly
 changed Host fields become overrides. NoChange leaves an inherited field
 inherited. Overrides last for the active content identity and clear on content
-replacement/restart; this extension has no unset/reset verb. A mixed batch may
+replacement/restart, except for the owned Rebuild continuation described below;
+this extension has no unset/reset verb. A mixed batch may
 set Host and Lab values atomically; one invalid item rejects all sources.
 Lab values apply first, then Host display-view overrides take precedence.
 Other render views retain their content settings. Exposure and pre-exposure are
@@ -59,7 +60,7 @@ legacy sequence overrides. Reference sampling continues to force temporal AA and
 temporal GTAO inactive. Legacy sequence values use the shared Runtime typed settings operations,
 are temporary, and do not replace session Host values. External `set` remains
 blocked throughout a sequence. Immediate events use the same Session transaction owner;
-see [Sequences](sequences.md#immediate-parameter-events).
+see [Sequences](sequences.md#parameter-events).
 
 Immediate NoChange is checked against frozen frame inputs before becoming
 terminal. A changed or unchanged stored Lab value masked by Host/tooling, or
@@ -73,6 +74,42 @@ perspective and TAA enabled. Preview tap, camera input/FOV and Immediate fields
 without a source projection are unavailable through session `set`. The existing
 Lab interactive controls retain their owning-domain behavior. Deferred lighting
 bindings retain their separate generation/publication evidence.
+
+## Rebuild transactions outside sequences
+
+`capabilities.sessionParameterControl.effectClasses` includes `Rebuild`. Descriptors
+with `RebuildScene`, `RecreatePipeline` or `RestartSession` impact use the existing
+Lab candidate preparation, activation and fence-retirement path. Multiple changed
+Rebuild items in one batch produce one operation with the maximum changed impact;
+the response reports that actual `impact`. Setting unchanged Rebuild items starts
+no operation and returns `NoChange` with no publication or consumption stamp.
+
+The external client's ordinary `set` supports Rebuild items mixed with supported
+Lab/Host Immediate items. Rebuild plus Deferred lighting rejects the complete
+batch before mutation: those lighting bindings belong to the old World. Sequence
+events continue to reject Rebuild. Use `-WaitConsumed` and inspect all terminal
+items, since default waiting can return while the candidate is preparing.
+
+Requested Lab storage belongs to the operation while the old active Lab retains
+its inputs. Frame snapshots retain requested values while edit admission is closed
+during preparation/warmup. Lab Immediate companions wait for the target activation's frame proof;
+Host Immediate items report their actual consumption, which can precede activation.
+Host view overrides survive this owned continuation, including explicit values in
+the mixed batch. Unrelated replacement/restart still clears them normally.
+
+Changed Rebuild receipts use `identity.domain: lab-session` and a Runtime-owned
+operation generation. The exact candidate activation supplies publication evidence;
+only a matching built and successfully submitted target frame supplies
+`firstConsumed`. Aborted target frames retain publication and retry without another
+operation. Factory/preparation failures end explicitly and preserve the old active
+Lab; committed Host values are not rolled back. Unrelated switches supersede the
+wait, and shutdown closes unresolved items without invented consumption.
+
+`RunVerification.ps1 -Suite session-rebuild-parameters` exercises
+`forward_plus.fixture` transitions through zero, one and 64 local lights, checks
+retained result ownership and NoChange, and compares actual built scene counts and
+frozen image/graph parameter metadata on both RHIs. Headless fault tests cover the
+three impacts, mixed preparation/drop, failure, abort/retry and lifetime invalidation.
 
 ## Content-registered lighting profiles
 
@@ -251,9 +288,9 @@ Process termination ends retention. LabRuntime owns its safe queued mutation,
 without holding a second result or receipt cache.
 
 `batch` includes source (`host`, `lab` or `mixed`)/content, state (`Queued`, `Applying`, `Finished`,
-`Failed`), revision (null until application), fixed supported impact `Immediate`,
-owned `values`, `items`, failure and terminal/success indicators. The impact
-means no Lab rebuild; it is independent of the per-item effect class. Each effect item
+`Failed`), revision (null until application), actual changed Lab impact,
+owned `values`, `items`, failure and terminal/success indicators. `Immediate`
+impact means no Lab rebuild; it is independent of the per-item effect class. Each effect item
 reports its declared class, actual revision/domain/generation identity, state,
 requested/applied/published/firstConsumed stamps and failure. Immediate
 `published == applied`; only the exact successfully submitted frame state can

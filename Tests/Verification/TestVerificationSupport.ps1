@@ -220,6 +220,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'sequence-parameter-events' = 'TestSequenceParameterEvents.ps1'
         'sequence-deferred-events' = 'TestDeferredSequenceEvents.ps1'
         'lab-sun-parameters' = 'TestLabSunParameters.ps1'
+        'session-rebuild-parameters' = 'TestRebuildParameters.ps1'
         'session-host-parameters' = 'TestHostParameters.ps1'
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'

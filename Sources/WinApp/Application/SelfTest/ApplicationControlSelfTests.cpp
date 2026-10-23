@@ -131,6 +131,11 @@ namespace gglab
 				status["capabilities"]["sessionParameterControl"]["maxBatches"] == 1,
 				"The additive session capability discovers host and mixed-source control without changing protocol v4");
 			batch.m_Source = "mixed";
+			batch.m_Impact = LabChangeImpact::RebuildScene;
+			context.Check(SerializeApplicationControlParameterBatch(batch)["impact"] == "RebuildScene" &&
+				status["capabilities"]["sessionParameterControl"]["effectClasses"].back() == "Rebuild" &&
+				!status["capabilities"]["sessionParameterControl"]["rebuildWithDeferred"],
+				"Rebuild discovery and batch responses preserve supported effect classes and actual change impact");
 			context.Check(SerializeApplicationControlParameterBatch(batch)["source"] == "mixed" &&
 				SerializeApplicationControlParameterBatch(batch)["contentId"] == "gglab.lab.fixture",
 				"A mixed-source receipt retains its captured content identity");

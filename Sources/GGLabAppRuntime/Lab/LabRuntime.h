@@ -63,6 +63,7 @@ namespace gglab
 			PreparedParameterBatch(const PreparedParameterBatch&) = delete;
 			PreparedParameterBatch& operator=(const PreparedParameterBatch&) = delete;
 			[[nodiscard]] bool HasChanges() const noexcept { return m_HasChanges; }
+			[[nodiscard]] uint64_t GetRebuildGeneration() const noexcept { return m_RebuildGeneration; }
 			[[nodiscard]] bool HasWorldLightingChanges() const noexcept
 			{
 				return m_WorldLightingMutation && m_WorldLightingMutation->HasChanges();
@@ -79,6 +80,8 @@ namespace gglab
 			LightingMutationResult m_WorldLightingEvidence;
 			uint64_t m_Id = 0;
 			uint64_t m_Revision = 0;
+			uint64_t m_RebuildGeneration = 0;
+			LabChangeImpact m_Impact = LabChangeImpact::Immediate;
 			uint32_t m_SessionSerial = 0;
 			bool m_HasChanges = false;
 			bool m_Committed = false;
@@ -102,6 +105,29 @@ namespace gglab
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		void CancelParameterBatch(uint64_t id) noexcept;
 		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
+		enum class ParameterRebuildState : uint8_t
+		{
+			Preparing,
+			Published,
+			Failed,
+			Superseded,
+		};
+		struct ParameterRebuild
+		{
+			// This generation identifies an owned operation, not a predicted activation serial.
+			uint64_t m_Generation = 0;
+			uint64_t m_BatchId = 0;
+			uint32_t m_SourceSession = 0;
+			uint32_t m_TargetSession = 0;
+			ParameterRebuildState m_State = ParameterRebuildState::Preparing;
+			LabParameterSet m_Parameters;
+			std::string m_Failure;
+		};
+		[[nodiscard]] const ParameterRebuild* GetParameterRebuild() const noexcept
+		{
+			return m_ParameterRebuild ? &*m_ParameterRebuild : nullptr;
+		}
+		[[nodiscard]] const LabParameterSet* GetParameterSourceParameters() const noexcept;
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
 		void ProcessPendingCommands() noexcept;
 		void TickTransitions() noexcept;
@@ -142,7 +168,7 @@ namespace gglab
 			std::span<const LabParameterValue> values, std::string& error) const noexcept;
 		bool BeginSessionTransition(const LabId& id,
 			std::span<const LabParameterValue> values = {},
-			std::span<const LabParameterAssignment> assignments = {}) noexcept;
+			std::span<const LabParameterAssignment> assignments = {}, uint64_t parameterRebuild = 0) noexcept;
 		bool CommitPendingSession() noexcept;
 		bool RestartActiveSessionWithValues(std::span<const LabParameterValue> values) noexcept;
 		void PollRetiringSessions() noexcept;
@@ -151,6 +177,9 @@ namespace gglab
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;
 
 		uint64_t m_ParameterRevision = 1;
+		uint64_t m_NextParameterRebuild = 1;
+		uint64_t m_PendingParameterRebuild = 0;
+		std::optional<ParameterRebuild> m_ParameterRebuild;
 
 		LabSessionCreateInfo m_CreateInfo{};
 		LabCatalog m_Catalog;

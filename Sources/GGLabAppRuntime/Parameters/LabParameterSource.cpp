@@ -32,6 +32,18 @@ namespace gglab
 			ParameterDomainState& domain) const noexcept override
 		{
 			const auto* parameter = m_Owner.GetParameters()->Find(id);
+			if (GetParameterEffectClass(parameter->m_Desc) == ParameterEffectClass::Rebuild)
+			{
+				const auto generation = m_Prepared.GetRebuildGeneration();
+				if (!IsChanged(id) || generation == 0)
+				{
+					return { .m_NoChange = true };
+				}
+				const ParameterStateIdentity identity{ .m_Domain = "lab-session", .m_Generation = generation };
+				const auto lifetime = m_Owner.ObserveLifetime(identity);
+				return { .m_ActualClass = ParameterEffectClass::Rebuild, .m_Identity = identity,
+					.m_Failure = lifetime.m_Failure };
+			}
 			if (GetParameterEffectClass(parameter->m_Desc) != ParameterEffectClass::Deferred)
 			{
 				return { .m_NoChange = !IsChanged(id) };
@@ -48,8 +60,7 @@ namespace gglab
 
 	const LabParameterSet* LabParameterSource::GetParameters() const noexcept
 	{
-		const auto* session = m_Lab ? m_Lab->GetActiveSession() : nullptr;
-		return session ? &session->GetParameters() : nullptr;
+		return m_Lab ? m_Lab->GetParameterSourceParameters() : nullptr;
 	}
 
 	bool LabParameterSource::Supports(const LabParameterDesc& desc) const noexcept
@@ -78,6 +89,56 @@ namespace gglab
 	{
 		auto prepared = m_Lab->PrepareParameterBatch(id, values, error, m_Control, m_Identity);
 		return prepared ? std::make_unique<Prepared>(*this, std::move(*prepared), values) : nullptr;
+	}
+
+	bool LabParameterSource::ContinuesContentChange(uint64_t batch,
+		uint64_t previous, uint64_t current) const noexcept
+	{
+		const auto* rebuild = m_Lab ? m_Lab->GetParameterRebuild() : nullptr;
+		return rebuild && rebuild->m_BatchId == batch &&
+			rebuild->m_State == LabRuntime::ParameterRebuildState::Published &&
+			(previous >> 32) == (current >> 32) &&
+			static_cast<uint32_t>(previous) == rebuild->m_SourceSession &&
+			static_cast<uint32_t>(current) == rebuild->m_TargetSession;
+	}
+
+	ParameterPublicationObservation LabParameterSource::ObserveLifetime(
+		const ParameterStateIdentity& identity) const noexcept
+	{
+		if (identity.m_Domain != "lab-session")
+		{
+			return {};
+		}
+		const auto* rebuild = m_Lab ? m_Lab->GetParameterRebuild() : nullptr;
+		if (!rebuild || rebuild->m_Generation != identity.m_Generation ||
+			rebuild->m_State == LabRuntime::ParameterRebuildState::Superseded)
+		{
+			return { .m_State = ParameterPublication::Superseded };
+		}
+		if (rebuild->m_State == LabRuntime::ParameterRebuildState::Failed)
+		{
+			return { .m_State = ParameterPublication::Failed, .m_Failure = rebuild->m_Failure };
+		}
+		return {};
+	}
+
+	ParameterPublicationObservation LabParameterSource::ObservePublication(
+		const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept
+	{
+		if (identity.m_Domain != "lab-session")
+		{
+			return m_Domain.ObservePublication(identity, frame);
+		}
+		auto observation = ObserveLifetime(identity);
+		const auto* rebuild = m_Lab ? m_Lab->GetParameterRebuild() : nullptr;
+		if (observation.m_State == ParameterPublication::Pending && rebuild &&
+			rebuild->m_State == LabRuntime::ParameterRebuildState::Published &&
+			frame.m_ContentIdentity == m_Identity &&
+			static_cast<uint32_t>(frame.m_ContentIdentity) == rebuild->m_TargetSession)
+		{
+			observation.m_State = ParameterPublication::Published;
+		}
+		return observation;
 	}
 
 	bool LabParameterSource::MatchesFrame(const LabParameterValue& value,

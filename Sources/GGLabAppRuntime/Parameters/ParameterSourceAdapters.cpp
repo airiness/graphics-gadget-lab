@@ -10,9 +10,13 @@ namespace gglab
 	{
 	}
 
-	void ParameterSourceAdapters::Bind(DemoBase* demo, LabRuntime* lab, uint64_t identity) noexcept
+	void ParameterSourceAdapters::Bind(DemoBase* demo, LabRuntime* lab,
+		uint64_t identity, bool continueView) noexcept
 	{
-		m_View.Bind(demo);
+		if (!continueView)
+		{
+			m_View.Bind(demo);
+		}
 		m_Lab.Bind(lab, identity);
 		m_Profiles.Bind(demo, identity);
 		m_HostParameters = {};

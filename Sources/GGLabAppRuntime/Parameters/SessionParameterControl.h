@@ -118,6 +118,8 @@ namespace gglab
 			uint64_t m_Session = 0;
 			uint64_t m_FrameSerial = 0;
 			ParameterDomainState m_Domain;
+			bool m_Rebuilding = false;
+			bool m_WaitingForContent = false;
 		};
 		std::unique_ptr<ParameterSourceAdapters> m_Sources;
 		DemoBase* m_Demo = nullptr;

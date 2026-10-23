@@ -9,8 +9,10 @@ namespace gglab
 	bool LabRuntime::SupportsParameterEffect(const LabParameterDesc& desc) const noexcept
 	{
 		const auto effect = GetParameterEffectClass(desc);
-		return (effect == ParameterEffectClass::Immediate && m_ActiveSession &&
-			m_ActiveSession->SupportsImmediateParameter(desc.m_Id)) ||
+		return (effect == ParameterEffectClass::Rebuild && desc.m_Impact != LabChangeImpact::Immediate &&
+			m_ActiveSession) ||
+			(effect == ParameterEffectClass::Immediate && m_ActiveSession &&
+				m_ActiveSession->SupportsImmediateParameter(desc.m_Id)) ||
 			(effect == ParameterEffectClass::Deferred && m_ActiveSession &&
 				(m_ActiveSession->SupportsDeferredLightingParameter(desc.m_Id) ||
 					m_ActiveSession->SupportsWorldLightingParameter(desc.m_Id)));
@@ -48,11 +50,18 @@ namespace gglab
 			if (!SupportsParameterEffect(desc) || lightingItems > 1)
 			{
 				error = "Unsupported effect: Immediate items require a frame projection; "
-					"at most one bound Deferred lighting item is supported; rebuild effects are unsupported.";
+					"at most one bound Deferred lighting item is supported.";
 				return std::nullopt;
 			}
 		}
 		prepared.m_HasChanges = !applied->m_Changed.empty();
+		prepared.m_Impact = applied->m_Impact;
+		if (prepared.m_Impact != LabChangeImpact::Immediate &&
+			(lightingItems != 0 || m_NextParameterRebuild == 0))
+		{
+			error = "Rebuild transactions cannot include Deferred lighting or exhaust operation identity capacity.";
+			return std::nullopt;
+		}
 		return prepared;
 	}
 
@@ -126,7 +135,22 @@ namespace gglab
 		{
 			prepared.m_WorldLightingEvidence = prepared.m_WorldLightingMutation->Commit();
 		}
-		m_ActiveSession->CommitPreparedParameters(std::move(prepared.m_Parameters));
+		if (prepared.m_Impact != LabChangeImpact::Immediate)
+		{
+			// Requested storage belongs to the operation until its candidate activates.
+			// Rendering the old session while assets load must still use its old inputs.
+			prepared.m_RebuildGeneration = m_NextParameterRebuild++;
+			m_ParameterRebuild = ParameterRebuild{
+				.m_Generation = prepared.m_RebuildGeneration,
+				.m_BatchId = prepared.m_Id,
+				.m_SourceSession = m_TemporalSessionSerial,
+				.m_Parameters = std::move(prepared.m_Parameters),
+			};
+		}
+		else
+		{
+			m_ActiveSession->CommitPreparedParameters(std::move(prepared.m_Parameters));
+		}
 		if (prepared.m_HasChanges)
 		{
 			++m_ParameterRevision;
@@ -142,6 +166,17 @@ namespace gglab
 			m_ParameterRevision == prepared.m_Revision + (prepared.m_HasChanges ? 1 : 0) &&
 			prepared.m_Committed && prepared.m_Id != 0);
 		prepared.m_Id = 0;
+		if (prepared.m_RebuildGeneration != 0)
+		{
+			const auto values = m_ParameterRebuild->m_Parameters.CaptureRestoredValues();
+			if (!BeginSessionTransition(m_ActiveSession->GetDescriptor().m_Id, values, {},
+				prepared.m_RebuildGeneration))
+			{
+				m_ParameterRebuild->m_State = ParameterRebuildState::Failed;
+				m_ParameterRebuild->m_Failure = m_LastError;
+			}
+			return std::nullopt;
+		}
 		if (prepared.m_HasChanges)
 		{
 			m_ActiveSession->ApplyImmediateParameters();
@@ -167,5 +202,14 @@ namespace gglab
 		CommitParameterBatch(*prepared);
 		GGLAB_UNUSED(ApplyParameterBatchEffects(std::move(*prepared)));
 		return true;
+	}
+
+	const LabParameterSet* LabRuntime::GetParameterSourceParameters() const noexcept
+	{
+		if (m_ParameterRebuild && m_ParameterRebuild->m_State == ParameterRebuildState::Preparing)
+		{
+			return &m_ParameterRebuild->m_Parameters;
+		}
+		return m_ActiveSession ? &m_ActiveSession->GetParameters() : nullptr;
 	}
 }

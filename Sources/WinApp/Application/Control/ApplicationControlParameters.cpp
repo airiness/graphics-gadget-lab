@@ -303,7 +303,7 @@ namespace gglab
 			{ "terminal", batch.IsTerminal() },
 			{ "succeeded", batch.IsTerminal() ? Json(succeeded) : Json() },
 			{ "revision", batch.m_Revision == 0 ? Json() : Json(batch.m_Revision) },
-			{ "impact", "Immediate" },
+			{ "impact", Impact(batch.m_Impact) },
 			{ "values", std::move(values) },
 			{ "items", std::move(items) },
 			{ "failure", batch.m_Failure } };
