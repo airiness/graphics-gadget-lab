@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "GGLabRuntime/Graphics/LightingMutationResult.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "Lab/LabParameter.h"
@@ -12,8 +13,10 @@
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
+#include <string>
 
 namespace gglab
 {
@@ -69,6 +72,24 @@ namespace gglab
 			const LabParameterId& id) noexcept
 		{
 			GGLAB_UNUSED(id);
+			return {};
+		}
+		[[nodiscard]] virtual bool SupportsWorldLightingParameter(const LabParameterId& id) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			return false;
+		}
+		// Read-only preparation from the candidate value at the synchronized safe
+		// boundary. The batch commits this plan before any Lab callbacks run.
+		[[nodiscard]] virtual std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingParameter(
+			const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+			uint64_t contentIdentity, std::string& error) noexcept
+		{
+			GGLAB_UNUSED(id);
+			GGLAB_UNUSED(value);
+			GGLAB_UNUSED(control);
+			GGLAB_UNUSED(contentIdentity);
+			error = "The Lab has no prepared World Lighting parameter binding.";
 			return {};
 		}
 		// Session Immediate controls require an explicit source-owned projection.

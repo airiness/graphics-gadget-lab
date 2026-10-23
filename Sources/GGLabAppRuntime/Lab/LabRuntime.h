@@ -7,6 +7,8 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -61,6 +63,10 @@ namespace gglab
 			PreparedParameterBatch(const PreparedParameterBatch&) = delete;
 			PreparedParameterBatch& operator=(const PreparedParameterBatch&) = delete;
 			[[nodiscard]] bool HasChanges() const noexcept { return m_HasChanges; }
+			[[nodiscard]] bool HasWorldLightingChanges() const noexcept
+			{
+				return m_WorldLightingMutation && m_WorldLightingMutation->HasChanges();
+			}
 
 		private:
 			friend class LabRuntime;
@@ -69,6 +75,8 @@ namespace gglab
 			LabSessionBase* m_Session = nullptr;
 			LabParameterSet m_Parameters;
 			std::optional<LabParameterId> m_LightingParameter;
+			std::unique_ptr<PreparedWorldLightingMutationBase> m_WorldLightingMutation;
+			LightingMutationResult m_WorldLightingEvidence;
 			uint64_t m_Id = 0;
 			uint64_t m_Revision = 0;
 			uint32_t m_SessionSerial = 0;
@@ -80,7 +88,8 @@ namespace gglab
 		// mutate the session. Discarding a plan leaves that reservation unchanged.
 		// Commit installs values without invoking Lab callbacks.
 		[[nodiscard]] std::optional<PreparedParameterBatch> PrepareParameterBatch(uint64_t id,
-			std::span<const LabParameterValue> values, std::string& error) const noexcept;
+			std::span<const LabParameterValue> values, std::string& error,
+			WorldLightingControlBase* worldLighting = nullptr, uint64_t contentIdentity = 0) const noexcept;
 		void CommitParameterBatch(PreparedParameterBatch& prepared) noexcept;
 		struct LightingParameterEffect
 		{

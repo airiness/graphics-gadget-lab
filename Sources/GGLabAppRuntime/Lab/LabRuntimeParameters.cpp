@@ -12,7 +12,8 @@ namespace gglab
 		return (effect == ParameterEffectClass::Immediate && m_ActiveSession &&
 			m_ActiveSession->SupportsImmediateParameter(desc.m_Id)) ||
 			(effect == ParameterEffectClass::Deferred && m_ActiveSession &&
-				m_ActiveSession->SupportsDeferredLightingParameter(desc.m_Id));
+				(m_ActiveSession->SupportsDeferredLightingParameter(desc.m_Id) ||
+					m_ActiveSession->SupportsWorldLightingParameter(desc.m_Id)));
 	}
 
 	std::optional<LabRuntime::PreparedParameterBatch> LabRuntime::PrepareParameterValues(
@@ -77,7 +78,8 @@ namespace gglab
 	}
 
 	std::optional<LabRuntime::PreparedParameterBatch> LabRuntime::PrepareParameterBatch(uint64_t id,
-		std::span<const LabParameterValue> values, std::string& error) const noexcept
+		std::span<const LabParameterValue> values, std::string& error,
+		WorldLightingControlBase* worldLighting, uint64_t contentIdentity) const noexcept
 	{
 		if (!m_CommandQueue.HasParameterBatch(id))
 		{
@@ -88,6 +90,24 @@ namespace gglab
 		if (prepared)
 		{
 			prepared->m_Id = id;
+			if (prepared->m_LightingParameter &&
+				m_ActiveSession->SupportsWorldLightingParameter(*prepared->m_LightingParameter))
+			{
+				if (!worldLighting || contentIdentity == 0)
+				{
+					error = "A World Lighting Lab batch requires the Session's control and content identity.";
+					return std::nullopt;
+				}
+				prepared->m_WorldLightingMutation = m_ActiveSession->PrepareWorldLightingParameter(
+					*prepared->m_LightingParameter,
+					prepared->m_Parameters.Find(*prepared->m_LightingParameter)->m_Value,
+					*worldLighting, contentIdentity, error);
+				if (!prepared->m_WorldLightingMutation)
+				{
+					return std::nullopt;
+				}
+				prepared->m_HasChanges |= prepared->HasWorldLightingChanges();
+			}
 		}
 		return prepared;
 	}
@@ -102,6 +122,10 @@ namespace gglab
 		const bool consumed = m_CommandQueue.ConsumeParameterBatch(prepared.m_Id);
 		GGLAB_ASSERT(consumed);
 		GGLAB_UNUSED(consumed);
+		if (prepared.m_WorldLightingMutation)
+		{
+			prepared.m_WorldLightingEvidence = prepared.m_WorldLightingMutation->Commit();
+		}
 		m_ActiveSession->CommitPreparedParameters(std::move(prepared.m_Parameters));
 		if (prepared.m_HasChanges)
 		{
@@ -126,7 +150,8 @@ namespace gglab
 		if (prepared.m_LightingParameter)
 		{
 			return LightingParameterEffect{ *prepared.m_LightingParameter,
-				m_ActiveSession->ApplyDeferredLightingParameter(*prepared.m_LightingParameter) };
+				prepared.m_WorldLightingMutation ? prepared.m_WorldLightingEvidence :
+					m_ActiveSession->ApplyDeferredLightingParameter(*prepared.m_LightingParameter) };
 		}
 		return std::nullopt;
 	}

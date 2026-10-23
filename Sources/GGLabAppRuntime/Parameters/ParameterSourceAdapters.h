@@ -45,8 +45,13 @@ namespace gglab
 	class LabParameterSource final : public ParameterSourceBase
 	{
 	public:
-		explicit LabParameterSource(LightingParameterDomain& domain) noexcept : m_Domain(domain) {}
-		void Bind(LabRuntime* lab) noexcept { m_Lab = lab; }
+		LabParameterSource(WorldLightingControlBase* control, LightingParameterDomain& domain) noexcept :
+			m_Control(control), m_Domain(domain) {}
+		void Bind(LabRuntime* lab, uint64_t identity) noexcept
+		{
+			m_Lab = lab;
+			m_Identity = identity;
+		}
 		[[nodiscard]] bool IsHost() const noexcept override { return false; }
 		[[nodiscard]] const LabParameterSet* GetParameters() const noexcept override;
 		[[nodiscard]] bool Supports(const LabParameterDesc& desc) const noexcept override;
@@ -71,8 +76,10 @@ namespace gglab
 
 	private:
 		class Prepared;
+		WorldLightingControlBase* m_Control = nullptr;
 		LightingParameterDomain& m_Domain;
 		LabRuntime* m_Lab = nullptr;
+		uint64_t m_Identity = 0;
 	};
 
 	class LightingProfileParameterSource final : public ParameterSourceBase

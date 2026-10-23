@@ -6,14 +6,14 @@ namespace gglab
 {
 	ParameterSourceAdapters::ParameterSourceAdapters(RenderEnvironmentAccess& environment,
 		WorldLightingControlBase* worldLighting, HostViewParameterSource::ViewResolver resolver) noexcept :
-		m_Domain(environment), m_View(std::move(resolver)), m_Lab(m_Domain), m_Profiles(worldLighting, m_Domain)
+		m_Domain(environment), m_View(std::move(resolver)), m_Lab(worldLighting, m_Domain), m_Profiles(worldLighting, m_Domain)
 	{
 	}
 
 	void ParameterSourceAdapters::Bind(DemoBase* demo, LabRuntime* lab, uint64_t identity) noexcept
 	{
 		m_View.Bind(demo);
-		m_Lab.Bind(lab);
+		m_Lab.Bind(lab, identity);
 		m_Profiles.Bind(demo, identity);
 		m_HostParameters = {};
 	}

@@ -30,6 +30,10 @@ namespace gglab
 		[[nodiscard]] bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override;
 		[[nodiscard]] LightingMutationResult ApplyDeferredLightingParameter(
 			const LabParameterId& id) noexcept override;
+		[[nodiscard]] bool SupportsWorldLightingParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingParameter(
+			const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+			uint64_t contentIdentity, std::string& error) noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -40,6 +44,8 @@ namespace gglab
 		bool RefreshInheritedParameters() noexcept override;
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		ModelID m_PendingModelId{};
+		entt::entity m_SunEntity = entt::null;
+		Vector3 m_SunHorizontalDirection = Vector3::Forward;
 		LoadingProgress m_LoadingProgress{};
 		std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
 	};

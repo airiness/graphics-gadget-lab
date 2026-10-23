@@ -39,6 +39,7 @@ $catalog = @(
     @{ name = 'lighting-profiles'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLightingProfiles.ps1' }) },
     @{ name = 'sequence-parameter-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSequenceParameterEvents.ps1' }) },
     @{ name = 'sequence-deferred-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestDeferredSequenceEvents.ps1' }) },
+    @{ name = 'lab-sun-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLabSunParameters.ps1' }) },
     @{ name = 'session-host-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestHostParameters.ps1' }) },
     @{ name = 'session-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionParameters.ps1' }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },

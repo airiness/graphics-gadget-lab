@@ -128,7 +128,14 @@ fields (such as chromaticity before normalization); it is not the Runtime
 effective-source identity.
 These records describe the published environment-lighting product, not a claim that
 every direct-light input is delayed until that publication. They are live control
-snapshots only; saved capture/sequence/export provenance is a later slice.
+snapshots; use the saved frame's `parameters` for capture/sequence/export provenance
+as described in [sequences](sequences.md).
+
+Atmosphere Range also exposes the Lab-owned Deferred float
+`atmosphere_range.sun.elevation_degrees` (-90 to 90). It preserves the current
+azimuth and other lighting inputs; a mixed batch still permits only one Deferred
+lighting item. `RunVerification.ps1 -Suite lab-sun-parameters` exercises this binding,
+including profile rebasing, repeated NoChange and its frame/receipt evidence.
 
 ## Discover and set
 

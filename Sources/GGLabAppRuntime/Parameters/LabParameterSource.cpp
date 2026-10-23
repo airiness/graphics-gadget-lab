@@ -14,7 +14,9 @@ namespace gglab
 			const auto* parameters = owner.GetParameters();
 			for (const auto& value : values)
 			{
-				if (!LabValuesEqual(parameters->Find(value.m_Id)->m_Value, value.m_Value))
+				if (!LabValuesEqual(parameters->Find(value.m_Id)->m_Value, value.m_Value) ||
+					(m_Prepared.HasWorldLightingChanges() &&
+						GetParameterEffectClass(parameters->Find(value.m_Id)->m_Desc) == ParameterEffectClass::Deferred))
 				{
 					m_Changed.push_back(value.m_Id);
 				}
@@ -52,7 +54,9 @@ namespace gglab
 
 	bool LabParameterSource::Supports(const LabParameterDesc& desc) const noexcept
 	{
-		return m_Lab && m_Lab->SupportsParameterEffect(desc);
+		const auto* session = m_Lab ? m_Lab->GetActiveSession() : nullptr;
+		return session && m_Lab->SupportsParameterEffect(desc) &&
+			(!session->SupportsWorldLightingParameter(desc.m_Id) || m_Control);
 	}
 
 	bool LabParameterSource::Reserve(uint64_t id, std::span<const LabParameterValue> values,
@@ -72,7 +76,7 @@ namespace gglab
 	std::unique_ptr<PreparedParameterSourceBase> LabParameterSource::Prepare(uint64_t id,
 		std::span<const LabParameterValue> values, std::string& error) noexcept
 	{
-		auto prepared = m_Lab->PrepareParameterBatch(id, values, error);
+		auto prepared = m_Lab->PrepareParameterBatch(id, values, error, m_Control, m_Identity);
 		return prepared ? std::make_unique<Prepared>(*this, std::move(*prepared), values) : nullptr;
 	}
 

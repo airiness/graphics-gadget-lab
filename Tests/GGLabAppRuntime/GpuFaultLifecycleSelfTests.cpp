@@ -1021,6 +1021,13 @@ namespace gglab
 					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("environment.profile"),
 						.m_Name = "Lab-owned boolean", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
 				}
+				if (m_Probe.m_EnableLightingProfiles)
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("sun-input"),
+						.m_Name = "Prepared sun input", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f,
+						.m_MinValue = LabValue(0.1f), .m_MaxValue = LabValue(4.0f),
+						.m_EffectClass = ParameterEffectClass::Deferred }));
+				}
 				for (const auto id : { "lighting", "broken-lighting" })
 				{
 					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId(id),
@@ -1050,6 +1057,24 @@ namespace gglab
 					return LabValue(frame.m_ViewSettings.m_Lighting.m_EnableAerialPerspective);
 				}
 				return std::nullopt;
+			}
+			bool SupportsWorldLightingParameter(const LabParameterId& id) const noexcept override
+			{
+				return m_Probe.m_EnableLightingProfiles && id == LabParameterId("sun-input");
+			}
+			std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingParameter(
+				const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+				uint64_t contentIdentity, std::string& error) noexcept override
+			{
+				const auto publication = control.GetWorldLightingPublication();
+				if (!SupportsWorldLightingParameter(id) || !publication.m_Requested)
+				{
+					error = "LightingPreparationFailed: the fixture lost its authored sun.";
+					return {};
+				}
+				auto inputs = publication.m_Requested->m_Inputs;
+				inputs.m_SunDirection = Vector3(-0.5f, -std::get<float>(value), 1.0f);
+				return control.PrepareWorldLightingInputs(m_World, contentIdentity, inputs, error);
 			}
 			bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override
 			{
@@ -4479,6 +4504,140 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunLabWorldLightingScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			probe.m_EnableLightingProfiles = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			runtime.EnableParameterControl();
+			auto& parameters = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &parameters;
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& lighting = *runtime.GetRenderComposition()->GetWorldLightingControl();
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+					}
+					return condition();
+				};
+			checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration != 0; }),
+				"The Lab World Lighting fixture starts from a real published generation");
+			const std::array sun{ LabParameterValue{ LabParameterId("sun-input"), 2.0f } };
+			std::string error;
+			auto generation = environment.GetBakeRequestGeneration();
+			const auto applications = probe.m_ParameterApplications;
+			checks.Check(lab.QueueParameterBatch(100, sun, error) &&
+				!lab.PrepareParameterBatch(100, sun, error),
+				"A World Lighting Lab plan requires the Session's explicit control and content identity");
+			auto prepared = lab.PrepareParameterBatch(100, sun, error, &lighting, parameters.GetContentIdentity());
+			checks.Check(prepared && prepared->HasWorldLightingChanges() &&
+				environment.GetBakeRequestGeneration() == generation && probe.m_ParameterApplications == applications &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("sun-input"), 0.0f) == 1.0f,
+				"Preparing a Lab sun plan mutates neither World Lighting, parameter storage nor callbacks");
+			prepared.reset();
+			lab.CancelParameterBatch(100);
+			const std::array invalid{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 11.0f },
+				LabParameterValue{ LabParameterId("sun-input"), 99.0f } };
+			checks.Check(runtime.RequestParameterBatch(invalid, error) == 0 &&
+				environment.GetBakeRequestGeneration() == generation,
+				"An invalid authored sun tail rejects the complete mixed batch");
+			const std::array values{ LabParameterValue{ LabParameterId("sun-input"), 2.0f },
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 11.0f } };
+			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
+			std::optional<entt::entity> sunEntity;
+			for (const auto entity : world.GetRegistry().view<components::LightComponent>())
+			{
+				if (world.GetRegistry().get<components::LightComponent>(entity).m_WorldSun)
+				{
+					sunEntity = entity;
+					break;
+				}
+			}
+			checks.Check(sunEntity.has_value(), "The prepared Lab fixture owns a designated World Sun");
+			if (sunEntity)
+			{
+				const float exposure = parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f);
+				const auto missing = runtime.RequestParameterBatch(values, error);
+				auto& light = world.GetRegistry().get<components::LightComponent>(*sunEntity);
+				const auto authored = light.m_WorldSun;
+				light.m_WorldSun.reset();
+				lighting.SynchronizeWorldLighting(world, parameters.GetContentIdentity());
+				const auto externalGeneration = environment.GetBakeRequestGeneration();
+				GGLAB_UNUSED(runtime.Tick());
+				const auto rejected = runtime.TakeParameterBatchResult(missing);
+				checks.Check(rejected && rejected->m_State == ParameterBatchState::Failed && rejected->m_Items.empty() &&
+					probe.m_ParameterApplications == applications && environment.GetBakeRequestGeneration() == externalGeneration &&
+					parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == exposure &&
+					lab.GetActiveSession()->GetParameters().Get(LabParameterId("sun-input"), 0.0f) == 1.0f,
+					"A Lab sun lost after admission rejects preparation without committing Lab, Host or another generation");
+				light.m_WorldSun = authored;
+				lighting.SynchronizeWorldLighting(world, parameters.GetContentIdentity());
+				generation = environment.GetBakeRequestGeneration();
+				checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration == generation; }),
+					"The restored authored sun publishes before another Lab mutation is admitted");
+			}
+			bool completeCommit = false;
+			probe.m_ParameterEffectCallback = [&]()
+				{
+					completeCommit = environment.GetBakeRequestGeneration() == generation + 1 &&
+						parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == 11.0f &&
+						lab.GetActiveSession()->GetParameters().Get(LabParameterId("sun-input"), 0.0f) == 2.0f;
+				};
+			const auto id = runtime.RequestParameterBatch(values, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(id && completeCommit && parameters.GetParameterBatchStatus()->m_Items[0].m_Applied &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == generation + 1,
+				"World Lighting, Lab and Host commit completely before the first Lab callback observes the batch");
+			if (!id || !parameters.GetParameterBatchStatus() || parameters.GetParameterBatchStatus()->m_Items.empty())
+			{
+				runtime.Shutdown();
+				return;
+			}
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->m_Items[0].m_Published.has_value(); }) &&
+				!parameters.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed,
+				"An aborted frame may observe prepared Lab sun publication without consuming it");
+			GGLAB_UNUSED(runtime.Tick());
+			const auto consumed = runtime.TakeParameterBatchResult(id);
+			checks.Check(consumed && consumed->IsTerminal() && consumed->m_Items[0].m_FirstConsumed > consumed->m_Items[0].m_Published,
+				"Only the successful retry consumes the exact Lab sun generation");
+			const auto revision = parameters.GetParameterRevision();
+			const auto unchangedGeneration = environment.GetBakeRequestGeneration();
+			const auto same = runtime.RequestParameterBatch(values, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto noChange = runtime.TakeParameterBatchResult(same);
+			checks.Check(noChange && noChange->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				parameters.GetParameterRevision() == revision && environment.GetBakeRequestGeneration() == unchangedGeneration,
+				"Repeating an owned Lab sun state is NoChange without a new revision or generation");
+			const std::array next{ LabParameterValue{ LabParameterId("sun-input"), 3.0f } };
+			const auto pending = runtime.RequestParameterBatch(next, error);
+			GGLAB_UNUSED(runtime.Tick());
+			GGLAB_UNUSED(lighting.ApplyWorldLightingInputs(runtime.GetDemoManager()->GetActiveDemo()->GetWorld(),
+				parameters.GetContentIdentity(), parameters.GetLightingProfiles()[1].m_Inputs));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto superseded = runtime.TakeParameterBatchResult(pending);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!superseded->m_Items[0].m_FirstConsumed,
+				"A foreign authored profile supersedes a pending Lab sun receipt without borrowing consumption");
+			runtime.Shutdown();
+		}
+
 		void RunLightingProfileScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -4843,6 +5002,7 @@ namespace gglab
 		RunLightingProfileRegistrationScenario(context, root / "profile-invalid-registration", false, false);
 		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
 		RunLightingProfileScenario(context, root / "lighting-profiles");
+		RunLabWorldLightingScenario(context, root / "lab-world-lighting");
 		RunSequenceParameterEventScenario(context, root / "sequence-events");
 		RunDeferredSequenceEventScenario(context, root / "deferred-sequence-events");
 		RunSessionAdmissionScenario(context, root / "session-admission");
