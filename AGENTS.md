@@ -55,12 +55,23 @@ visibility and project membership consistent.
 Keep application behavior in its owning domain. Enforce dependency direction
 with compiler include visibility as well as the boundary validator.
 
+The [Architecture Atlas](Docs/Architecture/README.md) maps the project layers, the
+frame path, render pass composition and Lab lifetime to their source entry points
+and owning tests. Use
+[gglab-architecture](.agents/skills/gglab-architecture/SKILL.md) for architecture
+orientation and cross-module changes; its task table selects the relevant map,
+Public interface and implementation path.
+
 ## GPU, shader and Lab invariants
 
 For GPU changes, follow ownership through submission, fences, frames in flight,
 resource states, descriptors, transient allocation and cancellation before
 submission. Readback requires GPU completion; retain the backing resource and
 mapping until the consumer finishes.
+
+The Atlas [frame contracts](Docs/Architecture/Frame_Execution_Map.md#contracts)
+detail how these rules apply to Renderer settlement order, settlement-time failures
+and teardown; keep both texts consistent when either changes.
 
 RenderGraph owns dependencies, culling, execution order, transient lifetimes
 and barriers for its managed resources. Passes declare all managed reads and
@@ -69,6 +80,9 @@ Fix ordering through those contracts rather than reaching into another pass's
 private resources. Justify manual barriers and consider whether the general
 barrier-planning rule needs correction. For compiler changes, inspect dependency
 analysis through resource release and barrier planning as one connected path.
+The Atlas [composition contracts](Docs/Architecture/Runtime_Boundaries_Map.md#contracts)
+detail pass ownership and the lifetime of imported resources; keep both texts
+consistent when either changes.
 
 Keep shader compilation policy and DXC argument construction authoritative in
 the Shader domain; avoid new Renderer/RHI coupling to host-side compilation.
@@ -86,7 +100,10 @@ verification claims.
 Lab IDs in `gglab.lab.*` are persisted identifiers. Apply Lab switches and
 rebuild-triggering changes through the LabRuntime safe command path. Preserve
 session ownership of worlds, cameras, pipelines and fence-dependent work; use
-immediate updates only when the state can safely change in place.
+immediate updates only when the state can safely change in place. The Atlas
+[Content retirement](Docs/Architecture/Frame_Execution_Map.md#content-retirement)
+rule details how long replaced and pending content is kept; keep both texts
+consistent when either changes.
 
 ## Source and generated files
 
@@ -143,9 +160,11 @@ builds. Diagnostic compiles during implementation may precede this pass. Revisit
 later code edits before final verification; unchanged code needs no repeated
 formatting pass for each build configuration or test invocation.
 
-Use `README.md` for setup and the executable/suite catalog, and
-`.github/workflows/build.yml` for the CI build matrix and command details. Use
-the owner's Visual Studio/MSVC toolchain. Run builds from the repository root
+Use [README.md](README.md) for setup and the
+[CI workflow](.github/workflows/build.yml) for executable test commands and the
+build matrix. List scripted verification suites with
+[RunVerification.ps1](Tests/Verification/RunVerification.ps1) `-List`. Use the
+owner's Visual Studio/MSVC toolchain. Run builds from the repository root
 in a shell with x64-hosted MSBuild available
 (`MSBuild/Current/Bin/amd64/MSBuild.exe`); outputs are under
 `Build/Output/x64/<Configuration>/`.

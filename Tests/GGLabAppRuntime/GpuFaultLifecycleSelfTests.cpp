@@ -105,7 +105,11 @@ namespace gglab
 		enum class CommitEnqueueFault
 		{
 			None,
+			// After Render sealed the list, before the RHI submission.
 			BeforeSubmission,
+			// After the RHI accepted the submission, before the commits start.
+			AfterSubmission,
+			// While the commits of a Submitted frame run.
 			DuringSettlement,
 		};
 
@@ -155,6 +159,8 @@ namespace gglab
 			uint64_t m_ExpectedReleasedBatch = 0;
 			bool m_BindingReleasedBeforeExit = false;
 			uint32_t m_DemoDestructions = 0;
+			uint32_t m_LabSessionDestructions = 0;
+			bool m_HoldRetirementPreparation = false;
 			bool m_EnableLightingProfiles = false;
 			bool m_ProfileNamedLabBool = false;
 			bool m_InvalidLightingProfiles = false;
@@ -664,6 +670,17 @@ namespace gglab
 				if (!m_Probe.m_Inject && m_Probe.m_FrameEndInjection != FrameEndInjection::Completed)
 				{
 					return RHIFrameEndResult::Fatal(resolved.m_Fence);
+				}
+				if (m_Probe.m_CommitEnqueueFault == CommitEnqueueFault::AfterSubmission &&
+					m_Probe.m_RetainedExecuteContext)
+				{
+					// Renderer checked the list before this call, so the failure surfaces only
+					// when settlement reaches the commits.
+					m_Probe.m_RetainedExecuteContext->DeferCommit(
+						[&late = m_Probe.m_LateCommitsRun](const RGCommitContext&) noexcept
+						{
+							++late;
+						});
 				}
 				return resolved.m_State == RHIFrameSubmissionState::CompletionUnknown ?
 					RHIFrameEndResult::FatalCompletionUnknown() :
@@ -1253,6 +1270,35 @@ namespace gglab
 			}
 			LifetimeProbe& m_Probe;
 			std::unique_ptr<EnvironmentLightingOverrideBase> m_Override;
+		};
+
+		class RetirementTestLab final : public LabSessionBase
+		{
+		public:
+			explicit RetirementTestLab(const LabSessionCreateInfo& info) noexcept :
+				LabSessionBase({ .m_Id = LabId("gglab.lab.test.retirement"),
+					.m_DisplayName = "Retirement fixture" }, info,
+					std::make_unique<FaultPipeline>(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)),
+				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)
+			{
+			}
+			~RetirementTestLab() override
+			{
+				++m_Probe.m_LabSessionDestructions;
+			}
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				return m_Probe.m_HoldRetirementPreparation ?
+					LoadingProgress{ .m_Status = LoadingStatus::Preparing } :
+					LoadingProgress::Ready();
+			}
+			void Update(float) noexcept override {}
+			static std::unique_ptr<LabSessionBase> Create(const LabSessionCreateInfo& info) noexcept
+			{
+				return std::make_unique<RetirementTestLab>(info);
+			}
+		private:
+			LifetimeProbe& m_Probe;
 		};
 
 		class FaultDemo final : public DemoBase
@@ -2436,7 +2482,10 @@ namespace gglab
 			const uint64_t capture = probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene);
 			probe.m_CommitEnqueueFault = fault;
 			probe.m_AbortInjection = abort;
-			const bool submitted = fault == CommitEnqueueFault::DuringSettlement;
+			const bool submitted = fault != CommitEnqueueFault::BeforeSubmission;
+			// A list that failed before the commits start discards them; once they run, the
+			// original batch completes.
+			const bool committed = fault == CommitEnqueueFault::DuringSettlement;
 			if (submitted && throughRuntime)
 			{
 				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal,
@@ -2452,7 +2501,7 @@ namespace gglab
 			checks.Check(probe.m_FrameEnds == ends + (submitted ? 1u : 0u) &&
 				probe.m_FrameAborts == aborts + (submitted ? 0u : 1u) &&
 				probe.m_SubmittedCallbacks == callbacks && probe.m_LateCommitsRun == 0 &&
-				probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2 &&
+				probe.m_CommitsRun == (committed ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2 &&
 				probe.m_CommitIdentityMatches,
 				"Late enqueue never runs its callback, never resettles owners, and releases every CPU capture once");
 			const auto expectedFence = submitted ? probe.m_LastEndFence :
@@ -2462,9 +2511,9 @@ namespace gglab
 				"Late enqueue preserves the actual submission or abort retirement fence");
 			const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
 			checks.Check(temporal.m_HistoryValid && (submitted ?
-				temporal.m_LastCommitted.m_GraphicsFence == expectedFence &&
+				temporal.m_LastCommitted.m_GraphicsFence == expectedFence && (!committed ||
 					probe.m_CommitObservations[0].m_Order == 1 && probe.m_CommitObservations[1].m_Order == 2 &&
-					probe.m_CommitObservations[1].m_Fence == expectedFence :
+					probe.m_CommitObservations[1].m_Fence == expectedFence) :
 				temporal.m_LastCommitted.m_GraphicsFence == previousTemporal.m_LastCommitted.m_GraphicsFence &&
 					temporal.m_ResetCount == previousTemporal.m_ResetCount),
 				"A settlement violation keeps Submitted history; a sealed-list abort preserves previous history");
@@ -2483,7 +2532,7 @@ namespace gglab
 			probe.m_RetainedExecuteContext.reset();
 			runtime.Shutdown();
 			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 &&
-				probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2,
+				probe.m_CommitsRun == (committed ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2,
 				"Late-enqueue teardown neither repeats commits nor releases GPU resources early");
 		}
 
@@ -3868,6 +3917,61 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunLabSessionRetirementScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			LabRuntime lab({ .m_Services = probe.m_ContentServices, .m_WindowWidth = 32,
+				.m_WindowHeight = 32, .m_RunConfig = { .m_WarmupFrames = 0 } });
+			const LabId labId("gglab.lab.test.retirement");
+			checks.Check(lab.RegisterLab({ .m_Id = labId, .m_DisplayName = "Retirement fixture" },
+				&RetirementTestLab::Create) && lab.Initialize(labId),
+				"The retirement fixture initializes through the production LabRuntime");
+			lab.TickTransitions();
+			lab.OnEnter();
+
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(lab.GetRetiringSessionCount() == 1 && probe.m_LabSessionDestructions == 0,
+				"Activation keeps the replaced session alive in the retiring list");
+			lab.TickTransitions();
+			checks.Check(lab.GetRetiringSessionCount() == 0 && probe.m_LabSessionDestructions == 1,
+				"A session that never reached a Completed frame is released at the next poll");
+
+			const RHIFencePoint renderedFence{ RHIFenceHandle{ 1, 1 }, 1000 };
+			probe.m_ReadbackFence = renderedFence;
+			lab.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::Ready,
+				.m_SubmittedFence = renderedFence });
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			lab.TickTransitions();
+			checks.Check(lab.GetRetiringSessionCount() == 1 && probe.m_LabSessionDestructions == 1,
+				"A replaced session stays alive while its last Completed frame's fence is pending");
+			probe.m_ReadbackFence = {};
+			lab.TickTransitions();
+			checks.Check(lab.GetRetiringSessionCount() == 0 && probe.m_LabSessionDestructions == 2,
+				"The replaced session is destroyed once that fence completes");
+
+			probe.m_HoldRetirementPreparation = true;
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(lab.HasPendingSession() && lab.GetRetiringSessionCount() == 0 &&
+				probe.m_LabSessionDestructions == 3,
+				"A superseded pending session is destroyed at once and never retires");
+			lab.Shutdown();
+			checks.Check(probe.m_LabSessionDestructions == 5,
+				"Shutdown destroys the pending and active sessions");
+			runtime.Shutdown();
+		}
+
 		void RunRebuildParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -5028,6 +5132,10 @@ namespace gglab
 				CommitEnqueueFault::BeforeSubmission, AbortInjection::Unfenced);
 			RunLateCommitScenario(checks, root / "late-sealed-fenced",
 				CommitEnqueueFault::BeforeSubmission, AbortInjection::Fenced);
+			RunLateCommitScenario(checks, root / "late-submitted",
+				CommitEnqueueFault::AfterSubmission, AbortInjection::Unfenced);
+			RunLateCommitScenario(checks, root / "late-submitted-host-fence",
+				CommitEnqueueFault::AfterSubmission, AbortInjection::Unfenced, false);
 			RunLateCommitScenario(checks, root / "late-settling",
 				CommitEnqueueFault::DuringSettlement, AbortInjection::Unfenced);
 			RunLateCommitScenario(checks, root / "late-settling-host-fence",
@@ -5209,6 +5317,7 @@ namespace gglab
 		RunParameterFeedbackScenario(context, root / "parameter-feedback");
 		RunPendingParameterBatchScenario(context, root / "pending-parameter-batches");
 		RunInheritedLightingScenario(context, root / "inherited-lighting");
+		RunLabSessionRetirementScenario(context, root / "lab-session-retirement");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
 		RunRebuildParameterScenario(context, root / "parameter-rebuild");
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);

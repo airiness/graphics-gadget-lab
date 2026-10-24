@@ -14,6 +14,12 @@ visual quality, and experimenting with GPU resources, shaders, and diagnostics.
 - Focused Labs for graphics experiments
 - ImGui-based developer tools, diagnostics, and GPU profiling
 
+## Architecture
+
+The [Architecture Atlas](Docs/Architecture/README.md) explains how the projects are
+layered and how a frame is built, submitted and retired, with links into the code
+and tests.
+
 ## Demo
 
 [![Start Demo](Assets/Media/StartDemo.gif)](Assets/Media/StartDemo.mp4)
