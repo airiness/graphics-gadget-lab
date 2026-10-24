@@ -2,7 +2,7 @@
 Atlas ID: atlas.overview.layers
 
 - Question: where does a frame belong, and where should a change start?
-- VerifiedAgainst: `ed1636bc06e0f2016c187575110017a9b21f6558`
+- VerifiedAgainst: `77ed8765f1959978482ee8ede35f421d75ca3853`
 - Refresh triggers: project ownership, service composition, public interfaces, or
   frame execution and teardown responsibilities change.
 
@@ -35,9 +35,13 @@ flowchart TD
 
 1. [WinApp Application](../../Sources/WinApp/Application/Application.cpp) creates
    the shared application and provides host inputs and the selected RHI factory.
+   Before composing services it prepares development shader artifacts, or reads
+   the packaged active registry in an artifact-only build.
 2. [AppRuntime services](../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp)
-   create the Runtime RenderHost and shared services. AppRuntime owns the host;
-   composition and service pointers taken from it stay valid while the host lives.
+   create the Runtime RenderHost and shared services, register content and queue
+   the startup Demo for [preparation](Frame_Execution_Map.md#content-transitions).
+   AppRuntime owns the host; composition and service pointers taken from it stay
+   valid while the host lives.
 3. [TickFrame](../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp) updates
    content, begins a frame, resolves immutable frame inputs and validates the
    pipeline. If it returns early after the frame began, the scoped `RenderFrame`
@@ -51,7 +55,7 @@ flowchart TD
    [settlement contract](Frame_Execution_Map.md#frame-settlement) keeps four
    outcomes apart: submitted, failed, discarded and completion unknown.
 6. AppRuntime sends success feedback only when EndFrame returns Completed. The GPU
-   finishes the frame later; resource reuse and readback wait for the frame's
+   may finish the frame later; resource reuse and readback wait for the frame's
    fence, not for EndFrame.
 
 ## Projects
@@ -74,6 +78,7 @@ Anchors:
   - Projects/WinApp/WinApp.vcxproj
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
   - Projects/GGLabRuntime/GGLabRuntime.vcxproj
+  - Sources/WinApp/Application/Application.cpp::Initialize
   - Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp::InitializeServices
 ReviewPaths:
   - GraphicsGadgetLab.sln
