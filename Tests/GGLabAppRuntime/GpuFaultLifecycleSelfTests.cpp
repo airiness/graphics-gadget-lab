@@ -159,6 +159,8 @@ namespace gglab
 			uint64_t m_ExpectedReleasedBatch = 0;
 			bool m_BindingReleasedBeforeExit = false;
 			uint32_t m_DemoDestructions = 0;
+			uint32_t m_LabSessionDestructions = 0;
+			bool m_HoldRetirementPreparation = false;
 			bool m_EnableLightingProfiles = false;
 			bool m_ProfileNamedLabBool = false;
 			bool m_InvalidLightingProfiles = false;
@@ -1268,6 +1270,35 @@ namespace gglab
 			}
 			LifetimeProbe& m_Probe;
 			std::unique_ptr<EnvironmentLightingOverrideBase> m_Override;
+		};
+
+		class RetirementTestLab final : public LabSessionBase
+		{
+		public:
+			explicit RetirementTestLab(const LabSessionCreateInfo& info) noexcept :
+				LabSessionBase({ .m_Id = LabId("gglab.lab.test.retirement"),
+					.m_DisplayName = "Retirement fixture" }, info,
+					std::make_unique<FaultPipeline>(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)),
+				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)
+			{
+			}
+			~RetirementTestLab() override
+			{
+				++m_Probe.m_LabSessionDestructions;
+			}
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				return m_Probe.m_HoldRetirementPreparation ?
+					LoadingProgress{ .m_Status = LoadingStatus::Preparing } :
+					LoadingProgress::Ready();
+			}
+			void Update(float) noexcept override {}
+			static std::unique_ptr<LabSessionBase> Create(const LabSessionCreateInfo& info) noexcept
+			{
+				return std::make_unique<RetirementTestLab>(info);
+			}
+		private:
+			LifetimeProbe& m_Probe;
 		};
 
 		class FaultDemo final : public DemoBase
@@ -3886,6 +3917,61 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunLabSessionRetirementScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			LabRuntime lab({ .m_Services = probe.m_ContentServices, .m_WindowWidth = 32,
+				.m_WindowHeight = 32, .m_RunConfig = { .m_WarmupFrames = 0 } });
+			const LabId labId("gglab.lab.test.retirement");
+			checks.Check(lab.RegisterLab({ .m_Id = labId, .m_DisplayName = "Retirement fixture" },
+				&RetirementTestLab::Create) && lab.Initialize(labId),
+				"The retirement fixture initializes through the production LabRuntime");
+			lab.TickTransitions();
+			lab.OnEnter();
+
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(lab.GetRetiringSessionCount() == 1 && probe.m_LabSessionDestructions == 0,
+				"Activation keeps the replaced session alive in the retiring list");
+			lab.TickTransitions();
+			checks.Check(lab.GetRetiringSessionCount() == 0 && probe.m_LabSessionDestructions == 1,
+				"A session that never reached a Completed frame is released at the next poll");
+
+			const RHIFencePoint renderedFence{ RHIFenceHandle{ 1, 1 }, 1000 };
+			probe.m_ReadbackFence = renderedFence;
+			lab.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::Ready,
+				.m_SubmittedFence = renderedFence });
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			lab.TickTransitions();
+			checks.Check(lab.GetRetiringSessionCount() == 1 && probe.m_LabSessionDestructions == 1,
+				"A replaced session stays alive while its last Completed frame's fence is pending");
+			probe.m_ReadbackFence = {};
+			lab.TickTransitions();
+			checks.Check(lab.GetRetiringSessionCount() == 0 && probe.m_LabSessionDestructions == 2,
+				"The replaced session is destroyed once that fence completes");
+
+			probe.m_HoldRetirementPreparation = true;
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(lab.HasPendingSession() && lab.GetRetiringSessionCount() == 0 &&
+				probe.m_LabSessionDestructions == 3,
+				"A superseded pending session is destroyed at once and never retires");
+			lab.Shutdown();
+			checks.Check(probe.m_LabSessionDestructions == 5,
+				"Shutdown destroys the pending and active sessions");
+			runtime.Shutdown();
+		}
+
 		void RunRebuildParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -5231,6 +5317,7 @@ namespace gglab
 		RunParameterFeedbackScenario(context, root / "parameter-feedback");
 		RunPendingParameterBatchScenario(context, root / "pending-parameter-batches");
 		RunInheritedLightingScenario(context, root / "inherited-lighting");
+		RunLabSessionRetirementScenario(context, root / "lab-session-retirement");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
 		RunRebuildParameterScenario(context, root / "parameter-rebuild");
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);
