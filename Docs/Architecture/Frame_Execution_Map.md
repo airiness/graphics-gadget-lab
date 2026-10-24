@@ -3,7 +3,7 @@ Atlas ID: atlas.runtime.frame-execution
 
 - Question: what happens to recorded GPU work and dependent CPU state when a frame
   does not complete successfully?
-- VerifiedAgainst: `ed1636bc06e0f2016c187575110017a9b21f6558`
+- VerifiedAgainst: `62772447328f54aa8d2814f3489a939173ec2a27`
 - Refresh triggers: begin/end outcomes, early-return cleanup, participant order,
   submission feedback, borrowing or GPU-dependent retirement changes.
 
@@ -78,11 +78,15 @@ aborted inside EndFrame instead.
 | `Discarded` | Renderer took its abort path and the recorded commands never execute. Capture requests that did not name this frame are requeued. Graph resources retire on the abort fence, or on the last submitted fence when the abort submitted nothing |
 | `CompletionUnknown` | Neither path could verify completion. Renderer is poisoned, no further frame begins, and GPU-visible owners stay retained without ordinary graph retirement |
 
-Two backend details affect these outcomes:
+Three backend details affect these outcomes:
 
 - A submission can succeed and presentation still fail. DX12 can fail Present;
   Vulkan can fail presentation or closing the frame's descriptor arena. These
   frames are Failed with a real fence.
+- A backend can also abort inside its own EndFrame after a recording or
+  upload-publication failure. The result still comes back through EndFrame, so the
+  frame settles as Failed although its commands never ran: the outcome follows the
+  Renderer path, not GPU execution.
 - Abort does not execute the recorded commands, but the native abort can still
   submit work, for example to signal retirement or release an acquired swapchain
   image. Vulkan's abort may need a fence or a checked idle wait, so an abort can
@@ -151,18 +155,22 @@ transaction fails. Passes must not reproduce this policy.
 ### Settlement contract failures
 
 Renderer seals the frame's commit list whenever `Render` exits. An enqueue that
-arrives after the list is sealed, for example through an enqueue capability kept
-past `Render`, is rejected and marks the list failed:
+arrives after that, for example through an enqueue capability kept past `Render`,
+is rejected and marks the list failed. The outcome depends on when it arrives:
 
-- Before RHI submission, the failed list makes EndFrame take the abort path.
-- While the commits of a Submitted frame are running, the list finishes its
-  original batch once and the participants keep their Submitted settlement.
-  EndFrame then returns Fatal with the real submitted fence; nothing is rolled
-  back or settled again.
+| Late enqueue arrives | Runtime participants | CPU commits | EndFrame returns |
+| --- | --- | --- | --- |
+| Before RHI submission | Abort path: Discarded, or CompletionUnknown | Discarded | The abort's result |
+| After the RHI accepted the submission, before the commits start | Settled as Submitted | Discarded | Fatal with the real submitted fence |
+| While the commits run | Settled as Submitted | The original batch runs once | Fatal with the real submitted fence |
 
-A late enqueue is the one case where the layers disagree: Runtime participants and
-CPU commits settled as Submitted, yet EndFrame returns Fatal, so AppRuntime stops
-without sending submitted feedback.
+After an accepted submission nothing is rolled back or settled again. A failure
+seen before the commits start cancels them; once they start, the original batch
+completes rather than publishing only part of it. In both post-submission rows the
+layers disagree: Runtime participants settled as Submitted, yet EndFrame returns
+Fatal, so AppRuntime stops without sending submitted feedback. An enqueue after
+EndFrame returns is outside this contract, because `RGExecuteContext` must not be
+retained beyond execution.
 
 ### Teardown ownership
 

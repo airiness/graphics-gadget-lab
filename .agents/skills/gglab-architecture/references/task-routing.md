@@ -2,7 +2,7 @@
 Atlas ID: atlas.routes.frame-settlement
 
 - Question: where should a frame-settlement investigation or change begin?
-- VerifiedAgainst: `c5fc8eec360cab77227714865d2d39e7d316fbb2`
+- VerifiedAgainst: `62772447328f54aa8d2814f3489a939173ec2a27`
 - Refresh triggers: public interfaces, settlement ownership, caller feedback,
   retention rules or owning verification change.
 
