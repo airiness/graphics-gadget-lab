@@ -105,7 +105,11 @@ namespace gglab
 		enum class CommitEnqueueFault
 		{
 			None,
+			// After Render sealed the list, before the RHI submission.
 			BeforeSubmission,
+			// After the RHI accepted the submission, before the commits start.
+			AfterSubmission,
+			// While the commits of a Submitted frame run.
 			DuringSettlement,
 		};
 
@@ -664,6 +668,17 @@ namespace gglab
 				if (!m_Probe.m_Inject && m_Probe.m_FrameEndInjection != FrameEndInjection::Completed)
 				{
 					return RHIFrameEndResult::Fatal(resolved.m_Fence);
+				}
+				if (m_Probe.m_CommitEnqueueFault == CommitEnqueueFault::AfterSubmission &&
+					m_Probe.m_RetainedExecuteContext)
+				{
+					// Renderer checked the list before this call, so the failure surfaces only
+					// when settlement reaches the commits.
+					m_Probe.m_RetainedExecuteContext->DeferCommit(
+						[&late = m_Probe.m_LateCommitsRun](const RGCommitContext&) noexcept
+						{
+							++late;
+						});
 				}
 				return resolved.m_State == RHIFrameSubmissionState::CompletionUnknown ?
 					RHIFrameEndResult::FatalCompletionUnknown() :
@@ -2436,7 +2451,10 @@ namespace gglab
 			const uint64_t capture = probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene);
 			probe.m_CommitEnqueueFault = fault;
 			probe.m_AbortInjection = abort;
-			const bool submitted = fault == CommitEnqueueFault::DuringSettlement;
+			const bool submitted = fault != CommitEnqueueFault::BeforeSubmission;
+			// A list that failed before the commits start discards them; once they run, the
+			// original batch completes.
+			const bool committed = fault == CommitEnqueueFault::DuringSettlement;
 			if (submitted && throughRuntime)
 			{
 				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal,
@@ -2452,7 +2470,7 @@ namespace gglab
 			checks.Check(probe.m_FrameEnds == ends + (submitted ? 1u : 0u) &&
 				probe.m_FrameAborts == aborts + (submitted ? 0u : 1u) &&
 				probe.m_SubmittedCallbacks == callbacks && probe.m_LateCommitsRun == 0 &&
-				probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2 &&
+				probe.m_CommitsRun == (committed ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2 &&
 				probe.m_CommitIdentityMatches,
 				"Late enqueue never runs its callback, never resettles owners, and releases every CPU capture once");
 			const auto expectedFence = submitted ? probe.m_LastEndFence :
@@ -2462,9 +2480,9 @@ namespace gglab
 				"Late enqueue preserves the actual submission or abort retirement fence");
 			const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
 			checks.Check(temporal.m_HistoryValid && (submitted ?
-				temporal.m_LastCommitted.m_GraphicsFence == expectedFence &&
+				temporal.m_LastCommitted.m_GraphicsFence == expectedFence && (!committed ||
 					probe.m_CommitObservations[0].m_Order == 1 && probe.m_CommitObservations[1].m_Order == 2 &&
-					probe.m_CommitObservations[1].m_Fence == expectedFence :
+					probe.m_CommitObservations[1].m_Fence == expectedFence) :
 				temporal.m_LastCommitted.m_GraphicsFence == previousTemporal.m_LastCommitted.m_GraphicsFence &&
 					temporal.m_ResetCount == previousTemporal.m_ResetCount),
 				"A settlement violation keeps Submitted history; a sealed-list abort preserves previous history");
@@ -2483,7 +2501,7 @@ namespace gglab
 			probe.m_RetainedExecuteContext.reset();
 			runtime.Shutdown();
 			checks.Check(probe.m_ContextDestructions == 1 && probe.m_EarlyDestructions == 0 &&
-				probe.m_CommitsRun == (submitted ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2,
+				probe.m_CommitsRun == (committed ? 2u : 0u) && probe.m_CommitPayloadsDestroyed == 2,
 				"Late-enqueue teardown neither repeats commits nor releases GPU resources early");
 		}
 
@@ -5028,6 +5046,10 @@ namespace gglab
 				CommitEnqueueFault::BeforeSubmission, AbortInjection::Unfenced);
 			RunLateCommitScenario(checks, root / "late-sealed-fenced",
 				CommitEnqueueFault::BeforeSubmission, AbortInjection::Fenced);
+			RunLateCommitScenario(checks, root / "late-submitted",
+				CommitEnqueueFault::AfterSubmission, AbortInjection::Unfenced);
+			RunLateCommitScenario(checks, root / "late-submitted-host-fence",
+				CommitEnqueueFault::AfterSubmission, AbortInjection::Unfenced, false);
 			RunLateCommitScenario(checks, root / "late-settling",
 				CommitEnqueueFault::DuringSettlement, AbortInjection::Unfenced);
 			RunLateCommitScenario(checks, root / "late-settling-host-fence",

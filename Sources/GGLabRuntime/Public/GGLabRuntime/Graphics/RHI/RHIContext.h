@@ -190,6 +190,8 @@ namespace gglab
 		[[nodiscard]] virtual GpuProfiler* GetGpuProfiler() noexcept = 0;
 
 		[[nodiscard]] virtual RHIFrameBeginResult BeginFrame() noexcept = 0;
+		// Submits the frame's own streams. After a recording or upload-publication failure a
+		// backend may abort them instead; the result then reports that abort as AbortFrame would.
 		[[nodiscard]] virtual RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept = 0;
 		// Discards the frame's own streams. The result still reports any backend work the
 		// abort itself submitted.

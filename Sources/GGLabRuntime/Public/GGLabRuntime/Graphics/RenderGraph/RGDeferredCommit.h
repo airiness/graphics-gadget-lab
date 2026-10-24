@@ -19,8 +19,11 @@ namespace gglab
 		RHIFencePoint m_Fence{};
 	};
 
-	// Captures contain stable CPU service pointers and values, never GPU resource owners.
-	// A commit cannot start GPU work, wait, fail, or retain any enqueue capability.
+	// Checked at compile time: the callable is nothrow to construct, destroy and invoke,
+	// and its result is ignored, so a commit cannot report failure.
+	// Caller obligations, not checked: captures hold stable CPU service pointers and
+	// values, never GPU resource owners, and a commit does not start GPU work, wait or
+	// retain any enqueue capability.
 	class RGDeferredCommit final
 	{
 	public:
@@ -72,8 +75,10 @@ namespace gglab
 		~RGDeferredCommitList() noexcept;
 
 		void Seal() noexcept;
-		// A valid fence is required even for an empty list. Runs the original batch once,
-		// in order, despite any rejected enqueue during settlement.
+		// A valid fence is required even for an empty list. A list that has already failed,
+		// for example through an enqueue after Seal, discards its batch. Otherwise the
+		// original batch runs once, in order, and an enqueue rejected while it runs does not
+		// stop it.
 		void CommitAll(const RGCommitContext& context) noexcept;
 		void Discard() noexcept;
 		[[nodiscard]] bool HasFailed() const noexcept { return m_Failed; }
