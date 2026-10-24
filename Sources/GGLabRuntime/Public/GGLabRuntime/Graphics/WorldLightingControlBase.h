@@ -31,6 +31,11 @@ namespace gglab
 		[[nodiscard]] virtual std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
 			std::string& error) noexcept = 0;
+		// Change only the current physical sun's direction. Other authored inputs
+		// and process-wide settings, including entered-session leases, are untouched.
+		[[nodiscard]] virtual std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldSunDirection(
+			World& world, uint64_t sessionIdentity, const Vector3& direction,
+			std::string& error) noexcept = 0;
 		// Standalone convenience only; a multi-source batch must use prepared plans.
 		[[nodiscard]] virtual LightingMutationResult ApplyWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept = 0;

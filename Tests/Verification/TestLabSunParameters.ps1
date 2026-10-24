@@ -53,6 +53,32 @@ try {
                 [double]$exposure = @($discovery.parameters | Where-Object id -eq 'view.exposure.ev100')[0].current
                 $samples = Set-Values @(@{id='atmosphere_range.ibl.sample_count';type='uint';value=32})
                 Check ($samples.batch.succeeded) "$case-small-bake"
+                $previousGeneration = $samples.batch.items[0].identity.generation
+                $angleIndex = 0
+                foreach ($degrees in @(0.0,0.01,-0.01)) {
+                    $angleIndex++
+                    $angle = Set-Values @(@{id=$sunId;type='float';value=$degrees})
+                    Write-VerificationJson "$directory/angle-$angleIndex-receipt.json" $angle
+                    $effect = $angle.batch.items[0]
+                    Check ($angle.batch.succeeded -and $effect.state -eq 'Consumed' -and
+                        $effect.identity.domain -eq 'lighting' -and $effect.identity.generation -gt $previousGeneration -and
+                        $effect.applied -ge $effect.requested -and $effect.published -ge $effect.applied -and
+                        $effect.firstConsumed -ge $effect.published) "$case-angle-$angleIndex-new-target"
+                    $current = Invoke-VerificationSession parameters $session
+                    Check ([Math]::Abs([double]@($current.parameters | Where-Object id -eq $sunId)[0].current-$degrees) -lt 0.000001) "$case-angle-$angleIndex-discovery"
+                    $repeat = Set-Values @(@{id=$sunId;type='float';value=$degrees})
+                    Write-VerificationJson "$directory/angle-$angleIndex-repeat.json" $repeat
+                    Check ($repeat.batch.succeeded -and $repeat.batch.items[0].state -eq 'NoChange' -and
+                        $null -eq $repeat.batch.items[0].firstConsumed) "$case-angle-$angleIndex-nochange"
+                    $capture = Invoke-VerificationSession capture $session @{SettleFrames=2;OutputDirectory=$directory;
+                        Label="angle-$angleIndex";TimeoutSeconds=$TimeoutSeconds}
+                    Check ($capture.status -eq 'completed') "$case-angle-$angleIndex-capture"
+                    $metadata = Get-Content -LiteralPath (Get-VerificationCaptureFile $capture '.json' 0) -Raw | ConvertFrom-Json
+                    Check ([Math]::Abs((Elevation $metadata.sceneInputs.sun.photonDirection)-$degrees) -lt 0.00001 -and
+                        $metadata.parameters.lighting.requested.generation -eq $effect.identity.generation -and
+                        $metadata.parameters.lighting.active.generation -eq $effect.identity.generation) "$case-angle-$angleIndex-actual-direction-and-generation"
+                    $previousGeneration = $effect.identity.generation
+                }
                 $baseline = Set-Values @(@{id=$sunId;type='float';value=45.0},
                     @{id='view.taa.enabled';type='bool';value=$true})
                 Check ($baseline.batch.succeeded) "$case-baseline"

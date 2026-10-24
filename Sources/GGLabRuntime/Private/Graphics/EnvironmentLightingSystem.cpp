@@ -23,12 +23,12 @@ namespace gglab
 	public:
 		PreparedWorldLightingMutation(EnvironmentLightingSystem& owner, World& world,
 			const RenderDirectionalLight& target, const WorldLightingInputs& inputs,
-			WorldLightingState state, bool changed) noexcept :
+			WorldLightingState state, bool changed, WorldLightingMutationKind kind) noexcept :
 			m_Owner(owner), m_World(world), m_Target(target), m_Inputs(inputs),
 			m_Rotation(ResolveWorldLightingRotation(inputs.m_SunDirection)),
 			m_Source{ inputs.m_Atmosphere, state.m_Sun, target.m_EntityKey.value(),
 				state.m_SessionIdentity, state.m_ReferenceObserverWorld, state.m_Parameters, state },
-			m_PreviousGeneration(owner.GetBakeRequestGeneration()), m_Changed(changed)
+			m_PreviousGeneration(owner.GetBakeRequestGeneration()), m_Changed(changed), m_Kind(kind)
 		{
 		}
 
@@ -47,9 +47,12 @@ namespace gglab
 				return { LightingMutationOutcome::Unchanged, m_PreviousGeneration, m_PreviousGeneration };
 			}
 			m_Target.m_Transform->m_Rotation = m_Rotation;
-			m_Target.m_Light->m_WorldSun = m_Inputs.m_Sun;
-			m_World.m_Atmosphere = m_Inputs.m_Atmosphere;
-			m_Owner.SetBackgroundMode(m_Inputs.m_BackgroundMode);
+			if (m_Kind == WorldLightingMutationKind::Inputs)
+			{
+				m_Target.m_Light->m_WorldSun = m_Inputs.m_Sun;
+				m_World.m_Atmosphere = m_Inputs.m_Atmosphere;
+				m_Owner.SetBackgroundMode(m_Inputs.m_BackgroundMode);
+			}
 			m_Owner.m_RequestedPhysicalSky = std::move(m_Source);
 			m_Owner.RequestRebake();
 			m_Owner.RefreshRenderSettings();
@@ -66,6 +69,7 @@ namespace gglab
 		PhysicalSkySource m_Source;
 		uint64_t m_PreviousGeneration = 0;
 		bool m_Changed = false;
+		WorldLightingMutationKind m_Kind;
 		bool m_Committed = false;
 	};
 
@@ -446,6 +450,36 @@ namespace gglab
 	std::unique_ptr<PreparedWorldLightingMutationBase> EnvironmentLightingSystem::PrepareWorldLightingInputs(
 		World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs, std::string& error) noexcept
 	{
+		return PrepareWorldLightingMutation(world, sessionIdentity, inputs, WorldLightingMutationKind::Inputs, error);
+	}
+
+	std::unique_ptr<PreparedWorldLightingMutationBase> EnvironmentLightingSystem::PrepareWorldSunDirection(
+		World& world, uint64_t sessionIdentity, const Vector3& direction, std::string& error) noexcept
+	{
+		if (!m_RequestedPhysicalSky || !m_RequestedPhysicalSky->m_Provenance ||
+			m_RequestedPhysicalSky->m_SessionIdentity != sessionIdentity)
+		{
+			error = "LightingPreparationFailed: the current session has no authored Physical Sky request.";
+			return {};
+		}
+		// Read current authoring rather than a deduplicated request's older inputs:
+		// an equivalent sun chromaticity edit must survive a direction-only patch.
+		const auto target = RenderWorldExtractor{}.Extract(world).m_MainDirectionalLight;
+		if (!target.m_WorldSun || !world.m_Atmosphere)
+		{
+			error = "LightingPreparationFailed: the current World has no physical sun or atmosphere.";
+			return {};
+		}
+		const WorldLightingInputs inputs{ .m_SunDirection = direction,
+			.m_Sun = *target.m_Light->m_WorldSun, .m_Atmosphere = *world.m_Atmosphere };
+		return PrepareWorldLightingMutation(world, sessionIdentity, inputs,
+			WorldLightingMutationKind::SunDirection, error);
+	}
+
+	std::unique_ptr<PreparedWorldLightingMutationBase> EnvironmentLightingSystem::PrepareWorldLightingMutation(
+		World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
+		WorldLightingMutationKind kind, std::string& error) noexcept
+	{
 		error.clear();
 		if (!ValidateWorldLightingInputs(inputs))
 		{
@@ -491,7 +525,8 @@ namespace gglab
 			error = "LightingPreparationFailed: Runtime request identity capacity is exhausted.";
 			return {};
 		}
-		return std::make_unique<PreparedWorldLightingMutation>(*this, world, target, inputs, std::move(state), changed);
+		return std::make_unique<PreparedWorldLightingMutation>(*this, world, target, inputs,
+			std::move(state), changed, kind);
 	}
 
 	LightingMutationResult EnvironmentLightingSystem::ApplyWorldLightingInputs(

@@ -247,12 +247,11 @@ namespace gglab
 			error = "LightingPreparationFailed: the Lab's authored World Lighting state is unavailable.";
 			return {};
 		}
-		auto inputs = publication.m_Requested->m_Inputs;
 		// Retain the Lab's authored horizontal direction through its own rotation
 		// round trips. Re-deriving it from each resolved request drifts by ULPs and
 		// would turn an identical elevation request into another Runtime generation.
-		inputs.m_SunDirection = WithSunElevation(m_SunHorizontalDirection, *degrees);
-		return control.PrepareWorldLightingInputs(m_World, contentIdentity, inputs, error);
+		return control.PrepareWorldSunDirection(m_World, contentIdentity,
+			WithSunElevation(m_SunHorizontalDirection, *degrees), error);
 	}
 
 	void AtmosphereRangeLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept

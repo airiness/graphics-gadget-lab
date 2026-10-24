@@ -86,6 +86,9 @@ namespace gglab
 		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
 			std::string& error) noexcept override;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldSunDirection(
+			World& world, uint64_t sessionIdentity, const Vector3& direction,
+			std::string& error) noexcept override;
 		[[nodiscard]] LightingMutationResult ApplyWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept override;
 		[[nodiscard]] WorldLightingPublication GetWorldLightingPublication() const noexcept override;
@@ -98,6 +101,11 @@ namespace gglab
 	private:
 		class PreparedWorldLightingMutation;
 		class OverrideLease;
+		enum class WorldLightingMutationKind : uint8_t
+		{
+			Inputs,
+			SunDirection,
+		};
 		enum class OverrideField : uint8_t
 		{
 			Intensity,
@@ -112,6 +120,9 @@ namespace gglab
 			EnvironmentLightingSystem* m_Owner = nullptr;
 		};
 		void RecordSettingsWrite(OverrideField field) noexcept;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingMutation(
+			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
+			WorldLightingMutationKind kind, std::string& error) noexcept;
 		void RefreshRenderSettings() noexcept;
 		std::shared_ptr<OverrideLifetime> m_OverrideLifetime;
 		std::array<uint64_t, static_cast<size_t>(OverrideField::Count)> m_OverrideOwners{};

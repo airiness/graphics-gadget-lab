@@ -43,7 +43,13 @@ def validate_frame(frame, serial=None):
 		if item["state"] == "Consumed" and item["firstConsumed"] is None:
 			raise ValueError("Consumed receipts require submitted frame evidence")
 		if item["declaredClass"] == "Immediate" and (item["identity"]["domain"] or item["identity"]["generation"]):
-			raise ValueError("Immediate receipts have no asynchronous domain identity")
+			# EffectMismatch retains the actual asynchronous operation for diagnosis.
+			# It fails at application, before publication or successful consumption.
+			mismatch = (item["state"] == "Failed" and item["failure"] == "EffectMismatch" and
+				bool(item["identity"]["domain"]) and item["identity"]["generation"] > 0 and
+				item["applied"] is not None and item["published"] is None and item["firstConsumed"] is None)
+			if not mismatch:
+				raise ValueError("Immediate receipts require no asynchronous identity except retained EffectMismatch evidence")
 	return frame
 
 
@@ -102,7 +108,22 @@ def fixture():
 def self_test():
 	good = fixture()
 	validate(good)
+	mismatch = copy.deepcopy(good)
+	mismatch["frames"][0]["parameters"]["receipts"] = [dict(batchId=1, id="fixture.effect",
+		declaredClass="Immediate", state="Failed", identity=dict(revision=2, domain="lighting", generation=7),
+		requested=1, applied=1, published=None, firstConsumed=None, failure="EffectMismatch")]
+	validate(mismatch)
+	validate_export(dict(parameterRevision=2, parameters=mismatch["frames"][0]["parameters"]), 3, 3, 1)
 	cases = []
+	for keys, value in ((("state",), "Applied"), (("failure",), "OtherFailure"),
+		(("identity", "domain"), ""), (("identity", "generation"), 0),
+		(("applied",), None), (("published",), 1), (("firstConsumed",), 1)):
+		bad = copy.deepcopy(mismatch)
+		target = bad["frames"][0]["parameters"]["receipts"][0]
+		for key in keys[:-1]:
+			target = target[key]
+		target[keys[-1]] = value
+		cases.append(bad)
 	for key, value in (("frames", good["frames"][:1]), ("schemaVersion", 2)):
 		bad = copy.deepcopy(good)
 		bad[key] = value

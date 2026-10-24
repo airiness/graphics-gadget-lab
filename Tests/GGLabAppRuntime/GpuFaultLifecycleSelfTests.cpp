@@ -1100,9 +1100,8 @@ namespace gglab
 					error = "LightingPreparationFailed: the fixture lost its authored sun.";
 					return {};
 				}
-				auto inputs = publication.m_Requested->m_Inputs;
-				inputs.m_SunDirection = Vector3(-0.5f, -std::get<float>(value), 1.0f);
-				return control.PrepareWorldLightingInputs(m_World, contentIdentity, inputs, error);
+				return control.PrepareWorldSunDirection(m_World, contentIdentity,
+					Vector3(-0.5f, -std::get<float>(value), 1.0f), error);
 			}
 			bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override
 			{

@@ -953,6 +953,31 @@ namespace gglab
 
 		void RunLightingProfileContractTests(SelfTestContext& context) noexcept
 		{
+			struct DirectionRotationCase
+			{
+				Vector3 m_From;
+				Vector3 m_To;
+			};
+			const std::array rotations
+			{
+				DirectionRotationCase{ Vector3::Forward, Vector3::Forward },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.0f, -0.0001745329f, 1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.0f, 0.0001745329f, 1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.00001f, 0.0f, 1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.0001745329f, 0.0f, -1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(-0.001745329f, 0.0f, -1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3::Backward },
+				DirectionRotationCase{ Vector3::UnitX, -Vector3::UnitX },
+				DirectionRotationCase{ Vector3::UnitY, Vector3(0.0001f, 1.0f, 0.0f) },
+				DirectionRotationCase{ Vector3(2.0f, 0.0f, 0.0f), Vector3(-3.0f, 0.0003f, 0.0f) },
+			};
+			for (const auto& test : rotations)
+			{
+				const auto rotation = math::RotationFromTo(test.m_From, test.m_To);
+				const auto actual = math::TransformDirection(test.m_From.Normalized(), math::CreateFromQuaternion(rotation));
+				context.Check(math::IsFinite(rotation) && (actual - test.m_To.Normalized()).Length() < 1.0e-6f,
+					"Direction rotations preserve small parallel and antiparallel angles on every axis");
+			}
 			WorldLightingProfile profile{ .m_Id = "test.daylight" };
 			const auto hash = HashLightingProfile(profile);
 			context.Check(ValidateLightingProfile(profile) && hash.IsValid() &&
@@ -1085,6 +1110,59 @@ namespace gglab
 			context.Check(changedProfile.m_Outcome == LightingMutationOutcome::Requested &&
 				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
 				"A committed profile mutation owns its background and survives the previous Lab's release");
+
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto beforeSun = environment.GetBakeRequestGeneration();
+			const auto beforeSunSettings = environment.GetSettings();
+			// Equivalent authoring is not substituted by an older request's provenance.
+			auto& authoredSun = *registry.get<components::LightComponent>(entity).m_WorldSun;
+			authoredSun.m_Chromaticity *= 0.5f;
+			environment.SynchronizeWorldLighting(world, 17);
+			const Vector3 smallDirection(0.0f, -0.0001745329f, 1.0f);
+			context.Check(!environment.PrepareWorldSunDirection(world, 18, smallDirection, preparationError) &&
+				!environment.PrepareWorldSunDirection(world, 17, Vector3::Zero, preparationError) &&
+				environment.GetBakeRequestGeneration() == beforeSun,
+				"Sun direction preparation rejects foreign sessions and invalid directions without mutation");
+			auto sunPlan = environment.PrepareWorldSunDirection(world, 17, smallDirection, preparationError);
+			context.Check(sunPlan && sunPlan->HasChanges() && preparationError.empty() &&
+				environment.GetBakeRequestGeneration() == beforeSun &&
+				ResolveWorldSunDirection(rotation).m_Y < -0.99f,
+				"Preparing a sun-only plan preserves the World and existing request");
+			sunPlan.reset();
+			sunPlan = environment.PrepareWorldSunDirection(world, 17, smallDirection, preparationError);
+			const auto sunResult = sunPlan ? sunPlan->Commit() : LightingMutationResult{};
+			const auto sunRequest = environment.GetWorldLightingPublication().m_Requested;
+			context.Check(sunResult.m_Outcome == LightingMutationOutcome::Requested &&
+				sunResult.m_PreviousGeneration == beforeSun && sunResult.m_Generation == beforeSun + 1 &&
+				(ResolveWorldSunDirection(rotation) - smallDirection.Normalized()).Length() < 1.0e-7f &&
+				authoredSun.m_Chromaticity.m_X == 0.5f && authoredSun.m_PerpendicularIlluminanceLux == 60000.0f &&
+				world.m_Atmosphere->m_RayleighScaleHeightMeters == 8000.0f && sunRequest &&
+				sunRequest->m_Inputs.m_Sun.m_Chromaticity.m_X == 0.5f &&
+				environment.GetSettings().m_BackgroundMode == beforeSunSettings.m_BackgroundMode &&
+				environment.GetSettings().m_BakeConfig == beforeSunSettings.m_BakeConfig,
+				"A sun-only commit preserves unrelated authoring and settings while requesting its actual direction");
+			sunPlan = environment.PrepareWorldSunDirection(world, 17, smallDirection, preparationError);
+			const auto sameSun = sunPlan ? sunPlan->Commit() : LightingMutationResult{};
+			context.Check(sameSun.m_Outcome == LightingMutationOutcome::Unchanged &&
+				sameSun.m_Generation == sunResult.m_Generation,
+				"Repeating a small sun direction binds the same target without another bake");
+			scope.reset();
+			context.Check(environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment,
+				"A sun-only mutation preserves the entered lease's background restoration on exit");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			sunPlan = environment.PrepareWorldSunDirection(world, 17, Vector3(1.0f, -1.0f, 0.0f), preparationError);
+			const auto otherSun = sunPlan ? sunPlan->Commit() : LightingMutationResult{};
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+			scope.reset();
+			context.Check(otherSun.m_Outcome == LightingMutationOutcome::Requested &&
+				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
+				"A same-value ordinary background writer still takes ownership after a sun-only mutation");
 
 			auto invalid = profile;
 			invalid.m_Inputs.m_SunDirection = Vector3(std::numeric_limits<float>::max(), 1.0f, 0.0f);

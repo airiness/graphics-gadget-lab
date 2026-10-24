@@ -408,12 +408,20 @@ namespace gglab::math
 		const DirectX::XMVECTOR to = DirectX::XMVector3Normalize(LoadVector3(toDir));
 
 		const float dot = DirectX::XMVectorGetX(DirectX::XMVector3Dot(from, to));
-		if (dot >= 1.0f)
+		const DirectX::XMVECTOR cross = DirectX::XMVector3Cross(from, to);
+		if (dot >= 1.0f || dot <= -0.9999f)
 		{
-			return Quaternion::Identity;
-		}
-		if (dot <= -1.0f)
-		{
+			// A rounded dot can lose a small angle; near opposition, 1 + dot also
+			// loses precision. The cross product retains the angle and its axis.
+			const float sine = DirectX::XMVectorGetX(DirectX::XMVector3Length(cross));
+			if (sine > 0.0f)
+			{
+				return StoreQuaternion(DirectX::XMQuaternionRotationAxis(cross, std::atan2(sine, dot)));
+			}
+			if (dot >= 0.0f)
+			{
+				return Quaternion::Identity;
+			}
 			DirectX::XMVECTOR axis = DirectX::XMVector3Cross(from, LoadVector3(Vector3::Right));
 			if (DirectX::XMVector3NearEqual(
 				DirectX::XMVector3LengthSq(axis), DirectX::g_XMZero, DirectX::g_XMEpsilon))
@@ -423,7 +431,6 @@ namespace gglab::math
 			return StoreQuaternion(DirectX::XMQuaternionRotationAxis(axis, Pi));
 		}
 
-		const DirectX::XMVECTOR cross = DirectX::XMVector3Cross(from, to);
 		Quaternion result = StoreQuaternion(cross);
 		const float scale = std::sqrt((1.0f + dot) * 2.0f);
 		result.m_X /= scale;
