@@ -10,6 +10,8 @@ This page gives the layers and a short tour of one frame. The
 [frame execution map](Frame_Execution_Map.md) then follows the success and failure
 paths in detail, and the [boundary and drift guide](Boundary_And_Drift_Guide.md)
 explains how these pages are kept current.
+For a specific investigation or change, start with the
+[task-routing table](../../.agents/skills/gglab-architecture/references/task-routing.md).
 
 ## Layers
 

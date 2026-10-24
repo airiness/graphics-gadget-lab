@@ -2,7 +2,7 @@
 Atlas ID: atlas.maintenance.boundaries-freshness
 
 - Question: what does a checked map establish, and when must it be refreshed?
-- VerifiedAgainst: `ed1636bc06e0f2016c187575110017a9b21f6558`
+- VerifiedAgainst: `b89e482e8f7cd7c2ed092ee1e55cdfb6a9a5f624`
 - Refresh triggers: represented boundaries, evidence semantics, refresh ownership
   or the local verification workflow changes.
 
@@ -17,6 +17,18 @@ rule change.
 
 `VerifiedAgainst` is the source commit that was reviewed, not the commit that
 contains the map.
+
+### Evidence labels
+
+In reviews, findings and handoffs, label a material claim whose support is not
+obvious from its link:
+
+| Label | Evidence |
+| --- | --- |
+| `[Observed]` | Directly checked source, project metadata or recorded result at a stated revision |
+| `[Documented]` | A local rule, interface contract or map statement, retaining its status and scope |
+| `[Inferred]` | A conclusion from named evidence, with reasoning and uncertainty stated |
+| `[Unverified]` | The evidence needed for the claim has not been checked |
 
 ## Refresh one affected entry
 
@@ -41,8 +53,8 @@ contains the map.
 | `EvidenceIncomplete` | Keep the old baseline and name the missing evidence |
 
 Each `Atlas ID` line names the entry it sits under; links use heading anchors
-instead. An `Anchors` / `ReviewPaths` block belongs to the nearest preceding
-`Atlas ID`.
+instead. An `Anchors` / `ReviewPaths` block belongs to the innermost enclosing
+section that declares an `Atlas ID`.
 
 ## Pending refreshes
 
@@ -56,21 +68,34 @@ when the refresh lands.
 
 ## Checks
 
-The existing validator owns boundary rules. From the repository root:
+From the repository root, with the PR target branch available locally:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CheckArchitectureAtlas.ps1 -RootDir . -BaseRef origin/main
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CheckArchitectureAtlas.ps1 -SelfTest
+```
+
+The helper checks local links, heading anchors and anchor file/symbol text, and
+whether each `VerifiedAgainst` commit is an available ancestor of `HEAD`. It lists
+as `ReviewRequired` the entries whose anchors or review paths changed since the
+merge base or in the working tree; review each with the procedure above, since the
+list is not a staleness verdict. Missing history or an unavailable merge base is
+reported as `EvidenceIncomplete`, never fetched. A produced report exits 0 even
+with findings, and `-AsJson` emits the same data.
+
+The existing validator owns boundary rules; report its result separately from
+map freshness:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/ValidateProjectBoundaries.ps1 -RootDir . -SelfTest
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/ValidateProjectBoundaries.ps1 -RootDir .
 ```
 
-Report its result separately from map freshness: a passing boundary check or a
-matching symbol name does not show that a lifecycle explanation is still right.
-Path, anchor and impact checks are currently manual.
-
 ```text
 Anchors:
   - Scripts/ValidateProjectBoundaries.ps1
+  - Scripts/CheckArchitectureAtlas.ps1
   - AGENTS.md
 ReviewPaths:
-  - Docs/Architecture/*.md
+  - .agents/skills/gglab-architecture/**/*.md
 ```

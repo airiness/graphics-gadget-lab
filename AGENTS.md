@@ -56,7 +56,10 @@ Keep application behavior in its owning domain. Enforce dependency direction
 with compiler include visibility as well as the boundary validator.
 
 The [Architecture Atlas](Docs/Architecture/README.md) maps the project layers and
-the frame path to their source entry points and owning tests.
+the frame path to their source entry points and owning tests. Use
+[gglab-architecture](.agents/skills/gglab-architecture/SKILL.md) for architecture
+orientation and cross-module changes; its task table selects the relevant map,
+Public interface and implementation path.
 
 ## GPU, shader and Lab invariants
 
