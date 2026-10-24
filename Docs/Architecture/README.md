@@ -8,8 +8,10 @@ Atlas ID: atlas.overview.layers
 
 This page gives the layers and a short tour of one frame. The
 [frame execution map](Frame_Execution_Map.md) then follows the success and failure
-paths in detail, and the [boundary and drift guide](Boundary_And_Drift_Guide.md)
-explains how these pages are kept current.
+paths in detail, the [runtime boundaries map](Runtime_Boundaries_Map.md) shows where
+render passes belong and how they are composed, and the
+[boundary and drift guide](Boundary_And_Drift_Guide.md) explains how these pages are
+kept current. The [module catalog](Module_Catalog.md) lists every card.
 For a specific investigation or change, start with the
 [task-routing table](../../.agents/skills/gglab-architecture/references/task-routing.md).
 
@@ -39,10 +41,11 @@ flowchart TD
    content, begins a frame, resolves immutable frame inputs and validates the
    pipeline. If it returns early after the frame began, the scoped `RenderFrame`
    handle aborts that frame.
-4. The pipeline declares graph passes; RenderGraph compiles their dependencies and
-   records the surviving passes through RHI contexts. A pass may also queue a
-   CPU-side commit; the [Frame settlement](Frame_Execution_Map.md#frame-settlement)
-   contract decides when it runs.
+4. The pipeline [declares graph passes](Runtime_Boundaries_Map.md#composition);
+   RenderGraph compiles their dependencies and records the surviving passes through
+   RHI contexts. A pass may also queue a CPU-side commit; the
+   [Frame settlement](Frame_Execution_Map.md#frame-settlement) contract decides when
+   it runs.
 5. Renderer ends or aborts the frame and settles its Runtime participants once. The
    [settlement contract](Frame_Execution_Map.md#frame-settlement) keeps four
    outcomes apart: submitted, failed, discarded and completion unknown.
@@ -62,13 +65,12 @@ flowchart TD
 
 ## Coverage and related guidance
 
-These pages cover the frame path: execution, settlement, GPU-dependent retirement
-and the teardown rules it relies on. Routes for adding a RenderPass and for Lab
-lifetime are not written yet.
+These pages cover the frame path (execution, settlement, GPU-dependent retirement
+and the teardown rules it relies on) and render pass composition. The Lab lifetime
+route is not written yet.
 
-When making a change, follow [AGENTS.md](../../AGENTS.md), the
-[frame contracts](Frame_Execution_Map.md#contracts) and the owning tests linked from
-each module card. GPU capture and visual verification use the
+When making a change, follow [AGENTS.md](../../AGENTS.md), the `Contracts` sections
+of the maps and the owning tests linked from each module card. GPU capture and visual verification use the
 [frame-capture skill](../../.agents/skills/gglab-frame-capture/SKILL.md).
 
 ```text

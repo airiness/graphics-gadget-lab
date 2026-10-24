@@ -55,8 +55,9 @@ visibility and project membership consistent.
 Keep application behavior in its owning domain. Enforce dependency direction
 with compiler include visibility as well as the boundary validator.
 
-The [Architecture Atlas](Docs/Architecture/README.md) maps the project layers and
-the frame path to their source entry points and owning tests. Use
+The [Architecture Atlas](Docs/Architecture/README.md) maps the project layers, the
+frame path and render pass composition to their source entry points and owning
+tests. Use
 [gglab-architecture](.agents/skills/gglab-architecture/SKILL.md) for architecture
 orientation and cross-module changes; its task table selects the relevant map,
 Public interface and implementation path.
@@ -79,6 +80,9 @@ Fix ordering through those contracts rather than reaching into another pass's
 private resources. Justify manual barriers and consider whether the general
 barrier-planning rule needs correction. For compiler changes, inspect dependency
 analysis through resource release and barrier planning as one connected path.
+The Atlas [composition contracts](Docs/Architecture/Runtime_Boundaries_Map.md#contracts)
+detail pass ownership and the lifetime of imported resources; keep both texts
+consistent when either changes.
 
 Keep shader compilation policy and DXC argument construction authoritative in
 the Shader domain; avoid new Renderer/RHI coupling to host-side compilation.

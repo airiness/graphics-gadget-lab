@@ -8,8 +8,9 @@ description: Orient gglab architecture investigations and cross-module changes u
 ## Route
 
 Start with the matching row in [task routing](references/task-routing.md), one
-map section and the cards needed for the question. Use the
-[overview](../../../Docs/Architecture/README.md) when the owner is unclear.
+map section and the cards needed for the question; the
+[module catalog](../../../Docs/Architecture/Module_Catalog.md) lists every card. Use
+the [overview](../../../Docs/Architecture/README.md) when the owner is unclear.
 
 Identify the owning project, its Public interface and its implementation entry
 separately.

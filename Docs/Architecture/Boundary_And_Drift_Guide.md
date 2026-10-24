@@ -9,8 +9,10 @@ Atlas ID: atlas.maintenance.boundaries-freshness
 ## Authority and baselines
 
 Source and project membership show what the implementation does. Local interface
-contracts, [AGENTS.md](../../AGENTS.md) and the map
-[Contracts](Frame_Execution_Map.md#contracts) state what it is required to do.
+contracts, [AGENTS.md](../../AGENTS.md) and the `Contracts` sections of the
+[frame execution](Frame_Execution_Map.md#contracts) and
+[runtime boundaries](Runtime_Boundaries_Map.md#contracts) maps state what it is
+required to do.
 When source and a rule disagree, resolve it with the subsystem owner as either an
 implementation fix or an explicit rule change.
 
