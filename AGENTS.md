@@ -160,9 +160,11 @@ builds. Diagnostic compiles during implementation may precede this pass. Revisit
 later code edits before final verification; unchanged code needs no repeated
 formatting pass for each build configuration or test invocation.
 
-Use `README.md` for setup and the executable/suite catalog, and
-`.github/workflows/build.yml` for the CI build matrix and command details. Use
-the owner's Visual Studio/MSVC toolchain. Run builds from the repository root
+Use [README.md](README.md) for setup and the
+[CI workflow](.github/workflows/build.yml) for executable test commands and the
+build matrix. List scripted verification suites with
+[RunVerification.ps1](Tests/Verification/RunVerification.ps1) `-List`. Use the
+owner's Visual Studio/MSVC toolchain. Run builds from the repository root
 in a shell with x64-hosted MSBuild available
 (`MSBuild/Current/Bin/amd64/MSBuild.exe`); outputs are under
 `Build/Output/x64/<Configuration>/`.
