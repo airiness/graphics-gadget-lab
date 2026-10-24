@@ -443,7 +443,7 @@ namespace gglab
 			{ "values", std::move(values) },
 			{ "lighting", { { "requested", lighting(frame.m_RequestedLighting) },
 				{ "active", lighting(frame.m_ActiveLighting) } } },
-			{ "receipts", std::move(receipts) } }.dump();
+			{ "receipts", std::move(receipts) } }.dump(-1, ' ', false, Json::error_handler_t::replace);
 	}
 
 	std::string SerializeFrameCaptureMetadata(const FrameCaptureMetadata& metadata) noexcept

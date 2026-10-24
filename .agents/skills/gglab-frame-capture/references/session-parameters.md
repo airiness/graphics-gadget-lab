@@ -11,8 +11,10 @@ see [sequences](sequences.md) for publication and frame/reference joins.
 
 Use the script and application from the same revision. Check
 `status.capabilities.sessionParameterControl` for Host/mixed-source support.
-`labParameterControl` retains discovery for the earlier Lab-only extension. The extension adds commands and status fields; existing
-capture/result/sequence fields and their v4 meanings are unchanged.
+`labParameterControl` retains discovery for the earlier Lab-only extension; scheduled
+sequence events are discovered only through `sequenceImmediateEvents`,
+`sequenceDeferredEvents` and `sequenceEventDomains`. The extension adds commands and
+status fields; existing capture/result/sequence fields and their v4 meanings are unchanged.
 
 The external session client owns one batch/result slot shared by Host and active Lab sources.
 Host `view.taa.*`, `view.gtao.*` and `view.exposure.*` work on Demo and Lab content.

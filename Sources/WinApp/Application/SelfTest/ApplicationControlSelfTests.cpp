@@ -126,6 +126,10 @@ namespace gglab
 				status["capabilities"]["labParameterControl"]["maxItems"] == 128 &&
 				status["parameterControl"]["batch"] == superseded && status["parameterControl"]["revision"] == 7,
 				"Status advertises bounded parameter support and borrows the actual receipt");
+			context.Check(!status["capabilities"]["labParameterControl"].contains("scheduledEvents") &&
+				status["capabilities"]["sequenceImmediateEvents"] == true &&
+				status["capabilities"]["sequenceDeferredEvents"] == true,
+				"Sequence capabilities alone advertise scheduled events; the Lab-only object does not contradict them");
 			context.Check(status["capabilities"]["sessionParameterControl"]["sources"] == Json::array({ "host", "lab" }) &&
 				status["capabilities"]["sessionParameterControl"]["mixedSources"] &&
 				status["capabilities"]["sessionParameterControl"]["maxBatches"] == 1,

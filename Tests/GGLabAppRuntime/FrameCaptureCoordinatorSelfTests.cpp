@@ -1744,6 +1744,24 @@ namespace gglab
 				json.find("\"sequence\": null") != std::string::npos,
 				"Metadata records temporal consumers, services, jitter, settings and render "
 				"scale, and the sequence frame when the capture belongs to a sequence");
+
+			// Failure text can carry host-encoded paths or system messages. Frozen
+			// serialization is noexcept and must replace invalid UTF-8 instead of throwing.
+			ParameterFrameState parameters{ .m_FrameSerial = 11, .m_Revision = 3,
+				.m_ContentId = "gglab.lab.fixture" };
+			parameters.m_Receipts.push_back({ .m_BatchId = 4, .m_Item = {
+				.m_Parameter = LabParameterId("fixture.samples"),
+				.m_DeclaredClass = ParameterEffectClass::Rebuild,
+				.m_State = ParameterEffectState::Failed,
+				.m_Requested = 10,
+				.m_Failure = "Failed to prepare lab: \xC0\xFF" } });
+			metadata.m_Parameters = std::make_shared<const ParameterFrameState>(parameters);
+			const auto frozen = nlohmann::json::parse(SerializeParameterFrameState(parameters), nullptr, false);
+			const auto embedded = nlohmann::json::parse(SerializeFrameCaptureMetadata(metadata), nullptr, false);
+			context.Check(!frozen.is_discarded() && !embedded.is_discarded() &&
+				frozen["receipts"][0]["failure"].get<std::string>().find("\xEF\xBF\xBD") != std::string::npos &&
+				embedded["parameters"] == frozen,
+				"Frozen parameter failure text replaces invalid UTF-8 instead of terminating serialization");
 		}
 	}
 

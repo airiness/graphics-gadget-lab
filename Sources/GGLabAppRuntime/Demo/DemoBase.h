@@ -76,8 +76,9 @@ namespace gglab
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}
 		virtual void OnExit() noexcept {}
 		virtual void Update() noexcept = 0;
-		// Content may apply safe in-place parameter changes after RHI readiness and
-		// before settings/planning, then freeze consumed identities after scene build.
+		// Runtime-failure, ready-frame and built-frame notifications; ready follows Session
+		// parameter application. Session owns parameter changes and effect attribution, so a
+		// lighting change made here is unattributed and fails or supersedes pending receipts.
 		virtual void OnRuntimeFailed(std::string_view reason) noexcept { GGLAB_UNUSED(reason); }
 		virtual void OnFrameReady(uint64_t serial) noexcept { GGLAB_UNUSED(serial); }
 		virtual void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept

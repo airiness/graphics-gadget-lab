@@ -65,10 +65,16 @@ namespace gglab
 			return 0;
 		}
 		UpdateSequenceParameterEvents();
-		if (m_ParameterControl && (m_ParameterControl->HasPendingParameterBatches() ||
-			(!request.m_Events.empty() && m_ParameterControl->GetParameterBatchCount() != 0)))
+		if (m_ParameterControl && m_ParameterControl->HasPendingParameterBatches())
 		{
 			error = "Busy: finish the pending parameter batch before starting a sequence.";
+			return 0;
+		}
+		// Sequence-owned event batches cannot be admitted beside another owner's retained record.
+		if (m_ParameterControl && !request.m_Events.empty() &&
+			m_ParameterControl->GetParameterBatchCount() != 0)
+		{
+			error = "Busy: consume the retained parameter batch result before starting a sequence with events.";
 			return 0;
 		}
 		request.m_ParameterProvenance = true;

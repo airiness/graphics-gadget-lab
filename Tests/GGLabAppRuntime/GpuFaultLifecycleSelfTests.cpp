@@ -3364,6 +3364,11 @@ namespace gglab
 						runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_Readiness.IsReady();
 				}),
 				"The admitted Host batch completes and readiness settles before sequence replay");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission",
+				.m_Events = { { .m_Frame = 0, .m_Values = { host[0] } } } }, error) == 0 &&
+				error.find("consume the retained parameter batch result") != std::string::npos &&
+				sequence.GetStatus()->m_SequenceId == waiting && parameters.GetParameterBatchStatus()->m_BatchId == first,
+				"A retained terminal result rejects an event sequence with consumption guidance and keeps the result");
 			const auto running = runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission",
 				.m_CaptureFrames = { 2 } }, error);
 			checks.Check(running == waiting + 1 && parameters.GetParameterBatchStatus()->m_BatchId == first &&
