@@ -1,4 +1,7 @@
 #pragma once
+#include "GGLabRuntime/Graphics/LightingProfile.h"
+#include "GGLabRuntime/Graphics/LightingMutationResult.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "Lab/LabParameter.h"
@@ -9,6 +12,12 @@
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+
 namespace gglab
 {
 	class Camera;
@@ -17,6 +26,7 @@ namespace gglab
 	class RenderPipelineBase;
 	struct LabDiagnosticsSnapshot;
 	struct LabDiagnosticsFrameContext;
+	struct RenderView;
 
 	struct LabSessionCreateInfo
 	{
@@ -31,6 +41,12 @@ namespace gglab
 		}
 	};
 
+	struct LabParameterFrameContext
+	{
+		const ResolvedViewRenderSettings& m_ViewSettings;
+		const RenderView* m_View = nullptr;
+	};
+
 	class LabSessionBase
 	{
 	public:
@@ -42,7 +58,55 @@ namespace gglab
 		bool IsValid() const noexcept;
 		bool SetParameter(const LabParameterId& id, const LabValue& value,
 			LabChangeImpact* impact = nullptr) noexcept;
+		[[nodiscard]] std::optional<LabParameterBatchResult> SetParameters(
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		LabChangeImpact ResetParameters() noexcept;
+		[[nodiscard]] virtual bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			return false;
+		}
+		// Runs after the complete batch commits, even when parameter storage is unchanged.
+		// Return the current operation's result, never a cached earlier request.
+		[[nodiscard]] virtual LightingMutationResult ApplyDeferredLightingParameter(
+			const LabParameterId& id) noexcept
+		{
+			GGLAB_UNUSED(id);
+			return {};
+		}
+		[[nodiscard]] virtual bool SupportsWorldLightingParameter(const LabParameterId& id) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			return false;
+		}
+		// Read-only preparation from the candidate value at the synchronized safe
+		// boundary. The batch commits this plan before any Lab callbacks run.
+		[[nodiscard]] virtual std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingParameter(
+			const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+			uint64_t contentIdentity, std::string& error) noexcept
+		{
+			GGLAB_UNUSED(id);
+			GGLAB_UNUSED(value);
+			GGLAB_UNUSED(control);
+			GGLAB_UNUSED(contentIdentity);
+			error = "The Lab has no prepared World Lighting parameter binding.";
+			return {};
+		}
+		// Session Immediate controls require an explicit source-owned projection.
+		// Read only the frozen frame inputs, never substitute the live parameter set.
+		[[nodiscard]] virtual bool SupportsImmediateParameter(const LabParameterId& id) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			return false;
+		}
+		[[nodiscard]] virtual std::optional<LabValue> ReadImmediateParameterFrameValue(
+			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
+		{
+			GGLAB_UNUSED(id);
+			GGLAB_UNUSED(frame);
+			return std::nullopt;
+		}
+		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
 
@@ -105,6 +169,7 @@ namespace gglab
 		void ResetAssetInterests() noexcept;
 
 		virtual void ApplyImmediateParameters() noexcept {}
+		virtual bool RefreshInheritedParameters() noexcept { return false; }
 		virtual void RebuildScene() noexcept {}
 		virtual void RecreatePipeline() noexcept {}
 		virtual void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept;
@@ -116,6 +181,8 @@ namespace gglab
 		World m_World;
 
 	private:
+		friend class LabRuntime;
+		void CommitPreparedParameters(LabParameterSet&& parameters) noexcept;
 		LabDescriptor m_Descriptor;
 		std::unique_ptr<AssetOwnerScope> m_AssetOwnerScope;
 		LabParameterSet m_Parameters;

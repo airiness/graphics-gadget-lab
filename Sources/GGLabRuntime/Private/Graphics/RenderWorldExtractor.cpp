@@ -1,11 +1,9 @@
 #include "Graphics/RenderWorldExtractor.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/WorldSun.h"
 #include "GGLabRuntime/Scene/Components.h"
-
-#include <cmath>
 
 namespace gglab
 {
@@ -62,14 +60,6 @@ namespace gglab
 	Vector3 RenderWorldExtractor::ResolveLightDirection(
 		const components::TransformComponent& transform) noexcept
 	{
-		const Matrix rotation = math::CreateFromQuaternion(transform.m_Rotation);
-		Vector3 forward = math::TransformDirection(Vector3::Forward, rotation);
-		if (!std::isfinite(forward.LengthSquared()) || forward.LengthSquared() <= 1.0e-8f)
-		{
-			return -Vector3::UnitY;
-		}
-
-		forward.Normalize();
-		return forward;
+		return ResolveWorldSunDirection(transform.m_Rotation);
 	}
 }

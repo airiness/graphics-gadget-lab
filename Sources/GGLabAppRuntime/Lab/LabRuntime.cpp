@@ -1,5 +1,6 @@
 #include "Lab/LabRuntime.h"
 #include "AppRuntimeLog.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
@@ -140,6 +141,12 @@ namespace gglab
 
 	void LabRuntime::Shutdown() noexcept
 	{
+		if (m_ParameterRebuild)
+		{
+			m_ParameterRebuild->m_State = ParameterRebuildState::Superseded;
+		}
+		m_PendingParameterRebuild = 0;
+		GGLAB_UNUSED(m_CommandQueue.ConsumeParameterBatch());
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
@@ -171,6 +178,11 @@ namespace gglab
 
 	void LabRuntime::OnExit() noexcept
 	{
+		if (m_ParameterRebuild)
+		{
+			m_ParameterRebuild->m_State = ParameterRebuildState::Superseded;
+		}
+		GGLAB_UNUSED(m_CommandQueue.ConsumeParameterBatch());
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
@@ -199,6 +211,7 @@ namespace gglab
 
 	void LabRuntime::Update() noexcept
 	{
+		RefreshInheritedParameters();
 		GGLAB_ASSERT_MSG(m_ActiveSession, "LabRuntime requires an active session before update.");
 		if (m_ActiveSession)
 		{
@@ -246,6 +259,7 @@ namespace gglab
 
 	void LabRuntime::ProcessPendingCommands() noexcept
 	{
+		RefreshInheritedParameters();
 		const LabCommandBatch commands = m_CommandQueue.Consume();
 		if (commands.m_SwitchTarget)
 		{
@@ -259,7 +273,7 @@ namespace gglab
 			m_CreateInfo.m_RunConfig = *commands.m_RunConfig;
 			m_CreateInfo.m_RunConfig.Sanitize();
 			const std::vector<LabParameterValue> values =
-				m_ActiveSession->GetParameters().CaptureValues();
+				m_ActiveSession->GetParameters().CaptureRestoredValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 			TickTransitions();
 			return;
@@ -268,7 +282,7 @@ namespace gglab
 		if (commands.m_RestartRequested && m_ActiveSession)
 		{
 			const std::vector<LabParameterValue> values =
-				m_ActiveSession->GetParameters().CaptureValues();
+				m_ActiveSession->GetParameters().CaptureRestoredValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 			TickTransitions();
 			return;
@@ -314,10 +328,11 @@ namespace gglab
 			return;
 		}
 
+		++m_ParameterRevision;
 		if (impact != LabChangeImpact::Immediate)
 		{
 			const std::vector<LabParameterValue> values =
-				m_ActiveSession->GetParameters().CaptureValues();
+				m_ActiveSession->GetParameters().CaptureRestoredValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 		}
 		else
@@ -344,6 +359,13 @@ namespace gglab
 			m_PendingSession.reset();
 			m_State = m_ActiveSession ? m_StateBeforeTransition : LabRunState::Failed;
 			SetError(std::format("Failed to prepare lab '{}': {}", labName, progress.m_Detail));
+			if (m_PendingParameterRebuild != 0 && m_ParameterRebuild &&
+				m_ParameterRebuild->m_Generation == m_PendingParameterRebuild)
+			{
+				m_ParameterRebuild->m_State = ParameterRebuildState::Failed;
+				m_ParameterRebuild->m_Failure = m_LastError;
+			}
+			m_PendingParameterRebuild = 0;
 			return;
 		}
 		if (progress.IsReady())
@@ -476,8 +498,13 @@ namespace gglab
 
 	bool LabRuntime::BeginSessionTransition(const LabId& id,
 		std::span<const LabParameterValue> values,
-		std::span<const LabParameterAssignment> assignments) noexcept
+		std::span<const LabParameterAssignment> assignments, uint64_t parameterRebuild) noexcept
 	{
+		if (m_ParameterRebuild && m_ParameterRebuild->m_Generation != parameterRebuild)
+		{
+			m_ParameterRebuild->m_State = ParameterRebuildState::Superseded;
+		}
+		m_PendingParameterRebuild = parameterRebuild;
 		if (!m_PendingSession)
 		{
 			m_StateBeforeTransition = m_State;
@@ -559,6 +586,14 @@ namespace gglab
 
 		m_ActiveSession = std::move(m_PendingSession);
 		++m_TemporalSessionSerial;
+		++m_ParameterRevision;
+		if (m_PendingParameterRebuild != 0 && m_ParameterRebuild &&
+			m_ParameterRebuild->m_Generation == m_PendingParameterRebuild)
+		{
+			m_ParameterRebuild->m_TargetSession = m_TemporalSessionSerial;
+			m_ParameterRebuild->m_State = ParameterRebuildState::Published;
+		}
+		m_PendingParameterRebuild = 0;
 		GGLAB_ASSERT_MSG(m_TemporalSessionSerial != 0,
 			"Lab temporal session serial overflowed its valid range.");
 		m_ActiveSession->OnResize(m_CreateInfo.m_WindowWidth, m_CreateInfo.m_WindowHeight);
@@ -601,6 +636,14 @@ namespace gglab
 				return !retiring.m_RetireFence.IsValid() ||
 					device->IsFencePointCompleted(retiring.m_RetireFence);
 			});
+	}
+
+	void LabRuntime::RefreshInheritedParameters() noexcept
+	{
+		if (m_IsEntered && m_ActiveSession && m_ActiveSession->RefreshInheritedParameters())
+		{
+			++m_ParameterRevision;
+		}
 	}
 
 	void LabRuntime::SetError(std::string message) noexcept

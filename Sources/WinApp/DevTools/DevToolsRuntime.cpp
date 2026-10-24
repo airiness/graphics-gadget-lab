@@ -3,6 +3,7 @@
 #include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
 
 #include <format>
+#include <optional>
 
 #include <imgui.h>
 
@@ -22,28 +23,28 @@ namespace gglab
 		m_ViewRenderSettingsOverrides.ClearAll();
 	}
 
+	ApplicationToolingFrameSettings DevToolsRuntime::CaptureFrameSettings() const noexcept
+	{
+		const auto& overrides = m_ViewRenderSettingsOverrides;
+		return {
+			.m_TemporalAA = overrides.m_TemporalAA.m_IsActive ?
+				std::optional(overrides.m_TemporalAA.m_Settings) :
+				std::nullopt,
+			.m_GTAO = overrides.m_GTAO.m_IsActive ?
+				std::optional(overrides.m_GTAO.m_Settings) :
+				std::nullopt,
+			.m_Bloom = overrides.m_Bloom.m_IsActive ?
+				std::optional(overrides.m_Bloom.m_Settings) :
+				std::nullopt,
+			.m_ScenePreExposure = overrides.m_ScenePreExposure,
+			.m_Shadow = m_RenderVisualizationSettings.m_Shadow,
+		};
+	}
+
 	ViewRenderProfile DevToolsRuntime::ResolveViewRenderProfile(
 		const ViewRenderProfile& authoringProfile) const noexcept
 	{
-		ViewRenderProfile effectiveProfile = authoringProfile;
-		effectiveProfile.m_EnableScenePreExposure =
-			m_ViewRenderSettingsOverrides.m_ScenePreExposure.value_or(
-				authoringProfile.m_EnableScenePreExposure);
-		if (m_ViewRenderSettingsOverrides.m_TemporalAA.m_IsActive)
-		{
-			effectiveProfile.m_TemporalAA =
-				m_ViewRenderSettingsOverrides.m_TemporalAA.m_Settings;
-		}
-		if (m_ViewRenderSettingsOverrides.m_GTAO.m_IsActive)
-		{
-			effectiveProfile.m_Lighting.m_GTAO = m_ViewRenderSettingsOverrides.m_GTAO.m_Settings;
-		}
-		if (m_ViewRenderSettingsOverrides.m_Bloom.m_IsActive)
-		{
-			effectiveProfile.m_PostProcess.m_Bloom =
-				m_ViewRenderSettingsOverrides.m_Bloom.m_Settings;
-		}
-		return effectiveProfile;
+		return CaptureFrameSettings().ResolveProfile(authoringProfile);
 	}
 
 	void DevToolsRuntime::Draw(DevelopGuiContext& context) noexcept

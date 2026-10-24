@@ -9,10 +9,13 @@ from pathlib import Path
 import numpy as np
 from jsonschema import Draft202012Validator
 
+import ValidateParameterFrames as parameters
+
 
 def validate(path, validator):
 	document = json.loads(path.read_text(encoding="utf-8"))
 	validator.validate(document)
+	parameters.validate_export(document["frame"], document["schemaVersion"], 3, document["frameSerial"])
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
 		raise ValueError("Frame serials disagree")
 	if document["graph"] is not None and not document["observation"]["graph"]:
@@ -66,10 +69,13 @@ def validate(path, validator):
 				raise ValueError("Unregistered buffers require raw 32-bit words")
 	if document["graph"] is not None:
 		graph = json.loads((path.parent / document["graph"]).read_text(encoding="utf-8"))
+		parameters.validate_export(graph.get("frame", {}), graph["schemaVersion"], 6, graph["frameSerial"])
+		if graph.get("frame", {}).get("parameters") != document["frame"].get("parameters"):
+			raise ValueError("Paired graph and resources disagree on frozen parameters")
 		if graph["frameSerial"] != document["frameSerial"] or graph["submission"] != document["submission"]:
 			raise ValueError("The paired graph belongs to a different submitted frame")
 		scanning = document["observation"]["nonFiniteWatch"]
-		if graph["schemaVersion"] == 5:
+		if graph["schemaVersion"] >= 5:
 			# Content versions no longer encode observation variants; the node kinds do.
 			kinds = set(graph["observation"].get("nodeKinds") or ())
 			observed = "ResourceExport" in kinds and bool(kinds & {"NonFiniteScan", "ProductionCounters"}) == scanning

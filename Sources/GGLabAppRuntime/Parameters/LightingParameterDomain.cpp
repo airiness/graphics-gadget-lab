@@ -1,0 +1,97 @@
+#include "Parameters/LightingParameterDomain.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+
+namespace gglab
+{
+	void LightingParameterDomain::BeginFrame() noexcept
+	{
+		m_FrameBaseline = m_Environment.GetBakeRequestGeneration();
+		m_FrameAttributedGeneration = 0;
+	}
+
+	void LightingParameterDomain::BeginApplication(ParameterDomainState& state) const noexcept
+	{
+		state = { .m_Baseline = m_Environment.GetBakeRequestGeneration() };
+	}
+
+	void LightingParameterDomain::ObserveFrameEffects(const ParameterDomainState& state) noexcept
+	{
+		if (state.m_Attributed)
+		{
+			m_FrameAttributedGeneration = state.m_Applied;
+		}
+	}
+
+	void LightingParameterDomain::CompleteEffects(ParameterDomainState& state) const noexcept
+	{
+		const uint64_t requested = m_Environment.GetBakeRequestGeneration();
+		state.m_Applied = requested != state.m_Baseline ? requested : 0;
+		state.m_Attributed = false;
+	}
+
+	ParameterApplication LightingParameterDomain::Translate(const LightingMutationResult& evidence,
+		bool unchanged, ParameterDomainState& state) const noexcept
+	{
+		const uint64_t requested = m_Environment.GetBakeRequestGeneration();
+		const bool newTarget = evidence.m_Outcome == LightingMutationOutcome::Requested &&
+			evidence.m_Generation > evidence.m_PreviousGeneration;
+		const bool existing = evidence.m_Outcome == LightingMutationOutcome::Unchanged &&
+			evidence.m_Generation == evidence.m_PreviousGeneration;
+		if ((!newTarget && !existing) || evidence.m_PreviousGeneration != state.m_Baseline ||
+			evidence.m_Generation != requested || requested == 0)
+		{
+			return { .m_Failure =
+				"LightingEffectUnproven: the current operation did not bind the Runtime target at this boundary." };
+		}
+		state.m_Attributed = true;
+		state.m_Applied = requested;
+		return { .m_ActualClass = ParameterEffectClass::Deferred,
+			.m_Identity = { .m_Domain = "lighting", .m_Generation = requested },
+			.m_NoChange = unchanged && existing && m_Environment.GetBakingStatus().m_ActiveGeneration == requested };
+	}
+
+	ParameterApplication LightingParameterDomain::ObserveImmediate(const ParameterDomainState& state) const noexcept
+	{
+		if (state.m_Applied != 0 && !state.m_Attributed)
+		{
+			return { .m_ActualClass = ParameterEffectClass::Deferred,
+				.m_Identity = { .m_Domain = "lighting", .m_Generation = state.m_Applied } };
+		}
+		const uint64_t requested = m_Environment.GetBakeRequestGeneration();
+		if (requested != m_FrameBaseline && requested != m_FrameAttributedGeneration)
+		{
+			return { .m_Failure = "UnexpectedLightingTransition: effect attribution is unavailable for this frame." };
+		}
+		return {};
+	}
+
+	bool LightingParameterDomain::CoversReadinessGate(const ParameterStateIdentity& identity,
+		std::string_view gate) const noexcept
+	{
+		// Environment asset loading is external to these synchronous lighting mutations.
+		// Only the exact Runtime target attributed to this operation covers IBL Pending.
+		return gate == "ibl" && identity.m_Domain == "lighting" && identity.m_Generation != 0 &&
+			identity.m_Generation == m_Environment.GetBakeRequestGeneration() &&
+			m_Environment.GetBakingStatus().m_Stage != IBLBakeStage::Failed;
+	}
+
+	ParameterPublicationObservation LightingParameterDomain::ObservePublication(
+		const ParameterStateIdentity& identity, const ParameterSourceFrame& frame) const noexcept
+	{
+		// A newer target observed before build supersedes this operation. A request
+		// after build cannot rewrite the frozen evidence retained for that submission.
+		if (m_Environment.GetBakeRequestGeneration() != identity.m_Generation)
+		{
+			return { ParameterPublication::Superseded };
+		}
+		if (frame.m_LightingGeneration != 0 && frame.m_LightingGeneration == identity.m_Generation)
+		{
+			return { ParameterPublication::Published };
+		}
+		if (m_Environment.GetBakingStatus().m_Stage == IBLBakeStage::Failed)
+		{
+			return { ParameterPublication::Failed, "LightingPublicationFailed" };
+		}
+		return {};
+	}
+}

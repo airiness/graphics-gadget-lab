@@ -153,9 +153,14 @@ namespace gglab
 		return std::clamp(fov, 1.0f, 179.0f);
 	}
 
+	bool Camera::IsValidManualEV100(float ev) noexcept
+	{
+		return math::IsInClosedRange(ev, MinimumManualEV100, MaximumManualEV100);
+	}
+
 	float Camera::ClampManualEV100(float ev) noexcept
 	{
-		return std::clamp(ev, -16.0f, 24.0f);
+		return std::clamp(ev, MinimumManualEV100, MaximumManualEV100);
 	}
 
 	float Camera::ClampExposureCompensationEV(float ev) noexcept

@@ -1,5 +1,6 @@
 #pragma once
 #include "Capture/FrameCaptureReadiness.h"
+#include "Parameters/ParameterFrameState.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
@@ -187,6 +188,7 @@ namespace gglab
 		bool m_ResourceExportActive = false;
 		bool m_NonFiniteScanActive = false;
 		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
+		std::shared_ptr<const ParameterFrameState> m_Parameters;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.
@@ -196,4 +198,5 @@ namespace gglab
 	[[nodiscard]] std::string SerializeFrameCaptureMetadata(
 		const FrameCaptureMetadata& metadata) noexcept;
 	[[nodiscard]] std::string SerializeNonFiniteWatchCoverage(const NonFiniteWatchCoverage& coverage) noexcept;
+	[[nodiscard]] std::string SerializeParameterFrameState(const ParameterFrameState& frame) noexcept;
 }

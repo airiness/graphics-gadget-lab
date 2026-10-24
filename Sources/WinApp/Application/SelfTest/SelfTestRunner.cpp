@@ -1,4 +1,5 @@
 #include "Application/SelfTest/SelfTestRunner.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/SelfTest/ApplicationHostConfigurationSelfTests.h"
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/ApplicationControlSelfTests.h"
@@ -169,7 +170,7 @@ namespace gglab
 		context.Check(activeRegistryStream.good(),
 			"Injected artifact root opens the packaged active registry independently of process CWD");
 #else
-		static_cast<void>(backend);
+		GGLAB_UNUSED(backend);
 		context.Check(runtimePaths.m_ShaderArtifactRoot == runtimePaths.m_IblDerivedDataRoot.parent_path().parent_path() / "ShaderArtifacts",
 			"Artifact and derived-data paths share the explicit writable root independently of process CWD");
 #endif

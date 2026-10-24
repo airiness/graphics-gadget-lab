@@ -39,7 +39,7 @@ function Read-GraphProduct {
 
 function Test-GraphMemoryFacts {
     param($Graph, [string[]]$NodeKinds)
-    if ($Graph.schemaVersion -ne 5) { throw "Expected graph schemaVersion 5, found $($Graph.schemaVersion)." }
+    if ($Graph.schemaVersion -ne 6) { throw "Expected graph schemaVersion 6, found $($Graph.schemaVersion)." }
     if ((@($Graph.observation.nodeKinds) -join ',') -cne ($NodeKinds -join ',')) {
         throw "Graph node kinds '$(@($Graph.observation.nodeKinds) -join ',')' differ from '$($NodeKinds -join ',')'."
     }

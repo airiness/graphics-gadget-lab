@@ -153,6 +153,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.cpp">
       <Filter>Application\Control</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlParameters.cpp">
+      <Filter>Application\Control</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.cpp">
       <Filter>Application\Control</Filter>
     </ClCompile>
@@ -521,10 +524,16 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlCaptureJobs.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlParameters.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Control\ApplicationControlProtocol.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneCameraPaths.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneLightingProfiles.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalSceneReferenceViews.h">

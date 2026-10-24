@@ -15,6 +15,7 @@ import ValidateNonFiniteCoverage as coverage
 import ValidateRenderGraphExports as graphs
 import ValidateResourceExports as resources
 import ValidateGpuTiming as timing
+import ValidateParameterFrames as parameters
 
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "Schemas"
@@ -131,26 +132,46 @@ def validate(path, bundle_validator=None):
 				raise ValueError("Product adapter disagrees with the bundle")
 		if any(frame.get(key) != document["provenance"][key] for key in PROVENANCE) or frame.get("watch") != watch:
 			raise ValueError("Required products disagree on actual frame, camera, time, scene inputs or watch coverage")
+		if frame.get("parameters") != document["provenance"].get("parameters"):
+			raise ValueError("Required products disagree on frozen parameters")
+		if frame.get("parameters") is not None:
+			parameters.validate_frame(frame["parameters"], frame["frame"]["serial"])
 	return document
 
 
 def validate_sequence(path, document):
 	sequence, environment = document["sequence"], document["environment"]
-	if document["bundleId"] != f'{document["runIdentity"]}-s{sequence["id"]}-timing':
+	products = document["products"]
+	sources = [product["source"] for product in products]
+	if len(set(sources)) != len(sources) or [product["index"] for product in products] != list(range(len(products))):
+		raise ValueError("Sequence products must be distinct with contiguous indices")
+	suffix = "range" if "parameter-frames" in sources else "timing"
+	if document["bundleId"] != f'{document["runIdentity"]}-s{sequence["id"]}-{suffix}':
 		raise ValueError("Sequence bundle identity disagrees with its qualified sequence")
 	if environment["process"]["runIdentity"] not in (None, document["runIdentity"]):
 		raise ValueError("Environment run identity disagrees with the sequence bundle")
-	product = document["products"][0]
-	if product["files"] != [product["metadata"]] or product["metadata"] == path.name:
-		raise ValueError("A timing bundle requires exactly one owning timing product")
-	metadata = json.loads(local_file(path.parent, product["metadata"]).read_text(encoding="utf-8"))
-	timing.validate(metadata)
-	if metadata["sequence"] != sequence or metadata["watch"] != document["watch"]:
-		raise ValueError("Timing product disagrees with its bundle sequence range or watch coverage")
-	if metadata["measurement"]["validation"] != environment["validation"]:
-		raise ValueError("Timing measurement validation disagrees with its environment")
-	if environment["device"] is not None and metadata["context"]["backend"] != environment["device"]["backend"]:
-		raise ValueError("Timing backend disagrees with its environment")
+	files, timing_samples, parameter_samples = set(), None, None
+	for product in products:
+		if product["files"] != [product["metadata"]] or product["metadata"] == path.name or product["metadata"] in files:
+			raise ValueError("A sequence product requires one distinct owning metadata file")
+		files.add(product["metadata"])
+		metadata = json.loads(local_file(path.parent, product["metadata"]).read_text(encoding="utf-8"))
+		if product["schema"] != metadata["schema"] or product["schemaVersion"] != metadata["schemaVersion"]:
+			raise ValueError("Sequence product schema disagrees with its owning metadata")
+		if product["source"] == "gpu-timing":
+			timing.validate(metadata)
+			timing_samples = [(s["sequenceFrame"], s["referenceSample"], s["frameSerial"]) for s in metadata["coverage"]["samples"]]
+			if metadata["measurement"]["validation"] != environment["validation"]:
+				raise ValueError("Timing measurement validation disagrees with its environment")
+			if environment["device"] is not None and metadata["context"]["backend"] != environment["device"]["backend"]:
+				raise ValueError("Timing backend disagrees with its environment")
+		else:
+			parameters.validate(metadata)
+			parameter_samples = [(s["sequenceFrame"], s["referenceSample"], s["parameters"]["frameSerial"]) for s in metadata["frames"]]
+		if metadata["sequence"] != sequence or metadata["watch"] != document["watch"]:
+			raise ValueError("Sequence product disagrees with its bundle range or watch coverage")
+	if timing_samples is not None and parameter_samples is not None and sorted(timing_samples) != parameter_samples:
+		raise ValueError("Timing and parameters must cover exactly the same submitted samples")
 	return document
 
 
@@ -240,6 +261,28 @@ def self_test(bundle_validator):
 			products=[dict(index=0, source="gpu-timing", diagnosticTap=None, schema="gglab.gpu-timing",
 				schemaVersion=1, metadata="timing.json", files=["timing.json"])])
 		check(sequence_bundle)
+		parameter_product = parameters.fixture()
+		parameter_product["sequence"] = copy.deepcopy(measurement["sequence"])
+		parameter_product["frames"] = [dict(sequenceFrame=s["sequenceFrame"], referenceSample=s["referenceSample"],
+			parameters=parameters.frame_fixture(s["frameSerial"])) for s in measurement["coverage"]["samples"]]
+		(root / "parameters.json").write_text(json.dumps(parameter_product), encoding="utf-8")
+		combined = copy.deepcopy(sequence_bundle)
+		combined["schemaVersion"] = 3
+		combined["bundleId"] = f"{run}-s3-range"
+		combined["products"].append(dict(index=1, source="parameter-frames", diagnosticTap=None,
+			schema="gglab.parameter-frames", schemaVersion=1, metadata="parameters.json", files=["parameters.json"]))
+		check(combined)
+		parameter_only = copy.deepcopy(combined)
+		parameter_only["products"] = [dict(combined["products"][1], index=0)]
+		check(parameter_only)
+		for bad_product in (dict(combined["products"][1], source="gpu-timing"),
+			dict(combined["products"][1], schema="gglab.gpu-timing"), dict(combined["products"][1], index=0)):
+			bad = copy.deepcopy(combined)
+			bad["products"][1] = bad_product
+			cases.append(bad)
+		bad = copy.deepcopy(parameter_only)
+		bad["schemaVersion"] = 2
+		cases.append(bad)
 		for key, value in (("bundleId", f"{run}-j3-a1"), ("schemaVersion", 1),
 			("jobId", 3), ("attempt", 1), ("consistency", "same-frame")):
 			bad = copy.deepcopy(sequence_bundle)

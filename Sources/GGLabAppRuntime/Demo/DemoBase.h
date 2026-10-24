@@ -4,14 +4,18 @@
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 
+#include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
 namespace gglab
 {
 	class World;
+	class LabRuntime;
 	class Camera;
 	class CameraController;
 	class CameraRig;
@@ -63,10 +67,25 @@ namespace gglab
 			return std::nullopt;
 		}
 
+		// Only the active content exposes its Lab source; Demo content returns null.
+		virtual LabRuntime* GetParameterLabRuntime() noexcept { return nullptr; }
+		// Stable for the active content lifetime; never registers profiles from pending content.
+		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }
+
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}
 		virtual void OnExit() noexcept {}
 		virtual void Update() noexcept = 0;
+		// Runtime-failure, ready-frame and built-frame notifications; ready follows Session
+		// parameter application. Session owns parameter changes and effect attribution, so a
+		// lighting change made here is unattributed and fails or supersedes pending receipts.
+		virtual void OnRuntimeFailed(std::string_view reason) noexcept { GGLAB_UNUSED(reason); }
+		virtual void OnFrameReady(uint64_t serial) noexcept { GGLAB_UNUSED(serial); }
+		virtual void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept
+		{
+			GGLAB_UNUSED(serial);
+			GGLAB_UNUSED(lightingGeneration);
+		}
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);

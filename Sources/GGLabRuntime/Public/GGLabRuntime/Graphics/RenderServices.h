@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
@@ -27,6 +28,7 @@
 
 namespace gglab
 {
+	class World;
 	class ComposedLayout;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;

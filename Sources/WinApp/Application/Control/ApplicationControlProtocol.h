@@ -1,4 +1,5 @@
 #pragma once
+#include "Application/Control/ApplicationControlParameters.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
 #include "Capture/FrameSequenceCoordinator.h"
@@ -9,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gglab
 {
@@ -20,6 +22,9 @@ namespace gglab
 	enum class ApplicationControlCommand : uint8_t
 	{
 		Status,
+		Parameters,
+		Set,
+		ParameterResult,
 		Capture,
 		Graph,
 		Export,
@@ -46,6 +51,9 @@ namespace gglab
 		// Sequence: the sequence to start.
 		FrameSequenceRequest m_Sequence{};
 		NonFiniteWatchConfiguration m_Watch{};
+		std::vector<ApplicationControlParameterChange> m_ParameterChanges;
+		// Separate namespace from capture job ids; only terminal results can be consumed.
+		uint64_t m_ParameterBatchId = 0;
 	};
 
 	struct ApplicationControlParseResult
@@ -78,6 +86,11 @@ namespace gglab
 		const NonFiniteWatchStatus* m_Watch = nullptr;
 		// The process environment record as JSON; empty before the runtime services exist.
 		std::string_view m_Environment;
+		bool m_ParametersAvailable = false;
+		uint64_t m_ParameterRevision = 0;
+		const ParameterBatchStatus* m_ParameterBatch = nullptr;
+		const LightingProfilePublication* m_LightingProfiles = nullptr;
+		std::string m_LightingProfileError;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

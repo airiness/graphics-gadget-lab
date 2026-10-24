@@ -10,6 +10,9 @@
     <Filter Include="Lab">
       <UniqueIdentifier>{CFE283C1-17BA-8AD4-F54D-B87C473B1758}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Parameters">
+      <UniqueIdentifier>{03C4C70C-3EF6-2753-9C5E-8A1345912D97}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationCameraInput.cpp" />
@@ -72,10 +75,37 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.cpp">
       <Filter>Lab</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntimeParameters.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.cpp">
       <Filter>Lab</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameterSource.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LabParameterSource.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingParameterDomain.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingProfileParameterSource.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSourceAdapters.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -170,6 +200,30 @@
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingParameterDomain.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterBatch.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterFrameState.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSource.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSourceAdapters.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />
   </ItemGroup>
 </Project>

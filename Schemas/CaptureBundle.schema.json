@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.capture-bundle",
-  "title": "GGLab same-frame and sequence-range capture bundles v1 and v2",
+  "title": "GGLab same-frame and sequence-range capture bundles v1 through v3",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "schemaVersion", "bundleId", "runIdentity", "consistency", "watch", "products"],
   "properties": {
     "schema": {"const": "gglab.capture-bundle"},
-    "schemaVersion": {"enum": [1, 2]},
-    "bundleId": {"type": "string", "pattern": "^[0-9a-f]{32}-(j[1-9][0-9]*-a[1-9][0-9]*|s[1-9][0-9]*-timing)$"},
+    "schemaVersion": {"enum": [1, 2, 3]},
+    "bundleId": {"type": "string", "pattern": "^[0-9a-f]{32}-(j[1-9][0-9]*-a[1-9][0-9]*|s[1-9][0-9]*-(timing|range))$"},
     "runIdentity": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "jobId": {"type": "integer", "minimum": 1},
     "attempt": {"type": "integer", "minimum": 1},
@@ -32,7 +32,8 @@
         "developmentTools": {"type": "boolean"},
         "readiness": {"type": "object"},
         "temporal": {"type": "object"},
-        "sequence": {"type": ["object", "null"]}
+        "sequence": {"type": ["object", "null"]},
+        "parameters": {"type": ["object", "null"]}
       }
     },
     "submission": {
@@ -96,64 +97,158 @@
         }
       },
       "else": {
-        "required": [
-          "sequence",
-          "environment"
-        ],
-        "properties": {
-          "schemaVersion": {
-            "const": 2
-          },
-          "bundleId": {
-            "pattern": "^[0-9a-f]{32}-s[1-9][0-9]*-timing$"
-          },
-          "products": {
-            "minItems": 1,
-            "maxItems": 1,
-            "items": {
-              "properties": {
-                "index": {
-                  "const": 0
-                },
-                "source": {
-                  "const": "gpu-timing"
-                },
-                "diagnosticTap": {
-                  "type": "null"
-                },
-                "schema": {
-                  "const": "gglab.gpu-timing"
-                },
-                "schemaVersion": {
-                  "const": 1
-                }
-              }
+        "if": {
+          "properties": {
+            "schemaVersion": {
+              "const": 2
             }
           }
         },
-        "not": {
-          "anyOf": [
-            {
-              "required": [
-                "jobId"
-              ]
+        "then": {
+          "required": [
+            "sequence",
+            "environment"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": 2
             },
-            {
-              "required": [
-                "attempt"
-              ]
+            "bundleId": {
+              "pattern": "^[0-9a-f]{32}-s[1-9][0-9]*-timing$"
             },
-            {
-              "required": [
-                "provenance"
-              ]
-            },
-            {
-              "required": [
-                "submission"
-              ]
+            "products": {
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "properties": {
+                  "index": {
+                    "const": 0
+                  },
+                  "source": {
+                    "const": "gpu-timing"
+                  },
+                  "diagnosticTap": {
+                    "type": "null"
+                  },
+                  "schema": {
+                    "const": "gglab.gpu-timing"
+                  },
+                  "schemaVersion": {
+                    "const": 1
+                  }
+                }
+              }
             }
-          ]
+          },
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "jobId"
+                ]
+              },
+              {
+                "required": [
+                  "attempt"
+                ]
+              },
+              {
+                "required": [
+                  "provenance"
+                ]
+              },
+              {
+                "required": [
+                  "submission"
+                ]
+              }
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "sequence",
+            "environment"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": 3
+            },
+            "bundleId": {
+              "pattern": "^[0-9a-f]{32}-s[1-9][0-9]*-(timing|range)$"
+            },
+            "products": {
+              "minItems": 1,
+              "maxItems": 2,
+              "items": {
+                "properties": {
+                  "source": {
+                    "enum": [
+                      "gpu-timing",
+                      "parameter-frames"
+                    ]
+                  },
+                  "diagnosticTap": {
+                    "type": "null"
+                  },
+                  "schema": {
+                    "enum": [
+                      "gglab.gpu-timing",
+                      "gglab.parameter-frames"
+                    ]
+                  },
+                  "schemaVersion": {
+                    "const": 1
+                  }
+                }
+              }
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "jobId"
+                ]
+              },
+              {
+                "required": [
+                  "attempt"
+                ]
+              },
+              {
+                "required": [
+                  "provenance"
+                ]
+              },
+              {
+                "required": [
+                  "submission"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": 3
+          },
+          "consistency": {
+            "const": "same-frame"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "provenance": {
+            "required": [
+              "parameters"
+            ]
+          }
         }
       }
     }
@@ -279,9 +374,9 @@
       "required": ["index", "source", "diagnosticTap", "schema", "schemaVersion", "metadata", "files"],
       "properties": {
         "index": {"type": "integer", "minimum": 0},
-        "source": {"enum": ["scene", "composited", "diagnostic", "graph", "resource-export", "gpu-timing"]},
+        "source": {"enum": ["scene", "composited", "diagnostic", "graph", "resource-export", "gpu-timing", "parameter-frames"]},
         "diagnosticTap": {"type": ["string", "null"], "minLength": 1},
-        "schema": {"enum": ["gglab.frame-capture", "gglab.render-graph", "gglab.resource-export", "gglab.gpu-timing"]},
+        "schema": {"enum": ["gglab.frame-capture", "gglab.render-graph", "gglab.resource-export", "gglab.gpu-timing", "gglab.parameter-frames"]},
         "schemaVersion": {"type": "integer", "minimum": 1},
         "metadata": {"$ref": "#/$defs/file"},
         "files": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/file"}}

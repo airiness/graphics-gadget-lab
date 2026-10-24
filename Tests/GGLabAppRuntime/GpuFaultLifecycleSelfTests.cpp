@@ -9,6 +9,9 @@
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
+#include "Parameters/ParameterSourceAdapters.h"
+#include "Lab/LabRuntime.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
@@ -19,6 +22,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -52,6 +56,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -62,6 +67,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -110,12 +116,74 @@ namespace gglab
 			uint32_t m_Order = 0;
 		};
 
+		static_assert(!std::is_copy_constructible_v<HostViewParameterSource> &&
+			!std::is_move_constructible_v<HostViewParameterSource>);
+		static_assert(!std::is_copy_constructible_v<LabParameterSource> &&
+			!std::is_move_constructible_v<LabParameterSource>);
+		static_assert(!std::is_copy_constructible_v<LightingProfileParameterSource> &&
+			!std::is_move_constructible_v<LightingProfileParameterSource>);
+		static_assert(!std::is_copy_constructible_v<ParameterSourceAdapters> &&
+			!std::is_move_constructible_v<ParameterSourceAdapters>);
+
+		template<typename Services>
+		concept CarriesWorldLightingAuthoring = requires(Services services) { services.m_WorldLighting; };
+		static_assert(!CarriesWorldLightingAuthoring<RenderServices>);
+		static_assert(std::is_same_v<decltype(std::declval<RenderCompositionAccess&>().GetWorldLightingControl()),
+			WorldLightingControlBase*>);
+
+		static_assert(std::is_same_v<decltype(std::declval<GGLabAppRuntime&>().GetParameterControl()),
+			const SessionParameterControl*>);
+		static_assert(std::is_same_v<decltype(std::declval<GGLabAppRuntime&>().GetFrameSequenceCoordinator()),
+			const FrameSequenceCoordinator*>);
+
 		// Only the backend is simulated. Renderer, graph, capture, IBL, upload scheduler,
 		// AppRuntime::Tick/Shutdown and their owners are the production implementations.
 		struct LifetimeProbe
 		{
 			TeardownOutcome m_Outcome = TeardownOutcome::Completed;
 			std::filesystem::path m_Receipt;
+			bool m_EnableParameterLab = false;
+			bool m_ReturnStaleLightingEvidence = false;
+			bool m_ReturnMissingLightingEvidence = false;
+			bool m_RequestLightingTwice = false;
+			uint32_t m_LightingParameterApplications = 0;
+			bool m_HoldLightingPreparation = false;
+			DemoServices m_ContentServices{};
+			bool m_FrameBeginUnavailable = false;
+			uint32_t m_ContentSerialOffset = 0;
+			uint64_t m_PlannedContentIdentity = 0;
+			uint64_t m_ExpectedReleasedBatch = 0;
+			bool m_BindingReleasedBeforeExit = false;
+			uint32_t m_DemoDestructions = 0;
+			bool m_EnableLightingProfiles = false;
+			bool m_ProfileNamedLabBool = false;
+			bool m_InvalidLightingProfiles = false;
+			bool m_EquivalentLightingProfiles = false;
+			uint32_t m_LightingProfileQueries = 0;
+			bool m_ObserveParameterCommit = false;
+			bool m_ParameterCommitWasComplete = false;
+			uint64_t m_ExpectedCommitGeneration = 0;
+			LabRuntime* m_ParameterRuntime = nullptr;
+			const SessionParameterControl* m_ParameterControl = nullptr;
+			uint32_t m_ParameterApplications = 0;
+			uint32_t m_ParameterSessionCreations = 0;
+			bool m_HoldParameterPreparation = false;
+			bool m_FailParameterPreparation = false;
+			bool m_FailParameterCreation = false;
+			std::function<void()> m_ParameterEffectCallback;
+			uint64_t m_ParameterBuiltSerial = 0;
+			float m_ParameterBuiltRadius = 0.0f;
+			ResolvedViewRenderSettings m_ParameterBuiltView{};
+			ResolvedViewRenderSettings m_ParameterValidationView{};
+			bool m_SkipParameterFrame = false;
+			bool m_HoldLightingStages = false;
+			std::string m_ExtraPendingGate;
+			std::function<void()> m_ParameterBuiltCallback;
+			bool m_SkipLightingPublication = false;
+			bool m_RebakeAfterParameterBuild = false;
+			bool m_UnrelatedLightingChange = false;
+			EnvironmentLightingControlBase* m_ParameterEnvironment = nullptr;
+			bool m_ChangeParameterAfterBuild = false;
 			bool m_Inject = false;
 			bool m_Faulted = false;
 			bool m_SafeToRelease = true;
@@ -537,6 +605,10 @@ namespace gglab
 				{
 					return RHIFrameBeginResult::Fatal();
 				}
+				if (m_Probe.m_FrameBeginUnavailable)
+				{
+					return RHIFrameBeginResult::Unavailable();
+				}
 				m_Frame.m_Batch = m_Uploads.BeginBatch();
 				m_Frame.m_Batch->Attach(m_Frame.m_Writer);
 				m_Frame.m_Graphics.SetWriter(&m_Frame.m_Writer);
@@ -705,6 +777,7 @@ namespace gglab
 			std::string_view GetName() const noexcept override { return "FaultLifecycle.Pipeline"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
+				m_Probe.m_PlannedContentIdentity = info.m_SessionIdentity;
 				auto plan = RenderPipelineBase::ResolveTemporalFramePlan(info);
 				if (m_Probe.m_EnableTemporalHistory)
 				{
@@ -716,6 +789,11 @@ namespace gglab
 			RenderFrameValidationResult ValidateRenderFrame(
 				const RenderFrameContext& frame, const RenderServices& services) noexcept override
 			{
+				m_Probe.m_ParameterValidationView = frame.GetDisplayViewRenderSettings();
+				if (std::exchange(m_Probe.m_SkipParameterFrame, false))
+				{
+					return RenderFrameValidationResult::Skip("Parameter retry fixture");
+				}
 				if (!m_Probe.m_EnableForwardPlusReadback)
 				{
 					return RenderFrameValidationResult::Ready();
@@ -741,6 +819,22 @@ namespace gglab
 			void BuildRenderGraph(RenderGraph& graph, const RenderFrameContext& frame, const RenderServices& services) noexcept override
 			{
 				++m_Probe.m_GraphBuilds;
+				m_Probe.m_ParameterBuiltView = frame.GetDisplayViewRenderSettings();
+				if (m_Probe.m_ParameterRuntime)
+				{
+					m_Probe.m_ParameterBuiltRadius = frame.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Radius;
+					m_Probe.m_ParameterBuiltSerial = frame.m_FrameSerial;
+					if (std::exchange(m_Probe.m_RebakeAfterParameterBuild, false))
+					{
+						m_Probe.m_ParameterEnvironment->RequestRebake();
+					}
+					if (std::exchange(m_Probe.m_ChangeParameterAfterBuild, false))
+					{
+						auto* session = m_Probe.m_ParameterRuntime->GetActiveSession();
+						GGLAB_UNUSED(session->SetParameter(LabParameterId("radius"), 3.5f));
+						session->ApplyParameterChanges(LabChangeImpact::Immediate);
+					}
+				}
 				struct Data
 				{
 					RGTextureId m_Texture;
@@ -781,7 +875,44 @@ namespace gglab
 								});
 						});
 				}
-				m_IBL->AddPass(graph, frame, services);
+				if (m_Probe.m_EnableLightingProfiles)
+				{
+					// Synthetic LUT/IBL producers exercise the real scheduler, publication
+					// fence and receipt owners. Native suites qualify the shader products.
+					const auto stage = services.m_Environment->GetStageForRecording();
+					const auto generation = services.m_Environment->GetBakingGeneration();
+					auto* atmosphere = services.m_BakeAtmosphere;
+					uint32_t dirty = 0;
+					if (stage == IBLBakeStage::Environment)
+					{
+						const auto* inputs = services.m_Environment->GetBakingAtmosphereParameters();
+						if (inputs && atmosphere->Begin(*inputs, { 1, 1, 1 }))
+						{
+							dirty = atmosphere->GetDiagnostics().m_DirtyMask;
+						}
+					}
+					if (services.m_Environment->ShouldInitializeBakeResources() ||
+						(stage != IBLBakeStage::Idle && stage != IBLBakeStage::Ready))
+					{
+						graph.AddTrivialSideEffectPass("FaultLifecycle.LightingProducer",
+							[environment = services.m_Environment, atmosphere, dirty, stage, generation](RGExecuteContext&)
+							{
+								for (uint32_t index = 0; index < 3; ++index)
+								{
+									if (dirty & (1u << index))
+									{
+										atmosphere->NotifyExecuted(index);
+									}
+								}
+								environment->NotifyBakeResourcesInitialized(generation);
+								environment->NotifyStageExecuted(stage, generation);
+							});
+					}
+				}
+				else if (!m_Probe.m_HoldLightingStages)
+				{
+					m_IBL->AddPass(graph, frame, services);
+				}
 				if (m_Probe.m_EnablePreviewCommits)
 				{
 					// The simulated producer uses the production registry and settlement APIs.
@@ -814,7 +945,10 @@ namespace gglab
 				}
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Scene);
 				AddFrameCaptureTapPass(graph, frame, services, FrameCaptureSource::Composited);
-				m_IBL->AddFinishPass(graph);
+				if (!m_Probe.m_EnableLightingProfiles && !m_Probe.m_HoldLightingStages)
+				{
+					m_IBL->AddFinishPass(graph);
+				}
 				if (m_Probe.m_EnableTemporalHistory)
 				{
 					struct HistoryData
@@ -864,25 +998,453 @@ namespace gglab
 			std::unique_ptr<IBLGraphSetupPass> m_IBL = CreateIBLGraphSetupPass();
 			std::unique_ptr<ForwardPlusDebugReadback> m_Readback = std::make_unique<ForwardPlusDebugReadback>();
 		};
+		class ParameterTestLab final : public LabSessionBase
+		{
+		public:
+			explicit ParameterTestLab(const LabSessionCreateInfo& info) noexcept :
+				LabSessionBase({ .m_Id = LabId("gglab.lab.test.parameters"),
+					.m_DisplayName = "Parameter frame fixture" }, info,
+					std::make_unique<FaultPipeline>(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)),
+				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)
+			{
+				++m_Probe.m_ParameterSessionCreations;
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("radius"),
+					.m_Name = "Radius", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f,
+					.m_MinValue = LabValue(0.0f), .m_MaxValue = LabValue(4.0f) }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("layout"),
+					.m_Name = "Layout", .m_Type = LabParameterType::UInt,
+					.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = uint32_t(1) }));
+				for (const auto& [name, impact] : std::array{
+					std::pair{ "scene-layout", LabChangeImpact::RebuildScene },
+					std::pair{ "pipeline-layout", LabChangeImpact::RecreatePipeline } })
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId(name),
+						.m_Name = name, .m_Type = LabParameterType::UInt,
+						.m_Impact = impact, .m_DefaultValue = uint32_t(1) }));
+				}
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("deferred"),
+					.m_Name = "Deferred", .m_Type = LabParameterType::Bool, .m_DefaultValue = false,
+					.m_EffectClass = ParameterEffectClass::Deferred }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("unprojected"),
+					.m_Name = "Unprojected", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("unbound-rebuild"),
+					.m_Name = "Unbound Rebuild", .m_Type = LabParameterType::Bool, .m_DefaultValue = false,
+					.m_EffectClass = ParameterEffectClass::Rebuild }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("rebake"),
+					.m_Name = "Misdeclared rebake", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
+				if (m_Probe.m_ProfileNamedLabBool)
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("environment.profile"),
+						.m_Name = "Lab-owned boolean", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
+				}
+				if (m_Probe.m_EnableLightingProfiles)
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("sun-input"),
+						.m_Name = "Prepared sun input", .m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f,
+						.m_MinValue = LabValue(0.1f), .m_MaxValue = LabValue(4.0f),
+						.m_EffectClass = ParameterEffectClass::Deferred }));
+				}
+				for (const auto id : { "lighting", "broken-lighting" })
+				{
+					GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId(id),
+						.m_Name = id, .m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(1),
+						.m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(4096)),
+						.m_EffectClass = ParameterEffectClass::Deferred }));
+				}
+			}
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				if (m_Probe.m_FailParameterPreparation)
+				{
+					return { .m_Status = LoadingStatus::Failed, .m_Detail = "Injected Lab preparation failure." };
+				}
+				if (m_Probe.m_HoldParameterPreparation)
+				{
+					return { .m_Status = LoadingStatus::Preparing };
+				}
+				return LoadingProgress::Ready();
+			}
+			bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override
+			{
+				return id == LabParameterId("radius") || id == LabParameterId("rebake") ||
+					id == LabParameterId("environment.profile");
+			}
+			std::optional<LabValue> ReadImmediateParameterFrameValue(
+				const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override
+			{
+				if (id == LabParameterId("radius"))
+				{
+					return LabValue(frame.m_ViewSettings.m_Lighting.m_GTAO.m_Radius);
+				}
+				if (id == LabParameterId("rebake"))
+				{
+					return LabValue(frame.m_ViewSettings.m_PostProcess.m_Bloom.m_Enabled);
+				}
+				if (id == LabParameterId("environment.profile"))
+				{
+					return LabValue(frame.m_ViewSettings.m_Lighting.m_EnableAerialPerspective);
+				}
+				return std::nullopt;
+			}
+			bool SupportsWorldLightingParameter(const LabParameterId& id) const noexcept override
+			{
+				return m_Probe.m_EnableLightingProfiles && id == LabParameterId("sun-input");
+			}
+			std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingParameter(
+				const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+				uint64_t contentIdentity, std::string& error) noexcept override
+			{
+				const auto publication = control.GetWorldLightingPublication();
+				if (!SupportsWorldLightingParameter(id) || !publication.m_Requested)
+				{
+					error = "LightingPreparationFailed: the fixture lost its authored sun.";
+					return {};
+				}
+				return control.PrepareWorldSunDirection(m_World, contentIdentity,
+					Vector3(-0.5f, -std::get<float>(value), 1.0f), error);
+			}
+			bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override
+			{
+				return m_LightingOverride &&
+					(id == LabParameterId("lighting") || id == LabParameterId("broken-lighting"));
+			}
+			LightingMutationResult ApplyDeferredLightingParameter(const LabParameterId& id) noexcept override
+			{
+				if (!SupportsDeferredLightingParameter(id))
+				{
+					return {};
+				}
+				++m_Probe.m_LightingParameterApplications;
+				if (std::exchange(m_Probe.m_ReturnStaleLightingEvidence, false))
+				{
+					return m_PreviousLightingEffect;
+				}
+				if (std::exchange(m_Probe.m_ReturnMissingLightingEvidence, false))
+				{
+					return {};
+				}
+				auto result = m_LightingOverride->ApplyPrefilteredSpecularSampleCount(
+					GetParameters().Get(id, uint32_t(1)));
+				if (std::exchange(m_Probe.m_RequestLightingTwice, false))
+				{
+					// This owning operation deliberately issues two real requests.
+					m_Services.m_EnvironmentLightingControl->RequestRebake();
+					result.m_Generation = m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration();
+				}
+				if (id == LabParameterId("broken-lighting"))
+				{
+					// Deliberately misreport owner evidence; capability is still valid.
+					result.m_PreviousGeneration = 0;
+				}
+				if (result.m_Outcome == LightingMutationOutcome::Requested)
+				{
+					m_PreviousLightingEffect = result;
+				}
+				return result;
+			}
+			void OnEnter() noexcept override
+			{
+				m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+				GGLAB_ASSERT_NOT_NULL(m_LightingOverride.get());
+			}
+			void OnExit() noexcept override { m_LightingOverride.reset(); }
+
+			void Update(float) noexcept override { GetCamera().Update(); }
+
+		private:
+			void ApplyImmediateParameters() noexcept override
+			{
+				++m_Probe.m_ParameterApplications;
+				if (auto callback = std::exchange(m_Probe.m_ParameterEffectCallback, {}))
+				{
+					callback();
+				}
+				if (std::exchange(m_Probe.m_ObserveParameterCommit, false))
+				{
+					const auto* control = m_Probe.m_ParameterControl;
+					const auto* batch = control ? control->GetParameterBatchStatus() : nullptr;
+					m_Probe.m_ParameterCommitWasComplete = batch && batch->m_State == ParameterBatchState::Applying &&
+						batch->m_Items.size() == 4 && batch->m_Revision == control->GetParameterRevision() &&
+						control->GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == 11.0f &&
+						control->GetHostParameters().Get(LabParameterId("environment.profile"), int32_t(-1)) == 1 &&
+						control->GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 1.0f &&
+						GetParameters().Get(LabParameterId("radius"), 0.0f) == 2.0f &&
+						m_Services.m_RenderServices.m_Environment->GetBakeRequestGeneration() == m_Probe.m_ExpectedCommitGeneration;
+				}
+				GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Radius =
+					GetParameters().Get(LabParameterId("radius"), 1.0f);
+				const bool rebake = GetParameters().Get(LabParameterId("rebake"), false);
+				GetMutableViewRenderProfile().m_PostProcess.m_Bloom.m_Enabled = rebake;
+				if (m_Probe.m_ProfileNamedLabBool)
+				{
+					GetMutableViewRenderProfile().m_Lighting.m_EnableAerialPerspective =
+						GetParameters().Get(LabParameterId("environment.profile"), false);
+				}
+				if (rebake != m_Rebake)
+				{
+					m_Rebake = rebake;
+					m_Services.m_EnvironmentLightingControl->RequestRebake();
+				}
+			}
+			LifetimeProbe& m_Probe;
+			bool m_Rebake = false;
+			std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
+			LightingMutationResult m_PreviousLightingEffect{};
+		};
+
+		std::unique_ptr<LabSessionBase> CreateParameterTestLab(const LabSessionCreateInfo& info) noexcept
+		{
+			if (static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe.m_FailParameterCreation)
+			{
+				return {};
+			}
+			return std::make_unique<ParameterTestLab>(info);
+		}
+
+		class InheritedLightingTestLab final : public LabSessionBase
+		{
+		public:
+			explicit InheritedLightingTestLab(const LabSessionCreateInfo& info) noexcept :
+				LabSessionBase({ .m_Id = LabId("gglab.lab.test.inherited-lighting"),
+					.m_DisplayName = "Inherited lighting fixture" }, info,
+					std::make_unique<FaultPipeline>(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)),
+				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe)
+			{
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("samples"),
+					.m_Name = "Samples", .m_Type = LabParameterType::UInt, .m_DefaultValue = uint32_t(512),
+					.m_InheritOnEnter = true }));
+				GGLAB_UNUSED(GetMutableParameters().Add({ .m_Id = LabParameterId("toggle"),
+					.m_Name = "Toggle", .m_Type = LabParameterType::Bool, .m_DefaultValue = false }));
+			}
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				return m_Probe.m_HoldLightingPreparation ?
+					LoadingProgress{ .m_Status = LoadingStatus::Preparing } : LoadingProgress::Ready();
+			}
+			void OnEnter() noexcept override
+			{
+				m_Override = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+				GGLAB_ASSERT_NOT_NULL(m_Override.get());
+				const uint32_t inherited = m_Override->GetInheritedSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount;
+				GGLAB_UNUSED(GetMutableParameters().BindInheritedDefault(LabParameterId("samples"), inherited));
+				ApplyImmediateParameters();
+			}
+			void OnExit() noexcept override { m_Override.reset(); }
+			void Update(float) noexcept override {}
+			static std::unique_ptr<LabSessionBase> Create(const LabSessionCreateInfo& info) noexcept
+			{
+				return std::make_unique<InheritedLightingTestLab>(info);
+			}
+		private:
+			bool RefreshInheritedParameters() noexcept override
+			{
+				return m_Override && !m_Override->OwnsBakeConfiguration() &&
+					GetMutableParameters().FollowInheritedValue(LabParameterId("samples"),
+						m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+							.m_BakeConfig.m_PrefilteredSpecularSampleCount);
+			}
+			void ApplyImmediateParameters() noexcept override
+			{
+				if (m_Override && GetParameters().Find(LabParameterId("samples"))->m_Dirty)
+				{
+					m_Override->Apply({ .m_PrefilteredSpecularSampleCount =
+						GetParameters().Get(LabParameterId("samples"), uint32_t(512)) });
+				}
+			}
+			LifetimeProbe& m_Probe;
+			std::unique_ptr<EnvironmentLightingOverrideBase> m_Override;
+		};
+
 		class FaultDemo final : public DemoBase
 		{
 		public:
 			explicit FaultDemo(const DemoCreateInfo& info) : m_CameraOwner(info),
 				m_Probe(static_cast<FaultContext*>(info.m_Services.m_RHIContext)->m_Probe),
-				m_Pipeline(m_Probe) {}
+				m_Pipeline(m_Probe)
+			{
+				m_Probe.m_ParameterEnvironment = info.m_Services.m_EnvironmentLightingControl;
+				m_Probe.m_ContentServices = info.m_Services;
+				if (m_Probe.m_EnableParameterLab)
+				{
+					m_Lab = std::make_unique<LabRuntime>(LabSessionCreateInfo{
+						.m_Services = info.m_Services, .m_WindowWidth = info.m_WindowWidth,
+						.m_WindowHeight = info.m_WindowHeight, .m_RunConfig = { .m_WarmupFrames = 0 } });
+					GGLAB_UNUSED(m_Lab->RegisterLab({ .m_Id = LabId("gglab.lab.test.parameters"),
+						.m_DisplayName = "Parameter frame fixture" }, &CreateParameterTestLab));
+					GGLAB_UNUSED(m_Lab->Initialize(LabId("gglab.lab.test.parameters")));
+					m_Lab->TickTransitions();
+					m_Probe.m_ParameterRuntime = m_Lab.get();
+					m_Probe.m_ParameterEnvironment = info.m_Services.m_EnvironmentLightingControl;
+				}
+			}
+			~FaultDemo() override
+			{
+				++m_Probe.m_DemoDestructions;
+			}
+			std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept override
+			{
+				++m_Probe.m_LightingProfileQueries;
+				static const std::array invalid{ WorldLightingProfile{} };
+				static const std::array equivalent
+				{
+					WorldLightingProfile{ .m_Id = "test.white" },
+					WorldLightingProfile{ .m_Id = "test.gray",
+						.m_Inputs = { .m_Sun = { .m_Chromaticity = Vector3(0.5f, 0.5f, 0.5f) } } },
+				};
+				if (m_Probe.m_InvalidLightingProfiles)
+				{
+					return invalid;
+				}
+				if (m_Probe.m_EquivalentLightingProfiles)
+				{
+					return equivalent;
+				}
+				static const std::array profiles
+				{
+					WorldLightingProfile{ .m_Id = "test.baseline" },
+					WorldLightingProfile{ .m_Id = "test.oblique", .m_Inputs = { .m_SunDirection = Vector3(1.0f, -1.0f, 0.0f) },
+						.m_RecommendedEV100 = 17.0f },
+				};
+				return m_Probe.m_EnableLightingProfiles ? std::span<const WorldLightingProfile>(profiles) :
+					std::span<const WorldLightingProfile>{};
+			}
 			std::string_view GetName() const noexcept override { return "FaultLifecycle.Demo"; }
-			void Update() noexcept override { m_CameraOwner.Update(); }
-			World& GetWorld() noexcept override { return m_CameraOwner.GetWorld(); }
-			Camera& GetCamera() noexcept override { return m_CameraOwner.GetCamera(); }
-			CameraController& GetCameraController() noexcept override { return m_CameraOwner.GetCameraController(); }
-			CameraRig& GetCameraRig() noexcept override { return m_CameraOwner.GetCameraRig(); }
-			const ViewRenderProfile& GetViewRenderProfile() const noexcept override { return m_CameraOwner.GetViewRenderProfile(); }
-			RenderPipelineBase& GetRenderPipeline() noexcept override { return m_Pipeline; }
-			void OnFrameSubmitted(const DemoFrameFeedback&) noexcept override { ++m_Probe.m_SubmittedCallbacks; }
+			void OnEnter() noexcept override
+			{
+				if (m_Probe.m_EnableLightingProfiles)
+				{
+					auto& world = GetWorld();
+					auto& registry = world.GetRegistry();
+					const auto sun = registry.create();
+					registry.emplace<components::TransformComponent>(sun);
+					components::LightComponent light;
+					light.m_Type = LightType::Directional;
+					light.m_WorldSun.emplace();
+					registry.emplace<components::LightComponent>(sun, light);
+					GGLAB_UNUSED(ApplyWorldLightingInputsToWorld(world, GetLightingProfiles().front().m_Inputs));
+					m_Probe.m_ParameterEnvironment->SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+				}
+				if (m_Lab)
+				{
+					m_Lab->OnEnter();
+				}
+			}
+			void OnExit() noexcept override
+			{
+				if (const auto id = std::exchange(m_Probe.m_ExpectedReleasedBatch, uint64_t(0)))
+				{
+					const auto* control = m_Probe.m_ParameterControl;
+					const auto* batch = control ? control->GetParameterBatchStatus() : nullptr;
+					const std::array values{ LabParameterValue{ LabParameterId("radius"), 2.5f } };
+					std::string error;
+					m_Probe.m_BindingReleasedBeforeExit = control && batch && batch->m_BatchId == id &&
+						batch->IsTerminal() && control->GetContentIdentity() == 0 && !control->GetLabParameters() &&
+						control->GetHostParameters().CaptureValues().empty() && m_Lab &&
+						!m_Lab->PrepareParameterBatch(id, values, error);
+				}
+				if (m_Lab)
+				{
+					m_Lab->OnExit();
+				}
+			}
+			void Update() noexcept override
+			{
+				if (m_Lab)
+				{
+					m_Lab->ProcessPendingCommands();
+					m_Lab->Update();
+				}
+				else
+				{
+					m_CameraOwner.Update();
+				}
+			}
+			LabRuntime* GetParameterLabRuntime() noexcept override { return m_Lab.get(); }
+			void AppendCaptureReadiness(FrameCaptureReadiness& readiness) const noexcept override
+			{
+				DemoBase::AppendCaptureReadiness(readiness);
+				if (!m_Probe.m_ExtraPendingGate.empty())
+				{
+					readiness.Add(m_Probe.m_ExtraPendingGate, FrameCaptureGateState::Pending,
+						"Unrelated readiness fixture");
+				}
+			}
+			uint32_t GetTemporalSessionSerial() const noexcept override
+			{
+				// Match the production Lab host: frame build and Session parameter
+				// preparation must resolve lighting under the same content identity.
+				return (m_Lab ? m_Lab->GetTemporalSessionSerial() : 0) + m_Probe.m_ContentSerialOffset;
+			}
+			void OnFrameReady(uint64_t serial) noexcept override
+			{
+				if (m_Lab)
+				{
+					GGLAB_UNUSED(serial);
+					if (std::exchange(m_Probe.m_UnrelatedLightingChange, false))
+					{
+						m_Probe.m_ParameterEnvironment->RequestRebake();
+					}
+				}
+			}
+			void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration) noexcept override
+			{
+				if (m_Probe.m_ParameterBuiltCallback)
+				{
+					m_Probe.m_ParameterBuiltCallback();
+				}
+				if (m_Lab || m_Probe.m_EnableLightingProfiles)
+				{
+					GGLAB_UNUSED(serial);
+					GGLAB_UNUSED(lightingGeneration);
+					const auto* batch = m_Probe.m_ParameterControl ? m_Probe.m_ParameterControl->GetParameterBatchStatus() : nullptr;
+					if (batch && m_Probe.m_SkipLightingPublication && std::ranges::any_of(batch->m_Items,
+						[](const auto& item)
+						{
+							return item.m_DeclaredClass == ParameterEffectClass::Deferred && item.m_Published.has_value();
+						}))
+					{
+						m_Probe.m_SkipLightingPublication = false;
+						m_Probe.m_SkipParameterFrame = true;
+					}
+				}
+			}
+			World& GetWorld() noexcept override
+			{
+				return m_Lab ? m_Lab->GetWorld() : m_CameraOwner.GetWorld();
+			}
+			Camera& GetCamera() noexcept override
+			{
+				return m_Lab ? m_Lab->GetCamera() : m_CameraOwner.GetCamera();
+			}
+			CameraController& GetCameraController() noexcept override
+			{
+				return m_Lab ? m_Lab->GetCameraController() : m_CameraOwner.GetCameraController();
+			}
+			CameraRig& GetCameraRig() noexcept override
+			{
+				return m_Lab ? m_Lab->GetCameraRig() : m_CameraOwner.GetCameraRig();
+			}
+			const ViewRenderProfile& GetViewRenderProfile() const noexcept override
+			{
+				return m_Lab ? m_Lab->GetViewRenderProfile() : m_CameraOwner.GetViewRenderProfile();
+			}
+			RenderPipelineBase& GetRenderPipeline() noexcept override
+			{
+				return m_Lab ? m_Lab->GetRenderPipeline() : m_Pipeline;
+			}
+			void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override
+			{
+				++m_Probe.m_SubmittedCallbacks;
+				if (m_Lab)
+				{
+					m_Lab->OnFrameSubmitted(feedback);
+				}
+			}
 		private:
 			DemoLoadingShell m_CameraOwner;
 			LifetimeProbe& m_Probe;
 			FaultPipeline m_Pipeline;
+			std::unique_ptr<LabRuntime> m_Lab;
 		};
 		std::unique_ptr<DemoBase> CreateFaultDemo(const DemoCreateInfo& info, const LabStartupSelection&, std::span<const LabRegistration>) noexcept { return std::make_unique<FaultDemo>(info); }
 
@@ -943,6 +1505,10 @@ namespace gglab
 				.m_CaptureJobLimits = jobLimits };
 			ApplicationContentRegistration content;
 			content.m_Demos.push_back({ .m_Id = "FaultLifecycle.Demo", .m_Factory = &CreateFaultDemo });
+			if (probe.m_EnableLightingProfiles)
+			{
+				content.m_Demos.push_back({ .m_Id = "FaultLifecycle.Replacement", .m_Factory = &CreateFaultDemo });
+			}
 			const auto registry = WriteShaderFixtures(info.m_Paths.m_ShaderArtifactRoot);
 			const bool initialized = runtime.Initialize(info) == AppRuntimeInitializeResult::Succeeded &&
 				runtime.InitializeServices({ .m_RHIContextFactory = &factory, .m_Input = &input,
@@ -1315,11 +1881,14 @@ namespace gglab
 			auto& sequence = *runtime.GetFrameSequenceCoordinator();
 			auto& capture = *runtime.GetFrameCaptureCoordinator();
 			std::string error;
-			checks.Check(sequence.Start({ .m_CameraPathId = "SEQ_RequiredProducts", .m_CaptureFrames = { 0 },
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_RequiredProducts", .m_CaptureFrames = { 0 },
 				.m_Exports = { { .m_Frame = 0,
 					.m_Targets = { { .m_Resource = missingResource ? "Missing.RequiredResource" : "FaultLifecycle.Color" } },
 					.m_IncludeGraph = true } },
-				.m_ReferenceSamples = referenceSamples }, error) != 0,
+				.m_ReferenceSamples = referenceSamples,
+				.m_Events = referenceSamples == 0 ? std::vector<FrameSequenceParameterEvent>{ {
+					.m_Frame = 0, .m_Values = { { LabParameterId("view.exposure.ev100"), 3.0f } },
+				} } : std::vector<FrameSequenceParameterEvent>{} }, error) != 0,
 				"The production sequence accepts image, arrays and graph as one required-product plan");
 			if (missingResource)
 			{
@@ -1372,6 +1941,14 @@ namespace gglab
 					sequence.GetStatus()->m_SubmittedFrames == 1,
 					"Only the successful complete-plan retry submits and advances the sequence "
 					"at the preserved simulation instant");
+				if (referenceSamples == 0)
+				{
+					const auto& event = sequence.GetStatus()->m_Events[0].m_Batch;
+					checks.Check(event && event->IsTerminal() && event->m_Items[0].m_FirstConsumed ==
+						capture.GetLastFrameState()->m_FrameSerial && event->m_Items[0].m_Applied < event->m_Items[0].m_FirstConsumed &&
+						runtime.GetParameterControl()->GetParameterBatchCount() == 0,
+						"Repeated real capture-admission aborts preserve one event and only the successful retry consumes it");
+				}
 				const auto successfulSerial = capture.GetLastFrameState()->m_FrameSerial;
 				for (uint32_t attempt = 0; attempt < 100 && sequence.IsActive(); ++attempt)
 				{
@@ -1390,12 +1967,19 @@ namespace gglab
 						}
 					}
 				}
-				checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && manifests.size() == 1 &&
-					manifests.front()["products"].size() == 3 &&
-					manifests.front()["provenance"]["frame"]["serial"] == successfulSerial &&
-					manifests.front()["provenance"]["time"]["totalTime"] == time &&
-					manifests.front()["provenance"]["sequence"]["frame"] == 0 &&
+				const auto frameManifest = std::ranges::find_if(manifests,
+					[](const auto& manifest) { return manifest.at("consistency") == "same-frame"; });
+				const auto rangeManifest = std::ranges::find_if(manifests,
+					[](const auto& manifest) { return manifest.at("consistency") == "sequence-range"; });
+				checks.Check(runtime.GetCaptureIntakeSnapshot().m_AppRuntimePublishedResults == 0 && manifests.size() == 2 &&
+					frameManifest != manifests.end() && rangeManifest != manifests.end() &&
+					(*frameManifest)["products"].size() == 3 && (*rangeManifest)["products"].size() == 1 &&
+					(*frameManifest)["provenance"]["frame"]["serial"] == successfulSerial &&
+					(*frameManifest)["provenance"]["parameters"]["frameSerial"] == successfulSerial &&
+					(*frameManifest)["provenance"]["time"]["totalTime"] == time &&
+					(*frameManifest)["provenance"]["sequence"]["frame"] == 0 &&
 					sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+					sequence.GetStatus()->m_ParameterPublication->m_Outcome == CapturePublicationOutcome::Published &&
 					sequence.GetStatus()->m_CompletedCaptures == 2 && sequence.GetStatus()->m_FinishedCaptureJobs == 1 &&
 					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 0 &&
 					probe.m_ImageEncodes == 1 && capture.GetUnfinishedRequestCount() == 0 &&
@@ -2055,6 +2639,2367 @@ namespace gglab
 				"Late worker completion releases the last CPU lease without touching a destroyed device or publishing abandoned work");
 		}
 
+		void RunHostParameterScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool withLab)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = withLab;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& parameters = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &parameters;
+			const auto revisionBeforeDiscovery =
+				runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_ParameterRevision;
+			checks.Check(revisionBeforeDiscovery != 0,
+				"Production frames already carry a valid parameter identity before observer activation");
+			runtime.EnableParameterControl();
+			checks.Check(parameters.IsAvailable() && parameters.GetHostParameters().GetParameters().size() == 25 &&
+				(parameters.GetLabParameters() != nullptr) == withLab,
+				"Host descriptors are available with Demo content and alongside the active Lab source");
+			std::string error;
+			const auto initial = parameters.GetParameterRevision();
+			const LabParameterId inheritedRadius("view.gtao.radius");
+			const std::array inherited{ LabParameterValue{ inheritedRadius,
+				parameters.GetHostParameters().Find(inheritedRadius)->m_Value } };
+			const auto unchangedId = runtime.RequestParameterBatch(inherited, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = runtime.TakeParameterBatchResult(unchangedId);
+			checks.Check(unchanged && unchanged->m_Items.front().m_State == ParameterEffectState::NoChange &&
+				parameters.GetParameterRevision() == initial &&
+				runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_ParameterRevision == revisionBeforeDiscovery,
+				"Initial discovery and a first NoChange preserve the frame identity used by capture settling");
+			for (const auto& invalid : std::array{
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 25.0f },
+				LabParameterValue{ LabParameterId("view.gtao.direction_count"), int32_t(2) },
+				LabParameterValue{ LabParameterId("view.taa.history_filter"), int32_t(99) },
+				LabParameterValue{ LabParameterId("unknown.host"), true } })
+			{
+				std::vector<LabParameterValue> values{ { LabParameterId("view.gtao.radius"), 3.0f }, invalid };
+				if (withLab)
+				{
+					values.push_back({ LabParameterId("radius"), 2.0f });
+				}
+				checks.Check(runtime.RequestParameterBatch(values, error) == 0 &&
+					!parameters.GetParameterBatchStatus() && parameters.GetParameterRevision() == initial &&
+					(!withLab || probe.m_ParameterRuntime->GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 1.0f),
+					"Invalid host/type/enum/range items reject every source without live mutation or receipt allocation");
+			}
+			std::vector<LabParameterValue> values
+			{
+				{ LabParameterId("view.gtao.radius"), 3.0f },
+				{ LabParameterId("view.exposure.ev100"), 8.0f },
+				{ LabParameterId("view.exposure.compensation"), 1.0f },
+				{ LabParameterId("view.taa.max_history_feedback"), 0.7f },
+				{ LabParameterId("view.taa.history_rectification"), int32_t(TemporalAAHistoryRectification::BoundedVarianceClip) },
+			};
+			if (withLab)
+			{
+				values.push_back({ LabParameterId("radius"), 2.0f });
+			}
+			const auto id = runtime.RequestParameterBatch(values, error);
+			checks.Check(id != 0 && parameters.GetParameterBatchStatus()->m_Revision == 0 &&
+				parameters.GetParameterBatchStatus()->m_Items.empty(),
+				"Host/mixed admission owns values without predicting application stamps");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* aborted = parameters.GetParameterBatchStatus();
+			checks.Check(aborted && !aborted->IsTerminal() && aborted->m_Items.front().m_Published &&
+				!aborted->m_Items.front().m_FirstConsumed && !runtime.TakeParameterBatchResult(id),
+				"An aborted real host parameter frame retains application/publication but cannot be consumed");
+			const auto revision = aborted->m_Revision;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* done = parameters.GetParameterBatchStatus();
+			checks.Check(done && done->IsTerminal() && done->m_Revision == revision &&
+				std::ranges::all_of(done->m_Items, [](const auto& item)
+				{
+					if (item.m_Parameter == LabParameterId("radius"))
+					{
+						return item.m_State == ParameterEffectState::Superseded && !item.m_FirstConsumed;
+					}
+					return item.m_State == ParameterEffectState::Consumed &&
+						item.m_Identity.m_Revision != 0 && item.m_Published == item.m_Applied &&
+						item.m_FirstConsumed > item.m_Published;
+				}),
+				"A successful retry consumes the frozen Host revision while its masked Lab value stays Superseded");
+			const auto& view = probe.m_ParameterBuiltView;
+			const auto expectedExposure = ResolveManualExposureSettings(8.0f, 1.0f,
+				runtime.GetDemoManager()->GetActiveDemo()->GetViewRenderProfile().m_EnableScenePreExposure);
+			checks.Check(view.m_Lighting.m_GTAO.m_Radius == 3.0f &&
+				view.m_TemporalAA.m_MaxHistoryFeedback == 0.7f &&
+				view.m_TemporalAA.m_HistoryRectification == TemporalAAHistoryRectification::BoundedVarianceClip &&
+				view.m_Exposure.m_EffectiveEV100 == 7.0f &&
+				view.m_Exposure.m_PreExposure == expectedExposure.m_PreExposure &&
+				(!withLab || probe.m_ParameterRuntime->GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 2.0f),
+				"The production frame uses host overrides after Lab authoring, with coherent manual exposure and pre-exposure");
+			checks.Check(runtime.RequestParameterBatch(values, error) == 0 &&
+				!runtime.TakeParameterBatchResult(id + 1) && runtime.TakeParameterBatchResult(id).has_value(),
+				"Every source shares one retained result slot and only the correct terminal id releases it");
+			const auto nochange = runtime.RequestParameterBatch(values, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto same = runtime.TakeParameterBatchResult(nochange);
+			checks.Check(same && same->m_Revision == revision &&
+				std::ranges::all_of(same->m_Items, [](const auto& item)
+				{
+					return item.m_Parameter == LabParameterId("radius") ?
+						item.m_State == ParameterEffectState::Superseded && !item.m_FirstConsumed :
+						item.m_State == ParameterEffectState::NoChange;
+				}),
+				"Repeating a mixed batch keeps masked Lab state Superseded and creates no effects");
+			values.front().m_Value = 4.0f;
+			const auto stale = runtime.RequestParameterBatch(values, error);
+			if (withLab)
+			{
+				probe.m_ParameterRuntime->OnExit();
+				probe.m_ParameterRuntime->RequestRestartSession();
+				probe.m_ParameterRuntime->ProcessPendingCommands();
+				probe.m_ParameterRuntime->OnEnter();
+				GGLAB_UNUSED(runtime.Tick());
+				const auto replaced = runtime.TakeParameterBatchResult(stale);
+				checks.Check(replaced && replaced->m_State == ParameterBatchState::Failed &&
+					replaced->m_Items.empty() && probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius != 4.0f,
+					"Replacing the Lab session clears host overrides and never applies a stale cross-source batch");
+			}
+			else
+			{
+				probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal &&
+					parameters.GetParameterBatchStatus()->m_State == ParameterBatchState::Failed &&
+					!parameters.GetParameterBatchStatus()->m_Items.front().m_FirstConsumed,
+					"Fatal host-only submission fails its effects without fabricated consumption");
+			}
+			runtime.Shutdown();
+		}
+
+		class ParameterTestTooling final : public ApplicationToolingIntegrationBase
+		{
+		public:
+			ApplicationToolingFrameSettings m_Settings;
+			mutable uint32_t m_Captures = 0;
+			void PrepareForShutdown() noexcept override {}
+			ApplicationToolingInputCapture GetPreviousFrameInputCapture() const noexcept override { return {}; }
+			ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept override
+			{
+				++m_Captures;
+				return m_Settings;
+			}
+			bool BeginFrame() noexcept override { return false; }
+			void Draw(const ApplicationToolingFrameContext&) noexcept override {}
+			void EndFrame(ApplicationToolingFrameEndReason) noexcept override {}
+			RenderPipelineOverlayExtensionBase* GetOverlayExtension() noexcept override { return nullptr; }
+		};
+
+		void RunEffectiveParameterSettingsScenario(SelfTestContext& checks,
+			const std::filesystem::path& root, bool withLab)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = withLab;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			ParameterTestTooling tooling;
+			tooling.m_Settings.m_GTAO = GTAOSettings{ .m_Radius = 2.0f };
+			tooling.m_Settings.m_Bloom = BloomSettings{ .m_Intensity = 0.35f };
+			tooling.m_Settings.m_ScenePreExposure = false;
+			const auto tick = [&]()
+				{
+					return runtime.Tick({ .m_ApplicationTooling = &tooling });
+				};
+			GGLAB_UNUSED(tick());
+			runtime.EnableParameterControl();
+			const auto& control = *runtime.GetParameterControl();
+			const LabParameterId hostRadius("view.gtao.radius");
+			const LabParameterId labRadius("radius");
+			std::string error;
+			const auto requestHost = [&](float radius)
+				{
+					const std::array values{ LabParameterValue{ hostRadius, radius } };
+					return runtime.RequestParameterBatch(values, error);
+				};
+			checks.Check(control.GetHostParameters().Get(hostRadius, 0.0f) == 2.0f &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 2.0f &&
+				runtime.GetDemoManager()->GetActiveDemo()->GetViewRenderProfile().m_Lighting.m_GTAO.m_Radius == 1.0f,
+				"Discovery and frame planning share tooling inheritance while authored settings retain their value");
+			const auto sameId = requestHost(2.0f);
+			GGLAB_UNUSED(tick());
+			const auto same = runtime.TakeParameterBatchResult(sameId);
+			checks.Check(same && same->m_Items[0].m_State == ParameterEffectState::NoChange,
+				"A first Host request equal to complete inherited settings is NoChange");
+			tooling.m_Settings.m_GTAO->m_Radius = 4.0f;
+			runtime.EnableParameterControl();
+			checks.Check(control.GetHostParameters().Get(hostRadius, 0.0f) == 2.0f,
+				"Queries use an owned tooling snapshot rather than borrowing mutable UI state");
+			GGLAB_UNUSED(tick());
+			checks.Check(control.GetHostParameters().Get(hostRadius, 0.0f) == 4.0f &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 4.0f,
+				"NoChange does not pin a new Host override over later tooling edits");
+			if (withLab)
+			{
+				const std::array masked{ LabParameterValue{ labRadius, 2.5f } };
+				const auto maskedId = runtime.RequestParameterBatch(masked, error);
+				GGLAB_UNUSED(tick());
+				const auto result = runtime.TakeParameterBatchResult(maskedId);
+				checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::Superseded &&
+					!result->m_Items[0].m_FirstConsumed && probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 4.0f,
+					"Tooling alone can mask Lab authoring and must not produce false consumption");
+				const std::array unsupported{ LabParameterValue{ hostRadius, 1.5f },
+					LabParameterValue{ LabParameterId("unprojected"), 2.0f } };
+				checks.Check(runtime.RequestParameterBatch(unsupported, error) == 0 &&
+					!control.GetParameterBatchStatus() && control.GetHostParameters().Get(hostRadius, 0.0f) == 4.0f,
+					"An Immediate source without frame projection rejects the complete batch before mutation");
+			}
+			const auto id = requestHost(1.0f);
+			probe.m_SkipParameterFrame = true;
+			const auto captures = tooling.m_Captures;
+			GGLAB_UNUSED(tick());
+			const auto* aborted = control.GetParameterBatchStatus();
+			checks.Check(id != 0 && aborted && !aborted->IsTerminal() &&
+				aborted->m_Items[0].m_Published && !aborted->m_Items[0].m_FirstConsumed &&
+				tooling.m_Captures == captures + 1 && probe.m_ParameterValidationView.m_Lighting.m_GTAO.m_Radius == 1.0f,
+				"Host set overrides tooling and an aborted frame cannot consume it");
+			tooling.m_Settings.m_GTAO->m_Radius = 3.0f;
+			GGLAB_UNUSED(tick());
+			const auto done = runtime.TakeParameterBatchResult(id);
+			checks.Check(done && done->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 1.0f &&
+				probe.m_ParameterBuiltView.m_PostProcess.m_Bloom.m_Intensity == 0.35f &&
+				probe.m_ParameterBuiltView.m_Exposure.m_PreExposure == 1.0f,
+				"A successful retry keeps Host precedence and coherent inherited bloom and pre-exposure");
+			if (withLab)
+			{
+				const auto applications = probe.m_ParameterApplications;
+				const std::array masked{ LabParameterValue{ labRadius, 2.0f } };
+				const auto maskedId = runtime.RequestParameterBatch(masked, error);
+				GGLAB_UNUSED(tick());
+				const auto maskedResult = runtime.TakeParameterBatchResult(maskedId);
+				checks.Check(maskedResult && maskedResult->m_Items[0].m_State == ParameterEffectState::Superseded &&
+					!maskedResult->m_Items[0].m_FirstConsumed && probe.m_ParameterApplications == applications + 1 &&
+					probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 1.0f,
+					"A changed Lab value masked by Host cannot claim frame consumption");
+				const auto repeatId = runtime.RequestParameterBatch(masked, error);
+				GGLAB_UNUSED(tick());
+				const auto repeat = runtime.TakeParameterBatchResult(repeatId);
+				checks.Check(repeat && repeat->m_Items[0].m_State == ParameterEffectState::Superseded &&
+					!repeat->m_Items[0].m_FirstConsumed && probe.m_ParameterApplications == applications + 1,
+					"An unchanged stored Lab value still needs effective-frame proof instead of false NoChange");
+				const std::array matching{ LabParameterValue{ hostRadius, 3.5f }, LabParameterValue{ labRadius, 3.5f } };
+				const auto matchId = runtime.RequestParameterBatch(matching, error);
+				GGLAB_UNUSED(tick());
+				const auto match = runtime.TakeParameterBatchResult(matchId);
+				checks.Check(match && std::ranges::all_of(match->m_Items,
+					[](const auto& item) { return item.m_State == ParameterEffectState::Consumed; }),
+					"Matching mixed requests are both proven by the same submitted frame");
+			}
+			runtime.Shutdown();
+		}
+
+		void RunSequenceParameterEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root,
+				[](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					return std::vector<uint8_t>{ 0x89, 'P', 'N', 'G', 13, 10, 26, 10 };
+				}))
+			{
+				return;
+			}
+			// This scenario tests the ordinary custom-pipeline mode. The optional synthetic
+			// history producer is exercised by the dedicated history/fault scenarios.
+			probe.m_EnableTemporalHistory = false;
+			const auto& parameters = *runtime.GetParameterControl();
+			const auto& sequence = *runtime.GetFrameSequenceCoordinator();
+			probe.m_ParameterControl = &parameters;
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::yield();
+					}
+					return condition();
+				};
+			const auto ready = [&]()
+				{
+					const auto* frame = runtime.GetFrameCaptureCoordinator()->GetLastFrameState();
+					return frame && frame->m_Readiness.IsReady();
+				};
+			checks.Check(tickUntil(ready), "Event sequence starts from actually ready content");
+			checks.Check(runtime.GetDemoManager()->GetActiveDemo()->GetCameraRig().SetCameraPaths({ {
+				.m_Id = "SEQ_Events", .m_Name = "Parameter events", .m_Version = 1,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+					{ .m_Frame = 3, .m_Position = { 1, 1, 0 }, .m_Target = { 1, 1, 10 } },
+				},
+			} }), "Events use the production camera-path sequence");
+			runtime.GetTime()->SetFixedDeltaTime(1.0 / 60.0);
+			runtime.EnableParameterControl();
+			// Disable inactive temporal consumers before comparing ordinary event frames.
+			const std::array baselineSettings{
+				LabParameterValue{ LabParameterId("view.taa.enabled"), false },
+				LabParameterValue{ LabParameterId("view.gtao.temporal_accumulation"), false },
+			};
+			std::string baselineError;
+			const auto baselineBatch = runtime.RequestParameterBatch(baselineSettings, baselineError);
+			checks.Check(baselineBatch && tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(baselineBatch).has_value() && tickUntil(ready),
+				"The event fixture renders with supported temporal services");
+			const LabParameterId exposure("view.exposure.ev100");
+			const LabParameterId radius("view.gtao.radius");
+			const float baseline = parameters.GetHostParameters().Get(exposure, 0.0f);
+			std::string error;
+			const auto event = [](uint32_t frame, LabParameterId id, LabValue value)
+				{
+					return FrameSequenceParameterEvent{ .m_Frame = frame, .m_Values = { { id, value } } };
+				};
+			for (const auto& invalid : {
+				event(2, LabParameterId("unknown.event"), true),
+				event(2, radius, true),
+				event(2, radius, 999.0f),
+				event(2, LabParameterId("deferred"), true),
+				event(2, LabParameterId("layout"), uint32_t(2)),
+				event(2, LabParameterId("unprojected"), 2.0f),
+				event(4, exposure, baseline + 1.0f) })
+			{
+				const auto revision = parameters.GetParameterRevision();
+				const auto applications = probe.m_ParameterApplications;
+				checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+					.m_Events = { event(0, exposure, baseline + 1.0f), invalid } }, error) != 0 &&
+					tickUntil([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+					sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					parameters.GetParameterRevision() == revision &&
+					parameters.GetHostParameters().Get(exposure, 0.0f) == baseline &&
+					parameters.GetParameterBatchCount() == 0 && probe.m_ParameterApplications == applications,
+					"A bad later event rejects the whole plan before frame zero or any parameter mutation");
+			}
+			FrameSequenceRequest conflict{ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, LabParameterId("view.taa.enabled"), false) } };
+			conflict.m_TemporalAAOverrides.m_Enabled = true;
+			checks.Check(runtime.StartFrameSequence(conflict, error) == 0,
+				"Legacy overrides cannot silently mask an event on the same field");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline), event(0, radius, 2.0f) } }, error) == 0,
+				"One sequence frame has one atomic event batch");
+			const std::array retained{ LabParameterValue{ exposure, baseline } };
+			const auto retainedId = runtime.RequestParameterBatch(retained, error);
+			checks.Check(retainedId && tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+					.m_Events = { event(0, exposure, baseline) } }, error) == 0 &&
+				runtime.TakeParameterBatchResult(retainedId).has_value(),
+				"An event sequence reserves no slot by discarding a retained external result");
+			const auto revision = parameters.GetParameterRevision();
+			FrameSequenceParameterEvent mixed = event(1, radius, 2.0f);
+			mixed.m_Values.push_back({ LabParameterId("radius"), 2.0f });
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline + 1.0f), mixed,
+					event(2, exposure, baseline + 1.0f), event(3, exposure, baseline + 2.0f) } }, error) != 0,
+				"Immediate Host and mixed events are admitted as one plan");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* status = sequence.GetStatus();
+			const auto* aborted = parameters.GetParameterBatchStatus(
+				status->m_Events[0].m_Batch->m_BatchId, ParameterBatchOwner{ status->m_SequenceId });
+			checks.Check(aborted && aborted->m_Items[0].m_Published && !aborted->m_Items[0].m_FirstConsumed &&
+				sequence.GetStatus()->m_SubmittedFrames == 0 && !runtime.GetExternalParameterBatchStatus() &&
+				!runtime.TakeParameterBatchResult(aborted->m_BatchId),
+				"An aborted frame-zero event preserves publication and excludes external result consumption");
+			const auto applied = aborted ? aborted->m_Items[0].m_Applied : std::nullopt;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto& retried = sequence.GetStatus()->m_Events[0].m_Batch;
+			checks.Check(retried && retried->IsTerminal() && retried->m_Items[0].m_Applied == applied &&
+				retried->m_Items[0].m_FirstConsumed > applied && parameters.GetParameterRevision() == revision + 1 &&
+				sequence.GetStatus()->m_SubmittedFrames == 1 && parameters.GetParameterBatchCount() == 0,
+				"Retry consumes the same event without reapplying it or allocating another revision");
+			for (uint32_t frame = 1; frame < 4; ++frame)
+			{
+				const auto applications = probe.m_ParameterApplications;
+				if (frame == 1)
+				{
+					probe.m_SkipParameterFrame = true;
+					GGLAB_UNUSED(runtime.Tick());
+				}
+				GGLAB_UNUSED(runtime.Tick());
+				checks.Check(sequence.GetStatus()->m_SubmittedFrames == frame + 1 &&
+					probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == baseline + (frame == 3 ? 2.0f : 1.0f) &&
+					probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 2.0f &&
+					probe.m_ParameterApplications == applications + (frame == 1 ? 1 : 0),
+					std::format("Event frame {}: submitted={}, state={}, failure={}, EV={} expected={}, radius={}, applications={} expected={}",
+						frame, sequence.GetStatus()->m_SubmittedFrames, GetFrameSequenceStateName(sequence.GetStatus()->m_State),
+						sequence.GetStatus()->m_Failure, probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100,
+						baseline + (frame == 3 ? 2.0f : 1.0f), probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius,
+						probe.m_ParameterApplications, applications + (frame == 1 ? 1 : 0)));
+			}
+			checks.Check(tickUntil([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+				sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				parameters.GetParameterRevision() == revision + 3 && parameters.GetParameterBatchCount() == 0,
+				"Completed event reports retain all receipts and NoChange allocates no revision");
+			checks.Check(tickUntil(ready), "Ready baseline is restored before a cancellation case");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline), event(2, radius, 3.0f) } }, error) != 0,
+				"Cancellation sequence is admitted");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
+				parameters.GetParameterBatchCount() == 0 && sequence.GetStatus()->m_Events[0].m_Batch->IsTerminal() &&
+				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed &&
+				!sequence.GetStatus()->m_Events[1].m_Batch,
+				"Cancel closes the owned event receipt without executing future events or inventing consumption");
+			checks.Check(tickUntil(ready), "Ready baseline is restored before a content replacement case");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
+				.m_Events = { event(0, exposure, baseline + 1.0f) } }, error) != 0,
+				"Content-bound event sequence is admitted");
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			++probe.m_ContentSerialOffset;
+			probe.m_FrameBeginUnavailable = true;
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				parameters.GetParameterBatchCount() == 0 && !sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+				"Content invalidation releases the event reservation and never consumes against a replacement binding");
+			runtime.Shutdown();
+		}
+
+		void RunDeferredSequenceEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			probe.m_EnableTemporalHistory = false;
+			const auto& parameters = *runtime.GetParameterControl();
+			const auto& sequence = *runtime.GetFrameSequenceCoordinator();
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			probe.m_ParameterControl = &parameters;
+			const auto tick = [&]()
+				{
+					probe.m_ReadbackFence = {};
+					return runtime.Tick() == AppRuntimeTickResult::Continue;
+				};
+			const auto until = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						if (!tick())
+						{
+							return false;
+						}
+						std::this_thread::yield();
+					}
+					return condition();
+				};
+			const auto ready = [&]()
+				{
+					const auto* frame = runtime.GetFrameCaptureCoordinator()->GetLastFrameState();
+					return frame && frame->m_Readiness.IsReady();
+				};
+			checks.Check(until(ready), "Deferred events wait for an actually ready baseline");
+			runtime.EnableParameterControl();
+			runtime.GetTime()->SetFixedDeltaTime(1.0 / 60.0);
+			const std::array baseline{
+				LabParameterValue{ LabParameterId("view.taa.enabled"), false },
+				LabParameterValue{ LabParameterId("view.gtao.temporal_accumulation"), false },
+			};
+			std::string error;
+			const auto configured = runtime.RequestParameterBatch(baseline, error);
+			checks.Check(configured && until([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(configured).has_value() && until(ready),
+				"Deferred timeline uses supported temporal services and releases external ownership");
+			checks.Check(runtime.GetDemoManager()->GetActiveDemo()->GetCameraRig().SetCameraPaths({ {
+				.m_Id = "SEQ_Deferred", .m_Name = "Deferred events", .m_Version = 1,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+					{ .m_Frame = 63, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+				},
+			} }), "Deferred timeline registers one fixed 64-frame measurement range");
+			const auto lighting = [](uint32_t frame, uint32_t samples)
+				{
+					return FrameSequenceParameterEvent{ .m_Frame = frame,
+						.m_Values = { { LabParameterId("lighting"), samples } },
+						.m_ExpectEffects = std::vector<std::string>{ "lighting" } };
+				};
+			const auto start = [&](std::vector<FrameSequenceParameterEvent> events)
+				{
+					return runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Deferred",
+						.m_Events = std::move(events) }, error) != 0;
+				};
+			for (const bool deferred : { false, true })
+			{
+				auto invalid = lighting(1, 2);
+				if (deferred)
+				{
+					invalid.m_ExpectEffects = std::vector<std::string>{};
+				}
+				else
+				{
+					invalid.m_Values = { { LabParameterId("view.exposure.ev100"), 9.0f } };
+				}
+				const auto revision = parameters.GetParameterRevision();
+				checks.Check(start({ lighting(0, 2), invalid }) && until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+					sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					sequence.GetStatus()->m_SubmittedFrames == 0 && parameters.GetParameterRevision() == revision &&
+					probe.m_LightingParameterApplications == 0,
+					"A later domain expectation mismatch rejects every event before any mutation");
+			}
+			probe.m_HoldLightingStages = true;
+			auto mixed = lighting(0, 2);
+			mixed.m_Values.push_back({ LabParameterId("view.exposure.ev100"), 8.0f });
+			checks.Check(start({ mixed,
+				{ .m_Frame = 1, .m_Values = { { LabParameterId("radius"), 2.0f } } },
+				lighting(2, 2), lighting(63, 2) }), "Deferred and Immediate events share the existing Session owner");
+			probe.m_SkipParameterFrame = true;
+			checks.Check(tick() && sequence.GetStatus()->m_SubmittedFrames == 0 &&
+				probe.m_LightingParameterApplications == 1, "An aborted Deferred event applies exactly once");
+			const auto applied = sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_Applied;
+			checks.Check(tick() && tick() && tick() && sequence.GetStatus()->m_SubmittedFrames == 3 &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Running &&
+				parameters.GetParameterBatchCount() == 2,
+				"Transition frames and a later Immediate batch submit while two Deferred receipts remain outstanding");
+			const auto owner = ParameterBatchOwner{ sequence.GetStatus()->m_SequenceId };
+			const auto generation = environment.GetBakeRequestGeneration();
+			FrameCaptureGate gate{ .m_Name = "ibl", .m_State = FrameCaptureGateState::Pending,
+				.m_EffectDomain = "lighting", .m_EffectGeneration = generation };
+			checks.Check(parameters.CoversReadinessGate(owner, gate) &&
+				!parameters.CoversReadinessGate({}, gate) &&
+				!parameters.CoversReadinessGate(ParameterBatchOwner{ sequence.GetStatus()->m_SequenceId + 1 }, gate) &&
+				!parameters.CoversReadinessGate(owner, { .m_Name = "ibl", .m_State = FrameCaptureGateState::Pending }),
+				"Only this owner and its exact bound IBL target can cover a Pending gate");
+			gate.m_EffectGeneration = generation + 1;
+			checks.Check(!parameters.CoversReadinessGate(owner, gate),
+				"A gate with different frozen generation evidence cannot borrow the live receipt");
+			checks.Check(sequence.GetStatus()->m_Events[0].m_Batch->m_Items[1].m_State == ParameterEffectState::Consumed &&
+				sequence.GetStatus()->m_Events[1].m_Batch->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0].m_Identity.m_Generation == generation &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_Applied == applied,
+				"Unrelated revisions and same-target assignments preserve independent Deferred evidence");
+			bool abortedPublication = false;
+			probe.m_ParameterBuiltCallback = [&]()
+				{
+					const auto& item = sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0];
+					if (!abortedPublication && item.m_Published)
+					{
+						abortedPublication = true;
+						probe.m_SkipParameterFrame = true;
+					}
+				};
+			probe.m_HoldLightingStages = false;
+			checks.Check(until([&]() { return abortedPublication; }) &&
+				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+				"An aborted publication frame keeps its stamp without becoming firstConsumed");
+			probe.m_ParameterBuiltCallback = {};
+			checks.Check(until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
+				sequence.GetStatus()->m_SubmittedFrames == 64 && parameters.GetParameterBatchCount() == 0,
+				"Deferred timeline completes every measurement frame and collects every internal result");
+			const auto& first = sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0];
+			const auto& shared = sequence.GetStatus()->m_Events[2].m_Batch->m_Items[0];
+			checks.Check(first.m_State == ParameterEffectState::Consumed && first.m_Applied == applied &&
+				first.m_Published > applied && first.m_FirstConsumed > first.m_Published &&
+				shared.m_FirstConsumed == first.m_FirstConsumed &&
+				sequence.GetStatus()->m_Events[3].m_Batch->m_Items[0].m_State == ParameterEffectState::NoChange,
+				"Independent shared-target receipts consume the matching retry; final NoChange starts no transition");
+			uint32_t samples = 4;
+			for (const auto* pendingGate : { "environment", "asset-loads", "shaders", "ibl" })
+			{
+				checks.Check(until(ready) && start({ lighting(0, samples++) }) && tick(),
+					"An uncovered-gate case first establishes its own pending effect");
+				probe.m_ExtraPendingGate = pendingGate;
+				checks.Check(tick() && sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+					parameters.GetParameterBatchCount() == 0 &&
+					!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
+					"An unrelated Pending gate still fails and closes outstanding effects");
+				probe.m_ExtraPendingGate.clear();
+			}
+			checks.Check(until(ready) && start({ lighting(0, 8) }) && tick(),
+				"An external-target case establishes one pending generation");
+			probe.m_ParameterEnvironment->RequestRebake();
+			gate.m_EffectGeneration = environment.GetBakeRequestGeneration();
+			checks.Check(!parameters.CoversReadinessGate(
+				ParameterBatchOwner{ sequence.GetStatus()->m_SequenceId }, gate) && tick() &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Failed && parameters.GetParameterBatchCount() == 0,
+				"A newer unrelated Runtime target cannot borrow a sequence receipt's readiness allowance");
+			checks.Check(until(ready) && start({ lighting(0, 16), lighting(1, 32) }) && tick() && tick() &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				parameters.GetParameterBatchCount() == 0,
+				"An overlapping different assignment supersedes the first event and closes every sibling");
+			checks.Check(until(ready), "The last-frame case starts from Ready");
+			probe.m_HoldLightingStages = true;
+			checks.Check(start({ lighting(63, 64) }) && until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				sequence.GetStatus()->m_SubmittedFrames == 64 &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				parameters.GetParameterBatchCount() == 0,
+				"The last submitted frame closes unconsumed effects without waiting for post-range publication");
+			probe.m_HoldLightingStages = false;
+			checks.Check(until(ready) && start({ lighting(0, 128), lighting(1, 128), lighting(63, 256) }) && tick() && tick(),
+				"Cancellation admits two independently pending records");
+			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
+				parameters.GetParameterBatchCount() == 0 &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				sequence.GetStatus()->m_Events[1].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				!sequence.GetStatus()->m_Events[2].m_Batch,
+				"Cancellation closes all pending records and leaves future events unexecuted");
+			checks.Check(until(ready), "A masked Immediate failure starts from Ready");
+			const std::array mask{ LabParameterValue{ LabParameterId("view.gtao.radius"), 3.0f } };
+			const auto maskId = runtime.RequestParameterBatch(mask, error);
+			checks.Check(maskId && until([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(maskId).has_value(), "The failure fixture establishes a real Host override");
+			auto masked = lighting(0, 256);
+			masked.m_Values.push_back({ LabParameterId("radius"), 1.0f });
+			checks.Check(start({ masked }) && tick() && sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[1].m_State == ParameterEffectState::Superseded &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				parameters.GetParameterBatchCount() == 0,
+				"A failed Immediate sibling ends the event without waiting for its Deferred sibling");
+			checks.Check(until(ready) && start({ lighting(0, 512), lighting(1, 512) }) && tick() && tick(),
+				"Content invalidation starts with two pending Deferred records");
+			++probe.m_ContentSerialOffset;
+			probe.m_FrameBeginUnavailable = true;
+			checks.Check(tick() && sequence.GetStatus()->m_State == FrameSequenceState::Failed &&
+				parameters.GetParameterBatchCount() == 0 &&
+				sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				sequence.GetStatus()->m_Events[1].m_Batch->m_Items[0].m_State == ParameterEffectState::Superseded,
+				"Content replacement closes every Deferred record even while RHI BeginFrame is Unavailable");
+			probe.m_FrameBeginUnavailable = false;
+			runtime.Shutdown();
+		}
+
+		void RunSessionAdmissionScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			std::atomic<bool> encoderEntered = false;
+			std::atomic<bool> releaseEncoder = false;
+			GGLabAppRuntime runtime;
+			std::string error;
+			const std::array host{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 8.0f } };
+			const std::array mixed{ host[0], LabParameterValue{ LabParameterId("radius"), 2.0f } };
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission" }, error) == 0 &&
+				!error.empty() && runtime.RequestParameterBatch(host, error) == 0 && !error.empty() &&
+				runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::NotFound &&
+				!runtime.TakeParameterBatchResult(1),
+				"Session commands reject before composition without creating a sequence or parameter result");
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root,
+				[&](const FrameCaptureImage&) -> std::optional<std::vector<uint8_t>>
+				{
+					encoderEntered = true;
+					while (!releaseEncoder)
+					{
+						std::this_thread::yield();
+					}
+					return std::vector<uint8_t>{ 0x89, 'P', 'N', 'G', 13, 10, 26, 10 };
+				}))
+			{
+				return;
+			}
+			const auto& parameters = *runtime.GetParameterControl();
+			const auto& sequence = *runtime.GetFrameSequenceCoordinator();
+			probe.m_ParameterControl = &parameters;
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					}
+					return condition();
+				};
+			checks.Check(runtime.GetDemoManager()->GetActiveDemo()->GetCameraRig().SetCameraPaths({ {
+				.m_Id = "SEQ_Admission", .m_Name = "Session admission", .m_Version = 1,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 0, 1, 0 }, .m_Target = { 0, 1, 10 } },
+					{ .m_Frame = 2, .m_Position = { 2, 1, 0 }, .m_Target = { 2, 1, 10 } },
+				},
+			} }), "Session admission uses a production camera path");
+			runtime.GetTime()->SetFixedDeltaTime(1.0 / 60.0);
+			const auto waiting = runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission",
+				.m_RequiredContentId = "Missing.AdmissionContent" }, error);
+			const auto revision = parameters.GetParameterRevision();
+			checks.Check(waiting == 1 && sequence.GetStatus()->m_State == FrameSequenceState::Waiting &&
+				runtime.RequestParameterBatch(host, error) == 0 && error.find("sequence") != std::string::npos &&
+				runtime.RequestParameterBatch(mixed, error) == 0 && parameters.IsEnabled() &&
+				parameters.GetParameterRevision() == revision && !parameters.GetParameterBatchStatus(),
+				"Waiting sequences enable provenance discovery while rejecting direct batches without reserving parameter state");
+			checks.Check(runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Cancelled &&
+				!sequence.IsActive(), "Owner cancellation releases the sequence execution exclusion");
+			const auto first = runtime.RequestParameterBatch(host, error);
+			checks.Check(first == 1 && parameters.GetParameterBatchStatus()->m_State == ParameterBatchState::Queued &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission" }, error) == 0 &&
+				error.find("pending parameter batch") != std::string::npos &&
+				sequence.GetStatus()->m_SequenceId == waiting && parameters.GetParameterBatchStatus()->m_BatchId == first,
+				"A queued Host batch rejects direct sequence start without replacing either owner's state");
+			checks.Check(tickUntil([&]()
+				{
+					return parameters.GetParameterBatchStatus()->IsTerminal() &&
+						runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_Readiness.IsReady();
+				}),
+				"The admitted Host batch completes and readiness settles before sequence replay");
+			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission",
+				.m_Events = { { .m_Frame = 0, .m_Values = { host[0] } } } }, error) == 0 &&
+				error.find("consume the retained parameter batch result") != std::string::npos &&
+				sequence.GetStatus()->m_SequenceId == waiting && parameters.GetParameterBatchStatus()->m_BatchId == first,
+				"A retained terminal result rejects an event sequence with consumption guidance and keeps the result");
+			const auto running = runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission",
+				.m_CaptureFrames = { 2 } }, error);
+			checks.Check(running == waiting + 1 && parameters.GetParameterBatchStatus()->m_BatchId == first &&
+				tickUntil([&]() { return sequence.GetStatus()->m_State == FrameSequenceState::Running; }),
+				"A retained terminal parameter result permits a new sequence and remains queryable");
+			checks.Check(runtime.RequestParameterBatch(host, error) == 0 && error.find("sequence") != std::string::npos &&
+				runtime.RequestParameterBatch(mixed, error) == 0 &&
+				runtime.TakeParameterBatchResult(first).has_value() && !parameters.GetParameterBatchStatus() &&
+				runtime.RequestParameterBatch(host, error) == 0,
+				"Running sequences reject direct parameter writes before and after terminal result consumption");
+			checks.Check(tickUntil([&]() { return sequence.GetStatus()->m_State == FrameSequenceState::Finishing && encoderEntered; }) &&
+				runtime.RequestParameterBatch(host, error) == 0 && error.find("sequence") != std::string::npos &&
+				runtime.RequestParameterBatch(mixed, error) == 0 && !parameters.GetParameterBatchStatus(),
+				"Finishing retains exclusion while the real sequence writer is blocked inside its codec");
+			releaseEncoder = true;
+			checks.Check(tickUntil([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
+				sequence.GetStatus()->m_State == FrameSequenceState::Completed,
+				"Writer completion ends the sequence's execution exclusion");
+			const auto second = runtime.RequestParameterBatch(mixed, error);
+			checks.Check(second == first + 1 && tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(second).has_value(),
+				"Completed sequences allow a mixed batch without consuming ids for rejected requests");
+			const std::array lighting{ LabParameterValue{ LabParameterId("lighting"), uint32_t(2) } };
+			const auto deferred = runtime.RequestParameterBatch(lighting, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(deferred == second + 1 &&
+				parameters.GetParameterBatchStatus()->m_State == ParameterBatchState::Applying &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission" }, error) == 0 &&
+				error.find("pending parameter batch") != std::string::npos &&
+				runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::Finished &&
+				!parameters.GetParameterBatchStatus()->IsTerminal(),
+				"An Applying Deferred batch excludes sequences until consumption; cancelling an old sequence cannot release it");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"The Deferred batch eventually reaches its real terminal receipt");
+			const auto failing = runtime.StartFrameSequence({ .m_CameraPathId = "Missing.AdmissionPath" }, error);
+			checks.Check(failing == running + 1 &&
+				tickUntil([&]() { return sequence.GetStatus()->m_State == FrameSequenceState::Failed; }) &&
+				runtime.TakeParameterBatchResult(deferred).has_value(),
+				"A failed sequence releases exclusion and preserves the retained Deferred receipt");
+			runtime.HandleHostEvent({ .m_Type = AppHostEventType::Suspended });
+			const auto suspended = runtime.RequestParameterBatch(host, error);
+			checks.Check(suspended == deferred + 1 && runtime.Tick() == AppRuntimeTickResult::Suspended &&
+				parameters.GetParameterBatchStatus()->m_State == ParameterBatchState::Queued &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission" }, error) == 0,
+				"Suspension preserves queued session commands and their admission exclusion until resume");
+			runtime.HandleHostEvent({ .m_Type = AppHostEventType::Resumed });
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(suspended).has_value(),
+				"Resume completes the admitted suspended batch");
+			const std::array fatalValues{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 9.0f } };
+			const auto fatal = runtime.RequestParameterBatch(fatalValues, error);
+			probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+			checks.Check(fatal != 0 && runtime.Tick() == AppRuntimeTickResult::Fatal &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission" }, error) == 0 &&
+				runtime.RequestParameterBatch(host, error) == 0 && parameters.GetParameterBatchStatus()->IsTerminal(),
+				"A failed runtime rejects new session work without rewriting its terminal parameter receipt");
+			runtime.Shutdown();
+			checks.Check(runtime.TakeParameterBatchResult(fatal).has_value() &&
+				!runtime.TakeParameterBatchResult(fatal) &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Admission" }, error) == 0 &&
+				runtime.RequestParameterBatch(host, error) == 0,
+				"Post-shutdown consumption returns the real retained result once and cannot reopen session admission");
+		}
+
+		void RunSessionExitAdmissionScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			const std::array values{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 8.0f } };
+			std::string error;
+			const auto id = runtime.RequestParameterBatch(values, error);
+			runtime.HandleHostEvent({ .m_Type = AppHostEventType::ExitRequested });
+			checks.Check(id != 0 && !runtime.CanRequestParameterBatch(error) && !error.empty() &&
+				runtime.RequestParameterBatch(values, error) == 0 &&
+				runtime.StartFrameSequence({ .m_CameraPathId = "Missing.ExitPath" }, error) == 0 &&
+				runtime.GetParameterControl()->GetParameterBatchStatus()->m_State == ParameterBatchState::Queued &&
+				!runtime.TakeParameterBatchResult(id) && runtime.Tick() == AppRuntimeTickResult::Exit,
+				"ExitRequested closes admission while preserving the queued parameter owner's actual state");
+			runtime.Shutdown();
+			const auto result = runtime.TakeParameterBatchResult(id);
+			checks.Check(result && result->IsTerminal() && !result->m_Failure.empty() &&
+				runtime.CancelFrameSequence() == FrameSequenceCancelVerdict::NotFound,
+				"Graceful shutdown closes the unapplied batch and leaves its receipt available through AppRuntime");
+		}
+
+		void RunParameterFeedbackScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			// Standalone source tests may inject frame evidence. The AppRuntime-owned
+			// source is exposed read-only and receives evidence only from its frame owner.
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			SessionParameterControl source(*runtime.GetRenderServices().m_Environment);
+			source.SynchronizeContent(runtime.GetDemoManager()->GetActiveDemo(),
+				runtime.GetDemoManager()->GetActiveContentIdentity(), "FaultLifecycle.Demo", false);
+			const std::array values{ LabParameterValue{ LabParameterId("lighting"), uint32_t(2) } };
+			std::string error;
+			const auto id = source.RequestParameterBatch(values, error);
+			source.OnFrameReady(probe.m_ParameterBuiltSerial + 1);
+			const auto generation = environment.GetBakeRequestGeneration();
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+			while (environment.GetBakingStatus().m_ActiveGeneration != generation &&
+				std::chrono::steady_clock::now() < deadline)
+			{
+				probe.m_ReadbackFence = {};
+				GGLAB_UNUSED(runtime.Tick());
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+			const auto serial = probe.m_ParameterBuiltSerial;
+			source.OnFrameReady(serial);
+			source.OnFrameBuilt(serial, environment.GetBakingStatus().m_ActiveGeneration,
+				probe.m_ParameterBuiltView);
+			const auto published = source.GetParameterBatchStatus()->m_Items.front().m_Published;
+			checks.Check(id != 0 && published && !source.GetParameterBatchStatus()->IsTerminal(),
+				"The standalone source observes an actual Runtime Deferred publication before feedback injection");
+			source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed,
+				.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = serial });
+			checks.Check(!source.GetParameterBatchStatus()->m_Items.front().m_FirstConsumed &&
+				source.GetParameterBatchStatus()->m_Items.front().m_Published == published,
+				"A failed scene upload cannot consume a lighting publication even with a valid fence and matching serial");
+			source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::Ready,
+				.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = serial });
+			checks.Check(!source.GetParameterBatchStatus()->m_Items.front().m_FirstConsumed,
+				"Failed scene feedback discards its consumed-state evidence instead of allowing a later same-frame replay");
+			GGLAB_UNUSED(runtime.Tick());
+			source.OnFrameReady(probe.m_ParameterBuiltSerial);
+			source.OnFrameBuilt(probe.m_ParameterBuiltSerial, environment.GetBakingStatus().m_ActiveGeneration,
+				probe.m_ParameterBuiltView);
+			source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::Ready,
+				.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = probe.m_ParameterBuiltSerial });
+			const auto done = source.TakeParameterBatchResult(id);
+			checks.Check(done && done->m_Items.front().m_State == ParameterEffectState::Consumed &&
+				done->m_Items.front().m_FirstConsumed > published,
+				"Only fresh built evidence and a successful matching submission complete the Deferred receipt");
+			source.Finish();
+			runtime.Shutdown();
+		}
+
+		void RunPendingParameterBatchScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			probe.m_EnableTemporalHistory = false;
+			GGLAB_UNUSED(runtime.Tick());
+			auto& environment = *runtime.GetRenderServices().m_Environment;
+			auto* demo = runtime.GetDemoManager()->GetActiveDemo();
+			const auto content = runtime.GetDemoManager()->GetActiveContentIdentity();
+			const ParameterBatchOwner owner{ 1 };
+			const ParameterBatchOwner other{ 2 };
+			SessionParameterControl source(environment);
+			source.SynchronizeContent(demo, content, "FaultLifecycle.Demo", false);
+			uint64_t serial = 0;
+			std::string error;
+			const auto request = [&](std::string_view name, LabValue value)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId(name), value } };
+					return source.RequestParameterBatch(values, error, owner);
+				};
+			const auto status = [&](uint64_t id) { return source.GetParameterBatchStatus(id, owner); };
+			const auto begin = [&]() { source.OnFrameReady(++serial); };
+			// This standalone coordinator test injects view/submission evidence, while
+			// domain requests and publication use the production lighting scheduler.
+			const auto build = [&]()
+				{
+					auto view = probe.m_ParameterBuiltView;
+					source.ApplyViewSettings(view, false);
+					source.OnFrameBuilt(serial, environment.GetBakingStatus().m_ActiveGeneration, view);
+				};
+			const auto submit = [&]()
+				{
+					source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::Ready,
+						.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = serial });
+				};
+			const auto waitForLighting = [&]()
+				{
+					const auto target = environment.GetBakeRequestGeneration();
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+					while (environment.GetBakingStatus().m_ActiveGeneration != target &&
+						std::chrono::steady_clock::now() < deadline)
+					{
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::yield();
+					}
+					return environment.GetBakingStatus().m_ActiveGeneration == target;
+				};
+			const auto first = request("lighting", uint32_t(2));
+			checks.Check(first && !request("view.exposure.ev100", 9.0f),
+				"An unapplied transaction retains the single source reservation");
+			begin();
+			const auto* retained = status(first);
+			const auto applied = retained->m_Items[0].m_Applied;
+			const auto generation = retained->m_Items[0].m_Identity.m_Generation;
+			const auto immediate = request("view.exposure.ev100", 9.0f);
+			begin();
+			build();
+			auto frozen = source.CaptureFrameState(serial, environment.GetBakeRequestGeneration(),
+				environment.GetBakingStatus().m_ActiveGeneration);
+			const auto builtJson = nlohmann::json::parse(SerializeParameterFrameState(frozen));
+			checks.Check(frozen.m_Receipts.size() == 2 &&
+				!frozen.m_Receipts.back().m_Item.m_FirstConsumed &&
+				!frozen.m_RequestedLighting.m_Profile && !frozen.m_ActiveLighting.m_Profile,
+				"Build-time parameter snapshots retain outstanding receipts and leave unknown profile identity null");
+			submit();
+			source.CompleteFrameState(frozen);
+			const auto submittedJson = SerializeParameterFrameState(frozen);
+			checks.Check(frozen.m_Receipts.back().m_Item.m_FirstConsumed == serial &&
+				nlohmann::json::parse(submittedJson)["values"] == builtJson["values"],
+				"Submission completes exact frozen receipts without resampling parameter inputs");
+			checks.Check(immediate && retained == status(first) && !retained->IsTerminal() &&
+				retained->m_Items[0].m_Applied == applied && status(immediate)->IsTerminal() &&
+				status(immediate)->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				status(immediate)->m_Revision > retained->m_Revision,
+				"An unrelated later revision consumes Immediate work without superseding pending Deferred work");
+			checks.Check(!source.GetParameterBatchStatus() && !source.GetParameterBatchStatus(first, other) &&
+				!source.TakeParameterBatchResult(immediate) && !source.TakeParameterBatchResult(immediate, other),
+				"External and foreign owners cannot query or collect internal receipts");
+			source.FinishParameterBatches(other);
+			const std::array foreign{ LabParameterValue{ LabParameterId("radius"), 2.0f } };
+			checks.Check(!retained->IsTerminal() && !source.RequestParameterBatch(foreign, error, other) &&
+				!source.RequestParameterBatch(foreign, error),
+				"A foreign owner cannot cancel or acquire an occupied session lane");
+			checks.Check(source.TakeParameterBatchResult(immediate, owner).has_value() && retained == status(first),
+				"Collecting another record preserves borrowed status addresses");
+			source.CompleteFrameState(frozen);
+			checks.Check(SerializeParameterFrameState(frozen) == submittedJson,
+				"Collecting live receipts cannot change an owned submitted parameter snapshot");
+			const auto shared = request("lighting", uint32_t(2));
+			begin();
+			checks.Check(shared && !status(shared)->IsTerminal() &&
+				status(shared)->m_Items[0].m_Identity.m_Generation == generation &&
+				environment.GetBakeRequestGeneration() == generation,
+				"Two batches may independently wait on the same pending domain target without a redundant request");
+			checks.Check(waitForLighting(), "The shared target reaches actual Runtime publication");
+			begin();
+			build();
+			const auto publication = retained->m_Items[0].m_Published;
+			source.OnFrameSubmitted({ .m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed,
+				.m_SubmittedFence = probe.m_LastEndFence, .m_RenderFrameSerial = serial });
+			submit();
+			checks.Check(publication && !retained->IsTerminal() && !status(shared)->IsTerminal(),
+				"Failed submission discards candidates for all waiting batches and cannot be replayed");
+			begin();
+			build();
+			probe.m_ParameterEnvironment->RequestRebake();
+			submit();
+			const auto firstDone = source.TakeParameterBatchResult(first, owner);
+			const auto sharedDone = source.TakeParameterBatchResult(shared, owner);
+			checks.Check(firstDone && sharedDone && firstDone->m_BatchId != sharedDone->m_BatchId &&
+				firstDone->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				sharedDone->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				firstDone->m_Items[0].m_Published == publication &&
+				firstDone->m_Items[0].m_FirstConsumed == serial &&
+				sharedDone->m_Items[0].m_FirstConsumed == serial,
+				"Independent receipts consume frozen matching evidence despite a newer live request after build");
+
+			const auto aborted = request("view.exposure.ev100", 10.0f);
+			begin();
+			build();
+			const auto abortedPublication = status(aborted)->m_Items[0].m_Published;
+			const auto laterLighting = request("lighting", uint32_t(4));
+			begin();
+			build();
+			submit();
+			const auto retried = source.TakeParameterBatchResult(aborted, owner);
+			checks.Check(retried && retried->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				retried->m_Items[0].m_Published == abortedPublication &&
+				retried->m_Items[0].m_FirstConsumed > abortedPublication,
+				"A later proven Deferred operation is not misattributed to an older Immediate retry");
+			const auto replacement = request("lighting", uint32_t(8));
+			begin();
+			const auto superseded = source.TakeParameterBatchResult(laterLighting, owner);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				superseded->m_Items[0].m_Applied && !superseded->m_Items[0].m_FirstConsumed,
+				"A committed different assignment permanently supersedes an older unconsumed request");
+			checks.Check(waitForLighting(), "The replacement domain target becomes active");
+			const auto broken = request("broken-lighting", uint32_t(16));
+			begin();
+			build();
+			checks.Check(status(broken)->m_State == ParameterBatchState::Failed &&
+				status(replacement)->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!status(replacement)->m_Items[0].m_Published,
+				"A newer target before build supersedes an older still-active generation across parameter bindings");
+			GGLAB_UNUSED(source.TakeParameterBatchResult(broken, owner));
+			GGLAB_UNUSED(source.TakeParameterBatchResult(replacement, owner));
+
+			const auto old = request("view.exposure.ev100", 11.0f);
+			begin();
+			build();
+			const auto oldPublication = status(old)->m_Items[0].m_Published;
+			const auto away = request("view.exposure.ev100", 12.0f);
+			begin();
+			const auto back = request("view.exposure.ev100", 11.0f);
+			source.OnFrameReady(serial);
+			checks.Check(status(back)->m_State == ParameterBatchState::Queued,
+				"Repeating one Ready boundary cannot apply a second reservation in that frame");
+			begin();
+			build();
+			submit();
+			checks.Check(status(old)->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				status(old)->m_Items[0].m_Published == oldPublication &&
+				status(away)->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				status(back)->m_Items[0].m_State == ParameterEffectState::Consumed,
+				"An away-and-back assignment before build cannot resurrect either overwritten receipt");
+			GGLAB_UNUSED(source.TakeParameterBatchResult(old, owner));
+			GGLAB_UNUSED(source.TakeParameterBatchResult(away, owner));
+			GGLAB_UNUSED(source.TakeParameterBatchResult(back, owner));
+
+			std::vector<uint64_t> ids;
+			const auto revision = source.GetParameterRevision();
+			for (size_t index = 0; index < SessionParameterMaxBatches; ++index)
+			{
+				ids.push_back(request("view.exposure.ev100", 11.0f));
+				begin();
+				build();
+			}
+			const auto applications = probe.m_ParameterApplications;
+			checks.Check(source.GetParameterBatchCount() == SessionParameterMaxBatches &&
+				std::ranges::all_of(ids, [&](auto id)
+				{
+					return id && status(id)->m_Items[0].m_State == ParameterEffectState::NoChange;
+				}) && !request("radius", 2.0f) && source.GetParameterRevision() == revision &&
+				probe.m_ParameterApplications == applications,
+				"Retained terminal results count toward a hard bound; overflow neither reserves nor mutates");
+			GGLAB_UNUSED(source.TakeParameterBatchResult(ids.front(), owner));
+			const auto recovered = request("radius", 2.0f);
+			checks.Check(recovered == ids.back() + 1,
+				"Explicit collection restores capacity and rejected admission consumes no batch identity");
+			probe.m_ParameterEffectCallback = [&]()
+				{
+					checks.Check(!request("view.exposure.ev100", 13.0f) &&
+						!source.TakeParameterBatchResult(ids.back(), owner),
+						"Effect callbacks cannot reenter admission or invalidate records during transaction application");
+					source.FinishParameterBatches(owner);
+				};
+			begin();
+			checks.Check(status(recovered)->m_State == ParameterBatchState::Applying,
+				"A reentrant owner finish cannot partially cancel the committing transaction");
+			source.FinishParameterBatches(owner);
+			checks.Check(status(recovered)->IsTerminal() && !source.HasPendingParameterBatches() &&
+				source.GetParameterBatchStatuses(other).empty(),
+				"Owner finish closes unresolved work while retaining independently collectible results");
+			for (const auto& batch : source.GetParameterBatchStatuses(owner))
+			{
+				GGLAB_UNUSED(source.TakeParameterBatchResult(batch.m_BatchId, owner));
+			}
+			checks.Check(source.GetParameterBatchCount() == 0, "Every retained record is collected exactly once");
+			source.Finish();
+
+			for (uint32_t ending = 0; ending < 4; ++ending)
+			{
+				SessionParameterControl pending(environment);
+				pending.SynchronizeContent(demo, content, "FaultLifecycle.Demo", false);
+				const std::array lighting{ LabParameterValue{ LabParameterId("lighting"), uint32_t(32 + ending) } };
+				const auto waiting = pending.RequestParameterBatch(lighting, error, owner);
+				pending.OnFrameReady(1);
+				const auto queued = pending.RequestParameterBatch(foreign, error, owner);
+				const auto stamp = pending.GetParameterBatchStatus(waiting, owner)->m_Items[0].m_Applied;
+				if (ending == 0)
+				{
+					pending.FinishParameterBatches(owner);
+				}
+				else if (ending == 1)
+				{
+					pending.SynchronizeContent(nullptr, 0, {}, true);
+				}
+				else if (ending == 2)
+				{
+					pending.OnRuntimeFailed("Injected pending-transaction runtime failure.");
+				}
+				else
+				{
+					pending.Finish();
+				}
+				const auto closed = pending.TakeParameterBatchResult(waiting, owner);
+				const auto cancelled = pending.TakeParameterBatchResult(queued, owner);
+				const auto expected = ending == 1 ? ParameterEffectState::Superseded :
+					ending == 2 ? ParameterEffectState::Failed : ParameterEffectState::EffectNotReached;
+				checks.Check(waiting && queued && closed && cancelled &&
+					closed->m_Items[0].m_State == expected && closed->m_Items[0].m_Applied == stamp &&
+					!closed->m_Items[0].m_FirstConsumed && cancelled->m_State == ParameterBatchState::Failed &&
+					pending.GetParameterBatchCount() == 0,
+					"Owner/content/failure/shutdown closes all pending receipts and cancels only the queued reservation");
+				pending.Finish();
+			}
+			runtime.Shutdown();
+		}
+
+		void RunInheritedLightingScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			LabRuntime lab({ .m_Services = probe.m_ContentServices, .m_WindowWidth = 32,
+				.m_WindowHeight = 32, .m_RunConfig = { .m_WarmupFrames = 0 } });
+			const LabId labId("gglab.lab.test.inherited-lighting");
+			const LabParameterId samples("samples");
+			checks.Check(lab.RegisterLab({ .m_Id = labId, .m_DisplayName = "Inherited lighting fixture" },
+				&InheritedLightingTestLab::Create) && lab.Initialize(labId),
+				"The inherited lighting fixture initializes through the production LabRuntime");
+			lab.TickTransitions();
+			lab.OnEnter();
+			const auto settings = [&]()
+				{
+					return probe.m_ContentServices.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+				};
+			const auto generation = [&]()
+				{
+					return runtime.GetRenderServices().m_Environment->GetBakeRequestGeneration();
+				};
+			const auto baseline = settings().m_BakeConfig.m_PrefilteredSpecularSampleCount;
+			lab.RequestSetParameter(samples, uint32_t(64));
+			lab.ProcessPendingCommands();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64,
+				"An entered Lab establishes its explicit Runtime override");
+			probe.m_HoldLightingPreparation = true;
+			lab.RequestSwitchLab(labId);
+			const auto beforePrepare = generation();
+			lab.ProcessPendingCommands();
+			checks.Check(lab.HasPendingSession() && generation() == beforePrepare &&
+				settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64,
+				"Preparing replacement content leaves the active owner's lighting untouched");
+			probe.m_HoldLightingPreparation = false;
+			lab.TickTransitions();
+			checks.Check(lab.IsReady() && settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == baseline &&
+				lab.GetActiveSession()->GetParameters().Get(samples, uint32_t(0)) == baseline &&
+				!lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty && generation() == beforePrepare + 1,
+				"Replacement inherits after the old owner restores, without reapplying a stale pending default");
+			lab.RequestSetParameter(samples, uint32_t(128));
+			lab.ProcessPendingCommands();
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 128 &&
+				lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty &&
+				std::get<uint32_t>(lab.GetActiveSession()->GetParameters().Find(samples)->m_Desc.m_DefaultValue) == baseline,
+				"Restart preserves explicit intent while rebinding its entered reset default");
+			probe.m_ParameterEnvironment->SetPrefilteredSpecularSampleCount(256);
+			const auto externalGeneration = generation();
+			const auto revision = lab.GetParameterRevision();
+			lab.RequestSetParameter(LabParameterId("toggle"), true);
+			lab.ProcessPendingCommands();
+			checks.Check(lab.GetParameterRevision() > revision && generation() == externalGeneration &&
+				lab.GetActiveSession()->GetParameters().Get(samples, uint32_t(0)) == 256 &&
+				!lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty,
+				"A later ordinary writer is reflected before edits and is not replayed by unrelated Lab effects");
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			checks.Check(generation() == externalGeneration &&
+				lab.GetActiveSession()->GetParameters().Get(samples, uint32_t(0)) == 256 &&
+				!lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty,
+				"Restart leaves an inherited value inherited and schedules no redundant bake");
+			probe.m_HoldLightingPreparation = true;
+			lab.RequestRestartSession();
+			lab.ProcessPendingCommands();
+			lab.Shutdown();
+			checks.Check(generation() == externalGeneration && settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 256,
+				"Cancelling a pending session and exiting preserves the later writer's lighting");
+			probe.m_HoldLightingPreparation = false;
+			const std::array startup{ LabParameterAssignment{ "samples", "512" } };
+			checks.Check(lab.Initialize(labId, startup), "The lighting fixture accepts an explicit startup placeholder value");
+			lab.TickTransitions();
+			lab.OnEnter();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 512 &&
+				lab.GetActiveSession()->GetParameters().Find(samples)->m_Dirty,
+				"Explicit startup equal to the constructor placeholder wins over the actual entered baseline");
+			lab.Shutdown();
+			checks.Check(settings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 256,
+				"The explicit startup override restores its actual entered baseline on exit");
+			runtime.Shutdown();
+		}
+
+		void RunRebuildParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& control = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &control;
+			runtime.EnableParameterControl();
+			std::string error;
+			const auto request = [&](std::string_view name, uint32_t value)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId(name), value } };
+					return runtime.RequestParameterBatch(values, error);
+				};
+			const auto created = probe.m_ParameterSessionCreations;
+			const auto originalIdentity = control.GetContentIdentity();
+			const auto revision = control.GetParameterRevision();
+			for (const auto& invalid : std::array{
+				LabParameterValue{ LabParameterId("unknown"), true },
+				LabParameterValue{ LabParameterId("radius"), 5.0f },
+				LabParameterValue{ LabParameterId("lighting"), uint32_t(2) } })
+			{
+				const std::array values{ LabParameterValue{ LabParameterId("layout"), uint32_t(2) },
+					LabParameterValue{ LabParameterId("view.exposure.ev100"), 2.0f }, invalid };
+				checks.Check(runtime.RequestParameterBatch(values, error) == 0 &&
+					control.GetParameterRevision() == revision && probe.m_ParameterSessionCreations == created,
+					"Invalid or old-World Deferred mixed rebuild batches reject before any source mutation");
+			}
+			const auto same = request("layout", 1);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = runtime.TakeParameterBatchResult(same);
+			checks.Check(unchanged && unchanged->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				!unchanged->m_Items[0].m_Published && !unchanged->m_Items[0].m_FirstConsumed &&
+				probe.m_ParameterSessionCreations == created && control.GetContentIdentity() == originalIdentity,
+				"Re-setting a Rebuild value starts no transition and preserves content identity");
+			probe.m_HoldParameterPreparation = true;
+			const std::array mixed{
+				LabParameterValue{ LabParameterId("layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("scene-layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("pipeline-layout"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 2.0f },
+				};
+			const auto batchId = runtime.RequestParameterBatch(mixed, error);
+			checks.Check(batchId != 0 && lab.GetActiveSession()->GetParameters().Get(
+				LabParameterId("layout"), uint32_t(0)) == 1, "Rebuild admission reserves without mutating the active Lab");
+			{
+				auto prepared = lab.PrepareParameterBatch(batchId, std::span(mixed).first(4), error);
+				checks.Check(prepared && prepared->HasChanges() && prepared->GetRebuildGeneration() == 0 &&
+					!lab.GetParameterRebuild() && probe.m_ParameterSessionCreations == created,
+					"Preparing and dropping a Rebuild plan creates no operation, candidate or source mutation");
+			}
+			bool completeCommit = false;
+			probe.m_ParameterEffectCallback = [&]()
+				{
+					completeCommit = control.GetParameterBatchStatus()->m_State == ParameterBatchState::Applying &&
+						control.GetLabParameters()->Get(LabParameterId("layout"), uint32_t(0)) == 2 &&
+						control.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == 2.0f;
+				};
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* preparing = control.GetParameterBatchStatus();
+			checks.Check(completeCommit && preparing && !preparing->IsTerminal() && lab.HasPendingSession() &&
+				probe.m_ParameterSessionCreations == created + 1 &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 1.0f &&
+				control.GetLabParameters()->Get(LabParameterId("radius"), 0.0f) == 2.0f,
+				"One candidate owns all requested Lab values while the old active World retains its inputs");
+			const auto generation = preparing->m_Items[0].m_Identity;
+			const auto batchRevision = preparing->m_Revision;
+			const auto transitionFrame = control.CaptureFrameState(probe.m_ParameterBuiltSerial, 0, 0);
+			const auto requestedRadius = std::ranges::find(transitionFrame.m_Values,
+				std::string("radius"), &ParameterFrameValue::m_Id);
+			checks.Check(!transitionFrame.m_Available && requestedRadius != transitionFrame.m_Values.end() &&
+				std::get<float>(requestedRadius->m_Value) == 2.0f && probe.m_ParameterBuiltRadius == 1.0f,
+				"Closed edit admission does not erase the transition frame's requested candidate values");
+			checks.Check(generation.m_Domain == "lab-session" && generation.m_Generation != 0 &&
+				preparing->m_Items[0].m_Applied && !preparing->m_Items[0].m_Published &&
+				!preparing->m_Items[3].m_FirstConsumed && preparing->m_Items[4].m_FirstConsumed,
+				"Rebuild and Lab Immediate receipts await activation; Host Immediate consumption uses its actual old-session frame");
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(probe.m_ParameterSessionCreations == created + 1 &&
+				control.GetContentIdentity() == originalIdentity && !control.GetParameterBatchStatus()->IsTerminal(),
+				"Repeated old-session frames neither restart the operation nor consume its candidate");
+			probe.m_HoldParameterPreparation = false;
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto* published = control.GetParameterBatchStatus();
+			checks.Check(published && !published->IsTerminal() && published->m_Revision == batchRevision &&
+				published->m_Items[0].m_Identity == generation && published->m_Items[0].m_Published &&
+				!published->m_Items[0].m_FirstConsumed && control.GetContentIdentity() != originalIdentity &&
+				probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == 2.0f,
+				"Owned activation continues the batch and Host overrides; an aborted target frame proves publication only");
+			const auto publishedFrame = published->m_Items[0].m_Published;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto consumed = runtime.TakeParameterBatchResult(batchId);
+			checks.Check(consumed && consumed->m_State == ParameterBatchState::Finished &&
+				std::ranges::all_of(consumed->m_Items, [](const auto& item)
+				{
+					return item.m_State == ParameterEffectState::Consumed;
+				}) && consumed->m_Items[0].m_Published == publishedFrame &&
+				consumed->m_Items[0].m_FirstConsumed == probe.m_ParameterBuiltSerial &&
+				consumed->m_Items[0].m_FirstConsumed > publishedFrame &&
+				probe.m_ParameterSessionCreations == created + 1 && probe.m_ParameterBuiltRadius == 2.0f,
+				"Retry consumption matches the target operation and retains first publication without recreating the session");
+			for (const auto name : { "scene-layout", "pipeline-layout", "layout" })
+			{
+				const auto id = request(name, 3);
+				GGLAB_UNUSED(runtime.Tick());
+				GGLAB_UNUSED(runtime.Tick());
+				const auto result = runtime.TakeParameterBatchResult(id);
+				checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::Consumed &&
+					result->m_Items[0].m_FirstConsumed == probe.m_ParameterBuiltSerial,
+					"Each Rebuild impact follows the owned session transition and matching successful submission");
+			}
+			probe.m_HoldParameterPreparation = true;
+			const auto failedId = request("layout", 4);
+			GGLAB_UNUSED(runtime.Tick());
+			probe.m_FailParameterPreparation = true;
+			probe.m_FrameBeginUnavailable = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto failed = runtime.TakeParameterBatchResult(failedId);
+			checks.Check(failed && failed->m_State == ParameterBatchState::Failed &&
+				!failed->m_Items[0].m_Published && !failed->m_Items[0].m_FirstConsumed &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("layout"), uint32_t(0)) == 3,
+				"Preparation failure closes the receipt without an RHI frame and preserves the old active Lab");
+			probe.m_FailParameterPreparation = false;
+			probe.m_FrameBeginUnavailable = false;
+			probe.m_FailParameterCreation = true;
+			const auto creationId = request("layout", 4);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto creationFailure = runtime.TakeParameterBatchResult(creationId);
+			checks.Check(creationFailure && creationFailure->m_State == ParameterBatchState::Failed &&
+				!creationFailure->m_Items[0].m_FirstConsumed && !lab.HasPendingSession() &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("layout"), uint32_t(0)) == 3,
+				"Candidate factory failure is an explicit failed effect and leaves the old Lab intact");
+			probe.m_FailParameterCreation = false;
+			const auto supersededId = request("layout", 5);
+			GGLAB_UNUSED(runtime.Tick());
+			probe.m_HoldParameterPreparation = false;
+			probe.m_FrameBeginUnavailable = true;
+			lab.RequestRestartSession();
+			GGLAB_UNUSED(runtime.Tick());
+			const auto superseded = runtime.TakeParameterBatchResult(supersededId);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!superseded->m_Items[0].m_FirstConsumed,
+				"An unrelated restart cannot inherit the operation even when no renderer frame is available");
+			probe.m_FrameBeginUnavailable = false;
+			probe.m_HoldParameterPreparation = true;
+			const auto shutdownId = request("layout", 6);
+			GGLAB_UNUSED(runtime.Tick());
+			runtime.Shutdown();
+			const auto stopped = runtime.TakeParameterBatchResult(shutdownId);
+			checks.Check(stopped && stopped->m_Items[0].m_State == ParameterEffectState::EffectNotReached &&
+				!stopped->m_Items[0].m_FirstConsumed, "Shutdown closes the pending operation without invented consumption");
+		}
+
+		void RunParameterFrameScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool fatalSubmission)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& parameters = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &parameters;
+			std::string error;
+			const auto request = [&](float radius)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId("radius"), radius } };
+					return runtime.RequestParameterBatch(values, error);
+				};
+			const auto applications = probe.m_ParameterApplications;
+			for (const auto& invalid : std::array{
+				LabParameterValue{ LabParameterId("unknown"), true },
+				LabParameterValue{ LabParameterId("radius"), int32_t(2) },
+				LabParameterValue{ LabParameterId("radius"), 5.0f },
+				LabParameterValue{ LabParameterId("unprojected"), 2.0f },
+				LabParameterValue{ LabParameterId("unbound-rebuild"), true },
+				LabParameterValue{ LabParameterId("deferred"), true } })
+			{
+				const std::array values{ LabParameterValue{ LabParameterId("radius"), 2.0f }, invalid };
+				checks.Check(runtime.RequestParameterBatch(values, error) == 0 && !error.empty() &&
+					probe.m_ParameterApplications == applications && !parameters.GetParameterBatchStatus(),
+					"Production Lab admission rejects a complete invalid/unsupported batch without mutation or ownership");
+			}
+			const auto id = request(2.0f);
+			checks.Check(id != 0 && error.empty() && request(3.0f) == 0 &&
+				probe.m_ParameterApplications == applications &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 1.0f,
+				"One accepted Lab transaction survives Update-time command draining without eager application");
+			const std::array wrongOwnerValues{ LabParameterValue{ LabParameterId("radius"), 2.0f } };
+			checks.Check(!lab.ApplyParameterBatch(id + 1, wrongOwnerValues, error),
+				"A wrong source command id cannot consume the accepted session reservation");
+			if (fatalSubmission)
+			{
+				probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal &&
+					parameters.GetParameterBatchStatus()->m_Items.size() == 1 &&
+					parameters.GetParameterBatchStatus()->m_State == ParameterBatchState::Failed &&
+					!parameters.GetParameterBatchStatus()->m_Items.front().m_FirstConsumed &&
+					probe.m_ParameterApplications == applications + 1,
+					"A fatal fenced production frame never confirms parameter consumption");
+				checks.Check(runtime.TakeParameterBatchResult(id).has_value() && request(1.0f) == 0,
+					"Fatal runtime failure closes the retained receipt and stops parameter intake");
+				runtime.Shutdown();
+				return;
+			}
+			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue &&
+				parameters.GetParameterBatchStatus()->IsTerminal() && probe.m_ParameterBuiltRadius == 2.0f &&
+				probe.m_ParameterApplications == applications + 1,
+				"The real AppRuntime Ready/build/submit path applies the Lab batch to the built frame exactly once");
+			const auto* status = parameters.GetParameterBatchStatus();
+			const auto revision = status->m_Revision;
+			const auto& item = status->m_Items.front();
+			checks.Check(item.m_State == ParameterEffectState::Consumed &&
+				item.m_Requested == probe.m_ParameterBuiltSerial && item.m_Applied == item.m_Requested &&
+				item.m_Published == item.m_Applied && item.m_FirstConsumed == item.m_Applied &&
+				request(3.0f) == 0 && !runtime.TakeParameterBatchResult(id + 1),
+				"Four Immediate stamps bind to the actual submitted serial and the owner retains its result until consumption");
+			checks.Check(runtime.TakeParameterBatchResult(id).has_value() && !runtime.TakeParameterBatchResult(id),
+				"The bounded Lab result has exactly one explicit consumption");
+
+			const auto noChange = request(2.0f);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = runtime.TakeParameterBatchResult(noChange);
+			checks.Check(unchanged && unchanged->m_Revision == revision &&
+				unchanged->m_Items.front().m_State == ParameterEffectState::NoChange &&
+				!unchanged->m_Items.front().m_Published && probe.m_ParameterApplications == applications + 1,
+				"NoChange preserves the active revision and starts neither a handler call nor publication");
+
+			const auto retry = request(3.0f);
+			probe.m_SkipParameterFrame = true;
+			const auto aborts = probe.m_FrameAborts;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto published = parameters.GetParameterBatchStatus()->m_Items.front().m_Published;
+			checks.Check(published && !parameters.GetParameterBatchStatus()->IsTerminal() &&
+				!parameters.GetParameterBatchStatus()->m_Items.front().m_FirstConsumed &&
+				probe.m_FrameAborts == aborts + 1 && probe.m_ParameterApplications == applications + 2,
+				"A real RAII frame abort preserves publication without firstConsumed");
+			GGLAB_UNUSED(runtime.Tick());
+			const auto retried = runtime.TakeParameterBatchResult(retry);
+			checks.Check(retried && retried->m_Items.front().m_Published == published &&
+				retried->m_Items.front().m_FirstConsumed == *published + 1 &&
+				probe.m_ParameterBuiltRadius == 3.0f && probe.m_ParameterApplications == applications + 2,
+				"Only a matching successful retry consumes the state; application and publication are not repeated");
+
+			const auto superseded = request(2.5f);
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto oldPublication = parameters.GetParameterBatchStatus()->m_Items.front().m_Published;
+			lab.RequestSetParameter(LabParameterId("radius"), 1.5f);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto replaced = runtime.TakeParameterBatchResult(superseded);
+			checks.Check(replaced && replaced->m_Items.front().m_State == ParameterEffectState::Superseded &&
+				replaced->m_Items.front().m_Published == oldPublication &&
+				!replaced->m_Items.front().m_FirstConsumed && probe.m_ParameterBuiltRadius == 1.5f,
+				"A later UI edit supersedes the aborted state instead of being mislabeled as its consumption");
+
+			const auto frozen = request(2.0f);
+			probe.m_ChangeParameterAfterBuild = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto consumed = runtime.TakeParameterBatchResult(frozen);
+			checks.Check(consumed && consumed->m_Items.front().m_State == ParameterEffectState::Consumed &&
+				consumed->m_Items.front().m_FirstConsumed == probe.m_ParameterBuiltSerial &&
+				probe.m_ParameterBuiltRadius == 2.0f &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 3.5f,
+				"Submission uses the identity frozen by scene build rather than re-reading a later live value");
+
+			const auto unrelated = request(2.5f);
+			probe.m_UnrelatedLightingChange = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto uncertain = runtime.TakeParameterBatchResult(unrelated);
+			checks.Check(uncertain && uncertain->m_State == ParameterBatchState::Failed &&
+				uncertain->m_Failure.find("UnexpectedLightingTransition") != std::string::npos &&
+				!uncertain->m_Items.front().m_FirstConsumed,
+				"An unrelated lighting transition fails conservatively without inventing parameter attribution");
+
+			const std::array rebake{ LabParameterValue{ LabParameterId("rebake"), true } };
+			const auto mismatched = runtime.RequestParameterBatch(rebake, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto mismatch = runtime.TakeParameterBatchResult(mismatched);
+			checks.Check(mismatch && mismatch->m_State == ParameterBatchState::Failed &&
+				mismatch->m_Failure.find("EffectMismatch") != std::string::npos &&
+				!mismatch->m_Items.front().m_FirstConsumed,
+				"An actual Runtime lighting generation advance cannot masquerade as an Immediate effect");
+
+			const auto queued = request(1.0f);
+			lab.RequestRestartSession();
+			GGLAB_UNUSED(runtime.Tick());
+			const auto stale = runtime.TakeParameterBatchResult(queued);
+			checks.Check(stale && stale->m_State == ParameterBatchState::Failed && stale->m_Items.empty(),
+				"Replacing the Lab session rejects a queued batch before it can mutate the replacement");
+			runtime.Shutdown();
+		}
+
+		void RunLightingParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& parameters = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &parameters;
+			std::string error;
+			const auto request = [&](uint32_t value, bool mixed = false)
+				{
+					std::vector<LabParameterValue> values{ { LabParameterId("lighting"), value } };
+					if (mixed)
+					{
+						values.push_back({ LabParameterId("radius"), 2.0f });
+						values.push_back({ LabParameterId("view.exposure.ev100"), 8.0f });
+					}
+					return runtime.RequestParameterBatch(values, error);
+				};
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						// This fault backend deliberately holds cache-readback fences. This
+						// success scenario explicitly delivers completion so a later bake can start.
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+						std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					}
+					return condition();
+				};
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration != 0; }),
+				"Deferred fixture establishes an actual published production bake before its experiment");
+			const std::array tooMany{ LabParameterValue{ LabParameterId("lighting"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("broken-lighting"), uint32_t(2) } };
+			checks.Check(runtime.RequestParameterBatch(tooMany, error) == 0 && !parameters.GetParameterBatchStatus(),
+				"Multiple lighting bindings reject atomically before any owner handler runs");
+			const auto applications = probe.m_ParameterApplications;
+			const auto id = request(2, true);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto first = *parameters.GetParameterBatchStatus();
+			checks.Check(id != 0 && first.m_Items.size() == 3 && !first.IsTerminal() &&
+				first.m_Items[0].m_State == ParameterEffectState::Applied && !first.m_Items[0].m_Published &&
+				first.m_Items[1].m_State == ParameterEffectState::Consumed &&
+				first.m_Items[2].m_State == ParameterEffectState::Consumed &&
+				first.m_Items[0].m_Identity.m_Domain == "lighting" &&
+				first.m_Items[0].m_Identity.m_Generation == environment.GetBakeRequestGeneration(),
+				"A mixed real frame consumes Immediate state while Deferred state keeps its own applied generation pending");
+			checks.Check(!runtime.TakeParameterBatchResult(id) && request(3) == 0,
+				"Pending Deferred effects retain their one result slot and cannot be consumed early");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"The production scheduler eventually publishes the exact Deferred generation");
+			const auto done = runtime.TakeParameterBatchResult(id);
+			checks.Check(done && done->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				done->m_Items[0].m_Applied == first.m_Items[0].m_Applied &&
+				done->m_Items[0].m_Published > done->m_Items[0].m_Applied &&
+				done->m_Items[0].m_FirstConsumed == done->m_Items[0].m_Published &&
+				probe.m_ParameterApplications == applications + 1,
+				"Deferred stamps distinguish application from actual publication and successful first consumption without reapplying");
+			const auto generation = environment.GetBakeRequestGeneration();
+			const auto revision = parameters.GetParameterRevision();
+			const auto nochange = request(2);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = runtime.TakeParameterBatchResult(nochange);
+			checks.Check(unchanged && unchanged->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				!unchanged->m_Items[0].m_Published && !unchanged->m_Items[0].m_FirstConsumed &&
+				parameters.GetParameterRevision() == revision && environment.GetBakeRequestGeneration() == generation &&
+				probe.m_ParameterApplications == applications + 1,
+				"Deferred NoChange confirms the active target without a new request, Immediate handler, publication or revision");
+			const auto lightingCalls = probe.m_LightingParameterApplications;
+			const std::array immediate{ LabParameterValue{ LabParameterId("radius"), 2.5f } };
+			const auto immediateId = runtime.RequestParameterBatch(immediate, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto immediateResult = runtime.TakeParameterBatchResult(immediateId);
+			checks.Check(immediateResult && immediateResult->m_State == ParameterBatchState::Finished &&
+				probe.m_LightingParameterApplications == lightingCalls &&
+				environment.GetBakeRequestGeneration() == generation,
+				"An unrelated Immediate batch never calls the Deferred binding or reuses its previous result");
+
+			probe.m_ParameterEnvironment->SetPrefilteredSpecularSampleCount(3);
+			const auto existingGeneration = environment.GetBakeRequestGeneration();
+			const auto existingId = request(3);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto existing = *parameters.GetParameterBatchStatus();
+			checks.Check(existingId != 0 && !existing.IsTerminal() &&
+				existing.m_Items[0].m_State == ParameterEffectState::Applied &&
+				existing.m_Items[0].m_Identity.m_Generation == existingGeneration &&
+				environment.GetBakeRequestGeneration() == existingGeneration,
+				"A changed source value binds an existing pending Runtime target without issuing another request");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"An existing pending target reaches real publication and submitted consumption");
+			const auto existingDone = runtime.TakeParameterBatchResult(existingId);
+			checks.Check(existingDone && existingDone->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				existingDone->m_Items[0].m_FirstConsumed && environment.GetBakeRequestGeneration() == existingGeneration,
+				"Binding an existing target retains honest Deferred publication and first-consumption receipts");
+
+			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(4));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto pendingGeneration = environment.GetBakeRequestGeneration();
+			const auto pendingRevision = parameters.GetParameterRevision();
+			const auto pendingId = request(4);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(pendingId != 0 && !parameters.GetParameterBatchStatus()->IsTerminal() &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == pendingGeneration &&
+				parameters.GetParameterRevision() == pendingRevision &&
+				environment.GetBakeRequestGeneration() == pendingGeneration,
+				"Unchanged parameter storage cannot report NoChange while its actual target is pending");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"An unchanged pending target eventually terminates through the production scheduler");
+			const auto pendingDone = runtime.TakeParameterBatchResult(pendingId);
+			checks.Check(pendingDone && pendingDone->m_Items[0].m_State == ParameterEffectState::Consumed,
+				"An unchanged pending target is consumed with no new revision or generation");
+
+			probe.m_ReturnStaleLightingEvidence = true;
+			const auto staleId = request(4);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto stale = runtime.TakeParameterBatchResult(staleId);
+			checks.Check(stale && stale->m_State == ParameterBatchState::Failed &&
+				stale->m_Failure.find("LightingEffectUnproven") != std::string::npos,
+				"A stale earlier request is rejected even for unchanged parameter storage");
+			probe.m_ReturnMissingLightingEvidence = true;
+			const auto missingId = request(4);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto missing = runtime.TakeParameterBatchResult(missingId);
+			checks.Check(missing && missing->m_State == ParameterBatchState::Failed &&
+				missing->m_Failure.find("LightingEffectUnproven") != std::string::npos,
+				"A declared capability without this operation's evidence cannot confirm an unchanged target");
+
+			probe.m_RequestLightingTwice = true;
+			const auto beforeDouble = environment.GetBakeRequestGeneration();
+			const auto doubleId = request(5);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(doubleId != 0 && !parameters.GetParameterBatchStatus()->IsTerminal() &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_State == ParameterEffectState::Applied &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == beforeDouble + 2,
+				"Session accepts the target returned by one owning operation without assuming generation plus one");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"A target following multiple domain requests reaches actual publication");
+			const auto doubleDone = runtime.TakeParameterBatchResult(doubleId);
+			checks.Check(doubleDone && doubleDone->m_Items[0].m_State == ParameterEffectState::Consumed,
+				"The exact final target from a multiple-request operation is consumed");
+
+			const auto replacedId = request(3);
+			GGLAB_UNUSED(runtime.Tick());
+			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(4));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto replaced = runtime.TakeParameterBatchResult(replacedId);
+			checks.Check(replaced && replaced->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!replaced->m_Items[0].m_Published && !replaced->m_Items[0].m_FirstConsumed,
+				"A later UI lighting request supersedes an unpublished exact generation without consuming its replacement");
+			const auto retryId = request(5);
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->m_Items.size() == 1 &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Published.has_value(); }),
+				"A publication can be observed in a frame subsequently aborted by the real RAII path");
+			const auto aborted = *parameters.GetParameterBatchStatus();
+			checks.Check(!aborted.IsTerminal() && !aborted.m_Items[0].m_FirstConsumed,
+				"An aborted publication frame is never Deferred firstConsumed");
+			probe.m_RebakeAfterParameterBuild = true;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto retried = runtime.TakeParameterBatchResult(retryId);
+			checks.Check(retried && retried->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				retried->m_Items[0].m_Published == aborted.m_Items[0].m_Published &&
+				retried->m_Items[0].m_FirstConsumed > retried->m_Items[0].m_Published &&
+				environment.GetBakeRequestGeneration() != retried->m_Items[0].m_Identity.m_Generation,
+				"Retry consumes the frozen built lighting generation even when a later live request advances after build");
+			const auto supersededAfterPublication = request(6);
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->m_Items.size() == 1 &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Published.has_value(); }),
+				"Deferred publication is retained before a later UI replacement");
+			const auto oldPublished = parameters.GetParameterBatchStatus()->m_Items[0].m_Published;
+			lab.RequestSetParameter(LabParameterId("lighting"), uint32_t(7));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto overwritten = runtime.TakeParameterBatchResult(supersededAfterPublication);
+			checks.Check(overwritten && overwritten->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				overwritten->m_Items[0].m_Published == oldPublished && !overwritten->m_Items[0].m_FirstConsumed,
+				"A published but aborted Deferred state keeps publication evidence when superseded before consumption");
+			const std::array broken{ LabParameterValue{ LabParameterId("broken-lighting"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("radius"), 3.0f } };
+			const auto brokenId = runtime.RequestParameterBatch(broken, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto failed = runtime.TakeParameterBatchResult(brokenId);
+			checks.Check(failed && failed->m_State == ParameterBatchState::Failed &&
+				std::ranges::all_of(failed->m_Items, [](const auto& item) { return item.IsTerminal(); }) &&
+				failed->m_Failure.find("LightingEffectUnproven") != std::string::npos,
+				"Unproven domain attribution closes every pending sibling instead of returning a terminal batch with unfinished items");
+			const std::array unrelated{ LabParameterValue{ LabParameterId("lighting"), uint32_t(7) },
+				LabParameterValue{ LabParameterId("rebake"), true } };
+			const auto unrelatedId = runtime.RequestParameterBatch(unrelated, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unattributed = runtime.TakeParameterBatchResult(unrelatedId);
+			checks.Check(unattributed && unattributed->m_State == ParameterBatchState::Failed &&
+				unattributed->m_Failure.find("LightingEffectUnproven") != std::string::npos &&
+				std::ranges::none_of(unattributed->m_Items, [](const auto& item) { return item.m_FirstConsumed.has_value(); }),
+				"An unchanged Deferred binding cannot absorb an unrelated Immediate handler's lighting request");
+			const auto fatalId = request(8);
+			probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+			checks.Check(fatalId != 0 && runtime.Tick() == AppRuntimeTickResult::Fatal &&
+				parameters.GetParameterBatchStatus()->IsTerminal() && !parameters.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed,
+				"Fatal submission closes an applied Deferred wait without inventing publication or consumption");
+			runtime.Shutdown();
+		}
+
+		void RunContentBindingScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool failBeforeShutdown)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			probe.m_EnableLightingProfiles = true;
+			// The Demo owns the nested content identity; it need not equal the raw Lab serial.
+			probe.m_ContentSerialOffset = 100;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			// Retain this borrow: subsequent owner transitions must not need a fresh getter.
+			auto& parameters = *runtime.GetParameterControl();
+			runtime.EnableParameterControl();
+			probe.m_ParameterControl = &parameters;
+			auto& demos = *runtime.GetDemoManager();
+			checks.Check(parameters.GetContentIdentity() == demos.GetActiveContentIdentity() &&
+				probe.m_PlannedContentIdentity == parameters.GetContentIdentity(),
+				"Parameter binding and frame planning share the Demo owner's nested content identity");
+			const std::array overrideValues
+			{
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 3.0f },
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+			};
+			std::string error;
+			const auto initial = runtime.RequestParameterBatch(overrideValues, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(initial != 0 && runtime.TakeParameterBatchResult(initial).has_value() &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 3.0f,
+				"The binding fixture establishes an explicit Host override before content replacement");
+			const std::array pendingValues
+			{
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 4.0f },
+				LabParameterValue{ LabParameterId("radius"), 2.5f },
+			};
+			const auto oldIdentity = parameters.GetContentIdentity();
+			const auto staleLab = runtime.RequestParameterBatch(pendingValues, error);
+			probe.m_ParameterRuntime->RequestRestartSession();
+			probe.m_FrameBeginUnavailable = true;
+			const auto readyFrames = probe.m_FrameBegins;
+			GGLAB_UNUSED(runtime.Tick());
+			const auto labResult = runtime.TakeParameterBatchResult(staleLab);
+			checks.Check(staleLab != 0 && labResult && labResult->IsTerminal() && labResult->m_Items.empty() &&
+				parameters.GetContentIdentity() != oldIdentity &&
+				parameters.GetContentIdentity() == demos.GetActiveContentIdentity() && probe.m_FrameBegins == readyFrames &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f,
+				"Lab replacement cancels the stale batch and clears Host overrides during an Unavailable frame");
+			auto* session = probe.m_ParameterRuntime->GetActiveSession();
+			GGLAB_UNUSED(session->SetParameter(LabParameterId("radius"), 2.75f));
+			session->ApplyParameterChanges(LabChangeImpact::Immediate);
+			const auto beforeQuery = parameters.GetParameterRevision();
+			checks.Check(runtime.GetParameterControl() == &parameters &&
+				static_cast<const GGLabAppRuntime&>(runtime).GetParameterControl() == &parameters &&
+				parameters.GetParameterRevision() == beforeQuery &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f,
+				"The parameter getter is a pure const accessor, without settings refresh or revision mutation");
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(parameters.GetParameterRevision() > beforeQuery &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.75f,
+				"The explicit content update stage refreshes inherited settings even without RHI readiness");
+			probe.m_FrameBeginUnavailable = false;
+			const auto restoredOverride = runtime.RequestParameterBatch(overrideValues, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(restoredOverride != 0 && runtime.TakeParameterBatchResult(restoredOverride).has_value() &&
+				probe.m_PlannedContentIdentity == parameters.GetContentIdentity(),
+				"The next Ready frame plans with the same refreshed identity as parameter control");
+			const auto pendingDemo = runtime.RequestParameterBatch(pendingValues, error);
+			const auto oldDestructions = probe.m_DemoDestructions;
+			const auto oldFrames = probe.m_FrameBegins;
+			probe.m_ExpectedReleasedBatch = pendingDemo;
+			probe.m_FrameBeginUnavailable = true;
+			probe.m_HoldCaptureFence = true;
+			demos.RequestActiveDemo(1);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(pendingDemo != 0 && probe.m_BindingReleasedBeforeExit &&
+				demos.GetRetiringDemoCount() == 1 && probe.m_DemoDestructions == oldDestructions &&
+				parameters.GetHostParameters().Get(LabParameterId("view.gtao.radius"), 0.0f) == 1.0f &&
+				parameters.GetContentIdentity() == demos.GetActiveContentIdentity(),
+				"Demo ownership cancels the old reservation and releases bindings before OnExit, independent of queries");
+			GGLAB_UNUSED(runtime.Tick());
+			probe.m_HoldCaptureFence = false;
+			probe.m_ReadbackFence = {};
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(demos.GetRetiringDemoCount() == 0 && probe.m_DemoDestructions == oldDestructions + 1 &&
+				probe.m_FrameBegins == oldFrames && runtime.TakeParameterBatchResult(pendingDemo).has_value(),
+				"The old Demo is destroyed behind its completed fence during repeated Unavailable frames without a control getter");
+			const auto shutdownBatch = runtime.RequestParameterBatch(pendingValues, error);
+			checks.Check(shutdownBatch != 0, "The current content accepts a new batch before teardown");
+			if (failBeforeShutdown)
+			{
+				probe.m_FrameBeginUnavailable = false;
+				probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+				checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal,
+					"Runtime failure terminates the new binding after the previous owner has been destroyed");
+			}
+			runtime.Shutdown();
+			const auto finished = runtime.TakeParameterBatchResult(shutdownBatch);
+			checks.Check(finished && finished->IsTerminal() &&
+				std::ranges::none_of(finished->m_Items, [](const auto& item) { return item.m_FirstConsumed.has_value(); }) &&
+				parameters.GetContentIdentity() == 0 && !parameters.GetLabParameters() &&
+				parameters.GetHostParameters().CaptureValues().empty(),
+				"Shutdown clears content borrows and overrides without revisiting the destroyed owner or inventing consumption");
+		}
+
+		void RunBatchPreparationScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			probe.m_EnableLightingProfiles = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& parameters = *runtime.GetParameterControl();
+			runtime.EnableParameterControl();
+			probe.m_ParameterControl = &parameters;
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
+			auto& lighting = *runtime.GetRenderComposition()->GetWorldLightingControl();
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto source = lighting.GetWorldLightingPublication().m_Requested;
+			std::optional<entt::entity> sun;
+			for (const auto entity : world.GetRegistry().view<components::LightComponent>())
+			{
+				if (world.GetRegistry().get<components::LightComponent>(entity).m_WorldSun)
+				{
+					sun = entity;
+					break;
+				}
+			}
+			checks.Check(source && sun && parameters.GetLightingProfiles().size() == 2,
+				"Batch preparation fixture binds real Lab, Host and World Lighting sources");
+			if (!source || !sun)
+			{
+				runtime.Shutdown();
+				return;
+			}
+			const std::array values
+			{
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+				LabParameterValue{ LabParameterId("environment.profile"), int32_t(1) },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 11.0f },
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 1.0f },
+			};
+			std::string error;
+			const auto initialExposure = parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f);
+			const auto applications = probe.m_ParameterApplications;
+			const auto labRevision = lab.GetParameterRevision();
+			const auto unchanged = [&]()
+				{
+					return probe.m_ParameterApplications == applications && lab.GetParameterRevision() == labRevision &&
+						lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 1.0f &&
+						parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == initialExposure &&
+						probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == initialExposure;
+				};
+
+			const std::array labValues{ LabParameterValue{ LabParameterId("radius"), 2.0f } };
+			const uint64_t independentId = 1;
+			checks.Check(lab.QueueParameterBatch(independentId, labValues, error) &&
+				runtime.RequestParameterBatch(values, error) == 0 && !parameters.GetParameterBatchStatus() && unchanged(),
+				"Busy source admission never allocates a Session receipt or changes live values");
+			auto independentPlan = lab.PrepareParameterBatch(independentId, labValues, error);
+			checks.Check(independentPlan.has_value() && unchanged(),
+				"Failed admission preserves the source's pre-existing same-numbered reservation");
+			independentPlan.reset();
+			lab.CancelParameterBatch(independentId);
+
+			const auto cancelled = runtime.RequestParameterBatch(values, error);
+			const auto cancelledRevision = parameters.GetParameterRevision();
+			const auto cancelledGeneration = environment.GetBakeRequestGeneration();
+			auto labPlan = lab.PrepareParameterBatch(cancelled, labValues, error);
+			checks.Check(labPlan && labPlan->HasChanges() && unchanged() &&
+				environment.GetBakeRequestGeneration() == cancelledGeneration,
+				"Lab preparation changes neither live values, handler counts nor Runtime requests");
+			labPlan.reset();
+			labPlan = lab.PrepareParameterBatch(cancelled, labValues, error);
+			checks.Check(labPlan.has_value() && unchanged(),
+				"Discarding a Lab plan leaves the same command reservation available for preparation");
+			labPlan.reset();
+			lab.CancelParameterBatch(cancelled);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto lostReservation = runtime.TakeParameterBatchResult(cancelled);
+			checks.Check(cancelled != 0 && lostReservation && lostReservation->m_State == ParameterBatchState::Failed &&
+				lostReservation->m_Items.empty() && lostReservation->m_Revision == 0 && unchanged() &&
+				parameters.GetParameterRevision() == cancelledRevision &&
+				environment.GetBakeRequestGeneration() == cancelledGeneration,
+				std::format("A lost Lab reservation rejects preparation before mutation "
+					"(id={}, failure={}, unchanged={}, revision={}/{}, generation={}/{})",
+					cancelled, lostReservation ? lostReservation->m_Failure : error, unchanged(),
+					parameters.GetParameterRevision(), cancelledRevision,
+					environment.GetBakeRequestGeneration(), cancelledGeneration));
+
+			const auto missing = runtime.RequestParameterBatch(values, error);
+			auto& light = world.GetRegistry().get<components::LightComponent>(*sun);
+			const auto originalSun = light.m_WorldSun;
+			light.m_WorldSun.reset();
+			// This is an external authored edit, not part of the accepted batch.
+			lighting.SynchronizeWorldLighting(world, source->m_SessionIdentity);
+			runtime.EnableParameterControl();
+			const auto missingRevision = parameters.GetParameterRevision();
+			const auto missingGeneration = environment.GetBakeRequestGeneration();
+			GGLAB_UNUSED(runtime.Tick());
+			const auto missingTarget = runtime.TakeParameterBatchResult(missing);
+			checks.Check(missing != 0 && missingTarget && missingTarget->m_State == ParameterBatchState::Failed &&
+				missingTarget->m_Failure.starts_with("LightingPreparationFailed:") &&
+				missingTarget->m_Items.empty() && missingTarget->m_Revision == 0 && unchanged() &&
+				parameters.GetParameterRevision() == missingRevision &&
+				environment.GetBakeRequestGeneration() == missingGeneration,
+				"A sun lost after admission rejects the entire prepared batch without applying exposure or calling the Lab handler");
+
+			light.m_WorldSun = originalSun;
+			lighting.SynchronizeWorldLighting(world, source->m_SessionIdentity);
+			runtime.EnableParameterControl();
+			const auto revision = parameters.GetParameterRevision();
+			probe.m_ExpectedCommitGeneration = environment.GetBakeRequestGeneration() + 1;
+			probe.m_ObserveParameterCommit = true;
+			const auto accepted = runtime.RequestParameterBatch(values, error);
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+			while (accepted != 0 && !parameters.GetParameterBatchStatus()->IsTerminal() &&
+				std::chrono::steady_clock::now() < deadline)
+			{
+				probe.m_ReadbackFence = {};
+				if (runtime.Tick() != AppRuntimeTickResult::Continue)
+				{
+					break;
+				}
+			}
+			const auto committed = runtime.TakeParameterBatchResult(accepted);
+			checks.Check(committed && committed->m_State == ParameterBatchState::Finished &&
+				probe.m_ParameterCommitWasComplete && probe.m_ParameterApplications == applications + 1 &&
+				parameters.GetParameterRevision() == revision + 1 && lab.GetParameterRevision() == labRevision + 1,
+				std::format("A successful mixed batch installs all sources before effects "
+					"(id={}, failure={}, observed={}, applications={}/{}, revision={}/{}, labRevision={}/{})",
+					accepted, committed ? committed->m_Failure : error, probe.m_ParameterCommitWasComplete,
+					probe.m_ParameterApplications, applications + 1, parameters.GetParameterRevision(), revision + 1,
+					lab.GetParameterRevision(), labRevision + 1));
+			checks.Check(committed && committed->m_Items.size() == 4 &&
+				std::ranges::all_of(committed->m_Items, [](const auto& item)
+				{
+					return item.m_Parameter == LabParameterId("radius") ?
+						item.m_State == ParameterEffectState::Superseded && !item.m_FirstConsumed :
+						item.m_State == ParameterEffectState::Consumed;
+				}) &&
+				committed->m_Items[1].m_Identity.m_Generation == probe.m_ExpectedCommitGeneration &&
+				probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == 11.0f &&
+				probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius == 1.0f &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f) == 2.0f,
+				std::format("Host precedence survives an inherited NoChange becoming changed "
+					"(hostRadius={}, labRadius={}, exposure={}, items={})",
+					probe.m_ParameterBuiltView.m_Lighting.m_GTAO.m_Radius,
+					lab.GetActiveSession()->GetParameters().Get(LabParameterId("radius"), 0.0f),
+					probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100, committed ? committed->m_Items.size() : 0));
+			runtime.Shutdown();
+		}
+
+		void RunLightingProfileRegistrationScenario(SelfTestContext& checks,
+			const std::filesystem::path& root, bool labBoolean, bool equivalent)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = labBoolean;
+			probe.m_ProfileNamedLabBool = labBoolean;
+			probe.m_EnableLightingProfiles = !labBoolean;
+			probe.m_InvalidLightingProfiles = !labBoolean && !equivalent;
+			probe.m_EquivalentLightingProfiles = equivalent;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& parameters = *runtime.GetParameterControl();
+			runtime.EnableParameterControl();
+			std::string error;
+			if (labBoolean)
+			{
+				const std::array values{ LabParameterValue{ LabParameterId("environment.profile"), true } };
+				const auto id = runtime.RequestParameterBatch(values, error);
+				GGLAB_UNUSED(runtime.Tick());
+				const auto result = runtime.TakeParameterBatchResult(id);
+				checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+					probe.m_ParameterRuntime->GetActiveSession()->GetParameters().Get(
+						LabParameterId("environment.profile"), false),
+					"A Lab-owned environment.profile boolean dispatches through its source, not the Host enum variant");
+			}
+			else
+			{
+				checks.Check(parameters.IsAvailable() && parameters.GetLightingProfiles().empty() &&
+					parameters.GetLightingProfileError().starts_with("LightingProfileRegistration:"),
+					"Invalid or effective-equivalent registrations report a configuration error without disabling Host controls");
+				const auto queries = probe.m_LightingProfileQueries;
+				const std::array invalid{ LabParameterValue{ LabParameterId("environment.profile"), int32_t(0) } };
+				checks.Check(runtime.RequestParameterBatch(invalid, error) == 0 &&
+					error.starts_with("LightingProfileRegistration:"),
+					"Selecting an invalid registration reports its concrete error instead of source unreadiness");
+				const std::array host{ LabParameterValue{ LabParameterId("view.gtao.radius"), 2.0f } };
+				const auto id = runtime.RequestParameterBatch(host, error);
+				GGLAB_UNUSED(runtime.Tick());
+				const auto result = runtime.TakeParameterBatchResult(id);
+				checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+					probe.m_LightingProfileQueries == queries,
+					"Unrelated Host controls remain usable and invalid registrations are cached for the content lifetime");
+			}
+			runtime.Shutdown();
+		}
+
+		void RunLabWorldLightingScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			probe.m_EnableLightingProfiles = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			runtime.EnableParameterControl();
+			auto& parameters = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &parameters;
+			auto& lab = *probe.m_ParameterRuntime;
+			auto& lighting = *runtime.GetRenderComposition()->GetWorldLightingControl();
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+					}
+					return condition();
+				};
+			checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration != 0; }),
+				"The Lab World Lighting fixture starts from a real published generation");
+			const std::array sun{ LabParameterValue{ LabParameterId("sun-input"), 2.0f } };
+			std::string error;
+			auto generation = environment.GetBakeRequestGeneration();
+			const auto applications = probe.m_ParameterApplications;
+			checks.Check(lab.QueueParameterBatch(100, sun, error) &&
+				!lab.PrepareParameterBatch(100, sun, error),
+				"A World Lighting Lab plan requires the Session's explicit control and content identity");
+			auto prepared = lab.PrepareParameterBatch(100, sun, error, &lighting, parameters.GetContentIdentity());
+			checks.Check(prepared && prepared->HasWorldLightingChanges() &&
+				environment.GetBakeRequestGeneration() == generation && probe.m_ParameterApplications == applications &&
+				lab.GetActiveSession()->GetParameters().Get(LabParameterId("sun-input"), 0.0f) == 1.0f,
+				"Preparing a Lab sun plan mutates neither World Lighting, parameter storage nor callbacks");
+			prepared.reset();
+			lab.CancelParameterBatch(100);
+			const std::array invalid{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 11.0f },
+				LabParameterValue{ LabParameterId("sun-input"), 99.0f } };
+			checks.Check(runtime.RequestParameterBatch(invalid, error) == 0 &&
+				environment.GetBakeRequestGeneration() == generation,
+				"An invalid authored sun tail rejects the complete mixed batch");
+			const std::array values{ LabParameterValue{ LabParameterId("sun-input"), 2.0f },
+				LabParameterValue{ LabParameterId("radius"), 2.0f },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 11.0f } };
+			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
+			std::optional<entt::entity> sunEntity;
+			for (const auto entity : world.GetRegistry().view<components::LightComponent>())
+			{
+				if (world.GetRegistry().get<components::LightComponent>(entity).m_WorldSun)
+				{
+					sunEntity = entity;
+					break;
+				}
+			}
+			checks.Check(sunEntity.has_value(), "The prepared Lab fixture owns a designated World Sun");
+			if (sunEntity)
+			{
+				const float exposure = parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f);
+				const auto missing = runtime.RequestParameterBatch(values, error);
+				auto& light = world.GetRegistry().get<components::LightComponent>(*sunEntity);
+				const auto authored = light.m_WorldSun;
+				light.m_WorldSun.reset();
+				lighting.SynchronizeWorldLighting(world, parameters.GetContentIdentity());
+				const auto externalGeneration = environment.GetBakeRequestGeneration();
+				GGLAB_UNUSED(runtime.Tick());
+				const auto rejected = runtime.TakeParameterBatchResult(missing);
+				checks.Check(rejected && rejected->m_State == ParameterBatchState::Failed && rejected->m_Items.empty() &&
+					probe.m_ParameterApplications == applications && environment.GetBakeRequestGeneration() == externalGeneration &&
+					parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == exposure &&
+					lab.GetActiveSession()->GetParameters().Get(LabParameterId("sun-input"), 0.0f) == 1.0f,
+					"A Lab sun lost after admission rejects preparation without committing Lab, Host or another generation");
+				light.m_WorldSun = authored;
+				lighting.SynchronizeWorldLighting(world, parameters.GetContentIdentity());
+				generation = environment.GetBakeRequestGeneration();
+				checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration == generation; }),
+					"The restored authored sun publishes before another Lab mutation is admitted");
+			}
+			bool completeCommit = false;
+			probe.m_ParameterEffectCallback = [&]()
+				{
+					completeCommit = environment.GetBakeRequestGeneration() == generation + 1 &&
+						parameters.GetHostParameters().Get(LabParameterId("view.exposure.ev100"), 0.0f) == 11.0f &&
+						lab.GetActiveSession()->GetParameters().Get(LabParameterId("sun-input"), 0.0f) == 2.0f;
+				};
+			const auto id = runtime.RequestParameterBatch(values, error);
+			GGLAB_UNUSED(runtime.Tick());
+			checks.Check(id && completeCommit && parameters.GetParameterBatchStatus()->m_Items[0].m_Applied &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == generation + 1,
+				"World Lighting, Lab and Host commit completely before the first Lab callback observes the batch");
+			if (!id || !parameters.GetParameterBatchStatus() || parameters.GetParameterBatchStatus()->m_Items.empty())
+			{
+				runtime.Shutdown();
+				return;
+			}
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->m_Items[0].m_Published.has_value(); }) &&
+				!parameters.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed,
+				"An aborted frame may observe prepared Lab sun publication without consuming it");
+			GGLAB_UNUSED(runtime.Tick());
+			const auto consumed = runtime.TakeParameterBatchResult(id);
+			checks.Check(consumed && consumed->IsTerminal() && consumed->m_Items[0].m_FirstConsumed > consumed->m_Items[0].m_Published,
+				"Only the successful retry consumes the exact Lab sun generation");
+			const auto revision = parameters.GetParameterRevision();
+			const auto unchangedGeneration = environment.GetBakeRequestGeneration();
+			const auto same = runtime.RequestParameterBatch(values, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto noChange = runtime.TakeParameterBatchResult(same);
+			checks.Check(noChange && noChange->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				parameters.GetParameterRevision() == revision && environment.GetBakeRequestGeneration() == unchangedGeneration,
+				"Repeating an owned Lab sun state is NoChange without a new revision or generation");
+			const std::array next{ LabParameterValue{ LabParameterId("sun-input"), 3.0f } };
+			const auto pending = runtime.RequestParameterBatch(next, error);
+			GGLAB_UNUSED(runtime.Tick());
+			GGLAB_UNUSED(lighting.ApplyWorldLightingInputs(runtime.GetDemoManager()->GetActiveDemo()->GetWorld(),
+				parameters.GetContentIdentity(), parameters.GetLightingProfiles()[1].m_Inputs));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto superseded = runtime.TakeParameterBatchResult(pending);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!superseded->m_Items[0].m_FirstConsumed,
+				"A foreign authored profile supersedes a pending Lab sun receipt without borrowing consumption");
+			runtime.Shutdown();
+		}
+
+		void RunLightingProfileScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableLightingProfiles = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			auto& parameters = *runtime.GetParameterControl();
+			probe.m_ParameterControl = &parameters;
+			runtime.EnableParameterControl();
+			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto tickUntil = [&](auto condition)
+				{
+					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+					while (!condition() && std::chrono::steady_clock::now() < deadline)
+					{
+						probe.m_ReadbackFence = {};
+						if (runtime.Tick() != AppRuntimeTickResult::Continue)
+						{
+							return false;
+						}
+					}
+					return condition();
+				};
+			checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration != 0; }),
+				"Profile fixture publishes its real initial Physical Sky generation");
+			checks.Check(parameters.GetLightingProfiles().size() == 2 &&
+				parameters.GetHostParameters().Find(LabParameterId("environment.profile")) != nullptr,
+				"Only active content registers the bounded named profile source");
+			std::string error;
+			const auto request = [&](int32_t profile)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId("environment.profile"), profile },
+						LabParameterValue{ LabParameterId("view.exposure.ev100"), 8.0f } };
+					return runtime.RequestParameterBatch(values, error);
+				};
+			const auto initialRevision = parameters.GetParameterRevision();
+			checks.Check(request(-1) == 0 && request(99) == 0 &&
+				parameters.GetParameterRevision() == initialRevision && !parameters.GetParameterBatchStatus(),
+				"Read-only custom and unknown profile enums reject the complete mixed batch");
+			const auto id = request(1);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto first = *parameters.GetParameterBatchStatus();
+			const auto state = parameters.GetLightingProfilePublication();
+			const auto transitionFrame = parameters.CaptureFrameState(probe.m_ParameterBuiltSerial,
+				environment.GetBakeRequestGeneration(), environment.GetBakingStatus().m_ActiveGeneration);
+			const auto transitionBytes = SerializeParameterFrameState(transitionFrame);
+			checks.Check(transitionFrame.m_RequestedLighting.m_Profile && transitionFrame.m_ActiveLighting.m_Profile &&
+				transitionFrame.m_RequestedLighting.m_Profile->m_Id == "test.oblique" &&
+				transitionFrame.m_ActiveLighting.m_Profile->m_Id == "test.baseline" &&
+				transitionFrame.m_RequestedLighting.m_Generation != transitionFrame.m_ActiveLighting.m_Generation,
+				"A transition snapshot freezes separately identified requested and active lighting generations");
+			checks.Check(id != 0 && first.m_Items[0].m_State == ParameterEffectState::Applied &&
+				first.m_Items[0].m_Identity.m_Generation == environment.GetBakeRequestGeneration() &&
+				state.m_Requested && state.m_Requested->m_Id == "test.oblique" &&
+				state.m_Active && state.m_Active->m_Id == "test.baseline" &&
+				state.m_Requested->m_Generation != state.m_Active->m_Generation,
+				"A real authored sun transition retains separate requested and active profile identities");
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }),
+				"Profile publication reaches its exact submitted generation");
+			const auto done = runtime.TakeParameterBatchResult(id);
+			checks.Check(SerializeParameterFrameState(transitionFrame) == transitionBytes,
+				"Later lighting publication and receipt collection cannot relabel a transition frame");
+			checks.Check(done && done->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				done->m_Items[0].m_Published > done->m_Items[0].m_Applied &&
+				done->m_Items[0].m_FirstConsumed == done->m_Items[0].m_Published &&
+				probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == 8.0f,
+				"Profile receipts use actual publication/submission and never apply recommended exposure");
+			const auto generation = environment.GetBakeRequestGeneration();
+			const auto revision = parameters.GetParameterRevision();
+			const auto same = request(1);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto unchanged = runtime.TakeParameterBatchResult(same);
+			checks.Check(unchanged && unchanged->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				parameters.GetParameterRevision() == revision && environment.GetBakeRequestGeneration() == generation,
+				"Current profile NoChange causes no new request or revision");
+			const auto queries = probe.m_LightingProfileQueries;
+			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
+			for (const auto entity : world.GetRegistry().view<components::LightComponent>())
+			{
+				auto& light = world.GetRegistry().get<components::LightComponent>(entity);
+				if (light.m_WorldSun)
+				{
+					auto& rotation = world.GetRegistry().get<components::TransformComponent>(entity).m_Rotation;
+					rotation = Quaternion(-rotation.m_X, -rotation.m_Y, -rotation.m_Z, -rotation.m_W);
+					light.m_WorldSun->m_Chromaticity *= 0.5f;
+				}
+			}
+			const auto equivalent = request(1);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto equivalentResult = runtime.TakeParameterBatchResult(equivalent);
+			checks.Check(equivalentResult && equivalentResult->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				environment.GetBakeRequestGeneration() == generation &&
+				parameters.GetLightingProfilePublication().m_Requested->m_Generation == generation &&
+				probe.m_LightingProfileQueries == queries,
+				"Equivalent Quaternion/chromaticity authoring stays NoChange and never rebuilds static registrations or relabels a request");
+			world.m_Atmosphere->m_RayleighScaleHeightMeters *= 2.0f;
+			const auto retry = request(0);
+			probe.m_SkipLightingPublication = true;
+			checks.Check(tickUntil([&]()
+				{
+					const auto* status = parameters.GetParameterBatchStatus();
+					return !status->m_Items.empty() && status->m_Items[0].m_Published.has_value();
+				}), "Profile publication may be observed on an aborted frame");
+			const auto published = parameters.GetParameterBatchStatus()->m_Items[0].m_Published;
+			auto abortedFrame = parameters.CaptureFrameState(*published,
+				environment.GetBakeRequestGeneration(), environment.GetBakingStatus().m_ActiveGeneration);
+			const auto abortedBytes = SerializeParameterFrameState(abortedFrame);
+			checks.Check(!parameters.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed &&
+				parameters.GetParameterBatchStatus()->m_Items[0].m_Identity.m_Generation == generation + 2,
+				"An unresolved authored edit settles before profile attribution, and aborted publication is not consumed");
+			GGLAB_UNUSED(runtime.Tick());
+			const auto retried = runtime.TakeParameterBatchResult(retry);
+			parameters.CompleteFrameState(abortedFrame);
+			checks.Check(SerializeParameterFrameState(abortedFrame) == abortedBytes &&
+				!abortedFrame.m_Receipts.front().m_Item.m_FirstConsumed,
+				"A later retry cannot lend consumption to an aborted frame snapshot");
+			checks.Check(retried && retried->m_Items[0].m_Published == published &&
+				retried->m_Items[0].m_FirstConsumed > published,
+				"Retry preserves profile application/publication and supplies only first consumption");
+			const auto supersededId = request(1);
+			GGLAB_UNUSED(runtime.Tick());
+			GGLAB_UNUSED(ApplyWorldLightingInputsToWorld(runtime.GetDemoManager()->GetActiveDemo()->GetWorld(),
+				parameters.GetLightingProfiles()[0].m_Inputs));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto superseded = runtime.TakeParameterBatchResult(supersededId);
+			checks.Check(superseded && superseded->m_Items[0].m_State == ParameterEffectState::Superseded &&
+				!superseded->m_Items[0].m_FirstConsumed,
+				"An unrelated authored sun edit supersedes the selected profile instead of borrowing its generation");
+			const auto selected = request(1);
+			checks.Check(tickUntil([&]() { return parameters.GetParameterBatchStatus()->IsTerminal(); }) &&
+				runtime.TakeParameterBatchResult(selected).has_value(),
+				"A profile selection completes before exercising live content replacement");
+			const auto oldContent = runtime.GetDemoManager()->GetTemporalSessionSerial();
+			const auto oldGeneration = environment.GetBakeRequestGeneration();
+			const auto cancelled = request(0);
+			runtime.GetDemoManager()->RequestActiveDemo(1);
+			GGLAB_UNUSED(runtime.Tick());
+			runtime.EnableParameterControl();
+			const auto replacedContent = runtime.TakeParameterBatchResult(cancelled);
+			checks.Check(replacedContent && replacedContent->m_State == ParameterBatchState::Failed &&
+				runtime.GetDemoManager()->GetTemporalSessionSerial() != oldContent &&
+				parameters.GetLightingProfiles().size() == 2 &&
+				environment.GetBakeRequestGeneration() > oldGeneration &&
+				parameters.GetHostParameters().Get(LabParameterId("environment.profile"), int32_t(-1)) == 0,
+				"A running content replacement cancels old ownership, rebuilds registrations and never retains the prior profile override");
+			const auto replaced = request(1);
+			GGLAB_UNUSED(runtime.Tick());
+			runtime.Shutdown();
+			checks.Check(parameters.GetParameterBatchStatus()->m_BatchId == replaced &&
+				parameters.GetParameterBatchStatus()->IsTerminal() &&
+				!parameters.GetParameterBatchStatus()->m_Items[0].m_FirstConsumed,
+				"Shutdown closes profile ownership without fabricating consumption");
+			checks.Check(parameters.GetLightingProfiles().empty() &&
+				!parameters.GetLightingProfilePublication().m_Requested &&
+				!parameters.GetLightingProfilePublication().m_Active,
+				"Shutdown releases content bindings, profile registrations and both publication identities");
+		}
+
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
@@ -2244,6 +5189,29 @@ namespace gglab
 		const auto root = std::filesystem::temp_directory_path() /
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		RunHostParameterScenario(context, root / "host-demo", false);
+		RunHostParameterScenario(context, root / "host-lab", true);
+		RunEffectiveParameterSettingsScenario(context, root / "tooling-host", false);
+		RunEffectiveParameterSettingsScenario(context, root / "tooling-lab", true);
+		RunLightingParameterScenario(context, root / "lighting-parameters");
+		RunBatchPreparationScenario(context, root / "batch-preparation");
+		RunContentBindingScenario(context, root / "content-binding-shutdown", false);
+		RunContentBindingScenario(context, root / "content-binding-failure", true);
+		RunLightingProfileRegistrationScenario(context, root / "profile-source-binding", true, false);
+		RunLightingProfileRegistrationScenario(context, root / "profile-invalid-registration", false, false);
+		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
+		RunLightingProfileScenario(context, root / "lighting-profiles");
+		RunLabWorldLightingScenario(context, root / "lab-world-lighting");
+		RunSequenceParameterEventScenario(context, root / "sequence-events");
+		RunDeferredSequenceEventScenario(context, root / "deferred-sequence-events");
+		RunSessionAdmissionScenario(context, root / "session-admission");
+		RunSessionExitAdmissionScenario(context, root / "session-exit-admission");
+		RunParameterFeedbackScenario(context, root / "parameter-feedback");
+		RunPendingParameterBatchScenario(context, root / "pending-parameter-batches");
+		RunInheritedLightingScenario(context, root / "inherited-lighting");
+		RunParameterFrameScenario(context, root / "parameter-frames", false);
+		RunRebuildParameterScenario(context, root / "parameter-rebuild");
+		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);
 		RunFrameOutcomeScenarios(context, root / "outcomes");
 		RunOwnedJobRoutingScenario(context, root / "owned-job-routing");
 		RunOwnedJobFailureScenario(context, root / "owned-job-failed-fenced", FrameEndInjection::FatalFenced, false);

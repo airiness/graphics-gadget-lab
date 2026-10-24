@@ -1,10 +1,13 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/ApplicationEnvironment.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Capture/CaptureOnReady.h"
 #include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Application/Control/ApplicationControlParameters.h"
+#include "Parameters/SessionParameterControl.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Application/Platform/Windows/Win32Shell.h"
 #include "Capture/FrameCaptureCoordinator.h"
@@ -374,7 +377,7 @@ namespace gglab
 			});
 		if (m_FrameCapture)
 		{
-			(void)m_FrameCapture->Update();
+			GGLAB_UNUSED(m_FrameCapture->Update());
 		}
 		if (m_ControlServer && !UpdateControlSession())
 		{
@@ -555,10 +558,11 @@ namespace gglab
 		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
 		ApplicationControlRequest&& request) noexcept
 	{
-		FrameSequenceCoordinator* frameSequence =
+		const FrameSequenceCoordinator* frameSequence =
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
 		const FrameCaptureCoordinator* frameCapture =
 			m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator() : nullptr;
+		auto* parameters = m_AppRuntime ? m_AppRuntime->GetParameterControl() : nullptr;
 		switch (request.m_Command)
 		{
 		case ApplicationControlCommand::Status:
@@ -579,7 +583,23 @@ namespace gglab
 				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
 				.m_Watch = m_AppRuntime && m_AppRuntime->GetNonFiniteWatchCoordinator() ? &m_AppRuntime->GetNonFiniteWatchCoordinator()->GetStatus() : nullptr,
 				.m_Environment = frameCapture ? std::string_view(frameCapture->GetEnvironmentJson()) : std::string_view{},
+				.m_ParametersAvailable = parameters && parameters->IsAvailable(),
+				.m_ParameterRevision = parameters ? parameters->GetParameterRevision() : 0,
+				.m_ParameterBatch = parameters ? parameters->GetParameterBatchStatus() : nullptr,
+				.m_LightingProfiles = parameters ? &parameters->GetLightingProfilePublication() : nullptr,
+				.m_LightingProfileError = parameters ? parameters->GetLightingProfileError() : std::string{},
 				}));
+			return;
+		case ApplicationControlCommand::Parameters:
+			pipeRequest->Respond(SerializeApplicationControlParameters(request.m_Id, m_AppRuntime.get()));
+			return;
+		case ApplicationControlCommand::Set:
+			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
+				request.m_ParameterChanges, m_AppRuntime.get()));
+			return;
+		case ApplicationControlCommand::ParameterResult:
+			pipeRequest->Respond(QueryApplicationControlParameters(request.m_Id,
+				request.m_ParameterBatchId, request.m_Consume, m_AppRuntime.get()));
 			return;
 		case ApplicationControlCommand::Watch:
 		{
@@ -620,7 +640,7 @@ namespace gglab
 				return;
 			}
 			std::string error;
-			if (frameSequence->Start(request.m_Sequence, error) == 0)
+			if (m_AppRuntime->StartFrameSequence(std::move(request.m_Sequence), error) == 0)
 			{
 				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id, error));
 				return;
@@ -631,7 +651,9 @@ namespace gglab
 		}
 		case ApplicationControlCommand::SequenceCancel:
 		{
-			const auto verdict = frameSequence ? frameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
+			const auto verdict = m_AppRuntime ?
+				m_AppRuntime->CancelFrameSequence() :
+				FrameSequenceCancelVerdict::NotFound;
 			pipeRequest->Respond(SerializeApplicationControlSequenceCancellation(request.m_Id,
 				frameSequence ? frameSequence->GetStatus() : nullptr, verdict));
 			return;
@@ -677,7 +699,7 @@ namespace gglab
 			// Unconsumed job receipts end with this session; they are not cached by WinApp.
 			if (m_FrameCapture)
 			{
-				(void)m_FrameCapture->Update(false);
+				GGLAB_UNUSED(m_FrameCapture->Update(false));
 				m_FrameCapture.reset();
 			}
 			if (m_CaptureOnReadyJob)

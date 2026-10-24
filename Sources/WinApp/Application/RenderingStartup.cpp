@@ -1,5 +1,6 @@
 #include "Application/RenderingStartup.h"
 #include "AppRuntimeLog.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
@@ -42,8 +43,8 @@ namespace gglab
 		platformHost.Finalize();
 		return exitCode;
 #else
-		static_cast<void>(instance);
-		static_cast<void>(requestValidation);
+		GGLAB_UNUSED(instance);
+		GGLAB_UNUSED(requestValidation);
 		GGLAB_LOG_ERROR_ALWAYS("Vulkan backend was not built (GGLAB_ENABLE_VULKAN=0).");
 		return 1;
 #endif

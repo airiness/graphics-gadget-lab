@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabAppRuntime.h"
 #include "ApplicationFrameworkSelfTests.h"
+#include "ParameterTransactionSelfTests.h"
 #include "FrameCaptureCoordinatorSelfTests.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
@@ -99,6 +100,7 @@ namespace gglab
 		class TestEnvironmentLightingControl final : public EnvironmentLightingControlBase
 		{
 		public:
+			std::unique_ptr<EnvironmentLightingOverrideBase> AcquireOverride() noexcept override { return {}; }
 			void SetIntensity(float) noexcept override {}
 			void SetRotationRadians(float) noexcept override {}
 			void SetQualityPreset(IBLQualityPreset) noexcept override {}
@@ -192,9 +194,7 @@ namespace gglab
 				return {};
 			}
 
-			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
-				const ViewRenderProfile&,
-				ShadowVisualizationSettings&, ViewRenderProfile&) const noexcept override
+			ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept override
 			{
 				return {};
 			}
@@ -797,5 +797,8 @@ int main(int argumentCount, char* arguments[])
 		.m_Run = &gglab::RunNonFiniteWatchCoordinatorSelfTests }, reporter);
 	const bool faultLifecycleSucceeded = gglab::RunSelfTestSuite({ .m_Id = "gpu-fault-lifecycle",
 		.m_Run = &gglab::RunGpuFaultLifecycleSelfTests }, reporter);
-	return lifecycleSucceeded && frameCaptureSucceeded && watchSucceeded && faultLifecycleSucceeded ? 0 : 1;
+	const bool parametersSucceeded = gglab::RunSelfTestSuite({
+		.m_Id = "parameter-transactions", .m_Run = &gglab::RunParameterTransactionSelfTests }, reporter);
+	return lifecycleSucceeded && frameCaptureSucceeded && watchSucceeded &&
+		faultLifecycleSucceeded && parametersSucceeded ? 0 : 1;
 }

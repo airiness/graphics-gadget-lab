@@ -1,15 +1,17 @@
 #pragma once
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/CaptureWriter.h"
+#include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
-#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -17,35 +19,14 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
 {
 	// Display-view Temporal AA settings a sequence evaluates instead of the content's.
 	// Unset fields keep the content's resolved values.
-	struct FrameSequenceTemporalAAOverrides
-	{
-		// False evaluates the same sequence with Temporal AA not requested.
-		std::optional<bool> m_Enabled;
-		std::optional<float> m_MaxHistoryFeedback;
-		std::optional<float> m_DepthAbsoluteThreshold;
-		std::optional<float> m_DepthRelativeThreshold;
-		std::optional<float> m_VelocityWeightScale;
-		std::optional<float> m_LuminanceWeightScale;
-		std::optional<float> m_NeighborhoodClampExpansion;
-		std::optional<float> m_HistoryRelaxation;
-		std::optional<TemporalAAHistoryAccumulation> m_HistoryAccumulation;
-		std::optional<TemporalAAHistoryRectification> m_HistoryRectification;
-		std::optional<float> m_VarianceClipGamma;
-		std::optional<TemporalAAHistoryFilter> m_HistoryFilter;
-		std::optional<TemporalAACurrentFilter> m_CurrentFilter;
-		std::optional<TemporalAAMotionSelection> m_MotionSelection;
-		std::optional<TemporalAAPostTemporalView> m_PostTemporalView;
-		std::optional<TemporalAAResolutionPreset> m_ResolutionPreset;
-		std::optional<float> m_TextureLodBiasOffset;
-
-		[[nodiscard]] bool IsEmpty() const noexcept;
-	};
+	using FrameSequenceTemporalAAOverrides = TemporalAASettingsPatch;
 
 	// Returns the settings with every set override applied and resolved to the
 	// settings' valid ranges.
@@ -78,6 +59,24 @@ namespace gglab
 		uint32_t m_Frame = 0;
 		std::vector<RGResourceAddress> m_Targets;
 		bool m_IncludeGraph = false;
+	};
+
+	inline constexpr size_t FrameSequenceMaxParameterEvents = 128;
+
+	struct FrameSequenceParameterEvent
+	{
+		uint32_t m_Frame = 0;
+		std::vector<LabParameterValue> m_Values;
+		// Domain names, not permission to ignore readiness. Empty expects no deferred effect.
+		std::optional<std::vector<std::string>> m_ExpectEffects;
+	};
+
+	struct FrameSequenceParameterEventStatus
+	{
+		uint32_t m_Frame = 0;
+		// Immutable report copied from Session's sole live receipt owner.
+		std::optional<ParameterBatchStatus> m_Batch;
+		std::string m_Failure;
 	};
 
 	struct FrameSequenceRequest
@@ -114,6 +113,10 @@ namespace gglab
 		FrameSequenceGTAOOverrides m_GTAOOverrides;
 		// Records the GPU timing of sequence frames while the sequence runs.
 		bool m_GpuTiming = false;
+		// AppRuntime enables this for every production sequence; direct contract tests
+		// may drive the coordinator without a Session parameter source.
+		bool m_ParameterProvenance = false;
+		std::vector<FrameSequenceParameterEvent> m_Events;
 	};
 
 	// GPU times of one profiler scope over the timed frames that recorded it.
@@ -182,10 +185,16 @@ namespace gglab
 
 	[[nodiscard]] const char* GetFrameSequenceStateName(FrameSequenceState state) noexcept;
 
-	enum class FrameSequenceCancelVerdict : uint8_t { Cancelled, TooLate, Finished, NotFound };
+	enum class FrameSequenceCancelVerdict : uint8_t
+	{
+		Cancelled,
+		TooLate,
+		Finished,
+		NotFound,
+	};
 	[[nodiscard]] const char* GetFrameSequenceCancelVerdictName(FrameSequenceCancelVerdict verdict) noexcept;
 
-	struct FrameSequenceTimingPublication
+	struct FrameSequenceArtifactPublication
 	{
 		CapturePublicationOutcome m_Outcome = CapturePublicationOutcome::NotPublished;
 		bool m_Pending = false;
@@ -211,10 +220,13 @@ namespace gglab
 		uint32_t m_FinishedCaptureJobs = 0;
 		uint32_t m_PendingCaptureJobs = 0;
 		uint32_t m_CompletedCaptures = 0;
+		std::vector<FrameSequenceParameterEventStatus> m_Events;
 		// Set when the request records GPU timing.
 		std::optional<FrameSequenceGpuTiming> m_GpuTiming;
 		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
-		std::optional<FrameSequenceTimingPublication> m_TimingPublication;
+		std::optional<FrameSequenceArtifactPublication> m_TimingPublication;
+		uint32_t m_ParameterFrameCount = 0;
+		std::optional<FrameSequenceArtifactPublication> m_ParameterPublication;
 		std::string m_Failure;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
@@ -241,8 +253,8 @@ namespace gglab
 	// path by exactly one frame, independent of wall-clock and simulation time.
 	// Frame 0 and cut keys are camera cuts that reset temporal history, so a replay
 	// starts from the same temporal state. Any other change of temporal continuity
-	// (temporal session, display view, size or content) or a readiness gate leaving
-	// Ready fails the sequence, because the remaining frames would no longer be
+	// (temporal session, display view, size or content) or an uncovered readiness gate
+	// leaving Ready fails the sequence, because the remaining frames would no longer be
 	// comparable. Requested frames are captured through the capture coordinator as
 	// next-frame requests issued on exactly that frame. When the capture writer
 	// cannot accept another capture, the runtime defers the next frame entirely
@@ -280,7 +292,13 @@ namespace gglab
 		// to apply to this frame.
 		[[nodiscard]] std::optional<FrameSequencePoseRequest> PrepareFrame(
 			const FrameCaptureFrameState* previousFrame,
-			std::span<const CameraPath> cameraPaths) noexcept;
+			std::span<const CameraPath> cameraPaths, uint64_t contentIdentity = 0,
+			const std::function<bool(std::span<FrameSequenceParameterEvent>, std::string&)>&
+				validateEvents = {}) noexcept;
+		[[nodiscard]] const FrameSequenceParameterEvent* GetDueParameterEvent() const noexcept;
+		void OnParameterEventBatch(const ParameterBatchStatus& batch) noexcept;
+		void OnParameterEventFailed(std::string failure) noexcept;
+		void OnContentBindingChanged(uint64_t contentIdentity) noexcept;
 		// Reports the pose returned by CameraRig::ApplyCameraPathFrame; an empty pose
 		// fails the sequence.
 		void OnPoseApplied(const std::optional<CameraPathPose>& pose) noexcept;
@@ -288,11 +306,13 @@ namespace gglab
 		// BeginFrame: checks readiness and temporal continuity, then submits this
 		// frame's capture when requested.
 		// False aborts this frame before rendering when admission must retry or fails.
-		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state) noexcept;
+		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state,
+			const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate = {}) noexcept;
 		// Called for every successful runtime submission, including ordinary frames
 		// that publish remaining profiles while the sequence is Finishing.
 		void OnFrameSubmitted(uint64_t renderFrameSerial,
-			FrameSequenceObservation observation = {}) noexcept;
+			FrameSequenceObservation observation = {},
+			std::shared_ptr<const ParameterFrameState> parameters = {}) noexcept;
 		// Polled independently of sequence posing and host status queries. Only a
 		// profile bound to a pending successful sequence submission is accepted.
 		void UpdateGpuTiming(const GpuProfileFrameSnapshot& profile, bool profilingEnabled) noexcept;
@@ -329,7 +349,8 @@ namespace gglab
 		void CancelCaptureJobs() noexcept;
 		void CompleteIfFinished() noexcept;
 		[[nodiscard]] std::string SerializeTimingProduct() const;
-		void CollectTimingPublication() noexcept;
+		[[nodiscard]] std::string SerializeParameterFramesProduct() const;
+		void CollectArtifactPublication() noexcept;
 		// The posed frame is a requested frame, at its last reference sample, and has
 		// not been captured yet.
 		[[nodiscard]] bool IsCaptureDue() const noexcept;
@@ -340,6 +361,7 @@ namespace gglab
 		uint64_t m_NextSequenceId = 1;
 		std::optional<FrameSequenceStatus> m_Status;
 		FrameSequenceRequest m_Request{};
+		uint64_t m_EventContentIdentity = 0;
 		// Frame posed for the next submission; it is posed again if a frame ends
 		// without submission.
 		uint32_t m_Frame = 0;
@@ -361,7 +383,14 @@ namespace gglab
 		bool m_BegunCameraCut = false;
 		bool m_BegunDevelopmentTools = false;
 		std::string m_TimingContext;
-		std::optional<SequenceTimingBundleInput> m_TimingProduct;
-		std::shared_ptr<CaptureWriteJob> m_TimingWrite;
+		struct ParameterSample
+		{
+			uint32_t m_Frame = 0;
+			uint32_t m_ReferenceSample = 0;
+			std::shared_ptr<const ParameterFrameState> m_Parameters;
+		};
+		std::vector<ParameterSample> m_ParameterFrames;
+		std::optional<SequenceArtifactBundleInput> m_ArtifactProduct;
+		std::shared_ptr<CaptureWriteJob> m_ArtifactWrite;
 	};
 }

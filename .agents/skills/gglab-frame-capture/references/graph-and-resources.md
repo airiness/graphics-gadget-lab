@@ -25,19 +25,18 @@ completed frame fence. Build/shader identities and per-pass GPU timing remain
 explicitly unavailable where the export has no authoritative evidence; the bundle
 manifest's `environment` declares the build's tracked source state instead.
 
-Graph requests alone add no GPU observation nodes/queries, but do add CPU/file
-work. Active copies/scans/counters appear under observation records. New exports
-use `schemaVersion: 5` for every variant and list the present node kinds in
-`observation.nodeKinds` (`NonFiniteScan`, `ProductionCounters`, `ResourceExport`;
-empty for graph-only). Read capabilities from those kinds and field presence,
-never from a version number. Older exports keep their meaning: v1 has no
-observation nodes, and v2, v3 and v4 record only the highest variant present
-(resource copies, boundary scans, production counters). Do not interpret an
-observation flag as completed numerical coverage.
+Graph requests add CPU/file work without GPU observation nodes/queries.
+`observation.nodeKinds` identifies active `NonFiniteScan`, `ProductionCounters`
+and `ResourceExport` nodes (empty for graph-only). Inspect node kinds and field
+presence for capabilities; observation activity is not completed numerical coverage.
+Graph/resource `frame.parameters` and `parameterRevision` must match paired image
+products. See [artifact versions and provenance](session-jobs.md#interpret-results-and-artifacts)
+for current writers and compatibility; schema version alone does not identify
+which observation features ran.
 
 ## Memory facts in full exports
 
-Version 5 full exports add memory facts; summaries carry none of them.
+Full exports include memory facts; summaries carry none of them.
 
 - Each resource has `logicalBytes`, computed by GGLab from its description: every
   mip, slice and sample in whole format blocks, with volumes shrinking in depth.

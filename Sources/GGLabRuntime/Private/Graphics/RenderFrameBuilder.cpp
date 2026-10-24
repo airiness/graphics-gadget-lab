@@ -161,12 +161,13 @@ namespace gglab
 		result.m_WorldData = m_WorldExtractor.Extract(info.m_World);
 		auto& environment = *info.m_Renderer.GetEnvironmentLightingSystemService();
 		auto& mainLight = result.m_WorldData.m_MainDirectionalLight;
+		const auto* authoredSun = mainLight.m_WorldSun ? &*mainLight.m_Light->m_WorldSun : nullptr;
 		environment.ResolveWorldLighting(info.m_World.m_Atmosphere, mainLight.m_WorldSun,
-			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity);
+			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity, authoredSun);
 		// Observe this frame's authored request before completing any older bake.
 		info.m_Renderer.GetIBLBakeScheduler()->Tick(info.m_Renderer.GetLastSubmittedFencePoint());
 		environment.ResolveWorldLighting(info.m_World.m_Atmosphere, mainLight.m_WorldSun,
-			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity);
+			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity, authoredSun);
 		if (const auto& active = environment.GetActivePhysicalSky())
 		{
 			// Keep the published sun bound to its original entity while a new designation bakes.
@@ -321,6 +322,10 @@ namespace gglab
 		result.m_FrameConstants = sceneBuildResult.m_Constants;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
 		result.m_RenderSceneStatus = sceneBuildResult.m_Status;
+		// Publication is independent of scene upload success. Submission feedback
+		// separately decides whether this scene could consume the published state.
+		result.m_RenderScene.m_WorldLightingGeneration =
+			info.m_Renderer.GetBakingStatus().m_ActiveGeneration;
 
 		const auto* objectBuffer = info.m_Renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = info.m_Renderer.GetMaterialStructuredBuffer();

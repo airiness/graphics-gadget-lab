@@ -65,6 +65,9 @@ namespace gglab
 		static float ClampNear(float nearZ) noexcept;
 		static float ClampFar(float nearZ, float farZ) noexcept;
 		static float ClampFov(float fov) noexcept;
+		static constexpr float MinimumManualEV100 = -16.0f;
+		static constexpr float MaximumManualEV100 = 24.0f;
+		[[nodiscard]] static bool IsValidManualEV100(float ev) noexcept;
 		static float ClampManualEV100(float ev) noexcept;
 		static float ClampExposureCompensationEV(float ev) noexcept;
 

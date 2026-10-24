@@ -58,6 +58,11 @@ namespace gglab
 		return m_SamplerRegistry.get();
 	}
 
+	WorldLightingControlBase* Renderer::GetWorldLightingControl() const noexcept
+	{
+		return m_EnvironmentLightingSystem.get();
+	}
+
 	EnvironmentSourceControl* Renderer::GetEnvironmentSourceControl() const noexcept
 	{
 		return m_EnvironmentLightingSystem.get();

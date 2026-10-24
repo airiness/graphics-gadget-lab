@@ -1,4 +1,5 @@
 #include "Application/SelfTest/ApplicationFrameCaptureSelfTests.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Capture/CaptureOnReady.h"
 #include "Application/Platform/Windows/Win32FrameCaptureImageEncoder.h"
@@ -266,7 +267,7 @@ namespace gglab
 			coordinator.OnFrameSubmitted();
 			CapturePlan foreignPlan{ .m_RequiredProducts = { GraphCaptureProduct{} } };
 			const auto foreign = coordinator.TrySubmit(std::move(foreignPlan));
-			(void)coordinator.CancelJob(foreign.m_JobId);
+			GGLAB_UNUSED(coordinator.CancelJob(foreign.m_JobId));
 			context.Check(frontEnd.CaptureReferenceViews() == ViewCount && frontEnd.GetPendingJobCount() == 0 &&
 				frontEnd.GetLastAdmission().m_Status == CaptureAdmissionStatus::Busy &&
 				frontEnd.GetLastAdmission().m_JobId == 0 && frontEnd.CaptureReferenceViews() == 0,
@@ -275,7 +276,7 @@ namespace gglab
 			frontEnd.Update();
 			context.Check(frontEnd.GetHistory().empty() && coordinator.GetIntakeSnapshot().m_ReservedReceipts == 1 &&
 				!coordinator.GetPendingViewChange(), "Busy retries neither consume foreign results nor change the camera");
-			(void)coordinator.TakeJobResult(foreign.m_JobId);
+			GGLAB_UNUSED(coordinator.TakeJobResult(foreign.m_JobId));
 			frontEnd.Update();
 			frontEnd.GetSettings().m_Label = "edited-after-batch";
 			frontEnd.GetSettings().m_Source = source == CaptureImageSource::Scene ?
@@ -357,12 +358,12 @@ namespace gglab
 			const auto busy = frontEnd.ExportGraph();
 			context.Check(busy.m_Status == CaptureAdmissionStatus::Busy && busy.m_JobId == 0 &&
 				frontEnd.GetPendingJobCount() == 0, "Manual Busy returns admission instead of queueing a retry");
-			(void)coordinator.CancelJob(foreign.m_JobId);
+			GGLAB_UNUSED(coordinator.CancelJob(foreign.m_JobId));
 			frontEnd.Update();
 			context.Check(coordinator.GetIntakeSnapshot().m_TerminalReceipts == 1 && frontEnd.GetHistory().empty() &&
 				frontEnd.Cancel(foreign.m_JobId) == CaptureCancelResult::NotFound,
 				"Interactive ownership cannot cancel or consume a foreign job");
-			(void)coordinator.TakeJobResult(foreign.m_JobId);
+			GGLAB_UNUSED(coordinator.TakeJobResult(foreign.m_JobId));
 			const auto accepted = frontEnd.ExportResources({ { .m_Resource = "Test.Buffer" } }, true);
 			coordinator.BeginFrame(MakeFrameState(1));
 			coordinator.OnFrameSubmitted();
@@ -455,7 +456,7 @@ namespace gglab
 					.m_Cancel = [&](uint64_t) { ++cancellations; return CaptureCancelResult::NotFound; },
 				});
 				noJob.TryAdmit();
-				(void)noJob.Poll(now);
+				GGLAB_UNUSED(noJob.Poll(now));
 				context.Check(noJob.GetJobId() == 0 &&
 					noJob.Poll(now + std::chrono::seconds(1)) == (admission == CaptureAdmissionStatus::Busy ?
 						CaptureOnReady::State::TimedOut : CaptureOnReady::State::Rejected) && cancellations == 0,

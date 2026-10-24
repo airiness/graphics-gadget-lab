@@ -1,6 +1,7 @@
 #include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <algorithm>
 #include <format>
@@ -279,15 +280,15 @@ namespace gglab
 			vkQueueWaitIdle(m_Device->GetGraphicsQueue());
 			if (m_Timeline != nullptr)
 			{
-				(void)m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+				GGLAB_UNUSED(m_Timeline->Wait(m_Timeline->GetCurrentSignalValue()));
 			}
 		}
 		if (m_Device != nullptr && m_DescriptorFrameTrackingAttached)
 		{
 			if (m_ActiveFrame.has_value())
 			{
-				(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
-					m_ActiveFrame->m_FrameSlotIndex);
+				GGLAB_UNUSED(m_Device->GetDescriptorManager().AbortFrameSnapshot(
+					m_ActiveFrame->m_FrameSlotIndex));
 				m_ActiveFrame.reset();
 			}
 			m_PendingGraphicsWait.Reset();
@@ -493,7 +494,7 @@ namespace gglab
 				// transaction state.
 				MarkFatal(VK_ERROR_INITIALIZATION_FAILED,
 					"VulkanFrameSlotStateMachine::TryBegin");
-				(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex);
+				GGLAB_UNUSED(m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex));
 				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
 				return result;
 			}
@@ -511,11 +512,11 @@ namespace gglab
 			// swapchain with the real extent before retrying; the runtime
 			// never picks an extent itself.
 			result.m_Status = VulkanAcquireOutcome::OutOfDate;
-			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex);
+			GGLAB_UNUSED(m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex));
 			result.m_Result = acquireResult;
 			return result;
 		default:
-			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex);
+			GGLAB_UNUSED(m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex));
 			MarkFatal(acquireResult, "vkAcquireNextImageKHR");
 			result.m_Status = VulkanAcquireOutcome::Fatal;
 			result.m_Result = acquireResult;
@@ -651,8 +652,8 @@ namespace gglab
 		{
 			// End after Abort is rejected; the abort already released the
 			// image.
-			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
-				active.m_FrameSlotIndex);
+			GGLAB_UNUSED(m_Device->GetDescriptorManager().AbortFrameSnapshot(
+				active.m_FrameSlotIndex));
 			m_ActiveFrame.reset();
 			m_NormalRecordingOpen = false;
 			m_NormalRecordingReady = false;
@@ -713,8 +714,8 @@ namespace gglab
 		if (!m_StateMachine.TryAbort(active.m_FrameSlotIndex))
 		{
 			// Abort after End is rejected; the frame was already presented.
-			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
-				active.m_FrameSlotIndex);
+			GGLAB_UNUSED(m_Device->GetDescriptorManager().AbortFrameSnapshot(
+				active.m_FrameSlotIndex));
 			m_ActiveFrame.reset();
 			m_PendingGraphicsWait.Reset();
 			return result;

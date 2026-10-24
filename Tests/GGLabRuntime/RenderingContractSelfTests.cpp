@@ -18,15 +18,18 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "Graphics/Pipeline/GTAOTemporalHistory.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/PipelineCache.h"
@@ -642,6 +645,131 @@ namespace gglab
 			uint32_t m_NextSamplerIndex = 1;
 		};
 
+		void RunEnvironmentLightingOverrideTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
+			environment.SetPrefilteredSpecularMaxSampleLuminance(123.0f);
+			const auto baseline = environment.GetSettings();
+			const auto generation = environment.GetBakeRequestGeneration();
+			auto scope = environment.AcquireOverride();
+			context.Check(scope && !environment.AcquireOverride() && !scope->OwnsBakeConfiguration() &&
+				scope->GetInheritedSettings().m_BakeConfig == baseline.m_BakeConfig,
+				"An exclusive lighting scope snapshots the entered baseline without claiming inherited fields");
+			scope.reset();
+			context.Check(environment.GetBakeRequestGeneration() == generation,
+				"Releasing an unused lighting scope does not request a bake");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 2.0f, .m_RotationRadians = 0.5f,
+				.m_EnableSkybox = false, .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky,
+				.m_PrefilteredSpecularSampleCount = 64 });
+			context.Check(scope->OwnsBakeConfiguration() && environment.GetSettings().m_Intensity == 2.0f &&
+				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64 &&
+				environment.GetBakeRequestGeneration() == generation + 1,
+				"Lighting overrides claim only the typed fields they write and request one actual bake");
+			environment.SetIntensity(3.0f);
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalAtmospherePreview);
+			scope.reset();
+			const auto restored = environment.GetSettings();
+			context.Check(restored.m_Intensity == 3.0f &&
+				restored.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
+				restored.m_RotationRadians == baseline.m_RotationRadians &&
+				restored.m_EnableSkybox == baseline.m_EnableSkybox &&
+				restored.m_QualityPreset == baseline.m_QualityPreset &&
+				restored.m_BakeConfig == baseline.m_BakeConfig &&
+				environment.GetBakeRequestGeneration() == generation + 2,
+				"Release preserves later writers and restores the complete Custom bake recipe once");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 4.0f, .m_PrefilteredSpecularSampleCount = 64 });
+			const auto beforeSameValue = environment.GetBakeRequestGeneration();
+			environment.SetIntensity(4.0f);
+			environment.SetPrefilteredSpecularSampleCount(64);
+			context.Check(!scope->OwnsBakeConfiguration() &&
+				environment.GetBakeRequestGeneration() == beforeSameValue,
+				"A same-value ordinary write takes ownership without scheduling a redundant bake");
+			scope.reset();
+			context.Check(environment.GetSettings().m_Intensity == 4.0f &&
+				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64 &&
+				environment.GetBakeRequestGeneration() == beforeSameValue,
+				"Release never undoes a same-value write by another owner");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 5.0f, .m_PrefilteredSpecularSampleCount = 128 });
+			environment.SetIntensity(6.0f);
+			environment.SetPrefilteredSpecularMaxSampleLuminance(456.0f);
+			const auto external = environment.GetSettings();
+			scope->Apply({ .m_Intensity = 7.0f, .m_PrefilteredSpecularSampleCount = 256 });
+			const auto beforeRelease = environment.GetBakeRequestGeneration();
+			scope.reset();
+			context.Check(environment.GetSettings().m_Intensity == external.m_Intensity &&
+				environment.GetSettings().m_BakeConfig == external.m_BakeConfig &&
+				environment.GetBakeRequestGeneration() == beforeRelease + 1,
+				"Reclaiming an override restores the intervening writer's latest state on release");
+
+			environment.SetQualityPreset(IBLQualityPreset::Low);
+			const auto preset = environment.GetSettings();
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_Intensity = 8.0f, .m_PrefilteredSpecularSampleCount = 128 });
+			environment.SetIntensity(std::numeric_limits<float>::quiet_NaN());
+			environment.SetQualityPreset(static_cast<IBLQualityPreset>(255));
+			environment.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::infinity());
+			context.Check(scope->OwnsBakeConfiguration(),
+				"Rejected ordinary edits do not steal a lighting scope's ownership");
+			scope.reset();
+			context.Check(environment.GetSettings().m_QualityPreset == preset.m_QualityPreset &&
+				environment.GetSettings().m_BakeConfig == preset.m_BakeConfig &&
+				environment.GetSettings().m_Intensity == preset.m_Intensity,
+				"Release restores the original preset as well as its full recipe");
+
+			scope = environment.AcquireOverride();
+			const auto beforeOperation = environment.GetBakeRequestGeneration();
+			const auto requested = scope->ApplyPrefilteredSpecularSampleCount(13);
+			context.Check(requested.m_Outcome == LightingMutationOutcome::Requested &&
+				requested.m_PreviousGeneration == beforeOperation &&
+				requested.m_Generation == environment.GetBakeRequestGeneration() &&
+				requested.m_Generation > beforeOperation,
+				"A scoped sample operation returns its actual newly requested target directly");
+			const auto existing = scope->ApplyPrefilteredSpecularSampleCount(13);
+			context.Check(existing.m_Outcome == LightingMutationOutcome::Unchanged &&
+				existing.m_PreviousGeneration == requested.m_Generation &&
+				existing.m_Generation == requested.m_Generation,
+				"A matching scoped operation binds the existing target instead of replaying old request evidence");
+			environment.SetPrefilteredSpecularSampleCount(13);
+			const auto reclaimed = scope->ApplyPrefilteredSpecularSampleCount(13);
+			context.Check(scope->OwnsBakeConfiguration() && reclaimed.m_Outcome == LightingMutationOutcome::Unchanged &&
+				reclaimed.m_Generation == existing.m_Generation,
+				"Reclaiming an equal target returns this operation's unchanged identity without an unnecessary bake");
+			const auto clamped = scope->ApplyPrefilteredSpecularSampleCount(0);
+			context.Check(clamped.m_Outcome == LightingMutationOutcome::Requested &&
+				clamped.m_PreviousGeneration == existing.m_Generation &&
+				clamped.m_Generation == environment.GetBakeRequestGeneration() &&
+				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 1 &&
+				existing.m_Generation == requested.m_Generation,
+				"The domain sanitizes samples consistently and earlier returned evidence remains an owned value");
+			scope.reset();
+
+			auto temporary = std::make_unique<EnvironmentLightingSystem>(
+				EnvironmentLightingSystem::CreateInfo{ .m_RenderResourceRegistry = &registry });
+			scope = temporary->AcquireOverride();
+			scope->Apply({ .m_Intensity = 2.0f });
+			temporary.reset();
+			scope->Apply({ .m_Intensity = 3.0f });
+			const auto expired = scope->ApplyPrefilteredSpecularSampleCount(64);
+			context.Check(expired.m_Outcome == LightingMutationOutcome::Rejected &&
+				expired.m_PreviousGeneration == 0 && expired.m_Generation == 0,
+				"An expired lighting scope cannot return a current target or replay earlier evidence");
+			context.Check(!scope->OwnsBakeConfiguration(),
+				"A lighting scope may outlive its Runtime owner without accessing destroyed state");
+			scope.reset();
+		}
+
 		void RunEnvironmentLightingSettingsTests(SelfTestContext& context) noexcept
 		{
 			RecordingDevice device;
@@ -821,6 +949,239 @@ namespace gglab
 			context.Check(!environment.GetActivePhysicalSky() &&
 				environment.GetRenderSettings().m_Intensity == view.GetEnvironmentLightingSettings().m_Intensity,
 				"Texture mode restores its authored artistic intensity only after publication");
+		}
+
+		void RunLightingProfileContractTests(SelfTestContext& context) noexcept
+		{
+			struct DirectionRotationCase
+			{
+				Vector3 m_From;
+				Vector3 m_To;
+			};
+			const std::array rotations
+			{
+				DirectionRotationCase{ Vector3::Forward, Vector3::Forward },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.0f, -0.0001745329f, 1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.0f, 0.0001745329f, 1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.00001f, 0.0f, 1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(0.0001745329f, 0.0f, -1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3(-0.001745329f, 0.0f, -1.0f) },
+				DirectionRotationCase{ Vector3::Forward, Vector3::Backward },
+				DirectionRotationCase{ Vector3::UnitX, -Vector3::UnitX },
+				DirectionRotationCase{ Vector3::UnitY, Vector3(0.0001f, 1.0f, 0.0f) },
+				DirectionRotationCase{ Vector3(2.0f, 0.0f, 0.0f), Vector3(-3.0f, 0.0003f, 0.0f) },
+			};
+			for (const auto& test : rotations)
+			{
+				const auto rotation = math::RotationFromTo(test.m_From, test.m_To);
+				const auto actual = math::TransformDirection(test.m_From.Normalized(), math::CreateFromQuaternion(rotation));
+				context.Check(math::IsFinite(rotation) && (actual - test.m_To.Normalized()).Length() < 1.0e-6f,
+					"Direction rotations preserve small parallel and antiparallel angles on every axis");
+			}
+			WorldLightingProfile profile{ .m_Id = "test.daylight" };
+			const auto hash = HashLightingProfile(profile);
+			context.Check(ValidateLightingProfile(profile) && hash.IsValid() &&
+				Sha256DigestToHex(hash) ==
+					"04dc4b18a002e5a66f77d4b4558c3f7246b09bd9c4cb7e6899ceb52a403ad9d7",
+				std::format("Physical Sky profiles preserve the v2 explicit-field SHA-256 fixture ({})",
+					Sha256DigestToHex(hash)));
+			auto alias = profile;
+			alias.m_Id = "test.alias";
+			alias.m_RecommendedEV100 = 17.0f;
+			alias.m_Inputs.m_IBLRotationRadians = -0.0f;
+			context.Check(HashLightingProfile(alias) == hash,
+				"Profile identity excludes labels/exposure advice and canonicalizes signed zero");
+			alias.m_Inputs.m_Atmosphere.m_MieScattering *= 0.5f;
+			context.Check(HashLightingProfile(alias) != hash,
+				"Atmosphere transport inputs participate in the profile hash");
+			alias = profile;
+			alias.m_Inputs.m_Sun.m_PerpendicularIlluminanceLux = 1000001.0f;
+			context.Check(!ValidateLightingProfile(alias), "Profiles reject illuminance that Runtime would clamp");
+			alias = profile;
+			alias.m_Inputs.m_Atmosphere.m_MieAnisotropy = 0.99f;
+			context.Check(!ValidateLightingProfile(alias), "Profiles reject atmosphere inputs that Runtime would clamp");
+			alias = profile;
+			alias.m_Inputs.m_IBLIntensity = 2.0f;
+			context.Check(!ValidateLightingProfile(alias), "Physical Sky profiles reject unsupported artistic intensity");
+			World world;
+			context.Check(!ApplyWorldLightingInputsToWorld(world, profile.m_Inputs) && !world.m_Atmosphere,
+				"A profile cannot fabricate a missing designated sun");
+			auto& registry = world.GetRegistry();
+			const auto entity = registry.create();
+			registry.emplace<components::TransformComponent>(entity);
+			components::LightComponent light;
+			light.m_Type = LightType::Directional;
+			light.m_WorldSun.emplace();
+			registry.emplace<components::LightComponent>(entity, light);
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry resources({ .m_Device = &device,
+				.m_TransientResourcePool = &pool, .m_SamplerRegistry = &samplers });
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &resources });
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+			context.Check(ApplyWorldLightingInputsToWorld(world, profile.m_Inputs),
+				"Profile input application uses the production designated-sun selection");
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto original = environment.GetWorldLightingPublication().m_Requested;
+			const auto prepared = PrepareWorldLightingInputs(profile.m_Inputs);
+			context.Check(original && EqualWorldLightingAuthoring(*original, prepared) &&
+				EqualWorldLightingEffect(*original, prepared) && original->m_SessionIdentity == 17,
+				"Actual requests retain authored inputs independently of profile metadata");
+			context.Check(environment.PublishWorldLighting(environment.GetRequestedPhysicalSky(), original->m_Generation),
+				"Profile provenance crosses the existing Runtime publication gate");
+
+			std::string preparationError;
+			auto pendingInputs = profile.m_Inputs;
+			pendingInputs.m_Sun.m_PerpendicularIlluminanceLux *= 0.5f;
+			auto plan = environment.PrepareWorldLightingInputs(world, 17, pendingInputs, preparationError);
+			context.Check(plan && plan->HasChanges() && preparationError.empty() &&
+				environment.GetBakeRequestGeneration() == original->m_Generation &&
+				registry.get<components::LightComponent>(entity).m_WorldSun->m_PerpendicularIlluminanceLux == 120000.0f,
+				"Preparing a lighting mutation creates neither live authoring nor a Runtime request");
+			plan.reset();
+			context.Check(environment.GetBakeRequestGeneration() == original->m_Generation &&
+				EqualWorldLightingAuthoring(*environment.GetWorldLightingPublication().m_Requested, prepared),
+				"Discarding a prepared lighting plan preserves request ownership and authored provenance");
+			World missingSun;
+			context.Check(!environment.PrepareWorldLightingInputs(missingSun, 17, pendingInputs, preparationError) &&
+				!preparationError.empty() && environment.GetBakeRequestGeneration() == original->m_Generation,
+				"Missing current World targets reject during preparation without mutation");
+
+			auto& rotation = registry.get<components::TransformComponent>(entity).m_Rotation;
+			rotation = Quaternion(-rotation.m_X, -rotation.m_Y, -rotation.m_Z, -rotation.m_W);
+			const auto unchanged = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
+			context.Check(unchanged.m_Outcome == LightingMutationOutcome::Unchanged &&
+				unchanged.m_Generation == original->m_Generation,
+				"Quaternion sign equivalence neither requests a bake nor changes attribution");
+			auto equivalent = profile;
+			equivalent.m_Inputs.m_SunDirection *= 2.0f;
+			context.Check(HashLightingProfile(equivalent) == hash &&
+				EqualWorldLightingEffect(prepared, PrepareWorldLightingInputs(equivalent.m_Inputs)),
+				"Hash v2 and effect identity agree on producer-equivalent direction representations");
+			equivalent = profile;
+			equivalent.m_Inputs.m_Sun.m_Chromaticity *= 0.5f;
+			const auto gray = PrepareWorldLightingInputs(equivalent.m_Inputs);
+			context.Check(EqualWorldLightingEffect(prepared, gray) && !EqualWorldLightingAuthoring(prepared, gray),
+				"Chromaticity normalization does not conflate effective and authored identity");
+			registry.get<components::LightComponent>(entity).m_WorldSun->m_Chromaticity *= 0.5f;
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto deduplicated = environment.GetWorldLightingPublication();
+			context.Check(deduplicated.m_Requested && deduplicated.m_Active &&
+				EqualWorldLightingAuthoring(*deduplicated.m_Requested, prepared) &&
+				!EqualWorldLightingAuthoring(*deduplicated.m_Requested, gray) &&
+				EqualWorldLightingAuthoring(*deduplicated.m_Active, prepared),
+				"An effective-equivalent World edit cannot relabel an older requested or published generation");
+			const auto grayResult = environment.ApplyWorldLightingInputs(world, 17, equivalent.m_Inputs);
+			context.Check(grayResult.m_Outcome == LightingMutationOutcome::Unchanged &&
+				grayResult.m_Generation == original->m_Generation,
+				"An effective-equivalent selection reports Unchanged without a forced rebake");
+
+			world.m_Atmosphere->m_RayleighScaleHeightMeters *= 2.0f;
+			context.Check(!environment.PrepareWorldLightingInputs(world, 17, profile.m_Inputs, preparationError) &&
+				environment.GetBakeRequestGeneration() == original->m_Generation &&
+				world.m_Atmosphere->m_RayleighScaleHeightMeters == 16000.0f,
+				"Preparation does not silently settle or overwrite a pre-existing unresolved edit");
+			const auto replacement = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
+			context.Check(replacement.m_Outcome == LightingMutationOutcome::Requested &&
+				replacement.m_PreviousGeneration == original->m_Generation + 1 &&
+				replacement.m_Generation == replacement.m_PreviousGeneration + 1 &&
+				environment.GetWorldLightingPublication().m_Active->m_Generation == original->m_Generation,
+				"Pre-existing unresolved edits settle before a separately attributed profile mutation");
+			context.Check(!ApplyWorldLightingInputsToWorld(world, alias.m_Inputs) &&
+				world.m_Atmosphere->m_RayleighScaleHeightMeters == 8000.0f,
+				"Invalid profile inputs reject before mutating the World");
+
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
+			auto scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto sameProfile = environment.ApplyWorldLightingInputs(world, 17, profile.m_Inputs);
+			scope.reset();
+			context.Check(sameProfile.m_Outcome == LightingMutationOutcome::Unchanged &&
+				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment,
+				"A NoChange profile does not steal the entered owner's background override");
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto changedProfile = environment.ApplyWorldLightingInputs(world, 17, pendingInputs);
+			scope.reset();
+			context.Check(changedProfile.m_Outcome == LightingMutationOutcome::Requested &&
+				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
+				"A committed profile mutation owns its background and survives the previous Lab's release");
+
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			const auto beforeSun = environment.GetBakeRequestGeneration();
+			const auto beforeSunSettings = environment.GetSettings();
+			// Equivalent authoring is not substituted by an older request's provenance.
+			auto& authoredSun = *registry.get<components::LightComponent>(entity).m_WorldSun;
+			authoredSun.m_Chromaticity *= 0.5f;
+			environment.SynchronizeWorldLighting(world, 17);
+			const Vector3 smallDirection(0.0f, -0.0001745329f, 1.0f);
+			context.Check(!environment.PrepareWorldSunDirection(world, 18, smallDirection, preparationError) &&
+				!environment.PrepareWorldSunDirection(world, 17, Vector3::Zero, preparationError) &&
+				environment.GetBakeRequestGeneration() == beforeSun,
+				"Sun direction preparation rejects foreign sessions and invalid directions without mutation");
+			auto sunPlan = environment.PrepareWorldSunDirection(world, 17, smallDirection, preparationError);
+			context.Check(sunPlan && sunPlan->HasChanges() && preparationError.empty() &&
+				environment.GetBakeRequestGeneration() == beforeSun &&
+				ResolveWorldSunDirection(rotation).m_Y < -0.99f,
+				"Preparing a sun-only plan preserves the World and existing request");
+			sunPlan.reset();
+			sunPlan = environment.PrepareWorldSunDirection(world, 17, smallDirection, preparationError);
+			const auto sunResult = sunPlan ? sunPlan->Commit() : LightingMutationResult{};
+			const auto sunRequest = environment.GetWorldLightingPublication().m_Requested;
+			context.Check(sunResult.m_Outcome == LightingMutationOutcome::Requested &&
+				sunResult.m_PreviousGeneration == beforeSun && sunResult.m_Generation == beforeSun + 1 &&
+				(ResolveWorldSunDirection(rotation) - smallDirection.Normalized()).Length() < 1.0e-7f &&
+				authoredSun.m_Chromaticity.m_X == 0.5f && authoredSun.m_PerpendicularIlluminanceLux == 60000.0f &&
+				world.m_Atmosphere->m_RayleighScaleHeightMeters == 8000.0f && sunRequest &&
+				sunRequest->m_Inputs.m_Sun.m_Chromaticity.m_X == 0.5f &&
+				environment.GetSettings().m_BackgroundMode == beforeSunSettings.m_BackgroundMode &&
+				environment.GetSettings().m_BakeConfig == beforeSunSettings.m_BakeConfig,
+				"A sun-only commit preserves unrelated authoring and settings while requesting its actual direction");
+			sunPlan = environment.PrepareWorldSunDirection(world, 17, smallDirection, preparationError);
+			const auto sameSun = sunPlan ? sunPlan->Commit() : LightingMutationResult{};
+			context.Check(sameSun.m_Outcome == LightingMutationOutcome::Unchanged &&
+				sameSun.m_Generation == sunResult.m_Generation,
+				"Repeating a small sun direction binds the same target without another bake");
+			scope.reset();
+			context.Check(environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment,
+				"A sun-only mutation preserves the entered lease's background restoration on exit");
+
+			scope = environment.AcquireOverride();
+			scope->Apply({ .m_BackgroundMode = EnvironmentBackgroundMode::PhysicalSky });
+			environment.SynchronizeWorldLighting(world, 17);
+			sunPlan = environment.PrepareWorldSunDirection(world, 17, Vector3(1.0f, -1.0f, 0.0f), preparationError);
+			const auto otherSun = sunPlan ? sunPlan->Commit() : LightingMutationResult{};
+			environment.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+			scope.reset();
+			context.Check(otherSun.m_Outcome == LightingMutationOutcome::Requested &&
+				environment.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
+				"A same-value ordinary background writer still takes ownership after a sun-only mutation");
+
+			auto invalid = profile;
+			invalid.m_Inputs.m_SunDirection = Vector3(std::numeric_limits<float>::max(), 1.0f, 0.0f);
+			context.Check(!ValidateLightingProfile(invalid),
+				"Finite direction components still reject squared-length overflow");
+			invalid = profile;
+			invalid.m_RecommendedEV100 = 25.0f;
+			context.Check(!ValidateLightingProfile(invalid) && !Camera::IsValidManualEV100(25.0f),
+				"Exposure advice uses the Camera's strict supported EV100 range");
+			invalid = profile;
+			invalid.m_Inputs.m_Sun.m_PerpendicularIlluminanceLux = 0.0f;
+			context.Check(ValidateWorldSunSettings(invalid.m_Inputs.m_Sun) && !ValidateLightingProfile(invalid),
+				"Zero illuminance is valid in WorldSun but excluded by the named-profile policy");
+			invalid.m_Inputs.m_Atmosphere.m_MieExtinction = 0.0f;
+			context.Check(!ValidateAtmosphereSettings(invalid.m_Inputs.m_Atmosphere),
+				"Atmosphere owns the extinction/scattering relationship");
+			context.Check(math::IsInClosedRange(1.0f, 0.0f, 1.0f) &&
+				!math::IsInClosedRange(std::numeric_limits<float>::infinity(), 0.0f, 1.0f),
+				"Math's finite closed interval helper contains no domain policy");
 		}
 
 		void RunIBLPreviewContractTests(SelfTestContext& context) noexcept
@@ -10693,6 +11054,131 @@ namespace gglab
 				"Invalid sun input resolves finite darkness, neutral chromaticity and a valid angular radius");
 		}
 
+		void RunViewSettingsPatchTests(SelfTestContext& context) noexcept
+		{
+			TemporalAASettings content;
+			content.m_Enabled = true;
+			content.m_DepthAbsoluteThreshold = 0.2f;
+			content.m_DepthRelativeThreshold = 0.3f;
+			content.m_HistoryRelaxation = 1.5f;
+			context.Check(TemporalAASettingsPatch{}.IsEmpty() &&
+				ApplyTemporalAASettingsPatch({}, content) == content,
+				"An empty typed TAA patch retains the resolved content settings");
+			const auto checkTAAField = [&](auto patchMember, auto settingsMember,
+				auto value, auto expectedValue)
+				{
+					TemporalAASettingsPatch patch;
+					patch.*patchMember = value;
+					auto expected = content;
+					expected.*settingsMember = expectedValue;
+					context.Check(!patch.IsEmpty() &&
+						ApplyTemporalAASettingsPatch(patch, content) == expected,
+						"A typed TAA field resolves its value without changing inherited fields");
+				};
+			checkTAAField(&TemporalAASettingsPatch::m_Enabled, &TemporalAASettings::m_Enabled,
+				false, false);
+			struct FloatField
+			{
+				std::optional<float> TemporalAASettingsPatch::* m_Patch;
+				float TemporalAASettings::* m_Settings;
+				float m_Min;
+				float m_Max;
+			};
+			const std::array floats
+			{
+				FloatField{ &TemporalAASettingsPatch::m_MaxHistoryFeedback, &TemporalAASettings::m_MaxHistoryFeedback, 0.0f, TemporalAAMaxHistoryFeedbackCeiling },
+				FloatField{ &TemporalAASettingsPatch::m_DepthAbsoluteThreshold, &TemporalAASettings::m_DepthAbsoluteThreshold, 0.0f, TemporalAAMaxDepthThreshold },
+				FloatField{ &TemporalAASettingsPatch::m_DepthRelativeThreshold, &TemporalAASettings::m_DepthRelativeThreshold, 0.0f, TemporalAAMaxDepthThreshold },
+				FloatField{ &TemporalAASettingsPatch::m_VelocityWeightScale, &TemporalAASettings::m_VelocityWeightScale, 0.0f, TemporalAAMaxVelocityWeightScale },
+				FloatField{ &TemporalAASettingsPatch::m_LuminanceWeightScale, &TemporalAASettings::m_LuminanceWeightScale, 0.0f, TemporalAAMaxLuminanceWeightScale },
+				FloatField{ &TemporalAASettingsPatch::m_NeighborhoodClampExpansion, &TemporalAASettings::m_NeighborhoodClampExpansion, 0.0f, TemporalAAMaxNeighborhoodClampExpansion },
+				FloatField{ &TemporalAASettingsPatch::m_HistoryRelaxation, &TemporalAASettings::m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation },
+				FloatField{ &TemporalAASettingsPatch::m_VarianceClipGamma, &TemporalAASettings::m_VarianceClipGamma, TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
+				FloatField{ &TemporalAASettingsPatch::m_TextureLodBiasOffset, &TemporalAASettings::m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
+			};
+			const TemporalAASettings defaults;
+			for (const auto& field : floats)
+			{
+				for (const float value : { 0.0f, -99.0f, 99.0f,
+					std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity() })
+				{
+					const float expected = std::isfinite(value) ?
+						std::clamp(value, field.m_Min, field.m_Max) :
+						defaults.*field.m_Settings;
+					checkTAAField(field.m_Patch, field.m_Settings, value, expected);
+				}
+			}
+			const auto checkTAAEnum = [&](auto patchMember, auto settingsMember, auto values)
+				{
+					for (const auto value : values)
+					{
+						checkTAAField(patchMember, settingsMember, value, value);
+					}
+					using T = std::remove_cvref_t<decltype(content.*settingsMember)>;
+					checkTAAField(patchMember, settingsMember, static_cast<T>(255), defaults.*settingsMember);
+				};
+			checkTAAEnum(&TemporalAASettingsPatch::m_HistoryAccumulation,
+				&TemporalAASettings::m_HistoryAccumulation,
+				std::array{ TemporalAAHistoryAccumulation::CompatibilityAge, TemporalAAHistoryAccumulation::EffectiveSamples });
+			checkTAAEnum(&TemporalAASettingsPatch::m_HistoryRectification,
+				&TemporalAASettings::m_HistoryRectification,
+				std::array{ TemporalAAHistoryRectification::MinMaxClamp, TemporalAAHistoryRectification::VarianceClip, TemporalAAHistoryRectification::BoundedVarianceClip });
+			checkTAAEnum(&TemporalAASettingsPatch::m_HistoryFilter, &TemporalAASettings::m_HistoryFilter,
+				std::array{ TemporalAAHistoryFilter::Bilinear, TemporalAAHistoryFilter::CatmullRomClamped });
+			checkTAAEnum(&TemporalAASettingsPatch::m_CurrentFilter, &TemporalAASettings::m_CurrentFilter,
+				std::array{ TemporalAACurrentFilter::Point, TemporalAACurrentFilter::Gaussian });
+			checkTAAEnum(&TemporalAASettingsPatch::m_MotionSelection, &TemporalAASettings::m_MotionSelection,
+				std::array{ TemporalAAMotionSelection::Center, TemporalAAMotionSelection::ClosestDepth });
+			checkTAAEnum(&TemporalAASettingsPatch::m_PostTemporalView, &TemporalAASettings::m_PostTemporalView,
+				std::array{ TemporalAAPostTemporalView::Jittered, TemporalAAPostTemporalView::Unjittered });
+			checkTAAEnum(&TemporalAASettingsPatch::m_ResolutionPreset, &TemporalAASettings::m_ResolutionPreset,
+				std::array{ TemporalAAResolutionPreset::Native, TemporalAAResolutionPreset::Quality });
+
+			GTAOSettings gtao;
+			gtao.m_Power = 2.0f;
+			gtao.m_DenoiseRadius = 4;
+			gtao.m_FinalAOFormatPreference = GTAOFinalAOFormatPreference::ForceR16Float;
+			const auto patchedGTAO = ApplyGTAOSettingsPatch({ .m_Enabled = false,
+				.m_Radius = 0.5f, .m_DirectionCount = 0, .m_StepCount = 999,
+				.m_TemporalAccumulation = false, .m_TemporalMaxSamples = 999 }, gtao);
+			context.Check(!patchedGTAO.m_Enabled && patchedGTAO.m_Radius == 0.5f &&
+				patchedGTAO.m_FalloffStart == 0.5f && patchedGTAO.m_FalloffEnd == 0.5f &&
+				patchedGTAO.m_DirectionCount == 1 && patchedGTAO.m_StepCount == GTAOMaxStepCount &&
+				!patchedGTAO.m_TemporalAccumulation &&
+				patchedGTAO.m_TemporalMaxSamples == GTAOMaxTemporalSamples &&
+				patchedGTAO.m_Power == 2.0f && patchedGTAO.m_DenoiseRadius == 4 &&
+				patchedGTAO.m_FinalAOFormatPreference == GTAOFinalAOFormatPreference::ForceR16Float,
+				"Typed GTAO patches clamp sampling and dependent falloff while preserving unrelated fields");
+			const auto minimumGTAO = ApplyGTAOSettingsPatch({ .m_Radius = -1.0f,
+				.m_DirectionCount = 999, .m_StepCount = 0, .m_TemporalMaxSamples = 0 }, gtao);
+			context.Check(minimumGTAO.m_Radius == GTAOMinRadius &&
+				minimumGTAO.m_DirectionCount == GTAOMaxDirectionCount && minimumGTAO.m_StepCount == 1 &&
+				minimumGTAO.m_TemporalMaxSamples == 1 &&
+				ApplyGTAOSettingsPatch({ .m_Radius = 99.0f }, gtao).m_Radius == GTAOMaxRadius,
+				"Typed GTAO patches preserve both sampling bounds and the radius limits");
+
+			ResolvedViewRenderSettings view;
+			view.m_TemporalAA = content;
+			view.m_Lighting.m_GTAO = gtao;
+			view.m_Lighting.m_EnableAerialPerspective = false;
+			view.m_PostProcess.m_Bloom.m_Intensity = 0.2f;
+			view.m_Exposure = ResolveManualExposureSettings(5.0f, 2.0f, true);
+			ApplyViewRenderSettingsPatch({ .m_Exposure = { .m_CompensationEV = 0.0f } }, view, true);
+			context.Check(view.m_Exposure.m_ManualEV100 == 5.0f && view.m_Exposure.m_CompensationEV == 0.0f &&
+				view.m_Exposure.m_EffectiveEV100 == 5.0f &&
+				NearlyEqual(view.m_Exposure.m_ExposureScale, 1.0f / (1.2f * 32.0f)) &&
+				view.m_Exposure.m_PreExposure == view.m_Exposure.m_ExposureScale &&
+				view.m_TemporalAA == content && view.m_Lighting.m_GTAO.m_Power == 2.0f &&
+				!view.m_Lighting.m_EnableAerialPerspective && view.m_PostProcess.m_Bloom.m_Intensity == 0.2f,
+				"A compensation-only patch derives exposure together and preserves the other view settings");
+			view.m_Exposure = ResolveManualExposureSettings(5.0f, 2.0f, true);
+			ApplyViewRenderSettingsPatch({ .m_Exposure = { .m_ManualEV100 = 0.0f } }, view, false);
+			context.Check(view.m_Exposure.m_ManualEV100 == 0.0f && view.m_Exposure.m_CompensationEV == 2.0f &&
+				view.m_Exposure.m_EffectiveEV100 == -2.0f && view.m_Exposure.m_PreExposure == 1.0f &&
+				NearlyEqual(view.m_Exposure.m_ExposureScale, 4.0f / 1.2f),
+				"A manual-only zero patch retains compensation and resolves disabled pre-exposure");
+		}
+
 		void RunExposureContractTests(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{});
@@ -12928,6 +13414,8 @@ namespace gglab
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
 		RunEnvironmentLightingSettingsTests(context);
+		RunEnvironmentLightingOverrideTests(context);
+		RunLightingProfileContractTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);
 		RunRuntimePathConfigurationContractTests(context);
@@ -12967,6 +13455,7 @@ namespace gglab
 		RunTemporalCaptureContinuityContractTests(context);
 		RunAtmosphereContractTests(context);
 		RunWorldSunContractTests(context);
+		RunViewSettingsPatchTests(context);
 		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);

@@ -2,8 +2,10 @@
 
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
 
 #include <cstdint>
+#include <memory>
 
 namespace gglab
 {
@@ -15,6 +17,8 @@ namespace gglab
 	{
 	public:
 		virtual ~EnvironmentLightingControlBase() = default;
+		// Returns null while another entered-session lease exists or identity capacity is exhausted.
+		[[nodiscard]] virtual std::unique_ptr<EnvironmentLightingOverrideBase> AcquireOverride() noexcept = 0;
 		// Non-finite inputs are ignored. Intensity is nonnegative; yaw wraps to one turn.
 		virtual void SetIntensity(float intensity) noexcept = 0;
 		virtual void SetRotationRadians(float rotationRadians) noexcept = 0;

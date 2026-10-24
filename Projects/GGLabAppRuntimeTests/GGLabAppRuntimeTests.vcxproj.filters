@@ -6,6 +6,7 @@
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\GGLabAppRuntimeLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\GpuFaultLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\NonFiniteWatchCoordinatorSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\ParameterTransactionSelfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.h" />
@@ -13,5 +14,6 @@
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\GpuFaultLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\NonFiniteWatchCoordinatorSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\ParameterTransactionSelfTests.h" />
   </ItemGroup>
 </Project>

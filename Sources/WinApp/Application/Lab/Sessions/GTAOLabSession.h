@@ -2,9 +2,13 @@
 
 #include "AssetPreparationTracker.h"
 #include "Lab/LabSessionBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <entt/entity/entity.hpp>
+
+#include <memory>
+#include <optional>
 
 namespace gglab
 {
@@ -22,6 +26,12 @@ namespace gglab
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
+		[[nodiscard]] bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] std::optional<LabValue> ReadImmediateParameterFrameValue(
+			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override;
+		[[nodiscard]] bool SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] LightingMutationResult ApplyDeferredLightingParameter(
+			const LabParameterId& id) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
@@ -33,6 +43,7 @@ namespace gglab
 
 	private:
 		void ApplyImmediateParameters() noexcept override;
+		bool RefreshInheritedParameters() noexcept override;
 		void RebuildScene() noexcept override;
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		void BuildScene() noexcept;
@@ -54,5 +65,6 @@ namespace gglab
 		entt::entity m_StepOccluder = entt::null;
 		bool m_EnableCameraInput = false;
 		bool m_FixtureConfigured = false;
+		std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
 	};
 }

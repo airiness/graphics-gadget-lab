@@ -2,9 +2,12 @@
 
 #include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Application/Control/ApplicationControlParameters.h"
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
+#include "Parameters/ParameterEffectReceipt.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <nlohmann/json.hpp>
 
@@ -29,6 +32,143 @@ namespace gglab
 	namespace
 	{
 		using Json = nlohmann::json;
+
+		void RunParameterControlTests(SelfTestContext& context) noexcept
+		{
+			const auto parameters = ParseApplicationControlRequest(R"({"protocol":4,"id":700,"command":"parameters"})");
+			context.Check(parameters.m_Request && parameters.m_Request->m_Command == ApplicationControlCommand::Parameters,
+				"Parameter discovery is an additive v4 command");
+			const auto changes = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":701,"command":"set","changes":[{"id":"b","type":"bool","value":false},{"id":"i","type":"int","value":-2147483648},{"id":"u","type":"uint","value":4294967295},{"id":"f","type":"float","value":2},{"id":"e","type":"enum","value":2},{"id":"v","type":"vector3","value":[1,2,3]},{"id":"c","type":"color","value":[0,0.5,1,1]}]})");
+			const auto* parsed = changes.m_Request ? &changes.m_Request->m_ParameterChanges : nullptr;
+			context.Check(parsed && parsed->size() == 7 && std::get<bool>((*parsed)[0].m_Value.m_Value) == false &&
+				std::get<int32_t>((*parsed)[1].m_Value.m_Value) == INT32_MIN &&
+				std::get<uint32_t>((*parsed)[2].m_Value.m_Value) == UINT32_MAX &&
+				std::get<float>((*parsed)[3].m_Value.m_Value) == 2.0f && (*parsed)[4].m_Type == LabParameterType::Enum &&
+				std::get<Vector3>((*parsed)[5].m_Value.m_Value).m_Z == 3.0f &&
+				std::get<Color>((*parsed)[6].m_Value.m_Value).G() == 0.5f,
+				"All seven wire types retain strict owned 32-bit Lab values without string coercion");
+			const std::vector<std::string> invalidChanges =
+			{
+				R"([])", R"({})", R"([{"id":"x","type":"bool","value":1}])",
+				R"([{"id":"x","type":"bool","value":"true"}])",
+				R"([{"id":"x","type":"int","value":2147483648}])",
+				R"([{"id":"x","type":"int","value":1.0}])",
+				R"([{"id":"x","type":"int","value":18446744073709551615}])",
+				R"([{"id":"x","type":"uint","value":-1}])",
+				R"([{"id":"x","type":"uint","value":4294967296}])",
+				R"([{"id":"x","type":"float","value":1e100}])",
+				R"([{"id":"x","type":"float","value":null}])",
+				R"([{"id":"x","type":"vector3","value":[1,2]}])",
+				R"([{"id":"x","type":"color","value":[1,2,3,"4"]}])",
+				R"([{"id":"x","type":"vector3","value":[1,2,1e100]}])",
+				R"([{"id":"x","type":"float","value":1},{"id":"x","type":"float","value":2}])",
+				R"([{"id":"","type":"float","value":1}])",
+				R"([{"id":"x","type":"unknown","value":1}])",
+				R"([{"id":"x","type":"float","value":1,"clamp":true}])",
+				R"([{"id":"x","type":"enum","value":"named"}])",
+			};
+			for (const auto& invalid : invalidChanges)
+			{
+				const auto rejected = ParseApplicationControlRequest(
+					R"({"protocol":4,"id":702,"command":"set","changes":)" + invalid + "}");
+				context.Check(!rejected.m_Request && rejected.m_Id == 702 && !rejected.m_Error.empty(),
+					"Malformed typed batches reject completely and retain correlation");
+			}
+			Json oversized = Json::array();
+			for (size_t i = 0; i <= ApplicationControlMaxParameterItems; ++i)
+			{
+				oversized.push_back({ { "id", std::to_string(i) }, { "type", "bool" }, { "value", true } });
+			}
+			context.Check(!ParseApplicationControlRequest(Json({ { "protocol", 4 }, { "id", 703 },
+				{ "command", "set" }, { "changes", oversized } }).dump()).m_Request,
+				"Session batches have a fixed admission item bound");
+			for (const auto& invalid : { R"({"jobId":1})", R"({"batchId":0})",
+				R"({"batchId":1,"consume":1})", R"({"batchId":1,"jobId":1})" })
+			{
+				Json request = Json::parse(invalid);
+				request.update({ { "protocol", 4 }, { "id", 704 }, { "command", "parameter-result" } });
+				context.Check(!ParseApplicationControlRequest(request.dump()).m_Request,
+					"Parameter results cannot reinterpret capture job identities or consumption types");
+			}
+			const auto query = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":705,"command":"parameter-result","batchId":9,"consume":true})");
+			context.Check(query.m_Request && query.m_Request->m_ParameterBatchId == 9 &&
+				query.m_Request->m_JobId == 0 && query.m_Request->m_Consume,
+				"Parameter query preserves its independent batch identity");
+			context.Check(!Json::parse(SerializeApplicationControlParameters(706, nullptr))["ok"] &&
+				!Json::parse(SubmitApplicationControlParameters(707, {}, nullptr))["ok"],
+				"A missing parameter source rejects discovery and admission");
+			const Json missing = Json::parse(QueryApplicationControlParameters(708, 9, true, nullptr));
+			context.Check(!missing["ok"] && missing["batchId"] == 9 && missing["status"] == "not-found",
+				"Missing parameter ownership never yields a fabricated receipt");
+			ParameterBatchStatus batch{ .m_BatchId = 9, .m_Revision = 7,
+				.m_ContentId = "gglab.lab.fixture", .m_State = ParameterBatchState::Finished };
+			batch.m_Values.push_back({ LabParameterId("f"), 2.0f });
+			auto receipt = ParameterEffectReceipt::Begin(LabParameterId("f"), ParameterEffectClass::Immediate, 7, 20);
+			GGLAB_UNUSED(receipt->RecordApplied(ParameterEffectClass::Immediate, { .m_Revision = 7 }, 20));
+			GGLAB_UNUSED(receipt->RecordSubmittedFrame({ .m_Revision = 7 }, 21));
+			batch.m_Items.push_back(receipt->GetSnapshot());
+			const Json wire = SerializeApplicationControlParameterBatch(batch);
+			context.Check(wire["terminal"] && wire["succeeded"] && wire["values"][0]["value"] == 2.0f &&
+				wire["items"][0]["requested"] == 20 && wire["items"][0]["applied"] == 20 &&
+				wire["items"][0]["published"] == 20 && wire["items"][0]["firstConsumed"] == 21 &&
+				wire["items"][0]["identity"]["revision"] == 7,
+				"Serialization preserves values, exact identities and all four authoritative stamps");
+			batch.m_Items[0].m_State = ParameterEffectState::Superseded;
+			batch.m_Items[0].m_FirstConsumed.reset();
+			const Json superseded = SerializeApplicationControlParameterBatch(batch);
+			context.Check(!superseded["succeeded"] && superseded["items"][0]["firstConsumed"].is_null(),
+				"A terminal superseded effect is not successful consumption");
+			const Json status = Json::parse(SerializeApplicationControlStatus(709, {
+				.m_ParametersAvailable = true, .m_ParameterRevision = 7, .m_ParameterBatch = &batch }));
+			context.Check(status["capabilities"]["labParameterControl"]["maxBatches"] == 1 &&
+				status["capabilities"]["labParameterControl"]["maxItems"] == 128 &&
+				status["parameterControl"]["batch"] == superseded && status["parameterControl"]["revision"] == 7,
+				"Status advertises bounded parameter support and borrows the actual receipt");
+			context.Check(!status["capabilities"]["labParameterControl"].contains("scheduledEvents") &&
+				status["capabilities"]["sequenceImmediateEvents"] == true &&
+				status["capabilities"]["sequenceDeferredEvents"] == true,
+				"Sequence capabilities alone advertise scheduled events; the Lab-only object does not contradict them");
+			context.Check(status["capabilities"]["sessionParameterControl"]["sources"] == Json::array({ "host", "lab" }) &&
+				status["capabilities"]["sessionParameterControl"]["mixedSources"] &&
+				status["capabilities"]["sessionParameterControl"]["maxBatches"] == 1,
+				"The additive session capability discovers host and mixed-source control without changing protocol v4");
+			batch.m_Source = "mixed";
+			batch.m_Impact = LabChangeImpact::RebuildScene;
+			context.Check(SerializeApplicationControlParameterBatch(batch)["impact"] == "RebuildScene" &&
+				status["capabilities"]["sessionParameterControl"]["effectClasses"].back() == "Rebuild" &&
+				!status["capabilities"]["sessionParameterControl"]["rebuildWithDeferred"],
+				"Rebuild discovery and batch responses preserve supported effect classes and actual change impact");
+			context.Check(SerializeApplicationControlParameterBatch(batch)["source"] == "mixed" &&
+				SerializeApplicationControlParameterBatch(batch)["contentId"] == "gglab.lab.fixture",
+				"A mixed-source receipt retains its captured content identity");
+		}
+
+		void RunDeferredParameterSerializationTests(SelfTestContext& context) noexcept
+		{
+			ParameterBatchStatus batch{ .m_BatchId = 10, .m_Revision = 8,
+				.m_ContentId = "gglab.lab.fixture", .m_State = ParameterBatchState::Applying };
+			auto receipt = ParameterEffectReceipt::Begin(LabParameterId("lighting"), ParameterEffectClass::Deferred, 8, 30);
+			const ParameterStateIdentity identity{ 8, "lighting", 11 };
+			GGLAB_UNUSED(receipt->RecordApplied(ParameterEffectClass::Deferred, identity, 30));
+			batch.m_Items.push_back(receipt->GetSnapshot());
+			const Json pending = SerializeApplicationControlParameterBatch(batch);
+			context.Check(!pending["terminal"] && pending["succeeded"].is_null() &&
+				pending["items"][0]["declaredClass"] == "Deferred" && pending["items"][0]["state"] == "Applied" &&
+				pending["items"][0]["identity"]["domain"] == "lighting" &&
+				pending["items"][0]["identity"]["generation"] == 11 &&
+				pending["items"][0]["published"].is_null() && pending["items"][0]["firstConsumed"].is_null(),
+				"An applied Deferred wire receipt retains domain identity without claiming publication or consumption");
+			GGLAB_UNUSED(receipt->RecordPublished(identity, 34));
+			GGLAB_UNUSED(receipt->RecordSubmittedFrame(identity, 35));
+			batch.m_State = ParameterBatchState::Finished;
+			batch.m_Items[0] = receipt->GetSnapshot();
+			const Json consumed = SerializeApplicationControlParameterBatch(batch);
+			context.Check(consumed["succeeded"] && consumed["items"][0]["applied"] == 30 &&
+				consumed["items"][0]["published"] == 34 && consumed["items"][0]["firstConsumed"] == 35,
+				"Deferred serialization preserves distinct application, publication and actual consuming frames");
+		}
 
 		void RunParseTests(SelfTestContext& context) noexcept
 		{
@@ -121,6 +261,33 @@ namespace gglab
 				"Sequence GTAO overrides preserve exact values");
 			context.Check(ParseApplicationControlRequest(R"({"protocol":4,"id":12,"command":"sequence-cancel"})").m_Request.has_value(),
 				"Sequence cancellation remains a distinct business command");
+			const auto events = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":80,"command":"sequence","path":"A","events":[{"frame":10,"set":{"view.exposure.ev100":2,"view.gtao.radius":1.5},"expectEffects":[]}]})");
+			context.Check(events.m_Request && events.m_Request->m_Sequence.m_Events.size() == 1 &&
+				events.m_Request->m_Sequence.m_Events[0].m_Frame == 10 &&
+				events.m_Request->m_Sequence.m_Events[0].m_Values.size() == 2 &&
+				events.m_Request->m_Sequence.m_Events[0].m_ExpectEffects.has_value(),
+				"Sequence events retain exact frames, raw numeric assignments and explicit empty expectations");
+			const auto deferredEvent = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":82,"command":"sequence","path":"A","events":[{"frame":10,"set":{"environment.profile":1},"expectEffects":["lighting"]}]})");
+			context.Check(deferredEvent.m_Request &&
+				deferredEvent.m_Request->m_Sequence.m_Events[0].m_ExpectEffects ==
+					std::optional(std::vector<std::string>{ "lighting" }),
+				"Deferred event expectations retain their owning domain without granting readiness permission");
+			for (const auto* invalid : {
+				R"({"frame":-1,"set":{"a":1}})",
+				R"({"frame":0,"set":{}})",
+				R"({"frame":0,"set":{"a":"bad"}})",
+				R"({"frame":0,"set":{"a":1},"extra":true})",
+				R"({"frame":0,"set":{"a":1},"expectEffects":["unknown"]})",
+				R"({"frame":0,"set":{"a":1},"expectEffects":["lighting","lighting"]})",
+				R"({"frame":0,"set":{"a":1},"expectEffects":[true]})",
+				R"({"frame":0,"set":{"a":4294967296}})" })
+			{
+				context.Check(!ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":81,"command":"sequence","path":"A","events":[{}]}})", invalid)).m_Request,
+					"Malformed or unsupported event input rejects before admission");
+			}
 			const auto watch = ParseApplicationControlRequest(
 				R"({"protocol":4,"id":70,"command":"watch","mode":"report","claims":["boundary"],"targets":[{"resource":"Motion","at":{"before":"TAA"},"occurrence":2,"slices":[2,1]}]})");
 			const auto buffer = ParseApplicationControlRequest(
@@ -294,7 +461,7 @@ namespace gglab
 				generation["targets"][0]["resourceIdentity"] == Json({ { "generation", 3 }, { "index", 12 } }),
 				"Watch retains fail mode, content generation, physical identity, tier and checked frame");
 			FrameCaptureFrameState frame{ .m_Backend = "vulkan", .m_DemoId = "Demo.LabHost", .m_LabId = "gglab.lab.culling",
-				.m_FrameIndex = 42, .m_ReferenceViewIds = { "CAM_A", "CAM_B" } };
+				.m_FrameSerial = 73, .m_FrameIndex = 42, .m_ReferenceViewIds = { "CAM_A", "CAM_B" } };
 			frame.m_Readiness.Add("lab", FrameCaptureGateState::Pending, "Warming up.");
 			const auto status = Json::parse(SerializeApplicationControlStatus(4, {
 				.m_SessionId = "s1", .m_ProcessId = 99, .m_Hidden = true, .m_Width = 640, .m_Height = 360,
@@ -303,6 +470,8 @@ namespace gglab
 				status["frame"]["ready"] == false && status["frame"]["settledFrames"] == 5 &&
 				status["frame"]["gates"][0]["state"] == "pending" && status["frame"]["fixedDeltaTime"].is_null() &&
 				status["frame"]["referenceViews"] == Json::array({ "CAM_A", "CAM_B" }), "Status preserves session and frame readiness");
+			context.Check(status["frame"]["frameSerial"] == 73 && status["frame"]["frameIndex"] == 42,
+				"Status preserves the render serial separately from the simulation frame index");
 			context.Check(!status["capture"].contains("legacyUnfinishedOutputs") &&
 				!status["capture"].contains("legacyRetainedResults"),
 				"Status exposes only current job ownership without retired output counters");
@@ -348,7 +517,7 @@ namespace gglab
 				timing["scopes"][1]["occurrence"].is_null(),
 				"Sequence GPU timing exposes pass instance identities separately from other scopes");
 			sequence.m_State = FrameSequenceState::Failed;
-			sequence.m_TimingPublication = FrameSequenceTimingPublication{
+			sequence.m_TimingPublication = FrameSequenceArtifactPublication{
 				.m_Outcome = CapturePublicationOutcome::Indeterminate, .m_Failure = "Publication is uncertain." };
 			const auto tooLate = Json::parse(SerializeApplicationControlSequenceCancellation(
 				13, &sequence, FrameSequenceCancelVerdict::TooLate));
@@ -686,6 +855,8 @@ namespace gglab
 
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
 	{
+		RunParameterControlTests(context);
+		RunDeferredParameterSerializationTests(context);
 		RunParseTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);

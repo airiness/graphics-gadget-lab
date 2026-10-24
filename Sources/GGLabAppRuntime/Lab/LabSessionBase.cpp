@@ -5,6 +5,8 @@
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
+#include <utility>
+
 namespace gglab
 {
 	LabSessionBase::LabSessionBase(LabDescriptor descriptor, const LabSessionCreateInfo& createInfo,
@@ -48,6 +50,17 @@ namespace gglab
 		return m_Parameters.Set(id, value, impact);
 	}
 
+	std::optional<LabParameterBatchResult> LabSessionBase::SetParameters(
+		std::span<const LabParameterValue> values, std::string& error) noexcept
+	{
+		return m_Parameters.ApplyBatch(values, error);
+	}
+
+	void LabSessionBase::CommitPreparedParameters(LabParameterSet&& parameters) noexcept
+	{
+		m_Parameters = std::move(parameters);
+	}
+
 	LabChangeImpact LabSessionBase::ResetParameters() noexcept
 	{
 		return m_Parameters.ResetAll();
@@ -56,6 +69,14 @@ namespace gglab
 	void LabSessionBase::ApplyParameterChanges(LabChangeImpact impact) noexcept
 	{
 		ApplyImmediateParameters();
+		for (const auto& parameter : m_Parameters.GetParameters())
+		{
+			if (parameter.m_Dirty && GetParameterEffectClass(parameter.m_Desc) == ParameterEffectClass::Deferred &&
+				SupportsDeferredLightingParameter(parameter.m_Desc.m_Id))
+			{
+				GGLAB_UNUSED(ApplyDeferredLightingParameter(parameter.m_Desc.m_Id));
+			}
+		}
 		switch (impact)
 		{
 		case LabChangeImpact::Immediate:

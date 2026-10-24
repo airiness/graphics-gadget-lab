@@ -27,6 +27,12 @@ namespace gglab
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void OnExit() noexcept override;
 		void Update() noexcept override;
+		LabRuntime* GetParameterLabRuntime() noexcept override { return &m_Runtime; }
+		std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept override
+		{
+			const auto* session = m_Runtime.GetActiveSession();
+			return session ? session->GetLightingProfiles() : std::span<const WorldLightingProfile>{};
+		}
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override;
 		void OnCameraPathFrameApplied(const CameraPath& path, uint32_t frame) noexcept override;
 

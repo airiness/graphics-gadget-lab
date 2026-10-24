@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
 
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
@@ -8,6 +9,8 @@
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
+#include "Demo/DemoBase.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Demo/DemoTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -42,6 +45,7 @@ namespace gglab
 
 	void GGLabAppRuntime::CollectFrameCaptureResults() noexcept
 	{
+		UpdateSequenceParameterEvents();
 		if (!m_FrameCapture)
 		{
 			return;
@@ -258,6 +262,16 @@ namespace gglab
 			});
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
+		m_ParameterControl = std::make_unique<SessionParameterControl>(
+			*m_RenderServices.m_Environment, m_RenderComposition->GetWorldLightingControl(),
+			[this](DemoBase& demo) -> std::optional<ApplicationViewSettingsResolution>
+			{
+				const auto view = demo.GetCameraRig().ResolveEffectiveDisplayView();
+				return view.IsValid() ?
+					std::optional(ResolveApplicationViewSettings(demo.GetViewRenderProfile(),
+						*view.m_CameraSlot->m_Camera, m_ToolingFrameSettings)) :
+					std::nullopt;
+			});
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
@@ -284,6 +298,10 @@ namespace gglab
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
 
 		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost->GetRHIContext());
+		m_DemoManager->SetBeforeActiveDemoReleaseCallback([this]() noexcept
+		{
+			ReleaseContentBinding();
+		});
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services =
@@ -344,6 +362,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
 		}
 		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
+		SynchronizeContentBinding();
 		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
@@ -440,6 +459,15 @@ namespace gglab
 			return;
 		}
 
+		if (m_ParameterControl)
+		{
+			m_ParameterControl->Finish();
+		}
+		ReleaseContentBinding();
+		if (m_DemoManager)
+		{
+			m_DemoManager->SetBeforeActiveDemoReleaseCallback({});
+		}
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
 		if (m_FrameCapture)

@@ -26,6 +26,13 @@ statement. An attribute adds no indentation level.
 
 See [Control flow and HLSL attributes](examples.md#control-flow-and-hlsl-attributes).
 
+## Enum definitions
+
+Always expand enum definitions, including short or empty definitions. Put the
+opening and closing braces on separate lines and each enumerator on its own
+indented line. This applies to both scoped and unscoped enums. A forward
+declaration without a body may remain on one line.
+
 ## Wrapping and continuations
 
 Use 100 columns as a soft target for C++ and HLSL, counting tabs as four columns.

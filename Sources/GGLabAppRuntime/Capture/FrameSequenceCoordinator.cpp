@@ -1,7 +1,7 @@
 #include "Capture/FrameSequenceCoordinator.h"
 
 #include "Capture/NonFiniteWatchCoordinator.h"
-#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "Parameters/HostViewParameters.h"
 
 #include <algorithm>
 #include <cmath>
@@ -122,27 +122,73 @@ namespace gglab
 				Json::parse(SerializeNonFiniteWatchCoverage(*m_Status->m_WatchCoverage)) : Json(nullptr) } }.dump(2);
 	}
 
-	void FrameSequenceCoordinator::CollectTimingPublication() noexcept
+	std::string FrameSequenceCoordinator::SerializeParameterFramesProduct() const
 	{
-		if (!m_TimingWrite || !m_Status || m_Status->IsTerminal())
+		using Json = nlohmann::ordered_json;
+		const uint64_t requested = uint64_t(m_Status->m_FrameCount) *
+			std::max(1u, m_Status->m_ReferenceSamples);
+		if (m_ParameterFrames.empty() || m_ParameterFrames.size() != requested)
+		{
+			throw std::runtime_error("A parameter-frames product requires every submitted sequence sample.");
+		}
+		Json frames = Json::array();
+		for (const auto& sample : m_ParameterFrames)
+		{
+			frames.push_back({
+				{ "sequenceFrame", sample.m_Frame },
+				{ "referenceSample", sample.m_ReferenceSample },
+				{ "parameters", Json::parse(SerializeParameterFrameState(*sample.m_Parameters)) } });
+		}
+		return Json{
+			{ "schema", "gglab.parameter-frames" },
+			{ "schemaVersion", 1 },
+			{ "sequence", {
+				{ "id", m_Status->m_SequenceId },
+				{ "path", m_Status->m_CameraPathId },
+				{ "pathVersion", m_Status->m_CameraPathVersion },
+				{ "frameCount", m_Status->m_FrameCount },
+				{ "referenceSamples", m_Status->m_ReferenceSamples },
+				{ "firstFrameSerial", m_ParameterFrames.front().m_Parameters->m_FrameSerial },
+				{ "lastFrameSerial", m_ParameterFrames.back().m_Parameters->m_FrameSerial } } },
+			{ "frames", std::move(frames) },
+			{ "watch", m_Status->m_WatchCoverage ?
+				Json::parse(SerializeNonFiniteWatchCoverage(*m_Status->m_WatchCoverage)) : Json(nullptr) } }.dump(2);
+	}
+
+	void FrameSequenceCoordinator::CollectArtifactPublication() noexcept
+	{
+		if (!m_ArtifactWrite || !m_Status || m_Status->IsTerminal())
 		{
 			return;
 		}
-		const auto receipt = m_Capture->GetSequenceTimingReceipt(*m_TimingWrite);
+		const auto receipt = m_Capture->GetSequenceArtifactReceipt(*m_ArtifactWrite);
 		if (!receipt)
 		{
 			return;
 		}
-		auto& publication = *m_Status->m_TimingPublication;
-		publication.m_Outcome = receipt->m_Publication;
-		publication.m_Pending = false;
-		publication.m_BundleId = receipt->m_BundleId;
-		publication.m_Manifest = receipt->m_ManifestPath;
-		publication.m_Failure = receipt->m_Failure;
-		for (const auto& product : receipt->m_BundleProducts)
-		{
-			publication.m_Files.insert(publication.m_Files.end(), product.m_Files.begin(), product.m_Files.end());
-		}
+		const auto collect = [&](std::optional<FrameSequenceArtifactPublication>& target, uint32_t index)
+			{
+				if (!target)
+				{
+					return;
+				}
+				auto& publication = *target;
+				publication.m_Outcome = receipt->m_Publication;
+				publication.m_Pending = false;
+				publication.m_BundleId = receipt->m_BundleId;
+				publication.m_Manifest = receipt->m_ManifestPath;
+				publication.m_Failure = receipt->m_Failure;
+				publication.m_Files.clear();
+				for (const auto& product : receipt->m_BundleProducts)
+				{
+					if (product.m_ProductIndex == index)
+					{
+						publication.m_Files = product.m_Files;
+					}
+				}
+			};
+		collect(m_Status->m_TimingPublication, 0);
+		collect(m_Status->m_ParameterPublication, m_Request.m_GpuTiming ? 1 : 0);
 		if (receipt->m_Publication == CapturePublicationOutcome::Published)
 		{
 			m_Status->m_State = FrameSequenceState::Completed;
@@ -154,81 +200,24 @@ namespace gglab
 		}
 		else
 		{
-			Fail(receipt->m_Failure.empty() ? "Required sequence timing was not published." : receipt->m_Failure);
+			Fail(receipt->m_Failure.empty() ? "Required sequence artifacts were not published." : receipt->m_Failure);
 		}
-	}
-
-	bool FrameSequenceTemporalAAOverrides::IsEmpty() const noexcept
-	{
-		return !m_Enabled && !m_MaxHistoryFeedback && !m_DepthAbsoluteThreshold &&
-			!m_DepthRelativeThreshold && !m_VelocityWeightScale && !m_LuminanceWeightScale &&
-			!m_NeighborhoodClampExpansion && !m_HistoryRelaxation && !m_HistoryAccumulation &&
-			!m_HistoryRectification &&
-			!m_VarianceClipGamma && !m_HistoryFilter && !m_CurrentFilter &&
-			!m_MotionSelection && !m_PostTemporalView && !m_ResolutionPreset &&
-			!m_TextureLodBiasOffset;
 	}
 
 	GTAOSettings ApplyFrameSequenceGTAOOverrides(
 		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept
 	{
-		if (overrides.m_TemporalAccumulation)
-		{
-			settings.m_TemporalAccumulation = *overrides.m_TemporalAccumulation;
-		}
-		if (overrides.m_TemporalMaxSamples)
-		{
-			settings.m_TemporalMaxSamples =
-				std::clamp(*overrides.m_TemporalMaxSamples, 1u, GTAOMaxTemporalSamples);
-		}
-		if (overrides.m_DirectionCount)
-		{
-			settings.m_DirectionCount =
-				std::clamp(*overrides.m_DirectionCount, 1u, GTAOMaxDirectionCount);
-		}
-		if (overrides.m_StepCount)
-		{
-			settings.m_StepCount = std::clamp(*overrides.m_StepCount, 1u, GTAOMaxStepCount);
-		}
-		return settings;
+		return ApplyGTAOSettingsPatch({ .m_DirectionCount = overrides.m_DirectionCount,
+			.m_StepCount = overrides.m_StepCount,
+			.m_TemporalAccumulation = overrides.m_TemporalAccumulation,
+			.m_TemporalMaxSamples = overrides.m_TemporalMaxSamples }, settings);
 	}
 
 	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
 		const FrameSequenceTemporalAAOverrides& overrides,
 		TemporalAASettings settings) noexcept
 	{
-		settings.m_Enabled = overrides.m_Enabled.value_or(settings.m_Enabled);
-		settings.m_MaxHistoryFeedback =
-			overrides.m_MaxHistoryFeedback.value_or(settings.m_MaxHistoryFeedback);
-		settings.m_DepthAbsoluteThreshold =
-			overrides.m_DepthAbsoluteThreshold.value_or(settings.m_DepthAbsoluteThreshold);
-		settings.m_DepthRelativeThreshold =
-			overrides.m_DepthRelativeThreshold.value_or(settings.m_DepthRelativeThreshold);
-		settings.m_VelocityWeightScale =
-			overrides.m_VelocityWeightScale.value_or(settings.m_VelocityWeightScale);
-		settings.m_LuminanceWeightScale =
-			overrides.m_LuminanceWeightScale.value_or(settings.m_LuminanceWeightScale);
-		settings.m_NeighborhoodClampExpansion = overrides.m_NeighborhoodClampExpansion.value_or(
-			settings.m_NeighborhoodClampExpansion);
-		settings.m_HistoryRelaxation =
-			overrides.m_HistoryRelaxation.value_or(settings.m_HistoryRelaxation);
-		settings.m_HistoryAccumulation =
-			overrides.m_HistoryAccumulation.value_or(settings.m_HistoryAccumulation);
-		settings.m_HistoryRectification =
-			overrides.m_HistoryRectification.value_or(settings.m_HistoryRectification);
-		settings.m_VarianceClipGamma =
-			overrides.m_VarianceClipGamma.value_or(settings.m_VarianceClipGamma);
-		settings.m_HistoryFilter = overrides.m_HistoryFilter.value_or(settings.m_HistoryFilter);
-		settings.m_CurrentFilter = overrides.m_CurrentFilter.value_or(settings.m_CurrentFilter);
-		settings.m_MotionSelection =
-			overrides.m_MotionSelection.value_or(settings.m_MotionSelection);
-		settings.m_PostTemporalView =
-			overrides.m_PostTemporalView.value_or(settings.m_PostTemporalView);
-		settings.m_ResolutionPreset =
-			overrides.m_ResolutionPreset.value_or(settings.m_ResolutionPreset);
-		settings.m_TextureLodBiasOffset =
-			overrides.m_TextureLodBiasOffset.value_or(settings.m_TextureLodBiasOffset);
-		return ResolveTemporalAASettings(settings);
+		return ApplyTemporalAASettingsPatch(overrides, settings);
 	}
 
 	FrameSequenceTimingSummary SummarizeFrameSequenceTiming(
@@ -318,7 +307,7 @@ namespace gglab
 				GetFrameSequenceStateName(m_Status->m_State));
 			return 0;
 		}
-		if (!m_CaptureJobs.empty() || (m_TimingWrite && !m_TimingWrite->GetReceipt()))
+		if (!m_CaptureJobs.empty() || (m_ArtifactWrite && !m_ArtifactWrite->GetReceipt()))
 		{
 			outError = "The previous sequence's capture jobs are still draining.";
 			return 0;
@@ -371,6 +360,47 @@ namespace gglab
 				"overrides.";
 			return 0;
 		}
+		if (request.m_Events.size() > FrameSequenceMaxParameterEvents ||
+			(!request.m_Events.empty() && request.m_ReferenceSamples != 0))
+		{
+			outError = "A sequence supports at most 128 events; reference events are not supported yet.";
+			return 0;
+		}
+		std::ranges::sort(request.m_Events, {}, &FrameSequenceParameterEvent::m_Frame);
+		ViewRenderSettingsPatch legacy;
+		legacy.m_TemporalAA = request.m_TemporalAAOverrides;
+		legacy.m_Lighting.m_GTAO = {
+			.m_DirectionCount = request.m_GTAOOverrides.m_DirectionCount,
+			.m_StepCount = request.m_GTAOOverrides.m_StepCount,
+			.m_TemporalAccumulation = request.m_GTAOOverrides.m_TemporalAccumulation,
+			.m_TemporalMaxSamples = request.m_GTAOOverrides.m_TemporalMaxSamples,
+		};
+		size_t eventItems = 0;
+		for (size_t i = 0; i < request.m_Events.size(); ++i)
+		{
+			const auto& event = request.m_Events[i];
+			eventItems += event.m_Values.size();
+			if (event.m_Values.empty() || event.m_Values.size() > 128 || eventItems > 1024 ||
+				(i != 0 && request.m_Events[i - 1].m_Frame == event.m_Frame))
+			{
+				outError = "Events require distinct frames and 1-128 items each (1024 total).";
+				return 0;
+			}
+			if (event.m_ExpectEffects && (event.m_ExpectEffects->size() > 1 ||
+				(!event.m_ExpectEffects->empty() && event.m_ExpectEffects->front() != "lighting")))
+			{
+				outError = "Event expectEffects supports only [] or [\"lighting\"].";
+				return 0;
+			}
+			for (const auto& value : event.m_Values)
+			{
+				if (HasHostViewParameterPatch(value.m_Id, legacy))
+				{
+					outError = "An event parameter overlaps a legacy sequence override.";
+					return 0;
+				}
+			}
+		}
 		std::ranges::sort(request.m_CaptureFrames);
 		const auto duplicates = std::ranges::unique(request.m_CaptureFrames);
 		request.m_CaptureFrames.erase(duplicates.begin(), duplicates.end());
@@ -399,13 +429,23 @@ namespace gglab
 				std::optional<FrameSequenceGpuTiming>(std::in_place) :
 				std::nullopt,
 		};
+		m_EventContentIdentity = 0;
+		for (const auto& event : m_Request.m_Events)
+		{
+			m_Status->m_Events.push_back({ .m_Frame = event.m_Frame });
+		}
 		if (m_Request.m_GpuTiming)
 		{
 			m_Status->m_TimingPublication.emplace();
 		}
+		if (m_Request.m_ParameterProvenance)
+		{
+			m_Status->m_ParameterPublication.emplace();
+		}
+		m_ParameterFrames.clear();
 		m_TimingContext.clear();
-		m_TimingProduct.reset();
-		m_TimingWrite.reset();
+		m_ArtifactProduct.reset();
+		m_ArtifactWrite.reset();
 
 		m_Frame = 0;
 		m_Sample = 0;
@@ -425,19 +465,23 @@ namespace gglab
 
 	FrameSequenceCancelVerdict FrameSequenceCoordinator::Cancel() noexcept
 	{
-		CollectTimingPublication();
+		CollectArtifactPublication();
 		if (!IsActive())
 		{
 			return m_Status ? FrameSequenceCancelVerdict::Finished : FrameSequenceCancelVerdict::NotFound;
 		}
-		if (m_TimingWrite && !m_TimingWrite->TryCancel())
+		if (m_ArtifactWrite && !m_ArtifactWrite->TryCancel())
 		{
-			CollectTimingPublication();
+			CollectArtifactPublication();
 			return FrameSequenceCancelVerdict::TooLate;
 		}
 		if (m_Status->m_TimingPublication)
 		{
 			m_Status->m_TimingPublication->m_Pending = false;
+		}
+		if (m_Status->m_ParameterPublication)
+		{
+			m_Status->m_ParameterPublication->m_Pending = false;
 		}
 
 		m_Status->m_State = FrameSequenceState::Cancelled;
@@ -571,7 +615,8 @@ namespace gglab
 
 	std::optional<FrameSequencePoseRequest> FrameSequenceCoordinator::PrepareFrame(
 		const FrameCaptureFrameState* previousFrame,
-		std::span<const CameraPath> cameraPaths) noexcept
+		std::span<const CameraPath> cameraPaths, uint64_t contentIdentity,
+		const std::function<bool(std::span<FrameSequenceParameterEvent>, std::string&)>& validateEvents) noexcept
 	{
 		m_AppliedPose.reset();
 		m_FrameBegun = false;
@@ -632,6 +677,17 @@ namespace gglab
 				Fail("A resource export frame is outside the selected camera path.");
 				return std::nullopt;
 			}
+			if (!m_Request.m_Events.empty())
+			{
+				std::string error;
+				if (m_Request.m_Events.back().m_Frame >= frameCount || !validateEvents ||
+					contentIdentity == 0 || !validateEvents(m_Request.m_Events, error))
+				{
+					Fail(error.empty() ? "Invalid sequence event plan or frame outside camera path." : std::move(error));
+					return std::nullopt;
+				}
+				m_EventContentIdentity = contentIdentity;
+			}
 			m_Status->m_CameraPathVersion = path->m_Version;
 			m_Status->m_FrameCount = frameCount;
 			m_Status->m_State = FrameSequenceState::Running;
@@ -639,6 +695,11 @@ namespace gglab
 
 		if (m_Status->m_State != FrameSequenceState::Running)
 		{
+			return std::nullopt;
+		}
+		if (!m_Request.m_Events.empty() && contentIdentity != m_EventContentIdentity)
+		{
+			Fail("The content binding changed during a parameter event sequence.");
 			return std::nullopt;
 		}
 		return FrameSequencePoseRequest{
@@ -659,6 +720,76 @@ namespace gglab
 		};
 	}
 
+	const FrameSequenceParameterEvent* FrameSequenceCoordinator::GetDueParameterEvent() const noexcept
+	{
+		if (!m_Status || m_Status->m_State != FrameSequenceState::Running)
+		{
+			return nullptr;
+		}
+		for (size_t i = 0; i < m_Request.m_Events.size(); ++i)
+		{
+			if (m_Request.m_Events[i].m_Frame == m_Frame && !m_Status->m_Events[i].m_Batch)
+			{
+				return &m_Request.m_Events[i];
+			}
+		}
+		return nullptr;
+	}
+
+	void FrameSequenceCoordinator::OnParameterEventBatch(const ParameterBatchStatus& batch) noexcept
+	{
+		if (!m_Status)
+		{
+			return;
+		}
+		for (auto& event : m_Status->m_Events)
+		{
+			if ((event.m_Batch && event.m_Batch->m_BatchId == batch.m_BatchId) ||
+				(!event.m_Batch && event.m_Frame == m_Frame))
+			{
+				event.m_Batch = batch;
+				const auto index = static_cast<size_t>(&event - m_Status->m_Events.data());
+				const auto& expected = m_Request.m_Events[index].m_ExpectEffects;
+				if (expected && std::ranges::any_of(batch.m_Items, [&](const auto& item)
+					{
+						return item.m_Applied && !item.m_Identity.m_Domain.empty() &&
+							std::ranges::find(*expected, item.m_Identity.m_Domain) == expected->end();
+					}))
+				{
+					event.m_Failure = "EffectMismatch: the actual receipt domain differs from expectEffects.";
+					Fail(event.m_Failure);
+					return;
+				}
+				if (batch.m_State == ParameterBatchState::Failed ||
+					std::ranges::any_of(batch.m_Items, [](const auto& item)
+					{
+						return item.IsTerminal() && item.m_State != ParameterEffectState::Consumed &&
+							item.m_State != ParameterEffectState::NoChange;
+					}))
+				{
+					event.m_Failure = batch.m_Failure.empty() ? "An event effect did not reach consumption." : batch.m_Failure;
+					Fail(event.m_Failure);
+				}
+				CompleteIfFinished();
+				return;
+			}
+		}
+	}
+
+	void FrameSequenceCoordinator::OnContentBindingChanged(uint64_t contentIdentity) noexcept
+	{
+		if (m_Status && m_Status->m_State == FrameSequenceState::Running &&
+			m_EventContentIdentity && contentIdentity != m_EventContentIdentity)
+		{
+			Fail("The content binding changed during a parameter event sequence.");
+		}
+	}
+
+	void FrameSequenceCoordinator::OnParameterEventFailed(std::string failure) noexcept
+	{
+		Fail(std::move(failure));
+	}
+
 	void FrameSequenceCoordinator::OnPoseApplied(
 		const std::optional<CameraPathPose>& pose) noexcept
 	{
@@ -675,13 +806,19 @@ namespace gglab
 		m_AppliedPose = pose;
 	}
 
-	bool FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state) noexcept
+	bool FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state,
+		const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate) noexcept
 	{
 		if (!m_Status || m_Status->m_State != FrameSequenceState::Running || !m_AppliedPose)
 		{
 			return true;
 		}
-		if (!state.m_Readiness.IsReady())
+		if (!std::ranges::all_of(state.m_Readiness.m_Gates, [&](const auto& gate)
+			{
+				return gate.m_State == FrameCaptureGateState::Ready ||
+					(gate.m_State == FrameCaptureGateState::Pending && coversReadinessGate &&
+						coversReadinessGate(gate));
+			}))
 		{
 			Fail(std::format("A readiness gate left Ready at sequence frame {}: {}", m_Frame,
 				DescribePendingGates(state.m_Readiness)));
@@ -690,8 +827,14 @@ namespace gglab
 		if (m_LastSettleKey &&
 			!state.m_SettleKey.Continues(*m_LastSettleKey, m_AppliedPose->m_Cut))
 		{
-			Fail(std::format("Temporal continuity changed at sequence frame {} outside a camera "
-				"path cut (effective temporal identity, history availability or content).", m_Frame));
+			const auto& before = m_LastSettleKey->m_Temporal;
+			const auto& after = state.m_SettleKey.m_Temporal;
+			Fail(std::format("Temporal continuity changed at sequence frame {} outside a camera path cut "
+				"(reset {}->{}, session {}->{}, services {}->{}, history={}, identityEqual={}).", m_Frame,
+				before.m_Identity.m_ResetIdentity, after.m_Identity.m_ResetIdentity,
+				before.m_Identity.m_SessionIdentity, after.m_Identity.m_SessionIdentity,
+				static_cast<uint32_t>(before.m_Services), static_cast<uint32_t>(after.m_Services),
+				after.m_HasCompatiblePreviousHistory, before.m_Identity == after.m_Identity));
 			return false;
 		}
 		m_LastSettleKey = state.m_SettleKey;
@@ -762,7 +905,7 @@ namespace gglab
 	}
 
 	void FrameSequenceCoordinator::OnFrameSubmitted(uint64_t renderFrameSerial,
-		FrameSequenceObservation observation) noexcept
+		FrameSequenceObservation observation, std::shared_ptr<const ParameterFrameState> parameters) noexcept
 	{
 		if (WantsGpuTiming())
 		{
@@ -783,6 +926,29 @@ namespace gglab
 		{
 			Fail("Sequence submission did not match its begun RenderFrame serial.");
 			return;
+		}
+		if (m_Request.m_ParameterProvenance)
+		{
+			if (!parameters || parameters->m_FrameSerial != renderFrameSerial ||
+				(!m_ParameterFrames.empty() && renderFrameSerial <= m_ParameterFrames.back().m_Parameters->m_FrameSerial))
+			{
+				Fail("Sequence submission requires its matching frozen parameter frame.");
+				return;
+			}
+			m_ParameterFrames.push_back({ m_Frame, m_Sample, std::move(parameters) });
+			m_Status->m_ParameterFrameCount = static_cast<uint32_t>(m_ParameterFrames.size());
+		}
+		for (const auto& event : m_Status->m_Events)
+		{
+			if (event.m_Frame == m_Frame && (!event.m_Batch ||
+				std::ranges::any_of(event.m_Batch->m_Items, [](const auto& item)
+				{
+					return item.m_DeclaredClass == ParameterEffectClass::Immediate && !item.IsTerminal();
+				})))
+			{
+				Fail("An Immediate event did not reach its terminal receipt in the submitted sequence frame.");
+				return;
+			}
 		}
 		if (auto* watch = m_Capture->GetNonFiniteWatch())
 		{
@@ -988,43 +1154,56 @@ namespace gglab
 
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
-		CollectTimingPublication();
+		CollectArtifactPublication();
 		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
+			std::ranges::all_of(m_Status->m_Events, [](const auto& event)
+			{
+				return event.m_Batch && event.m_Batch->IsTerminal();
+			}) &&
 			m_CaptureJobs.empty() &&
 			m_PendingGpuTimingFrames.empty() &&
 			(!m_WatchCoverageId || (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->m_Complete)))
 		{
-			if (m_Request.m_GpuTiming)
+			if (m_Request.m_GpuTiming || m_Request.m_ParameterProvenance)
 			{
-				if (m_TimingWrite)
+				if (m_ArtifactWrite)
 				{
 					return;
 				}
 				try
 				{
-					if (!m_TimingProduct)
+					if (!m_ArtifactProduct)
 					{
-						m_TimingProduct = SequenceTimingBundleInput{
-							.m_SequenceId = m_Status->m_SequenceId, .m_ProductJson = SerializeTimingProduct() };
+						m_ArtifactProduct = SequenceArtifactBundleInput{
+							.m_SequenceId = m_Status->m_SequenceId,
+							.m_TimingJson = m_Request.m_GpuTiming ? SerializeTimingProduct() : "",
+							.m_ParameterFramesJson = m_Request.m_ParameterProvenance ? SerializeParameterFramesProduct() : "" };
 					}
 					std::string error;
-					m_TimingWrite = m_Capture->TryPublishSequenceTiming(*m_TimingProduct,
+					m_ArtifactWrite = m_Capture->TryPublishSequenceArtifacts(*m_ArtifactProduct,
 						m_Request.m_OutputDirectory, m_Request.m_Label, error);
 					if (!error.empty())
 					{
 						Fail(std::move(error));
 						return;
 					}
-					if (m_TimingWrite)
+					if (m_ArtifactWrite)
 					{
-						m_Status->m_TimingPublication->m_Pending = true;
-						m_TimingProduct.reset();
-						CollectTimingPublication();
+						if (m_Status->m_TimingPublication)
+						{
+							m_Status->m_TimingPublication->m_Pending = true;
+						}
+						if (m_Status->m_ParameterPublication)
+						{
+							m_Status->m_ParameterPublication->m_Pending = true;
+						}
+						m_ArtifactProduct.reset();
+						CollectArtifactPublication();
 					}
 				}
 				catch (const std::exception& error)
 				{
-					Fail(std::format("Serializing sequence GPU timing failed: {}", error.what()));
+					Fail(std::format("Serializing sequence artifacts failed: {}", error.what()));
 				}
 				return;
 			}

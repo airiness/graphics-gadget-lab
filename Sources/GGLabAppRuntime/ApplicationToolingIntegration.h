@@ -1,5 +1,9 @@
 #pragma once
 
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
+
+#include <optional>
 #include <cstdint>
 #include <span>
 
@@ -42,10 +46,28 @@ namespace gglab
 		bool m_Pointer = false;
 	};
 
-	struct ApplicationToolingFrameSettingsResolution
+	// Owned CPU snapshot captured before content/control callbacks. It can be
+	// reused after Lab effects without borrowing the tooling integration.
+	struct ApplicationToolingFrameSettings
 	{
-		bool m_GTAOOverrideActive = false;
+		std::optional<TemporalAASettings> m_TemporalAA;
+		std::optional<GTAOSettings> m_GTAO;
+		std::optional<BloomSettings> m_Bloom;
+		std::optional<bool> m_ScenePreExposure;
+		ShadowVisualizationSettings m_Shadow = DefaultShadowVisualizationSettings();
+
+		[[nodiscard]] ViewRenderProfile ResolveProfile(const ViewRenderProfile& authored) const noexcept;
 	};
+
+	struct ApplicationViewSettingsResolution
+	{
+		ViewRenderProfile m_Profile;
+		ResolvedViewRenderSettings m_View;
+	};
+
+	[[nodiscard]] ApplicationViewSettingsResolution ResolveApplicationViewSettings(
+		const ViewRenderProfile& authored, const Camera& camera,
+		const ApplicationToolingFrameSettings& tooling) noexcept;
 
 	struct ApplicationToolingFrameContext
 	{
@@ -96,10 +118,7 @@ namespace gglab
 		virtual void PrepareForShutdown() noexcept = 0;
 		[[nodiscard]] virtual ApplicationToolingInputCapture GetPreviousFrameInputCapture()
 			const noexcept = 0;
-		[[nodiscard]] virtual ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
-			const ViewRenderProfile& authoringProfile,
-			ShadowVisualizationSettings& outShadowVisualizationSettings,
-			ViewRenderProfile& outEffectiveProfile) const noexcept = 0;
+		[[nodiscard]] virtual ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept = 0;
 		[[nodiscard]] virtual bool BeginFrame() noexcept = 0;
 		virtual void Draw(const ApplicationToolingFrameContext& context) noexcept = 0;
 		virtual void EndFrame(ApplicationToolingFrameEndReason reason) noexcept = 0;

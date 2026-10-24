@@ -4,8 +4,12 @@
 #include "GGLabRuntime/Graphics/EnvironmentSourceControl.h"
 #include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
+#include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 namespace gglab
@@ -21,11 +25,13 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		Vector3 m_ReferenceObserverWorld{};
 		AtmosphereGPU m_Parameters{};
+		std::optional<WorldLightingState> m_Provenance;
 	};
 
 	class EnvironmentLightingSystem : public EnvironmentLightingViewBase,
 		public EnvironmentLightingControlBase,
-		public EnvironmentSourceControl
+		public EnvironmentSourceControl,
+		public WorldLightingControlBase
 	{
 	public:
 		struct CreateInfo
@@ -64,17 +70,28 @@ namespace gglab
 		{
 			return generation == m_IgnoreCacheGeneration;
 		}
+		[[nodiscard]] std::unique_ptr<EnvironmentLightingOverrideBase> AcquireOverride() noexcept override;
 		void SetIntensity(float intensity) noexcept override;
 		void SetRotationRadians(float rotationRadians) noexcept override;
 		void SetQualityPreset(IBLQualityPreset preset) noexcept override;
 		void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept override;
 		void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept override;
 		void RequestRebake(bool ignoreCache = false) noexcept override;
-		void SetSkyboxEnabled(bool enabled) noexcept override { m_Settings.m_EnableSkybox = enabled; }
+		void SetSkyboxEnabled(bool enabled) noexcept override;
 		void SetBackgroundMode(EnvironmentBackgroundMode mode) noexcept override;
 		void ResolveWorldLighting(const std::optional<AtmosphereSettings>& atmosphere,
 			const std::optional<ResolvedWorldSun>& sun, uint64_t sunEntityKey,
-			uint64_t sessionIdentity = 0) noexcept;
+			uint64_t sessionIdentity = 0, const WorldSunSettings* authoredSun = nullptr) noexcept;
+		void SynchronizeWorldLighting(World& world, uint64_t sessionIdentity) noexcept override;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingInputs(
+			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
+			std::string& error) noexcept override;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldSunDirection(
+			World& world, uint64_t sessionIdentity, const Vector3& direction,
+			std::string& error) noexcept override;
+		[[nodiscard]] LightingMutationResult ApplyWorldLightingInputs(
+			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs) noexcept override;
+		[[nodiscard]] WorldLightingPublication GetWorldLightingPublication() const noexcept override;
 		[[nodiscard]] const std::optional<PhysicalSkySource>& GetRequestedPhysicalSky() const noexcept { return m_RequestedPhysicalSky; }
 		[[nodiscard]] const std::optional<PhysicalSkySource>& GetActivePhysicalSky() const noexcept { return m_ActivePhysicalSky; }
 		[[nodiscard]] const EnvironmentLightingSettings& GetRenderSettings() const noexcept { return m_RenderSettings; }
@@ -82,6 +99,35 @@ namespace gglab
 		[[nodiscard]] double GetPublicationMilliseconds() const noexcept { return m_PublicationMilliseconds; }
 
 	private:
+		class PreparedWorldLightingMutation;
+		class OverrideLease;
+		enum class WorldLightingMutationKind : uint8_t
+		{
+			Inputs,
+			SunDirection,
+		};
+		enum class OverrideField : uint8_t
+		{
+			Intensity,
+			Rotation,
+			Skybox,
+			Background,
+			BakeConfiguration,
+			Count,
+		};
+		struct OverrideLifetime
+		{
+			EnvironmentLightingSystem* m_Owner = nullptr;
+		};
+		void RecordSettingsWrite(OverrideField field) noexcept;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingMutation(
+			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
+			WorldLightingMutationKind kind, std::string& error) noexcept;
+		void RefreshRenderSettings() noexcept;
+		std::shared_ptr<OverrideLifetime> m_OverrideLifetime;
+		std::array<uint64_t, static_cast<size_t>(OverrideField::Count)> m_OverrideOwners{};
+		uint64_t m_NextOverrideOwner = 1;
+		uint64_t m_ActiveOverrideOwner = 0;
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		EnvironmentTextureSource m_Source{};
 		EnvironmentLightingSettings m_Settings{};
@@ -89,6 +135,7 @@ namespace gglab
 		uint64_t m_IgnoreCacheGeneration = 0;
 		std::optional<PhysicalSkySource> m_RequestedPhysicalSky;
 		std::optional<PhysicalSkySource> m_ActivePhysicalSky;
+		uint64_t m_ActiveWorldLightingGeneration = 0;
 		EnvironmentLightingSettings m_RenderSettings{};
 		std::chrono::steady_clock::time_point m_RequestTime{};
 		double m_PublicationMilliseconds = 0.0;

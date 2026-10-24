@@ -1,9 +1,13 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
+#include "Capture/FrameSequenceCoordinator.h"
 
 #include "Demo/DemoManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 
+#include <algorithm>
 #include <chrono>
+#include <utility>
 
 namespace gglab
 {
@@ -42,6 +46,180 @@ namespace gglab
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
 		return AppRuntimeInitializeResult::Succeeded;
+	}
+
+	bool GGLabAppRuntime::CanAcceptSessionCommands() const noexcept
+	{
+		return m_ServicesInitialized &&
+			(m_LifecycleState == AppRuntimeLifecycleState::Running ||
+				m_LifecycleState == AppRuntimeLifecycleState::Suspended);
+	}
+
+	uint64_t GGLabAppRuntime::StartFrameSequence(
+		FrameSequenceRequest request, std::string& error) noexcept
+	{
+		error.clear();
+		if (!CanAcceptSessionCommands() || !m_FrameSequence)
+		{
+			error = "Frame sequences are unavailable in this session.";
+			return 0;
+		}
+		UpdateSequenceParameterEvents();
+		if (m_ParameterControl && m_ParameterControl->HasPendingParameterBatches())
+		{
+			error = "Busy: finish the pending parameter batch before starting a sequence.";
+			return 0;
+		}
+		// Sequence-owned event batches cannot be admitted beside another owner's retained record.
+		if (m_ParameterControl && !request.m_Events.empty() &&
+			m_ParameterControl->GetParameterBatchCount() != 0)
+		{
+			error = "Busy: consume the retained parameter batch result before starting a sequence with events.";
+			return 0;
+		}
+		request.m_ParameterProvenance = true;
+		const auto id = m_FrameSequence->Start(std::move(request), error);
+		if (id)
+		{
+			m_ParameterControl->Enable();
+		}
+		return id;
+	}
+
+	FrameSequenceCancelVerdict GGLabAppRuntime::CancelFrameSequence() noexcept
+	{
+		const auto verdict = m_FrameSequence ? m_FrameSequence->Cancel() : FrameSequenceCancelVerdict::NotFound;
+		UpdateSequenceParameterEvents();
+		return verdict;
+	}
+
+	void GGLabAppRuntime::EnableParameterControl() noexcept
+	{
+		if (CanAcceptSessionCommands() && m_ParameterControl)
+		{
+			m_ParameterControl->Enable();
+		}
+	}
+
+	bool GGLabAppRuntime::CanRequestParameterBatch(std::string& error) const noexcept
+	{
+		error.clear();
+		if (!CanAcceptSessionCommands() || !m_ParameterControl)
+		{
+			error = "NoParameterSource: ready active content in a live runtime is required.";
+			return false;
+		}
+		if (m_FrameSequence && m_FrameSequence->IsActive())
+		{
+			error = "Busy: session parameter changes are unavailable during a sequence.";
+			return false;
+		}
+		if (m_ParameterControl->GetParameterBatchCount() != 0)
+		{
+			error = "Busy: consume the previous parameter batch result first.";
+			return false;
+		}
+		if (!m_ParameterControl->IsAvailable())
+		{
+			error = "NoParameterSource: ready active content is required.";
+			return false;
+		}
+		return true;
+	}
+
+	uint64_t GGLabAppRuntime::RequestParameterBatch(
+		std::span<const LabParameterValue> values, std::string& error) noexcept
+	{
+		if (!CanRequestParameterBatch(error))
+		{
+			return 0;
+		}
+		return m_ParameterControl->RequestParameterBatch(values, error);
+	}
+
+	const ParameterBatchStatus* GGLabAppRuntime::GetExternalParameterBatchStatus() const noexcept
+	{
+		return m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
+	}
+
+	void GGLabAppRuntime::UpdateSequenceParameterEvents() noexcept
+	{
+		const auto* sequence = m_FrameSequence ? m_FrameSequence->GetStatus() : nullptr;
+		if (!sequence || !m_ParameterControl)
+		{
+			return;
+		}
+		const ParameterBatchOwner owner{ sequence->m_SequenceId };
+		const auto publish = [&]()
+			{
+				const auto batches = m_ParameterControl->GetParameterBatchStatuses(owner);
+				for (const auto& event : m_FrameSequence->GetStatus()->m_Events)
+				{
+					if (event.m_Batch && !event.m_Batch->IsTerminal() &&
+						std::ranges::none_of(batches, [&](const auto& batch)
+						{
+							return batch.m_BatchId == event.m_Batch->m_BatchId;
+						}))
+					{
+						m_FrameSequence->OnParameterEventFailed("The sequence parameter receipt was lost.");
+					}
+				}
+				for (const auto& batch : batches)
+				{
+					m_FrameSequence->OnParameterEventBatch(batch);
+					if (batch.IsTerminal())
+					{
+						GGLAB_UNUSED(m_ParameterControl->TakeParameterBatchResult(batch.m_BatchId, owner));
+					}
+				}
+			};
+		publish();
+		if (!m_FrameSequence->IsActive() ||
+			m_FrameSequence->GetStatus()->m_State == FrameSequenceState::Finishing)
+		{
+			// Consumption must occur within the submitted sequence range, even while
+			// captures/timing drain. Preserve reached stamps when closing the owner.
+			m_ParameterControl->FinishParameterBatches(owner);
+			publish();
+		}
+	}
+
+	std::optional<ParameterBatchStatus> GGLabAppRuntime::TakeParameterBatchResult(uint64_t id) noexcept
+	{
+		return m_ParameterControl ? m_ParameterControl->TakeParameterBatchResult(id) : std::nullopt;
+	}
+
+	void GGLabAppRuntime::SynchronizeContentBinding() noexcept
+	{
+		if (m_ParameterControl && m_DemoManager)
+		{
+			m_ActiveContentIdentity = m_DemoManager->GetActiveContentIdentity();
+			const uint32_t index = m_DemoManager->GetActiveIndex();
+			const std::string_view demoId = index < m_DemoManager->GetDemoCount() ?
+				m_DemoManager->GetDemoName(index) :
+				std::string_view{};
+			m_ParameterControl->SynchronizeContent(m_DemoManager->GetActiveDemo(),
+				m_ActiveContentIdentity, demoId, m_DemoManager->HasPendingActiveDemo());
+			if (m_FrameSequence)
+			{
+				m_FrameSequence->OnContentBindingChanged(m_ActiveContentIdentity);
+				UpdateSequenceParameterEvents();
+			}
+		}
+	}
+
+	void GGLabAppRuntime::ReleaseContentBinding() noexcept
+	{
+		if (m_ParameterControl)
+		{
+			m_ParameterControl->SynchronizeContent(nullptr, 0, {}, true);
+		}
+		m_ActiveContentIdentity = 0;
+		if (m_FrameSequence)
+		{
+			m_FrameSequence->OnContentBindingChanged(0);
+			UpdateSequenceParameterEvents();
+		}
 	}
 
 	void GGLabAppRuntime::HandleHostEvent(const AppHostEvent& event) noexcept

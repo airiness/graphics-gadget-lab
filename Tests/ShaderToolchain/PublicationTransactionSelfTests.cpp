@@ -1,6 +1,7 @@
 #include "PublicationTransactionSelfTests.h"
 
 #include "Artifact/PublicationTransaction.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 
 #include <process.h>
@@ -26,7 +27,7 @@ namespace gglab
 
 		[[nodiscard]] bool InjectRenameFailure(const std::filesystem::path& destination) noexcept
 		{
-			(void)destination;
+			GGLAB_UNUSED(destination);
 			if (g_RemainingRenameFailures > 0)
 			{
 				--g_RemainingRenameFailures;

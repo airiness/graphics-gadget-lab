@@ -1,11 +1,13 @@
 #pragma once
 
 #include "ApplicationContentRegistration.h"
+#include "ApplicationToolingIntegration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
+#include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "RuntimePaths.h"
@@ -15,6 +17,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -104,6 +108,8 @@ namespace gglab
 	class EnvironmentAssetController;
 	class FrameCaptureCoordinator;
 	class FrameSequenceCoordinator;
+	struct FrameSequenceRequest;
+	enum class FrameSequenceCancelVerdict : uint8_t;
 	class LabRuntimeLocatorBase;
 	class RenderCompositionAccess;
 	class RenderHost;
@@ -111,6 +117,7 @@ namespace gglab
 	class ShaderManager;
 	class TaskSystem;
 	class Time;
+	class SessionParameterControl;
 	struct LoadingProgress;
 
 	struct AppRuntimeServiceCreateInfo
@@ -238,8 +245,26 @@ namespace gglab
 		// The host's sole consuming operation. Unknown, active or not-yet-published
 		// jobs return no result and release no capacity. Receipts survive Shutdown.
 		[[nodiscard]] std::optional<CaptureJobResult> TakeCaptureJobResult(uint64_t jobId) noexcept;
-		// Non-owning; null before runtime services are composed.
-		[[nodiscard]] FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
+		// Owner-thread session admission. Active sequences and unfinished parameter
+		// batches exclude one another. Retained terminal results remain queryable and
+		// do not reserve execution. Cancellation and result consumption survive Shutdown.
+		[[nodiscard]] uint64_t StartFrameSequence(FrameSequenceRequest request, std::string& error) noexcept;
+		[[nodiscard]] FrameSequenceCancelVerdict CancelFrameSequence() noexcept;
+		void EnableParameterControl() noexcept;
+		// Read-only preflight before a transport enables descriptors for type checks.
+		// Submission repeats admission and then validates the complete typed batch.
+		[[nodiscard]] bool CanRequestParameterBatch(std::string& error) const noexcept;
+		[[nodiscard]] uint64_t RequestParameterBatch(
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
+		[[nodiscard]] const ParameterBatchStatus* GetExternalParameterBatchStatus() const noexcept;
+		// Borrowed read-only views; null before composition. Commands enter through
+		// AppRuntime so a C++ host cannot bypass admission or forge owner callbacks.
+		[[nodiscard]] const SessionParameterControl* GetParameterControl() const noexcept
+		{
+			return m_ParameterControl.get();
+		}
+		[[nodiscard]] const FrameSequenceCoordinator* GetFrameSequenceCoordinator() const noexcept
 		{
 			return m_FrameSequence.get();
 		}
@@ -256,6 +281,9 @@ namespace gglab
 	private:
 		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
 		void CollectFrameCaptureResults() noexcept;
+		[[nodiscard]] bool CanAcceptSessionCommands() const noexcept;
+		void SynchronizeContentBinding() noexcept;
+		void ReleaseContentBinding() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult BeginInitialShaderPreload(
@@ -267,7 +295,9 @@ namespace gglab
 		// the previous request afterwards.
 		void SyncSequenceGpuProfiling() noexcept;
 		void CollectSequenceGpuTiming() noexcept;
+		void UpdateSequenceParameterEvents() noexcept;
 
+		ApplicationToolingFrameSettings m_ToolingFrameSettings;
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
@@ -290,6 +320,9 @@ namespace gglab
 		std::unique_ptr<FrameCaptureCoordinator> m_FrameCapture;
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
+		std::unique_ptr<SessionParameterControl> m_ParameterControl;
+		// Frozen after content update; shared by parameters and this frame's planning.
+		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;

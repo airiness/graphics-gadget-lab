@@ -32,6 +32,7 @@ namespace gglab
 		~DemoPlayground() override = default;
 
 		std::string_view GetName() const noexcept override;
+		std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept override;
 		std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept override
 		{
 			return m_CaptureAssetBundle;

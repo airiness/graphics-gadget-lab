@@ -16,6 +16,13 @@ Commands:
            -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
   status   Report readiness gates, settled frames, camera and pending captures.
+  parameters
+           List Host and active Lab descriptors, current/default values and revision.
+  set      Submit -Changes/-ChangesFile as [{"id":"gtao.radius","type":"float","value":2.0}].
+           Waits for application; -WaitConsumed waits for all terminal effects.
+           -NoWait returns admission. Terminal results are consumed unless -KeepResult.
+  parameter-result
+           Query -BatchId; -Consume releases its terminal receipt. Status also reports it.
   capture  Submit required SameFrame products; waits and explicitly consumes the
            terminal receipt unless -NoWait or -KeepResult. -Products/-ProductsFile
            accepts typed products instead of the default single image.
@@ -63,7 +70,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'parameters', 'set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -125,6 +132,13 @@ param(
     # watch (Debug and Develop builds): one non-finite injection request as a JSON object.
     [string]$Inject,
 
+    # set: typed changes [{id, type, value}], directly or from a UTF-8 file.
+    [string]$Changes,
+    [string]$ChangesFile,
+    [switch]$WaitConsumed,
+    # parameter-result: separate from capture JobId.
+    [uint64]$BatchId,
+
     # result / capture-cancel
     [uint64]$JobId,
     [switch]$Consume,
@@ -135,6 +149,9 @@ param(
     # sequence: [{frame: n, targets: [...], graph: true}], directly or from a file.
     [string]$Exports,
     [string]$ExportsFile,
+    # sequence: [{frame: n, set: {parameterId: value}, expectEffects: []}].
+    [string]$Events,
+    [string]$EventsFile,
     [ValidateRange(0, 4096)]
     [int]$ReferenceSamples = 0,
     [double]$ReferenceTextureLodBias = 0,
@@ -317,6 +334,38 @@ function Wait-CaptureJob($Admission, [DateTime]$Deadline) {
     } while ($true)
 }
 
+# Polls the Lab owner; a timeout/transport failure never submits a second batch.
+function Wait-ParameterBatch($Admission, [DateTime]$Deadline) {
+    do {
+        $remaining = [Math]::Max(1, [int][Math]::Ceiling(($Deadline - [DateTime]::UtcNow).TotalSeconds))
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'parameter-result'; batchId = $Admission.batchId; consume = (-not $KeepResult)
+            } $remaining
+        }
+        catch {
+            return [pscustomobject]@{
+                protocol = $ProtocolVersion; ok = $false; batchId = $Admission.batchId
+                error = "$($_.Exception.Message) Query batchId explicitly; a consuming response may have been lost."
+            }
+        }
+        if (-not $response.ok -or $response.batch.terminal) { return $response }
+        # Queued has no receipt items/revision. Applied/published stamps come from the built frame.
+        $applied = $null -ne $response.batch.revision -and $response.batch.items.Count -gt 0
+        foreach ($item in $response.batch.items) {
+            if ($null -eq $item.applied -and $item.state -ne 'NoChange') { $applied = $false }
+        }
+        if (-not $WaitConsumed -and $applied) { return $response }
+        if ([DateTime]::UtcNow -ge $Deadline) {
+            $result = ConvertTo-Hashtable $response
+            $result.ok = $false
+            $result.error = 'Parameter batch timed out; query batchId explicitly. The batch remains owned.'
+            return [pscustomobject]$result
+        }
+        Start-Sleep -Milliseconds 100
+    } while ($true)
+}
+
 # Expands "0,10,20-23" into frame numbers.
 function ConvertTo-FrameList([string]$Text) {
     $frames = @()
@@ -443,6 +492,42 @@ switch ($Command) {
         $response = Invoke-SessionCommand $Session @{ command = 'status' } 30
         Complete-SessionResponse $response $Session
     }
+    'parameters' {
+        Require-Session
+        $response = Invoke-SessionCommand $Session @{ command = 'parameters' } 30
+        Complete-SessionResponse $response $Session
+    }
+    'set' {
+        Require-Session
+        if ($NoWait -and $WaitConsumed) { Fail '-NoWait and -WaitConsumed cannot be combined.' }
+        try { $items = Read-JsonArray $Changes $ChangesFile 'Changes' }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        try {
+            $response = Invoke-SessionRequest $Session @{ command = 'set'; changes = $items } ([Math]::Max(30, $TimeoutSeconds))
+        }
+        catch {
+            Fail "$($_.Exception.Message) Admission is unknown; inspect status before submitting again." @{
+                session = $Session; admissionUnknown = $true
+            }
+        }
+        if ($response.ok -and -not $NoWait) {
+            $response = Wait-ParameterBatch $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
+        }
+        Complete-SessionResponse $response $Session
+    }
+    'parameter-result' {
+        Require-Session
+        if ($BatchId -eq 0) { Fail "Command 'parameter-result' requires a positive -BatchId." }
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'parameter-result'; batchId = $BatchId; consume = [bool]$Consume
+            } 30
+        }
+        catch {
+            Fail $_.Exception.Message @{ session = $Session; batchId = $BatchId; consumptionUnknown = [bool]$Consume }
+        }
+        Complete-SessionResponse $response $Session
+    }
     'capture' {
         Require-Session
         $request = New-CaptureRequest $View
@@ -545,6 +630,7 @@ switch ($Command) {
         if ($RequiredContentId) { $request['requiredContentId'] = $RequiredContentId }
         if ($DiagnosticTap) { $request['diagnosticTap'] = $DiagnosticTap }
         if ($ReferenceSamples -gt 0) { $request['referenceSamples'] = $ReferenceSamples }
+        if ($Events -or $EventsFile) { $request['events'] = (Read-JsonArray $Events $EventsFile 'Events') }
         if ($Exports -or $ExportsFile) { $request['exports'] = (Read-JsonArray $Exports $ExportsFile 'Exports') }
         if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
         if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-SettingOverrides $TemporalAA 'Temporal AA') }

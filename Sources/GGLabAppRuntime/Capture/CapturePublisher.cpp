@@ -1,5 +1,6 @@
 #include "Capture/CapturePublisher.h"
 #include "Capture/FrameCaptureMetadata.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <cstddef>
 #include <exception>
@@ -207,12 +208,12 @@ namespace gglab
 			{
 				if (file.m_MakeBytes)
 				{
-					(void)file.m_MakeBytes(paths);
+					GGLAB_UNUSED(file.m_MakeBytes(paths));
 				}
 			}
 			if (content.m_MakeMarker)
 			{
-				(void)content.m_MakeMarker(paths);
+				GGLAB_UNUSED(content.m_MakeMarker(paths));
 			}
 			for (size_t i = 0; i < content.m_Files.size(); ++i)
 			{

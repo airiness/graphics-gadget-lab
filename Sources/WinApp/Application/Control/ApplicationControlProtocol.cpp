@@ -2,6 +2,7 @@
 #include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
+#include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
@@ -59,6 +60,18 @@ namespace gglab
 			if (command == "status")
 			{
 				return ApplicationControlCommand::Status;
+			}
+			if (command == "parameters")
+			{
+				return ApplicationControlCommand::Parameters;
+			}
+			if (command == "set")
+			{
+				return ApplicationControlCommand::Set;
+			}
+			if (command == "parameter-result")
+			{
+				return ApplicationControlCommand::ParameterResult;
 			}
 			if (command == "capture")
 			{
@@ -687,6 +700,42 @@ namespace gglab
 								sequence.m_Label :
 								sequence.m_Note;
 					target = value.get<std::string>();
+				}
+				else if (key == "events")
+				{
+					if (!value.is_array() || value.size() > FrameSequenceMaxParameterEvents)
+					{
+						return "Sequence 'events' must be an array of at most 128 events.";
+					}
+					for (const auto& item : value)
+					{
+						if (!item.is_object() || !item.contains("frame") || !IsUint32(item["frame"]) ||
+							!item.contains("set") || item.size() != (item.contains("expectEffects") ? 3 : 2))
+						{
+							return "Each event takes 'frame', 'set' and optional 'expectEffects'.";
+						}
+						FrameSequenceParameterEvent event{ .m_Frame = item["frame"].get<uint32_t>() };
+						if (auto error = ParseApplicationControlParameterAssignments(item["set"], event.m_Values);
+							!error.empty())
+						{
+							return error;
+						}
+						if (item.contains("expectEffects"))
+						{
+							const auto& effects = item["expectEffects"];
+							if (!effects.is_array() || effects.size() > 1 ||
+								(!effects.empty() && (!effects[0].is_string() || effects[0] != "lighting")))
+							{
+								return "Event 'expectEffects' supports only [] or [\"lighting\"].";
+							}
+							event.m_ExpectEffects.emplace();
+							for (const auto& effect : effects)
+							{
+								event.m_ExpectEffects->push_back(effect.get<std::string>());
+							}
+						}
+						sequence.m_Events.push_back(std::move(event));
+					}
 				}
 				else if (key == "source")
 				{
@@ -1339,19 +1388,36 @@ namespace gglab
 				{ "pendingCaptureJobs", status.m_PendingCaptureJobs },
 				{ "completedCaptures", status.m_CompletedCaptures },
 			};
+			sequence["events"] = Json::array();
+			for (const auto& event : status.m_Events)
+			{
+				sequence["events"].push_back({
+					{ "frame", event.m_Frame },
+					{ "batch", event.m_Batch ? SerializeApplicationControlParameterBatch(*event.m_Batch) : Json() },
+					{ "state", !event.m_Failure.empty() ? "Failed" :
+						event.m_Batch ? (event.m_Batch->IsTerminal() ? "Finished" : "Running") :
+							status.IsTerminal() ? "EffectNotReached" : "Pending" },
+					{ "failure", event.m_Failure } });
+			}
 			if (status.m_GpuTiming)
 			{
 				sequence["gpuTiming"] = SerializeGpuTiming(*status.m_GpuTiming);
 			}
-			if (status.m_TimingPublication)
+			sequence["parameterFrameCount"] = status.m_ParameterFrameCount;
+			for (const auto& [name, target] : { std::pair{ "timingPublication", &status.m_TimingPublication },
+				std::pair{ "parameterPublication", &status.m_ParameterPublication } })
 			{
-				const auto& publication = *status.m_TimingPublication;
+				if (!*target)
+				{
+					continue;
+				}
+				const auto& publication = **target;
 				Json files = Json::array();
 				for (const auto& path : publication.m_Files)
 				{
 					files.push_back(GetFrameCapturePathText(path));
 				}
-				sequence["timingPublication"] = {
+				sequence[name] = {
 					{ "outcome", publication.m_Outcome == CapturePublicationOutcome::Published ?
 						"Published" :
 						publication.m_Outcome == CapturePublicationOutcome::Indeterminate ?
@@ -1410,7 +1476,7 @@ namespace gglab
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
-				"'capture-cancel', 'watch', 'sequence' or 'sequence-cancel'.";
+				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set' or 'parameter-result'.";
 			return result;
 		}
 
@@ -1442,9 +1508,34 @@ namespace gglab
 			request.m_Consume = document.value("consume", false);
 			break;
 		}
+		case ApplicationControlCommand::Set:
+			if (document.size() != 4 || !document.contains("changes"))
+			{
+				error = "Command 'set' takes only a 'changes' array.";
+			}
+			else
+			{
+				error = ParseApplicationControlParameterChanges(document["changes"], request.m_ParameterChanges);
+			}
+			break;
+		case ApplicationControlCommand::ParameterResult:
+		{
+			const auto batch = document.find("batchId");
+			const bool consume = document.contains("consume");
+			if (batch == document.end() || !batch->is_number_unsigned() || batch->get<uint64_t>() == 0 ||
+				document.size() != (consume ? 5u : 4u) || (consume && !document["consume"].is_boolean()))
+			{
+				error = "Command 'parameter-result' takes a non-zero unsigned 'batchId' and optional boolean 'consume'.";
+				break;
+			}
+			request.m_ParameterBatchId = batch->get<uint64_t>();
+			request.m_Consume = document.value("consume", false);
+			break;
+		}
 		case ApplicationControlCommand::Sequence:
 			error = ParseSequenceFields(document, request);
 			break;
+		case ApplicationControlCommand::Parameters:
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
 		case ApplicationControlCommand::SequenceCancel:
@@ -1487,6 +1578,14 @@ namespace gglab
 		response["environment"] = environment.is_object() ? environment : Json(nullptr);
 		const auto& intake = status.m_CaptureIntake;
 		response["capabilities"] = {
+			{ "labParameterControl", {
+				{ "sources", Json::array({ "lab" }) },
+				{ "effectClasses", Json::array({ "Immediate", "Deferred", "Rebuild" }) },
+				{ "deferredDomains", Json::array({ "lighting" }) },
+				{ "maxLightingItemsPerBatch", 1 },
+				{ "maxBatches", 1 },
+				{ "maxItems", ApplicationControlMaxParameterItems },
+				{ "resultConsumption", "explicit" } } },
 			{ "captureJobs", true },
 			{ "requiredProducts", Json::array({ "image", "diagnostic", "graph", "resource" }) },
 			{ "consistency", "SameFrame" },
@@ -1497,7 +1596,22 @@ namespace gglab
 			{ "bundleSchemaVersion", CaptureBundleSchemaVersion },
 			{ "resultConsumption", "explicit" },
 			{ "resultRetention", "until-consumed-or-session-end" },
+			{ "sessionParameterControl", {
+				{ "sources", { "host", "lab" } },
+				{ "hostGroups", { "view.taa", "view.gtao", "view.exposure", "environment.profile" } },
+				{ "lightingProfiles", true },
+				{ "lightingProfileHashVersion", LightingProfileHashVersion },
+				{ "effectClasses", { "Immediate", "Deferred", "Rebuild" } },
+				{ "rebuildWithDeferred", false },
+				{ "maxBatches", 1 },
+				{ "maxItems", ApplicationControlMaxParameterItems },
+				{ "mixedSources", true },
+				{ "explicitConsumption", true } } },
 			{ "sequenceCaptureJobs", true },
+			{ "sequenceImmediateEvents", true },
+			{ "sequenceDeferredEvents", true },
+			{ "parameterFrameProvenance", true },
+			{ "sequenceEventDomains", Json::array({ "lighting" }) },
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
 			{ "gpuTimingSchema", "gglab.gpu-timing" },
@@ -1516,6 +1630,7 @@ namespace gglab
 			{ "drainingRuntimeRequests", intake.m_DrainingRuntimeRequests },
 			{ "drainingWriterJobs", intake.m_DrainingWriterJobs },
 			{ "sequenceTimingWrites", intake.m_SequenceTimingWrites },
+			{ "sequenceArtifactWrites", intake.m_SequenceArtifactWrites },
 			{ "drainingWriteReservations", intake.m_DrainingWriteReservations } };
 		const auto claimName = [](NonFiniteClaimStatus value)
 			{
@@ -1575,6 +1690,12 @@ namespace gglab
 		{
 			response["watch"]["report"] = SerializeWatchReport(*status.m_Watch);
 		}
+		response["parameterControl"] = {
+			{ "available", status.m_ParametersAvailable },
+			{ "revision", status.m_ParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
+			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() },
+			{ "lighting", SerializeApplicationControlLightingProfiles(status.m_LightingProfiles) },
+			{ "lightingProfileError", status.m_LightingProfileError } };
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{
@@ -1589,6 +1710,7 @@ namespace gglab
 			{ "demoId", frame.m_DemoId },
 			{ "labId", frame.m_LabId },
 			{ "frameIndex", frame.m_FrameIndex },
+			{ "frameSerial", frame.m_FrameSerial },
 			{ "ready", frame.m_Readiness.IsReady() },
 			{ "settledFrames", status.m_SettledFrames },
 			{ "gates", SerializeGates(frame.m_Readiness) },

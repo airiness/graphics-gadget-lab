@@ -4,6 +4,10 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
+#include <algorithm>
+#include <format>
+#include <utility>
+
 namespace gglab
 {
 	DemoManager::DemoManager(RHIContext* rhiContext) noexcept : m_RHIContext(rhiContext)
@@ -14,7 +18,7 @@ namespace gglab
 	{
 		if (!m_IsPreparedForAssetShutdown && m_ActiveDemo)
 		{
-			m_ActiveDemo->OnExit();
+			ExitActiveDemo();
 		}
 		if (!m_IsPreparedForAssetShutdown && m_PendingDemo)
 		{
@@ -30,13 +34,38 @@ namespace gglab
 		}
 		if (m_ActiveDemo)
 		{
-			m_ActiveDemo->OnExit();
+			ExitActiveDemo();
 		}
 		if (m_PendingDemo)
 		{
 			m_PendingDemo->CancelPrepare();
 		}
 		m_IsPreparedForAssetShutdown = true;
+	}
+
+	uint64_t DemoManager::GetActiveContentIdentity() const noexcept
+	{
+		if (!m_ActiveDemo)
+		{
+			return 0;
+		}
+		return (static_cast<uint64_t>(m_TemporalSessionSerial) << 32) |
+			static_cast<uint64_t>(m_ActiveDemo->GetTemporalSessionSerial());
+	}
+
+	void DemoManager::SetBeforeActiveDemoReleaseCallback(std::function<void()> callback) noexcept
+	{
+		m_BeforeActiveDemoRelease = std::move(callback);
+	}
+
+	void DemoManager::ExitActiveDemo() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ActiveDemo);
+		if (m_BeforeActiveDemoRelease)
+		{
+			m_BeforeActiveDemoRelease();
+		}
+		m_ActiveDemo->OnExit();
 	}
 
 	DemoBase* DemoManager::GetDemo(uint32_t index) const noexcept
@@ -255,7 +284,7 @@ namespace gglab
 		m_PendingDemo->CommitPrepare();
 		if (m_ActiveInstance)
 		{
-			m_ActiveInstance->OnExit();
+			ExitActiveDemo();
 			m_RetiringDemos.push_back({
 				.m_Index = m_ActiveDemoIndex,
 				.m_Instance = std::move(m_ActiveInstance),

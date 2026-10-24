@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
@@ -72,6 +73,13 @@ namespace gglab
 		std::string m_Name;
 	};
 
+	enum class ParameterEffectClass : uint8_t
+	{
+		Immediate,
+		Deferred,
+		Rebuild,
+	};
+
 	struct LabParameterDesc
 	{
 		LabParameterId m_Id;
@@ -81,9 +89,12 @@ namespace gglab
 		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
 		LabParameterEditPolicy m_EditPolicy = LabParameterEditPolicy::Continuous;
 		LabValue m_DefaultValue = false;
+		// The entered owning domain binds this default after the old session exits.
+		bool m_InheritOnEnter = false;
 		std::optional<LabValue> m_MinValue;
 		std::optional<LabValue> m_MaxValue;
 		std::vector<LabEnumItem> m_EnumItems;
+		ParameterEffectClass m_EffectClass = ParameterEffectClass::Immediate;
 	};
 
 	struct LabParameter
@@ -99,6 +110,17 @@ namespace gglab
 		LabValue m_Value = false;
 	};
 
+	// Rebuild impact always takes precedence over a descriptor's effect default.
+	[[nodiscard]] ParameterEffectClass GetParameterEffectClass(const LabParameterDesc& desc) noexcept;
+	[[nodiscard]] bool LabValuesEqual(const LabValue& lhs, const LabValue& rhs) noexcept;
+
+	struct LabParameterBatchResult
+	{
+		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
+		// Empty means NoChange: no dirty bits or rebuild impact were introduced.
+		std::vector<LabParameterId> m_Changed;
+	};
+
 	class LabParameterSet
 	{
 	public:
@@ -107,9 +129,22 @@ namespace gglab
 		bool Set(const LabParameterId& id, const LabValue& value,
 			LabChangeImpact* impact = nullptr) noexcept;
 
+		// Strict typed validation for session transactions; never sanitizes or clamps.
+		[[nodiscard]] static bool ValidateValue(const LabParameterDesc& desc,
+			const LabValue& value, std::string& error) noexcept;
+		// Called by the owning domain at its safe apply boundary. Unknown, duplicate,
+		// wrong-type, non-finite or out-of-range items reject the complete batch.
+		[[nodiscard]] std::optional<LabParameterBatchResult> ApplyBatch(
+			std::span<const LabParameterValue> changes, std::string& error) noexcept;
+
 		const LabParameter* Find(const LabParameterId& id) const noexcept;
 		std::span<const LabParameter> GetParameters() const noexcept { return m_Parameters; }
 		std::vector<LabParameterValue> CaptureValues() const noexcept;
+		// Inherited values are rebound on entry; explicit overrides survive restart.
+		std::vector<LabParameterValue> CaptureRestoredValues() const noexcept;
+		[[nodiscard]] bool BindInheritedDefault(const LabParameterId& id, const LabValue& value) noexcept;
+		// The domain lost its override: follow the effective value and release explicit intent.
+		[[nodiscard]] bool FollowInheritedValue(const LabParameterId& id, const LabValue& value) noexcept;
 
 		template<typename T>
 		T Get(const LabParameterId& id, const T& fallback) const noexcept

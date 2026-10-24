@@ -1,19 +1,25 @@
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <string>
 #include <string_view>
+#include <variant>
 
 namespace gglab
 {
@@ -23,6 +29,7 @@ namespace gglab
 		const LabParameterId PreviewTapId("gtao.preview_tap");
 		const LabParameterId FinalAOFormatId("gtao.final_ao_format");
 		const LabParameterId RadiusId("gtao.radius");
+		const LabParameterId IBLSamplesId("gtao.ibl.sample_count");
 		const LabParameterId FalloffStartId("gtao.falloff_start");
 		const LabParameterId FalloffEndId("gtao.falloff_end");
 		const LabParameterId PowerId("gtao.power");
@@ -35,6 +42,31 @@ namespace gglab
 		const LabParameterId FovId("gtao.camera.fov");
 		const LabParameterId NearPlaneId("gtao.camera.near");
 		const LabParameterId FarPlaneId("gtao.camera.far");
+
+		struct FrameBinding
+		{
+			LabParameterId m_Id;
+			LabValue (*m_Read)(const GTAOSettings&);
+		};
+
+		const auto& FrameBindings() noexcept
+		{
+			static const std::array bindings
+			{
+				FrameBinding{ EnabledId, [](const GTAOSettings& s) -> LabValue { return s.m_Enabled; } },
+				FrameBinding{ FinalAOFormatId, [](const GTAOSettings& s) -> LabValue { return static_cast<int32_t>(s.m_FinalAOFormatPreference); } },
+				FrameBinding{ RadiusId, [](const GTAOSettings& s) -> LabValue { return s.m_Radius; } },
+				FrameBinding{ FalloffStartId, [](const GTAOSettings& s) -> LabValue { return s.m_FalloffStart; } },
+				FrameBinding{ FalloffEndId, [](const GTAOSettings& s) -> LabValue { return s.m_FalloffEnd; } },
+				FrameBinding{ PowerId, [](const GTAOSettings& s) -> LabValue { return s.m_Power; } },
+				FrameBinding{ DirectionCountId, [](const GTAOSettings& s) -> LabValue { return s.m_DirectionCount; } },
+				FrameBinding{ StepCountId, [](const GTAOSettings& s) -> LabValue { return s.m_StepCount; } },
+				FrameBinding{ DenoiseRadiusId, [](const GTAOSettings& s) -> LabValue { return s.m_DenoiseRadius; } },
+				FrameBinding{ TemporalAccumulationId, [](const GTAOSettings& s) -> LabValue { return s.m_TemporalAccumulation; } },
+				FrameBinding{ TemporalMaxSamplesId, [](const GTAOSettings& s) -> LabValue { return s.m_TemporalMaxSamples; } },
+			};
+			return bindings;
+		}
 
 		const Vector3 PresetViewPosition(0.0f, 2.3f, -9.0f);
 		const Vector3 PresetViewTarget(0.0f, 0.0f, 6.5f);
@@ -252,6 +284,17 @@ namespace gglab
 			.m_MinValue = LabValue(100.0f),
 			.m_MaxValue = LabValue(10000.0f),
 			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = IBLSamplesId,
+			.m_Name = "IBL Specular Samples",
+			.m_Group = "Lighting Publication Fixture",
+			.m_Type = LabParameterType::UInt,
+			.m_DefaultValue = IBLBakeConfig{}.m_PrefilteredSpecularSampleCount,
+			.m_InheritOnEnter = true,
+			.m_MinValue = LabValue(uint32_t(1)),
+			.m_MaxValue = LabValue(uint32_t(4096)),
+			.m_EffectClass = ParameterEffectClass::Deferred,
+			}));
 		ApplyImmediateParameters();
 	}
 
@@ -291,17 +334,31 @@ namespace gglab
 
 	void GTAOLabSession::OnEnter() noexcept
 	{
+		GGLAB_ASSERT(!m_LightingOverride);
+		m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
+		GGLAB_ASSERT_NOT_NULL(m_LightingOverride.get());
+		if (!m_LightingOverride)
+		{
+			return;
+		}
+		const uint32_t inherited = m_LightingOverride->GetInheritedSettings()
+			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		const bool bound = GetMutableParameters().BindInheritedDefault(IBLSamplesId, inherited);
+		GGLAB_ASSERT(bound);
+		GGLAB_UNUSED(bound);
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
 			PostProcessPreviewChannel::AmbientOcclusion);
 		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount(
 			PostProcessPreviewChannel::AmbientOcclusion);
-		RequestSelectedPreview();
+		// Save the previous preview before the apply handler selects this Lab's tap.
+		ApplyParameterChanges(LabChangeImpact::Immediate);
 	}
 
 	void GTAOLabSession::OnExit() noexcept
 	{
+		m_LightingOverride.reset();
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
@@ -328,6 +385,56 @@ namespace gglab
 		LabSessionBase::OnResize(width, height);
 		m_ViewportWidth = width;
 		m_ViewportHeight = height;
+	}
+
+	bool GTAOLabSession::RefreshInheritedParameters() noexcept
+	{
+		if (!m_LightingOverride || m_LightingOverride->OwnsBakeConfiguration())
+		{
+			return false;
+		}
+		// An ordinary Runtime writer takes ownership. Follow its value before
+		// accepting new edits; unrelated Immediate changes must not reclaim it.
+		const uint32_t inherited = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings()
+			.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		return GetMutableParameters().FollowInheritedValue(IBLSamplesId, inherited);
+	}
+
+	bool GTAOLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
+	{
+		return std::ranges::find(FrameBindings(), id, &FrameBinding::m_Id) != FrameBindings().end() ||
+			id == NearPlaneId || id == FarPlaneId;
+	}
+
+	std::optional<LabValue> GTAOLabSession::ReadImmediateParameterFrameValue(
+		const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
+	{
+		const auto found = std::ranges::find(FrameBindings(), id, &FrameBinding::m_Id);
+		if (found != FrameBindings().end())
+		{
+			return found->m_Read(frame.m_ViewSettings.m_Lighting.m_GTAO);
+		}
+		if (frame.m_View && frame.m_View->m_ViewId == RenderViewID::Main &&
+			(id == NearPlaneId || id == FarPlaneId))
+		{
+			return LabValue(id == NearPlaneId ? frame.m_View->m_Near : frame.m_View->m_Far);
+		}
+		return std::nullopt;
+	}
+
+	bool GTAOLabSession::SupportsDeferredLightingParameter(const LabParameterId& id) const noexcept
+	{
+		return id == IBLSamplesId && m_LightingOverride != nullptr;
+	}
+
+	LightingMutationResult GTAOLabSession::ApplyDeferredLightingParameter(const LabParameterId& id) noexcept
+	{
+		if (!SupportsDeferredLightingParameter(id))
+		{
+			return {};
+		}
+		return m_LightingOverride->ApplyPrefilteredSpecularSampleCount(
+			GetParameters().Get(IBLSamplesId, uint32_t(1)));
 	}
 
 	void GTAOLabSession::ApplyImmediateParameters() noexcept
@@ -684,7 +791,7 @@ namespace gglab
 				"Validates deterministic GTAO surface selection, depth-derived normals, "
 				"bilateral denoise, and depth-aware upsample.",
 			.m_Kind = LabKind::Pipeline,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 

@@ -6,6 +6,14 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <vector>
+
 namespace gglab
 {
 	class LabRuntime final : public ILabControl, public LabSnapshotSourceBase
@@ -44,6 +52,83 @@ namespace gglab
 		{
 			m_CommandQueue.RequestRunConfig(config);
 		}
+		// Session coordination owns the receipt; this source owns its queued mutation.
+		[[nodiscard]] bool QueueParameterBatch(uint64_t id,
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		class PreparedParameterBatch
+		{
+		public:
+			PreparedParameterBatch(PreparedParameterBatch&&) noexcept = default;
+			PreparedParameterBatch& operator=(PreparedParameterBatch&&) noexcept = default;
+			PreparedParameterBatch(const PreparedParameterBatch&) = delete;
+			PreparedParameterBatch& operator=(const PreparedParameterBatch&) = delete;
+			[[nodiscard]] bool HasChanges() const noexcept { return m_HasChanges; }
+			[[nodiscard]] uint64_t GetRebuildGeneration() const noexcept { return m_RebuildGeneration; }
+			[[nodiscard]] bool HasWorldLightingChanges() const noexcept
+			{
+				return m_WorldLightingMutation && m_WorldLightingMutation->HasChanges();
+			}
+
+		private:
+			friend class LabRuntime;
+			PreparedParameterBatch() = default;
+			const LabRuntime* m_Owner = nullptr;
+			LabSessionBase* m_Session = nullptr;
+			LabParameterSet m_Parameters;
+			std::optional<LabParameterId> m_LightingParameter;
+			std::unique_ptr<PreparedWorldLightingMutationBase> m_WorldLightingMutation;
+			LightingMutationResult m_WorldLightingEvidence;
+			uint64_t m_Id = 0;
+			uint64_t m_Revision = 0;
+			uint64_t m_RebuildGeneration = 0;
+			LabChangeImpact m_Impact = LabChangeImpact::Immediate;
+			uint32_t m_SessionSerial = 0;
+			bool m_HasChanges = false;
+			bool m_Committed = false;
+		};
+
+		// Local to one safe boundary: preparation does not consume the command or
+		// mutate the session. Discarding a plan leaves that reservation unchanged.
+		// Commit installs values without invoking Lab callbacks.
+		[[nodiscard]] std::optional<PreparedParameterBatch> PrepareParameterBatch(uint64_t id,
+			std::span<const LabParameterValue> values, std::string& error,
+			WorldLightingControlBase* worldLighting = nullptr, uint64_t contentIdentity = 0) const noexcept;
+		void CommitParameterBatch(PreparedParameterBatch& prepared) noexcept;
+		struct LightingParameterEffect
+		{
+			LabParameterId m_Parameter;
+			LightingMutationResult m_Result;
+		};
+		[[nodiscard]] std::optional<LightingParameterEffect> ApplyParameterBatchEffects(
+			PreparedParameterBatch&& prepared) noexcept;
+		[[nodiscard]] bool ApplyParameterBatch(uint64_t id,
+			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		void CancelParameterBatch(uint64_t id) noexcept;
+		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
+		enum class ParameterRebuildState : uint8_t
+		{
+			Preparing,
+			Published,
+			Failed,
+			Superseded,
+		};
+		struct ParameterRebuild
+		{
+			// This generation identifies an owned operation, not a predicted activation serial.
+			uint64_t m_Generation = 0;
+			uint64_t m_BatchId = 0;
+			uint32_t m_SourceSession = 0;
+			uint32_t m_TargetSession = 0;
+			ParameterRebuildState m_State = ParameterRebuildState::Preparing;
+			LabParameterSet m_Parameters;
+			std::string m_Failure;
+		};
+		[[nodiscard]] const ParameterRebuild* GetParameterRebuild() const noexcept
+		{
+			return m_ParameterRebuild ? &*m_ParameterRebuild : nullptr;
+		}
+		[[nodiscard]] const LabParameterSet* GetParameterSourceParameters() const noexcept;
+		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
 		void ProcessPendingCommands() noexcept;
 		void TickTransitions() noexcept;
 		LabSnapshot GetLabSnapshot(
@@ -79,14 +164,22 @@ namespace gglab
 		RenderPipelineBase& GetRenderPipeline() noexcept;
 
 	private:
+		[[nodiscard]] std::optional<PreparedParameterBatch> PrepareParameterValues(
+			std::span<const LabParameterValue> values, std::string& error) const noexcept;
 		bool BeginSessionTransition(const LabId& id,
 			std::span<const LabParameterValue> values = {},
-			std::span<const LabParameterAssignment> assignments = {}) noexcept;
+			std::span<const LabParameterAssignment> assignments = {}, uint64_t parameterRebuild = 0) noexcept;
 		bool CommitPendingSession() noexcept;
 		bool RestartActiveSessionWithValues(std::span<const LabParameterValue> values) noexcept;
 		void PollRetiringSessions() noexcept;
+		void RefreshInheritedParameters() noexcept;
 		void SetError(std::string message) noexcept;
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;
+
+		uint64_t m_ParameterRevision = 1;
+		uint64_t m_NextParameterRebuild = 1;
+		uint64_t m_PendingParameterRebuild = 0;
+		std::optional<ParameterRebuild> m_ParameterRebuild;
 
 		LabSessionCreateInfo m_CreateInfo{};
 		LabCatalog m_Catalog;

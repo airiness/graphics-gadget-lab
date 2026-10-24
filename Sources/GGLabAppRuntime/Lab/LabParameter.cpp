@@ -1,10 +1,12 @@
 #include "Lab/LabParameter.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/String/StringUtils.h"
 
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstddef>
 #include <format>
 #include <system_error>
 #include <type_traits>
@@ -53,6 +55,38 @@ namespace gglab
 			}
 			return LabValue(*value);
 		}
+	}
+
+	ParameterEffectClass GetParameterEffectClass(const LabParameterDesc& desc) noexcept
+	{
+		return desc.m_Impact == LabChangeImpact::Immediate ?
+			desc.m_EffectClass :
+			ParameterEffectClass::Rebuild;
+	}
+
+	bool LabValuesEqual(const LabValue& lhs, const LabValue& rhs) noexcept
+	{
+		if (lhs.index() != rhs.index())
+		{
+			return false;
+		}
+		return std::visit([&rhs]<typename T>(const T& left)
+			{
+				const T& right = std::get<T>(rhs);
+				if constexpr (std::is_same_v<T, Vector3>)
+				{
+					return left.m_X == right.m_X && left.m_Y == right.m_Y && left.m_Z == right.m_Z;
+				}
+				else if constexpr (std::is_same_v<T, Color>)
+				{
+					return left.m_R == right.m_R && left.m_G == right.m_G &&
+						left.m_B == right.m_B && left.m_A == right.m_A;
+				}
+				else
+				{
+					return left == right;
+				}
+			}, lhs);
 	}
 
 	bool LabParameterSet::Add(LabParameterDesc desc) noexcept
@@ -113,6 +147,118 @@ namespace gglab
 		return true;
 	}
 
+	bool LabParameterSet::ValidateValue(const LabParameterDesc& desc,
+		const LabValue& value, std::string& error) noexcept
+	{
+		error.clear();
+		if (!IsValueCompatible(desc.m_Type, value))
+		{
+			error = "the value has the wrong type";
+			return false;
+		}
+		if (desc.m_Type == LabParameterType::Enum &&
+			!std::ranges::any_of(desc.m_EnumItems, [&](const LabEnumItem& item)
+				{ return item.m_Value == std::get<int32_t>(value); }))
+		{
+			error = "the value is not a declared enum item";
+			return false;
+		}
+		const bool valid = std::visit([&desc]<typename T>(const T& candidate)
+			{
+				const T* minimum = desc.m_MinValue ? std::get_if<T>(&*desc.m_MinValue) : nullptr;
+				const T* maximum = desc.m_MaxValue ? std::get_if<T>(&*desc.m_MaxValue) : nullptr;
+				if constexpr (std::is_same_v<T, float> || std::is_same_v<T, int32_t> ||
+					std::is_same_v<T, uint32_t>)
+				{
+					return std::isfinite(candidate) && (!minimum || candidate >= *minimum) &&
+						(!maximum || candidate <= *maximum);
+				}
+				else if constexpr (std::is_same_v<T, Vector3> || std::is_same_v<T, Color>)
+				{
+					constexpr size_t components = std::is_same_v<T, Vector3> ? 3 : 4;
+					for (size_t component = 0; component < components; ++component)
+					{
+						const float scalar = candidate[component];
+						if (!std::isfinite(scalar) || (minimum && scalar < (*minimum)[component]) ||
+							(maximum && scalar > (*maximum)[component]))
+						{
+							return false;
+						}
+						if constexpr (std::is_same_v<T, Color>)
+						{
+							if (scalar < 0.0f || scalar > 1.0f)
+							{
+								return false;
+							}
+						}
+					}
+					return true;
+				}
+				else
+				{
+					return true;
+				}
+			}, value);
+		if (!valid)
+		{
+			error = "the value must be finite and within the declared range";
+		}
+		return valid;
+	}
+
+	std::optional<LabParameterBatchResult> LabParameterSet::ApplyBatch(
+		std::span<const LabParameterValue> changes, std::string& error) noexcept
+	{
+		error.clear();
+		if (changes.empty())
+		{
+			error = "a parameter batch must not be empty";
+			return std::nullopt;
+		}
+		LabParameterBatchResult result;
+		std::vector<size_t> indices;
+		indices.reserve(changes.size());
+		result.m_Changed.reserve(changes.size());
+		for (const LabParameterValue& change : changes)
+		{
+			const auto found = std::ranges::find_if(m_Parameters,
+				[&](const LabParameter& parameter) { return parameter.m_Desc.m_Id == change.m_Id; });
+			if (found == m_Parameters.end())
+			{
+				error = std::format("Unknown parameter '{}'.", change.m_Id.GetName());
+				return std::nullopt;
+			}
+			const size_t index = static_cast<size_t>(found - m_Parameters.begin());
+			if (std::ranges::find(indices, index) != indices.end())
+			{
+				error = std::format("Duplicate parameter '{}'.", change.m_Id.GetName());
+				return std::nullopt;
+			}
+			if (!ValidateValue(found->m_Desc, change.m_Value, error))
+			{
+				error = std::format("Parameter '{}': {}.", change.m_Id.GetName(), error);
+				return std::nullopt;
+			}
+			indices.push_back(index);
+			if (!LabValuesEqual(found->m_Value, change.m_Value))
+			{
+				result.m_Changed.push_back(change.m_Id);
+				result.m_Impact = MaxImpact(result.m_Impact, found->m_Desc.m_Impact);
+			}
+		}
+		// Validation completes before any live value or dirty bit is changed.
+		for (size_t item = 0; item < changes.size(); ++item)
+		{
+			LabParameter& parameter = m_Parameters[indices[item]];
+			if (!LabValuesEqual(parameter.m_Value, changes[item].m_Value))
+			{
+				parameter.m_Value = changes[item].m_Value;
+				parameter.m_Dirty = true;
+			}
+		}
+		return result;
+	}
+
 	const LabParameter* LabParameterSet::Find(const LabParameterId& id) const noexcept
 	{
 		const auto iter = std::ranges::find_if(m_Parameters,
@@ -132,6 +278,56 @@ namespace gglab
 				});
 		}
 		return values;
+	}
+
+	std::vector<LabParameterValue> LabParameterSet::CaptureRestoredValues() const noexcept
+	{
+		std::vector<LabParameterValue> values;
+		values.reserve(m_Parameters.size());
+		for (const auto& parameter : m_Parameters)
+		{
+			if (!parameter.m_Desc.m_InheritOnEnter || parameter.m_Dirty)
+			{
+				values.push_back({ parameter.m_Desc.m_Id, parameter.m_Value });
+			}
+		}
+		return values;
+	}
+
+	bool LabParameterSet::BindInheritedDefault(const LabParameterId& id, const LabValue& value) noexcept
+	{
+		const auto found = std::ranges::find_if(m_Parameters,
+			[&](const auto& parameter) { return parameter.m_Desc.m_Id == id; });
+		std::string error;
+		if (found == m_Parameters.end() || !found->m_Desc.m_InheritOnEnter ||
+			!ValidateValue(found->m_Desc, value, error))
+		{
+			return false;
+		}
+		found->m_Desc.m_DefaultValue = value;
+		if (!found->m_Dirty)
+		{
+			found->m_Value = value;
+		}
+		return true;
+	}
+
+	bool LabParameterSet::FollowInheritedValue(const LabParameterId& id, const LabValue& value) noexcept
+	{
+		const auto found = std::ranges::find_if(m_Parameters,
+			[&](const auto& parameter) { return parameter.m_Desc.m_Id == id; });
+		std::string error;
+		const bool valid = found != m_Parameters.end() && found->m_Desc.m_InheritOnEnter &&
+			ValidateValue(found->m_Desc, value, error);
+		GGLAB_ASSERT_MSG(valid, "Only an entered owning domain can resolve a valid inherited parameter.");
+		if (!valid)
+		{
+			return false;
+		}
+		const bool changed = found->m_Dirty || !LabValuesEqual(found->m_Value, value);
+		found->m_Value = value;
+		found->m_Dirty = false;
+		return changed;
 	}
 
 	bool LabParameterSet::IsValueCompatible(LabParameterType type, const LabValue& value) noexcept

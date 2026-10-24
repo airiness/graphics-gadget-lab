@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/SessionParameterControl.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 
 #include "AppRuntimeLog.h"
@@ -179,7 +180,7 @@ namespace gglab
 				iblPending ?
 					std::format("Baking {} ({:.0f}%).", GetIBLBakeStageName(bake.m_Stage),
 						bake.m_Progress * 100.0f) :
-					std::string{});
+					std::string{}, "lighting", environment.GetBakeRequestGeneration());
 
 			// A load reaches the upload queues only once its CPU work completes, so
 			// asset uploads alone would report Ready while a decode is in flight.
@@ -353,6 +354,24 @@ namespace gglab
 	{
 		GGLAB_LOG_CRITICAL_ALWAYS("Fatal runtime failure: {}", failure);
 		m_LifecycleState = AppRuntimeLifecycleState::Failed;
+		if (m_ParameterControl)
+		{
+			m_ParameterControl->OnRuntimeFailed(failure);
+			UpdateSequenceParameterEvents();
+		}
+		if (m_FrameSequence && m_FrameSequence->GetStatus() &&
+			!m_FrameSequence->GetStatus()->m_Events.empty())
+		{
+			m_FrameSequence->OnParameterEventFailed(std::string(failure));
+			UpdateSequenceParameterEvents();
+		}
+		if (m_DemoManager)
+		{
+			if (DemoBase* demo = m_DemoManager->GetActiveDemo())
+			{
+				demo->OnRuntimeFailed(failure);
+			}
+		}
 		return AppRuntimeTickResult::Fatal;
 	}
 
@@ -377,6 +396,9 @@ namespace gglab
 			return AppRuntimeTickResult::Continue;
 		}
 
+		m_ToolingFrameSettings = tickInfo.m_ApplicationTooling ?
+			tickInfo.m_ApplicationTooling->CaptureFrameSettings() :
+			ApplicationToolingFrameSettings{};
 		m_FrameCapture->Update();
 		CollectFrameCaptureResults();
 		SyncSequenceGpuProfiling();
@@ -439,6 +461,8 @@ namespace gglab
 		{
 			m_DemoManager->BeginTransitionTick();
 		}
+		// Binding is a content lifecycle stage, including when no RHI frame is ready.
+		SynchronizeContentBinding();
 		if (!tickInfo.m_PreContentUpdate.Run())
 		{
 			return FailRuntime("Host pre-content update failed.");
@@ -465,8 +489,14 @@ namespace gglab
 		DemoBase* demo = m_DemoManager->GetActiveDemo();
 		GGLAB_ASSERT_NOT_NULL(demo);
 		demo->Update();
+		// Lab transitions may replace content during Update without replacing the Demo.
+		SynchronizeContentBinding();
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
+		if (m_FrameCapture->GetUnfinishedRequestCount() || m_FrameSequence->IsActive())
+		{
+			m_ParameterControl->Enable();
+		}
 
 		World& world = demo->GetWorld();
 		RenderFrame rendererFrame = m_RenderHost->BeginFrame();
@@ -476,6 +506,38 @@ namespace gglab
 				AppRuntimeTickResult::Continue :
 				FailRuntime("The render host failed to begin a frame.");
 		}
+		const auto sequencePose = m_FrameSequence->PrepareFrame(
+			m_FrameCapture->GetLastFrameState(), demo->GetCameraRig().GetCameraPaths(),
+			m_ParameterControl->GetContentIdentity(),
+			[this](std::span<FrameSequenceParameterEvent> events, std::string& error)
+			{
+				for (auto& event : events)
+				{
+					if (!m_ParameterControl->ValidateSequenceAssignments(
+						event.m_Values, event.m_ExpectEffects, error))
+					{
+						return false;
+					}
+				}
+				return true;
+			});
+		if (const auto* event = m_FrameSequence->GetDueParameterEvent())
+		{
+			std::string error;
+			const ParameterBatchOwner owner{ m_FrameSequence->GetStatus()->m_SequenceId };
+			const auto batch = m_ParameterControl->RequestParameterBatch(event->m_Values, error, owner);
+			if (!batch)
+			{
+				m_FrameSequence->OnParameterEventFailed(std::move(error));
+				return AppRuntimeTickResult::Continue;
+			}
+			UpdateSequenceParameterEvents();
+		}
+		if (m_ParameterControl->IsEnabled())
+		{
+			m_ParameterControl->OnFrameReady(rendererFrame.GetSerial());
+		}
+		demo->OnFrameReady(rendererFrame.GetSerial());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
 		services.m_TextureAssets = m_AssetManager.get();
@@ -486,17 +548,8 @@ namespace gglab
 		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
 		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 
-		ShadowVisualizationSettings shadowVisualizationSettings =
-			DefaultShadowVisualizationSettings();
+		ShadowVisualizationSettings shadowVisualizationSettings = m_ToolingFrameSettings.m_Shadow;
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
-		ViewRenderProfile effectiveViewRenderProfile = authoringViewRenderProfile;
-		ApplicationToolingFrameSettingsResolution toolingSettingsResolution{};
-		if (applicationTooling)
-		{
-			toolingSettingsResolution = applicationTooling->ResolveFrameSettings(
-				authoringViewRenderProfile, shadowVisualizationSettings,
-				effectiveViewRenderProfile);
-		}
 		CameraRig& cameraRig = demo->GetCameraRig();
 		// A capture's reference view is restored before the frame is planned, so
 		// this frame already renders it.
@@ -511,9 +564,7 @@ namespace gglab
 		std::optional<TemporalReferenceSample> referenceSample;
 		std::optional<FrameSequenceTemporalAAOverrides> sequenceTemporalAAOverrides;
 		std::optional<FrameSequenceGTAOOverrides> sequenceGTAOOverrides;
-		if (const std::optional<FrameSequencePoseRequest> sequencePose =
-			m_FrameSequence->PrepareFrame(
-				m_FrameCapture->GetLastFrameState(), cameraRig.GetCameraPaths()))
+		if (sequencePose)
 		{
 			const std::optional<CameraPathPose> pose = cameraRig.ApplyCameraPathFrame(
 				sequencePose->m_CameraPathId, sequencePose->m_Frame);
@@ -540,9 +591,12 @@ namespace gglab
 		{
 			displayCameraSlot->m_Camera->RequestTemporalReset();
 		}
-		ResolvedViewRenderSettings displayViewSettings =
-			ResolveViewRenderSettings(
-				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		const auto inheritedView = ResolveApplicationViewSettings(
+			authoringViewRenderProfile, *displayCameraSlot->m_Camera, m_ToolingFrameSettings);
+		const auto& effectiveViewRenderProfile = inheritedView.m_Profile;
+		ResolvedViewRenderSettings displayViewSettings = inheritedView.m_View;
+		m_ParameterControl->ApplyViewSettings(displayViewSettings,
+			effectiveViewRenderProfile.m_EnableScenePreExposure);
 		if (referenceSample)
 		{
 			// The reference owns jitter and accumulation; Temporal AA and temporal GTAO
@@ -563,9 +617,7 @@ namespace gglab
 					*sequenceGTAOOverrides, displayViewSettings.m_Lighting.m_GTAO);
 			}
 		}
-		const uint64_t temporalSessionIdentity =
-			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
-			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
+		const uint64_t temporalSessionIdentity = m_ActiveContentIdentity;
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
@@ -628,8 +680,14 @@ namespace gglab
 			.m_Backend = m_Config.m_RhiBackend,
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
-		if (!m_FrameSequence->BeginFrame(captureFrameState))
+		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
+		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
+			{
+				return m_ParameterControl->CoversReadinessGate(
+					ParameterBatchOwner{ m_FrameSequence->GetStatus()->m_SequenceId }, gate);
+			}))
 		{
+			UpdateSequenceParameterEvents();
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
@@ -639,6 +697,15 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
+		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
+			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
+			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
+		auto parameterFrame = m_ParameterControl->IsEnabled() ?
+			std::make_shared<ParameterFrameState>(m_ParameterControl->CaptureFrameState(
+				frame.m_FrameSerial, m_RenderServices.m_Environment->GetBakeRequestGeneration(),
+				frame.m_RenderScene.m_WorldLightingGeneration)) : nullptr;
+		UpdateSequenceParameterEvents();
+		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
 		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
@@ -646,7 +713,7 @@ namespace gglab
 			.m_PostProcess = capturedView.m_PostProcess,
 			.m_Shadows = frame.m_DirectionalShadowSettings,
 			.m_Environment = m_RenderServices.m_Environment->GetEnvironmentLightingSettings(),
-			.m_ActiveIBLGeneration = m_RenderServices.m_Environment->GetBakingStatus().m_ActiveGeneration,
+			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
 			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
 			.m_Sun = frame.m_RenderScene.m_WorldSun,
 			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
@@ -733,7 +800,7 @@ namespace gglab
 				.m_DisplayViewSettings =
 					&frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
-				.m_GTAOOverrideActive = toolingSettingsResolution.m_GTAOOverrideActive,
+				.m_GTAOOverrideActive = m_ToolingFrameSettings.m_GTAO.has_value(),
 			};
 			ScopedDiagnosticsFrame diagnosticsFrame(m_Diagnostics.get(), diagnosticsContext);
 			std::optional<LoadingProgress> loadingProgress;
@@ -800,8 +867,20 @@ namespace gglab
 			FrameSequenceObservation{ m_FrameCapture->HasFrameGraphExports(frame.m_FrameSerial),
 				renderGraph.GetObservationActivity() } :
 			FrameSequenceObservation{};
-		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation);
 
+		m_ParameterControl->OnFrameSubmitted({
+			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
+			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
+			.m_RenderFrameSerial = frame.m_FrameSerial,
+		});
+		if (parameterFrame)
+		{
+			m_ParameterControl->CompleteFrameState(*parameterFrame);
+			m_FrameCapture->SetFrameParameters(frame.m_FrameSerial, parameterFrame);
+		}
+		UpdateSequenceParameterEvents();
+		m_FrameSequence->OnFrameSubmitted(frame.m_FrameSerial, sequenceObservation, parameterFrame);
+		UpdateSequenceParameterEvents();
 		m_DemoManager->OnFrameSubmitted({
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
 			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),

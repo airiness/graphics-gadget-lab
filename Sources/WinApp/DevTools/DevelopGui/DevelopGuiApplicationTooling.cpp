@@ -78,19 +78,9 @@ namespace gglab
 				};
 			}
 
-			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
-				const ViewRenderProfile& authoringProfile,
-				ShadowVisualizationSettings& outShadowVisualizationSettings,
-				ViewRenderProfile& outEffectiveProfile) const noexcept override
+			ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept override
 			{
-				const auto& runtime = m_System.GetDevToolsRuntime();
-				outShadowVisualizationSettings =
-					runtime.GetRenderVisualizationSettings().m_Shadow;
-				outEffectiveProfile = runtime.ResolveViewRenderProfile(authoringProfile);
-				return {
-					.m_GTAOOverrideActive =
-						runtime.GetViewRenderSettingsOverrides().m_GTAO.m_IsActive,
-				};
+				return m_System.GetDevToolsRuntime().CaptureFrameSettings();
 			}
 
 			bool BeginFrame() noexcept override { return m_System.BeginFrame(); }

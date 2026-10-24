@@ -47,7 +47,8 @@ Inspect the affected constructs against the layout rules, particularly:
 - Control bodies, scoped `case` branches and macro call-site semicolons.
 - Continuation levels, nested ternaries and their branch initializers.
 - Lambda initializer continuations versus lambdas passed as call arguments.
-- Complete declarations, readable calls, arrays, repeated records and JSON fields.
+- Enum definitions, complete declarations, readable calls, arrays, repeated records
+  and JSON fields.
 - HLSL attributes and casts, comments inside conditional compilation, and code
   following multiline raw strings.
 

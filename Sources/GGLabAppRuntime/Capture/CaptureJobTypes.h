@@ -126,6 +126,7 @@ namespace gglab
 		uint32_t m_DrainingWriterJobs = 0;
 		uint32_t m_DrainingWriteReservations = 0;
 		uint32_t m_SequenceTimingWrites = 0;
+		uint32_t m_SequenceArtifactWrites = 0;
 	};
 
 	// Cancelled guarantees no publication for the job, not immediate resource

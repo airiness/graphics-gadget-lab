@@ -1,14 +1,20 @@
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 
 #include <cmath>
+#include <array>
 #include <cstdint>
 #include <format>
 #include <iterator>
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <variant>
+
+#include <nlohmann/json.hpp>
 
 namespace gglab
 {
@@ -365,12 +371,95 @@ namespace gglab
 		return writer.Finish();
 	}
 
+	std::string SerializeParameterFrameState(const ParameterFrameState& frame) noexcept
+	{
+		using Json = nlohmann::ordered_json;
+		const auto value = [](const LabValue& input)
+			{
+				return std::visit([](const auto& item) -> Json
+					{
+						using T = std::decay_t<decltype(item)>;
+						if constexpr (std::is_same_v<T, Vector3>)
+						{
+							return Json::array({ item.m_X, item.m_Y, item.m_Z });
+						}
+						else if constexpr (std::is_same_v<T, Color>)
+						{
+							return Json::array({ item.m_R, item.m_G, item.m_B, item.m_A });
+						}
+						else
+						{
+							return item;
+						}
+					}, input);
+			};
+		const auto lighting = [](const ParameterFrameLighting& state)
+			{
+				return Json{
+					{ "generation", state.m_Generation },
+					{ "profileId", state.m_Profile ? Json(state.m_Profile->m_Id) : Json() },
+					{ "profileHash", state.m_Profile ? Json(Sha256DigestToHex(state.m_Profile->m_Hash)) : Json() },
+					{ "profileHashVersion", state.m_Profile ? Json(LightingProfileHashVersion) : Json() } };
+			};
+		static constexpr std::array typeNames{ "bool", "int", "uint", "float", "enum", "vector3", "color" };
+		static constexpr std::array classNames{ "Immediate", "Deferred", "Rebuild" };
+		static constexpr std::array stateNames{ "Requested", "Applied", "Published", "Consumed",
+			"Superseded", "NoChange", "EffectNotReached", "Failed" };
+		Json values = Json::array();
+		for (const auto& item : frame.m_Values)
+		{
+			values.push_back({
+				{ "id", item.m_Id },
+				{ "source", item.m_Source },
+				{ "type", typeNames[static_cast<size_t>(item.m_Type)] },
+				{ "value", value(item.m_Value) },
+				{ "default", value(item.m_Default) } });
+		}
+		Json receipts = Json::array();
+		for (const auto& receipt : frame.m_Receipts)
+		{
+			const auto& item = receipt.m_Item;
+			receipts.push_back({
+				{ "batchId", receipt.m_BatchId },
+				{ "id", item.m_Parameter.GetName() },
+				{ "declaredClass", classNames[static_cast<size_t>(item.m_DeclaredClass)] },
+				{ "state", stateNames[static_cast<size_t>(item.m_State)] },
+				{ "identity", {
+					{ "revision", item.m_Identity.m_Revision },
+					{ "domain", item.m_Identity.m_Domain },
+					{ "generation", item.m_Identity.m_Generation } } },
+				{ "requested", item.m_Requested },
+				{ "applied", item.m_Applied ? Json(*item.m_Applied) : Json() },
+				{ "published", item.m_Published ? Json(*item.m_Published) : Json() },
+				{ "firstConsumed", item.m_FirstConsumed ? Json(*item.m_FirstConsumed) : Json() },
+				{ "failure", item.m_Failure } });
+		}
+		return Json{
+			{ "schemaVersion", 1 },
+			{ "frameSerial", frame.m_FrameSerial },
+			{ "revision", frame.m_Revision },
+			{ "contentId", frame.m_ContentId },
+			{ "available", frame.m_Available },
+			{ "values", std::move(values) },
+			{ "lighting", { { "requested", lighting(frame.m_RequestedLighting) },
+				{ "active", lighting(frame.m_ActiveLighting) } } },
+			{ "receipts", std::move(receipts) } }.dump(-1, ' ', false, Json::error_handler_t::replace);
+	}
+
 	std::string SerializeFrameCaptureMetadata(const FrameCaptureMetadata& metadata) noexcept
 	{
 		JsonWriter writer;
 		writer.BeginObject();
 		writer.Unsigned("schemaVersion", FrameCaptureMetadataSchemaVersion);
 		writer.Unsigned("requestId", metadata.m_RequestId);
+		if (metadata.m_Parameters)
+		{
+			writer.Json("parameters", SerializeParameterFrameState(*metadata.m_Parameters));
+		}
+		else
+		{
+			writer.Null("parameters");
+		}
 		writer.String("label", metadata.m_Label);
 		writer.String("note", metadata.m_Note);
 		writer.String("source", GetFrameCaptureSourceName(metadata.m_Source));
