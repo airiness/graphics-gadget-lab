@@ -55,12 +55,19 @@ visibility and project membership consistent.
 Keep application behavior in its owning domain. Enforce dependency direction
 with compiler include visibility as well as the boundary validator.
 
+The [Architecture Atlas](Docs/Architecture/README.md) maps the project layers and
+the frame path to their source entry points and owning tests.
+
 ## GPU, shader and Lab invariants
 
 For GPU changes, follow ownership through submission, fences, frames in flight,
 resource states, descriptors, transient allocation and cancellation before
 submission. Readback requires GPU completion; retain the backing resource and
 mapping until the consumer finishes.
+
+The Atlas [frame contracts](Docs/Architecture/Frame_Execution_Map.md#contracts)
+detail how these rules apply to Renderer settlement order, settlement-time failures
+and teardown; keep both texts consistent when either changes.
 
 RenderGraph owns dependencies, culling, execution order, transient lifetimes
 and barriers for its managed resources. Passes declare all managed reads and
