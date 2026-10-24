@@ -63,9 +63,10 @@ A Lab composes graph work through Public seams only. Two routes exist today:
 
 `RenderPassBase` is optional on both routes; the compute Lab declares its passes
 inline. Neither route can insert a pass between Runtime recipe stages, and a scene
-extension cannot take part in temporal integration yet. Lab work follows the same
-declaration, retention and commit rules as Runtime passes and registers its programs
-with the Lab.
+extension cannot take part in temporal integration yet. The overlay extension that
+runs after post-processing belongs to tooling and is not a Lab route. Lab work
+follows the same declaration, retention and commit rules as Runtime passes and
+registers its programs with the Lab.
 
 ## Program consumption
 

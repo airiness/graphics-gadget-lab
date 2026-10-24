@@ -5,6 +5,8 @@ Each module card has one home. Maps keep their contracts and link to the cards.
 | Atlas ID | Card | Home |
 | --- | --- | --- |
 | `atlas.application.frame-orchestration` | [Application orchestration](Modules/Application_Content.md#application-orchestration) | Application content |
+| `atlas.application.content-hosting` | [Content hosting](Modules/Application_Content.md#content-hosting) | Application content |
+| `atlas.application.lab-runtime` | [Lab runtime](Modules/Application_Content.md#lab-runtime) | Application content |
 | `atlas.runtime.render-host` | [Render host and settlement](Modules/Runtime_Rendering.md#render-host-and-settlement) | Runtime rendering |
 | `atlas.runtime.render-pipeline` | [Render pipeline composition](Modules/Runtime_Rendering.md#render-pipeline-composition) | Runtime rendering |
 | `atlas.runtime.render-pass-authoring` | [Render pass authoring](Modules/Runtime_Rendering.md#render-pass-authoring) | Runtime rendering |

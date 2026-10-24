@@ -54,8 +54,7 @@ Atlas ID: atlas.routes.render-pass
 | Add a Lab pass or pipeline | `WinApp`: the Lab session → a Forward+ scene extension or its own pipeline through [LabSessionBase.h](../../../../Sources/GGLabAppRuntime/Lab/LabSessionBase.h) | [Lab-owned composition](../../../../Docs/Architecture/Runtime_Boundaries_Map.md#lab-owned-composition); [render pipeline card](../../../../Docs/Architecture/Modules/Runtime_Rendering.md#render-pipeline-composition) | The Lab's WinApp self-test (for example `napa-voxel`) and `app-content-registration`; `--lab` GPU runs |
 | Use a new shader program | `ShaderArtifactRuntime`: [GGLabShaderPrograms.h](../../../../Sources/ShaderArtifactRuntime/Public/ShaderArtifactRuntime/GGLabShaderPrograms.h) → build record → demand | [Program consumption](../../../../Docs/Architecture/Runtime_Boundaries_Map.md#program-consumption); [shader card](../../../../Docs/Architecture/Modules/Runtime_Rendering.md#shader-program-consumption) | Runtime `shader-artifact-runtime`; WinApp `app-content-registration`; `GGLabShaderToolchainTests` |
 
-GPU runs use [gglab-frame-capture](../../gglab-frame-capture/SKILL.md). The Lab-switch
-route will be added with its map.
+GPU runs use [gglab-frame-capture](../../gglab-frame-capture/SKILL.md).
 
 ```text
 Anchors:
@@ -66,4 +65,32 @@ ReviewPaths:
   - Docs/Architecture/Runtime_Boundaries_Map.md
   - Docs/Architecture/Modules/Runtime_Rendering.md
   - Tests/GGLabRuntime/RenderingContractSelfTests.cpp
+```
+
+## Lab lifetime
+Atlas ID: atlas.routes.lab-lifetime
+
+- Question: where should work on a Lab switch, a Lab parameter or the GPU state a Lab
+  owns begin?
+- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- Refresh triggers: transition requests, retirement, parameter impacts, session GPU
+  ownership, Lab registration or shutdown order change.
+
+| Task or question | Owning project and source entry | Map/card and governing local contract | Owning verification |
+| --- | --- | --- | --- |
+| Switch or restart a Lab, or explain how long the old session lives | `GGLabAppRuntime`: [LabRuntime.cpp](../../../../Sources/GGLabAppRuntime/Lab/LabRuntime.cpp), from `ProcessPendingCommands` through `CommitPendingSession` to `PollRetiringSessions` | [content transitions](../../../../Docs/Architecture/Frame_Execution_Map.md#content-transitions); [Content retirement](../../../../Docs/Architecture/Frame_Execution_Map.md#content-retirement) | AppRuntime `gpu-fault-lifecycle`, including `RunLabSessionRetirementScenario` |
+| Add a Lab parameter or tune a Runtime pass from a Lab | `WinApp`: the Lab session → [LabSessionBase.h](../../../../Sources/GGLabAppRuntime/Lab/LabSessionBase.h) parameter hooks and `ViewRenderProfile` | [content transitions](../../../../Docs/Architecture/Frame_Execution_Map.md#content-transitions); [Lab runtime card](../../../../Docs/Architecture/Modules/Application_Content.md#lab-runtime) | AppRuntime `gpu-fault-lifecycle` (`RunRebuildParameterScenario`); the Lab's WinApp self-test |
+| Keep GPU work in a Lab session | `WinApp`: the session; uploads through `GGLabRuntime` [AssetManager.h](../../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Asset/AssetManager.h) | [Content retirement](../../../../Docs/Architecture/Frame_Execution_Map.md#content-retirement); [Imported resource ownership](../../../../Docs/Architecture/Runtime_Boundaries_Map.md#imported-resource-ownership) for graph imports | WinApp `napa-voxel` as the example; `--lab` GPU runs |
+| Add or register a Lab | `WinApp`: [DesktopApplicationContent.cpp](../../../../Sources/WinApp/Application/Content/DesktopApplicationContent.cpp) → `LabRegistration` in [LabCatalog.h](../../../../Sources/GGLabAppRuntime/Lab/LabCatalog.h) | [Lab runtime card](../../../../Docs/Architecture/Modules/Application_Content.md#lab-runtime); persisted Lab IDs in [AGENTS.md](../../../../AGENTS.md#gpu-shader-and-lab-invariants) | WinApp `app-content-registration` |
+| Release content at shutdown or after a failed frame | `GGLabAppRuntime`: [Shutdown](../../../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp) → `DemoManager` reset | [Teardown ownership](../../../../Docs/Architecture/Frame_Execution_Map.md#teardown-ownership); [Content retirement](../../../../Docs/Architecture/Frame_Execution_Map.md#content-retirement) | AppRuntime `gpu-fault-lifecycle` |
+
+```text
+Anchors:
+  - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::CommitPendingSession
+  - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::LabSessionBase
+  - Sources/WinApp/Application/Content/DesktopApplicationContent.cpp::CreateDesktopApplicationContent
+ReviewPaths:
+  - Docs/Architecture/Frame_Execution_Map.md
+  - Docs/Architecture/Modules/Application_Content.md
+  - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
 ```

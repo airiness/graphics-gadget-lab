@@ -8,8 +8,10 @@ Atlas ID: atlas.runtime.frame-execution
   submission feedback, borrowing or GPU-dependent retirement changes.
 
 This map follows the shared AppRuntime frame path and Runtime settlement on DX12 and
-Vulkan; the [overview](README.md) gives the project layers. Module facts for this path
-are in the cards listed in the [module catalog](Module_Catalog.md).
+Vulkan, then how content is replaced between frames
+([content transitions](#content-transitions)); the [overview](README.md) gives the
+project layers. Module facts for these paths are in the cards listed in the
+[module catalog](Module_Catalog.md).
 
 ## One successful frame
 
@@ -116,11 +118,77 @@ ReviewPaths:
   - Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp
 ```
 
+## Content transitions
+Atlas ID: atlas.application.content-transitions
+
+- Question: what happens to a Demo or Lab session, and to what it owns, when content
+  is switched, rebuilt or shut down?
+- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- Refresh triggers: transition requests or safe points, preparation, activation,
+  retirement, parameter impacts or shutdown order change.
+
+AppRuntime hosts content at two levels: `DemoManager` switches Demos, and the
+`LabRuntime` inside the Lab host Demo switches Lab sessions. Both replace content
+the same way; the [Content retirement](#content-retirement) rule says how long each
+state keeps what it owns. Arrows are state changes.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: request consumed at the safe point
+    Pending --> Released: cancelled, superseded or failed
+    Pending --> Active: preparation ready
+    Active --> Retiring: replaced
+    Retiring --> Released: retire fence completed, or shutdown
+    Active --> Released: shutdown
+    Released --> [*]
+```
+
+| Step | Demos | Lab sessions |
+| --- | --- | --- |
+| Request | `DemoManager::RequestActiveDemo` | `ILabControl`, queued in `LabCommandQueue` |
+| Safe point | `BeginTransitionTick` and `CompleteTransitionTick` in `TickFrame`, before the Demo's `Update` | `LabRuntime::ProcessPendingCommands`, called from `DemoLabHost::Update` before `BeginFrame` |
+| Activation | Parameter and sequence bindings are released, then the old Demo exits and retires | The old session exits and retires; the temporal session serial advances |
+| Release | `PollRetiringDemos` | `PollRetiringSessions` |
+
+The active content keeps rendering while its replacement prepares. A retiring entry
+holds the fence of the last frame that sent feedback, and only frames whose EndFrame
+returned Completed send it. `DemoManager::GetActiveContentIdentity` combines the two
+serials; AppRuntime rebinds parameter control and frame sequences to it.
+
+Inside a Lab session:
+
+| Change | How it applies |
+| --- | --- |
+| Switch | A new pending session of the target Lab |
+| Restart or run configuration | A new pending session of the same Lab, restoring the current parameter values |
+| Parameter with `RebuildScene`, `RecreatePipeline` or `RestartSession` impact | A new pending session; never in place |
+| `Immediate` parameter | In place, through `ApplyImmediateParameters` and the session's `ViewRenderProfile` |
+
+A Lab tunes a Runtime pass through its `ViewRenderProfile`, which resolves into
+per-view settings each frame, as `GTAOLabSession` does for GTAO. Strict parameter
+batches and their receipts are coordinated by
+[SessionParameterControl](../../Sources/GGLabAppRuntime/Parameters/SessionParameterControl.h).
+Napa shows session-owned GPU work: the active session retires replaced mesh sets
+on their graphics fence from `OnFrameSubmitted`, and its preparation uploads go
+through the asset upload scheduler.
+
+```text
+Anchors:
+  - Sources/GGLabAppRuntime/Demo/DemoManager.cpp::DemoManager::CommitPendingDemo
+  - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::ProcessPendingCommands
+  - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::CommitPendingSession
+  - Sources/WinApp/Application/Demo/DemoLabHost.cpp::DemoLabHost::Update
+ReviewPaths:
+  - Sources/GGLabAppRuntime/Lab/LabRuntimeParameters.cpp
+  - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp
+  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
+```
+
 ## Contracts
 Atlas ID: atlas.runtime.frame-contracts
 
-The three rules below cover cross-participant coordination that no single
-interface owns. They detail the GPU and lifetime rules in
+The rules below cover cross-participant coordination that no single interface
+owns. They detail the GPU and lifetime rules in
 [AGENTS.md](../../AGENTS.md#gpu-shader-and-lab-invariants); keep both consistent
 when either changes. Per-interface rules stay in
 [RGDeferredCommit.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h),
@@ -200,5 +268,38 @@ Anchors:
 ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RenderGraph/RGDeferredCommit.cpp
   - Sources/GGLabRuntime/Private/Graphics/RHI/RHIContext.cpp
+  - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
+```
+
+### Content retirement
+Atlas ID: atlas.application.content-retirement
+
+- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- Refresh triggers: retirement fences, pending-content release, session-owned GPU
+  work or failure handling change.
+
+Content is a Demo or a Lab session together with what it owns: its World, cameras,
+pipeline, asset interests and fence-dependent work.
+
+- Replaced content stays alive until the GPU has finished the last frame that drew
+  it and whose EndFrame returned Completed. Content that no such frame drew may be
+  released at the next poll.
+- Pending content is released as soon as its preparation is cancelled, superseded or
+  fails. GPU work it starts belongs to a service that retains it until completion,
+  such as the asset upload scheduler.
+- Active content advances its own fence-dependent work only from submitted-frame
+  feedback.
+- After a Failed or CompletionUnknown frame, AppRuntime stops ticking, and content is
+  released only after [Teardown ownership](#teardown-ownership) establishes
+  quiescence.
+
+```text
+Anchors:
+  - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::PollRetiringSessions
+  - Sources/GGLabAppRuntime/Demo/DemoManager.cpp::DemoManager::PollRetiringDemos
+  - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::BeginPrepare
+ReviewPaths:
+  - Sources/GGLabAppRuntime/Demo/DemoBase.h
+  - Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderState.cpp
   - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
 ```

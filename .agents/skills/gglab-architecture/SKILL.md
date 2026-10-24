@@ -1,6 +1,6 @@
 ---
 name: gglab-architecture
-description: Orient gglab architecture investigations and cross-module changes using local task routes, contracts and source evidence. Use for project ownership, public interfaces, frame lifecycle and RenderGraph/RHI boundaries; ordinary formatting and text corrections need no orientation.
+description: Orient gglab architecture investigations and cross-module changes using local task routes, contracts and source evidence. Use for project ownership, public interfaces, frame lifecycle, RenderGraph/RHI boundaries and Lab lifetime; ordinary formatting and text corrections need no orientation.
 ---
 
 # GGLab architecture

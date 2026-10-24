@@ -8,7 +8,8 @@ Atlas ID: atlas.overview.layers
 
 This page gives the layers and a short tour of one frame. The
 [frame execution map](Frame_Execution_Map.md) then follows the success and failure
-paths in detail, the [runtime boundaries map](Runtime_Boundaries_Map.md) shows where
+paths and content transitions in detail, the
+[runtime boundaries map](Runtime_Boundaries_Map.md) shows where
 render passes belong and how they are composed, and the
 [boundary and drift guide](Boundary_And_Drift_Guide.md) explains how these pages are
 kept current. The [module catalog](Module_Catalog.md) lists every card.
@@ -66,8 +67,7 @@ flowchart TD
 ## Coverage and related guidance
 
 These pages cover the frame path (execution, settlement, GPU-dependent retirement
-and the teardown rules it relies on) and render pass composition. The Lab lifetime
-route is not written yet.
+and the teardown rules it relies on), render pass composition and Lab lifetime.
 
 When making a change, follow [AGENTS.md](../../AGENTS.md), the `Contracts` sections
 of the maps and the owning tests linked from each module card. GPU capture and visual verification use the

@@ -56,8 +56,8 @@ Keep application behavior in its owning domain. Enforce dependency direction
 with compiler include visibility as well as the boundary validator.
 
 The [Architecture Atlas](Docs/Architecture/README.md) maps the project layers, the
-frame path and render pass composition to their source entry points and owning
-tests. Use
+frame path, render pass composition and Lab lifetime to their source entry points
+and owning tests. Use
 [gglab-architecture](.agents/skills/gglab-architecture/SKILL.md) for architecture
 orientation and cross-module changes; its task table selects the relevant map,
 Public interface and implementation path.
@@ -100,7 +100,10 @@ verification claims.
 Lab IDs in `gglab.lab.*` are persisted identifiers. Apply Lab switches and
 rebuild-triggering changes through the LabRuntime safe command path. Preserve
 session ownership of worlds, cameras, pipelines and fence-dependent work; use
-immediate updates only when the state can safely change in place.
+immediate updates only when the state can safely change in place. The Atlas
+[Content retirement](Docs/Architecture/Frame_Execution_Map.md#content-retirement)
+rule details how long replaced and pending content is kept; keep both texts
+consistent when either changes.
 
 ## Source and generated files
 
