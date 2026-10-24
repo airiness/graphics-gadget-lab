@@ -1,187 +1,17 @@
-# Session parameters (additive protocol v4)
+# Session parameters (protocol v4)
 
-`capabilities.parameterFrameProvenance` advertises frozen frame metadata. Capture
-sidecars carry `parameters` schema v1: revision, non-default typed values and their
-defaults/sources, separate requested/active lighting generations and nullable
-profile identities, plus relevant batch receipts. Build freezes inputs; only a
-successful matching submission adds `firstConsumed`. Inspect the artifact instead
-of querying current session state to explain an older capture. Every completed
-production sequence also requires a `gglab.parameter-frames` v1 range product;
-see [sequences](sequences.md) for publication and frame/reference joins.
-
-Use the script and application from the same revision. Check
-`status.capabilities.sessionParameterControl` for Host/mixed-source support.
-`labParameterControl` retains discovery for the earlier Lab-only extension; scheduled
-sequence events are discovered only through `sequenceImmediateEvents`,
-`sequenceDeferredEvents` and `sequenceEventDomains`. The extension adds commands and
-status fields; existing capture/result/sequence fields and their v4 meanings are unchanged.
-
-The external session client owns one batch/result slot shared by Host and active Lab sources.
-Host `view.taa.*`, `view.gtao.*` and `view.exposure.*` work on Demo and Lab content.
-The Lab source supports Immediate parameters with explicit frozen-frame projections
-and **one explicitly
-bound Deferred lighting parameter per batch**, optionally mixed with Immediate
-items. Current bindings are `gtao.ibl.sample_count` and
-`atmosphere_range.ibl.sample_count` (uint, 1–4096). They change IBL specular sample
-count through the owning Runtime control, preserving generation attribution.
-The GTAO fixture covers texture-IBL cache restoration; Atmosphere Range covers
-Physical Sky, whose current producer deliberately skips texture caches.
-
-Host `environment.profile` selects content-registered Physical Sky inputs.
-The bounded authored sun fixture is described below. Frozen parameter metadata is
-saved with frame artifacts. Bound Deferred
-sequence events follow [Sequences](sequences.md#parameter-events).
-`set` rejects during an active sequence; a new
-sequence rejects while a parameter batch is pending. Do not use external `set`
-as a substitute for scheduled events.
-
-## Host display-view overrides
-
-Host ids use snake-case fields. `view.taa.*` exposes the same fields as the
-existing sequence Temporal AA overrides. `view.gtao.*` exposes `enabled`, `radius`,
-`direction_count`, `step_count`, `temporal_accumulation` and `temporal_max_samples`.
-Manual exposure uses `view.exposure.ev100` and `view.exposure.compensation`.
-Discover exact ids, ranges and enum integers through `parameters`; enum names
-are descriptor labels, while `set` uses the typed integer value.
-
-Defaults inherit the active content plus the frame owner's copied tooling overrides.
-Host current values additionally include committed Host overrides. Only explicitly
-changed Host fields become overrides. NoChange leaves an inherited field
-inherited. Overrides last for the active content identity and clear on content
-replacement/restart, except for the owned Rebuild continuation described below;
-this extension has no unset/reset verb. A mixed batch may
-set Host and Lab values atomically; one invalid item rejects all sources.
-Lab values apply first, then Host display-view overrides take precedence.
-Other render views retain their content settings. Exposure and pre-exposure are
-resolved together before temporal planning, without editing the authored camera.
-Discovery and a first NoChange preserve capture settling. `status.frame.frameSerial`
-is the render clock used by receipt stamps; `frameIndex` remains the simulation clock.
-
-Frame precedence is content plus optional tooling settings, Host overrides, then
-legacy sequence overrides. Reference sampling continues to force temporal AA and
-temporal GTAO inactive. Legacy sequence values use the shared Runtime typed settings operations,
-are temporary, and do not replace session Host values. External `set` remains
-blocked throughout a sequence. Immediate events use the same Session transaction owner;
-see [Sequences](sequences.md#parameter-events).
-
-Immediate NoChange is checked against frozen frame inputs before becoming
-terminal. A changed or unchanged stored Lab value masked by Host/tooling, or
-normalized to another value, reports `Superseded` with no `firstConsumed`.
-Inspect every item: a mixed batch can commit all source values while its masked
-Lab item prevents `batch.succeeded`. This does not roll back committed values.
-
-Check each descriptor's `setSupported`. GTAO projects its eleven GTAO settings
-and camera near/far from built view inputs; Atmosphere Range projects aerial
-perspective and TAA enabled. Preview tap, camera input/FOV and Immediate fields
-without a source projection are unavailable through session `set`. The existing
-Lab interactive controls retain their owning-domain behavior. Deferred lighting
-bindings retain their separate generation/publication evidence.
-
-## Rebuild transactions outside sequences
-
-`capabilities.sessionParameterControl.effectClasses` includes `Rebuild`. Descriptors
-with `RebuildScene`, `RecreatePipeline` or `RestartSession` impact use the existing
-Lab candidate preparation, activation and fence-retirement path. Multiple changed
-Rebuild items in one batch produce one operation with the maximum changed impact;
-the response reports that actual `impact`. Setting unchanged Rebuild items starts
-no operation and returns `NoChange` with no publication or consumption stamp.
-
-The external client's ordinary `set` supports Rebuild items mixed with supported
-Lab/Host Immediate items. Rebuild plus Deferred lighting rejects the complete
-batch before mutation: those lighting bindings belong to the old World. Sequence
-events continue to reject Rebuild. Use `-WaitConsumed` and inspect all terminal
-items, since default waiting can return while the candidate is preparing.
-
-Requested Lab storage belongs to the operation while the old active Lab retains
-its inputs. Frame snapshots retain requested values while edit admission is closed
-during preparation/warmup. Lab Immediate companions wait for the target activation's frame proof;
-Host Immediate items report their actual consumption, which can precede activation.
-Host view overrides survive this owned continuation, including explicit values in
-the mixed batch. Unrelated replacement/restart still clears them normally.
-
-Changed Rebuild receipts use `identity.domain: lab-session` and a Runtime-owned
-operation generation. The exact candidate activation supplies publication evidence;
-only a matching built and successfully submitted target frame supplies
-`firstConsumed`. Aborted target frames retain publication and retry without another
-operation. Factory/preparation failures end explicitly and preserve the old active
-Lab; committed Host values are not rolled back. Unrelated switches supersede the
-wait, and shutdown closes unresolved items without invented consumption.
-
-`RunVerification.ps1 -Suite session-rebuild-parameters` exercises
-`forward_plus.fixture` transitions through zero, one and 64 local lights, checks
-retained result ownership and NoChange, and compares actual built scene counts and
-frozen image/graph parameter metadata on both RHIs. Headless fault tests cover the
-three impacts, mixed preparation/drop, failure, abort/retry and lifetime invalidation.
-
-## Content-registered lighting profiles
-
-Discover `environment.profile` and its enum integers through `parameters`.
-The current enum matches Runtime's requested **effective** inputs; `-1` means
-no registered effective match and is read-only. Setting it rejects the batch.
-Registration rejects duplicate IDs/hashes and effective-equivalent aliases, so
-current selection is unambiguous. Source/type binding distinguishes this Host
-enum from a Lab-owned parameter with the same name when no Host profile exists.
-Only ready active content registers profiles; content replacement clears the
-registrations and requested/active identities. Coastal Atrium registers
-`coastal.daylight`; Atmosphere Range registers `atmosphere_range.baseline` and
-`atmosphere_range.oblique` as transition fixtures, not production Golden Hour values.
-
-`parameters.lightingProfiles` lists IDs, SHA-256 input hashes, `hashVersion: 2`
-and nullable `recommendedEV100`. Hash v2 encodes explicit little-endian float32
-fields, canonicalizes direction through the producer's rotation/extraction path,
-and normalizes signed zero; other authored fields remain raw. Profile ID and
-exposure advice are excluded. This supersedes the uncommitted v1 contract, which
-distinguished raw direction magnitudes even when the producer discarded them.
-The first contract supports Physical Sky with IBL intensity 1 and rotation 0.
-Profile application changes the designated sun and atmosphere, not manual exposure.
-Recommended exposure is advisory only. A profile requires an existing designated sun.
-Strict numerical validation belongs to WorldSun, Atmosphere and Camera; profiles
-compose it with producer support and the positive-illuminance profile policy.
-Registrations, prepared inputs, hashes and enum labels are cached for the content
-identity. Invalid registrations omit only this control: discovery's
-`lightingProfileError` and `status.parameterControl.lightingProfileError` explain
-the configuration error, while unrelated Host controls remain available.
-
-The same Session batch accepts one profile item, optionally with Host/Lab Immediate
-items; two Deferred lighting items reject atomically. Re-selecting current inputs
-does not rebake or rewrite equivalent authoring representations. An already active
-target confirms NoChange; a pending target still awaits publication and consumption.
-Quaternion sign, direction magnitude and normalized chromaticity are not compared
-as arbitrary representation bytes when deciding effective equality. Profile
-application uses an explicit Runtime World Lighting control at the safe boundary,
-separate from frame/pipeline access. Existing authored edits settle **before** the
-batch's attribution baseline; a changed profile must then prove its own actual
-request. No generations are predicted and no redundant rebake is forced. Normal
-frame building revalidates/deduplicates.
-
-Both discovery and `status.parameterControl.lighting` expose separate `requested`
-and `active` records (`profileId`, `profileHash`, actual `generation`), or null when
-unknown/custom. The old active identity remains attached to its published generation
-while a newer request is pending; the new profile hash never relabels an old generation.
-Identity comes from immutable authored-input snapshots retained by the actual
-Runtime request/publication, not the current mutable World. Effective equality
-alone does not prove a profile's authored hash: an equivalent selection can be
-NoChange while its profile identity stays unknown, or retains the older request's
-proven identity. The persisted v2 hash still distinguishes other raw authored
-fields (such as chromaticity before normalization); it is not the Runtime
-effective-source identity.
-These records describe the published environment-lighting product, not a claim that
-every direct-light input is delayed until that publication. They are live control
-snapshots; use the saved frame's `parameters` for capture/sequence/export provenance
-as described in [sequences](sequences.md).
-
-Atmosphere Range also exposes the Lab-owned Deferred float
-`atmosphere_range.sun.elevation_degrees` (-90 to 90). It preserves the current
-azimuth and other lighting inputs; a mixed batch still permits only one Deferred
-lighting item. `RunVerification.ps1 -Suite lab-sun-parameters` exercises this binding,
-including profile rebasing, repeated NoChange and its frame/receipt evidence.
+Use `parameters` to discover ready active content, then submit typed changes with
+`set`. Check `status.capabilities.sessionParameterControl` and each descriptor's
+`setSupported`; discovery is not a promise that every authored field is editable.
 
 ## Discover and set
+
+With an existing GTAO session named `check`:
 
 ```powershell
 $script = 'Scripts/Verification/GGLabSession.ps1'
 powershell -NoProfile -ExecutionPolicy Bypass -File $script parameters -Session check
-# Prefer a UTF-8 file to avoid shell quoting; preserve the outer array for one item.
+# A UTF-8 file avoids shell quoting; retain the outer array for one item.
 $changesFile = Join-Path (Get-Location) 'Build/radius-changes.json'
 [IO.File]::WriteAllText($changesFile,
     '[{"id":"gtao.radius","type":"float","value":2.0}]',
@@ -190,189 +20,179 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $script set -Session check `
     -ChangesFile $changesFile -WaitConsumed
 ```
 
-`parameters` returns the active `contentId`, current `revision`, and descriptors
-with `id`, `source`, display `name`/`group`, `type`, `impact`, `declaredClass`,
-`editPolicy`, `default`, `current`, nullable `min`/`max`, `enumItems` and
-`setSupported`. The latter describes the supported effect class; admission can
-still be Busy or require a ready Lab. No ready active content returns `NoParameterSource`.
+Discovery returns `contentId`, `revision` and descriptors with source, type,
+impact/effect class, edit policy, current/default values, ranges, enum integers
+and `setSupported`. No ready active content returns `NoParameterSource`.
 
-Wire set: `{"protocol":4,"id":7,"command":"set","changes":[{"id":"gtao.radius","type":"float","value":2.0}]}`.
-Every item takes exactly `id`, `type`, `value`. Types must match the descriptor:
+| Control | Supported scope |
+| --- | --- |
+| Host `view.taa.*`, `view.gtao.*` | Display-view overrides on Demo and Lab content. |
+| Host `view.exposure.ev100`, `view.exposure.compensation` | Manual exposure, independent of lighting profiles. |
+| Host `environment.profile` | Content-registered Physical Sky profiles. |
+| Lab Immediate fields | Fields with explicit frozen-frame projections; inspect `setSupported`. |
+| `gtao.ibl.sample_count`, `atmosphere_range.ibl.sample_count` | Deferred uint, 1-4096; texture IBL and Physical Sky respectively. |
+| `atmosphere_range.sun.elevation_degrees` | Deferred float, -90 to 90; preserves azimuth and other lighting inputs. |
+| Lab Rebuild fields | Supported `RebuildScene`, `RecreatePipeline` or `RestartSession` descriptors. |
+
+Each change has exactly `id`, `type`, `value`; types match the descriptor:
 
 | Type | JSON value |
 | --- | --- |
-| `bool` | Boolean; no numeric or string coercion. |
-| `int`, `enum` | Signed 32-bit integer; enum values must be declared item integers. |
+| `bool` | Boolean, without numeric/string coercion. |
+| `int`, `enum` | Signed 32-bit integer; enums use declared integers, not labels. |
 | `uint` | Unsigned 32-bit integer. |
-| `float` | Finite number representable as a 32-bit float. |
-| `vector3` | Three finite float components. |
-| `color` | Four finite float components, RGBA. |
+| `float` | Finite number representable as float32. |
+| `vector3`, `color` | Three finite float components or four in RGBA order respectively. |
 
 Integer types reject fractional/exponent JSON numbers even when mathematically
-integral. Float inputs use float storage, without range clamping. A batch has
-1–128 items with distinct ids (1–128 UTF-8 bytes each). Capability fields additionally
-advertise `effectClasses`, `deferredDomains: ["lighting"]` and
-`maxLightingItemsPerBatch: 1`. Unbound Deferred declarations reject. Unknown ids, mismatched
-types, invalid enums/ranges, unsupported effects and any invalid item reject the
-whole batch without changing live values or revision. String parsing for Debug
-startup `-LabParameters` is a separate path.
+integral. Floats are not range-clamped. A batch has 1-128 distinct ids, each
+1-128 UTF-8 bytes. Unknown ids, invalid values/types/ranges and unsupported effects
+reject the whole batch without changing live values or revision. Complete-batch
+preparation revalidates at application; post-commit effect failures are receipt
+outcomes and do not roll back committed values or already-started GPU work.
+
+A batch accepts at most one bound Deferred lighting item, optionally with
+Immediate items. Rebuild may accompany supported Immediate values, but Rebuild
+with Deferred lighting rejects atomically. `set` rejects during an active
+sequence; a sequence rejects pending external parameter work, and event sequences
+also reject retained terminal results. Consume those first and use
+[scheduled events](sequences.md#parameter-events) for in-sequence changes.
+Startup `-LabParameters` uses a separate Debug/Develop-only string parser.
 
 ## Wait, query and consume
 
-Wire submission immediately returns `admission: Accepted`, `batchId`,
-`consumed: false` and a `Queued` batch. No revision or receipt stamps are invented
-before the actual Ready frame. The external client retains one AppRuntime session-owned
-accepted batch/result slot; terminal results retain it until explicit consumption. Rejection allocates
-no batch id. IDs are process-local and **separate from capture `jobId`** and
-transport correlation `id`.
-
-Internally, Session separates one queued source reservation from a bounded set of
-128 retained transaction records, including terminal results. The same internal
-owner may admit another batch after application while older effects await domain
-publication or successful submission. Owner identity plus batch ID controls query,
-collection and cancellation; external commands cannot claim sequence records.
-Each batch retains its own revision, values, effect evidence and four stamps.
-A later unrelated revision does not supersede an older pending item. A committed
-different assignment to that item's ID, or a newer owning-domain target before
-build, supersedes it without inventing consumption. Owner termination closes every
-outstanding item and releases only the queued reservation. This storage capability
-does not itself grant readiness exceptions. Deferred sequence events use the
-owner- and generation-bound policy in [Sequences](sequences.md#parameter-events).
-
-At the Ready boundary, the Session prepares the complete current batch before
-committing any of its live values: source/type bindings, Host candidates and
-overrides, the Lab's queued reservation/candidate, World Lighting target and
-input plan, revision and receipt storage. Preparation does not invoke Lab
-handlers, consume the Lab command or start the batch's lighting request. A
-preparation rejection leaves those live values and revisions unchanged, including
-manual exposure when a designated sun disappeared after admission. Settling an
-already-authored external World edit happens before this batch's baseline and
-is not a request created by the rejected batch.
-
-Commit installs all source values without intervening content callbacks or
-fallible validation. Lab handlers execute afterward, so they cannot observe a
-half-committed mixed batch. Explicit Host display-view values still take
-precedence over Lab view changes; an inherited NoChange remains inherited unless
-the Lab effect actually changes that field. Post-commit effect failure,
-supersession and GPU publication/submission failure remain receipt outcomes, not
-a promise of GPU rollback. Host view, Lab and lighting-profile source adapters
-own their candidate changes and evidence translation; Session alone owns the
-batch receipts/result. World authoring control is supplied through Runtime
-composition access, not ordinary pipeline RenderServices. Busy admission releases
-only reservations acquired by that attempt, preserving any pre-existing source
-reservation even if its numeric ID coincides.
+Admission immediately returns `batchId` and a `Queued` batch; rejection allocates
+no batch id. The external client has one retained batch/result slot shared by
+Host and Lab sources. Session owns receipts; terminal results hold the slot until
+consumed. `batchId`, capture `jobId` and transport correlation `id` are separate
+process-local namespaces. External commands cannot claim sequence-owned batches.
 
 The script waits for application by default. `-NoWait` returns admission only;
-`-WaitConsumed` waits for every effect to become terminal (including failure or
-supersession), and cannot be combined with `-NoWait`. Waiting queries explicitly
-consume terminal results unless `-KeepResult`. If default waiting returns an
-applied but nonterminal batch, it remains owned and must be queried/consumed
-later. A command's `ok` and exit 0 describe the control operation; require
-`batch.terminal` and `batch.succeeded: true` for successful effects.
+`-WaitConsumed` waits for every effect to become terminal, including failure or
+supersession, and cannot be combined with `-NoWait`. Waiting consumes terminal
+results unless `-KeepResult`; applied nonterminal results require later query
+and consumption. Require `batch.terminal` and `batch.succeeded: true` for successful
+effects; `ok` and exit 0 describe only the control operation.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $script set -Session check `
-    -ChangesFile $changesFile -NoWait
+$queued = powershell -NoProfile -ExecutionPolicy Bypass -File $script set `
+    -Session check -ChangesFile $changesFile -NoWait | ConvertFrom-Json
+if (-not $queued.ok) { throw ($queued | ConvertTo-Json -Depth 10) }
 powershell -NoProfile -ExecutionPolicy Bypass -File $script parameter-result `
-    -Session check -BatchId 1
+    -Session check -BatchId $queued.batchId
 powershell -NoProfile -ExecutionPolicy Bypass -File $script parameter-result `
-    -Session check -BatchId 1 -Consume
+    -Session check -BatchId $queued.batchId -Consume
 ```
 
-Wire query: `{"protocol":4,"id":8,"command":"parameter-result","batchId":1,"consume":false}`.
-Pending consumption never releases the slot. Wrong, consumed or unavailable
-owner ids return `status: not-found`. `status.parameterControl` reports current
-availability/revision and borrows the same batch. It has no second result cache
-or unbounded history. Retained batches preserve their owned admission values,
-even if application fails or content is replaced. Results remain queryable
-through the session owner after replacement and retain their original content id.
-Process termination ends retention. LabRuntime owns its safe queued mutation,
-without holding a second result or receipt cache.
+Pending consumption never releases the slot. Unknown/consumed/other-owner ids
+return `status: not-found`. Results retain admitted values and original content
+identity through failure or content replacement; process termination ends retention.
+`status.parameterControl` exposes availability, revision and the same retained batch.
 
-`batch` includes source (`host`, `lab` or `mixed`)/content, state (`Queued`, `Applying`, `Finished`,
-`Failed`), revision (null until application), actual changed Lab impact,
-owned `values`, `items`, failure and terminal/success indicators. `Immediate`
-impact means no Lab rebuild; it is independent of the per-item effect class. Each effect item
-reports its declared class, actual revision/domain/generation identity, state,
-requested/applied/published/firstConsumed stamps and failure. Immediate
-`published == applied`; only the exact successfully submitted frame state can
-supply `firstConsumed`. `NoChange` records requested/applied confirmation but no
-publication/consumption and introduces no revision or new bake request.
-Superseded, failed and unreached effects are terminal without successful
-consumption. Capability is declared independently from operation evidence. After
-all sources commit, the explicit Deferred handler returns this synchronous
-operation's Runtime outcome and target identity. A new request must cover the
-apply boundary; the owning operation may issue more than one request. An unchanged
-operation binds the existing requested target without another bake. Unsupported,
-missing or stale attribution fails; it is never inferred from an earlier cached
-request, the descriptor or the `ibl` readiness gate. A mixed batch retains per-item
-classes and stamps.
+Timeout/polling failure preserves `batchId`; query it without resubmitting. A lost
+consuming response may already have released the slot. Lost admission reports
+`admissionUnknown`: inspect `status.parameterControl.batch` and its values before
+recovery. It is not an idempotency key; do not blindly resubmit.
 
-The Runtime frame builder freezes the published lighting generation in its
-`RenderScene`. That immutable scene state, followed by successful submission,
-establishes Deferred consumption. Publication observed in an aborted build stays
-recorded, while retry alone can supply firstConsumed. New requests/values can
-supersede pending states; a post-build request cannot relabel an already built
-frame. A terminal failed batch closes unresolved siblings without erasing their
-existing evidence. Accepted application/effect failure does not roll back live
-values or pretend already-started GPU work was cancelled.
+## Read effect receipts
 
-Deferred NoChange requires unchanged effective intent, a fresh operation result,
-and an already active matching Runtime target. It confirms without a new request
-or publication/firstConsumed stamp. Equal stored values whose target is still
-pending bind that target and await actual publication and submitted consumption.
-A Deferred operation runs even for equal stored values; an unrelated Immediate
-batch never invokes the Deferred binding. The fixtures change global bake quality
-only while entered and restore the owned
-override on exit. If no sample override was used, they do not restore unrelated
-quality edits. Declared Immediate behavior contradicting an actual lighting
-request continues to fail as EffectMismatch.
+Inspect each item's class, actual revision/domain/generation identity, failure,
+and `requested`, `applied`, `published`, `firstConsumed` stamps. Batch `impact`
+reports actual changed Lab impact; `Immediate` impact means no Lab rebuild,
+independently of an item's effect class.
 
-Timeout and polling transport failure preserve `batchId` without resubmitting,
-cancelling or inventing an outcome. A lost consuming response may already have
-released the slot. If admission's response is lost, `admissionUnknown` is true;
-inspect `status.parameterControl.batch` and its values before deciding how to
-recover. It is evidence for inspection, not an idempotency key. Do not blindly
-resubmit. File/transport failures still print one JSON error result.
+| Effect | Publication and consumption evidence |
+| --- | --- |
+| Immediate | `published == applied`; matching frozen inputs in a successfully submitted frame establish `firstConsumed`. |
+| Deferred lighting | Actual Runtime request/publication generation, then a matching frozen scene in a successfully submitted frame. |
+| Rebuild | `lab-session` operation generation, exact candidate activation, then its successfully submitted target frame. |
+| NoChange | Requested/applied confirmation without a new revision, publication or consumption stamp. |
 
-## Verify on native backends
+Equal stored Deferred values are NoChange only when effective intent is unchanged
+and the matching Runtime target is already active. A still-pending target must
+await publication and consumption. Publication observed on an aborted frame is
+retained; retry supplies consumption without reapplying the operation. Never infer
+consumption from readiness, application or a predicted serial. Missing/stale
+attribution fails; a contradictory declared effect reports `EffectMismatch`.
 
-`Tests/Verification/RunVerification.ps1 -Suite lighting-profiles` checks Coastal
-Atrium registration and Atmosphere Range baseline/oblique/baseline transitions on
-both RHIs, atomic rejection, mixed profile/Lab Immediate/Host NoChange commits,
-exposure independence, actual generation receipts, captured generations and
-uncached Physical Sky publication logs. Headless
-AppRuntime coverage additionally checks prepare-time loss of a Lab reservation
-or designated sun, mutation-free rejection, complete commit visibility to Lab
-handlers, Host precedence after Lab effects, source/type collisions, registration
-errors/cache lifetime, effective equivalence, unresolved authored edits,
-requested/active separation, supersession, publication on abort/retry, shutdown
-and running content replacement. The synthetic headless
-producers exercise real scheduler/fence/receipt ownership, not native shader products.
+A committed different assignment to the same id or a newer owning-domain target
+can supersede pending effects; an unrelated revision does not. Post-build requests
+cannot relabel built frames. Failed batches close unresolved siblings while
+preserving existing evidence. Use saved [frame provenance](session-jobs.md#frame-provenance)
+to explain artifacts, rather than the session's current mutable state.
 
+## Host display-view overrides
 
-`Tests/Verification/RunVerification.ps1 -Suite session-host-parameters` checks
-Host discovery, atomic mixed-source rejection, submitted receipts, NoChange,
-result retention, captured settings, exposure image response, exact settling origin
-across discovery/first NoChange, and sequence exclusion on Coastal Atrium Demo and
-GTAO Lab, using both RHIs by default. The suite primes clean ready history through
-an after-ready capture, then compares each content's authored exposure with +2 EV.
-Direct invocation accepts `-StateDirectory` to reuse task-owned verification caches;
-omit it for a new isolated state directory. Captures and receipts stay run-local.
+Defaults inherit active content plus copied tooling settings; current values also
+include committed Host overrides. Only changed Host fields become overrides;
+NoChange preserves inheritance. Precedence is content/tooling, Host overrides,
+then legacy sequence overrides. Lab values apply first and explicit Host fields
+win. Other render views retain their content settings. Exposure/pre-exposure
+resolve together without editing the authored camera.
 
+An Immediate Lab value masked by Host/tooling or normalized to another built value
+reports `Superseded` without `firstConsumed`. Inspect every item: a mixed batch may
+commit all values while one masked item prevents success. Discovery and a first
+NoChange preserve settling. Receipt `frameSerial` is the render clock;
+`frameIndex` is the simulation clock.
 
-`Tests/Verification/RunVerification.ps1 -Suite session-parameters` runs the hidden
-GTAO and Atmosphere Range Labs on both RHIs by default and accepts
-Debug/Develop/Release. For a focused rerun, invoke
-`TestSessionParameters.ps1 -Scope lighting` directly with typed `-Rhi` arrays;
-the default scope includes both Immediate and Deferred coverage. Immediate
-regression covers atomic rejection, result
-ownership, NoChange, identity and sequence exclusion, plus final-AO diagnostics
-for two radii. Deferred regression changes sample count in three arms, verifies
-mixed classes and four stamps, matches the actual captured generation/config,
-and checks publication logs: a restored texture configuration must publish a
-new generation with four cached stages and no GPU build stages; Physical Sky
-must use uncached GPU bakes. Native standard validation is requested. Inspect
-the capture PNGs and logs as well. These are scoped fixture parameter contracts,
-not arbitrary sun inputs, scheduled-event, cross-backend identity, performance
-or real driver-fault proof.
+Overrides clear on content replacement/restart except the owned Rebuild
+continuation below; there is no unset/reset verb. Legacy sequence overrides are
+temporary and do not replace Host values. Reference sampling forces temporal AA
+and temporal GTAO inactive. Preview tap, camera input/FOV and other Immediate
+fields without frozen projections remain unavailable through `set`.
+
+## Content-registered lighting profiles
+
+Discover enum integers through `parameters`. `-1` is a read-only indication of no
+registered effective match; setting it rejects the batch. Coastal Atrium registers
+`coastal.daylight`; Atmosphere Range registers `atmosphere_range.baseline` and
+`atmosphere_range.oblique` transition fixtures. Golden Hour values belong to GI P5.
+
+Profiles require a designated sun and support Physical Sky with IBL intensity 1
+and rotation 0. They change sun/atmosphere, not manual exposure;
+`recommendedEV100` is advisory. Invalid registrations omit this control and expose
+`lightingProfileError` in discovery/status without disabling other Host controls.
+Registrations clear with content replacement.
+
+`parameters.lightingProfiles` supplies ids, SHA-256 hashes and `hashVersion: 2`.
+Discovery and `status.parameterControl.lighting` keep separate `requested` and
+`active` profile id/hash/generation records, null when unknown/custom. A pending
+request never relabels the old active generation. Effective equality may confirm
+NoChange without proving a profile hash; the authored hash is distinct from
+Runtime's effective-source identity. These identities describe environment-lighting
+publication, not delayed publication of every direct-light input.
+
+## Rebuild transactions outside sequences
+
+Multiple changed Rebuild items create one operation at their maximum changed
+impact. Unchanged items start no operation. Admission closes during candidate
+preparation/warmup; requested Lab values and the old active Lab remain distinct.
+Host overrides survive the owned continuation. Lab Immediate companions await
+target activation's frame proof; Host Immediate items can be consumed earlier.
+Use `-WaitConsumed` to include activation/consumption in the result.
+
+Factory/preparation failure preserves the old active Lab without rolling back
+committed Host values. Aborted target frames retain publication and retry without
+another operation. Unrelated content switches supersede the wait; shutdown closes
+unresolved effects. Sequence events reject Rebuild.
+
+## Focused verification
+
+Select suites with [RunVerification.ps1](../../../../Tests/Verification/RunVerification.ps1);
+`-List` owns the current catalog and supported configurations.
+
+| Suite | Main evidence |
+| --- | --- |
+| `session-parameters` | GTAO Immediate and texture/Physical Sky Deferred receipts, captured settings/generations and cache-publication paths. |
+| `session-host-parameters` | Demo/Lab overrides, mixed-source atomicity, settling, exposure response and result retention. |
+| `lighting-profiles` | Profile discovery/transitions, exposure independence and requested/active identities. |
+| `lab-sun-parameters` | Authored sun elevation, profile rebasing and NoChange. |
+| `session-rebuild-parameters` | Zero/one/64-light fixtures, retained results and built scene/frame provenance. |
+
+These suites run hidden on both RHIs by default. For lighting-only coverage,
+invoke `Tests/Verification/TestSessionParameters.ps1 -Scope lighting` directly with
+typed `-Rhi` arrays. [TestHostParameters.ps1](../../../../Tests/Verification/TestHostParameters.ps1) accepts `-StateDirectory` for
+task-owned verification caches; omit it for isolated state. Scheduled-event suites
+are listed in [Sequences](sequences.md#parameter-events). Headless fault tests
+exercise ownership/failure paths; native receipts and artifacts establish GPU effects.
