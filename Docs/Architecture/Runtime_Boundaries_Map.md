@@ -113,8 +113,8 @@ from whether it could be reused:
 
 - It is Runtime-owned when the production recipe requires it or must place it, for
   example before the temporal boundary or between Runtime passes; when it reads or
-  publishes a Private record that Runtime passes exchange; or when its state must
-  settle with the frame, such as temporal history.
+  publishes a Private record that Runtime passes exchange; or when it requires
+  participation in a Runtime-owned settlement transaction, such as temporal history.
 - Otherwise it can be Lab-owned and composed through a Public seam. Reuse across Labs
   does not by itself make a pass Runtime-owned.
 - WinApp never depends on Runtime Private. A Lab that needs a Private record or a
