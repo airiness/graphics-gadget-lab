@@ -40,8 +40,9 @@ flowchart TD
    pipeline. If it returns early after the frame began, the scoped `RenderFrame`
    handle aborts that frame.
 4. The pipeline declares graph passes; RenderGraph compiles their dependencies and
-   records the surviving passes through RHI contexts. A pass may queue a CPU-side
-   commit, but the commit runs only after the frame's submission succeeds.
+   records the surviving passes through RHI contexts. A pass may also queue a
+   CPU-side commit; the [Frame settlement](Frame_Execution_Map.md#frame-settlement)
+   contract decides when it runs.
 5. Renderer ends or aborts the frame and settles its Runtime participants once. The
    [settlement contract](Frame_Execution_Map.md#frame-settlement) keeps four
    outcomes apart: submitted, failed, discarded and completion unknown.

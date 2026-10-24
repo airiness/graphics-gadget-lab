@@ -126,6 +126,19 @@ function Get-AtlasImpactReasons {
     }
 }
 
+function Get-AtlasExternalReferences {
+    param([string]$Text)
+    # Known design-repository names and explicit reading instructions only; publication
+    # review covers any other wording.
+    $pattern = '(?i)graphics-gadget-lab-docs|GraphicsGadgetLabDocs|gglab-docs|\bGGLab_\w+\.md\b|' +
+        '\b(?:documentation|design|docs) repo(?:sitory)?\b|\bbootstrap protocol\b'
+    $number = 0
+    foreach ($line in ($Text -split '\r?\n')) {
+        $number++
+        foreach ($match in [regex]::Matches($line, $pattern)) { "line ${number}: $($match.Value)" }
+    }
+}
+
 function Get-AtlasAncestry {
     param([bool]$ObjectAvailable, [int]$AncestorExit, [bool]$Shallow)
     if (-not $ObjectAvailable -or $AncestorExit -gt 1) { return "EvidenceIncomplete" }
@@ -188,8 +201,16 @@ function Invoke-AtlasSelfTests {
     $checks.Add(((Get-AtlasAncestry $true 128 $false) -eq 'EvidenceIncomplete'))
     $slugs = @(Get-AtlasHeadingSlugs "# A / B`n# A / B`n# Contract ``Run```n``````text`n# Hidden`n``````")
     $checks.Add(($slugs.Count -eq 3 -and $slugs[1] -eq 'a--b-1' -and $slugs[2] -eq 'contract-run'))
+    $references = @(Get-AtlasExternalReferences (
+        "Read [it](https://github.com/airiness/graphics-gadget-lab-docs/blob/main/GGLab_Plan.md).`n" +
+        "Ask the documentation repository.`nSee the design repo or docs repository.`n" +
+        "Follow the Bootstrap Protocol."))
+    $checks.Add(($references.Count -eq 6 -and $references[0] -eq 'line 1: graphics-gadget-lab-docs'))
+    $checks.Add(($references[2] -eq 'line 2: documentation repository' -and $references[5] -like 'line 4: *'))
+    $checks.Add((@(Get-AtlasExternalReferences ("Documentation-only changes keep the baseline.`n" +
+        "See Docs/Architecture/README.md in the graphics-gadget-lab repository for the design reason.")).Count -eq 0))
     if ($checks.Contains($false)) { throw "Atlas self-tests failed: $($checks.IndexOf($false) + 1)" }
-    Write-Output "SELF-TEST PASS - Atlas navigation/impact/baseline predicates ($($checks.Count) checks)."
+    Write-Output "SELF-TEST PASS - Atlas navigation/impact/baseline/publication predicates ($($checks.Count) checks)."
 }
 
 if ($SelfTest) {
@@ -209,11 +230,15 @@ $files += @(Get-ChildItem -LiteralPath (Join-Path $root '.agents/skills/gglab-ar
     ForEach-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') })
 $entries = @()
 $issues = [System.Collections.Generic.List[object]]::new()
+$publication = [System.Collections.Generic.List[object]]::new()
 $linkCount = 0
 foreach ($file in $files) {
     $full = Join-Path $root $file
     $text = [System.IO.File]::ReadAllText($full)
     $entries += @(Read-AtlasEntries ($text -split '\r?\n') $file)
+    foreach ($reference in @(Get-AtlasExternalReferences $text)) {
+        $publication.Add([pscustomobject]@{ File = $file; Kind = 'ExternalDocsReference'; Target = $reference })
+    }
     foreach ($match in [regex]::Matches($text, '\]\(([^)\s]+)\)')) {
         $target = $match.Groups[1].Value
         if ($target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') { continue }
@@ -311,7 +336,8 @@ $report = [pscustomobject]@{
     ImpactCoverage = $(if ($incomplete.Count -gt 0) { 'EvidenceIncomplete' } else { 'Available' })
     IncompleteReasons = @($incomplete.ToArray()); Baselines = @($baselineResults)
     CheckedFiles = $files.Count; LocalLinks = $linkCount; Entries = $entries.Count
-    NavigationIssues = @($issues.ToArray()); ChangedPaths = @($changes); ReviewCandidates = @($candidates)
+    NavigationIssues = @($issues.ToArray()); PublicationFindings = @($publication.ToArray())
+    ChangedPaths = @($changes); ReviewCandidates = @($candidates)
 }
 if ($AsJson) { $report | ConvertTo-Json -Depth 8 }
 else {
@@ -319,7 +345,7 @@ else {
     foreach ($baseline in $baselineResults) {
         Write-Output "Baseline $($baseline.VerifiedAgainst): availability $($baseline.Availability), ancestry $($baseline.Ancestry). $($baseline.Reason)"
     }
-    foreach ($issue in $issues) { Write-Output "$($issue.Kind): $($issue.File) -> $($issue.Target)" }
+    foreach ($issue in @($issues) + @($publication)) { Write-Output "$($issue.Kind): $($issue.File) -> $($issue.Target)" }
     foreach ($candidate in $candidates) {
         Write-Output "ReviewRequired: $($candidate.Id)"
         foreach ($reason in $candidate.Reasons) { Write-Output "  $reason" }

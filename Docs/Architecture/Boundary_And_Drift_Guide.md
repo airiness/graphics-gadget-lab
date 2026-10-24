@@ -79,8 +79,13 @@ whether each `VerifiedAgainst` commit is an available ancestor of `HEAD`. It lis
 as `ReviewRequired` the entries whose anchors or review paths changed since the
 merge base or in the working tree; review each with the procedure above. Missing
 history or an unavailable merge base is reported as `EvidenceIncomplete`, never
-fetched. A produced report exits 0 even
-with findings, and `-AsJson` emits the same data.
+fetched. A produced report exits 0 even with findings, and `-AsJson` emits the
+same data.
+
+The helper also reports `ExternalDocsReference` for known names, links and explicit
+reading instructions that point at external design documents in the files it reads.
+Atlas pages and the Skill must stay usable from this repository alone; publication
+review still reads changed guidance for dependencies the pattern cannot recognize.
 
 The existing validator owns boundary rules; report its result separately from
 map freshness:
