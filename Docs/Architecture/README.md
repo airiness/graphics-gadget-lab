@@ -15,8 +15,7 @@ For a specific investigation or change, start with the
 
 ## Layers
 
-Arrows mean **calls or supplies work to**; they are not project references or
-instance ownership.
+Arrows mean **calls or supplies work to**.
 
 ```mermaid
 flowchart TD

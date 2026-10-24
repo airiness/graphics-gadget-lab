@@ -10,10 +10,9 @@ Atlas ID: atlas.maintenance.boundaries-freshness
 
 Source and project membership show what the implementation does. Local interface
 contracts, [AGENTS.md](../../AGENTS.md) and the map
-[Contracts](Frame_Execution_Map.md#contracts) state what it is required to do. A
-passing test shows only the cases it executed. When source and a rule disagree,
-resolve it with the subsystem owner as either an implementation fix or an explicit
-rule change.
+[Contracts](Frame_Execution_Map.md#contracts) state what it is required to do.
+When source and a rule disagree, resolve it with the subsystem owner as either an
+implementation fix or an explicit rule change.
 
 `VerifiedAgainst` is the source commit that was reviewed, not the commit that
 contains the map.
@@ -78,9 +77,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CheckArchitectureAtl
 The helper checks local links, heading anchors and anchor file/symbol text, and
 whether each `VerifiedAgainst` commit is an available ancestor of `HEAD`. It lists
 as `ReviewRequired` the entries whose anchors or review paths changed since the
-merge base or in the working tree; review each with the procedure above, since the
-list is not a staleness verdict. Missing history or an unavailable merge base is
-reported as `EvidenceIncomplete`, never fetched. A produced report exits 0 even
+merge base or in the working tree; review each with the procedure above. Missing
+history or an unavailable merge base is reported as `EvidenceIncomplete`, never
+fetched. A produced report exits 0 even
 with findings, and `-AsJson` emits the same data.
 
 The existing validator owns boundary rules; report its result separately from

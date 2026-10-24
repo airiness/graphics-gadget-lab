@@ -45,8 +45,8 @@ sequenceDiagram
 
 ## Early exit and outcome derivation
 
-Arrows below are **control flow**, not GPU execution or ownership. The RHI result
-and the Renderer end/abort path together determine the settlement.
+Arrows below are **control flow**. The RHI result and the Renderer end/abort path
+together determine the settlement.
 
 ```mermaid
 flowchart TD
@@ -146,8 +146,7 @@ Plain CPU deferred commits run only for Submitted: once each, in enqueue order,
 after every participant. Every other outcome discards them, and so does
 frame-lifetime cleanup. This keeps recorded work from publishing CPU state before
 its submission is accepted, while GPU-dependent owners are still retained when the
-transaction fails. Passes must not reproduce this policy, and a retention fence is
-never evidence of a successful frame.
+transaction fails. Passes must not reproduce this policy.
 
 ### Settlement contract failures
 
@@ -180,9 +179,9 @@ Shut down in this order:
 Unknown completion and timed-out waits do not count as device loss. When teardown
 ends in `RHITeardownState::Unverified` on a live device, GPU-visible memory is
 leaked rather than destroyed: AppRuntime shutdown exits the process without
-destructing it, and `Renderer::Finalize` abandons its retained owners. Neither path
-may fall back to ordinary destruction. After confirmed loss, owners may be
-destroyed without fence waits, but GPU-written contents stay unusable.
+destructing it, and `Renderer::Finalize` abandons its retained owners. After
+confirmed loss, owners may be destroyed without fence waits, but GPU-written
+contents stay unusable.
 
 ```text
 Anchors:

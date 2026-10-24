@@ -12,7 +12,7 @@ map section and the cards needed for the question. Use the
 [overview](../../../Docs/Architecture/README.md) when the owner is unclear.
 
 Identify the owning project, its Public interface and its implementation entry
-separately. Reading an implementation does not grant include access.
+separately.
 
 ## Verify
 
