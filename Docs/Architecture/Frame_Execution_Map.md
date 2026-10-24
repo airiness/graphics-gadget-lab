@@ -168,9 +168,9 @@ A Lab tunes a Runtime pass through its `ViewRenderProfile`, which resolves into
 per-view settings each frame, as `GTAOLabSession` does for GTAO. Strict parameter
 batches and their receipts are coordinated by
 [SessionParameterControl](../../Sources/GGLabAppRuntime/Parameters/SessionParameterControl.h).
-Napa shows session-owned GPU work: the active session retires replaced mesh sets
-on their graphics fence from `OnFrameSubmitted`, and its preparation uploads go
-through the asset upload scheduler.
+Napa shows session-owned GPU work: `OnFrameSubmitted` records the last-use graphics
+fence, and `Update` polls completion to retire replaced mesh sets. Preparation
+uploads go through the asset upload scheduler.
 
 ```text
 Anchors:
@@ -287,8 +287,9 @@ pipeline, asset interests and fence-dependent work.
 - Pending content is released as soon as its preparation is cancelled, superseded or
   fails. GPU work it starts belongs to a service that retains it until completion,
   such as the asset upload scheduler.
-- Active content advances its own fence-dependent work only from submitted-frame
-  feedback.
+- Active content advances last-use frame fences only from submitted-frame feedback.
+  Completion polling, including from `Update`, may release resources after their
+  recorded fences complete.
 - After a Failed or CompletionUnknown frame, AppRuntime stops ticking, and content is
   released only after [Teardown ownership](#teardown-ownership) establishes
   quiescence.
@@ -300,6 +301,7 @@ Anchors:
   - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::BeginPrepare
 ReviewPaths:
   - Sources/GGLabAppRuntime/Demo/DemoBase.h
+  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
   - Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderState.cpp
   - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
 ```

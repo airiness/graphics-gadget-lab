@@ -59,6 +59,7 @@ Anchors:
   - Sources/GGLabAppRuntime/Demo/DemoManager.h::DemoManager
   - Sources/GGLabAppRuntime/Demo/DemoBase.h::DemoBase
 ReviewPaths:
+  - Sources/GGLabAppRuntime/Demo/DemoManager.cpp
   - Sources/GGLabAppRuntime/ApplicationContentRegistration.cpp
 ```
 
@@ -92,6 +93,8 @@ Anchors:
   - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::LabSessionBase
   - Sources/WinApp/Application/Demo/DemoLabHost.h::DemoLabHost
 ReviewPaths:
+  - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp
+  - Sources/GGLabAppRuntime/Lab/LabRuntimeParameters.cpp
   - Sources/GGLabAppRuntime/Lab/LabCommandQueue.cpp
   - Sources/WinApp/Application/Content/DesktopApplicationContent.cpp
 ```
