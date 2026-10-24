@@ -3,6 +3,33 @@
 Select one row, then follow its source and contract links. Cards describe the
 provider/consumer and lifetime details; the table selects the starting point.
 
+## Project ownership and dependencies
+Atlas ID: atlas.routes.project-ownership
+
+- Question: which project owns the code and what build/include relationship
+  applies to a change?
+- VerifiedAgainst: `48f6226ef04ad528a744f3ae11933469a64b1627`
+- Refresh triggers: source ownership, project references, imports, build profiles
+  or privileged include visibility change.
+
+| Task or question | Source entry | Map and governing local rule | Verification |
+| --- | --- | --- | --- |
+| Find a source owner or choose a project | [Solution](../../../../GraphicsGadgetLab.sln), then the owner's `ClCompile`/`ClInclude` items | [Project inventory](../../../../Docs/Architecture/Repository_Module_Map.md#projects-and-source-ownership); [ownership rules](../../../../AGENTS.md#ownership-and-dependency-boundaries) | [Boundary validator](../../../../Scripts/ValidateProjectBoundaries.ps1) |
+| Change a project reference or build profile | The declaring `.vcxproj` and its imported `.props`/`.targets` | [Declared references](../../../../Docs/Architecture/Repository_Module_Map.md#declared-project-references) and [profiles](../../../../Docs/Architecture/Repository_Module_Map.md#build-profiles-and-imports) | Compare conditions and link/tool metadata; boundary checks |
+| Follow a Public interface or test/qualification privilege | Consumer include paths and the owning project | [Consumption and access](../../../../Docs/Architecture/Repository_Module_Map.md#public-consumption-and-privileged-access); [module catalog](../../../../Docs/Architecture/Module_Catalog.md) | Boundary checks; owning tests listed by the selected card |
+
+```text
+Anchors:
+  - GraphicsGadgetLab.sln
+ReviewPaths:
+  - Projects/**/*.vcxproj
+  - Projects/**/*.targets
+  - PropertySheets/*.props
+  - PropertySheets/*.targets
+  - Docs/Architecture/Repository_Module_Map.md
+  - AGENTS.md
+```
+
 ## Frame settlement
 Atlas ID: atlas.routes.frame-settlement
 

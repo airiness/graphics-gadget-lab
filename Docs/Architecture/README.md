@@ -56,18 +56,14 @@ flowchart TD
 
 ## Projects
 
-| Project | Responsibility |
-| --- | --- |
-| `WinApp` | Windows startup, platform hosts, concrete Labs and DevTools |
-| `GGLabAppRuntime` | Host-neutral lifecycle, frame orchestration, content hosting, capture and parameter coordination |
-| `GGLabRuntime` | Scene and graphics, RenderHost/Renderer, pipelines, RenderGraph, RHI and the native backends |
-| `GGLabRuntimeTests` | Runtime rendering-contract tests |
-| `GGLabAppRuntimeTests` | AppRuntime lifecycle and GPU fault-lifecycle tests |
+The [repository map](Repository_Module_Map.md) lists all sixteen first-party
+projects, their source owners, declared references and include visibility.
 
 ## Coverage and related guidance
 
-These pages cover the frame path (execution, settlement, GPU-dependent retirement
-and the teardown rules it relies on), render pass composition and Lab lifetime.
+These pages cover project ownership and declared build dependencies, the frame
+path (execution, settlement, GPU-dependent retirement and teardown), render pass
+composition and Lab lifetime.
 
 When making a change, follow [AGENTS.md](../../AGENTS.md), the `Contracts` sections
 of the maps and the owning tests linked from each module card. GPU capture and visual verification use the
