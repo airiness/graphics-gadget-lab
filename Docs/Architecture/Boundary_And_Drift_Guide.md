@@ -2,7 +2,7 @@
 Atlas ID: atlas.maintenance.boundaries-freshness
 
 - Question: what does a checked map establish, and when must it be refreshed?
-- VerifiedAgainst: `c5fc8eec360cab77227714865d2d39e7d316fbb2`
+- VerifiedAgainst: `3be3b56bdb224432ef650465310712194368e397`
 - Refresh triggers: represented boundaries, evidence semantics, refresh ownership
   or the local verification workflow changes.
 
