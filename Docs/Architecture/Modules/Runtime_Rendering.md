@@ -6,8 +6,7 @@
 - Refresh triggers: a card's source owner, Public interface, lifetime, linked
   contract or owning tests change.
 
-Each card has one home here; the [module catalog](../Module_Catalog.md) lists all
-cards. Contracts stay in their maps, and cards link to them.
+The [module catalog](../Module_Catalog.md) lists all cards.
 
 ## Render host and settlement
 Atlas ID: atlas.runtime.render-host

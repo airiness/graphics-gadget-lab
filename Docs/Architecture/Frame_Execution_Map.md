@@ -144,8 +144,7 @@ These are the implementation's baseline orders, also stated in comments inside
 `Renderer::SettleFrame`; change the table and those comments together. One
 placement has a recorded reason: on the abort path, capture releases its
 unsubmitted taps last, after the RHI abort has recorded the frame's resource uses.
-The two orders have not been shown to be interchangeable, so moving a participant
-or unifying them needs a review of its ownership and fence dependencies.
+Review ownership and fence dependencies before changing or unifying participant order.
 
 Plain CPU deferred commits run only for Submitted: once each, in enqueue order,
 after every participant. Every other outcome discards them, and so does
