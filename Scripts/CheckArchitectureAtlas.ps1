@@ -114,11 +114,9 @@ function Read-AtlasChanges {
 
 function Get-AtlasImpactReasons {
     param($Entry, [object[]]$Changes)
+    # The containing file is not implicit; honor any dependency declared on it.
     $patterns = @($Entry.Anchors | ForEach-Object { ($_ -split '::', 2)[0] }) + @($Entry.ReviewPaths)
-    $ownFile = $Entry.File.Replace('\', '/')
     foreach ($change in $Changes) {
-        # Editing an entry's own text is its refresh, not an impact on the entry.
-        if ($change.Path.Replace('\', '/') -ieq $ownFile) { continue }
         foreach ($pattern in $patterns) {
             if (Test-AtlasPathMatch $change.Path $pattern) {
                 "$($change.Origin) $($change.Kind): $($change.Path) matches $pattern"
@@ -174,7 +172,12 @@ function Invoke-AtlasSelfTests {
     $globEntry = [pscustomobject]@{ File = 'Docs/Map.md'; Anchors = @(); ReviewPaths = @('Docs/*.md') }
     $checks.Add((@(Get-AtlasImpactReasons $globEntry @(
         [pscustomobject]@{ Path = 'Docs/Map.md'; Kind = 'M'; Origin = 'Staged' },
-        [pscustomobject]@{ Path = 'Docs/Other.md'; Kind = 'M'; Origin = 'Staged' })).Count -eq 1))
+        [pscustomobject]@{ Path = 'Docs/Other.md'; Kind = 'M'; Origin = 'Staged' })).Count -eq 2))
+    $sameFileChange = @([pscustomobject]@{ Path = 'Docs/Map.md'; Kind = 'M'; Origin = 'Unstaged' })
+    $reviewEntry = [pscustomobject]@{ File = 'Docs/Map.md'; Anchors = @(); ReviewPaths = @('Docs/Map.md') }
+    $checks.Add((@(Get-AtlasImpactReasons $reviewEntry $sameFileChange).Count -eq 1))
+    $anchorEntry = [pscustomobject]@{ File = 'Docs/Map.md'; Anchors = @('Docs/Map.md::Contract'); ReviewPaths = @() }
+    $checks.Add((@(Get-AtlasImpactReasons $anchorEntry $sameFileChange).Count -eq 1))
     $checks.Add(((Get-AtlasAnchorIssue $false '' 'Owner::Run') -eq 'MissingAnchorFile'))
     $checks.Add(($null -eq (Get-AtlasAnchorIssue $true 'void Run() {}' 'Owner::Run')))
     $checks.Add(((Get-AtlasAnchorIssue $true 'class Owner {};' 'Owner::Run') -eq 'MissingSymbolText'))
