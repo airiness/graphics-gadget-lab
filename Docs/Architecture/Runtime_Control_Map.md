@@ -3,7 +3,7 @@ Atlas ID: atlas.application.runtime-control
 
 - Question: who writes Host view overrides, how is the display view resolved, and
   which existing evidence ties a captured frame to that state?
-- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
+- VerifiedAgainst: `fcd07a489f59f0800b594b03dbcdbd58a91b1734`
 - Refresh triggers: Host parameter bindings or writers, tooling snapshot inputs,
   content continuation, display-view precedence, capture issue order, provenance
   or owning regression targets change.
@@ -198,6 +198,12 @@ and its [serializer](../../Sources/GGLabAppRuntime/Capture/FrameCaptureMetadata.
 `status.frame` reports the stamp, values, sources and outcome; capture sidecars do
 not record them.
 
+`Application::HandleControlRequest` calls
+[CheckApplicationControlRunIdentity](../../Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp)
+before any handle lookup or admission. A request whose optional `expectedRunIdentity`
+names another run is rejected, so a reused session name cannot reach the new
+process's job or batch IDs.
+
 After issue, `OnFrameBuilt` checks parameter effects against the built display view,
 `SetFrameSceneInputs` adds exposure and lighting inputs, and only a successful
 `EndFrame` lets `OnFrameSubmitted` record consumption. Full
@@ -220,7 +226,7 @@ serials. Directory pairing keys include the capture label.
 | `GGLabAppRuntimeTests`: [ParameterTransactionSelfTests.cpp](../../Tests/GGLabAppRuntime/ParameterTransactionSelfTests.cpp) | Batches, receipts, inherited parameters, `RunHostViewProjectionTests` and `RunHostViewAttributionTests` |
 | `GGLabAppRuntimeTests`: [GpuFaultLifecycleSelfTests.cpp](../../Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp) | Effective settings, Host view control state, content binding, rebuild, parameter-frame and sequence-event scenarios |
 | `GGLabAppRuntimeTests`: [FrameCaptureCoordinatorSelfTests.cpp](../../Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp) | Capture admission, readiness/settling, retries, SameFrame provenance and cancellation |
-| `WinAppTests`: [ApplicationControlSelfTests.cpp](../../Tests/WinApp/ApplicationControlSelfTests.cpp), [ApplicationLifecycleSelfTests.cpp](../../Tests/WinApp/ApplicationLifecycleSelfTests.cpp), [DevToolsViewProfileSelfTests.cpp](../../Tests/WinApp/DevToolsViewProfileSelfTests.cpp) | Wire parsing, status control state, host lifecycle and DevTools view-profile overrides |
+| `WinAppTests`: [ApplicationControlSelfTests.cpp](../../Tests/WinApp/ApplicationControlSelfTests.cpp), [ApplicationLifecycleSelfTests.cpp](../../Tests/WinApp/ApplicationLifecycleSelfTests.cpp), [DevToolsViewProfileSelfTests.cpp](../../Tests/WinApp/DevToolsViewProfileSelfTests.cpp) | Wire parsing, run checks, status control state, host lifecycle and DevTools view-profile overrides |
 | `GGLabRuntimeTests`: [RenderingContractSelfTests.cpp](../../Tests/GGLabRuntime/RenderingContractSelfTests.cpp) | `RunViewSettingsPatchTests` and temporal history/reference contracts |
 | [TestCompareCaptures.ps1](../../Tests/Verification/TestCompareCaptures.ps1), suite `capture-comparison` | Capture comparison and its input checks |
 | [Capture bundle](../../Scripts/Verification/ValidateCaptureBundles.py), [graph](../../Scripts/Verification/ValidateRenderGraphExports.py) and [parameter-frame](../../Scripts/Verification/ValidateParameterFrames.py) validators | Persisted schemas and provenance |
@@ -238,6 +244,7 @@ Anchors:
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.cpp::ResolveApplicationViewSettings
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp::BuildCaptureTemporalState
   - Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassTemporalAA.h
+  - Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp::CheckApplicationControlRunIdentity
   - Scripts/Verification/CompareCaptures.ps1
 ReviewPaths:
   - Sources/GGLabAppRuntime/Parameters/*
@@ -249,6 +256,7 @@ ReviewPaths:
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h
   - Sources/GGLabRuntime/Private/Diagnostics/Builders/RenderGraphSnapshotJson.cpp
   - Sources/WinAppHost/Application/Control/ApplicationControlParameters.cpp
+  - Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp
   - Sources/WinAppHost/DevTools/DevToolsRuntime.*
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
   - Projects/WinAppHost/WinAppHost.vcxproj

@@ -2,7 +2,7 @@
 Atlas ID: atlas.overview.layers
 
 - Question: where does a frame belong, and where should a change start?
-- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
+- VerifiedAgainst: `fcd07a489f59f0800b594b03dbcdbd58a91b1734`
 - Refresh triggers: project ownership, service composition, public interfaces, or
   frame execution and teardown responsibilities change.
 
