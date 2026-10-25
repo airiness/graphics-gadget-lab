@@ -34,7 +34,7 @@ ReviewPaths:
 Atlas ID: atlas.routes.frame-settlement
 
 - Question: where should a frame-settlement investigation or change begin?
-- VerifiedAgainst: `62772447328f54aa8d2814f3489a939173ec2a27`
+- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
 - Refresh triggers: public interfaces, settlement ownership, caller feedback,
   retention rules or owning verification change.
 
@@ -99,7 +99,7 @@ Atlas ID: atlas.routes.lab-lifetime
 
 - Question: where should work on a Lab switch, a Lab parameter or the GPU state a Lab
   owns begin?
-- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
 - Refresh triggers: transition requests, retirement, parameter impacts, session GPU
   ownership, Lab registration or shutdown order change.
 

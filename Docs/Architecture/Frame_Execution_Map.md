@@ -3,7 +3,7 @@ Atlas ID: atlas.runtime.frame-execution
 
 - Question: what happens to recorded GPU work and dependent CPU state when a frame
   does not complete successfully?
-- VerifiedAgainst: `62772447328f54aa8d2814f3489a939173ec2a27`
+- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
 - Refresh triggers: begin/end outcomes, early-return cleanup, participant order,
   submission feedback, borrowing or GPU-dependent retirement changes.
 
@@ -123,7 +123,7 @@ Atlas ID: atlas.application.content-transitions
 
 - Question: what happens to a Demo or Lab session, and to what it owns, when content
   is switched, rebuilt or shut down?
-- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
 - Refresh triggers: transition requests or safe points, preparation, activation,
   retirement, parameter impacts or shutdown order change.
 
@@ -274,7 +274,7 @@ ReviewPaths:
 ### Content retirement
 Atlas ID: atlas.application.content-retirement
 
-- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
 - Refresh triggers: retirement fences, pending-content release, session-owned GPU
   work or failure handling change.
 
