@@ -415,6 +415,7 @@ namespace gglab
 		RGSnapshotBuilder(rg.m_ResourceNodes, rg.m_PassNodes, rg.m_VirtualResources,
 			rg.m_ExecutionPlan.get(), outSnapshot)
 			.Build();
+		outSnapshot.m_ObjectArena = rg.GetObjectArenaStatistics();
 		outSnapshot.m_CompileDiagnostics = rg.GetCompileDiagnostics();
 		outSnapshot.m_ObservationNodes = rg.m_ObservationPasses;
 		for (const auto& [index, target] : rg.m_ObservationPasses)

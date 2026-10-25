@@ -9,6 +9,8 @@
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <format>
 
 #include <imgui.h>
 
@@ -26,6 +28,75 @@ namespace gglab
 			int32_t m_GraphPopupResourceIndex = -1;
 			char m_Filter[128] = {};
 		};
+
+		void DrawObjectArenaTab(const RGSnapshot& snapshot) noexcept
+		{
+			if (!snapshot.m_ObjectArena)
+			{
+				ImGui::TextDisabled("CPU arena statistics are not available for this frame.");
+				return;
+			}
+			const auto& arena = *snapshot.m_ObjectArena;
+			const size_t paddingBytes = arena.m_UsedPayloadBytes -
+				arena.m_ObjectBytes - arena.m_DestructorRecordBytes;
+			const size_t unusedBytes = arena.m_ReservedPayloadBytes - arena.m_UsedPayloadBytes;
+			const size_t blockCount = arena.m_RegularBlockCount + arena.m_DedicatedBlockCount;
+			const double utilization = arena.m_ReservedPayloadBytes > 0 ?
+				static_cast<double>(arena.m_UsedPayloadBytes) / arena.m_ReservedPayloadBytes :
+				0.0;
+
+			ImGui::Spacing();
+			ImGui::TextUnformatted("CPU Object Arena");
+			ImGui::Text("Payload: %.2f / %.2f KiB used", arena.m_UsedPayloadBytes / 1024.0,
+				arena.m_ReservedPayloadBytes / 1024.0);
+			const auto utilizationText = std::format("{:.1f}% of reserved payload", utilization * 100.0);
+			ImGui::ProgressBar(static_cast<float>(utilization), ImVec2(-1.0f, 0.0f),
+				utilizationText.c_str());
+			ImGui::Text("Blocks: %zu regular / %zu dedicated", arena.m_RegularBlockCount,
+				arena.m_DedicatedBlockCount);
+			ImGui::Spacing();
+
+			constexpr auto tableFlags = ImGuiTableFlags_BordersInnerV |
+				ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
+			if (ImGui::BeginTable("ObjectArenaStorage", 3, tableFlags))
+			{
+				ImGui::TableSetupColumn("Storage", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+				ImGui::TableSetupColumn("Bytes", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+				ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+				ImGui::TableHeadersRow();
+				const auto row = [](const char* label, size_t bytes, size_t count, bool showCount)
+					{
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::TextUnformatted(label);
+						ImGui::TableSetColumnIndex(1);
+						ImGui::Text("%.2f KiB (%zu B)", bytes / 1024.0, bytes);
+						ImGui::TableSetColumnIndex(2);
+						if (showCount)
+						{
+							ImGui::Text("%zu", count);
+						}
+						else
+						{
+							ImGui::TextDisabled("-");
+						}
+					};
+				row("Objects", arena.m_ObjectBytes, arena.m_ObjectCount, true);
+				row("Destructor records", arena.m_DestructorRecordBytes,
+					arena.m_DestructorRecordCount, true);
+				row("Alignment padding", paddingBytes, 0, false);
+				row("Unused payload", unusedBytes, 0, false);
+				row("Block headers / layout", arena.m_BlockOverheadBytes, blockCount, true);
+				row("Block storage total", arena.m_ReservedPayloadBytes + arena.m_BlockOverheadBytes,
+					blockCount, true);
+				ImGui::EndTable();
+			}
+			ImGui::Spacing();
+			ImGui::TextWrapped("Sampled when this frame's graph snapshot is captured. "
+				"Includes culled pass payloads; storage lives until graph destruction.");
+			ImGui::TextWrapped("Counts CPU arena blocks only. Object-owned heap allocations, "
+				"other graph containers and GPU memory are outside this accounting.");
+		}
 
 		static std::string UsageBitsText(uint64_t bits, RGResourceType resourceType) noexcept
 		{
@@ -1169,6 +1240,12 @@ namespace gglab
 			if (ImGui::BeginTabItem("Graph"))
 			{
 				DrawGraphTab(snapshot, state);
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("CPU Arena"))
+			{
+				DrawObjectArenaTab(snapshot);
 				ImGui::EndTabItem();
 			}
 

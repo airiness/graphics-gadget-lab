@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObjectArena.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourceTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
@@ -164,6 +165,9 @@ namespace gglab
 
 	struct RGSnapshot
 	{
+		// Value copy at snapshot capture; absent when there is no graph. Live CPU
+		// diagnostics only, excluded from the versioned graph export.
+		std::optional<RGObjectArena::Statistics> m_ObjectArena;
 		std::vector<RGSnapshotPassInfo> m_Passes;
 		std::vector<RGSnapshotResourceInfo> m_Resources;
 		std::vector<RGSnapshotResourceNodeInfo> m_ResourceNodes;
