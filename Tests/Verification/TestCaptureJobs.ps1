@@ -170,10 +170,13 @@ try {
                     $sequenceFinal.sequence.pendingCaptureJobs -eq 0 -and $sequenceFinal.sequence.completedCaptures -eq 181 -and
                     $sequenceFinal.capture.reservedReceipts -eq 127 -and $sequenceFinal.capture.activeJobs -eq 0 -and
                     $null -eq $sequenceFinal.capture.PSObject.Properties['legacyRetainedResults']) "$backend-long-sequence-reuses-one-receipt-without-consuming-foreign-results"
-                $manifests = @(Get-ChildItem -LiteralPath $sequenceDirectory -Filter '*.capture-bundle.json')
-                $paired = @($manifests | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } |
-                    Where-Object { $_.products.Count -eq 3 })
-                Check ($manifests.Count -eq 180 -and $paired.Count -eq 1 -and
+                $bundles = @(Get-ChildItem -LiteralPath $sequenceDirectory -Filter '*.capture-bundle.json' |
+                    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json })
+                # Per-frame job manifests carry a job identity; the sequence's parameter range artifact does not.
+                $manifests = @($bundles | Where-Object { $null -ne $_.PSObject.Properties['jobId'] })
+                $ranges = @($bundles | Where-Object { $null -eq $_.PSObject.Properties['jobId'] })
+                $paired = @($manifests | Where-Object { $_.products.Count -eq 3 })
+                Check ($manifests.Count -eq 180 -and $ranges.Count -eq 1 -and $paired.Count -eq 1 -and
                     $paired[0].provenance.sequence.frame -eq 179) "$backend-sequence-publishes-manifest-per-frame-and-required-resource-graph"
                 $replacement = Submit-Waiting
                 Check ($last.consumed -and $replacement.ok -and
